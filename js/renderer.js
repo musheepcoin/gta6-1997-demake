@@ -402,7 +402,7 @@ class RetroRenderer {
                             d[p + 3] = 255;
                         }
 
-                        if (!isVehicle && !isPed) continue;
+                        if (!isPed) continue;
 
                         const nx = ((lx + 0.5) / sw) * 2.0 - 1.0;
                         const r = d[p];
@@ -416,61 +416,25 @@ class RetroRenderer {
                             ext[idx - sw] === 1 ||
                             ext[idx + sw] === 1;
 
-                        if (isPed) {
-                            if (isPerimeter) {
-                                // Crisp GTA 2 1px dark character silhouette outline so pedestrians pop against bright sidewalks & asphalt!
-                                d[p] = (r * 0.73) | 0;
-                                d[p + 1] = (g * 0.73) | 0;
-                                d[p + 2] = (b * 0.77) | 0;
-                            } else {
-                                // GTA 2 3ds Max Spherical Head & Cylindrical Shoulder Volume Shading!
-                                const radialDist = Math.hypot(nx * 0.90, (ny + 0.06) * 1.02);
-                                const dome = Math.max(0.0, 1.0 - radialDist * 1.12);
-                                const shadeMult = 0.88 + 0.24 * dome;
-                                const crownHighlight = (dome * dome) * 14.0;
-                                // Subtle 14% color vibrance boost on GTA 2 pedestrian outfits
-                                const avg = (r + g + b) * 0.3333;
-                                const vr = avg + (r - avg) * 1.14;
-                                const vg = avg + (g - avg) * 1.14;
-                                const vb = avg + (b - avg) * 1.14;
-                                d[p] = Math.min(255, Math.max(0, Math.round(vr * shadeMult + crownHighlight)));
-                                d[p + 1] = Math.min(255, Math.max(0, Math.round(vg * shadeMult + crownHighlight)));
-                                d[p + 2] = Math.min(255, Math.max(0, Math.round(vb * shadeMult + crownHighlight)));
-                            }
-                            continue;
-                        }
-
-                        const maxC = Math.max(r, g, b);
-                        const minC = Math.min(r, g, b);
-                        const sat = maxC - minC;
-                        const lum = r * 0.299 + g * 0.587 + b * 0.114;
-
                         if (isPerimeter) {
-                            // Crisp GTA 2 dark metallic chassis outline
-                            d[p] = (r * 0.72) | 0;
-                            d[p + 1] = (g * 0.72) | 0;
-                            d[p + 2] = (b * 0.76) | 0;
-                        } else if (Math.abs(nx) < 0.62 && ny > -0.56 && ny < 0.48 && sat < 24 && lum >= 12 && lum <= 84) {
-                            // GTA 2 Glossy Sapphire-Tinted Windshield & Rear Window with diagonal sky reflection!
-                            const diagBand = (lx * 0.85 + ly * 0.55) % 8.5;
-                            const skyGlint = diagBand < 1.8 ? 1.0 : (diagBand < 3.1 ? 0.45 : 0.0);
-                            const baseGlassR = Math.round(r * 0.55 + 18);
-                            const baseGlassG = Math.round(g * 0.65 + 38);
-                            const baseGlassB = Math.round(b * 0.72 + 68);
-                            d[p] = Math.min(255, Math.round(baseGlassR + skyGlint * 58));
-                            d[p + 1] = Math.min(255, Math.round(baseGlassG + skyGlint * 92));
-                            d[p + 2] = Math.min(255, Math.round(baseGlassB + skyGlint * 118));
-                        } else if (sat >= 20 || lum > 85) {
-                            // GTA 2 3ds Max Curved Metallic Bodywork Dome & Contoured Side Fenders!
-                            // Cylindrical crown peaks slightly left-of-center (nx = -0.10) for 3D top-down light volume
-                            const crownDist = Math.abs(nx + 0.08);
-                            const domeCurve = Math.cos(Math.min(1.45, Math.abs(nx) * 1.38)); // 1.0 at center -> 0.18 at door edge
-                            const clearcoatSpec = Math.max(0.0, 1.0 - crownDist * 2.4) * (1.0 - 0.35 * ny * ny);
-                            const shadeMult = 0.86 + 0.22 * domeCurve;
-                            const specAdd = clearcoatSpec * 26.0;
-                            d[p] = Math.min(255, Math.max(0, Math.round(r * shadeMult + specAdd)));
-                            d[p + 1] = Math.min(255, Math.max(0, Math.round(g * shadeMult + specAdd)));
-                            d[p + 2] = Math.min(255, Math.max(0, Math.round(b * shadeMult + specAdd)));
+                            // Crisp GTA 2 1px dark character silhouette outline so pedestrians pop against bright sidewalks & asphalt!
+                            d[p] = (r * 0.73) | 0;
+                            d[p + 1] = (g * 0.73) | 0;
+                            d[p + 2] = (b * 0.77) | 0;
+                        } else {
+                            // GTA 2 3ds Max Spherical Head & Cylindrical Shoulder Volume Shading!
+                            const radialDist = Math.hypot(nx * 0.90, (ny + 0.06) * 1.02);
+                            const dome = Math.max(0.0, 1.0 - radialDist * 1.12);
+                            const shadeMult = 0.88 + 0.24 * dome;
+                            const crownHighlight = (dome * dome) * 14.0;
+                            // Subtle 14% color vibrance boost on GTA 2 pedestrian outfits
+                            const avg = (r + g + b) * 0.3333;
+                            const vr = avg + (r - avg) * 1.14;
+                            const vg = avg + (g - avg) * 1.14;
+                            const vb = avg + (b - avg) * 1.14;
+                            d[p] = Math.min(255, Math.max(0, Math.round(vr * shadeMult + crownHighlight)));
+                            d[p + 1] = Math.min(255, Math.max(0, Math.round(vg * shadeMult + crownHighlight)));
+                            d[p + 2] = Math.min(255, Math.max(0, Math.round(vb * shadeMult + crownHighlight)));
                         }
                     }
                 }
@@ -616,9 +580,9 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_81";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_81";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_81";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_98";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_98";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_98";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
