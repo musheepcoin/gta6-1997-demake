@@ -50,6 +50,7 @@ class LeonidaGame {
             },
             shootCooldown: 0,
             muzzleTimer: 0,
+            weaponDrawnTimer: 0,
             walkPhase: 0,
             isMoving: false,
             tankControls: false,
@@ -74,6 +75,7 @@ class LeonidaGame {
             combatAnimTimer: 0,
             shootCooldown: 0,
             muzzleTimer: 0,
+            weaponDrawnTimer: 0,
             walkPhase: 0,
             isMoving: false
         };
@@ -737,6 +739,9 @@ class LeonidaGame {
                 const idx = parseInt(key, 10) - 1;
                 if (this.player.weaponsOwned[idx]) {
                     this.player.weapon = this.player.weaponsOwned[idx];
+                    this.player.weaponDrawnTimer = 0;
+                    const wSpec = WEAPON_SPECS[this.player.weapon] || { name: this.player.weapon };
+                    this.addFloatingText(this.player.x, this.player.y - 26, this.player.weapon === "FIST" ? "👊 FIST" : `🔫 ${wSpec.name}`, "#ffd13b");
                     this.audio.playBeep(660, 0.04, "square", 0.05);
                     this.updateHud();
                 }
@@ -1074,6 +1079,9 @@ class LeonidaGame {
         const idx = list.indexOf(this.player.weapon);
         const nextIdx = (idx + dir + list.length) % list.length;
         this.player.weapon = list[nextIdx];
+        this.player.weaponDrawnTimer = 0;
+        const wSpec = WEAPON_SPECS[this.player.weapon] || { name: this.player.weapon };
+        this.addFloatingText(this.player.x, this.player.y - 26, this.player.weapon === "FIST" ? "👊 FIST" : `🔫 ${wSpec.name}`, "#ffd13b");
         this.audio.playBeep(620, 0.04, "square", 0.04);
         this.updateHud();
     }
@@ -2239,6 +2247,7 @@ class LeonidaGame {
         // 1. Player On-Foot or In-Vehicle Update
         if (!p.dead) {
             if (p.muzzleTimer > 0) p.muzzleTimer -= dt;
+            if (p.weaponDrawnTimer > 0) p.weaponDrawnTimer = Math.max(0, p.weaponDrawnTimer - dt);
             if (p.enterAnimTimer > 0) p.enterAnimTimer = Math.max(0, p.enterAnimTimer - dt);
             if (p.exitAnimTimer > 0) p.exitAnimTimer = Math.max(0, p.exitAnimTimer - dt);
             if (p.punchTimer > 0) p.punchTimer = Math.max(0, p.punchTimer - dt);
@@ -2447,6 +2456,7 @@ class LeonidaGame {
                     p.shootCooldown = isTank ? 0.85 : spec.fireRate;
                     p.muzzleTimer = 0.08;
                     if (!spec.isMelee) {
+                        p.weaponDrawnTimer = 0.45;
                         p.playerCombatTimer = 3.5;
                     }
                     this.fireWeapon(p.x, p.y, shotAngle, activeWep, true, false);

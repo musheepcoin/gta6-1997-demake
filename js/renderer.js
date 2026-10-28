@@ -283,23 +283,23 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_77";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_77";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_77";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_78";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_78";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_78";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_77";
+        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_78";
 
         this.viceOverviewImg.onload = () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_77";
+        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_78";
 
-        fetch("assets/gta1/gta1_meta.json?v=97_77")
+        fetch("assets/gta1/gta1_meta.json?v=97_78")
             .then((res) => res.json())
             .then((meta) => {
                 this.gta1Meta = meta;
@@ -307,7 +307,7 @@ class RetroRenderer {
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetch("assets/gta1/gta1_map.bin?v=97_77")
+        fetch("assets/gta1/gta1_map.bin?v=97_78")
             .then((res) => res.arrayBuffer())
             .then((buf) => {
                 mapBinBuffer = buf;
@@ -1183,7 +1183,8 @@ class RetroRenderer {
                 frameIdx = this.getPedFrameIndex("FIST", true, false, walkPhase);
             } else if (ped.kind === "COP") {
                 const walkPhase = this.time * 1.8 + ped.animSeed;
-                frameIdx = this.getPedFrameIndex("PISTOL", true, true, walkPhase);
+                const copWeapon = (game.wantedLevel || 0) > 0 ? "PISTOL" : "FIST";
+                frameIdx = this.getPedFrameIndex(copWeapon, ped.speed > 0, (game.wantedLevel || 0) > 0, walkPhase);
             } else if (ped.kind === "HOSTILE") {
                 const walkPhase = this.time * 2.2 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex("FIST", true, true, walkPhase);
@@ -1247,8 +1248,15 @@ class RetroRenderer {
                     ? (181 + Math.min(7, Math.floor(prog * 8)))
                     : (50 + Math.min(5, Math.floor(prog * 6)));
             } else {
+                // Only draw weapon on Lucia's sprite while actively firing or briefly after firing; otherwise keep holstered ("FIST")!
+                const isAimingOrFiring = Boolean(
+                    p.weapon &&
+                    p.weapon !== "FIST" &&
+                    (game.input.shoot || (p.weaponDrawnTimer || 0) > 0 || (p.muzzleTimer || 0) > 0)
+                );
+                const visualWeapon = isAimingOrFiring ? p.weapon : "FIST";
                 frameIdx = this.getPedFrameIndex(
-                    p.weapon,
+                    visualWeapon,
                     Boolean(p.isMoving || jumpZ > 0.02),
                     Boolean(game.input.sprint || jumpZ > 0.02),
                     p.walkPhase || 0
@@ -1830,7 +1838,7 @@ class RetroRenderer {
 
         const p = game.player;
         const lFrame = this.getPedFrameIndex(
-            p.weapon,
+            "FIST",
             Boolean(p.isMoving),
             Boolean(game.input.sprint),
             p.walkPhase || 0
