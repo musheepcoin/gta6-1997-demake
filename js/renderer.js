@@ -136,14 +136,38 @@ class RetroRenderer {
             varying vec3 vWorldPos;
             uniform sampler2D uTex;
             uniform sampler2D uDayLightTex;
+            uniform highp float uWaterStep;
             uniform float uNightTint;
             uniform float uSunsetTint;
             uniform float uViceStyle;
             uniform float uTime;
             uniform vec2 uSunDir;
+
+            vec4 sampleOceanWater(float dayAmt) {
+                float idx = 698.0 + 25.0 + uWaterStep;
+                float col = mod(idx, 16.0);
+                float row = floor(idx / 16.0);
+                vec2 localUV = clamp(fract(vWorldPos.xz), vec2(0.5 / 64.0), vec2(63.5 / 64.0));
+                vec2 wUV = (vec2(col, row) + localUV) / vec2(16.0, 51.0);
+                vec3 texW = texture2D(uTex, wUV).rgb;
+                float swell = sin(vWorldPos.x * 1.35 + vWorldPos.z * 0.95 + uTime * 1.4) * 0.5
+                            + cos(vWorldPos.x * 2.70 - vWorldPos.z * 2.15 - uTime * 1.9) * 0.5;
+                float w1 = sin(vWorldPos.x * 5.4 + uTime * 2.3 + swell * 0.8) * cos(vWorldPos.z * 5.4 - uTime * 1.8);
+                float w2 = sin((vWorldPos.x + vWorldPos.z) * 3.9 - uTime * 2.7);
+                float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
+                vec3 lagunaBase = mix(vec3(0.11, 0.57, 0.69), vec3(0.24, 0.76, 0.84), clamp(0.5 + swell * 0.38, 0.0, 1.0));
+                vec3 rgb = mix(texW, lagunaBase, 0.72);
+                vec3 crestFoam = vec3(0.88, 0.97, 0.99);
+                rgb = mix(rgb, crestFoam, caust * 0.18 * (1.0 - uNightTint * 0.65));
+                float sunGlint = pow(caust, 3.0) * dayAmt;
+                rgb = min(vec3(1.0), rgb + vec3(0.36, 0.34, 0.24) * sunGlint);
+                return vec4(rgb, 0.78);
+            }
+
             void main() {
                 vec4 c = texture2D(uTex, vUV);
-                if (c.a < 0.1) discard;
+                bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
+                if (c.a < 0.03 && !isShoreTile) discard;
 
                 float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
 
@@ -156,19 +180,12 @@ class RetroRenderer {
                     vec3 submergedSand = c.rgb * vec3(0.45, 0.78, 0.86) + vec3(0.28, 0.34, 0.22) * caust * (1.0 - uNightTint * 0.7);
                     c.rgb = submergedSand;
                 } else if (vAnim > 0.5 && vAnim < 1.5) {
-                    // Translucent animated turquoise water surface (alpha = 0.78) revealing the 3D sunken seabed with parallax + daytime sun sparkles!
-                    float w1 = sin(vUV.x * 220.0 + uTime * 2.3) * cos(vUV.y * 220.0 - uTime * 1.8);
-                    float w2 = sin((vUV.x + vUV.y) * 160.0 - uTime * 2.7);
-                    float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
-                    vec3 crestFoam = vec3(0.88, 0.96, 0.98);
-                    c.rgb = mix(c.rgb, crestFoam, caust * 0.15 * (1.0 - uNightTint * 0.65));
-                    float sunGlint = pow(caust, 3.0) * dayAmt;
-                    c.rgb = min(vec3(1.0), c.rgb + vec3(0.36, 0.34, 0.24) * sunGlint);
-                    c.a = 0.78;
-                } else if (vAnim > -0.5 && vAnim < 0.5) {
-                    if (vWorldPos.y < 2.2) {
+                    c = sampleOceanWater(dayAmt);
+                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile) {
+                    float isSand = 0.0;
+                    if (vWorldPos.y < 2.2 && c.a > 0.02) {
                         // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
-                        float isSand = clamp((c.r - c.b - 0.18) * 7.5, 0.0, 1.0) * step(0.72, c.r);
+                        isSand = clamp((c.r - c.b - 0.14) * 6.5, 0.0, 1.0) * smoothstep(0.54, 0.76, c.r);
                         float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
                         if (isSand > 0.01) {
                             float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
@@ -176,10 +193,10 @@ class RetroRenderer {
                             float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
                             float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
                             float duneWave = (r1 * 0.52 + r2 * 0.33 + r3 * 0.15) * isSand;
-                            vec3 sandCrest = vec3(1.0, 0.94, 0.78);
-                            vec3 sandTrough = vec3(0.84, 0.69, 0.45);
+                            vec3 sandCrest = vec3(0.99, 0.91, 0.71);
+                            vec3 sandTrough = vec3(0.91, 0.78, 0.55);
                             vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
-                            c.rgb = mix(c.rgb, targetSand, isSand * 0.36);
+                            c.rgb = mix(c.rgb, targetSand, isSand * 0.48);
                         } else if (isGrass > 0.01) {
                             float gWarp = sin(vWorldPos.z * 1.61 - vWorldPos.x * 0.97) * 0.75;
                             float g1 = sin(vWorldPos.x * 5.17 + vWorldPos.z * 3.43 + gWarp);
@@ -194,21 +211,29 @@ class RetroRenderer {
                     }
 
                     // Daytime 3D Building Cast Shadows, Building-Foot Ambient Occlusion & Warm Florida Sunlight vs. Cool Sky Shade
-                    if (dayAmt > 0.01) {
+                    if (dayAmt > 0.01 && c.a > 0.02) {
                         vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 256.0);
                         float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
-                        float bldAO = lm.g * onGround;
+                        float sandMask = clamp(isSand + step(0.82, min(c.r, min(c.g, c.b))), 0.0, 1.0);
+                        float bldAO = lm.g * onGround * (1.0 - sandMask * 0.88);
                         float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
-                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround;
+                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.88);
                         float totalShade = clamp(max(bldShadow * 0.94, bldAO * 0.72), 0.0, 1.0);
 
-                        vec3 sunlitTint = vec3(1.13, 1.06, 0.92);
-                        vec3 shadowTint = vec3(0.56, 0.65, 0.84);
+                        vec3 sunlitTint = mix(vec3(1.13, 1.06, 0.92), vec3(1.03, 1.01, 0.97), sandMask);
+                        vec3 shadowTint = mix(vec3(0.56, 0.65, 0.84), vec3(0.92, 0.88, 0.80), sandMask);
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
                         float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.035, 0.0, 0.10);
-                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade)) + 0.5, 0.0, 1.0);
+                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
                         sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
                         c.rgb = mix(c.rgb, sunlitRgb, dayAmt);
+                    }
+
+                    // For shoreline tiles (lid 99..101), composite the beach sand & white surf directly over the animated ocean water on the SAME quad!
+                    if (isShoreTile && c.a < 0.999) {
+                        vec4 waterCol = sampleOceanWater(dayAmt);
+                        c.rgb = mix(waterCol.rgb, c.rgb, c.a);
+                        c.a = mix(waterCol.a, 1.0, c.a);
                     }
                 }
 
@@ -617,6 +642,167 @@ class RetroRenderer {
         }
     }
 
+    processViceTilesRtx(img) {
+        try {
+            const w = img.width || 1024;
+            const h = img.height || 3264;
+            const cvs = document.createElement("canvas");
+            cvs.width = w;
+            cvs.height = h;
+            const ctx = cvs.getContext("2d", { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const d = imgData.data;
+
+            // 1. Make animated ocean water & seabed tiles (lid 41 at 431/585, lid 98 at 488, & aux 25..35 at 723..733) 100% seamlessly tileable across 64x64 borders
+            const waterIndices = [431, 488, 585, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733];
+            const tileBuf = new Uint8ClampedArray(64 * 64 * 4);
+            for (const idx of waterIndices) {
+                const col = idx % 16;
+                const row = Math.floor(idx / 16);
+                const x0 = col * 64;
+                const y0 = row * 64;
+                if (y0 + 64 > h) continue;
+
+                for (let ty = 0; ty < 64; ty++) {
+                    for (let tx = 0; tx < 64; tx++) {
+                        const sp = ((y0 + ty) * w + (x0 + tx)) * 4;
+                        const dp = (ty * 64 + tx) * 4;
+                        tileBuf[dp]     = d[sp];
+                        tileBuf[dp + 1] = d[sp + 1];
+                        tileBuf[dp + 2] = d[sp + 2];
+                        tileBuf[dp + 3] = d[sp + 3];
+                    }
+                }
+
+                // Toroidal edge cross-fade over 14-pixel border band so adjacent 64x64 water tiles have zero seam
+                const BAND = 14;
+                for (let ty = 0; ty < 64; ty++) {
+                    for (let tx = 0; tx < BAND; tx++) {
+                        const t = (BAND - tx) / (BAND * 2.0);
+                        const pL = (ty * 64 + tx) * 4;
+                        const pR = (ty * 64 + (63 - tx)) * 4;
+                        for (let c = 0; c < 3; c++) {
+                            const vL = tileBuf[pL + c];
+                            const vR = tileBuf[pR + c];
+                            tileBuf[pL + c] = Math.round(vL * (1.0 - t) + vR * t);
+                            tileBuf[pR + c] = Math.round(vR * (1.0 - t) + vL * t);
+                        }
+                    }
+                }
+                for (let tx = 0; tx < 64; tx++) {
+                    for (let ty = 0; ty < BAND; ty++) {
+                        const t = (BAND - ty) / (BAND * 2.0);
+                        const pT = (ty * 64 + tx) * 4;
+                        const pB = ((63 - ty) * 64 + tx) * 4;
+                        for (let c = 0; c < 3; c++) {
+                            const vT = tileBuf[pT + c];
+                            const vB = tileBuf[pB + c];
+                            tileBuf[pT + c] = Math.round(vT * (1.0 - t) + vB * t);
+                            tileBuf[pB + c] = Math.round(vB * (1.0 - t) + vT * t);
+                        }
+                    }
+                }
+
+                for (let ty = 0; ty < 64; ty++) {
+                    for (let tx = 0; tx < 64; tx++) {
+                        const sp = (ty * 64 + tx) * 4;
+                        const dp = ((y0 + ty) * w + (x0 + tx)) * 4;
+                        d[dp]     = tileBuf[sp];
+                        d[dp + 1] = tileBuf[sp + 1];
+                        d[dp + 2] = tileBuf[sp + 2];
+                    }
+                }
+            }
+
+            // 2. Beach Shoreline Tiles (lid 99 straight, lid 100 convex corner, lid 101 concave corner):
+            //    Remove all flat solid cyan (#0f94b2) water fill (alpha -> 0) and bridge the 2px gap between wet sand
+            //    and surf foam so the real animated ocean water (lid 41) is in direct contact with the beach!
+            const shoreIndices = [390 + 99, 390 + 100, 390 + 101, 544 + 99, 544 + 100, 544 + 101];
+            const isSandMask = new Uint8Array(64 * 64);
+            for (const idx of shoreIndices) {
+                const col = idx % 16;
+                const row = Math.floor(idx / 16);
+                const x0 = col * 64;
+                const y0 = row * 64;
+                if (y0 + 64 > h) continue;
+
+                for (let ty = 0; ty < 64; ty++) {
+                    for (let tx = 0; tx < 64; tx++) {
+                        const p = ((y0 + ty) * w + (x0 + tx)) * 4;
+                        isSandMask[ty * 64 + tx] = (d[p] > d[p + 2] + 12) ? 1 : 0;
+                    }
+                }
+
+                for (let ty = 0; ty < 64; ty++) {
+                    for (let tx = 0; tx < 64; tx++) {
+                        const p = ((y0 + ty) * w + (x0 + tx)) * 4;
+                        const r = d[p];
+                        const g = d[p + 1];
+                        const b = d[p + 2];
+
+                        if (isSandMask[ty * 64 + tx]) {
+                            // Opaque beach sand: normalize dry sand near tile edges so adjacent sand tiles blend without seams
+                            if (r - b > 65) {
+                                const edgeDist = Math.min(tx, 63 - tx, ty, 63 - ty);
+                                if (edgeDist < 6) {
+                                    const blend = (6 - edgeDist) / 6.0 * 0.65;
+                                    d[p]     = Math.round(r * (1.0 - blend) + 242 * blend);
+                                    d[p + 1] = Math.round(g * (1.0 - blend) + 213 * blend);
+                                    d[p + 2] = Math.round(b * (1.0 - blend) + 156 * blend);
+                                }
+                            }
+                            d[p + 3] = 255;
+                            continue;
+                        }
+
+                        // Find distance to nearest sand pixel (within 3px neighborhood)
+                        let minSandDistSq = 99;
+                        for (let dy = -3; dy <= 3; dy++) {
+                            const ny = ty + dy;
+                            if (ny < 0 || ny >= 64) continue;
+                            for (let dx = -3; dx <= 3; dx++) {
+                                const nx = tx + dx;
+                                if (nx < 0 || nx >= 64) continue;
+                                if (isSandMask[ny * 64 + nx]) {
+                                    const dSq = dx * dx + dy * dy;
+                                    if (dSq < minSandDistSq) minSandDistSq = dSq;
+                                }
+                            }
+                        }
+
+                        if (minSandDistSq <= 2) {
+                            // 1px contact line right against the wet sand: warm wet-sand-to-surf transition (eliminates cyan trench!)
+                            d[p]     = 230;
+                            d[p + 1] = 212;
+                            d[p + 2] = 172;
+                            d[p + 3] = 242;
+                        } else if (minSandDistSq <= 5) {
+                            // 2px contact zone: creamy white surf washing directly onto the wet sand
+                            d[p]     = 244;
+                            d[p + 1] = 248;
+                            d[p + 2] = 242;
+                            d[p + 3] = 210;
+                        } else {
+                            // Seaward surf foam & water zone: pure white surf crest where r > 165, 100% transparent (alpha = 0) across all flat cyan!
+                            const foamStrength = Math.max(0.0, Math.min(1.0, (r - 165.0) / (255.0 - 165.0)));
+                            d[p]     = 246;
+                            d[p + 1] = 253;
+                            d[p + 2] = 255;
+                            d[p + 3] = Math.round(foamStrength * foamStrength * 195.0);
+                        }
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            return cvs;
+        } catch (err) {
+            console.warn("processViceTilesRtx fallback:", err);
+            return img;
+        }
+    }
+
     loadAuthenticGta1Assets() {
         this.loadProgress = 0;
         this.loadTotal = 4;
@@ -639,7 +825,8 @@ class RetroRenderer {
                     }
                 }
                 if (this.gl) {
-                    this.tilesTexVice = this.createGLTexture(this.gta1TilesViceImg, true);
+                    const enhancedViceTiles = this.processViceTilesRtx(this.gta1TilesViceImg);
+                    this.tilesTexVice = this.createGLTexture(enhancedViceTiles, true);
                     this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
                     this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
                     const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
@@ -799,6 +986,15 @@ class RetroRenderer {
         const bedV0 = bedRow / 51.0 + padV;
         const bedV1 = (bedRow + 1.0) / 51.0 - padV;
 
+        // Compute UV bounds for continuous animated ocean water (lid 41) emitted beneath shoreline blocks (lid 99..101)
+        const waterAtlasIdx = (tiles.lid_start || 390) + (41 % (tiles.lid_count || 154));
+        const waterCol = waterAtlasIdx % 16;
+        const waterRow = Math.floor(waterAtlasIdx / 16);
+        const waterU0 = waterCol / 16.0 + padU;
+        const waterU1 = (waterCol + 1.0) / 16.0 - padU;
+        const waterV0 = waterRow / 51.0 + padV;
+        const waterV1 = (waterRow + 1.0) / 51.0 - padV;
+
         for (let cy = 0; cy < NUM_CHUNKS; cy++) {
             for (let cx = 0; cx < NUM_CHUNKS; cx++) {
                 const opaqueVerts = [];
@@ -808,7 +1004,7 @@ class RetroRenderer {
                 const y0 = cy * CHUNK_SIZE;
 
                 // 1. AddRiverbed (world_mesh.cpp lines 1016-1054):
-                // Emit a 3D sunken sandy seabed quad (y_elev - 0.42) under every water cell and its 1-cell shore neighbors (kRiverbedPad = 1)
+                // Emit a 3D sunken sandy seabed quad (y_elev - 0.42) under every water/shoreline cell and its 1-cell shore neighbors (kRiverbedPad = 1)
                 for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
                     for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
                         let waterFloor = null;
@@ -822,7 +1018,7 @@ class RetroRenderer {
                                     const wBlkIdx = this.map.getBlockIndex(nx, ny, wz);
                                     if (wBlkIdx === 0) continue;
                                     const wb = this.map.getBlockInfo(wBlkIdx);
-                                    if (wb && wb.faces[4] === 41) {
+                                    if (wb && (wb.faces[4] === 41 || (wb.faces[4] >= 99 && wb.faces[4] <= 101))) {
                                         waterFloor = wz + 1.0 - RIVERBED_DEPTH;
                                         break;
                                     }
@@ -844,7 +1040,7 @@ class RetroRenderer {
                     }
                 }
 
-                // 2. Emit 3D Voxel Block Faces (routing animated water lids face===4 && tile===41 to flatVerts so they blend translucently over the 3D seabed!)
+                // 2. Emit 3D Voxel Block Faces (routing animated water lids face===4 && tile===41 and shoreline lids 99..101 to flatVerts!)
                 for (let z = 0; z < MAP_LAYERS; z++) {
                     for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
                         for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
@@ -855,9 +1051,10 @@ class RetroRenderer {
 
                             for (let face = 0; face < 5; face++) {
                                 if (b.faces[face] !== 0) {
-                                    const isWaterLid = (face === 4 && b.faces[4] === 41);
-                                    const targetArr = (b.isFlat || isWaterLid) ? flatVerts : opaqueVerts;
-                                    this.putBlockFace(targetArr, x, z, y, face, b);
+                                    const lid = b.faces[4];
+                                    const isWaterOrShoreLid = (face === 4 && (lid === 41 || (lid >= 99 && lid <= 101)));
+                                    const targetArr = (b.isFlat || isWaterOrShoreLid) ? flatVerts : opaqueVerts;
+                                    this.putBlockFace(targetArr, x, z, y, face, b, 0.0);
                                 }
                             }
                         }
@@ -1034,7 +1231,7 @@ class RetroRenderer {
         return Math.min(1.0, Math.max(ao * 0.55, shW * 0.68 + shE * 0.32));
     }
 
-    putBlockFace(verts, x, y_elev, z_south, face, b) {
+    putBlockFace(verts, x, y_elev, z_south, face, b, extraYOffset = 0.0) {
         const tileIdx = b.faces[face];
         if (tileIdx === 0) return;
 
@@ -1235,8 +1432,9 @@ class RetroRenderer {
             let effTileIdx = tileIdx;
             let effRemap = b.remap;
 
-            if (effTileIdx === 41) animType = 1.0;      // Animated water
-            else if (effTileIdx === 22) animType = 2.0; // Animated rooftop fan
+            if (effTileIdx === 41) animType = 1.0;                      // Animated water
+            else if (effTileIdx === 22) animType = 2.0;                 // Animated rooftop fan
+            else if (effTileIdx >= 99 && effTileIdx <= 101) animType = 4.0; // Beach shoreline (composites sand + surf over animated water on single quad)
 
             if (effRemap > 0 && tiles.remap_lids) {
                 const rKey = `${effTileIdx}_${effRemap}`;
@@ -1288,14 +1486,14 @@ class RetroRenderer {
 
         // 5. kFlatFaceOffset (world_mesh.cpp line 18):
         // Nudge flat decal faces slightly along their outward normal to prevent Z-fighting on coincident wall/floor planes!
-        let nOffX = 0.0, nOffY = 0.0, nOffZ = 0.0;
+        let nOffX = 0.0, nOffY = extraYOffset || 0.0, nOffZ = 0.0;
         if (b.isFlat) {
             const kFlatFaceOffset = 0.003;
             if (face === 0) nOffX = -kFlatFaceOffset;
             else if (face === 1) nOffX = kFlatFaceOffset;
             else if (face === 2) nOffZ = -kFlatFaceOffset;
             else if (face === 3) nOffZ = kFlatFaceOffset;
-            else nOffY = kFlatFaceOffset;
+            else nOffY += kFlatFaceOffset;
         }
 
         // Emit 2 triangles for quad: (0, 2, 1) and (1, 2, 3)
