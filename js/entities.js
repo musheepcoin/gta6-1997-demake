@@ -1068,7 +1068,7 @@ class Vehicle {
     tryAdjacentLaneChange(bx, by, curZ, map, game) {
         if (this.aiLaneChangeCooldown > 0 || !this.aiChosenDir || this.aiChosenDir.isTurn) return false;
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
-        if (lidZ1 === 25 || lidZ1 === 24) return false;
+        if (lidZ1 === 25 || lidZ1 === 24 || (map.isStopLineBlock && map.isStopLineBlock(bx, by))) return false;
 
         const dx = this.aiChosenDir.dx || 0;
         const dy = this.aiChosenDir.dy || 0;
@@ -1199,7 +1199,7 @@ class Vehicle {
             this.aiTargetBlockY = by + this.aiChosenDir.dy;
         }
 
-        const isPanicked = this.aiPanicTimer > 0 || this.driver === "AI_EMERGENCY";
+        const isPanicked = this.aiPanicTimer > 0 || Boolean(this.sirenActive);
         let desiredThrottle = isPanicked ? 0.78 : this.aiCruiseFactor;
         this.aiState = isPanicked ? "PANIC" : "CRUISE";
 
@@ -1246,29 +1246,63 @@ class Vehicle {
             }
         }
 
-        // 3. Authentic GTA 1 Entrance Crosswalk Traffic Lights
-        // Stop ONLY before entering an intersection (lidZ1 === 25), and if already past the stop line on the crosswalk, keep going to clear!
+        // 3. Authentic GTA 1 / GTA 2 Entrance Stop-Line Traffic Lights
+        // Works seamlessly with continuous GTA 2 roads (stopLineMask + nextLidZ1 === 25):
+        // - Pre-slows 1 block before a red/amber light,
+        // - Rolls smoothly up to the stop line (distToTargetCenter ~ 56px) on the approach block,
+        // - Holds a strict 0-speed stop behind the intersection boundary until the light turns GREEN!
         const nextLidZ1 = map.getBlockInfo ? map.getBlockInfo(this.aiTargetBlockX, this.aiTargetBlockY, 1).lid : 0;
+        const stepDx = this.aiTargetBlockX - bx;
+        const stepDy = this.aiTargetBlockY - by;
+        const twoAheadLidZ1 = map.getBlockInfo
+            ? map.getBlockInfo(this.aiTargetBlockX + stepDx, this.aiTargetBlockY + stepDy, 1).lid
+            : 0;
         const distToTargetCenter = Math.hypot(tx - this.x, ty - this.y);
-        const isBeforeStopLine = (lidZ1 === 24 && nextLidZ1 === 25 && distToTargetCenter > 50);
+        const isStopBlock = (lidZ1 !== 25 && nextLidZ1 === 25 && distToTargetCenter > 33);
+        const isPreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 === 25);
 
-        const hasSignal = map && typeof map.hasTrafficSignalNear === "function" ? map.hasTrafficSignalNear(this.x, this.y, 340) : true;
-        if (!isPanicked && curBlk && (curBlk.trafficHint === 1 || lidZ1 === 24) && isBeforeStopLine && hasSignal && game) {
-            const isNSLane = Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right;
-            const isEWLane = Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down;
+        const hasSignal = map && typeof map.hasTrafficSignalNear === "function" ? map.hasTrafficSignalNear(this.x, this.y, 380) : true;
+        if (!isPanicked && curBlk && (isStopBlock || isPreStopBlock) && hasSignal && game) {
+            const isNSLane = stepDy !== 0 ? true : (Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right);
+            const isEWLane = stepDx !== 0 ? true : (Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down);
             const nsRed = isNSLane && typeof game.isNSGreen === "function" && !game.isNSGreen();
             const ewRed = isEWLane && typeof game.isEWGreen === "function" && !game.isEWGreen();
             if (nsRed || ewRed) {
-                this.aiState = "STOPPED_LIGHT";
-                desiredThrottle = 0;
-                const brakeMult = Math.pow(0.015, dt);
-                this.vx *= brakeMult;
-                this.vy *= brakeMult;
-                this.speed *= brakeMult;
-                if (Math.abs(this.speed) < 12) {
-                    this.vx = 0;
-                    this.vy = 0;
-                    this.speed = 0;
+                if (isPreStopBlock) {
+                    if (this.speed > 92) {
+                        desiredThrottle = 0;
+                        const preMult = Math.pow(0.18, dt);
+                        this.vx *= preMult;
+                        this.vy *= preMult;
+                        this.speed *= preMult;
+                    } else {
+                        desiredThrottle = Math.min(desiredThrottle, 0.32);
+                    }
+                } else if (isStopBlock) {
+                    this.aiState = "STOPPED_LIGHT";
+                    if (distToTargetCenter > 60) {
+                        const rollSpd = Math.max(0, (distToTargetCenter - 54) * 2.0);
+                        if (this.speed > rollSpd) {
+                            desiredThrottle = 0;
+                            const slowMult = Math.pow(0.04, dt);
+                            this.vx *= slowMult;
+                            this.vy *= slowMult;
+                            this.speed *= slowMult;
+                        } else {
+                            desiredThrottle = 0.16;
+                        }
+                    } else {
+                        desiredThrottle = 0;
+                        const brakeMult = Math.pow(0.002, dt);
+                        this.vx *= brakeMult;
+                        this.vy *= brakeMult;
+                        this.speed *= brakeMult;
+                        if (Math.abs(this.speed) < 28 || distToTargetCenter <= 56) {
+                            this.vx = 0;
+                            this.vy = 0;
+                            this.speed = 0;
+                        }
+                    }
                 }
             }
         }

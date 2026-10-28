@@ -208,8 +208,10 @@ class LeonidaMap {
             }
         }
 
-        // Seamless GTA 2 Road Continuity Pass: replace disruptive barcode crosswalk blocks (lid 24)
-        // with their adjacent continuous lane block (lid 1, 80, or 74) so curbs, yellow edge lines & lane dividers run unbroken to every junction!
+        // Seamless GTA 2 Road Continuity Pass: record original intersection stop-line blocks (lid 24)
+        // in stopLineMask, then replace disruptive barcode crosswalk blocks with their adjacent continuous lane block (lid 1, 80, or 74)
+        // so curbs, yellow edge lines & lane dividers run unbroken to every junction while Traffic AI still knows every stop line!
+        this.stopLineMask = new Uint8Array(MAP_ROWS * MAP_COLS);
         for (let tilez = 0; tilez < MAP_LAYERS; tilez++) {
             const zOff = tilez * MAP_ROWS;
             for (let tiley = 2; tiley < MAP_ROWS - 2; tiley++) {
@@ -218,6 +220,9 @@ class LeonidaMap {
                     const blkIdx = this.voxelGrid[gIdx];
                     const blk = this.blocksData[blkIdx];
                     if (!blk || blk.lid !== 24) continue;
+                    if (tilez === 1) {
+                        this.stopLineMask[tiley * MAP_COLS + tilex] = 1;
+                    }
                     const candidates = (blk.lidRotation === 1 || blk.lidRotation === 3)
                         ? [[tilex - 1, tiley], [tilex + 1, tiley], [tilex - 2, tiley], [tilex + 2, tiley]]
                         : [[tilex, tiley - 1], [tilex, tiley + 1], [tilex, tiley - 2], [tilex, tiley + 2]];
@@ -413,17 +418,16 @@ class LeonidaMap {
                 const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
                 const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
 
-                // Signalized Major Urban Intersections Only (spaced >= 15 tiles apart, max 1 NS + 1 EW gantry per major junction!)
+                // Signalized Urban Intersections (1 NS + 1 EW gantry per intersection; check per-avenue distance so Collins Ave doesn't suppress Ocean Drive!)
                 const isUrbanSignalZone = (c >= 102 && c <= 226 && r >= 34 && r <= 204);
-                const isMinorOceanCross = (r >= 138 && r <= 143) || (r >= 152 && r <= 161);
-                if (isUrbanSignalZone && !isMinorOceanCross && roadCount === 2 && eRoad && (sRoad || nRoad)) {
+                if (isUrbanSignalZone && roadCount === 2 && eRoad && (sRoad || nRoad)) {
                     const dcCorner = 1;
                     const drCorner = sRoad ? 1 : -1;
                     // NW corner (eRoad && sRoad) -> 1 NS signal; SW corner (eRoad && nRoad) -> 1 EW signal
                     const isNS = sRoad;
                     const axis = isNS ? "NS" : "EW";
                     const tooClose = this.trafficSignals.some(
-                        ts => ts.axis === axis && Math.hypot(ts.c - c, ts.r - r) < 15.0
+                        ts => ts.axis === axis && Math.abs(ts.c - c) < 7 && Math.abs(ts.r - r) < 6
                     );
                     if (!tooClose) {
                         const surfZ = this.surfaceLayer[idx] || 2.0;
@@ -462,9 +466,10 @@ class LeonidaMap {
                 else if (sRoad) dr = 1;
                 else if (nRoad) dr = -1;
 
-                // Never place a streetlamp right next to a crosswalk (lid 24) or intersection interior (lid 25)
+                // Never place a streetlamp right next to an intersection stop-line (stopLineMask) or intersection interior (lid 25)
                 const roadLid = this.getBlockInfo(c + dc, r + dr, 1).lid;
-                if (roadLid === 24 || roadLid === 25) continue;
+                const isRoadStopLine = this.stopLineMask && this.stopLineMask[(r + dr) * MAP_COLS + (c + dc)] === 1;
+                if (roadLid === 24 || roadLid === 25 || isRoadStopLine) continue;
 
                 const isVerticalCurb = dc !== 0;
                 // Ensure this sidewalk tile is truly mid-block (at least 1 straight sidewalk tile on each side along the curb)
@@ -476,7 +481,9 @@ class LeonidaMap {
                     this.surfaceGround[prevR * MAP_COLS + prevC] !== GROUND_TYPE.PAWEMENT ||
                     this.surfaceGround[nextR * MAP_COLS + nextC] !== GROUND_TYPE.PAWEMENT ||
                     this.getBlockInfo(prevC + dc, prevR + dr, 1).lid === 24 ||
-                    this.getBlockInfo(nextC + dc, nextR + dr, 1).lid === 24
+                    this.getBlockInfo(nextC + dc, nextR + dr, 1).lid === 24 ||
+                    (this.stopLineMask && this.stopLineMask[(prevR + dr) * MAP_COLS + (prevC + dc)] === 1) ||
+                    (this.stopLineMask && this.stopLineMask[(nextR + dr) * MAP_COLS + (nextC + dc)] === 1)
                 ) {
                     continue;
                 }
@@ -1389,7 +1396,14 @@ class LeonidaMap {
         return true;
     }
 
-    hasTrafficSignalNear(x, y, maxDist = 340) {
+    isStopLineBlock(bx, by) {
+        if (bx < 0 || bx >= MAP_COLS || by < 0 || by >= MAP_ROWS) return false;
+        if (this.stopLineMask && this.stopLineMask[by * MAP_COLS + bx] === 1) return true;
+        const blk = this.getBlockInfo(bx, by, 1);
+        return Boolean(blk && (blk.lid === 24 || blk.trafficHint === 1));
+    }
+
+    hasTrafficSignalNear(x, y, maxDist = 360) {
         if (!Array.isArray(this.trafficSignals) || this.trafficSignals.length === 0) return false;
         const maxD2 = maxDist * maxDist;
         for (let i = 0; i < this.trafficSignals.length; i++) {
