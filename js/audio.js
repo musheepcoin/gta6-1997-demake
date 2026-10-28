@@ -55,6 +55,7 @@ class RetroAudioEngine {
 
         this.currentStationIdx = 0;
         this.inVehicle = false;
+        this.ytRadioPlaying = true;
         this.stepIdx = 0;
         this.nextNoteTime = 0;
 
@@ -145,9 +146,9 @@ class RetroAudioEngine {
             this.sirenGain.gain.setTargetAtTime(0.0, now, 0.08);
         }
 
-        // 3. Sequencer for In-Car Radio Station
+        // 3. Sequencer for In-Car Radio Station (disabled when YouTube Radio Deck is playing!)
         const st = this.stations[this.currentStationIdx];
-        if (this.inVehicle && st && st.bassNotes.length > 0) {
+        if (!this.ytRadioPlaying && this.inVehicle && st && st.bassNotes.length > 0) {
             const stepDur = (60 / st.bpm) / 2; // eighth notes
             if (now >= this.nextNoteTime) {
                 this.playRadioStep(st, this.stepIdx, stepDur);

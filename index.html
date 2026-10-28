@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRAND THEFT AUTO: LEONIDA '97 — LUCIA EDITION (1997 2.5D Demake)</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=97_66">
 </head>
 <body>
     <div id="game-container">
@@ -120,6 +120,37 @@
             <div><span class="key-pill">R</span> Radio • <span class="key-pill">N</span> Night • <span class="key-pill">H</span> Dossier</div>
         </div>
 
+        <!-- Bottom-Right: Integrated 1997 Vice City / GTA 6 YouTube Car Stereo Deck -->
+        <div id="yt-radio-widget">
+            <div class="yt-radio-header">
+                <span class="yt-radio-led" id="yt-radio-led"></span>
+                <span class="yt-radio-title" id="yt-radio-title">📻 GTA 6 SOUNDTRACK FM</span>
+                <button id="yt-btn-minimize" title="Réduire / Agrandir l'écran vidéo">[—]</button>
+            </div>
+            <div id="yt-radio-body">
+                <div class="yt-iframe-wrap" id="yt-iframe-wrap">
+                    <iframe
+                        id="yt-player-iframe"
+                        src="https://www.youtube.com/embed/Nl7r0rL38nU?enablejsapi=1&amp;autoplay=1&amp;rel=0&amp;modestbranding=1&amp;playsinline=1"
+                        title="GTA 6 Radio YouTube Player"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        referrerpolicy="strict-origin-when-cross-origin"
+                        allowfullscreen>
+                    </iframe>
+                </div>
+                <div class="yt-controls-row">
+                    <button id="yt-btn-play" class="yt-btn">▶ PLAY</button>
+                    <button id="yt-btn-pause" class="yt-btn">⏸ PAUSE</button>
+                    <button id="yt-btn-skip" class="yt-btn" title="Sauter à un autre morceau du mix GTA 6 (+3 min)">⏭ PISTE +</button>
+                    <input id="yt-vol-slider" type="range" min="0" max="100" value="75" title="Volume Radio YouTube">
+                </div>
+                <div class="yt-url-row">
+                    <input id="yt-url-input" type="text" placeholder="Coller lien YouTube / Playlist..." value="https://www.youtube.com/watch?v=Nl7r0rL38nU">
+                    <button id="yt-btn-load" class="yt-btn yt-btn-accent">OK</button>
+                </div>
+            </div>
+        </div>
+
         <!-- FULL-SQUARE GTA 1 (.CMP) INTERACTIVE CITY MAP MODAL (Toggleable with [M] or clicking Radar) -->
         <div id="fullmap-modal" class="hidden">
             <div class="fullmap-card">
@@ -218,11 +249,11 @@
     </div>
 
     <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=97_65"></script>
-    <script src="js/map.js?v=97_65"></script>
-    <script src="js/entities.js?v=97_65"></script>
-    <script src="js/missions.js?v=97_65"></script>
-    <script src="js/renderer.js?v=97_65"></script>
-    <script src="js/game.js?v=97_65"></script>
+    <script src="js/audio.js?v=97_66"></script>
+    <script src="js/map.js?v=97_66"></script>
+    <script src="js/entities.js?v=97_66"></script>
+    <script src="js/missions.js?v=97_66"></script>
+    <script src="js/renderer.js?v=97_66"></script>
+    <script src="js/game.js?v=97_66"></script>
 </body>
 </html>

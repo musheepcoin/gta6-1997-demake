@@ -635,6 +635,9 @@ class LeonidaGame {
 
     bindEvents() {
         window.addEventListener("keydown", (e) => {
+            if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+                return;
+            }
             const code = e.code;
             const key = e.key.toLowerCase();
 
@@ -678,12 +681,15 @@ class LeonidaGame {
                 this.armOrRigCarBomb();
             }
 
-            // Cycle Radio Station (R)
+            // Cycle Radio Station / Skip YouTube Radio Track (R)
             if (code === "KeyR") {
+                this.skipYouTubeRadioTrack();
                 if (this.player.inVehicle) {
                     const st = this.audio.cycleStation();
                     this.addFloatingText(this.player.x, this.player.y - 30, `📻 ${st.name}`, "#00f0ff");
                     this.updateHud();
+                } else {
+                    this.addFloatingText(this.player.x, this.player.y - 30, "📻 YT RADIO: PISTE SUIVANTE", "#00f0ff");
                 }
             }
 
@@ -830,6 +836,135 @@ class LeonidaGame {
                 }
             });
         });
+
+        this.initYouTubeRadio();
+    }
+
+    initYouTubeRadio() {
+        this.ytSeekOffset = 0;
+        const widget = document.getElementById("yt-radio-widget");
+        const minBtn = document.getElementById("yt-btn-minimize");
+        const playBtn = document.getElementById("yt-btn-play");
+        const pauseBtn = document.getElementById("yt-btn-pause");
+        const skipBtn = document.getElementById("yt-btn-skip");
+        const volSlider = document.getElementById("yt-vol-slider");
+        const urlInput = document.getElementById("yt-url-input");
+        const loadBtn = document.getElementById("yt-btn-load");
+        const led = document.getElementById("yt-radio-led");
+
+        if (minBtn && widget) {
+            minBtn.addEventListener("click", () => {
+                const collapsed = widget.classList.toggle("minimized");
+                minBtn.textContent = collapsed ? "+" : "—";
+            });
+        }
+
+        if (playBtn) {
+            playBtn.addEventListener("click", () => {
+                this.sendYouTubeCommand("playVideo", []);
+                if (this.audio) this.audio.ytRadioPlaying = true;
+                if (led) led.classList.remove("paused");
+            });
+        }
+
+        if (pauseBtn) {
+            pauseBtn.addEventListener("click", () => {
+                this.sendYouTubeCommand("pauseVideo", []);
+                if (this.audio) this.audio.ytRadioPlaying = false;
+                if (led) led.classList.add("paused");
+            });
+        }
+
+        if (skipBtn) {
+            skipBtn.addEventListener("click", () => {
+                this.skipYouTubeRadioTrack();
+            });
+        }
+
+        if (volSlider) {
+            volSlider.addEventListener("input", () => {
+                const vol = parseInt(volSlider.value, 10) || 0;
+                this.sendYouTubeCommand("setVolume", [vol]);
+            });
+        }
+
+        if (loadBtn && urlInput) {
+            loadBtn.addEventListener("click", () => {
+                this.loadYouTubeUrl(urlInput.value);
+            });
+            urlInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    this.loadYouTubeUrl(urlInput.value);
+                    urlInput.blur();
+                }
+            });
+        }
+    }
+
+    sendYouTubeCommand(func, args = []) {
+        const iframe = document.getElementById("yt-player-iframe");
+        if (!iframe || !iframe.contentWindow) return;
+        try {
+            iframe.contentWindow.postMessage(
+                JSON.stringify({ event: "command", func, args }),
+                "*"
+            );
+        } catch (err) {
+            // Ignore cross-origin frame readiness race
+        }
+    }
+
+    skipYouTubeRadioTrack() {
+        // Advance ~3m15s into compilation mixes (or next video if playlist)
+        this.ytSeekOffset = ((this.ytSeekOffset || 0) + 195) % 3400;
+        this.sendYouTubeCommand("seekTo", [this.ytSeekOffset, true]);
+        this.sendYouTubeCommand("nextVideo", []);
+        this.sendYouTubeCommand("playVideo", []);
+        const led = document.getElementById("yt-radio-led");
+        if (led) led.classList.remove("paused");
+        if (this.audio) {
+            this.audio.ytRadioPlaying = true;
+            this.audio.playBeep(680, 0.04, "square", 0.04);
+        }
+    }
+
+    loadYouTubeUrl(rawUrl) {
+        const iframe = document.getElementById("yt-player-iframe");
+        if (!iframe || !rawUrl) return;
+        const trimmed = String(rawUrl).trim();
+        let videoId = null;
+        let listId = null;
+
+        try {
+            const u = new URL(trimmed);
+            if (u.hostname.includes("youtu.be")) {
+                videoId = u.pathname.replace(/^\//, "").split("/")[0];
+            } else {
+                videoId = u.searchParams.get("v");
+            }
+            listId = u.searchParams.get("list");
+        } catch (err) {
+            // Fallback regex for raw ID or partial URL
+            const m = trimmed.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+            if (m) videoId = m[1];
+            else if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) videoId = trimmed;
+        }
+
+        let embedSrc = "";
+        if (listId && !videoId) {
+            embedSrc = `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(listId)}&enablejsapi=1&autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+        } else if (videoId) {
+            embedSrc = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&autoplay=1&rel=0&modestbranding=1&playsinline=1${listId ? `&list=${encodeURIComponent(listId)}` : ""}`;
+        }
+
+        if (embedSrc) {
+            this.ytSeekOffset = 0;
+            iframe.src = embedSrc;
+            if (this.audio) this.audio.ytRadioPlaying = true;
+            const led = document.getElementById("yt-radio-led");
+            if (led) led.classList.remove("paused");
+        }
     }
 
     toggleFullMap(forceState = null) {
@@ -888,6 +1023,8 @@ class LeonidaGame {
     startGame() {
         this.started = true;
         this.audio.resume();
+        this.sendYouTubeCommand("playVideo", []);
+        this.sendYouTubeCommand("setVolume", [75]);
         const modal = document.getElementById("start-modal");
         if (modal) modal.classList.add("hidden");
 
