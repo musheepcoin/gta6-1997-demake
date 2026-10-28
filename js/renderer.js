@@ -1967,7 +1967,7 @@ class RetroRenderer {
 
         const hasPager = Boolean(game.missions.activeMission || (game.pagerPopupTimer || 0) > 0);
         const wx = 12;
-        const wy = hasPager ? 136 : 74;
+        const wy = hasPager ? 126 : 74;
         const ww = 268;
         const wh = this.cheatsCollapsed ? 26 : 226;
 
@@ -2353,37 +2353,73 @@ class RetroRenderer {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
 
-        // Only draw Pager when an active mission or pager notification is triggered
+        // 1997 Motorola Beeper / Pager ("Bipeur '97") — crisp casing + authentic PAGER1 LCD matrix font
         if (game.missions.activeMission || (game.pagerPopupTimer || 0) > 0) {
-            const pagerY = leftY + 62;
-            const pagerEl = document.getElementById("pager-text");
-            const rawPagerText = pagerEl ? (pagerEl.textContent || "").trim().toUpperCase() : "MISSION ACTIVE";
+            const pagerX = leftX;
+            const pagerY = leftY + 62; // y = 74
+            const pagerW = 268;
+            const pagerH = 46; // y = 74..120 (leaves clean 6px gap above GPS bar at y = 126)
 
-            this.drawHudSprite(ctx, "28", leftX, pagerY, iconScale);
-            if (Math.floor(this.time * 4) % 2 === 0) {
-                this.drawHudSprite(ctx, "29", leftX + 14 * iconScale, pagerY + 31 * iconScale, iconScale);
-            }
+            const pagerEl = document.getElementById("pager-text");
+            const senderEl = document.getElementById("pager-sender");
+            const rawPagerText = pagerEl ? (pagerEl.textContent || "").trim().toUpperCase() : "MISSION ACTIVE";
+            const rawSender = senderEl
+                ? (senderEl.textContent || "📟 BIPEUR '97").replace(/PAGER/i, "BIPEUR '97").trim()
+                : "📟 BIPEUR '97 // JASON";
 
             ctx.save();
+            // Outer gunmetal Motorola pager casing with neon-cyan/slate bevel
+            ctx.fillStyle = "rgba(18, 23, 34, 0.95)";
+            ctx.fillRect(pagerX, pagerY, pagerW, pagerH);
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(pagerX, pagerY, pagerW, pagerH);
+
+            // Top metallic highlight line
+            ctx.fillStyle = "rgba(148, 163, 184, 0.25)";
+            ctx.fillRect(pagerX + 2, pagerY + 2, pagerW - 4, 13);
+
+            // Flashing Red Beeper Alert LED
+            const ledOn = Math.floor(this.time * 4) % 2 === 0;
+            ctx.fillStyle = ledOn ? "#ff1e38" : "#4c0519";
             ctx.beginPath();
-            ctx.rect(
-                leftX + Math.round(19 * iconScale),
-                pagerY + Math.round(12 * iconScale),
-                Math.round(86 * iconScale),
-                Math.round(15 * iconScale)
-            );
+            ctx.arc(pagerX + 10, pagerY + 8.5, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pager Header Label ("📟 BIPEUR '97 // JASON")
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+            ctx.textBaseline = "middle";
+            ctx.fillText(rawSender.toUpperCase(), pagerX + 19, pagerY + 9);
+
+            // Recessed Backlit Dark-Green LCD Matrix Screen
+            const lcdX = pagerX + 6;
+            const lcdY = pagerY + 17;
+            const lcdW = pagerW - 12;
+            const lcdH = 23;
+            ctx.fillStyle = "#041208";
+            ctx.fillRect(lcdX, lcdY, lcdW, lcdH);
+            ctx.strokeStyle = "#15803d";
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(lcdX + 0.5, lcdY + 0.5, lcdW - 1, lcdH - 1);
+
+            // Clip & scroll authentic 1997 GTA 1 PAGER1 bitmap font inside the LCD screen
+            ctx.beginPath();
+            ctx.rect(lcdX + 3, lcdY + 2, lcdW - 6, lcdH - 4);
             ctx.clip();
-            const scrollSpeed = 52 * iconScale;
+
+            const lcdScale = 1.15;
+            const scrollSpeed = 52 * lcdScale;
             const paddedPager = `   ${rawPagerText}   `;
-            const totalPagerW = this.measureGta1FontString("PAGER1", paddedPager, iconScale);
+            const totalPagerW = this.measureGta1FontString("PAGER1", paddedPager, lcdScale);
             const scrollOffset = (this.time * scrollSpeed) % Math.max(1, totalPagerW);
             this.drawGta1FontString(
                 ctx,
                 "PAGER1",
                 paddedPager + paddedPager,
-                leftX + Math.round(19 * iconScale) - scrollOffset,
-                pagerY + Math.round(12 * iconScale),
-                iconScale,
+                lcdX + 4 - scrollOffset,
+                lcdY + 3,
+                lcdScale,
                 "left"
             );
             ctx.restore();
