@@ -238,8 +238,43 @@ class LeonidaMap {
             }
         }
 
+        // South Beach / Española Way Urban Infill & Sidewalk Cleanup Pass:
+        // 1) Copy 3D stepped Art Deco hotel blocks onto the empty lots at (r=111..116) and (r=121..126) on Ocean Drive (c=209..212)
+        //    and Washington Ave (c=198..202) so mid-Ocean Drive has continuous 3D Miami Art Deco architecture.
+        // 2) Replace any accidental inland beach-sand/grass tiles (lid 98/10 at r=108..132, c=196..214) with 3ds Max stone promenade (lid 9).
+        const cleanPaveBlkIdx = this.voxelGrid[(1 * MAP_ROWS + 110) * MAP_COLS + 200];
+        if (cleanPaveBlkIdx) {
+            for (let ry = 108; ry <= 132; ry++) {
+                for (let cx = 196; cx <= 214; cx++) {
+                    const g1 = (1 * MAP_ROWS + ry) * MAP_COLS + cx;
+                    const b1 = this.blocksData[this.voxelGrid[g1]];
+                    if (b1 && (b1.lid === 98 || b1.lid === 10)) {
+                        this.voxelGrid[g1] = cleanPaveBlkIdx;
+                    }
+                }
+            }
+        }
+        for (let dy = 0; dy < 6; dy++) {
+            for (let cx = 209; cx <= 212; cx++) {
+                for (let tz = 0; tz < MAP_LAYERS; tz++) {
+                    this.voxelGrid[((tz * MAP_ROWS) + (111 + dy)) * MAP_COLS + cx] =
+                        this.voxelGrid[((tz * MAP_ROWS) + (169 + dy)) * MAP_COLS + cx];
+                    this.voxelGrid[((tz * MAP_ROWS) + (121 + dy)) * MAP_COLS + cx] =
+                        this.voxelGrid[((tz * MAP_ROWS) + (179 + dy)) * MAP_COLS + cx];
+                }
+            }
+            for (let cx = 198; cx <= 202; cx++) {
+                for (let tz = 0; tz < MAP_LAYERS; tz++) {
+                    this.voxelGrid[((tz * MAP_ROWS) + (111 + dy)) * MAP_COLS + cx] =
+                        this.voxelGrid[((tz * MAP_ROWS) + (169 + dy)) * MAP_COLS + cx];
+                    this.voxelGrid[((tz * MAP_ROWS) + (121 + dy)) * MAP_COLS + cx] =
+                        this.voxelGrid[((tz * MAP_ROWS) + (179 + dy)) * MAP_COLS + cx];
+                }
+            }
+        }
+
         // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
-        // Enriches interior penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
+        // Enriches penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
         // and 3ds Max Glass Skylight Atriums (lid 31) while preserving 100% of their 3D side walls (w, e, n, s)!
         const roofVariantCache = new Map();
         const getRoofVariantIdx = (origIdx, newLid, newRemap = 0) => {
@@ -273,21 +308,22 @@ class LeonidaMap {
                         const aboveBlk = this.blocksData[this.voxelGrid[((tilez + 1) * MAP_ROWS + tiley) * MAP_COLS + tilex]];
                         if (aboveBlk && aboveBlk.groundType !== GROUND_TYPE.AIR) continue;
                     }
-                    // Check if surrounded North & South (or East & West) by roof tiles at the same height
                     const nBlk = this.blocksData[this.voxelGrid[(zOff + tiley - 1) * MAP_COLS + tilex]];
                     const sBlk = this.blocksData[this.voxelGrid[(zOff + tiley + 1) * MAP_COLS + tilex]];
                     const wBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex - 1)]];
                     const eBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex + 1)]];
                     const hasNSRoof = nBlk && nBlk.lid > 0 && sBlk && sBlk.lid > 0;
                     const hasEWRoof = wBlk && wBlk.lid > 0 && eBlk && eBlk.lid > 0;
-                    if (!hasNSRoof && !hasEWRoof) continue;
+                    const isPenthouseTier = (tilez >= 4) && ((nBlk && nBlk.lid > 0) || (sBlk && sBlk.lid > 0)) && ((wBlk && wBlk.lid > 0) || (eBlk && eBlk.lid > 0));
+                    if (!hasNSRoof && !hasEWRoof && !isPenthouseTier) continue;
 
                     const isHotelDixonPool = ((tiley === 144 || tiley === 145) && (tilex === 210 || tilex === 211));
-                    const isOceanDrivePenthouse = (tilex >= 200 && tilex <= 212 && tilez >= 4 && ((tilex + tiley * 3) % 4 === 0));
+                    const isOceanDrivePenthouse = (tilex >= 198 && tilex <= 212 && tilez >= 4);
                     const isInteriorFeature = (hasNSRoof && hasEWRoof && ((tilex * 5 + tiley * 7) % 3 === 0));
 
-                    if (isHotelDixonPool || (isOceanDrivePenthouse && ((tiley % 3) === 0))) {
-                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, 0);
+                    if (isHotelDixonPool) {
+                        const dixonLid = (tiley === 144 && tilex === 210) || (tiley === 145 && tilex === 211) ? 35 : 31;
+                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, dixonLid, blk.remap);
                     } else if (isOceanDrivePenthouse || isInteriorFeature) {
                         const featLid = ((tilex + tiley) % 2 === 0) ? 35 : 31;
                         this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, featLid, blk.remap);
@@ -638,35 +674,22 @@ class LeonidaMap {
         }
 
         // Deep-Dive Vice City Architectural Streetscape Props:
-        // A. Ocean Drive Art Deco Sidewalk Café Tables & Pastel Bistro Umbrellas (West sidewalk x=213.18 in front of Art Deco hotels)
-        for (let r = 42; r <= 194; r += 2) {
+        // A. Ocean Drive Art Deco Sidewalk Café Parasols (West sidewalk x=213.18 directly in front of 3D Art Deco hotels)
+        for (let r = 42; r <= 194; r += 3) {
             if (this.surfaceGround[r * MAP_COLS + 213] !== GROUND_TYPE.PAWEMENT) continue;
-            // Skip cross-street intersections
-            if (this.surfaceGround[r * MAP_COLS + 212] === GROUND_TYPE.ROAD) continue;
+            // Only place café parasols directly in front of actual 3D Ocean Drive buildings (never in front of parks or roads!)
+            if (this.surfaceGround[r * MAP_COLS + 212] !== GROUND_TYPE.BUILDING) continue;
+            if (this.getBlockInfo(213, r, 1)?.lid === 69) continue;
             this.viceStreetDetails.push({
                 kind: "CAFE_TABLE",
-                x: 213.18 * TILE_SIZE,
+                x: 213.22 * TILE_SIZE,
                 y: (r + 0.5) * TILE_SIZE,
                 z: 2.0,
-                theme: ((r >> 1) % 3 === 0) ? "PINK" : (((r >> 1) % 3 === 1) ? "CYAN" : "YELLOW")
+                theme: ((r >> 1) % 2 === 0) ? "PINK" : "CYAN"
             });
         }
 
-        // B. Lummus Park Pastel Art Deco Serpentine Beach Wall & Neon Uplight Planters (along x=220.85 separating promenade from beach sand)
-        for (let r = 40; r <= 192; r += 2) {
-            if (this.surfaceGround[r * MAP_COLS + 220] !== GROUND_TYPE.PAWEMENT) continue;
-            if (r % 12 === 0) continue; // Leave pedestrian beach access openings every 12 blocks!
-            const waveX = Math.sin(r * 0.45) * 4.5;
-            this.viceStreetDetails.push({
-                kind: "SERPENTINE_WALL",
-                x: 220.82 * TILE_SIZE + waveX,
-                y: (r + 0.5) * TILE_SIZE,
-                z: 2.0,
-                theme: (r % 4 === 0) ? "PINK" : "CYAN"
-            });
-        }
-
-        // C. Española Way Overhead Mediterranean Bistro Light Strings (y=105..108, x=204..213)
+        // B. Española Way Overhead Mediterranean Bistro Light Strings (y=105..108, x=204..213)
         for (let c = 204; c <= 212; c += 2) {
             this.viceStreetDetails.push({
                 kind: "BISTRO_STRING",

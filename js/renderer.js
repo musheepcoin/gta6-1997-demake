@@ -591,7 +591,7 @@ class RetroRenderer {
                 }
 
                 // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_05", () => {
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_06", () => {
                     if (this.gl) {
                         this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
                         if (this.mapStyle === "NYC") {
@@ -639,34 +639,34 @@ class RetroRenderer {
             return run();
         };
 
-        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_05", () => {
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_06", () => {
             viceTilesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_05", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_06", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_05", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_06", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_05", () => {
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_06", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_05", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_06", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_05", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_06", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -1097,10 +1097,8 @@ class RetroRenderer {
             verts.push(pos[0] + nOffX, pos[1] + nOffY, pos[2] + nOffZ, uv[0], uv[1], animType);
         }
 
-        // 6. 3D Mitered Outer Roof Parapet Coping & Drop-Shadow Rim:
-        // Emitted ONLY along true outer drop-off edges of a building roof (where b.faces[0..3] > 0),
-        // framing each roof tier with a continuous 3D Art Deco parapet while keeping interior roof tiles seamless!
-        if (face === 4 && st === 0 && !b.isFlat && y_elev >= 1 && b.groundType === 5 && tileIdx !== 41 && tileIdx !== 22) {
+        // 6. 3D Mitered Outer Parapet Coping (bridges & piers only; building roofs use 100% 3ds Max roof textures without stretched neon bands!)
+        if (face === 4 && st === 0 && !b.isFlat && y_elev >= 2 && b.groundType === 4 && tileIdx !== 41 && tileIdx !== 22) {
             const hasW = b.faces[0] > 0;
             const hasE = b.faces[1] > 0;
             const hasN = b.faces[2] > 0;
@@ -2313,39 +2311,14 @@ class RetroRenderer {
                 }
             }
 
-            // 7B. Deep-Dive Vice City Architectural Streetscape Props (Ocean Drive Café Terraces, Lummus Serpentine Wall & Española Bistro Lights)
+            // 7B. Deep-Dive Vice City Architectural Streetscape Props (Ocean Drive Café Parasol Sprites & Española Bistro Lights)
             if (Array.isArray(this.map.viceStreetDetails)) {
                 for (const vd of this.map.viceStreetDetails) {
                     if (vd.x < minX || vd.x > maxX || vd.y < minY || vd.y > maxY) continue;
                     const vz = (vd.z !== undefined ? vd.z : 2.0);
                     if (vd.kind === "CAFE_TABLE") {
-                        // White Art Deco table + twin chairs on the Ocean Drive sidewalk + 3D elevated pastel parasol
-                        this.pushSolidQuad3D(vd.x - 6, vd.y, vz + 0.03, 4.5, 4.5, 0, 0.92, 0.95, 0.98, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                        this.pushSolidQuad3D(vd.x + 6, vd.y, vz + 0.03, 4.5, 4.5, 0, 0.92, 0.95, 0.98, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.04, 8.5, 8.5, 0.78, 0.98, 0.98, 1.0, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                        const cr = vd.theme === "PINK" ? 1.0 : (vd.theme === "CYAN" ? 0.12 : 1.0);
-                        const cg = vd.theme === "PINK" ? 0.32 : (vd.theme === "CYAN" ? 0.88 : 0.85);
-                        const cb = vd.theme === "PINK" ? 0.68 : (vd.theme === "CYAN" ? 0.96 : 0.22);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.15, 13, 13, 0.35, cr, cg, cb, 0.96, SPRITE_DRAW_ORDER.TREES);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.16, 5, 5, 0.35, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.TREES);
-                    } else if (vd.kind === "SERPENTINE_WALL") {
-                        // Iconic Lummus Park / South Beach white-stucco & pastel-neon serpentine low beach wall
-                        this.pushSolidQuad3D(vd.x + 2, vd.y + 2, vz + 0.02, 8, 52, 0, 0.05, 0.08, 0.14, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.05, 7.5, 50, 0, 0.96, 0.94, 0.92, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                        const isPink = vd.theme === "PINK";
-                        this.pushSolidQuad3D(
-                            vd.x,
-                            vd.y,
-                            vz + 0.09,
-                            4.2,
-                            46,
-                            0,
-                            isPink ? 1.0 : 0.08,
-                            isPink ? 0.28 : 0.92,
-                            isPink ? 0.68 : 0.98,
-                            0.95,
-                            SPRITE_DRAW_ORDER.MAP_OBJECT
-                        );
+                        const umbSpr = vd.theme === "PINK" ? "umbrella_pink" : "umbrella_cyan";
+                        this.batchObjectSprite3D(umbSpr, vd.x, vd.y, vz + 0.08, (vd.y * 0.03) % 6.28, 0.78, SPRITE_DRAW_ORDER.TREES);
                     } else if (vd.kind === "BISTRO_STRING") {
                         // Española Way overhead Mediterranean festive light cable & glowing bulbs
                         this.pushSolidQuad3D(vd.x, vd.y, vz + 0.50, 58, 1.8, 0, 0.18, 0.22, 0.28, 0.85, SPRITE_DRAW_ORDER.TREES);
