@@ -96,6 +96,13 @@ class LeonidaGame {
         this.currentDistrict = "";
         this.districtPopupTimer = 0;
 
+        // Live 24-Hour Smartphone Clock & Dynamic Day/Night Cycle (1 in-game minute = 1 real second)
+        // Starts at 16:30 (Sunny late afternoon on Ocean Drive, approaching Golden Hour sunset & Neon Night!)
+        this.worldMinutes = 16 * 60 + 30;
+        this.timeScale = 1.0;
+        this.lastSmsTimeStr = "16:30";
+        this._lastAnnouncedPhase = "DAY";
+
         // Active Kill Frenzy, GOURANGA Monk Chain & Enterable Venue Interior state
         this.killFrenzy = null;
         this.monkChain = [];
@@ -125,8 +132,112 @@ class LeonidaGame {
 
         this.initWorldEntities();
         this.bindEvents();
+        this.syncDayNightCycle();
         this.renderPortraits();
         this.updateHud();
+    }
+
+    getClockString(showColon = true) {
+        const total = ((Math.floor(this.worldMinutes || 0) % 1440) + 1440) % 1440;
+        const hh = Math.floor(total / 60);
+        const mm = total % 60;
+        const sep = showColon ? ":" : " ";
+        return `${String(hh).padStart(2, "0")}${sep}${String(mm).padStart(2, "0")}`;
+    }
+
+    getTimePhaseInfo() {
+        const mins = ((this.worldMinutes % 1440) + 1440) % 1440;
+        const hour = mins / 60.0;
+        const smooth = (t) => {
+            const c = Math.max(0, Math.min(1, t));
+            return c * c * (3 - 2 * c);
+        };
+
+        // Night darkness factor (0.0 = full daylight, 1.0 = deep midnight)
+        let nightFactor = 0.0;
+        if (hour >= 20.5 || hour < 5.25) {
+            nightFactor = 1.0;
+        } else if (hour >= 17.75 && hour < 20.5) {
+            nightFactor = smooth((hour - 17.75) / 2.75);
+        } else if (hour >= 5.25 && hour < 7.5) {
+            nightFactor = 1.0 - smooth((hour - 5.25) / 2.25);
+        }
+
+        // Warm Vice City Sunset (17:15..20:15, peak 18:45) & Sunrise (05:15..07:45, peak 06:30) factor
+        let sunsetFactor = 0.0;
+        if (hour >= 17.25 && hour <= 20.25) {
+            const d = Math.abs(hour - 18.75) / 1.5;
+            sunsetFactor = Math.max(0, 1.0 - d * d);
+        } else if (hour >= 5.25 && hour <= 7.75) {
+            const d = Math.abs(hour - 6.5) / 1.25;
+            sunsetFactor = Math.max(0, 1.0 - d * d) * 0.85;
+        }
+
+        let phase = "DAY";
+        let icon = "☀️";
+        let dockLabel = "☀️ DAY [N]";
+        if (hour >= 5.25 && hour < 7.5) {
+            phase = "DAWN";
+            icon = "🌅";
+            dockLabel = "🌅 DAWN [N]";
+        } else if (hour >= 7.5 && hour < 17.75) {
+            phase = "DAY";
+            icon = "☀️";
+            dockLabel = "☀️ DAY [N]";
+        } else if (hour >= 17.75 && hour < 20.25) {
+            phase = "DUSK";
+            icon = "🌇";
+            dockLabel = "🌇 DUSK [N]";
+        } else {
+            phase = "NIGHT";
+            icon = "🌙";
+            dockLabel = "🌙 NIGHT [N]";
+        }
+
+        return { hour, nightFactor, sunsetFactor, phase, icon, dockLabel };
+    }
+
+    syncDayNightCycle() {
+        if (!this.renderer) return;
+        const info = this.getTimePhaseInfo();
+        this.renderer.nightFactor = info.nightFactor;
+        this.renderer.sunsetFactor = info.sunsetFactor;
+        this.renderer.nightMode = info.nightFactor >= 0.25;
+    }
+
+    advanceTimeOfDayPhase() {
+        const hour = (((this.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+        let nextMins = 14 * 60;
+        let banner = "☀️ LEONIDA DAYLIGHT";
+        let color = "#fde047";
+
+        if (hour >= 7.25 && hour < 17.5) {
+            nextMins = 18 * 60 + 45; // 18:45 Golden Sunset
+            banner = "🌇 VICE CITY SUNSET";
+            color = "#fb7185";
+        } else if (hour >= 17.5 && hour < 20.25) {
+            nextMins = 22 * 60 + 30; // 22:30 Neon Night
+            banner = "🌙 NEON NIGHT MODE";
+            color = "#ff2a85";
+        } else if (hour >= 20.25 || hour < 5.25) {
+            nextMins = 6 * 60 + 25; // 06:25 Atlantic Sunrise
+            banner = "🌅 ATLANTIC SUNRISE";
+            color = "#f97316";
+        } else {
+            nextMins = 14 * 60; // 14:00 Sunny Afternoon
+            banner = "☀️ LEONIDA DAYLIGHT";
+            color = "#fde047";
+        }
+
+        this.worldMinutes = nextMins;
+        this.syncDayNightCycle();
+        this._lastAnnouncedPhase = this.getTimePhaseInfo().phase;
+        this.addFloatingText(
+            this.player.x,
+            this.player.y - 30,
+            `${banner} (${this.getClockString(true)})`,
+            color
+        );
     }
 
     isNSGreen() {
@@ -747,15 +858,9 @@ class LeonidaGame {
                 }
             }
 
-            // Toggle Neon Night / Dusk Mode (N)
+            // Advance Time-of-Day Phase (Day -> Sunset -> Night -> Sunrise) (N)
             if (code === "KeyN") {
-                this.renderer.nightMode = !this.renderer.nightMode;
-                this.addFloatingText(
-                    this.player.x,
-                    this.player.y - 30,
-                    this.renderer.nightMode ? "🌙 NEON NIGHT MODE" : "☀️ LEONIDA DAYLIGHT",
-                    "#ff2a85"
-                );
+                this.advanceTimeOfDayPhase();
             }
 
             // Toggle Vice City GPS Tour Drawer (C)
@@ -2209,6 +2314,10 @@ class LeonidaGame {
     update(dt) {
         if (!this.started) return;
 
+        // Advance Live 24-Hour Smartphone Clock & Smooth Day / Sunset / Night / Sunrise Cycle (1 in-game minute = 1 real second)
+        this.worldMinutes = (this.worldMinutes + dt * 60.0 * (this.timeScale || 1.0)) % 1440;
+        this.syncDayNightCycle();
+
         if (this.interiorCooldown > 0) {
             this.interiorCooldown = Math.max(0, this.interiorCooldown - dt);
         }
@@ -3390,6 +3499,7 @@ class LeonidaGame {
 
         sEl.textContent = `📱 SMARTPHONE // ${sender}`;
         tEl.textContent = text;
+        this.lastSmsTimeStr = this.getClockString(true);
         if (lblEl) {
             lblEl.textContent = String(sender).toUpperCase().includes("LUCIA") ? "LUCIA" : "JASON";
         }

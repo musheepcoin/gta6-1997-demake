@@ -23,6 +23,8 @@ class RetroRenderer {
         this.zoom = 1.0;
         this.targetZoom = 1.0;
         this.nightMode = false;
+        this.nightFactor = 0.0;
+        this.sunsetFactor = 0.0;
         this.time = 0;
         this.lastFrameDt = 0.0166;
         this.fpsSmoothed = 60.0;
@@ -131,11 +133,18 @@ class RetroRenderer {
             varying float vAnim;
             uniform sampler2D uTex;
             uniform float uNightTint;
+            uniform float uSunsetTint;
             uniform float uViceStyle;
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 if (c.a < 0.1) discard;
+                if (uSunsetTint > 0.01) {
+                    // Warm Vice City Golden-Pink Sunset & Atlantic Sunrise glow
+                    vec3 sunsetCol = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
+                    c.rgb = mix(c.rgb, min(vec3(1.0), sunsetCol), uSunsetTint * 0.65);
+                }
                 if (uNightTint > 0.01) {
+                    vec3 nightRgb = c.rgb;
                     if (vAnim < -0.5) {
                         // Vertical 3D building facade (face < 4): lit hotel/skyscraper windows & neon strips glow at night!
                         float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
@@ -143,15 +152,16 @@ class RetroRenderer {
                         float isWindowOrNeon = clamp((lum - 0.55) * 3.6 + (sat - 0.38) * 2.5, 0.0, 1.0);
                         vec3 wallDark = c.rgb * vec3(0.55, 0.62, 0.85);
                         vec3 windowGlow = min(vec3(1.0), c.rgb * 1.45 + vec3(0.10, 0.06, 0.14));
-                        c.rgb = mix(wallDark, windowGlow, isWindowOrNeon);
+                        nightRgb = mix(wallDark, windowGlow, isWindowOrNeon);
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal navy
-                        c.rgb *= vec3(0.42, 0.52, 0.78);
+                        nightRgb = c.rgb * vec3(0.42, 0.52, 0.78);
                     } else {
                         // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops):
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!)
-                        c.rgb *= vec3(0.68, 0.73, 0.90);
+                        nightRgb = c.rgb * vec3(0.68, 0.73, 0.90);
                     }
+                    c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
                 }
                 gl_FragColor = c;
             }
@@ -199,6 +209,7 @@ class RetroRenderer {
             uFanStep: gl.getUniformLocation(this.cityProg, "uFanStep"),
             uTex: gl.getUniformLocation(this.cityProg, "uTex"),
             uNightTint: gl.getUniformLocation(this.cityProg, "uNightTint"),
+            uSunsetTint: gl.getUniformLocation(this.cityProg, "uSunsetTint"),
             uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle")
         };
 
@@ -885,8 +896,8 @@ class RetroRenderer {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(this.glCanvas, 0, 0);
 
-        // 2B. Real Dynamic Night Mode Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
-        if (this.nightMode && !game.activeInterior) {
+        // 2B. Real Dynamic Day/Sunset/Night Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
+        if (((this.nightFactor || 0) > 0.02 || (this.sunsetFactor || 0) > 0.04 || this.nightMode) && !game.activeInterior) {
             this.renderNightLighting(ctx, game);
         }
 
@@ -936,14 +947,16 @@ class RetroRenderer {
         const gl = this.gl;
         if (!gl) return;
 
+        const nf = Math.max(0, Math.min(1, this.nightFactor !== undefined ? this.nightFactor : (this.nightMode ? 1.0 : 0.0)));
+        const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0.0));
+
         gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
         if (this.mapStyle === "VICE") {
-            // Tropical Atlantic / Biscayne Bay turquoise sea-level clear color (deep midnight navy at night)
-            if (this.nightMode) {
-                gl.clearColor(0.012, 0.045, 0.11, 1.0);
-            } else {
-                gl.clearColor(0.03, 0.44, 0.56, 1.0);
-            }
+            // Smoothly interpolate Tropical Atlantic turquoise sea-level clear color from Day -> Sunset -> Midnight Navy
+            const r = 0.03 * (1.0 - nf) + 0.012 * nf + sf * 0.06;
+            const g = 0.44 * (1.0 - nf) + 0.045 * nf - sf * 0.04;
+            const b = 0.56 * (1.0 - nf) + 0.11 * nf + sf * 0.04;
+            gl.clearColor(r, g, b, 1.0);
         } else {
             // Sea-level dark abyss clear color (matches MapRenderer.cpp)
             gl.clearColor(0.08, 0.14, 0.18, 1.0);
@@ -970,7 +983,10 @@ class RetroRenderer {
         gl.uniformMatrix4fv(this.cityLocs.uViewProj, false, viewProj);
         gl.uniform1f(this.cityLocs.uWaterStep, Math.floor(this.time * 7.0) % 11);
         gl.uniform1f(this.cityLocs.uFanStep, Math.floor(this.time * 9.0) % 6);
-        gl.uniform1f(this.cityLocs.uNightTint, this.nightMode ? 1.0 : 0.0);
+        gl.uniform1f(this.cityLocs.uNightTint, nf);
+        if (this.cityLocs.uSunsetTint) {
+            gl.uniform1f(this.cityLocs.uSunsetTint, sf);
+        }
         gl.uniform1f(this.cityLocs.uViceStyle, this.mapStyle === "VICE" ? 1.0 : 0.0);
 
         gl.activeTexture(gl.TEXTURE0);
@@ -1620,14 +1636,24 @@ class RetroRenderer {
         }
         const lctx = this.nightCanvas.getContext("2d");
 
-        // 1. Fill offscreen lightmap with deep midnight darkness (R=34, G=44, B=76)
+        const nf = Math.max(0, Math.min(1, this.nightFactor !== undefined ? this.nightFactor : (this.nightMode ? 1.0 : 0.0)));
+        const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0.0));
+        // Artificial lights (streetlamps, neon signs, headlights) fade on smoothly as dusk deepens (nf > 0.12)
+        const lightInt = Math.max(0, Math.min(1, (nf - 0.10) / 0.55));
+
+        // 1. Fill offscreen lightmap with smooth Day (255,255,255) -> Golden-Pink Sunset -> Deep Midnight Darkness (34,44,76)
+        const ambR = Math.round(Math.max(24, Math.min(255, 255 * (1.0 - nf) + 34 * nf - sf * 10 * (1.0 - nf))));
+        const ambG = Math.round(Math.max(30, Math.min(255, 255 * (1.0 - nf) + 44 * nf - sf * 52 * (1.0 - nf * 0.5))));
+        const ambB = Math.round(Math.max(52, Math.min(255, 255 * (1.0 - nf) + 76 * nf - sf * 24 * (1.0 - nf * 0.5))));
+
         lctx.save();
         lctx.globalCompositeOperation = "source-over";
-        lctx.fillStyle = "#222c4c";
+        lctx.fillStyle = `rgb(${ambR}, ${ambG}, ${ambB})`;
         lctx.fillRect(0, 0, lw, lh);
 
         // Switch to additive light accumulation on the lightmap
         lctx.globalCompositeOperation = "lighter";
+        lctx.globalAlpha = lightInt;
 
         const addLightPool = (sx, sy, radPx, innerCol, midCol) => {
             const x = sx * scale;
@@ -1926,38 +1952,40 @@ class RetroRenderer {
         ctx.drawImage(this.nightCanvas, 0, 0, W, H);
 
         // 8. Composite Pass 2: Soft Atmospheric Screen Bloom + High-Res Headlight Beams & Lens Flares
-        ctx.globalCompositeOperation = "screen";
-        ctx.globalAlpha = 0.28;
-        ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+        if (lightInt > 0.02) {
+            ctx.globalCompositeOperation = "screen";
+            ctx.globalAlpha = 0.28 * nf;
+            ctx.drawImage(this.nightCanvas, 0, 0, W, H);
 
-        ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 1.0;
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = lightInt;
 
-        for (const c of highResCones) {
-            const x1 = c.x + Math.cos(c.angle) * c.len;
-            const y1 = c.y + Math.sin(c.angle) * c.len;
-            const g = ctx.createLinearGradient(c.x, c.y, x1, y1);
-            g.addColorStop(0.0, c.col0);
-            g.addColorStop(0.55, c.col1);
-            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.moveTo(c.x, c.y);
-            ctx.arc(c.x, c.y, c.len, c.angle - c.spread, c.angle + c.spread);
-            ctx.closePath();
-            ctx.fill();
-        }
+            for (const c of highResCones) {
+                const x1 = c.x + Math.cos(c.angle) * c.len;
+                const y1 = c.y + Math.sin(c.angle) * c.len;
+                const g = ctx.createLinearGradient(c.x, c.y, x1, y1);
+                g.addColorStop(0.0, c.col0);
+                g.addColorStop(0.55, c.col1);
+                g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.moveTo(c.x, c.y);
+                ctx.arc(c.x, c.y, c.len, c.angle - c.spread, c.angle + c.spread);
+                ctx.closePath();
+                ctx.fill();
+            }
 
-        for (const f of highResFlares) {
-            const r = Math.max(2, f.r);
-            const g = ctx.createRadialGradient(f.x, f.y, r * 0.1, f.x, f.y, r);
-            g.addColorStop(0.0, "#ffffff");
-            g.addColorStop(0.35, f.col);
-            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-            ctx.fill();
+            for (const f of highResFlares) {
+                const r = Math.max(2, f.r);
+                const g = ctx.createRadialGradient(f.x, f.y, r * 0.1, f.x, f.y, r);
+                g.addColorStop(0.0, "#ffffff");
+                g.addColorStop(0.35, f.col);
+                g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         ctx.restore();
@@ -2428,11 +2456,23 @@ class RetroRenderer {
         ctx.arc(notchX + notchW - 9.5, notchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
         ctx.fill();
 
-        // Clock on left of Dynamic Island
+        // Live 24-Hour Clock & Time-of-Day Icon on left of Dynamic Island (Click to advance time phase [N])
+        const timeInfo = (game && typeof game.getTimePhaseInfo === "function")
+            ? game.getTimePhaseInfo()
+            : { icon: "☀️", dockLabel: "☀️ DAY [N]", phase: "DAY" };
+        const showColon = (Math.floor(this.time * 2.0) % 2) === 0;
+        const liveClockStr = (game && typeof game.getClockString === "function")
+            ? game.getClockString(showColon)
+            : "16:30";
+        const staticClockStr = (game && typeof game.getClockString === "function")
+            ? game.getClockString(true)
+            : "16:30";
+
         ctx.fillStyle = "#f8fafc";
-        ctx.font = "bold 9.5px -apple-system, 'Segoe UI', Roboto, sans-serif";
+        ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
-        ctx.fillText("09:41", sx + 12, sy + 10);
+        ctx.fillText(`${timeInfo.icon} ${liveClockStr}`, sx + 8, sy + 10);
+        this.cheatButtons.push({ id: "TOGGLE_NIGHT", x: sx + 4, y: sy + 2, w: 68, h: 15 });
 
         // Cellular Signal Bars + 5G + Battery on right of Dynamic Island
         const sigX = sx + sw - 50;
@@ -2661,7 +2701,7 @@ class RetroRenderer {
         ctx.fillStyle = "#38bdf8";
         ctx.font = "bold 8px -apple-system, 'Segoe UI', sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText("09:41 ✓✓", smsX + smsW - 6, smsY + 12);
+        ctx.fillText(`${(game && game.lastSmsTimeStr) ? game.lastSmsTimeStr : staticClockStr} ✓✓`, smsX + smsW - 6, smsY + 12);
         ctx.textAlign = "left";
 
         // Word-wrapped English SMS message body
@@ -2728,7 +2768,7 @@ class RetroRenderer {
 
         drawDockTab("PHONE_TAB_MSG", "🧭 GPS MAP", sx + 7, !isPlacesApp);
         drawDockTab("TOGGLE_COLLAPSE", "📍 PLACES [C]", sx + 9 + tabW, isPlacesApp);
-        drawDockTab("TOGGLE_NIGHT", this.nightMode ? "☀️ DAY [N]" : "🌙 NIGHT [N]", sx + 11 + tabW * 2, this.nightMode);
+        drawDockTab("TOGGLE_NIGHT", timeInfo.dockLabel || "☀️ DAY [N]", sx + 11 + tabW * 2, timeInfo.phase !== "DAY");
 
         // 6. Bottom iOS White Home Indicator Bar
         rrect(sx + (sw - 58) * 0.5, sy + sh - 6.5, 58, 3.2, 2);
@@ -3020,7 +3060,12 @@ class RetroRenderer {
                     return true;
                 }
                 if (btn.id === "TOGGLE_NIGHT") {
-                    this.nightMode = !this.nightMode;
+                    if (game && typeof game.advanceTimeOfDayPhase === "function") {
+                        game.advanceTimeOfDayPhase();
+                    } else {
+                        this.nightMode = !this.nightMode;
+                        this.nightFactor = this.nightMode ? 1.0 : 0.0;
+                    }
                     return true;
                 }
                 if (btn.id === "MINIMAP_NEXT_LM" && btn.landmarkId && typeof game.teleportToLandmark === "function") {
