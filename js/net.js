@@ -1213,41 +1213,37 @@ class ViceNetworkManager {
     }
 
     /* ========================================================================
-       7. INTERACTIVE [O] ONLINE ACTION (Teleport to Player / Spawn Rival / Room)
+       7. INTERACTIVE [O] ONLINE ACTION (Teleport to Real Connected Player / Open Server List)
        ======================================================================== */
     triggerOnlineAction() {
         const p = this.game.player;
-        const remotes = Array.from(this.remotePlayers.values());
+        const remotes = Array.from(this.remotePlayers.values()).filter((r) => !r.isBot);
 
         if (remotes.length === 0) {
-            // If alone in lobby, spawn an active Online Rival Player so they can test MP combat/chases immediately,
-            // AND remind them they can open a 2nd browser tab or share the URL to play with real players!
-            const rival = this.spawnSimulatedRival();
-            if (typeof this.game.sendPager === "function") {
-                this.game.sendPager(
-                    "VICE CITY ONLINE",
-                    `🌐 Room [${this.roomCode}] active! Spawned Online Rival ${rival.name} near you. Open a 2nd browser tab or share this URL with friends to play real P2P Multiplayer!`,
-                    false
-                );
+            // No other real players in this room yet -> Open the Server & Character Selector modal!
+            this.updateServerListUI();
+            const modal = document.getElementById("start-modal");
+            if (modal) {
+                modal.classList.remove("hidden");
             }
+            this.addChatLog(
+                "VICE NET",
+                `🌐 1/12 joueur sur [${this.roomCode}]. Partagez l'URL avec un ami ou changez de serveur !`,
+                "#00f0ff",
+                true
+            );
             return;
         }
 
-        // If remote players exist, cycle teleport to the next remote player (or spawn an extra rival if already next to them)
+        // Cycle teleport to the next real connected player in the room
         this._tpIdx = ((this._tpIdx || 0) + 1) % remotes.length;
         const target = remotes[this._tpIdx];
-        const dist = Math.hypot(target.x - p.x, target.y - p.y);
-
-        if (dist > 220) {
-            const targetObj = p.inVehicle || p;
-            targetObj.x = target.x - 64;
-            targetObj.y = target.y;
-            targetObj.z = target.z || 2.0;
-            this.game.addFloatingText(targetObj.x, targetObj.y - 30, `🌐 WARPED TO ${target.name}!`, target.color || "#00f0ff");
-        } else {
-            const rival = this.spawnSimulatedRival();
-            this.game.addFloatingText(p.x, p.y - 30, `🌐 +1 RIVAL: ${rival.name} (${this.getPlayerCount()}P ONLINE)`, rival.color);
-        }
+        const targetObj = p.inVehicle || p;
+        targetObj.x = target.x - 64;
+        targetObj.y = target.y;
+        targetObj.z = target.z || 2.0;
+        this.game.addFloatingText(targetObj.x, targetObj.y - 30, `🌐 TELEPORTED TO ${target.name}!`, target.color || "#00f0ff");
+        this.addChatLog("VICE NET", `🌐 Teleported to ${target.name}`, target.color || "#00f0ff", true);
     }
 }
 
