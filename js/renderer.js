@@ -160,6 +160,20 @@ class RetroRenderer {
                     vec3 crestFoam = vec3(0.88, 0.96, 0.98);
                     c.rgb = mix(c.rgb, crestFoam, caust * 0.15 * (1.0 - uNightTint * 0.65));
                     c.a = 0.78;
+                } else if (vAnim > -0.5 && vAnim < 0.5 && vWorldPos.y < 2.2) {
+                    // World-space multi-block Miami beach sand wind-ripples & coastal dune relief (100% continuous & non-repeating across block boundaries!)
+                    float isSand = clamp((c.r - c.b - 0.18) * 7.5, 0.0, 1.0) * step(0.72, c.r);
+                    if (isSand > 0.01) {
+                        float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
+                        float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
+                        float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
+                        float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
+                        float duneWave = (r1 * 0.52 + r2 * 0.33 + r3 * 0.15) * isSand;
+                        vec3 sandCrest = vec3(1.0, 0.94, 0.78);
+                        vec3 sandTrough = vec3(0.84, 0.69, 0.45);
+                        vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
+                        c.rgb = mix(c.rgb, targetSand, isSand * 0.36);
+                    }
                 }
 
                 // 2. 3D Cardinal Wall Normals, Solar Directional Shading & Ground-Contact Ambient Occlusion (world_mesh.cpp)
@@ -591,7 +605,7 @@ class RetroRenderer {
                 }
 
                 // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_06", () => {
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_07", () => {
                     if (this.gl) {
                         this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
                         if (this.mapStyle === "NYC") {
@@ -639,34 +653,34 @@ class RetroRenderer {
             return run();
         };
 
-        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_06", () => {
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_07", () => {
             viceTilesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_06", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_07", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_06", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_07", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_06", () => {
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_07", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_06", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_07", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_06", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_07", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();

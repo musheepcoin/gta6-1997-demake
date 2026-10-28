@@ -273,6 +273,23 @@ class LeonidaMap {
             }
         }
 
+        // Clean up accidental 1x1 3-story office building blocks placed on the beach sand (c >= 221, r = 40..195)
+        // so only authentic lifeguard_hut sprites, beach parasols & beach towels sit on Vice Beach!
+        const cleanSandBlkIdx = this.voxelGrid[(1 * MAP_ROWS + 144) * MAP_COLS + 225];
+        for (let ry = 40; ry <= 195; ry++) {
+            for (let cx = 221; cx <= 245; cx++) {
+                const g3 = (3 * MAP_ROWS + ry) * MAP_COLS + cx;
+                const b3 = this.blocksData[this.voxelGrid[g3]];
+                if (b3 && b3.lid === 51) {
+                    this.voxelGrid[g3] = 0;
+                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + cx] = 0;
+                    if (cleanSandBlkIdx) {
+                        this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx] = cleanSandBlkIdx;
+                    }
+                }
+            }
+        }
+
         // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
         // Enriches penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
         // and 3ds Max Glass Skylight Atriums (lid 31) while preserving 100% of their 3D side walls (w, e, n, s)!
