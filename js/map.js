@@ -388,48 +388,27 @@ class LeonidaMap {
                 const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
                 const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
 
-                // Intersection Corner (4-way corner OR T-junction crosswalk entrance): Place Miami 3-Lens Traffic Signal Gantry!
-                if (roadCount === 2 && (eRoad || wRoad) && (sRoad || nRoad)) {
-                    const dcCorner = eRoad ? 1 : -1;
+                // Signalized Major Urban Intersections Only (spaced >= 15 tiles apart, max 1 NS + 1 EW gantry per major junction!)
+                const isUrbanSignalZone = (c >= 102 && c <= 226 && r >= 34 && r <= 204);
+                const isMinorOceanCross = (r >= 138 && r <= 143) || (r >= 152 && r <= 161);
+                if (isUrbanSignalZone && !isMinorOceanCross && roadCount === 2 && eRoad && (sRoad || nRoad)) {
+                    const dcCorner = 1;
                     const drCorner = sRoad ? 1 : -1;
-                    const surfZ = this.surfaceLayer[idx] || 2.0;
-                    const baseX = (c + 0.5) * TILE_SIZE + dcCorner * 18.0;
-                    const baseY = (r + 0.5) * TILE_SIZE + drCorner * 18.0;
-                    // NW (eRoad && sRoad) & SE (wRoad && nRoad) overhang the N/S road; SW & NE overhang the E/W cross-street
-                    const isNS = (eRoad && sRoad) || (wRoad && nRoad);
-                    const dirX = isNS ? dcCorner : 0;
-                    const dirY = isNS ? 0 : drCorner;
-                    const headX = baseX + dirX * 32.0;
-                    const headY = baseY + dirY * 32.0;
-                    const armAngle = isNS ? (dcCorner > 0 ? 0 : Math.PI) : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
-                    this.trafficSignals.push({
-                        c,
-                        r,
-                        baseX,
-                        baseY,
-                        headX,
-                        headY,
-                        dirX,
-                        dirY,
-                        z: surfZ,
-                        armAngle,
-                        axis: isNS ? "NS" : "EW"
-                    });
-                    continue;
-                }
-
-                // T-Junction opposite sidewalk corner (e.g. Ocean Drive East sidewalk opposite cross-street crosswalks)
-                if (roadCount === 1 && (wRoad || eRoad)) {
-                    const dcSide = eRoad ? 1 : -1;
-                    const adjLid = this.getBlockInfo(c + dcSide, r, 1).lid;
-                    const prevLid = this.getBlockInfo(c + dcSide, r - dcSide, 1).lid;
-                    if (adjLid === 24 && prevLid === 25) {
+                    // NW corner (eRoad && sRoad) -> 1 NS signal; SW corner (eRoad && nRoad) -> 1 EW signal
+                    const isNS = sRoad;
+                    const axis = isNS ? "NS" : "EW";
+                    const tooClose = this.trafficSignals.some(
+                        ts => ts.axis === axis && Math.hypot(ts.c - c, ts.r - r) < 15.0
+                    );
+                    if (!tooClose) {
                         const surfZ = this.surfaceLayer[idx] || 2.0;
-                        const baseX = (c + 0.5) * TILE_SIZE + dcSide * 18.0;
-                        const baseY = (r + 0.5) * TILE_SIZE - dcSide * 14.0;
-                        const headX = baseX + dcSide * 32.0;
-                        const headY = baseY;
-                        const armAngle = dcSide > 0 ? 0 : Math.PI;
+                        const baseX = (c + 0.5) * TILE_SIZE + dcCorner * 18.0;
+                        const baseY = (r + 0.5) * TILE_SIZE + drCorner * 18.0;
+                        const dirX = isNS ? dcCorner : 0;
+                        const dirY = isNS ? 0 : drCorner;
+                        const headX = baseX + dirX * 32.0;
+                        const headY = baseY + dirY * 32.0;
+                        const armAngle = isNS ? 0 : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
                         this.trafficSignals.push({
                             c,
                             r,
@@ -437,11 +416,11 @@ class LeonidaMap {
                             baseY,
                             headX,
                             headY,
-                            dirX: dcSide,
-                            dirY: 0,
+                            dirX,
+                            dirY,
                             z: surfZ,
                             armAngle,
-                            axis: "NS"
+                            axis
                         });
                         continue;
                     }
@@ -1355,6 +1334,18 @@ class LeonidaMap {
             if (this.resolveCircleBuildingCollision(sx, sy, 14, zBlocks).hit) return false;
         }
         return true;
+    }
+
+    hasTrafficSignalNear(x, y, maxDist = 340) {
+        if (!Array.isArray(this.trafficSignals) || this.trafficSignals.length === 0) return false;
+        const maxD2 = maxDist * maxDist;
+        for (let i = 0; i < this.trafficSignals.length; i++) {
+            const ts = this.trafficSignals[i];
+            const dx = ts.headX - x;
+            const dy = ts.headY - y;
+            if (dx * dx + dy * dy <= maxD2) return true;
+        }
+        return false;
     }
 
     chooseTargetGuidedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks = 2.0, turnedInIntersection = false) {
