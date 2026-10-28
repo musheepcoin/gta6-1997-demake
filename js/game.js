@@ -96,11 +96,12 @@ class LeonidaGame {
         this.currentDistrict = "";
         this.districtPopupTimer = 0;
 
-        // Live 24-Hour Smartphone Clock & Dynamic Day/Night Cycle (1 in-game minute = 1 real second)
-        // Starts at 16:30 (Sunny late afternoon on Ocean Drive, approaching Golden Hour sunset & Neon Night!)
-        this.worldMinutes = 16 * 60 + 30;
+        // Live 24-Hour Smartphone Clock & Dynamic Day/Night Cycle:
+        // 1 in-game minute = 1 real second -> 1 full 24-hour cycle (1440 min) = 24 real minutes!
+        // Starts at 12:00 (Sunny midday on Ocean Drive)
+        this.worldMinutes = 12 * 60;
         this.timeScale = 1.0;
-        this.lastSmsTimeStr = "16:30";
+        this.lastSmsTimeStr = "12:00";
         this._lastAnnouncedPhase = "DAY";
 
         // Active Kill Frenzy, GOURANGA Monk Chain & Enterable Venue Interior state
@@ -2314,8 +2315,9 @@ class LeonidaGame {
     update(dt) {
         if (!this.started) return;
 
-        // Advance Live 24-Hour Smartphone Clock & Smooth Day / Sunset / Night / Sunrise Cycle (1 in-game minute = 1 real second)
-        this.worldMinutes = (this.worldMinutes + dt * 60.0 * (this.timeScale || 1.0)) % 1440;
+        // Advance Live 24-Hour Smartphone Clock & Smooth Day / Sunset / Night / Sunrise Cycle
+        // (1.0 in-game minute per 1.0 real second = 24 real minutes for a full 24h cycle!)
+        this.worldMinutes = (this.worldMinutes + dt * 1.0 * (this.timeScale || 1.0)) % 1440;
         this.syncDayNightCycle();
 
         if (this.interiorCooldown > 0) {
