@@ -348,7 +348,8 @@ class RetroRenderer {
             // - Repairs interior palette-index-0 black holes inside car windshields, tires & grilles
             // - Upgrades flat 1997 8-bit car roofs/hoods with GTA 2's curved 3ds Max metallic clearcoat dome & contoured side fenders
             // - Transforms flat grey/black car windows into GTA 2 glossy sapphire-tinted windshields with diagonal sky reflections!
-            const closeBoxHoles = (rect, isVehicle = false) => {
+            // - Remasters pedestrian sprites (`isPed = true`) to GTA 2 (1999) 3D pre-rendered character quality (spherical head/shoulder dome + dark contour)!
+            const closeBoxHoles = (rect, isVehicle = false, isPed = false) => {
                 if (!Array.isArray(rect) || rect.length < 4) return;
                 const [sx, sy, sw, sh] = rect;
                 if (sw <= 3 || sh <= 3 || sx < 0 || sy < 0 || sx + sw > W || sy + sh > H) return;
@@ -401,23 +402,48 @@ class RetroRenderer {
                             d[p + 3] = 255;
                         }
 
-                        if (!isVehicle) continue;
+                        if (!isVehicle && !isPed) continue;
 
-                        const nx = ((lx + 0.5) / sw) * 2.0 - 1.0; // -1: left door, 0: roof centerline, +1: right door
+                        const nx = ((lx + 0.5) / sw) * 2.0 - 1.0;
                         const r = d[p];
                         const g = d[p + 1];
                         const b = d[p + 2];
-                        const maxC = Math.max(r, g, b);
-                        const minC = Math.min(r, g, b);
-                        const sat = maxC - minC;
-                        const lum = r * 0.299 + g * 0.587 + b * 0.114;
 
-                        // Check if this pixel is on the outer 1px chassis perimeter (adjacent to exterior background)
+                        // Check if this pixel is on the outer 1px silhouette perimeter (adjacent to exterior background)
                         const isPerimeter =
                             ext[idx - 1] === 1 ||
                             ext[idx + 1] === 1 ||
                             ext[idx - sw] === 1 ||
                             ext[idx + sw] === 1;
+
+                        if (isPed) {
+                            if (isPerimeter) {
+                                // Crisp GTA 2 1px dark character silhouette outline so pedestrians pop against bright sidewalks & asphalt!
+                                d[p] = (r * 0.73) | 0;
+                                d[p + 1] = (g * 0.73) | 0;
+                                d[p + 2] = (b * 0.77) | 0;
+                            } else {
+                                // GTA 2 3ds Max Spherical Head & Cylindrical Shoulder Volume Shading!
+                                const radialDist = Math.hypot(nx * 0.90, (ny + 0.06) * 1.02);
+                                const dome = Math.max(0.0, 1.0 - radialDist * 1.12);
+                                const shadeMult = 0.88 + 0.24 * dome;
+                                const crownHighlight = (dome * dome) * 14.0;
+                                // Subtle 14% color vibrance boost on GTA 2 pedestrian outfits
+                                const avg = (r + g + b) * 0.3333;
+                                const vr = avg + (r - avg) * 1.14;
+                                const vg = avg + (g - avg) * 1.14;
+                                const vb = avg + (b - avg) * 1.14;
+                                d[p] = Math.min(255, Math.max(0, Math.round(vr * shadeMult + crownHighlight)));
+                                d[p + 1] = Math.min(255, Math.max(0, Math.round(vg * shadeMult + crownHighlight)));
+                                d[p + 2] = Math.min(255, Math.max(0, Math.round(vb * shadeMult + crownHighlight)));
+                            }
+                            continue;
+                        }
+
+                        const maxC = Math.max(r, g, b);
+                        const minC = Math.min(r, g, b);
+                        const sat = maxC - minC;
+                        const lum = r * 0.299 + g * 0.587 + b * 0.114;
 
                         if (isPerimeter) {
                             // Crisp GTA 2 dark metallic chassis outline
@@ -452,23 +478,32 @@ class RetroRenderer {
 
             if (Array.isArray(meta.sprites.vehicles)) {
                 for (const ve of meta.sprites.vehicles) {
-                    if (ve.base) closeBoxHoles(ve.base, true);
+                    if (ve.base) closeBoxHoles(ve.base, true, false);
                     if (Array.isArray(ve.remaps)) {
-                        for (const rm of ve.remaps) closeBoxHoles(rm, true);
+                        for (const rm of ve.remaps) closeBoxHoles(rm, true, false);
                     }
                     if (Array.isArray(ve.doors)) {
-                        for (const dr of ve.doors) closeBoxHoles(dr, true);
+                        for (const dr of ve.doors) closeBoxHoles(dr, true, false);
                     }
                     if (ve.damage) {
-                        if (ve.damage.front) closeBoxHoles(ve.damage.front, true);
-                        if (ve.damage.rear) closeBoxHoles(ve.damage.rear, true);
-                        if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy, true);
+                        if (ve.damage.front) closeBoxHoles(ve.damage.front, true, false);
+                        if (ve.damage.rear) closeBoxHoles(ve.damage.rear, true, false);
+                        if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy, true, false);
                     }
                 }
             }
             if (meta.sprites.wrecked) {
                 for (const k of Object.keys(meta.sprites.wrecked)) {
-                    closeBoxHoles(meta.sprites.wrecked[k], false);
+                    closeBoxHoles(meta.sprites.wrecked[k], false, false);
+                }
+            }
+            if (meta.sprites.peds) {
+                for (const roleKey of Object.keys(meta.sprites.peds)) {
+                    const roleFrames = meta.sprites.peds[roleKey];
+                    if (!roleFrames) continue;
+                    for (const frameKey of Object.keys(roleFrames)) {
+                        closeBoxHoles(roleFrames[frameKey], false, true);
+                    }
                 }
             }
 
@@ -1497,14 +1532,14 @@ class RetroRenderer {
         this.pushAtlasSprite3D(rect, x, y, zBlocks, angle, scale, drawOrder);
     }
 
-    batchPedSprite3D(pedType, frameIdx, x, y, zBlocks, angle, scale = 1.0, muzzleFlash = false, drawOrder = SPRITE_DRAW_ORDER.PEDESTRIAN) {
+    batchPedSprite3D(pedType, frameIdx, x, y, zBlocks, angle, scale = 1.0, muzzleFlash = false, drawOrder = SPRITE_DRAW_ORDER.PEDESTRIAN, rTint = 1.0, gTint = 1.0, bTint = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta.sprites.peds[pedType]) return;
         const frames = this.gta1Meta.sprites.peds[pedType];
         const rect = frames[String(frameIdx)] || frames["98"] || frames["0"];
         if (!rect) return;
         // SPRITE_ZERO_ANGLE = 90.0f in GameDefs.h: .G24 sprites face South (+Y, Math.PI/2)
         const rot = angle - Math.PI * 0.5;
-        this.pushAtlasSprite3D(rect, x, y, zBlocks, rot, scale, drawOrder);
+        this.pushAtlasSprite3D(rect, x, y, zBlocks, rot, scale, drawOrder, rTint, gTint, bTint, 1.0);
 
         if (muzzleFlash && this.gta1Meta.sprites.objects["234"]) {
             const fl = this.gta1Meta.sprites.objects["234"];
@@ -1604,7 +1639,7 @@ class RetroRenderer {
             let pedType = ped.g24Type || "civ2";
             if (ped.kind === "MONK") pedType = "monk";
             else if (ped.kind === "COP") pedType = "police";
-            this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.0, false, SPRITE_DRAW_ORDER.CORPSE);
+            this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.12, false, SPRITE_DRAW_ORDER.CORPSE);
         }
 
         // Solar azimuth shadow vector for pedestrians, vehicles & street furniture (TimeOfDaySunAt from gta2-rtx-remix time_of_day.cpp!)
@@ -1620,8 +1655,18 @@ class RetroRenderer {
         const sunSin = Math.sin(sunShadowAngle);
 
         // 4. Living Pedestrians, Monks, Cops, Jason Duval & Lucia Caminos (eSpriteDrawOrder_Pedestrian / JumpingPedestrian)
-        // Native 1997 GTA 1 .G24 ped scale = 1.0 (15x11 texels = 15/64 x 11/64 map blocks!)
-        const pedScale = 1.0;
+        // GTA 2 (1999) fuller top-down 3D pedestrian presence (pedScale = 1.12 vs tiny GTA 1 1.0) + RemapPed outfit variety!
+        const pedScale = 1.12;
+        const pedRemapTints = [
+            [1.00, 1.00, 1.00], // Classic Original
+            [0.86, 1.04, 1.12], // Vice Pastel Cyan
+            [1.10, 0.88, 0.96], // Flamingo Rose
+            [1.08, 1.02, 0.82], // Sunburst Linen
+            [0.88, 1.08, 0.92], // Ocean Mint
+            [0.96, 0.90, 1.12], // Lavender Neon
+            [1.10, 0.94, 0.84], // Coral Peach
+            [0.90, 0.98, 1.10]  // Biscayne Blue
+        ];
         for (const ped of game.peds) {
             if (ped.dead) continue;
             if (ped.x < minX || ped.x > maxX || ped.y < minY || ped.y > maxY) continue;
@@ -1648,7 +1693,7 @@ class RetroRenderer {
 
             // Solar-tracked pedestrian ground drop shadow (live_geometry.cpp + time_of_day.cpp)
             if (nfGlobal < 0.88) {
-                this.pushSolidQuad3D(ped.x + sunCos * 3.2, ped.y + sunSin * 3.2, pz - 0.022, 9.5, 7.5, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(ped.x + sunCos * 3.4, ped.y + sunSin * 3.4, pz - 0.022, 10.5, 8.2, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
             const pedDrawOrder = typeof ped.getDrawOrder === "function"
@@ -1682,12 +1727,21 @@ class RetroRenderer {
                 frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0, isRunning, walkPhase);
             }
 
-            this.batchPedSprite3D(pedType, frameIdx, ped.x, ped.y, pz, ped.angle, pedScale, false, pedDrawOrder);
+            let pr = 1.0, pg = 1.0, pb = 1.0;
+            if (pedType.startsWith("civ")) {
+                const remapIdx = Math.abs(Math.floor(ped.animSeed * 997)) % pedRemapTints.length;
+                const rt = pedRemapTints[remapIdx];
+                pr = rt[0];
+                pg = rt[1];
+                pb = rt[2];
+            }
+
+            this.batchPedSprite3D(pedType, frameIdx, ped.x, ped.y, pz, ped.angle, pedScale, false, pedDrawOrder, pr, pg, pb);
 
             // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm civilian pedestrians smoke a glowing cigarette ember after dusk!
             if (nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
-                const cigX = ped.x + Math.cos(ped.angle + 0.55) * 5.2;
-                const cigY = ped.y + Math.sin(ped.angle + 0.55) * 5.2;
+                const cigX = ped.x + Math.cos(ped.angle + 0.55) * 5.6;
+                const cigY = ped.y + Math.sin(ped.angle + 0.55) * 5.6;
                 const dragGlow = 0.65 + 0.35 * Math.max(0, Math.sin(this.time * 2.2 + ped.animSeed * 30));
                 this.pushSolidQuad3D(cigX, cigY, pz + 0.015, 1.9, 1.9, 0, 1.0, 0.26 * dragGlow, 0.06, 0.95 * nfGlobal, SPRITE_DRAW_ORDER.HUD_ARROW);
             }
@@ -1703,7 +1757,7 @@ class RetroRenderer {
         if (jason && !jason.inVehicle) {
             const jz = this.getEntityZ(jason, 0.045);
             if (nfGlobal < 0.88) {
-                this.pushSolidQuad3D(jason.x + sunCos * 3.4, jason.y + sunSin * 3.4, jz - 0.022, 10.5, 8.2, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(jason.x + sunCos * 3.5, jason.y + sunSin * 3.5, jz - 0.022, 11.0, 8.6, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
             const jWeapon = jason.weaponKey || "FIST";
             const frameIdx = this.getPedFrameIndex(jWeapon, Boolean(jason.isMoving), Boolean(jason.isRunning), jason.walkPhase || 0);
@@ -1714,7 +1768,7 @@ class RetroRenderer {
                 jason.y,
                 jz,
                 jason.angle,
-                pedScale * 1.18,
+                pedScale * 1.10,
                 (jason.muzzleTimer || 0) > 0,
                 SPRITE_DRAW_ORDER.PEDESTRIAN
             );
@@ -1726,8 +1780,8 @@ class RetroRenderer {
             const jumpZ = p.jumpZOffset || 0;
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
             // Solar-tracked shadow under Lucia (separates further when jumping!)
-            const pShOff = 3.5 + jumpZ * 16.0;
-            this.pushSolidQuad3D(p.x + sunCos * pShOff, p.y + sunSin * pShOff, baseZ - 0.022, 11.5, 9.0, sunShadowAngle, 0.03, 0.04, 0.08, Math.max(0.22, sunShadowAlpha), SPRITE_DRAW_ORDER.TIRE_MARKS);
+            const pShOff = 3.6 + jumpZ * 16.0;
+            this.pushSolidQuad3D(p.x + sunCos * pShOff, p.y + sunSin * pShOff, baseZ - 0.022, 11.8, 9.2, sunShadowAngle, 0.03, 0.04, 0.08, Math.max(0.22, sunShadowAlpha), SPRITE_DRAW_ORDER.TIRE_MARKS);
 
             let frameIdx;
             if ((p.slideCarTimer || 0) > 0) {
@@ -1769,7 +1823,7 @@ class RetroRenderer {
                 p.y,
                 baseZ + jumpZ,
                 p.angle,
-                pedScale * 1.24,
+                pedScale * 1.15,
                 (p.muzzleTimer || 0) > 0,
                 isJumpingOrSliding ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.PEDESTRIAN
             );
