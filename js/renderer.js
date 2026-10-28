@@ -284,23 +284,23 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_57";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_57";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_57";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_69";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_69";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_69";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_57";
+        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_69";
 
         this.viceOverviewImg.onload = () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_57";
+        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_69";
 
-        fetch("assets/gta1/gta1_meta.json?v=97_57")
+        fetch("assets/gta1/gta1_meta.json?v=97_69")
             .then((res) => res.json())
             .then((meta) => {
                 this.gta1Meta = meta;
@@ -308,7 +308,7 @@ class RetroRenderer {
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetch("assets/gta1/gta1_map.bin?v=97_57")
+        fetch("assets/gta1/gta1_map.bin?v=97_69")
             .then((res) => res.arrayBuffer())
             .then((buf) => {
                 mapBinBuffer = buf;

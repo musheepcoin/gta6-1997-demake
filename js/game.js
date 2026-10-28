@@ -170,8 +170,8 @@ class LeonidaGame {
             { spec: "PANZER_TANK", c: 230.5, r: 22.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
 
             // --- E. Star Island Mansions & Port of Vice City Cruise Terminal ---
-            { spec: "STINGER_CABRIO", c: 172.5, r: 105.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
-            { spec: "PENETRATOR_GT", c: 174.5, r: 107.5, a: Math.PI, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "STINGER_CABRIO", c: 172.5, r: 104.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "PENETRATOR_GT", c: 174.5, r: 104.5, a: Math.PI, z: 2.0, missionTag: "LANDMARK" },
             { spec: "AIRBOAT", c: 185.5, r: 160.0, a: 0, z: 1.0, missionTag: "LANDMARK" },
 
             // --- F. Vice City Mambas Open-Air Stadium, Downtown & Golf Club ---
@@ -179,22 +179,22 @@ class LeonidaGame {
             { spec: "MICRO_KART", c: 145.5, r: 53.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
             // --- G. Wynwood, Lake Leonida Gator Island & Mount Kalaga ---
-            { spec: "HARLEY_BIKE", c: 115.5, r: 82.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "HARLEY_BIKE", c: 116.5, r: 82.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { spec: "AIRBOAT", c: 82.5, r: 78.0, a: 0, z: 1.0, missionTag: "LANDMARK" },
-            { spec: "CAMPER_PICKUP", c: 77.5, r: 76.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
-            { spec: "MONSTER_BUGGY", c: 84.5, r: 25.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "CAMPER_PICKUP", c: 73.5, r: 76.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "MONSTER_BUGGY", c: 84.5, r: 22.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
             // --- H. Leonida State Penitentiary Yard & Port Gellhorn Dirt Speedway Oval ---
-            { spec: "VCPD_CRUISER", c: 31.5, r: 75.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "VCPD_CRUISER", c: 31.5, r: 76.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
             { spec: "CHALLENGER_RT", c: 46.5, r: 112.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
             { spec: "FJORD_FASTBACK", c: 49.5, r: 112.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
             { spec: "FIRE_TRUCK", c: 38.5, r: 136.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
 
             // --- I. VCIA International Airport Tarmac & Grassrivers Thrillbilly Mud Park / Keys ---
-            { spec: "SUPERBIKE", c: 52.0, r: 148.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
-            { spec: "PICKUP_TRUCK", c: 58.0, r: 214.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "SUPERBIKE", c: 55.5, r: 149.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "PICKUP_TRUCK", c: 58.0, r: 212.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
             { spec: "AIRBOAT", c: 68.5, r: 222.5, a: 0, z: 1.0, missionTag: "LANDMARK" },
-            { spec: "STINGER_CABRIO", c: 135.0, r: 241.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" }
+            { spec: "STINGER_CABRIO", c: 135.0, r: 239.5, a: -Math.PI, z: 2.0, driver: "AI_TRAFFIC" }
         ];
 
         parked.forEach((p, idx) => {
@@ -360,9 +360,26 @@ class LeonidaGame {
         }
         for (const v of this.vehicles) {
             v.z = this.map.getHeightAtPixel(v.x, v.y, 4.0);
+            let bx = Math.floor(v.x / TILE_SIZE);
+            let by = Math.floor(v.y / TILE_SIZE);
+            const nav = this.map.getNavigationBlock(bx, by, v.z);
             if (v.driver === "AI_TRAFFIC" || v.driver === "AI_EMERGENCY") {
-                const bx = Math.floor(v.x / TILE_SIZE);
-                const by = Math.floor(v.y / TILE_SIZE);
+                if (nav && nav.groundType !== GROUND_TYPE.ROAD) {
+                    for (let r = 1; r <= 4; r++) {
+                        let foundRoad = false;
+                        for (let dy = -r; dy <= r && !foundRoad; dy++) {
+                            for (let dx = -r; dx <= r && !foundRoad; dx++) {
+                                const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z);
+                                if (nb && nb.groundType === GROUND_TYPE.ROAD) {
+                                    bx += dx;
+                                    by += dy;
+                                    foundRoad = true;
+                                }
+                            }
+                        }
+                        if (foundRoad) break;
+                    }
+                }
                 v.x = (bx + 0.5) * TILE_SIZE;
                 v.y = (by + 0.5) * TILE_SIZE;
                 v.angle = this.map.getAlignedRoadAngle(bx, by, v.angle, v.z);
@@ -372,6 +389,22 @@ class LeonidaGame {
                 v.aiBlockY = -1;
                 v.aiChosenDir = null;
                 v.aiTurnedInIntersection = false;
+            } else if (!v.driver && nav && nav.groundType === GROUND_TYPE.ROAD) {
+                // Never leave a driverless parked car blocking an active road lane!
+                for (let r = 1; r <= 4; r++) {
+                    let foundCurb = false;
+                    for (let dy = -r; dy <= r && !foundCurb; dy++) {
+                        for (let dx = -r; dx <= r && !foundCurb; dx++) {
+                            const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z);
+                            if (nb && (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)) {
+                                v.x = (bx + dx + 0.5) * TILE_SIZE;
+                                v.y = (by + dy + 0.5) * TILE_SIZE;
+                                foundCurb = true;
+                            }
+                        }
+                    }
+                    if (foundCurb) break;
+                }
             }
         }
         for (const ped of this.peds) {
