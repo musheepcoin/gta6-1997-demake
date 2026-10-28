@@ -85,7 +85,7 @@ class RetroRenderer {
         const gl = this.glCanvas.getContext("webgl", {
             alpha: false,
             Depth: true,
-            antialias: false,
+            antialias: true,
             preserveDrawingBuffer: true
         });
         if (!gl) {
@@ -112,14 +112,14 @@ class RetroRenderer {
                     float idx = 698.0 + 25.0 + uWaterStep;
                     float col = mod(idx, 16.0);
                     float row = floor(idx / 16.0);
-                    vec2 localUV = fract(aUV * vec2(16.0, 51.0));
+                    vec2 localUV = clamp(fract(aUV * vec2(16.0, 51.0)), vec2(0.5 / 64.0), vec2(63.5 / 64.0));
                     uv = (vec2(col, row) + localUV) / vec2(16.0, 51.0);
-                } else if (aAnim > 1.5) {
+                } else if (aAnim > 1.5 && aAnim < 2.5) {
                     // Lid 22 animated rooftop fan: Aux frames 19..24 in 16x51 tile atlas
                     float idx = 698.0 + 19.0 + uFanStep;
                     float col = mod(idx, 16.0);
                     float row = floor(idx / 16.0);
-                    vec2 localUV = fract(aUV * vec2(16.0, 51.0));
+                    vec2 localUV = clamp(fract(aUV * vec2(16.0, 51.0)), vec2(0.5 / 64.0), vec2(63.5 / 64.0));
                     uv = (vec2(col, row) + localUV) / vec2(16.0, 51.0);
                 }
                 vUV = uv;
@@ -316,9 +316,9 @@ class RetroRenderer {
         gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        // Nearest-neighbor filtering (exact crisp 1997 1997 GTA 1 pixel art!)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        // GTA 2 (1999) Direct3D hardware bilinear texture filtering (smooth rotated 3D cars, peds & perspective walls!)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         return tex;
@@ -580,21 +580,21 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_98";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_98";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_98";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_99";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_99";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_99";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_81";
+        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_99";
 
         this.viceOverviewImg.onload = () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_81";
+        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_99";
 
         fetch("assets/gta1/gta1_meta.json?v=97_81")
             .then((res) => res.json())
@@ -664,8 +664,8 @@ class RetroRenderer {
         const bedAtlasIdx = (tiles.lid_start || 390) + (98 % (tiles.lid_count || 154));
         const bedCol = bedAtlasIdx % 16;
         const bedRow = Math.floor(bedAtlasIdx / 16);
-        const padU = 0.25 / 1024.0;
-        const padV = 0.25 / 3264.0;
+        const padU = 0.5 / 1024.0;
+        const padV = 0.5 / 3264.0;
         const bedU0 = bedCol / 16.0 + padU;
         const bedU1 = (bedCol + 1.0) / 16.0 - padU;
         const bedV0 = bedRow / 51.0 + padV;
@@ -981,9 +981,9 @@ class RetroRenderer {
 
         const col = atlasIdx % 16;
         const row = Math.floor(atlasIdx / 16);
-        // Inset UV by 0.25 texels to prevent mip/edge bleeding at perspective angles (kUvInset from world_mesh.cpp)
-        const padU = 0.25 / 1024.0;
-        const padV = 0.25 / 3264.0;
+        // Inset UV by 0.5 texels so gl.LINEAR bilinear filtering never bleeds across 64x64 tile boundaries!
+        const padU = 0.5 / 1024.0;
+        const padV = 0.5 / 3264.0;
         const u0 = col / 16.0 + padU;
         const u1 = (col + 1.0) / 16.0 - padU;
         const v0 = row / 51.0 + padV;
@@ -1163,10 +1163,10 @@ class RetroRenderer {
         const [sx, sy, sw, sh] = rect;
         const texW = this.gta1SpritesImg.width;
         const texH = this.gta1SpritesImg.height;
-        const u0 = (sx + 0.15) / texW;
-        const v0 = (sy + 0.15) / texH;
-        const u1 = (sx + sw - 0.15) / texW;
-        const v1 = (sy + sh - 0.15) / texH;
+        const u0 = (sx + 0.35) / texW;
+        const v0 = (sy + 0.35) / texH;
+        const u1 = (sx + sw - 0.35) / texW;
+        const v1 = (sy + sh - 0.35) / texH;
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, sw * scale, sh * scale, angleRad, u0, v0, u1, v1, r, g, b, a, drawOrder, pitchZ);
     }
 
@@ -1322,7 +1322,7 @@ class RetroRenderer {
         // 2. Composite WebGL 3D scene onto 2D main canvas + draw dynamic Night Lighting, floating scores, HUD & Smartphone
         const ctx = this.ctx;
         ctx.save();
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
         ctx.drawImage(this.glCanvas, 0, 0);
 
         // 2B. Real Dynamic Day/Sunset/Night Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
@@ -1603,7 +1603,7 @@ class RetroRenderer {
             let pedType = ped.g24Type || "civ2";
             if (ped.kind === "MONK") pedType = "monk";
             else if (ped.kind === "COP") pedType = "police";
-            this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.12, false, SPRITE_DRAW_ORDER.CORPSE);
+            this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.30, false, SPRITE_DRAW_ORDER.CORPSE);
         }
 
         // Solar azimuth shadow vector for pedestrians, vehicles & street furniture (TimeOfDaySunAt from gta2-rtx-remix time_of_day.cpp!)
@@ -1614,13 +1614,13 @@ class RetroRenderer {
         const sunShadowAngle = Math.atan2(0.55, Math.max(-1.2, Math.min(1.2, hourFromNoon)));
         const sunShadowLen = 11.0 + Math.min(14.0, Math.abs(hourFromNoon) * 13.0);
         const nfGlobal = Math.max(0, Math.min(1, this.nightFactor || 0));
-        const sunShadowAlpha = 0.30 * (1.0 - nfGlobal * 0.72);
+        const sunShadowAlpha = 0.34 * (1.0 - nfGlobal * 0.70);
         const sunCos = Math.cos(sunShadowAngle);
         const sunSin = Math.sin(sunShadowAngle);
 
         // 4. Living Pedestrians, Monks, Cops, Jason Duval & Lucia Caminos (eSpriteDrawOrder_Pedestrian / JumpingPedestrian)
-        // GTA 2 (1999) fuller top-down 3D pedestrian presence (pedScale = 1.12 vs tiny GTA 1 1.0) + RemapPed outfit variety!
-        const pedScale = 1.12;
+        // GTA 2 (1999) fuller top-down 3D pedestrian presence (pedScale = 1.34 so peds stay crisp & readable even when zoomed out!) + RemapPed outfit variety!
+        const pedScale = 1.34;
         const pedRemapTints = [
             [1.00, 1.00, 1.00], // Classic Original
             [0.86, 1.04, 1.12], // Vice Pastel Cyan
@@ -1859,19 +1859,34 @@ class RetroRenderer {
             const cosA = Math.cos(v.angle);
             const sinA = Math.sin(v.angle);
 
-            // A. GTA 2 live_geometry.cpp: Solar-Tracked 3D Ground Drop Shadow under EVERY vehicle (separating further when airborne!)
-            const shOff = 4.2 + airZ * 22.0;
+            // A. GTA 2 live_geometry.cpp: Dual-Layer Under-Chassis Contact Shadow + Solar-Tracked 3D Drop Shadow under EVERY vehicle!
+            if (airZ < 0.05) {
+                this.pushSolidQuad3D(
+                    v.x,
+                    v.y,
+                    vz - 0.022,
+                    (v.w || 48) * 0.94,
+                    (v.h || 24) * 0.92,
+                    v.angle,
+                    0.02,
+                    0.03,
+                    0.06,
+                    0.36,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                );
+            }
+            const shOff = 4.6 + airZ * 22.0;
             this.pushSolidQuad3D(
                 v.x + sunCos * shOff,
                 v.y + sunSin * shOff,
-                vz - 0.025,
-                (v.w || 48) * 0.88,
-                (v.h || 24) * 0.86,
+                vz - 0.026,
+                (v.w || 48) * 0.90,
+                (v.h || 24) * 0.88,
                 v.angle,
                 0.03,
                 0.04,
                 0.08,
-                airZ > 0.05 ? 0.50 : Math.max(0.24, sunShadowAlpha * 1.15),
+                airZ > 0.05 ? 0.52 : Math.max(0.28, sunShadowAlpha * 1.18),
                 SPRITE_DRAW_ORDER.TIRE_MARKS
             );
 

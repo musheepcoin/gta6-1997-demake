@@ -63,7 +63,6 @@ const VEHICLE_SPECS = {
         stripeColor: "#ccfbf1",
         bodyStyle: "CONVERTIBLE",
         isConvertible: true,
-        useBaseOnly: true,
         amphibious: false
     },
     MINT_STALLION: {
