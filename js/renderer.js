@@ -1670,22 +1670,42 @@ class RetroRenderer {
             lctx.fill();
         };
 
-        const addHeadlightCone = (sx, sy, angle, lenPx, spreadRad, innerCol, midCol) => {
+        const addHeadlightCone = (sx, sy, angle, lenPx, spreadRad, baseHalfWPx, innerCol, midCol) => {
             const x0 = sx * scale;
             const y0 = sy * scale;
             const len = Math.max(12, lenPx * scale);
-            const x1 = x0 + Math.cos(angle) * len;
-            const y1 = y0 + Math.sin(angle) * len;
+            const bw = Math.max(1.5, (baseHalfWPx || 2.0) * scale);
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            const nx = -sinA;
+            const ny = cosA;
+            const x1 = x0 + cosA * len;
+            const y1 = y0 + sinA * len;
+
             const g = lctx.createLinearGradient(x0, y0, x1, y1);
             g.addColorStop(0.0, innerCol);
             g.addColorStop(0.45, midCol);
             g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
             lctx.fillStyle = g;
-            lctx.beginPath();
-            lctx.moveTo(x0, y0);
-            lctx.arc(x0, y0, len, angle - spreadRad, angle + spreadRad);
-            lctx.closePath();
-            lctx.fill();
+
+            // Draw 3 feathered wide-base trapezoidal fan layers so the beam starts wide across both headlights and has soft side edges
+            const layers = [
+                { sp: spreadRad * 1.14, wMult: 1.12, alpha: 0.34 },
+                { sp: spreadRad * 0.90, wMult: 1.00, alpha: 0.44 },
+                { sp: spreadRad * 0.60, wMult: 0.76, alpha: 0.38 }
+            ];
+            const prevAlpha = lctx.globalAlpha;
+            for (const ly of layers) {
+                const w = bw * ly.wMult;
+                lctx.globalAlpha = prevAlpha * ly.alpha;
+                lctx.beginPath();
+                lctx.moveTo(x0 - nx * w, y0 - ny * w);
+                lctx.arc(x0, y0, len, angle - ly.sp, angle + ly.sp);
+                lctx.lineTo(x0 + nx * w, y0 + ny * w);
+                lctx.closePath();
+                lctx.fill();
+            }
+            lctx.globalAlpha = prevAlpha;
         };
 
         // Collect crisp flares (streetlamp bulbs, dual headlight bulbs, red taillights) for the high-res pass
@@ -1833,15 +1853,18 @@ class RetroRenderer {
             const fyWorld = v.y + sinA * frontDist;
             const fSc = this.worldToScreen(fxWorld, fyWorld, vz);
 
-            // Long Conical Headlight Beam illuminating the road, traffic & pedestrians ahead!
+            // Long Wide-Base Headlight Beam (starts across the full width of both headlights for cars/trucks, narrow single bulb for motorcycles!)
             const beamLen = (v.isMotorcycle ? 140 : (v.driver === "PLAYER" ? 185 : 158)) * pxScale;
-            const coneSpread = v.isMotorcycle ? 0.24 : 0.34;
+            const coneSpread = v.isMotorcycle ? 0.22 : 0.32;
+            const baseHalfWPx = v.isMotorcycle ? (2.2 * pxScale) : ((latSpread + 3.2) * pxScale);
+
             addHeadlightCone(
                 fSc.x,
                 fSc.y,
                 beamAng,
                 beamLen,
                 coneSpread,
+                baseHalfWPx,
                 "rgba(255, 250, 225, 0.98)",
                 "rgba(215, 232, 255, 0.52)"
             );
@@ -1850,17 +1873,19 @@ class RetroRenderer {
                 y: fSc.y,
                 angle: beamAng,
                 len: beamLen * 0.92,
-                spread: coneSpread * 0.85,
-                col0: "rgba(255, 250, 220, 0.26)",
-                col1: "rgba(180, 220, 255, 0.08)"
+                spread: coneSpread * 0.88,
+                baseHalfW: baseHalfWPx,
+                col0: "rgba(255, 250, 220, 0.22)",
+                col1: "rgba(180, 220, 255, 0.07)"
             });
 
-            // Dual Front Headlight Bulbs (or Single Motorcycle Bulb)
+            // Dual Front Headlight Bulbs (or Single Motorcycle Bulb) + Soft Bumper Halo
             const headOffsets = v.isMotorcycle ? [0] : [-latSpread, latSpread];
             for (const lat of headOffsets) {
                 const hx = v.x + cosA * frontDist - sinA * lat;
                 const hy = v.y + sinA * frontDist + cosA * lat;
                 const hSc = this.worldToScreen(hx, hy, vz);
+                addLightPool(hSc.x, hSc.y, (v.isMotorcycle ? 18 : 22) * pxScale, "rgba(255, 250, 225, 0.72)", "rgba(210, 230, 255, 0.24)");
                 highResFlares.push({
                     x: hSc.x,
                     y: hSc.y,
@@ -1961,19 +1986,36 @@ class RetroRenderer {
             ctx.globalAlpha = lightInt;
 
             for (const c of highResCones) {
-                const x1 = c.x + Math.cos(c.angle) * c.len;
-                const y1 = c.y + Math.sin(c.angle) * c.len;
+                const cosA = Math.cos(c.angle);
+                const sinA = Math.sin(c.angle);
+                const nx = -sinA;
+                const ny = cosA;
+                const x1 = c.x + cosA * c.len;
+                const y1 = c.y + sinA * c.len;
+                const bw = Math.max(1.5, c.baseHalfW || 2.0);
                 const g = ctx.createLinearGradient(c.x, c.y, x1, y1);
                 g.addColorStop(0.0, c.col0);
                 g.addColorStop(0.55, c.col1);
                 g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
                 ctx.fillStyle = g;
-                ctx.beginPath();
-                ctx.moveTo(c.x, c.y);
-                ctx.arc(c.x, c.y, c.len, c.angle - c.spread, c.angle + c.spread);
-                ctx.closePath();
-                ctx.fill();
+
+                const layers = [
+                    { sp: c.spread * 1.12, wMult: 1.08, alpha: 0.35 },
+                    { sp: c.spread * 0.86, wMult: 0.96, alpha: 0.42 },
+                    { sp: c.spread * 0.56, wMult: 0.72, alpha: 0.35 }
+                ];
+                for (const ly of layers) {
+                    const w = bw * ly.wMult;
+                    ctx.globalAlpha = lightInt * ly.alpha;
+                    ctx.beginPath();
+                    ctx.moveTo(c.x - nx * w, c.y - ny * w);
+                    ctx.arc(c.x, c.y, c.len, c.angle - ly.sp, c.angle + ly.sp);
+                    ctx.lineTo(c.x + nx * w, c.y + ny * w);
+                    ctx.closePath();
+                    ctx.fill();
+                }
             }
+            ctx.globalAlpha = lightInt;
 
             for (const f of highResFlares) {
                 const r = Math.max(2, f.r);
