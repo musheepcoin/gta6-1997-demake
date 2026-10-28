@@ -2202,7 +2202,7 @@ class RetroRenderer {
             const jWeapon = jason.weaponKey || "FIST";
             const frameIdx = this.getPedFrameIndex(jWeapon, Boolean(jason.isMoving), Boolean(jason.isRunning), jason.walkPhase || 0);
             this.batchPedSprite3D(
-                "jason",
+                jason.pedType || "jason",
                 frameIdx,
                 jason.x,
                 jason.y,
@@ -2308,7 +2308,7 @@ class RetroRenderer {
             }
 
             this.batchPedSprite3D(
-                "lucia",
+                p.pedType || "lucia",
                 frameIdx,
                 p.x,
                 p.y,
@@ -2491,7 +2491,7 @@ class RetroRenderer {
                 if (mapInfo.isMotorcycle) {
                     const bikerTypes = ["gang", "gang", "civ0", "civ1", "civ2", "civ3"];
                     const riderPedType = v.driver === "PLAYER"
-                        ? "lucia"
+                        ? (p.pedType || "lucia")
                         : (v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length]);
                     const riderFrame = (v.doorOpenTimer || 0) > 0
                         ? (80 + Math.min(3, Math.floor((1.0 - v.doorOpenTimer / 0.48) * 4)))
@@ -2517,7 +2517,7 @@ class RetroRenderer {
                         const jx = v.x - cosA * 7.5;
                         const jy = v.y - sinA * 7.5;
                         this.batchPedSprite3D(
-                            "jason",
+                            game.jason.pedType || "jason",
                             84,
                             jx,
                             jy,
@@ -2536,7 +2536,7 @@ class RetroRenderer {
                 ) {
                     const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
                     const drvPedType = v.driver === "PLAYER"
-                        ? "lucia"
+                        ? (p.pedType || "lucia")
                         : (v.driver === "AI_COP" ? "police" : civTypes[idHash % civTypes.length]);
                     const isCenterSeat = v.specKey === "MICRO_KART" || v.specKey === "AIRBOAT";
                     const latOff = isCenterSeat ? 0 : -4.5;
@@ -2562,7 +2562,7 @@ class RetroRenderer {
                         const px = v.x + cosA * longOff - sinA * 4.5;
                         const py = v.y + sinA * longOff + cosA * 4.5;
                         this.batchPedSprite3D(
-                            "jason",
+                            game.jason.pedType || "jason",
                             97,
                             px,
                             py,
@@ -4649,6 +4649,11 @@ class RetroRenderer {
                     game.net.triggerOnlineAction();
                     return true;
                 }
+                if (btn.id === "OPEN_CHAR_SELECT") {
+                    const modal = document.getElementById("start-modal");
+                    if (modal) modal.classList.remove("hidden");
+                    return true;
+                }
                 if (btn.id === "UNMINIMIZE_PHONE") {
                     this.showCheatsWindow = true;
                     return true;
@@ -4812,14 +4817,15 @@ class RetroRenderer {
         let iconX = leftX;
         const p = game.player;
 
-        // Draw Lucia Caminos 1997 Pixel-Art Portrait Badge + Health Bar
+        // Draw Player 1997 Pixel-Art Portrait Badge + Health Bar (Click to change Character/Nickname [H]!)
         const mugW = 48;
         const mugH = 48;
-        this.drawPixelPortraitRect(ctx, iconX, leftY, mugW, mugH, "LUCIA", {
+        this.drawPixelPortraitRect(ctx, iconX, leftY, mugW, mugH, p.charId || "LUCIA", {
             bandana: Boolean(p.bandana),
             alert: (game.wantedLevel || 0) > 0
         });
-        // Health Bar right below Lucia's Mugshot
+        this.cheatButtons.push({ id: "OPEN_CHAR_SELECT", x: iconX, y: leftY, w: mugW, h: mugH + 10 });
+        // Health Bar right below Player's Mugshot
         ctx.fillStyle = "rgba(10, 12, 20, 0.88)";
         ctx.fillRect(iconX, leftY + mugH + 2, mugW, 7);
         const hpRatio = Math.max(0, Math.min(1, (p.hp || 0) / (p.maxHp || 100)));
@@ -5309,6 +5315,61 @@ class RetroRenderer {
                 dot(10, 13, 4, 2, "#be185d");
                 dot(11, 13, 2, 1, "#f43f5e");
             }
+        } else if (character === "TOMMY") {
+            // Tommy Vercetti '86: Dark 80s Pompadour, Cyan Tropical Hawaiian Shirt, Gold Chain
+            dot(6, 2, 12, 5, "#181824"); // pompadour crown
+            dot(5, 5, 2, 6, "#181824");
+            dot(17, 5, 2, 6, "#181824");
+            dot(4, 18, 16, 6, "#06b6d4"); // cyan Hawaiian shirt
+            dot(6, 18, 3, 6, "#0e7490"); // tropical leaf print
+            dot(15, 19, 3, 5, "#0e7490");
+            dot(9, 15, 6, 4, "#c6865c"); // neck
+            dot(9, 18, 6, 2, "#facc15"); // gold chain
+            dot(7, 5, 10, 10, "#e2a278"); // tanned face
+            dot(8, 7, 3, 2, "#1e293b");
+            dot(13, 7, 3, 2, "#1e293b");
+            dot(8, 12, 8, 2, "#b47852"); // 5 o'clock shadow
+            dot(10, 13, 4, 1, "#ffffff"); // confident smirk
+        } else if (character === "VALERIA") {
+            // Valeria Cortez: Crimson-Streaked Dark Hair, Neon Shades, Red Biker Jacket
+            dot(5, 2, 14, 6, "#1e1024");
+            dot(6, 3, 3, 9, "#e11d48"); // crimson hair streak
+            dot(4, 5, 2, 11, "#1e1024");
+            dot(18, 5, 2, 11, "#1e1024");
+            dot(4, 18, 16, 6, "#be123c"); // red biker jacket
+            dot(8, 18, 8, 6, "#1e293b"); // black inner top
+            dot(9, 15, 6, 3, "#d4946a");
+            dot(9, 17, 6, 1, "#facc15"); // gold choker
+            dot(7, 5, 10, 10, "#df9f74");
+            dot(7, 7, 10, 3, "#0f172a"); // dark aviator shades
+            dot(8, 8, 3, 1, "#ff2a85"); // neon lens reflection
+            dot(13, 8, 3, 1, "#ff2a85");
+            dot(10, 13, 4, 2, "#e11d48"); // crimson lips
+        } else if (character === "DETECTIVE") {
+            // Det. Sonny Crockett / VCPD Vice Squad: Peaked Police Cap + Gold Badge + Aviators
+            dot(5, 1, 14, 4, "#0f172a"); // VCPD navy cap crown
+            dot(4, 4, 16, 2, "#1e293b"); // cap visor
+            dot(11, 2, 2, 2, "#facc15"); // gold VCPD shield on cap
+            dot(4, 18, 16, 6, "#1e3a8a"); // VCPD jacket
+            dot(9, 18, 6, 6, "#38bdf8"); // pastel Miami shirt under blazer
+            dot(15, 20, 2, 3, "#facc15"); // gold detective badge on lapel
+            dot(9, 15, 6, 3, "#c6865c");
+            dot(7, 6, 10, 9, "#e4a87e");
+            dot(7, 7, 10, 3, "#090d16"); // dark sunglasses
+            dot(8, 7, 3, 1, "#38bdf8");
+            dot(13, 7, 3, 1, "#38bdf8");
+            dot(9, 13, 6, 1, "#7c4d2b");
+        } else if (character === "GOURANGA") {
+            // Iconic 1997 DMA Design Gouranga Monk: Shaved Head, Tilak Mark, Saffron-Orange Robes
+            dot(7, 3, 10, 12, "#e2a276"); // bald head
+            dot(8, 2, 8, 2, "#d99568");
+            dot(11, 4, 2, 3, "#ef4444"); // red tilak forehead mark
+            dot(4, 17, 16, 7, "#f97316"); // saffron orange robe
+            dot(6, 18, 12, 6, "#fb923c");
+            dot(8, 17, 8, 2, "#fde047"); // gold sash
+            dot(8, 8, 2, 2, "#1e1124");
+            dot(14, 8, 2, 2, "#1e1124");
+            dot(9, 12, 6, 2, "#ffffff"); // joyful smile
         } else {
             // Jason Duval: Backwards Crimson Cap, Dirty-Blond Hair, White Ribbed Tank Top
             dot(6, 2, 12, 5, "#dc2626"); // red cap crown

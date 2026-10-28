@@ -193,6 +193,51 @@ class ViceNetworkManager {
         this.chatMessagesEl.scrollTop = this.chatMessagesEl.scrollHeight;
     }
 
+    setIdentity(nickname, charId, pedType, color, roomCode) {
+        const cleanName = String(nickname || "").trim().slice(0, 18).toUpperCase();
+        if (cleanName) {
+            this.playerName = cleanName;
+            this.safeSetStorage("vc97_mp_name", cleanName);
+            if (this.chatNameBtn) {
+                this.chatNameBtn.textContent = `✏️ ${this.playerName.slice(0, 12)}`;
+            }
+        }
+        if (charId) {
+            this.safeSetStorage("vc97_mp_char", charId);
+        }
+        if (pedType) {
+            this.pedSpriteType = pedType;
+        }
+        if (color) {
+            this.playerColor = color;
+        }
+        const cleanRoom = String(roomCode || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+        if (cleanRoom && cleanRoom !== this.roomCode) {
+            this.roomCode = cleanRoom;
+            this.remotePlayers.clear();
+            if (this.chatRoomBadge) {
+                this.chatRoomBadge.textContent = `[${this.roomCode}]`;
+            }
+            this.initBroadcastChannel();
+            this.claimRoomSlot(0);
+        } else {
+            this.sendPacket({
+                t: "JOIN",
+                id: this.playerId,
+                name: this.playerName,
+                color: this.playerColor,
+                pedType: this.pedSpriteType
+            });
+            this.broadcastStateNow();
+        }
+        this.addChatLog(
+            "VICE NET",
+            `🎭 Playing as ${this.playerName} (${charId || "LUCIA"}) in room [${this.roomCode}]`,
+            this.playerColor,
+            true
+        );
+    }
+
     sendChatMessage(rawText) {
         const cleaned = String(rawText || "").trim().slice(0, 140);
         if (!cleaned) return;

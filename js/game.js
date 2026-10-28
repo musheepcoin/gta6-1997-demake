@@ -61,7 +61,9 @@ class LeonidaGame {
             mouseShoot: false,
             bandana: false,
             ankleScrambled: false,
-            dead: false
+            dead: false,
+            charId: "LUCIA",
+            pedType: "lucia"
         };
 
         // GTA 6 Partner AI: Jason Duval (follows Lucia on foot, rides shotgun, and only fires when Lucia fights!)
@@ -786,14 +788,24 @@ class LeonidaGame {
             if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
                 if (e.code === "Escape") {
                     e.target.blur();
+                } else if (
+                    e.code === "Enter" &&
+                    (e.target.id === "start-nickname-input" || e.target.id === "start-room-input")
+                ) {
+                    e.preventDefault();
+                    e.target.blur();
+                    this.startGame();
                 }
                 return;
             }
             const code = e.code;
             const key = e.key.toLowerCase();
 
-            // Start modal shortcut
-            if (!this.started && (code === "Enter" || code === "Space")) {
+            // Start / Character Selection modal shortcut
+            const startModal = document.getElementById("start-modal");
+            const startModalOpen = startModal && !startModal.classList.contains("hidden");
+            if ((!this.started || startModalOpen) && (code === "Enter" || code === "Space")) {
+                e.preventDefault();
                 this.startGame();
                 return;
             }
@@ -959,6 +971,8 @@ class LeonidaGame {
         if (startBtn) {
             startBtn.addEventListener("click", () => this.startGame());
         }
+
+        this.initCharacterSelectModal();
 
         const charBadge = document.querySelector(".char-badge");
         if (charBadge) {
@@ -1157,24 +1171,72 @@ class LeonidaGame {
         this.renderPortraits();
     }
 
+    initCharacterSelectModal() {
+        const nickInput = document.getElementById("start-nickname-input");
+        const roomInput = document.getElementById("start-room-input");
+        const randBtn = document.getElementById("btn-random-nickname");
+        const cards = document.querySelectorAll(".char-select-card");
+
+        if (nickInput && this.net) {
+            nickInput.value = this.net.playerName || "LUCIA #97";
+        }
+        if (roomInput && this.net) {
+            roomInput.value = this.net.roomCode || "VICE97";
+        }
+
+        // Restore previously saved character if any
+        const savedChar = (this.net && this.net.safeGetStorage("vc97_mp_char")) || "LUCIA";
+        cards.forEach((card) => {
+            if (card.getAttribute("data-char-id") === savedChar) {
+                cards.forEach((c) => c.classList.remove("active-mug"));
+                card.classList.add("active-mug");
+            }
+            card.addEventListener("click", () => {
+                cards.forEach((c) => c.classList.remove("active-mug"));
+                card.classList.add("active-mug");
+                const cId = card.getAttribute("data-char-id") || "LUCIA";
+                if (this.audio) {
+                    this.audio.playBeep(680, 0.05, "square", 0.05);
+                }
+                // Update auto-generated nickname prefix if user hasn't typed a custom one yet
+                if (nickInput) {
+                    const cur = nickInput.value.trim();
+                    if (!cur || /^(LUCIA|JASON|TOMMY|VALERIA|DETECTIVE|GOURANGA|CROCKETT)\s*#?\d*$/i.test(cur)) {
+                        const num = Math.floor(100 + Math.random() * 900);
+                        nickInput.value = `${cId} #${num}`;
+                    }
+                }
+            });
+        });
+
+        if (randBtn && nickInput) {
+            const presets = [
+                "LUCIA_97", "TOMMY_86", "JASON_305", "VALERIA_GT",
+                "CROCKETT_84", "GOURANGA_1", "OCEAN_KING", "NEON_VIPER",
+                "MIAMI_WOLF", "STAR_BOSS"
+            ];
+            randBtn.addEventListener("click", () => {
+                const pick = presets[Math.floor(Math.random() * presets.length)];
+                const num = Math.floor(10 + Math.random() * 89);
+                nickInput.value = `${pick}_${num}`.slice(0, 18);
+                if (this.audio) this.audio.playBeep(760, 0.04, "triangle", 0.05);
+            });
+        }
+    }
+
     renderPortraits(pagerSpeaker = "JASON") {
         if (!this.renderer || !this.renderer.drawCharacterPortrait) return;
         const alert = this.wantedLevel > 0 && !this.player.ankleScrambled;
+        const activeChar = (this.player && this.player.charId) || "LUCIA";
         this.renderer.drawCharacterPortrait(
             document.getElementById("lucia-hud-portrait"),
-            "LUCIA",
+            activeChar,
             { bandana: this.player.bandana, alert }
         );
-        this.renderer.drawCharacterPortrait(
-            document.getElementById("lucia-dossier-portrait"),
-            "LUCIA",
-            { bandana: false, alert: false }
-        );
-        this.renderer.drawCharacterPortrait(
-            document.getElementById("jason-dossier-portrait"),
-            "JASON",
-            { bandana: false, alert: false }
-        );
+        document.querySelectorAll(".char-select-canvas").forEach((canvasEl) => {
+            const cId = canvasEl.getAttribute("data-char") || "LUCIA";
+            this.renderer.drawCharacterPortrait(canvasEl, cId, { bandana: false, alert: false });
+        });
         const isLuciaPager = String(pagerSpeaker).toUpperCase().includes("LUCIA");
         this.renderer.drawCharacterPortrait(
             document.getElementById("pager-portrait"),
@@ -1186,6 +1248,42 @@ class LeonidaGame {
     startGame() {
         this.started = true;
         this.audio.resume();
+
+        // Read chosen Nickname, Room Code & Character from the Selection Modal
+        const nickInput = document.getElementById("start-nickname-input");
+        const roomInput = document.getElementById("start-room-input");
+        const activeCard = document.querySelector(".char-select-card.active-mug");
+
+        const chosenCharId = activeCard ? (activeCard.getAttribute("data-char-id") || "LUCIA") : (this.player.charId || "LUCIA");
+        const chosenPedType = activeCard ? (activeCard.getAttribute("data-ped-type") || "lucia") : (this.player.pedType || "lucia");
+        const chosenColor = activeCard ? (activeCard.getAttribute("data-color") || "#ff2a85") : "#ff2a85";
+        const chosenWeapon = activeCard ? (activeCard.getAttribute("data-weapon") || "PISTOL") : "PISTOL";
+        const chosenNick = (nickInput && nickInput.value.trim()) ? nickInput.value.trim().toUpperCase() : `${chosenCharId} #97`;
+        const chosenRoom = (roomInput && roomInput.value.trim()) ? roomInput.value.trim().toUpperCase() : "VICE97";
+
+        this.player.charId = chosenCharId;
+        this.player.pedType = chosenPedType;
+        this.player.nickname = chosenNick;
+        if (chosenWeapon && this.player.weaponsOwned.includes(chosenWeapon)) {
+            this.player.weapon = chosenWeapon;
+        }
+        if (chosenCharId === "JASON") {
+            this.player.armor = 100;
+            if (this.jason) this.jason.pedType = "lucia";
+        } else {
+            if (this.jason) this.jason.pedType = "jason";
+            if (chosenCharId === "TOMMY") this.cash = Math.max(this.cash, 5000);
+            else if (chosenCharId === "DETECTIVE") this.jailFreeCards = Math.max(this.jailFreeCards, 3);
+            else if (chosenCharId === "GOURANGA") this.multiplier = Math.max(this.multiplier, 2);
+        }
+
+        if (this.net && typeof this.net.setIdentity === "function") {
+            this.net.setIdentity(chosenNick, chosenCharId, chosenPedType, chosenColor, chosenRoom);
+        }
+
+        this.renderPortraits();
+        this.updateHud();
+
         if (this.ytMusicEnabled) {
             const volSlider = document.getElementById("yt-vol-slider");
             const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
@@ -1197,12 +1295,13 @@ class LeonidaGame {
         const modal = document.getElementById("start-modal");
         if (modal) modal.classList.add("hidden");
 
+        this.addFloatingText(this.player.x, this.player.y - 32, `🎭 ${chosenNick} (${chosenCharId}) READY!`, chosenColor);
         this.sendPager(
-            "JASON (PARTNER)",
-            "Welcome out of Leonida Penitentiary, Lucia! Watch that DOC Ankle Monitor. Hop in my red Declasse Tulip outside the gate [Press F] and let's answer the ringing payphone at the Pink Velvet Motel!",
+            "VICE CITY ONLINE",
+            `Welcome to Vice City '97, ${chosenNick}! Playing as ${chosenCharId} in room [${chosenRoom}]. Press [T] to chat, [O] for Multiplayer, or [H] to switch character!`,
             true
         );
-        this.showDistrictBanner("KELLY COUNTY — LEONIDA PENITENTIARY");
+        this.showDistrictBanner(`SOUTH BEACH — ${chosenNick}`);
     }
 
     cycleWeapon(dir = 1) {

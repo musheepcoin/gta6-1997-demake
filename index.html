@@ -227,63 +227,112 @@
             </div>
         </div>
 
-        <!-- RETRO 1997 START MODAL (Toggleable with [H]) -->
-        <div id="start-modal" class="hidden">
+        <!-- RETRO 1997 CHARACTER & NICKNAME SELECTION MODAL (Opens at Game Entrance & Toggleable with [H]) -->
+        <div id="start-modal">
             <div class="start-card">
                 <div class="title-header">
                     <div class="gta-logo-top">GRAND THEFT AUTO: VICE CITY '97</div>
-                    <div class="gta-logo-sub">VICE CITY TRANSPOSED INTO THE 1997 TOP-DOWN 2.5D ENGINE</div>
+                    <div class="gta-logo-sub">SELECT YOUR CHARACTER &amp; ONLINE NICKNAME • 1997 2.5D ENGINE</div>
                 </div>
 
-                <div class="dossier-grid">
-                    <div class="dossier-panel">
-                        <h3>PROTAGONIST // LUCIA CAMINOS</h3>
-                        <div class="mugshot-showcase">
-                            <div class="mugshot-card active-mug">
-                                <canvas id="lucia-dossier-portrait" width="72" height="72"></canvas>
-                                <div class="mugshot-meta">
-                                    <span class="mug-name">LUCIA CAMINOS</span>
-                                    <span class="mug-tag">INMATE #L-9724 • PLAYABLE</span>
-                                </div>
-                            </div>
-                            <div class="mugshot-card">
-                                <canvas id="jason-dossier-portrait" width="72" height="72"></canvas>
-                                <div class="mugshot-meta">
-                                    <span class="mug-name">JASON DUVAL</span>
-                                    <span class="mug-tag">PARTNER • AI WINGMAN</span>
-                                </div>
-                            </div>
+                <!-- STEP 1: NICKNAME & MULTIPLAYER ROOM BAR -->
+                <div class="identity-bar">
+                    <div class="identity-field">
+                        <label for="start-nickname-input">🏷️ PSEUDO / CALLSIGN</label>
+                        <div class="identity-input-wrap">
+                            <input
+                                type="text"
+                                id="start-nickname-input"
+                                maxlength="18"
+                                placeholder="Ex: LUCIA_97, TOMMY_86..."
+                                autocomplete="off"
+                            />
+                            <button type="button" id="btn-random-nickname" title="Generate Random Vice City Callsign">🎲</button>
                         </div>
-                        <ul>
-                            <li><strong>Status:</strong> Released on Parole from Kelly County Penitentiary</li>
-                            <li><strong>Look &amp; Gear:</strong> Pink Camisole, Gold Hoops, Red Heist Bandana [B], Active DOC Electronic Ankle Monitor + 9mm Pistol</li>
-                            <li><strong>Accomplice:</strong> Jason (follows on foot, shoots cops &amp; rides shotgun in your Declasse Tulip)</li>
-                        </ul>
                     </div>
-
-                    <div class="dossier-panel">
-                        <h3>12 BESPOKE VICE CITY REGIONS &amp; 16 LANDMARKS</h3>
-                        <ul>
-                            <li><strong>S-Curving Vice Beach &amp; SERA Spaceport:</strong> Ocean Drive, Lummus &amp; Flamingo Parks, 3 Piers &amp; Rocket Launch Pads 39A/39B</li>
-                            <li><strong>Biscayne Bay, Mambas Stadium &amp; Golf Club:</strong> 4 Venetian/Star Islands, 2 3D Cruise Ships, Enterable Football Stadium &amp; 9-Hole Golf Course</li>
-                            <li><strong>Lake Leonida, Mount Kalaga &amp; Penitentiary:</strong> Multi-lobed Lake with Gator Island, 6 3D Mountain Massifs &amp; Walled Prison Fortress</li>
-                            <li><strong>Dirt Speedway, VCIA Airport, Mud Park &amp; Keys:</strong> Driveable Dirt Oval, Dual Runways + 3D Jetliner, Figure-8 Mud Track &amp; 6 Diagonal Keys</li>
-                        </ul>
+                    <div class="identity-field identity-room-field">
+                        <label for="start-room-input">🌐 SALON MULTI (ROOM)</label>
+                        <input
+                            type="text"
+                            id="start-room-input"
+                            maxlength="10"
+                            value="VICE97"
+                            placeholder="VICE97"
+                            autocomplete="off"
+                        />
                     </div>
                 </div>
 
-                <button id="btn-start-game">[ CLICK OR PRESS ENTER — HIT THE STREETS OF VICE CITY ]</button>
+                <!-- STEP 2: 6 PLAYABLE VICE CITY '97 CHARACTERS -->
+                <div class="char-select-section-title">🎭 CHOISISSEZ VOTRE PERSONNAGE JOUABLE (CLICK TO SELECT)</div>
+                <div class="char-select-grid" id="char-select-grid">
+                    <div class="mugshot-card char-select-card active-mug" data-char-id="LUCIA" data-ped-type="lucia" data-color="#ff2a85" data-weapon="PISTOL">
+                        <canvas id="lucia-dossier-portrait" class="char-select-canvas" data-char="LUCIA" width="64" height="64"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">LUCIA CAMINOS</span>
+                            <span class="mug-tag">INMATE #L-9724 • SOUTH BEACH</span>
+                            <span class="mug-perk">🔫 9MM PISTOL + BANDANA [B]</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="JASON" data-ped-type="jason" data-color="#00f0ff" data-weapon="UZI">
+                        <canvas id="jason-dossier-portrait" class="char-select-canvas" data-char="JASON" width="64" height="64"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">JASON DUVAL</span>
+                            <span class="mug-tag">WHEELMAN • LEONIDA KEYS</span>
+                            <span class="mug-perk">🔫 MICRO-UZI + KEVLAR 100%</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="TOMMY" data-ped-type="civ0" data-color="#38bdf8" data-weapon="SHOTGUN">
+                        <canvas class="char-select-canvas" data-char="TOMMY" width="64" height="64"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">TOMMY V. '86</span>
+                            <span class="mug-tag">KINGPIN • OCEAN DRIVE</span>
+                            <span class="mug-perk">🔫 SHOTGUN + STAR ISLAND VIP</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="VALERIA" data-ped-type="gang" data-color="#f43f5e" data-weapon="UZI">
+                        <canvas class="char-select-canvas" data-char="VALERIA" width="64" height="64"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">VALERIA CORTEZ</span>
+                            <span class="mug-tag">ENFORCER • LITTLE HAVANA</span>
+                            <span class="mug-perk">🔫 MICRO-UZI + STREET RACER</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="DETECTIVE" data-ped-type="police" data-color="#fde047" data-weapon="PISTOL">
+                        <canvas class="char-select-canvas" data-char="DETECTIVE" width="64" height="64"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">DET. CROCKETT</span>
+                            <span class="mug-tag">VICE SQUAD • VCPD BADGE</span>
+                            <span class="mug-perk">🚨 PISTOL + JAIL FREE CARD</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="GOURANGA" data-ped-type="monk" data-color="#fb923c" data-weapon="FLAMETHROWER">
+                        <canvas class="char-select-canvas" data-char="GOURANGA" width="64" height="64"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">GOURANGA MONK</span>
+                            <span class="mug-tag">1997 LEGEND • LUMMUS PARK</span>
+                            <span class="mug-perk">🔥 FLAMETHROWER + MULT x2</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-start-game">[ ENTRER DANS VICE CITY '97 — PLAY NOW (ENTER) ]</button>
             </div>
         </div>
     </div>
 
     <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=98_15"></script>
-    <script src="js/map.js?v=98_15"></script>
-    <script src="js/entities.js?v=98_15"></script>
-    <script src="js/missions.js?v=98_15"></script>
-    <script src="js/renderer.js?v=98_15"></script>
-    <script src="js/net.js?v=98_15"></script>
-    <script src="js/game.js?v=98_15"></script>
+    <script src="js/audio.js?v=98_16"></script>
+    <script src="js/map.js?v=98_16"></script>
+    <script src="js/entities.js?v=98_16"></script>
+    <script src="js/missions.js?v=98_16"></script>
+    <script src="js/renderer.js?v=98_16"></script>
+    <script src="js/net.js?v=98_16"></script>
+    <script src="js/game.js?v=98_16"></script>
 </body>
 </html>
