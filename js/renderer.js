@@ -2353,75 +2353,104 @@ class RetroRenderer {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
 
-        // 1997 Motorola Beeper / Pager ("Bipeur '97") — crisp casing + authentic PAGER1 LCD matrix font
+        // Modern Vice City Smartphone ("📱 SMARTPHONE // JASON") — OLED screen, 5G + Battery bar & Chat Bubble
         if (game.missions.activeMission || (game.pagerPopupTimer || 0) > 0) {
-            const pagerX = leftX;
-            const pagerY = leftY + 62; // y = 74
-            const pagerW = 268;
-            const pagerH = 46; // y = 74..120 (leaves clean 6px gap above GPS bar at y = 126)
+            const phoneX = leftX;
+            const phoneY = leftY + 62; // y = 74
+            const phoneW = 268;
+            const phoneH = 46; // y = 74..120 (leaves clean 6px gap above GPS bar at y = 126)
 
             const pagerEl = document.getElementById("pager-text");
             const senderEl = document.getElementById("pager-sender");
-            const rawPagerText = pagerEl ? (pagerEl.textContent || "").trim().toUpperCase() : "MISSION ACTIVE";
+            const rawPagerText = pagerEl ? (pagerEl.textContent || "").trim() : "Mission active à Vice City";
             const rawSender = senderEl
-                ? (senderEl.textContent || "📟 BIPEUR '97").replace(/PAGER/i, "BIPEUR '97").trim()
-                : "📟 BIPEUR '97 // JASON";
+                ? (senderEl.textContent || "📱 JASON")
+                    .replace(/📟|PAGER|BIPEUR\s*'97|BIPEUR/gi, "")
+                    .replace(/^[\s/]+/, "")
+                    .trim()
+                : "JASON (PARTNER)";
 
             ctx.save();
-            // Outer gunmetal Motorola pager casing with neon-cyan/slate bevel
-            ctx.fillStyle = "rgba(18, 23, 34, 0.95)";
-            ctx.fillRect(pagerX, pagerY, pagerW, pagerH);
-            ctx.strokeStyle = "#475569";
+
+            // Helper for rounded rectangles
+            const drawRoundedRect = (rx, ry, rw, rh, rad) => {
+                ctx.beginPath();
+                if (typeof ctx.roundRect === "function") {
+                    ctx.roundRect(rx, ry, rw, rh, rad);
+                } else {
+                    ctx.rect(rx, ry, rw, rh);
+                }
+            };
+
+            // 1. Smartphone Titanium / Neon-Pink-Cyan Chassis (Landscape Smartphone)
+            drawRoundedRect(phoneX, phoneY, phoneW, phoneH, 8);
+            ctx.fillStyle = "rgba(10, 14, 26, 0.96)";
+            ctx.fill();
+            ctx.strokeStyle = "#38bdf8";
             ctx.lineWidth = 2;
-            ctx.strokeRect(pagerX, pagerY, pagerW, pagerH);
+            ctx.stroke();
 
-            // Top metallic highlight line
-            ctx.fillStyle = "rgba(148, 163, 184, 0.25)";
-            ctx.fillRect(pagerX + 2, pagerY + 2, pagerW - 4, 13);
-
-            // Flashing Red Beeper Alert LED
-            const ledOn = Math.floor(this.time * 4) % 2 === 0;
-            ctx.fillStyle = ledOn ? "#ff1e38" : "#4c0519";
+            // 2. Left Dynamic Island / Front Camera Notch (Landscape orientation)
+            drawRoundedRect(phoneX + 4, phoneY + 14, 4, 18, 2);
+            ctx.fillStyle = "#020617";
+            ctx.fill();
+            ctx.fillStyle = "#0ea5e9";
             ctx.beginPath();
-            ctx.arc(pagerX + 10, pagerY + 8.5, 3.5, 0, Math.PI * 2);
+            ctx.arc(phoneX + 6, phoneY + 18, 1.3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Pager Header Label ("📟 BIPEUR '97 // JASON")
-            ctx.fillStyle = "#fde047";
-            ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
-            ctx.textBaseline = "middle";
-            ctx.fillText(rawSender.toUpperCase(), pagerX + 19, pagerY + 9);
-
-            // Recessed Backlit Dark-Green LCD Matrix Screen
-            const lcdX = pagerX + 6;
-            const lcdY = pagerY + 17;
-            const lcdW = pagerW - 12;
-            const lcdH = 23;
-            ctx.fillStyle = "#041208";
-            ctx.fillRect(lcdX, lcdY, lcdW, lcdH);
-            ctx.strokeStyle = "#15803d";
-            ctx.lineWidth = 1.2;
-            ctx.strokeRect(lcdX + 0.5, lcdY + 0.5, lcdW - 1, lcdH - 1);
-
-            // Clip & scroll authentic 1997 GTA 1 PAGER1 bitmap font inside the LCD screen
+            // 3. Top Status Bar: Contact Name + Notification Dot (Left) & 5G + Battery Icon (Right)
+            const pulseOn = Math.floor(this.time * 4) % 2 === 0;
+            ctx.fillStyle = pulseOn ? "#00f0ff" : "#ff2a85";
             ctx.beginPath();
-            ctx.rect(lcdX + 3, lcdY + 2, lcdW - 6, lcdH - 4);
+            ctx.arc(phoneX + 16, phoneY + 9.5, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "bold 10px 'Segoe UI', Consolas, sans-serif";
+            ctx.textBaseline = "middle";
+            ctx.fillText(`📱 ${rawSender.toUpperCase()}`, phoneX + 23, phoneY + 10);
+
+            // 5G & Battery Status on top-right of smartphone screen
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 9px Consolas, monospace";
+            ctx.fillText("5G 📶", phoneX + phoneW - 58, phoneY + 10);
+
+            // Battery icon
+            const batX = phoneX + phoneW - 24;
+            const batY = phoneY + 6;
+            ctx.strokeStyle = "#4ade80";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(batX, batY, 14, 7);
+            ctx.fillStyle = "#4ade80";
+            ctx.fillRect(batX + 1.5, batY + 1.5, 10, 4);
+            ctx.fillRect(batX + 14, batY + 2, 1.5, 3);
+
+            // 4. Modern Dark-Mode Chat Message Bubble (with scrolling SMS text)
+            const msgX = phoneX + 12;
+            const msgY = phoneY + 17;
+            const msgW = phoneW - 20;
+            const msgH = 23;
+            drawRoundedRect(msgX, msgY, msgW, msgH, 5);
+            ctx.fillStyle = "rgba(23, 37, 68, 0.95)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255, 42, 133, 0.75)";
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // Clip & scroll crisp modern SMS text inside the chat bubble
+            ctx.beginPath();
+            ctx.rect(msgX + 4, msgY + 2, msgW - 8, msgH - 4);
             ctx.clip();
 
-            const lcdScale = 1.15;
-            const scrollSpeed = 52 * lcdScale;
-            const paddedPager = `   ${rawPagerText}   `;
-            const totalPagerW = this.measureGta1FontString("PAGER1", paddedPager, lcdScale);
-            const scrollOffset = (this.time * scrollSpeed) % Math.max(1, totalPagerW);
-            this.drawGta1FontString(
-                ctx,
-                "PAGER1",
-                paddedPager + paddedPager,
-                lcdX + 4 - scrollOffset,
-                lcdY + 3,
-                lcdScale,
-                "left"
-            );
+            ctx.font = "bold 11px 'Segoe UI', Consolas, monospace";
+            ctx.fillStyle = "#f8fafc";
+            ctx.textBaseline = "middle";
+            const paddedSms = `💬 ${rawPagerText}      •      `;
+            const smsWidth = Math.max(1, ctx.measureText(paddedSms).width);
+            const scrollOffset = (this.time * 58) % smsWidth;
+            ctx.fillText(paddedSms + paddedSms, msgX + 6 - scrollOffset, msgY + msgH * 0.5 + 0.5);
+
             ctx.restore();
         }
 

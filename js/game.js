@@ -3366,7 +3366,7 @@ class LeonidaGame {
         const lblEl = document.getElementById("pager-avatar-label");
         if (!box || !sEl || !tEl) return;
 
-        sEl.textContent = `📟 PAGER // ${sender}`;
+        sEl.textContent = `📱 SMARTPHONE // ${sender}`;
         tEl.textContent = text;
         if (lblEl) {
             lblEl.textContent = String(sender).toUpperCase().includes("LUCIA") ? "LUCIA" : "JASON";
