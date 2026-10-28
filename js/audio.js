@@ -59,12 +59,26 @@ class RetroAudioEngine {
         this.stepIdx = 0;
         this.nextNoteTime = 0;
 
-        // Continuous oscillators
+        // Continuous oscillators & ambient environmental buses
         this.engineOsc = null;
         this.engineGain = null;
         this.sirenOsc = null;
         this.sirenGain = null;
         this.sirenPhase = 0;
+
+        // Spatial AI Traffic Pass-By Engine (with Doppler shift!)
+        this.trafficOsc = null;
+        this.trafficFilter = null;
+        this.trafficGain = null;
+
+        // Ocean Surf & City Ambience continuous filtered noise
+        this.oceanFilter = null;
+        this.oceanGain = null;
+        this.cityHumOsc = null;
+        this.cityHumGain = null;
+        this.ambientTimer = 0;
+        this.seagullCooldown = 6.0;
+        this.cricketCooldown = 2.5;
     }
 
     init() {
@@ -79,7 +93,7 @@ class RetroAudioEngine {
             this.sfxMasterGain.gain.value = 2.75;
             this.sfxMasterGain.connect(this.ctx.destination);
 
-            // Engine continuous hum
+            // 1. Player Engine continuous hum
             this.engineOsc = this.ctx.createOscillator();
             this.engineGain = this.ctx.createGain();
             this.engineOsc.type = "sawtooth";
@@ -89,7 +103,7 @@ class RetroAudioEngine {
             this.engineGain.connect(this.sfxMasterGain);
             this.engineOsc.start();
 
-            // Police Siren continuous oscillator
+            // 2. Police Siren continuous oscillator
             this.sirenOsc = this.ctx.createOscillator();
             this.sirenGain = this.ctx.createGain();
             this.sirenOsc.type = "triangle";
@@ -98,6 +112,54 @@ class RetroAudioEngine {
             this.sirenOsc.connect(this.sirenGain);
             this.sirenGain.connect(this.sfxMasterGain);
             this.sirenOsc.start();
+
+            // 3. Spatial AI Traffic Pass-By Engine Oscillator (filtered sawtooth with Doppler shift!)
+            this.trafficOsc = this.ctx.createOscillator();
+            this.trafficFilter = this.ctx.createBiquadFilter();
+            this.trafficGain = this.ctx.createGain();
+            this.trafficOsc.type = "sawtooth";
+            this.trafficOsc.frequency.value = 58;
+            this.trafficFilter.type = "lowpass";
+            this.trafficFilter.frequency.value = 240;
+            this.trafficGain.gain.value = 0.0;
+            this.trafficOsc.connect(this.trafficFilter);
+            this.trafficFilter.connect(this.trafficGain);
+            this.trafficGain.connect(this.sfxMasterGain);
+            this.trafficOsc.start();
+
+            // 4. Looping Ocean Waves / Beach Surf Noise Buffer (3-second seamless pink/brown noise loop)
+            const loopLen = Math.floor(this.ctx.sampleRate * 3.0);
+            const loopBuf = this.ctx.createBuffer(1, loopLen, this.ctx.sampleRate);
+            const ch = loopBuf.getChannelData(0);
+            let lastOut = 0;
+            for (let i = 0; i < loopLen; i++) {
+                const white = Math.random() * 2 - 1;
+                lastOut = (lastOut + 0.04 * white) / 1.04;
+                ch[i] = lastOut * 2.8;
+            }
+            const oceanSrc = this.ctx.createBufferSource();
+            oceanSrc.buffer = loopBuf;
+            oceanSrc.loop = true;
+            this.oceanFilter = this.ctx.createBiquadFilter();
+            this.oceanFilter.type = "bandpass";
+            this.oceanFilter.frequency.value = 340;
+            this.oceanFilter.Q.value = 0.7;
+            this.oceanGain = this.ctx.createGain();
+            this.oceanGain.gain.value = 0.0;
+            oceanSrc.connect(this.oceanFilter);
+            this.oceanFilter.connect(this.oceanGain);
+            this.oceanGain.connect(this.sfxMasterGain);
+            oceanSrc.start();
+
+            // 5. Subtle Urban Street Ambience Hum
+            this.cityHumOsc = this.ctx.createOscillator();
+            this.cityHumGain = this.ctx.createGain();
+            this.cityHumOsc.type = "triangle";
+            this.cityHumOsc.frequency.value = 62;
+            this.cityHumGain.gain.value = 0.0;
+            this.cityHumOsc.connect(this.cityHumGain);
+            this.cityHumGain.connect(this.sfxMasterGain);
+            this.cityHumOsc.start();
 
             this.nextNoteTime = this.ctx.currentTime + 0.05;
         } catch (e) {
@@ -155,7 +217,57 @@ class RetroAudioEngine {
             this.sirenGain.gain.setTargetAtTime(0.0, now, 0.08);
         }
 
-        // 3. Sequencer for In-Car Radio Station (disabled when YouTube Radio Deck is playing!)
+        // 3. Spatial AI Traffic Pass-By Engine (with Doppler shift & motorcycle vs V8 timbre!)
+        if (this.trafficOsc && this.trafficGain) {
+            const tDist = state.nearestTrafficDist !== undefined ? state.nearestTrafficDist : 9999;
+            const tSpd = Math.abs(state.nearestTrafficSpeed || 0);
+            if (tDist < 540 && tSpd > 8) {
+                const prox = Math.pow(Math.max(0, 1 - tDist / 540), 1.45);
+                const doppler = Math.max(0.78, Math.min(1.26, state.trafficDoppler || 1.0));
+                const baseF = state.trafficIsMoto ? 92 : 48;
+                const rpmF = (baseF + Math.min(1.0, tSpd / 320) * (state.trafficIsMoto ? 135 : 68)) * doppler;
+                this.trafficOsc.frequency.setTargetAtTime(rpmF, now, 0.05);
+                this.trafficFilter.frequency.setTargetAtTime(state.trafficIsMoto ? 480 : 260, now, 0.06);
+                const volScale = this.inVehicle ? 0.016 : 0.032;
+                this.trafficGain.gain.setTargetAtTime(prox * volScale, now, 0.06);
+            } else {
+                this.trafficGain.gain.setTargetAtTime(0.0, now, 0.10);
+            }
+        }
+
+        // 4. Environmental Ambience: Ocean Waves Surf, Urban Hum, Daytime Seagulls & Night Crickets!
+        this.ambientTimer += dt;
+        const waterProx = Math.max(0, Math.min(1, state.waterProximity || 0));
+        if (this.oceanGain && this.oceanFilter) {
+            // Rolling 5.5-second Atlantic wave crest & wash cycle
+            const waveLfo = 0.55 + 0.45 * Math.sin(this.ambientTimer * 1.14);
+            const surfVol = waterProx * (this.inVehicle ? 0.012 : 0.028) * waveLfo;
+            this.oceanFilter.frequency.setTargetAtTime(220 + waveLfo * 340, now, 0.12);
+            this.oceanGain.gain.setTargetAtTime(surfVol, now, 0.15);
+        }
+        if (this.cityHumGain) {
+            const urbanVol = (!this.inVehicle && waterProx < 0.7) ? 0.0045 : 0.0015;
+            this.cityHumGain.gain.setTargetAtTime(urbanVol, now, 0.20);
+        }
+
+        // Occasional Vice Beach Seagulls (day/sunset near water) & Nighttime Tropical Crickets
+        const nf = state.nightFactor || 0;
+        if (!this.inVehicle && waterProx > 0.35 && nf < 0.55) {
+            this.seagullCooldown -= dt;
+            if (this.seagullCooldown <= 0) {
+                this.seagullCooldown = 7.5 + Math.random() * 9.0;
+                this.playSeagullCall(waterProx);
+            }
+        }
+        if (!this.inVehicle && nf > 0.48) {
+            this.cricketCooldown -= dt;
+            if (this.cricketCooldown <= 0) {
+                this.cricketCooldown = 2.4 + Math.random() * 3.8;
+                this.playCricketChirp(nf);
+            }
+        }
+
+        // 5. Sequencer for In-Car Radio Station (disabled when YouTube Radio Deck is playing!)
         const st = this.stations[this.currentStationIdx];
         if (!this.ytRadioPlaying && this.inVehicle && st && st.bassNotes.length > 0) {
             const stepDur = (60 / st.bpm) / 2; // eighth notes
@@ -331,6 +443,188 @@ class RetroAudioEngine {
         if (!this.initialized || this.muted || !this.ctx) return;
         this.playNoise(0.16, 850, 0.11);
         this.playBeep(160, 0.1, "triangle", 0.07);
+    }
+
+    // --- GTA 1 / GTA 2 SfxDefs.h Footsteps, Car Doors, Crashes, Ricochets & Ambient Calls ---
+    playFootstep(surface = "PAVEMENT", isLeft = false) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const pitchJit = (isLeft ? 0.94 : 1.06) * (0.96 + Math.random() * 0.08);
+
+        if (surface === "WATER") {
+            this.playWaterSplash(0.55);
+            return;
+        }
+        if (surface === "SAND") {
+            // Soft granular Vice Beach sand crunch
+            this.playBandNoise(0.065, 1650 * pitchJit, 1.4, 0.022);
+            this.playBeep(95 * pitchJit, 0.032, "sine", 0.015);
+            return;
+        }
+        if (surface === "GRASS") {
+            // Soft park turf brush step
+            this.playBandNoise(0.055, 1100 * pitchJit, 1.2, 0.018);
+            this.playBeep(105 * pitchJit, 0.03, "triangle", 0.014);
+            return;
+        }
+        // Default PAVEMENT / ROAD sneaker heel-sole tap (SfxLevel_FootStep1 / SfxLevel_FootStep2)
+        this.playBandNoise(0.038, 1450 * pitchJit, 2.2, 0.020);
+        this.playBeep(132 * pitchJit, 0.032, "triangle", 0.022);
+    }
+
+    playWaterSplash(scale = 1.0) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        this.playBandNoise(0.14, 780, 0.9, 0.045 * scale);
+        this.playBeep(210, 0.07, "sine", 0.025 * scale);
+    }
+
+    playCarEnter(isMotorcycle = false) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        if (!isMotorcycle) {
+            // SfxLevel_CarDoorOpen (metallic latch click) + SfxLevel_CarDoorClose (heavy door thud)
+            this.playBeep(680, 0.025, "square", 0.032);
+            this.playBandNoise(0.045, 950, 1.8, 0.04);
+            setTimeout(() => {
+                this.playBeep(88, 0.085, "triangle", 0.075);
+                this.playNoise(0.06, 420, 0.055);
+            }, 140);
+        }
+        // SfxLevel_CarEngineStart (ignition starter crank + rev)
+        setTimeout(() => {
+            if (!this.ctx || this.muted) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = "sawtooth";
+            const f0 = isMotorcycle ? 82 : 52;
+            const fPeak = isMotorcycle ? 195 : 118;
+            osc.frequency.setValueAtTime(f0, now);
+            osc.frequency.linearRampToValueAtTime(fPeak, now + 0.14);
+            osc.frequency.exponentialRampToValueAtTime(f0 * 1.15, now + 0.28);
+            g.gain.setValueAtTime(0.065, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+            osc.connect(g);
+            g.connect(this.sfxOut());
+            osc.start(now);
+            osc.stop(now + 0.31);
+        }, isMotorcycle ? 40 : 230);
+    }
+
+    playCarExit(isMotorcycle = false) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        if (isMotorcycle) {
+            this.playBeep(140, 0.045, "triangle", 0.03);
+            return;
+        }
+        // SfxLevel_CarDoorOpen + SfxLevel_CarDoorClose
+        this.playBeep(590, 0.022, "square", 0.028);
+        setTimeout(() => {
+            this.playBeep(82, 0.08, "triangle", 0.068);
+            this.playNoise(0.055, 380, 0.048);
+        }, 110);
+    }
+
+    playCarCrash(intensity = 1.0) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastCrashTime && now - this._lastCrashTime < 0.16) return;
+        this._lastCrashTime = now;
+        const k = Math.max(0.35, Math.min(1.5, intensity));
+        // SfxLevel_CarCrash1..4: heavy sheet-metal crunch + glass/panel rattle
+        this.playNoise(0.16 * k, 720, 0.085 * k);
+        this.playBeep(95 + Math.random() * 35, 0.11, "sawtooth", 0.075 * k);
+    }
+
+    playRicochet() {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastRicoTime && now - this._lastRicoTime < 0.09) return;
+        this._lastRicoTime = now;
+        // SfxLevel_BulletRicochet: metallic high-pitched "zing!"
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = "triangle";
+        const startF = 1850 + Math.random() * 650;
+        osc.frequency.setValueAtTime(startF, now);
+        osc.frequency.exponentialRampToValueAtTime(520, now + 0.075);
+        g.gain.setValueAtTime(0.036, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(g);
+        g.connect(this.sfxOut());
+        osc.start(now);
+        osc.stop(now + 0.085);
+    }
+
+    playPedScream() {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastScreamTime && now - this._lastScreamTime < 0.75) return;
+        this._lastScreamTime = now;
+        // SfxLevel_ScaredScream1..3: retro pitched vocal shriek
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = "sawtooth";
+        const base = 620 + Math.random() * 240;
+        osc.frequency.setValueAtTime(base, now);
+        osc.frequency.linearRampToValueAtTime(base * 1.28, now + 0.09);
+        osc.frequency.exponentialRampToValueAtTime(base * 0.72, now + 0.26);
+        g.gain.setValueAtTime(0.038, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.27);
+        osc.connect(g);
+        g.connect(this.sfxOut());
+        osc.start(now);
+        osc.stop(now + 0.28);
+    }
+
+    playSeagullCall(prox = 0.7) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = "sine";
+        const f = 1480 + Math.random() * 260;
+        osc.frequency.setValueAtTime(f, now);
+        osc.frequency.linearRampToValueAtTime(f * 1.18, now + 0.08);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.68, now + 0.34);
+        g.gain.setValueAtTime(0.018 * prox, now);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.35);
+        osc.connect(g);
+        g.connect(this.sfxOut());
+        osc.start(now);
+        osc.stop(now + 0.36);
+    }
+
+    playCricketChirp(nf = 0.8) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        for (let i = 0; i < 3; i++) {
+            setTimeout(() => {
+                this.playBeep(4150 + (i % 2) * 180, 0.022, "sine", 0.009 * nf);
+            }, i * 38);
+        }
+    }
+
+    playBandNoise(duration = 0.06, centerFreq = 1200, q = 1.5, vol = 0.03) {
+        if (!this.ctx) return;
+        const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = centerFreq;
+        filter.Q.value = q;
+        const g = this.ctx.createGain();
+        const now = this.ctx.currentTime;
+        g.gain.setValueAtTime(vol, now);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(this.sfxOut());
+        noise.start(now);
     }
 
     playNoise(duration = 0.1, filterFreq = 1000, vol = 0.06) {

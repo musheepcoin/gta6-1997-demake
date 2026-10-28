@@ -1421,7 +1421,7 @@ class LeonidaGame {
                 this.jason.x = this.map.getGroundTypeAt(jRes.x, jRes.y) === GROUND_TYPE.WATER ? exitX : jRes.x;
                 this.jason.y = this.map.getGroundTypeAt(jRes.x, jRes.y) === GROUND_TYPE.WATER ? exitY : jRes.y;
             }
-            this.audio.playBeep(320, 0.05, "triangle", 0.05);
+            this.audio.playCarExit(Boolean(v.isMotorcycle));
             this.updateHud();
             return;
         }
@@ -1487,6 +1487,7 @@ class LeonidaGame {
             this.jason.inVehicle = closest;
             closest.hasJason = true;
         }
+        this.audio.playCarEnter(Boolean(closest.isMotorcycle));
 
         // Trigger authentic GTA 1 top-center Blue/Gold Car Name Banner
         if (this.renderer) {
@@ -2844,6 +2845,9 @@ class LeonidaGame {
                         if (typeof b.receiveImpactDamage === "function") b.receiveImpactDamage(dmg, a.x, a.y);
                         else b.hp -= dmg;
                         this.spawnParticle((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, "SPARK");
+                        if (Math.hypot(a.x - p.x, a.y - p.y) < 520) {
+                            this.audio.playCarCrash(Math.min(1.5, dmg / 16));
+                        }
                     }
                 }
             }
@@ -3279,9 +3283,17 @@ class LeonidaGame {
                 pr.x = traceRes.pointX;
                 pr.y = traceRes.pointY;
                 hitSomething = true;
+                if (!pr.isFlame && !pr.isRocket && Math.hypot(pr.x - p.x, pr.y - p.y) < 480) {
+                    this.audio.playRicochet();
+                }
             } else {
                 const bCol = this.map.resolveCircleBuildingCollision(pr.x, pr.y, 3, p.z || 2.0);
-                if (bCol.hit) hitSomething = true;
+                if (bCol.hit) {
+                    hitSomething = true;
+                    if (!pr.isFlame && !pr.isRocket && Math.hypot(pr.x - p.x, pr.y - p.y) < 480) {
+                        this.audio.playRicochet();
+                    }
+                }
             }
 
             // Hit smashable wooden crate?
@@ -3318,6 +3330,9 @@ class LeonidaGame {
                             this.cash += 10 * this.multiplier;
                         }
                         this.spawnParticle(pr.x, pr.y, pr.isFlame ? "FIRE" : "SPARK");
+                        if (!pr.isFlame && !pr.isRocket && Math.hypot(pr.x - p.x, pr.y - p.y) < 480) {
+                            this.audio.playRicochet();
+                        }
                         hitSomething = true;
                         break;
                     }
@@ -3332,6 +3347,9 @@ class LeonidaGame {
                     if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE") continue;
                     if (Math.hypot(ped.x - pr.x, ped.y - pr.y) < 13) {
                         ped.hp -= pr.damage;
+                        if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) {
+                            this.audio.playPedScream();
+                        }
                         if (pr.isFlame && ped.hp > 0) {
                             ped.burnTimer = 3.2;
                             ped.panicTimer = 4.5;
@@ -3454,13 +3472,80 @@ class LeonidaGame {
             this.districtPopupTimer = Math.max(0, this.districtPopupTimer - dt);
         }
 
-        // 12. Missions & Audio Update
+        // 12. Missions, Footsteps & Spatial Ambient Audio Update
         this.missions.update(dt);
+
+        // 12A. Surface-aware Footsteps for Lucia on foot (Pavement, Vice Beach Sand, Park Grass, Water)
+        if (!p.inVehicle && !p.dead) {
+            const moveSpd = Math.hypot(p.vx || 0, p.vy || 0);
+            if (moveSpd > 22) {
+                this._footstepTimer = (this._footstepTimer || 0) - dt;
+                const stepInterval = moveSpd > 145 ? 0.25 : 0.34;
+                if (this._footstepTimer <= 0) {
+                    this._footstepTimer = stepInterval;
+                    this._footLeft = !this._footLeft;
+                    const bc = Math.max(0, Math.min(255, Math.floor(p.x / 64)));
+                    const br = Math.max(0, Math.min(255, Math.floor(p.y / 64)));
+                    const bIdx = br * 256 + bc;
+                    const gt = this.map.surfaceGround ? this.map.surfaceGround[bIdx] : 3;
+                    const isSand = this.map.coastalSandMask && this.map.coastalSandMask[bIdx] === 1;
+                    const surf = gt === 1 ? "WATER" : (isSand ? "SAND" : (gt === 4 ? "GRASS" : "PAVEMENT"));
+                    this.audio.playFootstep(surf, this._footLeft);
+                }
+            } else {
+                this._footstepTimer = 0.06;
+            }
+        }
+
+        // 12B. Spatial AI Traffic Pass-By (with Doppler shift!) & Ocean Surf Proximity
+        let nearestTrafficDist = 9999;
+        let nearestTrafficSpeed = 0;
+        let trafficDoppler = 1.0;
+        let trafficIsMoto = false;
+        for (let i = 0; i < this.vehicles.length; i++) {
+            const v = this.vehicles[i];
+            if (v.destroyed || v === p.inVehicle || !v.driver) continue;
+            const vSpd = Math.abs(v.speed || 0);
+            if (vSpd < 10) continue;
+            const dx = v.x - p.x;
+            const dy = v.y - p.y;
+            const d = Math.hypot(dx, dy);
+            if (d < nearestTrafficDist && d > 1) {
+                nearestTrafficDist = d;
+                nearestTrafficSpeed = vSpd;
+                trafficIsMoto = Boolean(v.isMotorcycle);
+                // Radial velocity toward player for realistic Doppler pitch shift
+                const radialVel = -((v.vx || 0) * (dx / d) + (v.vy || 0) * (dy / d));
+                trafficDoppler = 1.0 + Math.max(-0.22, Math.min(0.24, radialVel / 650));
+            }
+        }
+
+        // Compute proximity to Atlantic Ocean / Biscayne Bay / Lake Leonida water tiles
+        let waterProximity = 0;
+        const pc = Math.max(4, Math.min(251, Math.floor(p.x / 64)));
+        const pr = Math.max(4, Math.min(251, Math.floor(p.y / 64)));
+        if (this.map.surfaceGround) {
+            for (let dr = -4; dr <= 4; dr += 2) {
+                for (let dc = -4; dc <= 4; dc += 2) {
+                    if (this.map.surfaceGround[(pr + dr) * 256 + (pc + dc)] === 1) {
+                        const wd = Math.hypot(dc, dr);
+                        waterProximity = Math.max(waterProximity, Math.max(0, 1 - wd / 5.5));
+                    }
+                }
+            }
+        }
+
         this.audio.update(dt, {
             inVehicle: Boolean(p.inVehicle),
             vehicleSpeed: p.inVehicle ? p.inVehicle.speed : 0,
             wantedLevel: this.wantedLevel,
-            nearestCopDist: nearestCopDist
+            nearestCopDist: nearestCopDist,
+            nearestTrafficDist,
+            nearestTrafficSpeed,
+            trafficDoppler,
+            trafficIsMoto,
+            waterProximity,
+            nightFactor: this.renderer ? (this.renderer.nightFactor || 0) : 0
         });
     }
 
