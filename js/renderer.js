@@ -1546,16 +1546,148 @@ class RetroRenderer {
                 }
             }
             if (this.map.vicePalms) {
-                for (const pm of this.map.vicePalms) {
+                const isNightGlow = (this.nightFactor || 0) > 0.18;
+                for (let pi = 0; pi < this.map.vicePalms.length; pi++) {
+                    const pm = this.map.vicePalms[pi];
                     if (pm.x < minX || pm.x > maxX || pm.y < minY || pm.y > maxY) continue;
+                    const baseZ = (pm.z !== undefined ? pm.z : 2.0);
+                    // Ocean Drive & Star Island Neon Palm Trunk Uplight Ring at ground level!
+                    if (isNightGlow && pm.x >= 165 * TILE_SIZE && pm.x <= 222 * TILE_SIZE) {
+                        const isPink = (pi % 2) === 0;
+                        this.pushSolidQuad3D(
+                            pm.x,
+                            pm.y,
+                            baseZ + 0.025,
+                            11,
+                            11,
+                            0,
+                            isPink ? 1.0 : 0.05,
+                            isPink ? 0.22 : 0.92,
+                            isPink ? 0.68 : 1.0,
+                            0.75 * (this.nightFactor || 1.0),
+                            SPRITE_DRAW_ORDER.MAP_OBJECT
+                        );
+                    }
                     const pz = this.getEntityZ(pm, 0.15);
                     this.batchObjectSprite3D(palmSpr, pm.x, pm.y, pz, pm.angle || 0, pm.scale || 1.0, SPRITE_DRAW_ORDER.TREES);
+                }
+            }
+
+            // 7B. Deep-Dive Vice City Architectural Streetscape Props (Ocean Drive Café Terraces, Lummus Serpentine Wall & Española Bistro Lights)
+            if (Array.isArray(this.map.viceStreetDetails)) {
+                for (const vd of this.map.viceStreetDetails) {
+                    if (vd.x < minX || vd.x > maxX || vd.y < minY || vd.y > maxY) continue;
+                    const vz = (vd.z !== undefined ? vd.z : 2.0);
+                    if (vd.kind === "CAFE_TABLE") {
+                        // White Art Deco table + twin chairs on the Ocean Drive sidewalk + 3D elevated pastel parasol
+                        this.pushSolidQuad3D(vd.x - 6, vd.y, vz + 0.03, 4.5, 4.5, 0, 0.92, 0.95, 0.98, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                        this.pushSolidQuad3D(vd.x + 6, vd.y, vz + 0.03, 4.5, 4.5, 0, 0.92, 0.95, 0.98, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.04, 8.5, 8.5, 0.78, 0.98, 0.98, 1.0, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                        const cr = vd.theme === "PINK" ? 1.0 : (vd.theme === "CYAN" ? 0.12 : 1.0);
+                        const cg = vd.theme === "PINK" ? 0.32 : (vd.theme === "CYAN" ? 0.88 : 0.85);
+                        const cb = vd.theme === "PINK" ? 0.68 : (vd.theme === "CYAN" ? 0.96 : 0.22);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.15, 13, 13, 0.35, cr, cg, cb, 0.96, SPRITE_DRAW_ORDER.TREES);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.16, 5, 5, 0.35, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    } else if (vd.kind === "SERPENTINE_WALL") {
+                        // Iconic Lummus Park / South Beach white-stucco & pastel-neon serpentine low beach wall
+                        this.pushSolidQuad3D(vd.x + 2, vd.y + 2, vz + 0.02, 8, 52, 0, 0.05, 0.08, 0.14, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.05, 7.5, 50, 0, 0.96, 0.94, 0.92, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                        const isPink = vd.theme === "PINK";
+                        this.pushSolidQuad3D(
+                            vd.x,
+                            vd.y,
+                            vz + 0.09,
+                            4.2,
+                            46,
+                            0,
+                            isPink ? 1.0 : 0.08,
+                            isPink ? 0.28 : 0.92,
+                            isPink ? 0.68 : 0.98,
+                            0.95,
+                            SPRITE_DRAW_ORDER.MAP_OBJECT
+                        );
+                    } else if (vd.kind === "BISTRO_STRING") {
+                        // Española Way overhead Mediterranean festive light cable & glowing bulbs
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.50, 58, 1.8, 0, 0.18, 0.22, 0.28, 0.85, SPRITE_DRAW_ORDER.TREES);
+                        for (let bi = -2; bi <= 2; bi++) {
+                            const bx = vd.x + bi * 11;
+                            const isPink = ((bi + 2) % 2 === 0) && vd.theme === "PINK";
+                            this.pushSolidQuad3D(
+                                bx,
+                                vd.y,
+                                vz + 0.51,
+                                4.2,
+                                4.2,
+                                0,
+                                1.0,
+                                isPink ? 0.42 : 0.84,
+                                isPink ? 0.76 : 0.42,
+                                0.96,
+                                SPRITE_DRAW_ORDER.TREES
+                            );
+                        }
+                    }
                 }
             }
         } else if (this.map.trees) {
             for (const tr of this.map.trees) {
                 if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
                 this.batchObjectSprite3D("257", tr.x, tr.y, this.getEntityZ(tr, 0.12), 0, (tr.scale || 1.0), SPRITE_DRAW_ORDER.TREES);
+            }
+        }
+
+        // 7C. GTA 2 Style 3D Curb Streetlamps (Rising 3D Perspective Pole + Overhanging Cantilever Arm + Luminaire Head)
+        if (this.map && Array.isArray(this.map.streetlights)) {
+            const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
+            const lightsOn = nf > 0.12;
+            for (const sl of this.map.streetlights) {
+                if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
+                const sz = sl.z || 2.0;
+                const midX = (sl.baseX + sl.headX) * 0.5;
+                const midY = (sl.baseY + sl.headY) * 0.5;
+                const armLen = Math.max(8, Math.hypot(sl.headX - sl.baseX, sl.headY - sl.baseY) + 3);
+
+                // 1. Daytime angled ground shadow on the sidewalk
+                if (nf < 0.85) {
+                    const shX = sl.baseX + 8;
+                    const shY = sl.baseY + 6;
+                    this.pushSolidQuad3D(shX, shY, sz + 0.018, 18, 2.5, 0.62, 0.04, 0.06, 0.10, 0.34 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+
+                // 2. Curb Base Pedestal (z = sz + 0.03)
+                const isDeco = sl.style === "ART_DECO_NEON" || sl.style === "PROMENADE_TWIN";
+                const pr = isDeco ? 0.76 : 0.46;
+                const pg = isDeco ? 0.82 : 0.52;
+                const pb = isDeco ? 0.90 : 0.60;
+                this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.03, 6.2, 6.2, 0, pr * 0.72, pg * 0.72, pb * 0.72, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
+                // 3. 3D Rising Vertical Pole Segments (true 3D perspective parallax from sz+0.14 to sz+0.50!)
+                this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.15, 3.8, 3.8, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.28, 3.4, 3.4, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // Art Deco Neon Ring on upper pole shaft for Ocean Drive & Promenade lamps!
+                if (isDeco) {
+                    const nr = sl.colorType === "PINK" ? 1.0 : (sl.colorType === "CYAN" ? 0.08 : 1.0);
+                    const ng = sl.colorType === "PINK" ? 0.24 : (sl.colorType === "CYAN" ? 0.92 : 0.78);
+                    const nb = sl.colorType === "PINK" ? 0.66 : (sl.colorType === "CYAN" ? 1.0 : 0.35);
+                    this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.40, 4.4, 4.4, 0, nr, ng, nb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                } else {
+                    this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.40, 3.1, 3.1, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                }
+
+                // 4. Overhanging Cantilever Arm reaching out over the road (z = sz + 0.53)
+                this.pushSolidQuad3D(midX, midY, sz + 0.53, armLen, 2.8, sl.armAngle, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // 5. Luminaire Cobra/Deco Hood & Glowing Lamp Bulb at (headX, headY, sz + 0.55)
+                this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.54, 7.8, 5.2, sl.armAngle, pr * 0.85, pg * 0.85, pb * 0.85, 0.98, SPRITE_DRAW_ORDER.TREES);
+                if (lightsOn) {
+                    const br = sl.colorType === "PINK" ? 1.0 : (sl.colorType === "CYAN" ? 0.45 : 1.0);
+                    const bg = sl.colorType === "PINK" ? 0.55 : (sl.colorType === "CYAN" ? 0.98 : 0.92);
+                    const bb = sl.colorType === "PINK" ? 0.86 : (sl.colorType === "CYAN" ? 1.0 : 0.72);
+                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.56, 5.5, 4.2, sl.armAngle, br, bg, bb, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                } else {
+                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.55, 4.5, 3.4, sl.armAngle, 0.88, 0.94, 0.98, 0.92, SPRITE_DRAW_ORDER.TREES);
+                }
             }
         }
 
@@ -1712,55 +1844,55 @@ class RetroRenderer {
         const highResFlares = [];
         const highResCones = [];
 
-        // 2. Streetlamps & Ocean Drive Neon Boulevard Lights (anchored to world sidewalks)
-        if (this.map && this.map.cmpLoaded) {
-            const cBx = Math.floor(this.camX / TILE_SIZE);
-            const cBy = Math.floor(this.camY / TILE_SIZE);
-            const minBX = Math.max(2, cBx - 12);
-            const maxBX = Math.min(253, cBx + 12);
-            const minBY = Math.max(2, cBy - 9);
-            const maxBY = Math.min(253, cBy + 9);
+        // 2. GTA 2 Style 3D Curb Streetlamps, Ocean Drive Neon Palms & Española Bistro Lights!
+        if (this.map && Array.isArray(this.map.streetlights)) {
+            for (const sl of this.map.streetlights) {
+                if (Math.abs(sl.headX - this.camX) > 920 || Math.abs(sl.headY - this.camY) > 680) continue;
+                const sz = sl.z || 2.0;
+                // Ground light pool projected on the street directly beneath the overhanging luminaire head
+                const gSc = this.worldToScreen(sl.headX, sl.headY, sz + 0.04);
+                if (gSc.x < -160 || gSc.x > W + 160 || gSc.y < -160 || gSc.y > H + 160) continue;
+                const pxScale = (gSc.scale * H) / 128.0;
 
-            for (let by = minBY; by <= maxBY; by++) {
-                if (by % 3 !== 0) continue;
-                for (let bx = minBX; bx <= maxBX; bx++) {
-                    if (bx % 3 !== 0) continue;
-                    const nav = this.map.getNavigationBlock(bx, by, this.camZBlocks);
-                    if (!nav || nav.groundType !== GROUND_TYPE.PAWEMENT) continue;
+                // Elevated 3D lamp head position for the GTA 2 4-point star corona flare
+                const hSc = this.worldToScreen(sl.headX, sl.headY, sz + 0.56);
 
-                    // Place streetlamps along road curbs & Ocean Drive / Lummus Park promenade
-                    const nRoad =
-                        (this.map.getNavigationBlock(bx + 1, by, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
-                        (this.map.getNavigationBlock(bx - 1, by, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
-                        (this.map.getNavigationBlock(bx, by + 1, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
-                        (this.map.getNavigationBlock(bx, by - 1, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
-                        (bx >= 213 && bx <= 221);
-                    if (!nRoad) continue;
+                if (sl.colorType === "PINK") {
+                    addLightPool(gSc.x, gSc.y, 76 * pxScale, "rgba(255, 75, 175, 0.90)", "rgba(215, 35, 130, 0.38)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 10.5 * pxScale, col: "rgba(255, 105, 195, 0.85)", isStar: true });
+                } else if (sl.colorType === "CYAN") {
+                    addLightPool(gSc.x, gSc.y, 76 * pxScale, "rgba(45, 235, 255, 0.88)", "rgba(10, 155, 220, 0.36)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 10.5 * pxScale, col: "rgba(85, 245, 255, 0.85)", isStar: true });
+                } else if (sl.colorType === "SODIUM") {
+                    addLightPool(gSc.x, gSc.y, 74 * pxScale, "rgba(255, 180, 95, 0.88)", "rgba(220, 115, 35, 0.36)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 9.5 * pxScale, col: "rgba(255, 195, 115, 0.82)", isStar: true });
+                } else {
+                    addLightPool(gSc.x, gSc.y, 76 * pxScale, "rgba(255, 210, 135, 0.90)", "rgba(235, 150, 60, 0.38)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 10.0 * pxScale, col: "rgba(255, 228, 160, 0.84)", isStar: true });
+                }
+            }
+        }
 
-                    const wx = (bx + 0.5) * TILE_SIZE;
-                    const wy = (by + 0.5) * TILE_SIZE;
-                    const wz = this.map.getHeightAtPixel(wx, wy, this.camZBlocks) + 0.16;
-                    const sc = this.worldToScreen(wx, wy, wz);
-                    if (sc.x < -140 || sc.x > W + 140 || sc.y < -140 || sc.y > H + 140) continue;
-                    const pxScale = (sc.scale * H) / 128.0;
-
-                    const isViceNeonZone = bx >= 202 && bx <= 224;
-                    if (isViceNeonZone) {
-                        const bucket = (bx + by) % 3;
-                        if (bucket === 0) {
-                            addLightPool(sc.x, sc.y, 72 * pxScale, "rgba(255, 75, 175, 0.88)", "rgba(215, 35, 130, 0.36)");
-                            highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(255, 110, 195, 0.72)" });
-                        } else if (bucket === 1) {
-                            addLightPool(sc.x, sc.y, 72 * pxScale, "rgba(45, 235, 255, 0.85)", "rgba(10, 155, 220, 0.34)");
-                            highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(90, 245, 255, 0.72)" });
-                        } else {
-                            addLightPool(sc.x, sc.y, 74 * pxScale, "rgba(255, 205, 125, 0.90)", "rgba(235, 145, 55, 0.38)");
-                            highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(255, 225, 155, 0.75)" });
-                        }
-                    } else {
-                        addLightPool(sc.x, sc.y, 70 * pxScale, "rgba(255, 200, 125, 0.86)", "rgba(215, 135, 50, 0.35)");
-                        highResFlares.push({ x: sc.x, y: sc.y, r: 8 * pxScale, col: "rgba(255, 220, 150, 0.70)" });
-                    }
+        // 2B. Ocean Drive Serpentine Neon Wall & Española Way Bistro Light Strings
+        if (this.map && Array.isArray(this.map.viceStreetDetails)) {
+            for (const vd of this.map.viceStreetDetails) {
+                if (vd.kind === "CAFE_TABLE") continue;
+                if (Math.abs(vd.x - this.camX) > 860 || Math.abs(vd.y - this.camY) > 640) continue;
+                const sc = this.worldToScreen(vd.x, vd.y, (vd.z || 2.0) + (vd.kind === "BISTRO_STRING" ? 0.50 : 0.08));
+                if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                if (vd.kind === "BISTRO_STRING") {
+                    addLightPool(sc.x, sc.y, 64 * pxScale, "rgba(255, 195, 120, 0.82)", "rgba(235, 110, 150, 0.32)");
+                    highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(255, 215, 145, 0.78)", isStar: true });
+                } else if (vd.kind === "SERPENTINE_WALL") {
+                    const isPink = vd.theme === "PINK";
+                    addLightPool(
+                        sc.x,
+                        sc.y,
+                        42 * pxScale,
+                        isPink ? "rgba(255, 65, 175, 0.62)" : "rgba(35, 230, 255, 0.60)",
+                        isPink ? "rgba(195, 25, 120, 0.22)" : "rgba(10, 145, 210, 0.22)"
+                    );
                 }
             }
         }
@@ -2027,6 +2159,28 @@ class RetroRenderer {
                 ctx.beginPath();
                 ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
                 ctx.fill();
+
+                // GTA 2 Signature 4-Point Cross-Star Corona on elevated 3D Streetlamp Bulbs!
+                if (f.isStar) {
+                    const rayLen = r * 1.65;
+                    const rayW = Math.max(1.1, r * 0.16);
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+                    ctx.beginPath();
+                    ctx.moveTo(f.x - rayLen, f.y);
+                    ctx.lineTo(f.x, f.y - rayW);
+                    ctx.lineTo(f.x + rayLen, f.y);
+                    ctx.lineTo(f.x, f.y + rayW);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(f.x, f.y - rayLen);
+                    ctx.lineTo(f.x + rayW, f.y);
+                    ctx.lineTo(f.x, f.y + rayLen);
+                    ctx.lineTo(f.x - rayW, f.y);
+                    ctx.closePath();
+                    ctx.fill();
+                }
             }
         }
 

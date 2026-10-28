@@ -315,13 +315,20 @@ class LeonidaMap {
 
         // Populate Official GTA 6 S-Curving Vice Beach Lifeguard Towers, Volleyball Courts, Star Island Pool & Neon Marquees!
         this.beachProps = [
-            // 1. S-Curving Eastern Vice Beach Lifeguard Stands & Sand Volleyball Courts
+            // 1. S-Curving Eastern Vice Beach Lifeguard Stands & Sand Volleyball Courts (North Beach -> Mid Beach -> Lummus Park -> South Point)
+            { spr: "lifeguard_neon",   x: 231.5 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_tower",  x: 233.5 * TILE_SIZE, y: 44.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 235.5 * TILE_SIZE, y: 62.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 237.5 * TILE_SIZE, y: 74.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_neon",   x: 239.5 * TILE_SIZE, y: 88.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_tower",  x: 237.5 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 235.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 233.5 * TILE_SIZE, y: 138.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_neon",   x: 232.5 * TILE_SIZE, y: 145.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_tower",  x: 232.5 * TILE_SIZE, y: 150.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_neon",   x: 231.5 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 229.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 227.5 * TILE_SIZE, y: 184.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "volleyball_court", x: 226.5 * TILE_SIZE, y: 46.5 * TILE_SIZE,  z: 1.98, scale: 1.2, angle: 0 },
             { spr: "volleyball_court", x: 229.5 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 1.98, scale: 1.2, angle: 0 },
             { spr: "volleyball_court", x: 226.5 * TILE_SIZE, y: 145.5 * TILE_SIZE, z: 1.98, scale: 1.2, angle: 0 },
@@ -362,6 +369,154 @@ class LeonidaMap {
                 z: 2.0,
                 spr: (i % 2 === 0) ? "umbrella_pink" : "umbrella_cyan",
                 angle: i * 0.9
+            });
+        }
+
+        // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights) & Deep-Dive Vice City Streetscape Details (this.viceStreetDetails)
+        this.streetlights = [];
+        this.viceStreetDetails = [];
+        for (let r = 3; r < MAP_ROWS - 3; r++) {
+            for (let c = 3; c < MAP_COLS - 3; c++) {
+                const idx = r * MAP_COLS + c;
+                if (this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT) continue;
+                if (this.coastalSandMask[idx]) continue;
+
+                const eRoad = this.surfaceGround[r * MAP_COLS + (c + 1)] === GROUND_TYPE.ROAD;
+                const wRoad = this.surfaceGround[r * MAP_COLS + (c - 1)] === GROUND_TYPE.ROAD;
+                const sRoad = this.surfaceGround[(r + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
+                const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
+                const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
+
+                // Only place streetlamps along straight sidewalk curbs (1 road neighbor, never blocking intersection corners!)
+                if (roadCount !== 1) continue;
+
+                let dc = 0, dr = 0;
+                if (eRoad) dc = 1;
+                else if (wRoad) dc = -1;
+                else if (sRoad) dr = 1;
+                else if (nRoad) dr = -1;
+
+                const isVerticalCurb = dc !== 0;
+                const isOceanDriveCurb = (c === 213 || c === 218) && r >= 34 && r <= 204;
+                const spacing = isOceanDriveCurb ? 2 : 3;
+                const coordAlong = isVerticalCurb ? r : c;
+                if ((coordAlong % spacing) !== 1) continue;
+
+                const surfZ = this.surfaceLayer[idx] || 2.0;
+                // Position base near the curb edge of the sidewalk (+20px toward road), overhanging luminaire head +13px out over the street
+                const baseX = (c + 0.5) * TILE_SIZE + dc * 20.0;
+                const baseY = (r + 0.5) * TILE_SIZE + dr * 20.0;
+                const headX = baseX + dc * 13.0;
+                const headY = baseY + dr * 13.0;
+                const armAngle = Math.atan2(dr, dc);
+
+                // District-authentic GTA 2 / Vice City streetlamp style & color palette
+                let style = "BOULEVARD_GOLD";
+                let colorType = "AMBER";
+                if (c >= 202 && c <= 223) {
+                    style = "ART_DECO_NEON";
+                    const bucket = (c + r) % 3;
+                    colorType = bucket === 0 ? "PINK" : (bucket === 1 ? "CYAN" : "AMBER");
+                } else if (c >= 152 && c <= 201) {
+                    style = "STAR_RESORT";
+                    colorType = ((c + r) % 4 === 0) ? "CYAN" : "GOLD";
+                } else if (c < 95 || r >= 205) {
+                    style = "SODIUM_HIGHWAY";
+                    colorType = "SODIUM";
+                }
+
+                this.streetlights.push({
+                    c,
+                    r,
+                    baseX,
+                    baseY,
+                    headX,
+                    headY,
+                    z: surfZ,
+                    armAngle,
+                    style,
+                    colorType
+                });
+            }
+        }
+
+        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Promenade & the 3 Wooden Ocean Piers!
+        for (let r = 38; r <= 198; r += 4) {
+            if (this.surfaceGround[r * MAP_COLS + 220] === GROUND_TYPE.PAWEMENT) {
+                const bx = 220.35 * TILE_SIZE;
+                const by = (r + 0.5) * TILE_SIZE;
+                this.streetlights.push({
+                    c: 220,
+                    r,
+                    baseX: bx,
+                    baseY: by,
+                    headX: bx + 6.0,
+                    headY: by,
+                    z: 2.0,
+                    armAngle: 0,
+                    style: "PROMENADE_TWIN",
+                    colorType: (r % 8 === 2) ? "PINK" : "CYAN"
+                });
+            }
+        }
+        for (const pierR of [45, 88, 154]) {
+            for (let c = 232; c <= 246; c += 3) {
+                if (this.surfaceGround[pierR * MAP_COLS + c] === GROUND_TYPE.PAWEMENT) {
+                    const bx = (c + 0.5) * TILE_SIZE;
+                    const by = (pierR + 0.22) * TILE_SIZE;
+                    this.streetlights.push({
+                        c,
+                        r: pierR,
+                        baseX: bx,
+                        baseY: by,
+                        headX: bx,
+                        headY: by + 8.0,
+                        z: 2.0,
+                        armAngle: Math.PI * 0.5,
+                        style: "PROMENADE_TWIN",
+                        colorType: (c % 2 === 0) ? "AMBER" : "PINK"
+                    });
+                }
+            }
+        }
+
+        // Deep-Dive Vice City Architectural Streetscape Props:
+        // A. Ocean Drive Art Deco Sidewalk Café Tables & Pastel Bistro Umbrellas (West sidewalk x=213.18 in front of Art Deco hotels)
+        for (let r = 42; r <= 194; r += 2) {
+            if (this.surfaceGround[r * MAP_COLS + 213] !== GROUND_TYPE.PAWEMENT) continue;
+            // Skip cross-street intersections
+            if (this.surfaceGround[r * MAP_COLS + 212] === GROUND_TYPE.ROAD) continue;
+            this.viceStreetDetails.push({
+                kind: "CAFE_TABLE",
+                x: 213.18 * TILE_SIZE,
+                y: (r + 0.5) * TILE_SIZE,
+                z: 2.0,
+                theme: ((r >> 1) % 3 === 0) ? "PINK" : (((r >> 1) % 3 === 1) ? "CYAN" : "YELLOW")
+            });
+        }
+
+        // B. Lummus Park Pastel Art Deco Serpentine Beach Wall & Neon Uplight Planters (along x=220.85 separating promenade from beach sand)
+        for (let r = 40; r <= 192; r += 2) {
+            if (this.surfaceGround[r * MAP_COLS + 220] !== GROUND_TYPE.PAWEMENT) continue;
+            if (r % 12 === 0) continue; // Leave pedestrian beach access openings every 12 blocks!
+            const waveX = Math.sin(r * 0.45) * 4.5;
+            this.viceStreetDetails.push({
+                kind: "SERPENTINE_WALL",
+                x: 220.82 * TILE_SIZE + waveX,
+                y: (r + 0.5) * TILE_SIZE,
+                z: 2.0,
+                theme: (r % 4 === 0) ? "PINK" : "CYAN"
+            });
+        }
+
+        // C. Española Way Overhead Mediterranean Bistro Light Strings (y=105..108, x=204..213)
+        for (let c = 204; c <= 212; c += 2) {
+            this.viceStreetDetails.push({
+                kind: "BISTRO_STRING",
+                x: (c + 0.5) * TILE_SIZE,
+                y: 106.5 * TILE_SIZE,
+                z: 2.0,
+                theme: (c % 4 === 0) ? "PINK" : "AMBER"
             });
         }
 
