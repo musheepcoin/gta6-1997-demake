@@ -426,8 +426,10 @@ class LeonidaMap {
                     }
                 }
 
-                // Only place streetlamps along straight sidewalk curbs (1 road neighbor, never blocking intersection corners!)
+                // Only place streetlamps along straight mid-block sidewalk curbs (1 road neighbor, never near corners or crosswalks!)
                 if (roadCount !== 1) continue;
+                // Exclude wilderness/swamp/mountain zones
+                if (c < 36 || (c < 96 && r > 185) || (c < 105 && r < 42)) continue;
 
                 let dc = 0, dr = 0;
                 if (eRoad) dc = 1;
@@ -435,11 +437,38 @@ class LeonidaMap {
                 else if (sRoad) dr = 1;
                 else if (nRoad) dr = -1;
 
+                // Never place a streetlamp right next to a crosswalk (lid 24) or intersection interior (lid 25)
+                const roadLid = this.getBlockInfo(c + dc, r + dr, 1).lid;
+                if (roadLid === 24 || roadLid === 25) continue;
+
                 const isVerticalCurb = dc !== 0;
+                // Ensure this sidewalk tile is truly mid-block (at least 1 straight sidewalk tile on each side along the curb)
+                const prevC = isVerticalCurb ? c : c - 1;
+                const prevR = isVerticalCurb ? r - 1 : r;
+                const nextC = isVerticalCurb ? c : c + 1;
+                const nextR = isVerticalCurb ? r + 1 : r;
+                if (
+                    this.surfaceGround[prevR * MAP_COLS + prevC] !== GROUND_TYPE.PAWEMENT ||
+                    this.surfaceGround[nextR * MAP_COLS + nextC] !== GROUND_TYPE.PAWEMENT ||
+                    this.getBlockInfo(prevC + dc, prevR + dr, 1).lid === 24 ||
+                    this.getBlockInfo(nextC + dc, nextR + dr, 1).lid === 24
+                ) {
+                    continue;
+                }
+
+                // On horizontal cross-streets, only place streetlamps on the North sidewalk (dr > 0) so narrow cross-blocks aren't doubled up
+                if (!isVerticalCurb && dr < 0) continue;
+
+                // Realistic urban spacing (7 tiles on Ocean Drive, 9 tiles on avenues) with staggered quinconce offset on opposite curbs!
                 const isOceanDriveCurb = (c === 213 || c === 218) && r >= 34 && r <= 204;
-                const spacing = isOceanDriveCurb ? 2 : 3;
+                const spacing = isOceanDriveCurb ? 7 : 9;
+                const sideOffset = (dc < 0 || dr < 0) ? Math.floor(spacing * 0.5) : 0;
                 const coordAlong = isVerticalCurb ? r : c;
-                if ((coordAlong % spacing) !== 1) continue;
+                if (((coordAlong + sideOffset) % spacing) !== 2) continue;
+
+                // Never crowd a traffic signal or another nearby streetlamp
+                if (this.trafficSignals.some(ts => Math.hypot(ts.c - c, ts.r - r) < 4.2)) continue;
+                if (this.streetlights.some(sl => Math.hypot(sl.c - c, sl.r - r) < 4.5)) continue;
 
                 const surfZ = this.surfaceLayer[idx] || 2.0;
                 // Position base near the curb edge of the sidewalk (+20px toward road), overhanging luminaire head +13px out over the street
@@ -449,16 +478,15 @@ class LeonidaMap {
                 const headY = baseY + dr * 13.0;
                 const armAngle = Math.atan2(dr, dc);
 
-                // District-authentic GTA 2 / Vice City streetlamp style & color palette
+                // District-authentic GTA 2 / Vice City warm yellow/sodium streetlamp style
                 let style = "BOULEVARD_GOLD";
                 let colorType = "AMBER";
                 if (c >= 202 && c <= 223) {
                     style = "ART_DECO_NEON";
-                    const bucket = (c + r) % 3;
-                    colorType = bucket === 0 ? "PINK" : (bucket === 1 ? "CYAN" : "AMBER");
+                    colorType = "AMBER";
                 } else if (c >= 152 && c <= 201) {
                     style = "STAR_RESORT";
-                    colorType = ((c + r) % 4 === 0) ? "CYAN" : "GOLD";
+                    colorType = "GOLD";
                 } else if (c < 95 || r >= 205) {
                     style = "SODIUM_HIGHWAY";
                     colorType = "SODIUM";
@@ -479,8 +507,8 @@ class LeonidaMap {
             }
         }
 
-        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Promenade & the 3 Wooden Ocean Piers!
-        for (let r = 38; r <= 198; r += 4) {
+        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Promenade (every 10 tiles) & the 3 Wooden Ocean Piers (every 6 tiles)
+        for (let r = 42; r <= 194; r += 10) {
             if (this.surfaceGround[r * MAP_COLS + 220] === GROUND_TYPE.PAWEMENT) {
                 const bx = 220.35 * TILE_SIZE;
                 const by = (r + 0.5) * TILE_SIZE;
@@ -494,12 +522,12 @@ class LeonidaMap {
                     z: 2.0,
                     armAngle: 0,
                     style: "PROMENADE_TWIN",
-                    colorType: (r % 8 === 2) ? "PINK" : "CYAN"
+                    colorType: "AMBER"
                 });
             }
         }
         for (const pierR of [45, 88, 154]) {
-            for (let c = 232; c <= 246; c += 3) {
+            for (let c = 233; c <= 245; c += 6) {
                 if (this.surfaceGround[pierR * MAP_COLS + c] === GROUND_TYPE.PAWEMENT) {
                     const bx = (c + 0.5) * TILE_SIZE;
                     const by = (pierR + 0.22) * TILE_SIZE;
@@ -513,7 +541,7 @@ class LeonidaMap {
                         z: 2.0,
                         armAngle: Math.PI * 0.5,
                         style: "PROMENADE_TWIN",
-                        colorType: (c % 2 === 0) ? "AMBER" : "PINK"
+                        colorType: "AMBER"
                     });
                 }
             }
