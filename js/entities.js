@@ -1253,7 +1253,7 @@ class Vehicle {
         const distToTargetCenter = Math.hypot(tx - this.x, ty - this.y);
         const isBeforeStopLine = (lidZ1 === 24 && nextLidZ1 === 25 && distToTargetCenter > 50);
 
-        if (!isPanicked && curBlk && curBlk.trafficHint === 1 && isBeforeStopLine && game) {
+        if (!isPanicked && curBlk && (curBlk.trafficHint === 1 || lidZ1 === 24) && isBeforeStopLine && game) {
             const isNSLane = Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right;
             const isEWLane = Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down;
             const nsRed = isNSLane && typeof game.isNSGreen === "function" && !game.isNSGreen();

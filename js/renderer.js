@@ -1712,35 +1712,81 @@ class RetroRenderer {
             }
         }
 
-        // 7D. GTA 2 Style 3-Phase Junction Traffic Light Gantries (FUN_004C3C70 / kGameLightTraffic from gta2-rtx-remix!)
+        // 7D. Authentic Miami / Vice City 3-Lens Traffic Signal Gantries ([ RED | AMBER | GREEN ] overhanging road lanes!)
         if (this.map && Array.isArray(this.map.trafficSignals)) {
             const ph = ((game ? game.trafficLightTimer : this.time) || 0) % 12.0;
             // N/S: 0..5.2 Green (#00FF44), 5.2..6.0 Amber (#FF9900), 6.0..12.0 Red (#FF1E38)
             // E/W: 6.0..11.2 Green (#00FF44), 11.2..12.0 Amber (#FF9900), 0..6.0 Red (#FF1E38)
             const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
             const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+            const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
 
             for (const ts of this.map.trafficSignals) {
                 if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
                 const sz = ts.z || 2.0;
                 const midX = (ts.baseX + ts.headX) * 0.5;
                 const midY = (ts.baseY + ts.headY) * 0.5;
-                const armLen = Math.max(10, Math.hypot(ts.headX - ts.baseX, ts.headY - ts.baseY) + 3);
+                const armLen = Math.max(18, Math.hypot(ts.headX - ts.baseX, ts.headY - ts.baseY) + 4);
                 const st = ts.axis === "NS" ? nsState : ewState;
+                const dx = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle);
+                const dy = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle);
 
-                // Corner mast base & 3D vertical gantry pole
-                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.03, 6.5, 6.5, 0, 0.25, 0.28, 0.34, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.20, 3.8, 3.8, 0, 0.38, 0.42, 0.48, 0.98, SPRITE_DRAW_ORDER.TREES);
-                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.38, 3.5, 3.5, 0, 0.38, 0.42, 0.48, 0.98, SPRITE_DRAW_ORDER.TREES);
-                // Yellow Miami Signal Gantry Arm + Black 3-Lamp Signal Housing Box
-                this.pushSolidQuad3D(midX, midY, sz + 0.54, armLen, 3.0, ts.armAngle, 0.92, 0.72, 0.14, 0.98, SPRITE_DRAW_ORDER.TREES);
-                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.55, 10.5, 5.8, ts.armAngle, 0.12, 0.14, 0.18, 0.98, SPRITE_DRAW_ORDER.TREES);
+                // 1. Daytime solar ground shadow of the gantry pole & arm
+                if (nf < 0.85) {
+                    const shX = ts.baseX + Math.cos(sunShadowAngle) * (sunShadowLen * 0.6);
+                    const shY = ts.baseY + Math.sin(sunShadowAngle) * (sunShadowLen * 0.6);
+                    this.pushSolidQuad3D(shX, shY, sz + 0.018, sunShadowLen * 1.2, 3.0, sunShadowAngle, 0.04, 0.06, 0.10, 0.34 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
 
-                // Active Red / Amber / Green LED Signal Lens
-                const sr = st === "GREEN" ? 0.05 : 1.0;
-                const sg = st === "GREEN" ? 1.0 : (st === "AMBER" ? 0.62 : 0.12);
-                const sb = st === "GREEN" ? 0.28 : (st === "AMBER" ? 0.05 : 0.22);
-                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.57, 5.5, 4.8, ts.armAngle, sr, sg, sb, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                // 2. Corner Mast Base Pedestal & Rising 3D Vertical Gantry Pole (with yellow pedestrian crosswalk call button!)
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.03, 7.6, 7.6, 0, 0.22, 0.25, 0.30, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.16, 4.4, 4.4, 0, 0.36, 0.40, 0.46, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.24, 5.0, 5.0, 0, 0.94, 0.74, 0.14, 0.98, SPRITE_DRAW_ORDER.TREES); // Crosswalk button box
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.36, 4.0, 4.0, 0, 0.40, 0.44, 0.50, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.50, 3.6, 3.6, 0, 0.44, 0.48, 0.55, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // 3. Overhanging Horizontal Cantilever Mast Arm reaching out over the road lane
+                this.pushSolidQuad3D(midX, midY, sz + 0.57, armLen, 3.6, ts.armAngle, 0.38, 0.42, 0.49, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(midX, midY, sz + 0.58, armLen - 2.0, 1.5, ts.armAngle, 0.22, 0.25, 0.30, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // 4. Authentic 3-Lens Miami Traffic Signal Box ([ RED | AMBER | GREEN ])
+                // Outer shadow & Florida Highway-Yellow reflective backplate border
+                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.585, 26.0, 12.2, ts.armAngle, 0.05, 0.06, 0.09, 0.96, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.590, 24.4, 10.6, ts.armAngle, 0.96, 0.75, 0.12, 0.99, SPRITE_DRAW_ORDER.TREES);
+                // Matte black 3-compartment interior housing + 2 bay divider bars
+                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.595, 21.4, 8.0, ts.armAngle, 0.08, 0.09, 0.12, 0.99, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.headX - dx * 3.4, ts.headY - dy * 3.4, sz + 0.598, 1.1, 7.8, ts.armAngle, 0.22, 0.25, 0.32, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.headX + dx * 3.4, ts.headY + dy * 3.4, sz + 0.598, 1.1, 7.8, ts.armAngle, 0.22, 0.25, 0.32, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // Positions of the 3 circular signal bays along the housing: Red (+6.8 tip), Amber (0.0 mid), Green (-6.8 inner)
+                const redX = ts.headX + dx * 6.8, redY = ts.headY + dy * 6.8;
+                const ambX = ts.headX,           ambY = ts.headY;
+                const grnX = ts.headX - dx * 6.8, grnY = ts.headY - dy * 6.8;
+
+                // Visor hoods for all 3 lenses
+                this.pushSolidQuad3D(redX, redY, sz + 0.600, 5.8, 5.8, ts.armAngle, 0.04, 0.05, 0.07, 0.99, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ambX, ambY, sz + 0.600, 5.8, 5.8, ts.armAngle, 0.04, 0.05, 0.07, 0.99, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(grnX, grnY, sz + 0.600, 5.8, 5.8, ts.armAngle, 0.04, 0.05, 0.07, 0.99, SPRITE_DRAW_ORDER.TREES);
+
+                // Unlit dark tinted glass for all 3 lenses (so all 3 Red / Yellow / Green circles are always visible!)
+                this.pushSolidQuad3D(redX, redY, sz + 0.604, 4.4, 4.4, ts.armAngle, 0.32, 0.05, 0.07, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ambX, ambY, sz + 0.604, 4.4, 4.4, ts.armAngle, 0.32, 0.20, 0.04, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(grnX, grnY, sz + 0.604, 4.4, 4.4, ts.armAngle, 0.04, 0.28, 0.13, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // Blazing Active Lens + Outer Glow Halo + Incandescent Core Hotspot
+                if (st === "RED") {
+                    this.pushSolidQuad3D(redX, redY, sz + 0.608, 11.5, 11.5, ts.armAngle, 1.0, 0.08, 0.14, 0.38, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(redX, redY, sz + 0.612, 5.4, 5.4, ts.armAngle, 1.0, 0.10, 0.16, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(redX, redY, sz + 0.616, 2.8, 2.8, ts.armAngle, 1.0, 0.78, 0.82, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                } else if (st === "AMBER") {
+                    this.pushSolidQuad3D(ambX, ambY, sz + 0.608, 11.5, 11.5, ts.armAngle, 1.0, 0.68, 0.04, 0.38, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(ambX, ambY, sz + 0.612, 5.4, 5.4, ts.armAngle, 1.0, 0.74, 0.05, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(ambX, ambY, sz + 0.616, 2.8, 2.8, ts.armAngle, 1.0, 0.96, 0.72, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                } else {
+                    this.pushSolidQuad3D(grnX, grnY, sz + 0.608, 11.5, 11.5, ts.armAngle, 0.04, 1.0, 0.38, 0.38, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(grnX, grnY, sz + 0.612, 5.4, 5.4, ts.armAngle, 0.06, 0.98, 0.38, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(grnX, grnY, sz + 0.616, 2.8, 2.8, ts.armAngle, 0.76, 1.0, 0.88, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                }
             }
         }
 
@@ -1958,20 +2004,25 @@ class RetroRenderer {
             for (const ts of this.map.trafficSignals) {
                 if (Math.abs(ts.headX - this.camX) > 880 || Math.abs(ts.headY - this.camY) > 640) continue;
                 const sz = ts.z || 2.0;
-                const gSc = this.worldToScreen(ts.headX, ts.headY, sz + 0.04);
+                const st = ts.axis === "NS" ? nsState : ewState;
+                const dx = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle);
+                const dy = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle);
+                const lensOff = st === "RED" ? 6.8 : (st === "AMBER" ? 0.0 : -6.8);
+                const lx = ts.headX + dx * lensOff;
+                const ly = ts.headY + dy * lensOff;
+                const gSc = this.worldToScreen(lx, ly, sz + 0.04);
                 if (gSc.x < -140 || gSc.x > W + 140 || gSc.y < -140 || gSc.y > H + 140) continue;
                 const pxScale = (gSc.scale * H) / 128.0;
-                const hSc = this.worldToScreen(ts.headX, ts.headY, sz + 0.57);
-                const st = ts.axis === "NS" ? nsState : ewState;
+                const hSc = this.worldToScreen(lx, ly, sz + 0.61);
                 if (st === "GREEN") {
-                    addLightPool(gSc.x, gSc.y, 58 * pxScale, "rgba(0, 255, 95, 0.78)", "rgba(0, 180, 65, 0.28)");
-                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 8.5 * pxScale, col: "rgba(30, 255, 110, 0.92)" });
+                    addLightPool(gSc.x, gSc.y, 72 * pxScale, "rgba(0, 255, 95, 0.85)", "rgba(0, 180, 65, 0.32)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 12.0 * pxScale, col: "rgba(30, 255, 110, 0.94)", isStar: true });
                 } else if (st === "AMBER") {
-                    addLightPool(gSc.x, gSc.y, 58 * pxScale, "rgba(255, 165, 20, 0.82)", "rgba(215, 105, 0, 0.30)");
-                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 8.5 * pxScale, col: "rgba(255, 180, 40, 0.92)" });
+                    addLightPool(gSc.x, gSc.y, 72 * pxScale, "rgba(255, 175, 20, 0.88)", "rgba(215, 110, 0, 0.34)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 12.0 * pxScale, col: "rgba(255, 190, 40, 0.94)", isStar: true });
                 } else {
-                    addLightPool(gSc.x, gSc.y, 58 * pxScale, "rgba(255, 30, 60, 0.80)", "rgba(205, 10, 35, 0.30)");
-                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 8.5 * pxScale, col: "rgba(255, 45, 75, 0.92)" });
+                    addLightPool(gSc.x, gSc.y, 72 * pxScale, "rgba(255, 25, 55, 0.86)", "rgba(205, 10, 35, 0.34)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 12.0 * pxScale, col: "rgba(255, 45, 75, 0.94)", isStar: true });
                 }
             }
         }
