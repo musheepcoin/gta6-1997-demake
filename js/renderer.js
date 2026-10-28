@@ -216,6 +216,13 @@ class RetroRenderer {
                         // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops):
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!)
                         nightRgb = c.rgb * vec3(0.68, 0.73, 0.90);
+                        if (uViceStyle > 0.5 && vWorldPos.y > 1.5) {
+                            // Illuminated Vice City rooftop swimming pools, glass skylight atriums & neon parapet trims at night!
+                            float rSat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+                            float rLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                            float poolOrNeon = clamp((rSat - 0.32) * 2.6 + (rLum - 0.62) * 1.8, 0.0, 1.0);
+                            nightRgb = mix(nightRgb, min(vec3(1.0), c.rgb * 1.18 + vec3(0.04, 0.08, 0.12)), poolOrNeon * 0.75);
+                        }
                     }
                     c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
                 }
@@ -565,7 +572,7 @@ class RetroRenderer {
                     }
                 }
                 if (this.gl) {
-                    this.tilesTexVice = this.createGLTexture(this.gta1TilesViceImg, false);
+                    this.tilesTexVice = this.createGLTexture(this.gta1TilesViceImg, true);
                     this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
                     this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
                     const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
@@ -584,9 +591,9 @@ class RetroRenderer {
                 }
 
                 // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_02", () => {
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_05", () => {
                     if (this.gl) {
-                        this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, false);
+                        this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
                         if (this.mapStyle === "NYC") {
                             this.tilesTex = this.tilesTexNyc;
                         }
@@ -632,34 +639,34 @@ class RetroRenderer {
             return run();
         };
 
-        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_02", () => {
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_05", () => {
             viceTilesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_02", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_05", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_02", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_05", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_02", () => {
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_05", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_02", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_05", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_02", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_05", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -1088,6 +1095,74 @@ class RetroRenderer {
             const pos = p[qi[c]];
             const uv = cornerUVs[c];
             verts.push(pos[0] + nOffX, pos[1] + nOffY, pos[2] + nOffZ, uv[0], uv[1], animType);
+        }
+
+        // 6. 3D Mitered Outer Roof Parapet Coping & Drop-Shadow Rim:
+        // Emitted ONLY along true outer drop-off edges of a building roof (where b.faces[0..3] > 0),
+        // framing each roof tier with a continuous 3D Art Deco parapet while keeping interior roof tiles seamless!
+        if (face === 4 && st === 0 && !b.isFlat && y_elev >= 1 && b.groundType === 5 && tileIdx !== 41 && tileIdx !== 22) {
+            const hasW = b.faces[0] > 0;
+            const hasE = b.faces[1] > 0;
+            const hasN = b.faces[2] > 0;
+            const hasS = b.faces[3] > 0;
+            if (hasW || hasE || hasN || hasS) {
+                const wPar = 0.095;
+                const yCop = y_elev + 1.003;
+                const emitParapetStrip = (sideTile, q0, q1, q2, q3) => {
+                    const sAtlasIdx = (tiles.side_start || 0) + (sideTile % tiles.side_count);
+                    const sCol = sAtlasIdx % 16;
+                    const sRow = Math.floor(sAtlasIdx / 16);
+                    const su0 = sCol / 16.0 + padU;
+                    const su1 = (sCol + 1.0) / 16.0 - padU;
+                    // Sample top sunlit Art Deco cornice (py=0.6) -> neon/frieze accent -> inner parapet shadow (py=7.2)
+                    const svOuter = (sRow + 0.6 / 64.0) / 51.0;
+                    const svInner = (sRow + 7.2 / 64.0) / 51.0;
+                    const qPos = [q0, q1, q2, q3];
+                    for (let k = 0; k < 6; k++) {
+                        const c = triOrder[k];
+                        const qp = qPos[c];
+                        const qu = qp[3] ? su1 : su0;
+                        const qv = qp[4] ? svInner : svOuter;
+                        verts.push(qp[0], qp[1], qp[2], qu, qv, 0.0);
+                    }
+                };
+                if (hasN) {
+                    emitParapetStrip(
+                        b.faces[2],
+                        [xW, yCop, zN, 0, 0],
+                        [xE, yCop, zN, 1, 0],
+                        [xW + (hasW ? wPar : 0.0), yCop, zN + wPar, 0, 1],
+                        [xE - (hasE ? wPar : 0.0), yCop, zN + wPar, 1, 1]
+                    );
+                }
+                if (hasS) {
+                    emitParapetStrip(
+                        b.faces[3],
+                        [xW + (hasW ? wPar : 0.0), yCop, zS - wPar, 0, 1],
+                        [xE - (hasE ? wPar : 0.0), yCop, zS - wPar, 1, 1],
+                        [xW, yCop, zS, 0, 0],
+                        [xE, yCop, zS, 1, 0]
+                    );
+                }
+                if (hasW) {
+                    emitParapetStrip(
+                        b.faces[0],
+                        [xW, yCop, zN, 0, 0],
+                        [xW + wPar, yCop, zN + (hasN ? wPar : 0.0), 0, 1],
+                        [xW, yCop, zS, 1, 0],
+                        [xW + wPar, yCop, zS - (hasS ? wPar : 0.0), 1, 1]
+                    );
+                }
+                if (hasE) {
+                    emitParapetStrip(
+                        b.faces[1],
+                        [xE - wPar, yCop, zN + (hasN ? wPar : 0.0), 0, 1],
+                        [xE, yCop, zN, 0, 0],
+                        [xE - wPar, yCop, zS - (hasS ? wPar : 0.0), 1, 1],
+                        [xE, yCop, zS, 1, 0]
+                    );
+                }
+            }
         }
     }
 

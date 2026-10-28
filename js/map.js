@@ -238,6 +238,64 @@ class LeonidaMap {
             }
         }
 
+        // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
+        // Enriches interior penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
+        // and 3ds Max Glass Skylight Atriums (lid 31) while preserving 100% of their 3D side walls (w, e, n, s)!
+        const roofVariantCache = new Map();
+        const getRoofVariantIdx = (origIdx, newLid, newRemap = 0) => {
+            const key = `${origIdx}_${newLid}_${newRemap}`;
+            if (roofVariantCache.has(key)) return roofVariantCache.get(key);
+            const src = this.blocksData[origIdx];
+            const clone = {
+                ...src,
+                lid: newLid,
+                remap: newRemap,
+                faces: [src.w, src.e, src.n, src.s, newLid]
+            };
+            const nextIdx = this.blocksData.length;
+            this.blocksData.push(clone);
+            roofVariantCache.set(key, nextIdx);
+            return nextIdx;
+        };
+
+        for (let tilez = 2; tilez < MAP_LAYERS; tilez++) {
+            const zOff = tilez * MAP_ROWS;
+            for (let tiley = 3; tiley < MAP_ROWS - 3; tiley++) {
+                for (let tilex = 3; tilex < MAP_COLS - 3; tilex++) {
+                    const gIdx = (zOff + tiley) * MAP_COLS + tilex;
+                    const blkIdx = this.voxelGrid[gIdx];
+                    const blk = this.blocksData[blkIdx];
+                    if (!blk || blk.groundType !== GROUND_TYPE.BUILDING || (blk.lid !== 46 && blk.lid !== 48 && blk.lid !== 51)) {
+                        continue;
+                    }
+                    // Ensure this is the top roof surface of this column
+                    if (tilez + 1 < MAP_LAYERS) {
+                        const aboveBlk = this.blocksData[this.voxelGrid[((tilez + 1) * MAP_ROWS + tiley) * MAP_COLS + tilex]];
+                        if (aboveBlk && aboveBlk.groundType !== GROUND_TYPE.AIR) continue;
+                    }
+                    // Check if surrounded North & South (or East & West) by roof tiles at the same height
+                    const nBlk = this.blocksData[this.voxelGrid[(zOff + tiley - 1) * MAP_COLS + tilex]];
+                    const sBlk = this.blocksData[this.voxelGrid[(zOff + tiley + 1) * MAP_COLS + tilex]];
+                    const wBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex - 1)]];
+                    const eBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex + 1)]];
+                    const hasNSRoof = nBlk && nBlk.lid > 0 && sBlk && sBlk.lid > 0;
+                    const hasEWRoof = wBlk && wBlk.lid > 0 && eBlk && eBlk.lid > 0;
+                    if (!hasNSRoof && !hasEWRoof) continue;
+
+                    const isHotelDixonPool = ((tiley === 144 || tiley === 145) && (tilex === 210 || tilex === 211));
+                    const isOceanDrivePenthouse = (tilex >= 200 && tilex <= 212 && tilez >= 4 && ((tilex + tiley * 3) % 4 === 0));
+                    const isInteriorFeature = (hasNSRoof && hasEWRoof && ((tilex * 5 + tiley * 7) % 3 === 0));
+
+                    if (isHotelDixonPool || (isOceanDrivePenthouse && ((tiley % 3) === 0))) {
+                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, 0);
+                    } else if (isOceanDrivePenthouse || isInteriorFeature) {
+                        const featLid = ((tilex + tiley) % 2 === 0) ? 35 : 31;
+                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, featLid, blk.remap);
+                    }
+                }
+            }
+        }
+
         this.cmpLoaded = true;
 
         // Build 2D surface lookup table & tree planter list (Lid 69)
