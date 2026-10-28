@@ -246,7 +246,7 @@ class LeonidaMap {
                 if (surfGt !== GROUND_TYPE.PAWEMENT && surfGt !== GROUND_TYPE.FIELD) continue;
 
                 const blkZ1 = this.getBlockInfo(c, r, 1);
-                const isSandTile = (blkZ1 && (blkZ1.lid === 98 || blkZ1.lid === 99));
+                const isSandTile = (blkZ1 && blkZ1.lid >= 98 && blkZ1.lid <= 101);
 
                 let nearWater = false;
                 let adjRoad = false;
