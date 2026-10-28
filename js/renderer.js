@@ -135,6 +135,7 @@ class RetroRenderer {
             varying float vAnim;
             varying vec3 vWorldPos;
             uniform sampler2D uTex;
+            uniform sampler2D uDayLightTex;
             uniform float uNightTint;
             uniform float uSunsetTint;
             uniform float uViceStyle;
@@ -143,6 +144,8 @@ class RetroRenderer {
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 if (c.a < 0.1) discard;
+
+                float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
 
                 // 1. AddRiverbed (world_mesh.cpp): 3D Sunken Sandy Seabed Floor (vAnim == 3.0) & Translucent Water Surface (vAnim == 1.0)
                 if (vAnim > 2.5 && vAnim < 3.5) {
@@ -153,37 +156,59 @@ class RetroRenderer {
                     vec3 submergedSand = c.rgb * vec3(0.45, 0.78, 0.86) + vec3(0.28, 0.34, 0.22) * caust * (1.0 - uNightTint * 0.7);
                     c.rgb = submergedSand;
                 } else if (vAnim > 0.5 && vAnim < 1.5) {
-                    // Translucent animated turquoise water surface (alpha = 0.78) revealing the 3D sunken seabed with parallax!
+                    // Translucent animated turquoise water surface (alpha = 0.78) revealing the 3D sunken seabed with parallax + daytime sun sparkles!
                     float w1 = sin(vUV.x * 220.0 + uTime * 2.3) * cos(vUV.y * 220.0 - uTime * 1.8);
                     float w2 = sin((vUV.x + vUV.y) * 160.0 - uTime * 2.7);
                     float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
                     vec3 crestFoam = vec3(0.88, 0.96, 0.98);
                     c.rgb = mix(c.rgb, crestFoam, caust * 0.15 * (1.0 - uNightTint * 0.65));
+                    float sunGlint = pow(caust, 3.0) * dayAmt;
+                    c.rgb = min(vec3(1.0), c.rgb + vec3(0.36, 0.34, 0.24) * sunGlint);
                     c.a = 0.78;
-                } else if (vAnim > -0.5 && vAnim < 0.5 && vWorldPos.y < 2.2) {
-                    // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
-                    float isSand = clamp((c.r - c.b - 0.18) * 7.5, 0.0, 1.0) * step(0.72, c.r);
-                    float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
-                    if (isSand > 0.01) {
-                        float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
-                        float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
-                        float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
-                        float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
-                        float duneWave = (r1 * 0.52 + r2 * 0.33 + r3 * 0.15) * isSand;
-                        vec3 sandCrest = vec3(1.0, 0.94, 0.78);
-                        vec3 sandTrough = vec3(0.84, 0.69, 0.45);
-                        vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
-                        c.rgb = mix(c.rgb, targetSand, isSand * 0.36);
-                    } else if (isGrass > 0.01) {
-                        float gWarp = sin(vWorldPos.z * 1.61 - vWorldPos.x * 0.97) * 0.75;
-                        float g1 = sin(vWorldPos.x * 5.17 + vWorldPos.z * 3.43 + gWarp);
-                        float g2 = cos(vWorldPos.x * 13.89 - vWorldPos.z * 9.23 + sin(vWorldPos.z * 2.71) * 0.6);
-                        float g3 = sin(vWorldPos.x * 27.7 + vWorldPos.z * 19.3);
-                        float turfWave = (g1 * 0.50 + g2 * 0.34 + g3 * 0.16) * isGrass;
-                        vec3 turfShadow = vec3(0.09, 0.42, 0.18);
-                        vec3 turfSunlit = vec3(0.42, 0.81, 0.36);
-                        vec3 targetTurf = mix(turfShadow, turfSunlit, clamp(0.52 + turfWave * 0.26, 0.0, 1.0));
-                        c.rgb = mix(c.rgb, targetTurf, isGrass * 0.34);
+                } else if (vAnim > -0.5 && vAnim < 0.5) {
+                    if (vWorldPos.y < 2.2) {
+                        // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
+                        float isSand = clamp((c.r - c.b - 0.18) * 7.5, 0.0, 1.0) * step(0.72, c.r);
+                        float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
+                        if (isSand > 0.01) {
+                            float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
+                            float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
+                            float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
+                            float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
+                            float duneWave = (r1 * 0.52 + r2 * 0.33 + r3 * 0.15) * isSand;
+                            vec3 sandCrest = vec3(1.0, 0.94, 0.78);
+                            vec3 sandTrough = vec3(0.84, 0.69, 0.45);
+                            vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
+                            c.rgb = mix(c.rgb, targetSand, isSand * 0.36);
+                        } else if (isGrass > 0.01) {
+                            float gWarp = sin(vWorldPos.z * 1.61 - vWorldPos.x * 0.97) * 0.75;
+                            float g1 = sin(vWorldPos.x * 5.17 + vWorldPos.z * 3.43 + gWarp);
+                            float g2 = cos(vWorldPos.x * 13.89 - vWorldPos.z * 9.23 + sin(vWorldPos.z * 2.71) * 0.6);
+                            float g3 = sin(vWorldPos.x * 27.7 + vWorldPos.z * 19.3);
+                            float turfWave = (g1 * 0.50 + g2 * 0.34 + g3 * 0.16) * isGrass;
+                            vec3 turfShadow = vec3(0.09, 0.42, 0.18);
+                            vec3 turfSunlit = vec3(0.42, 0.81, 0.36);
+                            vec3 targetTurf = mix(turfShadow, turfSunlit, clamp(0.52 + turfWave * 0.26, 0.0, 1.0));
+                            c.rgb = mix(c.rgb, targetTurf, isGrass * 0.34);
+                        }
+                    }
+
+                    // Daytime 3D Building Cast Shadows, Building-Foot Ambient Occlusion & Warm Florida Sunlight vs. Cool Sky Shade
+                    if (dayAmt > 0.01) {
+                        vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 256.0);
+                        float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
+                        float bldAO = lm.g * onGround;
+                        float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
+                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround;
+                        float totalShade = clamp(max(bldShadow * 0.94, bldAO * 0.72), 0.0, 1.0);
+
+                        vec3 sunlitTint = vec3(1.13, 1.06, 0.92);
+                        vec3 shadowTint = vec3(0.56, 0.65, 0.84);
+                        vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
+                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.035, 0.0, 0.10);
+                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade)) + 0.5, 0.0, 1.0);
+                        sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
+                        c.rgb = mix(c.rgb, sunlitRgb, dayAmt);
                     }
                 }
 
@@ -196,11 +221,18 @@ class RetroRenderer {
                     else wallNormal = vec2(0.0, 1.0);                    // South wall (-4.0)
 
                     float sunDot = dot(wallNormal, uSunDir);
-                    float dirShade = 1.0 + sunDot * 0.14 * (1.0 - uNightTint * 0.75);
-                    // Subtle Ground-Contact Ambient Occlusion at the base of each 3D building storey
+                    float wallSunFactor = clamp(sunDot * 0.5 + 0.5, 0.0, 1.0);
+                    vec3 wallDayTint = mix(vec3(0.75, 0.83, 0.96), vec3(1.14, 1.06, 0.94), wallSunFactor);
+                    vec3 wallShade = mix(vec3(1.0 + sunDot * 0.06), wallDayTint, dayAmt);
+
+                    // Subtle Ground-Contact Ambient Occlusion at each storey ledge + street-level facade base
                     float storeyY = fract(vWorldPos.y);
-                    float baseAO = mix(0.84, 1.0, smoothstep(0.0, 0.32, storeyY));
-                    c.rgb = min(vec3(1.0), c.rgb * dirShade * baseAO);
+                    float baseAO = mix(0.84, 1.0, smoothstep(0.0, 0.32, storeyY)) * mix(0.82, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
+
+                    // Daytime solar sky-reflection glint on upper-floor glass windows
+                    float isGlass = clamp((c.b - c.r - 0.06) * 3.2, 0.0, 1.0) * dayAmt;
+                    vec3 skyGlint = vec3(0.10, 0.15, 0.20) * isGlass * clamp((vWorldPos.y - 2.0) * 0.30, 0.0, 1.0) * (0.4 + 0.6 * wallSunFactor);
+                    c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO + skyGlint);
                 }
 
                 if (uSunsetTint > 0.01) {
@@ -296,12 +328,22 @@ class RetroRenderer {
             uWaterStep: gl.getUniformLocation(this.cityProg, "uWaterStep"),
             uFanStep: gl.getUniformLocation(this.cityProg, "uFanStep"),
             uTex: gl.getUniformLocation(this.cityProg, "uTex"),
+            uDayLightTex: gl.getUniformLocation(this.cityProg, "uDayLightTex"),
             uNightTint: gl.getUniformLocation(this.cityProg, "uNightTint"),
             uSunsetTint: gl.getUniformLocation(this.cityProg, "uSunsetTint"),
             uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle"),
             uTime: gl.getUniformLocation(this.cityProg, "uTime"),
             uSunDir: gl.getUniformLocation(this.cityProg, "uSunDir")
         };
+
+        // Default 1x1 neutral daylight AO/shadow texture (replaced by 512x512 ray-marched lightmap in buildCityMesh)
+        this.dayLightTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.dayLightTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([85, 0, 0, 0]));
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         this.spriteProg = this.createProgram(gl, spriteVS, spriteFS);
         this.spriteLocs = {
@@ -847,6 +889,149 @@ class RetroRenderer {
                 });
             }
         }
+
+        // 3. Build 512x512 Ray-Marched 3D Building Solar Cast Shadow & Ambient Occlusion Lightmap (this.dayLightTex)
+        this.buildDayLightTexture();
+    }
+
+    buildDayLightTexture() {
+        const gl = this.gl;
+        if (!gl || !this.map || !this.map.cmpLoaded) return;
+
+        // 1) Compute true visible top elevation (1.0..6.0) for every 256x256 map column
+        const colTopElev = new Float32Array(256 * 256);
+        for (let r = 0; r < 256; r++) {
+            for (let c = 0; c < 256; c++) {
+                let topY = 2.0;
+                for (let z = 5; z >= 0; z--) {
+                    const bIdx = this.map.getBlockIndex(c, r, z);
+                    if (bIdx === 0) continue;
+                    const b = this.map.getBlockInfo(bIdx);
+                    if (b && (b.faces[4] !== 0 || b.faces[0] !== 0 || b.faces[1] !== 0 || b.faces[2] !== 0 || b.faces[3] !== 0)) {
+                        topY = z + 1.0;
+                        break;
+                    }
+                }
+                colTopElev[r * 256 + c] = topY;
+            }
+        }
+
+        // 2) Ray-march 512x512 sub-tile lightmap (2x2 samples per 64px tile) for:
+        //    - G: 3D Building-Foot & Urban Canyon Ambient Occlusion
+        //    - B: 3D Cast Shadow from South-East Sun (morning/forenoon)
+        //    - A: 3D Cast Shadow from West-Southwest Sun (midday/afternoon — casts Hotel Dixon & Ocean Drive shadows onto the promenade!)
+        const LRES = 512;
+        const rawElev = new Float32Array(LRES * LRES);
+        const rawAO = new Float32Array(LRES * LRES);
+        const rawShadE = new Float32Array(LRES * LRES);
+        const rawShadW = new Float32Array(LRES * LRES);
+        const aoOffsets = [
+            [-0.55, 0], [0.55, 0], [0, -0.55], [0, 0.55],
+            [-0.42, -0.42], [0.42, -0.42], [-0.42, 0.42], [0.42, 0.42]
+        ];
+
+        for (let ty = 0; ty < LRES; ty++) {
+            const wy = (ty + 0.5) * 0.5;
+            const cy = Math.min(255, Math.max(0, ty >> 1));
+            for (let tx = 0; tx < LRES; tx++) {
+                const wx = (tx + 0.5) * 0.5;
+                const cx = Math.min(255, Math.max(0, tx >> 1));
+                const idx = ty * LRES + tx;
+                const baseElev = colTopElev[cy * 256 + cx];
+                rawElev[idx] = baseElev;
+
+                // Building-foot contact Ambient Occlusion
+                let aoSum = 0.0;
+                for (let k = 0; k < 8; k++) {
+                    const nx = Math.min(255, Math.max(0, Math.floor(wx + aoOffsets[k][0])));
+                    const ny = Math.min(255, Math.max(0, Math.floor(wy + aoOffsets[k][1])));
+                    const hDiff = colTopElev[ny * 256 + nx] - baseElev;
+                    if (hDiff > 0.2) {
+                        aoSum += Math.min(1.0, hDiff * 0.38);
+                    }
+                }
+                rawAO[idx] = Math.min(1.0, aoSum / 3.0);
+
+                // Ray-march 3D solar cast shadows (7 steps up to ~2.8 blocks from 3D buildings)
+                let shE = 0.0;
+                let shW = 0.0;
+                for (let s = 1; s <= 7; s++) {
+                    const dist = s * 0.40;
+                    const reqH = dist * 0.78;
+                    const falloff = Math.max(0.28, 1.0 - dist * 0.13);
+
+                    // Caster to the North-East (+X, -Y) -> casts shadow South-West
+                    const ex = Math.min(255, Math.max(0, Math.floor(wx + 0.35 * s)));
+                    const ey = Math.min(255, Math.max(0, Math.floor(wy - 0.32 * s)));
+                    const diffE = colTopElev[ey * 256 + ex] - baseElev;
+                    if (diffE > reqH) {
+                        shE = Math.max(shE, Math.min(1.0, falloff * Math.min(1.0, diffE * 0.52)));
+                    }
+
+                    // Caster to the North-West (-X, -Y) -> casts shadow South-East (matching palm & ped shadows!)
+                    const wxCaster = Math.min(255, Math.max(0, Math.floor(wx - 0.36 * s)));
+                    const wyCaster = Math.min(255, Math.max(0, Math.floor(wy - 0.32 * s)));
+                    const diffW = colTopElev[wyCaster * 256 + wxCaster] - baseElev;
+                    if (diffW > reqH) {
+                        shW = Math.max(shW, Math.min(1.0, falloff * Math.min(1.0, diffW * 0.52)));
+                    }
+                }
+                rawShadE[idx] = shE;
+                rawShadW[idx] = shW;
+            }
+        }
+
+        // 3) Elevation-aware 3x3 penumbra smoothing (only averages samples sharing the same elevation plane)
+        const lightBytes = new Uint8Array(LRES * LRES * 4);
+        for (let ty = 0; ty < LRES; ty++) {
+            for (let tx = 0; tx < LRES; tx++) {
+                const idx = ty * LRES + tx;
+                const bElev = rawElev[idx];
+                let sumAO = 0.0, sumE = 0.0, sumW = 0.0, wTotal = 0.0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    const ny = Math.min(LRES - 1, Math.max(0, ty + dy));
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const nx = Math.min(LRES - 1, Math.max(0, tx + dx));
+                        const nIdx = ny * LRES + nx;
+                        if (Math.abs(rawElev[nIdx] - bElev) < 0.25) {
+                            const w = (dx === 0 && dy === 0) ? 2.0 : 1.0;
+                            sumAO += rawAO[nIdx] * w;
+                            sumE += rawShadE[nIdx] * w;
+                            sumW += rawShadW[nIdx] * w;
+                            wTotal += w;
+                        }
+                    }
+                }
+                const invW = wTotal > 0 ? (1.0 / wTotal) : 1.0;
+                const pOff = idx * 4;
+                lightBytes[pOff]     = Math.min(255, Math.round((bElev / 6.0) * 255.0));
+                lightBytes[pOff + 1] = Math.min(255, Math.round(sumAO * invW * 255.0));
+                lightBytes[pOff + 2] = Math.min(255, Math.round(sumE * invW * 255.0));
+                lightBytes[pOff + 3] = Math.min(255, Math.round(sumW * invW * 255.0));
+            }
+        }
+
+        this.dayShadowMap = lightBytes;
+        if (!this.dayLightTex) {
+            this.dayLightTex = gl.createTexture();
+        }
+        gl.bindTexture(gl.TEXTURE_2D, this.dayLightTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, LRES, LRES, 0, gl.RGBA, gl.UNSIGNED_BYTE, lightBytes);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+
+    getDayShadeAtPixel(xPx, yPx) {
+        if (!this.dayShadowMap) return 0.0;
+        const tx = Math.min(511, Math.max(0, Math.floor((xPx / TILE_SIZE) * 2.0)));
+        const ty = Math.min(511, Math.max(0, Math.floor((yPx / TILE_SIZE) * 2.0)));
+        const off = (ty * 512 + tx) * 4;
+        const ao = this.dayShadowMap[off + 1] / 255.0;
+        const shE = this.dayShadowMap[off + 2] / 255.0;
+        const shW = this.dayShadowMap[off + 3] / 255.0;
+        return Math.min(1.0, Math.max(ao * 0.55, shW * 0.68 + shE * 0.32));
     }
 
     putBlockFace(verts, x, y_elev, z_south, face, b) {
@@ -1522,6 +1707,11 @@ class RetroRenderer {
             return;
         }
 
+        // 2A. Daytime Ambient Florida Sunlight, Volumetric Sunbeams & Tropical Sky-Shadow Atmosphere
+        if ((this.nightFactor || 0) < 0.72 && !this.nightMode && !game.activeInterior) {
+            this.renderDaylightAtmosphere(ctx, game);
+        }
+
         // 2B. Real Dynamic Day/Sunset/Night Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
         if (((this.nightFactor || 0) > 0.02 || (this.sunsetFactor || 0) > 0.04 || this.nightMode) && !game.activeInterior) {
             this.renderNightLighting(ctx, game);
@@ -1629,6 +1819,13 @@ class RetroRenderer {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, activeTilesTex);
         gl.uniform1i(this.cityLocs.uTex, 0);
+
+        if (this.dayLightTex && this.cityLocs.uDayLightTex !== null && this.cityLocs.uDayLightTex !== undefined) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this.dayLightTex);
+            gl.uniform1i(this.cityLocs.uDayLightTex, 1);
+            gl.activeTexture(gl.TEXTURE0);
+        }
 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
@@ -2180,9 +2377,13 @@ class RetroRenderer {
                 : 0;
             const totalPitchZ = v._conformPitch + wheeliePitch + stuntPitch;
 
-            // Car body sprite with GTA 2 live rotation-aware solar clearcoat specular sheen!
-            const carSunSpec = v.destroyed ? 1.0 : (1.0 + 0.065 * Math.cos(v.angle - sunShadowAngle) * (1.0 - nfGlobal * 0.72));
-            this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, carSunSpec, carSunSpec, carSunSpec, 1, totalPitchZ);
+            // Car body sprite with GTA 2 live rotation-aware solar clearcoat specular sheen + 3D building cast shadow response!
+            const vehShade = (1.0 - nfGlobal) * this.getDayShadeAtPixel(v.x, v.y);
+            const carSunSpec = v.destroyed ? 1.0 : (1.0 + 0.08 * Math.cos(v.angle - sunShadowAngle) * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.7));
+            const vTintR = carSunSpec * (1.0 - vehShade * 0.16);
+            const vTintG = carSunSpec * (1.0 - vehShade * 0.11);
+            const vTintB = carSunSpec * (1.0 - vehShade * 0.03);
+            this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
 
             // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp):
             // Physical Front Headlight Glass Lenses + Day/Night Rear Taillights, Brake Lamps & Reverse Lamps!
@@ -2639,6 +2840,70 @@ class RetroRenderer {
                 this.pushAtlasSprite3D(rect, ax, ay, this.camZBlocks + 0.25, angle + Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
             }
         }
+    }
+
+    /* ========================================================================
+       5A-DAY. DAYTIME AMBIENT FLORIDA SUNLIGHT, VOLUMETRIC SUNBEAMS & SKY GLOW
+       ======================================================================== */
+    renderDaylightAtmosphere(ctx, game) {
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        if (W <= 0 || H <= 0) return;
+
+        const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
+        const dayInt = Math.max(0, Math.min(1, (0.72 - nf) / 0.65));
+        if (dayInt <= 0.01) return;
+
+        const clockHr = (game && typeof game.worldMinutes === "number")
+            ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
+            : 12.0;
+        // Sun positioned above top-left / top-center horizon (matching South-East cast shadows of buildings, palms & peds!)
+        const dayProgress = Math.max(0, Math.min(1, (clockHr - 6.0) / 12.0));
+        const sunX = W * (0.18 + dayProgress * 0.16);
+        const sunY = -H * 0.16;
+        const maxDim = Math.hypot(W, H);
+
+        ctx.save();
+
+        // 1. Warm Golden-Ivory Florida Solar Radiance Field (lifts flat textures with natural sun warmth)
+        ctx.globalCompositeOperation = "screen";
+        const sunGrad = ctx.createRadialGradient(sunX, sunY, maxDim * 0.04, sunX, sunY, maxDim * 1.05);
+        sunGrad.addColorStop(0.0, `rgba(255, 238, 184, ${(0.20 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(0.42, `rgba(255, 218, 148, ${(0.10 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(0.78, `rgba(255, 200, 128, ${(0.04 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+        ctx.fillStyle = sunGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 2. Feathered Elliptical Volumetric Sunbeams (100% radial-gradient feathered edges — zero hard polygon lines!)
+        ctx.globalCompositeOperation = "lighter";
+        const baseRayAngle = Math.atan2(H * 0.85, W * 0.58 - sunX);
+        const camPhase = (this.camX * 0.0020 + this.camY * 0.0015);
+        for (let i = 0; i < 4; i++) {
+            const rayWave = 0.72 + 0.28 * Math.sin(this.time * 0.80 + camPhase + i * 1.57);
+            const ang = baseRayAngle + (i - 1.5) * 0.14;
+            const lenR = maxDim * 0.68;
+            const widR = W * (0.09 + (i % 2) * 0.025);
+
+            ctx.save();
+            ctx.translate(sunX, sunY);
+            ctx.rotate(ang);
+            ctx.scale(lenR, widR);
+
+            const rg = ctx.createRadialGradient(0.55, 0.0, 0.02, 0.55, 0.0, 0.65);
+            const a0 = (0.045 * dayInt * rayWave).toFixed(4);
+            const a1 = (0.020 * dayInt * rayWave).toFixed(4);
+            rg.addColorStop(0.0, `rgba(255, 244, 198, ${a0})`);
+            rg.addColorStop(0.50, `rgba(255, 224, 154, ${a1})`);
+            rg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            ctx.fillStyle = rg;
+            ctx.beginPath();
+            ctx.arc(0.55, 0.0, 0.65, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.restore();
     }
 
     /* ========================================================================
