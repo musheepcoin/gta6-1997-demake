@@ -84,8 +84,8 @@ class RetroRenderer {
     initWebGL() {
         const gl = this.glCanvas.getContext("webgl", {
             alpha: false,
-            Depth: true,
-            antialias: true,
+            depth: true,
+            antialias: false,
             preserveDrawingBuffer: true
         });
         if (!gl) {
@@ -309,16 +309,16 @@ class RetroRenderer {
         return p;
     }
 
-    createGLTexture(img) {
+    createGLTexture(img, useLinear = false) {
         const gl = this.gl;
         if (!gl) return null;
         const tex = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        // GTA 2 (1999) Direct3D hardware bilinear texture filtering (smooth rotated 3D cars, peds & perspective walls!)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        const filter = useLinear ? gl.LINEAR : gl.NEAREST;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         return tex;
@@ -544,12 +544,20 @@ class RetroRenderer {
     }
 
     loadAuthenticGta1Assets() {
-        let loadedCount = 0;
+        this.loadProgress = 0;
+        this.loadTotal = 4;
+        let viceTilesLoaded = false;
+        let spritesLoaded = false;
         let mapBinBuffer = null;
 
         const checkReady = () => {
-            loadedCount++;
-            if (loadedCount >= 5 && this.gta1Meta && mapBinBuffer) {
+            this.loadProgress =
+                (viceTilesLoaded ? 1 : 0) +
+                (spritesLoaded ? 1 : 0) +
+                (this.gta1Meta ? 1 : 0) +
+                (mapBinBuffer ? 1 : 0);
+
+            if (viceTilesLoaded && spritesLoaded && this.gta1Meta && mapBinBuffer && !this.gta1Ready) {
                 this.vehicleBySprIdx = {};
                 if (Array.isArray(this.gta1Meta.sprites.vehicles)) {
                     for (const ve of this.gta1Meta.sprites.vehicles) {
@@ -557,11 +565,11 @@ class RetroRenderer {
                     }
                 }
                 if (this.gl) {
-                    this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg);
-                    this.tilesTexVice = this.createGLTexture(this.gta1TilesViceImg);
+                    this.tilesTexVice = this.createGLTexture(this.gta1TilesViceImg, false);
+                    this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
                     this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
                     const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
-                    this.spritesTex = this.createGLTexture(enhancedSprites);
+                    this.spritesTex = this.createGLTexture(enhancedSprites, true);
                 }
                 // Decompress NYC.CMP 256x256x6 voxel map into LeonidaMap and build 3D WebGL CityMesh!
                 this.map.mapStyle = this.mapStyle;
@@ -574,38 +582,84 @@ class RetroRenderer {
                 if (window.game && typeof window.game.onCmpLoaded === "function") {
                     window.game.onCmpLoaded(this.gta1Meta);
                 }
+
+                // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_00", () => {
+                    if (this.gl) {
+                        this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, false);
+                        if (this.mapStyle === "NYC") {
+                            this.tilesTex = this.tilesTexNyc;
+                        }
+                    }
+                });
             }
         };
 
-        this.gta1TilesImg.onload = checkReady;
-        this.gta1TilesViceImg.onload = checkReady;
-        this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_99";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_99";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_99";
-
-        this.nycOverviewImg.onload = () => {
-            this.nycOverviewReady = true;
-            this.bakeRadarBackground();
+        const loadImageWithRetry = (img, baseUrl, onSuccess, maxRetries = 5) => {
+            let attempt = 0;
+            img.onload = () => {
+                onSuccess();
+            };
+            img.onerror = () => {
+                attempt++;
+                if (attempt <= maxRetries) {
+                    const sep = baseUrl.includes("?") ? "&" : "?";
+                    setTimeout(() => {
+                        img.src = `${baseUrl}${sep}retry=${attempt}_${Date.now()}`;
+                    }, 300 * attempt);
+                } else {
+                    console.error("Failed to load image after retries:", baseUrl);
+                }
+            };
+            img.src = baseUrl;
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_99";
 
-        this.viceOverviewImg.onload = () => {
+        const fetchWithRetry = (url, asArrayBuffer = false, maxRetries = 5) => {
+            let attempt = 0;
+            const run = () =>
+                fetch(attempt === 0 ? url : `${url}&retry=${attempt}_${Date.now()}`)
+                    .then((res) => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return asArrayBuffer ? res.arrayBuffer() : res.json();
+                    })
+                    .catch((err) => {
+                        attempt++;
+                        if (attempt <= maxRetries) {
+                            return new Promise((resolve) => setTimeout(resolve, 300 * attempt)).then(run);
+                        }
+                        throw err;
+                    });
+            return run();
+        };
+
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_00", () => {
+            viceTilesLoaded = true;
+            checkReady();
+        });
+
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_00", () => {
+            spritesLoaded = true;
+            checkReady();
+        });
+
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_00", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
-        };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_99";
+        });
 
-        fetch("assets/gta1/gta1_meta.json?v=97_81")
-            .then((res) => res.json())
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_00", () => {
+            this.nycOverviewReady = true;
+            this.bakeRadarBackground();
+        });
+
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_00", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetch("assets/gta1/gta1_map.bin?v=97_81")
-            .then((res) => res.arrayBuffer())
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_00", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -1324,6 +1378,51 @@ class RetroRenderer {
         ctx.save();
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(this.glCanvas, 0, 0);
+
+        if (!this.gta1Ready || !this.cmpReady) {
+            const W = this.canvas.width;
+            const H = this.canvas.height;
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+            bgGrad.addColorStop(0.0, "#0b0724");
+            bgGrad.addColorStop(0.55, "#250b3b");
+            bgGrad.addColorStop(1.0, "#082f49");
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, W, H);
+
+            const cx = W * 0.5;
+            const cy = H * 0.5;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.font = "bold 28px Consolas, 'Courier New', monospace";
+            ctx.fillStyle = "#ff2a85";
+            ctx.fillText("GRAND THEFT AUTO: VICE CITY '97", cx + 2, cy - 42 + 2);
+            ctx.fillStyle = "#00f0ff";
+            ctx.fillText("GRAND THEFT AUTO: VICE CITY '97", cx, cy - 42);
+
+            ctx.font = "bold 14px Consolas, 'Courier New', monospace";
+            ctx.fillStyle = "#fde047";
+            const pct = Math.min(99, Math.round(((this.loadProgress || 0) / (this.loadTotal || 4)) * 100));
+            ctx.fillText(`LOADING 3D VICE CITY WORLD & GTA 2 ASSETS... ${pct}%`, cx, cy - 8);
+
+            const bw = 340;
+            const bh = 16;
+            const bx = Math.round(cx - bw * 0.5);
+            const by = Math.round(cy + 16);
+            ctx.fillStyle = "rgba(8, 15, 30, 0.9)";
+            ctx.fillRect(bx, by, bw, bh);
+            ctx.strokeStyle = "#00f0ff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(bx, by, bw, bh);
+
+            const fillW = Math.max(24, Math.round((bw - 6) * Math.max(0.15, (this.loadProgress || 0) / (this.loadTotal || 4))));
+            const barGrad = ctx.createLinearGradient(bx, by, bx + bw, by);
+            barGrad.addColorStop(0, "#ff2a85");
+            barGrad.addColorStop(1, "#00f0ff");
+            ctx.fillStyle = barGrad;
+            ctx.fillRect(bx + 3, by + 3, fillW, bh - 6);
+            ctx.restore();
+            return;
+        }
 
         // 2B. Real Dynamic Day/Sunset/Night Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
         if (((this.nightFactor || 0) > 0.02 || (this.sunsetFactor || 0) > 0.04 || this.nightMode) && !game.activeInterior) {
