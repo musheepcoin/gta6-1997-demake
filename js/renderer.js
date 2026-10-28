@@ -717,7 +717,8 @@ class RetroRenderer {
         g = 1,
         b = 1,
         a = 1,
-        drawOrder = 4
+        drawOrder = 4,
+        pitchZ = 0
     ) {
         if (!this.spriteQueue) this.spriteQueue = [];
         if (this.spriteQueue.length >= this.maxSprites) return;
@@ -737,11 +738,12 @@ class RetroRenderer {
             b,
             a,
             drawOrder,
+            pitchZ,
             seq: this.spriteQueue.length
         });
     }
 
-    pushAtlasSprite3D(rect, xPx, yPx, zBlocks, angleRad = 0, scale = 1.0, drawOrder = 4, r = 1, g = 1, b = 1, a = 1) {
+    pushAtlasSprite3D(rect, xPx, yPx, zBlocks, angleRad = 0, scale = 1.0, drawOrder = 4, r = 1, g = 1, b = 1, a = 1, pitchZ = 0) {
         if (!rect || !this.gta1SpritesImg.width) return;
         const [sx, sy, sw, sh] = rect;
         const texW = this.gta1SpritesImg.width;
@@ -750,7 +752,7 @@ class RetroRenderer {
         const v0 = (sy + 0.15) / texH;
         const u1 = (sx + sw - 0.15) / texW;
         const v1 = (sy + sh - 0.15) / texH;
-        this.pushSpriteQuad3D(xPx, yPx, zBlocks, sw * scale, sh * scale, angleRad, u0, v0, u1, v1, r, g, b, a, drawOrder);
+        this.pushSpriteQuad3D(xPx, yPx, zBlocks, sw * scale, sh * scale, angleRad, u0, v0, u1, v1, r, g, b, a, drawOrder, pitchZ);
     }
 
     pushSolidQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, r, g, b, a, drawOrder = 1) {
@@ -800,12 +802,14 @@ class RetroRenderer {
                 [s.u1, s.v1]
             ];
 
+            const pZ = s.pitchZ || 0;
             for (let k = 0; k < 6; k++) {
                 const idx = tri[k];
                 const wx = cx + lx[idx] * cosA - lz[idx] * sinA;
                 const wz = cz + lx[idx] * sinA + lz[idx] * cosA;
+                const cornerPitch = pZ !== 0 ? (lz[idx] > 0 ? pZ : -pZ) : 0;
                 verts[offset++] = wx;
-                verts[offset++] = s.zBlocks;
+                verts[offset++] = s.zBlocks + cornerPitch;
                 verts[offset++] = wz;
                 verts[offset++] = uvs[idx][0];
                 verts[offset++] = uvs[idx][1];
@@ -1179,6 +1183,18 @@ class RetroRenderer {
             this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.0, false, SPRITE_DRAW_ORDER.CORPSE);
         }
 
+        // Solar azimuth shadow vector for pedestrians, vehicles & street furniture (TimeOfDaySunAt from gta2-rtx-remix time_of_day.cpp!)
+        const clockHour = (game && typeof game.worldMinutes === "number")
+            ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
+            : 12.0;
+        const hourFromNoon = (clockHour - 12.0) / 6.5; // -1 at 05:30 sunrise, 0 at 12:00 noon, +1 at 18:30 sunset
+        const sunShadowAngle = Math.atan2(0.55, Math.max(-1.2, Math.min(1.2, hourFromNoon)));
+        const sunShadowLen = 11.0 + Math.min(14.0, Math.abs(hourFromNoon) * 13.0);
+        const nfGlobal = Math.max(0, Math.min(1, this.nightFactor || 0));
+        const sunShadowAlpha = 0.30 * (1.0 - nfGlobal * 0.72);
+        const sunCos = Math.cos(sunShadowAngle);
+        const sunSin = Math.sin(sunShadowAngle);
+
         // 4. Living Pedestrians, Monks, Cops, Jason Duval & Lucia Caminos (eSpriteDrawOrder_Pedestrian / JumpingPedestrian)
         // Native 1997 GTA 1 .G24 ped scale = 1.0 (15x11 texels = 15/64 x 11/64 map blocks!)
         const pedScale = 1.0;
@@ -1204,6 +1220,11 @@ class RetroRenderer {
             if (ped.kind === "GATOR") {
                 this.pushSolidQuad3D(ped.x, ped.y, pz, 24, 7, ped.angle, 0.21, 0.33, 0.08, 1.0, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 continue;
+            }
+
+            // Solar-tracked pedestrian ground drop shadow (live_geometry.cpp + time_of_day.cpp)
+            if (nfGlobal < 0.88) {
+                this.pushSolidQuad3D(ped.x + sunCos * 3.2, ped.y + sunSin * 3.2, pz - 0.022, 9.5, 7.5, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
             const pedDrawOrder = typeof ped.getDrawOrder === "function"
@@ -1239,6 +1260,14 @@ class RetroRenderer {
 
             this.batchPedSprite3D(pedType, frameIdx, ped.x, ped.y, pz, ped.angle, pedScale, false, pedDrawOrder);
 
+            // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm civilian pedestrians smoke a glowing cigarette ember after dusk!
+            if (nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
+                const cigX = ped.x + Math.cos(ped.angle + 0.55) * 5.2;
+                const cigY = ped.y + Math.sin(ped.angle + 0.55) * 5.2;
+                const dragGlow = 0.65 + 0.35 * Math.max(0, Math.sin(this.time * 2.2 + ped.animSeed * 30));
+                this.pushSolidQuad3D(cigX, cigY, pz + 0.015, 1.9, 1.9, 0, 1.0, 0.26 * dragGlow, 0.06, 0.95 * nfGlobal, SPRITE_DRAW_ORDER.HUD_ARROW);
+            }
+
             // 1997 GTA 1 Pedestrian::SetBurnEffectActive — attach .G24 fire sprite (234..241) on burning peds!
             if ((ped.burnTimer || 0) > 0) {
                 const fireFrame = 234 + (Math.floor(this.time * 14 + ped.animSeed * 10) % 8);
@@ -1248,6 +1277,10 @@ class RetroRenderer {
 
         const jason = game.jason;
         if (jason && !jason.inVehicle) {
+            const jz = this.getEntityZ(jason, 0.045);
+            if (nfGlobal < 0.88) {
+                this.pushSolidQuad3D(jason.x + sunCos * 3.4, jason.y + sunSin * 3.4, jz - 0.022, 10.5, 8.2, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
             const jWeapon = jason.weaponKey || "FIST";
             const frameIdx = this.getPedFrameIndex(jWeapon, Boolean(jason.isMoving), Boolean(jason.isRunning), jason.walkPhase || 0);
             this.batchPedSprite3D(
@@ -1255,7 +1288,7 @@ class RetroRenderer {
                 frameIdx,
                 jason.x,
                 jason.y,
-                this.getEntityZ(jason, 0.045),
+                jz,
                 jason.angle,
                 pedScale * 1.18,
                 (jason.muzzleTimer || 0) > 0,
@@ -1268,10 +1301,9 @@ class RetroRenderer {
             const baseZ = this.getEntityZ(p, 0.05);
             const jumpZ = p.jumpZOffset || 0;
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
-            if (jumpZ > 0.02) {
-                // Draw dark ground shadow under jumping character
-                this.pushSolidQuad3D(p.x, p.y, baseZ - 0.02, 12, 12, 0, 0.05, 0.05, 0.08, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
-            }
+            // Solar-tracked shadow under Lucia (separates further when jumping!)
+            const pShOff = 3.5 + jumpZ * 16.0;
+            this.pushSolidQuad3D(p.x + sunCos * pShOff, p.y + sunSin * pShOff, baseZ - 0.022, 11.5, 9.0, sunShadowAngle, 0.03, 0.04, 0.08, Math.max(0.22, sunShadowAlpha), SPRITE_DRAW_ORDER.TIRE_MARKS);
 
             let frameIdx;
             if ((p.slideCarTimer || 0) > 0) {
@@ -1382,14 +1414,61 @@ class RetroRenderer {
             const airZ = v.stuntZOffset || 0;
             const vScale = carScale * (1.0 + airZ * 0.22);
             const vDrawOrder = airZ > 0.05 ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.CAR;
+            const cosA = Math.cos(v.angle);
+            const sinA = Math.sin(v.angle);
 
-            if (airZ > 0.05) {
-                // Draw dark ground shadow under airborne stunt-jumping vehicle!
-                this.pushSolidQuad3D(v.x, v.y, vz - 0.02, v.w * 0.75, v.h * 0.75, v.angle, 0.04, 0.04, 0.08, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
-            }
+            // A. GTA 2 live_geometry.cpp: Solar-Tracked 3D Ground Drop Shadow under EVERY vehicle (separating further when airborne!)
+            const shOff = 4.2 + airZ * 22.0;
+            this.pushSolidQuad3D(
+                v.x + sunCos * shOff,
+                v.y + sunSin * shOff,
+                vz - 0.025,
+                (v.w || 48) * 0.88,
+                (v.h || 24) * 0.86,
+                v.angle,
+                0.03,
+                0.04,
+                0.08,
+                airZ > 0.05 ? 0.50 : Math.max(0.24, sunShadowAlpha * 1.15),
+                SPRITE_DRAW_ORDER.TIRE_MARKS
+            );
+
+            // B. GTA 2 live_geometry.cpp SetSpriteConform (kSmoothing = 0.25f): 4-Corner Ground Slope Pitch + Wheelie/Stunt Pitch!
+            const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
+            const hRear = this.map.getHeightAtPixel(v.x - cosA * 20, v.y - sinA * 20, vz);
+            const rawSlopePitch = Math.max(-0.22, Math.min(0.22, (hFront - hRear) * 0.45));
+            v._conformPitch = (v._conformPitch || 0) * 0.75 + rawSlopePitch * 0.25;
+            const wheeliePitch = (v.wheelieTimer || 0) > 0 ? 0.14 : 0;
+            const stuntPitch = (v.stuntAirTimer || 0) > 0
+                ? (((v.stuntAirTimer / (v.stuntMaxTime || 1.15)) - 0.5) * 0.24)
+                : 0;
+            const totalPitchZ = v._conformPitch + wheeliePitch + stuntPitch;
 
             // Car body sprite (.G24 car sprites already have crisp dark pixel outlines, seats & shading baked in)
-            this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder);
+            this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, 1, 1, 1, 1, totalPitchZ);
+
+            // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp): Day & Night Physical Brake Lamps & Reverse Lamps!
+            if (!v.destroyed && v.driver) {
+                const isBraking =
+                    (v.driver === "PLAYER" && (game.input.down || game.input.handbrake)) ||
+                    v.aiState === "STOPPED_LIGHT" ||
+                    (v.driver !== "PLAYER" && Math.abs(v.speed || 0) < 18);
+                const isReversing = (v.speed || 0) < -10;
+                if (isBraking || isReversing) {
+                    const rearDist = -(v.w || 48) * 0.46;
+                    const latSpread = mapInfo.isMotorcycle ? 0 : ((v.h || 24) * 0.30);
+                    const lampOffsets = mapInfo.isMotorcycle ? [0] : [-latSpread, latSpread];
+                    for (const lat of lampOffsets) {
+                        const lx = v.x + cosA * rearDist - sinA * lat;
+                        const ly = v.y + sinA * rearDist + cosA * lat;
+                        if (isReversing) {
+                            this.pushSolidQuad3D(lx, ly, vz + airZ - totalPitchZ + 0.012, 3.2, 2.4, v.angle, 0.95, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        } else {
+                            this.pushSolidQuad3D(lx, ly, vz + airZ - totalPitchZ + 0.012, 3.4, 2.6, v.angle, 1.0, 0.08, 0.14, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        }
+                    }
+                }
+            }
 
             // Authentic 1997 GTA 1 Motorcycle Riders (frame 84 = sitting_on_bike, 80..83 = enter_bike) & Convertible Drivers (frame 97 = sitting_in_car)
             // Port of PedestrianStatesManager::StateDriveCar_ProcessEnter (PedestrianStates.cpp:354-366) & Vehicle::GetSeatPosLocal (Vehicle.cpp:473-493)
@@ -1650,16 +1729,8 @@ class RetroRenderer {
         }
 
         // 7C. GTA 2 Style 3D Curb Streetlamps (Rising 3D Perspective Pole + Overhanging Cantilever Arm + Luminaire Head)
-        //     + Solar Azimuth Shadow Angle (TimeOfDaySunAt from gta2-rtx-remix time_of_day.cpp!)
-        const clockHour = (game && typeof game.worldMinutes === "number")
-            ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
-            : 12.0;
-        const hourFromNoon = (clockHour - 12.0) / 6.5; // -1 at 05:30 sunrise, 0 at 12:00 noon, +1 at 18:30 sunset
-        const sunShadowAngle = Math.atan2(0.55, Math.max(-1.2, Math.min(1.2, hourFromNoon)));
-        const sunShadowLen = 11.0 + Math.min(14.0, Math.abs(hourFromNoon) * 13.0);
-
         if (this.map && Array.isArray(this.map.streetlights)) {
-            const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
+            const nf = nfGlobal;
             const lightsOn = nf > 0.12;
             for (const sl of this.map.streetlights) {
                 if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
@@ -1797,6 +1868,19 @@ class RetroRenderer {
         for (const pt of game.particles) {
             const prog = Math.max(0, Math.min(0.999, 1.0 - pt.life / Math.max(0.01, pt.maxLife)));
             const pz = this.camZBlocks + 0.09;
+            if (pt.kind === "GIB_ARC") {
+                // GTA 2 gibs.cpp (FUN_0048C9C0 / FUN_0048C270): 3D parabolic arc in flight, then settles on the pavement!
+                const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);
+                if (pt.isRestingGib) {
+                    this.batchObjectSprite3D("229", pt.x, pt.y, floorZ + 0.012, pt.rot || 0, 0.78, SPRITE_DRAW_ORDER.CORPSE);
+                } else {
+                    const arcZ = Math.sin(prog * Math.PI) * (pt.peakZ || 0.35);
+                    this.pushSolidQuad3D(pt.x, pt.y, floorZ + 0.01, 4.5, 4.5, 0, 0.04, 0.04, 0.08, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const frameId = 224 + Math.min(5, Math.floor(prog * 6));
+                    this.batchObjectSprite3D(String(frameId), pt.x, pt.y, floorZ + 0.04 + arcZ, (pt.rot || 0) + prog * 4.5, 0.85, SPRITE_DRAW_ORDER.PROJECTILES);
+                }
+                continue;
+            }
             const isBlood = pt.kind === "BLOOD" || pt.color === "#dc2626" || pt.color === "#991b1b";
             if (isBlood) {
                 const frameId = 224 + Math.min(5, Math.floor(prog * 6));

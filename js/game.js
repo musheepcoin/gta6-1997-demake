@@ -1940,11 +1940,31 @@ class LeonidaGame {
             }
         }
 
-        // Damage nearby peds & trigger pedestrian panic!
+        // Damage nearby peds & trigger pedestrian panic + GTA 2 Explosive Gibs Arc (gibs.cpp FUN_0048C9C0 / FUN_0048C270)!
         for (const ped of this.peds) {
             if (ped.dead) continue;
             const d = Math.hypot(ped.x - x, ped.y - y);
             if (d < radius) {
+                const baseAng = Math.atan2(ped.y - y, ped.x - x);
+                for (let gi = 0; gi < 6; gi++) {
+                    const gAng = baseAng + (gi - 2.5) * 0.42 + (Math.random() - 0.5) * 0.25;
+                    const gSpd = 68 + Math.random() * 88;
+                    const flightDur = 0.42 + Math.random() * 0.24;
+                    this.particles.push({
+                        x: ped.x,
+                        y: ped.y,
+                        vx: Math.cos(gAng) * gSpd,
+                        vy: Math.sin(gAng) * gSpd,
+                        size: 5,
+                        kind: "GIB_ARC",
+                        color: "#b91c1c",
+                        peakZ: 0.34 + Math.random() * 0.28,
+                        rot: Math.random() * 6.28,
+                        life: flightDur,
+                        maxLife: flightDur,
+                        isRestingGib: false
+                    });
+                }
                 this.killPed(ped, byPlayer);
             } else if (d < radius * 2.5) {
                 ped.panicTimer = 6.5;
@@ -3378,13 +3398,25 @@ class LeonidaGame {
             }
         }
 
-        // 9. Particles & Floating Texts Update
+        // 9. Particles & Floating Texts Update (with GTA 2 gibs.cpp resting arc settlement!)
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const pt = this.particles[i];
-            pt.x += pt.vx * dt;
-            pt.y += pt.vy * dt;
+            if (!pt.isRestingGib) {
+                pt.x += pt.vx * dt;
+                pt.y += pt.vy * dt;
+            }
             pt.life -= dt;
-            if (pt.life <= 0) this.particles.splice(i, 1);
+            if (pt.life <= 0) {
+                if (pt.kind === "GIB_ARC" && !pt.isRestingGib) {
+                    pt.isRestingGib = true;
+                    pt.vx = 0;
+                    pt.vy = 0;
+                    pt.life = 18.0;
+                    pt.maxLife = 18.0;
+                } else {
+                    this.particles.splice(i, 1);
+                }
+            }
         }
 
         for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
