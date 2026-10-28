@@ -3231,7 +3231,7 @@ class LeonidaGame {
                         );
                         this.sendPager(
                             "JASON DUVAL",
-                            `WELCOME TO ${lm.name}! (${lm.district}) — ${lm.sub}. [${visitedCount}/${totalLm} GTA 6 LEONIDA LANDMARKS VISITED]`,
+                            `WELCOME TO ${lm.name}! (${lm.district}) — ${lm.sub}. [${visitedCount}/${totalLm} VICE CITY LANDMARKS VISITED]`,
                             false
                         );
                     }

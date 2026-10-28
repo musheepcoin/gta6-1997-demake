@@ -2038,10 +2038,10 @@ class RetroRenderer {
             Boolean(this.debugDrawPhysics)
         );
         ctx.fillStyle = "#9fb4d4";
-        ctx.fillText(this.mapStyle === "VICE" ? "Leonida" : "NYC.CMP", wx + 100, cy + 8);
+        ctx.fillText(this.mapStyle === "VICE" ? "Vice City" : "NYC.CMP", wx + 100, cy + 8);
         drawImGuiBtn(
             "TOGGLE_MAP_STYLE",
-            this.mapStyle === "VICE" ? "Style: GTA 6" : "Style: NYC97",
+            this.mapStyle === "VICE" ? "Style: Vice City" : "Style: NYC97",
             wx + 180,
             cy - 1,
             88,
@@ -2049,7 +2049,7 @@ class RetroRenderer {
         );
         cy += 21;
 
-        // Official GTA 6 (State of Leonida & Vice City) 16 Bespoke Landmarks Tour section
+        // Official Vice City 16 Bespoke Landmarks Tour section
         const visitedCount = Array.isArray(this.map.landmarks)
             ? this.map.landmarks.filter((lm) => lm.visited).length
             : 0;
@@ -2057,7 +2057,7 @@ class RetroRenderer {
         ctx.fillStyle = "rgba(138, 35, 92, 0.82)";
         ctx.fillRect(wx + 6, cy - 4, ww - 12, 16);
         ctx.fillStyle = "#ffe4f2";
-        ctx.fillText(`▼ GTA 6 Leonida Tour (${visitedCount}/${totalLm} Landmarks)`, wx + 10, cy + 4);
+        ctx.fillText(`▼ Vice City Tour (${visitedCount}/${totalLm} Landmarks)`, wx + 10, cy + 4);
         cy += 15;
 
         ctx.font = "11px Consolas, 'Courier New', monospace";
