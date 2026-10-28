@@ -3409,7 +3409,7 @@ class RetroRenderer {
         ctx.fillText("🎵 VICE CITY FM • RADIO OST", musX + 26, musY + 10.5);
 
         const volSlider = document.getElementById("yt-vol-slider");
-        const curVol = volSlider ? (parseInt(volSlider.value, 10) || 50) : (game.ytVolume || 50);
+        const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (game.ytVolume || 28);
         ctx.fillStyle = "#cbd5e1";
         ctx.font = "bold 8.5px Consolas, monospace";
         ctx.fillText(`${curVol}%`, musX + musW - 26, musY + 10.5);

@@ -88,10 +88,18 @@ class RetroAudioEngine {
             this.ctx = new AudioCtx();
             this.initialized = true;
 
-            // Master SFX Boost Gain Node (boosts all original game sound effects ~2.75x!)
+            // Master SFX Boost Gain Node + Limiter Compressor (boosts all game sound effects ~4.5x cleanly!)
+            this.sfxCompressor = this.ctx.createDynamicsCompressor();
+            this.sfxCompressor.threshold.value = -8;
+            this.sfxCompressor.knee.value = 10;
+            this.sfxCompressor.ratio.value = 4;
+            this.sfxCompressor.attack.value = 0.003;
+            this.sfxCompressor.release.value = 0.15;
+            this.sfxCompressor.connect(this.ctx.destination);
+
             this.sfxMasterGain = this.ctx.createGain();
-            this.sfxMasterGain.gain.value = 2.75;
-            this.sfxMasterGain.connect(this.ctx.destination);
+            this.sfxMasterGain.gain.value = 4.5;
+            this.sfxMasterGain.connect(this.sfxCompressor);
 
             // 1. Player Engine continuous hum
             this.engineOsc = this.ctx.createOscillator();
@@ -201,7 +209,7 @@ class RetroAudioEngine {
             const gearMod = (speedRatio * 3.2) % 1.0;
             const targetFreq = 44 + speedRatio * 95 + gearMod * 38;
             this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.05);
-            this.engineGain.gain.setTargetAtTime(0.05 + speedRatio * 0.045, now, 0.08);
+            this.engineGain.gain.setTargetAtTime(0.075 + speedRatio * 0.065, now, 0.08);
         } else {
             this.engineGain.gain.setTargetAtTime(0.0, now, 0.08);
         }
@@ -212,7 +220,7 @@ class RetroAudioEngine {
             const prox = Math.max(0, 1 - state.nearestCopDist / 900);
             const wail = 620 + Math.sin(this.sirenPhase) * 240;
             this.sirenOsc.frequency.setTargetAtTime(wail, now, 0.03);
-            this.sirenGain.gain.setTargetAtTime(prox * 0.065, now, 0.05);
+            this.sirenGain.gain.setTargetAtTime(prox * 0.095, now, 0.05);
         } else {
             this.sirenGain.gain.setTargetAtTime(0.0, now, 0.08);
         }
@@ -228,7 +236,7 @@ class RetroAudioEngine {
                 const rpmF = (baseF + Math.min(1.0, tSpd / 320) * (state.trafficIsMoto ? 135 : 68)) * doppler;
                 this.trafficOsc.frequency.setTargetAtTime(rpmF, now, 0.05);
                 this.trafficFilter.frequency.setTargetAtTime(state.trafficIsMoto ? 480 : 260, now, 0.06);
-                const volScale = this.inVehicle ? 0.016 : 0.032;
+                const volScale = this.inVehicle ? 0.028 : 0.052;
                 this.trafficGain.gain.setTargetAtTime(prox * volScale, now, 0.06);
             } else {
                 this.trafficGain.gain.setTargetAtTime(0.0, now, 0.10);
@@ -241,12 +249,12 @@ class RetroAudioEngine {
         if (this.oceanGain && this.oceanFilter) {
             // Rolling 5.5-second Atlantic wave crest & wash cycle
             const waveLfo = 0.55 + 0.45 * Math.sin(this.ambientTimer * 1.14);
-            const surfVol = waterProx * (this.inVehicle ? 0.012 : 0.028) * waveLfo;
+            const surfVol = waterProx * (this.inVehicle ? 0.022 : 0.046) * waveLfo;
             this.oceanFilter.frequency.setTargetAtTime(220 + waveLfo * 340, now, 0.12);
             this.oceanGain.gain.setTargetAtTime(surfVol, now, 0.15);
         }
         if (this.cityHumGain) {
-            const urbanVol = (!this.inVehicle && waterProx < 0.7) ? 0.0045 : 0.0015;
+            const urbanVol = (!this.inVehicle && waterProx < 0.7) ? 0.0075 : 0.0028;
             this.cityHumGain.gain.setTargetAtTime(urbanVol, now, 0.20);
         }
 
@@ -452,41 +460,41 @@ class RetroAudioEngine {
         const pitchJit = (isLeft ? 0.94 : 1.06) * (0.96 + Math.random() * 0.08);
 
         if (surface === "WATER") {
-            this.playWaterSplash(0.55);
+            this.playWaterSplash(0.75);
             return;
         }
         if (surface === "SAND") {
             // Soft granular Vice Beach sand crunch
-            this.playBandNoise(0.065, 1650 * pitchJit, 1.4, 0.022);
-            this.playBeep(95 * pitchJit, 0.032, "sine", 0.015);
+            this.playBandNoise(0.068, 1650 * pitchJit, 1.4, 0.038);
+            this.playBeep(95 * pitchJit, 0.035, "sine", 0.026);
             return;
         }
         if (surface === "GRASS") {
             // Soft park turf brush step
-            this.playBandNoise(0.055, 1100 * pitchJit, 1.2, 0.018);
-            this.playBeep(105 * pitchJit, 0.03, "triangle", 0.014);
+            this.playBandNoise(0.058, 1100 * pitchJit, 1.2, 0.032);
+            this.playBeep(105 * pitchJit, 0.032, "triangle", 0.024);
             return;
         }
         // Default PAVEMENT / ROAD sneaker heel-sole tap (SfxLevel_FootStep1 / SfxLevel_FootStep2)
-        this.playBandNoise(0.038, 1450 * pitchJit, 2.2, 0.020);
-        this.playBeep(132 * pitchJit, 0.032, "triangle", 0.022);
+        this.playBandNoise(0.042, 1450 * pitchJit, 2.2, 0.036);
+        this.playBeep(132 * pitchJit, 0.035, "triangle", 0.038);
     }
 
     playWaterSplash(scale = 1.0) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBandNoise(0.14, 780, 0.9, 0.045 * scale);
-        this.playBeep(210, 0.07, "sine", 0.025 * scale);
+        this.playBandNoise(0.15, 780, 0.9, 0.068 * scale);
+        this.playBeep(210, 0.075, "sine", 0.038 * scale);
     }
 
     playCarEnter(isMotorcycle = false) {
         if (!this.initialized || this.muted || !this.ctx) return;
         if (!isMotorcycle) {
             // SfxLevel_CarDoorOpen (metallic latch click) + SfxLevel_CarDoorClose (heavy door thud)
-            this.playBeep(680, 0.025, "square", 0.032);
-            this.playBandNoise(0.045, 950, 1.8, 0.04);
+            this.playBeep(680, 0.025, "square", 0.048);
+            this.playBandNoise(0.045, 950, 1.8, 0.058);
             setTimeout(() => {
-                this.playBeep(88, 0.085, "triangle", 0.075);
-                this.playNoise(0.06, 420, 0.055);
+                this.playBeep(88, 0.09, "triangle", 0.105);
+                this.playNoise(0.065, 420, 0.082);
             }, 140);
         }
         // SfxLevel_CarEngineStart (ignition starter crank + rev)
@@ -501,7 +509,7 @@ class RetroAudioEngine {
             osc.frequency.setValueAtTime(f0, now);
             osc.frequency.linearRampToValueAtTime(fPeak, now + 0.14);
             osc.frequency.exponentialRampToValueAtTime(f0 * 1.15, now + 0.28);
-            g.gain.setValueAtTime(0.065, now);
+            g.gain.setValueAtTime(0.092, now);
             g.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
             osc.connect(g);
             g.connect(this.sfxOut());
@@ -513,14 +521,14 @@ class RetroAudioEngine {
     playCarExit(isMotorcycle = false) {
         if (!this.initialized || this.muted || !this.ctx) return;
         if (isMotorcycle) {
-            this.playBeep(140, 0.045, "triangle", 0.03);
+            this.playBeep(140, 0.045, "triangle", 0.045);
             return;
         }
         // SfxLevel_CarDoorOpen + SfxLevel_CarDoorClose
-        this.playBeep(590, 0.022, "square", 0.028);
+        this.playBeep(590, 0.022, "square", 0.042);
         setTimeout(() => {
-            this.playBeep(82, 0.08, "triangle", 0.068);
-            this.playNoise(0.055, 380, 0.048);
+            this.playBeep(82, 0.085, "triangle", 0.096);
+            this.playNoise(0.06, 380, 0.072);
         }, 110);
     }
 
@@ -531,8 +539,8 @@ class RetroAudioEngine {
         this._lastCrashTime = now;
         const k = Math.max(0.35, Math.min(1.5, intensity));
         // SfxLevel_CarCrash1..4: heavy sheet-metal crunch + glass/panel rattle
-        this.playNoise(0.16 * k, 720, 0.085 * k);
-        this.playBeep(95 + Math.random() * 35, 0.11, "sawtooth", 0.075 * k);
+        this.playNoise(0.18 * k, 720, 0.12 * k);
+        this.playBeep(95 + Math.random() * 35, 0.12, "sawtooth", 0.105 * k);
     }
 
     playRicochet() {
@@ -547,7 +555,7 @@ class RetroAudioEngine {
         const startF = 1850 + Math.random() * 650;
         osc.frequency.setValueAtTime(startF, now);
         osc.frequency.exponentialRampToValueAtTime(520, now + 0.075);
-        g.gain.setValueAtTime(0.036, now);
+        g.gain.setValueAtTime(0.055, now);
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
         osc.connect(g);
         g.connect(this.sfxOut());
@@ -568,7 +576,7 @@ class RetroAudioEngine {
         osc.frequency.setValueAtTime(base, now);
         osc.frequency.linearRampToValueAtTime(base * 1.28, now + 0.09);
         osc.frequency.exponentialRampToValueAtTime(base * 0.72, now + 0.26);
-        g.gain.setValueAtTime(0.038, now);
+        g.gain.setValueAtTime(0.056, now);
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.27);
         osc.connect(g);
         g.connect(this.sfxOut());
@@ -586,7 +594,7 @@ class RetroAudioEngine {
         osc.frequency.setValueAtTime(f, now);
         osc.frequency.linearRampToValueAtTime(f * 1.18, now + 0.08);
         osc.frequency.exponentialRampToValueAtTime(f * 0.68, now + 0.34);
-        g.gain.setValueAtTime(0.018 * prox, now);
+        g.gain.setValueAtTime(0.028 * prox, now);
         g.gain.exponentialRampToValueAtTime(0.0008, now + 0.35);
         osc.connect(g);
         g.connect(this.sfxOut());
@@ -598,7 +606,7 @@ class RetroAudioEngine {
         if (!this.initialized || this.muted || !this.ctx) return;
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
-                this.playBeep(4150 + (i % 2) * 180, 0.022, "sine", 0.009 * nf);
+                this.playBeep(4150 + (i % 2) * 180, 0.022, "sine", 0.015 * nf);
             }, i * 38);
         }
     }

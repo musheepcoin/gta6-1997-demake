@@ -988,6 +988,7 @@ class LeonidaGame {
     initYouTubeRadio() {
         this.ytSeekOffset = 0;
         this.ytMusicEnabled = true;
+        this.ytVolume = 28;
         const toggleBtn = document.getElementById("yt-btn-toggle");
         const skipBtn = document.getElementById("yt-btn-skip");
         const volSlider = document.getElementById("yt-vol-slider");
@@ -995,7 +996,7 @@ class LeonidaGame {
 
         const tryAutoStart = () => {
             if (!this.ytMusicEnabled) return;
-            const vol = volSlider ? (parseInt(volSlider.value, 10) || 75) : 75;
+            const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
             this.sendYouTubeCommand("unMute", []);
             this.sendYouTubeCommand("setVolume", [vol]);
             this.sendYouTubeCommand("playVideo", []);
@@ -1005,6 +1006,7 @@ class LeonidaGame {
             iframe.addEventListener("load", () => {
                 setTimeout(tryAutoStart, 250);
                 setTimeout(tryAutoStart, 1000);
+                setTimeout(tryAutoStart, 2000);
             });
         }
 
@@ -1030,6 +1032,7 @@ class LeonidaGame {
         if (volSlider) {
             volSlider.addEventListener("input", () => {
                 const vol = parseInt(volSlider.value, 10) || 0;
+                this.ytVolume = vol;
                 this.sendYouTubeCommand("setVolume", [vol]);
             });
         }
@@ -1043,7 +1046,7 @@ class LeonidaGame {
         const volSlider = document.getElementById("yt-vol-slider");
 
         if (this.ytMusicEnabled) {
-            const vol = volSlider ? (parseInt(volSlider.value, 10) || 75) : 75;
+            const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
             this.sendYouTubeCommand("unMute", []);
             this.sendYouTubeCommand("setVolume", [vol]);
             this.sendYouTubeCommand("playVideo", []);
@@ -1099,7 +1102,7 @@ class LeonidaGame {
 
     adjustYouTubeVolume(delta = 15) {
         const volSlider = document.getElementById("yt-vol-slider");
-        const curVol = volSlider ? (parseInt(volSlider.value, 10) || 50) : (this.ytVolume || 50);
+        const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
         const nextVol = Math.max(0, Math.min(100, curVol + delta));
         this.ytVolume = nextVol;
         if (volSlider) volSlider.value = String(nextVol);
@@ -1166,8 +1169,12 @@ class LeonidaGame {
         this.started = true;
         this.audio.resume();
         if (this.ytMusicEnabled) {
+            const volSlider = document.getElementById("yt-vol-slider");
+            const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
             this.sendYouTubeCommand("unMute", []);
+            this.sendYouTubeCommand("setVolume", [vol]);
             this.sendYouTubeCommand("playVideo", []);
+            setTimeout(() => this.sendYouTubeCommand("setVolume", [vol]), 400);
         }
         const modal = document.getElementById("start-modal");
         if (modal) modal.classList.add("hidden");
