@@ -1173,15 +1173,35 @@ class LeonidaGame {
 
     initCharacterSelectModal() {
         const nickInput = document.getElementById("start-nickname-input");
-        const roomInput = document.getElementById("start-room-input");
         const randBtn = document.getElementById("btn-random-nickname");
         const cards = document.querySelectorAll(".char-select-card");
+        const serverBtns = document.querySelectorAll(".server-slot-btn");
 
         if (nickInput && this.net) {
             nickInput.value = this.net.playerName || "LUCIA #97";
         }
-        if (roomInput && this.net) {
-            roomInput.value = this.net.roomCode || "VICE97";
+
+        // Bind the 3 Official Server Slot Buttons (VICE97 / MIAMI86 / KEYS305)
+        const currentRoom = (this.net && this.net.roomCode) || "VICE97";
+        serverBtns.forEach((btn) => {
+            if (btn.getAttribute("data-room") === currentRoom) {
+                serverBtns.forEach((b) => b.classList.remove("active-server"));
+                btn.classList.add("active-server");
+            }
+            btn.addEventListener("click", () => {
+                serverBtns.forEach((b) => b.classList.remove("active-server"));
+                btn.classList.add("active-server");
+                const targetRoom = btn.getAttribute("data-room") || "VICE97";
+                if (this.audio) {
+                    this.audio.playBeep(740, 0.05, "sine", 0.05);
+                }
+                if (this.net && typeof this.net.switchServer === "function") {
+                    this.net.switchServer(targetRoom);
+                }
+            });
+        });
+        if (this.net && typeof this.net.updateServerListUI === "function") {
+            this.net.updateServerListUI();
         }
 
         // Restore previously saved character if any
@@ -1249,9 +1269,9 @@ class LeonidaGame {
         this.started = true;
         this.audio.resume();
 
-        // Read chosen Nickname, Room Code & Character from the Selection Modal
+        // Read chosen Nickname, Server Slot & Character from the Selection Modal
         const nickInput = document.getElementById("start-nickname-input");
-        const roomInput = document.getElementById("start-room-input");
+        const activeSrvBtn = document.querySelector(".server-slot-btn.active-server");
         const activeCard = document.querySelector(".char-select-card.active-mug");
 
         const chosenCharId = activeCard ? (activeCard.getAttribute("data-char-id") || "LUCIA") : (this.player.charId || "LUCIA");
@@ -1259,7 +1279,7 @@ class LeonidaGame {
         const chosenColor = activeCard ? (activeCard.getAttribute("data-color") || "#ff2a85") : "#ff2a85";
         const chosenWeapon = activeCard ? (activeCard.getAttribute("data-weapon") || "PISTOL") : "PISTOL";
         const chosenNick = (nickInput && nickInput.value.trim()) ? nickInput.value.trim().toUpperCase() : `${chosenCharId} #97`;
-        const chosenRoom = (roomInput && roomInput.value.trim()) ? roomInput.value.trim().toUpperCase() : "VICE97";
+        const chosenRoom = activeSrvBtn ? (activeSrvBtn.getAttribute("data-room") || "VICE97") : "VICE97";
 
         this.player.charId = chosenCharId;
         this.player.pedType = chosenPedType;

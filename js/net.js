@@ -50,6 +50,9 @@ class ViceNetworkManager {
 
         // Transports
         this.bc = null;
+        this.dirBc = null;
+        this.directoryPeers = new Map(); // playerId -> { room, bots, lastSeen }
+        this.dirAccumulator = 0;
         this.peer = null;
         this.peerConns = new Map(); // peerId -> DataConnection
         this.slotIndex = -1;
@@ -60,8 +63,127 @@ class ViceNetworkManager {
         this.chatHistory = [];
 
         this.initChatUI();
+        this.initServerDirectory();
         this.initBroadcastChannel();
         this.initWebRTCMesh();
+    }
+
+    /* ========================================================================
+       0A. LIVE 3-SERVER DIRECTORY & PLAYER COUNT TRACKER (VICE97 / MIAMI86 / KEYS305)
+       ======================================================================== */
+    initServerDirectory() {
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                this.dirBc = new BroadcastChannel("vc97_server_directory_v1");
+                this.dirBc.onmessage = (ev) => {
+                    const data = ev && ev.data;
+                    if (!data || data.id === this.playerId) return;
+                    if (data.t === "DIR_PING") {
+                        this.broadcastDirectoryHeartbeat();
+                    } else if (data.t === "DIR_HEARTBEAT") {
+                        this.directoryPeers.set(data.id, {
+                            room: data.room || "VICE97",
+                            bots: data.bots || 0,
+                            lastSeen: performance.now()
+                        });
+                        this.updateServerListUI();
+                    } else if (data.t === "DIR_LEAVE") {
+                        this.directoryPeers.delete(data.id);
+                        this.updateServerListUI();
+                    }
+                };
+                this.dirBc.postMessage({ t: "DIR_PING", id: this.playerId });
+                this.broadcastDirectoryHeartbeat();
+            } catch (_e) {}
+        }
+        if (typeof window !== "undefined") {
+            window.addEventListener("beforeunload", () => {
+                this.sendPacket({ t: "LEAVE", id: this.playerId, name: this.playerName });
+                if (this.dirBc) {
+                    try {
+                        this.dirBc.postMessage({ t: "DIR_LEAVE", id: this.playerId });
+                    } catch (_e) {}
+                }
+            });
+        }
+        this.updateServerListUI();
+    }
+
+    broadcastDirectoryHeartbeat() {
+        if (!this.dirBc) return;
+        const botCount = Array.from(this.remotePlayers.values()).filter((r) => r.isBot).length;
+        try {
+            this.dirBc.postMessage({
+                t: "DIR_HEARTBEAT",
+                id: this.playerId,
+                room: this.roomCode,
+                bots: botCount
+            });
+        } catch (_e) {}
+    }
+
+    getServerPlayerCount(targetRoom) {
+        const now = performance.now();
+        let count = 0;
+        let maxBotsInRoom = 0;
+
+        if (targetRoom === this.roomCode) {
+            // Local player + active remote players in our current room
+            return this.getPlayerCount();
+        }
+
+        for (const [pid, info] of this.directoryPeers.entries()) {
+            if (now - info.lastSeen > 4500) {
+                this.directoryPeers.delete(pid);
+                continue;
+            }
+            if (info.room === targetRoom) {
+                count++;
+                if ((info.bots || 0) > maxBotsInRoom) {
+                    maxBotsInRoom = info.bots;
+                }
+            }
+        }
+        return count + maxBotsInRoom;
+    }
+
+    updateServerListUI() {
+        if (typeof document === "undefined") return;
+        const servers = ["VICE97", "MIAMI86", "KEYS305"];
+        for (const srv of servers) {
+            const count = this.getServerPlayerCount(srv);
+            const countEl = document.getElementById(`srv-count-${srv}`);
+            const dotEl = document.getElementById(`srv-dot-${srv}`);
+            if (countEl) {
+                if (count <= 0) {
+                    countEl.textContent = "0/12 VIDE";
+                } else if (count === 1) {
+                    countEl.textContent = "1/12 JOUEUR";
+                } else {
+                    countEl.textContent = `${count}/12 JOUEURS`;
+                }
+            }
+            if (dotEl) {
+                dotEl.classList.toggle("online", count > 0);
+            }
+        }
+    }
+
+    switchServer(newRoomCode) {
+        const cleanRoom = String(newRoomCode || "VICE97").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+        if (!cleanRoom) return;
+        if (cleanRoom !== this.roomCode) {
+            this.sendPacket({ t: "LEAVE", id: this.playerId, name: this.playerName });
+            this.roomCode = cleanRoom;
+            this.remotePlayers.clear();
+            if (this.chatRoomBadge) {
+                this.chatRoomBadge.textContent = `[${this.roomCode}]`;
+            }
+            this.initBroadcastChannel();
+            this.claimRoomSlot(0);
+        }
+        this.broadcastDirectoryHeartbeat();
+        this.updateServerListUI();
     }
 
     /* ========================================================================
@@ -497,6 +619,14 @@ class ViceNetworkManager {
     handlePacket(pkt) {
         if (!pkt || pkt.id === this.playerId) return;
 
+        if (pkt.t === "LEAVE") {
+            if (this.remotePlayers.has(pkt.id)) {
+                this.remotePlayers.delete(pkt.id);
+                this.updateServerListUI();
+            }
+            return;
+        }
+
         if (pkt.t === "JOIN") {
             const isNew = !this.remotePlayers.has(pkt.id);
             this.ensureRemotePlayer(pkt);
@@ -751,11 +881,17 @@ class ViceNetworkManager {
         // 3. Check bumper-to-bumper collisions between remote player vehicles and local player/vehicles
         this.checkRemoteVehicleInteractions(dt);
 
-        // 4. Broadcast local player state at 20 Hz
+        // 4. Broadcast local player state at 20 Hz & Server Directory Heartbeat
         this.syncAccumulator += dt;
         if (this.syncAccumulator >= this.syncInterval) {
             this.syncAccumulator = 0;
             this.broadcastStateNow();
+        }
+        this.dirAccumulator = (this.dirAccumulator || 0) + dt;
+        if (this.dirAccumulator >= 0.85) {
+            this.dirAccumulator = 0;
+            this.broadcastDirectoryHeartbeat();
+            this.updateServerListUI();
         }
     }
 
