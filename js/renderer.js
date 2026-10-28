@@ -283,23 +283,23 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_76";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_76";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_76";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_77";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_77";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_77";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_76";
+        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_77";
 
         this.viceOverviewImg.onload = () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_76";
+        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_77";
 
-        fetch("assets/gta1/gta1_meta.json?v=97_76")
+        fetch("assets/gta1/gta1_meta.json?v=97_77")
             .then((res) => res.json())
             .then((meta) => {
                 this.gta1Meta = meta;
@@ -307,7 +307,7 @@ class RetroRenderer {
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetch("assets/gta1/gta1_map.bin?v=97_76")
+        fetch("assets/gta1/gta1_map.bin?v=97_77")
             .then((res) => res.arrayBuffer())
             .then((buf) => {
                 mapBinBuffer = buf;
@@ -1960,15 +1960,15 @@ class RetroRenderer {
     }
 
     /* ========================================================================
-       6. VICE CITY VERTICAL SMARTPHONE (iMessage / WhatsApp + GPS App)
+       6. ALL-IN-ONE VICE CITY SMARTPHONE (Live GPS Map + Vice FM Music + iMessage)
        ======================================================================== */
     renderViceCityTourPanel(ctx, game) {
         const px = 12;
-        const py = 74;
-        const pw = 212;
-        const isGpsApp = !this.cheatsCollapsed;
+        const py = 72;
+        const pw = 224;
+        const isPlacesApp = !this.cheatsCollapsed;
         const isMinimized = !this.showCheatsWindow;
-        const ph = isMinimized ? 44 : (isGpsApp ? 292 : 216);
+        const ph = isMinimized ? 44 : 388;
 
         ctx.save();
 
@@ -1984,13 +1984,13 @@ class RetroRenderer {
         // 1. Physical Side Buttons (Left: Mute + Volume Up/Down, Right: Power Button)
         if (!isMinimized) {
             ctx.fillStyle = "#64748b";
-            rrect(px - 2.5, py + 36, 3, 10, 1.5);
+            rrect(px - 2.5, py + 38, 3, 10, 1.5);
             ctx.fill();
-            rrect(px - 2.5, py + 54, 3, 18, 1.5);
+            rrect(px - 2.5, py + 56, 3, 20, 1.5);
             ctx.fill();
-            rrect(px - 2.5, py + 76, 3, 18, 1.5);
+            rrect(px - 2.5, py + 80, 3, 20, 1.5);
             ctx.fill();
-            rrect(px + pw - 0.5, py + 60, 3, 24, 1.5);
+            rrect(px + pw - 0.5, py + 64, 3, 26, 1.5);
             ctx.fill();
         }
 
@@ -2009,13 +2009,13 @@ class RetroRenderer {
         // 3. Inner OLED Screen Wallpaper
         const sx = px + 5;
         const sy = py + 5;
-        const sw = pw - 10;
-        const sh = ph - 10;
+        const sw = pw - 10; // 214
+        const sh = ph - 10; // 378
         rrect(sx, sy, sw, sh, 18);
         const wallGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
         wallGrad.addColorStop(0, "#0b1120");
-        wallGrad.addColorStop(0.6, "#131129");
-        wallGrad.addColorStop(1, "#1e102a");
+        wallGrad.addColorStop(0.55, "#111329");
+        wallGrad.addColorStop(1, "#1b0e28");
         ctx.fillStyle = wallGrad;
         ctx.fill();
 
@@ -2025,7 +2025,7 @@ class RetroRenderer {
         ctx.clip();
 
         // 4. Top Status Bar: "09:41" Clock + Dynamic Island Notch + Cellular Bars & Battery
-        const notchW = 54;
+        const notchW = 56;
         const notchH = 11;
         const notchX = sx + (sw - notchW) * 0.5;
         const notchY = sy + 4;
@@ -2071,134 +2071,28 @@ class RetroRenderer {
         ctx.fillStyle = "#cbd5e1";
         ctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
 
-        // If minimized (lock screen notification bar only), allow clicking to expand
         if (isMinimized) {
             ctx.fillStyle = "#38bdf8";
             ctx.font = "bold 10px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText("💬 Jason • Appuyer pour ouvrir [C]", sx + 12, sy + 25);
+            ctx.fillText("🧭 GPS • 🎵 Music • 💬 SMS [C]", sx + 12, sy + 25);
             this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
             ctx.restore();
             ctx.restore();
             return;
         }
 
-        if (!isGpsApp) {
-            // ================================================================
-            // APP 1: MESSAGES (Jason Duval Contact Header + Wrapped Chat Bubble)
-            // ================================================================
-            const hdrY = sy + 18;
-            const hdrH = 30;
-            ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-            ctx.fillRect(sx, hdrY, sw, hdrH);
-            ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(sx, hdrY + hdrH);
-            ctx.lineTo(sx + sw, hdrY + hdrH);
-            ctx.stroke();
-
-            // Blue back chevron
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = "bold 16px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText("‹", sx + 8, hdrY + 15);
-
-            // Jason Pixel Avatar + Green Online Badge
-            const avX = sx + 20;
-            const avY = hdrY + 4;
-            this.drawPixelPortraitRect(ctx, avX, avY, 22, 22, "JASON");
-            ctx.fillStyle = "#22c55e";
-            ctx.beginPath();
-            ctx.arc(avX + 20, avY + 19, 3.2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Contact Name & Online Subtitle (never writes "SMARTPHONE"!)
-            const senderEl = document.getElementById("pager-sender");
-            let contactName = "Jason Duval";
-            if (senderEl && senderEl.textContent) {
-                const cleaned = senderEl.textContent
-                    .replace(/📱|📟|SMARTPHONE|PAGER|BIPEUR\s*'97|BIPEUR|\(PARTNER\)/gi, "")
-                    .replace(/^[\s/]+/, "")
-                    .trim();
-                if (cleaned.toUpperCase().includes("LUCIA")) contactName = "Jason & Lucia";
-                else if (cleaned.length > 0 && !cleaned.toUpperCase().includes("JASON")) contactName = cleaned;
-            }
-
-            ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 10.5px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText(contactName, avX + 28, hdrY + 11);
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = "8.5px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText("En ligne • Messages", avX + 28, hdrY + 22);
-
-            // Timestamp pill
-            ctx.fillStyle = "#94a3b8";
-            ctx.font = "8.5px -apple-system, 'Segoe UI', sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText("Aujourd'hui 09:41", sx + sw * 0.5, hdrY + hdrH + 10);
-            ctx.textAlign = "left";
-
-            // Incoming SMS Chat Bubble (word-wrapped across up to 5 lines)
-            const pagerEl = document.getElementById("pager-text");
-            const rawMsg = pagerEl
-                ? (pagerEl.textContent || "").trim()
-                : "Cap sur Ocean Drive et Vice Beach ! Appuie sur [M] pour la carte ou [G] pour klaxonner.";
-
-            const bubX = sx + 8;
-            const bubY = hdrY + hdrH + 18;
-            const bubW = sw - 16;
-            const bubH = 92;
-
-            rrect(bubX, bubY, bubW, bubH, 12);
-            ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Word-wrap message cleanly inside the chat bubble
-            ctx.fillStyle = "#f8fafc";
-            ctx.font = "10px -apple-system, 'Segoe UI', sans-serif";
-            const maxLineW = bubW - 16;
-            const words = rawMsg.split(/\s+/);
-            const lines = [];
-            let curLine = "";
-            for (const w of words) {
-                const test = curLine ? `${curLine} ${w}` : w;
-                if (ctx.measureText(test).width > maxLineW && curLine) {
-                    lines.push(curLine);
-                    curLine = w;
-                    if (lines.length >= 4) break;
-                } else {
-                    curLine = test;
-                }
-            }
-            if (curLine && lines.length < 5) {
-                while (ctx.measureText(curLine).width > maxLineW && curLine.length > 6) {
-                    curLine = curLine.slice(0, -4) + "…";
-                }
-                lines.push(curLine);
-            }
-
-            let textY = bubY + 14;
-            for (let i = 0; i < lines.length; i++) {
-                ctx.fillText(lines[i], bubX + 8, textY);
-                textY += 14.5;
-            }
-
-            // Read receipt at bottom-right of chat bubble
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = "bold 8px -apple-system, 'Segoe UI', sans-serif";
-            ctx.textAlign = "right";
-            ctx.fillText("09:41 ✓✓", bubX + bubW - 8, bubY + bubH - 7);
-            ctx.textAlign = "left";
+        // ====================================================================
+        // WIDGET 1 (TOP OF PHONE): LIVE GPS MAP OR 16 FAST-TRAVEL PLACES GRID
+        // ====================================================================
+        const gpsTopY = sy + 18;
+        if (!isPlacesApp) {
+            this.renderPhoneGpsWidget(ctx, game, sx + 6, gpsTopY, sw - 12, 174, rrect);
         } else {
-            // ================================================================
-            // APP 2: VICE MAPS GPS (16 Fast-Travel Destinations inside Phone)
-            // ================================================================
-            const hdrY = sy + 18;
-            const hdrH = 22;
+            // 16 Fast-Travel Landmarks Grid inside the Smartphone
+            const hdrH = 19;
+            rrect(sx + 6, gpsTopY, sw - 12, hdrH, 5);
             ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-            ctx.fillRect(sx, hdrY, sw, hdrH);
+            ctx.fill();
 
             const visitedCount = Array.isArray(this.map.landmarks)
                 ? this.map.landmarks.filter((lm) => lm.visited).length
@@ -2207,17 +2101,17 @@ class RetroRenderer {
 
             ctx.fillStyle = "#38bdf8";
             ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText(`🧭 Vice Maps • GPS (${visitedCount}/${totalLm})`, sx + 10, hdrY + 11.5);
+            ctx.fillText(`📍 Fast Travel • Places (${visitedCount}/${totalLm})`, sx + 12, gpsTopY + 10);
 
-            const drawPhoneAppBtn = (id, label, bx, by, bw, bh = 18, highlight = false, extra = null) => {
-                rrect(bx, by, bw, bh, 5);
+            const drawPhoneAppBtn = (id, label, bx, by, bw, bh = 17, highlight = false, extra = null) => {
+                rrect(bx, by, bw, bh, 4);
                 ctx.fillStyle = highlight ? "rgba(255, 42, 133, 0.24)" : "rgba(30, 41, 59, 0.92)";
                 ctx.fill();
                 ctx.strokeStyle = highlight ? "#ff2a85" : "rgba(56, 189, 248, 0.55)";
                 ctx.lineWidth = 1;
                 ctx.stroke();
                 ctx.fillStyle = highlight ? "#fde047" : "#f8fafc";
-                ctx.font = "bold 9px -apple-system, 'Segoe UI', Consolas, sans-serif";
+                ctx.font = "bold 8.8px -apple-system, 'Segoe UI', Consolas, sans-serif";
                 ctx.fillText(label, bx + 4, by + bh * 0.5 + 0.5);
                 this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: bh, ...(extra || {}) });
             };
@@ -2257,56 +2151,456 @@ class RetroRenderer {
                 ]
             ];
 
-            let cy = hdrY + hdrH + 4;
-            const colW = Math.floor((sw - 14) * 0.5);
+            let cy = gpsTopY + hdrH + 3;
+            const colW = Math.floor((sw - 16) * 0.5);
             for (const [leftBtn, rightBtn] of tourPairs) {
-                drawPhoneAppBtn("TP_LANDMARK", leftBtn.label, sx + 5, cy, colW, 18, leftBtn.hi, {
+                drawPhoneAppBtn("TP_LANDMARK", leftBtn.label, sx + 6, cy, colW, 17, leftBtn.hi, {
                     landmarkId: leftBtn.id,
                     enterCar: leftBtn.car
                 });
-                drawPhoneAppBtn("TP_LANDMARK", rightBtn.label, sx + 9 + colW, cy, colW, 18, rightBtn.hi, {
+                drawPhoneAppBtn("TP_LANDMARK", rightBtn.label, sx + 10 + colW, cy, colW, 17, rightBtn.hi, {
                     landmarkId: rightBtn.id,
                     enterCar: rightBtn.car
                 });
-                cy += 20;
+                cy += 19;
             }
         }
 
-        // 5. Bottom Smartphone App Dock (💬 Messages | 🧭 GPS [C] | 🗺️ Carte | 🌙 Nuit)
-        const dockY = sy + sh - 34;
-        const dockH = 22;
-        rrect(sx + 6, dockY, sw - 12, dockH, 8);
-        ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+        // ====================================================================
+        // WIDGET 2 (MIDDLE OF PHONE): BUILT-IN VICE CITY FM MUSIC PLAYER
+        // ====================================================================
+        const musX = sx + 6;
+        const musY = sy + 196;
+        const musW = sw - 12;
+        const musH = 44;
+
+        rrect(musX, musY, musW, musH, 10);
+        ctx.fillStyle = "rgba(19, 25, 46, 0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 42, 133, 0.65)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        const isPlaying = game.ytMusicEnabled !== false;
+        // Equalizer bars + Radio Station title
+        ctx.fillStyle = isPlaying ? "#39ff14" : "#64748b";
+        for (let b = 0; b < 4; b++) {
+            const eqH = isPlaying
+                ? (3 + Math.abs(Math.sin(this.time * 7 + b * 1.4)) * 9)
+                : 3;
+            ctx.fillRect(musX + 8 + b * 3.5, musY + 15 - eqH, 2.2, eqH);
+        }
+
+        ctx.fillStyle = "#00f0ff";
+        ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
+        ctx.fillText("🎵 VICE CITY FM • RADIO OST", musX + 26, musY + 10.5);
+
+        const volSlider = document.getElementById("yt-vol-slider");
+        const curVol = volSlider ? (parseInt(volSlider.value, 10) || 50) : (game.ytVolume || 50);
+        ctx.fillStyle = "#cbd5e1";
+        ctx.font = "bold 8.5px Consolas, monospace";
+        ctx.fillText(`${curVol}%`, musX + musW - 26, musY + 10.5);
+
+        // Music Control Buttons Row inside the widget: [ON/OFF] [NEXT (R)] [VOL -] [VOL +]
+        const drawMusBtn = (id, label, bx, by, bw, activeColor = null) => {
+            rrect(bx, by, bw, 18, 5);
+            ctx.fillStyle = activeColor || "rgba(30, 41, 59, 0.95)";
+            ctx.fill();
+            ctx.strokeStyle = activeColor ? "#39ff14" : "#38bdf8";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "bold 8.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(label, bx + bw * 0.5, by + 9.5);
+            ctx.textAlign = "left";
+            this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: 18 });
+        };
+
+        const btnY = musY + 21;
+        drawMusBtn(
+            "PHONE_MUSIC_TOGGLE",
+            isPlaying ? "🔊 MUSIC: ON" : "🔇 MUSIC: OFF",
+            musX + 6,
+            btnY,
+            78,
+            isPlaying ? "rgba(21, 128, 61, 0.55)" : "rgba(153, 27, 27, 0.55)"
+        );
+        drawMusBtn("PHONE_MUSIC_SKIP", "⏭ NEXT [R]", musX + 88, btnY, 60);
+        drawMusBtn("PHONE_VOL_DOWN", "🔉–", musX + 152, btnY, 22);
+        drawMusBtn("PHONE_VOL_UP", "🔊+", musX + 176, btnY, 22);
+
+        // ====================================================================
+        // WIDGET 3 (BOTTOM OF PHONE): JASON DUVAL iMESSAGE / SMS CARD
+        // ====================================================================
+        const smsX = sx + 6;
+        const smsY = sy + 244;
+        const smsW = sw - 12;
+        const smsH = 92;
+
+        rrect(smsX, smsY, smsW, smsH, 10);
+        ctx.fillStyle = "rgba(17, 24, 39, 0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Jason Pixel Avatar + Green Online Dot
+        const avX = smsX + 6;
+        const avY = smsY + 5;
+        this.drawPixelPortraitRect(ctx, avX, avY, 20, 20, "JASON");
+        ctx.fillStyle = "#22c55e";
+        ctx.beginPath();
+        ctx.arc(avX + 18, avY + 18, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        const senderEl = document.getElementById("pager-sender");
+        let contactName = "Jason Duval";
+        if (senderEl && senderEl.textContent) {
+            const cleaned = senderEl.textContent
+                .replace(/📱|📟|SMARTPHONE|PAGER|BIPEUR\s*'97|BIPEUR|\(PARTNER\)/gi, "")
+                .replace(/^[\s/]+/, "")
+                .trim();
+            if (cleaned.toUpperCase().includes("LUCIA")) contactName = "Jason & Lucia";
+            else if (cleaned.length > 0 && !cleaned.toUpperCase().includes("JASON")) contactName = cleaned;
+        }
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
+        ctx.fillText(contactName, avX + 25, smsY + 11);
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "8px -apple-system, 'Segoe UI', sans-serif";
+        ctx.fillText("Online • Messages", avX + 25, smsY + 20);
+
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 8px -apple-system, 'Segoe UI', sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText("09:41 ✓✓", smsX + smsW - 6, smsY + 12);
+        ctx.textAlign = "left";
+
+        // Word-wrapped English SMS message body
+        const pagerEl = document.getElementById("pager-text");
+        const rawMsg = pagerEl
+            ? (pagerEl.textContent || "").trim()
+            : "Welcome to Vice City! Use the GPS map above or press [M] to fast-travel anywhere.";
+
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "9.5px -apple-system, 'Segoe UI', sans-serif";
+        const maxLineW = smsW - 14;
+        const words = rawMsg.split(/\s+/);
+        const lines = [];
+        let curLine = "";
+        for (const w of words) {
+            const test = curLine ? `${curLine} ${w}` : w;
+            if (ctx.measureText(test).width > maxLineW && curLine) {
+                lines.push(curLine);
+                curLine = w;
+                if (lines.length >= 3) break;
+            } else {
+                curLine = test;
+            }
+        }
+        if (curLine && lines.length < 4) {
+            while (ctx.measureText(curLine).width > maxLineW && curLine.length > 6) {
+                curLine = curLine.slice(0, -4) + "…";
+            }
+            lines.push(curLine);
+        }
+
+        let textY = smsY + 35;
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillText(lines[i], smsX + 7, textY);
+            textY += 13.5;
+        }
+
+        // ====================================================================
+        // 5. BOTTOM SMARTPHONE APP DOCK (🧭 GPS MAP | 📍 PLACES [C] | 🌙 NIGHT)
+        // ====================================================================
+        const dockY = sy + sh - 32;
+        const dockH = 21;
+        rrect(sx + 6, dockY, sw - 12, dockH, 7);
+        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
         ctx.fill();
         ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        const tabW = Math.floor((sw - 20) / 3);
+        const tabW = Math.floor((sw - 18) / 3);
         const drawDockTab = (id, label, tx, active) => {
             if (active) {
-                rrect(tx, dockY + 2, tabW, dockH - 4, 6);
-                ctx.fillStyle = "rgba(56, 189, 248, 0.22)";
+                rrect(tx, dockY + 2, tabW, dockH - 4, 5);
+                ctx.fillStyle = "rgba(56, 189, 248, 0.24)";
                 ctx.fill();
             }
             ctx.fillStyle = active ? "#38bdf8" : "#cbd5e1";
-            ctx.font = "bold 9px -apple-system, 'Segoe UI', sans-serif";
+            ctx.font = "bold 8.5px -apple-system, 'Segoe UI', sans-serif";
             ctx.textAlign = "center";
             ctx.fillText(label, tx + tabW * 0.5, dockY + dockH * 0.5 + 0.5);
             ctx.textAlign = "left";
             this.cheatButtons.push({ id, x: tx, y: dockY, w: tabW, h: dockH });
         };
 
-        drawDockTab("PHONE_TAB_MSG", "💬 SMS", sx + 8, !isGpsApp);
-        drawDockTab("TOGGLE_COLLAPSE", "🧭 GPS [C]", sx + 10 + tabW, isGpsApp);
-        drawDockTab("MINIMAP_FULLMAP", "🗺️ Carte", sx + 12 + tabW * 2, false);
+        drawDockTab("PHONE_TAB_MSG", "🧭 GPS MAP", sx + 7, !isPlacesApp);
+        drawDockTab("TOGGLE_COLLAPSE", "📍 PLACES [C]", sx + 9 + tabW, isPlacesApp);
+        drawDockTab("TOGGLE_NIGHT", this.nightMode ? "☀️ DAY [N]" : "🌙 NIGHT [N]", sx + 11 + tabW * 2, this.nightMode);
 
         // 6. Bottom iOS White Home Indicator Bar
-        rrect(sx + (sw - 58) * 0.5, sy + sh - 7, 58, 3.5, 2);
+        rrect(sx + (sw - 58) * 0.5, sy + sh - 6.5, 58, 3.2, 2);
         ctx.fillStyle = "rgba(248, 250, 252, 0.65)";
         ctx.fill();
 
         ctx.restore();
+        ctx.restore();
+    }
+
+    renderPhoneGpsWidget(ctx, game, gx, gy, gw, gh, rrect) {
+        const useVice = this.mapStyle === "VICE" && this.viceOverviewReady;
+        const srcImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
+        if (!srcImg) return;
+
+        const hdrH = 19;
+        const ftrH = 19;
+        const mx = gx;
+        const my = gy + hdrH;
+        const mw = gw;
+        const mh = gh - hdrH - ftrH; // 136px
+
+        const p = game.player;
+        const worldW = this.map.width;
+        const worldH = this.map.height;
+
+        const zoomMode = this.minimapZoomMode || 0;
+        const spanBlocks = zoomMode === 0 ? 68 : (zoomMode === 1 ? 136 : 256);
+        const viewWorldW = spanBlocks * TILE_SIZE;
+        const viewWorldH = spanBlocks * TILE_SIZE;
+
+        let viewWorldX = p.x - viewWorldW * 0.5;
+        let viewWorldY = p.y - viewWorldH * 0.5;
+        viewWorldX = Math.max(0, Math.min(worldW - viewWorldW, viewWorldX));
+        viewWorldY = Math.max(0, Math.min(worldH - viewWorldH, viewWorldY));
+
+        const imgScaleX = srcImg.width / worldW;
+        const imgScaleY = srcImg.height / worldH;
+        const srcX = viewWorldX * imgScaleX;
+        const srcY = viewWorldY * imgScaleY;
+        const srcW = viewWorldW * imgScaleX;
+        const srcH = viewWorldH * imgScaleY;
+
+        ctx.save();
+
+        // 1. GPS Header Bar (District Name + [1x] + [M] Full Map)
+        rrect(gx, gy, gw, gh, 8);
+        ctx.fillStyle = "rgba(9, 13, 22, 0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.55)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+        ctx.textBaseline = "middle";
+        const distName = (game.currentDistrict || "VICE CITY").toUpperCase();
+        ctx.fillStyle = "#00f0ff";
+        ctx.fillText(`🧭 ${distName.slice(0, 14)}`, gx + 5, gy + 10);
+
+        const zoomLabels = ["1x", "2x", "ALL"];
+        const zBtnW = 28;
+        const zBtnX = gx + gw - 62;
+        rrect(zBtnX, gy + 2, zBtnW, 15, 3);
+        ctx.fillStyle = "rgba(44, 78, 128, 0.95)";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(zoomLabels[zoomMode], zBtnX + 4, gy + 10);
+        this.cheatButtons.push({ id: "MINIMAP_ZOOM", x: zBtnX, y: gy + 2, w: zBtnW, h: 15 });
+
+        const mBtnW = 30;
+        const mBtnX = gx + gw - 32;
+        rrect(mBtnX, gy + 2, mBtnW, 15, 3);
+        ctx.fillStyle = "rgba(180, 42, 118, 0.95)";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("[M]", mBtnX + 5, gy + 10);
+        this.cheatButtons.push({ id: "MINIMAP_FULLMAP", x: mBtnX, y: gy + 2, w: mBtnW, h: 15 });
+
+        // 2. Live GPS Map Image inside Smartphone
+        ctx.fillStyle = "#07101c";
+        ctx.fillRect(mx, my, mw, mh);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(srcImg, srcX, srcY, srcW, srcH, mx, my, mw, mh);
+
+        this.cheatButtons.push({
+            id: "MINIMAP_CANVAS",
+            x: mx,
+            y: my,
+            w: mw,
+            h: mh,
+            viewWorldX,
+            viewWorldY,
+            viewWorldW,
+            viewWorldH
+        });
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(mx, my, mw, mh);
+        ctx.clip();
+
+        const worldToMini = (wx, wy) => ({
+            x: mx + ((wx - viewWorldX) / viewWorldW) * mw,
+            y: my + ((wy - viewWorldY) / viewWorldH) * mh
+        });
+
+        // Pay 'n' Spray Shops
+        if (Array.isArray(this.map.payNSprays)) {
+            for (const pns of this.map.payNSprays) {
+                const pt = worldToMini(pns.x + pns.w * 0.5, pns.y + pns.h * 0.5);
+                if (pt.x < mx - 6 || pt.x > mx + mw + 6 || pt.y < my - 6 || pt.y > my + mh + 6) continue;
+                ctx.fillStyle = "#14532d";
+                ctx.fillRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
+                ctx.strokeStyle = "#39ff14";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
+            }
+        }
+
+        // Ringing Payphones
+        if (game.missions && Array.isArray(game.missions.payphones)) {
+            for (const ph of game.missions.payphones) {
+                if (ph.completed) continue;
+                const pt = worldToMini(ph.x, ph.y);
+                if (pt.x < mx - 6 || pt.x > mx + mw + 6 || pt.y < my - 6 || pt.y > my + mh + 6) continue;
+                ctx.fillStyle = "#39ff14";
+                ctx.fillRect(pt.x - 3, pt.y - 3, 6, 6);
+            }
+        }
+
+        // Nearby Vehicles & Cops
+        if (Array.isArray(game.vehicles) && zoomMode < 2) {
+            const copFlash = Math.floor(this.time * 8) % 2 === 0;
+            for (const v of game.vehicles) {
+                if (v.destroyed || v === p.inVehicle) continue;
+                const pt = worldToMini(v.x, v.y);
+                if (pt.x < mx || pt.x > mx + mw || pt.y < my || pt.y > my + mh) continue;
+                if (v.driver === "AI_COP" || v.isPolice) {
+                    ctx.fillStyle = copFlash ? "#ef4444" : "#3b82f6";
+                    ctx.fillRect(pt.x - 2.5, pt.y - 2.5, 5, 5);
+                } else if (v.missionTag === "LANDMARK") {
+                    ctx.fillStyle = "#ffd13b";
+                    ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+                }
+            }
+        }
+
+        // Official Landmarks
+        let nearestLm = null;
+        let nearestDist = Infinity;
+        if (Array.isArray(this.map.landmarks)) {
+            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
+            for (const lm of this.map.landmarks) {
+                const d = Math.hypot(lm.x - p.x, lm.y - p.y);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearestLm = lm;
+                }
+                const pt = worldToMini(lm.x, lm.y);
+                const inside = pt.x >= mx + 6 && pt.x <= mx + mw - 6 && pt.y >= my + 6 && pt.y <= my + mh - 6;
+                if (inside) {
+                    ctx.fillStyle = lm.visited ? "#39ff14" : (lm.color || "#ff2a85");
+                    ctx.fillRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
+                    ctx.strokeStyle = "#050811";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
+                } else {
+                    const cx = Math.max(mx + 5, Math.min(mx + mw - 5, pt.x));
+                    const cy = Math.max(my + 5, Math.min(my + mh - 5, pt.y));
+                    ctx.fillStyle = lm.visited ? "#39ff14" : (lm.color || "#ff2a85");
+                    ctx.fillRect(cx - 2.5, cy - 2.5, 5, 5);
+                }
+            }
+        }
+
+        // Active Mission Target Blip
+        const mTarget = game.missions ? game.missions.getTargetPosition() : null;
+        if (mTarget) {
+            const pt = worldToMini(mTarget.x, mTarget.y);
+            const cx = Math.max(mx + 5, Math.min(mx + mw - 5, pt.x));
+            const cy = Math.max(my + 5, Math.min(my + mh - 5, pt.y));
+            const pulse = 4 + Math.sin(this.time * 9) * 2;
+            ctx.strokeStyle = "#ff2a85";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
+        }
+
+        // Jason Partner Blip
+        if (game.jason) {
+            const jp = worldToMini(game.jason.x, game.jason.y);
+            ctx.fillStyle = "#00f0ff";
+            ctx.fillRect(jp.x - 2.5, jp.y - 2.5, 5, 5);
+        }
+
+        // Player Directional Arrow
+        const pp = worldToMini(p.x, p.y);
+        const ang = (p.inVehicle ? p.inVehicle.angle : p.angle) || 0;
+        ctx.save();
+        ctx.translate(pp.x, pp.y);
+        ctx.rotate(ang);
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#ff2a85";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(6.5, 0);
+        ctx.lineTo(-4.5, -4.5);
+        ctx.lineTo(-2, 0);
+        ctx.lineTo(-4.5, 4.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.restore(); // End GPS map clip
+
+        // 3. Bottom GPS Landmark Navigation Bar
+        const ftrY = my + mh;
+        if (nearestLm) {
+            const distMeters = Math.round(nearestDist / 16);
+            const dx = nearestLm.x - p.x;
+            const dy = nearestLm.y - p.y;
+            const dirs = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
+            const dirIdx = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+            const dirStr = dirs[dirIdx];
+
+            let goTarget = nearestLm;
+            if (distMeters < 45 && Array.isArray(this.map.landmarks)) {
+                const unvisited = this.map.landmarks.find((l) => !l.visited && l.id !== nearestLm.id);
+                const nextIdx = (this.map.landmarks.indexOf(nearestLm) + 1) % this.map.landmarks.length;
+                goTarget = unvisited || this.map.landmarks[nextIdx];
+            }
+
+            const nearShort = nearestLm.short || nearestLm.shortName || "LANDMARK";
+            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+            ctx.fillStyle = "#ffd13b";
+            const statusTxt = distMeters < 35
+                ? `★ AT ${nearShort}`
+                : `📍 ${nearShort} (${distMeters}m ${dirStr})`;
+            ctx.fillText(statusTxt.slice(0, 21), gx + 5, ftrY + 10);
+
+            const goW = 34;
+            const goX = gx + gw - goW - 3;
+            rrect(goX, ftrY + 2, goW, 14, 3);
+            ctx.fillStyle = "rgba(25, 115, 72, 0.95)";
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("GO►", goX + 5, ftrY + 10);
+
+            this.cheatButtons.push({
+                id: "MINIMAP_NEXT_LM",
+                x: gx,
+                y: ftrY,
+                w: gw,
+                h: ftrH,
+                landmarkId: goTarget ? goTarget.id : nearestLm.id
+            });
+        }
+
         ctx.restore();
     }
 
@@ -2355,6 +2649,22 @@ class RetroRenderer {
                     const bx = Math.max(2, Math.min(MAP_COLS - 3, worldX / TILE_SIZE));
                     const by = Math.max(2, Math.min(MAP_ROWS - 3, worldY / TILE_SIZE));
                     game.teleportToBlock(bx, by, false);
+                    return true;
+                }
+                if (btn.id === "PHONE_MUSIC_TOGGLE" && typeof game.setYouTubeMusicEnabled === "function") {
+                    game.setYouTubeMusicEnabled(!game.ytMusicEnabled);
+                    return true;
+                }
+                if (btn.id === "PHONE_MUSIC_SKIP" && typeof game.skipYouTubeRadioTrack === "function") {
+                    game.skipYouTubeRadioTrack();
+                    return true;
+                }
+                if (btn.id === "PHONE_VOL_DOWN" && typeof game.adjustYouTubeVolume === "function") {
+                    game.adjustYouTubeVolume(-15);
+                    return true;
+                }
+                if (btn.id === "PHONE_VOL_UP" && typeof game.adjustYouTubeVolume === "function") {
+                    game.adjustYouTubeVolume(15);
                     return true;
                 }
                 if (btn.id === "UNMINIMIZE_PHONE") {
@@ -2560,9 +2870,6 @@ class RetroRenderer {
         if ((game.jailFreeCards || 0) > 0) {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
-
-        // B2. TOP-RIGHT LIVE VICE CITY MINIMAP / GPS RADAR (Below Score Counter)
-        this.renderTopMinimap(ctx, game);
 
         // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS), DISTRICT BANNER (25/26) & CAR NAME (27)
         if ((game.wantedLevel || 0) > 0) {

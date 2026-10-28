@@ -930,17 +930,14 @@ html, body {
    ============================================================================ */
 #yt-radio-widget {
     position: absolute;
-    bottom: 10px;
-    right: 10px;
-    width: 244px;
-    background: rgba(9, 12, 22, 0.92);
-    border: 2px solid var(--vice-pink);
-    box-shadow: 0 0 16px rgba(255, 42, 133, 0.35), 0 4px 0 #000;
-    border-radius: 3px;
-    z-index: 25;
-    font-family: var(--font-arcade);
-    pointer-events: auto;
+    bottom: 0;
+    right: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0.001;
+    pointer-events: none;
     overflow: hidden;
+    z-index: -1;
 }
 
 .yt-radio-header {

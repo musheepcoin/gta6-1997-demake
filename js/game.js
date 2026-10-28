@@ -722,7 +722,7 @@ class LeonidaGame {
                     this.addFloatingText(this.player.x, this.player.y - 30, `📻 ${st.name}`, "#00f0ff");
                     this.updateHud();
                 } else {
-                    this.addFloatingText(this.player.x, this.player.y - 30, "📻 YT RADIO: PISTE SUIVANTE", "#00f0ff");
+                    this.addFloatingText(this.player.x, this.player.y - 30, "📻 VICE FM: NEXT TRACK", "#00f0ff");
                 }
             }
 
@@ -937,7 +937,7 @@ class LeonidaGame {
             this.sendYouTubeCommand("setVolume", [vol]);
             this.sendYouTubeCommand("playVideo", []);
             if (toggleBtn) {
-                toggleBtn.textContent = "🔊 MUSIQUE : ON";
+                toggleBtn.textContent = "🔊 MUSIC: ON";
                 toggleBtn.classList.add("yt-btn-active");
                 toggleBtn.classList.remove("yt-btn-muted");
             }
@@ -946,7 +946,7 @@ class LeonidaGame {
         } else {
             this.sendYouTubeCommand("pauseVideo", []);
             if (toggleBtn) {
-                toggleBtn.textContent = "🔇 MUSIQUE : OFF";
+                toggleBtn.textContent = "🔇 MUSIC: OFF";
                 toggleBtn.classList.remove("yt-btn-active");
                 toggleBtn.classList.add("yt-btn-muted");
             }
@@ -984,6 +984,18 @@ class LeonidaGame {
         if (this.audio) {
             this.audio.playBeep(680, 0.04, "square", 0.04);
         }
+    }
+
+    adjustYouTubeVolume(delta = 15) {
+        const volSlider = document.getElementById("yt-vol-slider");
+        const curVol = volSlider ? (parseInt(volSlider.value, 10) || 50) : (this.ytVolume || 50);
+        const nextVol = Math.max(0, Math.min(100, curVol + delta));
+        this.ytVolume = nextVol;
+        if (volSlider) volSlider.value = String(nextVol);
+        if (nextVol > 0 && !this.ytMusicEnabled) {
+            this.setYouTubeMusicEnabled(true);
+        }
+        this.sendYouTubeCommand("setVolume", [nextVol]);
     }
 
     toggleFullMap(forceState = null) {
