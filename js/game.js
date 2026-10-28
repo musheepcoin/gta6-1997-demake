@@ -1221,7 +1221,7 @@ class LeonidaGame {
                 // Update auto-generated nickname prefix if user hasn't typed a custom one yet
                 if (nickInput) {
                     const cur = nickInput.value.trim();
-                    if (!cur || /^(LUCIA|JASON|TOMMY|VALERIA|DETECTIVE|GOURANGA|CROCKETT)\s*#?\d*$/i.test(cur)) {
+                    if (!cur || /^(LUCIA|JASON|TOMMY|TREVOR|CJ|NIKO|CLAUDE|BIGSMOKE|CROCKETT|VALERIA|DETECTIVE|GOURANGA)\s*#?\d*$/i.test(cur)) {
                         const num = Math.floor(100 + Math.random() * 900);
                         nickInput.value = `${cId} #${num}`;
                     }
@@ -1231,9 +1231,9 @@ class LeonidaGame {
 
         if (randBtn && nickInput) {
             const presets = [
-                "LUCIA_97", "TOMMY_86", "JASON_305", "VALERIA_GT",
-                "CROCKETT_84", "GOURANGA_1", "OCEAN_KING", "NEON_VIPER",
-                "MIAMI_WOLF", "STAR_BOSS"
+                "TREVOR_TP", "CJ_GROVE", "NIKO_LC", "TOMMY_86",
+                "LUCIA_97", "JASON_305", "CLAUDE_III", "BIG_SMOKE",
+                "CROCKETT_84", "OCEAN_KING"
             ];
             randBtn.addEventListener("click", () => {
                 const pick = presets[Math.floor(Math.random() * presets.length)];
@@ -1293,8 +1293,23 @@ class LeonidaGame {
         } else {
             if (this.jason) this.jason.pedType = "jason";
             if (chosenCharId === "TOMMY") this.cash = Math.max(this.cash, 5000);
-            else if (chosenCharId === "DETECTIVE") this.jailFreeCards = Math.max(this.jailFreeCards, 3);
-            else if (chosenCharId === "GOURANGA") this.multiplier = Math.max(this.multiplier, 2);
+            else if (chosenCharId === "TREVOR") {
+                this.player.armor = 100;
+                this.multiplier = Math.max(this.multiplier, 2);
+            } else if (chosenCharId === "CJ") {
+                this.cash = Math.max(this.cash, 2500);
+            } else if (chosenCharId === "NIKO") {
+                this.player.armor = 100;
+            } else if (chosenCharId === "CLAUDE") {
+                this.jailFreeCards = Math.max(this.jailFreeCards, 2);
+            } else if (chosenCharId === "BIGSMOKE") {
+                this.player.armor = 100;
+                this.multiplier = Math.max(this.multiplier, 2);
+            } else if (chosenCharId === "DETECTIVE" || chosenCharId === "CROCKETT") {
+                this.jailFreeCards = Math.max(this.jailFreeCards, 3);
+            } else if (chosenCharId === "GOURANGA") {
+                this.multiplier = Math.max(this.multiplier, 2);
+            }
         }
 
         if (this.net && typeof this.net.setIdentity === "function") {

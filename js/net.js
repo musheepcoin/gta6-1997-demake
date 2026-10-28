@@ -56,7 +56,7 @@ class ViceNetworkManager {
         this.peer = null;
         this.peerConns = new Map(); // peerId -> DataConnection
         this.slotIndex = -1;
-        this.maxSlots = 12;
+        this.maxSlots = 24;
         this.webrtcReady = false;
         this.statusText = "CONNECTING...";
         this.isChatTyping = false;
@@ -156,11 +156,11 @@ class ViceNetworkManager {
             const dotEl = document.getElementById(`srv-dot-${srv}`);
             if (countEl) {
                 if (count <= 0) {
-                    countEl.textContent = "0/12 VIDE";
+                    countEl.textContent = `0/${this.maxSlots} VIDE`;
                 } else if (count === 1) {
-                    countEl.textContent = "1/12 JOUEUR";
+                    countEl.textContent = `1/${this.maxSlots} JOUEUR`;
                 } else {
-                    countEl.textContent = `${count}/12 JOUEURS`;
+                    countEl.textContent = `${count}/${this.maxSlots} JOUEURS`;
                 }
             }
             if (dotEl) {
@@ -1228,7 +1228,7 @@ class ViceNetworkManager {
             }
             this.addChatLog(
                 "VICE NET",
-                `🌐 1/12 joueur sur [${this.roomCode}]. Partagez l'URL avec un ami ou changez de serveur !`,
+                `🌐 1/${this.maxSlots} joueur sur [${this.roomCode}]. Partagez l'URL avec un ami ou changez de serveur !`,
                 "#00f0ff",
                 true
             );

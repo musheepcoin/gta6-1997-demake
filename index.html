@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRAND THEFT AUTO: VICE CITY '97 — LUCIA EDITION (1997 2.5D Demake)</title>
-    <link rel="stylesheet" href="css/style.css?v=98_17">
+    <link rel="stylesheet" href="css/style.css?v=98_19">
 </head>
 <body>
     <div id="game-container">
@@ -251,87 +251,114 @@
                         </div>
                     </div>
                     <div class="identity-field identity-servers-col">
-                        <label>🌐 SERVEURS EN LIGNE (CLIQUEZ POUR REJOINDRE)</label>
+                        <label>🌐 SERVEURS EN LIGNE — 24 SLOTS / SERVEUR (CLIQUEZ POUR REJOINDRE)</label>
                         <div class="server-select-list" id="server-select-list">
                             <button type="button" class="server-slot-btn active-server" data-room="VICE97">
                                 <span class="srv-top">
                                     <span class="srv-dot online" id="srv-dot-VICE97"></span>
                                     <span class="srv-name">🌴 #1 OCEAN DRIVE</span>
                                 </span>
-                                <span class="srv-count" id="srv-count-VICE97">1/12 JOUEUR</span>
+                                <span class="srv-count" id="srv-count-VICE97">1/24 JOUEUR</span>
                             </button>
                             <button type="button" class="server-slot-btn" data-room="MIAMI86">
                                 <span class="srv-top">
                                     <span class="srv-dot" id="srv-dot-MIAMI86"></span>
                                     <span class="srv-name">🦩 #2 SOUTH BEACH</span>
                                 </span>
-                                <span class="srv-count" id="srv-count-MIAMI86">0/12 VIDE</span>
+                                <span class="srv-count" id="srv-count-MIAMI86">0/24 VIDE</span>
                             </button>
                             <button type="button" class="server-slot-btn" data-room="KEYS305">
                                 <span class="srv-top">
                                     <span class="srv-dot" id="srv-dot-KEYS305"></span>
                                     <span class="srv-name">🏎️ #3 STAR ISLAND</span>
                                 </span>
-                                <span class="srv-count" id="srv-count-KEYS305">0/12 VIDE</span>
+                                <span class="srv-count" id="srv-count-KEYS305">0/24 VIDE</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- STEP 2: 6 PLAYABLE VICE CITY '97 CHARACTERS -->
-                <div class="char-select-section-title">🎭 CHOISISSEZ VOTRE PERSONNAGE JOUABLE (CLICK TO SELECT)</div>
+                <!-- STEP 2: 9 ICONIC PLAYABLE GTA LEGENDS -->
+                <div class="char-select-section-title">🎭 CHOISISSEZ VOTRE LÉGENDE GTA (9 PERSONNAGES JOUABLES)</div>
                 <div class="char-select-grid" id="char-select-grid">
                     <div class="mugshot-card char-select-card active-mug" data-char-id="LUCIA" data-ped-type="lucia" data-color="#ff2a85" data-weapon="PISTOL">
-                        <canvas id="lucia-dossier-portrait" class="char-select-canvas" data-char="LUCIA" width="64" height="64"></canvas>
+                        <canvas id="lucia-dossier-portrait" class="char-select-canvas" data-char="LUCIA" width="54" height="54"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">LUCIA CAMINOS</span>
-                            <span class="mug-tag">INMATE #L-9724 • SOUTH BEACH</span>
+                            <span class="mug-tag">GTA VI • SOUTH BEACH</span>
                             <span class="mug-perk">🔫 9MM PISTOL + BANDANA [B]</span>
                         </div>
                     </div>
 
                     <div class="mugshot-card char-select-card" data-char-id="JASON" data-ped-type="jason" data-color="#00f0ff" data-weapon="UZI">
-                        <canvas id="jason-dossier-portrait" class="char-select-canvas" data-char="JASON" width="64" height="64"></canvas>
+                        <canvas id="jason-dossier-portrait" class="char-select-canvas" data-char="JASON" width="54" height="54"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">JASON DUVAL</span>
-                            <span class="mug-tag">WHEELMAN • LEONIDA KEYS</span>
+                            <span class="mug-tag">GTA VI • LEONIDA KEYS</span>
                             <span class="mug-perk">🔫 MICRO-UZI + KEVLAR 100%</span>
                         </div>
                     </div>
 
                     <div class="mugshot-card char-select-card" data-char-id="TOMMY" data-ped-type="civ0" data-color="#38bdf8" data-weapon="SHOTGUN">
-                        <canvas class="char-select-canvas" data-char="TOMMY" width="64" height="64"></canvas>
+                        <canvas class="char-select-canvas" data-char="TOMMY" width="54" height="54"></canvas>
                         <div class="mugshot-meta">
-                            <span class="mug-name">TOMMY V. '86</span>
-                            <span class="mug-tag">KINGPIN • OCEAN DRIVE</span>
-                            <span class="mug-perk">🔫 SHOTGUN + STAR ISLAND VIP</span>
+                            <span class="mug-name">TOMMY VERCETTI</span>
+                            <span class="mug-tag">VICE CITY '86 • KINGPIN</span>
+                            <span class="mug-perk">🔫 SHOTGUN + $10,000 VIP</span>
                         </div>
                     </div>
 
-                    <div class="mugshot-card char-select-card" data-char-id="VALERIA" data-ped-type="gang" data-color="#f43f5e" data-weapon="UZI">
-                        <canvas class="char-select-canvas" data-char="VALERIA" width="64" height="64"></canvas>
+                    <div class="mugshot-card char-select-card" data-char-id="TREVOR" data-ped-type="civ1" data-color="#f97316" data-weapon="FLAMETHROWER">
+                        <canvas class="char-select-canvas" data-char="TREVOR" width="54" height="54"></canvas>
                         <div class="mugshot-meta">
-                            <span class="mug-name">VALERIA CORTEZ</span>
-                            <span class="mug-tag">ENFORCER • LITTLE HAVANA</span>
-                            <span class="mug-perk">🔫 MICRO-UZI + STREET RACER</span>
+                            <span class="mug-name">TREVOR PHILIPS</span>
+                            <span class="mug-tag">GTA V • T.P. ENTERPRISES</span>
+                            <span class="mug-perk">🔥 FLAMETHROWER + RAGE x2</span>
                         </div>
                     </div>
 
-                    <div class="mugshot-card char-select-card" data-char-id="DETECTIVE" data-ped-type="police" data-color="#fde047" data-weapon="PISTOL">
-                        <canvas class="char-select-canvas" data-char="DETECTIVE" width="64" height="64"></canvas>
+                    <div class="mugshot-card char-select-card" data-char-id="CJ" data-ped-type="gang" data-color="#22c55e" data-weapon="UZI">
+                        <canvas class="char-select-canvas" data-char="CJ" width="54" height="54"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">CARL "CJ" JOHNSON</span>
+                            <span class="mug-tag">SAN ANDREAS '92 • GROVE ST.</span>
+                            <span class="mug-perk">🔫 MICRO-UZI + $5,000 CASH</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="NIKO" data-ped-type="civ2" data-color="#a855f7" data-weapon="ROCKET">
+                        <canvas class="char-select-canvas" data-char="NIKO" width="54" height="54"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">NIKO BELLIC</span>
+                            <span class="mug-tag">GTA IV • LIBERTY CITY</span>
+                            <span class="mug-perk">🚀 ROCKET LAUNCHER + ARMOR</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="CLAUDE" data-ped-type="civ3" data-color="#10b981" data-weapon="SHOTGUN">
+                        <canvas class="char-select-canvas" data-char="CLAUDE" width="54" height="54"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">CLAUDE SPEED</span>
+                            <span class="mug-tag">GTA III / GTA 2 • SILENT PRO</span>
+                            <span class="mug-perk">🔫 SHOTGUN + MULT x2</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="BIGSMOKE" data-ped-type="monk" data-color="#84cc16" data-weapon="UZI">
+                        <canvas class="char-select-canvas" data-char="BIGSMOKE" width="54" height="54"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">BIG SMOKE</span>
+                            <span class="mug-tag">SAN ANDREAS • NUMBER 9 LARGE</span>
+                            <span class="mug-perk">🍔 UZI + 150 HP + ARMOR</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="CROCKETT" data-ped-type="police" data-color="#fde047" data-weapon="PISTOL">
+                        <canvas class="char-select-canvas" data-char="CROCKETT" width="54" height="54"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">DET. CROCKETT</span>
-                            <span class="mug-tag">VICE SQUAD • VCPD BADGE</span>
-                            <span class="mug-perk">🚨 PISTOL + JAIL FREE CARD</span>
-                        </div>
-                    </div>
-
-                    <div class="mugshot-card char-select-card" data-char-id="GOURANGA" data-ped-type="monk" data-color="#fb923c" data-weapon="FLAMETHROWER">
-                        <canvas class="char-select-canvas" data-char="GOURANGA" width="64" height="64"></canvas>
-                        <div class="mugshot-meta">
-                            <span class="mug-name">GOURANGA MONK</span>
-                            <span class="mug-tag">1997 LEGEND • LUMMUS PARK</span>
-                            <span class="mug-perk">🔥 FLAMETHROWER + MULT x2</span>
+                            <span class="mug-tag">MIAMI VICE • VCPD SQUAD</span>
+                            <span class="mug-perk">🚨 PISTOL + 3 JAIL FREE CARDS</span>
                         </div>
                     </div>
                 </div>
@@ -342,12 +369,12 @@
     </div>
 
     <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=98_18"></script>
-    <script src="js/map.js?v=98_18"></script>
-    <script src="js/entities.js?v=98_18"></script>
-    <script src="js/missions.js?v=98_18"></script>
-    <script src="js/renderer.js?v=98_18"></script>
-    <script src="js/net.js?v=98_18"></script>
-    <script src="js/game.js?v=98_18"></script>
+    <script src="js/audio.js?v=98_19"></script>
+    <script src="js/map.js?v=98_19"></script>
+    <script src="js/entities.js?v=98_19"></script>
+    <script src="js/missions.js?v=98_19"></script>
+    <script src="js/renderer.js?v=98_19"></script>
+    <script src="js/net.js?v=98_19"></script>
+    <script src="js/game.js?v=98_19"></script>
 </body>
 </html>
