@@ -136,13 +136,21 @@ class RetroRenderer {
                 vec4 c = texture2D(uTex, vUV);
                 if (c.a < 0.1) discard;
                 if (uNightTint > 0.01) {
-                    if (uViceStyle > 0.5 && vAnim < 0.5) {
-                        // Vice City / GTA 6 Ocean Drive Neon Night: pink, cyan & gold hotel windows glow!
-                        float neon = max(c.r - c.g * 0.65, max(c.b - c.r * 0.65, (c.r + c.g) * 0.52 - c.b * 0.72));
-                        vec3 nightAmbient = vec3(0.50, 0.46, 0.82);
-                        c.rgb = mix(c.rgb * nightAmbient, min(vec3(1.0), c.rgb * 1.15), clamp(neon * 2.2, 0.0, 1.0));
+                    if (vAnim < -0.5) {
+                        // Vertical 3D building facade (face < 4): lit hotel/skyscraper windows & neon strips glow at night!
+                        float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                        float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+                        float isWindowOrNeon = clamp((lum - 0.55) * 3.6 + (sat - 0.38) * 2.5, 0.0, 1.0);
+                        vec3 wallDark = c.rgb * vec3(0.55, 0.62, 0.85);
+                        vec3 windowGlow = min(vec3(1.0), c.rgb * 1.45 + vec3(0.10, 0.06, 0.14));
+                        c.rgb = mix(wallDark, windowGlow, isWindowOrNeon);
+                    } else if (vAnim > 0.5 && vAnim < 1.5) {
+                        // Ocean / Bay / Lake water at night: deep nocturnal navy
+                        c.rgb *= vec3(0.42, 0.52, 0.78);
                     } else {
-                        c.rgb *= mix(vec3(1.0), vec3(0.42, 0.52, 0.78), uNightTint);
+                        // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops):
+                        // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!)
+                        c.rgb *= vec3(0.68, 0.73, 0.90);
                     }
                 }
                 gl_FragColor = c;
@@ -283,23 +291,23 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_78";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_78";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_78";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_79";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_79";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_79";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_78";
+        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_79";
 
         this.viceOverviewImg.onload = () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_78";
+        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_79";
 
-        fetch("assets/gta1/gta1_meta.json?v=97_78")
+        fetch("assets/gta1/gta1_meta.json?v=97_79")
             .then((res) => res.json())
             .then((meta) => {
                 this.gta1Meta = meta;
@@ -307,7 +315,7 @@ class RetroRenderer {
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetch("assets/gta1/gta1_map.bin?v=97_78")
+        fetch("assets/gta1/gta1_map.bin?v=97_79")
             .then((res) => res.arrayBuffer())
             .then((buf) => {
                 mapBinBuffer = buf;
@@ -542,7 +550,8 @@ class RetroRenderer {
         let animType = 0.0;
 
         if (face < 4) {
-            // Side face (0..194)
+            // Side face (0..194) — mark animType = -1.0 so cityFS knows this is a vertical 3D building wall
+            animType = -1.0;
             const base = b.isFlat ? (tiles.side_flat_start || 195) : (tiles.side_start || 0);
             atlasIdx = base + (tileIdx % tiles.side_count);
         } else {
@@ -870,11 +879,16 @@ class RetroRenderer {
         // 1. Render 3D WebGL CityMesh + 3D SpriteBatch into this.glCanvas
         this.renderWebGLScene(game, effectiveViewProj);
 
-        // 2. Composite WebGL 3D scene onto 2D main canvas + draw floating scores, HUD & Game Cheats window
+        // 2. Composite WebGL 3D scene onto 2D main canvas + draw dynamic Night Lighting, floating scores, HUD & Smartphone
         const ctx = this.ctx;
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(this.glCanvas, 0, 0);
+
+        // 2B. Real Dynamic Night Mode Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
+        if (this.nightMode && !game.activeInterior) {
+            this.renderNightLighting(ctx, game);
+        }
 
         // Optional 1997 GTA 1 DebugRenderer Wireframe Overlay (Vehicle::DebugDraw / Pedestrian::DebugDraw)
         if (this.debugDrawPhysics && !game.activeInterior) {
@@ -924,9 +938,9 @@ class RetroRenderer {
 
         gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
         if (this.mapStyle === "VICE") {
-            // Tropical Atlantic / Biscayne Bay turquoise sea-level clear color
+            // Tropical Atlantic / Biscayne Bay turquoise sea-level clear color (deep midnight navy at night)
             if (this.nightMode) {
-                gl.clearColor(0.02, 0.16, 0.28, 1.0);
+                gl.clearColor(0.012, 0.045, 0.11, 1.0);
             } else {
                 gl.clearColor(0.03, 0.44, 0.56, 1.0);
             }
@@ -1583,6 +1597,374 @@ class RetroRenderer {
                 this.pushAtlasSprite3D(rect, ax, ay, this.camZBlocks + 0.25, angle + Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
             }
         }
+    }
+
+    /* ========================================================================
+       5A0. DYNAMIC NIGHT LIGHTING ENGINE (Darkness Mask + Conical Headlights +
+            Red Taillights + Flashing Police Sirens + Streetlamps & Neon Glows)
+       ======================================================================== */
+    renderNightLighting(ctx, game) {
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        if (W <= 0 || H <= 0) return;
+
+        const scale = 0.5;
+        const lw = Math.max(1, Math.floor(W * scale));
+        const lh = Math.max(1, Math.floor(H * scale));
+        if (!this.nightCanvas) {
+            this.nightCanvas = document.createElement("canvas");
+        }
+        if (this.nightCanvas.width !== lw || this.nightCanvas.height !== lh) {
+            this.nightCanvas.width = lw;
+            this.nightCanvas.height = lh;
+        }
+        const lctx = this.nightCanvas.getContext("2d");
+
+        // 1. Fill offscreen lightmap with deep midnight darkness (R=34, G=44, B=76)
+        lctx.save();
+        lctx.globalCompositeOperation = "source-over";
+        lctx.fillStyle = "#222c4c";
+        lctx.fillRect(0, 0, lw, lh);
+
+        // Switch to additive light accumulation on the lightmap
+        lctx.globalCompositeOperation = "lighter";
+
+        const addLightPool = (sx, sy, radPx, innerCol, midCol) => {
+            const x = sx * scale;
+            const y = sy * scale;
+            const r = Math.max(4, radPx * scale);
+            if (x + r < 0 || x - r > lw || y + r < 0 || y - r > lh) return;
+            const g = lctx.createRadialGradient(x, y, r * 0.05, x, y, r);
+            g.addColorStop(0.0, innerCol);
+            g.addColorStop(0.48, midCol);
+            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            lctx.fillStyle = g;
+            lctx.beginPath();
+            lctx.arc(x, y, r, 0, Math.PI * 2);
+            lctx.fill();
+        };
+
+        const addHeadlightCone = (sx, sy, angle, lenPx, spreadRad, innerCol, midCol) => {
+            const x0 = sx * scale;
+            const y0 = sy * scale;
+            const len = Math.max(12, lenPx * scale);
+            const x1 = x0 + Math.cos(angle) * len;
+            const y1 = y0 + Math.sin(angle) * len;
+            const g = lctx.createLinearGradient(x0, y0, x1, y1);
+            g.addColorStop(0.0, innerCol);
+            g.addColorStop(0.45, midCol);
+            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            lctx.fillStyle = g;
+            lctx.beginPath();
+            lctx.moveTo(x0, y0);
+            lctx.arc(x0, y0, len, angle - spreadRad, angle + spreadRad);
+            lctx.closePath();
+            lctx.fill();
+        };
+
+        // Collect crisp flares (streetlamp bulbs, dual headlight bulbs, red taillights) for the high-res pass
+        const highResFlares = [];
+        const highResCones = [];
+
+        // 2. Streetlamps & Ocean Drive Neon Boulevard Lights (anchored to world sidewalks)
+        if (this.map && this.map.cmpLoaded) {
+            const cBx = Math.floor(this.camX / TILE_SIZE);
+            const cBy = Math.floor(this.camY / TILE_SIZE);
+            const minBX = Math.max(2, cBx - 12);
+            const maxBX = Math.min(253, cBx + 12);
+            const minBY = Math.max(2, cBy - 9);
+            const maxBY = Math.min(253, cBy + 9);
+
+            for (let by = minBY; by <= maxBY; by++) {
+                if (by % 3 !== 0) continue;
+                for (let bx = minBX; bx <= maxBX; bx++) {
+                    if (bx % 3 !== 0) continue;
+                    const nav = this.map.getNavigationBlock(bx, by, this.camZBlocks);
+                    if (!nav || nav.groundType !== GROUND_TYPE.PAWEMENT) continue;
+
+                    // Place streetlamps along road curbs & Ocean Drive / Lummus Park promenade
+                    const nRoad =
+                        (this.map.getNavigationBlock(bx + 1, by, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
+                        (this.map.getNavigationBlock(bx - 1, by, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
+                        (this.map.getNavigationBlock(bx, by + 1, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
+                        (this.map.getNavigationBlock(bx, by - 1, this.camZBlocks)?.groundType === GROUND_TYPE.ROAD) ||
+                        (bx >= 213 && bx <= 221);
+                    if (!nRoad) continue;
+
+                    const wx = (bx + 0.5) * TILE_SIZE;
+                    const wy = (by + 0.5) * TILE_SIZE;
+                    const wz = this.map.getHeightAtPixel(wx, wy, this.camZBlocks) + 0.16;
+                    const sc = this.worldToScreen(wx, wy, wz);
+                    if (sc.x < -140 || sc.x > W + 140 || sc.y < -140 || sc.y > H + 140) continue;
+                    const pxScale = (sc.scale * H) / 128.0;
+
+                    const isViceNeonZone = bx >= 202 && bx <= 224;
+                    if (isViceNeonZone) {
+                        const bucket = (bx + by) % 3;
+                        if (bucket === 0) {
+                            addLightPool(sc.x, sc.y, 72 * pxScale, "rgba(255, 75, 175, 0.88)", "rgba(215, 35, 130, 0.36)");
+                            highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(255, 110, 195, 0.72)" });
+                        } else if (bucket === 1) {
+                            addLightPool(sc.x, sc.y, 72 * pxScale, "rgba(45, 235, 255, 0.85)", "rgba(10, 155, 220, 0.34)");
+                            highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(90, 245, 255, 0.72)" });
+                        } else {
+                            addLightPool(sc.x, sc.y, 74 * pxScale, "rgba(255, 205, 125, 0.90)", "rgba(235, 145, 55, 0.38)");
+                            highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(255, 225, 155, 0.75)" });
+                        }
+                    } else {
+                        addLightPool(sc.x, sc.y, 70 * pxScale, "rgba(255, 200, 125, 0.86)", "rgba(215, 135, 50, 0.35)");
+                        highResFlares.push({ x: sc.x, y: sc.y, r: 8 * pxScale, col: "rgba(255, 220, 150, 0.70)" });
+                    }
+                }
+            }
+        }
+
+        // 3. Enterable Venue Neon Signs, Pay 'n' Sprays & Ringing Payphones
+        if (Array.isArray(this.map.interiors)) {
+            const pulse = 0.92 + Math.sin(this.time * 5.0) * 0.08;
+            for (const intr of this.map.interiors) {
+                const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.12;
+                const sc = this.worldToScreen(intr.doorX, intr.doorY, dz);
+                if (sc.x < -180 || sc.x > W + 180 || sc.y < -180 || sc.y > H + 180) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                addLightPool(sc.x, sc.y, 105 * pxScale * pulse, "rgba(255, 65, 185, 0.95)", "rgba(0, 220, 255, 0.42)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 22 * pxScale, col: "rgba(255, 80, 190, 0.55)" });
+            }
+        }
+        if (Array.isArray(this.map.payNSprays)) {
+            for (const pns of this.map.payNSprays) {
+                const cx = pns.x + pns.w * 0.5;
+                const cy = pns.y + pns.h * 0.5;
+                const sc = this.worldToScreen(cx, cy, 2.1);
+                if (sc.x < -140 || sc.x > W + 140 || sc.y < -140 || sc.y > H + 140) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                addLightPool(sc.x, sc.y, 82 * pxScale, "rgba(57, 255, 20, 0.85)", "rgba(16, 185, 129, 0.34)");
+            }
+        }
+        if (game.missions && Array.isArray(game.missions.payphones)) {
+            for (const ph of game.missions.payphones) {
+                if (ph.completed) continue;
+                const sc = this.worldToScreen(ph.x, ph.y, this.getEntityZ(ph, 0.08));
+                if (sc.x < -80 || sc.x > W + 80 || sc.y < -80 || sc.y > H + 80) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                addLightPool(sc.x, sc.y, 42 * pxScale, "rgba(80, 255, 120, 0.80)", "rgba(20, 180, 90, 0.28)");
+            }
+        }
+
+        // 4. Lucia & Jason Subtle Visibility Halo (plus Muzzle Flash light when firing!)
+        const p = game.player;
+        if (p && !p.dead) {
+            const pSc = this.worldToScreen(p.x, p.y, this.getEntityZ(p, 0.08));
+            const pScale = (pSc.scale * H) / 128.0;
+            addLightPool(pSc.x, pSc.y, 76 * pScale, "rgba(175, 198, 245, 0.65)", "rgba(95, 125, 190, 0.25)");
+            if ((p.muzzleTimer || 0) > 0) {
+                const mx = p.x + Math.cos(p.angle) * 14;
+                const my = p.y + Math.sin(p.angle) * 14;
+                const mSc = this.worldToScreen(mx, my, this.getEntityZ(p, 0.12));
+                addLightPool(mSc.x, mSc.y, 115 * pScale, "rgba(255, 220, 110, 1.0)", "rgba(255, 130, 30, 0.55)");
+                highResFlares.push({ x: mSc.x, y: mSc.y, r: 18 * pScale, col: "rgba(255, 230, 120, 0.90)" });
+            }
+        }
+        if (game.jason && !game.jason.inVehicle) {
+            const jSc = this.worldToScreen(game.jason.x, game.jason.y, this.getEntityZ(game.jason, 0.08));
+            const jScale = (jSc.scale * H) / 128.0;
+            addLightPool(jSc.x, jSc.y, 54 * jScale, "rgba(155, 185, 235, 0.48)", "rgba(80, 110, 175, 0.18)");
+            if ((game.jason.muzzleTimer || 0) > 0) {
+                addLightPool(jSc.x, jSc.y, 105 * jScale, "rgba(255, 215, 100, 0.95)", "rgba(255, 125, 25, 0.50)");
+            }
+        }
+
+        // 5. Vehicle Conical Headlights, Red Taillights & Flashing Police/Emergency Sirens!
+        for (const v of game.vehicles) {
+            const vz = this.getEntityZ(v, 0.08) + (v.stuntZOffset || 0);
+            const sc = this.worldToScreen(v.x, v.y, vz);
+            if (sc.x < -260 || sc.x > W + 260 || sc.y < -260 || sc.y > H + 260) continue;
+            const pxScale = (sc.scale * H) / 128.0;
+
+            if (v.destroyed || (v.burnTimer || 0) > 0) {
+                const flick = 0.88 + Math.sin(this.time * 22 + v.x) * 0.12;
+                addLightPool(sc.x, sc.y, 110 * pxScale * flick, "rgba(255, 165, 50, 0.95)", "rgba(235, 65, 15, 0.45)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 26 * pxScale, col: "rgba(255, 140, 35, 0.65)" });
+                continue;
+            }
+
+            const hasHeadlights = Boolean(
+                v.driver ||
+                v.sirenActive ||
+                v === game.scurveHeroCar ||
+                v.missionTag === "LANDMARK"
+            );
+            if (!hasHeadlights) continue;
+
+            const cosA = Math.cos(v.angle);
+            const sinA = Math.sin(v.angle);
+            const frontDist = (v.w || 48) * 0.46;
+            const rearDist = -(v.w || 48) * 0.46;
+            const latSpread = v.isMotorcycle ? 0 : ((v.h || 24) * 0.32);
+            const beamAng = v.angle + (v.steerAngleRad || 0) * 0.42;
+
+            // Warm ambient glow around the vehicle chassis
+            addLightPool(sc.x, sc.y, 38 * pxScale, "rgba(200, 215, 255, 0.42)", "rgba(100, 130, 190, 0.15)");
+
+            // Front Bumper Center in Screen Space
+            const fxWorld = v.x + cosA * frontDist;
+            const fyWorld = v.y + sinA * frontDist;
+            const fSc = this.worldToScreen(fxWorld, fyWorld, vz);
+
+            // Long Conical Headlight Beam illuminating the road, traffic & pedestrians ahead!
+            const beamLen = (v.isMotorcycle ? 140 : (v.driver === "PLAYER" ? 185 : 158)) * pxScale;
+            const coneSpread = v.isMotorcycle ? 0.24 : 0.34;
+            addHeadlightCone(
+                fSc.x,
+                fSc.y,
+                beamAng,
+                beamLen,
+                coneSpread,
+                "rgba(255, 250, 225, 0.98)",
+                "rgba(215, 232, 255, 0.52)"
+            );
+            highResCones.push({
+                x: fSc.x,
+                y: fSc.y,
+                angle: beamAng,
+                len: beamLen * 0.92,
+                spread: coneSpread * 0.85,
+                col0: "rgba(255, 250, 220, 0.26)",
+                col1: "rgba(180, 220, 255, 0.08)"
+            });
+
+            // Dual Front Headlight Bulbs (or Single Motorcycle Bulb)
+            const headOffsets = v.isMotorcycle ? [0] : [-latSpread, latSpread];
+            for (const lat of headOffsets) {
+                const hx = v.x + cosA * frontDist - sinA * lat;
+                const hy = v.y + sinA * frontDist + cosA * lat;
+                const hSc = this.worldToScreen(hx, hy, vz);
+                highResFlares.push({
+                    x: hSc.x,
+                    y: hSc.y,
+                    r: (v.isMotorcycle ? 6.5 : 5.8) * pxScale,
+                    col: "rgba(255, 252, 230, 0.95)"
+                });
+            }
+
+            // Rear Red Taillights / Brake Lights
+            const isBraking =
+                (v.driver === "PLAYER" && (game.input.down || game.input.handbrake)) ||
+                v.aiState === "STOPPED_LIGHT";
+            const rxWorld = v.x + cosA * rearDist;
+            const ryWorld = v.y + sinA * rearDist;
+            const rSc = this.worldToScreen(rxWorld, ryWorld, vz);
+            addLightPool(
+                rSc.x,
+                rSc.y,
+                (isBraking ? 34 : 22) * pxScale,
+                isBraking ? "rgba(255, 40, 65, 0.88)" : "rgba(235, 30, 55, 0.58)",
+                "rgba(180, 15, 35, 0.22)"
+            );
+            for (const lat of headOffsets) {
+                const tx = v.x + cosA * rearDist - sinA * lat;
+                const ty = v.y + sinA * rearDist + cosA * lat;
+                const tSc = this.worldToScreen(tx, ty, vz);
+                highResFlares.push({
+                    x: tSc.x,
+                    y: tSc.y,
+                    r: (isBraking ? 5.5 : 4.2) * pxScale,
+                    col: isBraking ? "rgba(255, 45, 70, 0.96)" : "rgba(255, 30, 55, 0.78)"
+                });
+            }
+
+            // Flashing VCPD Police / Ambulance / Fire Truck Roof Strobe Lights!
+            if (v.isEmergency && v.sirenActive) {
+                const sPhase = this.time * 15.0 + (v.sirenPhase || 0);
+                const redOn = Math.sin(sPhase) >= 0;
+                const lOff = -6.0;
+                const rOff = 6.0;
+                const lx = v.x - sinA * lOff;
+                const ly = v.y + cosA * lOff;
+                const rx = v.x - sinA * rOff;
+                const ry = v.y + cosA * rOff;
+                const lSc = this.worldToScreen(lx, ly, vz + 0.04);
+                const rScSiren = this.worldToScreen(rx, ry, vz + 0.04);
+
+                if (redOn) {
+                    addLightPool(lSc.x, lSc.y, 128 * pxScale, "rgba(255, 35, 75, 0.96)", "rgba(220, 15, 50, 0.42)");
+                    highResFlares.push({ x: lSc.x, y: lSc.y, r: 22 * pxScale, col: "rgba(255, 40, 80, 0.85)" });
+                } else {
+                    addLightPool(rScSiren.x, rScSiren.y, 128 * pxScale, "rgba(30, 165, 255, 0.96)", "rgba(10, 95, 235, 0.42)");
+                    highResFlares.push({ x: rScSiren.x, y: rScSiren.y, r: 22 * pxScale, col: "rgba(45, 185, 255, 0.85)" });
+                }
+            }
+        }
+
+        // 6. Street Fires, Rockets, Flamethrower Streams & Explosions
+        if (Array.isArray(this.map.streetFires)) {
+            for (const sf of this.map.streetFires) {
+                const sc = this.worldToScreen(sf.x, sf.y, this.getEntityZ(sf, 0.08));
+                if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                const flick = 0.9 + Math.sin(this.time * 18 + sf.x) * 0.1;
+                addLightPool(sc.x, sc.y, 92 * pxScale * flick, "rgba(255, 170, 55, 0.95)", "rgba(235, 75, 20, 0.42)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 18 * pxScale, col: "rgba(255, 150, 40, 0.65)" });
+            }
+        }
+        for (const pr of game.projectiles) {
+            if (!pr.isFlame && !pr.isRocket) continue;
+            const sc = this.worldToScreen(pr.x, pr.y, this.camZBlocks + 0.15);
+            const pxScale = (sc.scale * H) / 128.0;
+            addLightPool(sc.x, sc.y, 68 * pxScale, "rgba(255, 185, 65, 0.92)", "rgba(240, 85, 20, 0.40)");
+        }
+        for (const pt of game.particles) {
+            if (pt.kind !== "EXPLOSION" && pt.kind !== "FIRE") continue;
+            const sc = this.worldToScreen(pt.x, pt.y, this.camZBlocks + 0.12);
+            const pxScale = (sc.scale * H) / 128.0;
+            const rad = (pt.kind === "EXPLOSION" ? 135 : 65) * pxScale;
+            addLightPool(sc.x, sc.y, rad, "rgba(255, 190, 75, 0.95)", "rgba(240, 80, 20, 0.42)");
+        }
+
+        lctx.restore();
+
+        // 7. Composite Pass 1: Multiply Darkness & Light Mask over WebGL 3D Scene
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.globalCompositeOperation = "multiply";
+        ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+
+        // 8. Composite Pass 2: Soft Atmospheric Screen Bloom + High-Res Headlight Beams & Lens Flares
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.28;
+        ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 1.0;
+
+        for (const c of highResCones) {
+            const x1 = c.x + Math.cos(c.angle) * c.len;
+            const y1 = c.y + Math.sin(c.angle) * c.len;
+            const g = ctx.createLinearGradient(c.x, c.y, x1, y1);
+            g.addColorStop(0.0, c.col0);
+            g.addColorStop(0.55, c.col1);
+            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y);
+            ctx.arc(c.x, c.y, c.len, c.angle - c.spread, c.angle + c.spread);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        for (const f of highResFlares) {
+            const r = Math.max(2, f.r);
+            const g = ctx.createRadialGradient(f.x, f.y, r * 0.1, f.x, f.y, r);
+            g.addColorStop(0.0, "#ffffff");
+            g.addColorStop(0.35, f.col);
+            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
     }
 
     /* ========================================================================
