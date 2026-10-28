@@ -290,6 +290,24 @@ class LeonidaMap {
             }
         }
 
+        // Lummus Park Tropical Greenbelt Lawn along Ocean Drive (cx = 219..220, ry = 60..190):
+        // Lush St. Augustine tropical grass lawn between Ocean Drive's palm-lined sidewalk (cx = 218) and Vice Beach (cx >= 221),
+        // with coral-stone beach access footpaths at every cross-street (ry % 8 === 0)!
+        const cleanGrassBlkIdx = 10; // Block 10 in gta1_map.bin is (80, 0, 0, 0, 0, 0, 10) -> clean lid 10 grass!
+        for (let ry = 60; ry <= 190; ry++) {
+            if (ry % 8 === 0) continue;
+            for (let cx = 219; cx <= 220; cx++) {
+                const g2 = (2 * MAP_ROWS + ry) * MAP_COLS + cx;
+                const b2 = this.blocksData[this.voxelGrid[g2]];
+                if (b2 && b2.lid !== 0) continue;
+                const g1 = (1 * MAP_ROWS + ry) * MAP_COLS + cx;
+                const b1 = this.blocksData[this.voxelGrid[g1]];
+                if (b1 && (b1.lid === 8 || b1.lid === 9)) {
+                    this.voxelGrid[g1] = cleanGrassBlkIdx;
+                }
+            }
+        }
+
         // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
         // Enriches penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
         // and 3ds Max Glass Skylight Atriums (lid 31) while preserving 100% of their 3D side walls (w, e, n, s)!

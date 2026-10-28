@@ -161,8 +161,9 @@ class RetroRenderer {
                     c.rgb = mix(c.rgb, crestFoam, caust * 0.15 * (1.0 - uNightTint * 0.65));
                     c.a = 0.78;
                 } else if (vAnim > -0.5 && vAnim < 0.5 && vWorldPos.y < 2.2) {
-                    // World-space multi-block Miami beach sand wind-ripples & coastal dune relief (100% continuous & non-repeating across block boundaries!)
+                    // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
                     float isSand = clamp((c.r - c.b - 0.18) * 7.5, 0.0, 1.0) * step(0.72, c.r);
+                    float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
                     if (isSand > 0.01) {
                         float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
                         float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
@@ -173,6 +174,16 @@ class RetroRenderer {
                         vec3 sandTrough = vec3(0.84, 0.69, 0.45);
                         vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
                         c.rgb = mix(c.rgb, targetSand, isSand * 0.36);
+                    } else if (isGrass > 0.01) {
+                        float gWarp = sin(vWorldPos.z * 1.61 - vWorldPos.x * 0.97) * 0.75;
+                        float g1 = sin(vWorldPos.x * 5.17 + vWorldPos.z * 3.43 + gWarp);
+                        float g2 = cos(vWorldPos.x * 13.89 - vWorldPos.z * 9.23 + sin(vWorldPos.z * 2.71) * 0.6);
+                        float g3 = sin(vWorldPos.x * 27.7 + vWorldPos.z * 19.3);
+                        float turfWave = (g1 * 0.50 + g2 * 0.34 + g3 * 0.16) * isGrass;
+                        vec3 turfShadow = vec3(0.09, 0.42, 0.18);
+                        vec3 turfSunlit = vec3(0.42, 0.81, 0.36);
+                        vec3 targetTurf = mix(turfShadow, turfSunlit, clamp(0.52 + turfWave * 0.26, 0.0, 1.0));
+                        c.rgb = mix(c.rgb, targetTurf, isGrass * 0.34);
                     }
                 }
 
@@ -605,7 +616,7 @@ class RetroRenderer {
                 }
 
                 // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_07", () => {
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_08", () => {
                     if (this.gl) {
                         this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
                         if (this.mapStyle === "NYC") {
@@ -653,34 +664,34 @@ class RetroRenderer {
             return run();
         };
 
-        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_07", () => {
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_08", () => {
             viceTilesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_07", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_08", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_07", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_08", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_07", () => {
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_08", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_07", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_08", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_07", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_08", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
