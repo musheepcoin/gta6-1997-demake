@@ -1662,6 +1662,15 @@ class LeonidaMap {
             minElev = 0.0;
             maxElev = 1.0;
             lerpFactor = cx;
+        } else if (slopeType >= 49 && slopeType <= 52) {
+            // BilinearLid (gta2-rtx-remix dll/src/ground.cpp): 4-corner bilinear interpolation for corner ramps (49..52)
+            const hNW = slopeType === 49 ? 0.0 : 1.0;
+            const hNE = slopeType === 50 ? 0.0 : 1.0;
+            const hSW = slopeType === 51 ? 0.0 : 1.0;
+            const hSE = slopeType === 52 ? 0.0 : 1.0;
+            const north = hNW + (hNE - hNW) * cx;
+            const south = hSW + (hSE - hSW) * cx;
+            return north + (south - north) * cy;
         } else {
             return 0.0;
         }

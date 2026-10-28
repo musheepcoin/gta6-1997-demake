@@ -139,17 +139,45 @@ class RetroRenderer {
             uniform float uSunsetTint;
             uniform float uViceStyle;
             uniform float uTime;
+            uniform vec2 uSunDir;
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 if (c.a < 0.1) discard;
-                if (vAnim > 0.5 && vAnim < 1.5) {
-                    // Inspired by gta2-rtx-remix AddRiverbed: Translucent turquoise water with shimmering underwater sandy seabed caustics!
+
+                // 1. AddRiverbed (world_mesh.cpp): 3D Sunken Sandy Seabed Floor (vAnim == 3.0) & Translucent Water Surface (vAnim == 1.0)
+                if (vAnim > 2.5 && vAnim < 3.5) {
+                    // Sunken 3D sandy seabed floor 0.42 blocks beneath the water surface with refracted underwater caustics!
+                    float w1 = sin(vWorldPos.x * 4.2 + uTime * 2.3) * cos(vWorldPos.z * 4.2 - uTime * 1.8);
+                    float w2 = sin((vWorldPos.x + vWorldPos.z) * 3.1 - uTime * 2.7);
+                    float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
+                    vec3 submergedSand = c.rgb * vec3(0.45, 0.78, 0.86) + vec3(0.28, 0.34, 0.22) * caust * (1.0 - uNightTint * 0.7);
+                    c.rgb = submergedSand;
+                } else if (vAnim > 0.5 && vAnim < 1.5) {
+                    // Translucent animated turquoise water surface (alpha = 0.78) revealing the 3D sunken seabed with parallax!
                     float w1 = sin(vUV.x * 220.0 + uTime * 2.3) * cos(vUV.y * 220.0 - uTime * 1.8);
                     float w2 = sin((vUV.x + vUV.y) * 160.0 - uTime * 2.7);
                     float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
-                    vec3 sandReef = vec3(0.92, 0.84, 0.56);
-                    c.rgb = mix(c.rgb, sandReef, caust * 0.16 * (1.0 - uNightTint * 0.65));
+                    vec3 crestFoam = vec3(0.88, 0.96, 0.98);
+                    c.rgb = mix(c.rgb, crestFoam, caust * 0.15 * (1.0 - uNightTint * 0.65));
+                    c.a = 0.78;
                 }
+
+                // 2. 3D Cardinal Wall Normals, Solar Directional Shading & Ground-Contact Ambient Occlusion (world_mesh.cpp)
+                if (vAnim < -0.5) {
+                    vec2 wallNormal = vec2(0.0, 1.0);
+                    if (vAnim > -1.5) wallNormal = vec2(-1.0, 0.0);      // West wall (-1.0)
+                    else if (vAnim > -2.5) wallNormal = vec2(1.0, 0.0);  // East wall (-2.0)
+                    else if (vAnim > -3.5) wallNormal = vec2(0.0, -1.0); // North wall (-3.0)
+                    else wallNormal = vec2(0.0, 1.0);                    // South wall (-4.0)
+
+                    float sunDot = dot(wallNormal, uSunDir);
+                    float dirShade = 1.0 + sunDot * 0.14 * (1.0 - uNightTint * 0.75);
+                    // Subtle Ground-Contact Ambient Occlusion at the base of each 3D building storey
+                    float storeyY = fract(vWorldPos.y);
+                    float baseAO = mix(0.84, 1.0, smoothstep(0.0, 0.32, storeyY));
+                    c.rgb = min(vec3(1.0), c.rgb * dirShade * baseAO);
+                }
+
                 if (uSunsetTint > 0.01) {
                     // Warm Vice City Golden-Pink Sunset & Atlantic Sunrise glow
                     vec3 sunsetCol = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
@@ -181,6 +209,9 @@ class RetroRenderer {
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal navy
                         nightRgb = c.rgb * vec3(0.42, 0.52, 0.78);
+                    } else if (vAnim > 2.5 && vAnim < 3.5) {
+                        // Sunken seabed at night
+                        nightRgb = c.rgb * vec3(0.35, 0.45, 0.70);
                     } else {
                         // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops):
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!)
@@ -236,7 +267,8 @@ class RetroRenderer {
             uNightTint: gl.getUniformLocation(this.cityProg, "uNightTint"),
             uSunsetTint: gl.getUniformLocation(this.cityProg, "uSunsetTint"),
             uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle"),
-            uTime: gl.getUniformLocation(this.cityProg, "uTime")
+            uTime: gl.getUniformLocation(this.cityProg, "uTime"),
+            uSunDir: gl.getUniformLocation(this.cityProg, "uSunDir")
         };
 
         this.spriteProg = this.createProgram(gl, spriteVS, spriteFS);
@@ -561,7 +593,12 @@ class RetroRenderer {
 
     /* ========================================================================
        2. BUILD 3D NYC.CMP CITYMESH (16x16 CHUNKS OF 16x16x6 VOXEL BLOCKS)
-       Direct Port of GameMapHelpers::BuildMapMesh & PutBlockFace (lines 61-255)
+       Enhanced with gebdag/gta2-rtx-remix src/world_mesh.cpp:
+       - AddRiverbed: 3D Sunken Sandy Seabed Floor (-0.42 blocks) + Translucent 3D Water Surface
+       - AddDiagonalBlock (slopes 45..48), AddCornerRampBlock (slopes 49..52), AddPartialBlock (slopes 53..61)
+       - SlopedWallUvs: Proportional top-edge UV cropping on sloped ramp walls (no vertical texture squashing)
+       - kFlatFaceOffset: Outward normal offset on flat panels to eliminate 3D Z-fighting
+       - 3D Cardinal Wall Normals (-1..-4) for live Solar Azimuth Directional Lighting & Ground-Contact AO
        ======================================================================== */
     buildCityMesh() {
         const gl = this.gl;
@@ -575,6 +612,19 @@ class RetroRenderer {
 
         const CHUNK_SIZE = 16;
         const NUM_CHUNKS = 16; // 16 * 16 = 256
+        const RIVERBED_DEPTH = 0.42; // kDefaultRiverbedDepth from world_mesh.cpp
+
+        // Compute UV bounds for golden sandy seabed tile (lid 98 in 16x51 tile atlas)
+        const tiles = this.gta1Meta.tiles;
+        const bedAtlasIdx = (tiles.lid_start || 390) + (98 % (tiles.lid_count || 154));
+        const bedCol = bedAtlasIdx % 16;
+        const bedRow = Math.floor(bedAtlasIdx / 16);
+        const padU = 0.25 / 1024.0;
+        const padV = 0.25 / 3264.0;
+        const bedU0 = bedCol / 16.0 + padU;
+        const bedU1 = (bedCol + 1.0) / 16.0 - padU;
+        const bedV0 = bedRow / 51.0 + padV;
+        const bedV1 = (bedRow + 1.0) / 51.0 - padV;
 
         for (let cy = 0; cy < NUM_CHUNKS; cy++) {
             for (let cx = 0; cx < NUM_CHUNKS; cx++) {
@@ -584,6 +634,44 @@ class RetroRenderer {
                 const x0 = cx * CHUNK_SIZE;
                 const y0 = cy * CHUNK_SIZE;
 
+                // 1. AddRiverbed (world_mesh.cpp lines 1016-1054):
+                // Emit a 3D sunken sandy seabed quad (y_elev - 0.42) under every water cell and its 1-cell shore neighbors (kRiverbedPad = 1)
+                for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
+                    for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
+                        let waterFloor = null;
+                        for (let dy = -1; dy <= 1 && waterFloor === null; dy++) {
+                            const ny = y + dy;
+                            if (ny < 0 || ny >= 256) continue;
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const nx = x + dx;
+                                if (nx < 0 || nx >= 256) continue;
+                                for (let wz = 0; wz < 3; wz++) {
+                                    const wBlkIdx = this.map.getBlockIndex(nx, ny, wz);
+                                    if (wBlkIdx === 0) continue;
+                                    const wb = this.map.getBlockInfo(wBlkIdx);
+                                    if (wb && wb.faces[4] === 41) {
+                                        waterFloor = wz + 1.0 - RIVERBED_DEPTH;
+                                        break;
+                                    }
+                                }
+                                if (waterFloor !== null) break;
+                            }
+                        }
+                        if (waterFloor !== null) {
+                            // Two triangles forming the sunken 3D seabed quad at (x..x+1, waterFloor, y..y+1) with animType = 3.0
+                            opaqueVerts.push(
+                                x,     waterFloor, y,     bedU0, bedV0, 3.0,
+                                x,     waterFloor, y + 1, bedU0, bedV1, 3.0,
+                                x + 1, waterFloor, y,     bedU1, bedV0, 3.0,
+                                x + 1, waterFloor, y,     bedU1, bedV0, 3.0,
+                                x,     waterFloor, y + 1, bedU0, bedV1, 3.0,
+                                x + 1, waterFloor, y + 1, bedU1, bedV1, 3.0
+                            );
+                        }
+                    }
+                }
+
+                // 2. Emit 3D Voxel Block Faces (routing animated water lids face===4 && tile===41 to flatVerts so they blend translucently over the 3D seabed!)
                 for (let z = 0; z < MAP_LAYERS; z++) {
                     for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
                         for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
@@ -592,9 +680,10 @@ class RetroRenderer {
                             const b = this.map.getBlockInfo(blkIdx);
                             if (!b) continue;
 
-                            const targetArr = b.isFlat ? flatVerts : opaqueVerts;
                             for (let face = 0; face < 5; face++) {
                                 if (b.faces[face] !== 0) {
+                                    const isWaterLid = (face === 4 && b.faces[4] === 41);
+                                    const targetArr = (b.isFlat || isWaterLid) ? flatVerts : opaqueVerts;
                                     this.putBlockFace(targetArr, x, z, y, face, b);
                                 }
                             }
@@ -633,21 +722,44 @@ class RetroRenderer {
         const tileIdx = b.faces[face];
         if (tileIdx === 0) return;
 
-        // 8 corners of the unit voxel block in 3D block coordinates:
-        // X: East [x .. x+1], Y: Elevation [y_elev .. y_elev+1], Z: South [z_south .. z_south+1]
+        const st = b.slopeType || 0;
+
+        // 1. AddPartialBlock (world_mesh.cpp lines 776-855): Partial footprint slabs, pillars & corner posts (slopeType 53..61)
+        let x0 = 0.0, x1 = 1.0, z0 = 0.0, z1 = 1.0;
+        if (st >= 53 && st <= 61) {
+            const lo = 0.25, hi = 0.75;
+            switch (st) {
+                case 53: x1 = lo; break;                       // West slab
+                case 54: x0 = hi; break;                       // East slab
+                case 55: z1 = lo; break;                       // North slab
+                case 56: z0 = hi; break;                       // South slab
+                case 57: x1 = lo; z1 = lo; break;              // NW corner post
+                case 58: x0 = hi; z1 = lo; break;              // NE corner post
+                case 59: x0 = hi; z0 = hi; break;              // SE corner post
+                case 60: x1 = lo; z0 = hi; break;              // SW corner post
+                default: x0 = lo; x1 = hi; z0 = lo; z1 = hi; break; // 61: Centered pillar
+            }
+        }
+
+        const xW = x + x0;
+        const xE = x + x1;
+        const zN = z_south + z0;
+        const zS = z_south + z1;
+
+        // 8 corners of the voxel block in 3D block coordinates:
+        // X: East [xW .. xE], Y: Elevation [y_elev .. y_elev+1], Z: South [zN .. zS]
         const p = [
-            [x,     y_elev + 1.0, z_south],     // 0: Top-NW
-            [x + 1, y_elev + 1.0, z_south],     // 1: Top-NE
-            [x,     y_elev,       z_south],     // 2: Bot-NW
-            [x + 1, y_elev,       z_south],     // 3: Bot-NE
-            [x,     y_elev + 1.0, z_south + 1], // 4: Top-SW
-            [x + 1, y_elev + 1.0, z_south + 1], // 5: Top-SE
-            [x,     y_elev,       z_south + 1], // 6: Bot-SW
-            [x + 1, y_elev,       z_south + 1]  // 7: Bot-SE
+            [xW, y_elev + 1.0, zN], // 0: Top-NW
+            [xE, y_elev + 1.0, zN], // 1: Top-NE
+            [xW, y_elev,       zN], // 2: Bot-NW
+            [xE, y_elev,       zN], // 3: Bot-NE
+            [xW, y_elev + 1.0, zS], // 4: Top-SW
+            [xE, y_elev + 1.0, zS], // 5: Top-SE
+            [xW, y_elev,       zS], // 6: Bot-SW
+            [xE, y_elev,       zS]  // 7: Bot-SE
         ];
 
-        // Exact 44 slope vertex adjustments from GameMapHelpers.cpp (lines 82-182)
-        const st = b.slopeType;
+        // 2. Ramp & Corner-Ramp vertex adjustments (GameMapHelpers.cpp + world_mesh.cpp AddCornerRampBlock)
         if (st > 0 && st < 45) {
             switch (st) {
                 case 1:
@@ -723,11 +835,47 @@ class RetroRenderer {
                     p[0][1] -= 1.0; p[4][1] -= 1.0;
                     break;
             }
+        } else if (st >= 49 && st <= 52) {
+            // AddCornerRampBlock (world_mesh.cpp lines 659-767): Single-corner chamfer ramps
+            if (st === 49) p[0][1] -= 1.0;      // NW corner drops
+            else if (st === 50) p[1][1] -= 1.0; // NE corner drops
+            else if (st === 51) p[4][1] -= 1.0; // SW corner drops
+            else if (st === 52) p[5][1] -= 1.0; // SE corner drops
         }
 
-        // Select quad corner vertex indices (GameMapHelpers.cpp lines 184-213)
+        // 3. Select quad corner vertex indices + AddDiagonalBlock (slopes 45..48 from world_mesh.cpp lines 572-641)
         let qi;
-        if (b.isFlat) {
+        if (st >= 45 && st <= 48 && !b.isFlat) {
+            if (st === 45) {
+                // Solid E & S, diagonal cut faces NW (NE -> SW)
+                if (face === 2) return;
+                if (face === 0) qi = [4, 1, 6, 3];
+                else if (face === 1) qi = [1, 5, 3, 7];
+                else if (face === 3) qi = [5, 4, 7, 6];
+                else qi = [1, 1, 4, 5]; // Triangular lid dropping NW
+            } else if (st === 46) {
+                // Solid W & S, diagonal cut faces NE (NW -> SE)
+                if (face === 2) return;
+                if (face === 0) qi = [4, 0, 6, 2];
+                else if (face === 1) qi = [0, 5, 2, 7];
+                else if (face === 3) qi = [5, 4, 7, 6];
+                else qi = [0, 0, 4, 5]; // Triangular lid dropping NE
+            } else if (st === 47) {
+                // Solid E & N, diagonal cut faces SW (NW -> SE)
+                if (face === 3) return;
+                if (face === 0) qi = [5, 0, 7, 2];
+                else if (face === 1) qi = [1, 5, 3, 7];
+                else if (face === 2) qi = [0, 1, 2, 3];
+                else qi = [0, 1, 5, 5]; // Triangular lid dropping SW
+            } else {
+                // st === 48: Solid W & N, diagonal cut faces SE (NE -> SW)
+                if (face === 3) return;
+                if (face === 0) qi = [4, 0, 6, 2];
+                else if (face === 1) qi = [1, 4, 3, 6];
+                else if (face === 2) qi = [0, 1, 2, 3];
+                else qi = [0, 1, 4, 4]; // Triangular lid dropping SE
+            }
+        } else if (b.isFlat) {
             if (face === 0) qi = [4, 0, 6, 2];      // W
             else if (face === 1) qi = [0, 4, 2, 6]; // E drawn at W plane when flat
             else if (face === 2) qi = [0, 1, 2, 3]; // N
@@ -762,8 +910,8 @@ class RetroRenderer {
         let animType = 0.0;
 
         if (face < 4) {
-            // Side face (0..194) — mark animType = -1.0 so cityFS knows this is a vertical 3D building wall
-            animType = -1.0;
+            // Side face (0..194) — encode cardinal wall direction (-1:W, -2:E, -3:N, -4:S) for 3D solar shading & emissive windows!
+            animType = -(face + 1.0);
             const base = b.isFlat ? (tiles.side_flat_start || 195) : (tiles.side_start || 0);
             atlasIdx = base + (tileIdx % tiles.side_count);
         } else {
@@ -788,7 +936,7 @@ class RetroRenderer {
 
         const col = atlasIdx % 16;
         const row = Math.floor(atlasIdx / 16);
-        // Inset UV by 0.25 texels to prevent mip/edge bleeding at perspective angles
+        // Inset UV by 0.25 texels to prevent mip/edge bleeding at perspective angles (kUvInset from world_mesh.cpp)
         const padU = 0.25 / 1024.0;
         const padV = 0.25 / 3264.0;
         const u0 = col / 16.0 + padU;
@@ -803,13 +951,44 @@ class RetroRenderer {
             [u1, v1]  // 3: BR
         ];
 
+        // 4. SlopedWallUvs (world_mesh.cpp lines 520-537):
+        // A wall shortened by a ramp crops the top of its tile rather than squashing the whole tile into a shorter quad!
+        const cornerUVs = [
+            [baseUV[uvIdx[0]][0], baseUV[uvIdx[0]][1]],
+            [baseUV[uvIdx[1]][0], baseUV[uvIdx[1]][1]],
+            [baseUV[uvIdx[2]][0], baseUV[uvIdx[2]][1]],
+            [baseUV[uvIdx[3]][0], baseUV[uvIdx[3]][1]]
+        ];
+        if (face < 4 && st > 0 && st <= 52) {
+            const hTop0 = Math.max(0.0, Math.min(1.0, p[qi[0]][1] - y_elev));
+            const hTop1 = Math.max(0.0, Math.min(1.0, p[qi[1]][1] - y_elev));
+            if (hTop0 < 0.999) {
+                cornerUVs[0][1] = cornerUVs[2][1] + (cornerUVs[0][1] - cornerUVs[2][1]) * hTop0;
+            }
+            if (hTop1 < 0.999) {
+                cornerUVs[1][1] = cornerUVs[3][1] + (cornerUVs[1][1] - cornerUVs[3][1]) * hTop1;
+            }
+        }
+
+        // 5. kFlatFaceOffset (world_mesh.cpp line 18):
+        // Nudge flat decal faces slightly along their outward normal to prevent Z-fighting on coincident wall/floor planes!
+        let nOffX = 0.0, nOffY = 0.0, nOffZ = 0.0;
+        if (b.isFlat) {
+            const kFlatFaceOffset = 0.003;
+            if (face === 0) nOffX = -kFlatFaceOffset;
+            else if (face === 1) nOffX = kFlatFaceOffset;
+            else if (face === 2) nOffZ = -kFlatFaceOffset;
+            else if (face === 3) nOffZ = kFlatFaceOffset;
+            else nOffY = kFlatFaceOffset;
+        }
+
         // Emit 2 triangles for quad: (0, 2, 1) and (1, 2, 3)
         const triOrder = [0, 2, 1, 1, 2, 3];
         for (let k = 0; k < 6; k++) {
             const c = triOrder[k];
             const pos = p[qi[c]];
-            const uv = baseUV[uvIdx[c]];
-            verts.push(pos[0], pos[1], pos[2], uv[0], uv[1], animType);
+            const uv = cornerUVs[c];
+            verts.push(pos[0] + nOffX, pos[1] + nOffY, pos[2] + nOffZ, uv[0], uv[1], animType);
         }
     }
 
@@ -1194,6 +1373,14 @@ class RetroRenderer {
         }
         if (this.cityLocs.uTime) {
             gl.uniform1f(this.cityLocs.uTime, this.time);
+        }
+        if (this.cityLocs.uSunDir) {
+            const clockHr = (game && typeof game.worldMinutes === "number")
+                ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
+                : 12.0;
+            // Sun moves from East (+X) at 06:00 -> South (+Z) at 12:00 -> West (-X) at 18:00
+            const sunAz = ((clockHr - 6.0) / 12.0) * Math.PI;
+            gl.uniform2f(this.cityLocs.uSunDir, Math.cos(sunAz), Math.max(0.25, Math.sin(sunAz)));
         }
         gl.uniform1f(this.cityLocs.uViceStyle, this.mapStyle === "VICE" ? 1.0 : 0.0);
 
