@@ -842,36 +842,37 @@ class LeonidaGame {
 
     initYouTubeRadio() {
         this.ytSeekOffset = 0;
-        const widget = document.getElementById("yt-radio-widget");
-        const minBtn = document.getElementById("yt-btn-minimize");
-        const playBtn = document.getElementById("yt-btn-play");
-        const pauseBtn = document.getElementById("yt-btn-pause");
+        this.ytMusicEnabled = true;
+        const toggleBtn = document.getElementById("yt-btn-toggle");
         const skipBtn = document.getElementById("yt-btn-skip");
         const volSlider = document.getElementById("yt-vol-slider");
-        const urlInput = document.getElementById("yt-url-input");
-        const loadBtn = document.getElementById("yt-btn-load");
-        const led = document.getElementById("yt-radio-led");
+        const iframe = document.getElementById("yt-player-iframe");
 
-        if (minBtn && widget) {
-            minBtn.addEventListener("click", () => {
-                const collapsed = widget.classList.toggle("minimized");
-                minBtn.textContent = collapsed ? "+" : "—";
+        const tryAutoStart = () => {
+            if (!this.ytMusicEnabled) return;
+            const vol = volSlider ? (parseInt(volSlider.value, 10) || 75) : 75;
+            this.sendYouTubeCommand("unMute", []);
+            this.sendYouTubeCommand("setVolume", [vol]);
+            this.sendYouTubeCommand("playVideo", []);
+        };
+
+        if (iframe) {
+            iframe.addEventListener("load", () => {
+                setTimeout(tryAutoStart, 250);
+                setTimeout(tryAutoStart, 1000);
             });
         }
 
-        if (playBtn) {
-            playBtn.addEventListener("click", () => {
-                this.sendYouTubeCommand("playVideo", []);
-                if (this.audio) this.audio.ytRadioPlaying = true;
-                if (led) led.classList.remove("paused");
-            });
-        }
+        // Start audio automatically on first user gesture if browser blocked initial autoplay
+        const unlockOnce = () => {
+            tryAutoStart();
+        };
+        window.addEventListener("pointerdown", unlockOnce, { once: true });
+        window.addEventListener("keydown", unlockOnce, { once: true });
 
-        if (pauseBtn) {
-            pauseBtn.addEventListener("click", () => {
-                this.sendYouTubeCommand("pauseVideo", []);
-                if (this.audio) this.audio.ytRadioPlaying = false;
-                if (led) led.classList.add("paused");
+        if (toggleBtn) {
+            toggleBtn.addEventListener("click", () => {
+                this.setYouTubeMusicEnabled(!this.ytMusicEnabled);
             });
         }
 
@@ -887,18 +888,40 @@ class LeonidaGame {
                 this.sendYouTubeCommand("setVolume", [vol]);
             });
         }
+    }
 
-        if (loadBtn && urlInput) {
-            loadBtn.addEventListener("click", () => {
-                this.loadYouTubeUrl(urlInput.value);
-            });
-            urlInput.addEventListener("keydown", (e) => {
-                if (e.key === "Enter") {
-                    e.preventDefault();
-                    this.loadYouTubeUrl(urlInput.value);
-                    urlInput.blur();
-                }
-            });
+    setYouTubeMusicEnabled(enabled) {
+        this.ytMusicEnabled = Boolean(enabled);
+        const toggleBtn = document.getElementById("yt-btn-toggle");
+        const led = document.getElementById("yt-radio-led");
+        const eq = document.getElementById("yt-eq");
+        const volSlider = document.getElementById("yt-vol-slider");
+
+        if (this.ytMusicEnabled) {
+            const vol = volSlider ? (parseInt(volSlider.value, 10) || 75) : 75;
+            this.sendYouTubeCommand("unMute", []);
+            this.sendYouTubeCommand("setVolume", [vol]);
+            this.sendYouTubeCommand("playVideo", []);
+            if (toggleBtn) {
+                toggleBtn.textContent = "🔊 MUSIQUE : ON";
+                toggleBtn.classList.add("yt-btn-active");
+                toggleBtn.classList.remove("yt-btn-muted");
+            }
+            if (led) led.classList.remove("paused");
+            if (eq) eq.classList.remove("paused");
+        } else {
+            this.sendYouTubeCommand("pauseVideo", []);
+            if (toggleBtn) {
+                toggleBtn.textContent = "🔇 MUSIQUE : OFF";
+                toggleBtn.classList.remove("yt-btn-active");
+                toggleBtn.classList.add("yt-btn-muted");
+            }
+            if (led) led.classList.add("paused");
+            if (eq) eq.classList.add("paused");
+        }
+        // Keep internal 8-bit synth muted so turning off music truly silences all music
+        if (this.audio) {
+            this.audio.ytRadioPlaying = true;
         }
     }
 
@@ -918,52 +941,14 @@ class LeonidaGame {
     skipYouTubeRadioTrack() {
         // Advance ~3m15s into compilation mixes (or next video if playlist)
         this.ytSeekOffset = ((this.ytSeekOffset || 0) + 195) % 3400;
+        if (!this.ytMusicEnabled) {
+            this.setYouTubeMusicEnabled(true);
+        }
         this.sendYouTubeCommand("seekTo", [this.ytSeekOffset, true]);
         this.sendYouTubeCommand("nextVideo", []);
         this.sendYouTubeCommand("playVideo", []);
-        const led = document.getElementById("yt-radio-led");
-        if (led) led.classList.remove("paused");
         if (this.audio) {
-            this.audio.ytRadioPlaying = true;
             this.audio.playBeep(680, 0.04, "square", 0.04);
-        }
-    }
-
-    loadYouTubeUrl(rawUrl) {
-        const iframe = document.getElementById("yt-player-iframe");
-        if (!iframe || !rawUrl) return;
-        const trimmed = String(rawUrl).trim();
-        let videoId = null;
-        let listId = null;
-
-        try {
-            const u = new URL(trimmed);
-            if (u.hostname.includes("youtu.be")) {
-                videoId = u.pathname.replace(/^\//, "").split("/")[0];
-            } else {
-                videoId = u.searchParams.get("v");
-            }
-            listId = u.searchParams.get("list");
-        } catch (err) {
-            // Fallback regex for raw ID or partial URL
-            const m = trimmed.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-            if (m) videoId = m[1];
-            else if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) videoId = trimmed;
-        }
-
-        let embedSrc = "";
-        if (listId && !videoId) {
-            embedSrc = `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(listId)}&enablejsapi=1&autoplay=1&rel=0&modestbranding=1&playsinline=1`;
-        } else if (videoId) {
-            embedSrc = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&autoplay=1&rel=0&modestbranding=1&playsinline=1${listId ? `&list=${encodeURIComponent(listId)}` : ""}`;
-        }
-
-        if (embedSrc) {
-            this.ytSeekOffset = 0;
-            iframe.src = embedSrc;
-            if (this.audio) this.audio.ytRadioPlaying = true;
-            const led = document.getElementById("yt-radio-led");
-            if (led) led.classList.remove("paused");
         }
     }
 
@@ -1023,8 +1008,10 @@ class LeonidaGame {
     startGame() {
         this.started = true;
         this.audio.resume();
-        this.sendYouTubeCommand("playVideo", []);
-        this.sendYouTubeCommand("setVolume", [75]);
+        if (this.ytMusicEnabled) {
+            this.sendYouTubeCommand("unMute", []);
+            this.sendYouTubeCommand("playVideo", []);
+        }
         const modal = document.getElementById("start-modal");
         if (modal) modal.classList.add("hidden");
 
