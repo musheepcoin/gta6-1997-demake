@@ -208,6 +208,31 @@ class LeonidaMap {
             }
         }
 
+        // Seamless GTA 2 Road Continuity Pass: replace disruptive barcode crosswalk blocks (lid 24)
+        // with their adjacent continuous lane block (lid 1, 80, or 74) so curbs, yellow edge lines & lane dividers run unbroken to every junction!
+        for (let tilez = 0; tilez < MAP_LAYERS; tilez++) {
+            const zOff = tilez * MAP_ROWS;
+            for (let tiley = 2; tiley < MAP_ROWS - 2; tiley++) {
+                for (let tilex = 2; tilex < MAP_COLS - 2; tilex++) {
+                    const gIdx = (zOff + tiley) * MAP_COLS + tilex;
+                    const blkIdx = this.voxelGrid[gIdx];
+                    const blk = this.blocksData[blkIdx];
+                    if (!blk || blk.lid !== 24) continue;
+                    const candidates = (blk.lidRotation === 1 || blk.lidRotation === 3)
+                        ? [[tilex - 1, tiley], [tilex + 1, tiley], [tilex - 2, tiley], [tilex + 2, tiley]]
+                        : [[tilex, tiley - 1], [tilex, tiley + 1], [tilex, tiley - 2], [tilex, tiley + 2]];
+                    for (const [nx, ny] of candidates) {
+                        const nIdx = this.voxelGrid[(zOff + ny) * MAP_COLS + nx];
+                        const nBlk = this.blocksData[nIdx];
+                        if (nBlk && (nBlk.lid === 1 || nBlk.lid === 80 || nBlk.lid === 74)) {
+                            this.voxelGrid[gIdx] = nIdx;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         this.cmpLoaded = true;
 
         // Build 2D surface lookup table & tree planter list (Lid 69)

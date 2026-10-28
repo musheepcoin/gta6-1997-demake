@@ -584,7 +584,7 @@ class RetroRenderer {
                 }
 
                 // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_00", () => {
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_01", () => {
                     if (this.gl) {
                         this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, false);
                         if (this.mapStyle === "NYC") {
@@ -632,34 +632,34 @@ class RetroRenderer {
             return run();
         };
 
-        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_00", () => {
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_01", () => {
             viceTilesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_00", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_01", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_00", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_01", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_00", () => {
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_01", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_00", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_01", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_00", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_01", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
