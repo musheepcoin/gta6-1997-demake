@@ -291,23 +291,23 @@ class RetroRenderer {
         this.gta1TilesImg.onload = checkReady;
         this.gta1TilesViceImg.onload = checkReady;
         this.gta1SpritesImg.onload = checkReady;
-        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_79";
-        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_79";
-        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_79";
+        this.gta1TilesImg.src = "assets/gta1/gta1_tiles.png?v=97_80";
+        this.gta1TilesViceImg.src = "assets/gta1/gta1_tiles_vice.png?v=97_80";
+        this.gta1SpritesImg.src = "assets/gta1/gta1_sprites.png?v=97_80";
 
         this.nycOverviewImg.onload = () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_79";
+        this.nycOverviewImg.src = "assets/gta1/nyc_cmp_overview.png?v=97_80";
 
         this.viceOverviewImg.onload = () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         };
-        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_79";
+        this.viceOverviewImg.src = "assets/gta1/vice_cmp_overview.png?v=97_80";
 
-        fetch("assets/gta1/gta1_meta.json?v=97_79")
+        fetch("assets/gta1/gta1_meta.json?v=97_80")
             .then((res) => res.json())
             .then((meta) => {
                 this.gta1Meta = meta;
@@ -315,7 +315,7 @@ class RetroRenderer {
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetch("assets/gta1/gta1_map.bin?v=97_79")
+        fetch("assets/gta1/gta1_map.bin?v=97_80")
             .then((res) => res.arrayBuffer())
             .then((buf) => {
                 mapBinBuffer = buf;
@@ -1463,8 +1463,8 @@ class RetroRenderer {
                 }
             }
 
-            // Siren Overlays (eSpriteDrawOrder_CarRoof)
-            if (!v.destroyed && v.isEmergency && v.sirenActive && sirens.length > 0) {
+            // Siren Overlays (eSpriteDrawOrder_CarRoof) — only when driven & siren active
+            if (!v.destroyed && v.driver && v.isEmergency && v.sirenActive && sirens.length > 0) {
                 const sIdx = Math.floor(this.time * 10) % sirens.length;
                 const sRect = sirens[sIdx];
                 if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF);
@@ -1788,12 +1788,8 @@ class RetroRenderer {
                 continue;
             }
 
-            const hasHeadlights = Boolean(
-                v.driver ||
-                v.sirenActive ||
-                v === game.scurveHeroCar ||
-                v.missionTag === "LANDMARK"
-            );
+            // Parked vehicles (v.driver === null) never have their headlights or taillights turned on!
+            const hasHeadlights = Boolean(v.driver);
             if (!hasHeadlights) continue;
 
             const cosA = Math.cos(v.angle);

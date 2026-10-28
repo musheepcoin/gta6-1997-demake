@@ -820,7 +820,7 @@ class Vehicle {
         this.destroyed = false;
         this.burnTimer = 0;
         this.chainExplodeTimer = 0; // 1997 GTA 1 mCarExplosionChainDelayTime (0.28s chain reaction)
-        this.sirenActive = this.isEmergency;
+        this.sirenActive = false;
         this.sirenPhase = Math.random() * 6.28;
         this.aiTargetAngle = angle;
         this.aiTurnCooldown = 0;
