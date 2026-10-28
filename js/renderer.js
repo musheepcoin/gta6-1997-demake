@@ -616,7 +616,7 @@ class RetroRenderer {
                 }
 
                 // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_08", () => {
+                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
                     if (this.gl) {
                         this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
                         if (this.mapStyle === "NYC") {
@@ -664,34 +664,34 @@ class RetroRenderer {
             return run();
         };
 
-        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_08", () => {
+        loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_11", () => {
             viceTilesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_08", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_11", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_08", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_11", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_08", () => {
+        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_08", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_11", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_08", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_11", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -1693,6 +1693,88 @@ class RetroRenderer {
         this.pushAtlasSprite3D(rect, x, y, zBlocks, angle, scale, drawOrder);
     }
 
+    renderMiamiPalmTree3D(x, y, baseZ, baseAngle = 0, scale = 1.0, seedIdx = 0) {
+        if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.objects) return;
+        const palmRect = this.gta1Meta.sprites.objects["palm_tree"] || this.gta1Meta.sprites.objects["257"];
+        if (!palmRect) return;
+
+        const sc = scale || 1.0;
+        const breeze = Math.sin(this.time * 1.65 + x * 0.013 + y * 0.019) * 0.055;
+        const leanAng = (seedIdx * 2.39996 + x * 0.01 + y * 0.02) % 6.28318;
+        const leanX = Math.cos(leanAng) * 3.0 * sc + Math.cos(this.time * 1.65 + y * 0.02) * 0.9;
+        const leanY = Math.sin(leanAng) * 3.0 * sc + Math.sin(this.time * 1.65 + x * 0.02) * 0.9;
+
+        // 1. Soft Dappled Feathery Ground Shadow on Sidewalk / Lawn / Beach Sand
+        const nf = Math.max(0.0, Math.min(1.0, this.nightFactor || 0.0));
+        const shadowAlpha = 0.27 * (1.0 - nf * 0.55);
+        this.pushAtlasSprite3D(
+            palmRect,
+            x + 9.5 * sc,
+            y + 7.5 * sc,
+            baseZ + 0.018,
+            baseAngle + breeze * 0.5,
+            sc * 0.92,
+            SPRITE_DRAW_ORDER.TIRE_MARKS,
+            0.0,
+            0.0,
+            0.0,
+            shadowAlpha
+        );
+
+        // 2. 3D Curved Ringed Coconut / Royal Palm Trunk rising from planter to crown
+        for (let s = 0; s < 4; s++) {
+            const t = s / 3.0;
+            const tx = x + leanX * t;
+            const ty = y + leanY * t;
+            const tz = baseZ + 0.045 + t * 0.27;
+            const sz = (7.2 - t * 2.0) * sc;
+            const isRing = (s % 2) === 1;
+            this.pushSolidQuad3D(
+                tx,
+                ty,
+                tz,
+                sz,
+                sz,
+                leanAng + s * 0.4,
+                isRing ? 0.44 : 0.60,
+                isRing ? 0.35 : 0.50,
+                isRing ? 0.26 : 0.39,
+                0.98,
+                SPRITE_DRAW_ORDER.MAP_OBJECT
+            );
+        }
+
+        // 3. Lower Shaded Under-Canopy Frond Tier (adds 3D parallax depth & lushness)
+        this.pushAtlasSprite3D(
+            palmRect,
+            x + leanX * 0.86,
+            y + leanY * 0.86,
+            baseZ + 0.33,
+            baseAngle + 0.45 - breeze * 0.6,
+            sc * 0.94,
+            SPRITE_DRAW_ORDER.TREES,
+            0.68,
+            0.84,
+            0.70,
+            0.95
+        );
+
+        // 4. Upper Sunlit Feathery Palm Crown + Central Coconut Cluster
+        this.pushAtlasSprite3D(
+            palmRect,
+            x + leanX,
+            y + leanY,
+            baseZ + 0.42,
+            baseAngle + breeze,
+            sc * 1.04,
+            SPRITE_DRAW_ORDER.TREES,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        );
+    }
+
     batchPedSprite3D(pedType, frameIdx, x, y, zBlocks, angle, scale = 1.0, muzzleFlash = false, drawOrder = SPRITE_DRAW_ORDER.PEDESTRIAN, rTint = 1.0, gTint = 1.0, bTint = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta.sprites.peds[pedType]) return;
         const frames = this.gta1Meta.sprites.peds[pedType];
@@ -2300,12 +2382,12 @@ class RetroRenderer {
                     this.batchObjectSprite3D(umb.spr || "umbrella_pink", umb.x, umb.y, uz + 0.08, umb.angle || 0, 0.92, SPRITE_DRAW_ORDER.TREES);
                 }
             }
-            const palmSpr = this.gta1Meta.sprites.objects["palm_tree"] ? "palm_tree" : "257";
             if (this.map.trees) {
-                for (const tr of this.map.trees) {
+                for (let ti = 0; ti < this.map.trees.length; ti++) {
+                    const tr = this.map.trees[ti];
                     if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
-                    const tz = this.getEntityZ(tr, 0.14);
-                    this.batchObjectSprite3D(palmSpr, tr.x, tr.y, tz, (tr.x * 0.03 + tr.y * 0.05) % 6.28, (tr.scale || 1.0), SPRITE_DRAW_ORDER.TREES);
+                    const baseZ = this.getEntityZ(tr, 0.0);
+                    this.renderMiamiPalmTree3D(tr.x, tr.y, baseZ, (tr.x * 0.03 + tr.y * 0.05) % 6.28, tr.scale || 1.0, ti);
                 }
             }
             if (this.map.vicePalms) {
@@ -2331,8 +2413,8 @@ class RetroRenderer {
                             SPRITE_DRAW_ORDER.MAP_OBJECT
                         );
                     }
-                    const pz = this.getEntityZ(pm, 0.15);
-                    this.batchObjectSprite3D(palmSpr, pm.x, pm.y, pz, pm.angle || 0, pm.scale || 1.0, SPRITE_DRAW_ORDER.TREES);
+                    const groundZ = this.getEntityZ(pm, 0.0);
+                    this.renderMiamiPalmTree3D(pm.x, pm.y, groundZ, pm.angle || 0, pm.scale || 1.0, pi + 100);
                 }
             }
 
