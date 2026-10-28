@@ -135,9 +135,18 @@ class RetroRenderer {
             uniform float uNightTint;
             uniform float uSunsetTint;
             uniform float uViceStyle;
+            uniform float uTime;
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 if (c.a < 0.1) discard;
+                if (vAnim > 0.5 && vAnim < 1.5) {
+                    // Inspired by gta2-rtx-remix AddRiverbed: Translucent turquoise water with shimmering underwater sandy seabed caustics!
+                    float w1 = sin(vUV.x * 220.0 + uTime * 2.3) * cos(vUV.y * 220.0 - uTime * 1.8);
+                    float w2 = sin((vUV.x + vUV.y) * 160.0 - uTime * 2.7);
+                    float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
+                    vec3 sandReef = vec3(0.92, 0.84, 0.56);
+                    c.rgb = mix(c.rgb, sandReef, caust * 0.16 * (1.0 - uNightTint * 0.65));
+                }
                 if (uSunsetTint > 0.01) {
                     // Warm Vice City Golden-Pink Sunset & Atlantic Sunrise glow
                     vec3 sunsetCol = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
@@ -210,7 +219,8 @@ class RetroRenderer {
             uTex: gl.getUniformLocation(this.cityProg, "uTex"),
             uNightTint: gl.getUniformLocation(this.cityProg, "uNightTint"),
             uSunsetTint: gl.getUniformLocation(this.cityProg, "uSunsetTint"),
-            uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle")
+            uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle"),
+            uTime: gl.getUniformLocation(this.cityProg, "uTime")
         };
 
         this.spriteProg = this.createProgram(gl, spriteVS, spriteFS);
@@ -987,6 +997,9 @@ class RetroRenderer {
         if (this.cityLocs.uSunsetTint) {
             gl.uniform1f(this.cityLocs.uSunsetTint, sf);
         }
+        if (this.cityLocs.uTime) {
+            gl.uniform1f(this.cityLocs.uTime, this.time);
+        }
         gl.uniform1f(this.cityLocs.uViceStyle, this.mapStyle === "VICE" ? 1.0 : 0.0);
 
         gl.activeTexture(gl.TEXTURE0);
@@ -1637,6 +1650,14 @@ class RetroRenderer {
         }
 
         // 7C. GTA 2 Style 3D Curb Streetlamps (Rising 3D Perspective Pole + Overhanging Cantilever Arm + Luminaire Head)
+        //     + Solar Azimuth Shadow Angle (TimeOfDaySunAt from gta2-rtx-remix time_of_day.cpp!)
+        const clockHour = (game && typeof game.worldMinutes === "number")
+            ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
+            : 12.0;
+        const hourFromNoon = (clockHour - 12.0) / 6.5; // -1 at 05:30 sunrise, 0 at 12:00 noon, +1 at 18:30 sunset
+        const sunShadowAngle = Math.atan2(0.55, Math.max(-1.2, Math.min(1.2, hourFromNoon)));
+        const sunShadowLen = 11.0 + Math.min(14.0, Math.abs(hourFromNoon) * 13.0);
+
         if (this.map && Array.isArray(this.map.streetlights)) {
             const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
             const lightsOn = nf > 0.12;
@@ -1647,11 +1668,11 @@ class RetroRenderer {
                 const midY = (sl.baseY + sl.headY) * 0.5;
                 const armLen = Math.max(8, Math.hypot(sl.headX - sl.baseX, sl.headY - sl.baseY) + 3);
 
-                // 1. Daytime angled ground shadow on the sidewalk
+                // 1. Daytime solar-tracked ground shadow on the sidewalk (rotates & lengthens with the 24h sun!)
                 if (nf < 0.85) {
-                    const shX = sl.baseX + 8;
-                    const shY = sl.baseY + 6;
-                    this.pushSolidQuad3D(shX, shY, sz + 0.018, 18, 2.5, 0.62, 0.04, 0.06, 0.10, 0.34 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const shX = sl.baseX + Math.cos(sunShadowAngle) * (sunShadowLen * 0.5);
+                    const shY = sl.baseY + Math.sin(sunShadowAngle) * (sunShadowLen * 0.5);
+                    this.pushSolidQuad3D(shX, shY, sz + 0.018, sunShadowLen, 2.5, sunShadowAngle, 0.04, 0.06, 0.10, 0.34 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
 
                 // 2. Curb Base Pedestal (z = sz + 0.03)
@@ -1688,6 +1709,38 @@ class RetroRenderer {
                 } else {
                     this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.55, 4.5, 3.4, sl.armAngle, 0.88, 0.94, 0.98, 0.92, SPRITE_DRAW_ORDER.TREES);
                 }
+            }
+        }
+
+        // 7D. GTA 2 Style 3-Phase Junction Traffic Light Gantries (FUN_004C3C70 / kGameLightTraffic from gta2-rtx-remix!)
+        if (this.map && Array.isArray(this.map.trafficSignals)) {
+            const ph = ((game ? game.trafficLightTimer : this.time) || 0) % 12.0;
+            // N/S: 0..5.2 Green (#00FF44), 5.2..6.0 Amber (#FF9900), 6.0..12.0 Red (#FF1E38)
+            // E/W: 6.0..11.2 Green (#00FF44), 11.2..12.0 Amber (#FF9900), 0..6.0 Red (#FF1E38)
+            const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
+            const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+
+            for (const ts of this.map.trafficSignals) {
+                if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
+                const sz = ts.z || 2.0;
+                const midX = (ts.baseX + ts.headX) * 0.5;
+                const midY = (ts.baseY + ts.headY) * 0.5;
+                const armLen = Math.max(10, Math.hypot(ts.headX - ts.baseX, ts.headY - ts.baseY) + 3);
+                const st = ts.axis === "NS" ? nsState : ewState;
+
+                // Corner mast base & 3D vertical gantry pole
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.03, 6.5, 6.5, 0, 0.25, 0.28, 0.34, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.20, 3.8, 3.8, 0, 0.38, 0.42, 0.48, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.baseX, ts.baseY, sz + 0.38, 3.5, 3.5, 0, 0.38, 0.42, 0.48, 0.98, SPRITE_DRAW_ORDER.TREES);
+                // Yellow Miami Signal Gantry Arm + Black 3-Lamp Signal Housing Box
+                this.pushSolidQuad3D(midX, midY, sz + 0.54, armLen, 3.0, ts.armAngle, 0.92, 0.72, 0.14, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.55, 10.5, 5.8, ts.armAngle, 0.12, 0.14, 0.18, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // Active Red / Amber / Green LED Signal Lens
+                const sr = st === "GREEN" ? 0.05 : 1.0;
+                const sg = st === "GREEN" ? 1.0 : (st === "AMBER" ? 0.62 : 0.12);
+                const sb = st === "GREEN" ? 0.28 : (st === "AMBER" ? 0.05 : 0.22);
+                this.pushSolidQuad3D(ts.headX, ts.headY, sz + 0.57, 5.5, 4.8, ts.armAngle, sr, sg, sb, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
             }
         }
 
@@ -1897,16 +1950,42 @@ class RetroRenderer {
             }
         }
 
-        // 3. Enterable Venue Neon Signs, Pay 'n' Sprays & Ringing Payphones
+        // 2C. GTA 2 Junction Traffic Lights (FUN_004C3C70 / kGameLightTraffic from gta2-rtx-remix!)
+        if (this.map && Array.isArray(this.map.trafficSignals)) {
+            const ph = ((game ? game.trafficLightTimer : this.time) || 0) % 12.0;
+            const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
+            const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+            for (const ts of this.map.trafficSignals) {
+                if (Math.abs(ts.headX - this.camX) > 880 || Math.abs(ts.headY - this.camY) > 640) continue;
+                const sz = ts.z || 2.0;
+                const gSc = this.worldToScreen(ts.headX, ts.headY, sz + 0.04);
+                if (gSc.x < -140 || gSc.x > W + 140 || gSc.y < -140 || gSc.y > H + 140) continue;
+                const pxScale = (gSc.scale * H) / 128.0;
+                const hSc = this.worldToScreen(ts.headX, ts.headY, sz + 0.57);
+                const st = ts.axis === "NS" ? nsState : ewState;
+                if (st === "GREEN") {
+                    addLightPool(gSc.x, gSc.y, 58 * pxScale, "rgba(0, 255, 95, 0.78)", "rgba(0, 180, 65, 0.28)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 8.5 * pxScale, col: "rgba(30, 255, 110, 0.92)" });
+                } else if (st === "AMBER") {
+                    addLightPool(gSc.x, gSc.y, 58 * pxScale, "rgba(255, 165, 20, 0.82)", "rgba(215, 105, 0, 0.30)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 8.5 * pxScale, col: "rgba(255, 180, 40, 0.92)" });
+                } else {
+                    addLightPool(gSc.x, gSc.y, 58 * pxScale, "rgba(255, 30, 60, 0.80)", "rgba(205, 10, 35, 0.30)");
+                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 8.5 * pxScale, col: "rgba(255, 45, 75, 0.92)" });
+                }
+            }
+        }
+
+        // 3. Enterable Venue Neon Signs, Pay 'n' Sprays & Ringing Payphones (with GTA 2 LGHT blink/pulse jitter!)
         if (Array.isArray(this.map.interiors)) {
-            const pulse = 0.92 + Math.sin(this.time * 5.0) * 0.08;
             for (const intr of this.map.interiors) {
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.12;
                 const sc = this.worldToScreen(intr.doorX, intr.doorY, dz);
                 if (sc.x < -180 || sc.x > W + 180 || sc.y < -180 || sc.y > H + 180) continue;
                 const pxScale = (sc.scale * H) / 128.0;
-                addLightPool(sc.x, sc.y, 105 * pxScale * pulse, "rgba(255, 65, 185, 0.95)", "rgba(0, 220, 255, 0.42)");
-                highResFlares.push({ x: sc.x, y: sc.y, r: 22 * pxScale, col: "rgba(255, 80, 190, 0.55)" });
+                const pulse = 0.90 + Math.sin(this.time * 6.0 + intr.doorX * 0.05) * 0.10;
+                addLightPool(sc.x, sc.y, 108 * pxScale * pulse, "rgba(255, 65, 185, 0.95)", "rgba(0, 220, 255, 0.42)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 22 * pxScale * pulse, col: "rgba(255, 80, 190, 0.62)", isStar: true });
             }
         }
         if (Array.isArray(this.map.payNSprays)) {
@@ -2075,29 +2154,46 @@ class RetroRenderer {
             }
         }
 
-        // 6. Street Fires, Rockets, Flamethrower Streams & Explosions
+        // 6. Synthetic Gameplay Lights (inspired by gta2-rtx-remix synthetic_lights.cpp:
+        //    kSynthBullet, kSynthSpark, kSynthFire with per-particle flicker phase, Rockets & Explosions!)
         if (Array.isArray(this.map.streetFires)) {
             for (const sf of this.map.streetFires) {
                 const sc = this.worldToScreen(sf.x, sf.y, this.getEntityZ(sf, 0.08));
                 if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
                 const pxScale = (sc.scale * H) / 128.0;
-                const flick = 0.9 + Math.sin(this.time * 18 + sf.x) * 0.1;
+                const flick = 0.88 + Math.sin(this.time * 18 + sf.x * 0.41 + sf.y * 0.67) * 0.12;
                 addLightPool(sc.x, sc.y, 92 * pxScale * flick, "rgba(255, 170, 55, 0.95)", "rgba(235, 75, 20, 0.42)");
-                highResFlares.push({ x: sc.x, y: sc.y, r: 18 * pxScale, col: "rgba(255, 150, 40, 0.65)" });
+                highResFlares.push({ x: sc.x, y: sc.y, r: 18 * pxScale * flick, col: "rgba(255, 150, 40, 0.65)" });
             }
         }
         for (const pr of game.projectiles) {
-            if (!pr.isFlame && !pr.isRocket) continue;
             const sc = this.worldToScreen(pr.x, pr.y, this.camZBlocks + 0.15);
+            if (sc.x < -90 || sc.x > W + 90 || sc.y < -90 || sc.y > H + 90) continue;
             const pxScale = (sc.scale * H) / 128.0;
-            addLightPool(sc.x, sc.y, 68 * pxScale, "rgba(255, 185, 65, 0.92)", "rgba(240, 85, 20, 0.40)");
+            if (pr.isFlame || pr.isRocket) {
+                addLightPool(sc.x, sc.y, 68 * pxScale, "rgba(255, 185, 65, 0.92)", "rgba(240, 85, 20, 0.40)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 14 * pxScale, col: "rgba(255, 165, 45, 0.78)" });
+            } else {
+                // kSynthBullet: Fast bullet tracer illumination along its flight path!
+                addLightPool(sc.x, sc.y, 26 * pxScale, "rgba(255, 235, 145, 0.75)", "rgba(255, 165, 45, 0.25)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 5.5 * pxScale, col: "rgba(255, 240, 150, 0.88)" });
+            }
         }
         for (const pt of game.particles) {
-            if (pt.kind !== "EXPLOSION" && pt.kind !== "FIRE") continue;
+            if (pt.kind !== "EXPLOSION" && pt.kind !== "FIRE" && pt.kind !== "SPARK") continue;
             const sc = this.worldToScreen(pt.x, pt.y, this.camZBlocks + 0.12);
+            if (sc.x < -140 || sc.x > W + 140 || sc.y < -140 || sc.y > H + 140) continue;
             const pxScale = (sc.scale * H) / 128.0;
-            const rad = (pt.kind === "EXPLOSION" ? 135 : 65) * pxScale;
-            addLightPool(sc.x, sc.y, rad, "rgba(255, 190, 75, 0.95)", "rgba(240, 80, 20, 0.42)");
+            if (pt.kind === "SPARK") {
+                // kSynthSpark: Wall/vehicle scrape & ricochet spark burst light!
+                addLightPool(sc.x, sc.y, 34 * pxScale, "rgba(255, 240, 150, 0.85)", "rgba(255, 155, 35, 0.30)");
+                highResFlares.push({ x: sc.x, y: sc.y, r: 6.5 * pxScale, col: "rgba(255, 235, 120, 0.90)" });
+            } else {
+                // kSynthFire: Per-particle phase flicker so clusters of flames never pulse in step!
+                const flick = 0.86 + Math.sin(this.time * 24.0 + pt.x * 0.37 + pt.y * 0.73) * 0.14;
+                const rad = (pt.kind === "EXPLOSION" ? 135 : 65) * pxScale * flick;
+                addLightPool(sc.x, sc.y, rad, "rgba(255, 190, 75, 0.95)", "rgba(240, 80, 20, 0.42)");
+            }
         }
 
         lctx.restore();

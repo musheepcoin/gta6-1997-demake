@@ -372,8 +372,9 @@ class LeonidaMap {
             });
         }
 
-        // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights) & Deep-Dive Vice City Streetscape Details (this.viceStreetDetails)
+        // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
         this.streetlights = [];
+        this.trafficSignals = [];
         this.viceStreetDetails = [];
         for (let r = 3; r < MAP_ROWS - 3; r++) {
             for (let c = 3; c < MAP_COLS - 3; c++) {
@@ -386,6 +387,31 @@ class LeonidaMap {
                 const sRoad = this.surfaceGround[(r + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
                 const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
                 const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
+
+                // Intersection Corner (1 E/W road neighbor + 1 N/S road neighbor): Place GTA 2 3-Phase Traffic Light Signal Gantry!
+                if (roadCount === 2 && (eRoad || wRoad) && (sRoad || nRoad) && ((c + r) % 2 === 0)) {
+                    const dcCorner = eRoad ? 1 : -1;
+                    const drCorner = sRoad ? 1 : -1;
+                    const surfZ = this.surfaceLayer[idx] || 2.0;
+                    const baseX = (c + 0.5) * TILE_SIZE + dcCorner * 19.0;
+                    const baseY = (r + 0.5) * TILE_SIZE + drCorner * 19.0;
+                    const isNS = (c % 2 === 0);
+                    const headX = isNS ? (baseX + dcCorner * 17.0) : baseX;
+                    const headY = isNS ? baseY : (baseY + drCorner * 17.0);
+                    const armAngle = isNS ? (dcCorner > 0 ? 0 : Math.PI) : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
+                    this.trafficSignals.push({
+                        c,
+                        r,
+                        baseX,
+                        baseY,
+                        headX,
+                        headY,
+                        z: surfZ,
+                        armAngle,
+                        axis: isNS ? "NS" : "EW"
+                    });
+                    continue;
+                }
 
                 // Only place streetlamps along straight sidewalk curbs (1 road neighbor, never blocking intersection corners!)
                 if (roadCount !== 1) continue;
