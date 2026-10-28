@@ -1960,153 +1960,353 @@ class RetroRenderer {
     }
 
     /* ========================================================================
-       6. VICE CITY '97 NEON GPS EXPRESS DRAWER (100% Custom Miami Art Deco UI)
+       6. VICE CITY VERTICAL SMARTPHONE (iMessage / WhatsApp + GPS App)
        ======================================================================== */
     renderViceCityTourPanel(ctx, game) {
-        if (!this.showCheatsWindow) return;
-
-        const hasPager = Boolean(game.missions.activeMission || (game.pagerPopupTimer || 0) > 0);
-        const wx = 12;
-        const wy = hasPager ? 126 : 74;
-        const ww = 268;
-        const wh = this.cheatsCollapsed ? 26 : 226;
+        const px = 12;
+        const py = 74;
+        const pw = 212;
+        const isGpsApp = !this.cheatsCollapsed;
+        const isMinimized = !this.showCheatsWindow;
+        const ph = isMinimized ? 44 : (isGpsApp ? 292 : 216);
 
         ctx.save();
-        // Miami Art Deco dark midnight background with Neon Pink border & drop shadow
-        ctx.fillStyle = "rgba(9, 12, 22, 0.92)";
-        ctx.fillRect(wx, wy, ww, wh);
-        ctx.strokeStyle = "#ff2a85";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(wx, wy, ww, wh);
 
-        // Neon Purple-to-Navy Header Bar with Cyan bottom underline
-        const grad = ctx.createLinearGradient(wx, wy, wx + ww, wy);
-        grad.addColorStop(0, "#1b0a24");
-        grad.addColorStop(1, "#0b192c");
-        ctx.fillStyle = grad;
-        ctx.fillRect(wx + 1, wy + 1, ww - 2, 24);
-        ctx.strokeStyle = "#00f0ff";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(wx + 1, wy + 25);
-        ctx.lineTo(wx + ww - 1, wy + 25);
+        const rrect = (rx, ry, rw, rh, rad) => {
+            ctx.beginPath();
+            if (typeof ctx.roundRect === "function") {
+                ctx.roundRect(rx, ry, rw, rh, rad);
+            } else {
+                ctx.rect(rx, ry, rw, rh);
+            }
+        };
+
+        // 1. Physical Side Buttons (Left: Mute + Volume Up/Down, Right: Power Button)
+        if (!isMinimized) {
+            ctx.fillStyle = "#64748b";
+            rrect(px - 2.5, py + 36, 3, 10, 1.5);
+            ctx.fill();
+            rrect(px - 2.5, py + 54, 3, 18, 1.5);
+            ctx.fill();
+            rrect(px - 2.5, py + 76, 3, 18, 1.5);
+            ctx.fill();
+            rrect(px + pw - 0.5, py + 60, 3, 24, 1.5);
+            ctx.fill();
+        }
+
+        // 2. Outer Brushed Titanium Frame (Vertical Smartphone Chassis)
+        rrect(px, py, pw, ph, 22);
+        ctx.fillStyle = "#020617";
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        const frameGrad = ctx.createLinearGradient(px, py, px + pw, py + ph);
+        frameGrad.addColorStop(0, "#94a3b8");
+        frameGrad.addColorStop(0.5, "#475569");
+        frameGrad.addColorStop(1, "#64748b");
+        ctx.strokeStyle = frameGrad;
         ctx.stroke();
 
-        // Neon Green LED dot
-        ctx.fillStyle = "#39ff14";
-        ctx.beginPath();
-        ctx.arc(wx + 11, wy + 13, 3.8, 0, Math.PI * 2);
+        // 3. Inner OLED Screen Wallpaper
+        const sx = px + 5;
+        const sy = py + 5;
+        const sw = pw - 10;
+        const sh = ph - 10;
+        rrect(sx, sy, sw, sh, 18);
+        const wallGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
+        wallGrad.addColorStop(0, "#0b1120");
+        wallGrad.addColorStop(0.6, "#131129");
+        wallGrad.addColorStop(1, "#1e102a");
+        ctx.fillStyle = wallGrad;
         ctx.fill();
 
-        const visitedCount = Array.isArray(this.map.landmarks)
-            ? this.map.landmarks.filter((lm) => lm.visited).length
-            : 0;
-        const totalLm = Array.isArray(this.map.landmarks) ? this.map.landmarks.length : 16;
+        // Clip everything inside the rounded OLED screen
+        ctx.save();
+        rrect(sx, sy, sw, sh, 18);
+        ctx.clip();
 
-        ctx.fillStyle = "#00f0ff";
-        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+        // 4. Top Status Bar: "09:41" Clock + Dynamic Island Notch + Cellular Bars & Battery
+        const notchW = 54;
+        const notchH = 11;
+        const notchX = sx + (sw - notchW) * 0.5;
+        const notchY = sy + 4;
+        rrect(notchX, notchY, notchW, notchH, 5.5);
+        ctx.fillStyle = "#000000";
+        ctx.fill();
+        // Front camera lens inside Dynamic Island
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(notchX + notchW - 9, notchY + notchH * 0.5, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.arc(notchX + notchW - 9.5, notchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Clock on left of Dynamic Island
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 9.5px -apple-system, 'Segoe UI', Roboto, sans-serif";
         ctx.textBaseline = "middle";
-        const toggleHint = this.cheatsCollapsed ? "[+]" : "[—]";
-        ctx.fillText(`🌴 GPS VICE CITY (${visitedCount}/${totalLm} LIEUX) [C]`, wx + 21, wy + 13.5);
-        ctx.fillStyle = "#fde047";
-        ctx.fillText(toggleHint, wx + ww - 26, wy + 13.5);
+        ctx.fillText("09:41", sx + 12, sy + 10);
 
-        this.cheatButtons.push({
-            id: "TOGGLE_COLLAPSE",
-            x: wx,
-            y: wy,
-            w: ww,
-            h: 25
-        });
+        // Cellular Signal Bars + 5G + Battery on right of Dynamic Island
+        const sigX = sx + sw - 50;
+        const sigY = sy + 12.5;
+        ctx.fillStyle = "#f8fafc";
+        for (let b = 0; b < 4; b++) {
+            const bh = 3 + b * 1.6;
+            ctx.fillRect(sigX + b * 3.2, sigY - bh, 2.1, bh);
+        }
+        ctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+        ctx.fillText("5G", sigX + 15, sy + 10);
 
-        if (this.cheatsCollapsed) {
+        // Battery Icon
+        const batX = sx + sw - 22;
+        const batY = sy + 6.5;
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 1;
+        rrect(batX, batY, 13, 6.5, 1.5);
+        ctx.stroke();
+        ctx.fillStyle = "#4ade80";
+        ctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
+
+        // If minimized (lock screen notification bar only), allow clicking to expand
+        if (isMinimized) {
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 10px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText("💬 Jason • Appuyer pour ouvrir [C]", sx + 12, sy + 25);
+            this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
+            ctx.restore();
             ctx.restore();
             return;
         }
 
-        const drawViceBtn = (id, label, bx, by, bw, bh = 19, highlight = false, extra = null) => {
-            ctx.fillStyle = highlight ? "rgba(255, 42, 133, 0.22)" : "rgba(19, 28, 49, 0.94)";
-            ctx.fillRect(bx, by, bw, bh);
-            ctx.strokeStyle = highlight ? "#ff2a85" : "#00f0ff";
+        if (!isGpsApp) {
+            // ================================================================
+            // APP 1: MESSAGES (Jason Duval Contact Header + Wrapped Chat Bubble)
+            // ================================================================
+            const hdrY = sy + 18;
+            const hdrH = 30;
+            ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+            ctx.fillRect(sx, hdrY, sw, hdrH);
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
             ctx.lineWidth = 1;
-            ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
-            ctx.fillStyle = highlight ? "#fde047" : "#f8fafc";
-            ctx.fillText(label, bx + 5, by + bh * 0.5 + 0.5);
-            this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: bh, ...(extra || {}) });
-        };
+            ctx.beginPath();
+            ctx.moveTo(sx, hdrY + hdrH);
+            ctx.lineTo(sx + sw, hdrY + hdrH);
+            ctx.stroke();
 
-        let cy = wy + 31;
-        ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
+            // Blue back chevron
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 16px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText("‹", sx + 8, hdrY + 15);
 
-        const tourPairs = [
-            [
-                { id: "VICE_BEACH", label: "🏖️ Vice Beach", hi: true, car: false },
-                { id: "HOTEL_DIXON", label: "🏨 Hotel Dixon", hi: true, car: true }
-            ],
-            [
-                { id: "ESPANOLA_WAY", label: "🦩 Española Way", hi: false, car: false },
-                { id: "CLUB_NINE1NINE", label: "💃 Nine1Nine", hi: false, car: true }
-            ],
-            [
-                { id: "SERA_SPACE", label: "🚀 SERA Space", hi: true, car: false },
-                { id: "STAR_ISLAND", label: "🏛️ Star Island", hi: false, car: false }
-            ],
-            [
-                { id: "VICE_PORT", label: "🚢 Cruise Port", hi: false, car: false },
-                { id: "MAMBAS_STADIUM", label: "🏟️ Stadium Bowl", hi: true, car: false }
-            ],
-            [
-                { id: "DOWNTOWN_VC", label: "🏙️ Downtown/Golf", hi: false, car: false },
-                { id: "JACK_OF_HEARTS", label: "🎨 Wynwood/Jack", hi: false, car: true }
-            ],
-            [
-                { id: "LAKE_LEONIDA", label: "🌊 Lake Leonida", hi: false, car: false },
-                { id: "MOUNT_KALAGA", label: "⛰️ Mt Kalaga", hi: false, car: false }
-            ],
-            [
-                { id: "PENITENTIARY", label: "🚨 Penitentiary", hi: true, car: false },
-                { id: "PORT_GELLHORN", label: "🏁 Dirt Speedway", hi: true, car: true }
-            ],
-            [
-                { id: "VCIA_AIRPORT", label: "✈️ VCIA Airport", hi: false, car: false },
-                { id: "GRASSRIVERS", label: "🐊 Mud Park/Keys", hi: false, car: false }
-            ]
-        ];
+            // Jason Pixel Avatar + Green Online Badge
+            const avX = sx + 20;
+            const avY = hdrY + 4;
+            this.drawPixelPortraitRect(ctx, avX, avY, 22, 22, "JASON");
+            ctx.fillStyle = "#22c55e";
+            ctx.beginPath();
+            ctx.arc(avX + 20, avY + 19, 3.2, 0, Math.PI * 2);
+            ctx.fill();
 
-        for (const [leftBtn, rightBtn] of tourPairs) {
-            const leftHasInt = Array.isArray(this.map.interiors) && this.map.interiors.some((it) => it.id === leftBtn.id);
-            const rightHasInt = Array.isArray(this.map.interiors) && this.map.interiors.some((it) => it.id === rightBtn.id);
-
-            drawViceBtn("TP_LANDMARK", leftBtn.label, wx + 6, cy, leftHasInt ? 100 : 124, 19, leftBtn.hi, {
-                landmarkId: leftBtn.id,
-                enterCar: leftBtn.car
-            });
-            if (leftHasInt) {
-                drawViceBtn("ENTER_INTERIOR", "🚪", wx + 108, cy, 22, 19, true, { interiorId: leftBtn.id });
+            // Contact Name & Online Subtitle (never writes "SMARTPHONE"!)
+            const senderEl = document.getElementById("pager-sender");
+            let contactName = "Jason Duval";
+            if (senderEl && senderEl.textContent) {
+                const cleaned = senderEl.textContent
+                    .replace(/📱|📟|SMARTPHONE|PAGER|BIPEUR\s*'97|BIPEUR|\(PARTNER\)/gi, "")
+                    .replace(/^[\s/]+/, "")
+                    .trim();
+                if (cleaned.toUpperCase().includes("LUCIA")) contactName = "Jason & Lucia";
+                else if (cleaned.length > 0 && !cleaned.toUpperCase().includes("JASON")) contactName = cleaned;
             }
 
-            drawViceBtn("TP_LANDMARK", rightBtn.label, wx + 136, cy, rightHasInt ? 102 : 126, 19, rightBtn.hi, {
-                landmarkId: rightBtn.id,
-                enterCar: rightBtn.car
-            });
-            if (rightHasInt) {
-                drawViceBtn("ENTER_INTERIOR", "🚪", wx + 240, cy, 22, 19, true, { interiorId: rightBtn.id });
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "bold 10.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText(contactName, avX + 28, hdrY + 11);
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "8.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText("En ligne • Messages", avX + 28, hdrY + 22);
+
+            // Timestamp pill
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "8.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Aujourd'hui 09:41", sx + sw * 0.5, hdrY + hdrH + 10);
+            ctx.textAlign = "left";
+
+            // Incoming SMS Chat Bubble (word-wrapped across up to 5 lines)
+            const pagerEl = document.getElementById("pager-text");
+            const rawMsg = pagerEl
+                ? (pagerEl.textContent || "").trim()
+                : "Cap sur Ocean Drive et Vice Beach ! Appuie sur [M] pour la carte ou [G] pour klaxonner.";
+
+            const bubX = sx + 8;
+            const bubY = hdrY + hdrH + 18;
+            const bubW = sw - 16;
+            const bubH = 92;
+
+            rrect(bubX, bubY, bubW, bubH, 12);
+            ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Word-wrap message cleanly inside the chat bubble
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "10px -apple-system, 'Segoe UI', sans-serif";
+            const maxLineW = bubW - 16;
+            const words = rawMsg.split(/\s+/);
+            const lines = [];
+            let curLine = "";
+            for (const w of words) {
+                const test = curLine ? `${curLine} ${w}` : w;
+                if (ctx.measureText(test).width > maxLineW && curLine) {
+                    lines.push(curLine);
+                    curLine = w;
+                    if (lines.length >= 4) break;
+                } else {
+                    curLine = test;
+                }
             }
-            cy += 21;
+            if (curLine && lines.length < 5) {
+                while (ctx.measureText(curLine).width > maxLineW && curLine.length > 6) {
+                    curLine = curLine.slice(0, -4) + "…";
+                }
+                lines.push(curLine);
+            }
+
+            let textY = bubY + 14;
+            for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], bubX + 8, textY);
+                textY += 14.5;
+            }
+
+            // Read receipt at bottom-right of chat bubble
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 8px -apple-system, 'Segoe UI', sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText("09:41 ✓✓", bubX + bubW - 8, bubY + bubH - 7);
+            ctx.textAlign = "left";
+        } else {
+            // ================================================================
+            // APP 2: VICE MAPS GPS (16 Fast-Travel Destinations inside Phone)
+            // ================================================================
+            const hdrY = sy + 18;
+            const hdrH = 22;
+            ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+            ctx.fillRect(sx, hdrY, sw, hdrH);
+
+            const visitedCount = Array.isArray(this.map.landmarks)
+                ? this.map.landmarks.filter((lm) => lm.visited).length
+                : 0;
+            const totalLm = Array.isArray(this.map.landmarks) ? this.map.landmarks.length : 16;
+
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText(`🧭 Vice Maps • GPS (${visitedCount}/${totalLm})`, sx + 10, hdrY + 11.5);
+
+            const drawPhoneAppBtn = (id, label, bx, by, bw, bh = 18, highlight = false, extra = null) => {
+                rrect(bx, by, bw, bh, 5);
+                ctx.fillStyle = highlight ? "rgba(255, 42, 133, 0.24)" : "rgba(30, 41, 59, 0.92)";
+                ctx.fill();
+                ctx.strokeStyle = highlight ? "#ff2a85" : "rgba(56, 189, 248, 0.55)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.fillStyle = highlight ? "#fde047" : "#f8fafc";
+                ctx.font = "bold 9px -apple-system, 'Segoe UI', Consolas, sans-serif";
+                ctx.fillText(label, bx + 4, by + bh * 0.5 + 0.5);
+                this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: bh, ...(extra || {}) });
+            };
+
+            const tourPairs = [
+                [
+                    { id: "VICE_BEACH", label: "🏖️ Vice Beach", hi: true, car: false },
+                    { id: "HOTEL_DIXON", label: "🏨 Hotel Dixon", hi: true, car: true }
+                ],
+                [
+                    { id: "ESPANOLA_WAY", label: "🦩 Española", hi: false, car: false },
+                    { id: "CLUB_NINE1NINE", label: "💃 Nine1Nine", hi: false, car: true }
+                ],
+                [
+                    { id: "SERA_SPACE", label: "🚀 SERA Space", hi: true, car: false },
+                    { id: "STAR_ISLAND", label: "🏛️ Star Island", hi: false, car: false }
+                ],
+                [
+                    { id: "VICE_PORT", label: "🚢 Cruise Port", hi: false, car: false },
+                    { id: "MAMBAS_STADIUM", label: "🏟️ Stadium", hi: true, car: false }
+                ],
+                [
+                    { id: "DOWNTOWN_VC", label: "🏙️ Downtown", hi: false, car: false },
+                    { id: "JACK_OF_HEARTS", label: "🎨 Wynwood", hi: false, car: true }
+                ],
+                [
+                    { id: "LAKE_LEONIDA", label: "🌊 Lake Leonida", hi: false, car: false },
+                    { id: "MOUNT_KALAGA", label: "⛰️ Mt Kalaga", hi: false, car: false }
+                ],
+                [
+                    { id: "PENITENTIARY", label: "🚨 Prison", hi: true, car: false },
+                    { id: "PORT_GELLHORN", label: "🏁 Speedway", hi: true, car: true }
+                ],
+                [
+                    { id: "VCIA_AIRPORT", label: "✈️ VCIA Airport", hi: false, car: false },
+                    { id: "GRASSRIVERS", label: "🐊 Mud/Keys", hi: false, car: false }
+                ]
+            ];
+
+            let cy = hdrY + hdrH + 4;
+            const colW = Math.floor((sw - 14) * 0.5);
+            for (const [leftBtn, rightBtn] of tourPairs) {
+                drawPhoneAppBtn("TP_LANDMARK", leftBtn.label, sx + 5, cy, colW, 18, leftBtn.hi, {
+                    landmarkId: leftBtn.id,
+                    enterCar: leftBtn.car
+                });
+                drawPhoneAppBtn("TP_LANDMARK", rightBtn.label, sx + 9 + colW, cy, colW, 18, rightBtn.hi, {
+                    landmarkId: rightBtn.id,
+                    enterCar: rightBtn.car
+                });
+                cy += 20;
+            }
         }
 
-        cy += 3;
-        drawViceBtn("MINIMAP_FULLMAP", "🗺️ CARTE (M)", wx + 6, cy, 124, 20, false);
-        drawViceBtn(
-            "TOGGLE_NIGHT",
-            this.nightMode ? "☀️ MODE JOUR (N)" : "🌙 MODE NUIT (N)",
-            wx + 136,
-            cy,
-            126,
-            20,
-            this.nightMode
-        );
+        // 5. Bottom Smartphone App Dock (💬 Messages | 🧭 GPS [C] | 🗺️ Carte | 🌙 Nuit)
+        const dockY = sy + sh - 34;
+        const dockH = 22;
+        rrect(sx + 6, dockY, sw - 12, dockH, 8);
+        ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
+        const tabW = Math.floor((sw - 20) / 3);
+        const drawDockTab = (id, label, tx, active) => {
+            if (active) {
+                rrect(tx, dockY + 2, tabW, dockH - 4, 6);
+                ctx.fillStyle = "rgba(56, 189, 248, 0.22)";
+                ctx.fill();
+            }
+            ctx.fillStyle = active ? "#38bdf8" : "#cbd5e1";
+            ctx.font = "bold 9px -apple-system, 'Segoe UI', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(label, tx + tabW * 0.5, dockY + dockH * 0.5 + 0.5);
+            ctx.textAlign = "left";
+            this.cheatButtons.push({ id, x: tx, y: dockY, w: tabW, h: dockH });
+        };
+
+        drawDockTab("PHONE_TAB_MSG", "💬 SMS", sx + 8, !isGpsApp);
+        drawDockTab("TOGGLE_COLLAPSE", "🧭 GPS [C]", sx + 10 + tabW, isGpsApp);
+        drawDockTab("MINIMAP_FULLMAP", "🗺️ Carte", sx + 12 + tabW * 2, false);
+
+        // 6. Bottom iOS White Home Indicator Bar
+        rrect(sx + (sw - 58) * 0.5, sy + sh - 7, 58, 3.5, 2);
+        ctx.fillStyle = "rgba(248, 250, 252, 0.65)";
+        ctx.fill();
+
+        ctx.restore();
         ctx.restore();
     }
 
@@ -2155,6 +2355,14 @@ class RetroRenderer {
                     const bx = Math.max(2, Math.min(MAP_COLS - 3, worldX / TILE_SIZE));
                     const by = Math.max(2, Math.min(MAP_ROWS - 3, worldY / TILE_SIZE));
                     game.teleportToBlock(bx, by, false);
+                    return true;
+                }
+                if (btn.id === "UNMINIMIZE_PHONE") {
+                    this.showCheatsWindow = true;
+                    return true;
+                }
+                if (btn.id === "PHONE_TAB_MSG") {
+                    this.cheatsCollapsed = true;
                     return true;
                 }
                 if (!this.showCheatsWindow) continue;
@@ -2351,107 +2559,6 @@ class RetroRenderer {
 
         if ((game.jailFreeCards || 0) > 0) {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
-        }
-
-        // Modern Vice City Smartphone ("📱 SMARTPHONE // JASON") — OLED screen, 5G + Battery bar & Chat Bubble
-        if (game.missions.activeMission || (game.pagerPopupTimer || 0) > 0) {
-            const phoneX = leftX;
-            const phoneY = leftY + 62; // y = 74
-            const phoneW = 268;
-            const phoneH = 46; // y = 74..120 (leaves clean 6px gap above GPS bar at y = 126)
-
-            const pagerEl = document.getElementById("pager-text");
-            const senderEl = document.getElementById("pager-sender");
-            const rawPagerText = pagerEl ? (pagerEl.textContent || "").trim() : "Mission active à Vice City";
-            const rawSender = senderEl
-                ? (senderEl.textContent || "📱 JASON")
-                    .replace(/📟|PAGER|BIPEUR\s*'97|BIPEUR/gi, "")
-                    .replace(/^[\s/]+/, "")
-                    .trim()
-                : "JASON (PARTNER)";
-
-            ctx.save();
-
-            // Helper for rounded rectangles
-            const drawRoundedRect = (rx, ry, rw, rh, rad) => {
-                ctx.beginPath();
-                if (typeof ctx.roundRect === "function") {
-                    ctx.roundRect(rx, ry, rw, rh, rad);
-                } else {
-                    ctx.rect(rx, ry, rw, rh);
-                }
-            };
-
-            // 1. Smartphone Titanium / Neon-Pink-Cyan Chassis (Landscape Smartphone)
-            drawRoundedRect(phoneX, phoneY, phoneW, phoneH, 8);
-            ctx.fillStyle = "rgba(10, 14, 26, 0.96)";
-            ctx.fill();
-            ctx.strokeStyle = "#38bdf8";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // 2. Left Dynamic Island / Front Camera Notch (Landscape orientation)
-            drawRoundedRect(phoneX + 4, phoneY + 14, 4, 18, 2);
-            ctx.fillStyle = "#020617";
-            ctx.fill();
-            ctx.fillStyle = "#0ea5e9";
-            ctx.beginPath();
-            ctx.arc(phoneX + 6, phoneY + 18, 1.3, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 3. Top Status Bar: Contact Name + Notification Dot (Left) & 5G + Battery Icon (Right)
-            const pulseOn = Math.floor(this.time * 4) % 2 === 0;
-            ctx.fillStyle = pulseOn ? "#00f0ff" : "#ff2a85";
-            ctx.beginPath();
-            ctx.arc(phoneX + 16, phoneY + 9.5, 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 10px 'Segoe UI', Consolas, sans-serif";
-            ctx.textBaseline = "middle";
-            ctx.fillText(`📱 ${rawSender.toUpperCase()}`, phoneX + 23, phoneY + 10);
-
-            // 5G & Battery Status on top-right of smartphone screen
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = "bold 9px Consolas, monospace";
-            ctx.fillText("5G 📶", phoneX + phoneW - 58, phoneY + 10);
-
-            // Battery icon
-            const batX = phoneX + phoneW - 24;
-            const batY = phoneY + 6;
-            ctx.strokeStyle = "#4ade80";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(batX, batY, 14, 7);
-            ctx.fillStyle = "#4ade80";
-            ctx.fillRect(batX + 1.5, batY + 1.5, 10, 4);
-            ctx.fillRect(batX + 14, batY + 2, 1.5, 3);
-
-            // 4. Modern Dark-Mode Chat Message Bubble (with scrolling SMS text)
-            const msgX = phoneX + 12;
-            const msgY = phoneY + 17;
-            const msgW = phoneW - 20;
-            const msgH = 23;
-            drawRoundedRect(msgX, msgY, msgW, msgH, 5);
-            ctx.fillStyle = "rgba(23, 37, 68, 0.95)";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(255, 42, 133, 0.75)";
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-
-            // Clip & scroll crisp modern SMS text inside the chat bubble
-            ctx.beginPath();
-            ctx.rect(msgX + 4, msgY + 2, msgW - 8, msgH - 4);
-            ctx.clip();
-
-            ctx.font = "bold 11px 'Segoe UI', Consolas, monospace";
-            ctx.fillStyle = "#f8fafc";
-            ctx.textBaseline = "middle";
-            const paddedSms = `💬 ${rawPagerText}      •      `;
-            const smsWidth = Math.max(1, ctx.measureText(paddedSms).width);
-            const scrollOffset = (this.time * 58) % smsWidth;
-            ctx.fillText(paddedSms + paddedSms, msgX + 6 - scrollOffset, msgY + msgH * 0.5 + 0.5);
-
-            ctx.restore();
         }
 
         // B2. TOP-RIGHT LIVE VICE CITY MINIMAP / GPS RADAR (Below Score Counter)
