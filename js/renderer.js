@@ -344,11 +344,11 @@ class RetroRenderer {
             const imgData = ctx.getImageData(0, 0, W, H);
             const d = imgData.data;
 
-            // 1. CloseInteriorHoles (src/alpha_bleed.h):
-            // In 8-bit paletted GTA sprites, index 0 (pure black) is keyed as transparent, which accidentally punches
-            // see-through holes inside car windshields, tires, grilles, and pedestrian hair/jackets.
-            // Flood-fill exterior alpha=0 from each sprite box's perimeter; any unreached interior alpha=0 pixel is restored to opaque deep black!
-            const closeBoxHoles = (rect) => {
+            // 1. CloseInteriorHoles (src/alpha_bleed.h) + GTA 2 (1999) 3D Pre-Rendered Metallic Vehicle Remaster:
+            // - Repairs interior palette-index-0 black holes inside car windshields, tires & grilles
+            // - Upgrades flat 1997 8-bit car roofs/hoods with GTA 2's curved 3ds Max metallic clearcoat dome & contoured side fenders
+            // - Transforms flat grey/black car windows into GTA 2 glossy sapphire-tinted windshields with diagonal sky reflections!
+            const closeBoxHoles = (rect, isVehicle = false) => {
                 if (!Array.isArray(rect) || rect.length < 4) return;
                 const [sx, sy, sw, sh] = rect;
                 if (sw <= 3 || sh <= 3 || sx < 0 || sy < 0 || sx + sw > W || sy + sh > H) return;
@@ -388,17 +388,63 @@ class RetroRenderer {
                 }
 
                 for (let ly = 1; ly < sh - 1; ly++) {
+                    const ny = ((ly + 0.5) / sh) * 2.0 - 1.0; // -1: rear, 0: cabin roof, +1: front hood
                     for (let lx = 1; lx < sw - 1; lx++) {
                         const idx = ly * sw + lx;
-                        if (!ext[idx]) {
-                            const p = ((sy + ly) * W + (sx + lx)) * 4;
-                            if (d[p + 3] < 16) {
-                                // Restore interior palette-index-0 black pixel to opaque obsidian!
-                                d[p] = 14;
-                                d[p + 1] = 15;
-                                d[p + 2] = 20;
-                                d[p + 3] = 255;
-                            }
+                        if (ext[idx]) continue;
+                        const p = ((sy + ly) * W + (sx + lx)) * 4;
+                        if (d[p + 3] < 16) {
+                            // Restore interior palette-index-0 black pixel to opaque obsidian!
+                            d[p] = 14;
+                            d[p + 1] = 15;
+                            d[p + 2] = 20;
+                            d[p + 3] = 255;
+                        }
+
+                        if (!isVehicle) continue;
+
+                        const nx = ((lx + 0.5) / sw) * 2.0 - 1.0; // -1: left door, 0: roof centerline, +1: right door
+                        const r = d[p];
+                        const g = d[p + 1];
+                        const b = d[p + 2];
+                        const maxC = Math.max(r, g, b);
+                        const minC = Math.min(r, g, b);
+                        const sat = maxC - minC;
+                        const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+                        // Check if this pixel is on the outer 1px chassis perimeter (adjacent to exterior background)
+                        const isPerimeter =
+                            ext[idx - 1] === 1 ||
+                            ext[idx + 1] === 1 ||
+                            ext[idx - sw] === 1 ||
+                            ext[idx + sw] === 1;
+
+                        if (isPerimeter) {
+                            // Crisp GTA 2 dark metallic chassis outline
+                            d[p] = (r * 0.72) | 0;
+                            d[p + 1] = (g * 0.72) | 0;
+                            d[p + 2] = (b * 0.76) | 0;
+                        } else if (Math.abs(nx) < 0.62 && ny > -0.56 && ny < 0.48 && sat < 24 && lum >= 12 && lum <= 84) {
+                            // GTA 2 Glossy Sapphire-Tinted Windshield & Rear Window with diagonal sky reflection!
+                            const diagBand = (lx * 0.85 + ly * 0.55) % 8.5;
+                            const skyGlint = diagBand < 1.8 ? 1.0 : (diagBand < 3.1 ? 0.45 : 0.0);
+                            const baseGlassR = Math.round(r * 0.55 + 18);
+                            const baseGlassG = Math.round(g * 0.65 + 38);
+                            const baseGlassB = Math.round(b * 0.72 + 68);
+                            d[p] = Math.min(255, Math.round(baseGlassR + skyGlint * 58));
+                            d[p + 1] = Math.min(255, Math.round(baseGlassG + skyGlint * 92));
+                            d[p + 2] = Math.min(255, Math.round(baseGlassB + skyGlint * 118));
+                        } else if (sat >= 20 || lum > 85) {
+                            // GTA 2 3ds Max Curved Metallic Bodywork Dome & Contoured Side Fenders!
+                            // Cylindrical crown peaks slightly left-of-center (nx = -0.10) for 3D top-down light volume
+                            const crownDist = Math.abs(nx + 0.08);
+                            const domeCurve = Math.cos(Math.min(1.45, Math.abs(nx) * 1.38)); // 1.0 at center -> 0.18 at door edge
+                            const clearcoatSpec = Math.max(0.0, 1.0 - crownDist * 2.4) * (1.0 - 0.35 * ny * ny);
+                            const shadeMult = 0.86 + 0.22 * domeCurve;
+                            const specAdd = clearcoatSpec * 26.0;
+                            d[p] = Math.min(255, Math.max(0, Math.round(r * shadeMult + specAdd)));
+                            d[p + 1] = Math.min(255, Math.max(0, Math.round(g * shadeMult + specAdd)));
+                            d[p + 2] = Math.min(255, Math.max(0, Math.round(b * shadeMult + specAdd)));
                         }
                     }
                 }
@@ -406,23 +452,23 @@ class RetroRenderer {
 
             if (Array.isArray(meta.sprites.vehicles)) {
                 for (const ve of meta.sprites.vehicles) {
-                    if (ve.base) closeBoxHoles(ve.base);
+                    if (ve.base) closeBoxHoles(ve.base, true);
                     if (Array.isArray(ve.remaps)) {
-                        for (const rm of ve.remaps) closeBoxHoles(rm);
+                        for (const rm of ve.remaps) closeBoxHoles(rm, true);
                     }
                     if (Array.isArray(ve.doors)) {
-                        for (const dr of ve.doors) closeBoxHoles(dr);
+                        for (const dr of ve.doors) closeBoxHoles(dr, true);
                     }
                     if (ve.damage) {
-                        if (ve.damage.front) closeBoxHoles(ve.damage.front);
-                        if (ve.damage.rear) closeBoxHoles(ve.damage.rear);
-                        if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy);
+                        if (ve.damage.front) closeBoxHoles(ve.damage.front, true);
+                        if (ve.damage.rear) closeBoxHoles(ve.damage.rear, true);
+                        if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy, true);
                     }
                 }
             }
             if (meta.sprites.wrecked) {
                 for (const k of Object.keys(meta.sprites.wrecked)) {
-                    closeBoxHoles(meta.sprites.wrecked[k]);
+                    closeBoxHoles(meta.sprites.wrecked[k], false);
                 }
             }
 
@@ -1822,28 +1868,45 @@ class RetroRenderer {
                 : 0;
             const totalPitchZ = v._conformPitch + wheeliePitch + stuntPitch;
 
-            // Car body sprite (.G24 car sprites already have crisp dark pixel outlines, seats & shading baked in)
-            this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, 1, 1, 1, 1, totalPitchZ);
+            // Car body sprite with GTA 2 live rotation-aware solar clearcoat specular sheen!
+            const carSunSpec = v.destroyed ? 1.0 : (1.0 + 0.065 * Math.cos(v.angle - sunShadowAngle) * (1.0 - nfGlobal * 0.72));
+            this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, carSunSpec, carSunSpec, carSunSpec, 1, totalPitchZ);
 
-            // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp): Day & Night Physical Brake Lamps & Reverse Lamps!
-            if (!v.destroyed && v.driver) {
-                const isBraking =
+            // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp):
+            // Physical Front Headlight Glass Lenses + Day/Night Rear Taillights, Brake Lamps & Reverse Lamps!
+            if (!v.destroyed && !mapInfo.isTank) {
+                const frontDist = (v.w || 48) * 0.45;
+                const rearDist = -(v.w || 48) * 0.45;
+                const latSpread = mapInfo.isMotorcycle ? 0 : ((v.h || 24) * 0.29);
+                const lampOffsets = mapInfo.isMotorcycle ? [0] : [-latSpread, latSpread];
+                const isDriven = Boolean(v.driver);
+                const isBraking = isDriven && (
                     (v.driver === "PLAYER" && (game.input.down || game.input.handbrake)) ||
                     v.aiState === "STOPPED_LIGHT" ||
-                    (v.driver !== "PLAYER" && Math.abs(v.speed || 0) < 18);
-                const isReversing = (v.speed || 0) < -10;
-                if (isBraking || isReversing) {
-                    const rearDist = -(v.w || 48) * 0.46;
-                    const latSpread = mapInfo.isMotorcycle ? 0 : ((v.h || 24) * 0.30);
-                    const lampOffsets = mapInfo.isMotorcycle ? [0] : [-latSpread, latSpread];
-                    for (const lat of lampOffsets) {
-                        const lx = v.x + cosA * rearDist - sinA * lat;
-                        const ly = v.y + sinA * rearDist + cosA * lat;
-                        if (isReversing) {
-                            this.pushSolidQuad3D(lx, ly, vz + airZ - totalPitchZ + 0.012, 3.2, 2.4, v.angle, 0.95, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
-                        } else {
-                            this.pushSolidQuad3D(lx, ly, vz + airZ - totalPitchZ + 0.012, 3.4, 2.6, v.angle, 1.0, 0.08, 0.14, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
-                        }
+                    (v.driver !== "PLAYER" && Math.abs(v.speed || 0) < 18)
+                );
+                const isReversing = isDriven && (v.speed || 0) < -10;
+
+                for (const lat of lampOffsets) {
+                    // 1) Front Headlight Lenses (bright xenon-white when driven at dusk/night, crisp silver-blue glass housing by day)
+                    const fx = v.x + cosA * frontDist - sinA * lat;
+                    const fy = v.y + sinA * frontDist + cosA * lat;
+                    if (isDriven && nfGlobal > 0.15) {
+                        this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 3.0, 2.5, v.angle, 1.0, 0.98, 0.88, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    } else {
+                        this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 2.4, 2.1, v.angle, 0.82, 0.91, 0.98, 0.82, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    }
+
+                    // 2) Rear Taillight / Brake / Reverse Lenses
+                    const rx = v.x + cosA * rearDist - sinA * lat;
+                    const ry = v.y + sinA * rearDist + cosA * lat;
+                    if (isReversing) {
+                        this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 3.2, 2.4, v.angle, 0.95, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    } else if (isBraking || (isDriven && nfGlobal > 0.15)) {
+                        this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 3.4, 2.6, v.angle, 1.0, 0.08, 0.14, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    } else {
+                        // Unlit dark ruby taillight housing by day / when parked
+                        this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 2.5, 2.1, v.angle, 0.58, 0.07, 0.11, 0.85, SPRITE_DRAW_ORDER.CAR_ROOF);
                     }
                 }
             }
