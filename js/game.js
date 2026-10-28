@@ -753,9 +753,10 @@ class LeonidaGame {
                 );
             }
 
-            // Toggle Carnage3D Game Cheats Window (C)
+            // Toggle Vice City GPS Tour Drawer (C)
             if (code === "KeyC") {
-                this.renderer.showCheatsWindow = !this.renderer.showCheatsWindow;
+                this.renderer.showCheatsWindow = true;
+                this.renderer.cheatsCollapsed = !this.renderer.cheatsCollapsed;
             }
 
             // Toggle Lucia's Iconic Red Heist Bandana Mask (B)
@@ -1790,7 +1791,7 @@ class LeonidaGame {
             });
         }
 
-        // Damage nearby vehicles, trigger GTA 1 traffic panic & Carnage3D delayed chain explosions!
+        // Damage nearby vehicles, trigger GTA 1 traffic panic & 1997 GTA 1 delayed chain explosions!
         for (const v of this.vehicles) {
             if (v.destroyed) continue;
             const d = Math.hypot(v.x - x, v.y - y);
@@ -2021,7 +2022,7 @@ class LeonidaGame {
         const spec = WEAPON_SPECS[weaponKey] || WEAPON_SPECS.PISTOL;
         this.audio.playShot(weaponKey);
 
-        // Authentic GTA 1 / Carnage3D FIST Melee Punch & Knockdown (weapons.json: base_hit_range 0.2 blocks)
+        // Authentic 1997 GTA 1 FIST Melee Punch & Knockdown (weapons.json: base_hit_range 0.2 blocks)
         if (spec.isMelee) {
             if (isPlayer) {
                 this.player.punchTimer = 0.34;
@@ -2080,7 +2081,7 @@ class LeonidaGame {
     }
 
     /* ========================================================================
-       AUTHENTIC CARNAGE3D TRAFFIC & PEDESTRIAN MANAGER (TrafficManager.cpp)
+       AUTHENTIC 1997 GTA 1 TRAFFIC & PEDESTRIAN MANAGER (TrafficManager.cpp)
        Delegates off-screen ring generation and culling of AI cars and pedestrians
        to TrafficManager::UpdateTraffic(dt).
        ======================================================================== */
@@ -2235,7 +2236,7 @@ class LeonidaGame {
                 p.jumpTimer = Math.max(0, p.jumpTimer - dt);
                 p.jumpZOffset = Math.sin((1.0 - p.jumpTimer / 0.52) * Math.PI) * 0.38;
 
-                // Authentic GTA 1 / Carnage3D StateSlideOnCar (frames 91..96):
+                // Authentic 1997 GTA 1 StateSlideOnCar (frames 91..96):
                 // Jumping onto a vehicle hood/roof slides the player across the car!
                 if (!p.inVehicle) {
                     for (const v of this.vehicles) {
@@ -2348,7 +2349,7 @@ class LeonidaGame {
                         p.walkPhase += dt * 1.45;
                     }
                 } else if (p.tankControls) {
-                    // Authentic 1997 GTA 1 / carnage3d Rotational On-Foot Controls:
+                    // Authentic 1997 1997 GTA 1 Rotational On-Foot Controls:
                     // Left/Right rotates character; Up walks/runs forward; Down steps backward!
                     const turnRate = 4.35;
                     if (this.input.left) p.angle -= turnRate * dt;
@@ -2846,7 +2847,7 @@ class LeonidaGame {
             if (ped.dead) continue;
             if (ped.exitAnimTimer > 0) ped.exitAnimTimer = Math.max(0, ped.exitAnimTimer - dt);
 
-            // Carnage3D Pedestrian::SetBurnEffectActive (Flamethrower burning pedestrians!)
+            // 1997 GTA 1 Pedestrian::SetBurnEffectActive (Flamethrower burning pedestrians!)
             if ((ped.burnTimer || 0) > 0) {
                 ped.burnTimer -= dt;
                 ped.hp -= 15 * dt;
@@ -2860,7 +2861,7 @@ class LeonidaGame {
                 }
             }
 
-            // Carnage3D ePedestrianState_Stunned (knocked down onto asphalt, frames 38..41)
+            // 1997 GTA 1 ePedestrianState_Stunned (knocked down onto asphalt, frames 38..41)
             if ((ped.stunnedTimer || 0) > 0) {
                 ped.stunnedTimer -= dt;
                 continue;
@@ -2956,7 +2957,7 @@ class LeonidaGame {
                     ped.kind = "CIVILIAN";
                 }
             } else {
-                // Exact Port of Carnage3D AiCharacterController::UpdateWandering / ChooseWalkWaypoint / ContinueWalkToWaypoint
+                // Exact Port of 1997 GTA 1 AiCharacterController::UpdateWandering / ChooseWalkWaypoint / ContinueWalkToWaypoint
                 // (AiCharacterController.cpp lines 250-365): Pedestrians stay strictly on PAWEMENT / FIELD blocks!
                 if (ped.panicTimer > 0) ped.panicTimer = Math.max(0, ped.panicTimer - dt);
 

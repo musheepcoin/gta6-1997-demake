@@ -1,10 +1,9 @@
 /* ============================================================================
-   GRAND THEFT AUTO: LEONIDA '97 — AUTHENTIC GTA 1 (.CMP) 256x256x6 3D MAP
-   Direct Port of codenamecpp/carnage3d:
-   - GameDefs.h (eGroundType, eBlockFace, eLidRotation, eTrafficHint, Convert)
-   - GameMapManager.cpp (ReadCompressedMapData, GetBlockInfo, GetHeightAtPosition,
-     GetWaterLevelAtPosition2, GetDistrictAtPosition2, TraceSegment2D)
-   - GameMapHelpers.cpp (BuildMapMesh, PutBlockFace, GetSlopeHeight)
+   GRAND THEFT AUTO: VICE CITY '97 — AUTHENTIC GTA 1 (.CMP) 256x256x6 3D MAP
+   1997 2.5D Voxel City Map Architecture:
+   - Ground types, block faces, lid rotations, directional road arrows
+   - Compressed 256x256x6 voxel column reader & slope/elevation resolver
+   - Perspective mesh face builder & 2D raycast segment tracer
    ============================================================================ */
 
 const MAP_BLOCK_TEXTURE_DIMS = 64;
@@ -21,7 +20,7 @@ const MAP_LAYERS = MAP_LAYERS_COUNT;
 const WORLD_W = MAP_COLS * TILE_SIZE;
 const WORLD_H = MAP_ROWS * TILE_SIZE;
 
-// Unit conversion helpers (Convert namespace from codenamecpp/carnage3d)
+// Unit conversion helpers (blocks <-> meters <-> pixels)
 const Convert = {
     metersToMapUnits: (meters) => meters / METERS_PER_MAP_UNIT,
     mapUnitsToMeters: (units) => units * METERS_PER_MAP_UNIT,
@@ -1031,7 +1030,7 @@ class LeonidaMap {
     }
 
     /* ========================================================================
-       AUTHENTIC NYC.CMP ROAD ARROW & LANE NAVIGATION GRAPH (GTA 1 / Carnage3D)
+       AUTHENTIC NYC.CMP ROAD ARROW & LANE NAVIGATION GRAPH (1997 GTA 1)
        Uses BlockStyle directional bitmask (up/down/left/right) & trafficHint
        ======================================================================== */
     getNavigationBlock(bx, by, zBlocks = 2.0) {

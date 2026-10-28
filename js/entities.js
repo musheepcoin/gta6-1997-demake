@@ -4,7 +4,7 @@
    ============================================================================ */
 
 const VEHICLE_SPECS = {
-    // --- 1. MOTORCYCLES (vtype = 3 in STYLE001.G24 / Carnage3D eVehicle_Motorcycle) ---
+    // --- 1. MOTORCYCLES (vtype = 3 in STYLE001.G24 / 1997 GTA 1 eVehicle_Motorcycle) ---
     HARLEY_BIKE: {
         name: "CHOPPER CRUISER BIKE",
         sprId: "953",
@@ -809,9 +809,9 @@ class Vehicle {
         this.angularVelocity = 0;
         this.speed = 0;
         this.drifting = false;
-        this.steerAngleRad = 0; // Carnage3D Vehicle::UpdateSteer (±30 deg front wheel lock)
+        this.steerAngleRad = 0; // 1997 GTA 1 Vehicle::UpdateSteer (±30 deg front wheel lock)
 
-        // Carnage3D 2-axle tire offsets in pixels along longitudinal axis (mFrontTireOffset, mRearTireOffset)
+        // 1997 GTA 1 2-axle tire offsets in pixels along longitudinal axis (mFrontTireOffset, mRearTireOffset)
         this.frontTireOffset = this.w * 0.34;
         this.rearTireOffset = -this.w * 0.34;
 
@@ -819,14 +819,14 @@ class Vehicle {
         this.hasJason = false;
         this.destroyed = false;
         this.burnTimer = 0;
-        this.chainExplodeTimer = 0; // Carnage3D mCarExplosionChainDelayTime (0.28s chain reaction)
+        this.chainExplodeTimer = 0; // 1997 GTA 1 mCarExplosionChainDelayTime (0.28s chain reaction)
         this.sirenActive = this.isEmergency;
         this.sirenPhase = Math.random() * 6.28;
         this.aiTargetAngle = angle;
         this.aiTurnCooldown = 0;
         this.missionTag = null;
 
-        // Authentic 1997 GTA 1 / Carnage3D 6-Zone Localized .G24 Delta Damage & Door Animation (Vehicle.cpp:717-748)
+        // Authentic 1997 1997 GTA 1 6-Zone Localized .G24 Delta Damage & Door Animation (Vehicle.cpp:717-748)
         this.damageDeltaBits = 0;
         this.frontDented = false;
         this.rearDented = false;
@@ -834,7 +834,7 @@ class Vehicle {
         this.doorOpenTimer = 0;
         this.doorOpenDuration = 0.48;
 
-        // Authentic 1997 GTA 1 / Carnage3D Traffic & Pursuit AI State
+        // Authentic 1997 1997 GTA 1 Traffic & Pursuit AI State
         this.aiState = "CRUISE"; // CRUISE, STOPPED_LIGHT, FOLLOWING, LANE_CHANGE, YIELD_SIREN, PANIC, PURSUIT, REVERSING
         this.aiBlockX = -1;
         this.aiBlockY = -1;
@@ -888,7 +888,7 @@ class Vehicle {
     }
 
     /* ========================================================================
-       CARNAGE3D 2-AXLE TIRE KINEMATICS & CHASSIS OBB GEOMETRY (Vehicle.cpp)
+       1997 GTA 1 2-AXLE TIRE KINEMATICS & CHASSIS OBB GEOMETRY (Vehicle.cpp)
        ======================================================================== */
     getTireOffset(tireID) {
         return tireID === CAR_TIRE.FRONT ? this.frontTireOffset : this.rearTireOffset;
@@ -988,7 +988,7 @@ class Vehicle {
     }
 
     /* ========================================================================
-       CARNAGE3D 6-ZONE LOCAL CONTACT POINT DAMAGE (Vehicle::ReceiveImpact, lines 717-748)
+       1997 GTA 1 6-ZONE LOCAL CONTACT POINT DAMAGE (Vehicle::ReceiveImpact, lines 717-748)
        Transforms hit point into chassis local space and sets FL/FR/ML/MR/BL/BR
        using fr_bias = maxx / 3.0f.
        ======================================================================== */
@@ -1148,7 +1148,7 @@ class Vehicle {
     }
 
     /* ========================================================================
-       AUTHENTIC GTA 1 / CARNAGE3D TRAFFIC AI (NYC.CMP Arrow Graph + Strict Lane Discipline + Deadlock-Free Intersections)
+       AUTHENTIC 1997 GTA 1 TRAFFIC AI (NYC.CMP Arrow Graph + Strict Lane Discipline + Deadlock-Free Intersections)
        ======================================================================== */
     computeTrafficControls(dt, map, game) {
         if (this.aiHornCooldown > 0) this.aiHornCooldown -= dt;
@@ -1477,7 +1477,7 @@ class Vehicle {
             let aimX = targetX + targetVx * leadTime;
             let aimY = targetY + targetVy * leadTime;
 
-            // GTA 1 / Carnage3D PIT Maneuver: aim slightly at the fleeing car's rear flank when closing in fast
+            // 1997 GTA 1 PIT Maneuver: aim slightly at the fleeing car's rear flank when closing in fast
             const targetSpd = Math.hypot(targetVx, targetVy);
             if (allowPit && distToTarget > 34 && distToTarget < 115 && targetSpd > 85) {
                 const tAng = Math.atan2(targetVy, targetVx);
@@ -1811,7 +1811,7 @@ class Vehicle {
             this.doorOpenTimer = Math.max(0, this.doorOpenTimer - dt);
         }
 
-        // Carnage3D Delayed Chain-Reaction Explosion (mCarExplosionChainDelayTime)
+        // 1997 GTA 1 Delayed Chain-Reaction Explosion (mCarExplosionChainDelayTime)
         if (this.chainExplodeTimer > 0) {
             this.chainExplodeTimer -= dt;
             if (Math.random() < 0.5) {
@@ -1967,7 +1967,7 @@ class Vehicle {
     }
 
     /* ========================================================================
-       CARNAGE3D Vehicle::UpdateSteer (Vehicle.cpp:1058-1095)
+       1997 GTA 1 Vehicle::UpdateSteer (Vehicle.cpp:1058-1095)
        Front wheels steer up to ±30 deg (0.5236 rad) at 270 deg/s (4.712 rad/s)
        ======================================================================== */
     updateSteer(dt, steerInput) {
@@ -1982,7 +1982,7 @@ class Vehicle {
     }
 
     /* ========================================================================
-       CARNAGE3D Vehicle::UpdateDrive (Vehicle.cpp:1156-1204)
+       1997 GTA 1 Vehicle::UpdateDrive (Vehicle.cpp:1156-1204)
        Applies rear-wheel drive acceleration, braking, and steering angular rate
        ======================================================================== */
     updateDrive(dt, throttle, handbrake, surfaceMult) {
@@ -2032,7 +2032,7 @@ class Vehicle {
     }
 
     /* ========================================================================
-       CARNAGE3D Vehicle::UpdateFriction (Vehicle.cpp:1097-1154)
+       1997 GTA 1 Vehicle::UpdateFriction (Vehicle.cpp:1097-1154)
        Kills lateral tire velocity, determines drift state & emits tire marks
        ======================================================================== */
     updateFriction(dt, forwardVel, lateralVel, handbrake, map, game) {
@@ -2054,7 +2054,7 @@ class Vehicle {
 }
 
 /* ============================================================================
-   CARNAGE3D PEDESTRIAN & FINITE STATE MACHINE (Pedestrian.cpp / PedestrianStates.cpp)
+   1997 GTA 1 PEDESTRIAN & FINITE STATE MACHINE (Pedestrian.cpp / PedestrianStates.cpp)
    Supports all ePedestrianState states, ComputeDrawOrder, and SetBurnEffectActive
    ============================================================================ */
 class Pedestrian {
@@ -2123,7 +2123,7 @@ class Pedestrian {
 }
 
 /* ============================================================================
-   CARNAGE3D TRAFFIC MANAGER (TrafficManager.cpp)
+   1997 GTA 1 TRAFFIC MANAGER (TrafficManager.cpp)
    Spawns and recycles off-screen vehicles, pedestrians, and Hare Krishna chains
    within the off-screen ring around the camera's mOnScreenMapArea frustum.
    ============================================================================ */
@@ -2230,7 +2230,7 @@ class TrafficManager {
                 if (this.isPointInRect(bx, by, onScreenArea)) continue;
                 const navBlk = map.getNavigationBlock(bx, by, camZ);
                 if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD || navBlk.isRailway) continue;
-                // Carnage3D TrafficManager.cpp:368-374 — ONLY spawn on single-direction straight lane blocks (bits === 1), never intersections!
+                // 1997 GTA 1 TrafficManager.cpp:368-374 — ONLY spawn on single-direction straight lane blocks (bits === 1), never intersections!
                 const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
                 const bits = (navBlk.up ? 1 : 0) + (navBlk.down ? 1 : 0) + (navBlk.left ? 1 : 0) + (navBlk.right ? 1 : 0);
                 if (bits === 1 && lidZ1 !== 25) {

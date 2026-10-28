@@ -1,10 +1,9 @@
 /* ============================================================================
-   GRAND THEFT AUTO: LEONIDA '97 — AUTHENTIC CARNAGE3D / GTA 1 WEBGL 3D ENGINE
-   Direct Port of codenamecpp/carnage3d:
-   - True 256x256x6 NYC.CMP 3D Voxel CityMesh (GameMapManager.cpp, GameMapHelpers.cpp, MapRenderer.cpp)
-   - True 3D Perspective Camera: fovy = 55.0 deg, height = 20.0m / 5.0 blocks (FollowCameraController.cpp, GameCamera.cpp)
-   - True 3D Depth-Tested WebGL SpriteBatch for .G24 Vehicles, Peds, Props & Effects (SpriteBatch.cpp)
-   - Authentic .FON Bitmap Font HUD (HUD.cpp) + Interactive "Game Cheats" ImGui Window (GameCheatsWindow.cpp)
+   GRAND THEFT AUTO: VICE CITY '97 — CUSTOM 2.5D WEBGL VOXEL & SPRITE ENGINE
+   - 256x256x6 3D Voxel CityMesh & Coastal Terrain Renderer
+   - 3D Perspective Top-Down Camera (fovy = 55.0 deg)
+   - Depth-Tested WebGL SpriteBatch for Vehicles, Peds, Props & Effects
+   - Retro 1997 Vice City Bitmap Font HUD & Neon GPS Express Drawer
    ============================================================================ */
 
 class RetroRenderer {
@@ -19,7 +18,7 @@ class RetroRenderer {
         this.camX = 213.5 * TILE_SIZE;
         this.camY = 146.0 * TILE_SIZE;
         this.camZBlocks = 2.0; // Smoothed player ground elevation in blocks (0..6)
-        this.followHeightBlocks = 5.0; // 20.0m / 4.0m = 5.0 blocks above player ground (FollowCameraController.cpp)
+        this.followHeightBlocks = 5.0; // 20.0m / 4.0m = 5.0 blocks above player ground
         this.zoomOffsetBlocks = 0.0; // Mouse wheel zoom delta in blocks (-2.2 .. +8.0)
         this.zoom = 1.0;
         this.targetZoom = 1.0;
@@ -28,22 +27,22 @@ class RetroRenderer {
         this.lastFrameDt = 0.0166;
         this.fpsSmoothed = 60.0;
 
-        // Interactive Carnage3D "Game Cheats" Debug Window state ([C] key toggles visibility)
+        // Vice City Neon GPS Express Drawer ([C] key or click header toggles open/collapsed)
         this.showCheatsWindow = true;
-        this.cheatsCollapsed = false;
+        this.cheatsCollapsed = true;
         this.cheatButtons = [];
-        this.cameraMode = "follow"; // "follow" or "free"
+        this.cameraMode = "follow";
 
-        // Track vehicle banner popup when player enters a vehicle (like carnage3d HUD.cpp)
+        // Track vehicle banner popup when player enters a vehicle
         this.lastVehicleId = null;
         this.vehicleBannerTimer = 0;
         this.vehicleBannerName = "";
 
-        // Map Visual Style: "VICE" (Vice City STYLE003 + GTA 6 Leonida Art Deco) or "NYC" (Original 1997 STYLE001)
+        // Map Visual Style: "VICE" (Vice City Art Deco) or "NYC" (Classic 1997)
         this.mapStyle = "VICE";
         if (this.map) this.map.mapStyle = "VICE";
 
-        // Load Authentic GTA 1 / carnage3d Binary-Extracted Atlases, NYC.CMP Voxel Map & Metadata
+        // Load Atlases, Voxel Map & Metadata
         this.gta1Ready = false;
         this.cmpReady = false;
         this.gta1Meta = null;
@@ -78,7 +77,7 @@ class RetroRenderer {
 
     /* ========================================================================
        1. INITIALIZE WEBGL 3D CITYMESH & 3D SPRITEBATCH PIPELINE
-       Matches codenamecpp/carnage3d MapRenderer.cpp + SpriteBatch.cpp + GameCamera.cpp
+       Matches 1997 GTA 1 2.5D Engine MapRenderer.cpp + SpriteBatch.cpp + GameCamera.cpp
        ======================================================================== */
     initWebGL() {
         const gl = this.glCanvas.getContext("webgl", {
@@ -240,7 +239,7 @@ class RetroRenderer {
         gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        // Nearest-neighbor filtering (exact crisp 1997 GTA 1 / carnage3d pixel art!)
+        // Nearest-neighbor filtering (exact crisp 1997 1997 GTA 1 pixel art!)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -877,7 +876,7 @@ class RetroRenderer {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(this.glCanvas, 0, 0);
 
-        // Optional Carnage3D DebugRenderer Wireframe Overlay (Vehicle::DebugDraw / Pedestrian::DebugDraw)
+        // Optional 1997 GTA 1 DebugRenderer Wireframe Overlay (Vehicle::DebugDraw / Pedestrian::DebugDraw)
         if (this.debugDrawPhysics && !game.activeInterior) {
             this.renderDebugWireframe(ctx, game);
         }
@@ -902,11 +901,11 @@ class RetroRenderer {
             }
         }
 
-        // Authentic 1997 GTA 1 / carnage3d .FON & .G24 HUD Overlay + Top-Right Live Vice City Minimap
+        // 1997 Vice City Bitmap Font & Sprite HUD + Top-Right Live Vice City Minimap
         this.renderAuthenticGta1Hud(ctx, game);
 
-        // Authentic carnage3D_wasm.html "Game Cheats" ImGui Window (Top-Left, toggle with [C])
-        this.renderCarnage3DCheatsWindow(ctx, game);
+        // Vice City Neon GPS Express Drawer (below HUD/Pager, toggle with [C])
+        this.renderViceCityTourPanel(ctx, game);
 
         ctx.restore();
     }
@@ -1138,7 +1137,7 @@ class RetroRenderer {
         }
 
         // 4. Living Pedestrians, Monks, Cops, Jason Duval & Lucia Caminos (eSpriteDrawOrder_Pedestrian / JumpingPedestrian)
-        // Native carnage3d .G24 ped scale = 1.0 (15x11 texels = 15/64 x 11/64 map blocks!)
+        // Native 1997 GTA 1 .G24 ped scale = 1.0 (15x11 texels = 15/64 x 11/64 map blocks!)
         const pedScale = 1.0;
         for (const ped of game.peds) {
             if (ped.dead) continue;
@@ -1196,7 +1195,7 @@ class RetroRenderer {
 
             this.batchPedSprite3D(pedType, frameIdx, ped.x, ped.y, pz, ped.angle, pedScale, false, pedDrawOrder);
 
-            // Carnage3D Pedestrian::SetBurnEffectActive — attach .G24 fire sprite (234..241) on burning peds!
+            // 1997 GTA 1 Pedestrian::SetBurnEffectActive — attach .G24 fire sprite (234..241) on burning peds!
             if ((ped.burnTimer || 0) > 0) {
                 const fireFrame = 234 + (Math.floor(this.time * 14 + ped.animSeed * 10) % 8);
                 this.batchObjectSprite3D(String(fireFrame), ped.x, ped.y, pz + 0.025, 0, 0.78, SPRITE_DRAW_ORDER.EXPLOSION);
@@ -1269,7 +1268,7 @@ class RetroRenderer {
             );
         }
 
-        // 5. Authentic STYLE001.G24 Vehicles (1:1 carnage3d scale = 1.0 + Delta Doors & Crash Dents! — eSpriteDrawOrder_Car)
+        // 5. Authentic STYLE001.G24 Vehicles (1:1 1997 GTA 1 scale = 1.0 + Delta Doors & Crash Dents! — eSpriteDrawOrder_Car)
         const carScale = 1.0;
         for (const v of game.vehicles) {
             if (v.x < minX || v.x > maxX || v.y < minY || v.y > maxY) continue;
@@ -1341,7 +1340,7 @@ class RetroRenderer {
             // Car body sprite (.G24 car sprites already have crisp dark pixel outlines, seats & shading baked in)
             this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder);
 
-            // Authentic Carnage3D Motorcycle Riders (frame 84 = sitting_on_bike, 80..83 = enter_bike) & Convertible Drivers (frame 97 = sitting_in_car)
+            // Authentic 1997 GTA 1 Motorcycle Riders (frame 84 = sitting_on_bike, 80..83 = enter_bike) & Convertible Drivers (frame 97 = sitting_in_car)
             // Port of PedestrianStatesManager::StateDriveCar_ProcessEnter (PedestrianStates.cpp:354-366) & Vehicle::GetSeatPosLocal (Vehicle.cpp:473-493)
             if (!v.destroyed && v.driver) {
                 const cosA = Math.cos(v.angle);
@@ -1866,7 +1865,7 @@ class RetroRenderer {
     }
 
     /* ========================================================================
-       5B. CARNAGE3D PHYSICS & TIRE KINEMATICS DEBUG RENDERER (Vehicle::DebugDraw)
+       5B. 1997 GTA 1 PHYSICS & TIRE KINEMATICS DEBUG RENDERER (Vehicle::DebugDraw)
        Exact Port of Vehicle.cpp:668-706 & Pedestrian::DebugDraw:
        - Red OBB wireframe for vehicle chassis
        - Yellow OBB wireframes for FRONT & REAR tires (with steering angle)
@@ -1961,41 +1960,63 @@ class RetroRenderer {
     }
 
     /* ========================================================================
-       6. AUTHENTIC CARNAGE3D "GAME CHEATS" IMGUI WINDOW (GameCheatsWindow.cpp)
-       Matches carnage3D_wasm.html top-left dark debug/cheat window + Vice City Official Tour!
+       6. VICE CITY '97 NEON GPS EXPRESS DRAWER (100% Custom Miami Art Deco UI)
        ======================================================================== */
-    renderCarnage3DCheatsWindow(ctx, game) {
+    renderViceCityTourPanel(ctx, game) {
         if (!this.showCheatsWindow) return;
 
-        const wx = 10;
-        const wy = 10;
-        const ww = 276;
-        const wh = this.cheatsCollapsed ? 24 : 458;
+        const hasPager = Boolean(game.missions.activeMission || (game.pagerPopupTimer || 0) > 0);
+        const wx = 12;
+        const wy = hasPager ? 136 : 74;
+        const ww = 268;
+        const wh = this.cheatsCollapsed ? 26 : 226;
 
         ctx.save();
-        // Dearborn ImGui dark translucent window background & border
-        ctx.fillStyle = "rgba(15, 17, 20, 0.90)";
+        // Miami Art Deco dark midnight background with Neon Pink border & drop shadow
+        ctx.fillStyle = "rgba(9, 12, 22, 0.92)";
         ctx.fillRect(wx, wy, ww, wh);
-        ctx.strokeStyle = "rgba(75, 82, 95, 0.85)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(wx + 0.5, wy + 0.5, ww - 1, wh - 1);
+        ctx.strokeStyle = "#ff2a85";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wx, wy, ww, wh);
 
-        // Title bar
-        ctx.fillStyle = "rgba(38, 68, 115, 0.95)";
-        ctx.fillRect(wx + 1, wy + 1, ww - 2, 22);
+        // Neon Purple-to-Navy Header Bar with Cyan bottom underline
+        const grad = ctx.createLinearGradient(wx, wy, wx + ww, wy);
+        grad.addColorStop(0, "#1b0a24");
+        grad.addColorStop(1, "#0b192c");
+        ctx.fillStyle = grad;
+        ctx.fillRect(wx + 1, wy + 1, ww - 2, 24);
+        ctx.strokeStyle = "#00f0ff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(wx + 1, wy + 25);
+        ctx.lineTo(wx + ww - 1, wy + 25);
+        ctx.stroke();
 
-        ctx.fillStyle = "#e8ecf2";
-        ctx.font = "12px Consolas, 'Courier New', monospace";
+        // Neon Green LED dot
+        ctx.fillStyle = "#39ff14";
+        ctx.beginPath();
+        ctx.arc(wx + 11, wy + 13, 3.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        const visitedCount = Array.isArray(this.map.landmarks)
+            ? this.map.landmarks.filter((lm) => lm.visited).length
+            : 0;
+        const totalLm = Array.isArray(this.map.landmarks) ? this.map.landmarks.length : 16;
+
+        ctx.fillStyle = "#00f0ff";
+        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
-        const arrow = this.cheatsCollapsed ? "▶" : "▼";
-        ctx.fillText(`${arrow} Game Cheats & Leonida Tour [C]`, wx + 8, wy + 12);
+        const toggleHint = this.cheatsCollapsed ? "[+]" : "[—]";
+        ctx.fillText(`🌴 GPS VICE CITY (${visitedCount}/${totalLm} LIEUX) [C]`, wx + 21, wy + 13.5);
+        ctx.fillStyle = "#fde047";
+        ctx.fillText(toggleHint, wx + ww - 26, wy + 13.5);
 
         this.cheatButtons.push({
             id: "TOGGLE_COLLAPSE",
             x: wx,
             y: wy,
             w: ww,
-            h: 22
+            h: 25
         });
 
         if (this.cheatsCollapsed) {
@@ -2003,64 +2024,20 @@ class RetroRenderer {
             return;
         }
 
-        const drawImGuiBtn = (id, label, bx, by, bw, bh = 18, highlight = false, extra = null) => {
-            ctx.fillStyle = highlight ? "rgba(180, 42, 118, 0.88)" : "rgba(44, 78, 128, 0.92)";
+        const drawViceBtn = (id, label, bx, by, bw, bh = 19, highlight = false, extra = null) => {
+            ctx.fillStyle = highlight ? "rgba(255, 42, 133, 0.22)" : "rgba(19, 28, 49, 0.94)";
             ctx.fillRect(bx, by, bw, bh);
-            ctx.strokeStyle = highlight ? "rgba(255, 120, 196, 0.85)" : "rgba(92, 134, 196, 0.65)";
+            ctx.strokeStyle = highlight ? "#ff2a85" : "#00f0ff";
+            ctx.lineWidth = 1;
             ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText(label, bx + 4, by + bh * 0.5 + 1);
+            ctx.fillStyle = highlight ? "#fde047" : "#f8fafc";
+            ctx.fillText(label, bx + 5, by + bh * 0.5 + 0.5);
             this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: bh, ...(extra || {}) });
         };
 
-        let cy = wy + 27;
-        // Row 1: Exact Carnage3D action buttons + GTA1 Tank Controls toggle
-        drawImGuiBtn("CREATE_CARS", "Create Cars", wx + 8, cy, 86, 19);
-        drawImGuiBtn("CREATE_PEDS", "Create Peds", wx + 98, cy, 86, 19);
-        drawImGuiBtn(
-            "TOGGLE_TANK_CTRL",
-            game.player.tankControls ? "GTA1 Tank" : "WASD Free",
-            wx + 188,
-            cy,
-            80,
-            19
-        );
-        cy += 22;
+        let cy = wy + 31;
+        ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
 
-        // Row 2: Instant Map Style Switcher (GTA 6 Leonida <-> NYC.CMP) + Physics Debug Draw (Vehicle::DebugDraw)
-        drawImGuiBtn(
-            "TOGGLE_DEBUG_DRAW",
-            this.debugDrawPhysics ? "PhysBox: ON" : "PhysBox: OFF",
-            wx + 8,
-            cy - 1,
-            86,
-            18,
-            Boolean(this.debugDrawPhysics)
-        );
-        ctx.fillStyle = "#9fb4d4";
-        ctx.fillText(this.mapStyle === "VICE" ? "Vice City" : "NYC.CMP", wx + 100, cy + 8);
-        drawImGuiBtn(
-            "TOGGLE_MAP_STYLE",
-            this.mapStyle === "VICE" ? "Style: Vice City" : "Style: NYC97",
-            wx + 180,
-            cy - 1,
-            88,
-            18
-        );
-        cy += 21;
-
-        // Official Vice City 16 Bespoke Landmarks Tour section
-        const visitedCount = Array.isArray(this.map.landmarks)
-            ? this.map.landmarks.filter((lm) => lm.visited).length
-            : 0;
-        const totalLm = Array.isArray(this.map.landmarks) ? this.map.landmarks.length : 16;
-        ctx.fillStyle = "rgba(138, 35, 92, 0.82)";
-        ctx.fillRect(wx + 6, cy - 4, ww - 12, 16);
-        ctx.fillStyle = "#ffe4f2";
-        ctx.fillText(`▼ Vice City Tour (${visitedCount}/${totalLm} Landmarks)`, wx + 10, cy + 4);
-        cy += 15;
-
-        ctx.font = "11px Consolas, 'Courier New', monospace";
         const tourPairs = [
             [
                 { id: "VICE_BEACH", label: "🏖️ Vice Beach", hi: true, car: false },
@@ -2100,89 +2077,35 @@ class RetroRenderer {
             const leftHasInt = Array.isArray(this.map.interiors) && this.map.interiors.some((it) => it.id === leftBtn.id);
             const rightHasInt = Array.isArray(this.map.interiors) && this.map.interiors.some((it) => it.id === rightBtn.id);
 
-            drawImGuiBtn("TP_LANDMARK", leftBtn.label, wx + 8, cy, leftHasInt ? 102 : 126, 18, leftBtn.hi, {
+            drawViceBtn("TP_LANDMARK", leftBtn.label, wx + 6, cy, leftHasInt ? 100 : 124, 19, leftBtn.hi, {
                 landmarkId: leftBtn.id,
                 enterCar: leftBtn.car
             });
             if (leftHasInt) {
-                drawImGuiBtn("ENTER_INTERIOR", "🚪", wx + 112, cy, 22, 18, true, { interiorId: leftBtn.id });
+                drawViceBtn("ENTER_INTERIOR", "🚪", wx + 108, cy, 22, 19, true, { interiorId: leftBtn.id });
             }
 
-            drawImGuiBtn("TP_LANDMARK", rightBtn.label, wx + 140, cy, rightHasInt ? 104 : 128, 18, rightBtn.hi, {
+            drawViceBtn("TP_LANDMARK", rightBtn.label, wx + 136, cy, rightHasInt ? 102 : 126, 19, rightBtn.hi, {
                 landmarkId: rightBtn.id,
                 enterCar: rightBtn.car
             });
             if (rightHasInt) {
-                drawImGuiBtn("ENTER_INTERIOR", "🚪", wx + 246, cy, 22, 18, true, { interiorId: rightBtn.id });
+                drawViceBtn("ENTER_INTERIOR", "🚪", wx + 240, cy, 22, 19, true, { interiorId: rightBtn.id });
             }
-            cy += 20;
+            cy += 21;
         }
-        cy += 4;
-        ctx.font = "12px Consolas, 'Courier New', monospace";
 
-        // Separator line
-        ctx.strokeStyle = "rgba(85, 95, 110, 0.65)";
-        ctx.beginPath();
-        ctx.moveTo(wx + 6, cy);
-        ctx.lineTo(wx + ww - 6, cy);
-        ctx.stroke();
-        cy += 10;
-
-        // Frame Time & FPS
-        const ms = (this.lastFrameDt * 1000).toFixed(2);
-        const fps = this.fpsSmoothed.toFixed(1);
-        ctx.fillStyle = "#e5e9f0";
-        ctx.fillText(`Frame Time: ${ms} ms (${fps} FPS)`, wx + 8, cy);
-        cy += 15;
-
-        // ▼ Player section
-        ctx.fillStyle = "rgba(42, 73, 118, 0.72)";
-        ctx.fillRect(wx + 6, cy - 8, ww - 12, 16);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText("▼ Player", wx + 10, cy);
-        cy += 14;
-
-        const targetEnt = game.player.inVehicle || game.player;
-        const bx = Math.floor(targetEnt.x / TILE_SIZE);
-        const by = Math.floor(targetEnt.y / TILE_SIZE);
-        const bz = Math.floor(this.camZBlocks);
-        const physX = ((targetEnt.x / TILE_SIZE) * 4.0).toFixed(2);
-        const physY = (this.camZBlocks * 4.0).toFixed(2);
-        const physZ = ((targetEnt.y / TILE_SIZE) * 4.0).toFixed(2);
-        const headingDeg = (((targetEnt.angle * 180) / Math.PI) % 360).toFixed(1);
-
-        let groundName = "pawement";
-        const gt = this.map.getGroundTypeAtBlock(bx, by, Math.max(0, bz - 1));
-        if (gt === 1) groundName = "road";
-        else if (gt === 3) groundName = "beach / field";
-        else if (gt === 0) groundName = "air / water";
-
-        const activeAiCars = Array.isArray(game.vehicles)
-            ? game.vehicles.filter((v) => !v.destroyed && v.driver && v.driver !== "PLAYER").length
-            : 0;
-        const activeAiPeds = Array.isArray(game.peds)
-            ? game.peds.filter((pd) => !pd.dead).length
-            : 0;
-        const lightPhase = typeof game.isNSGreen === "function" && game.isNSGreen()
-            ? "N/S GRN"
-            : (typeof game.isEWGreen === "function" && game.isEWGreen() ? "E/W GRN" : "ALL RED");
-
-        ctx.fillStyle = "#d8dee9";
-        ctx.fillText(`heading: ${headingDeg} deg`, wx + 12, cy); cy += 14;
-        ctx.fillText(`physical pos: ${physX}, ${physY}, ${physZ}`, wx + 12, cy); cy += 14;
-        ctx.fillText(`logical pos: ${bx}, ${bz}, ${by}`, wx + 12, cy); cy += 14;
-        ctx.fillText(`block: ${groundName}`, wx + 12, cy); cy += 14;
-        ctx.fillText(`ai: ${activeAiCars} cars, ${activeAiPeds} peds (${lightPhase})`, wx + 12, cy); cy += 16;
-
-        // ▼ Camera section
-        ctx.fillStyle = "rgba(42, 73, 118, 0.72)";
-        ctx.fillRect(wx + 6, cy - 8, ww - 12, 16);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText("▼ Camera (Scroll Wheel = Zoom)", wx + 10, cy);
-        cy += 15;
-        ctx.fillStyle = "#d8dee9";
-        const distM = ((this.followHeightBlocks + this.zoomOffsetBlocks) * 4.0).toFixed(1);
-        ctx.fillText(`mode: (•) Follow  h=${distM}m  fovy=55°`, wx + 12, cy);
+        cy += 3;
+        drawViceBtn("MINIMAP_FULLMAP", "🗺️ CARTE (M)", wx + 6, cy, 124, 20, false);
+        drawViceBtn(
+            "TOGGLE_NIGHT",
+            this.nightMode ? "☀️ MODE JOUR (N)" : "🌙 MODE NUIT (N)",
+            wx + 136,
+            cy,
+            126,
+            20,
+            this.nightMode
+        );
 
         ctx.restore();
     }
@@ -2216,6 +2139,10 @@ class RetroRenderer {
                     game.toggleFullMap();
                     return true;
                 }
+                if (btn.id === "TOGGLE_NIGHT") {
+                    this.nightMode = !this.nightMode;
+                    return true;
+                }
                 if (btn.id === "MINIMAP_NEXT_LM" && btn.landmarkId && typeof game.teleportToLandmark === "function") {
                     game.teleportToLandmark(btn.landmarkId, false);
                     return true;
@@ -2233,26 +2160,6 @@ class RetroRenderer {
                 if (!this.showCheatsWindow) continue;
                 if (btn.id === "TOGGLE_COLLAPSE") {
                     this.cheatsCollapsed = !this.cheatsCollapsed;
-                    return true;
-                }
-                if (btn.id === "CREATE_CARS" && typeof game.cheatCreateCars === "function") {
-                    game.cheatCreateCars();
-                    return true;
-                }
-                if (btn.id === "CREATE_PEDS" && typeof game.cheatCreatePeds === "function") {
-                    game.cheatCreatePeds();
-                    return true;
-                }
-                if (btn.id === "TOGGLE_TANK_CTRL") {
-                    game.player.tankControls = !game.player.tankControls;
-                    return true;
-                }
-                if (btn.id === "TOGGLE_DEBUG_DRAW") {
-                    this.debugDrawPhysics = !this.debugDrawPhysics;
-                    return true;
-                }
-                if (btn.id === "TOGGLE_MAP_STYLE") {
-                    this.toggleMapStyle(game);
                     return true;
                 }
                 if (btn.id === "TP_LANDMARK" && btn.landmarkId && typeof game.teleportToLandmark === "function") {
@@ -2313,7 +2220,7 @@ class RetroRenderer {
     }
 
     /* ========================================================================
-       8. AUTHENTIC 1997 GTA 1 / CARNAGE3D BITMAP FONT & HUD RENDERER (HUD.cpp)
+       8. AUTHENTIC 1997 1997 GTA 1 BITMAP FONT & HUD RENDERER (HUD.cpp)
        ======================================================================== */
     measureGta1FontString(fontName, text, scale = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta.sprites.fonts[fontName]) return text.length * 12 * scale;
@@ -2374,7 +2281,7 @@ class RetroRenderer {
         const H = this.canvas.height;
         const s = 1.45;
 
-        // A. TOP-RIGHT: AUTHENTIC CARNAGE3D SCORE, MULTIPLIER & LIVES PANEL
+        // A. TOP-RIGHT: AUTHENTIC 1997 GTA 1 SCORE, MULTIPLIER & LIVES PANEL
         const scoreStr = String(Math.max(0, Math.floor(game.cash || 0))).padStart(8, "0");
         const scoreW = this.measureGta1FontString("SCORE2", scoreStr, s);
         const scoreX = W - scoreW - 14;
@@ -2397,9 +2304,9 @@ class RetroRenderer {
         const livesX = scoreX - 6 - livesW;
         this.drawGta1FontString(ctx, "MISSMUL2", livesStr, livesX, scoreY + 13 * s, s, "left");
 
-        // B. LEFT PANEL (Below ▼ Game Cheats): LUCIA GTA 6 MUGSHOT BADGE + WEAPON, ARMOR, KEY & PAGER POPUP
+        // B. LEFT PANEL (Top-Left): LUCIA MUGSHOT BADGE + WEAPON, ARMOR, KEY & PAGER POPUP
         const leftX = 12;
-        let leftY = this.showCheatsWindow ? (this.cheatsCollapsed ? 42 : 476) : 12;
+        const leftY = 12;
         const iconScale = 1.35;
 
         let iconX = leftX;
