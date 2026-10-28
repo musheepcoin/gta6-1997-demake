@@ -13,6 +13,7 @@ class LeonidaGame {
         this.renderer = new RetroRenderer(this.canvas, this.radarCanvas, this.map);
         this.missions = new MissionManager(this);
         this.trafficManager = new TrafficManager(this);
+        this.net = typeof ViceNetworkManager !== "undefined" ? new ViceNetworkManager(this) : null;
 
         // Input state (Supports both AZERTY ZQSD, QWERTY WASD, and Arrow Keys)
         this.input = {
@@ -886,6 +887,11 @@ class LeonidaGame {
                 this.toggleFullMap();
             }
 
+            // Online P2P Multiplayer Action: Teleport to Remote Player / Spawn Online Rival [O]
+            if (code === "KeyO") {
+                if (this.net) this.net.triggerOnlineAction();
+            }
+
             if (code === "Escape") {
                 if (this.activeInterior) {
                     this.exitInterior();
@@ -1623,10 +1629,13 @@ class LeonidaGame {
             if (v.isEmergency) {
                 v.sirenActive = !v.sirenActive;
                 this.audio.playHorn(true);
-                this.addFloatingText(v.x, v.y - 28, v.sirenActive ? "🚨 SIREN ON!" : "🚨 SIREN OFF", "#38bdf8");
+                const sTxt = v.sirenActive ? "🚨 SIREN ON!" : "🚨 SIREN OFF";
+                this.addFloatingText(v.x, v.y - 28, sTxt, "#38bdf8");
+                if (this.net) this.net.broadcastHorn(v.x, v.y, true, sTxt, "#38bdf8");
             } else {
                 this.audio.playHorn(false);
                 this.addFloatingText(v.x, v.y - 28, "📯 HONK! HONK!", "#ffd13b");
+                if (this.net) this.net.broadcastHorn(v.x, v.y, false, "📯 HONK! HONK!", "#ffd13b");
             }
             // Make nearby pedestrians panic and clear the road
             for (const ped of this.peds) {
@@ -1906,8 +1915,11 @@ class LeonidaGame {
         }
     }
 
-    explodeAt(x, y, radius = 115, damage = 180, byPlayer = false) {
+    explodeAt(x, y, radius = 115, damage = 180, byPlayer = false, fromNetwork = false) {
         this.audio.playExplosion();
+        if (byPlayer && !fromNetwork && this.net) {
+            this.net.broadcastExplosion(x, y, radius, damage);
+        }
 
         for (let i = 0; i < 18; i++) {
             const ang = Math.random() * Math.PI * 2;
@@ -2137,6 +2149,10 @@ class LeonidaGame {
             }
         } else {
             // WASTED: lose 1 life & halve multiplier
+            if (this.lastAttackerId && this.net) {
+                this.net.broadcastKilledBy(this.lastAttackerId, this.lastAttackerName);
+                this.lastAttackerId = null;
+            }
             this.lives = Math.max(0, this.lives - 1);
             this.multiplier = Math.max(1, Math.floor(this.multiplier * 0.5));
             if (this.lives === 0) {
@@ -2216,9 +2232,10 @@ class LeonidaGame {
         }
 
         const count = spec.pellets || 1;
+        const spawnedPellets = [];
         for (let i = 0; i < count; i++) {
             const a = angle + (Math.random() - 0.5) * spec.spread;
-            this.projectiles.push({
+            const proj = {
                 x: shooterX + Math.cos(a) * 16,
                 y: shooterY + Math.sin(a) * 16,
                 vx: Math.cos(a) * spec.speed,
@@ -2230,7 +2247,12 @@ class LeonidaGame {
                 fromPlayer: isPlayer,
                 fromJason: Boolean(fromJason),
                 r: spec.isFlame ? 9 : 4
-            });
+            };
+            this.projectiles.push(proj);
+            spawnedPellets.push(proj);
+        }
+        if (isPlayer && !fromJason && this.net) {
+            this.net.broadcastShoot(weaponKey, spawnedPellets);
         }
     }
 
@@ -3389,9 +3411,27 @@ class LeonidaGame {
                 }
             }
 
+            // Hit remote online player or Rival Bot?
+            if (!hitSomething && pr.fromPlayer && this.net && this.net.remotePlayers.size > 0) {
+                for (const rp of this.net.remotePlayers.values()) {
+                    if (rp.dead) continue;
+                    const hitRadius = rp.veh ? 24 : 15;
+                    if (Math.hypot(rp.x - pr.x, rp.y - pr.y) < hitRadius) {
+                        this.net.damageRemotePlayer(rp, pr.damage, !pr.fromJason);
+                        this.spawnParticle(pr.x, pr.y, pr.isFlame ? "FIRE" : "SPARK");
+                        hitSomething = true;
+                        break;
+                    }
+                }
+            }
+
             // Hit player?
             if (!hitSomething && !pr.fromPlayer && !p.inVehicle) {
                 if (Math.hypot(p.x - pr.x, p.y - pr.y) < 13) {
+                    if (pr.fromRemoteId) {
+                        this.lastAttackerId = pr.fromRemoteId;
+                        this.lastAttackerName = pr.fromRemoteName || "ONLINE RIVAL";
+                    }
                     this.damagePlayer(pr.damage * 0.35);
                     hitSomething = true;
                 }
@@ -3511,8 +3551,11 @@ class LeonidaGame {
             this.districtPopupTimer = Math.max(0, this.districtPopupTimer - dt);
         }
 
-        // 12. Missions, Footsteps & Spatial Ambient Audio Update
+        // 12. Missions, Online P2P Network, Footsteps & Spatial Ambient Audio Update
         this.missions.update(dt);
+        if (this.net) {
+            this.net.update(dt);
+        }
 
         // 12A. Surface-aware Footsteps for Lucia on foot (Pavement, Vice Beach Sand, Park Grass, Water)
         if (!p.inVehicle && !p.dead) {

@@ -2214,6 +2214,57 @@ class RetroRenderer {
             );
         }
 
+        // 4B. Online Multiplayer Remote Players & Rival Bots (On-Foot & In-Vehicle 3D Sync)
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            for (const rp of game.net.remotePlayers.values()) {
+                if (rp.x < minX || rp.x > maxX || rp.y < minY || rp.y > maxY) continue;
+                const rz = this.getEntityZ(rp, 0.05);
+                if (rp.dead) {
+                    this.batchObjectSprite3D("444", rp.x, rp.y, rz - 0.02, rp.angle || 0, 1.0, SPRITE_DRAW_ORDER.CORPSE);
+                    this.batchPedSprite3D(rp.pedType || "gang", 42, rp.x, rp.y, rz - 0.015, rp.angle || 0, 1.30, false, SPRITE_DRAW_ORDER.CORPSE);
+                    continue;
+                }
+                if (rp.veh) {
+                    const rv = rp.veh;
+                    const mapInfo = this.getVehicleG24Mapping(rv);
+                    const vehEntry = this.vehicleBySprIdx ? this.vehicleBySprIdx[mapInfo.sprId] : null;
+                    let rect = null;
+                    if (vehEntry) {
+                        rect = (vehEntry.remaps && vehEntry.remaps[(mapInfo.remapIdx || 0) % vehEntry.remaps.length]) || vehEntry.base;
+                    } else if (this.gta1Meta.sprites.objects[mapInfo.sprId]) {
+                        rect = this.gta1Meta.sprites.objects[mapInfo.sprId];
+                    }
+                    if (rect) {
+                        const vw = rv.w || 48;
+                        const vh = rv.h || 24;
+                        this.pushSolidQuad3D(rp.x, rp.y, rz - 0.022, vw * 0.94, vh * 0.92, rp.angle, 0.02, 0.03, 0.06, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(rp.x + sunCos * 4.6, rp.y + sunSin * 4.6, rz - 0.026, vw * 0.90, vh * 0.88, rp.angle, 0.03, 0.04, 0.08, Math.max(0.28, sunShadowAlpha * 1.18), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushAtlasSprite3D(rect, rp.x, rp.y, rz + 0.01, rp.angle - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1, 0);
+                        if (rv.isMoto) {
+                            this.batchPedSprite3D(rp.pedType || "gang", 84, rp.x, rp.y, rz + 0.035, rp.angle, 1.14, (rp.muzzleTimer || 0) > 0, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                        }
+                    }
+                } else {
+                    if (nfGlobal < 0.88) {
+                        this.pushSolidQuad3D(rp.x + sunCos * 3.5, rp.y + sunSin * 3.5, rz - 0.022, 11.4, 8.8, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    const rWep = (rp.muzzleTimer || 0) > 0 ? (rp.weapon || "PISTOL") : "FIST";
+                    const rFrame = this.getPedFrameIndex(rWep, Boolean(rp.isMoving), Boolean(rp.isRunning), rp.walkPhase || 0);
+                    this.batchPedSprite3D(
+                        rp.pedType || "gang",
+                        rFrame,
+                        rp.x,
+                        rp.y,
+                        rz,
+                        rp.angle || 0,
+                        pedScale * 1.14,
+                        (rp.muzzleTimer || 0) > 0,
+                        SPRITE_DRAW_ORDER.PEDESTRIAN
+                    );
+                }
+            }
+        }
+
         const p = game.player;
         if (!p.inVehicle) {
             const baseZ = this.getEntityZ(p, 0.05);
@@ -3449,6 +3500,41 @@ class RetroRenderer {
             }
         }
 
+        // 3. Online Multiplayer Floating 3D Player Nametags & Health Bars
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            const W = this.canvas.width;
+            const H = this.canvas.height;
+            for (const rp of game.net.remotePlayers.values()) {
+                const rz = this.getEntityZ(rp, 0.22);
+                const sc = this.worldToScreen(rp.x, rp.y, rz);
+                const col = rp.color || "#00f0ff";
+                if (sc.x >= -60 && sc.x <= W + 60 && sc.y >= -60 && sc.y <= H + 60) {
+                    const tag = rp.dead ? `💀 ${rp.name} (WASTED)` : `🌐 ${rp.name}`;
+                    const bw = Math.max(92, ctx.measureText(tag).width + 16);
+                    const bh = 22;
+                    const bx = Math.round(sc.x - bw * 0.5);
+                    const by = Math.round(sc.y - (rp.veh ? 38 : 30));
+
+                    ctx.fillStyle = "rgba(8, 12, 24, 0.88)";
+                    ctx.fillRect(bx, by, bw, bh);
+                    ctx.strokeStyle = col;
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillText(tag, sc.x, by + 8);
+
+                    // Mini Health Bar inside the nametag pill
+                    const hpPct = Math.max(0, Math.min(1, (rp.hp !== undefined ? rp.hp : 100) / 100));
+                    const barW = bw - 12;
+                    ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
+                    ctx.fillRect(bx + 6, by + 15, barW, 4);
+                    ctx.fillStyle = hpPct > 0.4 ? "#39ff14" : "#ff1e38";
+                    ctx.fillRect(bx + 6, by + 15, Math.round(barW * hpPct), 4);
+                }
+            }
+        }
+
         ctx.restore();
     }
 
@@ -4092,11 +4178,27 @@ class RetroRenderer {
         ctx.font = "8px -apple-system, 'Segoe UI', sans-serif";
         ctx.fillText("Online • Messages", avX + 25, smsY + 20);
 
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 8px -apple-system, 'Segoe UI', sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText(`${(game && game.lastSmsTimeStr) ? game.lastSmsTimeStr : staticClockStr} ✓✓`, smsX + smsW - 6, smsY + 12);
+        // Interactive Online P2P Multiplayer Pill Button [O]
+        const mpCount = (game && game.net && typeof game.net.getPlayerCount === "function")
+            ? game.net.getPlayerCount()
+            : 1;
+        const mpLabel = `🌐 ${mpCount}P ONLINE [O]`;
+        const mpBtnW = 68;
+        const mpBtnH = 15;
+        const mpBtnX = smsX + smsW - mpBtnW - 4;
+        const mpBtnY = smsY + 5;
+        rrect(mpBtnX, mpBtnY, mpBtnW, mpBtnH, 4);
+        ctx.fillStyle = mpCount > 1 ? "rgba(6, 182, 212, 0.32)" : "rgba(30, 41, 59, 0.92)";
+        ctx.fill();
+        ctx.strokeStyle = mpCount > 1 ? "#00f0ff" : "#38bdf8";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = mpCount > 1 ? "#00f0ff" : "#e2e8f0";
+        ctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(mpLabel, mpBtnX + mpBtnW * 0.5, mpBtnY + mpBtnH * 0.5 + 0.5);
         ctx.textAlign = "left";
+        this.cheatButtons.push({ id: "PHONE_ONLINE_BTN", x: mpBtnX, y: mpBtnY, w: mpBtnW, h: mpBtnH });
 
         // Word-wrapped English SMS message body
         const pagerEl = document.getElementById("pager-text");
@@ -4357,6 +4459,22 @@ class RetroRenderer {
             ctx.fillRect(jp.x - 2.5, jp.y - 2.5, 5, 5);
         }
 
+        // Online Multiplayer Remote Player Blips on Smartphone GPS
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            for (const rp of game.net.remotePlayers.values()) {
+                const rpt = worldToMini(rp.x, rp.y);
+                const rx = Math.max(mx + 4, Math.min(mx + mw - 4, rpt.x));
+                const ry = Math.max(my + 4, Math.min(my + mh - 4, rpt.y));
+                ctx.fillStyle = rp.color || "#00f0ff";
+                ctx.beginPath();
+                ctx.arc(rx, ry, 3.8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
         // Player Directional Arrow
         const pp = worldToMini(p.x, p.y);
         const ang = (p.inVehicle ? p.inVehicle.angle : p.angle) || 0;
@@ -4490,6 +4608,10 @@ class RetroRenderer {
                 }
                 if (btn.id === "PHONE_VOL_UP" && typeof game.adjustYouTubeVolume === "function") {
                     game.adjustYouTubeVolume(15);
+                    return true;
+                }
+                if (btn.id === "PHONE_ONLINE_BTN" && game && game.net && typeof game.net.triggerOnlineAction === "function") {
+                    game.net.triggerOnlineAction();
                     return true;
                 }
                 if (btn.id === "UNMINIMIZE_PHONE") {
@@ -4965,11 +5087,25 @@ class RetroRenderer {
             ctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
         }
 
-        // 8. Jason Duval Partner Blip
+        // 8. Jason Duval Partner Blip & Online Remote Players
         if (game.jason) {
             const jp = worldToMini(game.jason.x, game.jason.y);
             ctx.fillStyle = "#00f0ff";
             ctx.fillRect(jp.x - 3, jp.y - 3, 6, 6);
+        }
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            for (const rp of game.net.remotePlayers.values()) {
+                const rpt = worldToMini(rp.x, rp.y);
+                const rx = Math.max(mx + 5, Math.min(mx + mw - 5, rpt.x));
+                const ry = Math.max(my + 5, Math.min(my + mh - 5, rpt.y));
+                ctx.fillStyle = rp.color || "#00f0ff";
+                ctx.beginPath();
+                ctx.arc(rx, ry, 4.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+            }
         }
 
         // 9. Lucia / Player Directional Arrow & Vision Cone
@@ -5265,6 +5401,18 @@ class RetroRenderer {
             const jy = Math.round(game.jason.y * sy);
             fctx.fillStyle = "#00f0ff";
             fctx.fillRect(jx - 4, jy - 4, 8, 8);
+        }
+
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            for (const rp of game.net.remotePlayers.values()) {
+                const rx = Math.round(rp.x * sx);
+                const ry = Math.round(rp.y * sy);
+                fctx.fillStyle = rp.color || "#00f0ff";
+                fctx.fillRect(rx - 5, ry - 5, 10, 10);
+                fctx.strokeStyle = "#ffffff";
+                fctx.lineWidth = 1.8;
+                fctx.strokeRect(rx - 5, ry - 5, 10, 10);
+            }
         }
 
         const lx = Math.round(game.player.x * sx);
