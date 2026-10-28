@@ -56,9 +56,227 @@ class ViceNetworkManager {
         this.maxSlots = 12;
         this.webrtcReady = false;
         this.statusText = "CONNECTING...";
+        this.isChatTyping = false;
+        this.chatHistory = [];
 
+        this.initChatUI();
         this.initBroadcastChannel();
         this.initWebRTCMesh();
+    }
+
+    /* ========================================================================
+       0. LIVE MULTIPLAYER CHAT UI & 3D SPEECH BUBBLE SYSTEM [T]
+       ======================================================================== */
+    initChatUI() {
+        if (typeof document === "undefined") return;
+        this.chatWidget = document.getElementById("mp-chat-widget");
+        this.chatMessagesEl = document.getElementById("mp-chat-messages");
+        this.chatForm = document.getElementById("mp-chat-form");
+        this.chatInput = document.getElementById("mp-chat-input");
+        this.chatRoomBadge = document.getElementById("mp-chat-room");
+        this.chatNameBtn = document.getElementById("mp-chat-name-btn");
+        this.chatToggleBtn = document.getElementById("mp-chat-toggle-btn");
+
+        if (this.chatRoomBadge) {
+            this.chatRoomBadge.textContent = `[${this.roomCode}]`;
+        }
+        if (this.chatNameBtn) {
+            this.chatNameBtn.textContent = `✏️ ${this.playerName.slice(0, 12)}`;
+            this.chatNameBtn.addEventListener("click", () => {
+                this.focusChatInput("/name ");
+            });
+        }
+        if (this.chatToggleBtn && this.chatWidget) {
+            this.chatToggleBtn.addEventListener("click", () => {
+                const collapsed = this.chatWidget.classList.toggle("chat-collapsed");
+                this.chatToggleBtn.textContent = collapsed ? "+" : "–";
+            });
+        }
+
+        if (this.chatInput) {
+            this.chatInput.addEventListener("focus", () => {
+                this.isChatTyping = true;
+                if (this.chatWidget) this.chatWidget.classList.add("chat-active");
+                // Clear held movement/shoot keys so Lucia stops moving while typing
+                if (this.game && this.game.input) {
+                    this.game.input.up = false;
+                    this.game.input.down = false;
+                    this.game.input.left = false;
+                    this.game.input.right = false;
+                    this.game.input.handbrake = false;
+                    this.game.input.shoot = false;
+                    this.game.input.sprint = false;
+                }
+            });
+            this.chatInput.addEventListener("blur", () => {
+                this.isChatTyping = false;
+                if (this.chatWidget) this.chatWidget.classList.remove("chat-active");
+            });
+        }
+
+        if (this.chatForm) {
+            this.chatForm.addEventListener("submit", (e) => {
+                e.preventDefault();
+                if (!this.chatInput) return;
+                const val = this.chatInput.value.trim();
+                this.chatInput.value = "";
+                this.chatInput.blur();
+                if (val) {
+                    this.sendChatMessage(val);
+                }
+            });
+        }
+
+        document.querySelectorAll(".mp-quick-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const msg = btn.getAttribute("data-msg");
+                if (msg) {
+                    this.sendChatMessage(msg);
+                }
+            });
+        });
+
+        this.addChatLog(
+            "VICE NET",
+            `Connected to room [${this.roomCode}] as ${this.playerName}. Press [T] to chat or [O] for Online Action!`,
+            "#00f0ff",
+            true
+        );
+    }
+
+    focusChatInput(prefill = "") {
+        if (!this.chatInput) return;
+        if (this.chatWidget && this.chatWidget.classList.contains("chat-collapsed")) {
+            this.chatWidget.classList.remove("chat-collapsed");
+            if (this.chatToggleBtn) this.chatToggleBtn.textContent = "–";
+        }
+        if (prefill) {
+            this.chatInput.value = prefill;
+        }
+        this.chatInput.focus();
+    }
+
+    addChatLog(author, text, color = "#00f0ff", isSystem = false) {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        const timeStr = `${hh}:${mm}`;
+
+        this.chatHistory.push({ timeStr, author, text, color, isSystem });
+        if (this.chatHistory.length > 40) {
+            this.chatHistory.shift();
+        }
+
+        if (!this.chatMessagesEl) return;
+        const row = document.createElement("div");
+        row.className = isSystem ? "mp-chat-line mp-sys" : "mp-chat-line";
+
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "mp-time";
+        timeSpan.textContent = timeStr;
+        row.appendChild(timeSpan);
+
+        const authSpan = document.createElement("span");
+        authSpan.className = "mp-author";
+        authSpan.style.color = color || "#00f0ff";
+        authSpan.textContent = isSystem ? `[${author}]` : `${author}:`;
+        row.appendChild(authSpan);
+
+        const msgSpan = document.createElement("span");
+        msgSpan.textContent = text;
+        row.appendChild(msgSpan);
+
+        this.chatMessagesEl.appendChild(row);
+        while (this.chatMessagesEl.children.length > 40) {
+            this.chatMessagesEl.removeChild(this.chatMessagesEl.firstChild);
+        }
+        this.chatMessagesEl.scrollTop = this.chatMessagesEl.scrollHeight;
+    }
+
+    sendChatMessage(rawText) {
+        const cleaned = String(rawText || "").trim().slice(0, 140);
+        if (!cleaned) return;
+
+        // Slash command: /name NewPseudo or /nick NewPseudo
+        if (/^\/(name|nick|pseudo)\s+/i.test(cleaned)) {
+            const newName = cleaned.replace(/^\/(name|nick|pseudo)\s+/i, "").trim().slice(0, 18).toUpperCase();
+            if (newName) {
+                const oldName = this.playerName;
+                this.playerName = newName;
+                this.safeSetStorage("vc97_mp_name", newName);
+                if (this.chatNameBtn) {
+                    this.chatNameBtn.textContent = `✏️ ${this.playerName.slice(0, 12)}`;
+                }
+                this.addChatLog("VICE NET", `You changed your nickname to ${this.playerName}`, "#39ff14", true);
+                this.sendPacket({
+                    t: "NAME",
+                    oldName,
+                    name: this.playerName,
+                    color: this.playerColor
+                });
+            }
+            return;
+        }
+
+        // Slash command: /clear
+        if (/^\/clear$/i.test(cleaned)) {
+            if (this.chatMessagesEl) this.chatMessagesEl.innerHTML = "";
+            this.addChatLog("VICE NET", "Chat history cleared.", "#00f0ff", true);
+            return;
+        }
+
+        const p = this.game ? this.game.player : null;
+        if (p) {
+            p.chatText = cleaned;
+            p.chatTimer = 6.5;
+        }
+
+        this.addChatLog(this.playerName, cleaned, this.playerColor, false);
+
+        if (this.game && this.game.audio) {
+            this.game.audio.playBeep(720, 0.035, "sine", 0.04);
+        }
+        if (this.game && typeof this.game.sendPager === "function") {
+            this.game.sendPager(`💬 ${this.playerName}`, cleaned, false);
+        }
+
+        this.sendPacket({
+            t: "CHAT",
+            name: this.playerName,
+            color: this.playerColor,
+            text: cleaned,
+            x: p ? Math.round(p.x) : 0,
+            y: p ? Math.round(p.y) : 0
+        });
+
+        // If any Online Rival Bots are present in the lobby, let one reply naturally after ~1s!
+        const bots = Array.from(this.remotePlayers.values()).filter((r) => r.isBot && !r.dead);
+        if (bots.length > 0) {
+            const bot = bots[Math.floor(Math.random() * bots.length)];
+            setTimeout(() => {
+                if (!this.remotePlayers.has(bot.id)) return;
+                const lower = cleaned.toLowerCase();
+                let reply = "On se retrouve sur Ocean Drive devant le Hotel Dixon ! 🌴🔥";
+                if (lower.includes("race") || lower.includes("course")) {
+                    reply = "Vas-y ! Départ Ocean Drive jusqu'au Pier, le dernier paie sa tournée au Club Nine1Nine ! 🏎️💨";
+                } else if (lower.includes("yo") || lower.includes("salut") || lower.includes("hello") || lower.includes("slt") || lower.includes("cc")) {
+                    reply = `Yo ${this.playerName} ! Bienvenue dans Vice City '97 ! 👋🌴`;
+                } else if (lower.includes("gg") || lower.includes("bien joué")) {
+                    reply = "GG ! Ce moteur 1997 tourne comme une horloge ! 🔥";
+                } else if (lower.includes("gps") || lower.includes("rejoins") || lower.includes("me")) {
+                    reply = "J'arrive plein gaz sur ta position GPS ! 📍🚓";
+                }
+                bot.chatText = reply;
+                bot.chatTimer = 6.5;
+                this.addChatLog(bot.name, reply, bot.color, false);
+                if (this.game && this.game.audio) {
+                    this.game.audio.playBeep(820, 0.04, "sine", 0.04);
+                }
+                if (this.game && typeof this.game.sendPager === "function") {
+                    this.game.sendPager(`💬 ${bot.name}`, reply, false);
+                }
+            }, 950);
+        }
     }
 
     safeGetStorage(key) {
@@ -238,6 +456,12 @@ class ViceNetworkManager {
             const isNew = !this.remotePlayers.has(pkt.id);
             this.ensureRemotePlayer(pkt);
             if (isNew && this.game) {
+                this.addChatLog(
+                    "VICE NET",
+                    `🌐 ${pkt.name || "PLAYER"} joined room [${this.roomCode}] (${this.getPlayerCount()}P online)`,
+                    pkt.color || "#00f0ff",
+                    true
+                );
                 this.game.addFloatingText(
                     this.game.player.x,
                     this.game.player.y - 34,
@@ -247,13 +471,39 @@ class ViceNetworkManager {
                 if (typeof this.game.sendPager === "function") {
                     this.game.sendPager(
                         "VICE CITY ONLINE",
-                        `🌐 ${pkt.name || "PLAYER"} joined room [${this.roomCode}]! (${this.getPlayerCount()} players online). Press [O] to teleport to players or manage lobby.`,
+                        `🌐 ${pkt.name || "PLAYER"} joined room [${this.roomCode}]! (${this.getPlayerCount()} players online). Press [T] to chat or [O] to teleport.`,
                         false
                     );
                 }
             }
             // Reply with our current state immediately so the newcomer sees us right away
             this.broadcastStateNow();
+            return;
+        }
+
+        if (pkt.t === "CHAT") {
+            const rp = this.ensureRemotePlayer(pkt);
+            const msg = String(pkt.text || "").slice(0, 140);
+            if (!msg) return;
+            rp.name = pkt.name || rp.name;
+            rp.color = pkt.color || rp.color;
+            rp.chatText = msg;
+            rp.chatTimer = 6.5;
+            this.addChatLog(rp.name, msg, rp.color, false);
+            if (this.game && this.game.audio) {
+                this.game.audio.playBeep(820, 0.04, "sine", 0.045);
+            }
+            if (this.game && typeof this.game.sendPager === "function") {
+                this.game.sendPager(`💬 ${rp.name}`, msg, false);
+            }
+            return;
+        }
+
+        if (pkt.t === "NAME") {
+            const rp = this.ensureRemotePlayer(pkt);
+            const oldName = pkt.oldName || rp.name;
+            rp.name = pkt.name || rp.name;
+            this.addChatLog("VICE NET", `✏️ ${oldName} is now known as ${rp.name}`, rp.color || "#39ff14", true);
             return;
         }
 
@@ -335,6 +585,12 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "KILLED" && this.game) {
+            this.addChatLog(
+                "PVP FRAG",
+                `💀 ${pkt.killerName} wasted ${pkt.victimName}!`,
+                "#ff2a85",
+                true
+            );
             if (pkt.killerId === this.playerId) {
                 this.kills++;
                 this.game.multiplier += 1;
@@ -400,11 +656,18 @@ class ViceNetworkManager {
         if (!this.game) return;
         const now = performance.now();
 
+        if (this.game.player && (this.game.player.chatTimer || 0) > 0) {
+            this.game.player.chatTimer = Math.max(0, this.game.player.chatTimer - dt);
+        }
+
         // 1. Update simulated Online Rival Bots (if user spawned any via [O] for instant solo testing)
         this.updateSimulatedRivals(dt);
 
         // 2. Smooth 60 FPS dead-reckoning interpolation for all remote players
         for (const [id, rp] of this.remotePlayers.entries()) {
+            if ((rp.chatTimer || 0) > 0) {
+                rp.chatTimer = Math.max(0, rp.chatTimer - dt);
+            }
             if (rp.isBot) continue;
             if (now - rp.lastSeen > 8500) {
                 this.remotePlayers.delete(id);
@@ -654,6 +917,7 @@ class ViceNetworkManager {
         };
         this.remotePlayers.set(botId, rp);
         this.game.addFloatingText(p.x, p.y - 34, `🌐 ONLINE RIVAL JOINED: ${rp.name}!`, rp.color);
+        this.addChatLog("VICE NET", `🌐 ${rp.name} joined room [${this.roomCode}]! Say hi with [T]!`, rp.color, true);
         return rp;
     }
 

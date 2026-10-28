@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRAND THEFT AUTO: VICE CITY '97 — LUCIA EDITION (1997 2.5D Demake)</title>
-    <link rel="stylesheet" href="css/style.css?v=97_96">
+    <link rel="stylesheet" href="css/style.css?v=98_16">
 </head>
 <body>
     <div id="game-container">
@@ -146,6 +146,40 @@
             </div>
         </div>
 
+        <!-- Bottom-Left: Vice City '97 P2P Online Multiplayer Live Chat Box [T] -->
+        <div id="mp-chat-widget">
+            <div class="mp-chat-header">
+                <div class="mp-chat-title-wrap">
+                    <span class="mp-chat-dot"></span>
+                    <span class="mp-chat-title">💬 VICE ONLINE CHAT</span>
+                    <span id="mp-chat-room" class="mp-chat-room">[VICE97]</span>
+                </div>
+                <div class="mp-chat-actions">
+                    <button type="button" id="mp-chat-name-btn" class="mp-chat-mini-btn" title="Change your Online Nickname">✏️ NAME</button>
+                    <button type="button" id="mp-chat-toggle-btn" class="mp-chat-mini-btn" title="Minimize / Expand Chat">–</button>
+                </div>
+            </div>
+            <div id="mp-chat-body">
+                <div id="mp-chat-messages" aria-live="polite"></div>
+                <div class="mp-chat-quick-row">
+                    <button type="button" class="mp-quick-btn" data-msg="Yo Vice City! 👋">👋 YO!</button>
+                    <button type="button" class="mp-quick-btn" data-msg="Course sur Ocean Drive ?! 🏎️💨">🏎️ RACE?</button>
+                    <button type="button" class="mp-quick-btn" data-msg="Rejoins-moi sur ma position GPS ! 📍">📍 ON ME!</button>
+                    <button type="button" class="mp-quick-btn" data-msg="GG ! Bien joué ! 🔥">🔥 GG!</button>
+                </div>
+                <form id="mp-chat-form" autocomplete="off">
+                    <input
+                        type="text"
+                        id="mp-chat-input"
+                        maxlength="140"
+                        placeholder="Press [T] to chat... (/name Pseudo)"
+                        aria-label="Multiplayer Chat Input"
+                    />
+                    <button type="submit" id="mp-chat-send">SEND ↵</button>
+                </form>
+            </div>
+        </div>
+
         <!-- FULL-SQUARE GTA 1 (.CMP) INTERACTIVE CITY MAP MODAL (Toggleable with [M] or clicking Radar) -->
         <div id="fullmap-modal" class="hidden">
             <div class="fullmap-card">
@@ -244,12 +278,12 @@
     </div>
 
     <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=98_14"></script>
-    <script src="js/map.js?v=98_14"></script>
-    <script src="js/entities.js?v=98_14"></script>
-    <script src="js/missions.js?v=98_14"></script>
-    <script src="js/renderer.js?v=98_14"></script>
-    <script src="js/net.js?v=98_14"></script>
-    <script src="js/game.js?v=98_14"></script>
+    <script src="js/audio.js?v=98_15"></script>
+    <script src="js/map.js?v=98_15"></script>
+    <script src="js/entities.js?v=98_15"></script>
+    <script src="js/missions.js?v=98_15"></script>
+    <script src="js/renderer.js?v=98_15"></script>
+    <script src="js/net.js?v=98_15"></script>
+    <script src="js/game.js?v=98_15"></script>
 </body>
 </html>

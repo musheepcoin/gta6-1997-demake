@@ -3531,8 +3531,43 @@ class RetroRenderer {
                     ctx.fillRect(bx + 6, by + 15, barW, 4);
                     ctx.fillStyle = hpPct > 0.4 ? "#39ff14" : "#ff1e38";
                     ctx.fillRect(bx + 6, by + 15, Math.round(barW * hpPct), 4);
+
+                    // Floating 3D Speech Bubble above remote player nametag when they chat!
+                    if ((rp.chatTimer || 0) > 0 && rp.chatText) {
+                        const bubbleTxt = `💬 ${rp.chatText.slice(0, 56)}`;
+                        const bbw = Math.max(80, ctx.measureText(bubbleTxt).width + 18);
+                        const bbh = 20;
+                        const bbx = Math.round(sc.x - bbw * 0.5);
+                        const bby = by - 25;
+                        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+                        ctx.fillRect(bbx, bby, bbw, bbh);
+                        ctx.strokeStyle = col;
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(bbx + 0.5, bby + 0.5, bbw - 1, bbh - 1);
+                        ctx.fillStyle = "#fde047";
+                        ctx.fillText(bubbleTxt, sc.x, bby + bbh * 0.5);
+                    }
                 }
             }
+        }
+
+        // 4. Local Player 3D Speech Bubble when Lucia sends a chat message [T]
+        if ((p.chatTimer || 0) > 0 && p.chatText) {
+            const pObj = p.inVehicle || p;
+            const pz = this.getEntityZ(pObj, 0.24);
+            const pSc = this.worldToScreen(pObj.x, pObj.y, pz);
+            const bubbleTxt = `💬 ${p.chatText.slice(0, 56)}`;
+            const bbw = Math.max(80, ctx.measureText(bubbleTxt).width + 18);
+            const bbh = 21;
+            const bbx = Math.round(pSc.x - bbw * 0.5);
+            const bby = Math.round(pSc.y - (p.inVehicle ? 44 : 36));
+            ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+            ctx.fillRect(bbx, bby, bbw, bbh);
+            ctx.strokeStyle = "#ff2a85";
+            ctx.lineWidth = 1.6;
+            ctx.strokeRect(bbx + 0.5, bby + 0.5, bbw - 1, bbh - 1);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(bubbleTxt, pSc.x, bby + bbh * 0.5);
         }
 
         ctx.restore();

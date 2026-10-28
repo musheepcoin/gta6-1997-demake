@@ -784,6 +784,9 @@ class LeonidaGame {
     bindEvents() {
         window.addEventListener("keydown", (e) => {
             if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+                if (e.code === "Escape") {
+                    e.target.blur();
+                }
                 return;
             }
             const code = e.code;
@@ -890,6 +893,15 @@ class LeonidaGame {
             // Online P2P Multiplayer Action: Teleport to Remote Player / Spawn Online Rival [O]
             if (code === "KeyO") {
                 if (this.net) this.net.triggerOnlineAction();
+            }
+
+            // Open Online Multiplayer Live Chat Input [T or Y]
+            if (code === "KeyT" || code === "KeyY") {
+                if (this.net && typeof this.net.focusChatInput === "function") {
+                    e.preventDefault();
+                    this.net.focusChatInput();
+                    return;
+                }
             }
 
             if (code === "Escape") {
