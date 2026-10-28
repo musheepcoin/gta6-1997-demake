@@ -104,6 +104,7 @@ class RetroRenderer {
             uniform float uFanStep;
             varying vec2 vUV;
             varying float vAnim;
+            varying vec3 vWorldPos;
             void main() {
                 vec2 uv = aUV;
                 if (aAnim > 0.5 && aAnim < 1.5) {
@@ -123,6 +124,7 @@ class RetroRenderer {
                 }
                 vUV = uv;
                 vAnim = aAnim;
+                vWorldPos = aPos;
                 gl_Position = uViewProj * vec4(aPos, 1.0);
             }
         `;
@@ -131,6 +133,7 @@ class RetroRenderer {
             precision mediump float;
             varying vec2 vUV;
             varying float vAnim;
+            varying vec3 vWorldPos;
             uniform sampler2D uTex;
             uniform float uNightTint;
             uniform float uSunsetTint;
@@ -155,13 +158,26 @@ class RetroRenderer {
                 if (uNightTint > 0.01) {
                     vec3 nightRgb = c.rgb;
                     if (vAnim < -0.5) {
-                        // Vertical 3D building facade (face < 4): lit hotel/skyscraper windows & neon strips glow at night!
+                        // Inspired by gta2-rtx-remix SubUSDs/*_emissive.e.rtex.dds & lamp_emissives.py:
+                        // Vertical 3D building facade (face < 4) with per-room emissive window masks & Vice neon trim!
                         float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
                         float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                        float isWindowOrNeon = clamp((lum - 0.55) * 3.6 + (sat - 0.38) * 2.5, 0.0, 1.0);
-                        vec3 wallDark = c.rgb * vec3(0.55, 0.62, 0.85);
-                        vec3 windowGlow = min(vec3(1.0), c.rgb * 1.45 + vec3(0.10, 0.06, 0.14));
-                        nightRgb = mix(wallDark, windowGlow, isWindowOrNeon);
+                        float isGlassOrNeon = clamp((lum - 0.50) * 3.8 + (sat - 0.34) * 2.8, 0.0, 1.0);
+
+                        // Deterministic 3D room cell hash so ~62% of hotel/office rooms are lit and ~38% are dark
+                        vec3 roomCell = floor(vWorldPos * vec3(2.0, 2.0, 2.0));
+                        float roomHash = fract(sin(dot(roomCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+                        float roomLit = step(0.36, roomHash);
+
+                        vec3 roomTint = vec3(1.0, 0.86, 0.52); // Warm tungsten hotel/apartment window light
+                        if (uViceStyle > 0.5) {
+                            if (roomHash > 0.82) roomTint = vec3(0.28, 0.95, 1.0);      // Ocean Drive Neon Cyan
+                            else if (roomHash > 0.66) roomTint = vec3(1.0, 0.36, 0.76); // Art Deco Flamingo Pink
+                        }
+
+                        vec3 wallDark = c.rgb * vec3(0.46, 0.54, 0.78);
+                        vec3 windowGlow = min(vec3(1.0), mix(c.rgb * 1.38, roomTint, 0.42) + vec3(0.08, 0.05, 0.10));
+                        nightRgb = mix(wallDark, windowGlow, isGlassOrNeon * (0.28 + 0.72 * roomLit));
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal navy
                         nightRgb = c.rgb * vec3(0.42, 0.52, 0.78);
@@ -276,6 +292,180 @@ class RetroRenderer {
         return tex;
     }
 
+    /* ========================================================================
+       1C. GTA2-RTX-REMIX SPRITE & TEXTURE ENHANCEMENT PIPELINE
+       Direct Port of:
+       - src/alpha_bleed.h CloseInteriorHoles (Repairs interior palette-index-0 black holes inside cars & peds)
+       - dll/src/texture_store.cpp ConvertEffectToAlpha (Luminance-to-alpha soft glow on fire, explosions, smoke & sparks)
+       - src/alpha_bleed.h BleedTransparentEdges (Dilates border RGB into alpha=0 texels to prevent dark edge halos)
+       ======================================================================== */
+    processGtaSpritesRtx(img, meta) {
+        if (!img || !img.width || !img.height || !meta || !meta.sprites) return img;
+        try {
+            const W = img.width;
+            const H = img.height;
+            const cvs = document.createElement("canvas");
+            cvs.width = W;
+            cvs.height = H;
+            const ctx = cvs.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            const imgData = ctx.getImageData(0, 0, W, H);
+            const d = imgData.data;
+
+            // 1. CloseInteriorHoles (src/alpha_bleed.h):
+            // In 8-bit paletted GTA sprites, index 0 (pure black) is keyed as transparent, which accidentally punches
+            // see-through holes inside car windshields, tires, grilles, and pedestrian hair/jackets.
+            // Flood-fill exterior alpha=0 from each sprite box's perimeter; any unreached interior alpha=0 pixel is restored to opaque deep black!
+            const closeBoxHoles = (rect) => {
+                if (!Array.isArray(rect) || rect.length < 4) return;
+                const [sx, sy, sw, sh] = rect;
+                if (sw <= 3 || sh <= 3 || sx < 0 || sy < 0 || sx + sw > W || sy + sh > H) return;
+                const size = sw * sh;
+                const ext = new Uint8Array(size);
+                const queue = new Int32Array(size);
+                let head = 0;
+                let tail = 0;
+
+                const trySeed = (lx, ly) => {
+                    const idx = ly * sw + lx;
+                    if (ext[idx]) return;
+                    const p = ((sy + ly) * W + (sx + lx)) * 4;
+                    if (d[p + 3] < 16) {
+                        ext[idx] = 1;
+                        queue[tail++] = idx;
+                    }
+                };
+
+                for (let lx = 0; lx < sw; lx++) {
+                    trySeed(lx, 0);
+                    trySeed(lx, sh - 1);
+                }
+                for (let ly = 1; ly < sh - 1; ly++) {
+                    trySeed(0, ly);
+                    trySeed(sw - 1, ly);
+                }
+
+                while (head < tail) {
+                    const cur = queue[head++];
+                    const lx = cur % sw;
+                    const ly = (cur - lx) / sw;
+                    if (lx > 0) trySeed(lx - 1, ly);
+                    if (lx + 1 < sw) trySeed(lx + 1, ly);
+                    if (ly > 0) trySeed(lx, ly - 1);
+                    if (ly + 1 < sh) trySeed(lx, ly + 1);
+                }
+
+                for (let ly = 1; ly < sh - 1; ly++) {
+                    for (let lx = 1; lx < sw - 1; lx++) {
+                        const idx = ly * sw + lx;
+                        if (!ext[idx]) {
+                            const p = ((sy + ly) * W + (sx + lx)) * 4;
+                            if (d[p + 3] < 16) {
+                                // Restore interior palette-index-0 black pixel to opaque obsidian!
+                                d[p] = 14;
+                                d[p + 1] = 15;
+                                d[p + 2] = 20;
+                                d[p + 3] = 255;
+                            }
+                        }
+                    }
+                }
+            };
+
+            if (Array.isArray(meta.sprites.vehicles)) {
+                for (const ve of meta.sprites.vehicles) {
+                    if (ve.base) closeBoxHoles(ve.base);
+                    if (Array.isArray(ve.remaps)) {
+                        for (const rm of ve.remaps) closeBoxHoles(rm);
+                    }
+                    if (Array.isArray(ve.doors)) {
+                        for (const dr of ve.doors) closeBoxHoles(dr);
+                    }
+                    if (ve.damage) {
+                        if (ve.damage.front) closeBoxHoles(ve.damage.front);
+                        if (ve.damage.rear) closeBoxHoles(ve.damage.rear);
+                        if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy);
+                    }
+                }
+            }
+            if (meta.sprites.wrecked) {
+                for (const k of Object.keys(meta.sprites.wrecked)) {
+                    closeBoxHoles(meta.sprites.wrecked[k]);
+                }
+            }
+
+            // 2. ConvertEffectToAlpha (dll/src/texture_store.cpp & tools/triage_textures.py):
+            // Convert 8-bit cutout fire (234..241), explosions (242..249), smoke (200..210) & sparks (219..223)
+            // so dark outer edges become smoothly translucent proportional to luminance instead of having a black 1-bit cutout rim!
+            if (meta.sprites.objects) {
+                const effectRanges = [
+                    [200, 210, false], // Smoke puffs
+                    [219, 223, true],  // Sparks & ricochets
+                    [234, 241, true],  // Fire flames
+                    [242, 249, true]   // Explosion fireballs
+                ];
+                for (const [idStart, idEnd, isEmissiveFire] of effectRanges) {
+                    for (let id = idStart; id <= idEnd; id++) {
+                        const rect = meta.sprites.objects[String(id)];
+                        if (!Array.isArray(rect) || rect.length < 4) continue;
+                        const [sx, sy, sw, sh] = rect;
+                        for (let ly = 0; ly < sh; ly++) {
+                            for (let lx = 0; lx < sw; lx++) {
+                                const p = ((sy + ly) * W + (sx + lx)) * 4;
+                                if (d[p + 3] === 0) continue;
+                                const r = d[p];
+                                const g = d[p + 1];
+                                const b = d[p + 2];
+                                const peak = Math.max(r, g, b);
+                                if (isEmissiveFire) {
+                                    // Smooth luminance-to-alpha ramp eliminating dark 8-bit charcoal fringe
+                                    const softA = Math.min(255, Math.max(0, Math.round((peak - 14) * 2.15)));
+                                    d[p + 3] = softA;
+                                    if (softA > 0) {
+                                        // Un-premultiply / lift warm flame colors on semi-transparent edges
+                                        d[p] = Math.min(255, Math.round(r * 1.18 + 18));
+                                        d[p + 1] = Math.min(255, Math.round(g * 1.10 + 6));
+                                    }
+                                } else {
+                                    // Smoke puff soft edge alpha
+                                    const softA = Math.min(220, Math.max(0, Math.round((peak - 10) * 1.85)));
+                                    d[p + 3] = softA;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. BleedTransparentEdges (src/alpha_bleed.h):
+            // 1-pass RGB color dilation into alpha=0 border texels (keeping alpha=0) to prevent dark fringe bleeding
+            for (let y = 1; y < H - 1; y++) {
+                const rowOff = y * W;
+                for (let x = 1; x < W - 1; x++) {
+                    const p = (rowOff + x) * 4;
+                    if (d[p + 3] !== 0) continue;
+                    let sr = 0, sg = 0, sb = 0, cnt = 0;
+                    const n1 = p - 4, n2 = p + 4, n3 = p - W * 4, n4 = p + W * 4;
+                    if (d[n1 + 3] > 32) { sr += d[n1]; sg += d[n1 + 1]; sb += d[n1 + 2]; cnt++; }
+                    if (d[n2 + 3] > 32) { sr += d[n2]; sg += d[n2 + 1]; sb += d[n2 + 2]; cnt++; }
+                    if (d[n3 + 3] > 32) { sr += d[n3]; sg += d[n3 + 1]; sb += d[n3 + 2]; cnt++; }
+                    if (d[n4 + 3] > 32) { sr += d[n4]; sg += d[n4 + 1]; sb += d[n4 + 2]; cnt++; }
+                    if (cnt > 0) {
+                        d[p] = (sr / cnt) | 0;
+                        d[p + 1] = (sg / cnt) | 0;
+                        d[p + 2] = (sb / cnt) | 0;
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            return cvs;
+        } catch (err) {
+            console.warn("processGtaSpritesRtx fallback:", err);
+            return img;
+        }
+    }
+
     loadAuthenticGta1Assets() {
         let loadedCount = 0;
         let mapBinBuffer = null;
@@ -293,7 +483,8 @@ class RetroRenderer {
                     this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg);
                     this.tilesTexVice = this.createGLTexture(this.gta1TilesViceImg);
                     this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
-                    this.spritesTex = this.createGLTexture(this.gta1SpritesImg);
+                    const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
+                    this.spritesTex = this.createGLTexture(enhancedSprites);
                 }
                 // Decompress NYC.CMP 256x256x6 voxel map into LeonidaMap and build 3D WebGL CityMesh!
                 this.map.mapStyle = this.mapStyle;
