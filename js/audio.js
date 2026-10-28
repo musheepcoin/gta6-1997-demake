@@ -74,6 +74,11 @@ class RetroAudioEngine {
             this.ctx = new AudioCtx();
             this.initialized = true;
 
+            // Master SFX Boost Gain Node (boosts all original game sound effects ~2.75x!)
+            this.sfxMasterGain = this.ctx.createGain();
+            this.sfxMasterGain.gain.value = 2.75;
+            this.sfxMasterGain.connect(this.ctx.destination);
+
             // Engine continuous hum
             this.engineOsc = this.ctx.createOscillator();
             this.engineGain = this.ctx.createGain();
@@ -81,7 +86,7 @@ class RetroAudioEngine {
             this.engineOsc.frequency.value = 48;
             this.engineGain.gain.value = 0.0;
             this.engineOsc.connect(this.engineGain);
-            this.engineGain.connect(this.ctx.destination);
+            this.engineGain.connect(this.sfxMasterGain);
             this.engineOsc.start();
 
             // Police Siren continuous oscillator
@@ -91,13 +96,17 @@ class RetroAudioEngine {
             this.sirenOsc.frequency.value = 650;
             this.sirenGain.gain.value = 0.0;
             this.sirenOsc.connect(this.sirenGain);
-            this.sirenGain.connect(this.ctx.destination);
+            this.sirenGain.connect(this.sfxMasterGain);
             this.sirenOsc.start();
 
             this.nextNoteTime = this.ctx.currentTime + 0.05;
         } catch (e) {
             console.warn("WebAudio init blocked or unavailable:", e);
         }
+    }
+
+    sfxOut() {
+        return this.sfxMasterGain || (this.ctx ? this.ctx.destination : null);
     }
 
     resume() {
@@ -130,7 +139,7 @@ class RetroAudioEngine {
             const gearMod = (speedRatio * 3.2) % 1.0;
             const targetFreq = 44 + speedRatio * 95 + gearMod * 38;
             this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.05);
-            this.engineGain.gain.setTargetAtTime(0.035 + speedRatio * 0.03, now, 0.08);
+            this.engineGain.gain.setTargetAtTime(0.05 + speedRatio * 0.045, now, 0.08);
         } else {
             this.engineGain.gain.setTargetAtTime(0.0, now, 0.08);
         }
@@ -141,7 +150,7 @@ class RetroAudioEngine {
             const prox = Math.max(0, 1 - state.nearestCopDist / 900);
             const wail = 620 + Math.sin(this.sirenPhase) * 240;
             this.sirenOsc.frequency.setTargetAtTime(wail, now, 0.03);
-            this.sirenGain.gain.setTargetAtTime(prox * 0.045, now, 0.05);
+            this.sirenGain.gain.setTargetAtTime(prox * 0.065, now, 0.05);
         } else {
             this.sirenGain.gain.setTargetAtTime(0.0, now, 0.08);
         }
@@ -205,7 +214,7 @@ class RetroAudioEngine {
         g.gain.setValueAtTime(vol, now);
         g.gain.exponentialRampToValueAtTime(0.001, now + duration);
         osc.connect(g);
-        g.connect(this.ctx.destination);
+        g.connect(this.sfxOut());
         osc.start(now);
         osc.stop(now + duration);
     }
@@ -215,28 +224,28 @@ class RetroAudioEngine {
         const now = this.ctx.currentTime;
 
         if (weaponType === "FLAMETHROWER") {
-            this.playNoise(0.11, 600, 0.035);
+            this.playNoise(0.11, 600, 0.045);
             return;
         }
         if (weaponType === "ROCKET") {
-            this.playNoise(0.28, 350, 0.09);
-            this.playBeep(140, 0.25, "sawtooth", 0.08);
+            this.playNoise(0.28, 350, 0.11);
+            this.playBeep(140, 0.25, "sawtooth", 0.09);
             return;
         }
 
         const dur = weaponType === "SHOTGUN" ? 0.16 : (weaponType === "UZI" ? 0.055 : 0.085);
         const startFreq = weaponType === "SHOTGUN" ? 180 : 320;
-        this.playNoise(dur, 1200, 0.075);
+        this.playNoise(dur, 1200, 0.09);
 
         const osc = this.ctx.createOscillator();
         const g = this.ctx.createGain();
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(startFreq, now);
         osc.frequency.exponentialRampToValueAtTime(45, now + dur);
-        g.gain.setValueAtTime(0.08, now);
+        g.gain.setValueAtTime(0.095, now);
         g.gain.exponentialRampToValueAtTime(0.001, now + dur);
         osc.connect(g);
-        g.connect(this.ctx.destination);
+        g.connect(this.sfxOut());
         osc.start(now);
         osc.stop(now + dur);
     }
@@ -244,24 +253,24 @@ class RetroAudioEngine {
     playExplosion() {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        this.playNoise(0.55, 280, 0.16);
+        this.playNoise(0.55, 280, 0.19);
 
         const osc = this.ctx.createOscillator();
         const g = this.ctx.createGain();
         osc.type = "triangle";
         osc.frequency.setValueAtTime(110, now);
         osc.frequency.exponentialRampToValueAtTime(22, now + 0.55);
-        g.gain.setValueAtTime(0.18, now);
+        g.gain.setValueAtTime(0.22, now);
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
         osc.connect(g);
-        g.connect(this.ctx.destination);
+        g.connect(this.sfxOut());
         osc.start(now);
         osc.stop(now + 0.56);
     }
 
     playTireScreech() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playNoise(0.07, 1900, 0.022);
+        this.playNoise(0.07, 1900, 0.032);
     }
 
     playCashSound() {
@@ -284,8 +293,8 @@ class RetroAudioEngine {
 
     playHorn() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBeep(392.0, 0.22, "sawtooth", 0.075);
-        this.playBeep(493.88, 0.22, "sawtooth", 0.065);
+        this.playBeep(392.0, 0.22, "sawtooth", 0.085);
+        this.playBeep(493.88, 0.22, "sawtooth", 0.075);
     }
 
     playBurpOrFart(isFart = false) {
@@ -302,10 +311,10 @@ class RetroAudioEngine {
             osc.frequency.linearRampToValueAtTime(135, now + 0.12);
             osc.frequency.linearRampToValueAtTime(70, now + 0.26);
         }
-        g.gain.setValueAtTime(0.11, now);
+        g.gain.setValueAtTime(0.13, now);
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.29);
         osc.connect(g);
-        g.connect(this.ctx.destination);
+        g.connect(this.sfxOut());
         osc.start(now);
         osc.stop(now + 0.3);
     }
@@ -347,7 +356,7 @@ class RetroAudioEngine {
 
         noise.connect(filter);
         filter.connect(g);
-        g.connect(this.ctx.destination);
+        g.connect(this.sfxOut());
         noise.start(now);
     }
 }
