@@ -2382,14 +2382,6 @@ class RetroRenderer {
                     this.batchObjectSprite3D(umb.spr || "umbrella_pink", umb.x, umb.y, uz + 0.08, umb.angle || 0, 0.92, SPRITE_DRAW_ORDER.TREES);
                 }
             }
-            if (this.map.trees) {
-                for (let ti = 0; ti < this.map.trees.length; ti++) {
-                    const tr = this.map.trees[ti];
-                    if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
-                    const baseZ = this.getEntityZ(tr, 0.0);
-                    this.renderMiamiPalmTree3D(tr.x, tr.y, baseZ, (tr.x * 0.03 + tr.y * 0.05) % 6.28, tr.scale || 1.0, ti);
-                }
-            }
             if (this.map.vicePalms) {
                 const isNightGlow = (this.nightFactor || 0) > 0.18;
                 for (let pi = 0; pi < this.map.vicePalms.length; pi++) {

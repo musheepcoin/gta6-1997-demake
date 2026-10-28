@@ -382,9 +382,6 @@ class LeonidaMap {
                 let surfGt = GROUND_TYPE.WATER;
                 for (let z = MAP_LAYERS - 1; z >= 0; z--) {
                     const blk = this.getBlockInfo(c, r, z);
-                    if (blk.lid === 69) {
-                        this.trees.push({ x: (c + 0.5) * TILE_SIZE, y: (r + 0.5) * TILE_SIZE, z: z + 1, scale: 1.0 });
-                    }
                     if (blk.groundType !== GROUND_TYPE.AIR) {
                         surfZ = z;
                         surfGt = blk.groundType;
@@ -393,27 +390,36 @@ class LeonidaMap {
                 }
                 this.surfaceLayer[r * MAP_COLS + c] = surfZ;
                 this.surfaceGround[r * MAP_COLS + c] = surfGt;
+
+                // Open ground tiles store their visible lid at z = 1 and their navigation groundType at z = 2 (with lid = 0)
+                const blkZ1 = this.getBlockInfo(c, r, 1);
+                const blkZ2 = this.getBlockInfo(c, r, 2);
+                if (surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && blkZ1 && blkZ1.lid === 69 && surfGt === GROUND_TYPE.PAWEMENT) {
+                    this.trees.push({ x: (c + 0.5) * TILE_SIZE, y: (r + 0.5) * TILE_SIZE, z: 2.0, scale: 1.0 });
+                }
             }
         }
 
-        // Second pass: Identify true sand tiles (lid 98/99) & place Vice City / GTA 6 tropical palm trees and beach parasols
+        // Second pass: Identify true sand tiles (lid 98..101) & place Vice City / GTA 6 tropical palm trees strictly on lid 69 sidewalk planters and lid 10 park lawns (NEVER on roads or roofs!)
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
                 const idx = r * MAP_COLS + c;
                 const surfGt = this.surfaceGround[idx];
                 const surfZ = this.surfaceLayer[idx];
+                if (surfZ > 2) continue;
                 if (surfGt !== GROUND_TYPE.PAWEMENT && surfGt !== GROUND_TYPE.FIELD) continue;
 
                 const blkZ1 = this.getBlockInfo(c, r, 1);
-                const isSandTile = (blkZ1 && blkZ1.lid >= 98 && blkZ1.lid <= 101);
+                const blkZ2 = this.getBlockInfo(c, r, 2);
+                if (!blkZ1 || (blkZ2 && blkZ2.lid !== 0)) continue;
 
-                let nearWater = false;
+                const isSandTile = (blkZ1.lid >= 98 && blkZ1.lid <= 101);
+
                 let adjRoad = false;
-                for (let dr = -2; dr <= 2; dr++) {
-                    for (let dc = -2; dc <= 2; dc++) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
                         const ngt = this.surfaceGround[(r + dr) * MAP_COLS + (c + dc)];
-                        if (ngt === GROUND_TYPE.WATER) nearWater = true;
-                        if (Math.abs(dr) <= 1 && Math.abs(dc) <= 1 && ngt === GROUND_TYPE.ROAD) adjRoad = true;
+                        if (ngt === GROUND_TYPE.ROAD) adjRoad = true;
                     }
                 }
 
@@ -423,53 +429,31 @@ class LeonidaMap {
                         this.beachUmbrellas.push({
                             x: (c + 0.5) * TILE_SIZE,
                             y: (r + 0.5) * TILE_SIZE,
-                            z: surfZ,
+                            z: 2.0,
                             spr: ((c + r) % 2 === 0) ? "umbrella_pink" : "umbrella_cyan",
                             angle: ((c * 31 + r * 17) % 628) * 0.01
                         });
                     }
                 }
 
-                // Place tropical palm trees along Ocean Drive sidewalks, parks & coastal strips
-                const isBoulevardPalm = (surfGt === GROUND_TYPE.PAWEMENT && adjRoad && ((c * 11 + r * 19) % 15 === 0));
-                const isCoastalOrParkPalm = ((surfGt === GROUND_TYPE.FIELD && !isSandTile) && ((c * 17 + r * 7) % 11 === 0));
-                if (isBoulevardPalm || isCoastalOrParkPalm) {
+                // 1) Sidewalk palm trees: strictly inside authentic lid === 69 circular stone tree-pit planters
+                const isPlanterPalm = (surfGt === GROUND_TYPE.PAWEMENT && blkZ1.lid === 69);
+                // 2) Park & Lummus Park lawn palm trees: strictly on lid === 10 tropical grass away from road lanes
+                const isParkGrassPalm = (
+                    (surfGt === GROUND_TYPE.FIELD || surfGt === GROUND_TYPE.PAWEMENT) &&
+                    blkZ1.lid === 10 &&
+                    ((c === 219 && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
+                );
+                if (isPlanterPalm || isParkGrassPalm) {
                     this.vicePalms.push({
                         x: (c + 0.5) * TILE_SIZE,
                         y: (r + 0.5) * TILE_SIZE,
-                        z: surfZ,
-                        scale: 0.92 + ((c * 3 + r * 5) % 4) * 0.06,
+                        z: 2.0,
+                        scale: isPlanterPalm ? 1.0 : (0.94 + ((c * 3 + r * 5) % 4) * 0.05),
                         angle: ((c * 23 + r * 41) % 628) * 0.01
                     });
                 }
             }
-        }
-
-        // Signature hand-placed Ocean Drive / Star Island / Mambas Stadium / Lake Leonida / Keys palm rows
-        const heroPalms = [
-            // Ocean Drive & Lummus Park Promenade Palms (around Hotel Dixon y=142..156)
-            [213.4, 143.5], [213.4, 146.5], [213.4, 149.5], [213.4, 152.5],
-            [218.6, 142.5], [218.6, 145.5], [218.6, 148.5], [218.6, 151.5], [218.6, 155.5],
-            // Mid-Beach / Malibu Club & Española Way Palms (y=86..108)
-            [218.6, 86.5], [218.6, 89.5], [213.4, 105.5], [213.4, 108.5],
-            // North Beach / Club Nine1Nine Palms (y=44..52)
-            [213.4, 45.5], [213.4, 48.5], [218.6, 45.5], [218.6, 48.5],
-            // Star Island & Venetian Islands Palms (173, 106)
-            [168.5, 102.5], [177.5, 102.5], [168.5, 110.5], [177.5, 110.5],
-            // Vice City Golf Club & Mambas Stadium Palms
-            [138.5, 50.5], [144.5, 54.5], [106.5, 98.5], [125.5, 98.5],
-            // Grassrivers Everglades & Diagonal Leonida Keys Palms
-            [54.5, 212.5], [62.5, 212.5], [135.0, 241.5], [105.5, 239.5]
-        ];
-        for (const [hx, hy] of heroPalms) {
-            const hz = this.surfaceLayer[Math.floor(hy) * MAP_COLS + Math.floor(hx)] || 2;
-            this.vicePalms.push({
-                x: hx * TILE_SIZE,
-                y: hy * TILE_SIZE,
-                z: hz,
-                scale: 1.04,
-                angle: (hx * 1.7 + hy * 0.9) % 6.28
-            });
         }
 
         // Populate Official GTA 6 S-Curving Vice Beach Lifeguard Towers, Volleyball Courts, Star Island Pool & Neon Marquees!
