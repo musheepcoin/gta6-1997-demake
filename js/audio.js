@@ -343,6 +343,12 @@ class RetroAudioEngine {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
 
+        if (weaponType === "FIST") {
+            // Bare-handed melee punch air swing ("whoosh") — never a gunshot!
+            this.playBandNoise(0.065, 420, 1.4, 0.032);
+            this.playBeep(115, 0.045, "sine", 0.028);
+            return;
+        }
         if (weaponType === "FLAMETHROWER") {
             this.playNoise(0.11, 600, 0.045);
             return;
@@ -368,6 +374,13 @@ class RetroAudioEngine {
         g.connect(this.sfxOut());
         osc.start(now);
         osc.stop(now + dur);
+    }
+
+    playPunchHit() {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        // Meaty bare-knuckle punch impact thud (low body thump + mid slap)
+        this.playBandNoise(0.075, 680, 1.6, 0.075);
+        this.playBeep(92, 0.07, "triangle", 0.085);
     }
 
     playExplosion() {

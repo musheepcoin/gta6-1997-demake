@@ -2342,18 +2342,23 @@ class LeonidaGame {
         if (spec.isMelee) {
             if (isPlayer) {
                 this.player.punchTimer = 0.34;
+                this.player.muzzleTimer = 0;
+                this.player.weaponDrawnTimer = 0;
             }
             const hitX = shooterX + Math.cos(angle) * 16;
             const hitY = shooterY + Math.sin(angle) * 16;
+            let hitAnyone = false;
+
             for (const ped of this.peds) {
                 if (ped.dead) continue;
                 if (Math.hypot(ped.x - hitX, ped.y - hitY) < 25) {
+                    hitAnyone = true;
                     ped.hp -= spec.damage;
                     ped.x += Math.cos(angle) * 10;
                     ped.y += Math.sin(angle) * 10;
                     ped.stunnedTimer = 1.25;
                     ped.panicTimer = 4.5;
-                    this.spawnParticle(ped.x, ped.y, "SPARK");
+                    this.spawnParticle(ped.x, ped.y, "BLOOD");
                     if (ped.hp <= 0) {
                         this.killPed(ped);
                     } else {
@@ -2361,6 +2366,21 @@ class LeonidaGame {
                     }
                     break;
                 }
+            }
+
+            // Also allow bare-handed punches to hit nearby wooden crates!
+            if (this.map && Array.isArray(this.map.crates)) {
+                for (const cr of this.map.crates) {
+                    if (!cr.smashed && Math.hypot(cr.x - hitX, cr.y - hitY) < 26) {
+                        hitAnyone = true;
+                        this.smashCrate(cr);
+                        break;
+                    }
+                }
+            }
+
+            if (hitAnyone && this.audio && typeof this.audio.playPunchHit === "function") {
+                this.audio.playPunchHit();
             }
             return;
         }
@@ -2761,10 +2781,13 @@ class LeonidaGame {
                         p.ammo[activeWep]--;
                     }
                     p.shootCooldown = isTank ? 0.85 : spec.fireRate;
-                    p.muzzleTimer = 0.08;
                     if (!spec.isMelee) {
+                        p.muzzleTimer = 0.08;
                         p.weaponDrawnTimer = 0.45;
                         p.playerCombatTimer = 3.5;
+                    } else {
+                        p.muzzleTimer = 0;
+                        p.weaponDrawnTimer = 0;
                     }
                     this.fireWeapon(p.x, p.y, shotAngle, activeWep, true, false);
                     this.updateHud();
