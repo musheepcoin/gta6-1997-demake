@@ -1,0 +1,6 @@
+*.zip
+*.bak
+assets/gta1_map.bin
+assets/gta1_meta.json
+assets/gta1_sprites.png
+assets/gta1_tiles.png

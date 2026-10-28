@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRAND THEFT AUTO: LEONIDA '97 — LUCIA EDITION (1997 2.5D Demake)</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Main 1997 2.5D Perspective Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Toggleable 1997 CRT Scanline Overlay -->
+        <div id="crt-overlay" class="hidden"></div>
+
+        <!-- TOP HUD BAR (1997 GTA 1 ARCHITECTURE) -->
+        <div id="hud-top">
+            <!-- Top-Left: Lucia Status, Health, Armor, Weapon, DOC Ankle Monitor -->
+            <div class="hud-box" id="hud-left">
+                <div class="char-badge" title="Lucia Caminos — Press [B] to toggle Red Heist Bandana">
+                    <canvas id="lucia-hud-portrait" width="56" height="56"></canvas>
+                    <div id="ankle-led" class="ankle-led"></div>
+                    <div class="char-badge-footer">
+                        <span class="char-name">LUCIA</span>
+                        <span class="char-id">#L-9724</span>
+                    </div>
+                </div>
+                <div class="stats-col">
+                    <div class="bars-row">
+                        <span class="stat-label">HEALTH</span>
+                        <div class="stat-bar-wrap">
+                            <div id="health-bar" class="stat-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div class="bars-row">
+                        <span class="stat-label">ARMOR</span>
+                        <div class="stat-bar-wrap">
+                            <div id="armor-bar" class="stat-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div class="weapon-ankle-row">
+                        <span id="weapon-display">9MM PISTOL [99]</span>
+                        <span id="ankle-status-badge">DOC: TRACKED</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top-Center: 1997 Flashing Police Heads & Active Vehicle Radio -->
+            <div id="hud-center">
+                <div id="wanted-strip" title="VCPD Wanted Level (1 to 6 Heads)">
+                    <div class="cop-head">👮</div>
+                    <div class="cop-head">👮</div>
+                    <div class="cop-head">👮</div>
+                    <div class="cop-head">👮</div>
+                    <div class="cop-head">👮</div>
+                    <div class="cop-head">👮</div>
+                </div>
+                <div id="vehicle-radio-banner">🚗 DECLASSE TULIP • 📻 FLASH FM LEONIDA</div>
+            </div>
+
+            <!-- Top-Right: GTA 1 Cash Score, Multiplier, Lives, Jail Free Card & Chapter Target -->
+            <div class="hud-box" id="hud-right">
+                <div class="score-row">
+                    <span id="lives-badge" title="GTA 1 Lives Remaining">❤️x3</span>
+                    <span id="multiplier-badge" title="GTA 1 Score Multiplier">x1</span>
+                    <span id="cash-counter">$00000500</span>
+                </div>
+                <div class="gta1-meta-row">
+                    <span id="jail-free-badge" title="Preserves Multiplier & Weapons if BUSTED!">🃏 JAIL FREE: 1</span>
+                    <span id="target-score-badge">GOAL: $1,000,000</span>
+                </div>
+                <div class="mission-mini-row">
+                    <span id="hud-objective-text">ANSWER PAYPHONE</span>
+                    <span id="hud-mission-timer"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- District Entry Popup Banner -->
+        <div id="district-popup">PORT GELLHORN</div>
+
+        <!-- Full-Screen Status Overlay (WASTED / BUSTED / MISSION PASSED) -->
+        <div id="big-status-overlay">
+            <div id="big-status-title">WASTED!</div>
+            <div id="big-status-sub">TRANSFERRED TO LEONIDA GENERAL HOSPITAL</div>
+        </div>
+
+        <!-- Bottom-Left: Live Leonida Top-Down Square Radar (Click or Press M for Full Square Map) -->
+        <div id="radar-box" title="Click or Press [M] to open the Full GTA 1 Square City Map!">
+            <canvas id="radar-canvas" width="196" height="196"></canvas>
+            <div id="radar-label">KELLY COUNTY [M: MAP]</div>
+        </div>
+
+        <!-- Bottom-Center: 1997 GTA 1 Green LCD Pager / Mission Subtitles -->
+        <div id="pager-box">
+            <div id="pager-avatar">
+                <canvas id="pager-portrait" width="44" height="44"></canvas>
+                <span id="pager-avatar-label">JASON</span>
+            </div>
+            <div class="pager-content">
+                <div id="pager-sender">📟 PAGER // JASON (PARTNER)</div>
+                <div id="pager-text">
+                    LEONIDA '97 SQUARE MAP LIVE: Press [M] or click the bottom-left radar to view the full GTA 1 Square City Map (Turquoise Canals, Central Park, Ocean Drive &amp; Barrier Islands) or click anywhere on the map to fast-travel!
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom-Right: Controls Reference Card -->
+        <div id="controls-card">
+            <div class="controls-title">
+                <span>LEONIDA '97 CONTROLS</span>
+                <span>GTA 1 ENGINE</span>
+            </div>
+            <div><span class="key-pill">ZQSD</span> / <span class="key-pill">WASD</span> / <span class="key-pill">ARROWS</span> Move &amp; Drive</div>
+            <div><span class="key-pill">M</span> Full GTA 1 Square Map • <span class="key-pill">F</span> Steal / Exit Car</div>
+            <div><span class="key-pill">G</span> Horn / Siren (Car) or Burp / Fart (Foot!)</div>
+            <div><span class="key-pill">K</span> Arm 5s Car Bomb • <span class="key-pill">B</span> Heist Bandana</div>
+            <div><span class="key-pill">CLICK</span> / <span class="key-pill">J</span> Shoot • <span class="key-pill">TAB</span> / <span class="key-pill">1-6</span> Weapon</div>
+            <div><span class="key-pill">R</span> Radio • <span class="key-pill">N</span> Night • <span class="key-pill">H</span> Dossier</div>
+        </div>
+
+        <!-- FULL-SQUARE GTA 1 (.CMP) INTERACTIVE CITY MAP MODAL (Toggleable with [M] or clicking Radar) -->
+        <div id="fullmap-modal" class="hidden">
+            <div class="fullmap-card">
+                <div class="fullmap-header">
+                    <div>
+                        <span class="fullmap-title">🗺️ GTA 6: STATE OF LEONIDA &amp; VICE CITY — 1997 MAP (.CMP)</span>
+                        <span class="fullmap-sub">CLICK ANY LOCATION OR PRESET BELOW TO FAST-TRAVEL LUCIA &amp; JASON</span>
+                    </div>
+                    <button id="btn-close-fullmap">[ ESC / M — CLOSE ]</button>
+                </div>
+
+                <div class="fullmap-body">
+                    <canvas id="fullmap-canvas" width="576" height="576"></canvas>
+
+                    <div class="fullmap-sidebar">
+                        <h4>16 OFFICIAL GTA 6 LANDMARKS (CLICK TO TELEPORT)</h4>
+                        <button class="jump-btn" data-col="225.5" data-row="154.0">🏖️ VICE BEACH, LUMMUS PARK &amp; PIER (225, 154)</button>
+                        <button class="jump-btn" data-col="213.5" data-row="146.0">🏨 HOTEL DIXON — OCEAN DRIVE (213, 146)</button>
+                        <button class="jump-btn" data-col="208.5" data-row="106.5">🦩 ESPAÑOLA WAY &amp; FLAMINGO PARK (208, 106)</button>
+                        <button class="jump-btn" data-col="213.5" data-row="48.0">💃 CLUB NINE1NINE &amp; NORTH MALL (213, 48)</button>
+                        <button class="jump-btn" data-col="224.5" data-row="20.5">🚀 SERA SPACEPORT &amp; PADS 39A/39B (224, 20)</button>
+                        <button class="jump-btn" data-col="173.0" data-row="106.5">🏛️ STAR ISLAND &amp; VENETIAN ISLES (173, 106)</button>
+                        <button class="jump-btn" data-col="171.5" data-row="164.5">🚢 PORT OF VICE CITY &amp; CRUISES (171, 164)</button>
+                        <button class="jump-btn" data-col="116.0" data-row="105.0">🏟️ VICE CITY MAMBAS STADIUM BOWL (116, 105)</button>
+                        <button class="jump-btn" data-col="141.5" data-row="116.5">🏙️ DOWNTOWN, BAYFRONT &amp; GOLF (141, 116)</button>
+                        <button class="jump-btn" data-col="115.5" data-row="82.5">🎨 WYNWOOD WALLS &amp; JACK OF HEARTS (115, 82)</button>
+                        <button class="jump-btn" data-col="77.5" data-row="75.0">🌊 LAKE LEONIDA GATOR ISLAND (77, 75)</button>
+                        <button class="jump-btn" data-col="84.5" data-row="25.5">⛰️ MOUNT KALAGA CANYON HIGHWAY (84, 25)</button>
+                        <button class="jump-btn" data-col="31.5" data-row="76.5">🚨 LEONIDA STATE PENITENTIARY (31, 76)</button>
+                        <button class="jump-btn" data-col="47.0" data-row="113.5">🏁 PORT GELLHORN DIRT SPEEDWAY (47, 113)</button>
+                        <button class="jump-btn" data-col="66.5" data-row="152.0">✈️ VCIA AIRPORT &amp; 3D JETLINER (66, 152)</button>
+                        <button class="jump-btn" data-col="58.0" data-row="214.5">🐊 THRILLBILLY MUD PARK &amp; KEYS (58, 214)</button>
+
+                        <h4>MAP LEGEND (.CMP)</h4>
+                        <ul class="fullmap-legend">
+                            <li><span class="leg-dot" style="background:#ffffff;border:2px solid #ff2a85;"></span> Lucia &amp; Jason (Player)</li>
+                            <li><span class="leg-dot" style="background:#ff2a85;border:1px solid #00f0ff;"></span> Official GTA 6 Landmark (16)</li>
+                            <li><span class="leg-dot" style="background:#39ff14;"></span> Ringing Payphone / Visited Landmark</li>
+                            <li><span class="leg-dot" style="background:#14532d;border:1px solid #39ff14;"></span> [P] Pay 'n' Spray Customs (6)</li>
+                            <li><span class="leg-dot" style="background:#ecd28e;"></span> S-Curving Sand Beach, Speedway &amp; Keys</li>
+                            <li><span class="leg-dot" style="background:#12c2d9;"></span> Atlantic Ocean, Biscayne Bay &amp; Lake Leonida</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RETRO 1997 START MODAL (Toggleable with [H]) -->
+        <div id="start-modal" class="hidden">
+            <div class="start-card">
+                <div class="title-header">
+                    <div class="gta-logo-top">GRAND THEFT AUTO: LEONIDA '97</div>
+                    <div class="gta-logo-sub">GTA VI TRANSPOSED INTO THE 1997 TOP-DOWN 2.5D ENGINE</div>
+                </div>
+
+                <div class="dossier-grid">
+                    <div class="dossier-panel">
+                        <h3>PROTAGONIST // LUCIA CAMINOS</h3>
+                        <div class="mugshot-showcase">
+                            <div class="mugshot-card active-mug">
+                                <canvas id="lucia-dossier-portrait" width="72" height="72"></canvas>
+                                <div class="mugshot-meta">
+                                    <span class="mug-name">LUCIA CAMINOS</span>
+                                    <span class="mug-tag">INMATE #L-9724 • PLAYABLE</span>
+                                </div>
+                            </div>
+                            <div class="mugshot-card">
+                                <canvas id="jason-dossier-portrait" width="72" height="72"></canvas>
+                                <div class="mugshot-meta">
+                                    <span class="mug-name">JASON DUVAL</span>
+                                    <span class="mug-tag">PARTNER • AI WINGMAN</span>
+                                </div>
+                            </div>
+                        </div>
+                        <ul>
+                            <li><strong>Status:</strong> Released on Parole from Kelly County Penitentiary</li>
+                            <li><strong>Look &amp; Gear:</strong> Pink Camisole, Gold Hoops, Red Heist Bandana [B], Active DOC Electronic Ankle Monitor + 9mm Pistol</li>
+                            <li><strong>Accomplice:</strong> Jason (follows on foot, shoots cops &amp; rides shotgun in your Declasse Tulip)</li>
+                        </ul>
+                    </div>
+
+                    <div class="dossier-panel">
+                        <h3>12 BESPOKE GTA 6 REGIONS &amp; 16 LANDMARKS</h3>
+                        <ul>
+                            <li><strong>S-Curving Vice Beach &amp; SERA Spaceport:</strong> Ocean Drive, Lummus &amp; Flamingo Parks, 3 Piers &amp; Rocket Launch Pads 39A/39B</li>
+                            <li><strong>Biscayne Bay, Mambas Stadium &amp; Golf Club:</strong> 4 Venetian/Star Islands, 2 3D Cruise Ships, Enterable Football Stadium &amp; 9-Hole Golf Course</li>
+                            <li><strong>Lake Leonida, Mount Kalaga &amp; Penitentiary:</strong> Multi-lobed Lake with Gator Island, 6 3D Mountain Massifs &amp; Walled Prison Fortress</li>
+                            <li><strong>Dirt Speedway, VCIA Airport, Mud Park &amp; Keys:</strong> Driveable Dirt Oval, Dual Runways + 3D Jetliner, Figure-8 Mud Track &amp; 6 Diagonal Keys</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <button id="btn-start-game">[ CLICK OR PRESS ENTER — HIT THE STREETS OF LEONIDA ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
+    <script src="js/audio.js?v=97_65"></script>
+    <script src="js/map.js?v=97_65"></script>
+    <script src="js/entities.js?v=97_65"></script>
+    <script src="js/missions.js?v=97_65"></script>
+    <script src="js/renderer.js?v=97_65"></script>
+    <script src="js/game.js?v=97_65"></script>
+</body>
+</html>

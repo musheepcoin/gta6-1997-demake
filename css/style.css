@@ -1,0 +1,927 @@
+/* ============================================================================
+   GRAND THEFT AUTO: LEONIDA '97 (GTA VI in GTA 1 1997 2.5D Engine)
+   Authentic 1997 DMA Design Arcade HUD + Vice City / Leonida Neon Palette
+   ============================================================================ */
+
+:root {
+    --vice-pink: #ff2a85;
+    --vice-cyan: #00f0ff;
+    --vice-gold: #ffd13b;
+    --gta1-green: #39ff14;
+    --gta1-amber: #ff9e00;
+    --gta1-red: #ff1e38;
+    --bg-dark: #07080d;
+    --panel-bg: rgba(10, 12, 20, 0.88);
+    --border-retro: #2c354d;
+    --font-arcade: 'Courier New', 'Lucida Console', monospace;
+    --font-impact: Impact, 'Arial Black', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-dark);
+    font-family: var(--font-arcade);
+    color: #fff;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #05070b;
+}
+
+#game-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    image-rendering: pixelated;
+}
+
+/* Optional 1997 CRT Scanlines Overlay */
+#crt-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 15;
+    background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.22) 50%
+    );
+    background-size: 100% 4px;
+    box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.65);
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+#crt-overlay.hidden {
+    opacity: 0;
+}
+
+/* ============================================================================
+   TOP HUD BAR (COMPACT 1997 GTA 1 ARCADE STYLE)
+   ============================================================================ */
+#hud-top {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.hud-box {
+    background: rgba(8, 10, 16, 0.62);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+    padding: 4px 7px;
+    border-radius: 2px;
+    pointer-events: auto;
+}
+
+/* Top-Left: Lucia Status, Weapon, Health, Armor, Ankle Monitor */
+#hud-left {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    min-width: 215px;
+}
+
+.char-badge {
+    width: 44px;
+    height: 48px;
+    background: #140812;
+    border: 1.5px solid var(--vice-cyan);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+#lucia-hud-portrait {
+    width: 44px;
+    height: 36px;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.char-badge-footer {
+    width: 100%;
+    background: rgba(8, 10, 18, 0.92);
+    border-top: 1px solid rgba(255, 42, 133, 0.5);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1px 3px;
+}
+
+.char-badge .char-name {
+    font-family: var(--font-impact);
+    font-size: 9px;
+    letter-spacing: 0.4px;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.char-badge .char-id {
+    font-size: 7.5px;
+    color: var(--vice-gold);
+    font-weight: bold;
+}
+
+.ankle-led {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--gta1-green);
+    box-shadow: 0 0 5px var(--gta1-green);
+}
+
+.ankle-led.alert {
+    background: var(--gta1-red);
+    box-shadow: 0 0 8px var(--gta1-red);
+    animation: blinkFast 0.35s infinite alternate;
+}
+
+@keyframes blinkFast {
+    from { opacity: 1; transform: scale(1.15); }
+    to { opacity: 0.25; transform: scale(0.85); }
+}
+
+.stats-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+}
+
+.bars-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-bar-wrap {
+    flex: 1;
+    height: 9px;
+    background: #141824;
+    border: 1px solid #475569;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    transition: width 0.15s ease;
+}
+
+#health-bar {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
+    width: 100%;
+}
+
+#armor-bar {
+    background: linear-gradient(90deg, #0284c7, #38bdf8);
+    width: 50%;
+}
+
+.stat-label {
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.4px;
+    color: #cbd5e1;
+    min-width: 38px;
+}
+
+.weapon-ankle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    padding-top: 2px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+#weapon-display {
+    font-size: 10.5px;
+    font-weight: bold;
+    color: var(--vice-gold);
+    text-shadow: 1px 1px 0 #000;
+}
+
+#ankle-status-badge {
+    font-size: 9px;
+    padding: 0 4px;
+    background: rgba(57, 255, 20, 0.14);
+    border: 1px solid var(--gta1-green);
+    color: var(--gta1-green);
+    font-weight: bold;
+}
+
+#ankle-status-badge.violation {
+    background: rgba(255, 30, 56, 0.22);
+    border-color: var(--gta1-red);
+    color: #ff6b7d;
+}
+
+/* Top-Center: Wanted Cop Heads (GTA 1 Iconic) */
+#hud-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+#wanted-strip {
+    display: flex;
+    gap: 4px;
+    padding: 3px 8px;
+    background: rgba(8, 10, 16, 0.62);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: 0 2px 0 #000;
+}
+
+.cop-head {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #334155;
+    background: #111622;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    opacity: 0.2;
+    filter: grayscale(100%);
+    transition: all 0.15s ease;
+}
+
+.cop-head.active {
+    opacity: 1;
+    filter: none;
+    border-color: var(--vice-cyan);
+    background: rgba(220, 38, 38, 0.25);
+    animation: copFlash 0.45s infinite alternate;
+}
+
+@keyframes copFlash {
+    0% { background: rgba(239, 68, 68, 0.45); border-color: #ef4444; transform: translateY(-1px); }
+    100% { background: rgba(59, 130, 246, 0.45); border-color: #3b82f6; transform: translateY(1px); }
+}
+
+#vehicle-radio-banner {
+    font-size: 10px;
+    color: var(--vice-cyan);
+    background: rgba(8, 12, 22, 0.85);
+    border: 1px solid var(--vice-pink);
+    padding: 2px 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 0 #000;
+    display: none;
+}
+
+/* Top-Right: GTA 1 Classic Score / Cash, Multiplier, Lives & Jail Free Card */
+#hud-right {
+    text-align: right;
+    min-width: 215px;
+}
+
+.score-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+#lives-badge {
+    font-size: 11px;
+    font-weight: bold;
+    color: #ff6b7d;
+    background: rgba(220, 38, 38, 0.18);
+    border: 1px solid rgba(244, 63, 94, 0.5);
+    padding: 0 4px;
+    text-shadow: 1px 1px 0 #000;
+}
+
+#multiplier-badge {
+    font-family: var(--font-impact);
+    font-size: 18px;
+    color: var(--vice-pink);
+    text-shadow: 2px 2px 0 #000;
+}
+
+#cash-counter {
+    font-family: var(--font-arcade);
+    font-size: 21px;
+    font-weight: 900;
+    color: var(--gta1-green);
+    letter-spacing: 1px;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.gta1-meta-row {
+    margin-top: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 9px;
+    font-weight: bold;
+    color: #cbd5e1;
+}
+
+#jail-free-badge {
+    color: var(--vice-gold);
+    background: rgba(250, 204, 21, 0.14);
+    border: 1px solid rgba(250, 204, 21, 0.45);
+    padding: 0 4px;
+}
+
+#target-score-badge {
+    color: var(--vice-cyan);
+    letter-spacing: 0.4px;
+}
+
+.mission-mini-row {
+    margin-top: 2px;
+    font-size: 9.5px;
+    color: var(--vice-gold);
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 2px;
+}
+
+/* ============================================================================
+   DISTRICT BANNER & BIG CENTER ALERTS (WASTED / BUSTED / MISSION PASSED)
+   ============================================================================ */
+#district-popup {
+    position: absolute;
+    top: 76px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-impact);
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--vice-pink);
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 var(--vice-cyan);
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 18;
+    opacity: 0;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+#district-popup.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(6px);
+}
+
+#big-status-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+#big-status-overlay.visible {
+    opacity: 1;
+}
+
+#big-status-title {
+    font-family: var(--font-impact);
+    font-size: 72px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--gta1-red);
+    text-shadow: 5px 5px 0 #000, -2px -2px 0 #fff;
+    transform: scale(0.9);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#big-status-overlay.visible #big-status-title {
+    transform: scale(1);
+}
+
+#big-status-sub {
+    margin-top: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--vice-gold);
+    background: rgba(0, 0, 0, 0.85);
+    padding: 5px 14px;
+    border: 2px solid var(--vice-pink);
+    text-shadow: 1px 1px 0 #000;
+}
+
+/* ============================================================================
+   BOTTOM-LEFT: LIVE RADAR / MINIMAP
+   ============================================================================ */
+#radar-box {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    width: 112px;
+    height: 112px;
+    background: rgba(7, 11, 18, 0.82);
+    border: 1.5px solid var(--vice-cyan);
+    box-shadow: 0 2px 0 #000;
+    z-index: 20;
+    overflow: hidden;
+    border-radius: 2px;
+}
+
+#radar-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#radar-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.78);
+    font-size: 8px;
+    color: var(--vice-gold);
+    padding: 1px 3px;
+    text-align: center;
+    font-weight: bold;
+    letter-spacing: 0.3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ============================================================================
+   BOTTOM-CENTER: 1997 GTA 1 PAGER / MISSION SUBTITLE BOX
+   ============================================================================ */
+#pager-box {
+    position: absolute;
+    bottom: 8px;
+    left: 128px;
+    right: 192px;
+    min-height: 44px;
+    background: rgba(9, 14, 12, 0.74);
+    border: 1.5px solid #3f6212;
+    box-shadow: 0 2px 0 #000;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+#pager-box.urgent {
+    border-color: var(--vice-pink);
+    box-shadow: 0 2px 0 #000, 0 0 8px rgba(255, 42, 133, 0.3);
+}
+
+#pager-avatar {
+    width: 36px;
+    height: 38px;
+    background: #101f05;
+    border: 1px solid var(--gta1-green);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    font-family: var(--font-impact);
+    font-size: 7.5px;
+    color: var(--gta1-green);
+    text-align: center;
+    overflow: hidden;
+    padding-bottom: 1px;
+}
+
+#pager-portrait {
+    width: 34px;
+    height: 28px;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.pager-content {
+    flex: 1;
+}
+
+#pager-sender {
+    font-size: 9px;
+    font-weight: bold;
+    color: var(--vice-gold);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    margin-bottom: 1px;
+}
+
+#pager-text {
+    font-size: 10.5px;
+    line-height: 1.25;
+    color: var(--gta1-green);
+    text-shadow: 0 0 4px rgba(57, 255, 20, 0.3);
+}
+
+/* ============================================================================
+   BOTTOM-RIGHT: QUICK CONTROLS & MISSION TRIGGER BAR
+   ============================================================================ */
+#controls-card {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 176px;
+    background: rgba(8, 10, 16, 0.62);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: 0 2px 0 #000;
+    padding: 4px 7px;
+    z-index: 20;
+    font-size: 8.5px;
+    line-height: 1.35;
+    border-radius: 2px;
+}
+
+.controls-title {
+    font-weight: bold;
+    color: var(--vice-pink);
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding-bottom: 1px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.key-pill {
+    display: inline-block;
+    background: #1e293b;
+    border: 1px solid #64748b;
+    padding: 0 4px;
+    border-radius: 2px;
+    color: var(--vice-cyan);
+    font-weight: bold;
+    font-size: 9px;
+}
+
+/* ============================================================================
+   START SCREEN MODAL (1997 RETRO LEONIDA EDITION)
+   ============================================================================ */
+#start-modal {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(25, 10, 35, 0.92) 0%, rgba(5, 6, 12, 0.98) 100%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+#start-modal.hidden {
+    display: none;
+}
+
+.start-card {
+    max-width: 820px;
+    width: 100%;
+    background: #0b0e17;
+    border: 3px solid var(--vice-pink);
+    box-shadow: 0 0 40px rgba(255, 42, 133, 0.35), 8px 8px 0 #000;
+    padding: 24px 30px;
+    position: relative;
+}
+
+.title-header {
+    text-align: center;
+    border-bottom: 2px solid var(--vice-cyan);
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+}
+
+.gta-logo-top {
+    font-family: var(--font-impact);
+    font-size: 50px;
+    letter-spacing: 3px;
+    color: #fff;
+    text-shadow: 4px 4px 0 var(--vice-pink), -2px -2px 0 var(--vice-cyan);
+    line-height: 1;
+}
+
+.gta-logo-sub {
+    margin-top: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--vice-gold);
+    letter-spacing: 3.5px;
+}
+
+.dossier-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.dossier-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid #334155;
+    padding: 12px 14px;
+}
+
+.dossier-panel h3 {
+    font-size: 13px;
+    color: var(--vice-cyan);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.mugshot-showcase {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.mugshot-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0f1422;
+    border: 1.5px solid #475569;
+    padding: 6px;
+    border-radius: 3px;
+}
+
+.mugshot-card.active-mug {
+    border-color: var(--vice-pink);
+    box-shadow: 0 0 12px rgba(255, 42, 133, 0.28);
+}
+
+.mugshot-card canvas {
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--vice-cyan);
+    image-rendering: pixelated;
+    flex-shrink: 0;
+}
+
+.mugshot-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mug-name {
+    font-family: var(--font-impact);
+    font-size: 13px;
+    letter-spacing: 0.8px;
+    color: #fff;
+}
+
+.mug-tag {
+    font-size: 9px;
+    color: var(--vice-gold);
+    font-weight: bold;
+}
+
+.dossier-panel p, .dossier-panel li {
+    font-size: 12px;
+    color: #cbd5e1;
+    line-height: 1.5;
+    list-style: none;
+}
+
+.dossier-panel li::before {
+    content: "▸ ";
+    color: var(--vice-pink);
+}
+
+#btn-start-game {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    font-family: var(--font-impact);
+    font-size: 24px;
+    letter-spacing: 3px;
+    color: #fff;
+    background: linear-gradient(90deg, var(--vice-pink), #d946ef);
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #000;
+    transition: transform 0.1s ease, filter 0.15s ease;
+    text-transform: uppercase;
+}
+
+#btn-start-game:hover {
+    filter: brightness(1.15);
+    transform: translateY(-2px);
+}
+
+#btn-start-game:active {
+    transform: translateY(2px);
+}
+
+/* ============================================================================
+   FULL-SQUARE GTA 1 (.CMP) INTERACTIVE CITY MAP MODAL ([M] KEY)
+   ============================================================================ */
+#radar-box {
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.15s ease;
+}
+
+#radar-box:hover {
+    transform: scale(1.03);
+    border-color: var(--vice-pink);
+}
+
+#fullmap-modal {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    background: rgba(5, 7, 14, 0.86);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
+
+#fullmap-modal.hidden {
+    display: none;
+}
+
+.fullmap-card {
+    background: #0b0f1c;
+    border: 2.5px solid var(--vice-cyan);
+    box-shadow: 0 0 36px rgba(0, 240, 255, 0.25), 0 10px 0 #000;
+    padding: 12px 14px;
+    border-radius: 4px;
+    max-width: 920px;
+    width: 94vw;
+}
+
+.fullmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1.5px solid #26324d;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.fullmap-title {
+    display: block;
+    font-family: var(--font-impact);
+    font-size: 20px;
+    letter-spacing: 1.5px;
+    color: var(--vice-cyan);
+    text-shadow: 2px 2px 0 #000;
+}
+
+.fullmap-sub {
+    display: block;
+    font-size: 10px;
+    color: var(--vice-gold);
+    margin-top: 2px;
+}
+
+#btn-close-fullmap {
+    background: #1e293b;
+    color: #fff;
+    border: 1.5px solid var(--vice-pink);
+    padding: 6px 12px;
+    font-family: var(--font-arcade);
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#btn-close-fullmap:hover {
+    background: var(--vice-pink);
+}
+
+.fullmap-body {
+    display: flex;
+    gap: 14px;
+    align-items: stretch;
+    justify-content: center;
+}
+
+#fullmap-canvas {
+    width: 540px;
+    height: 540px;
+    border: 2.5px solid #e2e8f0;
+    box-shadow: 0 4px 0 #000;
+    image-rendering: pixelated;
+    cursor: crosshair;
+    flex-shrink: 0;
+}
+
+.fullmap-sidebar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid #334155;
+    padding: 8px 10px;
+    max-height: 540px;
+    overflow-y: auto;
+}
+
+.fullmap-sidebar h4 {
+    font-family: var(--font-impact);
+    font-size: 12.5px;
+    letter-spacing: 1px;
+    color: var(--vice-pink);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding-bottom: 2px;
+    margin-top: 2px;
+}
+
+.jump-btn {
+    background: #131c31;
+    color: #f8fafc;
+    border: 1px solid #38bdf8;
+    padding: 3.5px 6px;
+    text-align: left;
+    font-family: var(--font-arcade);
+    font-size: 9.8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.jump-btn:hover {
+    background: rgba(0, 240, 255, 0.22);
+    border-color: var(--vice-gold);
+    color: var(--vice-gold);
+    transform: translateX(2px);
+}
+
+.fullmap-legend {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 2px;
+}
+
+.fullmap-legend li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10.5px;
+    color: #cbd5e1;
+}
+
+.leg-dot {
+    width: 11px;
+    height: 11px;
+    display: inline-block;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* ============================================================================
+   PURE 1997 GTA 1 / CARNAGE3D CANVAS HUD MODE
+   All HUD elements (Pager, Weapon, Armor, Wanted Cop Heads, Score2.fon,
+   Missmul2.fon, Big1.fon, Sub2.fon) are rendered directly on #game-canvas
+   using authentic STYLE001.G24 sprites and .FON bitmap fonts!
+   ============================================================================ */
+#hud-top,
+#district-popup,
+#big-status-overlay,
+#radar-box,
+#pager-box,
+#controls-card {
+    display: none !important;
+}
+
