@@ -386,9 +386,10 @@ class LeonidaMap {
         fillGroundRect(130, 139, 65, 70, 10);
         fillGroundRect(132, 137, 66, 68, 41);
 
-        // 6) Lake Leonida Shoreline & Gator Island (cx = 56..101, ry = 52..96):
+        // 6) Lake Leonida Shoreline & Gator Island (cx = 56..101, ry = 50..96):
         //    Replace jagged inland beach-sand/surf tiles (98..101) with lush lakeshore park grass (lid 10)
-        for (let ry = 52; ry <= 96; ry++) {
+        //    and regularize 2-tile staircase jumps along the diagonal NW/NE/SE banks into clean 1:1 diagonals!
+        for (let ry = 50; ry <= 96; ry++) {
             for (let cx = 56; cx <= 101; cx++) {
                 if (has3DBuildingAt(cx, ry)) continue;
                 const b1 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx]];
@@ -397,6 +398,22 @@ class LeonidaMap {
                 }
             }
         }
+        for (let ry = 50; ry <= 61; ry++) {
+            const gStart = 121 - ry;
+            for (let cx = 59; cx <= 74; cx++) {
+                setGroundTile(cx, ry, cx < gStart ? 8 : 10);
+            }
+        }
+        for (let ry = 54; ry <= 65; ry++) {
+            const wStart = 127 - ry;
+            for (let cx = 62; cx <= 74; cx++) {
+                setGroundTile(cx, ry, cx < wStart ? 10 : 41);
+            }
+        }
+        setGroundTile(91, 68, 41);
+        setGroundTile(90, 85, 41);
+        fillGroundRect(70, 71, 93, 93, 10);
+        fillGroundRect(81, 82, 92, 92, 10);
         fillGroundRect(88, 93, 92, 97, 8);
         fillGroundRect(96, 103, 99, 105, 8);
         fillGroundRect(98, 102, 100, 103, 41);
@@ -407,8 +424,8 @@ class LeonidaMap {
         fillGroundRect(144, 151, 125, 130, 10);
         fillGroundRect(144, 144, 125, 130, 9);
 
-        // 8) South Lake Leonida Park Lagoon (cx = 62..74, ry = 94..115) & Port Gellhorn Urban Basin (cx = 60..67, ry = 118..129)
-        fillGroundRect(62, 74, 94, 115, 8);
+        // 8) South Lake Leonida Park Lagoon (cx = 60..74, ry = 94..115) & Port Gellhorn Urban Basin (cx = 60..67, ry = 118..129)
+        fillGroundRect(60, 74, 94, 115, 8);
         fillGroundRect(64, 72, 96, 107, 10);
         fillGroundRect(66, 70, 98, 105, 41);
         fillGroundRect(60, 67, 118, 129, 8);

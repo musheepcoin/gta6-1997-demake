@@ -103,6 +103,7 @@ class RetroRenderer {
 
         // 1A. CityMesh Shader: Perspective projection + animated water/fan UV offset + alpha discard
         const cityVS = `
+            precision highp float;
             attribute vec3 aPos;
             attribute vec2 aUV;
             attribute float aAnim;
@@ -137,7 +138,7 @@ class RetroRenderer {
         `;
 
         const cityFS = `
-            precision mediump float;
+            precision highp float;
             varying vec2 vUV;
             varying highp float vAnim;
             varying highp vec3 vWorldPos;
@@ -256,6 +257,9 @@ class RetroRenderer {
                 float w = sin(p.y * 0.72 + 0.4) * 0.50 + cos(p.y * 1.65 - 0.9) * 0.32 + (aNoise(vec2(p.y * 2.3, 5.0)) - 0.5) * 0.36;
                 return clamp(0.28 + w * 0.16, 0.14, 0.44);
             }
+            float cornerNorm(float u, float v, float k) {
+                return mix(u + v, length(vec2(u, v)), k);
+            }
 
             void main() {
                 vec4 c = texture2D(uTex, vUV);
@@ -284,10 +288,13 @@ class RetroRenderer {
                     float dWater = 10.0;
                     float waterBits = 0.0;
                     float waterSurType = 0.0;
+                    float waterPaveBits = 0.0;
                     if (isCurvedWater) {
                         float rawW = floor(vAnim - 2000.0 + 0.5);
-                        waterSurType = floor(rawW / 256.0);
-                        waterBits = mod(rawW, 256.0);
+                        waterPaveBits = floor(rawW / 1024.0);
+                        float remW = mod(rawW, 1024.0);
+                        waterSurType = floor(remW / 256.0);
+                        waterBits = mod(remW, 256.0);
                         float groundLid = 8.0;
                         if (waterSurType > 2.5) groundLid = 98.0;
                         else if (waterSurType > 1.5) groundLid = 10.0;
@@ -327,12 +334,16 @@ class RetroRenderer {
                         }
 
                         // Non-orthogonal organic rounded & wavy park lawns (8-neighbor seam-free SDF fillet)
-                        if (isCurvedLawn) {
+                        if (isCurvedLawn || (isCurvedWater && waterPaveBits > 0.5)) {
                             vec2 p = vWorldPos.xz;
                             vec2 lp = fract(p);
-                            float raw = floor(vAnim - 30.0 + 0.5);
-                            float surType = floor(raw / 256.0);
-                            float bits = mod(raw, 256.0);
+                            float surType = 2.0;
+                            float bits = waterPaveBits;
+                            if (isCurvedLawn) {
+                                float raw = floor(vAnim - 30.0 + 0.5);
+                                surType = floor(raw / 256.0);
+                                bits = mod(raw, 256.0);
+                            }
 
                             bool bN  = mod(bits, 2.0) > 0.5;
                             bool bS  = mod(floor(bits / 2.0), 2.0) > 0.5;
@@ -348,23 +359,33 @@ class RetroRenderer {
                             bool iSW = bSW && !bS && !bW;
                             bool iSE = bSE && !bS && !bE;
 
-                            float dW = bW ? lp.x : min(iNW ? length(lp) : 10.0, iSW ? length(vec2(lp.x, 1.0 - lp.y)) : 10.0);
-                            float dE = bE ? (1.0 - lp.x) : min(iNE ? length(vec2(1.0 - lp.x, lp.y)) : 10.0, iSE ? length(vec2(1.0 - lp.x, 1.0 - lp.y)) : 10.0);
-                            float dN = bN ? lp.y : min(iNW ? length(lp) : 10.0, iNE ? length(vec2(1.0 - lp.x, lp.y)) : 10.0);
-                            float dS = bS ? (1.0 - lp.y) : min(iSW ? length(vec2(lp.x, 1.0 - lp.y)) : 10.0, iSE ? length(vec2(1.0 - lp.x, 1.0 - lp.y)) : 10.0);
+                            // Single continuous 2D world-space wave offset w(p) so neighboring tiles match with 0.0000 seam error!
+                            float w = 0.33 + 0.05 * sin(p.x * 0.62 + p.y * 0.58) + 0.03 * cos(p.y * 1.25 - p.x * 0.50);
+                            float R = 1.0 - w;
 
-                            // Smooth multi-tile meandering waves along each side (kept < 0.44 so wave + R < 1.0 across seams)
-                            float wW = 0.21 + 0.12 * sin(p.y * 0.58 + 0.4) + 0.06 * cos(p.y * 1.35 - 0.8) + (aNoise(p * 1.4 + 7.0) - 0.5) * 0.08;
-                            float wE = 0.25 + 0.13 * sin(p.y * 0.52 - 1.3) + 0.06 * cos(p.y * 1.18 + 0.6) + (aNoise(p * 1.3 + 23.0) - 0.5) * 0.09;
-                            float wN = 0.19 + 0.09 * sin(p.x * 1.30 + p.y * 0.4) + (aNoise(p * 1.5 + 41.0) - 0.5) * 0.08;
-                            float wS = 0.19 + 0.09 * cos(p.x * 1.30 - p.y * 0.4) + (aNoise(p * 1.5 + 59.0) - 0.5) * 0.08;
+                            float dW = bW ? (lp.x - w) : 10.0;
+                            float dE = bE ? (1.0 - lp.x - w) : 10.0;
+                            float dN = bN ? (lp.y - w) : 10.0;
+                            float dS = bS ? (1.0 - lp.y - w) : 10.0;
 
-                            float R = 0.47;
-                            float xDist = min(dW - wW, dE - wE);
-                            float yDist = min(dN - wN, dS - wS);
-                            vec2 q = max(vec2(R) - vec2(xDist, yDist), vec2(0.0));
-                            float tuft = (aNoise(p * 16.0 + 3.0) - 0.5) * 0.032 + (aHash(floor(p * 44.0)) - 0.5) * 0.016;
-                            float dLawn = min(min(xDist, yDist), R - length(q)) + tuft;
+                            float xDist = min(dW, dE);
+                            float yDist = min(dN, dS);
+                            bool isNarrow = (bW && bE) || (bN && bS);
+                            bool isDiagPair = bW == bN;
+                            bool isStair = !isNarrow && (isDiagPair ? (!bNE || !bSW) : (!bNW || !bSE));
+                            float kOuter = isStair ? 0.18 : 0.62;
+                            float dCard = (xDist < R && yDist < R)
+                                ? (R - cornerNorm(R - xDist, R - yDist, kOuter))
+                                : min(xDist, yDist);
+
+                            float dCorner = 10.0;
+                            if (iNW) dCorner = min(dCorner, cornerNorm(lp.x, lp.y, 0.18) - w);
+                            if (iNE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, lp.y, 0.18) - w);
+                            if (iSW) dCorner = min(dCorner, cornerNorm(lp.x, 1.0 - lp.y, 0.18) - w);
+                            if (iSE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, 1.0 - lp.y, 0.18) - w);
+
+                            float tuft = (aNoise(p * 16.0 + 3.0) - 0.5) * 0.026 + (aHash(floor(p * 44.0)) - 0.5) * 0.012;
+                            float dLawn = min(dCard, dCorner) + tuft;
 
                             if (dLawn < 0.08) {
                                 vec3 paveCol = sampleLidTile(surType > 1.5 ? 8.0 : 9.0);
@@ -374,7 +395,7 @@ class RetroRenderer {
                                     // East side borders beach sand (lid 98), N/S/W border coral promenade (lid 9)
                                     float drift = coastalSandDrift(p) + (aNoise(p * 9.0 + 17.0) - 0.5) * 0.06;
                                     float eastSand = smoothstep(1.0 - drift - 0.10, 1.0 - drift + 0.03, lp.x);
-                                    if (dE - wE < min(dN - wN, dS - wS) + 0.06) eastSand = 1.0;
+                                    if (dE < min(dN, dS) + 0.06) eastSand = 1.0;
                                     vec3 sandCol = styleBeachSand(sampleLidTile(98.0));
                                     outsideCol = mix(paveCol, sandCol, eastSand);
                                     outSandMask = eastSand;
@@ -413,23 +434,33 @@ class RetroRenderer {
                             bool iSW = bSW && !bS && !bW;
                             bool iSE = bSE && !bS && !bE;
 
-                            // Smooth multi-tile organic shoreline waves (shared 1D coordinate per axis so adjacent tiles join with zero seam)
-                            float wW = 0.21 + 0.09 * sin(p.y * 0.65 + 0.5) + 0.04 * cos(p.y * 1.45 - 0.7);
-                            float wE = 0.21 + 0.09 * sin(p.y * 0.61 - 1.1) + 0.04 * cos(p.y * 1.35 + 0.9);
-                            float wN = 0.21 + 0.09 * sin(p.x * 0.68 + 0.3) + 0.04 * cos(p.x * 1.50 - 0.5);
-                            float wS = 0.21 + 0.09 * cos(p.x * 0.64 - 0.8) + 0.04 * sin(p.x * 1.40 + 1.2);
+                            // Single continuous 2D world-space shoreline offset w(p) so adjacent tiles join with 0.0000 seam error!
+                            float w = 0.28 + 0.05 * sin(p.x * 0.62 + p.y * 0.58) + 0.03 * cos(p.y * 1.25 - p.x * 0.50);
+                            float R = 1.0 - w;
 
-                            float dW = bW ? (lp.x - wW) : min(iNW ? (length(lp) - 0.5 * (wW + wN)) : 10.0, iSW ? (length(vec2(lp.x, 1.0 - lp.y)) - 0.5 * (wW + wS)) : 10.0);
-                            float dE = bE ? (1.0 - lp.x - wE) : min(iNE ? (length(vec2(1.0 - lp.x, lp.y)) - 0.5 * (wE + wN)) : 10.0, iSE ? (length(vec2(1.0 - lp.x, 1.0 - lp.y)) - 0.5 * (wE + wS)) : 10.0);
-                            float dN = bN ? (lp.y - wN) : min(iNW ? (length(lp) - 0.5 * (wW + wN)) : 10.0, iNE ? (length(vec2(1.0 - lp.x, lp.y)) - 0.5 * (wE + wN)) : 10.0);
-                            float dS = bS ? (1.0 - lp.y - wS) : min(iSW ? (length(vec2(lp.x, 1.0 - lp.y)) - 0.5 * (wW + wS)) : 10.0, iSE ? (length(vec2(1.0 - lp.x, 1.0 - lp.y)) - 0.5 * (wE + wS)) : 10.0);
+                            float dW = bW ? (lp.x - w) : 10.0;
+                            float dE = bE ? (1.0 - lp.x - w) : 10.0;
+                            float dN = bN ? (lp.y - w) : 10.0;
+                            float dS = bS ? (1.0 - lp.y - w) : 10.0;
 
-                            float R = 0.62;
                             float xDist = min(dW, dE);
                             float yDist = min(dN, dS);
-                            vec2 q = max(vec2(R) - vec2(xDist, yDist), vec2(0.0));
-                            float stoneGrain = (aNoise(p * 18.0 + 11.0) - 0.5) * 0.008;
-                            dWater = min(min(xDist, yDist), R - length(q)) + stoneGrain;
+                            bool isNarrow = (bW && bE) || (bN && bS);
+                            bool isDiagPair = bW == bN;
+                            bool isStair = !isNarrow && (isDiagPair ? (!bNE || !bSW) : (!bNW || !bSE));
+                            float kOuter = isStair ? 0.18 : 0.62;
+                            float dCard = (xDist < R && yDist < R)
+                                ? (R - cornerNorm(R - xDist, R - yDist, kOuter))
+                                : min(xDist, yDist);
+
+                            float dCorner = 10.0;
+                            if (iNW) dCorner = min(dCorner, cornerNorm(lp.x, lp.y, 0.18) - w);
+                            if (iNE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, lp.y, 0.18) - w);
+                            if (iSW) dCorner = min(dCorner, cornerNorm(lp.x, 1.0 - lp.y, 0.18) - w);
+                            if (iSE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, 1.0 - lp.y, 0.18) - w);
+
+                            float stoneGrain = (aNoise(p * 18.0 + 11.0) - 0.5) * 0.006;
+                            dWater = min(dCard, dCorner) + stoneGrain;
 
                             // Outer contact shadow on surrounding ground & 3D sculpted limestone/granite coping rim (dWater in [-0.045, 0.145])
                             if (dWater < 0.155) {
@@ -2212,7 +2243,19 @@ class RetroRenderer {
                         if (nbs.indexOf(98) >= 0) surType = 3;
                         else if (nbs.indexOf(10) >= 0) surType = 2;
                         else if (nbs.indexOf(9) >= 0 || nbs.indexOf(69) >= 0) surType = 1;
-                        animType = 2000.0 + surType * 256.0 + bits;
+                        let paveBits = 0;
+                        if (surType === 2) {
+                            const isPave = (l) => (l === 8 || l === 9 || l === 69);
+                            if (isPave(lN))  paveBits += 1;
+                            if (isPave(lS))  paveBits += 2;
+                            if (isPave(lW))  paveBits += 4;
+                            if (isPave(lE))  paveBits += 8;
+                            if (isPave(lNW)) paveBits += 16;
+                            if (isPave(lNE)) paveBits += 32;
+                            if (isPave(lSW)) paveBits += 64;
+                            if (isPave(lSE)) paveBits += 128;
+                        }
+                        animType = 2000.0 + paveBits * 1024.0 + surType * 256.0 + bits;
                     }
                 }
             }
