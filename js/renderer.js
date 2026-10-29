@@ -257,7 +257,9 @@ class RetroRenderer {
                 bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
                 bool isRoad = (vAnim > 4.9 && vAnim < 26.0);
                 bool isFootpathSandEdge = (vAnim > 27.5 && vAnim < 28.5);
-                bool isCurvedLawn = (vAnim > 29.5);
+                bool isCurvedLawn = (vAnim > 29.5 && vAnim < 1999.5);
+                bool isCurvedWater = (vAnim > 1999.5);
+                float waterCoverage = (vAnim > 0.5 && vAnim < 1.5) ? 1.0 : 0.0;
                 if (isRoad) c.rgb = asphaltSurface(c.rgb, (vAnim > 5.1 && vAnim < 5.4) ? 1.0 : 0.0);
                 if (c.a < 0.03 && !isShoreTile) discard;
 
@@ -273,7 +275,20 @@ class RetroRenderer {
                     c.rgb = submergedSand;
                 } else if (vAnim > 0.5 && vAnim < 1.5) {
                     c = sampleOceanWater(dayAmt);
-                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile || isRoad || isFootpathSandEdge || isCurvedLawn) {
+                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile || isRoad || isFootpathSandEdge || isCurvedLawn || isCurvedWater) {
+                    float dWater = 10.0;
+                    float waterBits = 0.0;
+                    float waterSurType = 0.0;
+                    if (isCurvedWater) {
+                        float rawW = floor(vAnim - 2000.0 + 0.5);
+                        waterSurType = floor(rawW / 256.0);
+                        waterBits = mod(rawW, 256.0);
+                        float groundLid = 8.0;
+                        if (waterSurType > 2.5) groundLid = 98.0;
+                        else if (waterSurType > 1.5) groundLid = 10.0;
+                        else if (waterSurType > 0.5) groundLid = 9.0;
+                        c = vec4(sampleLidTile(groundLid), 1.0);
+                    }
                     float isSand = 0.0;
                     if (vWorldPos.y < 2.2 && c.a > 0.02) {
                         // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
@@ -373,6 +388,67 @@ class RetroRenderer {
                                 isSand = max(isSand, outSandMask * (1.0 - grassAlpha));
                             }
                         }
+
+                        // Non-orthogonal organic rounded & sculpted stone-coping water basins, ponds, canals & lagoons (8-neighbor seam-free SDF)
+                        if (isCurvedWater) {
+                            vec2 p = vWorldPos.xz;
+                            vec2 lp = fract(p);
+
+                            bool bN  = mod(waterBits, 2.0) > 0.5;
+                            bool bS  = mod(floor(waterBits / 2.0), 2.0) > 0.5;
+                            bool bW  = mod(floor(waterBits / 4.0), 2.0) > 0.5;
+                            bool bE  = mod(floor(waterBits / 8.0), 2.0) > 0.5;
+                            bool bNW = mod(floor(waterBits / 16.0), 2.0) > 0.5;
+                            bool bNE = mod(floor(waterBits / 32.0), 2.0) > 0.5;
+                            bool bSW = mod(floor(waterBits / 64.0), 2.0) > 0.5;
+                            bool bSE = mod(floor(waterBits / 128.0), 2.0) > 0.5;
+
+                            bool iNW = bNW && !bN && !bW;
+                            bool iNE = bNE && !bN && !bE;
+                            bool iSW = bSW && !bS && !bW;
+                            bool iSE = bSE && !bS && !bE;
+
+                            // Smooth multi-tile organic shoreline waves (shared 1D coordinate per axis so adjacent tiles join with zero seam)
+                            float wW = 0.21 + 0.09 * sin(p.y * 0.65 + 0.5) + 0.04 * cos(p.y * 1.45 - 0.7);
+                            float wE = 0.21 + 0.09 * sin(p.y * 0.61 - 1.1) + 0.04 * cos(p.y * 1.35 + 0.9);
+                            float wN = 0.21 + 0.09 * sin(p.x * 0.68 + 0.3) + 0.04 * cos(p.x * 1.50 - 0.5);
+                            float wS = 0.21 + 0.09 * cos(p.x * 0.64 - 0.8) + 0.04 * sin(p.x * 1.40 + 1.2);
+
+                            float dW = bW ? (lp.x - wW) : min(iNW ? (length(lp) - 0.5 * (wW + wN)) : 10.0, iSW ? (length(vec2(lp.x, 1.0 - lp.y)) - 0.5 * (wW + wS)) : 10.0);
+                            float dE = bE ? (1.0 - lp.x - wE) : min(iNE ? (length(vec2(1.0 - lp.x, lp.y)) - 0.5 * (wE + wN)) : 10.0, iSE ? (length(vec2(1.0 - lp.x, 1.0 - lp.y)) - 0.5 * (wE + wS)) : 10.0);
+                            float dN = bN ? (lp.y - wN) : min(iNW ? (length(lp) - 0.5 * (wW + wN)) : 10.0, iNE ? (length(vec2(1.0 - lp.x, lp.y)) - 0.5 * (wE + wN)) : 10.0);
+                            float dS = bS ? (1.0 - lp.y - wS) : min(iSW ? (length(vec2(lp.x, 1.0 - lp.y)) - 0.5 * (wW + wS)) : 10.0, iSE ? (length(vec2(1.0 - lp.x, 1.0 - lp.y)) - 0.5 * (wE + wS)) : 10.0);
+
+                            float R = 0.62;
+                            float xDist = min(dW, dE);
+                            float yDist = min(dN, dS);
+                            vec2 q = max(vec2(R) - vec2(xDist, yDist), vec2(0.0));
+                            float stoneGrain = (aNoise(p * 18.0 + 11.0) - 0.5) * 0.008;
+                            dWater = min(min(xDist, yDist), R - length(q)) + stoneGrain;
+
+                            // Outer contact shadow on surrounding ground & 3D sculpted limestone/granite coping rim (dWater in [-0.045, 0.145])
+                            if (dWater < 0.155) {
+                                float outerAO = mix(0.76, 1.0, smoothstep(-0.002, -0.045, dWater));
+                                vec3 groundCol = c.rgb * outerAO;
+
+                                // Architectural stone coping rim (margelle en pierre de taille / quai)
+                                float copingNorm = clamp(dWater / 0.14, 0.0, 1.0);
+                                vec3 stoneBase = (waterSurType > 0.5 && waterSurType < 2.5)
+                                    ? vec3(0.86, 0.81, 0.72) // Warm Florida coquina / travertine limestone for park & promenade lagoons
+                                    : vec3(0.76, 0.77, 0.80); // Chiselled light urban granite for city plazas & canals
+                                float blockNoise = (aNoise(p * 26.0 + 5.0) - 0.5) * 0.06 + (aHash(floor(p * 52.0)) - 0.5) * 0.03;
+                                float jointGrid = abs(sin((p.x + p.y) * 9.42477)) * abs(cos((p.x - p.y) * 9.42477));
+                                float mortarJoint = 1.0 - 0.22 * smoothstep(0.035, 0.0, jointGrid);
+                                float outerChamfer = smoothstep(0.0, 0.22, copingNorm);
+                                float crownTop = sin(copingNorm * 3.14159) * 0.14;
+                                float innerDropWall = 1.0 - 0.42 * smoothstep(0.68, 0.98, copingNorm);
+                                vec3 copingCol = (stoneBase + blockNoise + crownTop) * (0.88 + 0.16 * outerChamfer) * innerDropWall * mortarJoint;
+
+                                float rimMask = smoothstep(-0.008, 0.012, dWater);
+                                c.rgb = mix(groundCol, copingCol, rimMask);
+                                isSand *= (1.0 - rimMask);
+                            }
+                        }
                     }
 
                     // Daytime 3D Building Cast Shadows, Building-Foot Ambient Occlusion & Warm Florida Sunlight vs. Cool Sky Shade
@@ -406,9 +482,25 @@ class RetroRenderer {
 
                     // For shoreline tiles (lid 99..101), composite the beach sand & white surf directly over the animated ocean water on the SAME quad!
                     if (isShoreTile && c.a < 0.999) {
+                        float shoreAlpha = c.a;
                         vec4 waterCol = sampleOceanWater(dayAmt);
-                        c.rgb = mix(waterCol.rgb, c.rgb, c.a);
-                        c.a = mix(waterCol.a, 1.0, c.a);
+                        c.rgb = mix(waterCol.rgb, c.rgb, shoreAlpha);
+                        c.a = mix(waterCol.a, 1.0, shoreAlpha);
+                        waterCoverage = 1.0 - shoreAlpha;
+                    }
+                    // For curved basins, ponds, canals & lakes (isCurvedWater), transition from the 3D stone coping rim into animated water!
+                    if (isCurvedWater && dWater > 0.125) {
+                        vec4 waterCol = sampleOceanWater(dayAmt);
+                        // Submerged vertical basin wall shadow + turquoise shallow shelf + animated white water-line ripple (meniscus)
+                        float wallShade = mix(0.62, 1.0, smoothstep(0.135, 0.27, dWater));
+                        float shallowShelf = exp(-max(0.0, dWater - 0.135) * 8.5);
+                        float rippleWave = 0.5 + 0.5 * sin(dWater * 48.0 - uTime * 3.2 + sin(vWorldPos.x * 5.0 + vWorldPos.z * 5.0) * 1.4);
+                        float meniscus = exp(-pow((dWater - 0.148) / 0.018, 2.0)) * (0.55 + 0.45 * rippleWave);
+                        vec3 basinWater = waterCol.rgb * wallShade + vec3(0.04, 0.16, 0.18) * shallowShelf * (0.35 + 0.65 * dayAmt) + vec3(0.70, 0.88, 0.95) * meniscus * 0.42;
+                        float waterMix = smoothstep(0.126, 0.144, dWater);
+                        c.rgb = mix(c.rgb, min(vec3(1.0), basinWater), waterMix);
+                        c.a = mix(1.0, waterCol.a, waterMix);
+                        waterCoverage = waterMix;
                     }
                 }
 
@@ -470,10 +562,11 @@ class RetroRenderer {
                         // Sunken seabed at night
                         nightRgb = c.rgb * vec3(0.35, 0.45, 0.70);
                     } else {
-                        // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops):
+                        // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops) & hybrid water-edge tiles:
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!)
-                        nightRgb = c.rgb * vec3(0.68, 0.73, 0.90);
-                        if (uViceStyle > 0.5 && vWorldPos.y > 1.5) {
+                        vec3 nightScale = mix(vec3(0.68, 0.73, 0.90), vec3(0.42, 0.52, 0.78), waterCoverage);
+                        nightRgb = c.rgb * nightScale;
+                        if (uViceStyle > 0.5 && vWorldPos.y > 1.5 && waterCoverage < 0.05) {
                             // Illuminated Vice City rooftop swimming pools, glass skylight atriums & neon parapet trims at night!
                             float rSat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
                             float rLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
@@ -2077,7 +2170,47 @@ class RetroRenderer {
             let effTileIdx = tileIdx;
             let effRemap = b.remap;
 
-            if (effTileIdx === 41) animType = 1.0;                      // Animated water
+            if (effTileIdx === 41) {
+                animType = 1.0; // Animated water
+                // Non-orthogonal organic curved water basins, park lagoons & canals with 3D stone coping border:
+                // Encode 8-neighbor non-water mask (N1|S2|W4|E8|NW16|NE32|SW64|SE128) + surrounding ground type.
+                if (y_elev === 1 && this.map) {
+                    const wLid = (cx, cy) => {
+                        if (cx < 0 || cx >= 256 || cy < 0 || cy >= 256) return 41;
+                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+                        if (!bi) return 41;
+                        const nb = this.map.getBlockInfo(bi);
+                        if (!nb) return 41;
+                        if (nb.lid === 0 || nb.lid === 41 || nb.lid === 77 || (nb.lid >= 99 && nb.lid <= 101)) return 41;
+                        return nb.lid;
+                    };
+                    const lN  = wLid(x, z_south - 1);
+                    const lS  = wLid(x, z_south + 1);
+                    const lW  = wLid(x - 1, z_south);
+                    const lE  = wLid(x + 1, z_south);
+                    const lNW = wLid(x - 1, z_south - 1);
+                    const lNE = wLid(x + 1, z_south - 1);
+                    const lSW = wLid(x - 1, z_south + 1);
+                    const lSE = wLid(x + 1, z_south + 1);
+                    let bits = 0;
+                    if (lN  !== 41) bits += 1;
+                    if (lS  !== 41) bits += 2;
+                    if (lW  !== 41) bits += 4;
+                    if (lE  !== 41) bits += 8;
+                    if (lNW !== 41) bits += 16;
+                    if (lNE !== 41) bits += 32;
+                    if (lSW !== 41) bits += 64;
+                    if (lSE !== 41) bits += 128;
+                    if (bits > 0) {
+                        const nbs = [lN, lS, lW, lE, lNW, lNE, lSW, lSE];
+                        let surType = 0; // 0: city sidewalk (lid 8), 1: coral promenade (lid 9), 2: park lawn (lid 10), 3: golden sand (lid 98)
+                        if (nbs.indexOf(98) >= 0) surType = 3;
+                        else if (nbs.indexOf(10) >= 0) surType = 2;
+                        else if (nbs.indexOf(9) >= 0 || nbs.indexOf(69) >= 0) surType = 1;
+                        animType = 2000.0 + surType * 256.0 + bits;
+                    }
+                }
+            }
             else if (effTileIdx === 22) animType = 2.0;                 // Animated rooftop fan
             else if (effTileIdx >= 99 && effTileIdx <= 101) animType = 4.0; // Beach shoreline (composites sand + surf over animated water on single quad)
             else if (!b.isFlat && effRemap === 0) {
@@ -5653,7 +5786,8 @@ class RetroRenderer {
 
     renderPhoneGpsWidget(ctx, game, gx, gy, gw, gh, rrect) {
         const useVice = this.mapStyle === "VICE" && this.viceOverviewReady;
-        const srcImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
+        const rawImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
+        const srcImg = this.liveOverviewCanvas || rawImg;
         if (!srcImg) return;
 
         const hdrH = 19;
@@ -6281,7 +6415,8 @@ class RetroRenderer {
 
     renderTopMinimap(ctx, game) {
         const useVice = this.mapStyle === "VICE" && this.viceOverviewReady;
-        const srcImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
+        const rawImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
+        const srcImg = this.liveOverviewCanvas || rawImg;
         if (!srcImg) return;
 
         const W = this.canvas.width;
@@ -6886,8 +7021,54 @@ class RetroRenderer {
 
     bakeRadarBackground() {
         const useVice = this.mapStyle === "VICE" && this.viceOverviewReady;
-        const srcImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
-        if (!srcImg) return;
+        const rawImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
+        if (!rawImg) return;
+        let srcImg = rawImg;
+        if (this.map && this.map.cmpLoaded) {
+            if (!this.liveOverviewCanvas) {
+                this.liveOverviewCanvas = document.createElement("canvas");
+                this.liveOverviewCanvas.width = 1024;
+                this.liveOverviewCanvas.height = 1024;
+            }
+            const octx = this.liveOverviewCanvas.getContext("2d");
+            octx.imageSmoothingEnabled = false;
+            octx.drawImage(rawImg, 0, 0, 1024, 1024);
+            // Mirror restored Mambas Stadium south bowl & emerald football pitch (cx=106..125, ry=106..115) from north bowl (210 - ry)
+            for (let ry = 106; ry <= 115; ry++) {
+                const srcRy = 210 - ry;
+                octx.drawImage(rawImg, 106 * 4, srcRy * 4, 20 * 4, 4, 106 * 4, ry * 4, 20 * 4, 4);
+            }
+            // Sync reshaped urban basins, park lagoons & Lummus Park greenbelt onto the live GPS overview
+            for (let ry = 1; ry < 255; ry++) {
+                for (let cx = 1; cx < 255; cx++) {
+                    let has3D = false;
+                    for (let tz = 2; tz < 6; tz++) {
+                        const b = this.map.getBlockInfo(this.map.getBlockIndex(cx, ry, tz));
+                        if (b && (b.lid !== 0 || b.w !== 0 || b.e !== 0 || b.n !== 0 || b.s !== 0)) {
+                            has3D = true;
+                            break;
+                        }
+                    }
+                    if (has3D) continue;
+                    const b1 = this.map.getBlockInfo(this.map.getBlockIndex(cx, ry, 1));
+                    if (!b1) continue;
+                    if (b1.lid === 41) {
+                        octx.fillStyle = useVice ? "#2898b8" : "#225577";
+                        octx.fillRect(cx * 4, ry * 4, 4, 4);
+                    } else if (b1.lid === 8) {
+                        octx.fillStyle = useVice ? "#dfd3c3" : "#9c9a96";
+                        octx.fillRect(cx * 4, ry * 4, 4, 4);
+                    } else if (b1.lid === 9) {
+                        octx.fillStyle = useVice ? "#efe2cf" : "#b2aba0";
+                        octx.fillRect(cx * 4, ry * 4, 4, 4);
+                    } else if (b1.lid === 10) {
+                        octx.fillStyle = useVice ? "#2ea844" : "#3a7d34";
+                        octx.fillRect(cx * 4, ry * 4, 4, 4);
+                    }
+                }
+            }
+            srcImg = this.liveOverviewCanvas;
+        }
         if (this.fullMapBgCanvas) {
             const fctx = this.fullMapBgCanvas.getContext("2d");
             fctx.imageSmoothingEnabled = false;

@@ -309,6 +309,122 @@ class LeonidaMap {
             }
         }
 
+        // Map-Wide Urban Basins, Park Lagoons, Lake Leonida & Mambas Stadium Restoration Pass:
+        // Replaces all jagged 1-tile staircase water gashes and stray inland beach-sand squares (lid 98..101)
+        // with clean centered basin footprints so the 8-neighbor SDF shader renders smooth oval/curved basins
+        // with a 3D sculpted stone coping border all across the 256x256 world!
+        const has3DBuildingAt = (cx, ry) => {
+            for (let tz = 2; tz < MAP_LAYERS; tz++) {
+                const b = this.blocksData[this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx]];
+                if (b && (b.lid !== 0 || b.w !== 0 || b.e !== 0 || b.n !== 0 || b.s !== 0)) return true;
+            }
+            return false;
+        };
+        const setGroundTile = (cx, ry, lid) => {
+            if (cx < 1 || cx >= MAP_COLS - 1 || ry < 1 || ry >= MAP_ROWS - 1) return;
+            if (has3DBuildingAt(cx, ry)) return;
+            const g1 = (1 * MAP_ROWS + ry) * MAP_COLS + cx;
+            const g2 = (2 * MAP_ROWS + ry) * MAP_COLS + cx;
+            if (lid === 41) {
+                this.voxelGrid[g1] = 1;  // lid 41 water
+                this.voxelGrid[g2] = 2;  // groundType WATER
+            } else if (lid === 8) {
+                this.voxelGrid[g1] = 46; // lid 8 city sidewalk
+                this.voxelGrid[g2] = 47; // groundType PAWEMENT
+            } else if (lid === 9) {
+                this.voxelGrid[g1] = 92; // lid 9 coral stone promenade
+                this.voxelGrid[g2] = 47; // groundType PAWEMENT
+            } else if (lid === 10) {
+                this.voxelGrid[g1] = 10; // lid 10 tropical grass
+                this.voxelGrid[g2] = 4;  // groundType FIELD
+            }
+        };
+        const fillGroundRect = (x0, x1, y0, y1, lid) => {
+            for (let ry = y0; ry <= y1; ry++) {
+                for (let cx = x0; cx <= x1; cx++) {
+                    setGroundTile(cx, ry, lid);
+                }
+            }
+        };
+
+        // 1) Restore Mambas Stadium South Grandstand & Emerald Football Pitch (cx = 106..125, ry = 105..115)
+        //    where a diagonal staircase canal had cut through the SW corner of the stadium:
+        for (let ry = 106; ry <= 113; ry++) {
+            const mirrorNorthRy = 210 - ry; // 106..113 mirrors intact North bowl 104..97
+            for (let cx = 106; cx <= 125; cx++) {
+                for (let tz = 0; tz < MAP_LAYERS; tz++) {
+                    this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx] =
+                        this.voxelGrid[(tz * MAP_ROWS + mirrorNorthRy) * MAP_COLS + cx];
+                }
+            }
+        }
+        fillGroundRect(106, 125, 114, 114, 8);
+        fillGroundRect(106, 125, 115, 115, 9);
+
+        // 2) Mount Kalaga Mountain Lake (cx = 48..63, ry = 10..21)
+        fillGroundRect(48, 63, 10, 21, 10);
+        fillGroundRect(51, 61, 12, 19, 41);
+
+        // 3) SERA Spaceport & North Beach Reflecting Basins (cx = 209..218, ry = 23..37)
+        fillGroundRect(210, 217, 34, 34, 8);
+        fillGroundRect(209, 218, 23, 30, 10);
+        fillGroundRect(210, 217, 23, 30, 41);
+        fillGroundRect(209, 218, 35, 37, 10);
+        fillGroundRect(210, 217, 35, 37, 41);
+
+        // 4) Golf Club Water Hazard Pond (cx = 144..152, ry = 53..59)
+        fillGroundRect(144, 152, 53, 59, 10);
+        fillGroundRect(145, 150, 54, 58, 41);
+
+        // 5) Little Haiti & Wynwood Courtyard Basins (cx = 95..139, ry = 64..70)
+        fillGroundRect(95, 103, 64, 66, 8);
+        fillGroundRect(96, 101, 64, 66, 41);
+        fillGroundRect(106, 115, 64, 68, 8);
+        fillGroundRect(108, 113, 65, 67, 41);
+        fillGroundRect(118, 127, 65, 69, 8);
+        fillGroundRect(120, 125, 66, 68, 41);
+        fillGroundRect(130, 139, 65, 70, 10);
+        fillGroundRect(132, 137, 66, 68, 41);
+
+        // 6) Lake Leonida Shoreline & Gator Island (cx = 56..101, ry = 52..96):
+        //    Replace jagged inland beach-sand/surf tiles (98..101) with lush lakeshore park grass (lid 10)
+        for (let ry = 52; ry <= 96; ry++) {
+            for (let cx = 56; cx <= 101; cx++) {
+                if (has3DBuildingAt(cx, ry)) continue;
+                const b1 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx]];
+                if (b1 && b1.lid >= 98 && b1.lid <= 101) {
+                    setGroundTile(cx, ry, (cx >= 75 && cx <= 80) ? 8 : 10);
+                }
+            }
+        }
+        fillGroundRect(88, 93, 92, 97, 8);
+        fillGroundRect(96, 103, 99, 105, 8);
+        fillGroundRect(98, 102, 100, 103, 41);
+
+        // 7) Downtown Reflecting Basin (cx = 132..138, ry = 118..123) & Bayfront Park (cx = 144..151, ry = 125..130)
+        fillGroundRect(132, 138, 118, 123, 9);
+        fillGroundRect(134, 137, 119, 122, 41);
+        fillGroundRect(144, 151, 125, 130, 10);
+        fillGroundRect(144, 144, 125, 130, 9);
+
+        // 8) South Lake Leonida Park Lagoon (cx = 62..74, ry = 94..115) & Port Gellhorn Urban Basin (cx = 60..67, ry = 118..129)
+        fillGroundRect(62, 74, 94, 115, 8);
+        fillGroundRect(64, 72, 96, 107, 10);
+        fillGroundRect(66, 70, 98, 105, 41);
+        fillGroundRect(60, 67, 118, 129, 8);
+        fillGroundRect(62, 65, 120, 127, 41);
+
+        // 9) South-West / South City Blocks (cx = 56..64, ry = 172..193 & cx = 88..101, ry = 189..193) & Vice Port (cx = 159..188, ry = 158..165)
+        fillGroundRect(59, 64, 172, 175, 8);
+        fillGroundRect(58, 63, 178, 184, 8);
+        fillGroundRect(59, 62, 179, 183, 41);
+        fillGroundRect(56, 61, 187, 193, 8);
+        fillGroundRect(88, 93, 189, 193, 8);
+        fillGroundRect(96, 101, 189, 193, 8);
+        fillGroundRect(159, 163, 158, 161, 9);
+        fillGroundRect(174, 188, 158, 165, 9);
+        fillGroundRect(179, 187, 159, 163, 41);
+
         // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
         // Enriches penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
         // and 3ds Max Glass Skylight Atriums (lid 31) while preserving 100% of their 3D side walls (w, e, n, s)!
