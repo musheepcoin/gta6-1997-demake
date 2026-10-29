@@ -40,14 +40,15 @@ class LeonidaGame {
             maxArmor: 100,
             inVehicle: null,
             weapon: "PISTOL",
-            weaponsOwned: ["FIST", "PISTOL", "UZI", "SHOTGUN", "FLAMETHROWER", "ROCKET"],
+            weaponsOwned: ["FIST", "PISTOL", "UZI", "SHOTGUN", "FLAMETHROWER", "ROCKET", "ELECTRO"],
             ammo: {
                 FIST: Infinity,
                 PISTOL: 150,
                 UZI: 300,
                 SHOTGUN: 60,
                 FLAMETHROWER: 200,
-                ROCKET: 20
+                ROCKET: 20,
+                ELECTRO: 120
             },
             shootCooldown: 0,
             muzzleTimer: 0,
@@ -877,8 +878,8 @@ class LeonidaGame {
                 this.cycleWeapon(1);
             }
 
-            // Number keys 1..6 for direct weapon selection
-            if (key >= "1" && key <= "6") {
+            // Number keys 1..7 for direct weapon selection (7 = GTA 2 ElectroGun)
+            if (key >= "1" && key <= "7") {
                 const idx = parseInt(key, 10) - 1;
                 if (this.player.weaponsOwned[idx]) {
                     this.player.weapon = this.player.weaponsOwned[idx];
@@ -2199,7 +2200,10 @@ class LeonidaGame {
         if (ped.dead) return;
         ped.dead = true;
         ped.burnTimer = 0;
-        for (let i = 0; i < 8; i++) {
+        ped.electroTimer = 0;
+        ped.drownTimer = 0;
+        const noBlood = ped.deathKind === "DROWNED" || ped.deathKind === "ELECTRO" || ped.deathKind === "BURNT";
+        for (let i = 0; i < (noBlood ? 0 : 8); i++) {
             this.particles.push({
                 x: ped.x,
                 y: ped.y,
@@ -2425,6 +2429,7 @@ class LeonidaGame {
                 rangeLeft: spec.range,
                 isFlame: Boolean(spec.isFlame),
                 isRocket: Boolean(spec.isRocket),
+                isElectro: Boolean(spec.isElectro),
                 fromPlayer: isPlayer,
                 fromJason: Boolean(fromJason),
                 r: spec.isFlame ? 9 : 4
@@ -3226,9 +3231,39 @@ class LeonidaGame {
                     this.spawnParticle(ped.x + (Math.random() - 0.5) * 10, ped.y + (Math.random() - 0.5) * 10, "FIRE");
                 }
                 if (ped.hp <= 0 || ped.burnTimer <= 0) {
+                    ped.deathKind = "BURNT";
                     this.killPed(ped);
                     continue;
                 }
+            }
+
+            // GTA 2 ePedestrianState_Electrocuted (ElectroGun): frozen in place, crackling sparks
+            if ((ped.electroTimer || 0) > 0) {
+                ped.electroTimer -= dt;
+                if (Math.random() < 0.35) this.spawnParticle(ped.x + (Math.random() - 0.5) * 12, ped.y + (Math.random() - 0.5) * 12, "SPARK");
+                if (ped.electroTimer <= 0) {
+                    ped.electroTimer = 0;
+                    ped.deathKind = "ELECTRO";
+                    this.killPed(ped, ped.electroByPlayer !== false);
+                }
+                continue;
+            }
+
+            // GTA 2 ePedestrianState_Drowning: pedestrians can't swim — knocked/fleeing into deep water they sink
+            if (ped.kind !== "GATOR" && !((ped.drownTimer || 0) > 0) && this.map && this.map.getGroundTypeAt &&
+                this.map.getGroundTypeAt(ped.x, ped.y) === GROUND_TYPE.WATER) {
+                ped.drownTimer = 2.6;
+                ped.burnTimer = 0;
+                if (Math.hypot(ped.x - this.player.x, ped.y - this.player.y) < 480) this.audio.playPedScream();
+            }
+            if ((ped.drownTimer || 0) > 0) {
+                ped.drownTimer -= dt;
+                if (ped.drownTimer <= 0) {
+                    ped.drownTimer = 0;
+                    ped.deathKind = "DROWNED";
+                    this.killPed(ped, false);
+                }
+                continue;
             }
 
             // 1997 GTA 1 ePedestrianState_Stunned (knocked down onto asphalt, frames 38..41)
@@ -3579,6 +3614,18 @@ class LeonidaGame {
                     // Jason's cover fire never hits innocent civilians or monks!
                     if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE") continue;
                     if (Math.hypot(ped.x - pr.x, ped.y - pr.y) < 13) {
+                        if (pr.isElectro) {
+                            // GTA 2 ElectroGun: freeze & electrocute (X-ray skeleton flash) then drop charred
+                            if (!(ped.electroTimer > 0)) {
+                                ped.electroTimer = 1.5;
+                                ped.electroByPlayer = true;
+                                ped.burnTimer = 0;
+                                if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) this.audio.playPedScream();
+                            }
+                            this.spawnParticle(pr.x, pr.y, "SPARK");
+                            hitSomething = true;
+                            break;
+                        }
                         ped.hp -= pr.damage;
                         if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) {
                             this.audio.playPedScream();
@@ -3588,7 +3635,10 @@ class LeonidaGame {
                             ped.panicTimer = 4.5;
                             ped.angle = Math.random() * Math.PI * 2;
                         }
-                        if (ped.hp <= 0) this.killPed(ped, true);
+                        if (ped.hp <= 0) {
+                            if (pr.isFlame) ped.deathKind = "BURNT";
+                            this.killPed(ped, true);
+                        }
                         hitSomething = true;
                         break;
                     }

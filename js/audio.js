@@ -353,6 +353,13 @@ class RetroAudioEngine {
             this.playNoise(0.11, 600, 0.045);
             return;
         }
+        if (weaponType === "ELECTRO") {
+            // GTA 2 ElectroGun: high-voltage crackle + buzzing zap
+            this.playBandNoise(0.09, 3200, 2.2, 0.05);
+            this.playBeep(1180, 0.07, "sawtooth", 0.035);
+            this.playBeep(90, 0.09, "square", 0.03);
+            return;
+        }
         if (weaponType === "ROCKET") {
             this.playNoise(0.28, 350, 0.11);
             this.playBeep(140, 0.25, "sawtooth", 0.09);

@@ -735,6 +735,7 @@ class ViceNetworkManager {
                         rangeLeft: pl.rng || 320,
                         isFlame: Boolean(pl.flm),
                         isRocket: Boolean(pl.rck),
+                        isElectro: Boolean(pl.elc),
                         fromPlayer: false,
                         fromRemoteId: pkt.id,
                         fromRemoteName: pkt.name || "REMOTE PLAYER",
@@ -959,7 +960,8 @@ class ViceNetworkManager {
                 dmg: pr.damage,
                 rng: Math.round(pr.rangeLeft),
                 flm: pr.isFlame ? 1 : 0,
-                rck: pr.isRocket ? 1 : 0
+                rck: pr.isRocket ? 1 : 0,
+                elc: pr.isElectro ? 1 : 0
             }))
         });
     }

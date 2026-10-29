@@ -1517,6 +1517,13 @@ class LeonidaMap {
         return this.blocksData[idx] || EMPTY_BLOCK;
     }
 
+    // Raw surface eGroundType (GROUND_TYPE.*) at a world pixel position
+    getGroundTypeAt(px, py) {
+        const cx = Math.max(0, Math.min(MAP_COLS - 1, Math.floor(px / TILE_SIZE)));
+        const cy = Math.max(0, Math.min(MAP_ROWS - 1, Math.floor(py / TILE_SIZE)));
+        return this.surfaceGround[cy * MAP_COLS + cx];
+    }
+
     getGroundTypeAtBlock(bx, by, bz = 0) {
         const cx = Math.max(0, Math.min(MAP_COLS - 1, bx | 0));
         const cy = Math.max(0, Math.min(MAP_ROWS - 1, by | 0));

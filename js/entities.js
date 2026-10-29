@@ -699,7 +699,9 @@ const WEAPON_SPECS = {
     UZI: { name: "MACHINEGUN", fireRate: 0.0625, range: 360, damage: 22, speed: 600, spread: 0.08 },
     SHOTGUN: { name: "PUMP SHOTGUN", fireRate: 0.52, range: 270, damage: 22, speed: 560, spread: 0.24, pellets: 6 },
     FLAMETHROWER: { name: "FLAMETHROWER", fireRate: 0.0625, range: 155, damage: 10, speed: 270, spread: 0.16, isFlame: true },
-    ROCKET: { name: "ROCKET LAUNCHER", fireRate: 0.85, range: 1100, damage: 240, speed: 380, spread: 0.01, isRocket: true }
+    ROCKET: { name: "ROCKET LAUNCHER", fireRate: 0.85, range: 1100, damage: 240, speed: 380, spread: 0.01, isRocket: true },
+    // GTA 2 ElectroGun: freezes & electrocutes pedestrians (X-ray skeleton flash) before they drop charred
+    ELECTRO: { name: "ELECTROGUN", fireRate: 0.16, range: 240, damage: 6, speed: 820, spread: 0.02, isElectro: true }
 };
 
 // Car sprite delta damage bit indices from GameDefs.h (lines 39-45)

@@ -437,7 +437,45 @@ class RetroRenderer {
         try {
             const W = img.width;
             const origH = img.height;
-            const H = origH + 220;
+
+            // Pre-compute the shelf-packed atlas layout of the GTA 2 (1999) remap pedestrian archetypes
+            // (synthesized from the GTA 1 civilian base `civ0`) so the in-memory atlas can grow to fit them.
+            const g2Archs = this.getGta2PedArchetypes();
+            const g2SrcFrames = (meta.sprites.peds && meta.sprites.peds.civ0) || null;
+            const g2FrameKeys = [
+                "0", "1", "2", "3", "4", "5", "6", "7",
+                "16", "17", "18", "19", "20", "21", "22", "23",
+                "38", "39", "40", "41", "42",
+                "50", "51", "52", "53", "54", "55",
+                "84", "85", "86", "87", "88", "89",
+                "97", "98", "99", "100", "101", "102", "103", "104", "105", "106",
+                "136", "137", "138", "139", "140", "141", "142", "143", "152"
+            ];
+            const g2Layout = [];
+            let g2PackEndY = origH + 220;
+            if (g2SrcFrames) {
+                let cx = 2;
+                let cy = origH + 172;
+                let shelfH = 0;
+                // +1 archetype slot for the GTA 2 electrocution X-ray skeleton ("g2_xray")
+                for (let ai = 0; ai <= g2Archs.length; ai++) {
+                    for (const fk of g2FrameKeys) {
+                        const r = g2SrcFrames[fk];
+                        if (!Array.isArray(r) || r.length < 4) continue;
+                        if (cx + r[2] + 2 > W) {
+                            cx = 2;
+                            cy += shelfH + 2;
+                            shelfH = 0;
+                        }
+                        g2Layout.push({ ai, fk, dx: cx, dy: cy });
+                        cx += r[2] + 2;
+                        shelfH = Math.max(shelfH, r[3]);
+                    }
+                }
+                g2PackEndY = Math.max(g2PackEndY, cy + shelfH + 4);
+            }
+
+            const H = g2PackEndY;
             this.spritesTexW = W;
             this.spritesTexH = H;
             const cvs = document.createElement("canvas");
@@ -742,6 +780,167 @@ class RetroRenderer {
                     }
                     meta.sprites.peds[arch.key] = dstFrames;
                 }
+            }
+
+            // 2C. GTA 2 (1999) Remap Pedestrian Variety (remaps 0..52 of the GTA 2 .sty files + Vice City extras):
+            //     Re-dress the GTA 1 civilian base (`civ0`: green long-sleeve top, blue trousers, auburn hair)
+            //     region by region into ~35 distinct archetypes — short sleeves / tank tops (bare forearms),
+            //     shorts (bare calves), Hawaiian prints, stripes, open jackets, helmets, hoods, bald heads,
+            //     4 skin tones — plus the GTA 2 electrocution X-ray skeleton ("g2_xray").
+            if (g2SrcFrames && g2Layout.length) {
+                const clamp8 = (v) => (v < 0 ? 0 : (v > 255 ? 255 : v | 0));
+                const newFrames = g2Archs.map(() => ({}));
+                const xrayFrames = {};
+                const hairMask = new Uint8Array(40 * 40);
+
+                for (const ent of g2Layout) {
+                    const src = g2SrcFrames[ent.fk];
+                    const [sx, sy, sw, sh] = src;
+                    if (sw > 40 || sh > 40 || ent.dx + sw > W || ent.dy + sh > H) continue;
+                    const isXray = ent.ai === g2Archs.length;
+                    const arch = isXray ? null : g2Archs[ent.ai];
+
+                    // Pass 1: hair centroid = head centre (all frames share the same facing, so arms lie
+                    // left/right of the head and legs extend fore/aft of it).
+                    let hxSum = 0, hySum = 0, hCnt = 0;
+                    for (let ly = 0; ly < sh; ly++) {
+                        for (let lx = 0; lx < sw; lx++) {
+                            const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                            const r = d[sp], g = d[sp + 1], b = d[sp + 2];
+                            const isHair = d[sp + 3] >= 16 && r > 28 && r < 104 && r > g * 2 && g < 34 && b < 30;
+                            hairMask[ly * sw + lx] = isHair ? 1 : 0;
+                            if (isHair) { hxSum += lx; hySum += ly; hCnt++; }
+                        }
+                    }
+                    const hx = hCnt > 0 ? hxSum / hCnt : (sw - 1) * 0.5;
+                    const hy = hCnt > 0 ? hySum / hCnt : (sh - 1) * 0.5;
+                    // Pass 1b: relaxed hair test near the head centre (the GTA 2 crown highlight lifts
+                    // the centre hair pixels above the strict thresholds)
+                    if (hCnt > 0) {
+                        for (let ly = 0; ly < sh; ly++) {
+                            for (let lx = 0; lx < sw; lx++) {
+                                if (hairMask[ly * sw + lx]) continue;
+                                if (Math.hypot(lx - hx, ly - hy) > 3.4) continue;
+                                const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                                const r = d[sp], g = d[sp + 1], b = d[sp + 2];
+                                if (d[sp + 3] >= 16 && r > 30 && r < 135 && r > g * 1.5 && r - g > 22 && g < 56 && b < 48) {
+                                    hairMask[ly * sw + lx] = 1;
+                                }
+                            }
+                        }
+                    }
+
+                    for (let ly = 0; ly < sh; ly++) {
+                        for (let lx = 0; lx < sw; lx++) {
+                            const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                            const dp = ((ent.dy + ly) * W + (ent.dx + lx)) * 4;
+                            const a = d[sp + 3];
+                            if (a < 16) {
+                                d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
+                                continue;
+                            }
+                            const r = d[sp], g = d[sp + 1], b = d[sp + 2];
+                            const isHair = hairMask[ly * sw + lx] === 1;
+                            const isShirt = !isHair && g > r + 8 && g > b + 20;
+                            const isPants = !isHair && !isShirt && b > r + 25 && b + 6 >= g;
+                            const isSkin = !isHair && !isShirt && !isPants && r >= 120 && g >= 55 && r > g + 20 && g > b;
+                            const dx = lx - hx;
+                            const dy = ly - hy;
+                            const dist = Math.hypot(dx, dy);
+
+                            if (isXray) {
+                                // GTA 2 electrocution: glowing blue body outline + white bones + skull
+                                const opaqueAt = (ox, oy) => {
+                                    if (ox < 0 || oy < 0 || ox >= sw || oy >= sh) return false;
+                                    return d[((sy + oy) * W + (sx + ox)) * 4 + 3] >= 16;
+                                };
+                                const isCore = opaqueAt(lx - 1, ly) && opaqueAt(lx + 1, ly) && opaqueAt(lx, ly - 1) && opaqueAt(lx, ly + 1);
+                                if ((isHair || isSkin) && dist <= 2.7) {
+                                    const eye = (Math.abs(dy + 0.6) < 0.7 && Math.abs(Math.abs(dx) - 1.0) < 0.6);
+                                    d[dp] = eye ? 20 : 238; d[dp + 1] = eye ? 30 : 244; d[dp + 2] = eye ? 70 : 255; d[dp + 3] = 255;
+                                } else if (isCore) {
+                                    d[dp] = 196; d[dp + 1] = 222; d[dp + 2] = 255; d[dp + 3] = 255;
+                                } else {
+                                    d[dp] = 34; d[dp + 1] = 120; d[dp + 2] = 255; d[dp + 3] = 190;
+                                }
+                                continue;
+                            }
+
+                            let col = null;
+                            let shade = 1.0;
+                            if (isShirt) {
+                                shade = Math.max(0.35, Math.min(1.3, g / 190));
+                                const ax = Math.abs(dx);
+                                const bareArm =
+                                    arch.sleeves === "bare" ||
+                                    (arch.sleeves === "tank" && ax >= 3.5) ||
+                                    (arch.sleeves === "short" && ax >= 4.5);
+                                if (bareArm) {
+                                    col = arch.skin;
+                                    shade = Math.max(0.6, Math.min(1.2, shade * 1.05));
+                                } else {
+                                    col = arch.shirt;
+                                    if (arch.pattern === "hawaiian") {
+                                        if ((lx + ly * 2 + ent.ai) % 5 === 0) col = arch.shirt2;
+                                        else if ((lx * 3 + ly + ent.ai) % 7 === 0) col = arch.shirt3 || arch.shirt2;
+                                    } else if (arch.pattern === "stripes") {
+                                        if (ly % 2 === 0) col = arch.shirt2;
+                                    } else if (arch.pattern === "jacket") {
+                                        if (ax <= 1.2) col = arch.shirt2;
+                                    } else if (arch.pattern === "hivis") {
+                                        if ((ly + 1) % 4 === 0) col = arch.shirt2;
+                                    } else if (arch.pattern === "plaid") {
+                                        if (lx % 3 === 0 || ly % 3 === 0) col = arch.shirt2;
+                                    }
+                                }
+                            } else if (isPants) {
+                                shade = Math.max(0.4, Math.min(1.35, b / 105));
+                                if (arch.legs === "shorts" && dist > 4.2) {
+                                    col = arch.skin;
+                                    shade = Math.max(0.65, Math.min(1.15, shade));
+                                } else {
+                                    col = arch.pants;
+                                }
+                            } else if (isHair) {
+                                shade = Math.max(0.55, Math.min(1.35, r / 72));
+                                if (arch.hairMode === "bald") {
+                                    col = arch.skin;
+                                    shade = 0.9 + Math.max(0, 1.0 - dist / 2.2) * 0.3;
+                                } else if (arch.hairMode === "hood") {
+                                    col = arch.shirt;
+                                    shade *= 0.78;
+                                } else if (arch.hairMode === "helmet") {
+                                    col = arch.helmet;
+                                    shade = 0.82 + Math.max(0, 1.0 - dist / 2.4) * 0.42;
+                                } else {
+                                    col = arch.hair;
+                                }
+                            } else if (isSkin) {
+                                shade = Math.max(0.6, Math.min(1.2, r / 175));
+                                col = arch.skin;
+                            }
+
+                            if (col) {
+                                d[dp] = clamp8(col[0] * shade);
+                                d[dp + 1] = clamp8(col[1] * shade);
+                                d[dp + 2] = clamp8(col[2] * shade);
+                            } else {
+                                // Shoes, belts & dark contour keep their original GTA 1 pixels
+                                d[dp] = r; d[dp + 1] = g; d[dp + 2] = b;
+                            }
+                            d[dp + 3] = 255;
+                        }
+                    }
+
+                    const rect = [ent.dx, ent.dy, sw, sh];
+                    if (isXray) xrayFrames[ent.fk] = rect;
+                    else newFrames[ent.ai][ent.fk] = rect;
+                }
+
+                for (let ai = 0; ai < g2Archs.length; ai++) {
+                    meta.sprites.peds[g2Archs[ai].key] = { ...g2SrcFrames, ...newFrames[ai] };
+                }
+                meta.sprites.peds["g2_xray"] = { ...g2SrcFrames, ...xrayFrames };
             }
 
             // 3. BleedTransparentEdges (src/alpha_bleed.h):
@@ -1095,6 +1294,7 @@ class RetroRenderer {
                     this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
                     this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
                     const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
+                    this.enhancedSpritesCanvas = enhancedSprites;
                     this.spritesTex = this.createGLTexture(enhancedSprites, true);
                 }
                 // Decompress NYC.CMP 256x256x6 voxel map into LeonidaMap and build 3D WebGL CityMesh!
@@ -2667,6 +2867,96 @@ class RetroRenderer {
         }
     }
 
+    /* GTA 2 (1999) remap pedestrian archetypes (remaps 0..52 from the GTA 2 .sty files + Vice City '86 extras).
+       sleeves: long | short | tank | bare     legs: pants | shorts
+       hairMode: (hair colour) | bald | hood | helmet     pattern: hawaiian | stripes | jacket | hivis | plaid */
+    getGta2PedArchetypes() {
+        if (this._g2Archs) return this._g2Archs;
+        const SK = {
+            light: [238, 190, 152],
+            tan: [214, 152, 106],
+            brown: [164, 104, 66],
+            dark: [106, 64, 40]
+        };
+        const H = {
+            black: [24, 22, 28],
+            brown: [96, 58, 30],
+            auburn: [150, 60, 28],
+            red: [196, 70, 30],
+            blond: [236, 196, 92],
+            grey: [176, 176, 184],
+            white: [236, 236, 242]
+        };
+        const JEANS = [52, 84, 150];
+        const KHAKI = [196, 166, 114];
+        this._g2Archs = [
+            // --- GTA 2 special remaps (0..25): gangs, emergency services & street icons ---
+            { key: "g2_elvis",        shirt: [242, 242, 236], pants: [242, 242, 236], sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [232, 180, 40] },
+            { key: "g2_krishna",      shirt: [255, 142, 22],  pants: [255, 142, 22],  sleeves: "short", legs: "pants",  hairMode: "bald", skin: SK.tan },
+            { key: "g2_medic",        shirt: [244, 246, 250], pants: [244, 246, 250], sleeves: "short", legs: "pants",  hair: H.brown, skin: SK.light, pattern: "hivis", shirt2: [226, 34, 44] },
+            { key: "g2_fireman",      shirt: [150, 112, 52],  pants: [96, 74, 40],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [250, 204, 24], skin: SK.light, pattern: "hivis", shirt2: [236, 238, 120] },
+            { key: "g2_swat",         shirt: [34, 38, 50],    pants: [34, 38, 50],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [26, 28, 36], skin: SK.light },
+            { key: "g2_army",         shirt: [92, 104, 52],   pants: [80, 90, 46],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [70, 82, 40], skin: SK.tan, pattern: "plaid", shirt2: [66, 74, 36] },
+            { key: "g2_scientist",    shirt: [240, 244, 246], pants: [112, 114, 124], sleeves: "long",  legs: "pants",  hair: H.grey, skin: SK.light, pattern: "jacket", shirt2: [120, 170, 200] },
+            { key: "g2_zaibatsu",     shirt: [30, 30, 36],    pants: [76, 78, 88],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [210, 210, 214] },
+            { key: "g2_yakuza",       shirt: [30, 44, 96],    pants: [24, 30, 64],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [236, 236, 236] },
+            { key: "g2_loony",        shirt: [84, 206, 96],   pants: [238, 238, 230], sleeves: "short", legs: "pants",  hair: H.red, skin: SK.light },
+            { key: "g2_russian",      shirt: [98, 62, 36],    pants: [44, 44, 52],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light },
+            { key: "g2_redneck_red",  shirt: [238, 236, 226], pants: JEANS,           sleeves: "tank",  legs: "pants",  hair: H.red, skin: SK.light },
+            { key: "g2_redneck_blond",shirt: [200, 40, 40],   pants: JEANS,           sleeves: "short", legs: "pants",  hair: H.blond, skin: SK.light, pattern: "plaid", shirt2: [40, 30, 34] },
+            { key: "g2_prisoner",     shirt: [255, 116, 24],  pants: [255, 116, 24],  sleeves: "short", legs: "pants",  hairMode: "bald", skin: SK.brown },
+            { key: "g2_mugger",       shirt: [36, 36, 42],    pants: [62, 66, 80],    sleeves: "long",  legs: "pants",  hairMode: "hood", skin: SK.tan },
+            { key: "g2_hulk",         shirt: [96, 204, 64],   pants: [118, 44, 158],  sleeves: "bare",  legs: "shorts", hair: H.black, skin: [96, 204, 64] },
+            // --- GTA 2 civilian dummy remaps (26..52) ---
+            { key: "g2_civ_redtee",   shirt: [232, 96, 96],   pants: KHAKI,           sleeves: "short", legs: "shorts", hair: H.brown, skin: SK.light },
+            { key: "g2_civ_blueshorts",shirt: [64, 120, 220], pants: [54, 92, 190],   sleeves: "short", legs: "shorts", hair: H.blond, skin: SK.tan },
+            { key: "g2_civ_yellowtee",shirt: [246, 214, 60],  pants: KHAKI,           sleeves: "short", legs: "shorts", hair: H.black, skin: SK.dark },
+            { key: "g2_civ_lilac",    shirt: [190, 150, 222], pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.auburn, skin: SK.light },
+            { key: "g2_civ_burgundy", shirt: [128, 30, 50],   pants: [176, 144, 100], sleeves: "short", legs: "pants",  hair: H.black, skin: SK.brown },
+            { key: "g2_civ_aqua",     shirt: [60, 210, 210],  pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.brown, skin: SK.tan },
+            { key: "g2_civ_greysuit", shirt: [124, 128, 140], pants: [80, 82, 92],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [236, 236, 240] },
+            { key: "g2_civ_pink",     shirt: [246, 132, 186], pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.blond, skin: SK.light },
+            { key: "g2_civ_darkgreen",shirt: [36, 96, 52],    pants: [190, 160, 210], sleeves: "short", legs: "pants",  hair: H.black, skin: SK.dark },
+            { key: "g2_civ_granny",   shirt: [196, 168, 220], pants: [230, 230, 236], sleeves: "long",  legs: "pants",  hair: H.white, skin: SK.light },
+            // --- Vice City '86 street extras ---
+            { key: "vc_hawaiian_red", shirt: [222, 44, 52],   shirt2: [255, 226, 80], shirt3: [40, 160, 80], pants: [236, 232, 220], sleeves: "short", legs: "pants",  hair: H.brown, skin: SK.tan, pattern: "hawaiian" },
+            { key: "vc_tourist",      shirt: [70, 150, 230],  shirt2: [250, 250, 250], shirt3: [255, 120, 180], pants: KHAKI, sleeves: "short", legs: "shorts", hairMode: "bald", skin: [246, 176, 150], pattern: "hawaiian" },
+            { key: "vc_tommy",        shirt: [40, 170, 210],  shirt2: [30, 110, 60], shirt3: [240, 240, 230], pants: JEANS, sleeves: "short", legs: "pants", hair: H.black, skin: SK.tan, pattern: "hawaiian" },
+            { key: "vc_crockett",     shirt: [242, 240, 234], shirt2: [250, 150, 190], pants: [242, 240, 234], sleeves: "long", legs: "pants", hair: H.blond, skin: SK.tan, pattern: "jacket" },
+            { key: "vc_tubbs",        shirt: [70, 72, 86],    shirt2: [60, 200, 220], pants: [70, 72, 86], sleeves: "long", legs: "pants", hair: H.black, skin: SK.dark, pattern: "jacket" },
+            { key: "vc_jogger",       shirt: [255, 60, 160],  pants: [30, 30, 36],    sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.tan },
+            { key: "vc_sailor",       shirt: [244, 244, 248], shirt2: [34, 54, 120], pants: [214, 40, 50], sleeves: "short", legs: "shorts", hair: H.auburn, skin: SK.light, pattern: "stripes" },
+            { key: "vc_cuban",        shirt: [40, 150, 70],   shirt2: [250, 250, 240], shirt3: [250, 200, 60], pants: [30, 30, 34], sleeves: "short", legs: "pants", hair: H.black, skin: SK.brown, pattern: "hawaiian" },
+            { key: "vc_haitian",      shirt: [26, 82, 40],    pants: [38, 44, 40],    sleeves: "tank",  legs: "pants",  hair: H.black, skin: SK.dark },
+            { key: "vc_bodybuilder",  shirt: [250, 220, 40],  pants: [214, 40, 50],   sleeves: "bare",  legs: "shorts", hairMode: "bald", skin: SK.brown }
+        ];
+        return this._g2Archs;
+    }
+
+    // Weighted spawn pools for the GTA 2 remap archetypes
+    pickGta2PedType(ped, isGang) {
+        const gangPool = [
+            "g2_zaibatsu", "g2_yakuza", "g2_loony", "g2_russian",
+            "g2_redneck_red", "g2_redneck_blond", "vc_cuban", "vc_haitian", "g2_mugger"
+        ];
+        const civPool = [
+            "g2_civ_redtee", "g2_civ_blueshorts", "g2_civ_yellowtee", "g2_civ_lilac", "g2_civ_burgundy",
+            "g2_civ_aqua", "g2_civ_greysuit", "g2_civ_pink", "g2_civ_darkgreen", "g2_civ_granny",
+            "vc_hawaiian_red", "vc_tourist", "vc_tommy", "vc_crockett", "vc_tubbs", "vc_jogger",
+            "vc_sailor", "vc_bodybuilder",
+            "g2_civ_redtee", "g2_civ_greysuit", "vc_hawaiian_red", "vc_tourist", "g2_civ_aqua", "g2_civ_pink",
+            // rarer street icons & off-duty services
+            "g2_elvis", "g2_krishna", "g2_medic", "g2_fireman", "g2_scientist", "g2_prisoner",
+            "g2_swat", "g2_army", "g2_hulk",
+            // keep a few original GTA 1 civilians in the mix
+            "civ0", "civ1", "civ2", "civ3"
+        ];
+        const pool = isGang ? gangPool : civPool;
+        const seed = Math.abs(Math.floor((ped.animSeed || 0) * 7919 + (ped.turnSeed || 0) * 131 + (ped.x || 0) * 0.37));
+        const key = pool[seed % pool.length];
+        return (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.peds && this.gta1Meta.sprites.peds[key]) ? key : null;
+    }
+
     batchPedSprite3D(pedType, frameIdx, x, y, zBlocks, angle, scale = 1.0, muzzleFlash = false, drawOrder = SPRITE_DRAW_ORDER.PEDESTRIAN, rTint = 1.0, gTint = 1.0, bTint = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta.sprites.peds[pedType]) return;
         const frames = this.gta1Meta.sprites.peds[pedType];
@@ -2769,11 +3059,30 @@ class RetroRenderer {
         for (const ped of game.peds) {
             if (!ped.dead) continue;
             if (ped.x < minX || ped.x > maxX || ped.y < minY || ped.y > maxY) continue;
+            if (ped.deathKind === "DROWNED") continue; // sank below the surface
+            if (ped.deathRenderT === undefined) ped.deathRenderT = this.time;
             const pz = this.getEntityZ(ped, 0.025);
-            this.batchObjectSprite3D("444", ped.x, ped.y, pz, ped.angle, 1.0, SPRITE_DRAW_ORDER.CORPSE);
             let pedType = ped.g24Type || "civ2";
             if (ped.kind === "MONK") pedType = "monk";
             else if (ped.kind === "COP") pedType = "police";
+            if (ped.deathKind === "BURNT" || ped.deathKind === "ELECTRO") {
+                // GTA 2 charred corpse: scorched ash mark, blackened body & rising smoke wisps
+                const age = this.time - ped.deathRenderT;
+                this.pushSolidQuad3D(ped.x, ped.y, pz, 15, 15, ped.angle, 0.07, 0.06, 0.06, 0.26, SPRITE_DRAW_ORDER.CORPSE);
+                this.pushSolidQuad3D(ped.x, ped.y, pz, 15, 15, ped.angle + 0.785, 0.07, 0.06, 0.06, 0.26, SPRITE_DRAW_ORDER.CORPSE);
+                this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.30, false, SPRITE_DRAW_ORDER.CORPSE, 0.2, 0.17, 0.15);
+                if (age < 9.0) {
+                    const smokeFr = 200 + (Math.floor(age * 6 + (ped.animSeed || 0) * 10) % 11);
+                    const rise = (age * 0.7) % 1.0;
+                    this.batchObjectSprite3D(String(smokeFr), ped.x + Math.sin(age * 2.0) * 3, ped.y - rise * 10, pz + 0.05 + rise * 0.12, 0, 0.55 + rise * 0.4, SPRITE_DRAW_ORDER.EXPLOSION);
+                    if (ped.deathKind === "BURNT" && age < 2.5) {
+                        const fireFrame = 234 + (Math.floor(this.time * 14 + (ped.animSeed || 0) * 10) % 8);
+                        this.batchObjectSprite3D(String(fireFrame), ped.x, ped.y, pz + 0.02, 0, 0.62 * (1.0 - age / 2.5) + 0.2, SPRITE_DRAW_ORDER.EXPLOSION);
+                    }
+                }
+                continue;
+            }
+            this.batchObjectSprite3D("444", ped.x, ped.y, pz, ped.angle, 1.0, SPRITE_DRAW_ORDER.CORPSE);
             this.batchPedSprite3D(pedType, 42, ped.x, ped.y, pz + 0.005, ped.angle, 1.30, false, SPRITE_DRAW_ORDER.CORPSE);
         }
 
@@ -2825,7 +3134,17 @@ class RetroRenderer {
                 const bh = Math.abs(Math.floor((ped.turnSeed || 1) * 17 + ped.animSeed * 313)) % beachPool.length;
                 pedType = beachPool[bh];
                 ped.g24Type = pedType;
-            } else if (!pedType) {
+            } else if ((ped.kind === "CIVILIAN" || ped.kind === "HOSTILE") && !ped.g2Remapped && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
+                // GTA 2 (1999) remap variety: re-dress generic GTA 1 civilians & gang members once
+                ped.g2Remapped = true;
+                const isGang = ped.kind === "HOSTILE" || pedType === "gang";
+                const g2Type = this.pickGta2PedType(ped, isGang);
+                if (g2Type) {
+                    pedType = g2Type;
+                    ped.g24Type = pedType;
+                }
+            }
+            if (!pedType) {
                 if (ped.kind === "MONK") pedType = "monk";
                 else if (ped.kind === "COP") pedType = "police";
                 else if (ped.kind === "HOSTILE" || ped.archetype === "PAULY" || ped.archetype === "DELL") pedType = "gang";
@@ -2887,6 +3206,47 @@ class RetroRenderer {
                 pb = rt[2];
             }
 
+            // GTA 2 ePedestrianState_Electrocuted: frozen, shaking, flashing between body & X-ray skeleton
+            if ((ped.electroTimer || 0) > 0) {
+                const jx = (Math.random() - 0.5) * 2.4;
+                const jy = (Math.random() - 0.5) * 2.4;
+                const showSkeleton = (Math.floor(this.time * 16) % 2) === 0;
+                const glowA = 0.16 + Math.random() * 0.12;
+                this.pushSolidQuad3D(ped.x, ped.y, pz + 0.004, 18, 18, 0, 0.25, 0.65, 1.0, glowA, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(ped.x, ped.y, pz + 0.004, 18, 18, 0.785, 0.25, 0.65, 1.0, glowA, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchPedSprite3D(showSkeleton ? "g2_xray" : pedType, 98, ped.x + jx, ped.y + jy, pz, ped.angle, pedScale, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN, showSkeleton ? 1.0 : 0.7, showSkeleton ? 1.0 : 0.85, 1.0);
+                for (let k = 0; k < 3; k++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const rr = 6 + Math.random() * 7;
+                    this.pushSolidQuad3D(ped.x + Math.cos(a) * rr, ped.y + Math.sin(a) * rr, pz + 0.03, 7 + Math.random() * 6, 1.3, a + Math.PI * 0.5, 0.75, 0.92, 1.0, 0.95, SPRITE_DRAW_ORDER.HUD_ARROW);
+                }
+                continue;
+            }
+
+            // GTA 2 ePedestrianState_Drowning: arms flailing, splash rings, slowly sinking & fading to blue
+            if ((ped.drownTimer || 0) > 0) {
+                const prog = Math.max(0, Math.min(1, 1.0 - ped.drownTimer / 2.6));
+                const flail = 50 + (Math.floor(this.time * 9 + ped.animSeed * 10) % 4);
+                const bob = Math.sin(this.time * 9.0 + ped.animSeed) * 1.6;
+                for (let k = 0; k < 2; k++) {
+                    const ringT = (this.time * 1.4 + k * 0.5 + ped.animSeed) % 1.0;
+                    const rs = 10 + ringT * 18;
+                    this.pushSolidQuad3D(ped.x, ped.y, pz - 0.018, rs, rs, 0.785, 0.88, 0.97, 1.0, 0.3 * (1.0 - ringT), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(ped.x, ped.y, pz - 0.018, rs, rs, 0, 0.88, 0.97, 1.0, 0.3 * (1.0 - ringT), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                this.batchPedSprite3D(pedType, flail, ped.x, ped.y + bob, pz - prog * 0.03, ped.angle, pedScale * (1.0 - prog * 0.45), false, pedDrawOrder, 1.0 - prog * 0.6, 1.0 - prog * 0.25, 1.0);
+                continue;
+            }
+
+            // GTA 2 human torch: the burning body chars progressively darker while running in panic
+            if ((ped.burnTimer || 0) > 0) {
+                const charFrac = Math.max(0, Math.min(1, 1.0 - ped.burnTimer / 3.2));
+                const k = 1.0 - charFrac * 0.72;
+                pr *= k * 1.04;
+                pg *= k * 0.9;
+                pb *= k * 0.82;
+            }
+
             this.batchPedSprite3D(pedType, frameIdx, ped.x, ped.y, pz, ped.angle, pedScale, false, pedDrawOrder, pr, pg, pb);
 
             // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm civilian pedestrians smoke a glowing cigarette ember after dusk!
@@ -2899,7 +3259,7 @@ class RetroRenderer {
 
             // 1997 GTA 1 Pedestrian::SetBurnEffectActive — attach .G24 fire sprite (234..241) on burning peds!
             if ((ped.burnTimer || 0) > 0) {
-                const fireFrame = 234 + (Math.floor(this.time * 14 + ped.animSeed * 10) % 8);
+                const fireFrame = 234 + (Math.floor(this.time * 14 + (ped.animSeed || 0) * 10) % 8);
                 this.batchObjectSprite3D(String(fireFrame), ped.x, ped.y, pz + 0.025, 0, 0.78, SPRITE_DRAW_ORDER.EXPLOSION);
             }
         }
@@ -3539,7 +3899,17 @@ class RetroRenderer {
         // 8. Projectiles & Authentic STYLE001.G24 Sprite Particles (Smoke 200..210, Sparks 219..223, Blood 224..229, Fire 234..249)
         for (const pr of game.projectiles) {
             const pz = this.camZBlocks + 0.15;
-            if (pr.isFlame) {
+            if (pr.isElectro) {
+                // GTA 2 ElectroGun bolt: jagged crackling cyan-white lightning segments
+                const ang = Math.atan2(pr.vy || 0, pr.vx || 1);
+                for (let k = 0; k < 3; k++) {
+                    const off = (Math.random() - 0.5) * 5;
+                    const bx = pr.x - Math.cos(ang) * k * 7 - Math.sin(ang) * off;
+                    const by = pr.y - Math.sin(ang) * k * 7 + Math.cos(ang) * off;
+                    this.pushSolidQuad3D(bx, by, pz, 9, 2.0, ang + (Math.random() - 0.5) * 0.9, 0.55, 0.85, 1.0, 0.95, SPRITE_DRAW_ORDER.PROJECTILES);
+                }
+                this.pushSolidQuad3D(pr.x, pr.y, pz + 0.002, 4.2, 4.2, 0.785, 0.92, 0.97, 1.0, 1.0, SPRITE_DRAW_ORDER.PROJECTILES);
+            } else if (pr.isFlame) {
                 const frameId = 234 + (Math.floor(this.time * 14) % 8);
                 this.batchObjectSprite3D(String(frameId), pr.x, pr.y, pz, 0, 0.85, SPRITE_DRAW_ORDER.PROJECTILES);
             } else if (pr.isRocket) {
@@ -5398,7 +5768,7 @@ class RetroRenderer {
             if (!isMoving) return 98;
             return step8;
         }
-        if (weaponKey === "PISTOL") {
+        if (weaponKey === "PISTOL" || weaponKey === "ELECTRO") {
             if (!isMoving) return 89;
             return 99 + step8;
         }
@@ -5552,6 +5922,14 @@ class RetroRenderer {
             else if (p.weapon === "FLAMETHROWER") weapSpr = "33";
 
             const wDim = this.drawHudSprite(ctx, weapSpr, iconX, leftY, iconScale);
+            if (p.weapon === "ELECTRO") {
+                // GTA 2 ElectroGun HUD tint: crackling cyan glow over the pistol icon
+                ctx.save();
+                ctx.globalCompositeOperation = "lighter";
+                ctx.fillStyle = `rgba(60, 170, 255, ${0.35 + 0.25 * Math.sin(this.time * 18)})`;
+                ctx.fillRect(iconX, leftY, wDim.w, wDim.h);
+                ctx.restore();
+            }
             const ammoVal = p.ammo ? p.ammo[p.weapon] : 99;
             if (ammoVal !== undefined && Number.isFinite(ammoVal)) {
                 const ammoStr = String(Math.min(999, Math.max(0, ammoVal))).padStart(2, "0");
