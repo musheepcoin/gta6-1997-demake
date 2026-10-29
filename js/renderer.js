@@ -204,14 +204,29 @@ class RetroRenderer {
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
                 if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.08, 0.0, 0.94) / max(mx, 0.01));
                 paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
-                return mix(col, paintCol, paint);
+                vec3 outCol = mix(col, paintCol, paint);
+
+                // Junction mouth: zebra crosswalk + stop line on the lane tile touching the junction box
+                if (vAnim > 5.5) {
+                    float sd = floor(vAnim - 5.5);
+                    vec2 lp = fract(p);
+                    float d = lp.y;  float t = lp.x;                        // 6: junction to the north
+                    if (sd > 0.5 && sd < 1.5) { d = 1.0 - lp.y; }           // 7: south
+                    else if (sd > 1.5 && sd < 2.5) { d = lp.x; t = lp.y; }  // 8: west
+                    else if (sd > 2.5) { d = 1.0 - lp.x; t = lp.y; }        // 9: east
+                    float zebra = step(0.07, d) * step(d, 0.50) * step(0.5, fract(t * 4.0 + 0.25));
+                    float stopBar = step(0.62, d) * step(d, 0.71);
+                    float m = max(zebra, stopBar) * (0.86 + aNoise(p * 11.0 + 5.0) * 0.14);
+                    outCol = mix(outCol, vec3(0.90, 0.90, 0.87), m);
+                }
+                return outCol;
             }
 
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
-                bool isRoad = (vAnim > 4.9 && vAnim < 5.4);
-                if (isRoad) c.rgb = asphaltSurface(c.rgb, vAnim > 5.1 ? 1.0 : 0.0);
+                bool isRoad = (vAnim > 4.9 && vAnim < 9.5);
+                if (isRoad) c.rgb = asphaltSurface(c.rgb, (vAnim > 5.1 && vAnim < 5.4) ? 1.0 : 0.0);
                 if (c.a < 0.03 && !isShoreTile) discard;
 
                 float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
@@ -1965,6 +1980,21 @@ class RetroRenderer {
                 // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
                 if (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80) animType = 5.0;
                 else if (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82) animType = 5.25;
+                // Junction approach tiles (lane tile touching a lid-25 junction box): encode the junction side
+                // (6:N, 7:S, 8:W, 9:E) so the shader paints a zebra crosswalk + stop line at the box mouth,
+                // instead of lane markings ending abruptly against a bare asphalt rectangle.
+                if (animType > 4.5 && effTileIdx !== 25 && this.map) {
+                    const isJ = (cx, cy) => {
+                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+                        if (!bi) return false;
+                        const nb = this.map.getBlockInfo(bi);
+                        return !!(nb && nb.lid === 25 && !nb.isFlat);
+                    };
+                    if (isJ(x, z_south - 1)) animType = 6.0;
+                    else if (isJ(x, z_south + 1)) animType = 7.0;
+                    else if (isJ(x - 1, z_south)) animType = 8.0;
+                    else if (isJ(x + 1, z_south)) animType = 9.0;
+                }
             }
 
             if (effRemap > 0 && tiles.remap_lids) {
