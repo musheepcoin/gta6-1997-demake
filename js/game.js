@@ -1697,7 +1697,7 @@ class LeonidaGame {
         this.addFloatingText(this.player.x, this.player.y - 32, `🎭 ${chosenNick} (${chosenCharId}) READY!`, chosenColor);
         this.sendPager(
             "VICE CITY ONLINE",
-            `Welcome to Vice City '97, ${chosenNick}! Playing as ${chosenCharId} in room [${chosenRoom}]. Press [T] to chat, [O] for Multiplayer, or [H] to switch character!`,
+            `Welcome to Vice City '97, ${chosenNick}! Playing as ${chosenCharId} in room [${chosenRoom}].`,
             true
         );
         this.showDistrictBanner(`SOUTH BEACH — ${chosenNick}`);

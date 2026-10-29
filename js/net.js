@@ -278,7 +278,7 @@ class ViceNetworkManager {
 
         this.addChatLog(
             "VICE NET",
-            `Connected to room [${this.roomCode}] as ${this.playerName}. Press [T] to chat or [O] for Online Action!`,
+            `🟢 Room [${this.roomCode}] • ${this.playerName}`,
             "#00f0ff",
             true
         );
@@ -316,13 +316,16 @@ class ViceNetworkManager {
         timeSpan.textContent = timeStr;
         row.appendChild(timeSpan);
 
-        const authSpan = document.createElement("span");
-        authSpan.className = "mp-author";
-        authSpan.style.color = color || "#00f0ff";
-        authSpan.textContent = isSystem ? `[${author}]` : `${author}:`;
-        row.appendChild(authSpan);
+        if (!isSystem || (author && author !== "VICE NET")) {
+            const authSpan = document.createElement("span");
+            authSpan.className = "mp-author";
+            authSpan.style.color = color || "#00f0ff";
+            authSpan.textContent = isSystem ? `[${author}]` : `${author}:`;
+            row.appendChild(authSpan);
+        }
 
         const msgSpan = document.createElement("span");
+        msgSpan.className = "mp-msg-text";
         msgSpan.textContent = text;
         row.appendChild(msgSpan);
 
@@ -370,9 +373,18 @@ class ViceNetworkManager {
             });
             this.broadcastStateNow();
         }
+        // Replace initial startup system line if no player messages have been sent yet
+        if (
+            this.chatMessagesEl &&
+            this.chatMessagesEl.children.length === 1 &&
+            this.chatMessagesEl.firstChild.classList.contains("mp-sys")
+        ) {
+            this.chatMessagesEl.innerHTML = "";
+            this.chatHistory.length = 0;
+        }
         this.addChatLog(
             "VICE NET",
-            `🎭 Playing as ${this.playerName} (${charId || "LUCIA"}) in room [${this.roomCode}]`,
+            `🟢 Room [${this.roomCode}] • ${this.playerName} (${charId || "LUCIA"})`,
             this.playerColor,
             true
         );
@@ -665,7 +677,7 @@ class ViceNetworkManager {
                 if (typeof this.game.sendPager === "function") {
                     this.game.sendPager(
                         "VICE CITY ONLINE",
-                        `🌐 ${pkt.name || "PLAYER"} joined room [${this.roomCode}]! (${this.getPlayerCount()} players online). Press [T] to chat or [O] to teleport.`,
+                        `🌐 ${pkt.name || "PLAYER"} joined room [${this.roomCode}]! (${this.getPlayerCount()} players online).`,
                         false
                     );
                 }

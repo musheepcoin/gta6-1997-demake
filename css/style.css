@@ -1267,30 +1267,30 @@ html, body {
 }
 
 /* ============================================================================
-   VICE CITY '97 P2P ONLINE MULTIPLAYER LIVE CHAT WIDGET [T] (+30% SIZE)
+   VICE CITY '97 P2P ONLINE MULTIPLAYER LIVE CHAT WIDGET (COMPACT & READABLE)
    ============================================================================ */
 #mp-chat-widget {
     position: absolute;
-    right: 14px;
-    bottom: 14px;
-    width: 390px;
-    background: rgba(8, 12, 22, 0.88);
-    border: 2px solid rgba(0, 240, 255, 0.55);
-    border-radius: 11px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72), 0 0 16px rgba(0, 240, 255, 0.16);
+    right: 12px;
+    bottom: 12px;
+    width: 340px;
+    background: rgba(8, 12, 22, 0.90);
+    border: 1.5px solid rgba(0, 240, 255, 0.55);
+    border-radius: 9px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.72), 0 0 12px rgba(0, 240, 255, 0.14);
     backdrop-filter: blur(6px);
     z-index: 30;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     transition: opacity 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-    opacity: 0.90;
+    opacity: 0.94;
     pointer-events: auto;
 }
 
 #mp-chat-widget:hover,
 #mp-chat-widget.chat-active {
-    opacity: 0.99;
+    opacity: 1;
     border-color: var(--vice-pink);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85), 0 0 20px rgba(255, 42, 133, 0.30);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85), 0 0 16px rgba(255, 42, 133, 0.28);
 }
 
 #mp-chat-widget.chat-collapsed #mp-chat-body {
@@ -1301,60 +1301,74 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 11px;
-    background: linear-gradient(90deg, rgba(24, 13, 38, 0.95) 0%, rgba(11, 24, 42, 0.95) 100%);
-    border-bottom: 1px solid rgba(56, 189, 248, 0.35);
-    border-radius: 10px 10px 0 0;
+    gap: 6px;
+    padding: 4px 8px;
+    background: linear-gradient(90deg, rgba(24, 13, 38, 0.96) 0%, rgba(11, 24, 42, 0.96) 100%);
+    border-bottom: 1px solid rgba(56, 189, 248, 0.30);
+    border-radius: 8px 8px 0 0;
+    white-space: nowrap;
 }
 
 #mp-chat-widget.chat-collapsed .mp-chat-header {
     border-bottom: none;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .mp-chat-title-wrap {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 5px;
+    min-width: 0;
+    white-space: nowrap;
 }
 
 .mp-chat-dot {
-    width: 9px;
-    height: 9px;
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
     border-radius: 50%;
     background: var(--gta1-green);
-    box-shadow: 0 0 7px var(--gta1-green);
+    box-shadow: 0 0 6px var(--gta1-green);
 }
 
 .mp-chat-title {
-    font-size: 13px;
+    font-size: 11.5px;
     font-weight: 800;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.4px;
     color: #f8fafc;
+    white-space: nowrap;
 }
 
 .mp-chat-room {
-    font-size: 11.5px;
+    font-size: 10.5px;
     font-weight: 700;
     color: var(--vice-cyan);
     font-family: var(--font-arcade);
+    white-space: nowrap;
 }
 
 .mp-chat-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
 .mp-chat-mini-btn {
     background: rgba(30, 41, 59, 0.92);
     color: #e2e8f0;
-    border: 1px solid rgba(56, 189, 248, 0.45);
-    border-radius: 5px;
-    padding: 2px 7px;
-    font-size: 11px;
+    border: 1px solid rgba(56, 189, 248, 0.42);
+    border-radius: 4px;
+    padding: 1px 6px;
+    height: 20px;
+    line-height: 18px;
+    font-size: 10.5px;
     font-weight: 700;
     cursor: pointer;
+    white-space: nowrap;
+    max-width: 118px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     transition: all 0.12s ease;
 }
 
@@ -1365,13 +1379,13 @@ html, body {
 }
 
 #mp-chat-messages {
-    height: 120px;
+    height: 128px;
     overflow-y: auto;
-    padding: 7px 11px;
+    padding: 6px 8px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    font-size: 13.5px;
+    gap: 3px;
+    font-size: 13px;
     line-height: 1.32;
     scrollbar-width: thin;
     scrollbar-color: rgba(56, 189, 248, 0.4) transparent;
@@ -1379,42 +1393,46 @@ html, body {
 
 .mp-chat-line {
     word-break: break-word;
-    color: #f1f5f9;
-    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 .mp-chat-line .mp-time {
     color: #64748b;
-    font-size: 11.5px;
-    margin-right: 5px;
+    font-size: 10px;
+    margin-right: 4px;
     font-family: var(--font-arcade);
 }
 
 .mp-chat-line .mp-author {
+    font-size: 12.5px;
     font-weight: 800;
-    margin-right: 5px;
+    margin-right: 4px;
 }
 
 .mp-chat-line.mp-sys {
-    color: #fde047;
-    font-size: 12.5px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
 }
 
 .mp-chat-quick-row {
     display: flex;
-    gap: 6px;
-    padding: 4px 8px 6px 8px;
-    border-top: 1px solid rgba(148, 163, 184, 0.14);
+    gap: 4px;
+    padding: 3px 6px;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .mp-quick-btn {
     flex: 1;
-    background: rgba(15, 23, 42, 0.9);
+    background: rgba(15, 23, 42, 0.88);
     color: #cbd5e1;
-    border: 1px solid rgba(56, 189, 248, 0.32);
-    border-radius: 5px;
-    padding: 4px 5px;
-    font-size: 11px;
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 10.5px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.12s ease;
@@ -1429,19 +1447,21 @@ html, body {
 
 #mp-chat-form {
     display: flex;
-    gap: 6px;
-    padding: 6px 8px 8px 8px;
-    border-top: 1px solid rgba(56, 189, 248, 0.24);
+    gap: 5px;
+    padding: 4px 6px 5px 6px;
+    border-top: 1px solid rgba(56, 189, 248, 0.20);
 }
 
 #mp-chat-input {
     flex: 1;
+    min-width: 0;
+    height: 28px;
     background: rgba(15, 23, 42, 0.96);
     color: #ffffff;
-    border: 1px solid rgba(56, 189, 248, 0.48);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 13.5px;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 13px;
     outline: none;
     user-select: text;
     -webkit-user-select: text;
@@ -1457,13 +1477,15 @@ html, body {
 }
 
 #mp-chat-send {
+    height: 28px;
     background: linear-gradient(135deg, #ff2a85, #db2777);
     color: #ffffff;
     border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 6px;
-    padding: 6px 11px;
-    font-size: 12.5px;
+    border-radius: 5px;
+    padding: 0 10px;
+    font-size: 11.5px;
     font-weight: 800;
+    letter-spacing: 0.3px;
     cursor: pointer;
     transition: filter 0.12s ease;
 }
