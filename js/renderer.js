@@ -166,9 +166,54 @@ class RetroRenderer {
                 return vec4(rgb, 0.78);
             }
 
+            // Seamless world-space asphalt (hash without sin; inputs wrapped to stay precise in mediump)
+            float aHash(vec2 p) {
+                p = mod(p, 512.0);
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
+            }
+            float aNoise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                vec2 u = f * f * (3.0 - 2.0 * f);
+                return mix(mix(aHash(i), aHash(i + vec2(1.0, 0.0)), u.x),
+                           mix(aHash(i + vec2(0.0, 1.0)), aHash(i + vec2(1.0, 1.0)), u.x), u.y);
+            }
+            vec3 asphaltSurface(vec3 src, float darkFamily) {
+                vec2 p = vWorldPos.xz;
+                float mx = max(src.r, max(src.g, src.b));
+                float mn = min(src.r, min(src.g, src.b));
+                // Lane paint / curb stones are much brighter than tar: crisp mask from the blurry 64px texel
+                float paint = smoothstep(0.40, 0.50, mx);
+                bool yellow = (src.r - src.b) > 0.16;
+
+                // Large faded patches, medium mottling, fine aggregate grain (all continuous across tiles)
+                float big = aNoise(p * 0.45) * 0.6 + aNoise(p * 1.3 + 7.0) * 0.4;
+                float mid = aNoise(p * 4.0 + 13.0);
+                float grain = aHash(floor(p * 40.0));
+                float fine = aHash(floor(p * 96.0) + 19.0);
+                vec3 base = mix(vec3(0.215, 0.255, 0.285), vec3(0.170, 0.190, 0.225), darkFamily);
+                vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
+                col *= 0.94 + grain * 0.05 + fine * 0.08;
+                col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);           // light aggregate stones
+                float tar = smoothstep(0.66, 0.80, aNoise(p * 0.7 + 31.0));
+                col *= 1.0 - tar * 0.13;                                         // dark resealed tar patches
+                float seam = 1.0 - smoothstep(0.0, 0.022, abs(aNoise(p * 1.1 + 57.0) - 0.5));
+                col *= 1.0 - seam * 0.12 * step(0.68, aNoise(p * 0.3 + 3.0));    // sparse thin repaired cracks
+
+                // Crisp, slightly worn paint keeping the original lane colours
+                vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
+                if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.08, 0.0, 0.94) / max(mx, 0.01));
+                paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
+                return mix(col, paintCol, paint);
+            }
+
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
+                bool isRoad = (vAnim > 4.9 && vAnim < 5.4);
+                if (isRoad) c.rgb = asphaltSurface(c.rgb, vAnim > 5.1 ? 1.0 : 0.0);
                 if (c.a < 0.03 && !isShoreTile) discard;
 
                 float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
@@ -183,7 +228,7 @@ class RetroRenderer {
                     c.rgb = submergedSand;
                 } else if (vAnim > 0.5 && vAnim < 1.5) {
                     c = sampleOceanWater(dayAmt);
-                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile) {
+                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile || isRoad) {
                     float isSand = 0.0;
                     if (vWorldPos.y < 2.2 && c.a > 0.02) {
                         // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
@@ -1907,6 +1952,12 @@ class RetroRenderer {
             if (effTileIdx === 41) animType = 1.0;                      // Animated water
             else if (effTileIdx === 22) animType = 2.0;                 // Animated rooftop fan
             else if (effTileIdx >= 99 && effTileIdx <= 101) animType = 4.0; // Beach shoreline (composites sand + surf over animated water on single quad)
+            else if (!b.isFlat && effRemap === 0) {
+                // Asphalt road lids: shader replaces the 64px texel base with one seamless world-space
+                // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
+                if (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80) animType = 5.0;
+                else if (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82) animType = 5.25;
+            }
 
             if (effRemap > 0 && tiles.remap_lids) {
                 const rKey = `${effTileIdx}_${effRemap}`;
