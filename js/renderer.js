@@ -1660,6 +1660,14 @@ class RetroRenderer {
             return run();
         };
 
+        // Load character portraits FIRST so start-modal portraits appear immediately
+        loadImageWithRetry(this.charPortraitsImg, "assets/gta1/gta1_char_portraits.png?v=98_46", () => {
+            this.charPortraitsReady = true;
+            if (window.game && typeof window.game.renderPortraits === "function") {
+                window.game.renderPortraits();
+            }
+        });
+
         loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_11", () => {
             viceTilesLoaded = true;
             checkReady();
@@ -1678,13 +1686,6 @@ class RetroRenderer {
         loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
-        });
-
-        loadImageWithRetry(this.charPortraitsImg, "assets/gta1/gta1_char_portraits.png?v=98_23", () => {
-            this.charPortraitsReady = true;
-            if (window.game && typeof window.game.renderPortraits === "function") {
-                window.game.renderPortraits();
-            }
         });
 
         fetchWithRetry("assets/gta1/gta1_meta.json?v=98_11", false)
@@ -6909,224 +6910,11 @@ class RetroRenderer {
             return;
         }
 
-        // Fallback 24x24 pixel-art grid scaled to (rw, rh) while atlas loads
-        const G = 24;
-        const px = rw / G;
-        const py = rh / G;
-        const dot = (gx, gy, gw, gh, col) => {
-            ctx.fillStyle = col;
-            ctx.fillRect(
-                Math.floor(rx + gx * px),
-                Math.floor(ry + gy * py),
-                Math.ceil(gw * px),
-                Math.ceil(gh * py)
-            );
-        };
-
-        // Vice City Sunset Background
-        dot(0, 0, 24, 8, "#3b0764");
-        dot(0, 8, 24, 8, "#9d174d");
-        dot(0, 16, 24, 8, "#ea580c");
-
-        if (character === "LUCIA") {
-            // Jet-black tied-back hair + ponytail bun + wavy side strands
-            dot(8, 1, 8, 3, "#140d18"); // top bun / ponytail
-            dot(9, 3, 6, 1, "#ff2e93"); // pink hair tie
-            dot(6, 3, 12, 6, "#140d18"); // hair crown
-            dot(5, 5, 2, 10, "#140d18"); // left hair lock
-            dot(17, 5, 2, 10, "#140d18"); // right hair lock
-
-            // Bare Golden-Tan Latina Shoulders & Neck
-            dot(4, 18, 16, 6, "#d99568");
-            dot(9, 15, 6, 4, "#c68256");
-
-            // Hot-Pink Camisole Tank Top + Straps
-            dot(7, 18, 2, 6, "#ff2e93"); // left strap
-            dot(15, 18, 2, 6, "#ff2e93"); // right strap
-            dot(7, 20, 10, 4, "#f43f5e");
-            dot(8, 21, 8, 3, "#db2777");
-
-            // Gold Hoop Earrings
-            dot(4, 10, 2, 4, "#facc15");
-            dot(18, 10, 2, 4, "#facc15");
-
-            // Golden-Tan Face
-            dot(7, 5, 10, 10, "#e2a276");
-            dot(8, 14, 8, 2, "#d99568");
-
-            // Arched Dark Brows & Expressive Dark Eyes
-            dot(8, 7, 3, 1, "#1e1124");
-            dot(13, 7, 3, 1, "#1e1124");
-            dot(8, 8, 3, 2, "#140d18");
-            dot(13, 8, 3, 2, "#140d18");
-            dot(8, 8, 1, 1, "#ffffff"); // eye catchlight
-            dot(13, 8, 1, 1, "#ffffff");
-
-            if (opts.bandana) {
-                // Red GTA 6 Heist Bandana covering nose & mouth ([B] toggle)
-                dot(7, 11, 10, 4, "#dc2626");
-                dot(8, 14, 8, 2, "#991b1b");
-                dot(9, 12, 2, 1, "#fecaca");
-                dot(13, 12, 2, 1, "#fecaca");
-            } else {
-                // Nose shadow & full berry-rose lips
-                dot(11, 10, 2, 2, "#c68256");
-                dot(10, 13, 4, 2, "#be185d");
-                dot(11, 13, 2, 1, "#f43f5e");
-            }
-        } else if (character === "TOMMY") {
-            // Tommy Vercetti '86: Dark 80s Pompadour, Cyan Tropical Hawaiian Shirt, Gold Chain
-            dot(6, 2, 12, 5, "#181824"); // pompadour crown
-            dot(5, 5, 2, 6, "#181824");
-            dot(17, 5, 2, 6, "#181824");
-            dot(4, 18, 16, 6, "#06b6d4"); // cyan Hawaiian shirt
-            dot(6, 18, 3, 6, "#0e7490"); // tropical leaf print
-            dot(15, 19, 3, 5, "#0e7490");
-            dot(9, 15, 6, 4, "#c6865c"); // neck
-            dot(9, 18, 6, 2, "#facc15"); // gold chain
-            dot(7, 5, 10, 10, "#e2a278"); // tanned face
-            dot(8, 7, 3, 2, "#1e293b");
-            dot(13, 7, 3, 2, "#1e293b");
-            dot(8, 12, 8, 2, "#b47852"); // 5 o'clock shadow
-            dot(10, 13, 4, 1, "#ffffff"); // confident smirk
-        } else if (character === "TREVOR") {
-            // Trevor Philips (Sandy Shores): Receding Hair, Crazy Brows, Stubble, Stained White V-Neck
-            dot(5, 4, 2, 6, "#27272a"); // scraggly side hair
-            dot(17, 4, 2, 6, "#27272a");
-            dot(4, 18, 16, 6, "#e2e8f0"); // stained white tee
-            dot(10, 18, 4, 3, "#c6865c"); // V-neck chest skin
-            dot(6, 20, 3, 2, "#ca8a04"); // mustard/grease stain
-            dot(9, 15, 6, 3, "#c6865c"); // neck
-            dot(9, 16, 6, 1, "#ef4444"); // "CUT HERE" neck tattoo line
-            dot(7, 3, 10, 12, "#dca078"); // bald crown + weathered face
-            dot(8, 6, 3, 1, "#27272a"); // intense angled brows
-            dot(13, 6, 3, 1, "#27272a");
-            dot(8, 7, 3, 2, "#0f172a"); // wide manic eyes
-            dot(13, 7, 3, 2, "#0f172a");
-            dot(9, 7, 1, 1, "#ffffff");
-            dot(14, 7, 1, 1, "#ffffff");
-            dot(8, 11, 8, 4, "#52525b"); // heavy unshaven stubble
-            dot(9, 12, 6, 1, "#27272a"); // mustache
-            dot(10, 13, 4, 1, "#ef4444"); // manic snarl
-        } else if (character === "CJ") {
-            // Carl "CJ" Johnson (Grove Street '92): Fade Haircut, White Tank Top, Grove Green Bandana
-            dot(7, 2, 10, 3, "#090d16"); // crisp flat-top fade
-            dot(4, 18, 16, 6, "#8d5524"); // muscular brown shoulders
-            dot(7, 18, 10, 6, "#f8fafc"); // white ribbed tank top
-            dot(4, 18, 3, 3, "#16a34a"); // Grove Street green shoulder bandana
-            dot(9, 18, 6, 1, "#cbd5e1"); // silver chain
-            dot(9, 15, 6, 3, "#784419"); // neck
-            dot(7, 5, 10, 10, "#8d5524"); // face
-            dot(8, 7, 3, 2, "#090d16");
-            dot(13, 7, 3, 2, "#090d16");
-            dot(8, 7, 1, 1, "#ffffff");
-            dot(13, 7, 1, 1, "#ffffff");
-            dot(9, 12, 6, 3, "#18181b"); // goatee
-            dot(10, 13, 4, 1, "#b45309");
-        } else if (character === "NIKO") {
-            // Niko Bellic (Liberty City '08): Receding Buzzcut, Heavy Stubble, Track Jacket w/ Stripes
-            dot(7, 2, 10, 3, "#27272a"); // Eastern-European buzzcut
-            dot(6, 4, 2, 3, "#27272a");
-            dot(16, 4, 2, 3, "#27272a");
-            dot(4, 18, 16, 6, "#1e293b"); // dark navy/charcoal track jacket
-            dot(5, 18, 2, 6, "#f8fafc"); // iconic white double shoulder stripes
-            dot(17, 18, 2, 6, "#f8fafc");
-            dot(10, 18, 4, 6, "#64748b"); // zip inner hoodie
-            dot(9, 15, 6, 3, "#bc8f6f");
-            dot(7, 5, 10, 10, "#d6a786"); // weathered olive skin
-            dot(8, 7, 3, 2, "#1e293b"); // deep-set eyes
-            dot(13, 7, 3, 2, "#1e293b");
-            dot(7, 11, 10, 4, "#57473e"); // dark 5 o'clock beard shadow
-            dot(10, 13, 4, 1, "#a87960");
-        } else if (character === "CLAUDE") {
-            // Claude Speed (GTA III / GTA 2): Dark Spiky Hair w/ Front Lock, Black Leather Biker Jacket
-            dot(6, 2, 12, 4, "#171717"); // dark hair crown
-            dot(11, 5, 2, 2, "#171717"); // signature front hair lock
-            dot(5, 4, 2, 5, "#171717");
-            dot(17, 4, 2, 5, "#171717");
-            dot(4, 17, 16, 7, "#0f172a"); // black leather biker jacket
-            dot(6, 18, 3, 4, "#334155"); // leather lapel sheen
-            dot(15, 18, 3, 4, "#334155");
-            dot(9, 19, 6, 5, "#365314"); // olive-green undershirt
-            dot(9, 15, 6, 3, "#c68b65");
-            dot(7, 5, 10, 10, "#e2a882");
-            dot(8, 8, 3, 2, "#0f172a");
-            dot(13, 8, 3, 2, "#0f172a");
-            dot(10, 13, 4, 1, "#9a6344"); // silent stoic expression
-        } else if (character === "BIGSMOKE") {
-            // Big Smoke (Melvin Harris): Bowler Hat, Round Glasses, Goatee, Grove Green Polo
-            dot(6, 1, 12, 3, "#14532d"); // dark green bowler hat crown
-            dot(4, 4, 16, 2, "#166534"); // bowler hat brim
-            dot(6, 3, 12, 1, "#22c55e"); // bright green hat ribbon
-            dot(3, 18, 18, 6, "#15803d"); // Grove green polo shirt
-            dot(9, 18, 6, 3, "#22c55e"); // polo collar
-            dot(8, 15, 8, 3, "#784419");
-            dot(6, 6, 12, 10, "#8d5524"); // round face
-            dot(7, 7, 4, 3, "#090d16"); // round glasses frames
-            dot(13, 7, 4, 3, "#090d16");
-            dot(11, 8, 2, 1, "#facc15"); // gold glasses bridge
-            dot(8, 8, 2, 1, "#38bdf8"); // glasses lens reflection
-            dot(14, 8, 2, 1, "#38bdf8");
-            dot(9, 12, 6, 3, "#090d16"); // goatee & mustache
-            dot(10, 13, 4, 1, "#ffffff");
-        } else if (character === "VALERIA") {
-            // Valeria Cortez: Crimson-Streaked Dark Hair, Neon Shades, Red Biker Jacket
-            dot(5, 2, 14, 6, "#1e1024");
-            dot(6, 3, 3, 9, "#e11d48"); // crimson hair streak
-            dot(4, 5, 2, 11, "#1e1024");
-            dot(18, 5, 2, 11, "#1e1024");
-            dot(4, 18, 16, 6, "#be123c"); // red biker jacket
-            dot(8, 18, 8, 6, "#1e293b"); // black inner top
-            dot(9, 15, 6, 3, "#d4946a");
-            dot(9, 17, 6, 1, "#facc15"); // gold choker
-            dot(7, 5, 10, 10, "#df9f74");
-            dot(7, 7, 10, 3, "#0f172a"); // dark aviator shades
-            dot(8, 8, 3, 1, "#ff2a85"); // neon lens reflection
-            dot(13, 8, 3, 1, "#ff2a85");
-            dot(10, 13, 4, 2, "#e11d48"); // crimson lips
-        } else if (character === "DETECTIVE" || character === "CROCKETT") {
-            // Det. Sonny Crockett / VCPD Vice Squad: Peaked Police Cap + Gold Badge + Aviators
-            dot(5, 1, 14, 4, "#0f172a"); // VCPD navy cap crown
-            dot(4, 4, 16, 2, "#1e293b"); // cap visor
-            dot(11, 2, 2, 2, "#facc15"); // gold VCPD shield on cap
-            dot(4, 18, 16, 6, "#1e3a8a"); // VCPD jacket
-            dot(9, 18, 6, 6, "#38bdf8"); // pastel Miami shirt under blazer
-            dot(15, 20, 2, 3, "#facc15"); // gold detective badge on lapel
-            dot(9, 15, 6, 3, "#c6865c");
-            dot(7, 6, 10, 9, "#e4a87e");
-            dot(7, 7, 10, 3, "#090d16"); // dark sunglasses
-            dot(8, 7, 3, 1, "#38bdf8");
-            dot(13, 7, 3, 1, "#38bdf8");
-            dot(9, 13, 6, 1, "#7c4d2b");
-        } else if (character === "GOURANGA") {
-            // Iconic 1997 DMA Design Gouranga Monk: Shaved Head, Tilak Mark, Saffron-Orange Robes
-            dot(7, 3, 10, 12, "#e2a276"); // bald head
-            dot(8, 2, 8, 2, "#d99568");
-            dot(11, 4, 2, 3, "#ef4444"); // red tilak forehead mark
-            dot(4, 17, 16, 7, "#f97316"); // saffron orange robe
-            dot(6, 18, 12, 6, "#fb923c");
-            dot(8, 17, 8, 2, "#fde047"); // gold sash
-            dot(8, 8, 2, 2, "#1e1124");
-            dot(14, 8, 2, 2, "#1e1124");
-            dot(9, 12, 6, 2, "#ffffff"); // joyful smile
-        } else {
-            // Jason Duval: Backwards Crimson Cap, Dirty-Blond Hair, White Ribbed Tank Top
-            dot(6, 2, 12, 5, "#dc2626"); // red cap crown
-            dot(4, 5, 4, 2, "#991b1b"); // backwards cap strap/brim
-            dot(6, 6, 12, 2, "#92623a"); // dirty-blond hair edge
-            dot(4, 18, 16, 6, "#dca074"); // tanned muscular shoulders
-            dot(7, 18, 10, 6, "#f1f5f9"); // white ribbed tank top
-            dot(9, 15, 6, 4, "#c48558");
-            dot(7, 6, 10, 10, "#e4a87e");
-            dot(8, 8, 3, 2, "#1e293b");
-            dot(13, 8, 3, 2, "#1e293b");
-            dot(8, 12, 8, 3, "#a16e47"); // stubble
-            dot(10, 13, 4, 1, "#7c4d2b");
-        }
-
-        // Crisp 1997 Arcade Border
-        ctx.strokeStyle = opts.alert ? "#ff1e38" : "#f472b6";
-        ctx.lineWidth = 2;
+        // Clean dark frame while portrait sheet loads (old pixel-art fallback removed)
+        ctx.fillStyle = "#0b0f19";
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeStyle = opts.alert ? "#ff1e38" : "#d97706";
+        ctx.lineWidth = Math.max(2, rw * 0.035);
         ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
         ctx.restore();
     }
