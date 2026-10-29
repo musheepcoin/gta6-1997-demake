@@ -1110,19 +1110,35 @@ class LeonidaGame {
             this.input.joyMag = mag;
 
             if (this.player && this.player.inVehicle) {
-                // Vehicle steering via horizontal stick + optional forward/reverse if pedals aren't held
-                this.input.left = normX < -0.24;
-                this.input.right = normX > 0.24;
-                if (!this.input.touchGasHeld && !this.input.touchBrakeHeld) {
-                    this.input.up = normY < -0.32;
-                    this.input.down = normY > 0.32;
+                const v = this.player.inVehicle;
+                if (this.input.joyActive) {
+                    const stickAngle = Math.atan2(normY, normX);
+                    let diff = stickAngle - v.angle;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    if (Math.abs(diff) < Math.PI * 0.72) {
+                        this.input.up = true;
+                        this.input.down = false;
+                        this.input.left = diff < -0.11;
+                        this.input.right = diff > 0.11;
+                    } else {
+                        this.input.up = false;
+                        this.input.down = true;
+                        this.input.left = diff > 0 && diff < Math.PI - 0.11;
+                        this.input.right = diff < 0 && diff > -Math.PI + 0.11;
+                    }
+                } else {
+                    this.input.up = false;
+                    this.input.down = false;
+                    this.input.left = false;
+                    this.input.right = false;
                 }
             } else {
                 this.input.left = normX < -0.25;
                 this.input.right = normX > 0.25;
                 this.input.up = normY < -0.25;
                 this.input.down = normY > 0.25;
-                this.input.sprint = mag > 0.72 || Boolean(this.input.touchGasHeld);
+                this.input.sprint = mag > 0.70;
             }
         };
 
@@ -1136,9 +1152,9 @@ class LeonidaGame {
             this.input.joyMag = 0;
             this.input.left = false;
             this.input.right = false;
-            if (!this.input.touchGasHeld) this.input.up = false;
-            if (!this.input.touchBrakeHeld) this.input.down = false;
-            if (!this.input.touchGasHeld) this.input.sprint = false;
+            this.input.up = false;
+            this.input.down = false;
+            this.input.sprint = false;
         };
 
         joyZone.addEventListener("touchstart", (e) => {
@@ -1205,32 +1221,6 @@ class LeonidaGame {
             },
             () => {
                 this.input.shoot = false;
-            }
-        );
-
-        bindHoldBtn(
-            "tbtn-gas",
-            () => {
-                this.input.touchGasHeld = true;
-                this.input.up = true;
-                this.input.sprint = true;
-            },
-            () => {
-                this.input.touchGasHeld = false;
-                this.input.up = false;
-                this.input.sprint = false;
-            }
-        );
-
-        bindHoldBtn(
-            "tbtn-brake",
-            () => {
-                this.input.touchBrakeHeld = true;
-                this.input.down = true;
-            },
-            () => {
-                this.input.touchBrakeHeld = false;
-                this.input.down = false;
             }
         );
 
@@ -2904,6 +2894,25 @@ class LeonidaGame {
                     this.jason.y = v.y;
                     this.jason.z = p.z;
                     this.jason.isMoving = false;
+                }
+
+                // Live 360° Mobile Analog Stick Driving: continuously steer & accelerate toward the stick's vector
+                if (this.input.joyActive && (Math.abs(this.input.joyX) > 0.1 || Math.abs(this.input.joyY) > 0.1)) {
+                    const stickAngle = Math.atan2(this.input.joyY, this.input.joyX);
+                    let diff = stickAngle - v.angle;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    if (Math.abs(diff) < Math.PI * 0.72) {
+                        this.input.up = true;
+                        this.input.down = false;
+                        this.input.left = diff < -0.11;
+                        this.input.right = diff > 0.11;
+                    } else {
+                        this.input.up = false;
+                        this.input.down = true;
+                        this.input.left = diff > 0 && diff < Math.PI - 0.11;
+                        this.input.right = diff < 0 && diff > -Math.PI + 0.11;
+                    }
                 }
 
                 // A. Unique Stunt Jump Ramps! Launching bikes & cars high into 3D air!

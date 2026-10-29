@@ -1590,15 +1590,15 @@ body.touch-enabled #mobile-touch-controls {
 
 .touch-main-grid {
     display: grid;
-    grid-template-columns: repeat(3, 56px);
+    grid-template-columns: repeat(2, 60px);
     grid-template-rows: repeat(2, 54px);
-    gap: 7px;
+    gap: 8px;
     align-items: center;
     justify-items: center;
 }
 
 .touch-act-btn {
-    width: 56px;
+    width: 60px;
     height: 54px;
     border-radius: 14px;
     border: 2px solid rgba(255, 255, 255, 0.75);
@@ -1624,26 +1624,22 @@ body.touch-enabled #mobile-touch-controls {
     margin-top: 2px;
 }
 
-.touch-btn-gas {
-    background: linear-gradient(145deg, rgba(22, 163, 74, 0.84), rgba(15, 118, 110, 0.84));
-    border-color: #4ade80;
-}
-.touch-btn-brake {
-    background: linear-gradient(145deg, rgba(71, 85, 105, 0.84), rgba(30, 41, 59, 0.88));
-    border-color: #94a3b8;
-}
 .touch-btn-car {
+    grid-column: 1;
+    grid-row: 1;
     background: linear-gradient(145deg, rgba(2, 132, 199, 0.86), rgba(30, 64, 175, 0.86));
     border-color: var(--vice-cyan);
 }
 .touch-btn-jump {
+    grid-column: 1;
+    grid-row: 2;
     background: linear-gradient(145deg, rgba(217, 119, 6, 0.86), rgba(180, 83, 9, 0.86));
     border-color: var(--vice-gold);
 }
 .touch-btn-shoot {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1 / span 2;
-    height: 115px;
+    height: 116px;
     border-radius: 18px;
     background: linear-gradient(145deg, rgba(255, 42, 133, 0.90), rgba(190, 18, 60, 0.90));
     border-color: #ffffff;
@@ -1840,13 +1836,13 @@ body.touch-enabled #mobile-touch-controls {
     }
 
     .touch-main-grid {
-        grid-template-columns: repeat(3, 50px);
+        grid-template-columns: repeat(2, 54px);
         grid-template-rows: repeat(2, 48px);
         gap: 6px;
     }
 
     .touch-act-btn {
-        width: 50px;
+        width: 54px;
         height: 48px;
         font-size: 15px;
     }
@@ -1874,13 +1870,13 @@ body.touch-enabled #mobile-touch-controls {
     }
 
     .touch-main-grid {
-        grid-template-columns: repeat(3, 48px);
+        grid-template-columns: repeat(2, 52px);
         grid-template-rows: repeat(2, 44px);
         gap: 5px;
     }
 
     .touch-act-btn {
-        width: 48px;
+        width: 52px;
         height: 44px;
         font-size: 14px;
     }
