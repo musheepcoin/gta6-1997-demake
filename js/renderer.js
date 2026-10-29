@@ -180,6 +180,15 @@ class RetroRenderer {
                 return mix(mix(aHash(i), aHash(i + vec2(1.0, 0.0)), u.x),
                            mix(aHash(i + vec2(0.0, 1.0)), aHash(i + vec2(1.0, 1.0)), u.x), u.y);
             }
+            // Same curb profile as the lane edge tiles (lid 1/74 texels 0..7): curb stone, shade, gutter, yellow line
+            vec3 junctionCurb(vec3 col, float d) {
+                float px = d * 64.0;
+                if (px < 2.0) return mix(vec3(0.83, 0.80, 0.75), vec3(0.72, 0.69, 0.64), px * 0.5);
+                if (px < 3.0) return vec3(0.47, 0.45, 0.42);
+                if (px < 4.0) return vec3(0.15, 0.18, 0.20);
+                if (px >= 5.0 && px < 7.0) return vec3(0.88, 0.73, 0.25);
+                return col;
+            }
             vec3 asphaltSurface(vec3 src, float darkFamily) {
                 vec2 p = vWorldPos.xz;
                 float mx = max(src.r, max(src.g, src.b));
@@ -204,14 +213,24 @@ class RetroRenderer {
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
                 if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.08, 0.0, 0.94) / max(mx, 0.01));
                 paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
-                return mix(col, paintCol, paint);
+                vec3 outCol = mix(col, paintCol, paint);
+                if (vAnim > 9.5) {
+                    // Junction box side facing the pavement: continue curb + gutter + yellow edge line
+                    float bits = floor(vAnim - 10.0 + 0.5);
+                    vec2 lp = fract(p);
+                    if (mod(bits, 2.0) > 0.5)              outCol = junctionCurb(outCol, lp.y);
+                    if (mod(floor(bits / 2.0), 2.0) > 0.5) outCol = junctionCurb(outCol, 1.0 - lp.y);
+                    if (mod(floor(bits / 4.0), 2.0) > 0.5) outCol = junctionCurb(outCol, lp.x);
+                    if (mod(floor(bits / 8.0), 2.0) > 0.5) outCol = junctionCurb(outCol, 1.0 - lp.x);
+                }
+                return outCol;
             }
 
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
-                bool isRoad = (vAnim > 4.9 && vAnim < 5.4);
-                if (isRoad) c.rgb = asphaltSurface(c.rgb, vAnim > 5.1 ? 1.0 : 0.0);
+                bool isRoad = (vAnim > 4.9 && vAnim < 26.0);
+                if (isRoad) c.rgb = asphaltSurface(c.rgb, (vAnim > 5.1 && vAnim < 5.4) ? 1.0 : 0.0);
                 if (c.a < 0.03 && !isShoreTile) discard;
 
                 float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
@@ -1965,6 +1984,25 @@ class RetroRenderer {
                 // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
                 if (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80) animType = 5.0;
                 else if (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82) animType = 5.25;
+                // Junction box tiles (lid 25) have no curb at all, so where a box side faces the pavement
+                // (T-junctions, box wider than the crossing road) bare asphalt bulged into the sidewalk like a
+                // pasted rectangle. Encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader
+                // continues the curb, gutter & yellow edge line straight through the junction.
+                if (effTileIdx === 25 && this.map) {
+                    const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
+                    const nonRoad = (cx, cy) => {
+                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+                        if (!bi) return false;
+                        const nb = this.map.getBlockInfo(bi);
+                        return !!(nb && nb.lid && ROAD_LIDS.indexOf(nb.lid) < 0);
+                    };
+                    let bits = 0;
+                    if (nonRoad(x, z_south - 1)) bits += 1;
+                    if (nonRoad(x, z_south + 1)) bits += 2;
+                    if (nonRoad(x - 1, z_south)) bits += 4;
+                    if (nonRoad(x + 1, z_south)) bits += 8;
+                    if (bits > 0) animType = 10.0 + bits;
+                }
             }
 
             if (effRemap > 0 && tiles.remap_lids) {
