@@ -1104,35 +1104,18 @@ class LeonidaGame {
             const normY = ky / maxRadius;
             const mag = Math.min(1.0, dist / maxRadius);
 
-            this.input.joyActive = mag > 0.16;
+            this.input.joyActive = mag > 0.14;
             this.input.joyX = normX;
             this.input.joyY = normY;
             this.input.joyMag = mag;
+            this.input.joyWasUsed = true;
 
             if (this.player && this.player.inVehicle) {
-                const v = this.player.inVehicle;
-                if (this.input.joyActive) {
-                    const stickAngle = Math.atan2(normY, normX);
-                    let diff = stickAngle - v.angle;
-                    while (diff > Math.PI) diff -= Math.PI * 2;
-                    while (diff < -Math.PI) diff += Math.PI * 2;
-                    if (Math.abs(diff) < Math.PI * 0.72) {
-                        this.input.up = true;
-                        this.input.down = false;
-                        this.input.left = diff < -0.11;
-                        this.input.right = diff > 0.11;
-                    } else {
-                        this.input.up = false;
-                        this.input.down = true;
-                        this.input.left = diff > 0 && diff < Math.PI - 0.11;
-                        this.input.right = diff < 0 && diff > -Math.PI + 0.11;
-                    }
-                } else {
-                    this.input.up = false;
-                    this.input.down = false;
-                    this.input.left = false;
-                    this.input.right = false;
-                }
+                // Direct 360° pedestrian-like vehicle control is handled directly in Vehicle.update via joyX/joyY
+                this.input.up = false;
+                this.input.down = false;
+                this.input.left = false;
+                this.input.right = false;
             } else {
                 this.input.left = normX < -0.25;
                 this.input.right = normX > 0.25;
@@ -2894,25 +2877,6 @@ class LeonidaGame {
                     this.jason.y = v.y;
                     this.jason.z = p.z;
                     this.jason.isMoving = false;
-                }
-
-                // Live 360° Mobile Analog Stick Driving: continuously steer & accelerate toward the stick's vector
-                if (this.input.joyActive && (Math.abs(this.input.joyX) > 0.1 || Math.abs(this.input.joyY) > 0.1)) {
-                    const stickAngle = Math.atan2(this.input.joyY, this.input.joyX);
-                    let diff = stickAngle - v.angle;
-                    while (diff > Math.PI) diff -= Math.PI * 2;
-                    while (diff < -Math.PI) diff += Math.PI * 2;
-                    if (Math.abs(diff) < Math.PI * 0.72) {
-                        this.input.up = true;
-                        this.input.down = false;
-                        this.input.left = diff < -0.11;
-                        this.input.right = diff > 0.11;
-                    } else {
-                        this.input.up = false;
-                        this.input.down = true;
-                        this.input.left = diff > 0 && diff < Math.PI - 0.11;
-                        this.input.right = diff < 0 && diff > -Math.PI + 0.11;
-                    }
                 }
 
                 // A. Unique Stunt Jump Ramps! Launching bikes & cars high into 3D air!

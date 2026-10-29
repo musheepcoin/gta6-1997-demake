@@ -1904,44 +1904,87 @@ class Vehicle {
         let throttle = 0;
         let steer = 0;
         let handbrake = false;
-
-        if (this.driver === "PLAYER") {
-            this.aiState = "PLAYER";
-            if (input.up) throttle += 1;
-            if (input.down) throttle -= 0.7;
-            if (input.left) steer -= 1;
-            if (input.right) steer += 1;
-            handbrake = Boolean(input.handbrake);
-        } else if (this.driver === "AI_TRAFFIC") {
-            const aiCtrl = this.computeTrafficControls(dt, map, game);
-            throttle = aiCtrl.throttle;
-            steer = aiCtrl.steer;
-            handbrake = aiCtrl.handbrake;
-        } else if (this.driver === "AI_EMERGENCY") {
-            const emCtrl = this.computeEmergencyControls(dt, map, game);
-            throttle = emCtrl.throttle;
-            steer = emCtrl.steer;
-            handbrake = emCtrl.handbrake;
-        } else if (this.driver === "AI_COP") {
-            const copCtrl = this.computePoliceControls(dt, map, game);
-            throttle = copCtrl.throttle;
-            steer = copCtrl.steer;
-            handbrake = copCtrl.handbrake;
-        }
-
-        this.updateSteer(dt, steer);
         const surfaceMult = this.computeSurfaceMultiplier(map);
-        let { forwardVel, lateralVel } = this.updateDrive(dt, throttle, handbrake, surfaceMult);
-        ({ forwardVel, lateralVel } = this.updateFriction(dt, forwardVel, lateralVel, handbrake, map, game));
 
-        // Reconstruct world velocity from 2-axle tire state
-        const nfx = Math.cos(this.angle);
-        const nfy = Math.sin(this.angle);
-        const nrx = -nfy;
-        const nry = nfx;
+        if (this.driver === "PLAYER" && input && input.joyActive && (Math.abs(input.joyX) > 0.1 || Math.abs(input.joyY) > 0.1)) {
+            // Mobile Direct 360° Stick Driving (Pedestrian-like: point stick in any direction -> car turns & goes there immediately)
+            this.aiState = "PLAYER";
+            input.joyWasUsed = true;
+            const targetAngle = Math.atan2(input.joyY, input.joyX);
+            let diff = targetAngle - this.angle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
 
-        this.vx = nfx * forwardVel + nrx * lateralVel;
-        this.vy = nfy * forwardVel + nry * lateralVel;
+            const turnStep = 11.5 * dt;
+            if (Math.abs(diff) <= turnStep) {
+                this.angle = targetAngle;
+            } else {
+                this.angle += Math.sign(diff) * turnStep;
+            }
+            this.steerAngleRad = Math.max(-0.52, Math.min(0.52, diff * 0.65));
+
+            const joyMag = Math.min(1.0, Math.max(0.28, input.joyMag || 1.0));
+            const targetMaxSpd = this.maxSpeed * surfaceMult * joyMag;
+            let curSpd = Math.hypot(this.vx, this.vy);
+            curSpd = Math.min(targetMaxSpd, curSpd + this.accel * 1.25 * dt);
+            if (input.handbrake) {
+                curSpd *= Math.pow(0.35, dt);
+            }
+            this.speed = curSpd;
+            this.vx = Math.cos(this.angle) * curSpd;
+            this.vy = Math.sin(this.angle) * curSpd;
+            if ((Math.abs(diff) > 0.45 || input.handbrake) && curSpd > 110 && !map.isWaterAtPixel(this.x, this.y)) {
+                game.addSkidmark(this.x, this.y, this.angle, this.w, this.h);
+            }
+        } else if (this.driver === "PLAYER" && input && input.joyWasUsed && !input.up && !input.down && !input.left && !input.right) {
+            // Mobile stick released: smooth immediate stop like pedestrian movement
+            this.aiState = "PLAYER";
+            this.steerAngleRad = 0;
+            this.vx *= Math.pow(0.025, dt);
+            this.vy *= Math.pow(0.025, dt);
+            if (Math.hypot(this.vx, this.vy) < 6) {
+                this.vx = 0;
+                this.vy = 0;
+            }
+            this.speed = Math.hypot(this.vx, this.vy);
+        } else {
+            if (this.driver === "PLAYER") {
+                this.aiState = "PLAYER";
+                if (input.up) throttle += 1;
+                if (input.down) throttle -= 0.7;
+                if (input.left) steer -= 1;
+                if (input.right) steer += 1;
+                handbrake = Boolean(input.handbrake);
+            } else if (this.driver === "AI_TRAFFIC") {
+                const aiCtrl = this.computeTrafficControls(dt, map, game);
+                throttle = aiCtrl.throttle;
+                steer = aiCtrl.steer;
+                handbrake = aiCtrl.handbrake;
+            } else if (this.driver === "AI_EMERGENCY") {
+                const emCtrl = this.computeEmergencyControls(dt, map, game);
+                throttle = emCtrl.throttle;
+                steer = emCtrl.steer;
+                handbrake = emCtrl.handbrake;
+            } else if (this.driver === "AI_COP") {
+                const copCtrl = this.computePoliceControls(dt, map, game);
+                throttle = copCtrl.throttle;
+                steer = copCtrl.steer;
+                handbrake = copCtrl.handbrake;
+            }
+
+            this.updateSteer(dt, steer);
+            let { forwardVel, lateralVel } = this.updateDrive(dt, throttle, handbrake, surfaceMult);
+            ({ forwardVel, lateralVel } = this.updateFriction(dt, forwardVel, lateralVel, handbrake, map, game));
+
+            // Reconstruct world velocity from 2-axle tire state
+            const nfx = Math.cos(this.angle);
+            const nfy = Math.sin(this.angle);
+            const nrx = -nfy;
+            const nry = nfx;
+
+            this.vx = nfx * forwardVel + nrx * lateralVel;
+            this.vy = nfy * forwardVel + nry * lateralVel;
+        }
 
         this.x += this.vx * dt;
         this.y += this.vy * dt;
