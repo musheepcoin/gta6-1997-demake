@@ -816,8 +816,9 @@ class Vehicle {
         this.frontTireOffset = this.w * 0.34;
         this.rearTireOffset = -this.w * 0.34;
 
-        this.driver = null; // 'PLAYER', 'AI_TRAFFIC', 'AI_COP', 'AI_EMERGENCY', or null
+        this.driver = null; // 'PLAYER', 'REMOTE', 'AI_TRAFFIC', 'AI_COP', 'AI_EMERGENCY', or null
         this.hasJason = false;
+        this.maxSeats = this.computeMaxSeats(specKey, spec);
         this.destroyed = false;
         this.burnTimer = 0;
         this.chainExplodeTimer = 0; // 1997 GTA 1 mCarExplosionChainDelayTime (0.28s chain reaction)
@@ -982,6 +983,101 @@ class Vehicle {
             x: this.x + lx * cosA - ly * sinA,
             y: this.y + lx * sinA + ly * cosA
         };
+    }
+
+    computeMaxSeats(specKey, spec) {
+        if (spec && typeof spec.maxSeats === "number") return spec.maxSeats;
+        if (specKey === "MICRO_KART") return 1;
+        if (this.isMotorcycle) return 2;
+        if (this.isTank || specKey === "PANZER_TANK") return 2; // Seat 0: Driver, Seat 1: 360° Turret Gunner
+        if (specKey === "CITY_BUS" || specKey === "TOUR_COACH") return 8;
+        if (specKey === "STRETCH_LIMO" || specKey === "SWAT_ENFORCER" || specKey === "BRINKS_TRUCK") return 6;
+        const twoSeaters = new Set([
+            "VICE_CHEETAH", "BANSHEE_GT", "PENETRATOR_GT", "PORKA_TURBO",
+            "STINGER_CABRIO", "TURISMO_CABRIO", "SILVER_ROADSTER", "MINT_STALLION",
+            "PICKUP_TRUCK", "FLATBED_TRUCK", "TANKER_RIG", "AIRBOAT"
+        ]);
+        if (twoSeaters.has(specKey)) return 2;
+        return 4; // Sedans, Muscle Cars, Taxis, 4x4s, Police Cruisers, Ambulance, Fire Engine, Vans
+    }
+
+    getSeatOffset(seatIdx = 0) {
+        const s = Math.max(0, seatIdx | 0);
+        if (this.specKey === "MICRO_KART") {
+            return { lx: -1.5, ly: 0 };
+        }
+        if (this.isMotorcycle) {
+            return s === 0 ? { lx: 2.0, ly: 0 } : { lx: -7.5, ly: 0 };
+        }
+        if (this.specKey === "AIRBOAT") {
+            return s === 0 ? { lx: 2.0, ly: -3.5 } : { lx: 2.0, ly: 3.5 };
+        }
+        if (this.maxSeats === 2) {
+            return s === 0 ? { lx: -2.0, ly: -4.5 } : { lx: -2.0, ly: 4.5 };
+        }
+        // 4, 6, or 8 seat multi-row layout (Row 0 = front, Row 1 = middle/rear, Row 2..3 = back)
+        const row = Math.floor(s / 2);
+        const isRight = (s % 2) === 1;
+        const frontX = this.w > 70 ? (this.w * 0.24) : 3.0;
+        const rowSpacing = this.w > 70 ? 11.5 : 9.0;
+        return {
+            lx: frontX - row * rowSpacing,
+            ly: isRight ? 4.6 : -4.6
+        };
+    }
+
+    getSeatWorldPos(seatIdx = 0) {
+        const off = this.getSeatOffset(seatIdx);
+        const cosA = Math.cos(this.angle);
+        const sinA = Math.sin(this.angle);
+        return {
+            x: this.x + off.lx * cosA - off.ly * sinA,
+            y: this.y + off.lx * sinA + off.ly * cosA
+        };
+    }
+
+    getOccupiedSeats(game) {
+        const list = [];
+        if (!game) return list;
+        const p = game.player;
+        if (p && !p.dead && p.inVehicle === this) {
+            list.push({
+                seat: p.seatIndex || 0,
+                isLocal: true,
+                id: (game.net && game.net.playerId) || "local",
+                name: p.nickname || (game.net && game.net.playerName) || "PLAYER",
+                color: (game.net && game.net.playerColor) || "#ff2a85",
+                pedType: p.pedType || "lucia",
+                muzzleTimer: p.muzzleTimer || 0
+            });
+        }
+        if (game.net && typeof game.net.getHumanRemotePlayers === "function") {
+            for (const rp of game.net.getHumanRemotePlayers()) {
+                if (!rp.dead && rp.veh && rp.veh.id === this.id) {
+                    const rSeat = typeof rp.veh.seat === "number" ? rp.veh.seat : 0;
+                    list.push({
+                        seat: rSeat,
+                        isLocal: false,
+                        id: rp.id,
+                        name: rp.name || "PLAYER",
+                        color: rp.color || "#00f0ff",
+                        pedType: rp.pedType || "gang",
+                        muzzleTimer: rp.muzzleTimer || 0,
+                        rp
+                    });
+                }
+            }
+        }
+        list.sort((a, b) => a.seat - b.seat);
+        return list;
+    }
+
+    findFirstFreeSeat(game) {
+        const occupied = new Set(this.getOccupiedSeats(game).map((o) => o.seat));
+        for (let s = 0; s < (this.maxSeats || 4); s++) {
+            if (!occupied.has(s)) return s;
+        }
+        return -1;
     }
 
     hasDamageDelta(deltaBit) {

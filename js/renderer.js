@@ -4000,43 +4000,43 @@ class RetroRenderer {
                 }
                 idHash = Math.abs(idHash);
 
+                const occSeats = typeof v.getOccupiedSeats === "function" ? v.getOccupiedSeats(game) : [];
+
                 if (mapInfo.isMotorcycle) {
                     const bikerTypes = ["gang", "gang", "civ0", "civ1", "civ2", "civ3"];
-                    const riderPedType = v.driver === "PLAYER"
-                        ? (p.pedType || "lucia")
-                        : (v.driver === "REMOTE" ? (v.remotePedType || "gang") : (v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length]));
                     const riderFrame = (v.doorOpenTimer || 0) > 0
                         ? (80 + Math.min(3, Math.floor((1.0 - v.doorOpenTimer / 0.48) * 4)))
                         : 84; // Frame 84 = sitting_on_bike in ped_animations.json
-                    const rScale = vScale * (riderPedType === "lucia" ? 0.94 : 1.08);
-                    const rx = v.x + cosA * 1.5;
-                    const ry = v.y + sinA * 1.5;
 
-                    this.batchPedSprite3D(
-                        riderPedType,
-                        riderFrame,
-                        rx,
-                        ry,
-                        vz + airZ + 0.014,
-                        v.angle,
-                        rScale,
-                        v.driver === "PLAYER" && (p.muzzleTimer || 0) > 0,
-                        riderDrawOrder
-                    );
-
-                    // If Jason is riding pillion with Lucia on the motorcycle, render Jason on the rear saddle!
-                    if (v.driver === "PLAYER" && v.hasJason && game.jason) {
-                        const jx = v.x - cosA * 7.5;
-                        const jy = v.y - sinA * 7.5;
+                    if (occSeats.length > 0) {
+                        for (const occ of occSeats) {
+                            const sPos = typeof v.getSeatWorldPos === "function"
+                                ? v.getSeatWorldPos(occ.seat)
+                                : { x: v.x + cosA * (occ.seat === 0 ? 1.5 : -7.5), y: v.y + sinA * (occ.seat === 0 ? 1.5 : -7.5) };
+                            const rScale = vScale * (occ.pedType === "lucia" ? 0.94 : 1.04);
+                            this.batchPedSprite3D(
+                                occ.pedType || "gang",
+                                occ.seat === 0 ? riderFrame : 84,
+                                sPos.x,
+                                sPos.y,
+                                vz + airZ + 0.014 + occ.seat * 0.002,
+                                v.angle,
+                                rScale,
+                                (occ.muzzleTimer || 0) > 0,
+                                riderDrawOrder
+                            );
+                        }
+                    } else {
+                        const aiPedType = v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length];
                         this.batchPedSprite3D(
-                            game.jason.pedType || "jason",
-                            84,
-                            jx,
-                            jy,
-                            vz + airZ + 0.016,
+                            aiPedType,
+                            riderFrame,
+                            v.x + cosA * 1.5,
+                            v.y + sinA * 1.5,
+                            vz + airZ + 0.014,
                             v.angle,
-                            vScale * 0.92,
-                            (game.jason.muzzleTimer || 0) > 0,
+                            vScale * 1.05,
+                            false,
                             riderDrawOrder
                         );
                     }
@@ -4047,41 +4047,40 @@ class RetroRenderer {
                     v.specKey === "AIRBOAT"
                 ) {
                     const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
-                    const drvPedType = v.driver === "PLAYER"
-                        ? (p.pedType || "lucia")
-                        : (v.driver === "REMOTE" ? (v.remotePedType || "gang") : (v.driver === "AI_COP" ? "police" : civTypes[idHash % civTypes.length]));
-                    const isCenterSeat = v.specKey === "MICRO_KART" || v.specKey === "AIRBOAT";
-                    const latOff = isCenterSeat ? 0 : -4.5;
-                    const longOff = -2.0;
-                    const dx = v.x + cosA * longOff - sinA * latOff;
-                    const dy = v.y + sinA * longOff + cosA * latOff;
-                    const dScale = vScale * (drvPedType === "lucia" ? 0.88 : 1.0);
-
-                    // Frame 97 = sitting_in_car in ped_animations.json
-                    this.batchPedSprite3D(
-                        drvPedType,
-                        97,
-                        dx,
-                        dy,
-                        vz + airZ + 0.014,
-                        v.angle,
-                        dScale,
-                        v.driver === "PLAYER" && (p.muzzleTimer || 0) > 0,
-                        riderDrawOrder
-                    );
-
-                    if (!isCenterSeat && v.driver === "PLAYER" && v.hasJason && game.jason) {
-                        const px = v.x + cosA * longOff - sinA * 4.5;
-                        const py = v.y + sinA * longOff + cosA * 4.5;
+                    if (occSeats.length > 0) {
+                        for (const occ of occSeats) {
+                            const sPos = typeof v.getSeatWorldPos === "function"
+                                ? v.getSeatWorldPos(occ.seat)
+                                : { x: v.x, y: v.y };
+                            const dScale = vScale * (occ.pedType === "lucia" ? 0.88 : 0.98);
+                            this.batchPedSprite3D(
+                                occ.pedType || "gang",
+                                97,
+                                sPos.x,
+                                sPos.y,
+                                vz + airZ + 0.014 + occ.seat * 0.001,
+                                v.angle,
+                                dScale,
+                                (occ.muzzleTimer || 0) > 0,
+                                riderDrawOrder
+                            );
+                        }
+                    } else {
+                        const aiPedType = v.driver === "AI_COP" ? "police" : civTypes[idHash % civTypes.length];
+                        const isCenterSeat = v.specKey === "MICRO_KART" || v.specKey === "AIRBOAT";
+                        const latOff = isCenterSeat ? 0 : -4.5;
+                        const longOff = -2.0;
+                        const dx = v.x + cosA * longOff - sinA * latOff;
+                        const dy = v.y + sinA * longOff + cosA * latOff;
                         this.batchPedSprite3D(
-                            game.jason.pedType || "jason",
+                            aiPedType,
                             97,
-                            px,
-                            py,
+                            dx,
+                            dy,
                             vz + airZ + 0.014,
                             v.angle,
-                            vScale * 0.88,
-                            (game.jason.muzzleTimer || 0) > 0,
+                            vScale,
+                            false,
                             riderDrawOrder
                         );
                     }
@@ -5034,11 +5033,13 @@ class RetroRenderer {
                 const sc = this.worldToScreen(rp.x, rp.y, rz);
                 const col = rp.color || "#00f0ff";
                 if (sc.x >= -60 && sc.x <= W + 60 && sc.y >= -60 && sc.y <= H + 60) {
-                    const tag = rp.dead ? `💀 ${rp.name} (WASTED)` : `🌐 ${rp.name}`;
+                    const rSeat = (rp.veh && typeof rp.veh.seat === "number") ? rp.veh.seat : 0;
+                    const seatIcon = rp.veh ? (rSeat === 0 ? "🚗" : "🔫") : "🌐";
+                    const tag = rp.dead ? `💀 ${rp.name} (WASTED)` : `${seatIcon} ${rp.name}`;
                     const bw = Math.max(92, ctx.measureText(tag).width + 16);
                     const bh = 22;
                     const bx = Math.round(sc.x - bw * 0.5);
-                    const by = Math.round(sc.y - (rp.veh ? 38 : 30));
+                    const by = Math.round(sc.y - (rp.veh ? (38 + rSeat * 24) : 30));
 
                     ctx.fillStyle = "rgba(8, 12, 24, 0.88)";
                     ctx.fillRect(bx, by, bw, bh);

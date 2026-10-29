@@ -39,6 +39,7 @@ class LeonidaGame {
             armor: 50,
             maxArmor: 100,
             inVehicle: null,
+            seatIndex: 0,
             weapon: "PISTOL",
             weaponsOwned: ["FIST", "PISTOL", "UZI", "SHOTGUN", "FLAMETHROWER", "ROCKET", "ELECTRO"],
             ammo: {
@@ -704,9 +705,12 @@ class LeonidaGame {
         const tz = this.map.getHeightAtPixel(tx, ty, 4.0);
 
         if (this.player.inVehicle) {
-            this.player.inVehicle.driver = null;
+            if ((this.player.seatIndex || 0) === 0) {
+                this.player.inVehicle.driver = null;
+            }
             this.player.inVehicle.hasJason = false;
             this.player.inVehicle = null;
+            this.player.seatIndex = 0;
         }
         if (this.jason) {
             this.jason.inVehicle = null;
@@ -1881,8 +1885,10 @@ class LeonidaGame {
         // Exit current vehicle (with classic GTA 1 open door animation & exit_car ped frames 16..23!)
         if (p.inVehicle) {
             const v = p.inVehicle;
-            let exitX = v.x - Math.sin(v.angle) * 26;
-            let exitY = v.y + Math.cos(v.angle) * 26;
+            const mySeat = p.seatIndex || 0;
+            const sideSign = (mySeat % 2 === 1) ? 1 : -1;
+            let exitX = v.x + sideSign * Math.sin(v.angle) * 26;
+            let exitY = v.y - sideSign * Math.cos(v.angle) * 26;
             const resolvedExit = this.map.resolveCircleBuildingCollision(exitX, exitY, 10, p.z || 2.0, false);
             exitX = resolvedExit.x;
             exitY = resolvedExit.y;
@@ -1908,37 +1914,34 @@ class LeonidaGame {
                 exitX = foundDry.x;
                 exitY = foundDry.y;
             }
-            v.driver = null;
+            if (mySeat === 0) {
+                v.driver = null;
+            }
             v.hasJason = false;
             v.doorOpenTimer = 0.48;
-            if (this.net && typeof this.net.broadcastWorldEvent === "function") {
-                this.net.broadcastWorldEvent({
-                    kind: "VEH_EXIT",
-                    vehId: v.id,
-                    x: Math.round(v.x),
-                    y: Math.round(v.y),
-                    z: Math.round((v.z || 2.0) * 100) / 100,
-                    a: Math.round((v.angle || 0) * 1000) / 1000
-                });
-            }
             p.inVehicle = null;
+            p.seatIndex = 0;
             p.enteringVehicle = null;
             p.exitAnimTimer = 0.36;
             p.fromBike = Boolean(v.isMotorcycle);
             p.x = exitX;
             p.y = exitY;
-            p.angle = v.angle + Math.PI * 0.5;
-            if (this.jason && this.jason.inVehicle === v) {
-                this.jason.inVehicle = null;
-                const jRes = this.map.resolveCircleBuildingCollision(
-                    v.x + Math.sin(v.angle) * 26,
-                    v.y - Math.cos(v.angle) * 26,
-                    10,
-                    this.jason.z || 2.0,
-                    false
-                );
-                this.jason.x = this.map.getGroundTypeAt(jRes.x, jRes.y) === GROUND_TYPE.WATER ? exitX : jRes.x;
-                this.jason.y = this.map.getGroundTypeAt(jRes.x, jRes.y) === GROUND_TYPE.WATER ? exitY : jRes.y;
+            p.angle = v.angle + (mySeat % 2 === 1 ? -Math.PI * 0.5 : Math.PI * 0.5);
+            if (this.net) {
+                if (typeof this.net.broadcastWorldEvent === "function") {
+                    this.net.broadcastWorldEvent({
+                        kind: "VEH_EXIT",
+                        vehId: v.id,
+                        seat: mySeat,
+                        x: Math.round(v.x),
+                        y: Math.round(v.y),
+                        z: Math.round((v.z || 2.0) * 100) / 100,
+                        a: Math.round((v.angle || 0) * 1000) / 1000
+                    });
+                }
+                if (typeof this.net.broadcastStateNow === "function") {
+                    this.net.broadcastStateNow();
+                }
             }
             this.audio.playCarExit(Boolean(v.isMotorcycle));
             this.updateHud();
@@ -1946,7 +1949,7 @@ class LeonidaGame {
         }
 
         // Snappy Vehicle Entry + .G24 Door Swing: enter immediately if within 68px,
-        // or run quickly to the driver-side door if up to 125px away!
+        // or run quickly to the nearest door if up to 125px away!
         let closest = null;
         let bestDist = 125;
         for (const v of this.vehicles) {
@@ -1975,10 +1978,23 @@ class LeonidaGame {
         }
         p.enteringVehicle = null;
 
+        const maxSeats = closest.maxSeats || 4;
+        const freeSeat = typeof closest.findFirstFreeSeat === "function"
+            ? closest.findFirstFreeSeat(this)
+            : 0;
+
+        if (freeSeat === -1) {
+            this.audio.playBeep(220, 0.12, "sawtooth", 0.08);
+            this.addFloatingText(closest.x, closest.y - 28, `🚫 VEHICLE FULL (${maxSeats}/${maxSeats} SEATS)!`, "#ff1e38");
+            return;
+        }
+
         const wasOccupied =
-            closest.driver === "AI_TRAFFIC" ||
-            closest.driver === "AI_COP" ||
-            closest.driver === "AI_EMERGENCY";
+            freeSeat === 0 && (
+                closest.driver === "AI_TRAFFIC" ||
+                closest.driver === "AI_COP" ||
+                closest.driver === "AI_EMERGENCY"
+            );
 
         if (wasOccupied) {
             this.addCash(150, "GRAND THEFT AUTO!");
@@ -1995,34 +2011,51 @@ class LeonidaGame {
             }
         }
 
-        closest.driver = "PLAYER";
+        if (freeSeat === 0) {
+            closest.driver = "PLAYER";
+        }
         closest.doorOpenTimer = 0.48;
         p.enterAnimTimer = 0.36;
         p.inVehicle = closest;
-        p.x = closest.x;
-        p.y = closest.y;
-        if (this.net && typeof this.net.broadcastWorldEvent === "function") {
-            this.net.broadcastWorldEvent({
-                kind: "VEH_ENTER",
-                vehId: closest.id,
-                carjack: Boolean(wasOccupied)
-            });
+        p.seatIndex = freeSeat;
+        const seatPos = typeof closest.getSeatWorldPos === "function"
+            ? closest.getSeatWorldPos(freeSeat)
+            : { x: closest.x, y: closest.y };
+        p.x = seatPos.x;
+        p.y = seatPos.y;
+
+        if (this.net) {
+            if (typeof this.net.broadcastWorldEvent === "function") {
+                this.net.broadcastWorldEvent({
+                    kind: "VEH_ENTER",
+                    vehId: closest.id,
+                    seat: freeSeat,
+                    carjack: Boolean(wasOccupied)
+                });
+            }
+            if (typeof this.net.broadcastStateNow === "function") {
+                this.net.broadcastStateNow();
+            }
         }
 
-        if (this.jason && this.jason.recruited) {
-            this.jason.inVehicle = closest;
-            closest.hasJason = true;
-        }
         this.audio.playCarEnter(Boolean(closest.isMotorcycle));
 
-        // Trigger authentic GTA 1 top-center Blue/Gold Car Name Banner
+        const occCount = typeof closest.getOccupiedSeats === "function"
+            ? closest.getOccupiedSeats(this).length
+            : 1;
+        const seatBadge = `${occCount}/${maxSeats} SEATS`;
+
+        // Trigger authentic GTA 1 top-center Blue/Gold Car Name Banner with Seat Role
         if (this.renderer) {
-            this.renderer.vehicleBannerName = closest.name;
+            const roleSuffix = freeSeat === 0
+                ? `[DRIVER • ${seatBadge}]`
+                : (closest.hasTurret && freeSeat === 1 ? `[GUNNER • ${seatBadge}]` : `[PASSENGER #${freeSeat} • ${seatBadge}]`);
+            this.renderer.vehicleBannerName = `${closest.name} ${roleSuffix}`;
             this.renderer.vehicleBannerTimer = 3.0;
         }
 
         // Entering the hidden PANZER TANK triggers a classic GTA 1 Tank Kill Frenzy!
-        if (closest.specKey === "PANZER_TANK" && !closest._tankFrenzyTriggered) {
+        if (closest.specKey === "PANZER_TANK" && !closest._tankFrenzyTriggered && freeSeat === 0) {
             closest._tankFrenzyTriggered = true;
             this.startKillFrenzy({
                 title: "PANZER TANK RAMPAGE!",
@@ -2031,9 +2064,14 @@ class LeonidaGame {
                 duration: 40,
                 reward: 50000
             });
+        } else if (freeSeat > 0) {
+            const roleMsg = (closest.hasTurret && freeSeat === 1)
+                ? `🎯 TANK GUNNER (${seatBadge}) — 360° CANNON!`
+                : `🔫 PASSENGER #${freeSeat} (${seatBadge}) — 360° DRIVE-BY!`;
+            this.addFloatingText(closest.x, closest.y - 28, roleMsg, "#39ff14");
         } else {
             const st = this.audio.getCurrentStation();
-            this.addFloatingText(closest.x, closest.y - 26, `${closest.name}`, "#ffd13b");
+            this.addFloatingText(closest.x, closest.y - 26, `${closest.name} (${seatBadge})`, "#ffd13b");
             this.addFloatingText(closest.x, closest.y - 44, `📻 ${st.name}`, "#00f0ff");
         }
         this.updateHud();
@@ -2578,6 +2616,7 @@ class LeonidaGame {
 
         if (this.player.inVehicle === v) {
             this.player.inVehicle = null;
+            this.player.seatIndex = 0;
             this.player.x = v.x - 32;
             this.player.y = v.y - 32;
             this.damagePlayer(45);
@@ -3050,21 +3089,59 @@ class LeonidaGame {
             if (p.inVehicle) {
                 const v = p.inVehicle;
                 p.enteringVehicle = null;
-                p.x = v.x;
-                p.y = v.y;
+                const occList = typeof v.getOccupiedSeats === "function" ? v.getOccupiedSeats(this) : [];
+
+                // Auto-promote Passenger to Driver (seat 0) if the previous driver exited or disconnected!
+                if ((p.seatIndex || 0) > 0 && !occList.some((o) => !o.isLocal && o.seat === 0)) {
+                    p.seatIndex = 0;
+                    v.driver = "PLAYER";
+                    this.addFloatingText(v.x, v.y - 28, "🚗 PROMOTED TO DRIVER SEAT!", "#ffd13b");
+                    if (this.net && typeof this.net.broadcastStateNow === "function") {
+                        this.net.broadcastStateNow();
+                    }
+                }
+
+                const mySeat = p.seatIndex || 0;
+                const seatPos = typeof v.getSeatWorldPos === "function"
+                    ? v.getSeatWorldPos(mySeat)
+                    : { x: v.x, y: v.y };
+                p.x = seatPos.x;
+                p.y = seatPos.y;
                 p.z = v.z !== undefined ? v.z : this.map.getHeightAtPixel(v.x, v.y, p.z || 2.0);
                 p.angle = v.angle;
                 p.isMoving = false;
-                if (v.hasTurret) {
+
+                // Tank Co-Op Turret Logic: Seat 1 (Gunner) controls turret if occupied; otherwise Seat 0 (Driver) controls it!
+                const hasRemoteGunner = occList.some((o) => !o.isLocal && o.seat === 1);
+                if (v.hasTurret && (mySeat === 1 || (mySeat === 0 && !hasRemoteGunner))) {
                     v.turretAngle = (this.input.joyActive && typeof this.input.joyAngle === "number")
                         ? this.input.joyAngle
                         : (useMouseAim ? mouseAimAngle : v.angle);
                 }
-                if (this.jason && this.jason.inVehicle === v) {
-                    this.jason.x = v.x;
-                    this.jason.y = v.y;
-                    this.jason.z = p.z;
-                    this.jason.isMoving = false;
+
+                // Vehicle-Specific Multi-Player Crew Perks:
+                // 1) MEDIC_AMBULANCE: regenerates +6 HP/s for every player seated inside
+                if (v.specKey === "MEDIC_AMBULANCE" && p.hp < 100) {
+                    p.hp = Math.min(100, p.hp + 6 * dt);
+                }
+                // 2) SWAT_ENFORCER / BRINKS_TRUCK: regenerates +5 ARMOR/s for every player seated inside
+                if ((v.specKey === "SWAT_ENFORCER" || v.specKey === "BRINKS_TRUCK") && p.armor < 100) {
+                    p.armor = Math.min(100, p.armor + 5 * dt);
+                }
+                // 3) TAXI / VIP LIMO / BUS Chauffeur Bonus when driving online passengers at speed
+                const remotePassengerCount = occList.filter((o) => !o.isLocal && o.seat > 0).length;
+                if (
+                    mySeat === 0 &&
+                    remotePassengerCount > 0 &&
+                    Math.hypot(v.vx, v.vy) > 65 &&
+                    (v.specKey === "VICE_CAB" || v.specKey === "STRETCH_LIMO" || v.specKey === "CITY_BUS" || v.specKey === "TOUR_COACH")
+                ) {
+                    v._chauffeurTimer = (v._chauffeurTimer || 0) + dt;
+                    if (v._chauffeurTimer >= 2.5) {
+                        v._chauffeurTimer = 0;
+                        const fare = (v.specKey === "STRETCH_LIMO" ? 150 : 75) * remotePassengerCount;
+                        this.addCash(fare, `🚕 CHAUFFEUR FARE (+$${fare})`);
+                    }
                 }
 
                 // A. Unique Stunt Jump Ramps! Launching bikes & cars high into 3D air!
@@ -3074,12 +3151,14 @@ class LeonidaGame {
                     v.stuntZOffset = Math.sin(prog * Math.PI) * 1.45;
                     if (v.stuntAirTimer <= 0) {
                         v.stuntZOffset = 0;
-                        this.multiplier += 1;
-                        this.audio.playCashSound();
-                        this.addCash(5000, "🔥 INSANE STUNT JUMP!");
-                        this.showBigBanner("UNIQUE STUNT BONUS!", `${v.lastRampName || "BIG AIR"} — +$5,000 & MULTIPLIER +1!`, "#fde047", 2.4);
+                        if (mySeat === 0) {
+                            this.multiplier += 1;
+                            this.audio.playCashSound();
+                            this.addCash(5000, "🔥 INSANE STUNT JUMP!");
+                            this.showBigBanner("UNIQUE STUNT BONUS!", `${v.lastRampName || "BIG AIR"} — +$5,000 & MULTIPLIER +1!`, "#fde047", 2.4);
+                        }
                     }
-                } else if (Array.isArray(this.map.stuntRamps)) {
+                } else if (mySeat === 0 && Array.isArray(this.map.stuntRamps)) {
                     const vSpd = Math.hypot(v.vx, v.vy);
                     if (vSpd > 145) {
                         for (const ramp of this.map.stuntRamps) {
@@ -3098,7 +3177,7 @@ class LeonidaGame {
                 }
 
                 // B. Motorcycle Wheelie Bonus ([SPACE] while riding a Superbike or Chopper at speed!)
-                if (v.isMotorcycle && this.input.handbrake && Math.hypot(v.vx, v.vy) > 130) {
+                if (mySeat === 0 && v.isMotorcycle && this.input.handbrake && Math.hypot(v.vx, v.vy) > 130) {
                     v.wheelieTimer = (v.wheelieTimer || 0) + dt;
                     v.vx += Math.cos(v.angle) * 120 * dt;
                     v.vy += Math.sin(v.angle) * 120 * dt;
@@ -3106,7 +3185,7 @@ class LeonidaGame {
                         v.wheelieTimer = 0;
                         this.addCash(500, "🏍️ WHEELIE BONUS!");
                     }
-                } else {
+                } else if (mySeat === 0) {
                     v.wheelieTimer = 0;
                 }
             } else {
@@ -3117,11 +3196,13 @@ class LeonidaGame {
                     p.enteringVehicle = null;
                 }
 
-                // StateEnteringCar (PedestrianStates.cpp): physically run to the vehicle's driver-side door!
+                // StateEnteringCar (PedestrianStates.cpp): physically run to the vehicle's door!
                 if (p.enteringVehicle && !p.enteringVehicle.destroyed) {
                     const ev = p.enteringVehicle;
-                    const doorX = ev.x - Math.sin(ev.angle) * 20;
-                    const doorY = ev.y + Math.cos(ev.angle) * 20;
+                    const targetSeat = typeof ev.findFirstFreeSeat === "function" ? Math.max(0, ev.findFirstFreeSeat(this)) : 0;
+                    const sideSign = (targetSeat % 2 === 1) ? 1 : -1;
+                    const doorX = ev.x + sideSign * Math.sin(ev.angle) * 20;
+                    const doorY = ev.y - sideSign * Math.cos(ev.angle) * 20;
                     const distDoor = Math.hypot(doorX - p.x, doorY - p.y);
                     if (distDoor < 24) {
                         this.completeVehicleEntry(ev);
@@ -3206,8 +3287,7 @@ class LeonidaGame {
                 }
             }
 
-            // On-Foot & Drive-By Shooting:
-            // On foot -> fire equipped weapon; In Tank -> fire Rocket Cannon; In normal vehicle -> Drive-By UZI / PISTOL!
+            // On-Foot, Driver & Multi-Player Passenger 360° Drive-By / Tank Co-Op Turret Shooting:
             const shotAngle = (this.input.joyActive && typeof this.input.joyAngle === "number")
                 ? this.input.joyAngle
                 : (useMouseAim ? mouseAimAngle : p.angle);
@@ -3216,21 +3296,30 @@ class LeonidaGame {
                 p.playerCombatTimer = Math.max(0, p.playerCombatTimer - dt);
             }
             if (this.input.shoot && p.shootCooldown <= 0) {
-                const isTank = Boolean(p.inVehicle && p.inVehicle.hasTurret);
+                const v = p.inVehicle;
+                const mySeat = p.seatIndex || 0;
+                const occList = (v && typeof v.getOccupiedSeats === "function") ? v.getOccupiedSeats(this) : [];
+                const hasRemoteGunner = occList.some((o) => !o.isLocal && o.seat === 1);
+                const controlsTankTurret = Boolean(v && v.hasTurret && (mySeat === 1 || (mySeat === 0 && !hasRemoteGunner)));
                 let activeWep = p.weapon;
-                if (isTank) {
+                if (controlsTankTurret) {
                     activeWep = "ROCKET";
-                } else if (p.inVehicle) {
-                    activeWep = (p.ammo.UZI > 0) ? "UZI" : "PISTOL";
+                } else if (v) {
+                    if (mySeat > 0 && p.weapon !== "FIST" && (p.ammo[p.weapon] || 0) > 0) {
+                        // Passengers in Seat >= 1 can fire ANY equipped ranged weapon in 360°!
+                        activeWep = p.weapon;
+                    } else {
+                        activeWep = (p.ammo.UZI > 0) ? "UZI" : "PISTOL";
+                    }
                 }
                 const spec = WEAPON_SPECS[activeWep] || WEAPON_SPECS.PISTOL;
                 const hasFrenzyUnlimited = this.killFrenzy && this.killFrenzy.weapon === activeWep;
 
-                if (isTank || hasFrenzyUnlimited || p.ammo[activeWep] > 0) {
-                    if (!isTank && !hasFrenzyUnlimited && p.ammo[activeWep] !== Infinity) {
+                if (controlsTankTurret || hasFrenzyUnlimited || p.ammo[activeWep] > 0) {
+                    if (!controlsTankTurret && !hasFrenzyUnlimited && p.ammo[activeWep] !== Infinity) {
                         p.ammo[activeWep]--;
                     }
-                    p.shootCooldown = isTank ? 0.85 : spec.fireRate;
+                    p.shootCooldown = controlsTankTurret ? 0.85 : spec.fireRate;
                     if (!spec.isMelee) {
                         p.muzzleTimer = 0.08;
                         p.weaponDrawnTimer = 0.45;
@@ -3239,7 +3328,8 @@ class LeonidaGame {
                         p.muzzleTimer = 0;
                         p.weaponDrawnTimer = 0;
                     }
-                    this.fireWeapon(p.x, p.y, shotAngle, activeWep, true, false);
+                    const fireAng = controlsTankTurret ? (v.turretAngle || shotAngle) : shotAngle;
+                    this.fireWeapon(p.x, p.y, fireAng, activeWep, true, false);
                     this.updateHud();
                 } else if (!p.inVehicle) {
                     p.weapon = "FIST";

@@ -923,29 +923,37 @@ class ViceNetworkManager {
         if (!this.game || !pkt || !pkt.kind) return;
         if (pkt.kind === "VEH_ENTER" && pkt.vehId) {
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
-            if (v && v !== this.game.player.inVehicle) {
-                if (pkt.carjack && (v.driver === "AI_TRAFFIC" || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY")) {
-                    if (typeof this.game.ejectVehicleDriver === "function") {
-                        this.game.ejectVehicleDriver(v, "CARJACK");
-                    }
-                }
-                v.driver = "REMOTE";
+            const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
+            if (v) {
                 v.doorOpenTimer = 0.48;
-                v._linkedRemoteId = pkt.id;
+                const localIsDriver = this.game.player.inVehicle === v && (this.game.player.seatIndex || 0) === 0;
+                if (rSeat === 0 && !localIsDriver) {
+                    if (pkt.carjack && (v.driver === "AI_TRAFFIC" || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY")) {
+                        if (typeof this.game.ejectVehicleDriver === "function") {
+                            this.game.ejectVehicleDriver(v, "CARJACK");
+                        }
+                    }
+                    v.driver = "REMOTE";
+                    v._linkedRemoteId = pkt.id;
+                }
             }
         } else if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
-            if (v && v !== this.game.player.inVehicle) {
-                v.driver = null;
-                v._linkedRemoteId = null;
+            const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
+            if (v) {
                 v.doorOpenTimer = 0.48;
-                if (typeof pkt.x === "number") { v.x = pkt.x; v.netTargetX = pkt.x; }
-                if (typeof pkt.y === "number") { v.y = pkt.y; v.netTargetY = pkt.y; }
-                if (typeof pkt.z === "number") { v.z = pkt.z; v.netTargetZ = pkt.z; }
-                if (typeof pkt.a === "number") { v.angle = pkt.a; v.netTargetAngle = pkt.a; }
-                v.vx = 0;
-                v.vy = 0;
-                v.speed = 0;
+                const localIsDriver = this.game.player.inVehicle === v && (this.game.player.seatIndex || 0) === 0;
+                if (rSeat === 0 && !localIsDriver) {
+                    v.driver = null;
+                    v._linkedRemoteId = null;
+                    if (typeof pkt.x === "number") { v.x = pkt.x; v.netTargetX = pkt.x; }
+                    if (typeof pkt.y === "number") { v.y = pkt.y; v.netTargetY = pkt.y; }
+                    if (typeof pkt.z === "number") { v.z = pkt.z; v.netTargetZ = pkt.z; }
+                    if (typeof pkt.a === "number") { v.angle = pkt.a; v.netTargetAngle = pkt.a; }
+                    v.vx = 0;
+                    v.vy = 0;
+                    v.speed = 0;
+                }
             }
         } else if (pkt.kind === "VEH_EXPLODE" && pkt.vehId) {
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
@@ -1260,14 +1268,17 @@ class ViceNetworkManager {
                 rp.walkPhase = (rp.walkPhase || 0) + dt * (rp.isRunning ? 1.5 : 1.0);
             }
 
-            // Link remote player's driven vehicle directly to the unified world vehicle in game.vehicles!
+            // Link remote player's driven or passenger vehicle directly to the unified world vehicle in game.vehicles!
             if (rp.veh && rp.veh.id && this.game && Array.isArray(this.game.vehicles)) {
                 let wv = this.game.vehicles.find((v) => v.id === rp.veh.id);
                 if (!wv && typeof Vehicle === "function") {
                     wv = new Vehicle(rp.veh.id, rp.veh.specKey || "STALLION", rp.x, rp.y, rp.angle);
                     this.game.vehicles.push(wv);
                 }
-                if (wv && wv !== this.game.player.inVehicle) {
+                const rSeat = typeof rp.veh.seat === "number" ? rp.veh.seat : 0;
+                const localIsDriver = Boolean(wv && this.game.player.inVehicle === wv && (this.game.player.seatIndex || 0) === 0);
+
+                if (wv && rSeat === 0 && !localIsDriver) {
                     wv._linkedRemoteId = rp.id;
                     wv.driver = "REMOTE";
                     wv.remotePedType = rp.pedType || "gang";
@@ -1282,6 +1293,24 @@ class ViceNetworkManager {
                     wv.frontDented = Boolean(rp.veh.fDent);
                     wv.rearDented = Boolean(rp.veh.rDent);
                     wv.heavyDented = Boolean(rp.veh.hDent);
+                    // Only let seat 0 update tank turret if no co-op gunner (seat 1) is overriding it
+                    if (wv.hasTurret && typeof rp.veh.tAng === "number") {
+                        const localIsGunner = this.game.player.inVehicle === wv && (this.game.player.seatIndex || 0) === 1;
+                        if (!localIsGunner) {
+                            wv.turretAngle = rp.veh.tAng;
+                        }
+                    }
+                    rp._linkedWorldVeh = true;
+                } else if (wv && rSeat > 0) {
+                    // Remote player is a Passenger / Gunner inside wv: lock their world coords to their seat on wv!
+                    const sPos = typeof wv.getSeatWorldPos === "function" ? wv.getSeatWorldPos(rSeat) : { x: wv.x, y: wv.y };
+                    rp.x = sPos.x;
+                    rp.y = sPos.y;
+                    rp.z = wv.z !== undefined ? wv.z : rp.z;
+                    rp.angle = wv.angle;
+                    if (wv.hasTurret && rSeat === 1 && typeof rp.veh.tAng === "number") {
+                        wv.turretAngle = rp.veh.tAng;
+                    }
                     rp._linkedWorldVeh = true;
                 } else {
                     rp._linkedWorldVeh = false;
@@ -1296,7 +1325,7 @@ class ViceNetworkManager {
             for (const v of this.game.vehicles) {
                 if (v._linkedRemoteId) {
                     const owner = this.remotePlayers.get(v._linkedRemoteId);
-                    if (!owner || !owner.veh || owner.veh.id !== v.id) {
+                    if (!owner || !owner.veh || owner.veh.id !== v.id || (owner.veh.seat || 0) !== 0) {
                         v._linkedRemoteId = null;
                         if (v.driver === "REMOTE") {
                             v.driver = null;
@@ -1342,6 +1371,7 @@ class ViceNetworkManager {
         if (v) {
             vehData = {
                 id: v.id || "player_car",
+                seat: p.seatIndex || 0,
                 specKey: v.specKey || "STALLION",
                 sprId: v.sprId || "66",
                 remapIdx: v.remapIdx || 0,
@@ -1353,7 +1383,8 @@ class ViceNetworkManager {
                 isMoto: Boolean(v.isMotorcycle),
                 fDent: Boolean(v.frontDented),
                 rDent: Boolean(v.rearDented),
-                hDent: Boolean(v.heavyDented)
+                hDent: Boolean(v.heavyDented),
+                tAng: v.hasTurret ? Math.round((v.turretAngle || 0) * 1000) / 1000 : undefined
             };
         }
 
@@ -1450,7 +1481,8 @@ class ViceNetworkManager {
         if (!p || p.dead) return;
 
         for (const rp of this.remotePlayers.values()) {
-            if (rp.dead || !rp.veh) continue;
+            if (rp.dead || !rp.veh || (rp.veh.seat || 0) > 0) continue;
+            if (p.inVehicle && p.inVehicle.id === rp.veh.id) continue;
             const rSpeed = Math.hypot(rp.vx || 0, rp.vy || 0);
             if (rSpeed < 45) continue;
 
