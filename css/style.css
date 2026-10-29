@@ -1562,21 +1562,23 @@ body.touch-enabled #mobile-touch-controls {
 
 .touch-utility-row {
     display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 8px;
     justify-content: flex-end;
 }
 
 .touch-util-btn {
-    background: rgba(11, 17, 32, 0.82);
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(11, 17, 32, 0.78);
     color: #f8fafc;
     border: 1.5px solid rgba(56, 189, 248, 0.65);
-    border-radius: 16px;
-    padding: 6px 10px;
-    font-family: var(--font-arcade);
-    font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: 0.4px;
+    border-radius: 50%;
+    font-size: 16px;
+    line-height: 1;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65);
     cursor: pointer;
     touch-action: manipulation;
@@ -1586,65 +1588,48 @@ body.touch-enabled #mobile-touch-controls {
 .touch-util-btn.pressed {
     background: var(--vice-pink);
     border-color: #ffffff;
-    transform: scale(0.95);
+    transform: scale(0.92);
 }
 
 .touch-main-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 60px);
-    grid-template-rows: repeat(2, 54px);
-    gap: 8px;
+    display: flex;
     align-items: center;
-    justify-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .touch-act-btn {
-    width: 60px;
-    height: 54px;
-    border-radius: 14px;
-    border: 2px solid rgba(255, 255, 255, 0.75);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.78);
     background: rgba(15, 23, 42, 0.80);
     color: #ffffff;
-    font-family: var(--font-impact);
-    font-size: 17px;
+    font-size: 21px;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    line-height: 1.05;
+    line-height: 1;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75);
     cursor: pointer;
     touch-action: none;
 }
 
-.touch-act-btn small {
-    font-family: var(--font-arcade);
-    font-size: 8.5px;
-    font-weight: 900;
-    letter-spacing: 0.3px;
-    margin-top: 2px;
-}
-
 .touch-btn-car {
-    grid-column: 1;
-    grid-row: 1;
     background: linear-gradient(145deg, rgba(2, 132, 199, 0.86), rgba(30, 64, 175, 0.86));
     border-color: var(--vice-cyan);
 }
 .touch-btn-jump {
-    grid-column: 1;
-    grid-row: 2;
     background: linear-gradient(145deg, rgba(217, 119, 6, 0.86), rgba(180, 83, 9, 0.86));
     border-color: var(--vice-gold);
 }
 .touch-btn-shoot {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    height: 116px;
-    border-radius: 18px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
     background: linear-gradient(145deg, rgba(255, 42, 133, 0.90), rgba(190, 18, 60, 0.90));
     border-color: #ffffff;
-    font-size: 22px;
+    font-size: 26px;
 }
 
 .touch-act-btn:active,
@@ -1768,16 +1753,27 @@ body.touch-enabled #mobile-touch-controls {
 
     #mp-chat-widget.chat-collapsed {
         width: auto;
-        max-width: 176px;
+        border-radius: 20px;
     }
 
     #mp-chat-widget.chat-collapsed .mp-chat-header {
-        padding: 4px 8px;
-        gap: 6px;
+        padding: 5px 9px;
+        gap: 4px;
     }
 
-    #mp-chat-widget.chat-collapsed #mp-chat-name-btn {
+    #mp-chat-widget.chat-collapsed #mp-chat-name-btn,
+    #mp-chat-widget.chat-collapsed .mp-chat-room,
+    #mp-chat-widget.chat-collapsed #mp-chat-toggle-btn {
         display: none;
+    }
+
+    #mp-chat-widget.chat-collapsed .mp-chat-title {
+        font-size: 0;
+    }
+
+    #mp-chat-widget.chat-collapsed .mp-chat-title::before {
+        content: "💬";
+        font-size: 14px;
     }
 
     .mp-chat-title {
@@ -1837,25 +1833,25 @@ body.touch-enabled #mobile-touch-controls {
     }
 
     .touch-main-grid {
-        grid-template-columns: repeat(2, 54px);
-        grid-template-rows: repeat(2, 48px);
-        gap: 6px;
+        gap: 8px;
     }
 
     .touch-act-btn {
-        width: 54px;
-        height: 48px;
-        font-size: 15px;
+        width: 46px;
+        height: 46px;
+        font-size: 19px;
     }
 
     .touch-btn-shoot {
-        height: 102px;
-        font-size: 20px;
+        width: 58px;
+        height: 58px;
+        font-size: 24px;
     }
 
     .touch-util-btn {
-        padding: 5px 8px;
-        font-size: 9.5px;
+        width: 34px;
+        height: 34px;
+        font-size: 15px;
     }
 }
 
@@ -1871,19 +1867,19 @@ body.touch-enabled #mobile-touch-controls {
     }
 
     .touch-main-grid {
-        grid-template-columns: repeat(2, 52px);
-        grid-template-rows: repeat(2, 44px);
-        gap: 5px;
+        gap: 8px;
     }
 
     .touch-act-btn {
-        width: 52px;
+        width: 44px;
         height: 44px;
-        font-size: 14px;
+        font-size: 18px;
     }
 
     .touch-btn-shoot {
-        height: 93px;
+        width: 54px;
+        height: 54px;
+        font-size: 22px;
     }
 
     #fullmap-body,

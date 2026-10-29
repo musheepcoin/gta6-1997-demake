@@ -5536,8 +5536,8 @@ class RetroRenderer {
 
         if (isMinimized) {
             ctx.fillStyle = "#38bdf8";
-            ctx.font = isMobile ? "bold 9px -apple-system, 'Segoe UI', sans-serif" : "bold 10px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText(isMobile ? "📱 PHONE • FM • PLACES" : "🧭 GPS • 🎵 FM • 📍 PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
+            ctx.font = isMobile ? "bold 10px -apple-system, 'Segoe UI', sans-serif" : "bold 10px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText(isMobile ? "📱 • 🎵 • 📍" : "🧭 GPS • 🎵 FM • 📍 PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
             this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
             ctx.restore();
             // On mobile/minimized mode, render a compact live GPS mini-radar directly below the pill so the player always has a live radar!
