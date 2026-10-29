@@ -292,10 +292,11 @@ class LeonidaMap {
 
         // Lummus Park Tropical Greenbelt Lawn along Ocean Drive (cx = 219..220, ry = 60..190):
         // Lush St. Augustine tropical grass lawn between Ocean Drive's palm-lined sidewalk (cx = 218) and Vice Beach (cx >= 221),
-        // with coral-stone beach access footpaths at every cross-street (ry % 8 === 0)!
+        // with irregular coral-stone beach access footpaths so park beds have varied organic lengths!
         const cleanGrassBlkIdx = 10; // Block 10 in gta1_map.bin is (80, 0, 0, 0, 0, 0, 10) -> clean lid 10 grass!
+        const footpathRows = new Set([60, 67, 76, 85, 92, 102, 111, 118, 128, 137, 144, 152, 161, 169, 179, 187, 190]);
         for (let ry = 60; ry <= 190; ry++) {
-            if (ry % 8 === 0) continue;
+            if (footpathRows.has(ry)) continue;
             for (let cx = 219; cx <= 220; cx++) {
                 const g2 = (2 * MAP_ROWS + ry) * MAP_COLS + cx;
                 const b2 = this.blocksData[this.voxelGrid[g2]];
@@ -438,18 +439,23 @@ class LeonidaMap {
 
                 // 1) Sidewalk palm trees: strictly inside authentic lid === 69 circular stone tree-pit planters
                 const isPlanterPalm = (surfGt === GROUND_TYPE.PAWEMENT && blkZ1.lid === 69);
-                // 2) Park & Lummus Park lawn palm trees: strictly on lid === 10 tropical grass away from road lanes
+                // 2) Park & Lummus Park lawn palm trees: strictly on lid === 10 tropical grass away from road lanes & rounded footpath tips
+                const hasGrassN = (this.getBlockInfo(c, r - 1, 1).lid === 10);
+                const hasGrassS = (this.getBlockInfo(c, r + 1, 1).lid === 10);
                 const isParkGrassPalm = (
                     (surfGt === GROUND_TYPE.FIELD || surfGt === GROUND_TYPE.PAWEMENT) &&
                     blkZ1.lid === 10 &&
-                    ((c === 219 && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
+                    ((c === 219 && hasGrassN && hasGrassS && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
                 );
                 if (isPlanterPalm || isParkGrassPalm) {
                     // Varied palm sizes: crown spread 0.78..1.30 & trunk height 0.70..1.55 (young palms to towering royal palms)
                     const hs1 = (((c * 73856093) ^ (r * 19349663)) >>> 0) % 1000 / 1000;
                     const hs2 = (((c * 83492791) ^ (r * 2654435761)) >>> 0) % 1000 / 1000;
+                    const palmX = (c === 219 && !isPlanterPalm)
+                        ? (c + 0.68 + (hs1 - 0.5) * 0.48) * TILE_SIZE
+                        : (c + 0.5) * TILE_SIZE;
                     this.vicePalms.push({
-                        x: (c + 0.5) * TILE_SIZE,
+                        x: palmX,
                         y: (r + 0.5) * TILE_SIZE,
                         z: 2.0,
                         scale: (isPlanterPalm ? 0.80 : 0.84) + hs1 * 0.46,
@@ -800,13 +806,13 @@ class LeonidaMap {
             }
         }
 
-        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Promenade (every 10 tiles) & the 3 Wooden Ocean Piers (every 6 tiles)
+        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Coral Promenade (c = 218, never inside the grass lawn!) & the 3 Wooden Ocean Piers
         for (let r = 42; r <= 194; r += 10) {
-            if (this.surfaceGround[r * MAP_COLS + 220] === GROUND_TYPE.PAWEMENT) {
-                const bx = 220.35 * TILE_SIZE;
+            if (this.surfaceGround[r * MAP_COLS + 218] === GROUND_TYPE.PAWEMENT) {
+                const bx = 218.55 * TILE_SIZE;
                 const by = (r + 0.5) * TILE_SIZE;
                 this.streetlights.push({
-                    c: 220,
+                    c: 218,
                     r,
                     baseX: bx,
                     baseY: by,

@@ -105,8 +105,8 @@ class RetroRenderer {
             uniform float uWaterStep;
             uniform float uFanStep;
             varying vec2 vUV;
-            varying float vAnim;
-            varying vec3 vWorldPos;
+            varying highp float vAnim;
+            varying highp vec3 vWorldPos;
             void main() {
                 vec2 uv = aUV;
                 if (aAnim > 0.5 && aAnim < 1.5) {
@@ -134,8 +134,8 @@ class RetroRenderer {
         const cityFS = `
             precision mediump float;
             varying vec2 vUV;
-            varying float vAnim;
-            varying vec3 vWorldPos;
+            varying highp float vAnim;
+            varying highp vec3 vWorldPos;
             uniform sampler2D uTex;
             uniform sampler2D uDayLightTex;
             uniform highp float uWaterStep;
@@ -228,10 +228,36 @@ class RetroRenderer {
                 return outCol;
             }
 
+            vec3 sampleLidTile(float lidIdx) {
+                float idx = 390.0 + lidIdx;
+                float col = mod(idx, 16.0);
+                float row = floor(idx / 16.0);
+                vec2 localUV = clamp(fract(vWorldPos.xz), vec2(0.5 / 64.0), vec2(63.5 / 64.0));
+                vec2 uv = (vec2(col, row) + localUV) / vec2(16.0, 51.0);
+                return texture2D(uTex, uv).rgb;
+            }
+            vec3 styleBeachSand(vec3 baseSand) {
+                float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
+                float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
+                float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
+                float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
+                float duneWave = r1 * 0.52 + r2 * 0.33 + r3 * 0.15;
+                vec3 sandCrest = vec3(0.99, 0.91, 0.71);
+                vec3 sandTrough = vec3(0.91, 0.78, 0.55);
+                vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
+                return mix(baseSand, targetSand, 0.48);
+            }
+            float coastalSandDrift(vec2 p) {
+                float w = sin(p.y * 0.72 + 0.4) * 0.50 + cos(p.y * 1.65 - 0.9) * 0.32 + (aNoise(vec2(p.y * 2.3, 5.0)) - 0.5) * 0.36;
+                return clamp(0.28 + w * 0.16, 0.14, 0.44);
+            }
+
             void main() {
                 vec4 c = texture2D(uTex, vUV);
                 bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
                 bool isRoad = (vAnim > 4.9 && vAnim < 26.0);
+                bool isFootpathSandEdge = (vAnim > 27.5 && vAnim < 28.5);
+                bool isCurvedLawn = (vAnim > 29.5);
                 if (isRoad) c.rgb = asphaltSurface(c.rgb, (vAnim > 5.1 && vAnim < 5.4) ? 1.0 : 0.0);
                 if (c.a < 0.03 && !isShoreTile) discard;
 
@@ -247,22 +273,14 @@ class RetroRenderer {
                     c.rgb = submergedSand;
                 } else if (vAnim > 0.5 && vAnim < 1.5) {
                     c = sampleOceanWater(dayAmt);
-                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile || isRoad) {
+                } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile || isRoad || isFootpathSandEdge || isCurvedLawn) {
                     float isSand = 0.0;
                     if (vWorldPos.y < 2.2 && c.a > 0.02) {
                         // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
                         isSand = clamp((c.r - c.b - 0.14) * 6.5, 0.0, 1.0) * smoothstep(0.54, 0.76, c.r);
                         float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
                         if (isSand > 0.01) {
-                            float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
-                            float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
-                            float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
-                            float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
-                            float duneWave = (r1 * 0.52 + r2 * 0.33 + r3 * 0.15) * isSand;
-                            vec3 sandCrest = vec3(0.99, 0.91, 0.71);
-                            vec3 sandTrough = vec3(0.91, 0.78, 0.55);
-                            vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
-                            c.rgb = mix(c.rgb, targetSand, isSand * 0.48);
+                            c.rgb = mix(c.rgb, styleBeachSand(c.rgb), isSand);
                         } else if (isGrass > 0.01) {
                             float gWarp = sin(vWorldPos.z * 1.61 - vWorldPos.x * 0.97) * 0.75;
                             float g1 = sin(vWorldPos.x * 5.17 + vWorldPos.z * 3.43 + gWarp);
@@ -273,6 +291,87 @@ class RetroRenderer {
                             vec3 turfSunlit = vec3(0.42, 0.81, 0.36);
                             vec3 targetTurf = mix(turfShadow, turfSunlit, clamp(0.52 + turfWave * 0.26, 0.0, 1.0));
                             c.rgb = mix(c.rgb, targetTurf, isGrass * 0.34);
+                        }
+
+                        // Coral promenade footpath meeting beach sand on the East: organic wind-blown sand drift over pavers
+                        if (isFootpathSandEdge) {
+                            vec2 p = vWorldPos.xz;
+                            vec2 lp = fract(p);
+                            float drift = coastalSandDrift(p) + (aNoise(p * 9.0 + 17.0) - 0.5) * 0.06;
+                            float sandMix = smoothstep(1.0 - drift - 0.06, 1.0 - drift + 0.04, lp.x);
+                            if (sandMix > 0.005) {
+                                vec3 sandCol = styleBeachSand(sampleLidTile(98.0));
+                                c.rgb = mix(c.rgb, sandCol, sandMix);
+                                isSand = max(isSand, sandMix);
+                            }
+                        }
+
+                        // Non-orthogonal organic rounded & wavy park lawns (8-neighbor seam-free SDF fillet)
+                        if (isCurvedLawn) {
+                            vec2 p = vWorldPos.xz;
+                            vec2 lp = fract(p);
+                            float raw = floor(vAnim - 30.0 + 0.5);
+                            float surType = floor(raw / 256.0);
+                            float bits = mod(raw, 256.0);
+
+                            bool bN  = mod(bits, 2.0) > 0.5;
+                            bool bS  = mod(floor(bits / 2.0), 2.0) > 0.5;
+                            bool bW  = mod(floor(bits / 4.0), 2.0) > 0.5;
+                            bool bE  = mod(floor(bits / 8.0), 2.0) > 0.5;
+                            bool bNW = mod(floor(bits / 16.0), 2.0) > 0.5;
+                            bool bNE = mod(floor(bits / 32.0), 2.0) > 0.5;
+                            bool bSW = mod(floor(bits / 64.0), 2.0) > 0.5;
+                            bool bSE = mod(floor(bits / 128.0), 2.0) > 0.5;
+
+                            bool iNW = bNW && !bN && !bW;
+                            bool iNE = bNE && !bN && !bE;
+                            bool iSW = bSW && !bS && !bW;
+                            bool iSE = bSE && !bS && !bE;
+
+                            float dW = bW ? lp.x : min(iNW ? length(lp) : 10.0, iSW ? length(vec2(lp.x, 1.0 - lp.y)) : 10.0);
+                            float dE = bE ? (1.0 - lp.x) : min(iNE ? length(vec2(1.0 - lp.x, lp.y)) : 10.0, iSE ? length(vec2(1.0 - lp.x, 1.0 - lp.y)) : 10.0);
+                            float dN = bN ? lp.y : min(iNW ? length(lp) : 10.0, iNE ? length(vec2(1.0 - lp.x, lp.y)) : 10.0);
+                            float dS = bS ? (1.0 - lp.y) : min(iSW ? length(vec2(lp.x, 1.0 - lp.y)) : 10.0, iSE ? length(vec2(1.0 - lp.x, 1.0 - lp.y)) : 10.0);
+
+                            // Smooth multi-tile meandering waves along each side (kept < 0.44 so wave + R < 1.0 across seams)
+                            float wW = 0.21 + 0.12 * sin(p.y * 0.58 + 0.4) + 0.06 * cos(p.y * 1.35 - 0.8) + (aNoise(p * 1.4 + 7.0) - 0.5) * 0.08;
+                            float wE = 0.25 + 0.13 * sin(p.y * 0.52 - 1.3) + 0.06 * cos(p.y * 1.18 + 0.6) + (aNoise(p * 1.3 + 23.0) - 0.5) * 0.09;
+                            float wN = 0.19 + 0.09 * sin(p.x * 1.30 + p.y * 0.4) + (aNoise(p * 1.5 + 41.0) - 0.5) * 0.08;
+                            float wS = 0.19 + 0.09 * cos(p.x * 1.30 - p.y * 0.4) + (aNoise(p * 1.5 + 59.0) - 0.5) * 0.08;
+
+                            float R = 0.47;
+                            float xDist = min(dW - wW, dE - wE);
+                            float yDist = min(dN - wN, dS - wS);
+                            vec2 q = max(vec2(R) - vec2(xDist, yDist), vec2(0.0));
+                            float tuft = (aNoise(p * 16.0 + 3.0) - 0.5) * 0.032 + (aHash(floor(p * 44.0)) - 0.5) * 0.016;
+                            float dLawn = min(min(xDist, yDist), R - length(q)) + tuft;
+
+                            if (dLawn < 0.08) {
+                                vec3 paveCol = sampleLidTile(surType > 1.5 ? 8.0 : 9.0);
+                                vec3 outsideCol = paveCol;
+                                float outSandMask = 0.0;
+                                if (surType > 0.5 && surType < 1.5) {
+                                    // East side borders beach sand (lid 98), N/S/W border coral promenade (lid 9)
+                                    float drift = coastalSandDrift(p) + (aNoise(p * 9.0 + 17.0) - 0.5) * 0.06;
+                                    float eastSand = smoothstep(1.0 - drift - 0.10, 1.0 - drift + 0.03, lp.x);
+                                    if (dE - wE < min(dN - wN, dS - wS) + 0.06) eastSand = 1.0;
+                                    vec3 sandCol = styleBeachSand(sampleLidTile(98.0));
+                                    outsideCol = mix(paveCol, sandCol, eastSand);
+                                    outSandMask = eastSand;
+                                }
+                                // Soft grass-edge contact shadow / soil border on stone pavers & lush edge ring on turf
+                                float edgeShade = mix(0.84, 1.0, smoothstep(-0.004, -0.038, dLawn));
+                                outsideCol *= mix(edgeShade, 1.0, outSandMask * 0.65);
+                                vec3 lushEdge = c.rgb * mix(0.86, 1.0, smoothstep(0.0, 0.075, dLawn));
+                                if (outSandMask > 0.2) {
+                                    // Dappled coastal dune sand grains drifting slightly into the eastern turf margin
+                                    float duneGrains = smoothstep(0.055, -0.01, dLawn + (aNoise(p * 11.0 + 13.0) - 0.5) * 0.05) * outSandMask;
+                                    lushEdge = mix(lushEdge, outsideCol, duneGrains * 0.55);
+                                }
+                                float grassAlpha = smoothstep(-0.012, 0.016, dLawn);
+                                c.rgb = mix(outsideCol, lushEdge, grassAlpha);
+                                isSand = max(isSand, outSandMask * (1.0 - grassAlpha));
+                            }
                         }
                     }
 
@@ -2004,6 +2103,63 @@ class RetroRenderer {
                     if (nonRoad(x - 1, z_south)) bits += 4;
                     if (nonRoad(x + 1, z_south)) bits += 8;
                     if (bits > 0) animType = 10.0 + bits;
+                }
+                // Coral promenade footpath (lid 9) meeting beach sand (lid 98..101) to the East:
+                // feather the eastern end of the stone footpath into the sand so it doesn't end in a hard vertical line.
+                if (effTileIdx === 9 && this.map) {
+                    const eBi = this.map.getBlockIndex(x + 1, z_south, y_elev);
+                    const eBlk = eBi ? this.map.getBlockInfo(eBi) : null;
+                    if (eBlk && eBlk.lid >= 98 && eBlk.lid <= 101) {
+                        animType = 28.0;
+                    }
+                }
+                // Park & Lummus Park grass lawns (lid 10): encode 8-neighbor non-grass ground mask + surrounding
+                // surface family (0: coral promenade lid 9, 1: beach sand on East + promenade on N/S/W, 2: city sidewalk lid 8)
+                // so the shader rounds all 90° corners and curves straight lawn edges organically without tile seams.
+                if (effTileIdx === 10 && y_elev === 1 && this.map) {
+                    const nLid = (cx, cy) => {
+                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+                        if (!bi) return 10;
+                        const nb = this.map.getBlockInfo(bi);
+                        if (!nb) return 10;
+                        // Only treat open walkable ground (sidewalk lid 8, coral promenade lid 9/69, beach sand lid 98..101)
+                        // as surrounding non-grass terrain so walls, palms or 3D props never create false notches.
+                        if (nb.lid === 8 || nb.lid === 9 || nb.lid === 69 || (nb.lid >= 98 && nb.lid <= 101)) {
+                            return nb.lid;
+                        }
+                        return 10;
+                    };
+                    const lN  = nLid(x, z_south - 1);
+                    const lS  = nLid(x, z_south + 1);
+                    const lW  = nLid(x - 1, z_south);
+                    const lE  = nLid(x + 1, z_south);
+                    const lNW = nLid(x - 1, z_south - 1);
+                    const lNE = nLid(x + 1, z_south - 1);
+                    const lSW = nLid(x - 1, z_south + 1);
+                    const lSE = nLid(x + 1, z_south + 1);
+
+                    let bits = 0;
+                    if (lN  !== 10) bits += 1;
+                    if (lS  !== 10) bits += 2;
+                    if (lW  !== 10) bits += 4;
+                    if (lE  !== 10) bits += 8;
+                    if (lNW !== 10) bits += 16;
+                    if (lNE !== 10) bits += 32;
+                    if (lSW !== 10) bits += 64;
+                    if (lSE !== 10) bits += 128;
+
+                    if (bits > 0) {
+                        const isSandLid = (l) => (l >= 98 && l <= 101);
+                        const isCoralLid = (l) => (l === 9 || l === 69);
+                        let surType = 2; // city sidewalk (lid 8)
+                        if (isSandLid(lE) || isSandLid(lNE) || isSandLid(lSE)) {
+                            surType = 1; // beach sand on East, coral promenade on N/S/W
+                        } else if (isCoralLid(lN) || isCoralLid(lS) || isCoralLid(lW) || isCoralLid(lE) ||
+                                   isCoralLid(lNW) || isCoralLid(lNE) || isCoralLid(lSW) || isCoralLid(lSE) || x >= 215) {
+                            surType = 0; // coral promenade (lid 9)
+                        }
+                        animType = 30.0 + surType * 256.0 + bits;
+                    }
                 }
             }
 
