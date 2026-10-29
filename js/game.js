@@ -398,6 +398,7 @@ class LeonidaGame {
         ];
         starterPeds.forEach((sp, idx) => {
             this.peds.push(new Pedestrian({
+                id: `ped_init_${idx}`,
                 x: sp.c * TILE_SIZE,
                 y: sp.r * TILE_SIZE,
                 z: 2.0,
@@ -781,6 +782,7 @@ class LeonidaGame {
 
         for (let i = 0; i < 7; i++) {
             const monk = new Pedestrian({
+                id: `monk_${i}`,
                 x: startX,
                 y: startY + i * spacing,
                 z: 2.0,
@@ -1923,6 +1925,16 @@ class LeonidaGame {
             v.driver = null;
             v.hasJason = false;
             v.doorOpenTimer = 0.48;
+            if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                this.net.broadcastWorldEvent({
+                    kind: "VEH_EXIT",
+                    vehId: v.id,
+                    x: Math.round(v.x),
+                    y: Math.round(v.y),
+                    z: Math.round((v.z || 2.0) * 100) / 100,
+                    a: Math.round((v.angle || 0) * 1000) / 1000
+                });
+            }
             p.inVehicle = null;
             p.enteringVehicle = null;
             p.exitAnimTimer = 0.36;
@@ -2003,6 +2015,13 @@ class LeonidaGame {
         p.inVehicle = closest;
         p.x = closest.x;
         p.y = closest.y;
+        if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+            this.net.broadcastWorldEvent({
+                kind: "VEH_ENTER",
+                vehId: closest.id,
+                carjack: Boolean(wasOccupied)
+            });
+        }
 
         if (this.jason && this.jason.recruited) {
             this.jason.inVehicle = closest;
@@ -2341,6 +2360,63 @@ class LeonidaGame {
         this.addFloatingText(this.player.x, this.player.y - 30, "🤝 JASON PARTNER ACTIVE!", "#00f0ff");
     }
 
+    getNearestWantedTarget(fromX, fromY) {
+        const candidates = [];
+        const p = this.player;
+        const anyRemoteWanted = this.net && typeof this.net.getMaxWantedLevel === "function" && this.net.getMaxWantedLevel() > 0;
+        const effectiveGlobalWanted = Math.max(this.wantedLevel || 0, anyRemoteWanted ? this.net.getMaxWantedLevel() : 0);
+        if (effectiveGlobalWanted <= 0) return null;
+
+        if (p && !p.dead && (this.wantedLevel > 0 || !anyRemoteWanted)) {
+            const v = p.inVehicle;
+            candidates.push({
+                x: v ? v.x : p.x,
+                y: v ? v.y : p.y,
+                z: (v ? v.z : p.z) || 2.0,
+                angle: (v ? v.angle : p.angle) || 0,
+                vx: v ? (v.vx || 0) : 0,
+                vy: v ? (v.vy || 0) : 0,
+                speed: v ? (v.speed || 0) : 0,
+                inVehicle: Boolean(v),
+                isRemote: false,
+                wantedLevel: this.wantedLevel || effectiveGlobalWanted
+            });
+        }
+
+        if (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0) {
+            for (const rp of this.net.remotePlayers.values()) {
+                if (rp.isBot || rp.dead) continue;
+                if ((rp.wantedLevel || 0) > 0 || this.wantedLevel > 0) {
+                    candidates.push({
+                        x: rp.x,
+                        y: rp.y,
+                        z: rp.z || 2.0,
+                        angle: rp.angle || 0,
+                        vx: rp.vx || 0,
+                        vy: rp.vy || 0,
+                        speed: rp.veh ? (rp.veh.speed || Math.hypot(rp.vx || 0, rp.vy || 0)) : Math.hypot(rp.vx || 0, rp.vy || 0),
+                        inVehicle: Boolean(rp.veh),
+                        isRemote: true,
+                        wantedLevel: rp.wantedLevel || effectiveGlobalWanted
+                    });
+                }
+            }
+        }
+
+        if (candidates.length === 0) return null;
+        let best = candidates[0];
+        let bestDist = Math.hypot(best.x - fromX, best.y - fromY);
+        for (let i = 1; i < candidates.length; i++) {
+            const c = candidates[i];
+            const d = Math.hypot(c.x - fromX, c.y - fromY);
+            if (d < bestDist) {
+                bestDist = d;
+                best = c;
+            }
+        }
+        return best;
+    }
+
     setWantedLevel(level) {
         const clamped = Math.max(0, Math.min(6, Math.floor(level)));
         if (clamped > this.wantedLevel && !this.player.ankleScrambled) {
@@ -2514,11 +2590,20 @@ class LeonidaGame {
         }
     }
 
-    explodeVehicle(v, byPlayer = false) {
+    explodeVehicle(v, byPlayer = false, fromNetwork = false) {
         if (v.destroyed) return;
         v.destroyed = true;
         v.vx = 0;
         v.vy = 0;
+
+        if (!fromNetwork && this.net && typeof this.net.broadcastWorldEvent === "function") {
+            this.net.broadcastWorldEvent({
+                kind: "VEH_EXPLODE",
+                vehId: v.id,
+                x: Math.round(v.x),
+                y: Math.round(v.y)
+            });
+        }
 
         const playerResponsible = Boolean(byPlayer || v.damagedByPlayer || this.player.inVehicle === v);
 
@@ -2542,12 +2627,21 @@ class LeonidaGame {
         }
     }
 
-    killPed(ped, byPlayer = true) {
+    killPed(ped, byPlayer = true, fromNetwork = false) {
         if (ped.dead) return;
         ped.dead = true;
         ped.burnTimer = 0;
         ped.electroTimer = 0;
         ped.drownTimer = 0;
+        if (!fromNetwork && this.net && typeof this.net.broadcastWorldEvent === "function") {
+            this.net.broadcastWorldEvent({
+                kind: "PED_KILL",
+                pedId: ped.id,
+                x: Math.round(ped.x),
+                y: Math.round(ped.y),
+                deathKind: ped.deathKind || null
+            });
+        }
         const noBlood = ped.deathKind === "DROWNED" || ped.deathKind === "ELECTRO" || ped.deathKind === "BURNT";
         for (let i = 0; i < (noBlood ? 0 : 8); i++) {
             this.particles.push({
@@ -3584,10 +3678,66 @@ class LeonidaGame {
         }
 
         // 6. Pedestrians, GOURANGA Monk Chain, Alligators, Hostile Carjackers & VCPD Foot Officers Update
+        const isClientWorldSync = Boolean(
+            this.net &&
+            typeof this.net.isClientWorldSyncActive === "function" &&
+            this.net.isClientWorldSyncActive()
+        );
         let leadMonk = null;
         for (const ped of this.peds) {
             if (ped.dead) continue;
             if (ped.exitAnimTimer > 0) ped.exitAnimTimer = Math.max(0, ped.exitAnimTimer - dt);
+
+            if (isClientWorldSync) {
+                if ((ped.burnTimer || 0) > 0) {
+                    ped.burnTimer = Math.max(0, ped.burnTimer - dt);
+                    if (Math.random() < 0.35) this.spawnParticle(ped.x + (Math.random() - 0.5) * 10, ped.y + (Math.random() - 0.5) * 10, "FIRE");
+                }
+                if ((ped.electroTimer || 0) > 0) {
+                    ped.electroTimer = Math.max(0, ped.electroTimer - dt);
+                    if (Math.random() < 0.35) this.spawnParticle(ped.x + (Math.random() - 0.5) * 12, ped.y + (Math.random() - 0.5) * 12, "SPARK");
+                }
+                if ((ped.stunnedTimer || 0) > 0) {
+                    ped.stunnedTimer = Math.max(0, ped.stunnedTimer - dt);
+                }
+                if (ped.netTargetX !== undefined && ped.netTargetY !== undefined) {
+                    const moveSpd = (ped.stunnedTimer || 0) > 0 ? 0 : (ped.speed || 0);
+                    ped.netTargetX += Math.cos(ped.netTargetAngle || ped.angle || 0) * moveSpd * dt * 0.48;
+                    ped.netTargetY += Math.sin(ped.netTargetAngle || ped.angle || 0) * moveSpd * dt * 0.48;
+                    const dx = ped.netTargetX - ped.x;
+                    const dy = ped.netTargetY - ped.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 260) {
+                        ped.x = ped.netTargetX;
+                        ped.y = ped.netTargetY;
+                        if (ped.netTargetZ !== undefined) ped.z = ped.netTargetZ;
+                    } else {
+                        const lerp = Math.min(1.0, dt * 13.5);
+                        ped.x += dx * lerp;
+                        ped.y += dy * lerp;
+                        if (ped.netTargetZ !== undefined) ped.z += (ped.netTargetZ - ped.z) * lerp;
+                    }
+                    if (ped.netTargetAngle !== undefined) {
+                        const angDiff = Math.atan2(Math.sin(ped.netTargetAngle - ped.angle), Math.cos(ped.netTargetAngle - ped.angle));
+                        ped.angle += angDiff * Math.min(1.0, dt * 14.0);
+                    }
+                }
+                // Check close-range COP arrest / damage on local player even in client sync mode
+                if (ped.kind === "COP" && this.wantedLevel > 0 && !p.dead) {
+                    const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
+                    if (dPlayer <= 28) {
+                        const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
+                        if (!p.inVehicle && p.hp < 55) {
+                            this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
+                        } else if (inSlowCar) {
+                            this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
+                        } else if (!p.inVehicle) {
+                            this.damagePlayer(14 * dt);
+                        }
+                    }
+                }
+                continue;
+            }
 
             // 1997 GTA 1 Pedestrian::SetBurnEffectActive (Flamethrower burning pedestrians!)
             if ((ped.burnTimer || 0) > 0) {
@@ -3681,25 +3831,28 @@ class LeonidaGame {
                     ped.y += Math.sin(ped.angle) * 28 * dt;
                     if (Math.random() < 0.02) ped.angle += (Math.random() - 0.5) * 1.8;
                 }
-            } else if (ped.kind === "COP" && this.wantedLevel > 0 && !p.dead) {
-                const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
-                ped.angle = Math.atan2(p.y - ped.y, p.x - ped.x);
-                if (dPlayer > 28) {
-                    ped.x += Math.cos(ped.angle) * 98 * dt;
-                    ped.y += Math.sin(ped.angle) * 98 * dt;
-                } else {
-                    // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
-                    const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
-                    if (!p.inVehicle && p.hp < 55) {
-                        this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
-                    } else if (inSlowCar) {
-                        this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
-                    } else if (!p.inVehicle) {
-                        this.damagePlayer(14 * dt);
+            } else if (ped.kind === "COP" && (this.wantedLevel > 0 || (this.net && this.net.getMaxWantedLevel && this.net.getMaxWantedLevel() > 0))) {
+                const copTarget = this.getNearestWantedTarget(ped.x, ped.y);
+                if (copTarget) {
+                    const dTarget = Math.hypot(copTarget.x - ped.x, copTarget.y - ped.y);
+                    ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
+                    if (dTarget > 28) {
+                        ped.x += Math.cos(ped.angle) * 98 * dt;
+                        ped.y += Math.sin(ped.angle) * 98 * dt;
+                    } else if (!copTarget.isRemote && !p.dead) {
+                        // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
+                        const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
+                        if (!p.inVehicle && p.hp < 55) {
+                            this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
+                        } else if (inSlowCar) {
+                            this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
+                        } else if (!p.inVehicle) {
+                            this.damagePlayer(14 * dt);
+                        }
                     }
-                }
-                if (dPlayer < 280 && Math.random() < 0.025) {
-                    this.fireWeapon(ped.x, ped.y, ped.angle, "PISTOL", false);
+                    if (dTarget < 280 && Math.random() < 0.025) {
+                        this.fireWeapon(ped.x, ped.y, ped.angle, "PISTOL", false);
+                    }
                 }
             } else if (ped.kind === "HOSTILE") {
                 // Road-Rage Driver / Gang Member AI: chases Lucia and punches or pulls her out of a slow car!
@@ -3829,14 +3982,23 @@ class LeonidaGame {
 
         if (this.roadblockCooldown > 0) this.roadblockCooldown -= dt;
 
-        if (this.wantedLevel > 0) {
+        const maxRoomWanted = Math.max(
+            this.wantedLevel || 0,
+            (!isClientWorldSync && this.net && typeof this.net.getMaxWantedLevel === "function")
+                ? this.net.getMaxWantedLevel()
+                : 0
+        );
+
+        if (!isClientWorldSync && maxRoomWanted > 0) {
+            const spawnTarget = this.getNearestWantedTarget(p.x, p.y) || { x: p.x, y: p.y, z: p.z || 2.0, angle: p.angle || 0, wantedLevel: maxRoomWanted };
+            const tWanted = spawnTarget.wantedLevel || maxRoomWanted;
             this.copSpawnTimer += dt;
-            const maxCops = Math.min(4, this.wantedLevel);
+            const maxCops = Math.min(5, tWanted + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
             if (activeCopCars < maxCops && this.copSpawnTimer > 7.5) {
                 this.copSpawnTimer = 0;
-                const baseBx = Math.floor(p.x / TILE_SIZE);
-                const baseBy = Math.floor(p.y / TILE_SIZE);
-                const pz = p.z || 2.0;
+                const baseBx = Math.floor(spawnTarget.x / TILE_SIZE);
+                const baseBy = Math.floor(spawnTarget.y / TILE_SIZE);
+                const pz = spawnTarget.z || 2.0;
                 for (let attempt = 0; attempt < 8; attempt++) {
                     const ang = Math.random() * Math.PI * 2;
                     const distB = 9.5 + Math.random() * 4.0;
@@ -3846,12 +4008,12 @@ class LeonidaGame {
                     if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                         const sx = (bx + 0.5) * TILE_SIZE;
                         const sy = (by + 0.5) * TILE_SIZE;
-                        const toPlayerAng = Math.atan2(p.y - sy, p.x - sx);
+                        const toPlayerAng = Math.atan2(spawnTarget.y - sy, spawnTarget.x - sx);
                         const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                             ? this.map.getAlignedRoadAngle(bx, by, toPlayerAng, pz)
                             : toPlayerAng;
-                        const specKey = this.wantedLevel >= 4 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
-                        const copCar = new Vehicle(`cop_${Date.now()}`, specKey, sx, sy, roadAng);
+                        const specKey = tWanted >= 4 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
+                        const copCar = new Vehicle(`cop_${Date.now()}_${attempt}`, specKey, sx, sy, roadAng);
                         copCar.z = this.map.getHeightAtPixel(sx, sy, 4.0);
                         copCar.driver = "AI_COP";
                         copCar.speed = 140;
@@ -3864,17 +4026,18 @@ class LeonidaGame {
             }
 
             // Spawn GTA 1 Police Roadblock at Wanted Level >= 3
-            if (this.wantedLevel >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 5) {
+            if (tWanted >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 5) {
                 this.roadblockCooldown = 28;
-                const rbX = p.x + Math.cos(p.angle) * 480;
-                const rbY = p.y + Math.sin(p.angle) * 480;
+                const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 480;
+                const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 480;
                 if (this.map.isRoadAtPixel(rbX, rbY)) {
-                    const rbCar = new Vehicle(`rb_${Date.now()}`, "VCPD_CRUISER", rbX, rbY, p.angle + Math.PI * 0.5);
+                    const rbCar = new Vehicle(`rb_${Date.now()}`, "VCPD_CRUISER", rbX, rbY, (spawnTarget.angle || 0) + Math.PI * 0.5);
                     this.vehicles.push(rbCar);
                     this.peds.push(new Pedestrian({
-                        x: rbX - Math.cos(p.angle) * 28,
-                        y: rbY - Math.sin(p.angle) * 28,
-                        angle: p.angle + Math.PI,
+                        id: `rb_cop_${Date.now()}`,
+                        x: rbX - Math.cos(spawnTarget.angle || 0) * 28,
+                        y: rbY - Math.sin(spawnTarget.angle || 0) * 28,
+                        angle: (spawnTarget.angle || 0) + Math.PI,
                         speed: 90,
                         kind: "COP",
                         g24Type: "police",
@@ -3886,7 +4049,9 @@ class LeonidaGame {
                     this.addFloatingText(rbX, rbY - 26, "🚧 VCPD ROADBLOCK!", "#38bdf8");
                 }
             }
+        }
 
+        if (this.wantedLevel > 0) {
             // Decay 1 Wanted Head when out of immediate police sight (> 420px), or slowly over time at 1-2 heads if no new crimes occur!
             const decayThreshold = this.wantedLevel === 1 ? 11 : 15;
             if (nearestCopDist > 420) {

@@ -46,6 +46,9 @@ class ViceNetworkManager {
         // Timing
         this.syncAccumulator = 0;
         this.syncInterval = 0.05; // 20 Hz state broadcast
+        this.worldSyncAccumulator = 0;
+        this.worldSyncInterval = 0.10; // 10 Hz full-map world broadcast (vehicles, police, peds, clock)
+        this.lastWorldSyncReceivedMs = 0;
         this.cleanupAccumulator = 0;
 
         // Transports
@@ -644,7 +647,8 @@ class ViceNetworkManager {
 
         if (pkt.t === "JOIN") {
             const isNew = !this.remotePlayers.has(pkt.id);
-            this.ensureRemotePlayer(pkt);
+            const rp = this.ensureRemotePlayer(pkt);
+            if (typeof pkt.slot === "number") rp.slot = pkt.slot;
             if (isNew && this.game) {
                 this.addChatLog(
                     "VICE NET",
@@ -668,6 +672,9 @@ class ViceNetworkManager {
             }
             // Reply with our current state immediately so the newcomer sees us right away
             this.broadcastStateNow();
+            if (this.isWorldHost()) {
+                this.broadcastWorldSync();
+            }
             return;
         }
 
@@ -702,6 +709,8 @@ class ViceNetworkManager {
             rp.name = pkt.name || rp.name;
             rp.color = pkt.color || rp.color;
             rp.pedType = pkt.pedType || rp.pedType;
+            if (typeof pkt.slot === "number") rp.slot = pkt.slot;
+            rp.wantedLevel = pkt.wl || 0;
             rp.targetX = pkt.x;
             rp.targetY = pkt.y;
             rp.targetZ = pkt.z !== undefined ? pkt.z : 2.0;
@@ -727,6 +736,18 @@ class ViceNetworkManager {
                 rp.angle = rp.targetAngle;
                 rp.initialized = true;
             }
+            return;
+        }
+
+        if (pkt.t === "WORLD_SYNC" && this.game) {
+            if (!this.isWorldHost()) {
+                this.applyWorldSync(pkt);
+            }
+            return;
+        }
+
+        if (pkt.t === "WORLD_EVENT" && this.game) {
+            this.applyWorldEvent(pkt);
             return;
         }
 
@@ -830,7 +851,10 @@ class ViceNetworkManager {
                 walkPhase: 0,
                 muzzleTimer: 0,
                 kills: 0,
+                wantedLevel: pkt.wl || 0,
+                slot: typeof pkt.slot === "number" ? pkt.slot : -1,
                 veh: null,
+                _linkedWorldVeh: false,
                 initialized: pkt.x !== undefined,
                 lastSeen: performance.now(),
                 isBot: false
@@ -838,6 +862,337 @@ class ViceNetworkManager {
             this.remotePlayers.set(pkt.id, rp);
         }
         return rp;
+    }
+
+    getHumanRemotePlayers() {
+        const list = [];
+        const now = performance.now();
+        for (const rp of this.remotePlayers.values()) {
+            if (!rp.isBot && now - rp.lastSeen <= 8500) {
+                list.push(rp);
+            }
+        }
+        return list;
+    }
+
+    getMaxWantedLevel() {
+        let maxW = 0;
+        for (const rp of this.getHumanRemotePlayers()) {
+            if ((rp.wantedLevel || 0) > maxW) {
+                maxW = rp.wantedLevel || 0;
+            }
+        }
+        return maxW;
+    }
+
+    isWorldHost() {
+        const humans = this.getHumanRemotePlayers();
+        if (humans.length === 0) return true;
+        const mySlot = (typeof this.slotIndex === "number" && this.slotIndex >= 0) ? this.slotIndex : 999;
+        for (const rp of humans) {
+            const rpSlot = (typeof rp.slot === "number" && rp.slot >= 0) ? rp.slot : 999;
+            if (rpSlot < mySlot) return false;
+            if (rpSlot === mySlot && String(rp.id) < String(this.playerId)) return false;
+        }
+        return true;
+    }
+
+    isClientWorldSyncActive() {
+        if (this.isWorldHost()) return false;
+        return (performance.now() - (this.lastWorldSyncReceivedMs || 0)) < 3500;
+    }
+
+    broadcastWorldEvent(ev) {
+        if (!this.enabled || !ev) return;
+        this.sendPacket(Object.assign({ t: "WORLD_EVENT" }, ev));
+    }
+
+    applyWorldEvent(pkt) {
+        if (!this.game || !pkt || !pkt.kind) return;
+        if (pkt.kind === "VEH_ENTER" && pkt.vehId) {
+            const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
+            if (v && v !== this.game.player.inVehicle) {
+                if (pkt.carjack && (v.driver === "AI_TRAFFIC" || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY")) {
+                    if (typeof this.game.ejectVehicleDriver === "function") {
+                        this.game.ejectVehicleDriver(v, "CARJACK");
+                    }
+                }
+                v.driver = "REMOTE";
+                v.doorOpenTimer = 0.48;
+                v._linkedRemoteId = pkt.id;
+            }
+        } else if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
+            const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
+            if (v && v !== this.game.player.inVehicle) {
+                v.driver = null;
+                v._linkedRemoteId = null;
+                v.doorOpenTimer = 0.48;
+                if (typeof pkt.x === "number") { v.x = pkt.x; v.netTargetX = pkt.x; }
+                if (typeof pkt.y === "number") { v.y = pkt.y; v.netTargetY = pkt.y; }
+                if (typeof pkt.z === "number") { v.z = pkt.z; v.netTargetZ = pkt.z; }
+                if (typeof pkt.a === "number") { v.angle = pkt.a; v.netTargetAngle = pkt.a; }
+                v.vx = 0;
+                v.vy = 0;
+                v.speed = 0;
+            }
+        } else if (pkt.kind === "VEH_EXPLODE" && pkt.vehId) {
+            const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
+            if (v && !v.destroyed) {
+                this.game.explodeVehicle(v, false, true);
+            }
+        } else if (pkt.kind === "PED_KILL" && pkt.pedId) {
+            const ped = this.game.peds.find((pd) => pd.id === pkt.pedId);
+            if (ped && !ped.dead) {
+                if (pkt.deathKind) ped.deathKind = pkt.deathKind;
+                this.game.killPed(ped, false, true);
+            }
+        }
+    }
+
+    broadcastWorldSync() {
+        if (!this.enabled || !this.game) return;
+        const g = this.game;
+
+        const drvToCode = (d) => {
+            if (d === "AI_TRAFFIC") return 1;
+            if (d === "AI_COP") return 2;
+            if (d === "AI_EMERGENCY") return 3;
+            if (d === "PLAYER" || d === "REMOTE") return 4;
+            return 0;
+        };
+
+        const vehs = [];
+        for (let i = 0; i < g.vehicles.length; i++) {
+            const v = g.vehicles[i];
+            const flags =
+                (v.destroyed ? 1 : 0) |
+                (v.sirenActive ? 2 : 0) |
+                (v.frontDented ? 4 : 0) |
+                (v.rearDented ? 8 : 0) |
+                (v.heavyDented ? 16 : 0) |
+                ((v.doorOpenTimer || 0) > 0 ? 32 : 0) |
+                ((v.aiPanicTimer || 0) > 0 ? 64 : 0);
+            vehs.push([
+                v.id,
+                v.specKey || "STALLION",
+                Math.round(v.x),
+                Math.round(v.y),
+                Math.round((v.z || 2.0) * 100) / 100,
+                Math.round((v.angle || 0) * 1000) / 1000,
+                Math.round(v.vx || 0),
+                Math.round(v.vy || 0),
+                drvToCode(v.driver),
+                Math.round(v.hp || 0),
+                flags,
+                v.remapIdx || 0,
+                v.missionTag || 0
+            ]);
+        }
+
+        const kindToCode = (k) => {
+            if (k === "COP") return 1;
+            if (k === "MONK") return 2;
+            if (k === "HOSTILE") return 3;
+            if (k === "GATOR") return 4;
+            return 0;
+        };
+
+        const peds = [];
+        for (let i = 0; i < g.peds.length; i++) {
+            const pd = g.peds[i];
+            const flags =
+                (pd.dead ? 1 : 0) |
+                ((pd.panicTimer || 0) > 0 ? 2 : 0) |
+                ((pd.stunnedTimer || 0) > 0 ? 4 : 0) |
+                ((pd.burnTimer || 0) > 0 ? 8 : 0) |
+                ((pd.electroTimer || 0) > 0 ? 16 : 0) |
+                ((pd.drownTimer || 0) > 0 ? 32 : 0) |
+                ((pd.exitAnimTimer || 0) > 0 ? 64 : 0);
+            peds.push([
+                pd.id,
+                kindToCode(pd.kind),
+                pd.g24Type || "civ0",
+                Math.round(pd.x),
+                Math.round(pd.y),
+                Math.round((pd.z || 2.0) * 100) / 100,
+                Math.round((pd.angle || 0) * 100) / 100,
+                Math.round(pd.speed || 0),
+                Math.round(pd.hp || 0),
+                flags,
+                pd.missionTag || 0
+            ]);
+        }
+
+        this.sendPacket({
+            t: "WORLD_SYNC",
+            wm: Math.round((g.worldMinutes || 720) * 10) / 10,
+            tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
+            vehs,
+            peds
+        });
+    }
+
+    applyWorldSync(pkt) {
+        if (!this.game || !pkt) return;
+        this.lastWorldSyncReceivedMs = performance.now();
+        const g = this.game;
+
+        if (typeof pkt.wm === "number") {
+            const diffWm = pkt.wm - (g.worldMinutes || 720);
+            if (Math.abs(diffWm) > 1.5) {
+                g.worldMinutes = pkt.wm;
+            } else {
+                g.worldMinutes += diffWm * 0.25;
+            }
+            if (typeof g.syncDayNightCycle === "function") {
+                g.syncDayNightCycle();
+            }
+        }
+        if (typeof pkt.tl === "number") {
+            g.trafficLightTimer = pkt.tl;
+        }
+
+        const codeToDrv = (c) => {
+            if (c === 1) return "AI_TRAFFIC";
+            if (c === 2) return "AI_COP";
+            if (c === 3) return "AI_EMERGENCY";
+            if (c === 4) return "REMOTE";
+            return null;
+        };
+
+        if (Array.isArray(pkt.vehs) && typeof Vehicle === "function") {
+            const existingById = new Map();
+            for (const v of g.vehicles) {
+                existingById.set(v.id, v);
+            }
+            const seenIds = new Set();
+
+            for (const row of pkt.vehs) {
+                if (!Array.isArray(row) || row.length < 11) continue;
+                const [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag] = row;
+                seenIds.add(id);
+                let v = existingById.get(id);
+                if (!v) {
+                    v = new Vehicle(id, specKey, x, y, a);
+                    v.z = z;
+                    v.netTargetX = x;
+                    v.netTargetY = y;
+                    v.netTargetZ = z;
+                    v.netTargetAngle = a;
+                    if (remapIdx !== undefined) v.remapIdx = remapIdx;
+                    if (missionTag) v.missionTag = missionTag;
+                    g.vehicles.push(v);
+                }
+
+                // Never overwrite the vehicle currently driven by the local player or linked to a 20Hz remote player
+                if (g.player.inVehicle === v || v._linkedRemoteId) {
+                    continue;
+                }
+
+                v.netTargetX = x;
+                v.netTargetY = y;
+                v.netTargetZ = z;
+                v.netTargetAngle = a;
+                v.vx = vx;
+                v.vy = vy;
+                v.speed = Math.hypot(vx, vy);
+                v.driver = codeToDrv(drvCode);
+                v.hp = hp;
+                const wasDestroyed = v.destroyed;
+                const nowDestroyed = Boolean(flags & 1);
+                if (!wasDestroyed && nowDestroyed) {
+                    g.explodeVehicle(v, false, true);
+                } else {
+                    v.destroyed = nowDestroyed;
+                }
+                v.sirenActive = Boolean(flags & 2);
+                v.frontDented = Boolean(flags & 4);
+                v.rearDented = Boolean(flags & 8);
+                v.heavyDented = Boolean(flags & 16);
+                if ((flags & 32) && (v.doorOpenTimer || 0) <= 0) v.doorOpenTimer = 0.35;
+                if (flags & 64) v.aiPanicTimer = Math.max(v.aiPanicTimer || 0, 1.0);
+            }
+
+            for (let i = g.vehicles.length - 1; i >= 0; i--) {
+                const v = g.vehicles[i];
+                if (!seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId) {
+                    g.vehicles.splice(i, 1);
+                }
+            }
+        }
+
+        const codeToKind = (c) => {
+            if (c === 1) return "COP";
+            if (c === 2) return "MONK";
+            if (c === 3) return "HOSTILE";
+            if (c === 4) return "GATOR";
+            return "CIVILIAN";
+        };
+
+        if (Array.isArray(pkt.peds) && typeof Pedestrian === "function") {
+            const existingPeds = new Map();
+            for (const pd of g.peds) {
+                existingPeds.set(pd.id, pd);
+            }
+            const seenPedIds = new Set();
+
+            for (const row of pkt.peds) {
+                if (!Array.isArray(row) || row.length < 10) continue;
+                const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag] = row;
+                seenPedIds.add(id);
+                let pd = existingPeds.get(id);
+                const kindStr = codeToKind(kindCode);
+                if (!pd) {
+                    pd = new Pedestrian({
+                        id,
+                        x,
+                        y,
+                        z,
+                        angle: a,
+                        speed: spd,
+                        kind: kindStr,
+                        g24Type: g24Type || "civ0",
+                        missionTag: missionTag || null,
+                        hp,
+                        dead: Boolean(flags & 1)
+                    });
+                    pd.netTargetX = x;
+                    pd.netTargetY = y;
+                    pd.netTargetZ = z;
+                    pd.netTargetAngle = a;
+                    g.peds.push(pd);
+                } else {
+                    pd.netTargetX = x;
+                    pd.netTargetY = y;
+                    pd.netTargetZ = z;
+                    pd.netTargetAngle = a;
+                    pd.speed = spd;
+                    pd.kind = kindStr;
+                    pd.g24Type = g24Type || pd.g24Type;
+                    pd.hp = hp;
+                    const wasDead = pd.dead;
+                    const nowDead = Boolean(flags & 1);
+                    if (!wasDead && nowDead) {
+                        g.killPed(pd, false, true);
+                    } else {
+                        pd.dead = nowDead;
+                    }
+                    pd.panicTimer = (flags & 2) ? Math.max(pd.panicTimer || 0, 0.5) : 0;
+                    pd.stunnedTimer = (flags & 4) ? Math.max(pd.stunnedTimer || 0, 0.35) : 0;
+                    pd.burnTimer = (flags & 8) ? Math.max(pd.burnTimer || 0, 0.5) : 0;
+                    pd.electroTimer = (flags & 16) ? Math.max(pd.electroTimer || 0, 0.4) : 0;
+                    pd.drownTimer = (flags & 32) ? Math.max(pd.drownTimer || 0, 0.4) : 0;
+                    if ((flags & 64) && (pd.exitAnimTimer || 0) <= 0) pd.exitAnimTimer = 0.28;
+                }
+            }
+
+            for (let i = g.peds.length - 1; i >= 0; i--) {
+                const pd = g.peds[i];
+                if (!seenPedIds.has(pd.id)) {
+                    g.peds.splice(i, 1);
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -892,16 +1247,71 @@ class ViceNetworkManager {
             if (rp.isMoving && !rp.veh) {
                 rp.walkPhase = (rp.walkPhase || 0) + dt * (rp.isRunning ? 1.5 : 1.0);
             }
+
+            // Link remote player's driven vehicle directly to the unified world vehicle in game.vehicles!
+            if (rp.veh && rp.veh.id && this.game && Array.isArray(this.game.vehicles)) {
+                let wv = this.game.vehicles.find((v) => v.id === rp.veh.id);
+                if (!wv && typeof Vehicle === "function") {
+                    wv = new Vehicle(rp.veh.id, rp.veh.specKey || "STALLION", rp.x, rp.y, rp.angle);
+                    this.game.vehicles.push(wv);
+                }
+                if (wv && wv !== this.game.player.inVehicle) {
+                    wv._linkedRemoteId = rp.id;
+                    wv.driver = "REMOTE";
+                    wv.remotePedType = rp.pedType || "gang";
+                    wv.x = rp.x;
+                    wv.y = rp.y;
+                    wv.z = rp.z;
+                    wv.angle = rp.angle;
+                    wv.vx = rp.vx || 0;
+                    wv.vy = rp.vy || 0;
+                    wv.speed = rp.veh.speed || Math.hypot(rp.vx || 0, rp.vy || 0);
+                    wv.sirenActive = Boolean(rp.veh.siren);
+                    wv.frontDented = Boolean(rp.veh.fDent);
+                    wv.rearDented = Boolean(rp.veh.rDent);
+                    wv.heavyDented = Boolean(rp.veh.hDent);
+                    rp._linkedWorldVeh = true;
+                } else {
+                    rp._linkedWorldVeh = false;
+                }
+            } else {
+                rp._linkedWorldVeh = false;
+            }
+        }
+
+        // Release any world vehicle whose remote driver exited or disconnected
+        if (this.game && Array.isArray(this.game.vehicles)) {
+            for (const v of this.game.vehicles) {
+                if (v._linkedRemoteId) {
+                    const owner = this.remotePlayers.get(v._linkedRemoteId);
+                    if (!owner || !owner.veh || owner.veh.id !== v.id) {
+                        v._linkedRemoteId = null;
+                        if (v.driver === "REMOTE") {
+                            v.driver = null;
+                            v.vx = 0;
+                            v.vy = 0;
+                            v.speed = 0;
+                        }
+                    }
+                }
+            }
         }
 
         // 3. Check bumper-to-bumper collisions between remote player vehicles and local player/vehicles
         this.checkRemoteVehicleInteractions(dt);
 
-        // 4. Broadcast local player state at 20 Hz & Server Directory Heartbeat
+        // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (Host) & Server Directory Heartbeat
         this.syncAccumulator += dt;
         if (this.syncAccumulator >= this.syncInterval) {
             this.syncAccumulator = 0;
             this.broadcastStateNow();
+        }
+        if (this.isWorldHost() && this.getHumanRemotePlayers().length > 0) {
+            this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
+            if (this.worldSyncAccumulator >= this.worldSyncInterval) {
+                this.worldSyncAccumulator = 0;
+                this.broadcastWorldSync();
+            }
         }
         this.dirAccumulator = (this.dirAccumulator || 0) + dt;
         if (this.dirAccumulator >= 0.85) {
@@ -919,6 +1329,7 @@ class ViceNetworkManager {
         let vehData = null;
         if (v) {
             vehData = {
+                id: v.id || "player_car",
                 specKey: v.specKey || "STALLION",
                 sprId: v.sprId || "66",
                 remapIdx: v.remapIdx || 0,
@@ -939,6 +1350,8 @@ class ViceNetworkManager {
             name: this.playerName,
             color: this.playerColor,
             pedType: this.pedSpriteType,
+            slot: this.slotIndex,
+            wl: this.game.wantedLevel || 0,
             x: Math.round((v ? v.x : p.x) * 10) / 10,
             y: Math.round((v ? v.y : p.y) * 10) / 10,
             z: Math.round(((v ? v.z : p.z) || 2.0) * 100) / 100,

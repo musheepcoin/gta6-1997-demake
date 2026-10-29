@@ -1622,9 +1622,23 @@ class Vehicle {
 
     /* ========================================================================
        AUTHENTIC GTA 1 VCPD POLICE PURSUIT AI (Road-Graph + 9-Feeler + PIT)
+       Pursues the nearest wanted player (Host or Remote Online Player) on the map!
        ======================================================================== */
     computePoliceControls(dt, map, game) {
-        if (!game || game.wantedLevel <= 0 || game.player.dead) {
+        const wantedTarget = (game && typeof game.getNearestWantedTarget === "function")
+            ? game.getNearestWantedTarget(this.x, this.y)
+            : ((game && game.wantedLevel > 0 && !game.player.dead)
+                ? {
+                    x: (game.player.inVehicle || game.player).x,
+                    y: (game.player.inVehicle || game.player).y,
+                    vx: (game.player.inVehicle || game.player).vx || 0,
+                    vy: (game.player.inVehicle || game.player).vy || 0,
+                    speed: (game.player.inVehicle || game.player).speed || 0,
+                    inVehicle: Boolean(game.player.inVehicle)
+                }
+                : null);
+
+        if (!wantedTarget) {
             this.sirenActive = false;
             this.aiBailTimer = 0;
             return this.computeTrafficControls(dt, map, game);
@@ -1633,13 +1647,12 @@ class Vehicle {
         this.sirenActive = true;
         this.aiState = "PURSUIT";
 
-        const target = game.player.inVehicle || game.player;
-        const distToPlayer = Math.hypot(target.x - this.x, target.y - this.y);
+        const distToPlayer = Math.hypot(wantedTarget.x - this.x, wantedTarget.y - this.y);
 
         // GTA 1 Tactical Officer Bail-Out:
-        // When close to a player on foot (or a boxed-in slow car), brake hard and deploy VCPD Officer on foot!
-        const playerOnFootNear = !game.player.inVehicle && distToPlayer < 110;
-        const playerBoxedNear = Boolean(game.player.inVehicle) && Math.abs(target.speed || 0) < 35 && distToPlayer < 92;
+        // When close to a wanted player on foot (or a boxed-in slow car), brake hard and deploy VCPD Officer on foot!
+        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 110;
+        const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 35 && distToPlayer < 92;
         if (playerOnFootNear || playerBoxedNear) {
             this.aiBailTimer += dt;
             if (this.aiBailTimer > (playerOnFootNear ? 0.42 : 0.95) && typeof game.ejectVehicleDriver === "function") {
@@ -1658,12 +1671,12 @@ class Vehicle {
             dt,
             map,
             game,
-            target.x,
-            target.y,
-            target.vx || 0,
-            target.vy || 0,
+            wantedTarget.x,
+            wantedTarget.y,
+            wantedTarget.vx || 0,
+            wantedTarget.vy || 0,
             0.96,
-            Boolean(game.player.inVehicle)
+            Boolean(wantedTarget.inVehicle)
         );
     }
 
@@ -1845,6 +1858,52 @@ class Vehicle {
         this.sirenPhase += dt * 10;
         if (this.doorOpenTimer > 0) {
             this.doorOpenTimer = Math.max(0, this.doorOpenTimer - dt);
+        }
+
+        // Remote player driven vehicle: pose is updated directly at 60 FPS from remote player state in net.js
+        if (this.driver === "REMOTE") {
+            return;
+        }
+
+        // Client World Sync Mode: smoothly interpolate AI / parked vehicles from Host WORLD_SYNC at 60 FPS
+        if (
+            this.driver !== "PLAYER" &&
+            game &&
+            game.net &&
+            typeof game.net.isClientWorldSyncActive === "function" &&
+            game.net.isClientWorldSyncActive()
+        ) {
+            if (this.netTargetX !== undefined && this.netTargetY !== undefined) {
+                this.netTargetX += (this.vx || 0) * dt * 0.48;
+                this.netTargetY += (this.vy || 0) * dt * 0.48;
+                const dx = this.netTargetX - this.x;
+                const dy = this.netTargetY - this.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 320) {
+                    this.x = this.netTargetX;
+                    this.y = this.netTargetY;
+                    this.z = this.netTargetZ !== undefined ? this.netTargetZ : this.z;
+                } else {
+                    const lerp = Math.min(1.0, dt * 13.5);
+                    this.x += dx * lerp;
+                    this.y += dy * lerp;
+                    if (this.netTargetZ !== undefined) {
+                        this.z += (this.netTargetZ - this.z) * lerp;
+                    }
+                }
+                if (this.netTargetAngle !== undefined) {
+                    const angDiff = Math.atan2(Math.sin(this.netTargetAngle - this.angle), Math.cos(this.netTargetAngle - this.angle));
+                    this.angle += angDiff * Math.min(1.0, dt * 14.0);
+                }
+            }
+            if (this.hp < this.maxHp * 0.55 && Math.random() < 0.25 && !map.isWaterAtPixel(this.x, this.y)) {
+                game.spawnParticle(
+                    this.x + Math.cos(this.angle) * 18,
+                    this.y + Math.sin(this.angle) * 18,
+                    this.hp < this.maxHp * 0.3 ? "BLACK_SMOKE" : "WHITE_SMOKE"
+                );
+            }
+            return;
         }
 
         // 1997 GTA 1 Delayed Chain-Reaction Explosion (mCarExplosionChainDelayTime)
@@ -2138,6 +2197,7 @@ class Vehicle {
    ============================================================================ */
 class Pedestrian {
     constructor(props = {}) {
+        this.id = props.id || `ped_${++Pedestrian._nextId}`;
         this.x = props.x || 0;
         this.y = props.y || 0;
         this.z = props.z !== undefined ? props.z : 2.0;
@@ -2200,6 +2260,7 @@ class Pedestrian {
         this.panicTimer = Math.max(this.panicTimer || 0, duration + 1.5);
     }
 }
+Pedestrian._nextId = 1;
 
 /* ============================================================================
    1997 GTA 1 TRAFFIC MANAGER (TrafficManager.cpp)
@@ -2217,36 +2278,75 @@ class TrafficManager {
         this.maxTrafficPeds = 38;
         this.carsMaxDistanceBlocks = 5; // mTrafficGenCarsMaxDistance
         this.pedsMaxDistanceBlocks = 4; // mTrafficGenPedsMaxDistance
+        this._spawnPlayerCursor = 0;
+        this._trafficSeq = 1;
     }
 
-    updateTraffic(dt) {
-        this.lastGenCarsTime += dt;
-        this.lastGenPedsTime += dt;
-
+    getAllHumanPlayerViewports() {
         const game = this.game;
         const renderer = game.renderer;
         const map = game.map;
-        if (!map || !map.cmpLoaded) return;
-
-        const camX = renderer ? renderer.camX : game.player.x;
-        const camY = renderer ? renderer.camY : game.player.y;
-        const camZ = renderer ? renderer.camZBlocks : (game.player.z || 2.0);
         const canvasW = renderer && renderer.canvas ? renderer.canvas.width : 1280;
         const canvasH = renderer && renderer.canvas ? renderer.canvas.height : 720;
         const camDist = renderer ? (renderer.followHeightBlocks + renderer.zoomOffsetBlocks) : 5.0;
 
-        const onScreenArea = map.getOnScreenMapArea(camX, camY, camZ, canvasW, canvasH, camDist);
+        const camX = renderer ? renderer.camX : game.player.x;
+        const camY = renderer ? renderer.camY : game.player.y;
+        const camZ = renderer ? renderer.camZBlocks : (game.player.z || 2.0);
+        const list = [{
+            x: camX,
+            y: camY,
+            z: camZ,
+            area: map.getOnScreenMapArea(camX, camY, camZ, canvasW, canvasH, camDist)
+        }];
+
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            for (const rp of game.net.remotePlayers.values()) {
+                if (rp.isBot) continue;
+                const rz = rp.z !== undefined ? rp.z : 2.0;
+                list.push({
+                    x: rp.x,
+                    y: rp.y,
+                    z: rz,
+                    area: map.getOnScreenMapArea(rp.x, rp.y, rz, 1280, 720, 5.0)
+                });
+            }
+        }
+        return list;
+    }
+
+    updateTraffic(dt) {
+        const game = this.game;
+        if (
+            game &&
+            game.net &&
+            typeof game.net.isClientWorldSyncActive === "function" &&
+            game.net.isClientWorldSyncActive()
+        ) {
+            return;
+        }
+
+        this.lastGenCarsTime += dt;
+        this.lastGenPedsTime += dt;
+
+        const map = game.map;
+        if (!map || !map.cmpLoaded) return;
+
+        const viewports = this.getAllHumanPlayerViewports();
+        const vp = viewports[this._spawnPlayerCursor % viewports.length];
 
         if (this.lastGenCarsTime >= this.genCarsCooldown) {
             this.lastGenCarsTime = 0;
-            this.removeOffscreenCars(onScreenArea);
-            this.generateTrafficCars(onScreenArea, camZ);
+            this.removeOffscreenCars(viewports);
+            this.generateTrafficCars(vp.area, vp.z);
         }
 
         if (this.lastGenPedsTime >= this.genPedsCooldown) {
             this.lastGenPedsTime = 0;
-            this.removeOffscreenPeds(onScreenArea);
-            this.generateTrafficPeds(onScreenArea, camZ);
+            this._spawnPlayerCursor = (this._spawnPlayerCursor + 1) % Math.max(1, viewports.length);
+            const pedVp = viewports[this._spawnPlayerCursor % viewports.length];
+            this.removeOffscreenPeds(viewports);
+            this.generateTrafficPeds(pedVp.area, pedVp.z, pedVp.x, pedVp.y);
         }
     }
 
@@ -2263,23 +2363,27 @@ class TrafficManager {
         };
     }
 
-    removeOffscreenCars(onScreenArea) {
+    removeOffscreenCars(viewports) {
         const game = this.game;
-        if (game.vehicles.length <= 24) return;
-        const outerRect = this.expandRect(onScreenArea, this.carsMaxDistanceBlocks + 2);
+        const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
+        const minKeep = 24 + (vps.length - 1) * 10;
+        if (game.vehicles.length <= minKeep) return;
+        const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
 
         for (let i = game.vehicles.length - 1; i >= 0; i--) {
             const v = game.vehicles[i];
+            const anyWanted = game.wantedLevel > 0 || (game.net && typeof game.net.getMaxWantedLevel === "function" && game.net.getMaxWantedLevel() > 0);
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
-                (game.wantedLevel === 0 && v.driver === "AI_COP");
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag) continue;
+                (!anyWanted && v.driver === "AI_COP");
+            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE") continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
-            if (!this.isPointInRect(bx, by, outerRect)) {
+            const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
+            if (!nearAnyPlayer) {
                 game.vehicles.splice(i, 1);
-                if (game.vehicles.length <= 24) break;
+                if (game.vehicles.length <= minKeep) break;
             }
         }
     }
@@ -2375,7 +2479,7 @@ class TrafficManager {
             const vz = map.getHeightAtPixel(vx, vy, 4.0);
             const roadAngle = dirs[Math.floor(Math.random() * dirs.length)].angle;
             const spec = specPool[Math.floor(Math.random() * specPool.length)];
-            const newCar = new Vehicle(`traffic_${Date.now()}_${attempt}`, spec, vx, vy, roadAngle);
+            const newCar = new Vehicle(`trf_${++this._trafficSeq}`, spec, vx, vy, roadAngle);
             newCar.z = vz;
             newCar.driver = "AI_TRAFFIC";
             newCar.speed = 85;
@@ -2386,22 +2490,24 @@ class TrafficManager {
         }
     }
 
-    removeOffscreenPeds(onScreenArea) {
+    removeOffscreenPeds(viewports) {
         const game = this.game;
-        const outerRect = this.expandRect(onScreenArea, this.pedsMaxDistanceBlocks + 2);
+        const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
+        const outerRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 2));
 
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
             if (ped.kind !== "CIVILIAN" || ped.missionTag) continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
-            if (!this.isPointInRect(bx, by, outerRect)) {
+            const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
+            if (!nearAnyPlayer) {
                 game.peds.splice(i, 1);
             }
         }
     }
 
-    generateTrafficPeds(onScreenArea, camZ) {
+    generateTrafficPeds(onScreenArea, camZ, refX = null, refY = null) {
         const game = this.game;
         const map = game.map;
         const outerRect = this.expandRect(onScreenArea, this.pedsMaxDistanceBlocks);
@@ -2422,8 +2528,8 @@ class TrafficManager {
         // If nearby pedestrian density is low (< 18), also allow sidewalk tiles on screen at least 170px from the player
         // so fast driving or teleporting into a district immediately shows bustling sidewalks.
         const allowEdgeOnScreen = nearbyPeds < 18;
-        const px = game.player ? game.player.x : 0;
-        const py = game.player ? game.player.y : 0;
+        const px = refX !== null ? refX : (game.player ? game.player.x : 0);
+        const py = refY !== null ? refY : (game.player ? game.player.y : 0);
         const candidates = [];
 
         for (let by = outerRect.minY; by <= outerRect.maxY; by++) {

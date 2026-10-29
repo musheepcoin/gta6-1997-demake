@@ -3735,6 +3735,7 @@ class RetroRenderer {
                     continue;
                 }
                 if (rp.veh) {
+                    if (rp._linkedWorldVeh) continue;
                     const rv = rp.veh;
                     const mapInfo = this.getVehicleG24Mapping(rv);
                     const vehEntry = this.vehicleBySprIdx ? this.vehicleBySprIdx[mapInfo.sprId] : null;
@@ -4002,7 +4003,7 @@ class RetroRenderer {
                     const bikerTypes = ["gang", "gang", "civ0", "civ1", "civ2", "civ3"];
                     const riderPedType = v.driver === "PLAYER"
                         ? (p.pedType || "lucia")
-                        : (v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length]);
+                        : (v.driver === "REMOTE" ? (v.remotePedType || "gang") : (v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length]));
                     const riderFrame = (v.doorOpenTimer || 0) > 0
                         ? (80 + Math.min(3, Math.floor((1.0 - v.doorOpenTimer / 0.48) * 4)))
                         : 84; // Frame 84 = sitting_on_bike in ped_animations.json
@@ -4047,7 +4048,7 @@ class RetroRenderer {
                     const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
                     const drvPedType = v.driver === "PLAYER"
                         ? (p.pedType || "lucia")
-                        : (v.driver === "AI_COP" ? "police" : civTypes[idHash % civTypes.length]);
+                        : (v.driver === "REMOTE" ? (v.remotePedType || "gang") : (v.driver === "AI_COP" ? "police" : civTypes[idHash % civTypes.length]));
                     const isCenterSeat = v.specKey === "MICRO_KART" || v.specKey === "AIRBOAT";
                     const latOff = isCenterSeat ? 0 : -4.5;
                     const longOff = -2.0;
