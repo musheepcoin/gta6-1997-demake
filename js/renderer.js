@@ -55,6 +55,8 @@ class RetroRenderer {
         this.nycOverviewReady = false;
         this.viceOverviewImg = new Image();
         this.viceOverviewReady = false;
+        this.charPortraitsImg = new Image();
+        this.charPortraitsReady = false;
         this.minimapZoomMode = 0; // 0 = Cruise (68 blocks), 1 = Wide (136 blocks), 2 = Full Island (256 blocks)
 
         // Offscreen WebGL 3D Canvas for true perspective CityMesh + 3D SpriteBatch rendering
@@ -911,6 +913,13 @@ class RetroRenderer {
         loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
             this.nycOverviewReady = true;
             this.bakeRadarBackground();
+        });
+
+        loadImageWithRetry(this.charPortraitsImg, "assets/gta1/gta1_char_portraits.png?v=98_23", () => {
+            this.charPortraitsReady = true;
+            if (window.game && typeof window.game.renderPortraits === "function") {
+                window.game.renderPortraits();
+            }
         });
 
         fetchWithRetry("assets/gta1/gta1_meta.json?v=98_11", false)
@@ -5448,7 +5457,62 @@ class RetroRenderer {
        ======================================================================== */
     drawPixelPortraitRect(ctx, rx, ry, rw, rh, character = "LUCIA", opts = {}) {
         ctx.save();
-        // 24x24 pixel-art grid scaled to (rw, rh)
+
+        // 1. Authentic 1997 GTA 1 UK PlayStation Cover-Art Gouache Portrait Atlas (3x3 Grid)
+        const charGridIndex = {
+            LUCIA: 0,
+            JASON: 1,
+            TOMMY: 2,
+            TREVOR: 3,
+            CJ: 4,
+            NIKO: 5,
+            CLAUDE: 6,
+            BIGSMOKE: 7,
+            CROCKETT: 8,
+            DETECTIVE: 8
+        };
+        const upperChar = String(character || "LUCIA").toUpperCase();
+        if (this.charPortraitsReady && this.charPortraitsImg && this.charPortraitsImg.width > 0 && charGridIndex[upperChar] !== undefined) {
+            const idx = charGridIndex[upperChar];
+            const col = idx % 3;
+            const row = Math.floor(idx / 3);
+            const cellW = this.charPortraitsImg.width / 3;
+            const cellH = this.charPortraitsImg.height / 3;
+            const padX = cellW * 0.018;
+            const padY = cellH * 0.018;
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(
+                this.charPortraitsImg,
+                col * cellW + padX,
+                row * cellH + padY,
+                cellW - padX * 2,
+                cellH - padY * 2,
+                rx,
+                ry,
+                rw,
+                rh
+            );
+
+            if (opts.bandana && upperChar === "LUCIA") {
+                // Red Heist Bandana overlay ([B] key)
+                ctx.fillStyle = "rgba(185, 28, 28, 0.85)";
+                ctx.fillRect(rx + rw * 0.28, ry + rh * 0.56, rw * 0.44, rh * 0.22);
+            }
+
+            // Authentic 1997 GTA 1 Cover-Art Double Poster Frame (warm parchment inner + burnt-orange outer)
+            ctx.strokeStyle = opts.alert ? "#ff1e38" : "#d97706";
+            ctx.lineWidth = Math.max(2, rw * 0.035);
+            ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
+            ctx.strokeStyle = "rgba(247, 238, 214, 0.55)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(rx + 3, ry + 3, rw - 6, rh - 6);
+            ctx.restore();
+            return;
+        }
+
+        // Fallback 24x24 pixel-art grid scaled to (rw, rh) while atlas loads
         const G = 24;
         const px = rw / G;
         const py = rh / G;
@@ -5673,7 +5737,8 @@ class RetroRenderer {
     drawCharacterPortrait(canvasEl, character = "LUCIA", opts = {}) {
         if (!canvasEl) return;
         const ctx = canvasEl.getContext("2d");
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         this.drawPixelPortraitRect(ctx, 0, 0, canvasEl.width, canvasEl.height, character, opts);
     }
 

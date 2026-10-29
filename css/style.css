@@ -120,7 +120,7 @@ html, body {
     width: 44px;
     height: 36px;
     display: block;
-    image-rendering: pixelated;
+    image-rendering: auto;
 }
 
 .char-badge-footer {
@@ -686,10 +686,12 @@ html, body {
 }
 
 .mugshot-card canvas {
-    width: 48px;
-    height: 48px;
-    border: 1px solid var(--vice-cyan);
-    image-rendering: pixelated;
+    width: 58px;
+    height: 58px;
+    border: 2px solid #d97706;
+    border-radius: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+    image-rendering: auto;
     flex-shrink: 0;
 }
 
