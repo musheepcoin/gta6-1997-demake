@@ -55,7 +55,9 @@ class RetroAudioEngine {
 
         this.currentStationIdx = 0;
         this.inVehicle = false;
-        this.ytRadioPlaying = true;
+        this.ytRadioPlaying = false;
+        this.musicEnabled = true;
+        this.musicVolume = 0.28;
         this.stepIdx = 0;
         this.nextNoteTime = 0;
 
@@ -275,9 +277,9 @@ class RetroAudioEngine {
             }
         }
 
-        // 5. Sequencer for In-Car Radio Station (disabled when YouTube Radio Deck is playing!)
+        // 5. Sequencer for Vice City Synth Radio Soundtrack (plays on mobile/fallback whenever YouTube stream is not actively playing!)
         const st = this.stations[this.currentStationIdx];
-        if (!this.ytRadioPlaying && this.inVehicle && st && st.bassNotes.length > 0) {
+        if (this.musicEnabled && !this.ytRadioPlaying && st && st.bassNotes.length > 0) {
             const stepDur = (60 / st.bpm) / 2; // eighth notes
             if (now >= this.nextNoteTime) {
                 this.playRadioStep(st, this.stepIdx, stepDur);
@@ -290,8 +292,9 @@ class RetroAudioEngine {
     }
 
     playRadioStep(st, idx, dur) {
-        if (!this.ctx || this.muted) return;
+        if (!this.ctx || this.muted || !this.musicEnabled) return;
         const now = this.ctx.currentTime;
+        const volMult = Math.max(0.15, Math.min(1.5, (this.musicVolume || 0.28) * 2.2));
 
         // Bass note
         const bFreq = st.bassNotes[idx];
@@ -300,7 +303,7 @@ class RetroAudioEngine {
             const g = this.ctx.createGain();
             osc.type = "sawtooth";
             osc.frequency.setValueAtTime(bFreq, now);
-            g.gain.setValueAtTime(0.032, now);
+            g.gain.setValueAtTime(0.036 * volMult, now);
             g.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.85);
             osc.connect(g);
             g.connect(this.ctx.destination);
@@ -315,7 +318,7 @@ class RetroAudioEngine {
             const g = this.ctx.createGain();
             osc.type = st.wave;
             osc.frequency.setValueAtTime(lFreq, now);
-            g.gain.setValueAtTime(0.02, now);
+            g.gain.setValueAtTime(0.024 * volMult, now);
             g.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.4);
             osc.connect(g);
             g.connect(this.ctx.destination);

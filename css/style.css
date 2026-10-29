@@ -1126,15 +1126,15 @@ html, body {
    AUDIO-ONLY 1997 VICE CITY / GTA 6 CAR STEREO TUNER (NO VIDEO DISPLAY)
    ============================================================================ */
 #yt-radio-widget {
-    position: absolute;
+    position: fixed;
+    left: 0;
     bottom: 0;
-    right: 0;
-    width: 1px;
-    height: 1px;
-    opacity: 0.001;
+    width: 200px;
+    height: 200px;
+    opacity: 0.002;
     pointer-events: none;
     overflow: hidden;
-    z-index: -1;
+    z-index: 0;
 }
 
 .yt-radio-header {
@@ -1247,21 +1247,22 @@ html, body {
     height: 10px;
 }
 
-/* Keep the audio stream engine strictly invisible (no video display allowed) */
+/* Keep the audio stream engine strictly invisible to the eye while >=200x200 in-viewport so mobile browsers never auto-pause it */
 .yt-hidden-audio-engine {
     position: fixed;
-    right: -9999px;
-    bottom: -9999px;
-    width: 1px;
-    height: 1px;
-    opacity: 0.001;
+    left: 0;
+    bottom: 0;
+    width: 200px;
+    height: 200px;
+    opacity: 0.002;
     pointer-events: none;
     overflow: hidden;
+    z-index: 0;
 }
 
 #yt-player-iframe {
-    width: 1px;
-    height: 1px;
+    width: 200px;
+    height: 200px;
     border: 0;
 }
 
