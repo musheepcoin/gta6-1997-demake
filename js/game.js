@@ -953,11 +953,13 @@ class LeonidaGame {
         });
 
         this.canvas.addEventListener("mousemove", (e) => {
+            if (document.body && document.body.classList.contains("touch-enabled")) return;
             this.input.mouseX = e.clientX;
             this.input.mouseY = e.clientY;
         });
 
         this.canvas.addEventListener("mousedown", (e) => {
+            if (document.body && document.body.classList.contains("touch-enabled")) return;
             if (e.button === 0) {
                 this.audio.resume();
                 if (this.renderer && this.renderer.handleCheatsClick(e.clientX, e.clientY, this)) {
@@ -969,6 +971,7 @@ class LeonidaGame {
         });
 
         window.addEventListener("mouseup", (e) => {
+            if (document.body && document.body.classList.contains("touch-enabled")) return;
             if (e.button === 0) {
                 this.input.shoot = false;
                 this.player.mouseShoot = false;
@@ -1104,11 +1107,17 @@ class LeonidaGame {
             const normY = ky / maxRadius;
             const mag = Math.min(1.0, dist / maxRadius);
 
-            this.input.joyActive = mag > 0.14;
+            this.input.joyActive = mag > 0.12;
             this.input.joyX = normX;
             this.input.joyY = normY;
             this.input.joyMag = mag;
             this.input.joyWasUsed = true;
+            if (mag > 0.10) {
+                this.input.joyAngle = angle;
+                if (this.player && !this.player.inVehicle) {
+                    this.player.angle = angle;
+                }
+            }
 
             if (this.player && this.player.inVehicle) {
                 // Direct 360° pedestrian-like vehicle control is handled directly in Vehicle.update via joyX/joyY
@@ -2917,10 +2926,10 @@ class LeonidaGame {
                 p.jumpZOffset = 0;
             }
 
-            // Aim toward mouse cursor when firing with mouse, or straight along p.angle in GTA 1 Tank Controls!
+            // Aim toward mouse cursor only when actively firing with desktop mouse; otherwise aim straight along stick / player angle!
             const pScreen = this.renderer.worldToScreen(p.x, p.y, p.z || 2.0);
             const mouseAimAngle = Math.atan2(this.input.mouseY - pScreen.y, this.input.mouseX - pScreen.x);
-            const shotAngle = (!p.inVehicle && p.tankControls && !p.mouseShoot) ? p.angle : mouseAimAngle;
+            const useMouseAim = Boolean(p.mouseShoot && !this.input.joyActive && !this.input.joyWasUsed);
 
             if (p.inVehicle) {
                 const v = p.inVehicle;
@@ -2931,7 +2940,9 @@ class LeonidaGame {
                 p.angle = v.angle;
                 p.isMoving = false;
                 if (v.hasTurret) {
-                    v.turretAngle = mouseAimAngle;
+                    v.turretAngle = (this.input.joyActive && typeof this.input.joyAngle === "number")
+                        ? this.input.joyAngle
+                        : (useMouseAim ? mouseAimAngle : v.angle);
                 }
                 if (this.jason && this.jason.inVehicle === v) {
                     this.jason.x = v.x;
@@ -3036,7 +3047,7 @@ class LeonidaGame {
                     } else {
                         p.isMoving = false;
                     }
-                    if (this.input.shoot && p.mouseShoot) {
+                    if (this.input.shoot && useMouseAim) {
                         p.angle = mouseAimAngle;
                     }
                 } else {
@@ -3058,7 +3069,7 @@ class LeonidaGame {
                     } else {
                         p.isMoving = false;
                     }
-                    if (this.input.shoot) {
+                    if (this.input.shoot && useMouseAim) {
                         p.angle = mouseAimAngle;
                     }
                 }
@@ -3081,6 +3092,9 @@ class LeonidaGame {
 
             // On-Foot & Drive-By Shooting:
             // On foot -> fire equipped weapon; In Tank -> fire Rocket Cannon; In normal vehicle -> Drive-By UZI / PISTOL!
+            const shotAngle = (this.input.joyActive && typeof this.input.joyAngle === "number")
+                ? this.input.joyAngle
+                : (useMouseAim ? mouseAimAngle : p.angle);
             p.shootCooldown -= dt;
             if ((p.playerCombatTimer || 0) > 0) {
                 p.playerCombatTimer = Math.max(0, p.playerCombatTimer - dt);
