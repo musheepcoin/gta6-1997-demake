@@ -193,14 +193,12 @@ class RetroRenderer {
                 float mid = aNoise(p * 4.0 + 13.0);
                 float grain = aHash(floor(p * 40.0));
                 float fine = aHash(floor(p * 96.0) + 19.0);
-                vec3 base = mix(vec3(0.215, 0.255, 0.285), vec3(0.170, 0.190, 0.225), darkFamily);
-                vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
+                vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
+                vec3 col = base * (0.93 + big * 0.08 + mid * 0.06);
                 col *= 0.94 + grain * 0.05 + fine * 0.08;
                 col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);           // light aggregate stones
                 float tar = smoothstep(0.66, 0.80, aNoise(p * 0.7 + 31.0));
-                col *= 1.0 - tar * 0.13;                                         // dark resealed tar patches
-                float seam = 1.0 - smoothstep(0.0, 0.022, abs(aNoise(p * 1.1 + 57.0) - 0.5));
-                col *= 1.0 - seam * 0.12 * step(0.68, aNoise(p * 0.3 + 3.0));    // sparse thin repaired cracks
+                col *= 1.0 - tar * 0.08;                                         // faint resealed tar patches
 
                 // Crisp, slightly worn paint keeping the original lane colours
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
@@ -266,9 +264,19 @@ class RetroRenderer {
                         float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
                         float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.88);
                         float totalShade = clamp(max(bldShadow * 0.94, bldAO * 0.72), 0.0, 1.0);
+                        if (isRoad) {
+                            // The 2-texel-per-tile lightmap paints blurry light/dark squares on wide asphalt
+                            // (bright junction box vs. shaded lanes): keep only a faint, neutral hint of it on roads.
+                            bldAO *= 0.12;
+                            totalShade *= 0.30;
+                        }
 
                         vec3 sunlitTint = mix(vec3(1.13, 1.06, 0.92), vec3(1.03, 1.01, 0.97), sandMask);
                         vec3 shadowTint = mix(vec3(0.56, 0.65, 0.84), vec3(0.92, 0.88, 0.80), sandMask);
+                        if (isRoad) {
+                            sunlitTint = vec3(1.06, 1.05, 1.02);
+                            shadowTint = vec3(0.72, 0.76, 0.86);
+                        }
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
                         float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.035, 0.0, 0.10);
                         vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
@@ -4054,9 +4062,10 @@ class RetroRenderer {
         // 1. Warm Golden-Ivory Florida Solar Radiance Field (lifts flat textures with natural sun warmth)
         ctx.globalCompositeOperation = "screen";
         const sunGrad = ctx.createRadialGradient(sunX, sunY, maxDim * 0.04, sunX, sunY, maxDim * 1.05);
-        sunGrad.addColorStop(0.0, `rgba(255, 238, 184, ${(0.20 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(0.42, `rgba(255, 218, 148, ${(0.10 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(0.78, `rgba(255, 200, 128, ${(0.04 * dayInt).toFixed(3)})`);
+        // (kept faint: a strong full-screen "screen" lift washed dark asphalt into milky grey blotches)
+        sunGrad.addColorStop(0.0, `rgba(255, 238, 184, ${(0.08 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(0.42, `rgba(255, 218, 148, ${(0.04 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(0.78, `rgba(255, 200, 128, ${(0.015 * dayInt).toFixed(3)})`);
         sunGrad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
         ctx.fillStyle = sunGrad;
         ctx.fillRect(0, 0, W, H);
@@ -4077,8 +4086,9 @@ class RetroRenderer {
             ctx.scale(lenR, widR);
 
             const rg = ctx.createRadialGradient(0.55, 0.0, 0.02, 0.55, 0.0, 0.65);
-            const a0 = (0.045 * dayInt * rayWave).toFixed(4);
-            const a1 = (0.020 * dayInt * rayWave).toFixed(4);
+            // Very faint: brighter beams read as moving light smudges/squares on the top-down asphalt
+            const a0 = (0.010 * dayInt * rayWave).toFixed(4);
+            const a1 = (0.004 * dayInt * rayWave).toFixed(4);
             rg.addColorStop(0.0, `rgba(255, 244, 198, ${a0})`);
             rg.addColorStop(0.50, `rgba(255, 224, 154, ${a1})`);
             rg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
