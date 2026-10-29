@@ -9,47 +9,83 @@ class RetroAudioEngine {
         this.muted = false;
         this.initialized = false;
 
-        // Radio stations
+        // 4 Full 16-Step 1997 Vice City / GTA 1 Multi-Track Synthwave Radio Stations (Bass + Lead + Chord Arp + 80s Drum Groove)
         this.stations = [
             {
                 name: "FLASH FM LEONIDA 97.1",
-                genre: "Vice Synthwave",
-                bpm: 122,
-                bassNotes: [110, 110, 146.83, 146.83, 130.81, 130.81, 98, 110],
-                leadNotes: [440, 523.25, 659.25, 587.33, 523.25, 440, 392, 523.25],
+                genre: "Vice Outrun Synthwave",
+                bpm: 124,
+                bassNotes: [
+                    110.0, 110.0, 220.0, 110.0, 110.0, 110.0, 220.0, 110.0,
+                    87.31, 87.31, 174.61, 87.31, 98.0, 98.0, 196.0, 98.0
+                ],
+                leadNotes: [
+                    440.0, 0, 523.25, 659.25, 587.33, 0, 523.25, 440.0,
+                    349.23, 0, 440.0, 523.25, 493.88, 0, 392.0, 493.88
+                ],
+                arpNotes: [
+                    220.0, 261.63, 329.63, 261.63, 220.0, 261.63, 329.63, 261.63,
+                    174.61, 220.0, 261.63, 220.0, 196.0, 246.94, 293.66, 246.94
+                ],
+                drums: [1, 3, 2, 3, 1, 3, 2, 3, 1, 3, 2, 3, 1, 1, 2, 3], // 1:Kick, 2:Snare+Hat, 3:Hat
                 wave: "sawtooth"
             },
             {
                 name: "CALIENTE 98.3 MIAMI",
-                genre: "Leonida Latin Bass",
-                bpm: 112,
-                bassNotes: [82.41, 0, 82.41, 98.0, 110.0, 0, 98.0, 82.41],
-                leadNotes: [329.63, 392.0, 440.0, 392.0, 493.88, 440.0, 392.0, 329.63],
+                genre: "Leonida Latin Electro-Bass",
+                bpm: 118,
+                bassNotes: [
+                    82.41, 0, 164.81, 82.41, 98.0, 0, 110.0, 98.0,
+                    73.42, 0, 146.83, 73.42, 82.41, 98.0, 110.0, 123.47
+                ],
+                leadNotes: [
+                    329.63, 392.0, 493.88, 0, 440.0, 392.0, 329.63, 0,
+                    293.66, 349.23, 440.0, 392.0, 329.63, 0, 392.0, 329.63
+                ],
+                arpNotes: [
+                    164.81, 196.0, 246.94, 196.0, 196.0, 246.94, 293.66, 246.94,
+                    146.83, 174.61, 220.0, 174.61, 164.81, 196.0, 246.94, 196.0
+                ],
+                drums: [1, 3, 2, 1, 3, 1, 2, 3, 1, 3, 2, 1, 3, 1, 2, 3],
                 wave: "square"
             },
             {
-                name: "GELLHORN GARAGE 104.5",
-                genre: "Dirty Industrial Rock",
-                bpm: 136,
-                bassNotes: [73.42, 73.42, 87.31, 73.42, 65.41, 65.41, 82.41, 73.42],
-                leadNotes: [293.66, 0, 349.23, 293.66, 261.63, 0, 329.63, 293.66],
+                name: "OCEAN DRIVE BOOGIE 101.9",
+                genre: "Sunset Coast Italo-Disco",
+                bpm: 120,
+                bassNotes: [
+                    130.81, 261.63, 130.81, 261.63, 98.0, 196.0, 98.0, 196.0,
+                    110.0, 220.0, 110.0, 220.0, 87.31, 174.61, 98.0, 196.0
+                ],
+                leadNotes: [
+                    523.25, 0, 659.25, 587.33, 493.88, 0, 392.0, 493.88,
+                    440.0, 0, 523.25, 440.0, 349.23, 392.0, 440.0, 493.88
+                ],
+                arpNotes: [
+                    261.63, 329.63, 392.0, 329.63, 196.0, 246.94, 293.66, 246.94,
+                    220.0, 261.63, 329.63, 261.63, 174.61, 220.0, 246.94, 293.66
+                ],
+                drums: [1, 3, 2, 3, 1, 3, 2, 3, 1, 3, 2, 3, 1, 3, 2, 3],
                 wave: "sawtooth"
             },
             {
-                name: "GRASSRIVERS BAYOU FM",
-                genre: "Dark Swamp Synth",
-                bpm: 94,
-                bassNotes: [65.41, 65.41, 77.78, 77.78, 58.27, 58.27, 65.41, 49.0],
-                leadNotes: [261.63, 311.13, 392.0, 311.13, 233.08, 293.66, 261.63, 196.0],
-                wave: "triangle"
-            },
-            {
-                name: "RADIO OFF (STREET AUDIO)",
-                genre: "Off",
-                bpm: 100,
-                bassNotes: [],
-                leadNotes: [],
-                wave: "sine"
+                name: "GELLHORN GARAGE 104.5",
+                genre: "90s GTA 1 Big Beat & Synth-Rock",
+                bpm: 132,
+                bassNotes: [
+                    73.42, 73.42, 146.83, 73.42, 87.31, 87.31, 98.0, 73.42,
+                    65.41, 65.41, 130.81, 65.41, 82.41, 82.41, 87.31, 73.42
+                ],
+                leadNotes: [
+                    293.66, 349.23, 440.0, 0, 392.0, 349.23, 293.66, 0,
+                    261.63, 329.63, 392.0, 0, 349.23, 329.63, 293.66, 0
+                ],
+                arpNotes: [
+                    146.83, 220.0, 293.66, 220.0, 174.61, 261.63, 293.66, 220.0,
+                    130.81, 196.0, 261.63, 196.0, 164.81, 246.94, 293.66, 220.0
+                ],
+                drums: [1, 1, 2, 3, 3, 1, 2, 3, 1, 1, 2, 3, 1, 3, 2, 2],
+                wave: "sawtooth"
             }
         ];
 
@@ -60,6 +96,8 @@ class RetroAudioEngine {
         this.musicVolume = 0.28;
         this.stepIdx = 0;
         this.nextNoteTime = 0;
+        this._unlockedBuffer = false;
+        this._schedulerTimer = null;
 
         // Continuous oscillators & ambient environmental buses
         this.engineOsc = null;
@@ -102,6 +140,33 @@ class RetroAudioEngine {
             this.sfxMasterGain = this.ctx.createGain();
             this.sfxMasterGain.gain.value = 4.5;
             this.sfxMasterGain.connect(this.sfxCompressor);
+
+            // Dedicated Music Radio Bus + Pre-generated White Noise Buffer for 80s Drum Machine (Snare & Hi-Hats)
+            this.musicMasterGain = this.ctx.createGain();
+            this.musicMasterGain.gain.value = 1.45;
+            this.musicMasterGain.connect(this.sfxCompressor);
+
+            const drumLen = Math.floor(this.ctx.sampleRate * 0.25);
+            this.drumNoiseBuf = this.ctx.createBuffer(1, drumLen, this.ctx.sampleRate);
+            const dCh = this.drumNoiseBuf.getChannelData(0);
+            for (let i = 0; i < drumLen; i++) {
+                dCh[i] = Math.random() * 2 - 1;
+            }
+
+            // Auto-recover AudioContext if mobile OS interrupts or suspends it
+            this.ctx.onstatechange = () => {
+                if (this.ctx && this.ctx.state !== "running" && !document.hidden && !this.muted) {
+                    this.ctx.resume().catch(() => {});
+                }
+            };
+            const onVisOrFocus = () => {
+                if (!document.hidden && this.ctx && this.ctx.state !== "running" && !this.muted) {
+                    this.ctx.resume().catch(() => {});
+                }
+            };
+            document.addEventListener("visibilitychange", onVisOrFocus);
+            window.addEventListener("pageshow", onVisOrFocus);
+            window.addEventListener("focus", onVisOrFocus);
 
             // 1. Player Engine continuous hum
             this.engineOsc = this.ctx.createOscillator();
@@ -171,7 +236,10 @@ class RetroAudioEngine {
             this.cityHumGain.connect(this.sfxMasterGain);
             this.cityHumOsc.start();
 
-            this.nextNoteTime = this.ctx.currentTime + 0.05;
+            this.nextNoteTime = this.ctx.currentTime + 0.04;
+            if (!this._schedulerTimer) {
+                this._schedulerTimer = setInterval(() => this._tickMusicScheduler(), 60);
+            }
         } catch (e) {
             console.warn("WebAudio init blocked or unavailable:", e);
         }
@@ -181,10 +249,50 @@ class RetroAudioEngine {
         return this.sfxMasterGain || (this.ctx ? this.ctx.destination : null);
     }
 
+    musicOut() {
+        return this.musicMasterGain || (this.ctx ? this.ctx.destination : null);
+    }
+
     resume() {
         if (!this.initialized) this.init();
-        if (this.ctx && this.ctx.state === "suspended") {
-            this.ctx.resume();
+        if (!this.ctx) return;
+        if (this.ctx.state !== "running") {
+            this.ctx.resume().catch(() => {});
+        }
+        // Mandatory iOS Safari WebKit hardware unlock: play a 1-sample silent buffer synchronously inside user gesture
+        if (!this._unlockedBuffer) {
+            try {
+                const buf = this.ctx.createBuffer(1, 1, 22050);
+                const src = this.ctx.createBufferSource();
+                src.buffer = buf;
+                src.connect(this.ctx.destination);
+                src.start(0);
+                if (this.ctx.state === "running") {
+                    this._unlockedBuffer = true;
+                }
+            } catch (_e) {}
+        }
+        this._tickMusicScheduler();
+    }
+
+    _tickMusicScheduler() {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        if (this.ctx.state !== "running") return;
+
+        const now = this.ctx.currentTime;
+        const st = this.stations[this.currentStationIdx] || this.stations[0];
+        if (this.musicEnabled && !this.ytRadioPlaying && st && st.bassNotes.length > 0) {
+            const stepDur = (60 / st.bpm) / 2; // eighth-note groove steps
+            if (this.nextNoteTime < now - 0.20 || this.nextNoteTime > now + 1.0) {
+                this.nextNoteTime = now + 0.02;
+            }
+            while (this.nextNoteTime < now + 0.16) {
+                this.playRadioStep(st, this.stepIdx, stepDur, this.nextNoteTime);
+                this.stepIdx = (this.stepIdx + 1) % st.bassNotes.length;
+                this.nextNoteTime += stepDur;
+            }
+        } else {
+            this.nextNoteTime = now + 0.06;
         }
     }
 
@@ -195,6 +303,10 @@ class RetroAudioEngine {
     }
 
     getCurrentStation() {
+        return this.stations[this.currentStationIdx];
+    }
+
+    getStation() {
         return this.stations[this.currentStationIdx];
     }
 
@@ -277,53 +389,134 @@ class RetroAudioEngine {
             }
         }
 
-        // 5. Sequencer for Vice City Synth Radio Soundtrack (plays on mobile/fallback whenever YouTube stream is not actively playing!)
-        const st = this.stations[this.currentStationIdx];
-        if (this.musicEnabled && !this.ytRadioPlaying && st && st.bassNotes.length > 0) {
-            const stepDur = (60 / st.bpm) / 2; // eighth notes
-            if (now >= this.nextNoteTime) {
-                this.playRadioStep(st, this.stepIdx, stepDur);
-                this.stepIdx = (this.stepIdx + 1) % st.bassNotes.length;
-                this.nextNoteTime = now + stepDur;
-            }
-        } else {
-            this.nextNoteTime = now + 0.1;
-        }
+        // 5. Sequencer for Vice City Synth Radio Soundtrack (lookahead scheduled so it never drops or cuts out on mobile!)
+        this._tickMusicScheduler();
     }
 
-    playRadioStep(st, idx, dur) {
+    playRadioStep(st, idx, dur, when = null) {
         if (!this.ctx || this.muted || !this.musicEnabled) return;
-        const now = this.ctx.currentTime;
-        const volMult = Math.max(0.15, Math.min(1.5, (this.musicVolume || 0.28) * 2.2));
+        const t = when !== null ? Math.max(this.ctx.currentTime, when) : this.ctx.currentTime;
+        const volMult = Math.max(0.20, Math.min(1.8, (this.musicVolume || 0.28) * 2.5));
+        const dest = this.musicOut();
 
-        // Bass note
-        const bFreq = st.bassNotes[idx];
-        if (bFreq > 0) {
-            const osc = this.ctx.createOscillator();
-            const g = this.ctx.createGain();
-            osc.type = "sawtooth";
-            osc.frequency.setValueAtTime(bFreq, now);
-            g.gain.setValueAtTime(0.036 * volMult, now);
-            g.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.85);
-            osc.connect(g);
-            g.connect(this.ctx.destination);
-            osc.start(now);
-            osc.stop(now + dur * 0.9);
+        // 1. 1980s LinnDrum / 808 Drum Machine Groove (Kick + Gated Snare + Hi-Hat)
+        const drumCode = st.drums ? st.drums[idx % st.drums.length] : ((idx % 2 === 0) ? 1 : 3);
+        if (drumCode === 1) {
+            // Punchy 80s Synthwave Kick Drum
+            const kOsc = this.ctx.createOscillator();
+            const kGain = this.ctx.createGain();
+            kOsc.type = "sine";
+            kOsc.frequency.setValueAtTime(135, t);
+            kOsc.frequency.exponentialRampToValueAtTime(42, t + 0.11);
+            kGain.gain.setValueAtTime(0.16 * volMult, t);
+            kGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+            kOsc.connect(kGain);
+            kGain.connect(dest);
+            kOsc.start(t);
+            kOsc.stop(t + 0.15);
+        } else if (drumCode === 2) {
+            // Gated 80s Reverb Snare (Body tone + Bandpass Noise Burst)
+            const sOsc = this.ctx.createOscillator();
+            const sGain = this.ctx.createGain();
+            sOsc.type = "triangle";
+            sOsc.frequency.setValueAtTime(195, t);
+            sOsc.frequency.exponentialRampToValueAtTime(95, t + 0.08);
+            sGain.gain.setValueAtTime(0.085 * volMult, t);
+            sGain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+            sOsc.connect(sGain);
+            sGain.connect(dest);
+            sOsc.start(t);
+            sOsc.stop(t + 0.11);
+
+            if (this.drumNoiseBuf) {
+                const nSrc = this.ctx.createBufferSource();
+                nSrc.buffer = this.drumNoiseBuf;
+                const nFilt = this.ctx.createBiquadFilter();
+                nFilt.type = "bandpass";
+                nFilt.frequency.setValueAtTime(1850, t);
+                nFilt.Q.setValueAtTime(0.9, t);
+                const nGain = this.ctx.createGain();
+                nGain.gain.setValueAtTime(0.095 * volMult, t);
+                nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+                nSrc.connect(nFilt);
+                nFilt.connect(nGain);
+                nGain.connect(dest);
+                nSrc.start(t);
+                nSrc.stop(t + 0.15);
+            }
+        }
+        // Crisp 80s Metallic Hi-Hat on every step
+        if (this.drumNoiseBuf) {
+            const hSrc = this.ctx.createBufferSource();
+            hSrc.buffer = this.drumNoiseBuf;
+            const hFilt = this.ctx.createBiquadFilter();
+            hFilt.type = "highpass";
+            hFilt.frequency.setValueAtTime(7200, t);
+            const hGain = this.ctx.createGain();
+            const hatAccent = (idx % 2 === 1) ? 0.042 : 0.022;
+            hGain.gain.setValueAtTime(hatAccent * volMult, t);
+            hGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+            hSrc.connect(hFilt);
+            hFilt.connect(hGain);
+            hGain.connect(dest);
+            hSrc.start(t);
+            hSrc.stop(t + 0.05);
         }
 
-        // Lead synth note
-        const lFreq = st.leadNotes[idx];
-        if (lFreq > 0 && idx % 2 === 0) {
+        // 2. Warm Filtered Analog Synth Bassline
+        const bFreq = st.bassNotes[idx % st.bassNotes.length];
+        if (bFreq > 0) {
             const osc = this.ctx.createOscillator();
+            const filt = this.ctx.createBiquadFilter();
             const g = this.ctx.createGain();
-            osc.type = st.wave;
-            osc.frequency.setValueAtTime(lFreq, now);
-            g.gain.setValueAtTime(0.024 * volMult, now);
-            g.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.4);
-            osc.connect(g);
-            g.connect(this.ctx.destination);
-            osc.start(now);
-            osc.stop(now + dur * 1.5);
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(bFreq, t);
+            filt.type = "lowpass";
+            filt.frequency.setValueAtTime(620, t);
+            filt.frequency.exponentialRampToValueAtTime(190, t + dur * 0.85);
+            g.gain.setValueAtTime(0.095 * volMult, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.90);
+            osc.connect(filt);
+            filt.connect(g);
+            g.connect(dest);
+            osc.start(t);
+            osc.stop(t + dur * 0.92);
+        }
+
+        // 3. Shimmering Vice City Arpeggiator / Chord Pad
+        if (st.arpNotes && st.arpNotes.length > 0) {
+            const aFreq = st.arpNotes[idx % st.arpNotes.length];
+            if (aFreq > 0) {
+                const aOsc = this.ctx.createOscillator();
+                const aGain = this.ctx.createGain();
+                aOsc.type = "triangle";
+                aOsc.frequency.setValueAtTime(aFreq, t);
+                aGain.gain.setValueAtTime(0.048 * volMult, t);
+                aGain.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.95);
+                aOsc.connect(aGain);
+                aGain.connect(dest);
+                aOsc.start(t);
+                aOsc.stop(t + dur);
+            }
+        }
+
+        // 4. Soaring 1986/1997 Vice City Lead Synth Melody
+        const lFreq = st.leadNotes[idx % st.leadNotes.length];
+        if (lFreq > 0) {
+            const osc = this.ctx.createOscillator();
+            const filt = this.ctx.createBiquadFilter();
+            const g = this.ctx.createGain();
+            osc.type = st.wave || "sawtooth";
+            osc.frequency.setValueAtTime(lFreq, t);
+            filt.type = "lowpass";
+            filt.frequency.setValueAtTime(2400, t);
+            g.gain.setValueAtTime(0.062 * volMult, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + dur * 1.45);
+            osc.connect(filt);
+            filt.connect(g);
+            g.connect(dest);
+            osc.start(t);
+            osc.stop(t + dur * 1.5);
         }
     }
 

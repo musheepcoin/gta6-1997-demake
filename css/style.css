@@ -1131,7 +1131,7 @@ html, body {
     bottom: 0;
     width: 200px;
     height: 200px;
-    opacity: 0.002;
+    opacity: 0.01;
     pointer-events: none;
     overflow: hidden;
     z-index: 0;
@@ -1254,7 +1254,7 @@ html, body {
     bottom: 0;
     width: 200px;
     height: 200px;
-    opacity: 0.002;
+    opacity: 1;
     pointer-events: none;
     overflow: hidden;
     z-index: 0;

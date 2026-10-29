@@ -863,13 +863,6 @@ class LeonidaGame {
             // Cycle Radio Station / Skip YouTube Radio Track (R)
             if (code === "KeyR") {
                 this.skipYouTubeRadioTrack();
-                if (this.player.inVehicle) {
-                    const st = this.audio.cycleStation();
-                    this.addFloatingText(this.player.x, this.player.y - 30, `📻 ${st.name}`, "#00f0ff");
-                    this.updateHud();
-                } else {
-                    this.addFloatingText(this.player.x, this.player.y - 30, "📻 VICE FM: NEXT TRACK", "#00f0ff");
-                }
             }
 
             // Cycle Weapon (Tab or X)
@@ -1271,20 +1264,43 @@ class LeonidaGame {
         this.ytVolume = 28;
         this.ytActuallyPlaying = false;
         this._lastYtKickMs = 0;
+        this._lastYtTime = -1;
+        this._lastYtProgressMs = 0;
+        this.isMobileAudioMode = Boolean(
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+            /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")
+        );
+
         const toggleBtn = document.getElementById("yt-btn-toggle");
         const skipBtn = document.getElementById("yt-btn-skip");
         const volSlider = document.getElementById("yt-vol-slider");
         const iframe = document.getElementById("yt-player-iframe");
 
+        // On mobile/touch devices, cross-origin hidden YouTube iframes either stay muted (iOS WebKit)
+        // or get paused after ~5s by Android Chrome's Video Occlusion Tracker while muting WebAudio
+        // and fighting AVAudioSession/AudioFocus. Disable the hidden iframe on mobile so our 4-station
+        // multi-track 1997 WebAudio Synthwave Radio plays 100% natively without ever cutting out!
+        if (this.isMobileAudioMode) {
+            if (iframe) {
+                try {
+                    iframe.removeAttribute("src");
+                    iframe.src = "about:blank";
+                } catch (_e) {}
+            }
+            if (this.audio) {
+                this.audio.ytRadioPlaying = false;
+            }
+        }
+
         const subscribeYtEvents = () => {
-            if (!iframe || !iframe.contentWindow) return;
+            if (this.isMobileAudioMode || !iframe || !iframe.contentWindow) return;
             try {
                 iframe.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*");
             } catch (_e) {}
         };
 
         const tryAutoStart = () => {
-            if (!this.ytMusicEnabled) return;
+            if (this.isMobileAudioMode || !this.ytMusicEnabled) return;
             subscribeYtEvents();
             const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
             this.sendYouTubeCommand("unMute", []);
@@ -1292,46 +1308,47 @@ class LeonidaGame {
             this.sendYouTubeCommand("playVideo", []);
         };
 
-        // Listen for YouTube iframe playerState changes so mobile auto-pause is immediately resumed
+        // Listen for YouTube iframe playerState & currentTime advancement on desktop
         window.addEventListener("message", (ev) => {
-            if (!ev || typeof ev.data !== "string") return;
+            if (this.isMobileAudioMode || !ev || typeof ev.data !== "string") return;
             try {
                 const msg = JSON.parse(ev.data);
                 if (!msg) return;
-                const st = (msg.info && typeof msg.info.playerState === "number")
-                    ? msg.info.playerState
+                const info = msg.info && typeof msg.info === "object" ? msg.info : null;
+                const st = (info && typeof info.playerState === "number")
+                    ? info.playerState
                     : (msg.event === "onStateChange" && typeof msg.info === "number" ? msg.info : null);
+
+                if (info && typeof info.currentTime === "number") {
+                    if (this._lastYtTime >= 0 && info.currentTime > this._lastYtTime + 0.05) {
+                        this._lastYtProgressMs = performance.now();
+                    }
+                    this._lastYtTime = info.currentTime;
+                }
+
                 if (st === 1) {
-                    // 1 = PLAYING: YouTube stream is actively playing audio, mute fallback synth radio
-                    this.ytActuallyPlaying = true;
-                    if (this.audio) this.audio.ytRadioPlaying = true;
-                } else if (st === 2 || st === 0 || st === -1 || st === 5) {
-                    // 2 = PAUSED, 0 = ENDED, -1 = UNSTARTED: fallback to WebAudio synth & resume if music enabled
+                    const advancing = (performance.now() - (this._lastYtProgressMs || 0)) < 2500;
+                    const unmuted = !(info && info.muted === true);
+                    this.ytActuallyPlaying = Boolean(advancing && unmuted);
+                    if (this.audio) this.audio.ytRadioPlaying = this.ytActuallyPlaying;
+                } else if (st === 2 || st === 0 || st === -1 || st === 5 || st === 3) {
                     this.ytActuallyPlaying = false;
                     if (this.audio) this.audio.ytRadioPlaying = false;
-                    if (this.ytMusicEnabled && !document.hidden) {
-                        const nowMs = performance.now();
-                        if (nowMs - (this._lastYtKickMs || 0) > 1200) {
-                            this._lastYtKickMs = nowMs;
-                            tryAutoStart();
-                        }
-                    }
                 }
             } catch (_e) {}
         });
 
-        if (iframe) {
+        if (iframe && !this.isMobileAudioMode) {
             iframe.addEventListener("load", () => {
                 setTimeout(tryAutoStart, 250);
                 setTimeout(tryAutoStart, 1000);
-                setTimeout(tryAutoStart, 2200);
             });
         }
 
-        // Start/resume audio on any user gesture (touchstart, touchend, pointerdown, keydown)
+        // Start/resume audio on any user gesture (touchstart, touchend, pointerdown, keydown, click)
         const unlockGesture = () => {
             if (this.audio) this.audio.resume();
-            if (this.ytMusicEnabled && !this.ytActuallyPlaying) {
+            if (!this.isMobileAudioMode && this.ytMusicEnabled && !this.ytActuallyPlaying) {
                 const nowMs = performance.now();
                 if (nowMs - (this._lastYtKickMs || 0) > 1800) {
                     this._lastYtKickMs = nowMs;
@@ -1342,14 +1359,23 @@ class LeonidaGame {
         window.addEventListener("pointerdown", unlockGesture, { passive: true });
         window.addEventListener("touchstart", unlockGesture, { passive: true });
         window.addEventListener("touchend", unlockGesture, { passive: true });
+        window.addEventListener("click", unlockGesture, { passive: true });
         window.addEventListener("keydown", unlockGesture, { passive: true });
 
-        // Periodic mobile watchdog: if music is enabled and tab is visible, keep stream alive
+        // Periodic watchdog: verify WebAudio context stays running and desktop YT stream stays alive
         setInterval(() => {
-            if (this.ytMusicEnabled && !document.hidden && !this.ytActuallyPlaying) {
-                tryAutoStart();
+            if (this.ytMusicEnabled && !document.hidden) {
+                if (this.audio && this.audio.ctx && this.audio.ctx.state !== "running") {
+                    this.audio.resume();
+                }
+                if (!this.isMobileAudioMode && this.ytActuallyPlaying) {
+                    if (performance.now() - (this._lastYtProgressMs || 0) > 3200) {
+                        this.ytActuallyPlaying = false;
+                        if (this.audio) this.audio.ytRadioPlaying = false;
+                    }
+                }
             }
-        }, 3500);
+        }, 2000);
 
         if (toggleBtn) {
             toggleBtn.addEventListener("click", () => {
@@ -1367,7 +1393,12 @@ class LeonidaGame {
             volSlider.addEventListener("input", () => {
                 const vol = parseInt(volSlider.value, 10) || 0;
                 this.ytVolume = vol;
-                if (this.audio) this.audio.musicVolume = vol / 100;
+                if (this.audio) {
+                    this.audio.musicVolume = vol / 100;
+                    if (this.audio.musicMasterGain && this.audio.ctx) {
+                        this.audio.musicMasterGain.gain.setTargetAtTime((vol / 28) * 1.45, this.audio.ctx.currentTime, 0.03);
+                    }
+                }
                 this.sendYouTubeCommand("setVolume", [vol]);
             });
         }
@@ -1387,9 +1418,11 @@ class LeonidaGame {
 
         if (this.ytMusicEnabled) {
             const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
-            this.sendYouTubeCommand("unMute", []);
-            this.sendYouTubeCommand("setVolume", [vol]);
-            this.sendYouTubeCommand("playVideo", []);
+            if (!this.isMobileAudioMode) {
+                this.sendYouTubeCommand("unMute", []);
+                this.sendYouTubeCommand("setVolume", [vol]);
+                this.sendYouTubeCommand("playVideo", []);
+            }
             if (toggleBtn) {
                 toggleBtn.textContent = "🔊 MUSIC: ON";
                 toggleBtn.classList.add("yt-btn-active");
@@ -1399,7 +1432,10 @@ class LeonidaGame {
             if (eq) eq.classList.remove("paused");
         } else {
             this.ytActuallyPlaying = false;
-            this.sendYouTubeCommand("pauseVideo", []);
+            if (this.audio) this.audio.ytRadioPlaying = false;
+            if (!this.isMobileAudioMode) {
+                this.sendYouTubeCommand("pauseVideo", []);
+            }
             if (toggleBtn) {
                 toggleBtn.textContent = "🔇 MUSIC: OFF";
                 toggleBtn.classList.remove("yt-btn-active");
@@ -1411,6 +1447,7 @@ class LeonidaGame {
     }
 
     sendYouTubeCommand(func, args = []) {
+        if (this.isMobileAudioMode) return;
         const iframe = document.getElementById("yt-player-iframe");
         if (!iframe || !iframe.contentWindow) return;
         try {
@@ -1424,17 +1461,28 @@ class LeonidaGame {
     }
 
     skipYouTubeRadioTrack() {
-        // Advance ~3m15s into compilation mixes (or next video if playlist) + cycle WebAudio fallback station
-        this.ytSeekOffset = ((this.ytSeekOffset || 0) + 195) % 3400;
+        // Advance within the 1209s mix duration on desktop + cycle 4-station WebAudio synth radio
+        this.ytSeekOffset = ((this.ytSeekOffset || 0) + 180) % 1080;
         if (!this.ytMusicEnabled) {
             this.setYouTubeMusicEnabled(true);
         }
+        let st = null;
         if (this.audio) {
-            this.audio.cycleStation();
+            this.audio.resume();
+            st = this.audio.cycleStation();
         }
-        this.sendYouTubeCommand("seekTo", [this.ytSeekOffset, true]);
-        this.sendYouTubeCommand("nextVideo", []);
-        this.sendYouTubeCommand("playVideo", []);
+        const titleEl = document.getElementById("yt-radio-title");
+        if (titleEl && st && st.name) {
+            titleEl.textContent = `📻 ${st.name}`;
+        }
+        if (this.player && st && st.name) {
+            this.addFloatingText(this.player.x, this.player.y - 30, `📻 ${st.name}`, "#00f0ff");
+            this.updateHud();
+        }
+        if (!this.isMobileAudioMode) {
+            this.sendYouTubeCommand("seekTo", [this.ytSeekOffset, true]);
+            this.sendYouTubeCommand("playVideo", []);
+        }
         if (this.audio) {
             this.audio.playBeep(680, 0.04, "square", 0.04);
         }
@@ -1445,7 +1493,12 @@ class LeonidaGame {
         const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
         const nextVol = Math.max(0, Math.min(100, curVol + delta));
         this.ytVolume = nextVol;
-        if (this.audio) this.audio.musicVolume = nextVol / 100;
+        if (this.audio) {
+            this.audio.musicVolume = nextVol / 100;
+            if (this.audio.musicMasterGain && this.audio.ctx) {
+                this.audio.musicMasterGain.gain.setTargetAtTime((nextVol / 28) * 1.45, this.audio.ctx.currentTime, 0.03);
+            }
+        }
         if (volSlider) volSlider.value = String(nextVol);
         if (nextVol > 0 && !this.ytMusicEnabled) {
             this.setYouTubeMusicEnabled(true);

@@ -5707,8 +5707,10 @@ class RetroRenderer {
         }
 
         ctx.fillStyle = "#00f0ff";
-        ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
-        ctx.fillText("🎵 VICE CITY FM • RADIO OST", musX + 26, musY + 10.5);
+        ctx.font = "bold 9px -apple-system, 'Segoe UI', sans-serif";
+        const curSt = (game.audio && typeof game.audio.getCurrentStation === "function") ? game.audio.getCurrentStation() : null;
+        const stLabel = (curSt && curSt.name) ? curSt.name : "VICE CITY FM • RADIO OST";
+        ctx.fillText(`🎵 ${stLabel}`, musX + 26, musY + 10.5);
 
         const volSlider = document.getElementById("yt-vol-slider");
         const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (game.ytVolume || 28);
