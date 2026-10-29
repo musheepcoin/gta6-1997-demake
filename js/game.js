@@ -67,22 +67,8 @@ class LeonidaGame {
             pedType: "lucia"
         };
 
-        // GTA 6 Partner AI: Jason Duval (follows Lucia on foot, rides shotgun, and only fires when Lucia fights!)
-        this.jason = {
-            x: 213.5 * TILE_SIZE,
-            y: 144.8 * TILE_SIZE,
-            z: 2.0,
-            angle: 0,
-            recruited: true,
-            inVehicle: null,
-            weaponKey: "FIST",
-            combatAnimTimer: 0,
-            shootCooldown: 0,
-            muzzleTimer: 0,
-            weaponDrawnTimer: 0,
-            walkPhase: 0,
-            isMoving: false
-        };
+        // Partner AI disabled (solo & real multiplayer only)
+        this.jason = null;
 
         // Classic 1997 GTA 1 Score, Multiplier, Lives & Get Out of Jail Free Cards
         this.cash = 500;
@@ -2340,24 +2326,7 @@ class LeonidaGame {
     }
 
     recruitJason() {
-        if (!this.jason) {
-            this.jason = {
-                x: this.player.x + 26,
-                y: this.player.y + 16,
-                z: this.player.z || 2.0,
-                angle: this.player.angle,
-                recruited: true,
-                inVehicle: this.player.inVehicle || null,
-                weaponKey: "PISTOL",
-                shootCooldown: 0,
-                muzzleTimer: 0,
-                walkPhase: 0,
-                isMoving: false
-            };
-        } else {
-            this.jason.recruited = true;
-        }
-        this.addFloatingText(this.player.x, this.player.y - 30, "🤝 JASON PARTNER ACTIVE!", "#00f0ff");
+        this.jason = null;
     }
 
     getNearestWantedTarget(fromX, fromY) {
@@ -3279,84 +3248,7 @@ class LeonidaGame {
             }
         }
 
-        // 2. Jason Partner AI Update (Follows Lucia, boards passenger seat & only fires when Lucia fights!)
-        if (this.jason && !p.dead) {
-            if (this.jason.muzzleTimer > 0) this.jason.muzzleTimer -= dt;
-            if (this.jason.shootCooldown > 0) this.jason.shootCooldown -= dt;
-            if ((this.jason.combatAnimTimer || 0) > 0) {
-                this.jason.combatAnimTimer -= dt;
-                if (this.jason.combatAnimTimer <= 0) {
-                    this.jason.weaponKey = "FIST"; // Holster weapon when not actively shooting!
-                }
-            } else {
-                this.jason.weaponKey = "FIST";
-            }
-
-            // Auto-board passenger seat if Lucia is in a vehicle and Jason is nearby
-            if (p.inVehicle && !this.jason.inVehicle) {
-                const dCar = Math.hypot(p.inVehicle.x - this.jason.x, p.inVehicle.y - this.jason.y);
-                if (dCar < 36) {
-                    this.jason.inVehicle = p.inVehicle;
-                    p.inVehicle.hasJason = true;
-                }
-            }
-
-            if (!this.jason.inVehicle) {
-                const distToLucia = Math.hypot(p.x - this.jason.x, p.y - this.jason.y);
-                // Hysteresis: start moving at > 56px, keep moving smoothly until < 36px (eliminates 60Hz start/stop flicker!)
-                const shouldMove = this.jason.isMoving ? (distToLucia > 36) : (distToLucia > 56);
-                if (shouldMove) {
-                    const targetAng = Math.atan2(p.y - this.jason.y, p.x - this.jason.x);
-                    if ((this.jason.combatAnimTimer || 0) <= 0) {
-                        const diff = Math.atan2(Math.sin(targetAng - this.jason.angle), Math.cos(targetAng - this.jason.angle));
-                        this.jason.angle += diff * Math.min(1, dt * 12);
-                    }
-                    const jRunning = distToLucia > 95 || Boolean(this.input.sprint);
-                    const jSpeed = jRunning ? 190 : 138;
-                    this.jason.x += Math.cos(targetAng) * jSpeed * dt;
-                    this.jason.y += Math.sin(targetAng) * jSpeed * dt;
-                    this.jason.isMoving = true;
-                    this.jason.isRunning = jRunning;
-                    this.jason.walkPhase = (this.jason.walkPhase || 0) + dt * (jRunning ? 1.45 : 1.0);
-                    const jCol = this.map.resolveCircleBuildingCollision(this.jason.x, this.jason.y, 10, this.jason.z || 2.0);
-                    this.jason.x = jCol.x;
-                    this.jason.y = jCol.y;
-                    this.jason.z = this.map.getHeightAtPixel(this.jason.x, this.jason.y, this.jason.z || 2.0);
-                } else {
-                    this.jason.isMoving = false;
-                    this.jason.isRunning = false;
-                }
-            }
-
-            // Jason Combat Wingman AI: ONLY fires when Lucia is actively shooting (playerCombatTimer > 0)
-            // OR when a HOSTILE attacker is right on top of Lucia (< 115px)! Never shoots unprovoked!
-            const playerFighting = (p.playerCombatTimer || 0) > 0;
-            if (this.jason.shootCooldown <= 0) {
-                let nearestThreat = null;
-                let bestThreatDist = playerFighting ? 250 : 115;
-                for (const ped of this.peds) {
-                    if (ped.dead) continue;
-                    const isEnemy =
-                        ped.kind === "HOSTILE" ||
-                        (playerFighting && ped.kind === "COP" && this.wantedLevel > 0);
-                    if (!isEnemy) continue;
-                    const d = Math.hypot(ped.x - this.jason.x, ped.y - this.jason.y);
-                    if (d < bestThreatDist) {
-                        bestThreatDist = d;
-                        nearestThreat = ped;
-                    }
-                }
-                if (nearestThreat) {
-                    const shotAng = Math.atan2(nearestThreat.y - this.jason.y, nearestThreat.x - this.jason.x);
-                    this.jason.angle = shotAng;
-                    this.jason.weaponKey = this.jason.inVehicle ? "UZI" : "PISTOL";
-                    this.jason.combatAnimTimer = 0.65;
-                    this.jason.shootCooldown = 0.48;
-                    this.jason.muzzleTimer = 0.08;
-                    this.fireWeapon(this.jason.x, this.jason.y, shotAng, this.jason.weaponKey, true, true);
-                }
-            }
-        }
+        // 2. Partner AI removed (solo & multiplayer only)
 
         // 3. Update All Vehicles & Collisions
         if ((p.hitByCarCooldown || 0) > 0) {
