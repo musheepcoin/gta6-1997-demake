@@ -458,24 +458,22 @@ class LeonidaMap {
 
         // Populate Official GTA 6 S-Curving Vice Beach Lifeguard Towers, Volleyball Courts, Star Island Pool & Neon Marquees!
         this.beachProps = [
-            // 1. S-Curving Eastern Vice Beach Lifeguard Stands & Sand Volleyball Courts (North Beach -> Mid Beach -> Lummus Park -> South Point)
-            { spr: "lifeguard_neon",   x: 231.5 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 233.5 * TILE_SIZE, y: 44.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 235.5 * TILE_SIZE, y: 62.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 237.5 * TILE_SIZE, y: 74.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 239.5 * TILE_SIZE, y: 88.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 237.5 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 235.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 233.5 * TILE_SIZE, y: 138.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 232.5 * TILE_SIZE, y: 145.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 232.5 * TILE_SIZE, y: 150.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 231.5 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 229.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 227.5 * TILE_SIZE, y: 184.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "volleyball_court", x: 226.5 * TILE_SIZE, y: 46.5 * TILE_SIZE,  z: 1.98, scale: 1.2, angle: 0 },
-            { spr: "volleyball_court", x: 229.5 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 1.98, scale: 1.2, angle: 0 },
-            { spr: "volleyball_court", x: 226.5 * TILE_SIZE, y: 145.5 * TILE_SIZE, z: 1.98, scale: 1.2, angle: 0 },
-            { spr: "volleyball_court", x: 225.5 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 1.98, scale: 1.2, angle: 0 },
+            // 1. Vice Beach Lifeguard Stands (both West/Mid Beach near Lummus Park & East Shoreline near the Atlantic surf!)
+            { spr: "lifeguard_neon",   x: 238.8 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 225.8 * TILE_SIZE, y: 44.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 238.8 * TILE_SIZE, y: 62.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 238.8 * TILE_SIZE, y: 74.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 225.8 * TILE_SIZE, y: 88.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 238.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 238.8 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 225.8 * TILE_SIZE, y: 139.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 225.8 * TILE_SIZE, y: 146.2 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 239.2 * TILE_SIZE, y: 144.0 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 239.2 * TILE_SIZE, y: 149.8 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 225.8 * TILE_SIZE, y: 153.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 239.2 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: 238.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 237.5 * TILE_SIZE, y: 184.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             // 2. Star Island Mansion Central Lagoon Pool (inside Biscayne Bay at 173.0, 105.0)
             { spr: "vercetti_pool",    x: 173.0 * TILE_SIZE, y: 105.0 * TILE_SIZE, z: 1.98, scale: 1.25, angle: 0 },
             // 3. Official GTA 6 Neon Landmark Marquees on the 3D Buildings
@@ -488,30 +486,176 @@ class LeonidaMap {
             { spr: "sign_grassrivers", x: 56.5 * TILE_SIZE,  y: 211.5 * TILE_SIZE, z: 2.25, scale: 1.20, angle: 0 }
         ];
 
-        // Sunbather Beach Towels & Parasols along S-Curving Vice Beach right across from Lummus Park!
-        const eastBeachRowsY = [
-            44.0, 47.5, 50.0,
-            86.5, 90.0, 104.5, 108.5,
-            143.0, 145.0, 147.5, 149.0, 151.0, 152.5, 155.5, 158.0
+        // 3A. Live Animated 3D Beach Volleyball Courts (2v2 Bikini Women & Surfers + Raised 3D Net + Flying Volleyball!)
+        this.beachVolleyballCourts = [
+            { x: 224.2 * TILE_SIZE, y: 46.5 * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_yellow", p2: "bikini_cyan",  p3: "surfer_guy" },
+            { x: 225.2 * TILE_SIZE, y: 86.5 * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: 225.2 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_pink",   p2: "bikini_yellow",p3: "surfer_guy" },
+            { x: 224.0 * TILE_SIZE, y: 137.5 * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_red",    p2: "bikini_white", p3: "surfer_guy" },
+            { x: 224.0 * TILE_SIZE, y: 144.2 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "bikini_red" },
+            { x: 236.8 * TILE_SIZE, y: 145.5 * TILE_SIZE, z: 2.0, p0: "bikini_white",  p1: "bikini_pink",   p2: "surfer_guy",   p3: "bikini_cyan" },
+            { x: 224.0 * TILE_SIZE, y: 151.8 * TILE_SIZE, z: 2.0, p0: "bikini_red",    p1: "bikini_yellow", p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: 236.8 * TILE_SIZE, y: 154.2 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_white",  p2: "bikini_pink",  p3: "bikini_yellow" },
+            { x: 224.0 * TILE_SIZE, y: 158.8 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "surfer_guy",    p2: "bikini_cyan",  p3: "bikini_red" },
+            { x: 224.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_white", p3: "surfer_guy" }
         ];
-        for (let i = 0; i < eastBeachRowsY.length; i++) {
-            const by = eastBeachRowsY[i];
-            const sxShift = Math.max(-1, Math.round(0.5 * (6.5 * Math.sin((by - 38) * 0.036) - 3.0 * Math.cos((by - 38) * 0.019))));
-            const bx = 226.2 + sxShift + (i % 3) * 2.2;
-            this.beachProps.push({
-                spr: (i % 2 === 0) ? "beach_towel_pink" : "beach_towel_cyan",
-                x: bx * TILE_SIZE,
+
+        // 3B. Beach Aerobics & Retro Boombox Dance Parties on the Sand
+        this.beachParties = [
+            { x: 223.2 * TILE_SIZE, y: 147.8 * TILE_SIZE, z: 2.0 },
+            { x: 238.0 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0 },
+            { x: 223.2 * TILE_SIZE, y: 155.2 * TILE_SIZE, z: 2.0 },
+            { x: 223.5 * TILE_SIZE, y: 50.5 * TILE_SIZE,  z: 2.0 },
+            { x: 192.4 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0 }
+        ];
+
+        // 3C. Sunbathing Bikini Women on Striped Towels & Resort Sun Loungers shaded by 3D Umbrellas + Side Beach Props
+        this.beachSunbathers = [];
+        const bikiniPool = ["bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white"];
+        const towelPool = ["beach_towel_pink", "beach_towel_cyan", "beach_towel_yellow", "beach_towel_coral", "beach_lounger"];
+        const umbPool = ["umbrella_pink", "umbrella_cyan", "umbrella_yellow"];
+        const sidePropPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow", "beach_ball", "sandcastle", "beach_cooler"];
+
+        const sunbatherRowsY = [
+            42.5, 44.8, 48.8, 52.5, 56.0, 60.5, 65.0, 70.0, 76.0, 82.0,
+            88.5, 92.5, 98.0, 103.5, 109.0, 115.0, 121.0, 128.0, 134.5,
+            139.0, 140.8, 142.4, 146.2, 149.6, 153.4, 156.8, 160.5, 164.0, 171.0, 178.0, 184.0
+        ];
+        for (let i = 0; i < sunbatherRowsY.length; i++) {
+            const by = sunbatherRowsY[i];
+            // West/Mid Beach group right next to Lummus Park (c = 222.0..226.4)
+            const westCol = 222.1 + (i % 3) * 1.45;
+            this.beachSunbathers.push({
+                x: westCol * TILE_SIZE,
                 y: by * TILE_SIZE,
-                z: 1.98,
-                scale: 1.05,
-                angle: 0
-            });
-            this.beachUmbrellas.push({
-                x: (bx - 0.4) * TILE_SIZE,
-                y: (by - 0.25) * TILE_SIZE,
                 z: 2.0,
-                spr: (i % 2 === 0) ? "umbrella_pink" : "umbrella_cyan",
-                angle: i * 0.9
+                angle: ((i % 2) === 0 ? 0 : 0.18),
+                pedType: bikiniPool[i % bikiniPool.length],
+                towelSpr: towelPool[i % towelPool.length],
+                friendPedType: bikiniPool[(i + 2) % bikiniPool.length],
+                friendTowelSpr: towelPool[(i + 1) % towelPool.length],
+                umbSpr: umbPool[i % umbPool.length],
+                umbDx: -23,
+                umbDy: -13,
+                propSpr: sidePropPool[i % sidePropPool.length],
+                propDx: 26,
+                propDy: -10,
+                propAngle: 0.45,
+                extraPropSpr: (i % 2 === 0) ? "beach_ball" : "sandcastle",
+                extraPropDx: 24,
+                extraPropDy: 18
+            });
+
+            // East Shoreline group near the Atlantic surf (c = 235.2..240.4)
+            const eastCol = 235.4 + ((i + 1) % 3) * 2.1;
+            this.beachSunbathers.push({
+                x: eastCol * TILE_SIZE,
+                y: (by + 0.6) * TILE_SIZE,
+                z: 2.0,
+                angle: -0.12,
+                pedType: bikiniPool[(i + 1) % bikiniPool.length],
+                towelSpr: towelPool[(i + 2) % towelPool.length],
+                friendPedType: (i % 3 === 0) ? "surfer_guy" : bikiniPool[(i + 3) % bikiniPool.length],
+                friendTowelSpr: towelPool[(i + 3) % towelPool.length],
+                umbSpr: umbPool[(i + 1) % umbPool.length],
+                umbDx: -23,
+                umbDy: -13,
+                propSpr: sidePropPool[(i + 2) % sidePropPool.length],
+                propDx: 26,
+                propDy: -10,
+                propAngle: -0.35,
+                extraPropSpr: (i % 2 === 1) ? "beach_cooler" : "sandcastle",
+                extraPropDx: 24,
+                extraPropDy: 18
+            });
+        }
+
+        // Biscayne Bay West Beach (c = 191.6..193.2, r = 100..126) & Star Island Celebrity Beach (c = 184.2..185.5, r = 110..115)
+        const bayRowsY = [101.5, 105.0, 108.5, 115.5, 119.5, 123.5];
+        for (let bi = 0; bi < bayRowsY.length; bi++) {
+            this.beachSunbathers.push({
+                x: (191.8 + (bi % 2) * 1.1) * TILE_SIZE,
+                y: bayRowsY[bi] * TILE_SIZE,
+                z: 2.0,
+                angle: Math.PI,
+                pedType: bikiniPool[bi % bikiniPool.length],
+                towelSpr: towelPool[bi % towelPool.length],
+                friendPedType: bikiniPool[(bi + 1) % bikiniPool.length],
+                friendTowelSpr: towelPool[(bi + 2) % towelPool.length],
+                umbSpr: umbPool[bi % umbPool.length],
+                umbDx: 15,
+                umbDy: -10,
+                propSpr: sidePropPool[bi % sidePropPool.length],
+                propDx: -16,
+                propDy: 12
+            });
+        }
+        this.beachSunbathers.push(
+            {
+                x: 184.4 * TILE_SIZE,
+                y: 111.5 * TILE_SIZE,
+                z: 2.0,
+                angle: 0,
+                pedType: "bikini_pink",
+                towelSpr: "beach_lounger",
+                friendPedType: "bikini_white",
+                friendTowelSpr: "beach_lounger",
+                umbSpr: "umbrella_pink",
+                propSpr: "beach_cooler"
+            },
+            {
+                x: 184.4 * TILE_SIZE,
+                y: 114.2 * TILE_SIZE,
+                z: 2.0,
+                angle: 0,
+                pedType: "bikini_yellow",
+                towelSpr: "beach_lounger",
+                friendPedType: "bikini_cyan",
+                friendTowelSpr: "beach_lounger",
+                umbSpr: "umbrella_cyan",
+                propSpr: "beach_ball"
+            }
+        );
+
+        // 3D. Atlantic & Biscayne Bay Wave Surfers & Shallow-Water Bikini Swimmers
+        this.beachSwimmers = [];
+        const surfRowsY = [
+            44.5, 51.0, 64.0, 78.0, 90.0, 105.0, 122.0,
+            138.5, 141.0, 143.2, 145.5, 147.8, 150.2, 152.5, 155.0, 157.5, 160.5, 168.0, 178.0
+        ];
+        const boardPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow"];
+        for (let si = 0; si < surfRowsY.length; si++) {
+            const sy = surfRowsY[si];
+            // Shallow-water bikini swimmer wading/swimming at the shoreline (c = 241.6..242.4)
+            this.beachSwimmers.push({
+                x: (241.7 + (si % 2) * 0.6) * TILE_SIZE,
+                y: sy * TILE_SIZE,
+                z: 2.0,
+                angle: Math.PI,
+                isSurfer: false,
+                pedType: bikiniPool[si % bikiniPool.length]
+            });
+            // Atlantic wave surfer riding/paddling on surfboard (c = 243.2..244.5)
+            this.beachSwimmers.push({
+                x: (243.3 + (si % 2) * 0.9) * TILE_SIZE,
+                y: (sy + 1.1) * TILE_SIZE,
+                z: 2.0,
+                angle: Math.PI,
+                isSurfer: true,
+                pedType: (si % 2 === 0) ? "surfer_guy" : bikiniPool[(si + 2) % bikiniPool.length],
+                boardSpr: boardPool[si % boardPool.length]
+            });
+        }
+        // Biscayne Bay swimmers & surfers along West Beach shoreline (c = 190.2)
+        for (const by of [103.5, 109.5, 114.5, 120.5]) {
+            this.beachSwimmers.push({
+                x: 190.2 * TILE_SIZE,
+                y: by * TILE_SIZE,
+                z: 2.0,
+                angle: 0,
+                isSurfer: (by > 112),
+                pedType: (by > 112) ? "bikini_pink" : "bikini_cyan",
+                boardSpr: "surfboard_cyan"
             });
         }
 

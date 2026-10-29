@@ -436,7 +436,10 @@ class RetroRenderer {
         if (!img || !img.width || !img.height || !meta || !meta.sprites) return img;
         try {
             const W = img.width;
-            const H = img.height;
+            const origH = img.height;
+            const H = origH + 220;
+            this.spritesTexW = W;
+            this.spritesTexH = H;
             const cvs = document.createElement("canvas");
             cvs.width = W;
             cvs.height = H;
@@ -615,6 +618,132 @@ class RetroRenderer {
                 }
             }
 
+            // 2B. Synthesize 6 Top-Down Vice Beach Pedestrian Archetypes (5 Bikini Women + 1 Shirtless Surfer)
+            //     into the dedicated atlas band (y = origH + 4 .. origH + 165) and register in meta.sprites.peds!
+            if (meta.sprites.peds && meta.sprites.peds.lucia) {
+                const srcLucia = meta.sprites.peds.lucia;
+                const beachArchetypes = [
+                    { key: "bikini_pink",   bik: [255, 42, 138],  hair: [252, 211, 38],  skin: [232, 162, 114], isSurfer: false },
+                    { key: "bikini_cyan",   bik: [6, 218, 246],   hair: [118, 56, 22],   skin: [222, 148, 100], isSurfer: false },
+                    { key: "bikini_yellow", bik: [250, 204, 21],  hair: [204, 42, 36],   skin: [238, 168, 122], isSurfer: false },
+                    { key: "bikini_red",    bik: [239, 52, 52],   hair: [28, 26, 36],    skin: [216, 140, 92],  isSurfer: false },
+                    { key: "bikini_white",  bik: [248, 250, 252], hair: [234, 179, 14],  skin: [206, 132, 84],  isSurfer: false },
+                    { key: "surfer_guy",    bik: [6, 192, 224],   hair: [218, 168, 72],  skin: [218, 142, 94],  isSurfer: true  }
+                ];
+                const coreFrames = [
+                    "0", "1", "2", "3", "4", "5", "6", "7",
+                    "16", "17", "18", "19", "20", "21", "22", "23",
+                    "38", "39", "40", "41", "42",
+                    "50", "51", "52", "53", "54", "55",
+                    "84", "97", "98"
+                ];
+
+                for (let ai = 0; ai < beachArchetypes.length; ai++) {
+                    const arch = beachArchetypes[ai];
+                    const dstFrames = { ...srcLucia };
+                    const rowY = origH + 4 + ai * 26;
+
+                    for (let fi = 0; fi < coreFrames.length; fi++) {
+                        const fKey = coreFrames[fi];
+                        const srcRect = srcLucia[fKey] || srcLucia["98"];
+                        if (!Array.isArray(srcRect) || srcRect.length < 4) continue;
+                        const [sx, sy, sw, sh] = srcRect;
+                        const dx0 = 4 + fi * 26;
+                        const dy0 = rowY;
+                        if (dx0 + sw >= W || dy0 + sh >= H) continue;
+
+                        for (let ly = 0; ly < sh; ly++) {
+                            for (let lx = 0; lx < sw; lx++) {
+                                const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                                const dp = ((dy0 + ly) * W + (dx0 + lx)) * 4;
+                                const a = d[sp + 3];
+                                if (a < 16) {
+                                    d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
+                                    continue;
+                                }
+                                const r = d[sp];
+                                const g = d[sp + 1];
+                                const b = d[sp + 2];
+
+                                const isPerim =
+                                    lx === 0 || lx === sw - 1 || ly === 0 || ly === sh - 1 ||
+                                    d[sp - 4 + 3] < 16 || d[sp + 4 + 3] < 16 ||
+                                    d[sp - W * 4 + 3] < 16 || d[sp + W * 4 + 3] < 16;
+
+                                if (isPerim && r < 95 && g < 95 && b < 105) {
+                                    d[dp] = (r * 0.78) | 0;
+                                    d[dp + 1] = (g * 0.78) | 0;
+                                    d[dp + 2] = (b * 0.82) | 0;
+                                    d[dp + 3] = 255;
+                                    continue;
+                                }
+
+                                const isPinkTop = (r > 165 && r > g + 42 && b > 65);
+                                const isBlueJeans = (b > r + 14 && b > 65);
+                                const isDarkHair = (!isPerim && r < 72 && g < 72 && b < 80);
+                                const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 182.0;
+                                const shade = Math.max(0.76, Math.min(1.22, lum));
+
+                                let nr = Math.round(arch.skin[0] * shade);
+                                let ng = Math.round(arch.skin[1] * shade);
+                                let nb = Math.round(arch.skin[2] * shade);
+
+                                if (isDarkHair) {
+                                    const dome = Math.max(0, 1.0 - Math.hypot((lx - 11.5) * 0.22, (ly - 13.0) * 0.22));
+                                    const hMult = 0.82 + 0.36 * dome;
+                                    nr = Math.round(arch.hair[0] * hMult);
+                                    ng = Math.round(arch.hair[1] * hMult);
+                                    nb = Math.round(arch.hair[2] * hMult);
+                                    // Sunglasses on lying sunbather frame 42
+                                    if (fKey === "42" && ly === 7 && lx >= 10 && lx <= 13) {
+                                        nr = lx === 11 ? 56 : 18;
+                                        ng = lx === 11 ? 189 : 24;
+                                        nb = lx === 11 ? 248 : 38;
+                                    }
+                                } else if (arch.isSurfer) {
+                                    // Shirtless bronzed surfer guy: bare muscular upper torso/arms, neon boardshorts at hips/thighs, bare lower calves
+                                    if (isBlueJeans && ly >= 10 && ly <= 17) {
+                                        const isStripe = (lx <= 8 || lx >= 15);
+                                        nr = Math.round((isStripe ? 249 : arch.bik[0]) * shade);
+                                        ng = Math.round((isStripe ? 115 : arch.bik[1]) * shade);
+                                        nb = Math.round((isStripe ? 22 : arch.bik[2]) * shade);
+                                    }
+                                } else if (fKey === "42") {
+                                    // Lying down Sunbather on towel: distinct two-piece bikini top (ly 9..11) + bare tanned stomach (ly 12..13) + bikini bottom (ly 14..15) + bare tanned legs (ly >= 16)
+                                    const inBikiniTop = (ly >= 9 && ly <= 11 && lx >= 8 && lx <= 15 && (isPinkTop || isBlueJeans));
+                                    const inBikiniBot = ((ly === 14 || ly === 15) && lx >= 8 && lx <= 15 && (isPinkTop || isBlueJeans));
+                                    if (inBikiniTop || inBikiniBot) {
+                                        const cupSpec = (inBikiniTop && (lx === 10 || lx === 13)) ? 1.14 : 1.0;
+                                        nr = Math.round(arch.bik[0] * shade * cupSpec);
+                                        ng = Math.round(arch.bik[1] * shade * cupSpec);
+                                        nb = Math.round(arch.bik[2] * shade * cupSpec);
+                                    }
+                                } else {
+                                    // Standing / Walking / Jumping Bikini Woman:
+                                    // Bare tanned shoulders/arms (lx <= 8 || lx >= 15), bare midriff (ly === 13), bare tanned legs (ly <= 9 || ly >= 16),
+                                    // vibrant Two-Piece Bikini Top (ly 10..12, lx 9..14) & Bikini Bottom (ly 14..15, lx 9..14)!
+                                    const inTop = isPinkTop && lx >= 9 && lx <= 14 && ly >= 10 && ly <= 12;
+                                    const inBot = (isBlueJeans || isPinkTop) && lx >= 9 && lx <= 14 && (ly === 14 || ly === 15);
+                                    if (inTop || inBot) {
+                                        const cupBoost = (inTop && (lx === 10 || lx === 13)) ? 1.12 : 1.0;
+                                        nr = Math.round(arch.bik[0] * shade * cupBoost);
+                                        ng = Math.round(arch.bik[1] * shade * cupBoost);
+                                        nb = Math.round(arch.bik[2] * shade * cupBoost);
+                                    }
+                                }
+
+                                d[dp] = Math.min(255, Math.max(0, nr));
+                                d[dp + 1] = Math.min(255, Math.max(0, ng));
+                                d[dp + 2] = Math.min(255, Math.max(0, nb));
+                                d[dp + 3] = 255;
+                            }
+                        }
+                        dstFrames[fKey] = [dx0, dy0, sw, sh];
+                    }
+                    meta.sprites.peds[arch.key] = dstFrames;
+                }
+            }
+
             // 3. BleedTransparentEdges (src/alpha_bleed.h):
             // 1-pass RGB color dilation into alpha=0 border texels (keeping alpha=0) to prevent dark fringe bleeding
             for (let y = 1; y < H - 1; y++) {
@@ -637,6 +766,140 @@ class RetroRenderer {
             }
 
             ctx.putImageData(imgData, 0, 0);
+
+            // 4. Draw Custom Top-Down Vice Beach Activity Prop Sprites (Towels, Loungers, Surfboards, Beach Ball, Sandcastle, Cooler)
+            if (meta.sprites.objects) {
+                const py = origH + 8;
+                const drawStripedTowel = (ox, oy, c1, c2) => {
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(ox + 1, oy + 1, 30, 18);
+                    for (let s = 0; s < 6; s++) {
+                        ctx.fillStyle = (s % 2 === 0) ? c1 : c2;
+                        ctx.fillRect(ox + 2 + s * 4.5, oy + 2, 4.6, 16);
+                    }
+                    ctx.fillStyle = "#f8fafc";
+                    for (let t = 0; t < 5; t++) {
+                        ctx.fillRect(ox, oy + 3 + t * 3, 2, 1.5);
+                        ctx.fillRect(ox + 30, oy + 3 + t * 3, 2, 1.5);
+                    }
+                };
+                drawStripedTowel(820, py, "#facc15", "#fef9c3");
+                meta.sprites.objects["beach_towel_yellow"] = [820, py, 32, 20];
+
+                drawStripedTowel(860, py, "#fb7185", "#2dd4bf");
+                meta.sprites.objects["beach_towel_coral"] = [860, py, 32, 20];
+
+                // Miami Art Deco Sun Lounger ("beach_lounger")
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(900, py + 1, 34, 18);
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillRect(901, py + 2, 32, 16);
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillRect(903, py + 4, 28, 12);
+                ctx.fillStyle = "#fef08a";
+                ctx.fillRect(904, py + 4, 6, 12); // pillow headrest
+                meta.sprites.objects["beach_lounger"] = [900, py, 34, 20];
+
+                // Octagonal Yellow/Orange Beach Umbrella ("umbrella_yellow")
+                const ux = 962, uy = py + 20, ur = 18;
+                for (let w = 0; w < 8; w++) {
+                    const a0 = (w / 8) * Math.PI * 2;
+                    const a1 = ((w + 1) / 8) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(ux, uy);
+                    ctx.arc(ux, uy, ur, a0, a1);
+                    ctx.closePath();
+                    ctx.fillStyle = (w % 2 === 0) ? "#facc15" : "#f97316";
+                    ctx.fill();
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = "#78350f";
+                    ctx.stroke();
+                }
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(ux, uy, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                meta.sprites.objects["umbrella_yellow"] = [942, py, 40, 40];
+
+                // Pointed Malibu Surfboards ("surfboard_pink", "surfboard_cyan", "surfboard_yellow")
+                const drawSurfboard = (sx, sy, bodyCol, stripeCol) => {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(sx + 38, sy + 7);
+                    ctx.quadraticCurveTo(sx + 24, sy + 1, sx + 3, sy + 3);
+                    ctx.lineTo(sx + 5, sy + 7);
+                    ctx.lineTo(sx + 3, sy + 11);
+                    ctx.quadraticCurveTo(sx + 24, sy + 13, sx + 38, sy + 7);
+                    ctx.closePath();
+                    ctx.fillStyle = bodyCol;
+                    ctx.fill();
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = "#0f172a";
+                    ctx.stroke();
+                    ctx.fillStyle = stripeCol;
+                    ctx.fillRect(sx + 10, sy + 6, 22, 2);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(sx + 16, sy + 4, 4, 6);
+                    ctx.restore();
+                };
+                drawSurfboard(990, py, "#ff2a85", "#00f0ff");
+                meta.sprites.objects["surfboard_pink"] = [990, py, 40, 14];
+
+                drawSurfboard(1038, py, "#00f0ff", "#fde047");
+                meta.sprites.objects["surfboard_cyan"] = [1038, py, 40, 14];
+
+                drawSurfboard(1086, py, "#facc15", "#ef4444");
+                meta.sprites.objects["surfboard_yellow"] = [1086, py, 40, 14];
+
+                // 6-Panel Inflatable Beach Ball / Volleyball ("beach_ball")
+                const bx = 1142, by = py + 8, br = 7;
+                const ballCols = ["#ff2a85", "#ffffff", "#00f0ff", "#facc15", "#ffffff", "#fb7185"];
+                for (let s = 0; s < 6; s++) {
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.arc(bx, by, br, (s / 6) * Math.PI * 2, ((s + 1) / 6) * Math.PI * 2);
+                    ctx.closePath();
+                    ctx.fillStyle = ballCols[s];
+                    ctx.fill();
+                }
+                ctx.lineWidth = 1.1;
+                ctx.strokeStyle = "#0f172a";
+                ctx.beginPath();
+                ctx.arc(bx, by, br, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(bx - 2, by - 2, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+                meta.sprites.objects["beach_ball"] = [1134, py, 16, 16];
+
+                // Sculpted Golden Sandcastle ("sandcastle")
+                const scx = 1158, scy = py + 2;
+                ctx.fillStyle = "#b45309";
+                ctx.fillRect(scx + 3, scy + 3, 14, 14);
+                ctx.fillStyle = "#f59e0b";
+                ctx.fillRect(scx + 4, scy + 4, 12, 12);
+                ctx.fillStyle = "#fde68a";
+                ctx.fillRect(scx + 2, scy + 2, 5, 5);
+                ctx.fillRect(scx + 13, scy + 2, 5, 5);
+                ctx.fillRect(scx + 2, scy + 13, 5, 5);
+                ctx.fillRect(scx + 13, scy + 13, 5, 5);
+                ctx.fillRect(scx + 7, scy + 7, 6, 6);
+                ctx.fillStyle = "#ff2a85";
+                ctx.fillRect(scx + 9, scy + 5, 5, 3); // tiny pink flag
+                meta.sprites.objects["sandcastle"] = [scx, scy, 20, 20];
+
+                // Miami Beach Ice Cooler ("beach_cooler")
+                const clx = 1194, cly = py;
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(clx + 1, cly + 1, 18, 14);
+                ctx.fillStyle = "#ef4444";
+                ctx.fillRect(clx + 2, cly + 2, 16, 12);
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillRect(clx + 3, cly + 3, 14, 5);
+                meta.sprites.objects["beach_cooler"] = [clx, cly, 20, 16];
+            }
+
             return cvs;
         } catch (err) {
             console.warn("processGtaSpritesRtx fallback:", err);
@@ -1705,8 +1968,8 @@ class RetroRenderer {
     pushAtlasSprite3D(rect, xPx, yPx, zBlocks, angleRad = 0, scale = 1.0, drawOrder = 4, r = 1, g = 1, b = 1, a = 1, pitchZ = 0) {
         if (!rect || !this.gta1SpritesImg.width) return;
         const [sx, sy, sw, sh] = rect;
-        const texW = this.gta1SpritesImg.width;
-        const texH = this.gta1SpritesImg.height;
+        const texW = this.spritesTexW || this.gta1SpritesImg.width;
+        const texH = this.spritesTexH || this.gta1SpritesImg.height;
         const u0 = (sx + 0.35) / texW;
         const v0 = (sy + 0.35) / texH;
         const u1 = (sx + sw - 0.35) / texW;
@@ -2179,6 +2442,231 @@ class RetroRenderer {
         );
     }
 
+    renderViceBeachActivities3D(game, minX, minY, maxX, maxY, sunCos, sunSin, sunShadowAngle, sunShadowAlpha, nfGlobal) {
+        if (!this.gta1Ready || !this.map) return;
+        const objs = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects;
+        if (!objs) return;
+
+        // 1. Sunbathing Bikini Women on Beach Towels & Resort Sun Loungers under 3D Striped Beach Umbrellas
+        if (Array.isArray(this.map.beachSunbathers)) {
+            for (let i = 0; i < this.map.beachSunbathers.length; i++) {
+                const sb = this.map.beachSunbathers[i];
+                if (sb.x < minX - 48 || sb.x > maxX + 48 || sb.y < minY - 48 || sb.y > maxY + 48) continue;
+                const bz = sb.z || 2.0;
+                const ang = sb.angle || 0;
+
+                // Main Beach Towel or White Sun Lounger flat on the sand (GROUND_DECALS = 1 so sunbathers always render on top!)
+                this.batchObjectSprite3D(sb.towelSpr || "beach_towel_pink", sb.x, sb.y, bz + 0.015, ang, 1.15, SPRITE_DRAW_ORDER.GROUND_DECALS);
+
+                // Sunbathing Bikini Woman lying lengthwise on the towel (frame 42 = custom top-down lying sunbather with sunglasses & two-piece bikini!)
+                const tanSway = Math.sin(this.time * 1.5 + i * 1.3) * 0.04;
+                if (sb.pose === "WAVE") {
+                    const waveFr = 50 + (Math.floor(this.time * 4.2 + i) % 4);
+                    this.pushSolidQuad3D(sb.x + sunCos * 4.5, sb.y + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchPedSprite3D(sb.pedType || "bikini_pink", waveFr, sb.x, sb.y, bz + 0.038, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else {
+                    this.batchPedSprite3D(sb.pedType || "bikini_pink", 42, sb.x, sb.y, bz + 0.035, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+
+                // Optional Companion Bikini Friend on adjacent towel (chatting or sunbathing in pairs!)
+                if (sb.friendPedType) {
+                    const perpX = -Math.sin(ang) * 25;
+                    const perpY = Math.cos(ang) * 25;
+                    const fx = sb.x + perpX;
+                    const fy = sb.y + perpY;
+                    this.batchObjectSprite3D(sb.friendTowelSpr || "beach_towel_yellow", fx, fy, bz + 0.015, ang, 1.15, SPRITE_DRAW_ORDER.GROUND_DECALS);
+                    if ((i % 2) === 0) {
+                        this.batchPedSprite3D(sb.friendPedType, 42, fx, fy, bz + 0.035, ang - tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    } else {
+                        const chatFr = 50 + (Math.floor(this.time * 3.8 + i * 2) % 4);
+                        this.pushSolidQuad3D(fx + sunCos * 4.5, fy + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.batchPedSprite3D(sb.friendPedType, chatFr, fx, fy, bz + 0.038, ang - Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                }
+
+                // Side Beach Activity Props (Surfboard, Beach Ball, Sandcastle, Cooler)
+                if (sb.propSpr) {
+                    const px = sb.x + (sb.propDx !== undefined ? sb.propDx : 24);
+                    const py = sb.y + (sb.propDy !== undefined ? sb.propDy : -8);
+                    this.batchObjectSprite3D(sb.propSpr, px, py, bz + 0.026, sb.propAngle || 0.35, sb.propScale || 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                }
+                if (sb.extraPropSpr) {
+                    const ex = sb.x + (sb.extraPropDx !== undefined ? sb.extraPropDx : 22);
+                    const ey = sb.y + (sb.extraPropDy !== undefined ? sb.extraPropDy : 18);
+                    this.batchObjectSprite3D(sb.extraPropSpr, ex, ey, bz + 0.026, 0, 0.90, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                }
+
+                // 3D Striped Beach Umbrella (with solar ground shadow + 3D rising pole + elevated canopy at head corner of towel!)
+                if (sb.umbSpr) {
+                    const ux = sb.x + (sb.umbDx !== undefined ? sb.umbDx : -22);
+                    const uy = sb.y + (sb.umbDy !== undefined ? sb.umbDy : -14);
+                    const umbRect = objs[sb.umbSpr] || objs["umbrella_pink"];
+                    const umbRot = (i * 0.85) + Math.sin(this.time * 1.3 + i) * 0.04;
+                    if (umbRect) {
+                        this.pushAtlasSprite3D(
+                            umbRect,
+                            ux + sunCos * 10,
+                            uy + sunSin * 10,
+                            bz + 0.014,
+                            umbRot,
+                            0.92,
+                            SPRITE_DRAW_ORDER.GROUND_DECALS,
+                            0.0, 0.0, 0.0,
+                            0.26 * (1.0 - nfGlobal * 0.6)
+                        );
+                    }
+                    this.pushSolidQuad3D(ux, uy, bz + 0.05, 2.8, 2.8, 0, 0.92, 0.90, 0.84, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(ux, uy, bz + 0.11, 2.4, 2.4, 0, 0.96, 0.94, 0.88, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.batchObjectSprite3D(sb.umbSpr, ux, uy, bz + 0.16, umbRot, 0.95, SPRITE_DRAW_ORDER.TREES);
+                }
+            }
+        }
+
+        // 2. Live Animated 3D Beach Volleyball Matches (2v2 Bikini Women & Surfers + 3D Raised Net + Parabolic Flying Volleyball!)
+        if (Array.isArray(this.map.beachVolleyballCourts)) {
+            for (let ci = 0; ci < this.map.beachVolleyballCourts.length; ci++) {
+                const vc = this.map.beachVolleyballCourts[ci];
+                if (vc.x < minX - 64 || vc.x > maxX + 64 || vc.y < minY - 64 || vc.y > maxY + 64) continue;
+                const bz = vc.z || 2.0;
+
+                // Court boundary lines in the golden sand (rotated Math.PI * 0.5 so North/South court halves match the 3D horizontal net!)
+                this.batchObjectSprite3D("volleyball_court", vc.x, vc.y, bz + 0.014, Math.PI * 0.5, 1.34, SPRITE_DRAW_ORDER.GROUND_DECALS);
+
+                // 3D Raised Volleyball Net & Posts across the center line (y = vc.y)
+                this.pushSolidQuad3D(vc.x + sunCos * 7, vc.y + sunSin * 7, bz + 0.017, 46, 3.5, 0, 0.03, 0.04, 0.08, 0.30 * (1.0 - nfGlobal * 0.6), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                for (const postSide of [-22, 22]) {
+                    const px = vc.x + postSide;
+                    this.pushSolidQuad3D(px, vc.y, bz + 0.05, 3.6, 3.6, 0, 0.88, 0.72, 0.22, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(px, vc.y, bz + 0.14, 3.2, 3.2, 0, 0.94, 0.80, 0.26, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(px, vc.y, bz + 0.22, 3.0, 3.0, 0, 0.98, 0.86, 0.32, 0.98, SPRITE_DRAW_ORDER.TREES);
+                }
+                // Net mesh bands & crisp white top tape
+                this.pushSolidQuad3D(vc.x, vc.y, bz + 0.12, 44, 1.8, 0, 0.18, 0.22, 0.28, 0.78, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(vc.x, vc.y, bz + 0.17, 44, 1.8, 0, 0.22, 0.26, 0.32, 0.82, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(vc.x, vc.y, bz + 0.22, 45, 2.4, 0, 0.98, 0.98, 1.00, 0.98, SPRITE_DRAW_ORDER.TREES);
+
+                // Rally animation timing (ball flies North <-> South over the net)
+                const rallyPhase = (this.time * 1.45 + ci * 0.73) % 2.0;
+                const goingSouth = rallyPhase < 1.0;
+                const flight = goingSouth ? rallyPhase : (2.0 - rallyPhase);
+                const rallyCycle = Math.floor(this.time * 1.45 + ci * 0.73);
+                const northLeftActive = (rallyCycle % 2) === 0;
+                const southRightActive = ((rallyCycle + 1) % 2) === 0;
+
+                const players = [
+                    { ped: vc.p0 || "bikini_pink",   bx: vc.x - 11, by: vc.y - 21, face: Math.PI * 0.5,  isNorth: true,  active: northLeftActive },
+                    { ped: vc.p1 || "bikini_yellow", bx: vc.x + 11, by: vc.y - 19, face: Math.PI * 0.5,  isNorth: true,  active: !northLeftActive },
+                    { ped: vc.p2 || "bikini_cyan",   bx: vc.x - 11, by: vc.y + 20, face: -Math.PI * 0.5, isNorth: false, active: !southRightActive },
+                    { ped: vc.p3 || "surfer_guy",    bx: vc.x + 11, by: vc.y + 22, face: -Math.PI * 0.5, isNorth: false, active: southRightActive }
+                ];
+
+                let northTargetX = vc.x;
+                let southTargetX = vc.x;
+
+                for (let pi = 0; pi < 4; pi++) {
+                    const pl = players[pi];
+                    const moveX = Math.sin(this.time * 3.2 + pi * 1.7 + ci) * 4.5;
+                    const moveY = Math.cos(this.time * 2.8 + pi * 1.3 + ci) * 3.2;
+                    const px = pl.bx + moveX;
+                    const py = pl.by + moveY;
+                    if (pl.isNorth && pl.active) northTargetX = px;
+                    if (!pl.isNorth && pl.active) southTargetX = px;
+
+                    // Player jumps in 3D when spiking/receiving the volleyball!
+                    const distToHit = pl.isNorth ? flight : (1.0 - flight);
+                    const jumpZ = (pl.active && distToHit < 0.24)
+                        ? Math.sin((1.0 - distToHit / 0.24) * Math.PI) * 0.14
+                        : 0.0;
+                    const fr = (jumpZ > 0.03)
+                        ? (50 + (Math.floor(this.time * 8 + pi) % 4))
+                        : (Math.floor(this.time * 6 + pi * 2) % 8);
+
+                    this.pushSolidQuad3D(px + sunCos * 5, py + sunSin * 5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchPedSprite3D(pl.ped, fr, px, py, bz + 0.040 + jumpZ, pl.face, 1.06 + jumpZ * 0.4, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+
+                // 3D Flying Volleyball arcing over the net + ground shadow on the sand!
+                const ballX = northTargetX + (southTargetX - northTargetX) * flight;
+                const ballY = (vc.y - 20) + flight * 40;
+                const ballArcZ = Math.sin(flight * Math.PI) * 0.34;
+                this.pushSolidQuad3D(ballX + sunCos * 8, ballY + sunSin * 8, bz + 0.020, 6.5, 6.5, 0, 0.03, 0.04, 0.08, 0.36 * (1.0 - nfGlobal * 0.5), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("beach_ball", ballX, ballY, bz + 0.08 + ballArcZ, this.time * 5.0 + ci, 0.82 + ballArcZ * 0.35, SPRITE_DRAW_ORDER.TREES);
+            }
+        }
+
+        // 3. Beach Aerobics & Retro Boombox Dance Parties on the Sand
+        if (Array.isArray(this.map.beachParties)) {
+            for (let pi = 0; pi < this.map.beachParties.length; pi++) {
+                const bp = this.map.beachParties[pi];
+                if (bp.x < minX - 56 || bp.x > maxX + 56 || bp.y < minY - 56 || bp.y > maxY + 56) continue;
+                const bz = bp.z || 2.0;
+
+                // Retro 80s/90s Miami Boombox on a coral mat + cooler + pulsing neon sound rings
+                const boomX = bp.x - 14;
+                const boomY = bp.y;
+                this.batchObjectSprite3D("beach_towel_coral", boomX, boomY, bz + 0.015, 0, 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(boomX, boomY, bz + 0.045, 11.0, 6.0, Math.PI * 0.5, 0.16, 0.18, 0.22, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(boomX, boomY - 3.2, bz + 0.055, 3.6, 3.6, 0, 0.06, 0.07, 0.09, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(boomX, boomY + 3.2, bz + 0.055, 3.6, 3.6, 0, 0.06, 0.07, 0.09, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                const beatPulse = 0.5 + 0.5 * Math.sin(this.time * 8.5 + pi);
+                this.pushSolidQuad3D(boomX, boomY, bz + 0.062, 2.4, 4.2, 0, 1.0, 0.20 + beatPulse * 0.6, 0.75, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                this.batchObjectSprite3D("beach_cooler", boomX - 4, boomY + 14, bz + 0.030, 0.2, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchObjectSprite3D("sandcastle", boomX - 4, boomY - 15, bz + 0.028, 0, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
+                // Bikini Aerobics Instructor facing East toward dancers
+                const instSway = Math.sin(this.time * 5.5) * 3.0;
+                const instFr = 50 + (Math.floor(this.time * 6.5) % 4);
+                this.pushSolidQuad3D(bp.x - 4 + sunCos * 4.5, bp.y + instSway + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchPedSprite3D("bikini_red", instFr, bp.x - 4, bp.y + instSway, bz + 0.040, 0, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+
+                // Synchronized Bikini & Surfer Dancers in a 2x2 formation
+                const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white"];
+                for (let di = 0; di < 4; di++) {
+                    const row = (di % 2) === 0 ? -11 : 11;
+                    const col = di < 2 ? 12 : 24;
+                    const stepX = Math.cos(this.time * 5.5 + di * 0.8) * 2.5;
+                    const stepY = Math.sin(this.time * 5.5 + di * 0.4) * 3.5;
+                    const dx = bp.x + col + stepX;
+                    const dy = bp.y + row + stepY;
+                    const dFr = ((di + Math.floor(this.time * 3.0)) % 2 === 0)
+                        ? (50 + (Math.floor(this.time * 6.5 + di) % 4))
+                        : (Math.floor(this.time * 7.0 + di * 2) % 8);
+                    const dAng = Math.PI + Math.sin(this.time * 2.8 + di) * 0.35;
+                    this.pushSolidQuad3D(dx + sunCos * 4.5, dy + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchPedSprite3D(dancerPeds[(di + pi) % dancerPeds.length], dFr, dx, dy, bz + 0.040, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+
+        // 4. Atlantic & Bay Wave Surfers & Shallow-Water Bikini Swimmers
+        if (Array.isArray(this.map.beachSwimmers)) {
+            for (let si = 0; si < this.map.beachSwimmers.length; si++) {
+                const sw = this.map.beachSwimmers[si];
+                if (sw.x < minX - 48 || sw.x > maxX + 48 || sw.y < minY - 48 || sw.y > maxY + 48) continue;
+                const bz = sw.z || 2.0;
+                const waveT = this.time * 2.1 + si * 1.37;
+                const bobX = Math.sin(waveT) * 5.5;
+                const bobY = Math.cos(waveT * 0.8) * 2.8;
+                const wx = sw.x + bobX;
+                const wy = sw.y + bobY;
+
+                // Animated white ocean foam / water ripple ring around swimmer or surfboard
+                const rippleSize = 14.0 + Math.sin(waveT * 1.6) * 3.5;
+                this.pushSolidQuad3D(wx, wy, bz + 0.014, rippleSize, rippleSize * 0.72, sw.angle || 0, 0.85, 0.97, 1.0, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                if (sw.isSurfer) {
+                    const surfAng = (sw.angle || Math.PI) + Math.sin(waveT) * 0.12;
+                    this.batchObjectSprite3D(sw.boardSpr || "surfboard_pink", wx, wy, bz + 0.022, surfAng + Math.PI * 0.5, 1.08, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    const surfFr = (si % 2 === 0) ? (50 + (Math.floor(this.time * 4.5 + si) % 4)) : 42;
+                    this.batchPedSprite3D(sw.pedType || "surfer_guy", surfFr, wx, wy, bz + 0.036, surfAng, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else {
+                    const swimFr = 50 + (Math.floor(this.time * 4.2 + si) % 4);
+                    this.batchPedSprite3D(sw.pedType || "bikini_cyan", swimFr, wx, wy, bz + 0.026, (sw.angle || 0) + Math.sin(waveT) * 0.25, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+    }
+
     batchPedSprite3D(pedType, frameIdx, x, y, zBlocks, angle, scale = 1.0, muzzleFlash = false, drawOrder = SPRITE_DRAW_ORDER.PEDESTRIAN, rTint = 1.0, gTint = 1.0, bTint = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta.sprites.peds[pedType]) return;
         const frames = this.gta1Meta.sprites.peds[pedType];
@@ -2321,7 +2809,23 @@ class RetroRenderer {
             const pz = this.getEntityZ(ped, 0.04);
 
             let pedType = ped.g24Type;
-            if (!pedType) {
+            const pbx = Math.floor(ped.x / TILE_SIZE);
+            const pby = Math.floor(ped.y / TILE_SIZE);
+            const isBeachZone =
+                ped.missionTag === "BEACH" ||
+                ped.x >= 218.2 * TILE_SIZE ||
+                (this.map && this.map.coastalSandMask && this.map.coastalSandMask[pby * MAP_COLS + pbx] === 1) ||
+                (pbx >= 182 && pbx <= 195 && pby >= 98 && pby <= 128);
+
+            if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
+                const beachPool = [
+                    "bikini_pink", "bikini_cyan", "bikini_yellow",
+                    "bikini_red", "bikini_white", "bikini_pink", "surfer_guy"
+                ];
+                const bh = Math.abs(Math.floor((ped.turnSeed || 1) * 17 + ped.animSeed * 313)) % beachPool.length;
+                pedType = beachPool[bh];
+                ped.g24Type = pedType;
+            } else if (!pedType) {
                 if (ped.kind === "MONK") pedType = "monk";
                 else if (ped.kind === "COP") pedType = "police";
                 else if (ped.kind === "HOSTILE" || ped.archetype === "PAULY" || ped.archetype === "DELL") pedType = "gang";
@@ -2841,6 +3345,7 @@ class RetroRenderer {
                     this.batchObjectSprite3D(umb.spr || "umbrella_pink", umb.x, umb.y, uz + 0.08, umb.angle || 0, 0.92, SPRITE_DRAW_ORDER.TREES);
                 }
             }
+            this.renderViceBeachActivities3D(game, minX, minY, maxX, maxY, sunCos, sunSin, sunShadowAngle, sunShadowAlpha, nfGlobal);
             if (this.map.vicePalms) {
                 const isNightGlow = (this.nightFactor || 0) > 0.18;
                 for (let pi = 0; pi < this.map.vicePalms.length; pi++) {
