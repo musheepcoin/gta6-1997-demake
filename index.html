@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>GRAND THEFT AUTO: VICE CITY '97 — LUCIA EDITION (1997 2.5D Demake)</title>
-    <link rel="stylesheet" href="css/style.css?v=98_37">
+    <link rel="stylesheet" href="css/style.css?v=98_38">
 </head>
 <body>
     <div id="game-container">
@@ -163,16 +163,16 @@
                 <div id="mp-chat-messages" aria-live="polite"></div>
                 <div class="mp-chat-quick-row">
                     <button type="button" class="mp-quick-btn" data-msg="Yo Vice City! 👋">👋 YO!</button>
-                    <button type="button" class="mp-quick-btn" data-msg="Course sur Ocean Drive ?! 🏎️💨">🏎️ RACE?</button>
-                    <button type="button" class="mp-quick-btn" data-msg="Rejoins-moi sur ma position GPS ! 📍">📍 ON ME!</button>
-                    <button type="button" class="mp-quick-btn" data-msg="GG ! Bien joué ! 🔥">🔥 GG!</button>
+                    <button type="button" class="mp-quick-btn" data-msg="Race on Ocean Drive?! 🏎️💨">🏎️ RACE?</button>
+                    <button type="button" class="mp-quick-btn" data-msg="Meet me at my GPS position! 📍">📍 ON ME!</button>
+                    <button type="button" class="mp-quick-btn" data-msg="GG! Well played! 🔥">🔥 GG!</button>
                 </div>
                 <form id="mp-chat-form" autocomplete="off">
                     <input
                         type="text"
                         id="mp-chat-input"
                         maxlength="140"
-                        placeholder="Press [T] to chat... (/name Pseudo)"
+                        placeholder="Press [T] to chat... (/name Callsign)"
                         aria-label="Multiplayer Chat Input"
                     />
                     <button type="submit" id="mp-chat-send">SEND ↵</button>
@@ -193,15 +193,15 @@
             </div>
             <div id="touch-actions-zone">
                 <div class="touch-utility-row">
-                    <button type="button" class="touch-util-btn" id="tbtn-phone" title="Toggle Smartphone">📱 TEL</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-phone" title="Toggle Smartphone">📱 PHONE</button>
                     <button type="button" class="touch-util-btn" id="tbtn-map" title="Open Full Map">🗺️ MAP</button>
-                    <button type="button" class="touch-util-btn" id="tbtn-weapon" title="Cycle Weapon">🔄 ARME</button>
-                    <button type="button" class="touch-util-btn" id="tbtn-horn" title="Horn / Siren / Burp">📢 KLAXON</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-weapon" title="Cycle Weapon">🔄 WEAPON</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-horn" title="Horn / Siren / Burp">📢 HORN</button>
                 </div>
                 <div class="touch-main-grid">
-                    <button type="button" class="touch-act-btn touch-btn-car" id="tbtn-car">🚗<small>AUTO</small></button>
+                    <button type="button" class="touch-act-btn touch-btn-car" id="tbtn-car">🚗<small>CAR</small></button>
                     <button type="button" class="touch-act-btn touch-btn-jump" id="tbtn-jump">⚡<small>DRIFT</small></button>
-                    <button type="button" class="touch-act-btn touch-btn-shoot" id="tbtn-shoot">🔫<small>TIR</small></button>
+                    <button type="button" class="touch-act-btn touch-btn-shoot" id="tbtn-shoot">🔫<small>FIRE</small></button>
                 </div>
             </div>
         </div>
@@ -264,48 +264,48 @@
                 <!-- STEP 1: NICKNAME & LIVE SERVER SELECTOR BAR -->
                 <div class="identity-bar">
                     <div class="identity-field identity-nick-col">
-                        <label for="start-nickname-input">🏷️ PSEUDO / CALLSIGN</label>
+                        <label for="start-nickname-input">🏷️ CALLSIGN / NICKNAME</label>
                         <div class="identity-input-wrap">
                             <input
                                 type="text"
                                 id="start-nickname-input"
                                 maxlength="18"
-                                placeholder="Ex: LUCIA_97, TOMMY_86..."
+                                placeholder="e.g. LUCIA_97, TOMMY_86..."
                                 autocomplete="off"
                             />
                             <button type="button" id="btn-random-nickname" title="Generate Random Vice City Callsign">🎲</button>
                         </div>
                     </div>
                     <div class="identity-field identity-servers-col">
-                        <label>🌐 SERVEURS EN LIGNE — 24 SLOTS / SERVEUR (CLIQUEZ POUR REJOINDRE)</label>
+                        <label>🌐 ONLINE SERVERS — 24 SLOTS / SERVER (CLICK TO JOIN)</label>
                         <div class="server-select-list" id="server-select-list">
                             <button type="button" class="server-slot-btn active-server" data-room="VICE97">
                                 <span class="srv-top">
                                     <span class="srv-dot online" id="srv-dot-VICE97"></span>
                                     <span class="srv-name">🌴 #1 OCEAN DRIVE</span>
                                 </span>
-                                <span class="srv-count" id="srv-count-VICE97">1/24 JOUEUR</span>
+                                <span class="srv-count" id="srv-count-VICE97">1/24 PLAYER</span>
                             </button>
                             <button type="button" class="server-slot-btn" data-room="MIAMI86">
                                 <span class="srv-top">
                                     <span class="srv-dot" id="srv-dot-MIAMI86"></span>
                                     <span class="srv-name">🦩 #2 SOUTH BEACH</span>
                                 </span>
-                                <span class="srv-count" id="srv-count-MIAMI86">0/24 VIDE</span>
+                                <span class="srv-count" id="srv-count-MIAMI86">0/24 EMPTY</span>
                             </button>
                             <button type="button" class="server-slot-btn" data-room="KEYS305">
                                 <span class="srv-top">
                                     <span class="srv-dot" id="srv-dot-KEYS305"></span>
                                     <span class="srv-name">🏎️ #3 STAR ISLAND</span>
                                 </span>
-                                <span class="srv-count" id="srv-count-KEYS305">0/24 VIDE</span>
+                                <span class="srv-count" id="srv-count-KEYS305">0/24 EMPTY</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- STEP 2: 9 ICONIC PLAYABLE GTA LEGENDS -->
-                <div class="char-select-section-title">🎭 CHOISISSEZ VOTRE LÉGENDE GTA (9 PERSONNAGES JOUABLES)</div>
+                <div class="char-select-section-title">🎭 CHOOSE YOUR GTA LEGEND (9 PLAYABLE CHARACTERS)</div>
                 <div class="char-select-grid" id="char-select-grid">
                     <div class="mugshot-card char-select-card active-mug" data-char-id="LUCIA" data-ped-type="lucia" data-color="#ff2a85" data-weapon="PISTOL">
                         <canvas id="lucia-dossier-portrait" class="char-select-canvas" data-char="LUCIA" width="128" height="128"></canvas>
@@ -389,18 +389,18 @@
                     </div>
                 </div>
 
-                <button id="btn-start-game">[ ENTRER DANS VICE CITY '97 — PLAY NOW (ENTER) ]</button>
+                <button id="btn-start-game">[ ENTER VICE CITY '97 — PLAY NOW (ENTER) ]</button>
             </div>
         </div>
     </div>
 
     <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=98_37"></script>
-    <script src="js/map.js?v=98_37"></script>
-    <script src="js/entities.js?v=98_37"></script>
-    <script src="js/missions.js?v=98_37"></script>
-    <script src="js/renderer.js?v=98_37"></script>
-    <script src="js/net.js?v=98_37"></script>
-    <script src="js/game.js?v=98_37"></script>
+    <script src="js/audio.js?v=98_38"></script>
+    <script src="js/map.js?v=98_38"></script>
+    <script src="js/entities.js?v=98_38"></script>
+    <script src="js/missions.js?v=98_38"></script>
+    <script src="js/renderer.js?v=98_38"></script>
+    <script src="js/net.js?v=98_38"></script>
+    <script src="js/game.js?v=98_38"></script>
 </body>
 </html>

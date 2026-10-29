@@ -156,11 +156,11 @@ class ViceNetworkManager {
             const dotEl = document.getElementById(`srv-dot-${srv}`);
             if (countEl) {
                 if (count <= 0) {
-                    countEl.textContent = `0/${this.maxSlots} VIDE`;
+                    countEl.textContent = `0/${this.maxSlots} EMPTY`;
                 } else if (count === 1) {
-                    countEl.textContent = `1/${this.maxSlots} JOUEUR`;
+                    countEl.textContent = `1/${this.maxSlots} PLAYER`;
                 } else {
-                    countEl.textContent = `${count}/${this.maxSlots} JOUEURS`;
+                    countEl.textContent = `${count}/${this.maxSlots} PLAYERS`;
                 }
             }
             if (dotEl) {
