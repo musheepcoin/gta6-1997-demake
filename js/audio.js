@@ -91,9 +91,9 @@ class RetroAudioEngine {
 
         this.currentStationIdx = 0;
         this.inVehicle = false;
-        this.ytRadioPlaying = false;
-        this.musicEnabled = true;
-        this.musicVolume = 0.28;
+        this.ytRadioPlaying = true;
+        this.musicEnabled = false;
+        this.musicVolume = 0;
         this.stepIdx = 0;
         this.nextNoteTime = 0;
         this._unlockedBuffer = false;
@@ -235,11 +235,6 @@ class RetroAudioEngine {
             this.cityHumOsc.connect(this.cityHumGain);
             this.cityHumGain.connect(this.sfxMasterGain);
             this.cityHumOsc.start();
-
-            this.nextNoteTime = this.ctx.currentTime + 0.04;
-            if (!this._schedulerTimer) {
-                this._schedulerTimer = setInterval(() => this._tickMusicScheduler(), 60);
-            }
         } catch (e) {
             console.warn("WebAudio init blocked or unavailable:", e);
         }
@@ -272,28 +267,10 @@ class RetroAudioEngine {
                 }
             } catch (_e) {}
         }
-        this._tickMusicScheduler();
     }
 
     _tickMusicScheduler() {
-        if (!this.initialized || this.muted || !this.ctx) return;
-        if (this.ctx.state !== "running") return;
-
-        const now = this.ctx.currentTime;
-        const st = this.stations[this.currentStationIdx] || this.stations[0];
-        if (this.musicEnabled && !this.ytRadioPlaying && st && st.bassNotes.length > 0) {
-            const stepDur = (60 / st.bpm) / 2; // eighth-note groove steps
-            if (this.nextNoteTime < now - 0.20 || this.nextNoteTime > now + 1.0) {
-                this.nextNoteTime = now + 0.02;
-            }
-            while (this.nextNoteTime < now + 0.16) {
-                this.playRadioStep(st, this.stepIdx, stepDur, this.nextNoteTime);
-                this.stepIdx = (this.stepIdx + 1) % st.bassNotes.length;
-                this.nextNoteTime += stepDur;
-            }
-        } else {
-            this.nextNoteTime = now + 0.06;
-        }
+        // Synthesized WebAudio music disabled: game uses the YouTube soundtrack only
     }
 
     cycleStation() {
