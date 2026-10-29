@@ -203,11 +203,13 @@ class RetroRenderer {
                 float grain = aHash(floor(p * 40.0));
                 float fine = aHash(floor(p * 96.0) + 19.0);
                 vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
-                vec3 col = base * (0.93 + big * 0.08 + mid * 0.06);
+                vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
                 col *= 0.94 + grain * 0.05 + fine * 0.08;
                 col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);           // light aggregate stones
                 float tar = smoothstep(0.66, 0.80, aNoise(p * 0.7 + 31.0));
-                col *= 1.0 - tar * 0.08;                                         // faint resealed tar patches
+                col *= 1.0 - tar * 0.13;                                         // dark resealed tar patches
+                float seam = 1.0 - smoothstep(0.0, 0.022, abs(aNoise(p * 1.1 + 57.0) - 0.5));
+                col *= 1.0 - seam * 0.12 * step(0.68, aNoise(p * 0.3 + 3.0));    // sparse thin repaired cracks
 
                 // Crisp, slightly worn paint keeping the original lane colours
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
