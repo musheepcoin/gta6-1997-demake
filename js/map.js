@@ -445,11 +445,15 @@ class LeonidaMap {
                     ((c === 219 && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
                 );
                 if (isPlanterPalm || isParkGrassPalm) {
+                    // Varied palm sizes: crown spread 0.78..1.30 & trunk height 0.70..1.55 (young palms to towering royal palms)
+                    const hs1 = (((c * 73856093) ^ (r * 19349663)) >>> 0) % 1000 / 1000;
+                    const hs2 = (((c * 83492791) ^ (r * 2654435761)) >>> 0) % 1000 / 1000;
                     this.vicePalms.push({
                         x: (c + 0.5) * TILE_SIZE,
                         y: (r + 0.5) * TILE_SIZE,
                         z: 2.0,
-                        scale: isPlanterPalm ? 1.0 : (0.94 + ((c * 3 + r * 5) % 4) * 0.05),
+                        scale: (isPlanterPalm ? 0.80 : 0.84) + hs1 * 0.46,
+                        height: 0.70 + hs2 * 0.85,
                         angle: ((c * 23 + r * 41) % 628) * 0.01
                     });
                 }

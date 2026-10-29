@@ -2560,24 +2560,25 @@ class RetroRenderer {
         this.pushAtlasSprite3D(rect, x, y, zBlocks, angle, scale, drawOrder);
     }
 
-    renderMiamiPalmTree3D(x, y, baseZ, baseAngle = 0, scale = 1.0, seedIdx = 0) {
+    renderMiamiPalmTree3D(x, y, baseZ, baseAngle = 0, scale = 1.0, seedIdx = 0, heightMul = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.objects) return;
         const palmRect = this.gta1Meta.sprites.objects["palm_tree"] || this.gta1Meta.sprites.objects["257"];
         if (!palmRect) return;
 
         const sc = scale || 1.0;
-        const breeze = Math.sin(this.time * 1.65 + x * 0.013 + y * 0.019) * 0.055;
+        const hm = Math.max(0.5, Math.min(1.8, heightMul || 1.0));
+        const breeze = Math.sin(this.time * 1.65 + x * 0.013 + y * 0.019) * 0.055 * (0.8 + hm * 0.25);
         const leanAng = (seedIdx * 2.39996 + x * 0.01 + y * 0.02) % 6.28318;
-        const leanX = Math.cos(leanAng) * 3.0 * sc + Math.cos(this.time * 1.65 + y * 0.02) * 0.9;
-        const leanY = Math.sin(leanAng) * 3.0 * sc + Math.sin(this.time * 1.65 + x * 0.02) * 0.9;
+        const leanX = Math.cos(leanAng) * 3.0 * sc * hm + Math.cos(this.time * 1.65 + y * 0.02) * 0.9 * hm;
+        const leanY = Math.sin(leanAng) * 3.0 * sc * hm + Math.sin(this.time * 1.65 + x * 0.02) * 0.9 * hm;
 
-        // 1. Soft Dappled Feathery Ground Shadow on Sidewalk / Lawn / Beach Sand
+        // 1. Soft Dappled Feathery Ground Shadow on Sidewalk / Lawn / Beach Sand (taller palms cast longer shadows)
         const nf = Math.max(0.0, Math.min(1.0, this.nightFactor || 0.0));
         const shadowAlpha = 0.27 * (1.0 - nf * 0.55);
         this.pushAtlasSprite3D(
             palmRect,
-            x + 9.5 * sc,
-            y + 7.5 * sc,
+            x + 9.5 * sc * hm,
+            y + 7.5 * sc * hm,
             baseZ + 0.018,
             baseAngle + breeze * 0.5,
             sc * 0.92,
@@ -2588,12 +2589,13 @@ class RetroRenderer {
             shadowAlpha
         );
 
-        // 2. 3D Curved Ringed Coconut / Royal Palm Trunk rising from planter to crown
-        for (let s = 0; s < 4; s++) {
-            const t = s / 3.0;
+        // 2. 3D Curved Ringed Coconut / Royal Palm Trunk rising from planter to crown (more rings on taller palms)
+        const segs = Math.max(3, Math.round(4 * hm));
+        for (let s = 0; s < segs; s++) {
+            const t = s / (segs - 1);
             const tx = x + leanX * t;
             const ty = y + leanY * t;
-            const tz = baseZ + 0.045 + t * 0.27;
+            const tz = baseZ + 0.045 + t * 0.27 * hm;
             const sz = (7.2 - t * 2.0) * sc;
             const isRing = (s % 2) === 1;
             this.pushSolidQuad3D(
@@ -2616,7 +2618,7 @@ class RetroRenderer {
             palmRect,
             x + leanX * 0.86,
             y + leanY * 0.86,
-            baseZ + 0.33,
+            baseZ + 0.33 * hm,
             baseAngle + 0.45 - breeze * 0.6,
             sc * 0.94,
             SPRITE_DRAW_ORDER.TREES,
@@ -2631,7 +2633,7 @@ class RetroRenderer {
             palmRect,
             x + leanX,
             y + leanY,
-            baseZ + 0.42,
+            baseZ + 0.42 * hm,
             baseAngle + breeze,
             sc * 1.04,
             SPRITE_DRAW_ORDER.TREES,
@@ -3730,7 +3732,7 @@ class RetroRenderer {
                         );
                     }
                     const groundZ = this.getEntityZ(pm, 0.0);
-                    this.renderMiamiPalmTree3D(pm.x, pm.y, groundZ, pm.angle || 0, pm.scale || 1.0, pi + 100);
+                    this.renderMiamiPalmTree3D(pm.x, pm.y, groundZ, pm.angle || 0, pm.scale || 1.0, pi + 100, pm.height || 1.0);
                 }
             }
 
