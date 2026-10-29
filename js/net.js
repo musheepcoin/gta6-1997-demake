@@ -209,10 +209,25 @@ class ViceNetworkManager {
             });
         }
         if (this.chatToggleBtn && this.chatWidget) {
-            this.chatToggleBtn.addEventListener("click", () => {
+            const isMobileInit = typeof window !== "undefined" && (
+                window.innerWidth <= 960 ||
+                window.innerHeight <= 560 ||
+                (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+            );
+            if (isMobileInit) {
+                this.chatWidget.classList.add("chat-collapsed");
+                this.chatToggleBtn.textContent = "+";
+            }
+            const toggleChatCollapse = () => {
                 const collapsed = this.chatWidget.classList.toggle("chat-collapsed");
                 this.chatToggleBtn.textContent = collapsed ? "+" : "–";
-            });
+            };
+            this.chatToggleBtn.addEventListener("click", toggleChatCollapse);
+            const titleWrap = this.chatWidget.querySelector(".mp-chat-title-wrap");
+            if (titleWrap) {
+                titleWrap.style.cursor = "pointer";
+                titleWrap.addEventListener("click", toggleChatCollapse);
+            }
         }
 
         if (this.chatInput) {

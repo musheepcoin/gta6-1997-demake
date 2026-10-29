@@ -983,6 +983,43 @@ class LeonidaGame {
             }
         });
 
+        // Mobile & Tablet Touch Interaction on Canvas (Smartphone UI / HUD Buttons + Two-Finger Pinch Zoom)
+        let pinchStartDist = 0;
+        let pinchStartZoom = 0;
+        this.canvas.addEventListener("touchstart", (e) => {
+            if (document.body) document.body.classList.add("touch-enabled");
+            this.audio.resume();
+            if (e.touches.length === 2 && this.renderer) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                pinchStartDist = Math.hypot(dx, dy);
+                pinchStartZoom = this.renderer.zoomOffsetBlocks || 0;
+                e.preventDefault();
+                return;
+            }
+            if (e.changedTouches.length > 0) {
+                const t = e.changedTouches[0];
+                if (this.renderer && this.renderer.handleCheatsClick(t.clientX, t.clientY, this)) {
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener("touchmove", (e) => {
+            if (e.touches.length === 2 && pinchStartDist > 10 && this.renderer) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                const delta = (pinchStartDist - dist) * 0.025;
+                this.renderer.zoomOffsetBlocks = Math.max(-2.2, Math.min(8.0, pinchStartZoom + delta));
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener("touchend", () => {
+            pinchStartDist = 0;
+        });
+
         const startBtn = document.getElementById("btn-start-game");
         if (startBtn) {
             startBtn.addEventListener("click", () => this.startGame());
@@ -1008,15 +1045,22 @@ class LeonidaGame {
 
         const fullMapCanvas = document.getElementById("fullmap-canvas");
         if (fullMapCanvas) {
-            fullMapCanvas.addEventListener("click", (e) => {
+            const handleFullMapPick = (clientX, clientY) => {
                 const rect = fullMapCanvas.getBoundingClientRect();
-                const u = (e.clientX - rect.left) / rect.width;
-                const v = (e.clientY - rect.top) / rect.height;
+                const u = (clientX - rect.left) / Math.max(1, rect.width);
+                const v = (clientY - rect.top) / Math.max(1, rect.height);
                 const col = u * this.map.cols;
                 const row = v * this.map.rows;
                 this.teleportToTile(col, row);
                 this.toggleFullMap(false);
-            });
+            };
+            fullMapCanvas.addEventListener("click", (e) => handleFullMapPick(e.clientX, e.clientY));
+            fullMapCanvas.addEventListener("touchstart", (e) => {
+                if (e.changedTouches.length > 0) {
+                    e.preventDefault();
+                    handleFullMapPick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                }
+            }, { passive: false });
         }
 
         document.querySelectorAll(".jump-btn").forEach((btn) => {
@@ -1030,7 +1074,213 @@ class LeonidaGame {
             });
         });
 
+        this.initMobileTouchControls();
         this.initYouTubeRadio();
+    }
+
+    initMobileTouchControls() {
+        const joyZone = document.getElementById("touch-joystick-zone");
+        const joyRing = document.getElementById("touch-joy-ring");
+        const joyKnob = document.getElementById("touch-joy-knob");
+        if (!joyZone || !joyRing || !joyKnob) return;
+
+        let activeJoyTouchId = null;
+        const maxRadius = 38;
+
+        const updateJoystick = (clientX, clientY) => {
+            const rect = joyRing.getBoundingClientRect();
+            const cx = rect.left + rect.width * 0.5;
+            const cy = rect.top + rect.height * 0.5;
+            const dx = clientX - cx;
+            const dy = clientY - cy;
+            const dist = Math.hypot(dx, dy);
+            const clamped = Math.min(maxRadius, dist);
+            const angle = Math.atan2(dy, dx);
+            const kx = dist > 0.5 ? Math.cos(angle) * clamped : 0;
+            const ky = dist > 0.5 ? Math.sin(angle) * clamped : 0;
+            joyKnob.style.transform = `translate(${kx.toFixed(1)}px, ${ky.toFixed(1)}px)`;
+
+            const normX = kx / maxRadius;
+            const normY = ky / maxRadius;
+            const mag = Math.min(1.0, dist / maxRadius);
+
+            this.input.joyActive = mag > 0.16;
+            this.input.joyX = normX;
+            this.input.joyY = normY;
+            this.input.joyMag = mag;
+
+            if (this.player && this.player.inVehicle) {
+                // Vehicle steering via horizontal stick + optional forward/reverse if pedals aren't held
+                this.input.left = normX < -0.24;
+                this.input.right = normX > 0.24;
+                if (!this.input.touchGasHeld && !this.input.touchBrakeHeld) {
+                    this.input.up = normY < -0.32;
+                    this.input.down = normY > 0.32;
+                }
+            } else {
+                this.input.left = normX < -0.25;
+                this.input.right = normX > 0.25;
+                this.input.up = normY < -0.25;
+                this.input.down = normY > 0.25;
+                this.input.sprint = mag > 0.72 || Boolean(this.input.touchGasHeld);
+            }
+        };
+
+        const resetJoystick = () => {
+            activeJoyTouchId = null;
+            joyRing.classList.remove("active");
+            joyKnob.style.transform = "translate(0px, 0px)";
+            this.input.joyActive = false;
+            this.input.joyX = 0;
+            this.input.joyY = 0;
+            this.input.joyMag = 0;
+            this.input.left = false;
+            this.input.right = false;
+            if (!this.input.touchGasHeld) this.input.up = false;
+            if (!this.input.touchBrakeHeld) this.input.down = false;
+            if (!this.input.touchGasHeld) this.input.sprint = false;
+        };
+
+        joyZone.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            this.audio.resume();
+            if (activeJoyTouchId === null && e.changedTouches.length > 0) {
+                const t = e.changedTouches[0];
+                activeJoyTouchId = t.identifier;
+                joyRing.classList.add("active");
+                updateJoystick(t.clientX, t.clientY);
+            }
+        }, { passive: false });
+
+        joyZone.addEventListener("touchmove", (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === activeJoyTouchId) {
+                    updateJoystick(t.clientX, t.clientY);
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        const onJoyEnd = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === activeJoyTouchId) {
+                    resetJoystick();
+                    break;
+                }
+            }
+        };
+        joyZone.addEventListener("touchend", onJoyEnd, { passive: false });
+        joyZone.addEventListener("touchcancel", onJoyEnd, { passive: false });
+
+        // Helper for continuous hold buttons (Gas, Brake, Shoot, Jump/Handbrake)
+        const bindHoldBtn = (id, onDown, onUp) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const start = (e) => {
+                e.preventDefault();
+                this.audio.resume();
+                el.classList.add("pressed");
+                onDown();
+            };
+            const end = (e) => {
+                e.preventDefault();
+                el.classList.remove("pressed");
+                onUp();
+            };
+            el.addEventListener("touchstart", start, { passive: false });
+            el.addEventListener("touchend", end, { passive: false });
+            el.addEventListener("touchcancel", end, { passive: false });
+            el.addEventListener("mousedown", start);
+            el.addEventListener("mouseup", end);
+            el.addEventListener("mouseleave", end);
+        };
+
+        bindHoldBtn(
+            "tbtn-shoot",
+            () => {
+                this.input.shoot = true;
+                if (this.player) this.player.mouseShoot = false;
+            },
+            () => {
+                this.input.shoot = false;
+            }
+        );
+
+        bindHoldBtn(
+            "tbtn-gas",
+            () => {
+                this.input.touchGasHeld = true;
+                this.input.up = true;
+                this.input.sprint = true;
+            },
+            () => {
+                this.input.touchGasHeld = false;
+                this.input.up = false;
+                this.input.sprint = false;
+            }
+        );
+
+        bindHoldBtn(
+            "tbtn-brake",
+            () => {
+                this.input.touchBrakeHeld = true;
+                this.input.down = true;
+            },
+            () => {
+                this.input.touchBrakeHeld = false;
+                this.input.down = false;
+            }
+        );
+
+        bindHoldBtn(
+            "tbtn-jump",
+            () => {
+                this.input.handbrake = true;
+                if (this.player && !this.player.inVehicle && !this.player.dead && (this.player.jumpTimer || 0) <= 0) {
+                    this.player.jumpTimer = 0.52;
+                    this.audio.playBeep(440, 0.06, "sine", 0.05);
+                }
+            },
+            () => {
+                this.input.handbrake = false;
+            }
+        );
+
+        // Helper for single-tap action buttons (Steal/Exit Car, Weapon, Horn, Full Map, Smartphone)
+        const bindTapBtn = (id, fn) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            let touched = false;
+            el.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                touched = true;
+                this.audio.resume();
+                el.classList.add("pressed");
+                fn();
+                setTimeout(() => el.classList.remove("pressed"), 140);
+            }, { passive: false });
+            el.addEventListener("click", (e) => {
+                if (touched) {
+                    touched = false;
+                    return;
+                }
+                e.preventDefault();
+                this.audio.resume();
+                fn();
+            });
+        };
+
+        bindTapBtn("tbtn-car", () => this.toggleVehicleEntry());
+        bindTapBtn("tbtn-weapon", () => this.cycleWeapon(1));
+        bindTapBtn("tbtn-horn", () => this.triggerHornOrBurp());
+        bindTapBtn("tbtn-map", () => this.toggleFullMap());
+        bindTapBtn("tbtn-phone", () => {
+            if (this.renderer) {
+                this.renderer.showCheatsWindow = !this.renderer.showCheatsWindow;
+            }
+        });
     }
 
     initYouTubeRadio() {
@@ -2478,7 +2728,14 @@ class LeonidaGame {
         // Move Lucia inside the room
         const speedBoost = (p.speedBoostTimer || 0) > 0 ? 1.28 : 1.0;
         const walkSpeed = (this.input.sprint ? 215 : 155) * speedBoost;
-        if (p.tankControls) {
+        if (this.input.joyActive && (Math.abs(this.input.joyX) > 0.1 || Math.abs(this.input.joyY) > 0.1)) {
+            this.interiorAngle = Math.atan2(this.input.joyY, this.input.joyX);
+            const mag = Math.min(1.0, this.input.joyMag || 1.0);
+            this.interiorX += Math.cos(this.interiorAngle) * walkSpeed * mag * dt;
+            this.interiorY += Math.sin(this.interiorAngle) * walkSpeed * mag * dt;
+            p.isMoving = true;
+            p.walkPhase += dt * (this.input.sprint ? 1.55 : 1.0);
+        } else if (p.tankControls) {
             const turnRate = 4.35;
             if (this.input.left) this.interiorAngle -= turnRate * dt;
             if (this.input.right) this.interiorAngle += turnRate * dt;
@@ -2716,6 +2973,15 @@ class LeonidaGame {
                         p.isMoving = true;
                         p.walkPhase += dt * 1.45;
                     }
+                } else if (this.input.joyActive && (Math.abs(this.input.joyX) > 0.1 || Math.abs(this.input.joyY) > 0.1)) {
+                    // Mobile 360° Virtual Analog Stick On-Foot Movement
+                    p.angle = Math.atan2(this.input.joyY, this.input.joyX);
+                    const mag = Math.min(1.0, this.input.joyMag || 1.0);
+                    const spd = p.jumpTimer > 0 ? Math.max(walkSpeed, 175) : walkSpeed * mag;
+                    p.x += Math.cos(p.angle) * spd * dt;
+                    p.y += Math.sin(p.angle) * spd * dt;
+                    p.isMoving = true;
+                    p.walkPhase += dt * (this.input.sprint ? 1.55 : 1.0);
                 } else if (p.tankControls) {
                     // Authentic 1997 1997 GTA 1 Rotational On-Foot Controls:
                     // Left/Right rotates character; Up walks/runs forward; Down steps backward!

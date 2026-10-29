@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>GRAND THEFT AUTO: VICE CITY '97 — LUCIA EDITION (1997 2.5D Demake)</title>
-    <link rel="stylesheet" href="css/style.css?v=98_34">
+    <link rel="stylesheet" href="css/style.css?v=98_35">
 </head>
 <body>
     <div id="game-container">
@@ -177,6 +177,34 @@
                     />
                     <button type="submit" id="mp-chat-send">SEND ↵</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- MOBILE & TABLET ARCADE TOUCH CONTROLS OVERLAY (Virtual Analog Joystick + Action Cluster) -->
+        <div id="mobile-touch-controls" aria-label="Mobile Touch Controls">
+            <div id="touch-joystick-zone">
+                <div class="touch-joy-ring" id="touch-joy-ring">
+                    <span class="joy-dir joy-n">▲</span>
+                    <span class="joy-dir joy-s">▼</span>
+                    <span class="joy-dir joy-w">◀</span>
+                    <span class="joy-dir joy-e">▶</span>
+                    <div class="touch-joy-knob" id="touch-joy-knob"></div>
+                </div>
+            </div>
+            <div id="touch-actions-zone">
+                <div class="touch-utility-row">
+                    <button type="button" class="touch-util-btn" id="tbtn-phone" title="Toggle Smartphone">📱 TEL</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-map" title="Open Full Map">🗺️ MAP</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-weapon" title="Cycle Weapon">🔄 ARME</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-horn" title="Horn / Siren / Burp">📢 KLAXON</button>
+                </div>
+                <div class="touch-main-grid">
+                    <button type="button" class="touch-act-btn touch-btn-brake" id="tbtn-brake">🔽<small>FREIN</small></button>
+                    <button type="button" class="touch-act-btn touch-btn-gas" id="tbtn-gas">🔼<small>GAZ</small></button>
+                    <button type="button" class="touch-act-btn touch-btn-car" id="tbtn-car">🚗<small>AUTO</small></button>
+                    <button type="button" class="touch-act-btn touch-btn-jump" id="tbtn-jump">⚡<small>SAUT</small></button>
+                    <button type="button" class="touch-act-btn touch-btn-shoot" id="tbtn-shoot">🔫<small>TIR</small></button>
+                </div>
             </div>
         </div>
 
@@ -369,12 +397,12 @@
     </div>
 
     <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=98_34"></script>
-    <script src="js/map.js?v=98_34"></script>
-    <script src="js/entities.js?v=98_34"></script>
-    <script src="js/missions.js?v=98_34"></script>
-    <script src="js/renderer.js?v=98_34"></script>
-    <script src="js/net.js?v=98_34"></script>
-    <script src="js/game.js?v=98_34"></script>
+    <script src="js/audio.js?v=98_35"></script>
+    <script src="js/map.js?v=98_35"></script>
+    <script src="js/entities.js?v=98_35"></script>
+    <script src="js/missions.js?v=98_35"></script>
+    <script src="js/renderer.js?v=98_35"></script>
+    <script src="js/net.js?v=98_35"></script>
+    <script src="js/game.js?v=98_35"></script>
 </body>
 </html>

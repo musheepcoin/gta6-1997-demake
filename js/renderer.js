@@ -29,8 +29,13 @@ class RetroRenderer {
         this.lastFrameDt = 0.0166;
         this.fpsSmoothed = 60.0;
 
-        // Vice City Neon GPS Express Drawer ([C] key or click header toggles open/collapsed)
-        this.showCheatsWindow = true;
+        // Vice City Neon GPS Express Drawer ([C] key or click header toggles open/collapsed; auto-minimized on mobile)
+        const isMobileInit = typeof window !== "undefined" && (
+            window.innerWidth <= 960 ||
+            window.innerHeight <= 560 ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+        );
+        this.showCheatsWindow = !isMobileInit;
         this.cheatsCollapsed = true;
         this.cheatButtons = [];
         this.cameraMode = "follow";
@@ -2448,7 +2453,8 @@ class RetroRenderer {
 
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
-        const distBlocks = Math.max(2.2, this.followHeightBlocks + this.zoomOffsetBlocks);
+        const portraitPullback = aspect < 0.85 ? (0.85 - aspect) * 4.5 : 0.0;
+        const distBlocks = Math.max(2.2, this.followHeightBlocks + this.zoomOffsetBlocks + portraitPullback);
         const camElev = this.camZBlocks + distBlocks;
         this.currentCamElev = camElev;
         this.currentCamDist = distBlocks;
@@ -5076,14 +5082,22 @@ class RetroRenderer {
         const H = this.canvas.height;
         const rw = intr.w || 780;
         const rh = intr.h || 530;
-        const ox = Math.round((W - rw) * 0.5);
-        const oy = Math.round((H - rh) * 0.5) + 12;
+        const iScale = Math.min(1.0, (W - 16) / rw, (H - 80) / rh);
+        const baseOx = Math.round((W - rw * iScale) * 0.5);
+        const baseOy = Math.round((H - rh * iScale) * (iScale < 0.95 ? 0.36 : 0.5)) + (iScale < 0.95 ? 0 : 12);
+        const ox = iScale < 0.999 ? 0 : baseOx;
+        const oy = iScale < 0.999 ? 0 : baseOy;
+        const btnStartIdx = this.cheatButtons.length;
 
         ctx.save();
 
         // Dark backdrop dim over the exterior city view
         ctx.fillStyle = "rgba(6, 9, 18, 0.84)";
         ctx.fillRect(0, 0, W, H);
+        if (iScale < 0.999) {
+            ctx.translate(baseOx, baseOy);
+            ctx.scale(iScale, iScale);
+        }
 
         // 1. Interior Floor Tiles by Venue Theme
         const tileSz = 40;
@@ -5264,6 +5278,16 @@ class RetroRenderer {
             h: exitH
         });
 
+        if (iScale < 0.999) {
+            for (let bi = btnStartIdx; bi < this.cheatButtons.length; bi++) {
+                const b = this.cheatButtons[bi];
+                b.x = baseOx + b.x * iScale;
+                b.y = baseOy + b.y * iScale;
+                b.w *= iScale;
+                b.h *= iScale;
+            }
+        }
+
         ctx.restore();
     }
 
@@ -5366,14 +5390,36 @@ class RetroRenderer {
        6. ALL-IN-ONE VICE CITY SMARTPHONE (Live GPS Map + Vice FM Music + iMessage)
        ======================================================================== */
     renderViceCityTourPanel(ctx, game) {
-        const px = 12;
-        const py = 72;
-        const pw = 224;
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        const isMobile = W <= 960 || H <= 560;
+        const px = isMobile ? 8 : 12;
+        const py = W < 480 ? 54 : (isMobile ? 60 : 72);
         const isPlacesApp = !this.cheatsCollapsed;
         const isMinimized = !this.showCheatsWindow;
-        const ph = isMinimized ? 44 : 388;
+        const pw = (isMobile && isMinimized) ? 142 : 224;
+        const ph = isMinimized ? (isMobile ? 36 : 44) : 388;
+        const pScale = isMinimized
+            ? Math.min(1.0, (W - 16) / 224)
+            : Math.min(1.0, (W - 16) / 228, Math.max(0.56, (H - py - (isMobile ? 140 : 16)) / 392));
+        const btnStartIdx = this.cheatButtons.length;
+        const applyPhoneScaleToButtons = () => {
+            if (pScale >= 0.999) return;
+            for (let bi = btnStartIdx; bi < this.cheatButtons.length; bi++) {
+                const b = this.cheatButtons[bi];
+                b.x = px + (b.x - px) * pScale;
+                b.y = py + (b.y - py) * pScale;
+                b.w *= pScale;
+                b.h *= pScale;
+            }
+        };
 
         ctx.save();
+        if (pScale < 0.999) {
+            ctx.translate(px, py);
+            ctx.scale(pScale, pScale);
+            ctx.translate(-px, -py);
+        }
 
         const rrect = (rx, ry, rw, rh, rad) => {
             ctx.beginPath();
@@ -5432,18 +5478,20 @@ class RetroRenderer {
         const notchH = 11;
         const notchX = sx + (sw - notchW) * 0.5;
         const notchY = sy + 4;
-        rrect(notchX, notchY, notchW, notchH, 5.5);
-        ctx.fillStyle = "#000000";
-        ctx.fill();
-        // Front camera lens inside Dynamic Island
-        ctx.fillStyle = "#0f172a";
-        ctx.beginPath();
-        ctx.arc(notchX + notchW - 9, notchY + notchH * 0.5, 2.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#38bdf8";
-        ctx.beginPath();
-        ctx.arc(notchX + notchW - 9.5, notchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
-        ctx.fill();
+        if (!(isMobile && isMinimized)) {
+            rrect(notchX, notchY, notchW, notchH, 5.5);
+            ctx.fillStyle = "#000000";
+            ctx.fill();
+            // Front camera lens inside Dynamic Island
+            ctx.fillStyle = "#0f172a";
+            ctx.beginPath();
+            ctx.arc(notchX + notchW - 9, notchY + notchH * 0.5, 2.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#38bdf8";
+            ctx.beginPath();
+            ctx.arc(notchX + notchW - 9.5, notchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // Live 24-Hour Clock & Time-of-Day Icon on left of Dynamic Island (Click to advance time phase [N])
         const timeInfo = (game && typeof game.getTimePhaseInfo === "function")
@@ -5488,13 +5536,22 @@ class RetroRenderer {
 
         if (isMinimized) {
             ctx.fillStyle = "#38bdf8";
-            ctx.font = "bold 10px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText("🧭 GPS • 🎵 Music • 💬 SMS [C]", sx + 12, sy + 25);
+            ctx.font = isMobile ? "bold 9px -apple-system, 'Segoe UI', sans-serif" : "bold 10px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillText(isMobile ? "📱 TEL • FM • LIEUX" : "🧭 GPS • 🎵 FM • 📍 LIEUX [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
             this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
             ctx.restore();
+            // On mobile/minimized mode, render a compact live GPS mini-radar directly below the pill so the player always has a live radar!
+            const miniRadarH = isMobile ? 114 : 0;
+            if (miniRadarH > 0) {
+                this.renderPhoneGpsWidget(ctx, game, px, py + ph + 4, pw, miniRadarH, rrect);
+            }
+            applyPhoneScaleToButtons();
             ctx.restore();
             return;
         }
+
+        // Tap top-right of status bar or Dynamic Island to minimize the Smartphone on mobile/desktop
+        this.cheatButtons.push({ id: "MINIMIZE_PHONE", x: notchX, y: sy + 1, w: sx + sw - notchX, h: 16 });
 
         // ====================================================================
         // WIDGET 1 (TOP OF PHONE): LIVE GPS MAP OR 16 FAST-TRAVEL PLACES GRID
@@ -5775,11 +5832,13 @@ class RetroRenderer {
         drawDockTab("TOGGLE_COLLAPSE", "📍 PLACES [C]", sx + 9 + tabW, isPlacesApp);
         drawDockTab("TOGGLE_NIGHT", timeInfo.dockLabel || "☀️ DAY [N]", sx + 11 + tabW * 2, timeInfo.phase !== "DAY");
 
-        // 6. Bottom iOS White Home Indicator Bar
+        // 6. Bottom iOS White Home Indicator Bar (Tap to minimize phone)
         rrect(sx + (sw - 58) * 0.5, sy + sh - 6.5, 58, 3.2, 2);
         ctx.fillStyle = "rgba(248, 250, 252, 0.65)";
         ctx.fill();
+        this.cheatButtons.push({ id: "MINIMIZE_PHONE", x: sx + (sw - 90) * 0.5, y: sy + sh - 11, w: 90, h: 11 });
 
+        applyPhoneScaleToButtons();
         ctx.restore();
         ctx.restore();
     }
@@ -6133,6 +6192,14 @@ class RetroRenderer {
                     this.showCheatsWindow = true;
                     return true;
                 }
+                if (btn.id === "MINIMIZE_PHONE") {
+                    this.showCheatsWindow = false;
+                    return true;
+                }
+                if (btn.id === "CYCLE_WEAPON" && game && typeof game.cycleWeapon === "function") {
+                    game.cycleWeapon(1);
+                    return true;
+                }
                 if (btn.id === "PHONE_TAB_MSG") {
                     this.cheatsCollapsed = true;
                     return true;
@@ -6259,13 +6326,15 @@ class RetroRenderer {
 
         const W = this.canvas.width;
         const H = this.canvas.height;
-        const s = 1.45;
+        const isCompact = W < 768;
+        const isPhonePortrait = W < 480;
+        const s = isPhonePortrait ? 0.90 : (isCompact ? 1.12 : 1.45);
 
         // A. TOP-RIGHT: AUTHENTIC 1997 GTA 1 SCORE, MULTIPLIER & LIVES PANEL
         const scoreStr = String(Math.max(0, Math.floor(game.cash || 0))).padStart(8, "0");
         const scoreW = this.measureGta1FontString("SCORE2", scoreStr, s);
-        const scoreX = W - scoreW - 14;
-        const scoreY = 10;
+        const scoreX = W - scoreW - (isPhonePortrait ? 8 : 14);
+        const scoreY = isPhonePortrait ? 8 : 10;
         this.drawGta1FontString(ctx, "SCORE2", scoreStr, scoreX, scoreY, s, "left");
 
         const mulStr = String(Math.max(1, game.multiplier || 1));
@@ -6285,16 +6354,16 @@ class RetroRenderer {
         this.drawGta1FontString(ctx, "MISSMUL2", livesStr, livesX, scoreY + 13 * s, s, "left");
 
         // B. LEFT PANEL (Top-Left): LUCIA MUGSHOT BADGE + WEAPON, ARMOR, KEY & PAGER POPUP
-        const leftX = 12;
-        const leftY = 12;
-        const iconScale = 1.35;
+        const leftX = isPhonePortrait ? 8 : 12;
+        const leftY = isPhonePortrait ? 8 : 12;
+        const iconScale = isPhonePortrait ? 0.88 : (isCompact ? 1.06 : 1.35);
 
         let iconX = leftX;
         const p = game.player;
 
         // Draw Player 1997 Pixel-Art Portrait Badge + Health Bar (Click to change Character/Nickname [H]!)
-        const mugW = 48;
-        const mugH = 48;
+        const mugW = isPhonePortrait ? 34 : (isCompact ? 40 : 48);
+        const mugH = mugW;
         this.drawPixelPortraitRect(ctx, iconX, leftY, mugW, mugH, p.charId || "LUCIA", {
             bandana: Boolean(p.bandana),
             alert: (game.wantedLevel || 0) > 0
@@ -6302,11 +6371,11 @@ class RetroRenderer {
         this.cheatButtons.push({ id: "OPEN_CHAR_SELECT", x: iconX, y: leftY, w: mugW, h: mugH + 10 });
         // Health Bar right below Player's Mugshot
         ctx.fillStyle = "rgba(10, 12, 20, 0.88)";
-        ctx.fillRect(iconX, leftY + mugH + 2, mugW, 7);
+        ctx.fillRect(iconX, leftY + mugH + 2, mugW, 6);
         const hpRatio = Math.max(0, Math.min(1, (p.hp || 0) / (p.maxHp || 100)));
         ctx.fillStyle = hpRatio > 0.35 ? "#39ff14" : "#ff1e38";
-        ctx.fillRect(iconX + 1, leftY + mugH + 3, Math.round((mugW - 2) * hpRatio), 5);
-        iconX += mugW + 8;
+        ctx.fillRect(iconX + 1, leftY + mugH + 3, Math.round((mugW - 2) * hpRatio), 4);
+        iconX += mugW + (isPhonePortrait ? 5 : 8);
 
         if (p.weapon && p.weapon !== "FIST") {
             let weapSpr = "30";
@@ -6315,6 +6384,7 @@ class RetroRenderer {
             else if (p.weapon === "FLAMETHROWER") weapSpr = "33";
 
             const wDim = this.drawHudSprite(ctx, weapSpr, iconX, leftY, iconScale);
+            this.cheatButtons.push({ id: "CYCLE_WEAPON", x: iconX, y: leftY, w: wDim.w, h: wDim.h });
             if (p.weapon === "ELECTRO") {
                 // GTA 2 ElectroGun HUD tint: crackling cyan glow over the pistol icon
                 ctx.save();
@@ -6328,27 +6398,31 @@ class RetroRenderer {
                 const ammoStr = String(Math.min(999, Math.max(0, ammoVal))).padStart(2, "0");
                 this.drawGta1FontString(ctx, "SUB1", ammoStr, iconX + wDim.w * 0.5, leftY + wDim.h - 10 * iconScale, iconScale, "center");
             }
-            iconX += wDim.w + 6;
+            iconX += wDim.w + (isPhonePortrait ? 4 : 6);
+        } else {
+            this.cheatButtons.push({ id: "CYCLE_WEAPON", x: iconX, y: leftY, w: 36, h: mugH });
         }
 
         if ((p.armor || 0) > 0) {
             const aDim = this.drawHudSprite(ctx, "43", iconX, leftY, iconScale);
             const armStr = String(Math.min(99, Math.ceil(p.armor))).padStart(2, "0");
             this.drawGta1FontString(ctx, "SUB1_RED", armStr, iconX + aDim.w * 0.5, leftY + aDim.h * 0.58, iconScale, "center");
-            iconX += aDim.w + 6;
+            iconX += aDim.w + (isPhonePortrait ? 4 : 6);
         }
 
-        if ((game.jailFreeCards || 0) > 0) {
+        if ((game.jailFreeCards || 0) > 0 && (!isPhonePortrait || iconX + 20 < badgeX)) {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
 
         // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS), DISTRICT BANNER (25/26) & CAR NAME (27)
         if ((game.wantedLevel || 0) > 0) {
             const headSp = this.gta1Meta.sprites.hud["41"];
-            const headW = headSp ? headSp[2] * s : 32;
+            const headScale = isPhonePortrait ? s * 0.85 : s;
+            const headW = headSp ? headSp[2] * headScale : 24;
             const maxHeads = 6;
-            const stripW = maxHeads * (headW + 4);
+            const stripW = maxHeads * (headW + 3);
             let hx = Math.round((W - stripW) * 0.5);
+            const hy = W < 640 ? (leftY + mugH + 10) : 10;
             const flashActive = Math.floor(this.time * 6) % 2 === 0;
 
             for (let i = 0; i < maxHeads; i++) {
@@ -6356,9 +6430,9 @@ class RetroRenderer {
                 const sprId = isLit ? (flashActive ? "41" : "42") : "42";
                 ctx.save();
                 if (!isLit) ctx.globalAlpha = 0.32;
-                this.drawHudSprite(ctx, sprId, hx, 10, s);
+                this.drawHudSprite(ctx, sprId, hx, hy, headScale);
                 ctx.restore();
-                hx += headW + 4;
+                hx += headW + 3;
             }
         }
 
