@@ -1673,7 +1673,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_11", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_52", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -1688,7 +1688,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_11", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_52", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -3819,6 +3819,7 @@ class RetroRenderer {
                 );
             }
 
+            const pCharScale = p.pedType === "bigsmoke" ? 1.22 : 1.15;
             this.batchPedSprite3D(
                 p.pedType || "lucia",
                 frameIdx,
@@ -3826,7 +3827,7 @@ class RetroRenderer {
                 p.y,
                 baseZ + jumpZ,
                 p.angle,
-                pedScale * 1.15,
+                pedScale * pCharScale,
                 (p.muzzleTimer || 0) > 0,
                 isJumpingOrSliding ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.PEDESTRIAN
             );
@@ -4013,7 +4014,8 @@ class RetroRenderer {
                             const sPos = typeof v.getSeatWorldPos === "function"
                                 ? v.getSeatWorldPos(occ.seat)
                                 : { x: v.x + cosA * (occ.seat === 0 ? 1.5 : -7.5), y: v.y + sinA * (occ.seat === 0 ? 1.5 : -7.5) };
-                            const rScale = vScale * (occ.pedType === "lucia" ? 0.94 : 1.04);
+                            const isCustom24 = !((occ.pedType || "").startsWith("civ") || occ.pedType === "gang" || occ.pedType === "police" || occ.pedType === "monk");
+                            const rScale = vScale * (isCustom24 ? 0.94 : 1.04);
                             this.batchPedSprite3D(
                                 occ.pedType || "gang",
                                 occ.seat === 0 ? riderFrame : 84,
@@ -4052,7 +4054,8 @@ class RetroRenderer {
                             const sPos = typeof v.getSeatWorldPos === "function"
                                 ? v.getSeatWorldPos(occ.seat)
                                 : { x: v.x, y: v.y };
-                            const dScale = vScale * (occ.pedType === "lucia" ? 0.88 : 0.98);
+                            const isCustom24 = !((occ.pedType || "").startsWith("civ") || occ.pedType === "gang" || occ.pedType === "police" || occ.pedType === "monk");
+                            const dScale = vScale * (isCustom24 ? 0.88 : 0.98);
                             this.batchPedSprite3D(
                                 occ.pedType || "gang",
                                 97,

@@ -18,7 +18,7 @@ const NET_COLORS = [
     "#f43f5e"  // Ocean Drive Crimson
 ];
 
-const NET_PED_TYPES = ["gang", "civ0", "civ1", "civ2", "civ3", "jason"];
+const NET_PED_TYPES = ["lucia", "jason", "tommy", "trevor", "cj", "niko", "claude", "bigsmoke", "crockett"];
 
 class ViceNetworkManager {
     constructor(game) {
