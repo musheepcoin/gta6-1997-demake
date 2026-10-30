@@ -791,11 +791,16 @@ html, body {
 .mugshot-card canvas {
     width: 58px;
     height: 58px;
-    border: 2px solid #d97706;
-    border-radius: 3px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+    border: 2px solid var(--vice-cyan);
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.75);
     image-rendering: auto;
     flex-shrink: 0;
+}
+
+.mugshot-card.active-mug canvas {
+    border-color: var(--vice-pink);
+    box-shadow: 0 0 12px rgba(255, 42, 133, 0.45), 0 2px 8px rgba(0, 0, 0, 0.75);
 }
 
 .mugshot-meta {

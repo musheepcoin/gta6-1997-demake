@@ -1661,7 +1661,7 @@ class RetroRenderer {
         };
 
         // Load character portraits FIRST so start-modal portraits appear immediately
-        loadImageWithRetry(this.charPortraitsImg, "assets/gta1/gta1_char_portraits.png?v=98_46", () => {
+        loadImageWithRetry(this.charPortraitsImg, "assets/gta1/gta1_char_portraits.png?v=98_51", () => {
             this.charPortraitsReady = true;
             if (window.game && typeof window.game.renderPortraits === "function") {
                 window.game.renderPortraits();
@@ -6951,21 +6951,21 @@ class RetroRenderer {
                 ctx.fillRect(rx + rw * 0.28, ry + rh * 0.56, rw * 0.44, rh * 0.22);
             }
 
-            // Authentic 1997 GTA 1 Cover-Art Double Poster Frame (warm parchment inner + burnt-orange outer)
-            ctx.strokeStyle = opts.alert ? "#ff1e38" : "#d97706";
+            // Vice City Neon Double Frame (hot pink outer + cyan inner)
+            ctx.strokeStyle = opts.alert ? "#ff1e38" : "#ff2a85";
             ctx.lineWidth = Math.max(2, rw * 0.035);
             ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
-            ctx.strokeStyle = "rgba(247, 238, 214, 0.55)";
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.65)";
             ctx.lineWidth = 1;
             ctx.strokeRect(rx + 3, ry + 3, rw - 6, rh - 6);
             ctx.restore();
             return;
         }
 
-        // Clean dark frame while portrait sheet loads (old pixel-art fallback removed)
+        // Clean dark frame while portrait sheet loads
         ctx.fillStyle = "#0b0f19";
         ctx.fillRect(rx, ry, rw, rh);
-        ctx.strokeStyle = opts.alert ? "#ff1e38" : "#d97706";
+        ctx.strokeStyle = opts.alert ? "#ff1e38" : "#ff2a85";
         ctx.lineWidth = Math.max(2, rw * 0.035);
         ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
         ctx.restore();
