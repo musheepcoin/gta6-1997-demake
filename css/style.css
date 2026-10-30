@@ -624,14 +624,14 @@ html, body {
 .title-header {
     text-align: center;
     border-bottom: 2px solid var(--vice-cyan);
-    padding-bottom: 10px;
-    margin-bottom: 12px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .gta-logo-top {
     font-family: var(--font-impact);
-    font-size: 42px;
-    letter-spacing: 3px;
+    font-size: 44px;
+    letter-spacing: 4px;
     color: #fff;
     text-shadow: 4px 4px 0 var(--vice-pink), -2px -2px 0 var(--vice-cyan);
     line-height: 1;
@@ -639,10 +639,110 @@ html, body {
 
 .gta-logo-sub {
     margin-top: 4px;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: bold;
     color: var(--vice-gold);
-    letter-spacing: 3.5px;
+    letter-spacing: 3px;
+}
+
+/* ALL-TIME BEST SCORES LEADERBOARD BAR (TOP OF START MODAL) */
+.alltime-scores-bar {
+    background: linear-gradient(90deg, rgba(15, 23, 42, 0.92), rgba(30, 15, 45, 0.92), rgba(15, 23, 42, 0.92));
+    border: 1.5px solid rgba(250, 204, 21, 0.65);
+    border-radius: 5px;
+    padding: 7px 12px;
+    margin-bottom: 10px;
+    box-shadow: inset 0 0 14px rgba(250, 204, 21, 0.12);
+}
+
+.alltime-scores-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.alltime-scores-title {
+    font-family: var(--font-impact);
+    font-size: 13px;
+    letter-spacing: 1.4px;
+    color: var(--vice-gold);
+    text-shadow: 1px 1px 0 #000;
+}
+
+.alltime-scores-sub {
+    font-size: 9.5px;
+    font-weight: 800;
+    color: var(--vice-cyan);
+    letter-spacing: 1.2px;
+}
+
+.alltime-scores-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+}
+
+.alltime-score-card {
+    background: #090d16;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 4px 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.alltime-score-card.rank-1 {
+    border-color: #facc15;
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.16), rgba(9, 13, 22, 0.95));
+    box-shadow: 0 0 8px rgba(250, 204, 21, 0.25);
+}
+
+.alltime-score-card.rank-2 {
+    border-color: #cbd5e1;
+}
+
+.alltime-score-card.rank-3 {
+    border-color: #f59e0b;
+}
+
+.alltime-score-card.is-self {
+    border-color: var(--vice-pink);
+    box-shadow: 0 0 10px rgba(255, 42, 133, 0.35);
+}
+
+.at-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.at-rank {
+    font-family: var(--font-impact);
+    font-size: 10.5px;
+    color: var(--vice-gold);
+    flex-shrink: 0;
+}
+
+.at-name {
+    font-family: var(--font-arcade);
+    font-size: 10px;
+    font-weight: 800;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.at-score {
+    font-family: var(--font-arcade);
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--gta1-green);
+    letter-spacing: 0.3px;
 }
 
 .dossier-grid {
@@ -1815,6 +1915,14 @@ body.touch-enabled #mobile-touch-controls {
 }
 
 @media (max-width: 580px) {
+    .alltime-scores-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .alltime-score-card:first-child {
+        grid-column: 1 / -1;
+    }
+
     .server-select-list {
         grid-template-columns: 1fr;
         gap: 5px;

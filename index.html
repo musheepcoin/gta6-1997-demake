@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GRAND THEFT AUTO: VICE CITY '97 — LUCIA EDITION (1997 2.5D Demake)</title>
-    <link rel="preload" as="image" href="assets/gta1/gta1_char_portraits.png?v=98_49" fetchpriority="high">
-    <link rel="stylesheet" href="css/style.css?v=98_49">
+    <title>VICE CITY 26</title>
+    <link rel="preload" as="image" href="assets/gta1/gta1_char_portraits.png?v=98_50" fetchpriority="high">
+    <link rel="stylesheet" href="css/style.css?v=98_50">
 </head>
 <body>
     <div id="game-container">
@@ -110,11 +110,11 @@
         <!-- Bottom-Right: Controls Reference Card -->
         <div id="controls-card">
             <div class="controls-title">
-                <span>LEONIDA '97 CONTROLS</span>
-                <span>GTA 1 ENGINE</span>
+                <span>VICE CITY 26 CONTROLS</span>
+                <span>2.5D ENGINE</span>
             </div>
             <div><span class="key-pill">ZQSD</span> / <span class="key-pill">WASD</span> / <span class="key-pill">ARROWS</span> Move &amp; Drive</div>
-            <div><span class="key-pill">M</span> Full GTA 1 Square Map • <span class="key-pill">F</span> Steal / Exit Car</div>
+            <div><span class="key-pill">M</span> Full Square Map • <span class="key-pill">F</span> Steal / Exit Car</div>
             <div><span class="key-pill">G</span> Horn / Siren (Car) or Burp / Fart (Foot!)</div>
             <div><span class="key-pill">K</span> Arm 5s Car Bomb • <span class="key-pill">B</span> Heist Bandana</div>
             <div><span class="key-pill">CLICK</span> / <span class="key-pill">J</span> Shoot • <span class="key-pill">TAB</span> / <span class="key-pill">1-6</span> Weapon</div>
@@ -153,7 +153,7 @@
                 <div class="mp-chat-title-wrap">
                     <span class="mp-chat-dot"></span>
                     <span class="mp-chat-title">💬 CHAT</span>
-                    <span id="mp-chat-room" class="mp-chat-room">[VICE97]</span>
+                    <span id="mp-chat-room" class="mp-chat-room">[VICE26]</span>
                 </div>
                 <div class="mp-chat-actions">
                     <button type="button" id="mp-chat-name-btn" class="mp-chat-mini-btn" title="Change your Online Nickname">✏️ NAME</button>
@@ -212,8 +212,8 @@
             <div class="fullmap-card">
                 <div class="fullmap-header">
                     <div>
-                        <span class="fullmap-title">🗺️ VICE CITY &amp; STATE OF LEONIDA — 1997 MAP (.CMP)</span>
-                        <span class="fullmap-sub">CLICK ANY LOCATION OR PRESET BELOW TO FAST-TRAVEL LUCIA &amp; JASON</span>
+                        <span class="fullmap-title">🗺️ VICE CITY 26 — STATE OF LEONIDA MAP</span>
+                        <span class="fullmap-sub">CLICK ANY LOCATION OR PRESET BELOW TO FAST-TRAVEL</span>
                     </div>
                     <button id="btn-close-fullmap">[ ESC / M — CLOSE ]</button>
                 </div>
@@ -254,12 +254,21 @@
             </div>
         </div>
 
-        <!-- RETRO 1997 CHARACTER & NICKNAME SELECTION MODAL (Opens at Game Entrance & Toggleable with [H]) -->
+        <!-- CHARACTER & NICKNAME SELECTION MODAL (Opens at Game Entrance & Toggleable with [H]) -->
         <div id="start-modal">
             <div class="start-card">
                 <div class="title-header">
-                    <div class="gta-logo-top">GRAND THEFT AUTO: VICE CITY '97</div>
-                    <div class="gta-logo-sub">SELECT YOUR CHARACTER &amp; ONLINE NICKNAME • 1997 2.5D ENGINE</div>
+                    <div class="gta-logo-top">VICE CITY 26</div>
+                    <div class="gta-logo-sub">SELECT YOUR CHARACTER &amp; ONLINE NICKNAME</div>
+                </div>
+
+                <!-- ALL-TIME BEST SCORES LEADERBOARD BAR (TOP 5) -->
+                <div class="alltime-scores-bar" id="alltime-scores-bar">
+                    <div class="alltime-scores-header">
+                        <span class="alltime-scores-title">🏆 ALL-TIME BEST SCORES</span>
+                        <span class="alltime-scores-sub">HALL OF FAME</span>
+                    </div>
+                    <div class="alltime-scores-grid" id="alltime-scores-list"></div>
                 </div>
 
                 <!-- STEP 1: NICKNAME & LIVE SERVER SELECTOR BAR -->
@@ -271,7 +280,7 @@
                                 type="text"
                                 id="start-nickname-input"
                                 maxlength="18"
-                                placeholder="e.g. LUCIA_97, TOMMY_86..."
+                                placeholder="e.g. LUCIA_26, TOMMY_86..."
                                 autocomplete="off"
                             />
                             <button type="button" id="btn-random-nickname" title="Generate Random Vice City Callsign">🎲</button>
@@ -305,14 +314,14 @@
                     </div>
                 </div>
 
-                <!-- STEP 2: 9 ICONIC PLAYABLE GTA LEGENDS -->
-                <div class="char-select-section-title">🎭 CHOOSE YOUR GTA LEGEND (9 PLAYABLE CHARACTERS)</div>
+                <!-- STEP 2: 9 ICONIC PLAYABLE LEGENDS -->
+                <div class="char-select-section-title">🎭 CHOOSE YOUR LEGEND (9 PLAYABLE CHARACTERS)</div>
                 <div class="char-select-grid" id="char-select-grid">
                     <div class="mugshot-card char-select-card active-mug" data-char-id="LUCIA" data-ped-type="lucia" data-color="#ff2a85" data-weapon="PISTOL">
                         <canvas id="lucia-dossier-portrait" class="char-select-canvas" data-char="LUCIA" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">LUCIA CAMINOS</span>
-                            <span class="mug-tag">GTA VI • SOUTH BEACH</span>
+                            <span class="mug-tag">LEONIDA • SOUTH BEACH</span>
                             <span class="mug-perk">🔫 9MM PISTOL + BANDANA [B]</span>
                         </div>
                     </div>
@@ -321,7 +330,7 @@
                         <canvas id="jason-dossier-portrait" class="char-select-canvas" data-char="JASON" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">JASON DUVAL</span>
-                            <span class="mug-tag">GTA VI • LEONIDA KEYS</span>
+                            <span class="mug-tag">LEONIDA • KEYS</span>
                             <span class="mug-perk">🔫 MICRO-UZI + KEVLAR 100%</span>
                         </div>
                     </div>
@@ -330,7 +339,7 @@
                         <canvas class="char-select-canvas" data-char="TOMMY" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">TOMMY VERCETTI</span>
-                            <span class="mug-tag">VICE CITY '86 • KINGPIN</span>
+                            <span class="mug-tag">VICE CITY • KINGPIN</span>
                             <span class="mug-perk">🔫 SHOTGUN + $10,000 VIP</span>
                         </div>
                     </div>
@@ -339,7 +348,7 @@
                         <canvas class="char-select-canvas" data-char="TREVOR" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">TREVOR PHILIPS</span>
-                            <span class="mug-tag">GTA V • T.P. ENTERPRISES</span>
+                            <span class="mug-tag">SANDY SHORES • T.P. INC.</span>
                             <span class="mug-perk">🔥 FLAMETHROWER + RAGE x2</span>
                         </div>
                     </div>
@@ -348,7 +357,7 @@
                         <canvas class="char-select-canvas" data-char="CJ" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">CARL "CJ" JOHNSON</span>
-                            <span class="mug-tag">SAN ANDREAS '92 • GROVE ST.</span>
+                            <span class="mug-tag">SAN ANDREAS • GROVE ST.</span>
                             <span class="mug-perk">🔫 MICRO-UZI + $5,000 CASH</span>
                         </div>
                     </div>
@@ -357,7 +366,7 @@
                         <canvas class="char-select-canvas" data-char="NIKO" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">NIKO BELLIC</span>
-                            <span class="mug-tag">GTA IV • LIBERTY CITY</span>
+                            <span class="mug-tag">LIBERTY CITY • VETERAN</span>
                             <span class="mug-perk">🚀 ROCKET LAUNCHER + ARMOR</span>
                         </div>
                     </div>
@@ -366,7 +375,7 @@
                         <canvas class="char-select-canvas" data-char="CLAUDE" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">CLAUDE SPEED</span>
-                            <span class="mug-tag">GTA III / GTA 2 • SILENT PRO</span>
+                            <span class="mug-tag">LIBERTY CITY • SILENT PRO</span>
                             <span class="mug-perk">🔫 SHOTGUN + MULT x2</span>
                         </div>
                     </div>
@@ -390,18 +399,18 @@
                     </div>
                 </div>
 
-                <button id="btn-start-game">[ ENTER VICE CITY '97 — PLAY NOW (ENTER) ]</button>
+                <button id="btn-start-game">[ ENTER VICE CITY 26 — PLAY NOW (ENTER) ]</button>
             </div>
         </div>
     </div>
 
-    <!-- Modular Zero-Dependency 1997 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=98_49"></script>
-    <script src="js/map.js?v=98_49"></script>
-    <script src="js/entities.js?v=98_49"></script>
-    <script src="js/missions.js?v=98_49"></script>
-    <script src="js/renderer.js?v=98_49"></script>
-    <script src="js/net.js?v=98_49"></script>
-    <script src="js/game.js?v=98_49"></script>
+    <!-- Modular Zero-Dependency 2.5D Engine Scripts -->
+    <script src="js/audio.js?v=98_50"></script>
+    <script src="js/map.js?v=98_50"></script>
+    <script src="js/entities.js?v=98_50"></script>
+    <script src="js/missions.js?v=98_50"></script>
+    <script src="js/renderer.js?v=98_50"></script>
+    <script src="js/net.js?v=98_50"></script>
+    <script src="js/game.js?v=98_50"></script>
 </body>
 </html>

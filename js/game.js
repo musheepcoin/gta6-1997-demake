@@ -895,7 +895,13 @@ class LeonidaGame {
             // Toggle Dossier Modal (H)
             if (code === "KeyH") {
                 const modal = document.getElementById("start-modal");
-                if (modal) modal.classList.toggle("hidden");
+                if (modal) {
+                    const willShow = modal.classList.contains("hidden");
+                    modal.classList.toggle("hidden");
+                    if (willShow && typeof this.renderAllTimeHighScoresUI === "function") {
+                        this.renderAllTimeHighScoresUI();
+                    }
+                }
             }
 
             // Toggle Full Square GTA 1 (.CMP) City Map Modal (M)
@@ -1521,7 +1527,7 @@ class LeonidaGame {
         if (randBtn && nickInput) {
             const presets = [
                 "TREVOR_TP", "CJ_GROVE", "NIKO_LC", "TOMMY_86",
-                "LUCIA_97", "JASON_305", "CLAUDE_III", "BIG_SMOKE",
+                "LUCIA_26", "JASON_305", "CLAUDE_III", "BIG_SMOKE",
                 "CROCKETT_84", "OCEAN_KING"
             ];
             randBtn.addEventListener("click", () => {
@@ -1531,6 +1537,164 @@ class LeonidaGame {
                 if (this.audio) this.audio.playBeep(760, 0.04, "triangle", 0.05);
             });
         }
+
+        this.initAllTimeHighScores();
+        this.renderAllTimeHighScoresUI();
+    }
+
+    initAllTimeHighScores() {
+        const defaultScores = [
+            { name: "TOMMY_86", charId: "TOMMY", score: 50000, color: "#38bdf8" },
+            { name: "CROCKETT", charId: "CROCKETT", score: 35000, color: "#fde047" },
+            { name: "TREVOR_TP", charId: "TREVOR", score: 20000, color: "#f97316" },
+            { name: "CJ_GROVE", charId: "CJ", score: 12500, color: "#22c55e" },
+            { name: "JASON_305", charId: "JASON", score: 7500, color: "#00f0ff" }
+        ];
+        this.allTimeScores = defaultScores.slice();
+        try {
+            const raw = window.localStorage ? window.localStorage.getItem("vc26_alltime_scores_v1") : null;
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    this.mergeAllTimeScores(parsed, false);
+                }
+            }
+        } catch (_e) {}
+    }
+
+    saveAllTimeScores() {
+        try {
+            if (window.localStorage && Array.isArray(this.allTimeScores)) {
+                window.localStorage.setItem("vc26_alltime_scores_v1", JSON.stringify(this.allTimeScores.slice(0, 10)));
+            }
+        } catch (_e) {}
+    }
+
+    getAllTimeHighScores() {
+        if (!Array.isArray(this.allTimeScores)) {
+            this.initAllTimeHighScores();
+        }
+        return this.allTimeScores.slice(0, 5);
+    }
+
+    recordHighScore(name, charId, score, color = "#ff2a85", broadcast = true) {
+        const numScore = Math.floor(Number(score) || 0);
+        if (numScore <= 0) return false;
+        const cleanName = String(name || "PLAYER").trim().slice(0, 18).toUpperCase();
+        if (!cleanName) return false;
+
+        if (!Array.isArray(this.allTimeScores)) {
+            this.initAllTimeHighScores();
+        }
+
+        let updated = false;
+        const existing = this.allTimeScores.find((e) => String(e.name).toUpperCase() === cleanName);
+        if (existing) {
+            if (numScore > existing.score) {
+                existing.score = numScore;
+                if (charId) existing.charId = charId;
+                if (color) existing.color = color;
+                updated = true;
+            }
+        } else {
+            const minTop5 = this.allTimeScores.length < 5 ? 0 : (this.allTimeScores[4] ? this.allTimeScores[4].score : 0);
+            if (numScore > minTop5 || this.allTimeScores.length < 10) {
+                this.allTimeScores.push({
+                    name: cleanName,
+                    charId: charId || "LUCIA",
+                    score: numScore,
+                    color: color || "#ff2a85"
+                });
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            this.allTimeScores.sort((a, b) => (b.score || 0) - (a.score || 0));
+            if (this.allTimeScores.length > 10) {
+                this.allTimeScores.length = 10;
+            }
+            this.saveAllTimeScores();
+            this.renderAllTimeHighScoresUI();
+            if (broadcast && this.net && typeof this.net.broadcastHighScore === "function") {
+                this.net.broadcastHighScore(cleanName, charId || "LUCIA", numScore, color || "#ff2a85");
+            }
+        }
+        return updated;
+    }
+
+    mergeAllTimeScores(entries, render = true) {
+        if (!Array.isArray(entries)) return;
+        if (!Array.isArray(this.allTimeScores)) {
+            this.allTimeScores = [];
+        }
+        for (const item of entries) {
+            if (!item || !item.name) continue;
+            const sc = Math.floor(Number(item.score) || 0);
+            if (sc <= 0) continue;
+            const cleanName = String(item.name).trim().slice(0, 18).toUpperCase();
+            const existing = this.allTimeScores.find((e) => String(e.name).toUpperCase() === cleanName);
+            if (existing) {
+                if (sc > existing.score) {
+                    existing.score = sc;
+                    if (item.charId) existing.charId = item.charId;
+                    if (item.color) existing.color = item.color;
+                }
+            } else {
+                this.allTimeScores.push({
+                    name: cleanName,
+                    charId: item.charId || "LUCIA",
+                    score: sc,
+                    color: item.color || "#00f0ff"
+                });
+            }
+        }
+        this.allTimeScores.sort((a, b) => (b.score || 0) - (a.score || 0));
+        if (this.allTimeScores.length > 10) {
+            this.allTimeScores.length = 10;
+        }
+        this.saveAllTimeScores();
+        if (render) {
+            this.renderAllTimeHighScoresUI();
+        }
+    }
+
+    renderAllTimeHighScoresUI() {
+        const listEl = document.getElementById("alltime-scores-list");
+        if (!listEl) return;
+        const top5 = this.getAllTimeHighScores();
+        const myName = String((this.net && this.net.playerName) || (this.player && this.player.nickname) || "").trim().toUpperCase();
+        const medals = ["🥇 #1", "🥈 #2", "🥉 #3", "#4", "#5"];
+
+        listEl.innerHTML = "";
+        top5.forEach((entry, idx) => {
+            const card = document.createElement("div");
+            const isSelf = myName && String(entry.name).toUpperCase() === myName;
+            card.className = `alltime-score-card rank-${idx + 1}${isSelf ? " is-self" : ""}`;
+
+            const topRow = document.createElement("div");
+            topRow.className = "at-row-top";
+
+            const rankSpan = document.createElement("span");
+            rankSpan.className = "at-rank";
+            rankSpan.textContent = medals[idx] || `#${idx + 1}`;
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "at-name";
+            if (entry.color) nameSpan.style.color = entry.color;
+            nameSpan.textContent = entry.name;
+
+            topRow.appendChild(rankSpan);
+            topRow.appendChild(nameSpan);
+
+            const scoreSpan = document.createElement("div");
+            scoreSpan.className = "at-score";
+            scoreSpan.textContent = `$${Number(entry.score || 0).toLocaleString()}`;
+
+            card.appendChild(topRow);
+            card.appendChild(scoreSpan);
+            listEl.appendChild(card);
+        });
     }
 
     renderPortraits(pagerSpeaker = "JASON") {
@@ -1605,6 +1769,8 @@ class LeonidaGame {
             this.net.setIdentity(chosenNick, chosenCharId, chosenPedType, chosenColor, chosenRoom);
         }
 
+        this.recordHighScore(chosenNick, chosenCharId, this.cash, chosenColor, true);
+        this.renderAllTimeHighScoresUI();
         this.renderPortraits();
         this.updateHud();
 
@@ -1619,10 +1785,11 @@ class LeonidaGame {
         const modal = document.getElementById("start-modal");
         if (modal) modal.classList.add("hidden");
 
+        const displayRoom = chosenRoom === "VICE97" ? "VICE26" : chosenRoom;
         this.addFloatingText(this.player.x, this.player.y - 32, `🎭 ${chosenNick} (${chosenCharId}) READY!`, chosenColor);
         this.sendPager(
             "VICE CITY ONLINE",
-            `Welcome to Vice City '97, ${chosenNick}! Playing as ${chosenCharId} in room [${chosenRoom}].`,
+            `Welcome to Vice City 26, ${chosenNick}! Playing as ${chosenCharId} in room [${displayRoom}].`,
             true
         );
         this.showDistrictBanner(`SOUTH BEACH — ${chosenNick}`);
@@ -1932,7 +2099,7 @@ class LeonidaGame {
             );
 
         if (wasOccupied) {
-            this.addCash(150, "GRAND THEFT AUTO!");
+            this.addCash(150, "CARJACKED!");
             this.ejectVehicleDriver(closest, "CARJACK");
             if (closest.isPolice) {
                 this.setWantedLevel(Math.max(this.wantedLevel, 1));
@@ -2377,6 +2544,10 @@ class LeonidaGame {
         } else {
             this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}`, "#39ff14");
         }
+
+        const pName = (this.net && this.net.playerName) || (this.player && this.player.nickname) || "LUCIA";
+        const pColor = (this.net && this.net.playerColor) || "#ff2a85";
+        this.recordHighScore(pName, (this.player && this.player.charId) || "LUCIA", this.cash, pColor, true);
 
         // Classic 1997 GTA 1 Chapter Target Score ($1,000,000) Check!
         if (!this.chapterCleared && this.cash >= this.targetScore) {

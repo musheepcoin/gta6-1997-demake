@@ -2784,16 +2784,16 @@ class RetroRenderer {
             const cy = H * 0.5;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.font = "bold 28px Consolas, 'Courier New', monospace";
+            ctx.font = "bold 32px Consolas, 'Courier New', monospace";
             ctx.fillStyle = "#ff2a85";
-            ctx.fillText("GRAND THEFT AUTO: VICE CITY '97", cx + 2, cy - 42 + 2);
+            ctx.fillText("VICE CITY 26", cx + 2, cy - 42 + 2);
             ctx.fillStyle = "#00f0ff";
-            ctx.fillText("GRAND THEFT AUTO: VICE CITY '97", cx, cy - 42);
+            ctx.fillText("VICE CITY 26", cx, cy - 42);
 
             ctx.font = "bold 14px Consolas, 'Courier New', monospace";
             ctx.fillStyle = "#fde047";
             const pct = Math.min(99, Math.round(((this.loadProgress || 0) / (this.loadTotal || 4)) * 100));
-            ctx.fillText(`LOADING 3D VICE CITY WORLD & GTA 2 ASSETS... ${pct}%`, cx, cy - 8);
+            ctx.fillText(`LOADING 3D VICE CITY 26 WORLD... ${pct}%`, cx, cy - 8);
 
             const bw = 340;
             const bh = 16;
@@ -6400,6 +6400,57 @@ class RetroRenderer {
 
         const livesX = scoreX - 6 - livesW;
         this.drawGta1FontString(ctx, "MISSMUL2", livesStr, livesX, scoreY + 13 * s, s, "left");
+
+        // A2. TOP-RIGHT ALL-TIME BEST SCORES MINI-TABLE (Below Score Counter)
+        if (!isPhonePortrait && typeof game.getAllTimeHighScores === "function") {
+            const topScores = game.getAllTimeHighScores().slice(0, 3);
+            if (topScores.length > 0) {
+                const lbW = isCompact ? 176 : 196;
+                const rowH = isCompact ? 13 : 14;
+                const lbH = 18 + topScores.length * rowH + 4;
+                const lbX = W - lbW - 14;
+                const lbY = Math.round(scoreY + 26 * s + 4);
+                const myName = String((game.net && game.net.playerName) || (game.player && game.player.nickname) || "").trim().toUpperCase();
+
+                ctx.save();
+                ctx.fillStyle = "rgba(9, 13, 22, 0.82)";
+                ctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                if (typeof ctx.roundRect === "function") {
+                    ctx.roundRect(lbX, lbY, lbW, lbH, 5);
+                } else {
+                    ctx.rect(lbX, lbY, lbW, lbH);
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                ctx.textBaseline = "middle";
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#facc15";
+                ctx.fillText("🏆 ALL-TIME BEST SCORES", lbX + 7, lbY + 10);
+
+                const medals = ["#1", "#2", "#3"];
+                for (let i = 0; i < topScores.length; i++) {
+                    const item = topScores[i];
+                    const ry = lbY + 20 + i * rowH + 3;
+                    const isSelf = myName && String(item.name).toUpperCase() === myName;
+                    ctx.font = "bold 10px Consolas, 'Courier New', monospace";
+                    ctx.textAlign = "left";
+                    ctx.fillStyle = i === 0 ? "#fde047" : (i === 1 ? "#cbd5e1" : "#f59e0b");
+                    ctx.fillText(medals[i], lbX + 7, ry);
+
+                    ctx.fillStyle = isSelf ? "#ff2a85" : (item.color || "#f8fafc");
+                    ctx.fillText(String(item.name || "PLAYER").slice(0, 11), lbX + 26, ry);
+
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillText(`$${Number(item.score || 0).toLocaleString()}`, lbX + lbW - 7, ry);
+                }
+                ctx.restore();
+            }
+        }
 
         // B. LEFT PANEL (Top-Left): LUCIA MUGSHOT BADGE + WEAPON, ARMOR, KEY & PAGER POPUP
         const leftX = isPhonePortrait ? 8 : 12;

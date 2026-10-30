@@ -172,6 +172,10 @@ class ViceNetworkManager {
         }
     }
 
+    getRoomDisplayName(code = this.roomCode) {
+        return code === "VICE97" ? "VICE26" : code;
+    }
+
     switchServer(newRoomCode) {
         const cleanRoom = String(newRoomCode || "VICE97").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
         if (!cleanRoom) return;
@@ -180,7 +184,7 @@ class ViceNetworkManager {
             this.roomCode = cleanRoom;
             this.remotePlayers.clear();
             if (this.chatRoomBadge) {
-                this.chatRoomBadge.textContent = `[${this.roomCode}]`;
+                this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
             }
             this.initBroadcastChannel();
             this.claimRoomSlot(0);
@@ -203,7 +207,7 @@ class ViceNetworkManager {
         this.chatToggleBtn = document.getElementById("mp-chat-toggle-btn");
 
         if (this.chatRoomBadge) {
-            this.chatRoomBadge.textContent = `[${this.roomCode}]`;
+            this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
         }
         if (this.chatNameBtn) {
             this.chatNameBtn.textContent = `✏️ ${this.playerName.slice(0, 12)}`;
@@ -278,7 +282,7 @@ class ViceNetworkManager {
 
         this.addChatLog(
             "VICE NET",
-            `🟢 Room [${this.roomCode}] • ${this.playerName}`,
+            `🟢 Room [${this.getRoomDisplayName()}] • ${this.playerName}`,
             "#00f0ff",
             true
         );
@@ -359,7 +363,7 @@ class ViceNetworkManager {
             this.roomCode = cleanRoom;
             this.remotePlayers.clear();
             if (this.chatRoomBadge) {
-                this.chatRoomBadge.textContent = `[${this.roomCode}]`;
+                this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
             }
             this.initBroadcastChannel();
             this.claimRoomSlot(0);
@@ -384,7 +388,7 @@ class ViceNetworkManager {
         }
         this.addChatLog(
             "VICE NET",
-            `🟢 Room [${this.roomCode}] • ${this.playerName} (${charId || "LUCIA"})`,
+            `🟢 Room [${this.getRoomDisplayName()}] • ${this.playerName} (${charId || "LUCIA"})`,
             this.playerColor,
             true
         );
@@ -457,9 +461,9 @@ class ViceNetworkManager {
                 if (lower.includes("race") || lower.includes("course")) {
                     reply = "Vas-y ! Départ Ocean Drive jusqu'au Pier, le dernier paie sa tournée au Club Nine1Nine ! 🏎️💨";
                 } else if (lower.includes("yo") || lower.includes("salut") || lower.includes("hello") || lower.includes("slt") || lower.includes("cc")) {
-                    reply = `Yo ${this.playerName} ! Bienvenue dans Vice City '97 ! 👋🌴`;
+                    reply = `Yo ${this.playerName} ! Bienvenue dans Vice City 26 ! 👋🌴`;
                 } else if (lower.includes("gg") || lower.includes("bien joué")) {
-                    reply = "GG ! Ce moteur 1997 tourne comme une horloge ! 🔥";
+                    reply = "GG ! Ce moteur tourne comme une horloge ! 🔥";
                 } else if (lower.includes("gps") || lower.includes("rejoins") || lower.includes("me")) {
                     reply = "J'arrive plein gaz sur ta position GPS ! 📍🚓";
                 }
@@ -682,11 +686,27 @@ class ViceNetworkManager {
                     );
                 }
             }
-            // Reply with our current state immediately so the newcomer sees us right away
+            // Reply with our current state & all-time high scores immediately so the newcomer sees us right away
             this.broadcastStateNow();
+            if (this.game && typeof this.game.getAllTimeHighScores === "function") {
+                this.sendPacket({
+                    t: "LEADERBOARD_SYNC",
+                    entries: this.game.getAllTimeHighScores()
+                });
+            }
             if (this.isWorldHost()) {
                 this.broadcastWorldSync();
             }
+            return;
+        }
+
+        if (pkt.t === "LEADERBOARD_SYNC" && this.game && typeof this.game.mergeAllTimeScores === "function") {
+            this.game.mergeAllTimeScores(pkt.entries, true);
+            return;
+        }
+
+        if (pkt.t === "HISCORE" && this.game && typeof this.game.recordHighScore === "function") {
+            this.game.recordHighScore(pkt.name, pkt.charId || "LUCIA", pkt.sc || 0, pkt.color || "#00f0ff", false);
             return;
         }
 
@@ -740,6 +760,9 @@ class ViceNetworkManager {
             rp.kills = pkt.k || 0;
             rp.veh = pkt.veh || null;
             rp.lastSeen = performance.now();
+            if (typeof pkt.sc === "number" && pkt.sc > 0 && this.game && typeof this.game.recordHighScore === "function") {
+                this.game.recordHighScore(rp.name, pkt.charId || "LUCIA", pkt.sc, rp.color, false);
+            }
 
             if (!rp.initialized) {
                 rp.x = rp.targetX;
@@ -1410,7 +1433,20 @@ class ViceNetworkManager {
             wp: Math.round((p.walkPhase || 0) * 100) / 100,
             mz: (p.muzzleTimer || 0) > 0 ? 0.08 : 0,
             k: this.kills,
+            sc: Math.round(this.game.cash || 0),
+            charId: p.charId || "LUCIA",
             veh: vehData
+        });
+    }
+
+    broadcastHighScore(name, charId, score, color) {
+        if (!this.enabled) return;
+        this.sendPacket({
+            t: "HISCORE",
+            name,
+            charId: charId || "LUCIA",
+            sc: Math.round(score || 0),
+            color: color || "#ff2a85"
         });
     }
 
@@ -1699,6 +1735,9 @@ class ViceNetworkManager {
             const modal = document.getElementById("start-modal");
             if (modal) {
                 modal.classList.remove("hidden");
+            }
+            if (this.game && typeof this.game.renderAllTimeHighScoresUI === "function") {
+                this.game.renderAllTimeHighScoresUI();
             }
             this.addChatLog(
                 "VICE NET",
