@@ -559,7 +559,7 @@ class LeonidaMap {
 
                 if (isSandTile) {
                     this.coastalSandMask[idx] = 1;
-                    if (((c * 7 + r * 13) % 14) === 0 && c >= 216 && c <= 246) {
+                    if (!adjRoad && ((c * 7 + r * 13) % 14) === 0 && c >= 216 && c <= 246) {
                         this.beachUmbrellas.push({
                             x: (c + 0.5) * TILE_SIZE,
                             y: (r + 0.5) * TILE_SIZE,
@@ -622,7 +622,7 @@ class LeonidaMap {
             // 3. Official GTA 6 Neon Landmark Marquees on the 3D Buildings
             { spr: "sign_hotel_dixon", x: 212.3 * TILE_SIZE, y: 145.0 * TILE_SIZE, z: 2.35, scale: 1.20, angle: 0 },
             { spr: "sign_ocean_view",  x: 212.3 * TILE_SIZE, y: 151.0 * TILE_SIZE, z: 2.35, scale: 1.15, angle: 0 },
-            { spr: "sign_nine1nine",   x: 212.3 * TILE_SIZE, y: 47.5 * TILE_SIZE,  z: 2.35, scale: 1.20, angle: 0 },
+            { spr: "sign_nine1nine",   x: 212.3 * TILE_SIZE, y: 50.5 * TILE_SIZE,  z: 2.35, scale: 1.20, angle: 0 },
             { spr: "sign_malibu",      x: 212.3 * TILE_SIZE, y: 87.5 * TILE_SIZE,  z: 2.35, scale: 1.18, angle: 0 },
             { spr: "sign_jack_hearts", x: 113.2 * TILE_SIZE, y: 78.5 * TILE_SIZE,  z: 2.35, scale: 1.20, angle: 0 },
             { spr: "sign_uncle_jacks", x: 35.2 * TILE_SIZE,  y: 140.5 * TILE_SIZE, z: 2.35, scale: 1.20, angle: 0 },
@@ -790,7 +790,7 @@ class LeonidaMap {
             });
         }
         // Biscayne Bay swimmers & surfers along West Beach shoreline (c = 190.2)
-        for (const by of [103.5, 109.5, 114.5, 120.5]) {
+        for (const by of [103.5, 114.5, 120.5]) {
             this.beachSwimmers.push({
                 x: 190.2 * TILE_SIZE,
                 y: by * TILE_SIZE,
@@ -800,6 +800,155 @@ class LeonidaMap {
                 pedType: (by > 112) ? "bikini_pink" : "bikini_cyan",
                 boardSpr: "surfboard_cyan"
             });
+        }
+
+        // Strict Ground-Truth Validation & Snap Pass for all Beach Props, Sunbathers, Courts, Parties & Swimmers:
+        // Guarantees no towel, umbrella, sunbather, surfboard, volleyball court, lifeguard tower, or swimmer ever
+        // lands on or adjacent to a ROAD, bridge, causeway, building, stone sidewalk, or wooden pier!
+        const isCleanSandTile = (c, r, allowStarIsland = false) => {
+            if (c < 2 || c >= MAP_COLS - 2 || r < 2 || r >= MAP_ROWS - 2) return false;
+            const idx = r * MAP_COLS + c;
+            const isStarLawn = allowStarIsland && c >= 183 && c <= 185 && r >= 111 && r <= 115 && this.surfaceGround[idx] === GROUND_TYPE.FIELD;
+            if (!this.coastalSandMask[idx] && !isStarLawn) return false;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    const nr = r + dr;
+                    const nc = c + dc;
+                    const nIdx = nr * MAP_COLS + nc;
+                    const gt = this.surfaceGround[nIdx];
+                    const lid = this.getBlockInfo(nc, nr, 1)?.lid || 0;
+                    if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING || lid === 77) {
+                        return false;
+                    }
+                    if (!isStarLawn && (dr === 0 || dc === 0) && !this.coastalSandMask[nIdx]) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        const snapPxToCleanSand = (px, py, allowStarIsland = false) => {
+            const cxF = px / TILE_SIZE;
+            const ryF = py / TILE_SIZE;
+            const c0 = Math.floor(cxF);
+            const r0 = Math.floor(ryF);
+            const fracX = cxF - c0;
+            if (isCleanSandTile(c0, r0, allowStarIsland)) return { x: px, y: py };
+            const offsets = [1, -1, 2, -2, 3, -3, 4, -4, 5];
+            for (const dc of offsets) {
+                if (isCleanSandTile(c0 + dc, r0, allowStarIsland)) {
+                    return { x: (c0 + dc + fracX) * TILE_SIZE, y: py };
+                }
+            }
+            return null;
+        };
+
+        const isCleanWaterTile = (c, r) => {
+            if (c < 2 || c >= MAP_COLS - 2 || r < 2 || r >= MAP_ROWS - 2) return false;
+            if (this.surfaceGround[r * MAP_COLS + c] !== GROUND_TYPE.WATER) return false;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    const nr = r + dr;
+                    const nc = c + dc;
+                    const gt = this.surfaceGround[nr * MAP_COLS + nc];
+                    const lid = this.getBlockInfo(nc, nr, 1)?.lid || 0;
+                    if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.BUILDING || lid === 77) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        const snapPxToCleanWater = (px, py) => {
+            const cxF = px / TILE_SIZE;
+            const ryF = py / TILE_SIZE;
+            const c0 = Math.floor(cxF);
+            const r0 = Math.floor(ryF);
+            const fracX = cxF - c0;
+            if (isCleanWaterTile(c0, r0)) return { x: px, y: py };
+            const dirs = c0 > 210 ? [1, 2, 3, 4, -1, -2] : [-1, -2, -3, -4, 1, 2];
+            for (const dc of dirs) {
+                if (isCleanWaterTile(c0 + dc, r0)) {
+                    return { x: (c0 + dc + fracX) * TILE_SIZE, y: py };
+                }
+            }
+            return null;
+        };
+
+        this.beachUmbrellas = this.beachUmbrellas.filter(u => isCleanSandTile(Math.floor(u.x / TILE_SIZE), Math.floor(u.y / TILE_SIZE), false));
+
+        this.beachSunbathers = this.beachSunbathers.filter(sb => {
+            const snapped = snapPxToCleanSand(sb.x, sb.y, sb.towelSpr === "beach_lounger");
+            if (!snapped) return false;
+            sb.x = snapped.x;
+            sb.y = snapped.y;
+            return true;
+        });
+
+        this.beachVolleyballCourts = this.beachVolleyballCourts.filter(vc => {
+            const snapped = snapPxToCleanSand(vc.x, vc.y, false);
+            if (!snapped) return false;
+            vc.x = snapped.x;
+            vc.y = snapped.y;
+            return true;
+        });
+
+        this.beachParties = this.beachParties.filter(bp => {
+            const snapped = snapPxToCleanSand(bp.x, bp.y, false);
+            if (!snapped) return false;
+            bp.x = snapped.x;
+            bp.y = snapped.y;
+            return true;
+        });
+
+        this.beachProps = this.beachProps.filter(pr => {
+            if (!pr.spr || !pr.spr.startsWith("lifeguard_")) return true;
+            const snapped = snapPxToCleanSand(pr.x, pr.y, false);
+            if (!snapped) return false;
+            pr.x = snapped.x;
+            pr.y = snapped.y;
+            return true;
+        });
+
+        this.beachSwimmers = this.beachSwimmers.filter(sw => {
+            const snapped = snapPxToCleanWater(sw.x, sw.y);
+            if (!snapped) return false;
+            sw.x = snapped.x;
+            sw.y = snapped.y;
+            return true;
+        });
+
+        // Snap any sidewalk/park props (crates, infoSigns, streetFires, pickups, killFrenzies) off ROAD/BUILDING/WATER tiles
+        const snapPxToPedSurface = (px, py) => {
+            const c0 = Math.floor(px / TILE_SIZE);
+            const r0 = Math.floor(py / TILE_SIZE);
+            if (c0 < 2 || c0 >= MAP_COLS - 2 || r0 < 2 || r0 >= MAP_ROWS - 2) return { x: px, y: py };
+            const gt0 = this.surfaceGround[r0 * MAP_COLS + c0];
+            if (gt0 === GROUND_TYPE.PAWEMENT || gt0 === GROUND_TYPE.FIELD) return { x: px, y: py };
+            for (let rad = 1; rad <= 4; rad++) {
+                for (let dr = -rad; dr <= rad; dr++) {
+                    for (let dc = -rad; dc <= rad; dc++) {
+                        if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+                        const nr = r0 + dr;
+                        const nc = c0 + dc;
+                        const gt = this.surfaceGround[nr * MAP_COLS + nc];
+                        if (gt === GROUND_TYPE.PAWEMENT || gt === GROUND_TYPE.FIELD) {
+                            return { x: (nc + 0.5) * TILE_SIZE, y: (nr + 0.5) * TILE_SIZE };
+                        }
+                    }
+                }
+            }
+            return { x: px, y: py };
+        };
+        for (const list of [this.crates, this.infoSigns, this.streetFires, this.pickups, this.killFrenzies]) {
+            if (!Array.isArray(list)) continue;
+            for (const item of list) {
+                const s = snapPxToPedSurface(item.x, item.y);
+                item.x = s.x;
+                item.y = s.y;
+            }
         }
 
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
