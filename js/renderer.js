@@ -890,6 +890,9 @@ class RetroRenderer {
                     if (Array.isArray(ve.remaps)) {
                         for (const rm of ve.remaps) closeBoxHoles(rm, true, false);
                     }
+                    if (Array.isArray(ve.sirens)) {
+                        for (const sr of ve.sirens) closeBoxHoles(sr, true, false);
+                    }
                     if (Array.isArray(ve.doors)) {
                         for (const dr of ve.doors) closeBoxHoles(dr, true, false);
                     }
@@ -945,6 +948,30 @@ class RetroRenderer {
                         }
                         if (Array.isArray(ve.doors)) {
                             for (const dr of ve.doors) toNeutralDeltaOverlay(dr, true);
+                        }
+                        if (Array.isArray(ve.sirens)) {
+                            for (const sr of ve.sirens) {
+                                if (!Array.isArray(sr) || sr.length < 4) continue;
+                                const [sx, sy, sw, sh] = sr;
+                                if (sw !== bw || sh !== bh) continue;
+                                for (let ly = 0; ly < bh; ly++) {
+                                    for (let lx = 0; lx < bw; lx++) {
+                                        const bp = ((by + ly) * W + (bx + lx)) * 4;
+                                        const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                                        if (
+                                            d[sp] === d[bp] &&
+                                            d[sp + 1] === d[bp + 1] &&
+                                            d[sp + 2] === d[bp + 2] &&
+                                            d[sp + 3] === d[bp + 3]
+                                        ) {
+                                            d[sp] = 0;
+                                            d[sp + 1] = 0;
+                                            d[sp + 2] = 0;
+                                            d[sp + 3] = 0;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1722,7 +1749,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=98_52", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_14", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -4175,7 +4202,7 @@ class RetroRenderer {
             if (!v.destroyed && v.driver && v.isEmergency && v.sirenActive && sirens.length > 0) {
                 const sIdx = Math.floor(this.time * 10) % sirens.length;
                 const sRect = sirens[sIdx];
-                if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF);
+                if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF, 1, 1, 1, 1, totalPitchZ);
             }
 
             // Tank Turret & Barrel (Sprite 267 — eSpriteDrawOrder_CarRoof)
@@ -6491,7 +6518,10 @@ class RetroRenderer {
         const isMotorcycle = Boolean(v.isMotorcycle || specObj.isMotorcycle);
 
         if (v.specKey === "VCPD_CRUISER" || sprId === "73") {
-            return { sprId: "73", useBaseObject: false, remapIdx: 0, isConvertible: false, isTank: false };
+            return { sprId: "73", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
+        }
+        if (v.specKey === "SWAT_ENFORCER" || (v.isPolice && sprId === "76")) {
+            return { sprId: "76", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
         }
 
         const hasRemap = typeof v.remapIdx === "number" && v.remapIdx >= 0 && !v.useBaseOnly && !specObj.useBaseOnly;

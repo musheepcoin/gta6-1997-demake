@@ -610,6 +610,7 @@ const VEHICLE_SPECS = {
         stripeColor: "#38bdf8",
         bodyStyle: "TRUCK",
         isPolice: true,
+        useBaseOnly: true,
         amphibious: false
     },
     AIRBOAT: {
