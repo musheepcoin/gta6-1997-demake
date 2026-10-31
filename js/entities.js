@@ -1778,7 +1778,7 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            forceDirect ? 0.70 : 0.96,
+            forceDirect ? 0.62 : 0.84,
             Boolean(wantedTarget.inVehicle && targetOnRoad),
             forceDirect
         );

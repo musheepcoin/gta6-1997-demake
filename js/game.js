@@ -2599,6 +2599,11 @@ class LeonidaGame {
 
     setWantedLevel(level) {
         const clamped = Math.max(0, Math.min(6, Math.floor(level)));
+        if (this.wantedLevel === 0 && clamped > 0) {
+            this.copSpawnTimer = -3.5; // Give the player a fair head-start before the first VCPD dispatch arrives!
+        } else if (clamped === 0) {
+            this.copSpawnTimer = 0;
+        }
         if (clamped > this.wantedLevel && !this.player.ankleScrambled) {
             this.audio.playAnkleMonitorAlert();
         }
@@ -4000,8 +4005,8 @@ class LeonidaGame {
                     const dTarget = Math.hypot(copTarget.x - ped.x, copTarget.y - ped.y);
                     if (dTarget > 28) {
                         ped.angle = this.steerPedWithObstacleFeelers(ped, copTarget.x, copTarget.y);
-                        ped.x += Math.cos(ped.angle) * 98 * dt;
-                        ped.y += Math.sin(ped.angle) * 98 * dt;
+                        ped.x += Math.cos(ped.angle) * 84 * dt;
+                        ped.y += Math.sin(ped.angle) * 84 * dt;
                     } else {
                         ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
                         if (!copTarget.isRemote && !p.dead) {
@@ -4243,6 +4248,7 @@ class LeonidaGame {
         // 7. VCPD Police Spawner, Roadblocks (Wanted >= 3) & Wanted Decay
         let nearestCopDist = 9999;
         let activeCopCars = 0;
+        let activeFootCopsNear = 0;
         for (const v of this.vehicles) {
             if (v.isPolice && !v.destroyed && v.driver === "AI_COP") {
                 activeCopCars++;
@@ -4254,6 +4260,7 @@ class LeonidaGame {
             if (!ped.dead && ped.kind === "COP") {
                 const d = Math.hypot(ped.x - p.x, ped.y - p.y);
                 if (d < nearestCopDist) nearestCopDist = d;
+                if (d < 850) activeFootCopsNear++;
             }
         }
 
@@ -4270,21 +4277,24 @@ class LeonidaGame {
             const spawnTarget = this.getNearestWantedTarget(p.x, p.y) || { x: p.x, y: p.y, z: p.z || 2.0, angle: p.angle || 0, wantedLevel: maxRoomWanted };
             const tWanted = spawnTarget.wantedLevel || maxRoomWanted;
             this.copSpawnTimer += dt;
-            const maxCops = Math.min(5, tWanted + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
-            if (activeCopCars < maxCops && this.copSpawnTimer > 7.5) {
+            const maxCops = Math.min(4, Math.ceil(tWanted * 0.75) + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
+            const totalActiveUnits = activeCopCars + activeFootCopsNear;
+            const spawnInterval = tWanted <= 1 ? 15.5 : (tWanted === 2 ? 13.0 : (tWanted === 3 ? 11.0 : 9.5));
+            if (totalActiveUnits < maxCops && this.copSpawnTimer > spawnInterval) {
                 this.copSpawnTimer = 0;
                 const baseBx = Math.floor(spawnTarget.x / TILE_SIZE);
                 const baseBy = Math.floor(spawnTarget.y / TILE_SIZE);
                 const pz = spawnTarget.z || 2.0;
-                for (let attempt = 0; attempt < 8; attempt++) {
+                for (let attempt = 0; attempt < 18; attempt++) {
                     const ang = Math.random() * Math.PI * 2;
-                    const distB = 9.5 + Math.random() * 4.0;
+                    const distB = 13.5 + Math.random() * 5.0; // 860..1180px away so police arrive progressively from a distance
                     const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                     const by = Math.floor(baseBy + Math.sin(ang) * distB);
                     const navBlk = this.map.getNavigationBlock(bx, by, pz);
                     if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                         const sx = (bx + 0.5) * TILE_SIZE;
                         const sy = (by + 0.5) * TILE_SIZE;
+                        if (Math.hypot(sx - spawnTarget.x, sy - spawnTarget.y) < 760) continue;
                         const toPlayerAng = Math.atan2(spawnTarget.y - sy, spawnTarget.x - sx);
                         const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                             ? this.map.getAlignedRoadAngle(bx, by, toPlayerAng, pz)
@@ -4293,9 +4303,9 @@ class LeonidaGame {
                         const copCar = new Vehicle(`cop_${Date.now()}_${attempt}`, specKey, sx, sy, roadAng);
                         copCar.z = this.map.getHeightAtPixel(sx, sy, 4.0);
                         copCar.driver = "AI_COP";
-                        copCar.speed = 140;
-                        copCar.vx = Math.cos(roadAng) * 140;
-                        copCar.vy = Math.sin(roadAng) * 140;
+                        copCar.speed = 105;
+                        copCar.vx = Math.cos(roadAng) * 105;
+                        copCar.vy = Math.sin(roadAng) * 105;
                         this.vehicles.push(copCar);
                         break;
                     }
