@@ -934,102 +934,102 @@ class RetroAudioEngine {
         if (!this.initialized || this.muted || !this.ctx) return;
 
         if (weaponType === "FIST") {
-            if (!this.playSample("melee_swing", 0.135, 0.92 + Math.random() * 0.18, 0.28)) {
-                this.playBandNoise(0.065, 420, 1.4, 0.032);
-                this.playBeep(115, 0.045, "sine", 0.028);
+            if (!this.playSample("melee_swing", 0.085, 0.92 + Math.random() * 0.18, 0.28)) {
+                this.playBandNoise(0.065, 420, 1.4, 0.025);
+                this.playBeep(115, 0.045, "sine", 0.022);
             }
             return;
         }
         if (weaponType === "FLAMETHROWER") {
-            const ok = this.playSample("gta_shot_flamethrower", 0.125, 0.92 + Math.random() * 0.16, 0.28);
-            this.playSample("flame_burst", 0.085, 0.94 + Math.random() * 0.16, 0.22);
+            const ok = this.playSample("gta_shot_flamethrower", 0.055, 0.92 + Math.random() * 0.16, 0.28);
+            this.playSample("flame_burst", 0.036, 0.94 + Math.random() * 0.16, 0.22);
             if (!ok) {
-                this.playNoise(0.11, 600, 0.045);
+                this.playNoise(0.11, 600, 0.032);
             }
             return;
         }
         if (weaponType === "ELECTRO") {
-            const ok = this.playSample("electro_zap", 0.125, 1.15 + Math.random() * 0.25, 0.22);
-            this.playSample("gta_ricochet", 0.065, 1.32 + Math.random() * 0.18, 0.16);
+            const ok = this.playSample("electro_zap", 0.055, 1.15 + Math.random() * 0.25, 0.22);
+            this.playSample("gta_ricochet", 0.028, 1.32 + Math.random() * 0.18, 0.16);
             if (!ok) {
-                this.playBandNoise(0.09, 3200, 2.2, 0.05);
-                this.playBeep(1180, 0.07, "sawtooth", 0.035);
+                this.playBandNoise(0.09, 3200, 2.2, 0.035);
+                this.playBeep(1180, 0.07, "sawtooth", 0.025);
             }
             return;
         }
         if (weaponType === "ROCKET") {
-            const ok = this.playSample("gta_shot_rocket", 0.175, 0.94 + Math.random() * 0.08, 0.78);
-            this.playSample("cannon_blast", 0.13, 0.88 + Math.random() * 0.08, 0.48);
+            const ok = this.playSample("gta_shot_rocket", 0.075, 0.94 + Math.random() * 0.08, 0.78);
+            this.playSample("cannon_blast", 0.052, 0.88 + Math.random() * 0.08, 0.48);
             if (!ok) {
-                this.playNoise(0.28, 350, 0.11);
-                this.playBeep(140, 0.25, "sawtooth", 0.09);
+                this.playNoise(0.28, 350, 0.065);
+                this.playBeep(140, 0.25, "sawtooth", 0.055);
             }
             return;
         }
         if (weaponType === "SHOTGUN") {
-            const ok = this.playSample("shot_shotgun_1", 0.185, 0.94 + Math.random() * 0.08, 0.65);
-            this.playSample("shot_shotgun_2", 0.105, 0.96 + Math.random() * 0.06, 0.58);
+            const ok = this.playSample("shot_shotgun_1", 0.076, 0.94 + Math.random() * 0.08, 0.65);
+            this.playSample("shot_shotgun_2", 0.038, 0.96 + Math.random() * 0.06, 0.58);
             setTimeout(() => {
                 if (this.ctx && !this.muted) {
-                    this.playSample("shotgun_reload", 0.085, 1.06 + Math.random() * 0.06, 0.38);
+                    this.playSample("shotgun_reload", 0.038, 1.06 + Math.random() * 0.06, 0.38);
                 }
             }, 175);
             if (!ok) {
-                this.playNoise(0.16, 1200, 0.09);
+                this.playNoise(0.16, 1200, 0.055);
             }
             return;
         }
         if (weaponType === "UZI") {
             this._uziCycle = ((this._uziCycle || 0) + 1) % 3;
             const uziKey = this._uziCycle === 0 ? "shot_uzi_1" : (this._uziCycle === 1 ? "shot_uzi_2" : "shot_uzi_3");
-            const ok = this.playSample(uziKey, 0.13, 0.95 + Math.random() * 0.12, 0.26);
-            this.playSample("gta_shot_uzi", 0.058, 0.98 + Math.random() * 0.08, 0.24);
+            const ok = this.playSample(uziKey, 0.048, 0.95 + Math.random() * 0.12, 0.26);
+            this.playSample("gta_shot_uzi", 0.020, 0.98 + Math.random() * 0.08, 0.24);
             if (Math.random() < 0.45) {
                 setTimeout(() => {
                     if (this.ctx && !this.muted) {
-                        this.playSample(Math.random() < 0.5 ? "casing_bounce_1" : "casing_bounce_2", 0.028, 1.15 + Math.random() * 0.20, 0.18);
+                        this.playSample(Math.random() < 0.5 ? "casing_bounce_1" : "casing_bounce_2", 0.014, 1.15 + Math.random() * 0.20, 0.18);
                     }
                 }, 85);
             }
             if (!ok) {
-                this.playNoise(0.055, 1200, 0.09);
+                this.playNoise(0.055, 1200, 0.045);
             }
             return;
         }
 
         // Default: PISTOL (9mm Semi-Auto)
         const primaryKey = Math.random() < 0.72 ? "shot_pistol_1" : "shot_pistol_2";
-        const ok = this.playSample(primaryKey, 0.155, 0.96 + Math.random() * 0.08, 0.44);
-        this.playSample("gta_shot_pistol", 0.072, 0.98 + Math.random() * 0.06, 0.40);
+        const ok = this.playSample(primaryKey, 0.062, 0.96 + Math.random() * 0.08, 0.44);
+        this.playSample("gta_shot_pistol", 0.026, 0.98 + Math.random() * 0.06, 0.40);
         setTimeout(() => {
             if (this.ctx && !this.muted) {
-                this.playSample(Math.random() < 0.5 ? "casing_bounce_1" : "casing_bounce_2", 0.034, 1.10 + Math.random() * 0.20, 0.20);
+                this.playSample(Math.random() < 0.5 ? "casing_bounce_1" : "casing_bounce_2", 0.016, 1.10 + Math.random() * 0.20, 0.20);
             }
         }, 105);
         if (!ok) {
-            this.playNoise(0.085, 1200, 0.09);
+            this.playNoise(0.085, 1200, 0.05);
         }
     }
 
     playPunchHit() {
         if (!this.initialized || this.muted || !this.ctx) return;
         const hitKey = Math.random() < 0.5 ? "melee_hit_1" : "melee_hit_2";
-        const ok = this.playSample("gta_punch", 0.165, 0.94 + Math.random() * 0.12, 0.26);
-        this.playSample(hitKey, 0.135, 0.95 + Math.random() * 0.10, 0.28);
+        const ok = this.playSample("gta_punch", 0.095, 0.94 + Math.random() * 0.12, 0.26);
+        this.playSample(hitKey, 0.075, 0.95 + Math.random() * 0.10, 0.28);
         if (!ok) {
-            this.playBandNoise(0.075, 680, 1.6, 0.075);
-            this.playBeep(92, 0.07, "triangle", 0.085);
+            this.playBandNoise(0.075, 680, 1.6, 0.055);
+            this.playBeep(92, 0.07, "triangle", 0.065);
         }
     }
 
     playExplosion() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const ok = this.playSample("explosion_modern", 0.21, 0.90 + Math.random() * 0.14, 1.35);
-        this.playSample("gta_explosion", 0.155, 0.94 + Math.random() * 0.10, 1.45);
-        this.playSample("gta_huge_explosion", 0.105, 0.96 + Math.random() * 0.08, 1.85);
-        this.playSample("crash_heavy", 0.11, 0.78, 0.85);
+        const ok = this.playSample("explosion_modern", 0.115, 0.90 + Math.random() * 0.14, 1.35);
+        this.playSample("gta_explosion", 0.078, 0.94 + Math.random() * 0.10, 1.45);
+        this.playSample("gta_huge_explosion", 0.055, 0.96 + Math.random() * 0.08, 1.85);
+        this.playSample("crash_heavy", 0.058, 0.78, 0.85);
         if (!ok) {
-            this.playNoise(0.55, 280, 0.19);
+            this.playNoise(0.55, 280, 0.12);
         }
     }
 
@@ -1279,8 +1279,8 @@ class RetroAudioEngine {
         this._lastRicoTime = now;
         const keys = ["ricochet_1", "ricochet_2", "ricochet_3", "gta_ricochet"];
         const rKey = keys[Math.floor(Math.random() * keys.length)];
-        if (!this.playSample(rKey, 0.105, 0.92 + Math.random() * 0.18, 0.32)) {
-            this.playBeep(1950, 0.06, "triangle", 0.045);
+        if (!this.playSample(rKey, 0.048, 0.92 + Math.random() * 0.18, 0.32)) {
+            this.playBeep(1950, 0.06, "triangle", 0.032);
         }
     }
 
