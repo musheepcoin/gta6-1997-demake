@@ -3774,7 +3774,10 @@ class LeonidaGame {
         );
         let leadMonk = null;
         for (const ped of this.peds) {
-            if (ped.dead) continue;
+            if (ped.dead) {
+                ped.deadTimer = (ped.deadTimer || 0) + dt;
+                continue;
+            }
             if (ped.exitAnimTimer > 0) ped.exitAnimTimer = Math.max(0, ped.exitAnimTimer - dt);
 
             if (isClientWorldSync) {
@@ -4182,36 +4185,36 @@ class LeonidaGame {
                 }
                 if (!medicNearCasualty) {
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + dt;
-                    if (this.medicDispatchTimer > 6.5) {
+                    if (this.medicDispatchTimer > 18.0) {
                         this.medicDispatchTimer = 0;
                         const baseBx = Math.floor(casualtyNearPlayer.x / TILE_SIZE);
                         const baseBy = Math.floor(casualtyNearPlayer.y / TILE_SIZE);
                         const pz = casualtyNearPlayer.z || 2.0;
-                        for (let attempt = 0; attempt < 10; attempt++) {
+                        for (let attempt = 0; attempt < 12; attempt++) {
                             const ang = Math.random() * Math.PI * 2;
-                            const distB = 8.5 + Math.random() * 4.0;
+                            const distB = 13.5 + Math.random() * 5.0;
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                             const by = Math.floor(baseBy + Math.sin(ang) * distB);
                             const navBlk = this.map.getNavigationBlock(bx, by, pz);
                             if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                                 const sx = (bx + 0.5) * TILE_SIZE;
                                 const sy = (by + 0.5) * TILE_SIZE;
-                                if (Math.hypot(sx - p.x, sy - p.y) < 380) continue;
+                                if (Math.hypot(sx - p.x, sy - p.y) < 640) continue;
                                 const toCasAng = Math.atan2(casualtyNearPlayer.y - sy, casualtyNearPlayer.x - sx);
                                 const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                                     ? this.map.getAlignedRoadAngle(bx, by, toCasAng, pz)
                                     : toCasAng;
                                 const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-                                if (farMedicCar || totalMedics >= 4) {
+                                if (farMedicCar || totalMedics >= 3) {
                                     const reuseCar = farMedicCar;
                                     if (reuseCar) {
                                         reuseCar.x = sx;
                                         reuseCar.y = sy;
                                         reuseCar.z = sz;
                                         reuseCar.angle = roadAng;
-                                        reuseCar.speed = 130;
-                                        reuseCar.vx = Math.cos(roadAng) * 130;
-                                        reuseCar.vy = Math.sin(roadAng) * 130;
+                                        reuseCar.speed = 105;
+                                        reuseCar.vx = Math.cos(roadAng) * 105;
+                                        reuseCar.vy = Math.sin(roadAng) * 105;
                                         reuseCar.sirenActive = true;
                                         reuseCar.aiStuckTimer = 0;
                                     }
@@ -4220,9 +4223,9 @@ class LeonidaGame {
                                     medCar.z = sz;
                                     medCar.driver = "AI_EMERGENCY";
                                     medCar.sirenActive = true;
-                                    medCar.speed = 130;
-                                    medCar.vx = Math.cos(roadAng) * 130;
-                                    medCar.vy = Math.sin(roadAng) * 130;
+                                    medCar.speed = 105;
+                                    medCar.vx = Math.cos(roadAng) * 105;
+                                    medCar.vy = Math.sin(roadAng) * 105;
                                     this.vehicles.push(medCar);
                                 }
                                 break;

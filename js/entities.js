@@ -1852,12 +1852,12 @@ class Vehicle {
     computeEmergencyControls(dt, map, game) {
         if (!game) return this.computeTrafficControls(dt, map, game);
 
-        // A. MEDIC AMBULANCE: Responds to dead casualties within 1200px and revives them!
+        // A. MEDIC AMBULANCE: Responds to dead casualties within 1050px (after 6s 911 call delay) and revives them!
         if (this.specKey === "MEDIC_AMBULANCE" && Array.isArray(game.peds)) {
             let nearestCorpse = null;
-            let bestDist = 1200;
+            let bestDist = 1050;
             for (const ped of game.peds) {
-                if (!ped.dead || ped.revived) continue;
+                if (!ped.dead || ped.revived || (ped.deadTimer || 0) < 6.0) continue;
                 const d = Math.hypot(ped.x - this.x, ped.y - this.y);
                 if (d < bestDist) {
                     bestDist = d;
@@ -1871,9 +1871,10 @@ class Vehicle {
                 // Road-to-sidewalk distance is 64..92px (1 to 1.4 tiles), so stop and treat casualties within 96px
                 if (bestDist < 96) {
                     this.aiBailTimer += dt;
-                    if (this.aiBailTimer > 1.0) {
+                    if (this.aiBailTimer > 2.4) {
                         this.aiBailTimer = 0;
                         nearestCorpse.dead = false;
+                        nearestCorpse.deadTimer = 0;
                         nearestCorpse.revived = true;
                         nearestCorpse.hp = 35;
                         nearestCorpse.speed = 36;
@@ -1903,7 +1904,7 @@ class Vehicle {
                     nearestCorpse.y,
                     0,
                     0,
-                    0.92,
+                    0.78,
                     false
                 );
             }
