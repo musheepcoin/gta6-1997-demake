@@ -250,13 +250,16 @@ class LeonidaGame {
             { spec: "TULIP_MUSCLE", c: 218.55, r: 144.2, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
             { spec: "SUPERBIKE", c: 218.55, r: 146.8, a: -Math.PI * 0.5, z: 2.0 },
             { spec: "HARLEY_BIKE", c: 218.55, r: 149.2, a: -Math.PI * 0.5, z: 2.0 },
-            // Active moving traffic on Ocean Drive & Collins Ave (spaced cleanly across lanes)
-            { spec: "SUPERBIKE", c: 216.5, r: 147.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            // Active moving traffic on Ocean Drive & Collins Ave (never parked stationary in the road!)
+            { spec: "SUPERBIKE", c: 216.5, r: 148.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { spec: "HARLEY_BIKE", c: 214.5, r: 142.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-            { spec: "STINGER_CABRIO", c: 217.5, r: 153.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-            { spec: "VICE_CAB", c: 215.5, r: 151.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "STINGER_CABRIO", c: 217.5, r: 152.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "BANSHEE_GT", c: 216.5, r: 145.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "VICE_CAB", c: 215.5, r: 144.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "CHALLENGER_RT", c: 216.5, r: 155.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "VCPD_CRUISER", c: 214.5, r: 154.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { spec: "CITY_BUS", c: 204.5, r: 147.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-            { spec: "MEDIC_AMBULANCE", c: 205.5, r: 154.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
+            { spec: "MEDIC_AMBULANCE", c: 205.5, r: 152.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
 
             // --- B. S-Curving Vice Beach Sand & South Wooden Pier (off-road on beach sand & water) ---
             { spec: "MONSTER_BUGGY", c: 224.5, r: 148.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
@@ -444,7 +447,7 @@ class LeonidaGame {
                 "VCPD_CRUISER",
                 "MEDIC_AMBULANCE"
             ];
-            const count = Math.min(28, meta.startup_cars.length);
+            const count = Math.min(72, meta.startup_cars.length);
             for (let i = 0; i < count; i++) {
                 const sc = meta.startup_cars[i];
                 const bx = Math.floor(sc.x);
@@ -455,7 +458,7 @@ class LeonidaGame {
                 const vy = (by + 0.5) * TILE_SIZE;
                 let tooClose = false;
                 for (const other of this.vehicles) {
-                    if (Math.hypot(other.x - vx, other.y - vy) < 240) {
+                    if (Math.hypot(other.x - vx, other.y - vy) < 120) {
                         tooClose = true;
                         break;
                     }
@@ -552,12 +555,12 @@ class LeonidaGame {
             ped.targetBx = null;
             ped.targetBy = null;
         }
-        this.populateNearbySidewalks(this.player.x, this.player.y, 14, 14);
+        this.populateNearbySidewalks(this.player.x, this.player.y, 32, 14);
         this.currentDistrict = this.map.getDistrictName(this.player.x, this.player.y);
         this.districtPopupTimer = 0;
     }
 
-    populateNearbySidewalks(centerX, centerY, targetCount = 14, radiusBlocks = 14) {
+    populateNearbySidewalks(centerX, centerY, targetCount = 30, radiusBlocks = 14) {
         if (!this.map || !this.map.cmpLoaded) return;
         const cBx = Math.floor(centerX / TILE_SIZE);
         const cBy = Math.floor(centerY / TILE_SIZE);
@@ -597,7 +600,7 @@ class LeonidaGame {
             const py = (pick.by + 0.25 + Math.random() * 0.5) * TILE_SIZE;
             let tooClose = false;
             for (const other of this.peds) {
-                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 52) {
+                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 28) {
                     tooClose = true;
                     break;
                 }
@@ -748,7 +751,7 @@ class LeonidaGame {
             }
         }
 
-        this.populateNearbySidewalks(this.player.x, this.player.y, 14, 14);
+        this.populateNearbySidewalks(this.player.x, this.player.y, 30, 14);
         this.currentDistrict = this.map.getDistrictName(this.player.x, this.player.y);
         this.districtPopupTimer = 0;
         this.renderer.camX = this.player.x;
