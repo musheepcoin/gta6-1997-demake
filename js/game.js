@@ -4063,7 +4063,7 @@ class LeonidaGame {
                 }
 
                 let targetCorpse = null;
-                let bestDist = 480;
+                let bestDist = 760;
                 for (const other of this.peds) {
                     if (
                         !other.dead ||
@@ -4074,7 +4074,7 @@ class LeonidaGame {
                         continue;
                     }
                     if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(other.x, other.y)) continue;
-                    if (Math.hypot(other.x - amb.x, other.y - amb.y) > 480) continue;
+                    if (Math.hypot(other.x - amb.x, other.y - amb.y) > 760) continue;
                     const d = Math.hypot(other.x - ped.x, other.y - ped.y);
                     if (d < bestDist) {
                         bestDist = d;
@@ -4082,7 +4082,7 @@ class LeonidaGame {
                     }
                 }
 
-                if (targetCorpse && ped.medicOutTimer < 18.0) {
+                if (targetCorpse && ped.medicOutTimer < 30.0) {
                     if (bestDist < 28) {
                         ped.angle = Math.atan2(targetCorpse.y - ped.y, targetCorpse.x - ped.x);
                         ped.healTimer = (ped.healTimer || 0) + dt;
@@ -4110,7 +4110,19 @@ class LeonidaGame {
                         }
                     } else {
                         ped.healTimer = 0;
-                        ped.angle = this.steerPedWithObstacleFeelers(ped, targetCorpse.x, targetCorpse.y);
+                        if (ped.medicTarget !== targetCorpse) {
+                            ped.medicTarget = targetCorpse;
+                            ped.lastBestDist = 9999;
+                            ped.medicStuckTimer = 0;
+                            ped.detourTimer = 0;
+                        }
+                        if ((ped.detourTimer || 0) > 0) {
+                            // Side-step detour around a shoreline corner / wall that blocked the direct path
+                            ped.detourTimer -= dt;
+                            ped.angle = ped.detourAngle;
+                        } else {
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, targetCorpse.x, targetCorpse.y);
+                        }
                         ped.x += Math.cos(ped.angle) * 96 * dt;
                         ped.y += Math.sin(ped.angle) * 96 * dt;
                         if (bestDist < (ped.lastBestDist || 9999) - 2) {
@@ -4118,7 +4130,13 @@ class LeonidaGame {
                             ped.medicStuckTimer = 0;
                         } else {
                             ped.medicStuckTimer = (ped.medicStuckTimer || 0) + dt;
-                            if (ped.medicStuckTimer > 4.5) {
+                            if (ped.medicStuckTimer > 1.6 && (ped.detourTimer || 0) <= 0) {
+                                const direct = Math.atan2(targetCorpse.y - ped.y, targetCorpse.x - ped.x);
+                                ped.detourSign = -(ped.detourSign || 1);
+                                ped.detourAngle = direct + ped.detourSign * Math.PI * 0.5;
+                                ped.detourTimer = 1.3;
+                            }
+                            if (ped.medicStuckTimer > 9.0) {
                                 targetCorpse.unreachableForMedic = true;
                                 ped.medicStuckTimer = 0;
                                 ped.lastBestDist = 9999;
@@ -4128,7 +4146,7 @@ class LeonidaGame {
                 } else {
                     // All nearby casualties revived (or timed out) — jog back to the ambulance and climb in!
                     const dAmb = Math.hypot(amb.x - ped.x, amb.y - ped.y);
-                    if (dAmb < 38 || ped.medicOutTimer > 21.0) {
+                    if (dAmb < 38 || ped.medicOutTimer > 34.0) {
                         amb.doorOpenTimer = 0.40;
                         amb.deployedMedic = null;
                         const idx = this.peds.indexOf(ped);
@@ -4343,7 +4361,7 @@ class LeonidaGame {
                     if (v.specKey === "MEDIC_AMBULANCE" && !v.destroyed && v.driver === "AI_EMERGENCY") {
                         totalMedics++;
                         const dCas = Math.hypot(v.x - casualtyNearPlayer.x, v.y - casualtyNearPlayer.y);
-                        if (dCas < 960) {
+                        if (v.aiState === "EMERGENCY_MEDIC" || v.deployedMedic) {
                             medicNearCasualty = true;
                         } else if (Math.hypot(v.x - p.x, v.y - p.y) > 1050) {
                             farMedicCar = v;
@@ -4352,40 +4370,41 @@ class LeonidaGame {
                 }
                 if (!medicNearCasualty) {
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + dt;
-                    if (this.medicDispatchTimer > 18.0) {
-                        this.medicDispatchTimer = 0;
+                    if (this.medicDispatchTimer > 9.0) {
+                        this.medicDispatchTimer = 6.0; // if no road spawn point is found, retry ~3s later
                         const baseBx = Math.floor(casualtyNearPlayer.x / TILE_SIZE);
                         const baseBy = Math.floor(casualtyNearPlayer.y / TILE_SIZE);
                         const pz = casualtyNearPlayer.z || 2.0;
-                        for (let attempt = 0; attempt < 12; attempt++) {
+                        for (let attempt = 0; attempt < 30; attempt++) {
                             const ang = Math.random() * Math.PI * 2;
-                            const distB = 13.5 + Math.random() * 5.0;
+                            const distB = 8.0 + Math.random() * 5.0;
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                             const by = Math.floor(baseBy + Math.sin(ang) * distB);
                             const navBlk = this.map.getNavigationBlock(bx, by, pz);
                             if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                                 const sx = (bx + 0.5) * TILE_SIZE;
                                 const sy = (by + 0.5) * TILE_SIZE;
-                                if (Math.hypot(sx - p.x, sy - p.y) < 640) continue;
+                                if (Math.hypot(sx - p.x, sy - p.y) < 420) continue;
                                 const toCasAng = Math.atan2(casualtyNearPlayer.y - sy, casualtyNearPlayer.x - sx);
                                 const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                                     ? this.map.getAlignedRoadAngle(bx, by, toCasAng, pz)
                                     : toCasAng;
                                 const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-                                if (farMedicCar || totalMedics >= 3) {
+                                if (farMedicCar) {
                                     const reuseCar = farMedicCar;
-                                    if (reuseCar) {
-                                        reuseCar.x = sx;
-                                        reuseCar.y = sy;
-                                        reuseCar.z = sz;
-                                        reuseCar.angle = roadAng;
-                                        reuseCar.speed = 105;
-                                        reuseCar.vx = Math.cos(roadAng) * 105;
-                                        reuseCar.vy = Math.sin(roadAng) * 105;
-                                        reuseCar.sirenActive = true;
-                                        reuseCar.aiStuckTimer = 0;
-                                    }
-                                } else {
+                                    reuseCar.x = sx;
+                                    reuseCar.y = sy;
+                                    reuseCar.z = sz;
+                                    reuseCar.angle = roadAng;
+                                    reuseCar.speed = 105;
+                                    reuseCar.vx = Math.cos(roadAng) * 105;
+                                    reuseCar.vy = Math.sin(roadAng) * 105;
+                                    reuseCar.sirenActive = true;
+                                    reuseCar.aiStuckTimer = 0;
+                                    reuseCar.aiChosenDir = null;
+                                    reuseCar.approachBestDist = undefined;
+                                    reuseCar.approachNoProgress = 0;
+                                } else if (totalMedics < 6) {
                                     const medCar = new Vehicle(`medic_${Date.now()}_${attempt}`, "MEDIC_AMBULANCE", sx, sy, roadAng);
                                     medCar.z = sz;
                                     medCar.driver = "AI_EMERGENCY";

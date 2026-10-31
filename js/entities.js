@@ -1571,12 +1571,12 @@ class Vehicle {
        Uses road-network intersection routing when blocked by buildings/far away,
        and switches to 9-feeler tactical interception + PIT maneuver on line-of-sight!
        ======================================================================== */
-    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, stayOnRoad = false) {
+    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, forceDirect = false) {
         const curZ = this.z !== undefined ? this.z : 2.0;
         if (this.aiLaneChangeCooldown > 0) this.aiLaneChangeCooldown -= dt;
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
 
-        if (!stayOnRoad && this.aiReverseTimer > 0) {
+        if (this.aiReverseTimer > 0) {
             this.aiReverseTimer -= dt;
             const rearX = this.x - Math.cos(this.angle) * (this.w * 0.48 + 10);
             const rearY = this.y - Math.sin(this.angle) * (this.w * 0.48 + 10);
@@ -1604,7 +1604,8 @@ class Vehicle {
         const onRoadNow = map.isRoadAtPixel(this.x, this.y);
 
         // Mode A: Direct Line-of-Sight Tactical Interception & PIT Maneuver (or when off-road)
-        if ((!stayOnRoad && hasLOS && distToTarget < 275) || !onRoadNow) {
+        // forceDirect: target is off-road nearby (beach, plaza, park) -> leave the asphalt and drive straight there like GTA 1
+        if (forceDirect || (hasLOS && distToTarget < 275) || !onRoadNow) {
             const leadTime = Math.min(0.44, distToTarget / 640);
             let aimX = targetX + targetVx * leadTime;
             let aimY = targetY + targetVy * leadTime;
@@ -1745,34 +1746,30 @@ class Vehicle {
 
         const distToPlayer = Math.hypot(wantedTarget.x - this.x, wantedTarget.y - this.y);
         const targetOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(wantedTarget.x, wantedTarget.y) : false;
-        const forwardProj =
-            (wantedTarget.x - this.x) * Math.cos(this.angle) +
-            (wantedTarget.y - this.y) * Math.sin(this.angle);
+        const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
         // GTA 1 Tactical Officer Bail-Out:
-        // 1) When close to a wanted player on foot (< 115px) or a boxed-in slow car (< 92px), OR
-        // 2) When the wanted player is off-road (beach, park, plaza, courtyard < 440px) and the cruiser reached the closest point on its road lane!
-        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 115;
+        // 1) Close to a wanted player on foot (< 130px) or a boxed-in slow car (< 92px), OR
+        // 2) Cruiser can't get any closer (blocked by water/buildings/plaza walls) for 2s while within 650px
+        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 130;
         const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 35 && distToPlayer < 92;
-        const playerOffRoadClosest = !targetOnRoad && distToPlayer < 440 && forwardProj <= 18;
+        const blockedNear = !wantedTarget.inVehicle && distToPlayer < 650 && noProgress > 2.0;
 
-        if (playerOnFootNear || playerBoxedNear || playerOffRoadClosest) {
+        if (playerOnFootNear || playerBoxedNear || blockedNear) {
             this.aiBailTimer += dt;
-            const bailDelay = playerOnFootNear ? 0.42 : (playerOffRoadClosest ? 0.55 : 0.95);
+            const bailDelay = playerBoxedNear ? 0.95 : 0.40;
             if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
+                this.approachNoProgress = 0;
                 game.ejectVehicleDriver(this, "COP_DEPLOY");
                 return { throttle: 0, steer: 0, handbrake: true };
             }
-            if ((playerOnFootNear && distToPlayer < 85) || playerOffRoadClosest) {
-                return { throttle: this.speed > 10 ? -0.8 : 0, steer: 0, handbrake: true };
-            }
-        } else {
-            this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
+            return { throttle: this.speed > 10 ? -0.8 : 0, steer: 0, handbrake: true };
         }
+        this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
 
-        // Keep cruisers strictly on the road network when the target is off-road so they never glitch at the road edge
-        const stayOnRoad = !targetOnRoad;
+        // Wanted player off-road nearby (beach, plaza, park): cruiser leaves the asphalt and drives straight at them
+        const forceDirect = !targetOnRoad && distToPlayer < 720;
         return this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -1781,10 +1778,24 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            0.96,
+            forceDirect ? 0.70 : 0.96,
             Boolean(wantedTarget.inVehicle && targetOnRoad),
-            stayOnRoad
+            forceDirect
         );
+    }
+
+    // Tracks whether an emergency vehicle is actually getting closer to its target; returns seconds without progress
+    updateApproachProgress(dt, dist) {
+        if (this.approachBestDist === undefined || dist > this.approachBestDist + 160) {
+            this.approachBestDist = dist;
+            this.approachNoProgress = 0;
+        } else if (dist < this.approachBestDist - 6) {
+            this.approachBestDist = dist;
+            this.approachNoProgress = 0;
+        } else {
+            this.approachNoProgress = (this.approachNoProgress || 0) + dt;
+        }
+        return this.approachNoProgress;
     }
 
     steerTowardTargetWithFeelers(dt, map, curZ, directAngle, maxThrottle = 0.92, game = null) {
@@ -1868,7 +1879,7 @@ class Vehicle {
             if (this.deployedMedic) {
                 if (
                     this.deployedMedic.dead ||
-                    (this.deployedMedic.medicOutTimer || 0) > 22.0 ||
+                    (this.deployedMedic.medicOutTimer || 0) > 36.0 ||
                     !game.peds.includes(this.deployedMedic)
                 ) {
                     this.deployedMedic = null;
@@ -1880,14 +1891,14 @@ class Vehicle {
             }
 
             let nearestCorpse = null;
-            let bestDist = 1050;
+            let bestDist = 1500;
             for (const ped of game.peds) {
                 if (
                     !ped.dead ||
                     ped.revived ||
                     ped.unreachableForMedic ||
                     ped.deathKind === "DROWNED" ||
-                    (ped.deadTimer || 0) < 6.0
+                    (ped.deadTimer || 0) < 4.0
                 ) {
                     continue;
                 }
@@ -1902,22 +1913,26 @@ class Vehicle {
             if (nearestCorpse) {
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_MEDIC";
+                if (this.medicTargetPed !== nearestCorpse) {
+                    this.medicTargetPed = nearestCorpse;
+                    this.approachBestDist = undefined;
+                    this.approachNoProgress = 0;
+                }
+                const noProgress = this.updateApproachProgress(dt, bestDist);
 
-                // Check if we reached the closest point on our road lane to the casualty (e.g. on sidewalk, beach, or park)
-                const forwardProj =
-                    (nearestCorpse.x - this.x) * Math.cos(this.angle) +
-                    (nearestCorpse.y - this.y) * Math.sin(this.angle);
-                const closestOnRoadReached = bestDist < 105 || (bestDist < 420 && forwardProj <= 18);
-
-                if (closestOnRoadReached) {
+                // Park and send the paramedic on foot when close (< 140px) or when blocked (water/walls) within 700px
+                if (bestDist < 140 || (bestDist < 700 && noProgress > 2.0)) {
                     this.aiBailTimer += dt;
-                    if (this.aiBailTimer > 0.65 && Math.abs(this.speed) < 22 && typeof game.deployParamedicFromAmbulance === "function") {
+                    if (this.aiBailTimer > 0.5 && Math.abs(this.speed) < 30 && typeof game.deployParamedicFromAmbulance === "function") {
                         this.aiBailTimer = 0;
+                        this.approachNoProgress = 0;
                         game.deployParamedicFromAmbulance(this, nearestCorpse);
                     }
                     return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
+                const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
+                const forceDirect = !corpseOnRoad && bestDist < 720;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -1926,11 +1941,12 @@ class Vehicle {
                     nearestCorpse.y,
                     0,
                     0,
-                    0.78,
+                    forceDirect ? 0.62 : 0.80,
                     false,
-                    true
+                    forceDirect
                 );
             }
+            this.medicTargetPed = null;
         }
 
         // B. FIRE ENGINE: Responds to burning vehicles within 640px and sprays water cannon!
