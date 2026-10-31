@@ -1840,10 +1840,10 @@ class LeonidaGame {
         this.activeInterior = intr;
         this.interiorCooldown = 0.85;
         this.interiorX = intr.w * 0.5;
-        this.interiorY = intr.h - 76;
+        this.interiorY = intr.h - 120;
         this.interiorAngle = -Math.PI * 0.5;
         this.interiorJasonX = intr.w * 0.5 + 38;
-        this.interiorJasonY = intr.h - 68;
+        this.interiorJasonY = intr.h - 112;
         this.interiorJasonAngle = -Math.PI * 0.5;
 
         if (Array.isArray(intr.stations)) {
@@ -1868,7 +1868,8 @@ class LeonidaGame {
         if (!this.activeInterior) return;
         const intr = this.activeInterior;
         this.activeInterior = null;
-        this.interiorCooldown = 1.4;
+        this.doorRearmBlock = intr;
+        this.interiorCooldown = 0.6;
         this.player.x = intr.doorX;
         this.player.y = intr.doorY + 26;
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
@@ -3254,8 +3255,8 @@ class LeonidaGame {
 
         // Step onto the bottom EXIT DOOR mat (near center bottom) to return to the street!
         if (this.interiorCooldown <= 0 &&
-            this.interiorY >= intr.h - 42 &&
-            Math.abs(this.interiorX - intr.w * 0.5) < 68) {
+            this.interiorY >= intr.h - 60 &&
+            Math.abs(this.interiorX - intr.w * 0.5) < 95) {
             this.exitInterior();
         }
     }
@@ -3282,6 +3283,22 @@ class LeonidaGame {
         if (this.activeInterior) {
             this.updateInterior(dt);
             return;
+        }
+
+        // Spawn / respawn / teleport (big jump in one frame): never auto-enter a door we land next to
+        if (Array.isArray(this.map.interiors)) {
+            const pp = this.player;
+            if (this._doorChkX === undefined || Math.hypot(pp.x - this._doorChkX, pp.y - this._doorChkY) > 120) {
+                this.doorRearmBlock = null;
+                for (const intr of this.map.interiors) {
+                    if (Math.hypot(pp.x - intr.doorX, pp.y - intr.doorY) < 80) {
+                        this.doorRearmBlock = intr;
+                        break;
+                    }
+                }
+            }
+            this._doorChkX = pp.x;
+            this._doorChkY = pp.y;
         }
 
         const p = this.player;
@@ -3537,11 +3554,18 @@ class LeonidaGame {
                 p.z = this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0);
 
                 // Walk directly onto a glowing Venue Door Mat (< 20px) to enter its Interior!
-                if (this.interiorCooldown <= 0 && Array.isArray(this.map.interiors)) {
-                    for (const intr of this.map.interiors) {
-                        if (Math.hypot(p.x - intr.doorX, p.y - intr.doorY) < 20) {
-                            this.enterInterior(intr);
-                            return;
+                // Proximity entry: just walk up to a door (re-armed only after stepping away from the door you just left)
+                if (Array.isArray(this.map.interiors)) {
+                    if (this.doorRearmBlock) {
+                        if (Math.hypot(p.x - this.doorRearmBlock.doorX, p.y - this.doorRearmBlock.doorY) > 80) {
+                            this.doorRearmBlock = null;
+                        }
+                    } else if (this.interiorCooldown <= 0) {
+                        for (const intr of this.map.interiors) {
+                            if (Math.hypot(p.x - intr.doorX, p.y - intr.doorY) < 42) {
+                                this.enterInterior(intr);
+                                return;
+                            }
                         }
                     }
                 }
