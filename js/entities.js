@@ -1534,7 +1534,7 @@ class Vehicle {
                     this.aiHornCooldown = 4.2 + Math.random() * 3.0;
                     const distToPlayer = Math.hypot(game.player.x - this.x, game.player.y - this.y);
                     if (distToPlayer < 420) {
-                        game.audio.playHorn();
+                        game.audio.playHorn(Boolean(this.isEmergency), this.specKey);
                     }
                 }
             } else {
@@ -2234,6 +2234,9 @@ class Vehicle {
                 if (this.driver === "PLAYER" && impact > 155) {
                     this.receiveImpactDamage((impact - 140) * 0.085, hitX, hitY);
                     game.spawnParticle(hitX, hitY, "SPARK");
+                    if (game && game.audio) {
+                        game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145));
+                    }
                 }
             }
         }

@@ -2046,7 +2046,7 @@ class LeonidaGame {
                     this.net.broadcastStateNow();
                 }
             }
-            this.audio.playCarExit(Boolean(v.isMotorcycle));
+            this.audio.playCarExit(Boolean(v.isMotorcycle), v.specKey);
             this.updateHud();
             return;
         }
@@ -2141,7 +2141,7 @@ class LeonidaGame {
             }
         }
 
-        this.audio.playCarEnter(Boolean(closest.isMotorcycle));
+        this.audio.playCarEnter(Boolean(closest.isMotorcycle), closest.specKey);
 
         const occCount = typeof closest.getOccupiedSeats === "function"
             ? closest.getOccupiedSeats(this).length
@@ -2352,12 +2352,12 @@ class LeonidaGame {
             const v = p.inVehicle;
             if (v.isEmergency) {
                 v.sirenActive = !v.sirenActive;
-                this.audio.playHorn(true);
+                this.audio.playHorn(true, v.specKey);
                 const sTxt = v.sirenActive ? "🚨 SIREN ON!" : "🚨 SIREN OFF";
                 this.addFloatingText(v.x, v.y - 28, sTxt, "#38bdf8");
                 if (this.net) this.net.broadcastHorn(v.x, v.y, true, sTxt, "#38bdf8");
             } else {
-                this.audio.playHorn(false);
+                this.audio.playHorn(false, v.specKey);
                 this.addFloatingText(v.x, v.y - 28, "📯 HONK! HONK!", "#ffd13b");
                 if (this.net) this.net.broadcastHorn(v.x, v.y, false, "📯 HONK! HONK!", "#ffd13b");
             }
@@ -3686,7 +3686,8 @@ class LeonidaGame {
                         if (typeof a.triggerPanic === "function") a.triggerPanic(8.5);
                         if (typeof b.triggerPanic === "function") b.triggerPanic(8.5);
                         if ((a.driver === "PLAYER" || b.driver === "PLAYER") && Math.random() < 0.5) {
-                            this.audio.playHorn();
+                            const honker = a.driver === "PLAYER" ? b : a;
+                            this.audio.playHorn(Boolean(honker.isEmergency), honker.specKey);
                         }
                         // Aggressive AI drivers (Bikers, Muscle Cars, 4x4s) may bail out in road rage if rammed hard by the player!
                         const aiVictim = (a.driver === "PLAYER" && b.driver === "AI_TRAFFIC") ? b : ((b.driver === "PLAYER" && a.driver === "AI_TRAFFIC") ? a : null);
@@ -4707,19 +4708,28 @@ class LeonidaGame {
             }
         }
 
-        // 12B. Spatial AI Traffic Pass-By (with Doppler shift!) & Ocean Surf Proximity
+        // 12B. Spatial AI Traffic Pass-By (with Doppler shift!), Emergency Siren Proximity & Ocean Surf
         let nearestTrafficDist = 9999;
         let nearestTrafficSpeed = 0;
         let trafficDoppler = 1.0;
         let trafficIsMoto = false;
+        let nearestSirenDist = this.wantedLevel > 0 ? nearestCopDist : 9999;
+        let nearestSirenType = "POLICE";
         for (let i = 0; i < this.vehicles.length; i++) {
             const v = this.vehicles[i];
-            if (v.destroyed || v === p.inVehicle || !v.driver) continue;
-            const vSpd = Math.abs(v.speed || 0);
-            if (vSpd < 10) continue;
+            if (v.destroyed) continue;
             const dx = v.x - p.x;
             const dy = v.y - p.y;
             const d = Math.hypot(dx, dy);
+            if (v.sirenActive && d < nearestSirenDist) {
+                nearestSirenDist = d;
+                nearestSirenType = v.specKey === "MEDIC_AMBULANCE"
+                    ? "MEDIC"
+                    : (v.specKey === "FIRE_TRUCK" ? "FIRE" : "POLICE");
+            }
+            if (v === p.inVehicle || !v.driver) continue;
+            const vSpd = Math.abs(v.speed || 0);
+            if (vSpd < 10) continue;
             if (d < nearestTrafficDist && d > 1) {
                 nearestTrafficDist = d;
                 nearestTrafficSpeed = vSpd;
@@ -4745,11 +4755,26 @@ class LeonidaGame {
             }
         }
 
+        const pVeh = p.inVehicle;
+        const playerThrottle = pVeh
+            ? ((this.input.up || (this.input.joyActive && this.input.joyMag > 0.15)) ? 1 : (this.input.down ? -1 : 0))
+            : 0;
+        const playerSirenType = pVeh
+            ? (pVeh.specKey === "MEDIC_AMBULANCE" ? "MEDIC" : (pVeh.specKey === "FIRE_TRUCK" ? "FIRE" : "POLICE"))
+            : nearestSirenType;
+
         this.audio.update(dt, {
-            inVehicle: Boolean(p.inVehicle),
-            vehicleSpeed: p.inVehicle ? p.inVehicle.speed : 0,
+            inVehicle: Boolean(pVeh),
+            vehicleSpeed: pVeh ? pVeh.speed : 0,
+            vehicleSpecKey: pVeh ? pVeh.specKey : null,
+            vehicleMaxSpeed: pVeh ? pVeh.maxSpeed : 420,
+            vehicleThrottle: playerThrottle,
+            vehicleDrifting: Boolean(pVeh && pVeh.drifting),
+            playerSirenActive: Boolean(pVeh && pVeh.sirenActive),
             wantedLevel: this.wantedLevel,
             nearestCopDist: nearestCopDist,
+            nearestSirenDist,
+            nearestSirenType: (pVeh && pVeh.sirenActive) ? playerSirenType : nearestSirenType,
             nearestTrafficDist,
             nearestTrafficSpeed,
             trafficDoppler,
