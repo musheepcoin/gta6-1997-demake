@@ -1164,7 +1164,7 @@ class LeonidaMap {
     }
 
     buildGta6Landmarks() {
-        return [
+        const landmarksList = [
             {
                 id: "VICE_BEACH",
                 short: "VICE BEACH",
@@ -1774,6 +1774,16 @@ class LeonidaMap {
             }
         ];
 
+        // Template-based shop interiors (restaurants, hotels, gun shops, bars, stores...) on real storefronts
+        try {
+            if (window.ShopInteriors) {
+                const shops = window.ShopInteriors.generate(this);
+                for (const s of shops) this.interiors.push(s);
+            }
+        } catch (e) {
+            console.warn("Shop interior generation failed:", e);
+        }
+
         // 10 High-Flying Unique Stunt Jump Ramps across Vice City & Leonida!
         this.stuntRamps = [
             { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: 217.5 * TILE_SIZE, y: 151.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
@@ -1787,6 +1797,7 @@ class LeonidaMap {
             { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: 66.5 * TILE_SIZE, y: 156.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: 124.0 * TILE_SIZE, y: 241.5 * TILE_SIZE, angle: 0 }
         ];
+        return landmarksList;
     }
 
     getBlockIndex(coordx, coordy, layer) {

@@ -2899,6 +2899,14 @@ class RetroRenderer {
             }
         }
 
+        // Door transition fade (enter / exit interiors)
+        if (game.fadeAlpha > 0.01) {
+            ctx.save();
+            ctx.fillStyle = `rgba(0,0,0,${Math.min(1, game.fadeAlpha)})`;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.restore();
+        }
+
         // 1997 Vice City Bitmap Font & Sprite HUD + Top-Right Live Vice City Minimap
         this.renderAuthenticGta1Hud(ctx, game);
 
@@ -3531,7 +3539,8 @@ class RetroRenderer {
             for (const intr of this.map.interiors) {
                 if (intr.doorX < minX || intr.doorX > maxX || intr.doorY < minY || intr.doorY > maxY) continue;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.03;
-                this.pushSolidQuad3D(intr.doorX, intr.doorY, dz, 26, 26, this.time * 1.2, 0.96, 0.25, 0.65, pulse, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                const mrgb = intr.matRGB || [0.96, 0.25, 0.65];
+                this.pushSolidQuad3D(intr.doorX, intr.doorY, dz, 26, 26, this.time * 1.2, mrgb[0], mrgb[1], mrgb[2], pulse, SPRITE_DRAW_ORDER.MAP_OBJECT);
                 this.pushSolidQuad3D(intr.doorX, intr.doorY, dz + 0.01, 16, 16, -this.time * 1.8, 0.15, 0.92, 0.98, 0.9, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         }
@@ -5177,6 +5186,101 @@ class RetroRenderer {
        Renders Hotel Dixon, Club Nine1Nine, Club Jack of Hearts, The Malibu,
        Star Island Mansion, SERA Space Bunker, Leonida Penitentiary & Hank's Diner!
        ======================================================================== */
+    /* Shop furniture: purely decorative, drawn under the stations/NPCs */
+    drawShopDecor(ctx, intr, ox, oy, rw, rh) {
+        const R = (x, y, w, h, fill, stroke) => {
+            ctx.fillStyle = fill;
+            ctx.fillRect(ox + x, oy + y, w, h);
+            if (stroke) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(ox + x + 0.5, oy + y + 0.5, w - 1, h - 1);
+            }
+        };
+        const C = (x, y, rad, fill, stroke) => {
+            ctx.fillStyle = fill;
+            ctx.beginPath();
+            ctx.arc(ox + x, oy + y, rad, 0, Math.PI * 2);
+            ctx.fill();
+            if (stroke) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        };
+        const acc = intr.accent || "#38bdf8";
+        const t = intr.theme;
+
+        // Back wall strip under the header
+        R(8, 64, rw - 16, 26, "rgba(15,23,42,0.85)", acc);
+
+        if (t === "SHOP_GUN_SHOP") {
+            // Wall rack of guns
+            const gunCols = ["#475569", "#64748b", "#78350f", "#334155"];
+            for (let i = 0; i < 12; i++) {
+                R(30 + i * 60, 70, 40, 7, gunCols[i % 4]);
+                R(30 + i * 60 + 28, 77, 8, 9, "#1e293b");
+            }
+            // Glass counters in front of each gun station
+            for (const cx of [150, 380, 610]) R(cx - 100, 196, 200, 18, "rgba(56,189,248,0.18)", "#38bdf8");
+            R(165, 365, 200, 18, "rgba(56,189,248,0.18)", "#38bdf8");
+            R(395, 365, 200, 18, "rgba(56,189,248,0.18)", "#38bdf8");
+        } else if (t === "SHOP_RESTAURANT") {
+            // Kitchen pass-through + bottles
+            R(40, 94, rw - 80, 18, "#78350f", "#fbbf24");
+            for (let i = 0; i < 10; i++) R(60 + i * 68, 70, 12, 16, ["#16a34a", "#dc2626", "#facc15", "#2563eb"][i % 4]);
+            // Dining tables with chairs
+            for (const tx of [130, 280, 480, 630]) {
+                C(tx, 430, 30, "#92400e", "#451a03");
+                C(tx - 40, 430, 10, "#7c2d12");
+                C(tx + 40, 430, 10, "#7c2d12");
+                R(tx - 8, 424, 16, 12, "#ffffff");
+            }
+        } else if (t === "SHOP_HOTEL") {
+            // Reception desk + key rack
+            R(260, 100, 240, 28, "#92400e", "#fbbf24");
+            for (let i = 0; i < 14; i++) R(40 + i * 50, 70, 8, 14, i % 2 ? "#facc15" : "#fb7185");
+            // Beds in side alcoves + plants
+            for (const bx of [50, 640]) {
+                R(bx, 400, 80, 90, "#e2e8f0", "#94a3b8");
+                R(bx, 400, 80, 24, "#f472b6");
+            }
+            C(240, 450, 16, "#15803d", "#14532d");
+            C(520, 450, 16, "#15803d", "#14532d");
+        } else if (t === "SHOP_CLOTHES") {
+            // Clothing racks
+            const cc = ["#ef4444", "#3b82f6", "#facc15", "#22c55e", "#a855f7", "#f97316"];
+            for (let row = 0; row < 2; row++) {
+                for (let i = 0; i < 9; i++) {
+                    R(40 + i * 76, 230 + row * 150, 6, 36, "#64748b");
+                    R(34 + i * 76, 232 + row * 150, 18, 30, cc[(i + row * 2) % cc.length]);
+                }
+            }
+            // Fitting rooms
+            for (let i = 0; i < 3; i++) R(540 + i * 70, 70, 56, 20, "#7c3aed", "#c4b5fd");
+        } else if (t === "SHOP_CONVENIENCE") {
+            // Aisles of shelves with colourful goods
+            const g = ["#ef4444", "#facc15", "#22c55e", "#3b82f6", "#f97316", "#a855f7"];
+            for (let row = 0; row < 2; row++) {
+                R(60, 235 + row * 135, rw - 120, 14, "#475569", "#94a3b8");
+                for (let i = 0; i < 20; i++) R(66 + i * 33, 224 + row * 135, 22, 12, g[(i + row) % g.length]);
+            }
+            // Fridge wall
+            R(30, 70, rw - 60, 20, "rgba(103,232,249,0.35)", "#22d3ee");
+        } else if (t === "SHOP_BAR") {
+            // Long bar counter, stools, bottle shelf, neon sign
+            R(80, 100, rw - 160, 24, "#78350f", "#fbbf24");
+            for (let i = 0; i < 16; i++) R(70 + i * 40, 70, 10, 16, ["#16a34a", "#b91c1c", "#ca8a04", "#1d4ed8"][i % 4]);
+            for (let i = 0; i < 8; i++) C(120 + i * 72, 140, 9, "#7f1d1d", "#fca5a5");
+            for (const tx of [150, 380, 610]) C(tx, 440, 26, "#451a03", "#fbbf24");
+            ctx.save();
+            ctx.shadowColor = acc;
+            ctx.shadowBlur = 14;
+            R(rw / 2 - 70, 420, 140, 4, acc);
+            ctx.restore();
+        }
+    }
+
     renderActiveInterior(ctx, game) {
         const intr = game.activeInterior;
         if (!intr) return;
@@ -5243,6 +5347,19 @@ class RetroRenderer {
                     col = checker ? "#27272a" : "#18181b";
                 } else if (intr.theme === "DINER_PAWN") {
                     col = checker ? "#334155" : "#0f172a";
+                } else if (intr.theme === "SHOP_GUN_SHOP") {
+                    col = checker ? "#2a2a2e" : "#1b1b1f";
+                } else if (intr.theme === "SHOP_RESTAURANT") {
+                    col = checker ? "#7c2d12" : "#fde68a";
+                    if (!checker) col = "#e7d8a8";
+                } else if (intr.theme === "SHOP_HOTEL") {
+                    col = (x >= 340 && x < 420) ? "#7f1d1d" : (checker ? "#3a2442" : "#2a1a33");
+                } else if (intr.theme === "SHOP_CLOTHES") {
+                    col = checker ? "#e2e8f0" : "#cbd5e1";
+                } else if (intr.theme === "SHOP_CONVENIENCE") {
+                    col = checker ? "#e5e7eb" : "#9ca3af";
+                } else if (intr.theme === "SHOP_BAR") {
+                    col = checker ? "#2b1810" : "#3b2214";
                 }
 
                 ctx.fillStyle = col;
@@ -5269,6 +5386,11 @@ class RetroRenderer {
         ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.fillStyle = intr.accent || "#38bdf8";
         ctx.fillText(intr.subtitle, ox + rw * 0.5, oy + 45);
+
+        // 2b. Template shop furniture (counters, shelves, tables, beds, racks...)
+        if (intr.isShop) {
+            this.drawShopDecor(ctx, intr, ox, oy, rw, rh);
+        }
 
         // 3. Interactive Stations inside the Venue (Walk onto pad OR Click to activate!)
         if (Array.isArray(intr.stations)) {

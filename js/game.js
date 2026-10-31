@@ -102,6 +102,7 @@ class LeonidaGame {
         this.monkRespawnTimer = 0;
         this.activeInterior = null;
         this.interiorCooldown = 0;
+        this.fadeAlpha = 0;
         this.interiorX = 380;
         this.interiorY = 440;
         this.interiorAngle = -Math.PI * 0.5;
@@ -1852,6 +1853,12 @@ class LeonidaGame {
         }
 
         this.audio.playCashSound();
+        this.fadeAlpha = 1.0;
+        if (intr.isShop) {
+            // Shop door bell
+            this.audio.playBeep(1760, 0.12, "sine", 0.05);
+            setTimeout(() => this.audio.playBeep(2217, 0.18, "sine", 0.045), 110);
+        }
         this.showBigBanner(intr.name, intr.subtitle, intr.accent || "#00f0ff", 2.6);
         this.updateHud();
         return true;
@@ -1874,12 +1881,72 @@ class LeonidaGame {
         this.renderer.camY = this.player.y;
         this.renderer.camZBlocks = this.player.z;
         this.audio.playBeep(420, 0.06, "triangle", 0.06);
-        this.addFloatingText(this.player.x, this.player.y - 24, `🚪 EXITED ${intr.id.replace("_", " ")}`, "#38bdf8");
+        this.fadeAlpha = 1.0;
+        this.addFloatingText(this.player.x, this.player.y - 24, `🚪 EXITED ${intr.id.replace(/_/g, " ")}`, "#38bdf8");
+        this.updateHud();
+    }
+
+    /**
+     * Shop stations (restaurants, hotels, gun shops, bars, stores...): priced pads that apply a
+     * data-driven `effect` { hp, armor, weapon, ammo, speed, clearWanted, setMinutes, bandanaToggle, heist, wanted }.
+     */
+    purchaseInteriorStation(st) {
+        const p = this.player;
+        const fx = st.effect || {};
+        const price = st.price || 0;
+
+        if (price > 0 && this.cash < price) {
+            st.cooldown = 1.2;
+            this.audio.playBeep(180, 0.16, "sawtooth", 0.06);
+            this.addFloatingText(p.x, p.y - 24, `NOT ENOUGH CASH ($${price.toLocaleString("en-US")})`, "#ef4444");
+            return;
+        }
+        if (fx.hp && !fx.heist && p.hp >= p.maxHp && !fx.armor && !fx.weapon && !fx.speed && !fx.clearWanted && !fx.bandanaToggle) {
+            st.cooldown = 1.2;
+            this.addFloatingText(p.x, p.y - 24, "ALREADY AT FULL HEALTH", "#94a3b8");
+            return;
+        }
+
+        st.cooldown = st.cooldownSec || 5.0;
+        if (price > 0) {
+            this.cash -= price;
+            this.addFloatingText(p.x, p.y - 22, `-$${price.toLocaleString("en-US")}`, "#f87171");
+        }
+        if (fx.hp) p.hp = Math.min(p.maxHp, p.hp + fx.hp);
+        if (fx.armor) p.armor = Math.min(100, (p.armor || 0) + fx.armor);
+        if (fx.weapon) {
+            if (!p.weaponsOwned.includes(fx.weapon)) p.weaponsOwned.push(fx.weapon);
+            p.ammo[fx.weapon] = Math.min(999, (p.ammo[fx.weapon] || 0) + (fx.ammo || 30));
+            p.weapon = fx.weapon;
+        }
+        if (fx.speed) p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, fx.speed);
+        if (fx.bandanaToggle) {
+            p.bandana = !p.bandana;
+            if (typeof this.renderPortraits === "function") this.renderPortraits();
+        }
+        if (fx.clearWanted) this.setWantedLevel(0);
+        if (typeof fx.setMinutes === "number") {
+            this.worldMinutes = fx.setMinutes;
+            this.syncDayNightCycle();
+        }
+        if (Array.isArray(fx.heist)) {
+            const loot = fx.heist[0] + Math.floor(Math.random() * (fx.heist[1] - fx.heist[0] + 1));
+            this.addCash(loot, "HOLD-UP!");
+            this.setWantedLevel(Math.max(this.wantedLevel, fx.wanted || 3));
+            this.audio.playShot("PISTOL");
+        } else {
+            this.audio.playCashSound();
+        }
+        this.showBigBanner(st.label.split(" — ")[0], fx.desc || "PURCHASED", st.color || "#39ff14", 1.8);
         this.updateHud();
     }
 
     triggerInteriorStation(st) {
         if (!st || (st.cooldown || 0) > 0) return;
+        if (st.effect) {
+            this.purchaseInteriorStation(st);
+            return;
+        }
         st.cooldown = 8.0;
         const p = this.player;
         const grantWep = (wKey, ammoAmt) => {
@@ -3178,7 +3245,7 @@ class LeonidaGame {
         // Step onto any interactive station pad inside the venue to trigger its perk/heist/minigame!
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
-                if ((st.cooldown || 0) <= 0 && Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 34) {
+                if (!st.effect && (st.cooldown || 0) <= 0 && Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 34) {
                     this.triggerInteriorStation(st);
                     break;
                 }
@@ -3203,6 +3270,9 @@ class LeonidaGame {
 
         if (this.interiorCooldown > 0) {
             this.interiorCooldown = Math.max(0, this.interiorCooldown - dt);
+        }
+        if (this.fadeAlpha > 0) {
+            this.fadeAlpha = Math.max(0, this.fadeAlpha - dt * 3.2);
         }
         if ((this.player.speedBoostTimer || 0) > 0) {
             this.player.speedBoostTimer = Math.max(0, this.player.speedBoostTimer - dt);
