@@ -1425,7 +1425,7 @@ class Vehicle {
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
                 const dist = Math.hypot(dx, dy);
-                if (dist > 180) continue;
+                if (dist > 240) continue;
 
                 const forwardDist = dx * fx + dy * fy;
                 const lateralDist = Math.abs(dx * rx + dy * ry);
@@ -1438,11 +1438,11 @@ class Vehicle {
                     }
                 }
 
-                // B. Same-Direction Vehicle Ahead in Same Lane (cosDiff > 0.55):
-                // Strictly maintain bumper-to-bumper gap behind the car ahead in our lane.
-                const halfWidthSum = (this.h + (other.h || 24)) * 0.44 + 3;
-                const halfLengthSum = ((this.w || 48) + (other.w || 48)) * 0.32 + 5;
-                if (cosDiff > 0.55 && forwardDist > 6 && lateralDist < halfWidthSum) {
+                // B. Same-Direction Vehicle Ahead in Same Lane (cosDiff > 0.45):
+                // Strictly maintain true bumper-to-bumper gap (half of our length + half of lead car's length)
+                const halfWidthSum = (this.h + (other.h || 24)) * 0.46 + 4;
+                const halfLengthSum = ((this.w || 48) + (other.w || 48)) * 0.50;
+                if (cosDiff > 0.45 && forwardDist > 4 && lateralDist < halfWidthSum) {
                     const bumperGap = Math.max(0, forwardDist - halfLengthSum);
                     if (bumperGap < closestBumperGap) {
                         closestBumperGap = bumperGap;
@@ -1508,24 +1508,25 @@ class Vehicle {
             }
         }
 
-        // 5. Smooth Forward-Only Speed Regulation (Never reverses, never freezes when gap >= 18px!)
+        // 5. Smooth Forward-Only Speed Regulation (Maintains a clean 22px bumper-to-bumper gap at red lights!)
+        const minStopGap = 22;
         if (sirenYield || crossTrafficYield) {
             this.aiState = sirenYield ? "YIELD_SIREN" : "FOLLOWING";
             desiredThrottle = 0;
-            const brakeMult = Math.pow(0.02, dt);
+            const brakeMult = Math.pow(0.01, dt);
             this.vx *= brakeMult;
             this.vy *= brakeMult;
             this.speed *= brakeMult;
-        } else if (closestEntity && closestBumperGap < 72) {
+        } else if (closestEntity && closestBumperGap < 110) {
             const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
             this.aiState = "FOLLOWING";
-            if (closestBumperGap < 18) {
+            if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
-                const brakeMult = Math.pow(0.015, dt);
+                const brakeMult = Math.pow(0.002, dt);
                 this.vx *= brakeMult;
                 this.vy *= brakeMult;
                 this.speed *= brakeMult;
-                if (Math.abs(this.speed) < 10) {
+                if (Math.abs(this.speed) < 28 || closestBumperGap <= minStopGap - 2) {
                     this.vx = 0;
                     this.vy = 0;
                     this.speed = 0;
@@ -1538,19 +1539,18 @@ class Vehicle {
                     }
                 }
             } else {
-                // Proportional closing speed: rolls smoothly up to the 18px bumper gap even if lead car is stopped,
-                // and accelerates immediately as soon as the lead car moves!
-                const targetSpd = obstacleSpeed * 0.92 + (closestBumperGap - 18) * 1.65;
-                if (this.speed > targetSpd + 8) {
+                // Proportional closing speed: rolls smoothly up to the 22px bumper gap and brakes early so it never rear-ends stopped cars!
+                const targetSpd = obstacleSpeed * 0.90 + (closestBumperGap - minStopGap) * 1.35;
+                if (this.speed > targetSpd) {
                     desiredThrottle = 0;
-                    const slowMult = Math.pow(0.12, dt);
+                    const slowMult = Math.pow(0.03, dt);
                     this.vx *= slowMult;
                     this.vy *= slowMult;
                     this.speed *= slowMult;
-                } else if (this.speed < targetSpd) {
-                    desiredThrottle = Math.min(this.aiCruiseFactor, 0.48);
+                } else if (this.speed < targetSpd - 6) {
+                    desiredThrottle = Math.min(this.aiCruiseFactor, 0.42);
                 } else {
-                    desiredThrottle = 0.18;
+                    desiredThrottle = 0.14;
                 }
             }
         }
