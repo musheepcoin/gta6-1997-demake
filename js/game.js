@@ -3997,31 +3997,40 @@ class LeonidaGame {
                 const copTarget = this.getNearestWantedTarget(ped.x, ped.y);
                 if (copTarget) {
                     const dTarget = Math.hypot(copTarget.x - ped.x, copTarget.y - ped.y);
-                    ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
                     if (dTarget > 28) {
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, copTarget.x, copTarget.y);
                         ped.x += Math.cos(ped.angle) * 98 * dt;
                         ped.y += Math.sin(ped.angle) * 98 * dt;
-                    } else if (!copTarget.isRemote && !p.dead) {
-                        // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
-                        const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
-                        if (!p.inVehicle && p.hp < 55) {
-                            this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
-                        } else if (inSlowCar) {
-                            this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
-                        } else if (!p.inVehicle) {
-                            this.damagePlayer(14 * dt);
+                    } else {
+                        ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
+                        if (!copTarget.isRemote && !p.dead) {
+                            // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
+                            const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
+                            if (!p.inVehicle && p.hp < 55) {
+                                this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
+                            } else if (inSlowCar) {
+                                this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
+                            } else if (!p.inVehicle) {
+                                this.damagePlayer(14 * dt);
+                            }
                         }
                     }
                     if (dTarget < 280 && Math.random() < 0.025) {
-                        this.fireWeapon(ped.x, ped.y, ped.angle, "PISTOL", false);
+                        const blocked = this.map.traceSegment2D
+                            ? this.map.traceSegment2D(ped.x, ped.y, copTarget.x, copTarget.y, ped.z || 2.0).hit
+                            : false;
+                        if (!blocked) {
+                            const aimAng = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
+                            this.fireWeapon(ped.x, ped.y, aimAng, "PISTOL", false);
+                        }
                     }
                 }
             } else if (ped.kind === "HOSTILE") {
                 // Road-Rage Driver / Gang Member AI: chases Lucia and punches or pulls her out of a slow car!
                 const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
                 if (dPlayer < 290 && !p.dead) {
-                    ped.angle = Math.atan2(p.y - ped.y, p.x - ped.x);
                     if (dPlayer > 24) {
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, p.x, p.y);
                         ped.x += Math.cos(ped.angle) * 90 * dt;
                         ped.y += Math.sin(ped.angle) * 90 * dt;
                     } else if (p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 38) {

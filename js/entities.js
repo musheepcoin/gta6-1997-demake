@@ -1744,25 +1744,35 @@ class Vehicle {
         this.aiState = "PURSUIT";
 
         const distToPlayer = Math.hypot(wantedTarget.x - this.x, wantedTarget.y - this.y);
+        const targetOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(wantedTarget.x, wantedTarget.y) : false;
+        const forwardProj =
+            (wantedTarget.x - this.x) * Math.cos(this.angle) +
+            (wantedTarget.y - this.y) * Math.sin(this.angle);
 
         // GTA 1 Tactical Officer Bail-Out:
-        // When close to a wanted player on foot (or a boxed-in slow car), brake hard and deploy VCPD Officer on foot!
-        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 110;
+        // 1) When close to a wanted player on foot (< 115px) or a boxed-in slow car (< 92px), OR
+        // 2) When the wanted player is off-road (beach, park, plaza, courtyard < 440px) and the cruiser reached the closest point on its road lane!
+        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 115;
         const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 35 && distToPlayer < 92;
-        if (playerOnFootNear || playerBoxedNear) {
+        const playerOffRoadClosest = !targetOnRoad && distToPlayer < 440 && forwardProj <= 18;
+
+        if (playerOnFootNear || playerBoxedNear || playerOffRoadClosest) {
             this.aiBailTimer += dt;
-            if (this.aiBailTimer > (playerOnFootNear ? 0.42 : 0.95) && typeof game.ejectVehicleDriver === "function") {
+            const bailDelay = playerOnFootNear ? 0.42 : (playerOffRoadClosest ? 0.55 : 0.95);
+            if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
                 game.ejectVehicleDriver(this, "COP_DEPLOY");
                 return { throttle: 0, steer: 0, handbrake: true };
             }
-            if (playerOnFootNear && distToPlayer < 78) {
+            if ((playerOnFootNear && distToPlayer < 85) || playerOffRoadClosest) {
                 return { throttle: this.speed > 10 ? -0.8 : 0, steer: 0, handbrake: true };
             }
         } else {
             this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
         }
 
+        // Keep cruisers strictly on the road network when the target is off-road so they never glitch at the road edge
+        const stayOnRoad = !targetOnRoad;
         return this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -1772,7 +1782,8 @@ class Vehicle {
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
             0.96,
-            Boolean(wantedTarget.inVehicle)
+            Boolean(wantedTarget.inVehicle && targetOnRoad),
+            stayOnRoad
         );
     }
 
