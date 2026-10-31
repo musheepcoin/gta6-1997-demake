@@ -41,15 +41,16 @@ class LeonidaGame {
             inVehicle: null,
             seatIndex: 0,
             weapon: "PISTOL",
-            weaponsOwned: ["FIST", "PISTOL", "UZI", "SHOTGUN", "FLAMETHROWER", "ROCKET", "ELECTRO"],
+            // Everybody starts the same way: fists + a pistol with only a few bullets (the rest is bought in shops)
+            weaponsOwned: ["FIST", "PISTOL"],
             ammo: {
                 FIST: Infinity,
-                PISTOL: 150,
-                UZI: 300,
-                SHOTGUN: 60,
-                FLAMETHROWER: 200,
-                ROCKET: 20,
-                ELECTRO: 120
+                PISTOL: 18,
+                UZI: 0,
+                SHOTGUN: 0,
+                FLAMETHROWER: 0,
+                ROCKET: 0,
+                ELECTRO: 0
             },
             shootCooldown: 0,
             muzzleTimer: 0,
@@ -72,7 +73,8 @@ class LeonidaGame {
         this.jason = null;
 
         // Classic 1997 GTA 1 Score, Multiplier, Lives & Get Out of Jail Free Cards
-        this.cash = 500;
+        this.START_CASH = 500; // everybody starts with this, and dying puts you back to exactly this amount
+        this.cash = this.START_CASH;
         this.targetScore = 1000000;
         this.chapterCleared = false;
         this.multiplier = 1;
@@ -1739,20 +1741,15 @@ class LeonidaGame {
         this.player.charId = chosenCharId;
         this.player.pedType = chosenPedType;
         this.player.nickname = chosenNick;
-        if (chosenWeapon && this.player.weaponsOwned.includes(chosenWeapon)) {
-            this.player.weapon = chosenWeapon;
-        }
+        this.player.weapon = "PISTOL"; // same starting weapon for every character
         if (chosenCharId === "JASON") {
             this.player.armor = 100;
             if (this.jason) this.jason.pedType = "lucia";
         } else {
             if (this.jason) this.jason.pedType = "jason";
-            if (chosenCharId === "TOMMY") this.cash = Math.max(this.cash, 5000);
-            else if (chosenCharId === "TREVOR") {
+            if (chosenCharId === "TREVOR") {
                 this.player.armor = 100;
                 this.multiplier = Math.max(this.multiplier, 2);
-            } else if (chosenCharId === "CJ") {
-                this.cash = Math.max(this.cash, 2500);
             } else if (chosenCharId === "NIKO") {
                 this.player.armor = 100;
             } else if (chosenCharId === "CLAUDE") {
@@ -3003,6 +3000,16 @@ class LeonidaGame {
             this.audio.playFanfare(targetType === "POLICE" ? "BUSTED" : "WASTED");
         }
 
+        // Dying (or being arrested without a get-out-of-jail card) costs ALL your money: back to the starting sum
+        const loseAllCash = () => {
+            const lost = Math.max(0, this.cash - this.START_CASH);
+            this.cash = this.START_CASH;
+            if (lost > 0) {
+                this.addFloatingText(p.x, p.y - 30, `-$${lost.toLocaleString("en-US")} LOST`, "#ef4444");
+            }
+            return lost;
+        };
+
         if (targetType === "POLICE") {
             // Classic 1997 GTA 1 "GET OUT OF JAIL FREE" Card check!
             if (this.jailFreeCards > 0) {
@@ -3016,9 +3023,10 @@ class LeonidaGame {
             } else {
                 this.multiplier = Math.max(1, Math.floor(this.multiplier * 0.5));
                 p.weapon = "PISTOL";
+                loseAllCash();
                 this.showBigBanner(
                     title,
-                    `${subtitle} — MULTIPLIER HALVED (x${this.multiplier})`,
+                    `${subtitle} — ALL CASH CONFISCATED (BACK TO $${this.START_CASH}), MULTIPLIER x${this.multiplier}`,
                     color,
                     3.0
                 );
@@ -3031,11 +3039,12 @@ class LeonidaGame {
             }
             this.lives = Math.max(0, this.lives - 1);
             this.multiplier = Math.max(1, Math.floor(this.multiplier * 0.5));
+            loseAllCash();
             if (this.lives === 0) {
                 this.lives = 3;
-                this.showBigBanner("WASTED! (LIVES RESET)", `${subtitle} — LIVES RESTORED TO 3`, color, 3.2);
+                this.showBigBanner("WASTED! (LIVES RESET)", `${subtitle} — ALL CASH LOST (BACK TO $${this.START_CASH}), LIVES RESTORED TO 3`, color, 3.2);
             } else {
-                this.showBigBanner(title, `${subtitle} — LIVES LEFT: ${this.lives}`, color, 3.0);
+                this.showBigBanner(title, `${subtitle} — ALL CASH LOST (BACK TO $${this.START_CASH}), LIVES LEFT: ${this.lives}`, color, 3.0);
             }
         }
 
