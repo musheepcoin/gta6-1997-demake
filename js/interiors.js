@@ -45,8 +45,9 @@
                 buy("GUN_PISTOL", 150, 165, "#fde047", "🔫 PISTOL +60", 150, { weapon: "PISTOL", ammo: 60, desc: "PISTOL + 60 AMMO" }),
                 buy("GUN_UZI", 380, 165, "#f97316", "🔫 SMG +150", 800, { weapon: "UZI", ammo: 150, desc: "FULL-AUTO SMG" }),
                 buy("GUN_SHOTGUN", 610, 165, "#ef4444", "🔫 SHOTGUN +30", 1200, { weapon: "SHOTGUN", ammo: 30, desc: "6-PELLET SPREAD" }),
-                buy("GUN_ARMOR", 265, 335, "#38bdf8", "🛡️ BODY ARMOR", 500, { armor: 100, desc: "+100 ARMOR" }),
-                buy("GUN_ROCKET", 495, 335, "#a855f7", "🚀 ROCKETS +8", 4000, { weapon: "ROCKET", ammo: 8, desc: "BIG BOOM" })
+                buy("GUN_ARMOR", 150, 335, "#38bdf8", "🛡️ BODY ARMOR", 500, { armor: 100, desc: "+100 ARMOR" }),
+                buy("GUN_ROCKET", 380, 335, "#a855f7", "🚀 ROCKETS +8", 4000, { weapon: "ROCKET", ammo: 8, desc: "BIG BOOM" }),
+                buy("GUN_FLAME", 610, 335, "#fb923c", "🔥 FLAMETHROWER +150", 2500, { weapon: "FLAMETHROWER", ammo: 150, desc: "BURN EVERYTHING" })
             ]
         },
         RESTAURANT: {
@@ -81,7 +82,8 @@
             stations: () => [
                 buy("HOTEL_ROOM", 190, 165, "#f472b6", "🛏️ PRIVATE ROOM", 500, { hp: 999, armor: 50, clearWanted: true, setMinutes: 480, desc: "HEAL, NO STARS, MORNING" }),
                 buy("HOTEL_MINIBAR", 570, 165, "#38bdf8", "🍸 MINIBAR", 60, { hp: 25, speed: 12, desc: "+25 HP + SPEED" }),
-                buy("HOTEL_SUITE", 380, 335, "#fde047", "👑 PENTHOUSE SUITE", 1500, { hp: 999, armor: 100, clearWanted: true, setMinutes: 1200, desc: "FULL HEAL, NO STARS, NIGHT" })
+                buy("HOTEL_LIFE", 190, 335, "#39ff14", "❤️ LIFE INSURANCE", 3000, { extraLife: 1, desc: "+1 EXTRA LIFE" }),
+                buy("HOTEL_SUITE", 570, 335, "#fde047", "👑 PENTHOUSE SUITE", 1500, { hp: 999, armor: 100, clearWanted: true, setMinutes: 1200, desc: "FULL HEAL, NO STARS, NIGHT" })
             ]
         },
         CLOTHES: {
@@ -97,7 +99,8 @@
             ],
             stations: () => [
                 buy("CLOTHES_DISGUISE", 240, 165, "#38bdf8", "🕶️ NEW DISGUISE", 250, { bandanaToggle: true, clearWanted: true, desc: "NO STARS + NEW LOOK" }),
-                buy("CLOTHES_VEST", 520, 165, "#a3e635", "🧥 KEVLAR JACKET", 350, { armor: 70, desc: "+70 ARMOR" })
+                buy("CLOTHES_VEST", 520, 165, "#a3e635", "🧥 KEVLAR JACKET", 350, { armor: 70, desc: "+70 ARMOR" }),
+                buy("CLOTHES_VIP", 380, 335, "#facc15", "💎 DESIGNER LABEL", 4000, { multiplier: 1, desc: "SCORE MULTIPLIER +1" })
             ]
         },
         CONVENIENCE: {
@@ -115,6 +118,7 @@
                 buy("STORE_SNACK", 150, 165, "#fb923c", "🌮 SNACK PACK", 15, { hp: 20, desc: "+20 HEALTH" }),
                 buy("STORE_MEDKIT", 380, 165, "#ef4444", "🩹 FIRST AID KIT", 90, { hp: 999, desc: "FULL HEALTH" }),
                 buy("STORE_ENERGY", 610, 165, "#22d3ee", "⚡ ENERGY DRINK", 30, { speed: 25, desc: "SPEED BOOST 25S" }),
+                buy("STORE_JAIL", 150, 335, "#38bdf8", "🎟️ GET OUT OF JAIL FREE", 800, { jailCards: 1, desc: "+1 JAIL-FREE CARD" }),
                 {
                     id: "STORE_ROB",
                     x: 380,
@@ -142,7 +146,8 @@
             stations: () => [
                 buy("BAR_BEER", 190, 165, "#facc15", "🍺 ICE-COLD BEER", 20, { hp: 15, speed: 10, desc: "+15 HP, SPEED" }),
                 buy("BAR_COCKTAIL", 570, 165, "#f472b6", "🍹 MOJITO", 45, { hp: 40, speed: 18, desc: "+40 HP, SPEED 18S" }),
-                buy("BAR_SHOT", 380, 335, "#ef4444", "🥃 TEQUILA SHOT", 35, { armor: 30, speed: 15, desc: "+30 ARMOR, SPEED" })
+                buy("BAR_SHOT", 190, 335, "#ef4444", "🥃 TEQUILA SHOT", 35, { armor: 30, speed: 15, desc: "+30 ARMOR, SPEED" }),
+                buy("BAR_BRIBE", 570, 335, "#facc15", "💰 PAY OFF A COP", 500, { bribe: 2, desc: "-2 WANTED STARS" })
             ]
         }
     };

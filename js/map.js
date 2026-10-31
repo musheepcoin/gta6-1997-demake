@@ -2473,57 +2473,18 @@ class LeonidaMap {
 
         this.initPickups();
         this.initStreetProps();
+        // Kill-frenzy tokens were street pickups too: removed
+        this.killFrenzies = [];
     }
 
     initPickups() {
-        this.pickups = [
-            // 1. Pickups right around Hotel Dixon & Ocean Drive Spawn (213.5, 146.0)
-            { x: 213.5 * TILE_SIZE, y: 143.5 * TILE_SIZE, type: "JAIL_FREE", label: "GET OUT OF JAIL FREE CARD", respawnTimer: 0 },
-            { x: 213.5 * TILE_SIZE, y: 150.5 * TILE_SIZE, type: "WEAPON", subtype: "UZI", ammo: 120, label: "MICRO-UZI", respawnTimer: 0 },
-            { x: 218.5 * TILE_SIZE, y: 149.5 * TILE_SIZE, type: "ARMOR", label: "OCEAN DRIVE KEVLAR VEST", respawnTimer: 0 },
-            { x: 218.5 * TILE_SIZE, y: 154.5 * TILE_SIZE, type: "HEALTH", label: "MEDKIT +50", respawnTimer: 0 },
-            { x: 213.5 * TILE_SIZE, y: 155.0 * TILE_SIZE, type: "BRIBE", label: "COP BRIBE (-2 HEADS)", respawnTimer: 0 },
-            { x: 218.5 * TILE_SIZE, y: 142.5 * TILE_SIZE, type: "MULTIPLIER", label: "MULTIPLIER +1", respawnTimer: 0 },
-
-            // 2. Pickups on S-Curving Vice Beach, Lummus Park & South Wooden Pier (225.5, 154.0)
-            { x: 224.5 * TILE_SIZE, y: 148.5 * TILE_SIZE, type: "ARMOR", label: "VICE BEACH KEVLAR", respawnTimer: 0 },
-            { x: 226.5 * TILE_SIZE, y: 158.0 * TILE_SIZE, type: "CASH", amount: 5000, label: "BEACH STASH $5,000", respawnTimer: 0 },
-            { x: 245.5 * TILE_SIZE, y: 154.0 * TILE_SIZE, type: "WEAPON", subtype: "ROCKET", ammo: 15, label: "OCEAN PIER ROCKET LAUNCHER", respawnTimer: 0 },
-
-            // 3. Española Way, Flamingo Park (210, 118), Club Nine1Nine (213.5, 48.0) & SERA Space Center (224.5, 20.5)
-            { x: 210.5 * TILE_SIZE, y: 118.5 * TILE_SIZE, type: "EXTRA_LIFE", label: "FLAMINGO PARK EXTRA LIFE (+1)", respawnTimer: 0 },
-            { x: 213.5 * TILE_SIZE, y: 46.5 * TILE_SIZE, type: "WEAPON", subtype: "SHOTGUN", ammo: 40, label: "CLUB 919 SHOTGUN", respawnTimer: 0 },
-            { x: 232.0 * TILE_SIZE, y: 18.5 * TILE_SIZE, type: "WEAPON", subtype: "ROCKET", ammo: 20, label: "LAUNCH PAD 39A ROCKET LAUNCHER", respawnTimer: 0 },
-            { x: 222.5 * TILE_SIZE, y: 20.5 * TILE_SIZE, type: "ARMOR", label: "SERA SPACEPORT KEVLAR", respawnTimer: 0 },
-
-            // 4. Star Island (173, 106.5), Vice Port Cruise Ships (171.5, 164.5), Mambas Stadium (116, 105) & Golf Club (141.5, 52)
-            { x: 171.5 * TILE_SIZE, y: 105.0 * TILE_SIZE, type: "EXTRA_LIFE", label: "STAR ISLAND EXTRA LIFE (+1)", respawnTimer: 0 },
-            { x: 174.5 * TILE_SIZE, y: 107.5 * TILE_SIZE, type: "CASH", amount: 10000, label: "STAR ISLAND MANSION STASH $10,000", respawnTimer: 0 },
-            { x: 171.5 * TILE_SIZE, y: 162.5 * TILE_SIZE, type: "CASH", amount: 10000, label: "CRUISE LINER VAULT $10,000", respawnTimer: 0 },
-            { x: 116.0 * TILE_SIZE, y: 105.0 * TILE_SIZE, type: "MULTIPLIER", label: "50-YARD LINE MULTIPLIER +1", respawnTimer: 0 },
-            { x: 141.5 * TILE_SIZE, y: 52.0 * TILE_SIZE, type: "CASH", amount: 7500, label: "COUNTRY CLUB TROPHY $7,500", respawnTimer: 0 },
-
-            // 5. Wynwood & Jack of Hearts (115.5, 82.5), Lake Leonida Gator Island (77.5, 75), Mount Kalaga (84.5, 25.5)
-            { x: 114.5 * TILE_SIZE, y: 80.5 * TILE_SIZE, type: "WEAPON", subtype: "UZI", ammo: 150, label: "JACK OF HEARTS MICRO-UZI", respawnTimer: 0 },
-            { x: 77.5 * TILE_SIZE, y: 75.0 * TILE_SIZE, type: "ARMOR", label: "GATOR ISLAND KEVLAR", respawnTimer: 0 },
-            { x: 84.5 * TILE_SIZE, y: 24.0 * TILE_SIZE, type: "WEAPON", subtype: "SHOTGUN", ammo: 50, label: "MOUNT KALAGA RANGER SHOTGUN", respawnTimer: 0 },
-
-            // 6. Leonida Penitentiary (31.5, 68), Port Gellhorn Speedway (47, 113.5), VCIA Airport (66.5, 152) & Keys (135, 246.5)
-            { x: 31.5 * TILE_SIZE, y: 69.5 * TILE_SIZE, type: "JAIL_FREE", label: "PENITENTIARY WARDEN KEYCARD", respawnTimer: 0 },
-            { x: 47.0 * TILE_SIZE, y: 112.5 * TILE_SIZE, type: "CASH", amount: 10000, label: "SPEEDWAY CHAMPION PURSE $10,000", respawnTimer: 0 },
-            { x: 64.5 * TILE_SIZE, y: 152.0 * TILE_SIZE, type: "WEAPON", subtype: "ROCKET", ammo: 15, label: "VCIA JETLINER ROCKET LAUNCHER", respawnTimer: 0 },
-            { x: 58.0 * TILE_SIZE, y: 213.0 * TILE_SIZE, type: "WEAPON", subtype: "FLAMETHROWER", ammo: 150, label: "THRILLBILLY MUD PARK FLAMETHROWER", respawnTimer: 0 },
-            { x: 135.0 * TILE_SIZE, y: 246.5 * TILE_SIZE, type: "MULTIPLIER", label: "BAHIA HONDA BROKEN BRIDGE JUMP +1", respawnTimer: 0 }
-        ];
+        // Street bonuses were removed: everything is bought in shops (see interiors.js)
+        this.pickups = [];
     }
 
     initStreetProps() {
-        this.crates = [
-            // Near Hotel Dixon & Ocean Drive Spawn (213.5, 146.0)
-            { x: 213.45 * TILE_SIZE, y: 145.2 * TILE_SIZE, z: 2.0, w: 28, h: 28, smashed: false, respawnTimer: 0, dropType: "MULTIPLIER", dropLabel: "MULTIPLIER +1" },
-            { x: 218.55 * TILE_SIZE, y: 147.5 * TILE_SIZE, z: 2.0, w: 28, h: 28, smashed: false, respawnTimer: 0, dropType: "WEAPON", dropSubtype: "SHOTGUN", dropAmmo: 35, dropLabel: "PUMP SHOTGUN" },
-            { x: 218.55 * TILE_SIZE, y: 151.2 * TILE_SIZE, z: 2.0, w: 30, h: 34, smashed: false, respawnTimer: 0, dropType: "JAIL_FREE", dropLabel: "GET OUT OF JAIL FREE CARD" }
-        ];
+        // Street crates removed: all upgrades are sold in shops
+        this.crates = [];
 
         this.infoSigns = [
             { x: 213.5 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0, text: "STATE OF LEONIDA (12 BESPOKE REGIONS): VICE BEACH, MAMBAS STADIUM, SERA SPACEPORT, PENITENTIARY, SPEEDWAY & KEYS! PRESS [M] OR USE [C] TOUR!" },

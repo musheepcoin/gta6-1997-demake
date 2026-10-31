@@ -1898,6 +1898,11 @@ class LeonidaGame {
             this.addFloatingText(p.x, p.y - 24, `NOT ENOUGH CASH ($${price.toLocaleString("en-US")})`, "#ef4444");
             return;
         }
+        if (fx.bribe && this.wantedLevel <= 0) {
+            st.cooldown = 1.2;
+            this.addFloatingText(p.x, p.y - 24, "NO HEAT TO BRIBE AWAY", "#94a3b8");
+            return;
+        }
         if (fx.hp && !fx.heist && p.hp >= p.maxHp && !fx.armor && !fx.weapon && !fx.speed && !fx.clearWanted && !fx.bandanaToggle) {
             st.cooldown = 1.2;
             this.addFloatingText(p.x, p.y - 24, "ALREADY AT FULL HEALTH", "#94a3b8");
@@ -1922,6 +1927,10 @@ class LeonidaGame {
             if (typeof this.renderPortraits === "function") this.renderPortraits();
         }
         if (fx.clearWanted) this.setWantedLevel(0);
+        if (fx.bribe) this.setWantedLevel(Math.max(0, this.wantedLevel - fx.bribe));
+        if (fx.extraLife) this.lives += fx.extraLife;
+        if (fx.jailCards) this.jailFreeCards = (this.jailFreeCards || 0) + fx.jailCards;
+        if (fx.multiplier) this.multiplier += fx.multiplier;
         if (typeof fx.setMinutes === "number") {
             this.worldMinutes = fx.setMinutes;
             this.syncDayNightCycle();
@@ -4723,10 +4732,9 @@ class LeonidaGame {
                         const visitedCount = this.map.landmarks.filter((l) => l.visited).length;
                         const totalLm = this.map.landmarks.length;
                         this.audio.playFanfare("MISSION");
-                        this.addCash(2500, `${lm.short} DISCOVERED!`);
                         this.showBigBanner(
                             `🌴 ${lm.name}`,
-                            `${lm.sub} — LANDMARK ${visitedCount}/${totalLm} DISCOVERED (+$2,500)!`,
+                            `${lm.sub} — LANDMARK ${visitedCount}/${totalLm} DISCOVERED!`,
                             lm.color || "#ff2a85",
                             3.2
                         );
@@ -4736,41 +4744,7 @@ class LeonidaGame {
                             false
                         );
                     }
-                    if (!lm.perkCooldown || lm.perkCooldown <= 0) {
-                        lm.perkCooldown = 16.0;
-                        if (lm.perk === "HEAL" && p.hp < p.maxHp) {
-                            p.hp = p.maxHp;
-                            this.addFloatingText(p.x, p.y - 28, "🏨 HOTEL DIXON SUITE: FULL HEALTH!", "#39ff14");
-                            this.updateHud();
-                        } else if (lm.perk === "ARMOR" && p.armor < p.maxArmor) {
-                            p.armor = Math.min(p.maxArmor, p.armor + 50);
-                            this.addFloatingText(p.x, p.y - 28, "🏖️ VICE BEACH / GRASSRIVERS: +50 ARMOR!", "#00f0ff");
-                            this.updateHud();
-                        } else if (lm.perk === "MULTIPLIER") {
-                            this.multiplier += 1;
-                            this.addFloatingText(p.x, p.y - 28, `💃 CLUB NINE1NINE VIP: MULTIPLIER x${this.multiplier}!`, "#ff2a85");
-                            this.updateHud();
-                        } else if (lm.perk === "ESTATE") {
-                            p.hp = p.maxHp;
-                            p.armor = p.maxArmor;
-                            if (!p.weaponsOwned.includes("UZI")) p.weaponsOwned.push("UZI");
-                            p.ammo.UZI = Math.min(999, (p.ammo.UZI || 0) + 90);
-                            this.addFloatingText(p.x, p.y - 28, "🏛️ STAR ISLAND MANSION: FULL HP/ARMOR + UZI!", "#a855f7");
-                            this.updateHud();
-                        } else if (lm.perk === "REPAIR_CLEAR") {
-                            if (p.inVehicle) {
-                                p.inVehicle.hp = p.inVehicle.maxHp;
-                                p.inVehicle.dentMask = 0;
-                            }
-                            if (this.wantedLevel > 0) {
-                                this.setWantedLevel(0);
-                            }
-                            this.addFloatingText(p.x, p.y - 28, "🏪 PORT GELLHORN CUSTOMS: FREE REPAIR & WANTED CLEARED!", "#f97316");
-                            this.updateHud();
-                        } else if (lm.perk === "TAXI_BONUS") {
-                            this.addCash(3000, "🃏 JACK OF HEARTS VIP BONUS");
-                        }
-                    }
+                    // Landmark perks (free heal / armor / cash) removed: everything is sold in shops
                 }
             }
         }
