@@ -5478,18 +5478,7 @@ class RetroRenderer {
             }
         }
 
-        // 5. Render Jason Duval & Lucia Caminos walking inside the Interior Room!
-        const jFrame = this.getPedFrameIndex(
-            "FIST",
-            Boolean(game.jason && game.jason.isMoving),
-            false,
-            (game.jason && game.jason.walkPhase) || 0
-        );
-        this.drawPedSprite2D(ctx, "jason", jFrame, ox + game.interiorJasonX, oy + game.interiorJasonY, game.interiorJasonAngle, 2.5);
-        ctx.font = "bold 10px Consolas, monospace";
-        ctx.fillStyle = "#38bdf8";
-        ctx.fillText("JASON", ox + game.interiorJasonX, oy + game.interiorJasonY - 26);
-
+        // 5. The player walks alone inside the room (the companion waits outside)
         const p = game.player;
         const lFrame = this.getPedFrameIndex(
             "FIST",

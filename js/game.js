@@ -3233,20 +3233,8 @@ class LeonidaGame {
         this.interiorX = Math.max(64, Math.min(intr.w - 64, this.interiorX));
         this.interiorY = Math.max(88, Math.min(intr.h - 24, this.interiorY));
 
-        // Jason follows Lucia inside the venue
-        const dj = Math.hypot(this.interiorX - this.interiorJasonX, this.interiorY - this.interiorJasonY);
-        if (dj > 48) {
-            const jAng = Math.atan2(this.interiorY - this.interiorJasonY, this.interiorX - this.interiorJasonX);
-            this.interiorJasonAngle = jAng;
-            this.interiorJasonX += Math.cos(jAng) * 150 * dt;
-            this.interiorJasonY += Math.sin(jAng) * 150 * dt;
-            if (this.jason) {
-                this.jason.isMoving = true;
-                this.jason.walkPhase = (this.jason.walkPhase || 0) + dt * 1.2;
-            }
-        } else if (this.jason) {
-            this.jason.isMoving = false;
-        }
+        // The companion stays outside while the player is in a venue
+        if (this.jason) this.jason.isMoving = false;
 
         // Step onto any interactive station pad inside the venue to trigger its perk/heist/minigame!
         if (Array.isArray(intr.stations)) {
