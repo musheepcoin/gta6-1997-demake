@@ -159,6 +159,59 @@
         return (h ^ (h >>> 15)) >>> 0;
     }
 
+
+    function hexToRgb(hex) {
+        const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+        if (!m) return [0.96, 0.25, 0.65];
+        const n = parseInt(m[1], 16);
+        return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    }
+
+    /**
+     * Hand-made landmark interiors were authored with a free-floating door position. Snap each one to the
+     * nearest sidewalk/ground tile touching a building facade and record which wall (facing = wall normal).
+     * Landmarks with no building nearby keep their classic glowing mat.
+     */
+    function snapLandmarkDoors(map, maxDist = 5) {
+        const cols = MAP_COLS;
+        const rows = MAP_ROWS;
+        const ts = TILE_SIZE;
+        const ground = map.surfaceGround;
+        if (!ground || !map.interiors) return;
+        const gt = (c, r) => (c >= 0 && r >= 0 && c < cols && r < rows ? ground[r * cols + c] : -1);
+        const walkable = (c, r) => gt(c, r) === GROUND_TYPE.PAWEMENT || gt(c, r) === GROUND_TYPE.FIELD;
+        const dirs = [
+            { dc: 0, dr: -1, facing: "S" }, // building to the north -> door in a south-facing wall
+            { dc: 0, dr: 1, facing: "N" },
+            { dc: -1, dr: 0, facing: "E" },
+            { dc: 1, dr: 0, facing: "W" }
+        ];
+        for (const intr of map.interiors) {
+            if (intr.isShop || intr.facing) continue;
+            const c0 = Math.floor(intr.doorX / ts);
+            const r0 = Math.floor(intr.doorY / ts);
+            let best = null;
+            for (let dr = -maxDist; dr <= maxDist; dr++) {
+                for (let dc = -maxDist; dc <= maxDist; dc++) {
+                    const c = c0 + dc;
+                    const r = r0 + dr;
+                    if (!walkable(c, r)) continue;
+                    for (const d of dirs) {
+                        if (gt(c + d.dc, r + d.dr) !== GROUND_TYPE.BUILDING) continue;
+                        const dist = Math.hypot(dc, dr) + (d.facing === "S" ? 0 : 0.15);
+                        if (!best || dist < best.dist) best = { c, r, facing: d.facing, dist };
+                    }
+                }
+            }
+            if (best) {
+                intr.facing = best.facing;
+                intr.doorX = (best.c + 0.5) * ts;
+                intr.doorY = (best.r + 0.5) * ts;
+                intr.matRGB = hexToRgb(intr.accent);
+            }
+        }
+    }
+
     function buildInterior(type, index, c, r, tileSize) {
         const tpl = SHOP_TEMPLATES[type];
         const nm = tpl.names[hash2(c, r) % tpl.names.length];
@@ -171,6 +224,7 @@
             theme: tpl.theme,
             accent: tpl.accent,
             matRGB: tpl.mat,
+            facing: "S",
             doorX: (c + 0.5) * tileSize,
             doorY: (r + 1.5) * tileSize,
             w: ROOM_W,
@@ -260,5 +314,5 @@
         return out;
     }
 
-    window.ShopInteriors = { generate, TEMPLATES: SHOP_TEMPLATES, ROOM_W, ROOM_H };
+    window.ShopInteriors = { generate, snapLandmarkDoors, TEMPLATES: SHOP_TEMPLATES, ROOM_W, ROOM_H };
 })();

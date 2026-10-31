@@ -1777,6 +1777,7 @@ class LeonidaMap {
         // Template-based shop interiors (restaurants, hotels, gun shops, bars, stores...) on real storefronts
         try {
             if (window.ShopInteriors) {
+                window.ShopInteriors.snapLandmarkDoors(this);
                 const shops = window.ShopInteriors.generate(this);
                 for (const s of shops) this.interiors.push(s);
             }

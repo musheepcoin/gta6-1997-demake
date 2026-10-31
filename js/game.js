@@ -1828,8 +1828,9 @@ class LeonidaGame {
         }
 
         // Remember exterior coordinates right outside this venue's door
-        p.x = intr.doorX;
-        p.y = intr.doorY + 24;
+        const dn = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
+        p.x = intr.doorX + dn[0] * 24;
+        p.y = intr.doorY + dn[1] * 24;
         p.z = this.map.getHeightAtPixel(p.x, p.y, 4.0);
         if (this.jason) {
             this.jason.x = p.x + 24;
@@ -1870,8 +1871,9 @@ class LeonidaGame {
         this.activeInterior = null;
         this.doorRearmBlock = intr;
         this.interiorCooldown = 0.6;
-        this.player.x = intr.doorX;
-        this.player.y = intr.doorY + 26;
+        const dnx = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
+        this.player.x = intr.doorX + dnx[0] * 26;
+        this.player.y = intr.doorY + dnx[1] * 26;
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
         if (this.jason) {
             this.jason.x = this.player.x + 24;

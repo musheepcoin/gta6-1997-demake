@@ -3540,21 +3540,23 @@ class RetroRenderer {
                 if (intr.doorX < minX || intr.doorX > maxX || intr.doorY < minY || intr.doorY > maxY) continue;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.03;
                 const mrgb = intr.matRGB || [0.96, 0.25, 0.65];
-                if (intr.isShop) {
-                    // Real storefront door: vertical quads standing against the building's south wall
-                    const wallY = Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + 1.6;
-                    const variants = [[0, 0, 0]];
-                    for (const [zAdj, yAdj, xAdj] of variants) {
-                    const gz = dz - 0.03 + zAdj;
-                    const vq = (w, zc, halfH, rr, gg, bb, aa, yOff = 0) =>
-                        this.pushSpriteQuad3D(intr.doorX + xAdj, wallY + yOff + yAdj, gz + zc, w, 0.4, 0, -1, -1, -1, -1, rr, gg, bb, aa, SPRITE_DRAW_ORDER.MAP_OBJECT, halfH);
-                    vq(48, 1.02, 0.11, mrgb[0], mrgb[1], mrgb[2], 1.0, 0.00); // shop sign band
+                if (intr.facing) {
+                    // Real door: vertical quads standing against the facade the door belongs to (any of 4 sides)
+                    const fnv = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[intr.facing] || [0, 1];
+                    const tcx = Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
+                    const tcy = Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
+                    const wx0 = tcx - fnv[0] * TILE_SIZE * 0.5 + fnv[0] * 1.6;
+                    const wy0 = tcy - fnv[1] * TILE_SIZE * 0.5 + fnv[1] * 1.6;
+                    const dAng = fnv[0] !== 0 ? Math.PI * 0.5 : 0;
+                    const gz = dz - 0.03;
+                    const vq = (w, zc, halfH, rr, gg, bb, aa, off = 0) =>
+                        this.pushSpriteQuad3D(wx0 + fnv[0] * off, wy0 + fnv[1] * off, gz + zc, w, 0.4, dAng, -1, -1, -1, -1, rr, gg, bb, aa, SPRITE_DRAW_ORDER.MAP_OBJECT, halfH);
+                    vq(48, 1.02, 0.11, mrgb[0], mrgb[1], mrgb[2], 1.0, 0.00); // sign band
                     vq(38, 0.48, 0.50, 0.20, 0.15, 0.12, 1.0, 0.02);           // door frame
                     vq(31, 0.46, 0.46, 0.0, 0.0, 0.0, 1.0, 0.05);              // black doorway
                     vq(3, 0.42, 0.04, 0.95, 0.80, 0.25, 1.0, 0.08);           // brass handle
-                    }
-                    // Lit threshold step on the sidewalk
-                    this.pushSolidQuad3D(intr.doorX, intr.doorY - 24, dz, 36, 8, 0, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Threshold step on the sidewalk
+                    this.pushSolidQuad3D(tcx - fnv[0] * 24, tcy - fnv[1] * 24, dz, 36, 8, dAng, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     continue;
                 }
                 this.pushSolidQuad3D(intr.doorX, intr.doorY, dz, 26, 26, this.time * 1.2, mrgb[0], mrgb[1], mrgb[2], pulse, SPRITE_DRAW_ORDER.MAP_OBJECT);
