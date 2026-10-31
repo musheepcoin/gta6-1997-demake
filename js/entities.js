@@ -62,7 +62,6 @@ const VEHICLE_SPECS = {
         secondaryColor: "#134e4a",
         stripeColor: "#ccfbf1",
         bodyStyle: "CONVERTIBLE",
-        isConvertible: true,
         amphibious: false
     },
     MINT_STALLION: {
@@ -97,7 +96,6 @@ const VEHICLE_SPECS = {
         secondaryColor: "#450a0a",
         stripeColor: "#f8fafc",
         bodyStyle: "ROADSTER_SPARE",
-        isConvertible: true,
         amphibious: false
     },
     CHALLENGER_RT: {

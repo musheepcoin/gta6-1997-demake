@@ -4127,7 +4127,6 @@ class RetroRenderer {
                 } else if (
                     mapInfo.isConvertible ||
                     v.specKey === "MICRO_KART" ||
-                    v.specKey === "MONSTER_BUGGY" ||
                     v.specKey === "AIRBOAT"
                 ) {
                     const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
@@ -6496,7 +6495,10 @@ class RetroRenderer {
         const specObj = (typeof VEHICLE_SPECS !== "undefined" && VEHICLE_SPECS[v.specKey]) || {};
         const sprId = String(v.sprId || specObj.sprId || "66");
         const isTank = Boolean(v.isTank || specObj.isTank || sprId === "940");
-        const isConvertible = Boolean(v.isConvertible || specObj.isConvertible);
+        // The sprite atlas metadata (original GTA1 car info) is the source of truth for open-top cars:
+        // a driver/passenger may only be drawn if the sprite really has an open cockpit.
+        const spriteMeta = this.vehicleBySprIdx && this.vehicleBySprIdx[sprId];
+        const isConvertible = spriteMeta ? Boolean(spriteMeta.convertible) : Boolean(v.isConvertible || specObj.isConvertible);
         const isMotorcycle = Boolean(v.isMotorcycle || specObj.isMotorcycle);
 
         if (v.specKey === "VCPD_CRUISER" || sprId === "73") {
