@@ -1140,13 +1140,13 @@ class ViceNetworkManager {
                 v.vy = vy;
                 v.speed = Math.hypot(vx, vy);
                 v.driver = codeToDrv(drvCode);
-                v.hp = hp;
+                v.hp = Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp;
                 const wasDestroyed = v.destroyed;
                 const nowDestroyed = Boolean(flags & 1);
                 if (!wasDestroyed && nowDestroyed) {
                     g.explodeVehicle(v, false, true);
-                } else {
-                    v.destroyed = nowDestroyed;
+                } else if (nowDestroyed) {
+                    v.destroyed = true;
                 }
                 v.sirenActive = Boolean(flags & 2);
                 v.frontDented = Boolean(flags & 4);
@@ -1212,14 +1212,17 @@ class ViceNetworkManager {
                     pd.speed = spd;
                     pd.kind = kindStr;
                     pd.g24Type = g24Type || pd.g24Type;
-                    pd.hp = hp;
+                    // The host only learns about our hits through PED_KILL, so its snapshot hp is always
+                    // >= ours: keep the lower value or multi-hit kills would be healed back every 100 ms.
+                    pd.hp = Number.isFinite(pd.hp) ? Math.min(pd.hp, hp) : hp;
                     const wasDead = pd.dead;
                     const nowDead = Boolean(flags & 1);
                     if (!wasDead && nowDead) {
                         g.killPed(pd, false, true);
-                    } else {
-                        pd.dead = nowDead;
+                    } else if (nowDead) {
+                        pd.dead = true;
                     }
+                    // (a ped we killed locally stays dead even if the host has not processed PED_KILL yet)
                     pd.panicTimer = (flags & 2) ? Math.max(pd.panicTimer || 0, 0.5) : 0;
                     pd.stunnedTimer = (flags & 4) ? Math.max(pd.stunnedTimer || 0, 0.35) : 0;
                     pd.burnTimer = (flags & 8) ? Math.max(pd.burnTimer || 0, 0.5) : 0;
