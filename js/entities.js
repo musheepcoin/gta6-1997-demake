@@ -1434,13 +1434,6 @@ class Vehicle {
                 const lateralDist = Math.abs(dx * rx + dy * ry);
                 const cosDiff = Math.cos(other.angle - this.angle);
 
-                // A. Yield to nearby active Police / Ambulance / Fire Engine sirens!
-                if (!isPanicked && this.driver === "AI_TRAFFIC" && other.sirenActive && !other.destroyed && dist < 140) {
-                    if (forwardDist > -20 && forwardDist < 105 && lateralDist < 42) {
-                        sirenYield = true;
-                    }
-                }
-
                 // B. Same-Direction Vehicle Ahead in Same Lane (cosDiff > 0.45):
                 // Strictly maintain true bumper-to-bumper gap (half of our length + half of lead car's length)
                 const halfWidthSum = (this.h + (other.h || 24)) * 0.46 + 4;
@@ -1522,6 +1515,16 @@ class Vehicle {
             this.speed *= brakeMult;
         } else if (closestEntity && closestBumperGap < 110) {
             const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
+            // If blocked by a stationary vehicle (e.g. parked ambulance/cop/player) and not at a red light, overtake via adjacent lane!
+            if (
+                obstacleSpeed < 8 &&
+                closestBumperGap < 68 &&
+                this.aiState !== "STOPPED_LIGHT" &&
+                closestEntity.aiState !== "STOPPED_LIGHT" &&
+                this.tryAdjacentLaneChange(bx, by, curZ, map, game)
+            ) {
+                return { throttle: Math.min(this.aiCruiseFactor, 0.48), steer: 0, handbrake: false };
+            }
             this.aiState = "FOLLOWING";
             if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
@@ -2428,10 +2431,10 @@ class TrafficManager {
         this.game = game;
         this.lastGenCarsTime = 0;
         this.lastGenPedsTime = 0;
-        this.genCarsCooldown = 0.70;
-        this.genPedsCooldown = 0.28;
-        this.maxTrafficCars = 14;
-        this.maxTrafficPeds = 38;
+        this.genCarsCooldown = 1.65;
+        this.genPedsCooldown = 0.85;
+        this.maxTrafficCars = 7;
+        this.maxTrafficPeds = 18;
         this.carsMaxDistanceBlocks = 5; // mTrafficGenCarsMaxDistance
         this.pedsMaxDistanceBlocks = 4; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
@@ -2522,7 +2525,7 @@ class TrafficManager {
     removeOffscreenCars(viewports) {
         const game = this.game;
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
-        const minKeep = 24 + (vps.length - 1) * 10;
+        const minKeep = 12 + (vps.length - 1) * 6;
         if (game.vehicles.length <= minKeep) return;
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
 
@@ -2531,8 +2534,11 @@ class TrafficManager {
             const anyWanted = game.wantedLevel > 0 || (game.net && typeof game.net.getMaxWantedLevel === "function" && game.net.getMaxWantedLevel() > 0);
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
+                v.destroyed ||
+                (!v.driver && !v.missionTag) ||
+                (v.driver === "AI_EMERGENCY" && !v.deployedMedic && !v.sirenActive) ||
                 (!anyWanted && v.driver === "AI_COP");
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE") continue;
+            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "PLAYER" || v.driver === "REMOTE") continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
@@ -2549,10 +2555,10 @@ class TrafficManager {
         const map = game.map;
         const outerRect = this.expandRect(onScreenArea, this.carsMaxDistanceBlocks);
 
-        // Count active moving traffic cars within outerRect
+        // Count all non-player vehicles within outerRect so roads never become overcrowded
         let activeTraffic = 0;
         for (const v of game.vehicles) {
-            if (!v.destroyed && (v.driver === "AI_TRAFFIC" || v.driver === "AI_EMERGENCY")) {
+            if (v.driver !== "PLAYER") {
                 const bx = Math.floor(v.x / TILE_SIZE);
                 const by = Math.floor(v.y / TILE_SIZE);
                 if (this.isPointInRect(bx, by, outerRect)) {
@@ -2624,13 +2630,19 @@ class TrafficManager {
             const vx = (bx + 0.5) * TILE_SIZE;
             const vy = (by + 0.5) * TILE_SIZE;
             let occupied = false;
+            let sameCorridorCount = 0;
             for (const other of game.vehicles) {
-                if (Math.hypot(other.x - vx, other.y - vy) < 135) {
+                const dx = Math.abs(other.x - vx);
+                const dy = Math.abs(other.y - vy);
+                if (Math.hypot(dx, dy) < 240) {
                     occupied = true;
                     break;
                 }
+                if ((dx < 96 && dy < 480) || (dy < 96 && dx < 480)) {
+                    sameCorridorCount++;
+                }
             }
-            if (occupied) continue;
+            if (occupied || sameCorridorCount >= 2) continue;
 
             const vz = map.getHeightAtPixel(vx, vy, 4.0);
             const roadAngle = dirs[Math.floor(Math.random() * dirs.length)].angle;
@@ -2650,10 +2662,20 @@ class TrafficManager {
         const game = this.game;
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 2));
+        const anyWanted = game.wantedLevel > 0 || (game.net && typeof game.net.getMaxWantedLevel === "function" && game.net.getMaxWantedLevel() > 0);
 
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
-            if (ped.kind !== "CIVILIAN" || ped.missionTag) continue;
+            if (ped.missionTag || ped.kind === "MONK" || ped.kind === "GATOR" || ped.kind === "MEDIC") continue;
+            if (ped.dead && (ped.deadTimer || 0) > 26.0) {
+                game.peds.splice(i, 1);
+                continue;
+            }
+            const canRemove =
+                ped.kind === "CIVILIAN" ||
+                ped.kind === "HOSTILE" ||
+                (!anyWanted && ped.kind === "COP");
+            if (!canRemove) continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
             const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
@@ -2681,9 +2703,7 @@ class TrafficManager {
         if (nearbyPeds >= this.maxTrafficPeds) return;
 
         // Collect all valid sidewalk (PAWEMENT) and promenade/beach (FIELD) tiles in outerRect.
-        // If nearby pedestrian density is low (< 18), also allow sidewalk tiles on screen at least 170px from the player
-        // so fast driving or teleporting into a district immediately shows bustling sidewalks.
-        const allowEdgeOnScreen = nearbyPeds < 18;
+        const allowEdgeOnScreen = nearbyPeds < 8;
         const px = refX !== null ? refX : (game.player ? game.player.x : 0);
         const py = refY !== null ? refY : (game.player ? game.player.y : 0);
         const candidates = [];
@@ -2694,11 +2714,11 @@ class TrafficManager {
                 if (inScreen && !allowEdgeOnScreen) continue;
                 const pedX = (bx + 0.5) * TILE_SIZE;
                 const pedY = (by + 0.5) * TILE_SIZE;
-                if (inScreen && Math.hypot(pedX - px, pedY - py) < 175) continue;
+                if (inScreen && Math.hypot(pedX - px, pedY - py) < 220) continue;
 
                 const nav = map.getNavigationBlock(bx, by, camZ);
                 if (!nav) continue;
-                if (nav.groundType === GROUND_TYPE.PAWEMENT || (nav.groundType === GROUND_TYPE.FIELD && bx >= 216)) {
+                if (nav.groundType === GROUND_TYPE.PAWEMENT || (nav.groundType === GROUND_TYPE.FIELD && bx >= 218)) {
                     candidates.push({ bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT });
                 }
             }
@@ -2707,17 +2727,17 @@ class TrafficManager {
 
         const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
         const dirs = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
-        const needed = Math.min(5, this.maxTrafficPeds - nearbyPeds);
+        const needed = Math.min(2, this.maxTrafficPeds - nearbyPeds);
         let spawned = 0;
 
-        for (let attempt = 0; attempt < 18 && spawned < needed; attempt++) {
+        for (let attempt = 0; attempt < 12 && spawned < needed; attempt++) {
             const pick = candidates[Math.floor(Math.random() * candidates.length)];
             const pedX = (pick.bx + 0.25 + Math.random() * 0.5) * TILE_SIZE;
             const pedY = (pick.by + 0.25 + Math.random() * 0.5) * TILE_SIZE;
 
             let tooClose = false;
             for (const other of game.peds) {
-                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 28) {
+                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 52) {
                     tooClose = true;
                     break;
                 }
