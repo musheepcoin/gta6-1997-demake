@@ -1764,7 +1764,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=98_52", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_16", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -3851,11 +3851,20 @@ class RetroRenderer {
                         rect = this.gta1Meta.sprites.objects[mapInfo.sprId];
                     }
                     if (rect) {
-                        const vw = rv.w || 48;
-                        const vh = rv.h || 24;
-                        this.pushSolidQuad3D(rp.x, rp.y, rz - 0.022, vw * 0.94, vh * 0.92, rp.angle, 0.02, 0.03, 0.06, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushSolidQuad3D(rp.x + sunCos * 4.6, rp.y + sunSin * 4.6, rz - 0.026, vw * 0.90, vh * 0.88, rp.angle, 0.03, 0.04, 0.08, Math.max(0.28, sunShadowAlpha * 1.18), SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushAtlasSprite3D(rect, rp.x, rp.y, rz + 0.01, rp.angle - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1, 0);
+                        const rRot = (rp.angle || 0) - Math.PI * 0.5;
+                        const shAlpha = Math.max(0.28, sunShadowAlpha * 1.15);
+                        if (rv.isMoto || mapInfo.isMotorcycle) {
+                            this.pushAtlasSprite3D(rect, rp.x + sunCos * 3.4, rp.y + sunSin * 3.4, rz - 0.025, rRot, 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, shAlpha, 0);
+                            const rFrames = this.gta1Meta.sprites.peds[rp.pedType || "gang"];
+                            const rRect = rFrames && (rFrames["84"] || rFrames["98"]);
+                            if (rRect) {
+                                this.pushAtlasSprite3D(rRect, rp.x + sunCos * 3.8, rp.y + sunSin * 3.8, rz - 0.024, rRot, 1.10, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, shAlpha * 0.9, 0);
+                            }
+                        } else {
+                            this.pushAtlasSprite3D(rect, rp.x, rp.y, rz - 0.022, rRot, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.34, 0);
+                            this.pushAtlasSprite3D(rect, rp.x + sunCos * 4.6, rp.y + sunSin * 4.6, rz - 0.026, rRot, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.03, 0.04, 0.08, shAlpha, 0);
+                        }
+                        this.pushAtlasSprite3D(rect, rp.x, rp.y, rz + 0.01, rRot, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1, 0);
                         if (rv.isMoto) {
                             this.batchPedSprite3D(rp.pedType || "gang", 84, rp.x, rp.y, rz + 0.035, rp.angle, 1.14, (rp.muzzleTimer || 0) > 0, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
                         }
@@ -4002,36 +4011,79 @@ class RetroRenderer {
             const cosA = Math.cos(v.angle);
             const sinA = Math.sin(v.angle);
 
-            // A. GTA 2 live_geometry.cpp: Dual-Layer Under-Chassis Contact Shadow + Solar-Tracked 3D Drop Shadow under EVERY vehicle!
-            if (airZ < 0.05) {
-                this.pushSolidQuad3D(
-                    v.x,
-                    v.y,
-                    vz - 0.022,
-                    (v.w || 48) * 0.94,
-                    (v.h || 24) * 0.92,
-                    v.angle,
+            // A. GTA 2 live_geometry.cpp: True Sprite-Silhouette Under-Chassis & Solar-Tracked 3D Drop Shadow!
+            // (Uses exact per-pixel sprite alpha via pushAtlasSprite3D instead of a rectangular box so narrow motorcycles,
+            //  handlebars, rounded fenders & boats never show a wide rectangular slab underneath!)
+            const shAlpha = airZ > 0.05 ? 0.52 : Math.max(0.28, sunShadowAlpha * 1.18);
+            if (mapInfo.isMotorcycle) {
+                const motoShOff = 3.4 + airZ * 20.0;
+                this.pushAtlasSprite3D(
+                    rect,
+                    v.x + sunCos * motoShOff,
+                    v.y + sunSin * motoShOff,
+                    vz - 0.025,
+                    rot,
+                    carScale,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS,
                     0.02,
                     0.03,
                     0.06,
-                    0.36,
-                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                    shAlpha,
+                    0
+                );
+                if (!v.destroyed && v.driver) {
+                    const rFrames = this.gta1Meta.sprites.peds.gang || this.gta1Meta.sprites.peds.civ0;
+                    const rRect = rFrames && (rFrames["84"] || rFrames["98"]);
+                    if (rRect) {
+                        this.pushAtlasSprite3D(
+                            rRect,
+                            v.x + cosA * 1.5 + sunCos * (motoShOff + 0.6),
+                            v.y + sinA * 1.5 + sunSin * (motoShOff + 0.6),
+                            vz - 0.024,
+                            rot,
+                            carScale * 1.02,
+                            SPRITE_DRAW_ORDER.TIRE_MARKS,
+                            0.02,
+                            0.03,
+                            0.06,
+                            shAlpha * 0.9,
+                            0
+                        );
+                    }
+                }
+            } else {
+                if (airZ < 0.05) {
+                    this.pushAtlasSprite3D(
+                        rect,
+                        v.x,
+                        v.y,
+                        vz - 0.022,
+                        rot,
+                        carScale * 0.98,
+                        SPRITE_DRAW_ORDER.TIRE_MARKS,
+                        0.02,
+                        0.03,
+                        0.06,
+                        0.36,
+                        0
+                    );
+                }
+                const shOff = 4.6 + airZ * 22.0;
+                this.pushAtlasSprite3D(
+                    rect,
+                    v.x + sunCos * shOff,
+                    v.y + sunSin * shOff,
+                    vz - 0.026,
+                    rot,
+                    carScale * 0.96,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS,
+                    0.03,
+                    0.04,
+                    0.08,
+                    shAlpha,
+                    0
                 );
             }
-            const shOff = 4.6 + airZ * 22.0;
-            this.pushSolidQuad3D(
-                v.x + sunCos * shOff,
-                v.y + sunSin * shOff,
-                vz - 0.026,
-                (v.w || 48) * 0.90,
-                (v.h || 24) * 0.88,
-                v.angle,
-                0.03,
-                0.04,
-                0.08,
-                airZ > 0.05 ? 0.52 : Math.max(0.28, sunShadowAlpha * 1.18),
-                SPRITE_DRAW_ORDER.TIRE_MARKS
-            );
 
             // B. GTA 2 live_geometry.cpp SetSpriteConform (kSmoothing = 0.25f): 4-Corner Ground Slope Pitch + Wheelie/Stunt Pitch!
             const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
