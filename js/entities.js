@@ -580,12 +580,12 @@ const VEHICLE_SPECS = {
         sprId: "73",
         w: 48,
         h: 24,
-        maxSpeed: 425,
-        accel: 340,
-        turnSpeed: 3.25,
-        grip: 0.90,
+        maxSpeed: 460,
+        accel: 390,
+        turnSpeed: 3.45,
+        grip: 0.92,
         driftGrip: 0.96,
-        maxHp: 280,
+        maxHp: 440,
         color: "#1e293b",
         secondaryColor: "#f8fafc",
         stripeColor: "#f8fafc",
@@ -599,12 +599,12 @@ const VEHICLE_SPECS = {
         sprId: "76",
         w: 58,
         h: 28,
-        maxSpeed: 330,
-        accel: 240,
-        turnSpeed: 2.35,
-        grip: 0.93,
+        maxSpeed: 380,
+        accel: 310,
+        turnSpeed: 2.65,
+        grip: 0.94,
         driftGrip: 0.95,
-        maxHp: 520,
+        maxHp: 820,
         color: "#1e293b",
         secondaryColor: "#0f172a",
         stripeColor: "#38bdf8",
@@ -1779,7 +1779,7 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            forceDirect ? 0.62 : 0.84,
+            forceDirect ? 0.82 : 0.98,
             Boolean(wantedTarget.inVehicle && targetOnRoad),
             forceDirect
         );
@@ -2363,8 +2363,11 @@ class Pedestrian {
         this.missionTag = props.missionTag || null;
         this.monkIndex = props.monkIndex !== undefined ? props.monkIndex : 0;
         this.shirtColor = props.shirtColor || "#06b6d4";
-        this.hp = props.hp !== undefined ? props.hp : 35;
-        this.maxHp = this.hp;
+        const defaultHp = this.kind === "COP" ? 200 : 35;
+        this.hp = props.hp !== undefined ? props.hp : defaultHp;
+        this.maxHp = props.maxHp !== undefined ? props.maxHp : Math.max(this.hp, defaultHp);
+        this.copWeapon = props.copWeapon || null;
+        this.shootCooldown = props.shootCooldown || 0;
         this.dead = Boolean(props.dead);
         this.revived = Boolean(props.revived);
         this.panicTimer = props.panicTimer || 0;

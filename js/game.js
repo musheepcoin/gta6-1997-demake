@@ -2263,22 +2263,47 @@ class LeonidaGame {
         const vz = vehicle.z !== undefined ? vehicle.z : 2.0;
 
         if (reason === "COP_DEPLOY" || vehicle.isPolice) {
+            const isSwat = vehicle.specKey === "SWAT_ENFORCER";
+            const copHp = isSwat ? 260 : 200;
+            const copWep = isSwat ? "SHOTGUN" : (this.wantedLevel >= 3 ? "UZI" : "PISTOL");
             this.peds.push(new Pedestrian({
                 x: doorX,
                 y: doorY,
                 z: vz,
                 angle: Math.atan2(this.player.y - doorY, this.player.x - doorX),
-                speed: 98,
+                speed: isSwat ? 124 : 116,
                 kind: "COP",
                 g24Type: "police",
                 shirtColor: "#1e3a8a",
-                hp: 55,
+                hp: copHp,
+                maxHp: copHp,
+                copWeapon: copWep,
                 dead: false,
                 panicTimer: 0,
                 exitAnimTimer: 0.32
             }));
+            if (isSwat && reason === "COP_DEPLOY") {
+                const doorX2 = vehicle.x + Math.sin(vehicle.angle) * 28;
+                const doorY2 = vehicle.y - Math.cos(vehicle.angle) * 28;
+                this.peds.push(new Pedestrian({
+                    x: doorX2,
+                    y: doorY2,
+                    z: vz,
+                    angle: Math.atan2(this.player.y - doorY2, this.player.x - doorX2),
+                    speed: 124,
+                    kind: "COP",
+                    g24Type: "police",
+                    shirtColor: "#1e3a8a",
+                    hp: copHp,
+                    maxHp: copHp,
+                    copWeapon: "UZI",
+                    dead: false,
+                    panicTimer: 0,
+                    exitAnimTimer: 0.32
+                }));
+            }
             if (reason === "COP_DEPLOY") {
-                this.addFloatingText(doorX, doorY - 22, "🚓 VCPD OFFICER DEPLOYED!", "#38bdf8");
+                this.addFloatingText(doorX, doorY - 22, isSwat ? "🚓 SWAT SQUAD DEPLOYED!" : "🚓 VCPD OFFICER DEPLOYED!", "#38bdf8");
             }
             return;
         }
@@ -3095,12 +3120,15 @@ class LeonidaGame {
                     ped.hp -= spec.damage;
                     ped.x += Math.cos(angle) * 10;
                     ped.y += Math.sin(angle) * 10;
-                    ped.stunnedTimer = 1.25;
-                    ped.panicTimer = 4.5;
+                    ped.stunnedTimer = ped.kind === "COP" ? 0.22 : 1.25;
+                    ped.panicTimer = ped.kind === "COP" ? 0 : 4.5;
+                    if (ped.kind === "COP") {
+                        this.setWantedLevel(Math.max(this.wantedLevel, 1));
+                    }
                     this.spawnParticle(ped.x, ped.y, "BLOOD");
                     if (ped.hp <= 0) {
                         this.killPed(ped);
-                    } else {
+                    } else if (ped.kind !== "COP") {
                         this.addFloatingText(ped.x, ped.y - 20, "👊 KNOCKDOWN!", "#fde047");
                     }
                     break;
@@ -3642,8 +3670,20 @@ class LeonidaGame {
             if (isActiveThreatCar && vSpeed > 30) {
                 for (const ped of this.peds) {
                     if (ped.dead) continue;
+                    if (ped.kind === "COP" && v.driver === "AI_COP") continue;
                     if (Math.hypot(ped.x - v.x, ped.y - v.y) < 25) {
-                        if (vSpeed > 68 || (v.driver !== "PLAYER" && vSpeed > 110)) {
+                        if (ped.kind === "COP" && !v.crushesCars) {
+                            if ((ped.stunnedTimer || 0) <= 0) {
+                                ped.hp -= vSpeed * 0.45;
+                                ped.stunnedTimer = 0.55;
+                                ped.x += (v.vx / Math.max(1, vSpeed)) * 16;
+                                ped.y += (v.vy / Math.max(1, vSpeed)) * 16;
+                                this.spawnParticle(ped.x, ped.y, "BLOOD");
+                                if (ped.hp <= 0) {
+                                    this.killPed(ped, v.driver === "PLAYER");
+                                }
+                            }
+                        } else if (vSpeed > 68 || (v.driver !== "PLAYER" && vSpeed > 110)) {
                             this.killPed(ped, v.driver === "PLAYER");
                         } else if ((ped.stunnedTimer || 0) <= 0) {
                             ped.stunnedTimer = 1.15;
@@ -3998,13 +4038,13 @@ class LeonidaGame {
                 if (ped.kind === "COP" && this.wantedLevel > 0 && !p.dead) {
                     const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
                     if (dPlayer <= 28) {
-                        const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
-                        if (!p.inVehicle && p.hp < 55) {
+                        const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 52;
+                        if (!p.inVehicle && p.hp < 65) {
                             this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
                         } else if (inSlowCar) {
                             this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
                         } else if (!p.inVehicle) {
-                            this.damagePlayer(14 * dt);
+                            this.damagePlayer(32 * dt);
                         }
                     }
                 }
@@ -4107,31 +4147,42 @@ class LeonidaGame {
                 const copTarget = this.getNearestWantedTarget(ped.x, ped.y);
                 if (copTarget) {
                     const dTarget = Math.hypot(copTarget.x - ped.x, copTarget.y - ped.y);
+                    const effWanted = Math.max(this.wantedLevel || 0, copTarget.wantedLevel || 1);
+                    const copRunSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 124 : 114;
                     if (dTarget > 28) {
                         ped.angle = this.steerPedWithObstacleFeelers(ped, copTarget.x, copTarget.y);
-                        ped.x += Math.cos(ped.angle) * 84 * dt;
-                        ped.y += Math.sin(ped.angle) * 84 * dt;
+                        ped.x += Math.cos(ped.angle) * copRunSpd * dt;
+                        ped.y += Math.sin(ped.angle) * copRunSpd * dt;
                     } else {
                         ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
                         if (!copTarget.isRemote && !p.dead) {
                             // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
-                            const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 42;
-                            if (!p.inVehicle && p.hp < 55) {
+                            const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 52;
+                            if (!p.inVehicle && p.hp < 65) {
                                 this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
                             } else if (inSlowCar) {
                                 this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
                             } else if (!p.inVehicle) {
-                                this.damagePlayer(14 * dt);
+                                this.damagePlayer(32 * dt);
                             }
                         }
                     }
-                    if (dTarget < 280 && Math.random() < 0.025) {
+                    ped.shootCooldown = (ped.shootCooldown || 0) - dt;
+                    if (dTarget < 360 && ped.shootCooldown <= 0) {
                         const blocked = this.map.traceSegment2D
                             ? this.map.traceSegment2D(ped.x, ped.y, copTarget.x, copTarget.y, ped.z || 2.0).hit
                             : false;
                         if (!blocked) {
-                            const aimAng = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
-                            this.fireWeapon(ped.x, ped.y, aimAng, "PISTOL", false);
+                            const wep = ped.copWeapon || (effWanted >= 4 ? "SHOTGUN" : (effWanted >= 3 ? "UZI" : "PISTOL"));
+                            ped.shootCooldown = wep === "UZI" ? 0.18 : (wep === "SHOTGUN" ? 0.72 : 0.48);
+                            const leadX = copTarget.x + (copTarget.vx || 0) * 0.16;
+                            const leadY = copTarget.y + (copTarget.vy || 0) * 0.16;
+                            const aimAng = Math.atan2(leadY - ped.y, leadX - ped.x);
+                            ped.angle = aimAng;
+                            ped.muzzleTimer = 0.08;
+                            this.fireWeapon(ped.x, ped.y, aimAng, wep, false);
+                        } else {
+                            ped.shootCooldown = 0.25;
                         }
                     }
                 }
@@ -4381,9 +4432,9 @@ class LeonidaGame {
             const spawnTarget = this.getNearestWantedTarget(p.x, p.y) || { x: p.x, y: p.y, z: p.z || 2.0, angle: p.angle || 0, wantedLevel: maxRoomWanted };
             const tWanted = spawnTarget.wantedLevel || maxRoomWanted;
             this.copSpawnTimer += dt;
-            const maxCops = Math.min(4, Math.ceil(tWanted * 0.75) + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
+            const maxCops = Math.min(7, tWanted + 1 + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
             const totalActiveUnits = activeCopCars + activeFootCopsNear;
-            const spawnInterval = tWanted <= 1 ? 15.5 : (tWanted === 2 ? 13.0 : (tWanted === 3 ? 11.0 : 9.5));
+            const spawnInterval = tWanted <= 1 ? 10.5 : (tWanted === 2 ? 8.5 : (tWanted === 3 ? 6.8 : 5.2));
             if (totalActiveUnits < maxCops && this.copSpawnTimer > spawnInterval) {
                 this.copSpawnTimer = 0;
                 const baseBx = Math.floor(spawnTarget.x / TILE_SIZE);
@@ -4417,26 +4468,32 @@ class LeonidaGame {
             }
 
             // Spawn GTA 1 Police Roadblock at Wanted Level >= 3
-            if (tWanted >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 5) {
-                this.roadblockCooldown = 28;
+            if (tWanted >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 6) {
+                this.roadblockCooldown = 24;
                 const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 480;
                 const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 480;
                 if (this.map.isRoadAtPixel(rbX, rbY)) {
-                    const rbCar = new Vehicle(`rb_${Date.now()}`, "VCPD_CRUISER", rbX, rbY, (spawnTarget.angle || 0) + Math.PI * 0.5);
+                    const rbSpec = tWanted >= 4 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
+                    const rbCar = new Vehicle(`rb_${Date.now()}`, rbSpec, rbX, rbY, (spawnTarget.angle || 0) + Math.PI * 0.5);
                     this.vehicles.push(rbCar);
-                    this.peds.push(new Pedestrian({
-                        id: `rb_cop_${Date.now()}`,
-                        x: rbX - Math.cos(spawnTarget.angle || 0) * 28,
-                        y: rbY - Math.sin(spawnTarget.angle || 0) * 28,
-                        angle: (spawnTarget.angle || 0) + Math.PI,
-                        speed: 90,
-                        kind: "COP",
-                        g24Type: "police",
-                        shirtColor: "#1e3a8a",
-                        hp: 45,
-                        dead: false,
-                        panicTimer: 0
-                    }));
+                    const perpAng = (spawnTarget.angle || 0) + Math.PI * 0.5;
+                    for (let side of [-1, 1]) {
+                        this.peds.push(new Pedestrian({
+                            id: `rb_cop_${Date.now()}_${side}`,
+                            x: rbX - Math.cos(spawnTarget.angle || 0) * 28 + Math.cos(perpAng) * side * 18,
+                            y: rbY - Math.sin(spawnTarget.angle || 0) * 28 + Math.sin(perpAng) * side * 18,
+                            angle: (spawnTarget.angle || 0) + Math.PI,
+                            speed: 118,
+                            kind: "COP",
+                            g24Type: "police",
+                            shirtColor: "#1e3a8a",
+                            hp: 220,
+                            maxHp: 220,
+                            copWeapon: tWanted >= 4 ? "SHOTGUN" : "UZI",
+                            dead: false,
+                            panicTimer: 0
+                        }));
+                    }
                     this.addFloatingText(rbX, rbY - 26, "🚧 VCPD ROADBLOCK!", "#38bdf8");
                 }
             }
@@ -4588,10 +4645,11 @@ class LeonidaGame {
             if (!hitSomething) {
                 for (const v of this.vehicles) {
                     if (pr.fromPlayer && p.inVehicle === v) continue;
+                    if (!pr.fromPlayer && v.isPolice && p.inVehicle !== v) continue;
                     if (Math.hypot(v.x - pr.x, v.y - pr.y) < 24) {
                         const vehDmg = pr.isRocket
                             ? pr.damage * 1.35
-                            : (pr.isFlame ? pr.damage * 0.85 : pr.damage * 0.34);
+                            : (pr.isFlame ? pr.damage * 0.85 : (pr.fromPlayer ? pr.damage * 0.34 : pr.damage * 0.65));
                         if (pr.fromPlayer) {
                             v.damagedByPlayer = true;
                             if (v.isPolice && !pr.fromJason) {
@@ -4602,6 +4660,9 @@ class LeonidaGame {
                             v.receiveImpactDamage(vehDmg, pr.x, pr.y, Boolean(pr.isRocket));
                         } else {
                             v.hp -= vehDmg;
+                        }
+                        if (!pr.fromPlayer && p.inVehicle === v && (v.isMotorcycle || v.isConvertible)) {
+                            this.damagePlayer(pr.damage * 0.35);
                         }
                         if (pr.fromPlayer && !v.destroyed) {
                             this.cash += 10 * this.multiplier;
@@ -4636,13 +4697,17 @@ class LeonidaGame {
                             break;
                         }
                         ped.hp -= pr.damage;
+                        this.spawnParticle(pr.x, pr.y, "BLOOD");
+                        if (ped.kind === "COP") {
+                            this.setWantedLevel(Math.max(this.wantedLevel, 2));
+                        }
                         if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) {
                             this.audio.playPedScream();
                         }
                         if (pr.isFlame && ped.hp > 0) {
                             ped.burnTimer = 3.2;
-                            ped.panicTimer = 4.5;
-                            ped.angle = Math.random() * Math.PI * 2;
+                            ped.panicTimer = ped.kind === "COP" ? 0 : 4.5;
+                            if (ped.kind !== "COP") ped.angle = Math.random() * Math.PI * 2;
                         }
                         if (ped.hp <= 0) {
                             if (pr.isFlame) ped.deathKind = "BURNT";
@@ -4675,7 +4740,7 @@ class LeonidaGame {
                         this.lastAttackerId = pr.fromRemoteId;
                         this.lastAttackerName = pr.fromRemoteName || "ONLINE RIVAL";
                     }
-                    this.damagePlayer(pr.damage * 0.35);
+                    this.damagePlayer(pr.damage * 0.72);
                     hitSomething = true;
                 }
             }
