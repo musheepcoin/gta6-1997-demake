@@ -1571,12 +1571,12 @@ class Vehicle {
        Uses road-network intersection routing when blocked by buildings/far away,
        and switches to 9-feeler tactical interception + PIT maneuver on line-of-sight!
        ======================================================================== */
-    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false) {
+    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, stayOnRoad = false) {
         const curZ = this.z !== undefined ? this.z : 2.0;
         if (this.aiLaneChangeCooldown > 0) this.aiLaneChangeCooldown -= dt;
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
 
-        if (this.aiReverseTimer > 0) {
+        if (!stayOnRoad && this.aiReverseTimer > 0) {
             this.aiReverseTimer -= dt;
             const rearX = this.x - Math.cos(this.angle) * (this.w * 0.48 + 10);
             const rearY = this.y - Math.sin(this.angle) * (this.w * 0.48 + 10);
@@ -1604,7 +1604,7 @@ class Vehicle {
         const onRoadNow = map.isRoadAtPixel(this.x, this.y);
 
         // Mode A: Direct Line-of-Sight Tactical Interception & PIT Maneuver (or when off-road)
-        if ((hasLOS && distToTarget < 275) || !onRoadNow) {
+        if ((!stayOnRoad && hasLOS && distToTarget < 275) || !onRoadNow) {
             const leadTime = Math.min(0.44, distToTarget / 640);
             let aimX = targetX + targetVx * leadTime;
             let aimY = targetY + targetVy * leadTime;
@@ -1852,12 +1852,35 @@ class Vehicle {
     computeEmergencyControls(dt, map, game) {
         if (!game) return this.computeTrafficControls(dt, map, game);
 
-        // A. MEDIC AMBULANCE: Responds to dead casualties within 1050px (after 6s 911 call delay) and revives them!
+        // A. MEDIC AMBULANCE: Stays strictly on roads, stops at nearest road point, and deploys an on-foot Paramedic!
         if (this.specKey === "MEDIC_AMBULANCE" && Array.isArray(game.peds)) {
+            if (this.deployedMedic) {
+                if (
+                    this.deployedMedic.dead ||
+                    (this.deployedMedic.medicOutTimer || 0) > 22.0 ||
+                    !game.peds.includes(this.deployedMedic)
+                ) {
+                    this.deployedMedic = null;
+                } else {
+                    this.sirenActive = true;
+                    this.aiState = "EMERGENCY_MEDIC";
+                    return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
+                }
+            }
+
             let nearestCorpse = null;
             let bestDist = 1050;
             for (const ped of game.peds) {
-                if (!ped.dead || ped.revived || (ped.deadTimer || 0) < 6.0) continue;
+                if (
+                    !ped.dead ||
+                    ped.revived ||
+                    ped.unreachableForMedic ||
+                    ped.deathKind === "DROWNED" ||
+                    (ped.deadTimer || 0) < 6.0
+                ) {
+                    continue;
+                }
+                if (map.isWaterAtPixel && map.isWaterAtPixel(ped.x, ped.y)) continue;
                 const d = Math.hypot(ped.x - this.x, ped.y - this.y);
                 if (d < bestDist) {
                     bestDist = d;
@@ -1868,34 +1891,22 @@ class Vehicle {
             if (nearestCorpse) {
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_MEDIC";
-                // Road-to-sidewalk distance is 64..92px (1 to 1.4 tiles), so stop and treat casualties within 96px
-                if (bestDist < 96) {
+
+                // Check if we reached the closest point on our road lane to the casualty (e.g. on sidewalk, beach, or park)
+                const forwardProj =
+                    (nearestCorpse.x - this.x) * Math.cos(this.angle) +
+                    (nearestCorpse.y - this.y) * Math.sin(this.angle);
+                const closestOnRoadReached = bestDist < 105 || (bestDist < 420 && forwardProj <= 18);
+
+                if (closestOnRoadReached) {
                     this.aiBailTimer += dt;
-                    if (this.aiBailTimer > 2.4) {
+                    if (this.aiBailTimer > 0.65 && Math.abs(this.speed) < 22 && typeof game.deployParamedicFromAmbulance === "function") {
                         this.aiBailTimer = 0;
-                        nearestCorpse.dead = false;
-                        nearestCorpse.deadTimer = 0;
-                        nearestCorpse.revived = true;
-                        nearestCorpse.hp = 35;
-                        nearestCorpse.speed = 36;
-                        nearestCorpse.stunnedTimer = 0;
-                        nearestCorpse.burnTimer = 0;
-                        nearestCorpse.electroTimer = 0;
-                        nearestCorpse.drownTimer = 0;
-                        nearestCorpse.panicTimer = 4.0;
-                        if (typeof game.spawnParticle === "function") {
-                            for (let k = 0; k < 5; k++) {
-                                game.spawnParticle(
-                                    nearestCorpse.x + (Math.random() - 0.5) * 14,
-                                    nearestCorpse.y + (Math.random() - 0.5) * 14,
-                                    "SPARK"
-                                );
-                            }
-                        }
-                        game.addFloatingText(nearestCorpse.x, nearestCorpse.y - 22, "🚑 MEDIC REVIVED!", "#38bdf8");
+                        game.deployParamedicFromAmbulance(this, nearestCorpse);
                     }
-                    return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
+                    return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
+                this.aiBailTimer = 0;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -1905,7 +1916,8 @@ class Vehicle {
                     0,
                     0,
                     0.78,
-                    false
+                    false,
+                    true
                 );
             }
         }

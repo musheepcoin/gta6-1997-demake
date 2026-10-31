@@ -2273,6 +2273,76 @@ class LeonidaGame {
         }));
     }
 
+    deployParamedicFromAmbulance(ambulance, targetCorpse) {
+        if (!ambulance || ambulance.deployedMedic) return;
+        ambulance.doorOpenTimer = 0.48;
+        // Pick the side door facing the casualty so the paramedic steps out toward the sidewalk/beach!
+        const toCasX = targetCorpse ? (targetCorpse.x - ambulance.x) : 0;
+        const toCasY = targetCorpse ? (targetCorpse.y - ambulance.y) : 0;
+        const rightX = -Math.sin(ambulance.angle);
+        const rightY = Math.cos(ambulance.angle);
+        const sideSign = (toCasX * rightX + toCasY * rightY) >= 0 ? 1 : -1;
+        const doorX = ambulance.x + rightX * sideSign * 24;
+        const doorY = ambulance.y + rightY * sideSign * 24;
+        const vz = ambulance.z !== undefined ? ambulance.z : 2.0;
+
+        const medic = new Pedestrian({
+            id: `medic_ped_${Date.now()}`,
+            x: doorX,
+            y: doorY,
+            z: vz,
+            angle: targetCorpse ? Math.atan2(targetCorpse.y - doorY, targetCorpse.x - doorX) : ambulance.angle,
+            speed: 96,
+            kind: "MEDIC",
+            g24Type: "civ0",
+            shirtColor: "#38bdf8",
+            hp: 55,
+            dead: false,
+            panicTimer: 0,
+            exitAnimTimer: 0.30
+        });
+        medic.homeAmbulance = ambulance;
+        medic.medicOutTimer = 0;
+        medic.medicStuckTimer = 0;
+        medic.healTimer = 0;
+        medic.lastBestDist = 9999;
+        ambulance.deployedMedic = medic;
+        this.peds.push(medic);
+        this.addFloatingText(doorX, doorY - 22, "🚑 PARAMEDIC ON FOOT!", "#38bdf8");
+    }
+
+    steerPedWithObstacleFeelers(ped, targetX, targetY) {
+        const directAngle = Math.atan2(targetY - ped.y, targetX - ped.x);
+        const offsets = [0, 0.35, -0.35, 0.72, -0.72, 1.15, -1.15, 1.60, -1.60];
+        const pz = ped.z !== undefined ? ped.z : 2.0;
+        let bestAngle = directAngle;
+        let bestScore = -9999;
+
+        for (const off of offsets) {
+            const cand = directAngle + off;
+            const cCos = Math.cos(cand);
+            const cSin = Math.sin(cand);
+            let score = -Math.abs(off) * 1.6;
+            const p1x = ped.x + cCos * 20;
+            const p1y = ped.y + cSin * 20;
+            const p2x = ped.x + cCos * 42;
+            const p2y = ped.y + cSin * 42;
+            if (this.map.isWaterAtPixel && (this.map.isWaterAtPixel(p1x, p1y) || this.map.isWaterAtPixel(p2x, p2y))) {
+                score -= 80;
+            }
+            if (this.map.resolveCircleBuildingCollision(p1x, p1y, 9, pz).hit) {
+                score -= 70;
+            } else if (this.map.resolveCircleBuildingCollision(p2x, p2y, 9, pz).hit) {
+                score -= 35;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestAngle = cand;
+            }
+        }
+        return bestAngle;
+    }
+
     // Classic 1997 GTA 1 Horn / Siren (in vehicle) OR Famous Burp & Fart (on foot!) [G or V]
     triggerHornOrBurp() {
         const p = this.player;
@@ -3973,6 +4043,93 @@ class LeonidaGame {
                 } else {
                     ped.kind = "CIVILIAN";
                 }
+            } else if (ped.kind === "MEDIC") {
+                // On-Foot Paramedic AI: Runs from parked ambulance across sidewalks/beaches/parks to revive casualties, then boards ambulance!
+                ped.medicOutTimer = (ped.medicOutTimer || 0) + dt;
+                const amb = ped.homeAmbulance;
+                if (!amb || amb.destroyed || amb.driver !== "AI_EMERGENCY") {
+                    if (amb) amb.deployedMedic = null;
+                    ped.kind = "CIVILIAN";
+                    continue;
+                }
+
+                let targetCorpse = null;
+                let bestDist = 480;
+                for (const other of this.peds) {
+                    if (
+                        !other.dead ||
+                        other.revived ||
+                        other.unreachableForMedic ||
+                        other.deathKind === "DROWNED"
+                    ) {
+                        continue;
+                    }
+                    if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(other.x, other.y)) continue;
+                    if (Math.hypot(other.x - amb.x, other.y - amb.y) > 480) continue;
+                    const d = Math.hypot(other.x - ped.x, other.y - ped.y);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        targetCorpse = other;
+                    }
+                }
+
+                if (targetCorpse && ped.medicOutTimer < 18.0) {
+                    if (bestDist < 28) {
+                        ped.angle = Math.atan2(targetCorpse.y - ped.y, targetCorpse.x - ped.x);
+                        ped.healTimer = (ped.healTimer || 0) + dt;
+                        ped.medicStuckTimer = 0;
+                        if (ped.healTimer >= 1.8) {
+                            ped.healTimer = 0;
+                            targetCorpse.dead = false;
+                            targetCorpse.deadTimer = 0;
+                            targetCorpse.revived = true;
+                            targetCorpse.hp = 35;
+                            targetCorpse.speed = 36;
+                            targetCorpse.stunnedTimer = 0;
+                            targetCorpse.burnTimer = 0;
+                            targetCorpse.electroTimer = 0;
+                            targetCorpse.drownTimer = 0;
+                            targetCorpse.panicTimer = 4.0;
+                            for (let k = 0; k < 5; k++) {
+                                this.spawnParticle(
+                                    targetCorpse.x + (Math.random() - 0.5) * 14,
+                                    targetCorpse.y + (Math.random() - 0.5) * 14,
+                                    "SPARK"
+                                );
+                            }
+                            this.addFloatingText(targetCorpse.x, targetCorpse.y - 22, "🚑 MEDIC REVIVED!", "#38bdf8");
+                        }
+                    } else {
+                        ped.healTimer = 0;
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, targetCorpse.x, targetCorpse.y);
+                        ped.x += Math.cos(ped.angle) * 96 * dt;
+                        ped.y += Math.sin(ped.angle) * 96 * dt;
+                        if (bestDist < (ped.lastBestDist || 9999) - 2) {
+                            ped.lastBestDist = bestDist;
+                            ped.medicStuckTimer = 0;
+                        } else {
+                            ped.medicStuckTimer = (ped.medicStuckTimer || 0) + dt;
+                            if (ped.medicStuckTimer > 4.5) {
+                                targetCorpse.unreachableForMedic = true;
+                                ped.medicStuckTimer = 0;
+                                ped.lastBestDist = 9999;
+                            }
+                        }
+                    }
+                } else {
+                    // All nearby casualties revived (or timed out) — jog back to the ambulance and climb in!
+                    const dAmb = Math.hypot(amb.x - ped.x, amb.y - ped.y);
+                    if (dAmb < 38 || ped.medicOutTimer > 21.0) {
+                        amb.doorOpenTimer = 0.40;
+                        amb.deployedMedic = null;
+                        const idx = this.peds.indexOf(ped);
+                        if (idx >= 0) this.peds.splice(idx, 1);
+                        continue;
+                    }
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, amb.x, amb.y);
+                    ped.x += Math.cos(ped.angle) * 98 * dt;
+                    ped.y += Math.sin(ped.angle) * 98 * dt;
+                }
             } else {
                 // Exact Port of 1997 GTA 1 AiCharacterController::UpdateWandering / ChooseWalkWaypoint / ContinueWalkToWaypoint
                 // (AiCharacterController.cpp lines 250-365): Pedestrians stay strictly on PAWEMENT / FIELD blocks!
@@ -4161,7 +4318,8 @@ class LeonidaGame {
             let casualtyNearPlayer = null;
             let bestCasDist = 680;
             for (const ped of this.peds) {
-                if (!ped.dead || ped.revived) continue;
+                if (!ped.dead || ped.revived || ped.unreachableForMedic || ped.deathKind === "DROWNED") continue;
+                if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) continue;
                 const d = Math.hypot(ped.x - p.x, ped.y - p.y);
                 if (d < bestCasDist) {
                     bestCasDist = d;
