@@ -1853,13 +1853,8 @@ class LeonidaGame {
             }
         }
 
-        this.audio.playCashSound();
         this.fadeAlpha = 1.0;
-        if (intr.isShop) {
-            // Shop door bell
-            this.audio.playBeep(1760, 0.12, "sine", 0.05);
-            setTimeout(() => this.audio.playBeep(2217, 0.18, "sine", 0.045), 110);
-        }
+
         this.showBigBanner(intr.name, intr.subtitle, intr.accent || "#00f0ff", 2.6);
         this.updateHud();
         return true;
@@ -1883,7 +1878,6 @@ class LeonidaGame {
         this.renderer.camX = this.player.x;
         this.renderer.camY = this.player.y;
         this.renderer.camZBlocks = this.player.z;
-        this.audio.playBeep(420, 0.06, "triangle", 0.06);
         this.fadeAlpha = 1.0;
         this.addFloatingText(this.player.x, this.player.y - 24, `🚪 EXITED ${intr.id.replace(/_/g, " ")}`, "#38bdf8");
         this.updateHud();
