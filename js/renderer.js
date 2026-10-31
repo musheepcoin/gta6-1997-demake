@@ -5306,22 +5306,24 @@ class RetroRenderer {
         const H = this.canvas.height;
         const rw = intr.w || 780;
         const rh = intr.h || 530;
-        const iScale = Math.min(1.0, (W - 16) / rw, (H - 80) / rh);
+        // Full-screen room: scale up to fill the viewport (keeps aspect), leaving room for the side HUD (phone / chat)
+        const sideMargin = W >= 1000 ? 250 : 8;
+        const availW = Math.max(200, W - sideMargin * 2);
+        const availH = Math.max(200, H - 110);
+        const iScale = Math.max(0.3, Math.min(3.0, availW / rw, availH / rh));
         const baseOx = Math.round((W - rw * iScale) * 0.5);
-        const baseOy = Math.round((H - rh * iScale) * (iScale < 0.95 ? 0.36 : 0.5)) + (iScale < 0.95 ? 0 : 12);
-        const ox = iScale < 0.999 ? 0 : baseOx;
-        const oy = iScale < 0.999 ? 0 : baseOy;
+        const baseOy = Math.round(Math.max(54, (H - rh * iScale) * 0.5 + 18));
+        const ox = 0;
+        const oy = 0;
         const btnStartIdx = this.cheatButtons.length;
 
         ctx.save();
 
-        // Dark backdrop dim over the exterior city view
-        ctx.fillStyle = "rgba(6, 9, 18, 0.84)";
+        // Solid black backdrop: the city is fully hidden while inside
+        ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, W, H);
-        if (iScale < 0.999) {
-            ctx.translate(baseOx, baseOy);
-            ctx.scale(iScale, iScale);
-        }
+        ctx.translate(baseOx, baseOy);
+        ctx.scale(iScale, iScale);
 
         // 1. Interior Floor Tiles by Venue Theme
         const tileSz = 40;
@@ -5380,7 +5382,7 @@ class RetroRenderer {
                 }
 
                 ctx.fillStyle = col;
-                ctx.fillRect(ox + x, oy + y, Math.min(tileSz, rw - x), Math.min(tileSz, rh - y));
+                ctx.fillRect(ox + x, oy + y, Math.min(tileSz, rw - x) + 0.6, Math.min(tileSz, rh - y) + 0.6);
             }
         }
 
@@ -5520,7 +5522,7 @@ class RetroRenderer {
             h: exitH
         });
 
-        if (iScale < 0.999) {
+        {
             for (let bi = btnStartIdx; bi < this.cheatButtons.length; bi++) {
                 const b = this.cheatButtons[bi];
                 b.x = baseOx + b.x * iScale;
