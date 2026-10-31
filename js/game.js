@@ -2972,7 +2972,7 @@ class LeonidaGame {
         if (ped.kind === "COP") {
             this.crimeHeat = (this.crimeHeat || 0) + 3;
             this.setWantedLevel(Math.max(2, this.wantedLevel + 1));
-        } else if (ped.kind !== "GATOR") {
+        } else if (ped.kind !== "GATOR" && Math.random() < 0.45) {
             this.crimeHeat = (this.crimeHeat || 0) + 1;
             const targetWanted = Math.min(6, Math.max(this.wantedLevel, 1 + Math.floor((this.crimeHeat - 1) / 3)));
             this.setWantedLevel(targetWanted);
