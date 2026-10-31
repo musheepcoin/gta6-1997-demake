@@ -2363,7 +2363,7 @@ class Pedestrian {
         this.missionTag = props.missionTag || null;
         this.monkIndex = props.monkIndex !== undefined ? props.monkIndex : 0;
         this.shirtColor = props.shirtColor || "#06b6d4";
-        const defaultHp = this.kind === "COP" ? 200 : 35;
+        const defaultHp = this.kind === "COP" ? 105 : 35;
         this.hp = props.hp !== undefined ? props.hp : defaultHp;
         this.maxHp = props.maxHp !== undefined ? props.maxHp : Math.max(this.hp, defaultHp);
         this.copWeapon = props.copWeapon || null;
