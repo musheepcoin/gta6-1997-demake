@@ -87,7 +87,99 @@ const VEHICLE_AUDIO_MANIFEST = {
 
     // Crash Impacts
     crash_heavy: "assets/sfx/vehicles/crash_heavy.wav",
-    crash_metal: "assets/sfx/vehicles/crash_metal.wav"
+    crash_metal: "assets/sfx/vehicles/crash_metal.wav",
+
+    // Weapons (Modern High-Definition + Authentic GTA Layers)
+    shot_pistol_1: "assets/sfx/world/shot_pistol_1.ogg",
+    shot_pistol_2: "assets/sfx/world/shot_pistol_2.wav",
+    gta_shot_pistol: "assets/sfx/world/gta_shot_pistol.wav",
+    pistol_reload: "assets/sfx/world/pistol_reload.ogg",
+
+    shot_uzi_1: "assets/sfx/world/shot_uzi_1.ogg",
+    shot_uzi_2: "assets/sfx/world/shot_uzi_2.ogg",
+    shot_uzi_3: "assets/sfx/world/shot_uzi_3.ogg",
+    gta_shot_uzi: "assets/sfx/world/gta_shot_uzi.wav",
+    heavy_mg_shot: "assets/sfx/world/heavy_mg_shot.wav",
+
+    shot_shotgun_1: "assets/sfx/world/shot_shotgun_1.ogg",
+    shot_shotgun_2: "assets/sfx/world/shot_shotgun_2.wav",
+    shotgun_reload: "assets/sfx/world/shotgun_reload.ogg",
+
+    gta_shot_rocket: "assets/sfx/world/gta_shot_rocket.wav",
+    cannon_blast: "assets/sfx/world/cannon_blast.wav",
+
+    gta_shot_flamethrower: "assets/sfx/world/gta_shot_flamethrower.wav",
+    flame_burst: "assets/sfx/world/flame_burst.ogg",
+
+    electro_zap: "assets/sfx/world/electro_zap.ogg",
+    gta_scream_electro: "assets/sfx/world/gta_scream_electro.wav",
+
+    melee_swing: "assets/sfx/world/melee_swing.ogg",
+    gta_punch: "assets/sfx/world/gta_punch.wav",
+    melee_hit_1: "assets/sfx/world/melee_hit_1.ogg",
+    melee_hit_2: "assets/sfx/world/melee_hit_2.ogg",
+
+    // Explosions, Bullet Ricochets & Shell Casings
+    explosion_modern: "assets/sfx/world/explosion_modern.ogg",
+    gta_explosion: "assets/sfx/world/gta_explosion.wav",
+    gta_huge_explosion: "assets/sfx/world/gta_huge_explosion.wav",
+    ricochet_1: "assets/sfx/world/ricochet_1.ogg",
+    ricochet_2: "assets/sfx/world/ricochet_2.ogg",
+    ricochet_3: "assets/sfx/world/ricochet_3.ogg",
+    gta_ricochet: "assets/sfx/world/gta_ricochet.wav",
+    casing_bounce_1: "assets/sfx/world/casing_bounce_1.ogg",
+    casing_bounce_2: "assets/sfx/world/casing_bounce_2.ogg",
+
+    // Pedestrian Screams, Pain & Roadkill Splat
+    gta_scream_scared_1: "assets/sfx/world/gta_scream_scared_1.wav",
+    gta_scream_scared_2: "assets/sfx/world/gta_scream_scared_2.wav",
+    gta_scream_scared_3: "assets/sfx/world/gta_scream_scared_3.wav",
+    gta_scream_die_1: "assets/sfx/world/gta_scream_die_1.wav",
+    gta_scream_die_2: "assets/sfx/world/gta_scream_die_2.wav",
+    gta_scream_die_3: "assets/sfx/world/gta_scream_die_3.wav",
+    pain_1: "assets/sfx/world/pain_1.ogg",
+    pain_2: "assets/sfx/world/pain_2.ogg",
+    pain_3: "assets/sfx/world/pain_3.ogg",
+    die_1: "assets/sfx/world/die_1.ogg",
+    die_2: "assets/sfx/world/die_2.ogg",
+    gta_squashed: "assets/sfx/world/gta_squashed.wav",
+    splat: "assets/sfx/world/splat.wav",
+
+    // Footsteps & Water Splash
+    gta_step_1: "assets/sfx/world/gta_step_1.wav",
+    gta_step_2: "assets/sfx/world/gta_step_2.wav",
+    step_soft: "assets/sfx/world/step_soft.ogg",
+    step_grass: "assets/sfx/world/step_grass.ogg",
+    gta_water_splash: "assets/sfx/world/gta_water_splash.wav",
+    water_splash_1: "assets/sfx/world/water_splash_1.ogg",
+    water_splash_2: "assets/sfx/world/water_splash_2.ogg",
+
+    // World Objects, Pickups, Doors, Payphone, Pager & Comedy
+    gta_car_door_open: "assets/sfx/world/gta_car_door_open.wav",
+    gta_car_door_close: "assets/sfx/world/gta_car_door_close.wav",
+    gta_carjack: "assets/sfx/world/gta_carjack.wav",
+    gta_pickup: "assets/sfx/world/gta_pickup.wav",
+    pickup_weapon: "assets/sfx/world/pickup_weapon.ogg",
+    pickup_armor: "assets/sfx/world/pickup_armor.ogg",
+    pickup_health: "assets/sfx/world/pickup_health.ogg",
+    gta_crate_break: "assets/sfx/world/gta_crate_break.wav",
+    gta_phone_ring: "assets/sfx/world/gta_phone_ring.wav",
+    gta_pager: "assets/sfx/world/gta_pager.wav",
+    ankle_alarm: "assets/sfx/world/ankle_alarm.ogg",
+    gta_burp: "assets/sfx/world/gta_burp.wav",
+    gta_fart: "assets/sfx/world/gta_fart.wav",
+
+    // Authentic GTA Vocal Announcer Clips
+    gta_vocal_grand_theft_auto: "assets/sfx/world/gta_vocal_grand_theft_auto.wav",
+    gta_vocal_mission_complete: "assets/sfx/world/gta_vocal_mission_complete.wav",
+    gta_vocal_mission_failed: "assets/sfx/world/gta_vocal_mission_failed.wav",
+    gta_vocal_kill_frenzy: "assets/sfx/world/gta_vocal_kill_frenzy.wav",
+    gta_vocal_excellent: "assets/sfx/world/gta_vocal_excellent.wav",
+    gta_vocal_player_dies: "assets/sfx/world/gta_vocal_player_dies.wav",
+
+    // Nature Ambience
+    bird_call: "assets/sfx/world/bird_call.ogg",
+    night_crickets: "assets/sfx/world/night_crickets.ogg"
 };
 
 const ENGINE_BANK_SPECS = {
@@ -840,69 +932,105 @@ class RetroAudioEngine {
 
     playShot(weaponType = "PISTOL") {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const now = this.ctx.currentTime;
 
         if (weaponType === "FIST") {
-            this.playBandNoise(0.065, 420, 1.4, 0.032);
-            this.playBeep(115, 0.045, "sine", 0.028);
+            if (!this.playSample("melee_swing", 0.135, 0.92 + Math.random() * 0.18, 0.28)) {
+                this.playBandNoise(0.065, 420, 1.4, 0.032);
+                this.playBeep(115, 0.045, "sine", 0.028);
+            }
             return;
         }
         if (weaponType === "FLAMETHROWER") {
-            this.playNoise(0.11, 600, 0.045);
+            const ok = this.playSample("gta_shot_flamethrower", 0.125, 0.92 + Math.random() * 0.16, 0.28);
+            this.playSample("flame_burst", 0.085, 0.94 + Math.random() * 0.16, 0.22);
+            if (!ok) {
+                this.playNoise(0.11, 600, 0.045);
+            }
             return;
         }
         if (weaponType === "ELECTRO") {
-            this.playBandNoise(0.09, 3200, 2.2, 0.05);
-            this.playBeep(1180, 0.07, "sawtooth", 0.035);
-            this.playBeep(90, 0.09, "square", 0.03);
+            const ok = this.playSample("electro_zap", 0.125, 1.15 + Math.random() * 0.25, 0.22);
+            this.playSample("gta_ricochet", 0.065, 1.32 + Math.random() * 0.18, 0.16);
+            if (!ok) {
+                this.playBandNoise(0.09, 3200, 2.2, 0.05);
+                this.playBeep(1180, 0.07, "sawtooth", 0.035);
+            }
             return;
         }
         if (weaponType === "ROCKET") {
-            this.playNoise(0.28, 350, 0.11);
-            this.playBeep(140, 0.25, "sawtooth", 0.09);
+            const ok = this.playSample("gta_shot_rocket", 0.175, 0.94 + Math.random() * 0.08, 0.78);
+            this.playSample("cannon_blast", 0.13, 0.88 + Math.random() * 0.08, 0.48);
+            if (!ok) {
+                this.playNoise(0.28, 350, 0.11);
+                this.playBeep(140, 0.25, "sawtooth", 0.09);
+            }
+            return;
+        }
+        if (weaponType === "SHOTGUN") {
+            const ok = this.playSample("shot_shotgun_1", 0.185, 0.94 + Math.random() * 0.08, 0.65);
+            this.playSample("shot_shotgun_2", 0.105, 0.96 + Math.random() * 0.06, 0.58);
+            setTimeout(() => {
+                if (this.ctx && !this.muted) {
+                    this.playSample("shotgun_reload", 0.085, 1.06 + Math.random() * 0.06, 0.38);
+                }
+            }, 175);
+            if (!ok) {
+                this.playNoise(0.16, 1200, 0.09);
+            }
+            return;
+        }
+        if (weaponType === "UZI") {
+            this._uziCycle = ((this._uziCycle || 0) + 1) % 3;
+            const uziKey = this._uziCycle === 0 ? "shot_uzi_1" : (this._uziCycle === 1 ? "shot_uzi_2" : "shot_uzi_3");
+            const ok = this.playSample(uziKey, 0.13, 0.95 + Math.random() * 0.12, 0.26);
+            this.playSample("gta_shot_uzi", 0.058, 0.98 + Math.random() * 0.08, 0.24);
+            if (Math.random() < 0.45) {
+                setTimeout(() => {
+                    if (this.ctx && !this.muted) {
+                        this.playSample(Math.random() < 0.5 ? "casing_bounce_1" : "casing_bounce_2", 0.028, 1.15 + Math.random() * 0.20, 0.18);
+                    }
+                }, 85);
+            }
+            if (!ok) {
+                this.playNoise(0.055, 1200, 0.09);
+            }
             return;
         }
 
-        const dur = weaponType === "SHOTGUN" ? 0.16 : (weaponType === "UZI" ? 0.055 : 0.085);
-        const startFreq = weaponType === "SHOTGUN" ? 180 : 320;
-        this.playNoise(dur, 1200, 0.09);
-
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(startFreq, now);
-        osc.frequency.exponentialRampToValueAtTime(45, now + dur);
-        g.gain.setValueAtTime(0.095, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-        osc.connect(g);
-        g.connect(this.sfxOut());
-        osc.start(now);
-        osc.stop(now + dur);
+        // Default: PISTOL (9mm Semi-Auto)
+        const primaryKey = Math.random() < 0.72 ? "shot_pistol_1" : "shot_pistol_2";
+        const ok = this.playSample(primaryKey, 0.155, 0.96 + Math.random() * 0.08, 0.44);
+        this.playSample("gta_shot_pistol", 0.072, 0.98 + Math.random() * 0.06, 0.40);
+        setTimeout(() => {
+            if (this.ctx && !this.muted) {
+                this.playSample(Math.random() < 0.5 ? "casing_bounce_1" : "casing_bounce_2", 0.034, 1.10 + Math.random() * 0.20, 0.20);
+            }
+        }, 105);
+        if (!ok) {
+            this.playNoise(0.085, 1200, 0.09);
+        }
     }
 
     playPunchHit() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBandNoise(0.075, 680, 1.6, 0.075);
-        this.playBeep(92, 0.07, "triangle", 0.085);
+        const hitKey = Math.random() < 0.5 ? "melee_hit_1" : "melee_hit_2";
+        const ok = this.playSample("gta_punch", 0.165, 0.94 + Math.random() * 0.12, 0.26);
+        this.playSample(hitKey, 0.135, 0.95 + Math.random() * 0.10, 0.28);
+        if (!ok) {
+            this.playBandNoise(0.075, 680, 1.6, 0.075);
+            this.playBeep(92, 0.07, "triangle", 0.085);
+        }
     }
 
     playExplosion() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const now = this.ctx.currentTime;
-        this.playSample("crash_heavy", 0.16, 0.72, 0.85);
-        this.playNoise(0.55, 280, 0.19);
-
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(110, now);
-        osc.frequency.exponentialRampToValueAtTime(22, now + 0.55);
-        g.gain.setValueAtTime(0.22, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-        osc.connect(g);
-        g.connect(this.sfxOut());
-        osc.start(now);
-        osc.stop(now + 0.56);
+        const ok = this.playSample("explosion_modern", 0.21, 0.90 + Math.random() * 0.14, 1.35);
+        this.playSample("gta_explosion", 0.155, 0.94 + Math.random() * 0.10, 1.45);
+        this.playSample("gta_huge_explosion", 0.105, 0.96 + Math.random() * 0.08, 1.85);
+        this.playSample("crash_heavy", 0.11, 0.78, 0.85);
+        if (!ok) {
+            this.playNoise(0.55, 280, 0.19);
+        }
     }
 
     playTireScreech() {
@@ -917,20 +1045,33 @@ class RetroAudioEngine {
 
     playCashSound() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBeep(987.77, 0.06, "square", 0.06);
-        setTimeout(() => this.playBeep(1318.51, 0.12, "square", 0.06), 60);
+        const ok = this.playSample("gta_pickup", 0.12, 1.0 + Math.random() * 0.05, 0.85);
+        this.playSample("pickup_weapon", 0.068, 1.08 + Math.random() * 0.08, 0.35);
+        if (!ok) {
+            this.playBeep(987.77, 0.06, "square", 0.06);
+            setTimeout(() => this.playBeep(1318.51, 0.12, "square", 0.06), 60);
+        }
     }
 
     playPayphoneRing() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBeep(1100, 0.05, "square", 0.035);
-        setTimeout(() => this.playBeep(1380, 0.05, "square", 0.035), 55);
+        const now = this.ctx.currentTime;
+        if (this._lastPhoneRingTime && now - this._lastPhoneRingTime < 0.75) return;
+        this._lastPhoneRingTime = now;
+        if (!this.playSample("gta_phone_ring", 0.095, 1.0, 0.80)) {
+            this.playBeep(1100, 0.05, "square", 0.035);
+            setTimeout(() => this.playBeep(1380, 0.05, "square", 0.035), 55);
+        }
     }
 
     playAnkleMonitorAlert() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBeep(1560, 0.07, "sawtooth", 0.055);
-        setTimeout(() => this.playBeep(1560, 0.07, "sawtooth", 0.055), 110);
+        const ok = this.playSample("gta_pager", 0.11, 1.04, 0.55);
+        this.playSample("ankle_alarm", 0.072, 1.12, 0.35);
+        if (!ok) {
+            this.playBeep(1560, 0.07, "sawtooth", 0.055);
+            setTimeout(() => this.playBeep(1560, 0.07, "sawtooth", 0.055), 110);
+        }
     }
 
     playHorn(isEmergency = false, specKey = null) {
@@ -974,68 +1115,84 @@ class RetroAudioEngine {
         }
     }
 
-    playBurpOrFart(isFart = false) {
-        if (!this.initialized || this.muted || !this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = "sawtooth";
-        if (isFart) {
-            osc.frequency.setValueAtTime(115, now);
-            osc.frequency.linearRampToValueAtTime(58, now + 0.28);
-        } else {
-            osc.frequency.setValueAtTime(92, now);
-            osc.frequency.linearRampToValueAtTime(135, now + 0.12);
-            osc.frequency.linearRampToValueAtTime(70, now + 0.26);
+    playBurpOrFart(isFart = undefined) {
+        const useFart = isFart !== undefined ? Boolean(isFart) : (Math.random() < 0.5);
+        if (!this.initialized || this.muted || !this.ctx) return useFart ? "FART" : "BURP";
+        const key = useFart ? "gta_fart" : "gta_burp";
+        if (!this.playSample(key, 0.155, 0.92 + Math.random() * 0.16, 0.45)) {
+            this.playBeep(useFart ? 85 : 105, 0.22, "sawtooth", 0.10);
         }
-        g.gain.setValueAtTime(0.13, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.29);
-        osc.connect(g);
-        g.connect(this.sfxOut());
-        osc.start(now);
-        osc.stop(now + 0.3);
+        return useFart ? "FART" : "BURP";
     }
 
-    playFanfare() {
+    playFanfare(kind = "MISSION") {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const notes = [523.25, 659.25, 783.99, 1046.5];
-        notes.forEach((n, idx) => {
-            setTimeout(() => this.playBeep(n, 0.14, "square", 0.08), idx * 80);
-        });
+        let vocalKey = "gta_vocal_mission_complete";
+        if (kind === "FRENZY") {
+            vocalKey = "gta_vocal_kill_frenzy";
+        } else if (kind === "GOURANGA") {
+            vocalKey = "gta_vocal_excellent";
+        } else if (kind === "WASTED") {
+            vocalKey = "gta_vocal_player_dies";
+        } else if (kind === "BUSTED" || kind === "FAILED") {
+            vocalKey = "gta_vocal_mission_failed";
+        } else if (kind === "GTA") {
+            vocalKey = "gta_vocal_grand_theft_auto";
+        }
+        const ok = this.playSample(vocalKey, 0.18, 1.0, 2.8);
+        if (kind === "MISSION" || kind === "GOURANGA" || kind === "FRENZY") {
+            this.playSample("gta_pickup", 0.10, 1.0, 1.2);
+        }
+        if (!ok) {
+            const notes = [523.25, 659.25, 783.99, 1046.5];
+            notes.forEach((n, idx) => {
+                setTimeout(() => this.playBeep(n, 0.14, "square", 0.08), idx * 80);
+            });
+        }
     }
 
     playCrateSmash() {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playNoise(0.16, 850, 0.11);
-        this.playBeep(160, 0.1, "triangle", 0.07);
+        if (!this.playSample("gta_crate_break", 0.165, 0.94 + Math.random() * 0.12, 0.75)) {
+            this.playNoise(0.16, 850, 0.11);
+            this.playBeep(160, 0.1, "triangle", 0.07);
+        }
     }
 
     playFootstep(surface = "PAVEMENT", isLeft = false) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const pitchJit = (isLeft ? 0.94 : 1.06) * (0.96 + Math.random() * 0.08);
+        const pitchJit = (isLeft ? 0.95 : 1.05) * (0.96 + Math.random() * 0.08);
 
         if (surface === "WATER") {
-            this.playWaterSplash(0.75);
+            this.playWaterSplash(0.68);
             return;
         }
         if (surface === "SAND") {
-            this.playBandNoise(0.068, 1650 * pitchJit, 1.4, 0.038);
-            this.playBeep(95 * pitchJit, 0.035, "sine", 0.026);
+            if (!this.playSample("step_soft", 0.062, 0.88 * pitchJit, 0.16)) {
+                this.playBandNoise(0.068, 1650 * pitchJit, 1.4, 0.038);
+            }
             return;
         }
         if (surface === "GRASS") {
-            this.playBandNoise(0.058, 1100 * pitchJit, 1.2, 0.032);
-            this.playBeep(105 * pitchJit, 0.032, "triangle", 0.024);
+            if (!this.playSample("step_grass", 0.062, 0.95 * pitchJit, 0.16)) {
+                this.playBandNoise(0.058, 1100 * pitchJit, 1.2, 0.032);
+            }
             return;
         }
-        this.playBandNoise(0.042, 1450 * pitchJit, 2.2, 0.036);
-        this.playBeep(132 * pitchJit, 0.035, "triangle", 0.038);
+        const stepKey = isLeft ? "gta_step_1" : "gta_step_2";
+        if (!this.playSample(stepKey, 0.072, pitchJit, 0.14)) {
+            this.playBandNoise(0.042, 1450 * pitchJit, 2.2, 0.036);
+        }
     }
 
     playWaterSplash(scale = 1.0) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        this.playBandNoise(0.15, 780, 0.9, 0.068 * scale);
-        this.playBeep(210, 0.075, "sine", 0.038 * scale);
+        const splashKey = Math.random() < 0.5 ? "water_splash_1" : "water_splash_2";
+        const ok = this.playSample(splashKey, 0.115 * scale, 0.92 + Math.random() * 0.16, 0.65);
+        this.playSample("gta_water_splash", 0.075 * scale, 0.96 + Math.random() * 0.08, 0.65);
+        if (!ok) {
+            this.playBandNoise(0.15, 780, 0.9, 0.068 * scale);
+        }
     }
 
     playCarEnter(isMotorcycle = false, specKey = null) {
@@ -1043,11 +1200,13 @@ class RetroAudioEngine {
         const vehClass = this.getVehicleAudioClass(specKey);
 
         if (!isMotorcycle) {
-            const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "car_door";
-            if (!this.playSample(doorKey, 0.11, 0.96 + Math.random() * 0.08, 0.65)) {
-                this.playBeep(680, 0.025, "square", 0.048);
-                this.playBandNoise(0.045, 950, 1.8, 0.058);
-            }
+            const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "gta_car_door_open";
+            this.playSample(doorKey, 0.115, 0.96 + Math.random() * 0.08, 0.55);
+            setTimeout(() => {
+                if (this.ctx && !this.muted) {
+                    this.playSample("gta_car_door_close", 0.11, 0.96 + Math.random() * 0.08, 0.35);
+                }
+            }, 135);
         }
 
         // Play class-authentic ignition starter crank & initial engine roar!
@@ -1081,13 +1240,13 @@ class RetroAudioEngine {
     playCarExit(isMotorcycle = false, specKey = null) {
         if (!this.initialized || this.muted || !this.ctx) return;
         if (isMotorcycle) {
-            this.playBeep(140, 0.045, "triangle", 0.045);
+            this.playSample("step_soft", 0.075, 0.95, 0.18);
             return;
         }
         const vehClass = this.getVehicleAudioClass(specKey);
-        const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "car_door";
-        if (!this.playSample(doorKey, 0.105, 0.92 + Math.random() * 0.08, 0.60)) {
-            this.playBeep(590, 0.022, "square", 0.042);
+        const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "gta_car_door_close";
+        if (!this.playSample(doorKey, 0.11, 0.94 + Math.random() * 0.08, 0.50)) {
+            this.playSample("car_door", 0.105, 0.95, 0.55);
         }
         if (vehClass === "TRUCK") {
             this.playSample("air_brake", 0.075, 1.0, 0.65);
@@ -1116,66 +1275,67 @@ class RetroAudioEngine {
     playRicochet() {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        if (this._lastRicoTime && now - this._lastRicoTime < 0.09) return;
+        if (this._lastRicoTime && now - this._lastRicoTime < 0.07) return;
         this._lastRicoTime = now;
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = "triangle";
-        const startF = 1850 + Math.random() * 650;
-        osc.frequency.setValueAtTime(startF, now);
-        osc.frequency.exponentialRampToValueAtTime(520, now + 0.075);
-        g.gain.setValueAtTime(0.055, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.connect(g);
-        g.connect(this.sfxOut());
-        osc.start(now);
-        osc.stop(now + 0.085);
+        const keys = ["ricochet_1", "ricochet_2", "ricochet_3", "gta_ricochet"];
+        const rKey = keys[Math.floor(Math.random() * keys.length)];
+        if (!this.playSample(rKey, 0.105, 0.92 + Math.random() * 0.18, 0.32)) {
+            this.playBeep(1950, 0.06, "triangle", 0.045);
+        }
     }
 
     playPedScream() {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        if (this._lastScreamTime && now - this._lastScreamTime < 0.75) return;
+        if (this._lastScreamTime && now - this._lastScreamTime < 0.65) return;
         this._lastScreamTime = now;
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = "sawtooth";
-        const base = 620 + Math.random() * 240;
-        osc.frequency.setValueAtTime(base, now);
-        osc.frequency.linearRampToValueAtTime(base * 1.28, now + 0.09);
-        osc.frequency.exponentialRampToValueAtTime(base * 0.72, now + 0.26);
-        g.gain.setValueAtTime(0.056, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.27);
-        osc.connect(g);
-        g.connect(this.sfxOut());
-        osc.start(now);
-        osc.stop(now + 0.28);
+        const screamKeys = [
+            "gta_scream_scared_1",
+            "gta_scream_scared_2",
+            "gta_scream_scared_3",
+            "pain_1",
+            "pain_2",
+            "pain_3"
+        ];
+        const sKey = screamKeys[Math.floor(Math.random() * screamKeys.length)];
+        if (!this.playSample(sKey, 0.115, 0.94 + Math.random() * 0.14, 0.85)) {
+            this.playBeep(680, 0.18, "sawtooth", 0.05);
+        }
+    }
+
+    playPedDeath(deathKind = null, isRoadkill = false) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (isRoadkill) {
+            this.playSample("gta_squashed", 0.155, 0.94 + Math.random() * 0.12, 0.35);
+            this.playSample("splat", 0.105, 0.95 + Math.random() * 0.10, 0.35);
+        }
+        if (this._lastDeathScreamTime && now - this._lastDeathScreamTime < 0.38) return;
+        this._lastDeathScreamTime = now;
+        if (deathKind === "ELECTRO") {
+            this.playSample("gta_scream_electro", 0.135, 0.96 + Math.random() * 0.08, 0.70);
+            return;
+        }
+        if (deathKind === "BURNT") {
+            this.playSample("gta_scream_die_1", 0.13, 0.95 + Math.random() * 0.10, 0.95);
+            return;
+        }
+        const dieKeys = ["gta_scream_die_1", "gta_scream_die_2", "gta_scream_die_3", "die_1", "die_2"];
+        const dKey = dieKeys[Math.floor(Math.random() * dieKeys.length)];
+        this.playSample(dKey, 0.125, 0.94 + Math.random() * 0.12, 1.15);
     }
 
     playSeagullCall(prox = 0.7) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = "sine";
-        const f = 1480 + Math.random() * 260;
-        osc.frequency.setValueAtTime(f, now);
-        osc.frequency.linearRampToValueAtTime(f * 1.18, now + 0.08);
-        osc.frequency.exponentialRampToValueAtTime(f * 0.68, now + 0.34);
-        g.gain.setValueAtTime(0.028 * prox, now);
-        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.35);
-        osc.connect(g);
-        g.connect(this.sfxOut());
-        osc.start(now);
-        osc.stop(now + 0.36);
+        if (!this.playSample("bird_call", 0.055 * prox, 0.92 + Math.random() * 0.16, 0.85)) {
+            this.playBeep(1520, 0.22, "sine", 0.024 * prox);
+        }
     }
 
     playCricketChirp(nf = 0.8) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
-                this.playBeep(4150 + (i % 2) * 180, 0.022, "sine", 0.015 * nf);
-            }, i * 38);
+        if (!this.playSample("night_crickets", 0.042 * nf, 0.96 + Math.random() * 0.08, 0.95)) {
+            this.playBeep(4150, 0.022, "sine", 0.015 * nf);
         }
     }
 

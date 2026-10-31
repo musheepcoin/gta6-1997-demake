@@ -2846,6 +2846,11 @@ class LeonidaGame {
             });
         }
 
+        // Play authentic GTA death scream / roadkill splat if within hearing distance
+        if (this.audio && typeof this.audio.playPedDeath === "function" && this.player && Math.hypot(ped.x - this.player.x, ped.y - this.player.y) < 520) {
+            this.audio.playPedDeath(ped.deathKind || null, Boolean(byPlayer && this.player.inVehicle && !ped.deathKind));
+        }
+
         // If an AI traffic or AI police car ran over this pedestrian, do NOT blame or reward the player!
         if (!byPlayer) return;
 
@@ -2921,6 +2926,9 @@ class LeonidaGame {
         if (this.jason) this.jason.inVehicle = null;
         this.killFrenzy = null;
         this.setWantedLevel(0);
+        if (this.audio && typeof this.audio.playFanfare === "function") {
+            this.audio.playFanfare(targetType === "POLICE" ? "BUSTED" : "WASTED");
+        }
 
         if (targetType === "POLICE") {
             // Classic 1997 GTA 1 "GET OUT OF JAIL FREE" Card check!
