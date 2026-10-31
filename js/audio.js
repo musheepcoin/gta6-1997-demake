@@ -452,7 +452,7 @@ class RetroAudioEngine {
             src.buffer = buf;
             src.playbackRate.setValueAtTime(Math.max(0.35, Math.min(2.4, rate)), now);
             const g = this.ctx.createGain();
-            const scaledVol = vol * 0.38;
+            const scaledVol = vol * 0.68;
             g.gain.setValueAtTime(scaledVol, now);
             if (maxDuration > 0 && maxDuration < buf.duration / rate) {
                 g.gain.setValueAtTime(scaledVol, now + Math.max(0.02, maxDuration - 0.04));
@@ -596,7 +596,7 @@ class RetroAudioEngine {
                 } catch (_e) {}
             }
             if (this._skidLoopNode && this._skidLoopGain) {
-                const targetGain = Math.min(0.042, 0.018 + speedRatio * 0.024);
+                const targetGain = Math.min(0.075, 0.030 + speedRatio * 0.045);
                 this._skidLoopGain.gain.setTargetAtTime(targetGain, now, 0.04);
                 this._skidLoopNode.playbackRate.setTargetAtTime(0.92 + speedRatio * 0.22, now, 0.05);
             }
@@ -711,7 +711,7 @@ class RetroAudioEngine {
             const loadFilterHz = 1650 + this._smoothedRpm * 2800 + (throttle > 0 ? 750 : 0);
             if (this.engineMasterFilter && this.engineMasterGain) {
                 this.engineMasterFilter.frequency.setTargetAtTime(loadFilterHz, now, 0.05);
-                this.engineMasterGain.gain.setTargetAtTime((0.24 + this._smoothedRpm * 0.12) * shiftDip, now, 0.05);
+                this.engineMasterGain.gain.setTargetAtTime((0.48 + this._smoothedRpm * 0.22) * shiftDip, now, 0.05);
             }
 
             if (this._ensureEngineLayers(vehClass)) {
@@ -758,7 +758,7 @@ class RetroAudioEngine {
                 : (sirenType === "FIRE" ? "siren_firetruck" : "siren_police");
             const prox = playerSiren ? 0.95 : Math.max(0, 1 - sirenDist / 950);
             if (this._ensureSirenLoop(sirenKey) && this._sirenNode) {
-                this.sirenGain.gain.setTargetAtTime(prox * 0.036, now, 0.06);
+                this.sirenGain.gain.setTargetAtTime(prox * 0.065, now, 0.06);
                 const doppler = playerSiren ? 1.0 : Math.max(0.88, Math.min(1.14, state.trafficDoppler || 1.0));
                 this._sirenNode.playbackRate.setTargetAtTime(doppler, now, 0.06);
             }
@@ -785,7 +785,7 @@ class RetroAudioEngine {
                     this._trafficMotoNode.src.playbackRate.setTargetAtTime(rate, now, 0.05);
                 }
                 this.trafficFilter.frequency.setTargetAtTime(state.trafficIsMoto ? 1800 : 1150, now, 0.06);
-                const volScale = this.inVehicle ? 0.012 : 0.024;
+                const volScale = this.inVehicle ? 0.022 : 0.044;
                 this.trafficGain.gain.setTargetAtTime(prox * volScale, now, 0.06);
             } else {
                 this.trafficGain.gain.setTargetAtTime(0.0, now, 0.10);
