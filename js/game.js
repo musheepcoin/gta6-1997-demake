@@ -2695,9 +2695,20 @@ class LeonidaGame {
     setWantedLevel(level) {
         const clamped = Math.max(0, Math.min(6, Math.floor(level)));
         if (this.wantedLevel === 0 && clamped > 0) {
-            this.copSpawnTimer = -3.5; // Give the player a fair head-start before the first VCPD dispatch arrives!
+            this.copSpawnTimer = 99; // Dispatch the first VCPD unit immediately!
         } else if (clamped === 0) {
             this.copSpawnTimer = 0;
+            this.crimeHeat = 0;
+        }
+        if (clamped > 0 && Array.isArray(this.vehicles) && this.player) {
+            for (const v of this.vehicles) {
+                if (v.isPolice && !v.destroyed && v.driver === "AI_TRAFFIC") {
+                    if (Math.hypot(v.x - this.player.x, v.y - this.player.y) < 980) {
+                        v.driver = "AI_COP";
+                        v.sirenActive = true;
+                    }
+                }
+            }
         }
         if (clamped > this.wantedLevel && !this.player.ankleScrambled) {
             this.audio.playAnkleMonitorAlert();
@@ -2906,8 +2917,14 @@ class LeonidaGame {
         if (playerResponsible) {
             this.addCash(500, `${v.name} WRECKED!`);
             this.recordFrenzyKill();
+            this.wantedDecayTimer = 0;
             if (v.isPolice) {
-                this.setWantedLevel(this.wantedLevel + 1);
+                this.crimeHeat = (this.crimeHeat || 0) + 3;
+                this.setWantedLevel(Math.max(2, this.wantedLevel + 1));
+            } else {
+                this.crimeHeat = (this.crimeHeat || 0) + 2;
+                const targetWanted = Math.min(6, Math.max(this.wantedLevel, 1 + Math.floor(this.crimeHeat / 3)));
+                this.setWantedLevel(targetWanted);
             }
         }
     }
@@ -2950,6 +2967,16 @@ class LeonidaGame {
         if (!byPlayer) return;
 
         this.recordFrenzyKill();
+        this.wantedDecayTimer = 0;
+
+        if (ped.kind === "COP") {
+            this.crimeHeat = (this.crimeHeat || 0) + 3;
+            this.setWantedLevel(Math.max(2, this.wantedLevel + 1));
+        } else if (ped.kind !== "GATOR") {
+            this.crimeHeat = (this.crimeHeat || 0) + 1;
+            const targetWanted = Math.min(6, Math.max(this.wantedLevel, 1 + Math.floor((this.crimeHeat - 1) / 3)));
+            this.setWantedLevel(targetWanted);
+        }
 
         // Check Iconic 1997 GTA 1 "GOURANGA!" 7-Monk Chain Bonus!
         if (ped.kind === "MONK") {
@@ -2989,12 +3016,6 @@ class LeonidaGame {
             this.comboCount = 1;
         }
         this.lastKillTime = nowSec;
-
-        if (ped.kind === "COP") {
-            this.setWantedLevel(Math.max(this.wantedLevel, 2));
-        } else if (ped.kind === "CIVILIAN" && Math.random() < 0.45) {
-            this.setWantedLevel(Math.max(this.wantedLevel, 1));
-        }
     }
 
     damagePlayer(amount) {
@@ -4434,22 +4455,23 @@ class LeonidaGame {
             this.copSpawnTimer += dt;
             const maxCops = Math.min(7, tWanted + 1 + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
             const totalActiveUnits = activeCopCars + activeFootCopsNear;
-            const spawnInterval = tWanted <= 1 ? 10.5 : (tWanted === 2 ? 8.5 : (tWanted === 3 ? 6.8 : 5.2));
+            const spawnInterval = tWanted <= 1 ? 6.5 : (tWanted === 2 ? 5.2 : (tWanted === 3 ? 4.2 : 3.4));
             if (totalActiveUnits < maxCops && this.copSpawnTimer > spawnInterval) {
                 this.copSpawnTimer = 0;
                 const baseBx = Math.floor(spawnTarget.x / TILE_SIZE);
                 const baseBy = Math.floor(spawnTarget.y / TILE_SIZE);
                 const pz = spawnTarget.z || 2.0;
-                for (let attempt = 0; attempt < 18; attempt++) {
+                let spawnedCar = false;
+                for (let attempt = 0; attempt < 32; attempt++) {
                     const ang = Math.random() * Math.PI * 2;
-                    const distB = 13.5 + Math.random() * 5.0; // 860..1180px away so police arrive progressively from a distance
+                    const distB = 7.0 + Math.random() * 4.5; // 448..736px away so police arrive quickly right from off-screen
                     const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                     const by = Math.floor(baseBy + Math.sin(ang) * distB);
                     const navBlk = this.map.getNavigationBlock(bx, by, pz);
                     if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                         const sx = (bx + 0.5) * TILE_SIZE;
                         const sy = (by + 0.5) * TILE_SIZE;
-                        if (Math.hypot(sx - spawnTarget.x, sy - spawnTarget.y) < 760) continue;
+                        if (Math.hypot(sx - spawnTarget.x, sy - spawnTarget.y) < 420) continue;
                         const toPlayerAng = Math.atan2(spawnTarget.y - sy, spawnTarget.x - sx);
                         const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                             ? this.map.getAlignedRoadAngle(bx, by, toPlayerAng, pz)
@@ -4458,11 +4480,48 @@ class LeonidaGame {
                         const copCar = new Vehicle(`cop_${Date.now()}_${attempt}`, specKey, sx, sy, roadAng);
                         copCar.z = this.map.getHeightAtPixel(sx, sy, 4.0);
                         copCar.driver = "AI_COP";
-                        copCar.speed = 105;
-                        copCar.vx = Math.cos(roadAng) * 105;
-                        copCar.vy = Math.sin(roadAng) * 105;
+                        copCar.sirenActive = true;
+                        copCar.speed = 135;
+                        copCar.vx = Math.cos(roadAng) * 135;
+                        copCar.vy = Math.sin(roadAng) * 135;
                         this.vehicles.push(copCar);
+                        spawnedCar = true;
                         break;
+                    }
+                }
+                // Also dispatch an on-foot officer on a nearby sidewalk/beach if player is on foot or off-road
+                if ((!spawnedCar || !spawnTarget.inVehicle) && activeFootCopsNear < Math.min(4, tWanted + 1)) {
+                    for (let attempt = 0; attempt < 24; attempt++) {
+                        const ang = Math.random() * Math.PI * 2;
+                        const distB = 6.0 + Math.random() * 3.5; // 384..608px away
+                        const bx = Math.floor(baseBx + Math.cos(ang) * distB);
+                        const by = Math.floor(baseBy + Math.sin(ang) * distB);
+                        const navBlk = this.map.getNavigationBlock(bx, by, pz);
+                        if (navBlk && (navBlk.groundType === GROUND_TYPE.PAWEMENT || navBlk.groundType === GROUND_TYPE.FIELD || navBlk.groundType === GROUND_TYPE.ROAD)) {
+                            const sx = (bx + 0.5) * TILE_SIZE;
+                            const sy = (by + 0.5) * TILE_SIZE;
+                            if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(sx, sy)) continue;
+                            if (this.map.resolveCircleBuildingCollision(sx, sy, 10, pz).hit) continue;
+                            const copHp = tWanted >= 4 ? 260 : 200;
+                            const copWep = tWanted >= 4 ? "SHOTGUN" : (tWanted >= 3 ? "UZI" : "PISTOL");
+                            this.peds.push(new Pedestrian({
+                                id: `foot_cop_${Date.now()}_${attempt}`,
+                                x: sx,
+                                y: sy,
+                                z: this.map.getHeightAtPixel(sx, sy, 4.0),
+                                angle: Math.atan2(spawnTarget.y - sy, spawnTarget.x - sx),
+                                speed: tWanted >= 4 ? 124 : 116,
+                                kind: "COP",
+                                g24Type: "police",
+                                shirtColor: "#1e3a8a",
+                                hp: copHp,
+                                maxHp: copHp,
+                                copWeapon: copWep,
+                                dead: false,
+                                panicTimer: 0
+                            }));
+                            break;
+                        }
                     }
                 }
             }
@@ -4500,15 +4559,15 @@ class LeonidaGame {
         }
 
         if (this.wantedLevel > 0) {
-            // Decay 1 Wanted Head when out of immediate police sight (> 420px), or slowly over time at 1-2 heads if no new crimes occur!
-            const decayThreshold = this.wantedLevel === 1 ? 11 : 15;
-            if (nearestCopDist > 420) {
+            // Only decay Wanted Level when completely out of police sight (>= 720px) and not actively shooting/fighting!
+            const decayThreshold = this.wantedLevel === 1 ? 28 : 38;
+            if (nearestCopDist < 720 || (p.playerCombatTimer || 0) > 0) {
+                this.wantedDecayTimer = 0;
+            } else {
                 this.wantedDecayTimer += dt;
-            } else if (this.wantedLevel <= 2) {
-                this.wantedDecayTimer += dt * 0.35;
-            }
-            if (this.wantedDecayTimer >= decayThreshold) {
-                this.setWantedLevel(this.wantedLevel - 1);
+                if (this.wantedDecayTimer >= decayThreshold) {
+                    this.setWantedLevel(this.wantedLevel - 1);
+                }
             }
         }
 
