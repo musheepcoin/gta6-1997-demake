@@ -898,6 +898,55 @@ class RetroRenderer {
                         if (ve.damage.rear) closeBoxHoles(ve.damage.rear, true, false);
                         if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy, true, false);
                     }
+
+                    // Convert .G24 damage & door sprites (which are baked only in `ve.base` color in the atlas)
+                    // into pure color-neutral delta overlays so remapped cars NEVER change paint color on crash/bullet impact!
+                    if (ve.base && ve.base.length >= 4) {
+                        const [bx, by, bw, bh] = ve.base;
+                        const toNeutralDeltaOverlay = (deltaRect, isDoor = false) => {
+                            if (!Array.isArray(deltaRect) || deltaRect.length < 4) return;
+                            const [dx, dy, dw, dh] = deltaRect;
+                            if (dw !== bw || dh !== bh) return;
+                            for (let ly = 0; ly < bh; ly++) {
+                                for (let lx = 0; lx < bw; lx++) {
+                                    const bp = ((by + ly) * W + (bx + lx)) * 4;
+                                    const dp = ((dy + ly) * W + (dx + lx)) * 4;
+                                    const br = d[bp], bg = d[bp + 1], bb = d[bp + 2], ba = d[bp + 3];
+                                    const dr = d[dp], dg = d[dp + 1], db = d[dp + 2], da = d[dp + 3];
+                                    if (dr === br && dg === bg && db === bb && da === ba) {
+                                        // Unchanged body pixel -> make transparent so the vehicle's true remap paint shows through!
+                                        d[dp] = 0;
+                                        d[dp + 1] = 0;
+                                        d[dp + 2] = 0;
+                                        d[dp + 3] = 0;
+                                    } else if (da < 16) {
+                                        // Crumpled inward notch where base bumper was opaque -> dark shadow notch
+                                        d[dp] = 14;
+                                        d[dp + 1] = 16;
+                                        d[dp + 2] = 22;
+                                        d[dp + 3] = isDoor ? 0 : 220;
+                                    } else {
+                                        // Changed dent / crumpled metal / cracked glass / open door trim pixel:
+                                        // Desaturate any `ve.base` paint hue into neutral dark crumpled steel/charcoal
+                                        const lum = dr * 0.299 + dg * 0.587 + db * 0.114;
+                                        const gray = Math.min(240, Math.max(12, lum * (isDoor ? 0.68 : 0.76)));
+                                        d[dp] = Math.round(gray * 0.96);
+                                        d[dp + 1] = Math.round(gray * 0.98);
+                                        d[dp + 2] = Math.round(Math.min(255, gray * 1.04));
+                                        d[dp + 3] = isDoor ? 245 : 230;
+                                    }
+                                }
+                            }
+                        };
+                        if (ve.damage) {
+                            if (ve.damage.front) toNeutralDeltaOverlay(ve.damage.front, false);
+                            if (ve.damage.rear) toNeutralDeltaOverlay(ve.damage.rear, false);
+                            if (ve.damage.heavy) toNeutralDeltaOverlay(ve.damage.heavy, false);
+                        }
+                        if (Array.isArray(ve.doors)) {
+                            for (const dr of ve.doors) toNeutralDeltaOverlay(dr, true);
+                        }
+                    }
                 }
             }
             if (meta.sprites.wrecked) {
@@ -3840,6 +3889,8 @@ class RetroRenderer {
             const vz = this.getEntityZ(v, 0.06);
             const mapInfo = this.getVehicleG24Mapping(v);
             let rect = null;
+            let dmgRect = null;
+            let doorRect = null;
             let sirens = [];
 
             if (v.destroyed) {
@@ -3857,37 +3908,34 @@ class RetroRenderer {
                     sirens = vehEntry.sirens || [];
                 }
 
-                // 1) Animated .G24 Car Door Swing (CAR_DOOR1_SPRITE_DELTA_0..3) when entering/exiting!
+                // 1) Permanent Factory Paint Sprite (NEVER replaced by base-colored damage/door sprites!)
+                if (mapInfo.useBaseObject) {
+                    rect = (vehEntry && vehEntry.base) || this.gta1Meta.sprites.objects[mapInfo.sprId];
+                } else if (vehEntry) {
+                    rect = (vehEntry.remaps && vehEntry.remaps[(mapInfo.remapIdx || 0) % vehEntry.remaps.length]) || vehEntry.base;
+                } else if (this.gta1Meta.sprites.objects[mapInfo.sprId]) {
+                    rect = this.gta1Meta.sprites.objects[mapInfo.sprId];
+                }
+
+                // 2) Localized .G24 Crash Damage Delta Overlay (Front Dent, Rear Dent, Heavy Front+Rear!)
+                if (vehEntry && vehEntry.damage) {
+                    if (v.heavyDented && vehEntry.damage.heavy) {
+                        dmgRect = vehEntry.damage.heavy;
+                    } else if (v.frontDented && v.rearDented && vehEntry.damage.heavy) {
+                        dmgRect = vehEntry.damage.heavy;
+                    } else if (v.frontDented && vehEntry.damage.front) {
+                        dmgRect = vehEntry.damage.front;
+                    } else if (v.rearDented && vehEntry.damage.rear) {
+                        dmgRect = vehEntry.damage.rear;
+                    }
+                }
+
+                // 3) Animated .G24 Car Door Swing Delta Overlay (CAR_DOOR1_SPRITE_DELTA_0..3) when entering/exiting!
                 if ((v.doorOpenTimer || 0) > 0 && vehEntry && Array.isArray(vehEntry.doors) && vehEntry.doors.length > 0) {
                     const norm = 1.0 - Math.max(0, Math.min(1, v.doorOpenTimer / 0.48));
-                    // Open 0->1->2->3 then close 3->2->1->0
                     const tri = norm < 0.5 ? (norm * 2.0) : ((1.0 - norm) * 2.0);
                     const dIdx = Math.min(vehEntry.doors.length - 1, Math.floor(tri * vehEntry.doors.length));
-                    rect = vehEntry.doors[dIdx];
-                }
-
-                // 2) Localized .G24 Crash Damage Delta Sprites (Front Dent, Rear Dent, Heavy Front+Rear!)
-                if (!rect && vehEntry && vehEntry.damage) {
-                    if (v.heavyDented && vehEntry.damage.heavy) {
-                        rect = vehEntry.damage.heavy;
-                    } else if (v.frontDented && v.rearDented && vehEntry.damage.heavy) {
-                        rect = vehEntry.damage.heavy;
-                    } else if (v.frontDented && vehEntry.damage.front) {
-                        rect = vehEntry.damage.front;
-                    } else if (v.rearDented && vehEntry.damage.rear) {
-                        rect = vehEntry.damage.rear;
-                    }
-                }
-
-                // 3) Default Pristine .G24 Car Sprite
-                if (!rect) {
-                    if (mapInfo.useBaseObject && this.gta1Meta.sprites.objects[mapInfo.sprId]) {
-                        rect = this.gta1Meta.sprites.objects[mapInfo.sprId];
-                    } else if (vehEntry) {
-                        rect = (vehEntry.remaps && vehEntry.remaps[(mapInfo.remapIdx || 0) % vehEntry.remaps.length]) || vehEntry.base;
-                    } else if (this.gta1Meta.sprites.objects[mapInfo.sprId]) {
-                        rect = this.gta1Meta.sprites.objects[mapInfo.sprId];
-                    }
+                    doorRect = vehEntry.doors[dIdx];
                 }
             }
 
@@ -3948,6 +3996,12 @@ class RetroRenderer {
             const vTintG = carSunSpec * (1.0 - vehShade * 0.11);
             const vTintB = carSunSpec * (1.0 - vehShade * 0.03);
             this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
+            if (dmgRect) {
+                this.pushAtlasSprite3D(dmgRect, v.x, v.y, vz + airZ + 0.0015, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
+            }
+            if (doorRect) {
+                this.pushAtlasSprite3D(doorRect, v.x, v.y, vz + airZ + 0.0025, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
+            }
 
             // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp):
             // Physical Front Headlight Glass Lenses + Day/Night Rear Taillights, Brake Lamps & Reverse Lamps!

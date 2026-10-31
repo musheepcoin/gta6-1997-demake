@@ -1103,31 +1103,34 @@ class Vehicle {
             }
         }
 
-        if (hitX !== undefined && hitY !== undefined) {
-            const dx = hitX - this.x;
-            const dy = hitY - this.y;
-            const cosA = Math.cos(this.angle);
-            const sinA = Math.sin(this.angle);
-            const localX = dx * cosA + dy * sinA;
-            const localY = -dx * sinA + dy * cosA;
-            const frBias = (this.w * 0.5) / 3.0; // fr_bias = maxx / 3.0f (Vehicle.cpp:723)
+        const shouldDent = isExplosive || amount >= 14 || this.hp < this.maxHp * 0.82;
+        if (shouldDent) {
+            if (hitX !== undefined && hitY !== undefined) {
+                const dx = hitX - this.x;
+                const dy = hitY - this.y;
+                const cosA = Math.cos(this.angle);
+                const sinA = Math.sin(this.angle);
+                const localX = dx * cosA + dy * sinA;
+                const localY = -dx * sinA + dy * cosA;
+                const frBias = (this.w * 0.5) / 3.0; // fr_bias = maxx / 3.0f (Vehicle.cpp:723)
 
-            if (localX > frBias) {
-                if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FL);
-                else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FR);
-                this.frontDented = true;
-            } else if (localX < -frBias) {
-                if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.BL);
-                else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.BR);
-                this.rearDented = true;
+                if (localX > frBias) {
+                    if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FL);
+                    else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FR);
+                    this.frontDented = true;
+                } else if (localX < -frBias) {
+                    if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.BL);
+                    else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.BR);
+                    this.rearDented = true;
+                } else {
+                    if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.ML);
+                    else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.MR);
+                    this.frontDented = true;
+                }
             } else {
-                if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.ML);
-                else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.MR);
+                this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FL) | (1 << CAR_DAMAGE_DELTA.FR);
                 this.frontDented = true;
             }
-        } else {
-            this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FL) | (1 << CAR_DAMAGE_DELTA.FR);
-            this.frontDented = true;
         }
 
         if (this.hp < this.maxHp * 0.48) {
