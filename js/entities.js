@@ -1852,10 +1852,10 @@ class Vehicle {
     computeEmergencyControls(dt, map, game) {
         if (!game) return this.computeTrafficControls(dt, map, game);
 
-        // A. MEDIC AMBULANCE: Responds to dead casualties within 640px and revives them!
+        // A. MEDIC AMBULANCE: Responds to dead casualties within 1200px and revives them!
         if (this.specKey === "MEDIC_AMBULANCE" && Array.isArray(game.peds)) {
             let nearestCorpse = null;
-            let bestDist = 640;
+            let bestDist = 1200;
             for (const ped of game.peds) {
                 if (!ped.dead || ped.revived) continue;
                 const d = Math.hypot(ped.x - this.x, ped.y - this.y);
@@ -1868,7 +1868,8 @@ class Vehicle {
             if (nearestCorpse) {
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_MEDIC";
-                if (bestDist < 52) {
+                // Road-to-sidewalk distance is 64..92px (1 to 1.4 tiles), so stop and treat casualties within 96px
+                if (bestDist < 96) {
                     this.aiBailTimer += dt;
                     if (this.aiBailTimer > 1.0) {
                         this.aiBailTimer = 0;
@@ -1876,7 +1877,20 @@ class Vehicle {
                         nearestCorpse.revived = true;
                         nearestCorpse.hp = 35;
                         nearestCorpse.speed = 36;
+                        nearestCorpse.stunnedTimer = 0;
+                        nearestCorpse.burnTimer = 0;
+                        nearestCorpse.electroTimer = 0;
+                        nearestCorpse.drownTimer = 0;
                         nearestCorpse.panicTimer = 4.0;
+                        if (typeof game.spawnParticle === "function") {
+                            for (let k = 0; k < 5; k++) {
+                                game.spawnParticle(
+                                    nearestCorpse.x + (Math.random() - 0.5) * 14,
+                                    nearestCorpse.y + (Math.random() - 0.5) * 14,
+                                    "SPARK"
+                                );
+                            }
+                        }
                         game.addFloatingText(nearestCorpse.x, nearestCorpse.y - 22, "🚑 MEDIC REVIVED!", "#38bdf8");
                     }
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
@@ -1889,7 +1903,7 @@ class Vehicle {
                     nearestCorpse.y,
                     0,
                     0,
-                    0.90,
+                    0.92,
                     false
                 );
             }

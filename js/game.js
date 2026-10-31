@@ -444,7 +444,8 @@ class LeonidaGame {
                 "TOUR_COACH",
                 "FLATBED_TRUCK",
                 "TANKER_RIG",
-                "VCPD_CRUISER"
+                "VCPD_CRUISER",
+                "MEDIC_AMBULANCE"
             ];
             const count = Math.min(72, meta.startup_cars.length);
             for (let i = 0; i < count; i++) {
@@ -469,7 +470,7 @@ class LeonidaGame {
                 const alignedAng = this.map.getAlignedRoadAngle(bx, by, rawAng, vz);
                 const v = new Vehicle(`cmp_car_${i}`, spec, vx, vy, alignedAng);
                 v.z = vz;
-                v.driver = "AI_TRAFFIC";
+                v.driver = (spec === "MEDIC_AMBULANCE" || spec === "FIRE_TRUCK") ? "AI_EMERGENCY" : "AI_TRAFFIC";
                 this.vehicles.push(v);
             }
         }
@@ -4149,6 +4150,90 @@ class LeonidaGame {
             }
             if (this.wantedDecayTimer >= decayThreshold) {
                 this.setWantedLevel(this.wantedLevel - 1);
+            }
+        }
+
+        // 7B. 911 Emergency Ambulance Dispatch: Automatically dispatches a MEDIC_AMBULANCE when casualties occur nearby!
+        if (!isClientWorldSync) {
+            let casualtyNearPlayer = null;
+            let bestCasDist = 680;
+            for (const ped of this.peds) {
+                if (!ped.dead || ped.revived) continue;
+                const d = Math.hypot(ped.x - p.x, ped.y - p.y);
+                if (d < bestCasDist) {
+                    bestCasDist = d;
+                    casualtyNearPlayer = ped;
+                }
+            }
+            if (casualtyNearPlayer) {
+                let medicNearCasualty = false;
+                let farMedicCar = null;
+                let totalMedics = 0;
+                for (const v of this.vehicles) {
+                    if (v.specKey === "MEDIC_AMBULANCE" && !v.destroyed && v.driver === "AI_EMERGENCY") {
+                        totalMedics++;
+                        const dCas = Math.hypot(v.x - casualtyNearPlayer.x, v.y - casualtyNearPlayer.y);
+                        if (dCas < 960) {
+                            medicNearCasualty = true;
+                        } else if (Math.hypot(v.x - p.x, v.y - p.y) > 1050) {
+                            farMedicCar = v;
+                        }
+                    }
+                }
+                if (!medicNearCasualty) {
+                    this.medicDispatchTimer = (this.medicDispatchTimer || 0) + dt;
+                    if (this.medicDispatchTimer > 6.5) {
+                        this.medicDispatchTimer = 0;
+                        const baseBx = Math.floor(casualtyNearPlayer.x / TILE_SIZE);
+                        const baseBy = Math.floor(casualtyNearPlayer.y / TILE_SIZE);
+                        const pz = casualtyNearPlayer.z || 2.0;
+                        for (let attempt = 0; attempt < 10; attempt++) {
+                            const ang = Math.random() * Math.PI * 2;
+                            const distB = 8.5 + Math.random() * 4.0;
+                            const bx = Math.floor(baseBx + Math.cos(ang) * distB);
+                            const by = Math.floor(baseBy + Math.sin(ang) * distB);
+                            const navBlk = this.map.getNavigationBlock(bx, by, pz);
+                            if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
+                                const sx = (bx + 0.5) * TILE_SIZE;
+                                const sy = (by + 0.5) * TILE_SIZE;
+                                if (Math.hypot(sx - p.x, sy - p.y) < 380) continue;
+                                const toCasAng = Math.atan2(casualtyNearPlayer.y - sy, casualtyNearPlayer.x - sx);
+                                const roadAng = typeof this.map.getAlignedRoadAngle === "function"
+                                    ? this.map.getAlignedRoadAngle(bx, by, toCasAng, pz)
+                                    : toCasAng;
+                                const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
+                                if (farMedicCar || totalMedics >= 4) {
+                                    const reuseCar = farMedicCar;
+                                    if (reuseCar) {
+                                        reuseCar.x = sx;
+                                        reuseCar.y = sy;
+                                        reuseCar.z = sz;
+                                        reuseCar.angle = roadAng;
+                                        reuseCar.speed = 130;
+                                        reuseCar.vx = Math.cos(roadAng) * 130;
+                                        reuseCar.vy = Math.sin(roadAng) * 130;
+                                        reuseCar.sirenActive = true;
+                                        reuseCar.aiStuckTimer = 0;
+                                    }
+                                } else {
+                                    const medCar = new Vehicle(`medic_${Date.now()}_${attempt}`, "MEDIC_AMBULANCE", sx, sy, roadAng);
+                                    medCar.z = sz;
+                                    medCar.driver = "AI_EMERGENCY";
+                                    medCar.sirenActive = true;
+                                    medCar.speed = 130;
+                                    medCar.vx = Math.cos(roadAng) * 130;
+                                    medCar.vy = Math.sin(roadAng) * 130;
+                                    this.vehicles.push(medCar);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    this.medicDispatchTimer = 0;
+                }
+            } else {
+                this.medicDispatchTimer = 0;
             }
         }
 
