@@ -3286,9 +3286,45 @@ class LeonidaGame {
             }
         }
 
-        // Clamp Lucia inside the interior walls
-        this.interiorX = Math.max(64, Math.min(intr.w - 64, this.interiorX));
-        this.interiorY = Math.max(88, Math.min(intr.h - 24, this.interiorY));
+        // Clamp Lucia inside the 2.5D perimeter interior walls
+        this.interiorX = Math.max(40, Math.min(intr.w - 40, this.interiorX));
+        this.interiorY = Math.max(82, Math.min(intr.h - 24, this.interiorY));
+
+        // Resolve physical circle-vs-AABB collisions against partition walls, counters & furniture
+        if (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function") {
+            const obs = window.ShopInteriors.getObstacles(intr);
+            const pRad = 14;
+            for (let pass = 0; pass < 2; pass++) {
+                for (let i = 0; i < obs.length; i++) {
+                    const b = obs[i];
+                    const cx = Math.max(b.x, Math.min(b.x + b.w, this.interiorX));
+                    const cy = Math.max(b.y, Math.min(b.y + b.h, this.interiorY));
+                    const dx = this.interiorX - cx;
+                    const dy = this.interiorY - cy;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < pRad * pRad) {
+                        if (d2 > 0.0001) {
+                            const d = Math.sqrt(d2);
+                            this.interiorX += (dx / d) * (pRad - d);
+                            this.interiorY += (dy / d) * (pRad - d);
+                        } else {
+                            // Inside box center fallback: push out along nearest edge
+                            const dL = Math.abs(this.interiorX - b.x);
+                            const dR = Math.abs(b.x + b.w - this.interiorX);
+                            const dT = Math.abs(this.interiorY - b.y);
+                            const dB = Math.abs(b.y + b.h - this.interiorY);
+                            const m = Math.min(dL, dR, dT, dB);
+                            if (m === dL) this.interiorX = b.x - pRad;
+                            else if (m === dR) this.interiorX = b.x + b.w + pRad;
+                            else if (m === dT) this.interiorY = b.y - pRad;
+                            else this.interiorY = b.y + b.h + pRad;
+                        }
+                    }
+                }
+            }
+            this.interiorX = Math.max(40, Math.min(intr.w - 40, this.interiorX));
+            this.interiorY = Math.max(82, Math.min(intr.h - 24, this.interiorY));
+        }
 
         // The companion stays outside while the player is in a venue
         if (this.jason) this.jason.isMoving = false;

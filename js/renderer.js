@@ -5227,103 +5227,937 @@ class RetroRenderer {
     }
 
     /* ========================================================================
-       5A2. PLAYABLE WALKABLE LANDMARK INTERIOR ROOM RENDERER
-       Renders Hotel Dixon, Club Nine1Nine, Club Jack of Hearts, The Malibu,
-       Star Island Mansion, SERA Space Bunker, Leonida Penitentiary & Hank's Diner!
+       5A2. PLAYABLE WALKABLE 2.5D MULTI-ROOM INTERIOR & SHOP RENDERER
+       Pre-bakes 128x128 pixel-art procedural floor textures (hardwood planks,
+       beveled ceramic tiles, veined Carrara marble, South Beach terrazzo,
+       industrial diamond-plate, woven velvet carpet) and renders multi-room
+       2.5D architectural layouts with thick partition walls, north elevations,
+       ambient occlusion shadows, and richly detailed top-down furniture.
        ======================================================================== */
-    /* Shop furniture: purely decorative, drawn under the stations/NPCs */
-    drawShopDecor(ctx, intr, ox, oy, rw, rh) {
-        const R = (x, y, w, h, fill, stroke) => {
+    getInteriorTextures(ctx) {
+        if (this._interiorTextures) return this._interiorTextures;
+        const tex = {};
+        const hash = (x, y, s = 0) => {
+            let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 1442695041)) >>> 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+            return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+        };
+        const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+        const makePat = (sz, fn) => {
+            const c = document.createElement("canvas");
+            c.width = sz;
+            c.height = sz;
+            const g = c.getContext("2d");
+            const img = g.createImageData(sz, sz);
+            const d = img.data;
+            for (let y = 0; y < sz; y++) {
+                for (let x = 0; x < sz; x++) {
+                    const [r, gr, b] = fn(x, y, sz);
+                    const idx = (y * sz + x) * 4;
+                    d[idx] = clamp(r);
+                    d[idx + 1] = clamp(gr);
+                    d[idx + 2] = clamp(b);
+                    d[idx + 3] = 255;
+                }
+            }
+            g.putImageData(img, 0, 0);
+            return ctx.createPattern(c, "repeat");
+        };
+
+        // 1. Rich Mahogany Hardwood Planks (Tavern / Dive Bar / Mansion Office)
+        tex.wood_mahogany = makePat(64, (x, y) => {
+            const plankRow = Math.floor(y / 12);
+            const ly = y % 12;
+            const stagger = (plankRow % 2) * 32;
+            const lx = (x + stagger) % 64;
+            if (ly === 0 || lx === 0) return [24, 11, 7]; // Dark plank bevel joint
+            const pTone = (hash(plankRow, 1, 11) - 0.5) * 14;
+            const grain = Math.sin(x * 0.35 + Math.sin(y * 0.7 + plankRow) * 2.2) * 8 + (hash(x, y, 2) - 0.5) * 9;
+            const highlight = ly === 1 ? 10 : (ly === 11 ? -8 : 0);
+            return [66 + pTone + grain + highlight, 34 + (pTone + grain) * 0.55 + highlight * 0.5, 21 + (pTone + grain) * 0.35];
+        });
+
+        // 2. Warm Honey-Oak Parquet Planks (Hotel Suites / Fitting Rooms / Stage)
+        tex.wood_oak = makePat(64, (x, y) => {
+            const plankRow = Math.floor(y / 10);
+            const ly = y % 10;
+            const lx = (x + (plankRow % 2) * 28) % 56;
+            if (ly === 0 || lx === 0) return [52, 32, 16];
+            const pTone = (hash(plankRow, 3, 7) - 0.5) * 16;
+            const grain = Math.sin(x * 0.4 + Math.cos(y * 0.8) * 1.8) * 9 + (hash(x, y, 4) - 0.5) * 10;
+            const bevel = ly === 1 ? 12 : (ly === 9 ? -9 : 0);
+            return [122 + pTone + grain + bevel, 82 + (pTone + grain) * 0.7 + bevel * 0.6, 46 + (pTone + grain) * 0.4];
+        });
+
+        // 3. Retro 1980s Vice City Diner Beveled Checkerboard Tile (Terracotta / Cream)
+        tex.diner_checker = makePat(64, (x, y) => {
+            const tx = Math.floor(x / 32);
+            const ty = Math.floor(y / 32);
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [38, 28, 24]; // Grout line
+            const isRed = (tx + ty) % 2 === 0;
+            const n = (hash(x, y, 9) - 0.5) * 12;
+            const bev = (lx === 1 || ly === 1) ? 16 : ((lx === 31 || ly === 31) ? -16 : 0);
+            const spec = (lx > 4 && lx < 12 && ly > 4 && ly < 10) ? 8 : 0;
+            if (isRed) {
+                return [154 + n + bev + spec, 48 + n * 0.5 + bev * 0.5 + spec, 34 + n * 0.4 + bev * 0.4];
+            }
+            return [226 + n + bev + spec, 210 + n + bev + spec, 174 + n + bev * 0.7];
+        });
+
+        // 4. Commercial Stainless / Ceramic Kitchen Grid Tile (16x16)
+        tex.kitchen_tile = makePat(64, (x, y) => {
+            const lx = x % 16;
+            const ly = y % 16;
+            if (lx === 0 || ly === 0) return [45, 55, 68]; // Dark grout
+            const n = (hash(x, y, 14) - 0.5) * 10;
+            const bev = (lx === 1 || ly === 1) ? 14 : ((lx === 15 || ly === 15) ? -12 : 0);
+            return [196 + n + bev, 206 + n + bev, 216 + n + bev];
+        });
+
+        // 5. Veined White Carrara Marble (Boutique / Star Island Mansion Foyer)
+        tex.marble_carrara = makePat(64, (x, y) => {
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [138, 148, 162]; // Silver-gray marble grout
+            const veinWave = Math.sin((x + y * 1.3) * 0.14 + Math.sin(x * 0.09 - y * 0.11) * 2.6);
+            const vein = Math.pow(Math.max(0, 1 - Math.abs(veinWave) * 3.8), 2.2);
+            const n = (hash(x, y, 21) - 0.5) * 9;
+            const bev = (lx === 1 || ly === 1) ? 12 : ((lx === 31 || ly === 31) ? -11 : 0);
+            const base = 224 + n + bev - vein * 58;
+            return [base, base + 3, base + 9];
+        });
+
+        // 6. Dark Obsidian & Gold-Veined Luxury Slate (Nightclubs / VIP Lounges)
+        tex.marble_dark = makePat(64, (x, y) => {
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [14, 18, 28];
+            const veinWave = Math.sin((x - y * 1.2) * 0.15 + Math.cos(x * 0.1 + y * 0.08) * 2.4);
+            const vein = Math.pow(Math.max(0, 1 - Math.abs(veinWave) * 4.2), 2.0);
+            const n = (hash(x, y, 33) - 0.5) * 8;
+            const bev = (lx === 1 || ly === 1) ? 9 : ((lx === 31 || ly === 31) ? -8 : 0);
+            return [
+                30 + n + bev + vein * 42,
+                26 + n + bev + vein * 28,
+                44 + n + bev + vein * 48
+            ];
+        });
+
+        // 7. South Beach Art Deco Terrazzo with Brass Inlay & Coral/Turquoise Chips (Hotels)
+        tex.terrazzo_deco = makePat(64, (x, y) => {
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [184, 142, 62]; // Polished brass inlay strip!
+            const h = hash(Math.floor(x / 2), Math.floor(y / 2), 45);
+            const n = (hash(x, y, 46) - 0.5) * 8;
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -10 : 0);
+            if (h > 0.90) return [236, 118, 146]; // Flamingo coral chip
+            if (h > 0.81) return [64, 208, 216];  // Ocean turquoise chip
+            if (h > 0.72) return [238, 212, 148]; // Cream quartz chip
+            return [54 + n + bev, 38 + n + bev, 64 + n + bev];
+        });
+
+        // 8. Tactical Diamond-Plate Gunmetal Steel (Ammu-Nation / Space Bunker / Armory)
+        tex.gunmetal_plate = makePat(64, (x, y) => {
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [18, 22, 28];
+            const cx = (x % 8) - 4;
+            const cy = (y % 8) - 4;
+            const tread = (Math.abs(cx - cy) <= 1 && Math.abs(cx + cy) <= 3) || (Math.abs(cx + cy) <= 1 && Math.abs(cx - cy) <= 3);
+            const n = (hash(x, y, 55) - 0.5) * 9;
+            const bev = (lx === 1 || ly === 1) ? 11 : ((lx === 31 || ly === 31) ? -10 : 0);
+            const tBoost = tread ? 18 : 0;
+            return [44 + n + bev + tBoost, 50 + n + bev + tBoost, 58 + n + bev + tBoost];
+        });
+
+        // 9. Supermarket Speckled Vinyl Composition Tile (24/7 Convenience Store)
+        tex.linoleum_mart = makePat(64, (x, y) => {
+            const tx = Math.floor(x / 32);
+            const ty = Math.floor(y / 32);
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [136, 146, 156];
+            const alt = (tx + ty) % 2 === 0 ? 0 : -12;
+            const sp = hash(x, y, 67) > 0.82 ? -18 : (hash(x, y, 68) > 0.85 ? 14 : 0);
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -10 : 0);
+            return [208 + alt + sp + bev, 216 + alt + sp + bev, 220 + alt + sp + bev];
+        });
+
+        // 10. Woven Royal Crimson Velvet Carpet (Mansion / Hotel Runner / VIP Areas)
+        tex.carpet_royal = makePat(32, (x, y) => {
+            const weave = ((x + y) % 2 === 0 ? 6 : -6) + Math.sin(x * 0.78) * 5 + Math.cos(y * 0.78) * 5;
+            const motif = (Math.abs((x % 16) - 8) + Math.abs((y % 16) - 8) === 5) ? 28 : 0;
+            const n = (hash(x, y, 77) - 0.5) * 8;
+            return [128 + weave + motif + n, 24 + weave * 0.4 + motif * 0.75 + n, 38 + weave * 0.5 + motif * 0.25 + n];
+        });
+
+        // 11. Weathered Cellblock Concrete Slab (Leonida State Penitentiary)
+        tex.concrete_prison = makePat(64, (x, y) => {
+            const lx = x % 32;
+            const ly = y % 32;
+            if (lx === 0 || ly === 0) return [24, 26, 30];
+            const n = (hash(x, y, 88) - 0.5) * 14 + Math.sin(x * 0.21 + y * 0.17) * 5;
+            const bev = (lx === 1 || ly === 1) ? 8 : ((lx === 31 || ly === 31) ? -9 : 0);
+            return [58 + n + bev, 62 + n + bev, 68 + n + bev];
+        });
+
+        this._interiorTextures = tex;
+        return tex;
+    }
+
+    drawInteriorArchitectureAndDecor(ctx, intr, ox, oy, rw, rh) {
+        const tex = this.getInteriorTextures(ctx);
+        const acc = intr.accent || "#38bdf8";
+        const t = intr.theme;
+
+        // Helper primitives relative to (ox, oy)
+        const R = (x, y, w, h, fill, stroke, lw = 1.5) => {
             ctx.fillStyle = fill;
             ctx.fillRect(ox + x, oy + y, w, h);
             if (stroke) {
                 ctx.strokeStyle = stroke;
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = lw;
                 ctx.strokeRect(ox + x + 0.5, oy + y + 0.5, w - 1, h - 1);
             }
         };
-        const C = (x, y, rad, fill, stroke) => {
+        const C = (x, y, rad, fill, stroke, lw = 1.5) => {
             ctx.fillStyle = fill;
             ctx.beginPath();
             ctx.arc(ox + x, oy + y, rad, 0, Math.PI * 2);
             ctx.fill();
             if (stroke) {
                 ctx.strokeStyle = stroke;
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = lw;
                 ctx.stroke();
             }
         };
-        const acc = intr.accent || "#38bdf8";
-        const t = intr.theme;
+        const txt = (str, x, y, col = "#cbd5e1", font = "bold 9px Consolas, monospace", align = "center") => {
+            ctx.save();
+            ctx.font = font;
+            ctx.fillStyle = col;
+            ctx.textAlign = align;
+            ctx.textBaseline = "middle";
+            ctx.fillText(str, ox + x, oy + y);
+            ctx.restore();
+        };
 
-        // Back wall strip under the header
-        R(8, 64, rw - 16, 26, "rgba(15,23,42,0.85)", acc);
+        // 2.5D Object Box with floor drop shadow, south-facing vertical side face, and beveled top cap
+        const Box3D = (x, y, w, h, topFill, faceFill, strokeCol, depth = 8) => {
+            // Soft drop shadow on floor
+            ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+            ctx.fillRect(ox + x + 4, oy + y + 5, w, h + depth);
+            // South-facing vertical elevation face
+            ctx.fillStyle = faceFill || "#0f172a";
+            ctx.fillRect(ox + x, oy + y + h, w, depth);
+            ctx.strokeStyle = "rgba(0,0,0,0.65)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(ox + x + 0.5, oy + y + h + 0.5, w - 1, depth - 1);
+            // Top surface
+            R(x, y, w, h, topFill, strokeCol || "#475569", 1.5);
+            // Specular top bevel highlight
+            ctx.fillStyle = "rgba(255,255,255,0.14)";
+            ctx.fillRect(ox + x + 2, oy + y + 2, w - 4, 2);
+        };
 
+        // 2.5D Partition Wall Segment (top wall cap + south-facing wall elevation + baseboard + floor shadow)
+        const Wall3D = (x, y, w, h, topCol = "#1e293b", faceCol = "#334155", trimCol = acc) => {
+            const faceH = 12;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+            ctx.fillRect(ox + x + 5, oy + y + 6, w, h + faceH);
+            // South vertical face
+            ctx.fillStyle = faceCol;
+            ctx.fillRect(ox + x, oy + y + h, w, faceH);
+            ctx.fillStyle = "rgba(0,0,0,0.45)";
+            ctx.fillRect(ox + x, oy + y + h + faceH - 3, w, 3); // Baseboard trim
+            // Top cap of wall
+            R(x, y, w, h, topCol, trimCol, 1.5);
+            ctx.fillStyle = "rgba(255,255,255,0.18)";
+            ctx.fillRect(ox + x + 2, oy + y + 2, w - 4, 2);
+        };
+
+        // Potted tropical palm plant helper
+        const PalmPot = (x, y, r = 14) => {
+            C(x + 3, y + 4, r + 2, "rgba(0,0,0,0.42)");
+            C(x, y, r * 0.72, "#7c2d12", "#fbbf24", 1.5);
+            C(x, y, r * 0.52, "#451a03");
+            for (let a = 0; a < 7; a++) {
+                const ang = a * (Math.PI * 2 / 7) + 0.3;
+                ctx.save();
+                ctx.translate(ox + x, oy + y);
+                ctx.rotate(ang);
+                ctx.fillStyle = a % 2 === 0 ? "#16a34a" : "#15803d";
+                ctx.beginPath();
+                ctx.ellipse(r * 0.55, 0, r * 0.62, r * 0.24, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            C(x, y, 3, "#22c55e");
+        };
+
+        // ====================================================================
+        // 1. MULTI-ZONE PROCEDURAL PIXEL-ART FLOORING BY VENUE THEME
+        // ====================================================================
+        let mainPat = tex.marble_dark;
+        if (t === "SHOP_GUN_SHOP" || t === "SPACE_BUNKER") mainPat = tex.gunmetal_plate;
+        else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") mainPat = tex.diner_checker;
+        else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL" || t === "MALIBU_CLUB") mainPat = tex.terrazzo_deco;
+        else if (t === "SHOP_CLOTHES" || t === "MANSION") mainPat = tex.marble_carrara;
+        else if (t === "SHOP_CONVENIENCE") mainPat = tex.linoleum_mart;
+        else if (t === "SHOP_BAR") mainPat = tex.wood_mahogany;
+        else if (t === "PRISON_BLOCK") mainPat = tex.concrete_prison;
+
+        // Fill primary floor across the entire room
+        R(16, 68, rw - 32, rh - 84, mainPat);
+
+        // Room-specific floor sub-zones, rugs, dancefloors, and room thresholds
         if (t === "SHOP_GUN_SHOP") {
-            // Wall rack of guns
-            const gunCols = ["#475569", "#64748b", "#78350f", "#334155"];
-            for (let i = 0; i < 12; i++) {
-                R(30 + i * 60, 70, 40, 7, gunCols[i % 4]);
-                R(30 + i * 60 + 28, 77, 8, 9, "#1e293b");
-            }
-            // Glass counters in front of each gun station
-            for (const cx of [150, 380, 610]) R(cx - 100, 196, 200, 18, "rgba(56,189,248,0.18)", "#38bdf8");
-            R(165, 365, 200, 18, "rgba(56,189,248,0.18)", "#38bdf8");
-            R(395, 365, 200, 18, "rgba(56,189,248,0.18)", "#38bdf8");
+            // North-East Heavy Ordnance Vault concrete floor
+            R(502, 74, 240, 198, tex.concrete_prison, "#475569", 1);
+            // South-East Live Firing Range floor + yellow/black hazard boundary
+            R(502, 280, 240, 224, "#18181b", "#facc15", 1.5);
+            // Showroom crimson tactical rug under center aisle
+            R(90, 210, 340, 95, tex.carpet_royal, "#b45309", 1.5);
         } else if (t === "SHOP_RESTAURANT") {
-            // Kitchen pass-through + bottles
-            R(40, 94, rw - 80, 18, "#78350f", "#fbbf24");
-            for (let i = 0; i < 10; i++) R(60 + i * 68, 70, 12, 16, ["#16a34a", "#dc2626", "#facc15", "#2563eb"][i % 4]);
-            // Dining tables with chairs
-            for (const tx of [130, 280, 480, 630]) {
-                C(tx, 430, 30, "#92400e", "#451a03");
-                C(tx - 40, 430, 10, "#7c2d12");
-                C(tx + 40, 430, 10, "#7c2d12");
-                R(tx - 8, 424, 16, 12, "#ffffff");
-            }
-        } else if (t === "SHOP_HOTEL") {
-            // Reception desk + key rack
-            R(260, 100, 240, 28, "#92400e", "#fbbf24");
-            for (let i = 0; i < 14; i++) R(40 + i * 50, 70, 8, 14, i % 2 ? "#facc15" : "#fb7185");
-            // Beds in side alcoves + plants
-            for (const bx of [50, 640]) {
-                R(bx, 400, 80, 90, "#e2e8f0", "#94a3b8");
-                R(bx, 400, 80, 24, "#f472b6");
-            }
-            C(240, 450, 16, "#15803d", "#14532d");
-            C(520, 450, 16, "#15803d", "#14532d");
+            // North Commercial Kitchen ceramic grease-proof tile floor
+            R(18, 72, rw - 36, 76, tex.kitchen_tile, "#64748b", 1);
+            // Warm oak flooring strips under West & East diner booth rows
+            R(20, 220, 150, 250, tex.wood_oak, "#78350f", 1);
+            R(rw - 170, 220, 150, 250, tex.wood_oak, "#78350f", 1);
+        } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
+            // West Private Bedroom Suite warm honey-oak floor + Persian bedside rug
+            R(18, 72, 228, 405, tex.wood_oak, "#92400e", 1);
+            R(45, 215, 165, 120, tex.carpet_royal, "#fde047", 1.5);
+            // East VIP Lounge & Spa marble floor
+            R(514, 72, 228, 405, tex.marble_carrara, "#64748b", 1);
+            // Central Concierge Lobby Royal Red Carpet Runner from door to desk
+            R(332, 144, 96, rh - 168, tex.carpet_royal, "#fbbf24", 1.5);
         } else if (t === "SHOP_CLOTHES") {
-            // Clothing racks
-            const cc = ["#ef4444", "#3b82f6", "#facc15", "#22c55e", "#a855f7", "#f97316"];
-            for (let row = 0; row < 2; row++) {
-                for (let i = 0; i < 9; i++) {
-                    R(40 + i * 76, 230 + row * 150, 6, 36, "#64748b");
-                    R(34 + i * 76, 232 + row * 150, 18, 30, cc[(i + row * 2) % cc.length]);
+            // East Fitting Room Wing warm honey-oak floor
+            R(560, 72, 182, 405, tex.wood_oak, "#92400e", 1);
+            // Central VIP Velvet Runway Carpet
+            R(275, 165, 210, 275, tex.carpet_royal, "#fde047", 2);
+        } else if (t === "SHOP_CONVENIENCE") {
+            // Behind-counter employee anti-fatigue rubber floor
+            R(18, 92, 118, 126, tex.gunmetal_plate);
+            // North cooler stainless drip strip
+            R(190, 72, 548, 38, tex.kitchen_tile);
+        } else if (t === "SHOP_BAR") {
+            // East Billiards & Arcade Parlor emerald-green tournament carpet
+            R(492, 72, 250, 405, "#064e3b", "#fbbf24", 1.5);
+            R(504, 84, 226, 381, "rgba(16, 185, 129, 0.14)", "#047857", 1);
+            // South-West Live Band Wooden Stage & Rug
+            R(24, 408, 185, 76, tex.wood_oak, "#fbbf24", 2);
+            R(42, 420, 145, 52, tex.carpet_royal, "#f59e0b", 1);
+        } else if (t === "NEON_CLUB") {
+            // West VIP Lounge velvet carpet & East Manager Vault concrete floor
+            R(20, 76, 195, 390, tex.carpet_royal, "#f472b6", 1.5);
+            R(564, 76, 216, 390, tex.gunmetal_plate, "#fde047", 1);
+            // Animated Pulsing LED Club Dancefloor with individual glass bevel cells
+            for (let y = 185; y < 375; y += 38) {
+                for (let x = 240; x < 544; x += 38) {
+                    const gx = Math.floor(x / 38);
+                    const gy = Math.floor(y / 38);
+                    const pIdx = Math.floor(this.time * 5 + gx * 1.3 + gy * 1.7) % 4;
+                    const c = ["#db2777", "#0284c7", "#7c3aed", "#eab308"][pIdx];
+                    R(x, y, 36, 36, c, "#ffffff", 1);
+                    R(x + 4, y + 4, 28, 28, "rgba(255,255,255,0.18)");
                 }
             }
-            // Fitting rooms
-            for (let i = 0; i < 3; i++) R(540 + i * 70, 70, 56, 20, "#7c3aed", "#c4b5fd");
-        } else if (t === "SHOP_CONVENIENCE") {
-            // Aisles of shelves with colourful goods
-            const g = ["#ef4444", "#facc15", "#22c55e", "#3b82f6", "#f97316", "#a855f7"];
-            for (let row = 0; row < 2; row++) {
-                R(60, 235 + row * 135, rw - 120, 14, "#475569", "#94a3b8");
-                for (let i = 0; i < 20; i++) R(66 + i * 33, 224 + row * 135, 22, 12, g[(i + row) % g.length]);
-            }
-            // Fridge wall
-            R(30, 70, rw - 60, 20, "rgba(103,232,249,0.35)", "#22d3ee");
-        } else if (t === "SHOP_BAR") {
-            // Long bar counter, stools, bottle shelf, neon sign
-            R(80, 100, rw - 160, 24, "#78350f", "#fbbf24");
-            for (let i = 0; i < 16; i++) R(70 + i * 40, 70, 10, 16, ["#16a34a", "#b91c1c", "#ca8a04", "#1d4ed8"][i % 4]);
-            for (let i = 0; i < 8; i++) C(120 + i * 72, 140, 9, "#7f1d1d", "#fca5a5");
-            for (const tx of [150, 380, 610]) C(tx, 440, 26, "#451a03", "#fbbf24");
-            ctx.save();
-            ctx.shadowColor = acc;
-            ctx.shadowBlur = 14;
-            R(rw / 2 - 70, 420, 140, 4, acc);
-            ctx.restore();
+        } else if (t === "STRIP_CLUB") {
+            R(20, 76, 200, 390, tex.carpet_royal, "#e879f9", 1.5);
+            R(564, 76, 216, 390, tex.gunmetal_plate, "#fde047", 1);
+            // Center illuminated runway stage
+            R(305, 120, 190, 235, tex.wood_mahogany, "#e879f9", 2.5);
+            R(325, 136, 150, 200, "rgba(232, 121, 249, 0.22)", "#f0abfc", 1.5);
+        } else if (t === "MALIBU_CLUB") {
+            R(22, 76, 205, 160, tex.gunmetal_plate, "#f97316", 1.5);
+            R(255, 175, 250, 200, tex.wood_oak, "#fb7185", 2);
+        } else if (t === "MANSION") {
+            // West Armory gunmetal floor, Center Royal Foyer Carpet, East Marble Spa Wing
+            R(20, 76, 260, 390, tex.gunmetal_plate, "#f97316", 1);
+            R(348, 120, 124, rh - 144, tex.carpet_royal, "#fde047", 2);
+            R(536, 76, 264, 390, tex.terrazzo_deco, "#22d3ee", 1.5);
+        } else if (t === "DINER_PAWN") {
+            // West/Center Hank's Diner checker floor + North kitchen tile + East Uncle Jack's Pawn oak floor
+            R(20, 72, 466, 48, tex.kitchen_tile);
+            R(492, 72, 250, 405, tex.wood_mahogany, "#f97316", 1);
         }
+
+        // ====================================================================
+        // 2. 2.5D PERIMETER WALL ELEVATIONS, WAINSCOTING & AMBIENT OCCLUSION
+        // ====================================================================
+        // North 2.5D Wall Vertical Facade (y = 44..76) + Floor Ambient Occlusion Shadow
+        R(14, 44, rw - 28, 32, "#1e293b", "#0f172a", 1);
+        // Decorative upper wallpaper / paneling band
+        R(16, 46, rw - 32, 18, "#334155");
+        // Lower wood/steel wainscoting & baseboard along north wall
+        R(16, 64, rw - 32, 12, "#0f172a", acc, 1);
+        for (let wx = 24; wx < rw - 32; wx += 48) {
+            R(wx, 48, 40, 14, "rgba(15, 23, 42, 0.45)", "rgba(255,255,255,0.08)", 1);
+        }
+        // Soft floor drop-shadow cast by the North, West, and East walls
+        const nGrad = ctx.createLinearGradient(0, oy + 76, 0, oy + 108);
+        nGrad.addColorStop(0, "rgba(0, 0, 0, 0.62)");
+        nGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        ctx.fillStyle = nGrad;
+        ctx.fillRect(ox + 16, oy + 76, rw - 32, 32);
+
+        const wGrad = ctx.createLinearGradient(ox + 16, 0, ox + 44, 0);
+        wGrad.addColorStop(0, "rgba(0, 0, 0, 0.52)");
+        wGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        ctx.fillStyle = wGrad;
+        ctx.fillRect(ox + 16, oy + 76, 28, rh - 92);
+
+        const eGrad = ctx.createLinearGradient(ox + rw - 16, 0, ox + rw - 44, 0);
+        eGrad.addColorStop(0, "rgba(0, 0, 0, 0.52)");
+        eGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        ctx.fillStyle = eGrad;
+        ctx.fillRect(ox + rw - 44, oy + 76, 28, rh - 92);
+
+        // ====================================================================
+        // 3. DETAILED MULTI-ROOM ARCHITECTURE & FURNITURE BY THEME
+        // ====================================================================
+        if (t === "SHOP_GUN_SHOP") {
+            // --- NORTH WALL RIFLE & SMG PEGBOARD RACK (Showroom x=30..475) ---
+            R(34, 47, 444, 24, "#0f172a", "#f97316", 1.5);
+            for (let i = 0; i < 9; i++) {
+                const gx = 46 + i * 48;
+                // Pegboard rifle silhouette (stock + receiver + barrel + magazine)
+                R(gx, 53, 10, 6, "#78350f");
+                R(gx + 10, 52, 16, 5, "#64748b");
+                R(gx + 26, 53, 12, 3, "#94a3b8");
+                R(gx + 15, 57, 4, 6, "#334155");
+            }
+            // --- SHOWROOM ARMORED GLASS WEAPON COUNTER (x=56..460, y=118..146) ---
+            Box3D(56, 118, 404, 28, "#0f172a", "#1e293b", "#38bdf8", 10);
+            // Three illuminated glass display bays (Pistols / SMGs / Shotguns)
+            for (let b = 0; b < 3; b++) {
+                const bx = 66 + b * 132;
+                R(bx, 121, 120, 22, "rgba(56, 189, 248, 0.16)", "#38bdf8", 1);
+                // Red velvet display liner inside glass case
+                R(bx + 4, 124, 112, 16, "rgba(127, 29, 29, 0.65)");
+                if (b === 0) {
+                    // Pistols & ammo boxes
+                    for (let p = 0; p < 3; p++) {
+                        R(bx + 12 + p * 34, 128, 16, 5, "#e2e8f0");
+                        R(bx + 12 + p * 34, 133, 6, 5, "#475569");
+                    }
+                } else if (b === 1) {
+                    // Micro-SMGs & extended mags
+                    for (let p = 0; p < 2; p++) {
+                        R(bx + 14 + p * 50, 127, 28, 6, "#94a3b8");
+                        R(bx + 24 + p * 50, 133, 5, 6, "#fde047");
+                    }
+                } else {
+                    // Pump-action shotguns & shell boxes
+                    R(bx + 12, 127, 42, 5, "#78350f");
+                    R(bx + 54, 128, 36, 4, "#cbd5e1");
+                    R(bx + 16, 134, 72, 4, "#ef4444");
+                }
+                // Glass specular reflection streak
+                ctx.fillStyle = "rgba(255,255,255,0.25)";
+                ctx.fillRect(ox + bx + 8, oy + 122, 24, 2);
+            }
+            // Cash register & ammo crates on left end of counter
+            Box3D(60, 114, 26, 18, "#334155", "#0f172a", "#fde047", 4);
+
+            // --- PARTITION WALLS: HEAVY ORDNANCE VAULT (North-East) & FIRING RANGE (South-East) ---
+            Wall3D(490, 68, 16, 98, "#1e293b", "#334155", "#f97316");
+            Wall3D(490, 236, 16, 64, "#1e293b", "#334155", "#f97316");
+            // Vault doorway steel threshold (y=166..236)
+            R(490, 166, 16, 70, "#334155", "#facc15", 1);
+            txt("ORDNANCE VAULT", 620, 88, "#f97316", "bold 10px Consolas, monospace");
+            // Military olive-drab RPG & Flamethrower crates along NE vault wall
+            Box3D(668, 110, 62, 48, "#365314", "#1a2e05", "#84cc16", 8);
+            R(676, 124, 46, 6, "#4d7c0f");
+            R(680, 134, 38, 8, "#f97316"); // RPG warhead inside open crate
+            Box3D(668, 190, 62, 48, "#7c2d12", "#431407", "#fb923c", 8);
+            C(690, 212, 10, "#ef4444", "#fde047", 1.5); // Napalm tank
+
+            // Horizontal partition between Vault & Firing Range (doorway at x=534..610)
+            Wall3D(506, 272, 28, 16, "#1e293b", "#334155", "#f97316");
+            Wall3D(610, 272, 132, 16, "#1e293b", "#334155", "#f97316");
+
+            // --- SOUTH-EAST 3-LANE LIVE INDOOR FIRING RANGE (x=502..740, y=288..496) ---
+            // Bulletproof observation window wall on west side of range (y=300..475)
+            Box3D(492, 300, 12, 175, "rgba(56,189,248,0.45)", "#0284c7", "#38bdf8", 8);
+            // Yellow hazard line at firing line (x=562)
+            R(558, 290, 6, 198, "#facc15");
+            for (let hy = 292; hy < 484; hy += 16) R(558, hy, 6, 8, "#000000");
+            // 3 Shooting Lanes with divider walls, distance lines, shell casings & paper bullseye targets!
+            for (let lane = 0; lane < 3; lane++) {
+                const ly = 292 + lane * 62;
+                // Lane divider wall
+                Box3D(564, ly, 172, 6, "#334155", "#0f172a", "#64748b", 5);
+                // Shooting booth bench + red earmuffs
+                Box3D(542, ly + 14, 16, 36, "#475569", "#1e293b", "#94a3b8", 6);
+                C(550, ly + 24, 4, "#ef4444", "#000");
+                // Downrange distance lines
+                ctx.strokeStyle = "rgba(250, 204, 21, 0.22)";
+                ctx.beginPath();
+                ctx.moveTo(ox + 620, oy + ly + 8);
+                ctx.lineTo(ox + 620, oy + ly + 58);
+                ctx.moveTo(ox + 675, oy + ly + 8);
+                ctx.lineTo(ox + 675, oy + ly + 58);
+                ctx.stroke();
+                // Paper silhouette bullseye target at East sandtrap berm (x=718)
+                R(724, ly + 10, 12, 44, "#78350f", "#451a03", 1); // Sand berm
+                R(712, ly + 16, 10, 32, "#f8fafc", "#334155", 1); // Target sheet
+                C(717, ly + 32, 8, "#ef4444");
+                C(717, ly + 32, 4, "#facc15");
+                C(717, ly + 32, 1.5, "#000000");
+                // Spent brass shell casings on floor
+                for (let s = 0; s < 5; s++) {
+                    R(528 + ((s * 7 + lane * 3) % 24), ly + 18 + s * 7, 3, 2, "#fde047");
+                }
+            }
+            txt("LIVE FIRING RANGE — 25M", 645, 492, "#facc15", "bold 9px Consolas, monospace");
+
+            // --- SOUTH-WEST TACTICAL BODY ARMOR & GEAR ALCOVE ---
+            Box3D(42, 270, 195, 28, "#1e293b", "#0f172a", "#38bdf8", 9);
+            for (let v = 0; v < 3; v++) {
+                // Kevlar vests on tactical rack
+                const vx = 58 + v * 58;
+                R(vx, 273, 34, 22, "#0284c7", "#38bdf8", 1.5);
+                R(vx + 6, 277, 22, 14, "#0f172a"); // Trauma plate
+            }
+            PalmPot(455, 465, 14);
+        } else if (t === "SHOP_RESTAURANT") {
+            // --- NORTH COMMERCIAL KITCHEN (y=72..140) ---
+            // Stainless steel exhaust hood & kitchen equipment along north wall
+            Box3D(36, 52, 220, 36, "#475569", "#334155", "#94a3b8", 6);
+            // Sizzling Flattop Griddle with burger patties & bacon strips
+            R(44, 56, 120, 28, "#1e293b", "#cbd5e1", 1.5);
+            for (let p = 0; p < 6; p++) {
+                C(60 + (p % 3) * 34, 64 + Math.floor(p / 3) * 11, 6, "#7c2d12", "#451a03", 1);
+            }
+            // Twin golden deep-fryer vats with wire baskets
+            R(172, 56, 36, 28, "#ca8a04", "#fef08a", 1.5);
+            R(214, 56, 36, 28, "#ca8a04", "#fef08a", 1.5);
+            R(178, 60, 24, 18, "rgba(254, 240, 138, 0.55)", "#e2e8f0", 1);
+            R(220, 60, 24, 18, "rgba(254, 240, 138, 0.55)", "#e2e8f0", 1);
+            // Stainless prep island & backlit menu boards
+            Box3D(280, 52, 190, 28, "#e2e8f0", "#64748b", "#94a3b8", 6);
+            for (let m = 0; m < 3; m++) {
+                R(290 + m * 60, 55, 52, 18, "#0f172a", "#facc15", 1);
+            }
+            // Espresso machine & walk-in refrigerator on North-East kitchen wall
+            Box3D(490, 52, 220, 34, "#cbd5e1", "#475569", "#38bdf8", 6);
+            Box3D(575, 56, 48, 24, "#b91c1c", "#7f1d1d", "#fde047", 4); // Italian Espresso Machine
+
+            // --- TILED PASS-THROUGH SERVICE COUNTER WALL (x=24..648, y=138..160) ---
+            Box3D(24, 138, 624, 22, "#78350f", "#451a03", "#fbbf24", 10);
+            // Chrome tray slide & warm heat lamps with plated food on counter
+            R(28, 155, 616, 4, "#cbd5e1");
+            for (const px of [110, 165, 220, 340, 380, 425, 555, 605]) {
+                C(px, 148, 8, "#ffffff", "#cbd5e1", 1);
+                C(px, 148, 4, "#ea580c");
+            }
+            // Chrome counter stools along service counter
+            for (let s = 0; s < 8; s++) {
+                C(72 + s * 74, 174, 7, "#dc2626", "#f8fafc", 1.5);
+            }
+
+            // --- WEST & EAST CHROME-&-RED-VINYL DINER BOOTHS ---
+            const drawBooth = (bx, by) => {
+                // Red tufted vinyl bench seats (top & bottom of booth)
+                Box3D(bx, by - 22, 126, 18, "#b91c1c", "#7f1d1d", "#fca5a5", 6);
+                Box3D(bx, by + 28, 126, 18, "#b91c1c", "#7f1d1d", "#fca5a5", 6);
+                // Formica / checkered table in middle
+                Box3D(bx + 10, by - 2, 106, 26, "#fef3c7", "#78350f", "#d97706", 7);
+                // Red checkered runner + plates, burger, coffee & ketchup/mustard
+                R(bx + 44, by, 38, 22, "rgba(220, 38, 38, 0.35)");
+                C(bx + 32, by + 11, 7, "#ffffff", "#94a3b8", 1);
+                C(bx + 32, by + 11, 4, "#b45309");
+                C(bx + 92, by + 11, 7, "#ffffff", "#94a3b8", 1);
+                C(bx + 92, by + 11, 4, "#16a34a");
+                C(bx + 56, by + 7, 3, "#dc2626"); // Ketchup
+                C(bx + 66, by + 7, 3, "#facc15"); // Mustard
+            };
+            for (const by of [248, 328, 408]) {
+                drawBooth(28, by);
+                drawBooth(rw - 154, by);
+            }
+
+            // --- SOUTH-WEST GLOWING WURLITZER NEON JUKEBOX & PALMS ---
+            Box3D(195, 438, 44, 34, "#451a03", "#270e02", "#fbbf24", 8);
+            C(217, 448, 16, "#ec4899", "#fde047", 2);
+            C(217, 448, 9, "#38bdf8");
+            txt("JUKEBOX", 217, 484, "#facc15", "bold 8px Consolas, monospace");
+            PalmPot(535, 458, 15);
+        } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
+            const isDeco = t === "ART_DECO_HOTEL";
+            // --- NORTH CONCIERGE KEY RACK & GRAND LOBBY DESK ---
+            R(268, 46, 224, 24, "#27121b", "#fbbf24", 1.5);
+            for (let k = 0; k < 12; k++) {
+                R(278 + k * 17, 50, 12, 16, "#451a03", "#d97706", 1);
+                C(284 + k * 17, 58, 2, k % 3 === 0 ? "#fde047" : "#f472b6");
+            }
+            const deskY = isDeco ? 92 : 116;
+            Box3D(295, deskY, 170, 28, "#78350f", "#451a03", "#fbbf24", 10);
+            R(302, deskY + 4, 156, 20, "#92400e");
+            R(330, deskY + 7, 26, 14, "#fef3c7", "#78350f", 1); // Open guest registry ledger
+            C(375, deskY + 14, 4, "#fde047", "#b45309", 1);     // Brass service bell
+            R(410, deskY + 6, 28, 14, "#0f172a", "#38bdf8", 1); // Terminal monitor
+
+            // --- WEST PARTITIONED MASTER BEDROOM SUITE ---
+            const wWallX = isDeco ? 256 : 240;
+            Wall3D(wWallX, 68, 16, 162, "#2e1065", "#4c1d95", "#f472b6");
+            Wall3D(wWallX, 315, 16, 160, "#2e1065", "#4c1d95", "#f472b6");
+            R(wWallX, 230, 16, 85, "#451a03", "#fbbf24", 1); // Suite threshold
+            // Luxury King Bed with carved mahogany headboard, 4 pillows & quilted coverlet
+            Box3D(24, 108, 14, 92, "#451a03", "#270e02", "#fbbf24", 8); // Headboard
+            Box3D(38, 110, 116, 88, "#f8fafc", "#cbd5e1", "#94a3b8", 8); // Mattress
+            R(42, 116, 18, 36, "#ffffff", "#cbd5e1", 1); // Top pillow
+            R(42, 156, 18, 36, "#ffffff", "#cbd5e1", 1); // Bottom pillow
+            R(68, 112, 82, 84, "#be185d", "#f472b6", 1.5); // Silk quilted duvet
+            R(118, 112, 26, 84, "#f43f5e", "#fde047", 1);  // Gold brocade bed runner
+            // Twin nightstands with glowing warm table lamps
+            Box3D(26, 82, 24, 22, "#78350f", "#451a03", "#fbbf24", 6);
+            C(38, 93, 6, "#fef08a", "#f59e0b", 1.5);
+            Box3D(26, 204, 24, 22, "#78350f", "#451a03", "#fbbf24", 6);
+            C(38, 215, 6, "#fef08a", "#f59e0b", 1.5);
+            // Mahogany Wardrobe & En-suite Bathroom vanity in SW corner
+            Box3D(28, 368, 86, 28, "#78350f", "#451a03", "#fbbf24", 8);
+            Box3D(135, 368, 82, 26, "#e2e8f0", "#94a3b8", "#38bdf8", 8);
+            C(176, 381, 8, "#bae6fd", "#0284c7", 1.5); // Porcelain sink basin
+            txt("MASTER SUITE", 125, 422, "#f472b6", "bold 9px Consolas, monospace");
+
+            // --- EAST PARTITIONED VIP COCKTAIL LOUNGE & HEATED SPA ---
+            const eWallX = isDeco ? 492 : 504;
+            Wall3D(eWallX, 68, 16, 155, "#2e1065", "#4c1d95", "#38bdf8");
+            Wall3D(eWallX, 315, 16, 160, "#2e1065", "#4c1d95", "#38bdf8");
+            R(eWallX, 223, 16, 92, "#451a03", "#fbbf24", 1);
+            // Backlit Cocktail Minibar Counter
+            Box3D(545, 106, 168, 26, "#78350f", "#451a03", "#38bdf8", 9);
+            for (let b = 0; b < 8; b++) {
+                R(555 + b * 19, 52, 10, 18, ["#ec4899", "#38bdf8", "#a855f7", "#fde047"][b % 4], "#fff", 0.8);
+                C(562 + b * 19, 138, 6, "#be185d", "#fbcfe8", 1); // Barstools
+            }
+            // Sunken Animated Mosaic Jacuzzi Spa Pool (SE Suite)
+            Box3D(550, 336, 166, 122, "#e2e8f0", "#64748b", "#38bdf8", 6);
+            R(560, 346, 146, 102, "#0891b2", "#22d3ee", 2);
+            R(566, 352, 134, 90, "#06b6d4");
+            // Submerged mosaic steps
+            R(566, 352, 22, 90, "rgba(103, 232, 249, 0.45)", "#cffafe", 1);
+            // Animated jacuzzi bubbles & water ripples
+            for (let b = 0; b < 10; b++) {
+                const bx = 595 + ((b * 29 + Math.floor(this.time * 18)) % 95);
+                const by = 362 + ((b * 19 + Math.floor(this.time * 12)) % 70);
+                C(bx, by, 2.5 + (b % 3), "rgba(255, 255, 255, 0.65)");
+            }
+            txt("VIP SPA JACUZZI", 633, 398, "#cffafe", "bold 9px Consolas, monospace");
+            // Tropical lobby palms & brass luggage cart
+            PalmPot(285, 445, 15);
+            PalmPot(475, 445, 15);
+            Box3D(272, 330, 38, 24, "#d97706", "#78350f", "#fde047", 5);
+        } else if (t === "SHOP_CLOTHES") {
+            // --- NORTH BACKLIT SNEAKER & HANDBAG DISPLAY WALL ---
+            R(40, 46, 495, 24, "#0f172a", "#38bdf8", 1.5);
+            for (let s = 0; s < 10; s++) {
+                R(52 + s * 48, 51, 34, 14, "rgba(56, 189, 248, 0.2)", "#38bdf8", 1);
+                R(58 + s * 48, 55, 22, 7, ["#f43f5e", "#facc15", "#38bdf8", "#a855f7", "#22c55e"][s % 5]);
+            }
+            // --- NORTH-WEST GLASS JEWELRY & CHECKOUT COUNTER ---
+            Box3D(56, 112, 210, 26, "#1e293b", "#0f172a", "#38bdf8", 9);
+            R(62, 115, 145, 20, "rgba(186, 230, 253, 0.35)", "#7dd3fc", 1);
+            // Gold chains & watches inside glass case
+            for (let j = 0; j < 5; j++) {
+                C(80 + j * 26, 125, 6, "rgba(250, 204, 21, 0.35)", "#fde047", 1.5);
+            }
+            Box3D(216, 114, 42, 20, "#334155", "#0f172a", "#f472b6", 5); // Boutique POS Register
+
+            // --- CENTRAL VELVET MANNEQUIN PODIUM (x=334..426, y=252..320) ---
+            Box3D(334, 252, 92, 68, "#881337", "#4c0519", "#fde047", 8);
+            R(340, 258, 80, 56, "#be123c", "#f472b6", 1);
+            for (const mx of [356, 380, 404]) {
+                C(mx, 286, 10, "#f8fafc", "#fde047", 1.5);
+                C(mx, 286, 5, mx === 380 ? "#facc15" : "#38bdf8");
+            }
+            txt("VICE COUTURE", 380, 334, "#fde047", "bold 9px Consolas, monospace");
+
+            // --- DESIGNER MULTI-GARMENT CLOTHING RACKS (West Wing) ---
+            const rackCols = ["#ef4444", "#38bdf8", "#facc15", "#a855f7", "#ec4899", "#22c55e"];
+            for (const ry of [256, 356]) {
+                Box3D(72, ry, 160, 22, "#475569", "#1e293b", "#cbd5e1", 7);
+                R(76, ry + 9, 152, 4, "#e2e8f0"); // Chrome hanger bar
+                for (let g = 0; g < 11; g++) {
+                    R(80 + g * 13, ry + 2, 9, 18, rackCols[(g + ry) % rackCols.length], "rgba(0,0,0,0.45)", 0.8);
+                }
+            }
+
+            // --- EAST PARTITIONED FITTING ROOMS WING (x=552..742) ---
+            Wall3D(552, 68, 16, 147, "#1e293b", "#334155", "#38bdf8");
+            Wall3D(552, 305, 16, 165, "#1e293b", "#334155", "#38bdf8");
+            R(552, 215, 16, 90, "#78350f", "#fde047", 1);
+            // 3 Private Fitting Cubicles with velvet curtains, mirrors & stools
+            for (let c = 0; c < 3; c++) {
+                const cy = 84 + c * 132;
+                if (c > 0) Wall3D(645, cy - 10, 92, 10, "#334155", "#1e293b", "#94a3b8");
+                // Full-length illuminated vanity mirror on east wall
+                R(726, cy + 12, 8, 68, "#bae6fd", "#fde047", 1.5);
+                // Velvet privacy curtain & brass rod
+                R(655, cy + 4, 10, 32, "#be185d", "#f472b6", 1);
+                // Plush changing ottoman stool & rug
+                C(695, cy + 46, 14, "rgba(244, 114, 182, 0.25)", "#f472b6", 1);
+                C(695, cy + 46, 8, "#a855f7", "#fde047", 1.5);
+            }
+            txt("FITTING SUITES", 650, 482, "#38bdf8", "bold 9px Consolas, monospace");
+            PalmPot(518, 110, 14);
+            PalmPot(518, 435, 14);
+        } else if (t === "SHOP_CONVENIENCE") {
+            // --- NORTH ILLUMINATED 7-DOOR WALK-IN BEVERAGE COOLERS ---
+            Box3D(195, 50, 535, 34, "#0f172a", "#1e293b", "#22d3ee", 6);
+            for (let d = 0; d < 7; d++) {
+                const dx = 203 + d * 75;
+                R(dx, 54, 68, 26, "rgba(34, 211, 238, 0.24)", "#67e8f9", 1.5);
+                // Rows of cold soda/beer/energy cans visible through glass door
+                for (let c = 0; c < 5; c++) {
+                    R(dx + 6 + c * 12, 58, 9, 8, ["#ef4444", "#22c55e", "#facc15", "#3b82f6", "#a855f7"][(d + c) % 5]);
+                    R(dx + 6 + c * 12, 68, 9, 8, ["#38bdf8", "#f97316", "#ec4899", "#84cc16", "#eab308"][(d + c) % 5]);
+                }
+                R(dx + 60, 62, 3, 10, "#e2e8f0"); // Chrome door handle
+            }
+
+            // --- WEST L-SHAPED CASHIER COUNTER, LOTTO, CIGARETTE RACK & CCTV ---
+            Box3D(118, 102, 28, 118, "#334155", "#1e293b", "#39ff14", 8);
+            Box3D(28, 204, 118, 24, "#334155", "#1e293b", "#39ff14", 8);
+            // Dual cash registers, barcode scanner & lotto display
+            Box3D(120, 128, 22, 24, "#0f172a", "#020617", "#fde047", 5);
+            R(124, 132, 14, 10, "#22c55e");
+            Box3D(120, 168, 22, 24, "#0f172a", "#020617", "#38bdf8", 5);
+            // Behind-counter cigarette rack & CRT CCTV security monitor on west wall
+            Box3D(24, 96, 22, 88, "#451a03", "#270e02", "#f97316", 6);
+            for (let r = 0; r < 6; r++) R(28, 102 + r * 13, 14, 9, ["#ef4444", "#facc15", "#38bdf8"][r % 3]);
+
+            // --- 4 DOUBLE-SIDED 3D SUPERMARKET GONDOLA AISLES ---
+            const drawGondola = (gx, gy, gw) => {
+                Box3D(gx, gy, gw, 28, "#334155", "#0f172a", "#94a3b8", 9);
+                R(gx + 4, gy + 12, gw - 8, 4, "#cbd5e1"); // Center shelf divider spine
+                const pCols = ["#ef4444", "#facc15", "#22c55e", "#38bdf8", "#f97316", "#a855f7", "#ec4899"];
+                for (let p = 0; p < Math.floor((gw - 12) / 16); p++) {
+                    R(gx + 8 + p * 16, gy + 2, 12, 9, pCols[p % pCols.length], "rgba(0,0,0,0.4)", 0.8);
+                    R(gx + 8 + p * 16, gy + 17, 12, 9, pCols[(p + 3) % pCols.length], "rgba(0,0,0,0.4)", 0.8);
+                }
+            };
+            drawGondola(248, 210, 185);
+            drawGondola(495, 210, 195);
+            drawGondola(248, 338, 185);
+            drawGondola(495, 338, 195);
+
+            // --- EAST WALL SLUSHIE / HOT-DOG COUNTER & SOUTH-WEST ATM KIOSK ---
+            Box3D(702, 120, 34, 90, "#1e293b", "#0f172a", "#f43f5e", 7);
+            C(719, 138, 9, "#ef4444", "#fff", 1.5); // Cherry Slushie dome
+            C(719, 162, 9, "#06b6d4", "#fff", 1.5); // Blue Raspberry Slushie dome
+            Box3D(28, 355, 42, 58, "#0284c7", "#0369a1", "#38bdf8", 8);
+            R(34, 365, 28, 18, "#0f172a", "#39ff14", 1.5);
+            txt("ATM 24H", 49, 398, "#fde047", "bold 8px Consolas, monospace");
+        } else if (t === "SHOP_BAR") {
+            // --- NORTH-WEST BACKLIT LIQUOR MIRROR & MAHOGANY DIVE BAR ---
+            R(44, 48, 392, 24, "#1e1b4b", "#c084fc", 1.5);
+            for (let b = 0; b < 18; b++) {
+                R(54 + b * 21, 52, 9, 16, ["#22c55e", "#ef4444", "#eab308", "#38bdf8", "#a855f7"][b % 5], "#fff", 0.6);
+            }
+            Box3D(44, 120, 392, 28, "#451a03", "#270e02", "#d97706", 10);
+            R(48, 124, 384, 20, "#78350f");
+            // Brass foot-rail, black rubber bar mats & draft beer towers
+            R(46, 158, 388, 3, "#fbbf24");
+            for (const tx of [135, 250, 365]) {
+                R(tx - 24, 128, 48, 12, "#0f172a", "#475569", 1);
+                C(tx, 124, 5, "#fbbf24", "#fff", 1);
+            }
+            // 7 Red leather round barstools along bar
+            for (let s = 0; s < 7; s++) {
+                C(74 + s * 54, 168, 9, "#991b1b", "#fca5a5", 1.5);
+            }
+
+            // --- EAST PARTITIONED BILLIARDS & RETRO ARCADE PARLOR (x=482..742) ---
+            Wall3D(482, 68, 16, 127, "#27121b", "#451a03", "#c084fc");
+            Wall3D(482, 335, 16, 135, "#27121b", "#451a03", "#c084fc");
+            R(482, 195, 16, 140, "#451a03", "#fbbf24", 1);
+            // 3 Glowing 1997 Retro Arcade Cabinets along North-East wall
+            for (let a = 0; a < 3; a++) {
+                const ax = 524 + a * 66;
+                Box3D(ax, 76, 48, 36, "#1e1b4b", "#0f172a", ["#39ff14", "#00f0ff", "#f472b6"][a], 8);
+                R(ax + 6, 82, 36, 18, ["#052e16", "#082f49", "#4a044e"][a], ["#39ff14", "#38bdf8", "#f472b6"][a], 1.5);
+                C(ax + 16, 105, 2.5, "#ef4444");
+                C(ax + 28, 105, 2.5, "#facc15");
+            }
+            // Tournament Emerald-Felt Pool Table (x=545..699, y=252..334)
+            Box3D(545, 252, 154, 82, "#451a03", "#270e02", "#fbbf24", 10); // Mahogany rails
+            R(555, 262, 134, 62, "#059669", "#047857", 1.5); // Emerald baize felt
+            // 6 Brass & leather pockets
+            for (const px of [555, 622, 689]) {
+                for (const py of [262, 324]) C(px, py, 5.5, "#090d16", "#fbbf24", 1.2);
+            }
+            // Racked billiard balls + white cue ball + 2 wooden cue sticks
+            C(582, 293, 3.2, "#ffffff", "#000", 0.6);
+            const ballCols = ["#facc15", "#2563eb", "#ef4444", "#7c3aed", "#f97316", "#16a34a", "#000000"];
+            for (let b = 0; b < 7; b++) {
+                C(646 + (b % 3) * 6, 286 + Math.floor(b / 2) * 5, 3, ballCols[b]);
+            }
+            ctx.strokeStyle = "#fde68a";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ox + 560, oy + 272);
+            ctx.lineTo(ox + 608, oy + 286);
+            ctx.moveTo(ox + 625, oy + 318);
+            ctx.lineTo(ox + 680, oy + 312);
+            ctx.stroke();
+
+            // --- SOUTH-WEST LEATHER BOOTHS & LIVE BAND CORNER STAGE ---
+            for (const by of [270, 365]) {
+                Box3D(34, by, 125, 26, "#451a03", "#270e02", "#c084fc", 7);
+                C(96, by + 13, 8, "#fef3c7", "#d97706", 1);
+            }
+            // Stage mic stand & twin speaker stacks in SW corner
+            Box3D(28, 415, 26, 26, "#0f172a", "#020617", "#c084fc", 6);
+            C(115, 445, 7, "#94a3b8", "#f472b6", 1.5);
+        } else if (t === "NEON_CLUB" || t === "STRIP_CLUB") {
+            // --- NORTH RAISED DJ BOOTH, TURNTABLES & CONCERT SPEAKER WALL ---
+            Box3D(250, 74, 300, 52, "#0f172a", "#020617", acc, 9);
+            // Left & Right giant subwoofer speaker stacks
+            for (const sx of [258, 506]) {
+                Box3D(sx, 78, 36, 42, "#1e293b", "#090d16", "#94a3b8", 6);
+                C(sx + 18, 90, 9, "#090d16", acc, 1.5);
+                C(sx + 18, 108, 11, "#090d16", acc, 1.5);
+            }
+            // Twin Technics vinyl turntables & mixer console
+            Box3D(350, 92, 100, 28, "#1e293b", "#0f172a", "#00f0ff", 5);
+            C(368, 106, 10, "#090d16", "#e2e8f0", 1.5);
+            C(368, 106, 3, "#ef4444");
+            C(432, 106, 10, "#090d16", "#e2e8f0", 1.5);
+            C(432, 106, 3, "#00f0ff");
+            R(390, 96, 20, 20, "#0f172a", "#fde047", 1);
+
+            // --- WEST VIP BOTTLE SERVICE BAR & VELVET BOOTHS ---
+            Box3D(36, 120, 68, 220, "#3b0764", "#1e1b4b", "#f472b6", 9);
+            for (let s = 0; s < 5; s++) C(116, 140 + s * 42, 8, "#be185d", "#fbcfe8", 1.5);
+            for (const by of [375, 435]) {
+                Box3D(36, by, 135, 34, "#500724", "#270e02", "#f472b6", 7);
+            }
+
+            // --- EAST PARTITIONED MANAGER'S COUNTING VAULT ROOM (x=556..780) ---
+            Wall3D(556, 68, 16, 117, "#1e1b4b", "#311024", "#fde047");
+            Wall3D(556, 265, 16, 195, "#1e1b4b", "#311024", "#fde047");
+            R(556, 185, 16, 80, "#334155", "#fde047", 1);
+            // Armored cash safe, counting table & gold/cash stacks
+            Box3D(695, 84, 68, 54, "#334155", "#0f172a", "#fde047", 10);
+            C(729, 111, 11, "#94a3b8", "#fde047", 2);
+            Box3D(615, 290, 125, 65, "#451a03", "#270e02", "#fde047", 8);
+            for (let m = 0; m < 6; m++) {
+                R(630 + (m % 3) * 32, 304 + Math.floor(m / 3) * 20, 22, 12, "#22c55e", "#bbf7d0", 1);
+            }
+        } else if (t === "MALIBU_CLUB") {
+            // North-West Smuggler Crate Room, North-East Retro Arcade Wall & SE Mojito Bar
+            Box3D(42, 88, 72, 48, "#78350f", "#451a03", "#f97316", 9);
+            Box3D(124, 88, 64, 42, "#365314", "#1a2e05", "#84cc16", 8);
+            for (let a = 0; a < 4; a++) {
+                Box3D(515 + a * 52, 82, 42, 34, "#1e1b4b", "#0f172a", "#39ff14", 7);
+            }
+            Box3D(520, 392, 195, 32, "#78350f", "#451a03", "#fb7185", 9);
+            PalmPot(245, 435, 16);
+            PalmPot(490, 435, 16);
+        } else if (t === "MANSION") {
+            // --- STAR ISLAND MANSION ("THE WORLD IS YOURS" PALAZZO) ---
+            Wall3D(276, 68, 18, 115, "#334155", "#1e293b", "#fde047");
+            Wall3D(276, 275, 18, 185, "#334155", "#1e293b", "#fde047");
+            Wall3D(526, 68, 18, 115, "#334155", "#1e293b", "#fde047");
+            Wall3D(526, 275, 18, 185, "#334155", "#1e293b", "#fde047");
+            // Tony Montana Executive Mahogany Desk & CCTV Wall in North Center
+            Box3D(335, 88, 150, 34, "#451a03", "#270e02", "#fde047", 9);
+            // Golden "THE WORLD IS YOURS" Foyer Fountain Statue at (410, 330)
+            C(410, 330, 38, "#1e293b", "#fde047", 2.5);
+            C(410, 330, 28, "#0891b2", "#67e8f9", 1.5);
+            C(410, 330, 12, "#fde047", "#b45309", 2);
+            txt("THE WORLD IS YOURS", 410, 378, "#fde047", "bold 9px Consolas, monospace");
+            // West Golden Heavy Armory Racks
+            Box3D(42, 92, 190, 30, "#1e293b", "#0f172a", "#f97316", 8);
+            // East Indoor Marble Jacuzzi Pool
+            Box3D(562, 225, 215, 175, "#f8fafc", "#cbd5e1", "#fde047", 7);
+            R(574, 237, 191, 151, "#0891b2", "#22d3ee", 2);
+            for (let b = 0; b < 12; b++) {
+                C(595 + ((b * 31 + Math.floor(this.time * 16)) % 145), 255 + ((b * 23 + Math.floor(this.time * 12)) % 115), 3, "rgba(255,255,255,0.65)");
+            }
+            PalmPot(315, 445, 16);
+            PalmPot(505, 445, 16);
+        } else if (t === "SPACE_BUNKER") {
+            // --- SERA SPACE CENTER MISSION CONTROL ---
+            // Giant Orbital Telemetry Screen Wall along North Elevation
+            R(60, 46, rw - 120, 28, "#020617", "#38bdf8", 2);
+            // World map sine-wave orbital trajectory on screen
+            ctx.strokeStyle = "#39ff14";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let sx = 80; sx < rw - 80; sx += 12) {
+                const sy = 60 + Math.sin(sx * 0.03 + this.time * 3) * 8;
+                if (sx === 80) ctx.moveTo(ox + sx, oy + sy);
+                else ctx.lineTo(ox + sx, oy + sy);
+            }
+            ctx.stroke();
+            // Tiered Mission Control Telemetry Desks
+            Box3D(310, 102, 200, 28, "#0f172a", "#020617", "#ef4444", 8);
+            Box3D(190, 195, 140, 24, "#0f172a", "#020617", "#38bdf8", 7);
+            Box3D(490, 195, 140, 24, "#0f172a", "#020617", "#38bdf8", 7);
+            // West Orbital Ordnance Locker & East glowing Bio-Medpod Cylinder
+            Box3D(48, 175, 76, 130, "#1e293b", "#0f172a", "#38bdf8", 9);
+            C(725, 250, 34, "rgba(57, 255, 20, 0.22)", "#39ff14", 2.5);
+            C(725, 250, 20, "#052e16", "#4ade80", 1.5);
+        } else if (t === "PRISON_BLOCK") {
+            // --- LEONIDA STATE PENITENTIARY CELLBLOCK B ---
+            Wall3D(278, 68, 16, 145, "#27272a", "#18181b", "#f87171");
+            Wall3D(516, 68, 16, 145, "#27272a", "#18181b", "#38bdf8");
+            // Steel prison bars across Cell #06 (West), Warden Office (Center) & Armory (East)
+            for (let bx = 32; bx < 760; bx += 16) {
+                if ((bx > 145 && bx < 205) || (bx > 370 && bx < 430) || (bx > 605 && bx < 665)) continue;
+                R(bx, 208, 4, 14, "#94a3b8", "#18181b", 0.8);
+            }
+            // Cell #06 bunk bed & stainless prison toilet
+            Box3D(36, 82, 84, 42, "#334155", "#1e293b", "#f87171", 7);
+            C(245, 96, 10, "#cbd5e1", "#475569", 1.5);
+            // Warden's desk & safe (Center) + SWAT Riot Armory Racks (East)
+            Box3D(330, 96, 140, 28, "#451a03", "#270e02", "#fde047", 8);
+            Box3D(555, 88, 195, 28, "#0f172a", "#020617", "#38bdf8", 8);
+            // South Cellblock Steel Mess Tables
+            Box3D(110, 345, 140, 32, "#475569", "#1e293b", "#94a3b8", 7);
+            Box3D(550, 345, 140, 32, "#475569", "#1e293b", "#94a3b8", 7);
+        } else if (t === "DINER_PAWN") {
+            // --- HANK'S WAFFLES (West/Center) & UNCLE JACK'S PAWN SHOP (East) ---
+            Wall3D(484, 68, 16, 150, "#334155", "#1e293b", "#fb923c");
+            Wall3D(484, 305, 16, 165, "#334155", "#1e293b", "#fb923c");
+            R(484, 218, 16, 87, "#451a03", "#fde047", 1);
+            // Hank's Diner counter, waffle irons & register
+            Box3D(60, 106, 390, 24, "#78350f", "#451a03", "#fbbf24", 9);
+            for (let s = 0; s < 6; s++) C(90 + s * 58, 144, 7, "#dc2626", "#fff", 1.2);
+            // Diner booths in SW
+            for (const by of [255, 395]) {
+                Box3D(42, by, 125, 28, "#b91c1c", "#7f1d1d", "#fde047", 7);
+            }
+            // Uncle Jack's Caged Pawn Counter & Gun Wall in East Wing
+            Box3D(525, 106, 185, 26, "#1e293b", "#0f172a", "#f97316", 9);
+            for (let g = 0; g < 6; g++) {
+                R(535 + g * 28, 52, 20, 6, "#94a3b8");
+            }
+        }
+
+        // ====================================================================
+        // 4. OUTER 3D PERIMETER WALL CAPS, MOLDING TRIM & SOUTH ENTRYWAY ARCH
+        // ====================================================================
+        const doorGap = 156;
+        const doorLeft = Math.round((rw - doorGap) * 0.5);
+        const doorRight = doorLeft + doorGap;
+        // Top, Left, Right, and split Bottom 3D perimeter wall caps
+        R(0, 0, rw, 44, "#090d16", acc, 1.5);
+        R(0, 44, 16, rh - 44, "#0f172a", acc, 1.5);
+        R(rw - 16, 44, 16, rh - 44, "#0f172a", acc, 1.5);
+        R(0, rh - 16, doorLeft, 16, "#0f172a", acc, 1.5);
+        R(doorRight, rh - 16, rw - doorRight, 16, "#0f172a", acc, 1.5);
+        // Brass / Neon Door Jamb Pillars flanking the South Exit
+        Box3D(doorLeft - 10, rh - 24, 14, 22, "#334155", "#0f172a", "#fde047", 4);
+        Box3D(doorRight - 4, rh - 24, 14, 22, "#334155", "#0f172a", "#fde047", 4);
     }
 
     renderActiveInterior(ctx, game) {
@@ -5353,126 +6187,81 @@ class RetroRenderer {
         ctx.translate(baseOx, baseOy);
         ctx.scale(iScale, iScale);
 
-        // 1. Interior Floor Tiles by Venue Theme
-        const tileSz = 40;
-        for (let y = 0; y < rh; y += tileSz) {
-            for (let x = 0; x < rw; x += tileSz) {
-                const gx = Math.floor(x / tileSz);
-                const gy = Math.floor(y / tileSz);
-                const checker = (gx + gy) % 2 === 0;
-                let col = checker ? "#1e293b" : "#0f172a";
+        // 1 & 2. Render Pixel-Art Procedural Floor Zones, 2.5D Multi-Room Architecture & Detailed Furniture
+        this.drawInteriorArchitectureAndDecor(ctx, intr, ox, oy, rw, rh);
 
-                if (intr.theme === "ART_DECO_HOTEL") {
-                    col = checker ? "#2d1b38" : "#192f3d";
-                } else if (intr.theme === "NEON_CLUB") {
-                    // Center pulsing LED Dancefloor (x=240..560, y=180..370)
-                    if (x >= 240 && x < 560 && y >= 180 && y < 370) {
-                        const pulseIdx = Math.floor(this.time * 5 + gx * 1.3 + gy * 1.7) % 4;
-                        col = ["#db2777", "#0284c7", "#7c3aed", "#ca8a04"][pulseIdx];
-                    } else {
-                        col = checker ? "#170f26" : "#0f0a1c";
-                    }
-                } else if (intr.theme === "STRIP_CLUB") {
-                    if (x >= 320 && x < 480 && y >= 130 && y < 340) {
-                        col = (( gx + Math.floor(this.time * 4)) % 2 === 0) ? "#be185d" : "#701a75";
-                    } else {
-                        col = checker ? "#311024" : "#1f0918";
-                    }
-                } else if (intr.theme === "MALIBU_CLUB") {
-                    col = checker ? "#3b1d2e" : "#2b2118";
-                } else if (intr.theme === "MANSION") {
-                    if (x >= 350 && x < 470) {
-                        col = "#7f1d1d"; // Royal red carpet runner
-                    } else if (x >= 560 && y >= 230 && y < 390) {
-                        col = "#0891b2"; // Indoor marble Jacuzzi pool
-                    } else {
-                        col = checker ? "#334155" : "#1e293b";
-                    }
-                } else if (intr.theme === "SPACE_BUNKER") {
-                    col = checker ? "#0f293a" : "#0a1926";
-                } else if (intr.theme === "PRISON_BLOCK") {
-                    col = checker ? "#27272a" : "#18181b";
-                } else if (intr.theme === "DINER_PAWN") {
-                    col = checker ? "#334155" : "#0f172a";
-                } else if (intr.theme === "SHOP_GUN_SHOP") {
-                    col = checker ? "#2a2a2e" : "#1b1b1f";
-                } else if (intr.theme === "SHOP_RESTAURANT") {
-                    col = checker ? "#7c2d12" : "#fde68a";
-                    if (!checker) col = "#e7d8a8";
-                } else if (intr.theme === "SHOP_HOTEL") {
-                    col = (x >= 340 && x < 420) ? "#7f1d1d" : (checker ? "#3a2442" : "#2a1a33");
-                } else if (intr.theme === "SHOP_CLOTHES") {
-                    col = checker ? "#e2e8f0" : "#cbd5e1";
-                } else if (intr.theme === "SHOP_CONVENIENCE") {
-                    col = checker ? "#e5e7eb" : "#9ca3af";
-                } else if (intr.theme === "SHOP_BAR") {
-                    col = checker ? "#2b1810" : "#3b2214";
-                }
-
-                ctx.fillStyle = col;
-                ctx.fillRect(ox + x, oy + y, Math.min(tileSz, rw - x) + 0.6, Math.min(tileSz, rh - y) + 0.6);
-            }
-        }
-
-        // 2. Interior Walls, Neon Trim & Header Banner
-        ctx.strokeStyle = intr.accent || "#00f0ff";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(ox, oy, rw, rh);
-
-        ctx.fillStyle = "rgba(10, 15, 28, 0.95)";
-        ctx.fillRect(ox + 4, oy + 4, rw - 8, 58);
+        // 2b. Integrated Cornice Header Banner along the Top Wall Cap (y = 2..42)
+        ctx.fillStyle = "rgba(7, 11, 22, 0.94)";
+        ctx.fillRect(ox + 18, oy + 3, rw - 36, 39);
         ctx.strokeStyle = intr.accent || "#00f0ff";
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(ox + 4, oy + 4, rw - 8, 58);
+        ctx.strokeRect(ox + 18.5, oy + 3.5, rw - 37, 38);
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = "bold 17px Consolas, 'Courier New', monospace";
+        ctx.font = "bold 15px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(intr.name, ox + rw * 0.5, oy + 23);
-        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+        ctx.fillText(intr.name, ox + rw * 0.5, oy + 15);
+        ctx.font = "bold 10px Consolas, 'Courier New', monospace";
         ctx.fillStyle = intr.accent || "#38bdf8";
-        ctx.fillText(intr.subtitle, ox + rw * 0.5, oy + 45);
+        ctx.fillText(intr.subtitle, ox + rw * 0.5, oy + 31);
 
-        // 2b. Template shop furniture (counters, shelves, tables, beds, racks...)
-        if (intr.isShop) {
-            this.drawShopDecor(ctx, intr, ox, oy, rw, rh);
-        }
-
-        // 3. Interactive Stations inside the Venue (Walk onto pad OR Click to activate!)
+        // 3. Sleek Interactive Station Floor Pads & Compact Glassmorphic Floating Badges
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
                 const sx = ox + st.x;
                 const sy = oy + st.y;
                 const ready = (st.cooldown || 0) <= 0;
-                const pulseR = 30 + Math.sin(this.time * 6) * 4;
+                const distToPlayer = Math.hypot((game.interiorX || 0) - st.x, (game.interiorY || 0) - st.y);
+                const isNear = distToPlayer < 78;
+                const stCol = ready ? (st.color || "#39ff14") : "#64748b";
+                const pulseR = (isNear ? 24 : 20) + Math.sin(this.time * 6) * 2.5;
 
-                // Glowing floor pad
-                ctx.fillStyle = ready ? "rgba(16, 185, 129, 0.22)" : "rgba(100, 116, 139, 0.18)";
+                // Outer radial floor glow
+                const pGrad = ctx.createRadialGradient(sx, sy, 3, sx, sy, pulseR + 8);
+                pGrad.addColorStop(0, ready ? "rgba(57, 255, 20, 0.30)" : "rgba(100, 116, 139, 0.14)");
+                pGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+                ctx.fillStyle = pGrad;
                 ctx.beginPath();
-                ctx.arc(sx, sy, pulseR, 0, Math.PI * 2);
+                ctx.arc(sx, sy, pulseR + 8, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.strokeStyle = ready ? (st.color || "#39ff14") : "#64748b";
-                ctx.lineWidth = 2.5;
+
+                // 3D Beveled Floor Pad Ring
+                ctx.fillStyle = ready ? "rgba(15, 23, 42, 0.55)" : "rgba(15, 23, 42, 0.40)";
+                ctx.beginPath();
+                ctx.arc(sx, sy, pulseR * 0.78, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = stCol;
+                ctx.lineWidth = isNear ? 2.5 : 1.75;
                 ctx.stroke();
 
-                // Station counter/table box
-                const bw = 205;
-                const bh = 44;
+                // Inner target ring
+                ctx.strokeStyle = "rgba(255,255,255,0.35)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(sx, sy, pulseR * 0.42, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Compact Glassmorphic Pill Badge (never blocks the room's counters!)
+                const bw = isNear ? 174 : 154;
+                const bh = isNear ? 31 : 27;
                 const bx = Math.round(sx - bw * 0.5);
-                const by = Math.round(sy - 56);
-                ctx.fillStyle = "rgba(9, 13, 24, 0.92)";
+                const by = Math.round(sy - (isNear ? 44 : 39));
+                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.92)" : "rgba(9, 14, 28, 0.78)";
                 ctx.fillRect(bx, by, bw, bh);
-                ctx.strokeStyle = ready ? (st.color || "#39ff14") : "#475569";
-                ctx.lineWidth = 1.5;
+                // Left neon accent bar on pill
+                ctx.fillStyle = stCol;
+                ctx.fillRect(bx, by, 3, bh);
+                ctx.strokeStyle = stCol;
+                ctx.lineWidth = isNear ? 1.6 : 1.0;
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
-                ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+                ctx.font = isNear ? "bold 10px Consolas, 'Courier New', monospace" : "bold 9.5px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = ready ? "#ffffff" : "#94a3b8";
-                ctx.fillText(st.label, sx, by + 14);
-                ctx.font = "10px Consolas, 'Courier New', monospace";
-                ctx.fillStyle = ready ? (st.color || "#39ff14") : "#64748b";
-                ctx.fillText(ready ? st.sub : `RECHARGING (${Math.ceil(st.cooldown)}S)`, sx, by + 31);
+                ctx.fillText(st.label, sx + 1, by + 9.5);
+                ctx.font = "8.5px Consolas, 'Courier New', monospace";
+                ctx.fillStyle = stCol;
+                ctx.fillText(ready ? st.sub : `RECHARGING (${Math.ceil(st.cooldown)}S)`, sx + 1, by + 20.5);
 
                 if (ready) {
                     this.cheatButtons.push({
@@ -5480,14 +6269,14 @@ class RetroRenderer {
                         x: bx,
                         y: by,
                         w: bw,
-                        h: bh + 56,
+                        h: bh + 42,
                         station: st
                     });
                 }
             }
         }
 
-        // 4. Venue NPCs (Bartenders, DJs, Dancers, Guards, Astronauts)
+        // 4. Venue NPCs (Bartenders, DJs, Dancers, Guards, Astronauts) with soft floor shadow
         if (Array.isArray(intr.npcs)) {
             for (let i = 0; i < intr.npcs.length; i++) {
                 const npc = intr.npcs[i];
@@ -5495,41 +6284,65 @@ class RetroRenderer {
                 const ny = oy + npc.y + (npc.dancing ? Math.cos(this.time * 4 + i) * 6 : 0);
                 const nAng = npc.dancing ? (npc.angle + Math.sin(this.time * 3 + i) * 0.7) : npc.angle;
                 const fIdx = npc.dancing ? (Math.floor(this.time * 6 + i * 2) % 8) : 98;
+
+                ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+                ctx.beginPath();
+                ctx.ellipse(nx + 2, ny + 4, 11, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
                 this.drawPedSprite2D(ctx, npc.type || "civ2", fIdx, nx, ny, nAng, 2.35);
 
                 if (npc.label) {
-                    ctx.font = "bold 9px Consolas, monospace";
-                    ctx.fillStyle = "#cbd5e1";
-                    ctx.fillText(npc.label, nx, ny - 24);
+                    ctx.font = "bold 8.5px Consolas, monospace";
+                    ctx.fillStyle = "rgba(9, 13, 24, 0.72)";
+                    const tw = ctx.measureText(npc.label).width + 8;
+                    ctx.fillRect(nx - tw * 0.5, ny - 29, tw, 12);
+                    ctx.fillStyle = "#e2e8f0";
+                    ctx.fillText(npc.label, nx, ny - 23);
                 }
             }
         }
 
-        // 5. The player walks alone inside the room (the companion waits outside)
+        // 5. The player walks inside the room with a dynamic shadow & warm spotlight
         const p = game.player;
+        const px = ox + game.interiorX;
+        const py = oy + game.interiorY;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+        ctx.beginPath();
+        ctx.ellipse(px + 2, py + 4, 12, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         const lFrame = this.getPedFrameIndex(
             "FIST",
             Boolean(p.isMoving),
             Boolean(game.input.sprint),
             p.walkPhase || 0
         );
-        this.drawPedSprite2D(ctx, "lucia", lFrame, ox + game.interiorX, oy + game.interiorY, game.interiorAngle, 2.6);
+        this.drawPedSprite2D(ctx, "lucia", lFrame, px, py, game.interiorAngle, 2.6);
+        ctx.font = "bold 9.5px Consolas, monospace";
         ctx.fillStyle = "#f472b6";
-        ctx.fillText("LUCIA", ox + game.interiorX, oy + game.interiorY - 27);
+        ctx.fillText("LUCIA", px, py - 26);
 
-        // 6. Bottom Glowing [🚪 EXIT TO STREET] Door Mat & Clickable Button
-        const exitW = 290;
-        const exitH = 34;
+        // 6. South Threshold Welcome Mat & Glowing [🚪 EXIT TO STREET] Doorway
+        const exitW = 248;
+        const exitH = 28;
         const exitX = Math.round(ox + (rw - exitW) * 0.5);
-        const exitY = oy + rh - exitH - 6;
-        ctx.fillStyle = "rgba(180, 24, 112, 0.94)";
+        const exitY = oy + rh - exitH - 4;
+        // Coir & brass welcome mat just inside the doorway
+        ctx.fillStyle = "#451a03";
+        ctx.fillRect(exitX + 24, exitY - 12, exitW - 48, 14);
+        ctx.strokeStyle = "#d97706";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(exitX + 24.5, exitY - 11.5, exitW - 49, 13);
+
+        ctx.fillStyle = "rgba(131, 24, 67, 0.94)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
         ctx.strokeStyle = "#fde047";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.8;
         ctx.strokeRect(exitX + 0.5, exitY + 0.5, exitW - 1, exitH - 1);
-        ctx.font = "bold 12px Consolas, 'Courier New', monospace";
+        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("🚪 EXIT TO STREET [WALK HERE / ESC / CLICK]", ox + rw * 0.5, exitY + exitH * 0.5);
+        ctx.fillText("🚪 EXIT TO STREET [WALK / ESC / CLICK]", ox + rw * 0.5, exitY + exitH * 0.5);
 
         this.cheatButtons.push({
             id: "EXIT_INTERIOR",
