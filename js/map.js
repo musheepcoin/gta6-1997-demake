@@ -277,9 +277,7 @@ class LeonidaMap {
         };
 
         const dixonY0 = MAP_Y_256[144];
-        const dixonY1 = MAP_Y_256[145];
         const dixonX0 = MAP_X_256[210];
-        const dixonX1 = MAP_X_256[211];
         const oceanPentMinX = MAP_X_256[198];
         const oceanPentMaxX = MAP_X_256[212];
 
@@ -305,37 +303,36 @@ class LeonidaMap {
                     const eBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex + 1)]];
                     const hasNSRoof = nBlk && nBlk.lid > 0 && sBlk && sBlk.lid > 0;
                     const hasEWRoof = wBlk && wBlk.lid > 0 && eBlk && eBlk.lid > 0;
-                    const isPenthouseTier = (tilez >= 4) && ((nBlk && nBlk.lid > 0) || (sBlk && sBlk.lid > 0)) && ((wBlk && wBlk.lid > 0) || (eBlk && eBlk.lid > 0));
-                    if (!hasNSRoof && !hasEWRoof && !isPenthouseTier) continue;
+                    if (!hasNSRoof || !hasEWRoof) continue;
 
-                    const isHotelDixonPool = ((tiley === dixonY0 || tiley === dixonY1) && (tilex === dixonX0 || tilex === dixonX1));
+                    const isHotelDixonCenter = (tiley === dixonY0 && tilex === dixonX0);
                     const isOceanDrivePenthouse = (tilex >= oceanPentMinX && tilex <= oceanPentMaxX && tilez >= 4);
-                    const isInteriorFeature = (hasNSRoof && hasEWRoof && ((tilex * 5 + tiley * 7) % 3 === 0));
+                    // Enforce at least 18 tiles minimum spacing between any two rooftop pools so a building never has multiple pools!
+                    const tooCloseToExistingPool = this.rooftopParties.some(
+                        (rp) => Math.hypot(rp.x / TILE_SIZE - (tilex + 0.5), rp.y / TILE_SIZE - (tiley + 0.5)) < 18.0
+                    );
 
-                    if (isHotelDixonPool) {
-                        const dixonLid = (tiley === dixonY0 && tilex === dixonX0) || (tiley === dixonY1 && tilex === dixonX1) ? 35 : 31;
-                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, dixonLid, blk.remap);
-                        if (dixonLid === 35) {
-                            this.rooftopParties.push({
-                                x: (tilex + 0.5) * TILE_SIZE,
-                                y: (tiley + 0.5) * TILE_SIZE,
-                                z: tilez + 1.0,
-                                isHotelDixon: true,
-                                seed: tilex * 13 + tiley * 7
-                            });
-                        }
-                    } else if (isOceanDrivePenthouse || isInteriorFeature) {
-                        const featLid = ((tilex + tiley) % 2 === 0) ? 35 : 31;
-                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, featLid, blk.remap);
-                        if (featLid === 35 && (isOceanDrivePenthouse || ((tilex * 3 + tiley * 11) % 4 === 0))) {
-                            this.rooftopParties.push({
-                                x: (tilex + 0.5) * TILE_SIZE,
-                                y: (tiley + 0.5) * TILE_SIZE,
-                                z: tilez + 1.0,
-                                isHotelDixon: false,
-                                seed: tilex * 13 + tiley * 7
-                            });
-                        }
+                    if (isHotelDixonCenter && !tooCloseToExistingPool) {
+                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, blk.remap);
+                        this.rooftopParties.push({
+                            x: (tilex + 0.5) * TILE_SIZE,
+                            y: (tiley + 0.5) * TILE_SIZE,
+                            z: tilez + 1.0,
+                            isHotelDixon: true,
+                            seed: tilex * 13 + tiley * 7
+                        });
+                    } else if (!tooCloseToExistingPool && (isOceanDrivePenthouse ? ((tilex * 7 + tiley * 13) % 11 === 0) : ((tilex * 11 + tiley * 17) % 29 === 0))) {
+                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, blk.remap);
+                        this.rooftopParties.push({
+                            x: (tilex + 0.5) * TILE_SIZE,
+                            y: (tiley + 0.5) * TILE_SIZE,
+                            z: tilez + 1.0,
+                            isHotelDixon: false,
+                            seed: tilex * 13 + tiley * 7
+                        });
+                    } else if ((tilex * 5 + tiley * 9) % 19 === 0) {
+                        // Occasional glass skylight atrium (lid 31) without any pool or float
+                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 31, blk.remap);
                     }
                 }
             }
