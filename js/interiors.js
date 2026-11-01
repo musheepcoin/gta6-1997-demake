@@ -187,15 +187,23 @@
         const gt = (c, r) => (c >= 0 && r >= 0 && c < cols && r < rows ? ground[r * cols + c] : -1);
         const walkable = (c, r) => gt(c, r) === GROUND_TYPE.PAWEMENT || gt(c, r) === GROUND_TYPE.FIELD;
         const dirs = [
-            { dc: 0, dr: -1, facing: "S" }, // building to the north -> door in a south-facing wall
-            { dc: 0, dr: 1, facing: "N" },
-            { dc: -1, dr: 0, facing: "E" },
-            { dc: 1, dr: 0, facing: "W" }
+            { dc: 0, dr: -1, facing: "S", penalty: 0.0 }, // building to the north -> door in a south-facing wall
+            { dc: -1, dr: 0, facing: "E", penalty: 1.5 },
+            { dc: 1, dr: 0, facing: "W", penalty: 1.5 },
+            { dc: 0, dr: 1, facing: "N", penalty: 6.0 }
         ];
         for (const intr of map.interiors) {
-            if (intr.isShop || intr.facing) continue;
-            const c0 = Math.floor(intr.doorX / ts);
-            const r0 = Math.floor(intr.doorY / ts);
+            if (intr.isShop) continue;
+            intr.matRGB = hexToRgb(intr.accent);
+            const cInit = Math.floor(intr.doorX / ts);
+            const rInit = Math.floor(intr.doorY / ts);
+            if (intr.facing === "S" && walkable(cInit, rInit) && gt(cInit, rInit - 1) === GROUND_TYPE.BUILDING) {
+                intr.doorX = (cInit + 0.5) * ts;
+                intr.doorY = (rInit + 0.5) * ts;
+                continue;
+            }
+            const c0 = cInit;
+            const r0 = rInit;
             let best = null;
             for (let dr = -maxDist; dr <= maxDist; dr++) {
                 for (let dc = -maxDist; dc <= maxDist; dc++) {
@@ -204,7 +212,8 @@
                     if (!walkable(c, r)) continue;
                     for (const d of dirs) {
                         if (gt(c + d.dc, r + d.dr) !== GROUND_TYPE.BUILDING) continue;
-                        const dist = Math.hypot(dc, dr) + (d.facing === "S" ? 0 : 0.15);
+                        if (d.facing === "S" && gt(c, r + 1) === GROUND_TYPE.BUILDING) continue;
+                        const dist = Math.hypot(dc, dr) + d.penalty;
                         if (!best || dist < best.dist) best = { c, r, facing: d.facing, dist };
                     }
                 }
@@ -213,7 +222,6 @@
                 intr.facing = best.facing;
                 intr.doorX = (best.c + 0.5) * ts;
                 intr.doorY = (best.r + 0.5) * ts;
-                intr.matRGB = hexToRgb(intr.accent);
             }
         }
     }
@@ -270,8 +278,8 @@
                     const len = c1 - c + 1;
                     if (len >= 2) {
                         const mid = c + (len >> 1);
-                        // Door sidewalk tile needs walkable neighbours (not a 1-tile pavement sliver)
-                        if (isP(mid - 1, r + 1) || isP(mid + 1, r + 1)) {
+                        // Door sidewalk tile needs walkable neighbours and must not be trapped in a 1-tile alley behind another building
+                        if ((isP(mid - 1, r + 1) || isP(mid + 1, r + 1)) && !isB(mid, r + 2)) {
                             cands.push({ c: mid, r, len });
                         }
                     }

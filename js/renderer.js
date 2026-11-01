@@ -3186,7 +3186,6 @@ class RetroRenderer {
                 const tanSway = Math.sin(this.time * 1.5 + i * 1.3) * 0.04;
                 if (sb.pose === "WAVE") {
                     const waveFr = 50 + (Math.floor(this.time * 4.2 + i) % 4);
-                    this.pushSolidQuad3D(sb.x + sunCos * 4.5, sb.y + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.batchPedSprite3D(sb.pedType || "bikini_pink", waveFr, sb.x, sb.y, bz + 0.038, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 } else {
                     this.batchPedSprite3D(sb.pedType || "bikini_pink", 42, sb.x, sb.y, bz + 0.035, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
@@ -3203,7 +3202,6 @@ class RetroRenderer {
                         this.batchPedSprite3D(sb.friendPedType, 42, fx, fy, bz + 0.035, ang - tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     } else {
                         const chatFr = 50 + (Math.floor(this.time * 3.8 + i * 2) % 4);
-                        this.pushSolidQuad3D(fx + sunCos * 4.5, fy + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                         this.batchPedSprite3D(sb.friendPedType, chatFr, fx, fy, bz + 0.038, ang - Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 }
@@ -3305,7 +3303,6 @@ class RetroRenderer {
                         ? (50 + (Math.floor(this.time * 8 + pi) % 4))
                         : (Math.floor(this.time * 6 + pi * 2) % 8);
 
-                    this.pushSolidQuad3D(px + sunCos * 5, py + sunSin * 5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.batchPedSprite3D(pl.ped, fr, px, py, bz + 0.040 + jumpZ, pl.face, 1.06 + jumpZ * 0.4, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 }
 
@@ -3340,7 +3337,6 @@ class RetroRenderer {
                 // Bikini Aerobics Instructor facing East toward dancers
                 const instSway = Math.sin(this.time * 5.5) * 3.0;
                 const instFr = 50 + (Math.floor(this.time * 6.5) % 4);
-                this.pushSolidQuad3D(bp.x - 4 + sunCos * 4.5, bp.y + instSway + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 this.batchPedSprite3D("bikini_red", instFr, bp.x - 4, bp.y + instSway, bz + 0.040, 0, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
                 // Synchronized Bikini & Surfer Dancers in a 2x2 formation
@@ -3356,7 +3352,6 @@ class RetroRenderer {
                         ? (50 + (Math.floor(this.time * 6.5 + di) % 4))
                         : (Math.floor(this.time * 7.0 + di * 2) % 8);
                     const dAng = Math.PI + Math.sin(this.time * 2.8 + di) * 0.35;
-                    this.pushSolidQuad3D(dx + sunCos * 4.5, dy + sunSin * 4.5, bz + 0.020, 10, 7, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.batchPedSprite3D(dancerPeds[(di + pi) % dancerPeds.length], dFr, dx, dy, bz + 0.040, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 }
             }
@@ -3488,6 +3483,31 @@ class RetroRenderer {
         if (!rect) return;
         // SPRITE_ZERO_ANGLE = 90.0f in GameDefs.h: .G24 sprites face South (+Y, Math.PI/2)
         const rot = angle - Math.PI * 0.5;
+        const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
+        if (
+            nf < 0.88 &&
+            drawOrder !== SPRITE_DRAW_ORDER.CORPSE &&
+            drawOrder !== SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER &&
+            frameIdx !== 42
+        ) {
+            const shCos = this._curSunCos !== undefined ? this._curSunCos : 0.78;
+            const shSin = this._curSunSin !== undefined ? this._curSunSin : 0.62;
+            const shAlpha = (this._curSunShadowAlpha !== undefined ? this._curSunShadowAlpha : 0.28) * 1.05;
+            this.pushAtlasSprite3D(
+                rect,
+                x + shCos * 3.4,
+                y + shSin * 3.4,
+                zBlocks - 0.022,
+                rot,
+                scale * 0.96,
+                SPRITE_DRAW_ORDER.TIRE_MARKS,
+                0.02,
+                0.03,
+                0.06,
+                shAlpha,
+                0
+            );
+        }
         this.pushAtlasSprite3D(rect, x, y, zBlocks, rot, scale, drawOrder, rTint, gTint, bTint, 1.0);
 
         if (muzzleFlash && this.gta1Meta.sprites.objects["234"]) {
@@ -3641,6 +3661,9 @@ class RetroRenderer {
         const sunShadowAlpha = 0.34 * (1.0 - nfGlobal * 0.70);
         const sunCos = Math.cos(sunShadowAngle);
         const sunSin = Math.sin(sunShadowAngle);
+        this._curSunCos = sunCos;
+        this._curSunSin = sunSin;
+        this._curSunShadowAlpha = sunShadowAlpha;
 
         // 4. Living Pedestrians, Monks, Cops, Jason Duval & Lucia Caminos (eSpriteDrawOrder_Pedestrian / JumpingPedestrian)
         // GTA 2 (1999) fuller top-down 3D pedestrian presence (pedScale = 1.34 so peds stay crisp & readable even when zoomed out!) + RemapPed outfit variety!
@@ -3703,11 +3726,6 @@ class RetroRenderer {
             if (ped.kind === "GATOR") {
                 this.pushSolidQuad3D(ped.x, ped.y, pz, 24, 7, ped.angle, 0.21, 0.33, 0.08, 1.0, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 continue;
-            }
-
-            // Solar-tracked pedestrian ground drop shadow (live_geometry.cpp + time_of_day.cpp)
-            if (nfGlobal < 0.88) {
-                this.pushSolidQuad3D(ped.x + sunCos * 3.4, ped.y + sunSin * 3.4, pz - 0.022, 10.5, 8.2, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
             const pedDrawOrder = typeof ped.getDrawOrder === "function"
@@ -3811,9 +3829,6 @@ class RetroRenderer {
         const jason = game.jason;
         if (jason && !jason.inVehicle) {
             const jz = this.getEntityZ(jason, 0.045);
-            if (nfGlobal < 0.88) {
-                this.pushSolidQuad3D(jason.x + sunCos * 3.5, jason.y + sunSin * 3.5, jz - 0.022, 11.0, 8.6, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-            }
             const jWeapon = jason.weaponKey || "FIST";
             const frameIdx = this.getPedFrameIndex(jWeapon, Boolean(jason.isMoving), Boolean(jason.isRunning), jason.walkPhase || 0);
             this.batchPedSprite3D(
@@ -3870,9 +3885,6 @@ class RetroRenderer {
                         }
                     }
                 } else {
-                    if (nfGlobal < 0.88) {
-                        this.pushSolidQuad3D(rp.x + sunCos * 3.5, rp.y + sunSin * 3.5, rz - 0.022, 11.4, 8.8, sunShadowAngle, 0.03, 0.04, 0.08, sunShadowAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    }
                     const rWep = (rp.muzzleTimer || 0) > 0 ? (rp.weapon || "PISTOL") : "FIST";
                     const rFrame = this.getPedFrameIndex(rWep, Boolean(rp.isMoving), Boolean(rp.isRunning), rp.walkPhase || 0);
                     this.batchPedSprite3D(
@@ -3895,9 +3907,6 @@ class RetroRenderer {
             const baseZ = this.getEntityZ(p, 0.05);
             const jumpZ = p.jumpZOffset || 0;
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
-            // Solar-tracked shadow under Lucia (separates further when jumping!)
-            const pShOff = 3.6 + jumpZ * 16.0;
-            this.pushSolidQuad3D(p.x + sunCos * pShOff, p.y + sunSin * pShOff, baseZ - 0.022, 11.8, 9.2, sunShadowAngle, 0.03, 0.04, 0.08, Math.max(0.22, sunShadowAlpha), SPRITE_DRAW_ORDER.TIRE_MARKS);
 
             let frameIdx;
             if ((p.slideCarTimer || 0) > 0) {
@@ -5137,15 +5146,20 @@ class RetroRenderer {
         if (Array.isArray(this.map.interiors)) {
             for (const intr of this.map.interiors) {
                 const dist = Math.hypot(p.x - intr.doorX, p.y - intr.doorY);
-                if (dist > 340) continue;
-                const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.22;
-                const sc = this.worldToScreen(intr.doorX, intr.doorY, dz);
+                if (dist > 185) continue;
+                // Never draw a South-facing door badge when the player is on the North/back side of the 3D building
+                if ((!intr.facing || intr.facing === "S") && p.y < intr.doorY - TILE_SIZE * 0.65) continue;
+                if (dist > 58 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, intr.doorX, intr.doorY, 2.0).hit) continue;
+
+                const labelY = (!intr.facing || intr.facing === "S") ? intr.doorY + 10 : intr.doorY;
+                const dz = this.map.getHeightAtPixel(intr.doorX, labelY, 2.0) + 0.04;
+                const sc = this.worldToScreen(intr.doorX, labelY, dz);
                 const isClose = dist < 95;
                 const label = isClose ? `🚪 [CLICK OR PRESS E] ENTER ${intr.name}` : `🚪 ${intr.name}`;
                 const bw = Math.max(150, ctx.measureText(label).width + 18);
                 const bh = 22;
                 const bx = Math.round(sc.x - bw * 0.5);
-                const by = Math.round(sc.y - 26);
+                const by = Math.round(sc.y - bh * 0.5 + 2);
 
                 ctx.fillStyle = isClose ? "rgba(180, 24, 112, 0.94)" : "rgba(12, 18, 32, 0.86)";
                 ctx.fillRect(bx, by, bw, bh);
@@ -5170,13 +5184,14 @@ class RetroRenderer {
         if (Array.isArray(this.map.stuntRamps)) {
             for (const ramp of this.map.stuntRamps) {
                 const dist = Math.hypot(p.x - ramp.x, p.y - ramp.y);
-                if (dist > 280) continue;
-                const rz = this.map.getHeightAtPixel(ramp.x, ramp.y, 2.0) + 0.16;
+                if (dist > 190) continue;
+                if (dist > 64 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, ramp.x, ramp.y, 2.0).hit) continue;
+                const rz = this.map.getHeightAtPixel(ramp.x, ramp.y, 2.0) + 0.08;
                 const sc = this.worldToScreen(ramp.x, ramp.y, rz);
                 const label = `🔥 STUNT RAMP: ${ramp.name}`;
                 const bw = ctx.measureText(label).width + 14;
                 const bx = Math.round(sc.x - bw * 0.5);
-                const by = Math.round(sc.y - 20);
+                const by = Math.round(sc.y - 9);
                 ctx.fillStyle = "rgba(24, 16, 6, 0.85)";
                 ctx.fillRect(bx, by, bw, 18);
                 ctx.strokeStyle = "#facc15";

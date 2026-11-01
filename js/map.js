@@ -358,6 +358,15 @@ class LeonidaMap {
                 }
             }
         }
+        // Open South stadium entrance tunnel (cx = 115..117, ry = 111..113) all the way to the emerald pitch!
+        for (let ry = 111; ry <= 113; ry++) {
+            for (let cx = 115; cx <= 117; cx++) {
+                for (let tz = 2; tz < MAP_LAYERS; tz++) {
+                    this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx] = 0;
+                }
+            }
+        }
+        fillGroundRect(115, 117, 111, 113, 8);
         fillGroundRect(106, 125, 114, 114, 8);
         fillGroundRect(106, 125, 115, 115, 9);
 
@@ -617,16 +626,8 @@ class LeonidaMap {
             { spr: "lifeguard_neon",   x: 239.2 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_tower",  x: 238.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_neon",   x: 237.5 * TILE_SIZE, y: 184.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            // 2. Star Island Mansion Central Lagoon Pool (inside Biscayne Bay at 173.0, 105.0)
-            { spr: "vercetti_pool",    x: 173.0 * TILE_SIZE, y: 105.0 * TILE_SIZE, z: 1.98, scale: 1.25, angle: 0 },
-            // 3. Official GTA 6 Neon Landmark Marquees on the 3D Buildings
-            { spr: "sign_hotel_dixon", x: 212.3 * TILE_SIZE, y: 145.0 * TILE_SIZE, z: 2.35, scale: 1.20, angle: 0 },
-            { spr: "sign_ocean_view",  x: 212.3 * TILE_SIZE, y: 151.0 * TILE_SIZE, z: 2.35, scale: 1.15, angle: 0 },
-            { spr: "sign_nine1nine",   x: 212.3 * TILE_SIZE, y: 50.5 * TILE_SIZE,  z: 2.35, scale: 1.20, angle: 0 },
-            { spr: "sign_malibu",      x: 212.3 * TILE_SIZE, y: 87.5 * TILE_SIZE,  z: 2.35, scale: 1.18, angle: 0 },
-            { spr: "sign_jack_hearts", x: 113.2 * TILE_SIZE, y: 78.5 * TILE_SIZE,  z: 2.35, scale: 1.20, angle: 0 },
-            { spr: "sign_uncle_jacks", x: 35.2 * TILE_SIZE,  y: 140.5 * TILE_SIZE, z: 2.35, scale: 1.20, angle: 0 },
-            { spr: "sign_grassrivers", x: 56.5 * TILE_SIZE,  y: 211.5 * TILE_SIZE, z: 2.25, scale: 1.20, angle: 0 }
+            // 2. Star Island Mansion Central Lagoon Pool (on the mansion lawn at 173.0, 112.0)
+            { spr: "vercetti_pool",    x: 173.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, z: 2.0, scale: 1.15, angle: 0 }
         ];
 
         // 3A. Live Animated 3D Beach Volleyball Courts (2v2 Bikini Women & Surfers + Raised 3D Net + Flying Volleyball!)
@@ -1415,8 +1416,9 @@ class LeonidaMap {
                 subtitle: "ART DECO TERRAZZO LOBBY, COCKTAIL BAR, LUCIA & JASON'S SUITE STASH & WARDROBE",
                 theme: "ART_DECO_HOTEL",
                 accent: "#f472b6",
-                doorX: 213.35 * TILE_SIZE,
-                doorY: 145.8 * TILE_SIZE,
+                facing: "S",
+                doorX: 211.5 * TILE_SIZE,
+                doorY: 147.5 * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -1460,8 +1462,9 @@ class LeonidaMap {
                 subtitle: "PULSING LED DANCEFLOOR, DJ TURNTABLE BOOTH, VIP BOTTLES & MANAGER VAULT",
                 theme: "NEON_CLUB",
                 accent: "#fb923c",
-                doorX: 213.4 * TILE_SIZE,
-                doorY: 48.0 * TILE_SIZE,
+                facing: "S",
+                doorX: 211.5 * TILE_SIZE,
+                doorY: 51.5 * TILE_SIZE,
                 w: 800,
                 h: 540,
                 npcs: [
@@ -1507,8 +1510,9 @@ class LeonidaMap {
                 subtitle: "NEON STAGE RUNWAY, VELVET VIP BOOTHS & BOOBIE IKE'S BACKROOM COUNTING VAULT",
                 theme: "STRIP_CLUB",
                 accent: "#e879f9",
-                doorX: 115.5 * TILE_SIZE,
-                doorY: 82.5 * TILE_SIZE,
+                facing: "S",
+                doorX: 111.5 * TILE_SIZE,
+                doorY: 81.5 * TILE_SIZE,
                 w: 800,
                 h: 540,
                 npcs: [
@@ -1553,8 +1557,9 @@ class LeonidaMap {
                 subtitle: "CORAL HAVANA DANCE HALL, RETRO 1997 ARCADE CABINETS & SMUGGLER BACKROOM",
                 theme: "MALIBU_CLUB",
                 accent: "#fb7185",
-                doorX: 208.5 * TILE_SIZE,
-                doorY: 106.5 * TILE_SIZE,
+                facing: "S",
+                doorX: 210.5 * TILE_SIZE,
+                doorY: 105.5 * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -1598,8 +1603,9 @@ class LeonidaMap {
                 subtitle: "GRAND CARRARA MARBLE FOYER, SCARFACE SECURITY OFFICE, INDOOR JACUZZI & GOLDEN VAULT",
                 theme: "MANSION",
                 accent: "#c084fc",
-                doorX: 173.0 * TILE_SIZE,
-                doorY: 106.5 * TILE_SIZE,
+                facing: "S",
+                doorX: 176.5 * TILE_SIZE,
+                doorY: 104.5 * TILE_SIZE,
                 w: 820,
                 h: 550,
                 npcs: [
@@ -1643,8 +1649,9 @@ class LeonidaMap {
                 subtitle: "ORBITAL TELEMETRY SCREENS, APOLLO LAUNCH DIRECTOR CONSOLE & PROTOTYPE LAB",
                 theme: "SPACE_BUNKER",
                 accent: "#38bdf8",
-                doorX: 224.5 * TILE_SIZE,
-                doorY: 20.5 * TILE_SIZE,
+                facing: "S",
+                doorX: 230.5 * TILE_SIZE,
+                doorY: 17.5 * TILE_SIZE,
                 w: 820,
                 h: 540,
                 npcs: [
@@ -1688,7 +1695,8 @@ class LeonidaMap {
                 subtitle: "LUCIA'S OLD CELL #06, RIOT SWAT WEAPON LOCKER & WARDEN'S PAROLE SAFE",
                 theme: "PRISON_BLOCK",
                 accent: "#f87171",
-                doorX: 31.5 * TILE_SIZE,
+                facing: "S",
+                doorX: 35.5 * TILE_SIZE,
                 doorY: 76.5 * TILE_SIZE,
                 w: 800,
                 h: 530,
@@ -1733,8 +1741,9 @@ class LeonidaMap {
                 subtitle: "VICE CITY DINER HOLDUP REGISTER, WAFFLE COUNTER & BACKROOM GUN RACK",
                 theme: "DINER_PAWN",
                 accent: "#fb923c",
-                doorX: 38.5 * TILE_SIZE,
-                doorY: 142.5 * TILE_SIZE,
+                facing: "S",
+                doorX: 36.5 * TILE_SIZE,
+                doorY: 140.5 * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -1791,9 +1800,9 @@ class LeonidaMap {
             { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: 217.5 * TILE_SIZE, y: 124.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: 184.0 * TILE_SIZE, y: 156.5 * TILE_SIZE, angle: 0 },
             { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: 184.0 * TILE_SIZE, y: 109.5 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 184.0 * TILE_SIZE, y: 49.5 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 184.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, angle: 0 },
             { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: 141.5 * TILE_SIZE, y: 120.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: 116.0 * TILE_SIZE, y: 111.5 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: 116.0 * TILE_SIZE, y: 114.5 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: 47.0 * TILE_SIZE, y: 120.5 * TILE_SIZE, angle: 0 },
             { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: 66.5 * TILE_SIZE, y: 156.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: 124.0 * TILE_SIZE, y: 241.5 * TILE_SIZE, angle: 0 }
@@ -2341,7 +2350,7 @@ class LeonidaMap {
         // 4 BOMB SHOPS
         // --------------------------------------------------------------------
         this.bombShops = [
-            { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: 74.0 * TILE_SIZE, y: 152.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: 75.5 * TILE_SIZE, y: 153.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "bomb_littlehaiti", name: "AMBROSIA BOMB SHOP (LAKE LEONIDA)", x: 94.0 * TILE_SIZE, y: 80.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "bomb_sera", name: "SERA ROCKET ORDNANCE (CAPE LEONIDA)", x: 215.0 * TILE_SIZE, y: 20.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: 38.0 * TILE_SIZE, y: 140.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
@@ -2355,7 +2364,7 @@ class LeonidaMap {
                 id: "crane_viceport",
                 name: "VICE PORT CONTAINER CRANE",
                 x: 171.5 * TILE_SIZE,
-                y: 164.5 * TILE_SIZE,
+                y: 162.5 * TILE_SIZE,
                 w: 2.5 * TILE_SIZE,
                 h: 2.4 * TILE_SIZE,
                 armAngle: 0,
@@ -2365,7 +2374,7 @@ class LeonidaMap {
             {
                 id: "crane_docks",
                 name: "PORT GELLHORN MAGNETIC CRANE",
-                x: 19.5 * TILE_SIZE,
+                x: 29.5 * TILE_SIZE,
                 y: 132.5 * TILE_SIZE,
                 w: 2.6 * TILE_SIZE,
                 h: 2.4 * TILE_SIZE,
