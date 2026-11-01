@@ -1475,6 +1475,394 @@ class RetroRenderer {
                 ctx.fillStyle = "#f8fafc";
                 ctx.fillRect(clx + 3, cly + 3, 14, 5);
                 meta.sprites.objects["beach_cooler"] = [clx, cly, 20, 16];
+
+                // =========================================================================
+                // 5. GTA 6 LEONIDA & VICE CITY LIVING WORLD PROP SPRITES (Row py2 = origH + 54)
+                // =========================================================================
+                const py2 = origH + 54;
+
+                // 5A. Leonida Everglades Alligator ("gator_3d", 48x20, facing East +X)
+                const gx = 820, gy = py2;
+                ctx.save();
+                // 4 splayed reptile legs with claws
+                ctx.fillStyle = "#1e2e16";
+                ctx.fillRect(gx + 14, gy + 1, 5, 5);
+                ctx.fillRect(gx + 14, gy + 14, 5, 5);
+                ctx.fillRect(gx + 28, gy + 1, 5, 5);
+                ctx.fillRect(gx + 28, gy + 14, 5, 5);
+                // Sinuous armored tail (left) + muscular torso + broad U-shaped snout (right)
+                ctx.beginPath();
+                ctx.moveTo(gx + 1, gy + 10);
+                ctx.quadraticCurveTo(gx + 10, gy + 6, gx + 22, gy + 4);
+                ctx.lineTo(gx + 35, gy + 5);
+                ctx.quadraticCurveTo(gx + 46, gy + 6, gx + 47, gy + 10);
+                ctx.quadraticCurveTo(gx + 46, gy + 14, gx + 35, gy + 15);
+                ctx.lineTo(gx + 22, gy + 16);
+                ctx.quadraticCurveTo(gx + 10, gy + 14, gx + 1, gy + 10);
+                ctx.closePath();
+                ctx.fillStyle = "#2d4420";
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = "#0f190b";
+                ctx.stroke();
+                // Osteoderm dorsal scale ridges along back & tail
+                ctx.fillStyle = "#4d6b34";
+                for (let sx = 6; sx <= 34; sx += 4) {
+                    ctx.fillRect(gx + sx, gy + 7, 2.5, 2);
+                    ctx.fillRect(gx + sx, gy + 11, 2.5, 2);
+                }
+                ctx.fillStyle = "#658544";
+                ctx.fillRect(gx + 14, gy + 9, 18, 2);
+                // Glowing amber reptile eyes & nostrils
+                ctx.fillStyle = "#facc15";
+                ctx.fillRect(gx + 36, gy + 6, 2.5, 2);
+                ctx.fillRect(gx + 36, gy + 12, 2.5, 2);
+                ctx.fillStyle = "#0f190b";
+                ctx.fillRect(gx + 43, gy + 7.5, 1.8, 1.5);
+                ctx.fillRect(gx + 43, gy + 11, 1.8, 1.5);
+                ctx.restore();
+                meta.sprites.objects["gator_3d"] = [gx, gy, 48, 20];
+
+                // 5B. Leonida Pink Flamingo ("flamingo_pink", 18x18)
+                const fx0 = 874, fy0 = py2;
+                ctx.save();
+                ctx.fillStyle = "#be185d";
+                ctx.beginPath();
+                ctx.ellipse(fx0 + 8, fy0 + 9, 5.5, 4.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#f43f5e";
+                ctx.beginPath();
+                ctx.ellipse(fx0 + 8, fy0 + 9, 4.5, 3.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Wing highlight
+                ctx.fillStyle = "#fda4af";
+                ctx.beginPath();
+                ctx.ellipse(fx0 + 7, fy0 + 8.5, 3.0, 1.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // S-curved neck & head extending East
+                ctx.strokeStyle = "#fb7185";
+                ctx.lineWidth = 2.2;
+                ctx.beginPath();
+                ctx.moveTo(fx0 + 11, fy0 + 9);
+                ctx.quadraticCurveTo(fx0 + 15, fy0 + 6, fx0 + 14, fy0 + 9);
+                ctx.stroke();
+                ctx.fillStyle = "#f43f5e";
+                ctx.beginPath();
+                ctx.arc(fx0 + 14.5, fy0 + 9, 2.2, 0, Math.PI * 2);
+                ctx.fill();
+                // Black-tipped hooked beak
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(fx0 + 15.5, fy0 + 8.2, 2.2, 1.8);
+                ctx.restore();
+                meta.sprites.objects["flamingo_pink"] = [fx0, fy0, 18, 18];
+
+                // 5C. Inflatable Neon Pink Flamingo Pool Float ("flamingo_float", 26x26)
+                const flx = 898, fly = py2;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(flx + 13, fly + 13, 10, 0, Math.PI * 2);
+                ctx.arc(flx + 13, fly + 13, 4.2, 0, Math.PI * 2, true);
+                ctx.fillStyle = "#ff2a85";
+                ctx.fill("evenodd");
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = "#831843";
+                ctx.stroke();
+                // Glossy sun highlight arc on float tube
+                ctx.strokeStyle = "#fbcfe8";
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.arc(flx + 13, fly + 13, 7.5, -Math.PI * 0.75, -Math.PI * 0.15);
+                ctx.stroke();
+                // Flamingo head & black-tipped beak on East rim
+                ctx.fillStyle = "#ff2a85";
+                ctx.beginPath();
+                ctx.arc(flx + 21, fly + 13, 3.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(flx + 22, fly + 12, 2, 2);
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(flx + 23.5, fly + 12, 2, 2);
+                ctx.restore();
+                meta.sprites.objects["flamingo_float"] = [flx, fly, 26, 26];
+
+                // 5D. Biscayne Bay 3D Luxury Party Superyacht ("luxury_yacht", 96x38, bow facing East +X)
+                const yx = 930, yy = py2;
+                ctx.save();
+                // Outer dark marine shadow / hull rub-rail
+                ctx.beginPath();
+                ctx.moveTo(yx + 4, yy + 5);
+                ctx.lineTo(yx + 64, yy + 3);
+                ctx.quadraticCurveTo(yx + 86, yy + 5, ctx.moveTo ? yx + 94 : yx + 94, yy + 19);
+                ctx.quadraticCurveTo(yx + 86, yy + 33, yx + 64, yy + 35);
+                ctx.lineTo(yx + 4, yy + 33);
+                ctx.closePath();
+                ctx.fillStyle = "#0f172a";
+                ctx.fill();
+                // Crisp pearl-white fiberglass superyacht hull
+                ctx.beginPath();
+                ctx.moveTo(yx + 5, yy + 6);
+                ctx.lineTo(yx + 64, yy + 4);
+                ctx.quadraticCurveTo(yx + 85, yy + 6, yx + 92, yy + 19);
+                ctx.quadraticCurveTo(yx + 85, yy + 32, yx + 64, yy + 34);
+                ctx.lineTo(yx + 5, yy + 32);
+                ctx.closePath();
+                ctx.fillStyle = "#f8fafc";
+                ctx.fill();
+                // Warm Burmese teak wood deck inset (stern swim platform + bow sun-deck)
+                ctx.beginPath();
+                ctx.moveTo(yx + 8, yy + 8);
+                ctx.lineTo(yx + 62, yy + 6);
+                ctx.quadraticCurveTo(yx + 80, yy + 8, yx + 86, yy + 19);
+                ctx.quadraticCurveTo(yx + 80, yy + 30, yx + 62, yy + 32);
+                ctx.lineTo(yx + 8, yy + 30);
+                ctx.closePath();
+                ctx.fillStyle = "#d97706";
+                ctx.fill();
+                // Teak plank lines
+                ctx.strokeStyle = "#92400e";
+                ctx.lineWidth = 0.8;
+                for (let ty = yy + 10; ty <= yy + 28; ty += 3) {
+                    ctx.beginPath();
+                    ctx.moveTo(yx + 9, ty);
+                    ctx.lineTo(yx + 80, ty);
+                    ctx.stroke();
+                }
+                // Rear turquoise jacuzzi / swim-platform steps at stern (left)
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(yx + 9, yy + 12, 9, 14);
+                ctx.strokeStyle = "#e0f2fe";
+                ctx.strokeRect(yx + 9, yy + 12, 9, 14);
+                // Sculpted white superstructure cabin & wrap-around smoked-sapphire bridge windshield
+                ctx.fillStyle = "#e2e8f0";
+                ctx.fillRect(yx + 22, yy + 8, 36, 22);
+                ctx.fillStyle = "#0f172a";
+                ctx.beginPath();
+                ctx.moveTo(yx + 48, yy + 8);
+                ctx.lineTo(yx + 60, yy + 10);
+                ctx.lineTo(yx + 60, yy + 28);
+                ctx.lineTo(yx + 48, yy + 30);
+                ctx.closePath();
+                ctx.fill();
+                // White flybridge hardtop & radar arch
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(yx + 25, yy + 10, 24, 18);
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillRect(yx + 30, yy + 13, 12, 12); // sky-lounge glass sunroof
+                // Foredeck white VIP sun-pads on the bow
+                ctx.fillStyle = "#f1f5f9";
+                ctx.fillRect(yx + 63, yy + 11, 13, 7);
+                ctx.fillRect(yx + 63, yy + 20, 13, 7);
+                ctx.restore();
+                meta.sprites.objects["luxury_yacht"] = [yx, yy, 96, 38];
+
+                // 5E. Neon Vice Jet-Ski / WaveRunner ("jetski_neon", 32x14, facing East +X)
+                const jx = 1032, jy = py2;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(jx + 2, jy + 3);
+                ctx.lineTo(jx + 21, jy + 2);
+                ctx.quadraticCurveTo(jx + 30, jy + 4, jx + 31, jy + 7);
+                ctx.quadraticCurveTo(jx + 30, jy + 10, jx + 21, jy + 12);
+                ctx.lineTo(jx + 2, jy + 11);
+                ctx.closePath();
+                ctx.fillStyle = "#00f0ff";
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = "#0f172a";
+                ctx.stroke();
+                // Hot pink racing stripe & black seat saddle
+                ctx.fillStyle = "#ff2a85";
+                ctx.fillRect(jx + 16, jy + 5, 11, 4);
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(jx + 6, jy + 4, 12, 6);
+                // Handlebars
+                ctx.strokeStyle = "#f8fafc";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(jx + 18, jy + 2);
+                ctx.lineTo(jx + 18, jy + 12);
+                ctx.stroke();
+                ctx.restore();
+                meta.sprites.objects["jetski_neon"] = [jx, jy, 32, 14];
+
+                // 5F. Muscle Beach Weightlifting Bench & Heavy Barbell ("gym_bench", 30x22)
+                const gbx = 1070, gby = py2;
+                ctx.save();
+                // Rubber gym floor mat
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(gbx + 1, gby + 1, 28, 20);
+                ctx.strokeStyle = "#38bdf8";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(gbx + 1.5, gby + 1.5, 27, 19);
+                // Black leather bench pad along X
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(gbx + 5, gby + 7, 20, 8);
+                ctx.fillStyle = "#ef4444";
+                ctx.fillRect(gbx + 6, gby + 8, 18, 6);
+                // Chrome Olympic barbell across Y at head of bench (x = gbx + 21) + cast-iron weight plates
+                ctx.fillStyle = "#e2e8f0";
+                ctx.fillRect(gbx + 20, gby + 1, 2, 20);
+                ctx.fillStyle = "#090d16";
+                ctx.fillRect(gbx + 18, gby + 1, 6, 4);
+                ctx.fillRect(gbx + 18, gby + 17, 6, 4);
+                ctx.restore();
+                meta.sprites.objects["gym_bench"] = [gbx, gby, 30, 22];
+
+                // 5G. Muscle Beach Fitness Mat & Kettlebells ("gym_mat_cyan", 28x16)
+                const gmx = 1106, gmy = py2;
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(gmx + 1, gmy + 1, 26, 14);
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(gmx + 2, gmy + 2, 24, 12);
+                ctx.fillStyle = "#22d3ee";
+                ctx.fillRect(gmx + 4, gmy + 4, 20, 8);
+                meta.sprites.objects["gym_mat_cyan"] = [gmx, gmy, 28, 16];
+
+                // 5H. Wynwood Street-Art Graffiti & Breakdance Cypher Mat ("wynwood_mural_rug", 48x32)
+                const wmx = 1140, wmy = py2;
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(wmx, wmy, 48, 32);
+                ctx.fillStyle = "#ec4899";
+                ctx.fillRect(wmx + 2, wmy + 2, 22, 14);
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(wmx + 24, wmy + 2, 22, 14);
+                ctx.fillStyle = "#facc15";
+                ctx.fillRect(wmx + 2, wmy + 16, 22, 14);
+                ctx.fillStyle = "#a855f7";
+                ctx.fillRect(wmx + 24, wmy + 16, 22, 14);
+                // Geometric spray-art star & circle in center
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(wmx + 24, wmy + 16, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#10b981";
+                ctx.beginPath();
+                ctx.arc(wmx + 24, wmy + 16, 5, 0, Math.PI * 2);
+                ctx.fill();
+                meta.sprites.objects["wynwood_mural_rug"] = [wmx, wmy, 48, 32];
+
+                // 5I. Outdoor / Rooftop VIP DJ Turntable Deck ("dj_turntable_deck", 36x18)
+                const djx = 1194, djy = py2;
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(djx + 1, djy + 1, 34, 16);
+                ctx.fillStyle = "#334155";
+                ctx.fillRect(djx + 2, djy + 2, 32, 14);
+                // Twin black vinyl platters + silver tonearms + center mixer + neon front bar
+                ctx.fillStyle = "#090d16";
+                ctx.beginPath();
+                ctx.arc(djx + 10, djy + 9, 5, 0, Math.PI * 2);
+                ctx.arc(djx + 26, djy + 9, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#ff2a85";
+                ctx.beginPath();
+                ctx.arc(djx + 10, djy + 9, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#00f0ff";
+                ctx.beginPath();
+                ctx.arc(djx + 26, djy + 9, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(djx + 16, djy + 4, 4, 10);
+                ctx.fillStyle = "#00f0ff";
+                ctx.fillRect(djx + 3, djy + 14, 30, 2);
+                meta.sprites.objects["dj_turntable_deck"] = [djx, djy, 36, 18];
+
+                // 5J. Mount Kalaga National Park 3D Dome Tents ("camp_tent_green", "camp_tent_orange", 32x26)
+                const drawDomeTent = (tx0, ty0, mainCol, ridgeCol) => {
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(tx0 + 2, ty0 + 2, 28, 22);
+                    ctx.fillStyle = mainCol;
+                    ctx.fillRect(tx0 + 3, ty0 + 3, 26, 20);
+                    ctx.strokeStyle = ridgeCol;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(tx0 + 3, ty0 + 3);
+                    ctx.lineTo(tx0 + 29, ty0 + 23);
+                    ctx.moveTo(tx0 + 29, ty0 + 3);
+                    ctx.lineTo(tx0 + 3, ty0 + 23);
+                    ctx.stroke();
+                    ctx.fillStyle = "#1e293b";
+                    ctx.fillRect(tx0 + 12, ty0 + 19, 8, 4); // tent door flap
+                };
+                drawDomeTent(1236, py2, "#15803d", "#86efac");
+                meta.sprites.objects["camp_tent_green"] = [1236, py2, 32, 26];
+
+                drawDomeTent(1274, py2, "#ea580c", "#fde047");
+                meta.sprites.objects["camp_tent_orange"] = [1274, py2, 32, 26];
+
+                // 5K. Stone Ring Campfire ("campfire_ring", 24x24)
+                const cfx = 1312, cfy = py2;
+                ctx.save();
+                // Circle of 8 grey river stones
+                for (let s = 0; s < 8; s++) {
+                    const a = (s / 8) * Math.PI * 2;
+                    ctx.fillStyle = (s % 2 === 0) ? "#64748b" : "#94a3b8";
+                    ctx.beginPath();
+                    ctx.arc(cfx + 12 + Math.cos(a) * 8, cfy + 12 + Math.sin(a) * 8, 3.0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Crossed brown firewood logs
+                ctx.strokeStyle = "#78350f";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(cfx + 6, cfy + 6);
+                ctx.lineTo(cfx + 18, cfy + 18);
+                ctx.moveTo(cfx + 18, cfy + 6);
+                ctx.lineTo(cfx + 6, cfy + 18);
+                ctx.stroke();
+                // Glowing fire core
+                ctx.fillStyle = "#ef4444";
+                ctx.beginPath();
+                ctx.arc(cfx + 12, cfy + 12, 5.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#facc15";
+                ctx.beginPath();
+                ctx.arc(cfx + 12, cfy + 12, 3.0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["campfire_ring"] = [cfx, cfy, 24, 24];
+
+                // 5L. Everglades Water Lilypad & Pink Lotus ("lilypad_green", 16x16)
+                const lpx = 1342, lpy = py2;
+                ctx.save();
+                ctx.fillStyle = "#16a34a";
+                ctx.beginPath();
+                ctx.moveTo(lpx + 8, lpy + 8);
+                ctx.arc(lpx + 8, lpy + 8, 6.5, 0.3, Math.PI * 2 - 0.3);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = "#4ade80";
+                ctx.beginPath();
+                ctx.arc(lpx + 7, lpy + 7, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#f472b6";
+                ctx.beginPath();
+                ctx.arc(lpx + 8, lpy + 8, 2.0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["lilypad_green"] = [lpx, lpy, 16, 16];
+
+                // 5M. Vice City Golf Club Putting Green & Flagstick ("golf_green_pin", 28x28)
+                const ggx = 1364, ggy = py2;
+                ctx.save();
+                ctx.fillStyle = "#fde68a"; // sand bunker kidney edge
+                ctx.beginPath();
+                ctx.arc(ggx + 8, ggy + 20, 5.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#22c55e";
+                ctx.beginPath();
+                ctx.arc(ggx + 14, ggy + 14, 11, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#4ade80";
+                ctx.beginPath();
+                ctx.arc(ggx + 14, ggy + 14, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#0f172a";
+                ctx.beginPath();
+                ctx.arc(ggx + 14, ggy + 14, 2.0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["golf_green_pin"] = [ggx, ggy, 28, 28];
             }
 
             return cvs;
@@ -3384,6 +3772,342 @@ class RetroRenderer {
                 }
             }
         }
+
+        // =========================================================================
+        // 5. MUSCLE BEACH OUTDOOR FITNESS PARK (Weightlifting Benches, Pull-Up Racks & Bodybuilders)
+        // =========================================================================
+        if (Array.isArray(this.map.muscleBeachGyms)) {
+            for (let gi = 0; gi < this.map.muscleBeachGyms.length; gi++) {
+                const gm = this.map.muscleBeachGyms[gi];
+                if (gm.x < minX - 64 || gm.x > maxX + 64 || gm.y < minY - 64 || gm.y > maxY + 64) continue;
+                const bz = gm.z || 2.0;
+
+                // Two Olympic Weightlifting Benches ("gym_bench") with animated Bodybuilders pumping 3D iron!
+                for (let bi = -1; bi <= 1; bi += 2) {
+                    const bx = gm.x - 8;
+                    const by = gm.y + bi * 14;
+                    this.batchObjectSprite3D("gym_bench", bx, by, bz + 0.018, 0, 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Bodybuilder lying on bench pressing heavy barbell up & down in 3D z!
+                    const liftT = 0.5 + 0.5 * Math.sin(this.time * 4.2 + gi + bi);
+                    const lifterPed = bi < 0 ? "vc_bodybuilder" : "surfer_guy";
+                    this.batchPedSprite3D(lifterPed, 42, bx + 2, by, bz + 0.032, 0, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Animated 3D chrome barbell + cast-iron plates rising above chest (z + 0.05..0.14)
+                    const barZ = bz + 0.055 + liftT * 0.085;
+                    this.pushSolidQuad3D(bx + 6, by, barZ, 2.2, 19.0, 0, 0.88, 0.92, 0.96, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(bx + 6, by - 8.2, barZ + 0.004, 5.5, 3.6, 0, 0.08, 0.10, 0.15, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(bx + 6, by + 8.2, barZ + 0.004, 5.5, 3.6, 0, 0.08, 0.10, 0.15, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+
+                // Cyan Fitness Mats ("gym_mat_cyan") + Spotters / Calisthenics Athletes
+                this.batchObjectSprite3D("gym_mat_cyan", gm.x + 16, gm.y - 11, bz + 0.016, 0, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("gym_mat_cyan", gm.x + 16, gm.y + 11, bz + 0.016, 0, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const spotFr = 50 + (Math.floor(this.time * 6.0 + gi) % 4);
+                this.batchPedSprite3D("vc_jogger", spotFr, gm.x + 16, gm.y - 11, bz + 0.036, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("bikini_red", spotFr, gm.x + 16, gm.y + 11, bz + 0.036, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+
+                // 3D Steel Pull-Up Bar Frame on North side of gym station + athlete doing pull-ups!
+                const px = gm.x + 2, py = gm.y;
+                for (let step = 0; step < 5; step++) {
+                    const pz = bz + 0.03 + step * 0.045;
+                    this.pushSolidQuad3D(px, py - 5.5, pz, 2.4, 2.4, 0, 0.78, 0.84, 0.92, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(px, py + 5.5, pz, 2.4, 2.4, 0, 0.78, 0.84, 0.92, 0.98, SPRITE_DRAW_ORDER.TREES);
+                }
+                this.pushSolidQuad3D(px, py, bz + 0.25, 2.2, 13.0, 0, 0.94, 0.72, 0.12, 0.98, SPRITE_DRAW_ORDER.TREES);
+                const pullZ = Math.max(0, Math.sin(this.time * 3.8 + gi)) * 0.09;
+                this.batchPedSprite3D("vc_bodybuilder", 52, px, py, bz + 0.04 + pullZ, 0, 1.06, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+            }
+        }
+
+        // =========================================================================
+        // 6. LEONIDA EVERGLADES & LAKE LEONIDA ALLIGATORS ("gator_3d")
+        // =========================================================================
+        if (Array.isArray(this.map.leonidaGators)) {
+            for (let gi = 0; gi < this.map.leonidaGators.length; gi++) {
+                const gt = this.map.leonidaGators[gi];
+                if (gt.x < minX - 64 || gt.x > maxX + 64 || gt.y < minY - 64 || gt.y > maxY + 64) continue;
+                const bz = gt.z || 2.0;
+                const t = this.time * 0.85 + gt.seed;
+                let gx = gt.x;
+                let gy = gt.y;
+                let gAng = gt.angle || 0;
+
+                if (gt.inWater) {
+                    // Slow predatory figure-8 patrol in the water with sinuous tail-sway heading
+                    const rMove = 14.0;
+                    const dx = Math.cos(t) * rMove;
+                    const dy = Math.sin(t * 2.0) * (rMove * 0.45);
+                    gx += dx;
+                    gy += dy;
+                    const vx = -Math.sin(t) * rMove;
+                    const vy = Math.cos(t * 2.0) * (rMove * 0.9);
+                    gAng = Math.atan2(vy, vx) + Math.sin(this.time * 4.5 + gi) * 0.09;
+                    // Water ripple wake around swimming alligator
+                    const wakeW = 36.0 + Math.sin(this.time * 3.5 + gi) * 4.0;
+                    this.pushSolidQuad3D(gx, gy, bz + 0.012, wakeW, 14.0, gAng, 0.78, 0.95, 0.88, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                } else {
+                    // Basking alligator on bank / Port Gellhorn sidewalk (slowly turns head)
+                    gAng += Math.sin(this.time * 1.4 + gi) * 0.14;
+                    this.pushSolidQuad3D(gx + sunCos * 3.5, gy + sunSin * 3.5, bz + 0.012, 38.0, 13.0, gAng, 0.02, 0.03, 0.06, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                this.batchObjectSprite3D("gator_3d", gx, gy, bz + 0.026, gAng + Math.PI * 0.5, 1.04, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // =========================================================================
+        // 7. LEONIDA PINK FLAMINGO FLOCKS & EMERALD LILYPADS ("flamingo_pink", "lilypad_green")
+        // =========================================================================
+        if (Array.isArray(this.map.flamingoFlocks)) {
+            for (let fi = 0; fi < this.map.flamingoFlocks.length; fi++) {
+                const fl = this.map.flamingoFlocks[fi];
+                if (fl.x < minX - 64 || fl.x > maxX + 64 || fl.y < minY - 64 || fl.y > maxY + 64) continue;
+                const bz = fl.z || 2.0;
+
+                // Floating emerald lotus lilypads ("lilypad_green")
+                for (let li = 0; li < 4; li++) {
+                    const la = li * 1.57 + fl.seed;
+                    const lr = 10.0 + (li % 2) * 8.0;
+                    const lx = fl.x + Math.cos(la) * lr;
+                    const ly = fl.y + Math.sin(la) * lr;
+                    this.batchObjectSprite3D("lilypad_green", lx, ly, bz + 0.014, la + Math.sin(this.time + li) * 0.15, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+
+                // Wading Pink Flamingos ("flamingo_pink") with water ripples & gentle head rotation
+                const count = fl.count || 5;
+                for (let bi = 0; bi < count; bi++) {
+                    const a0 = (bi / count) * Math.PI * 2 + fl.seed;
+                    const rad = (bi === 0) ? 3.0 : (11.0 + (bi % 2) * 6.5);
+                    const wadeT = this.time * 1.3 + bi * 1.1 + fl.seed;
+                    const fx = fl.x + Math.cos(a0) * rad + Math.sin(wadeT) * 2.2;
+                    const fy = fl.y + Math.sin(a0) * rad + Math.cos(wadeT * 0.8) * 2.2;
+                    const fAng = a0 + Math.sin(wadeT * 1.5) * 0.45;
+                    this.pushSolidQuad3D(fx, fy, bz + 0.015, 9.5, 9.5, 0, 0.85, 0.97, 1.0, 0.28, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("flamingo_pink", fx, fy, bz + 0.032, fAng + Math.PI * 0.5, 1.05, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+
+        // =========================================================================
+        // 8. BISCAYNE BAY & ATLANTIC LUXURY SUPERYACHT PARTIES ("luxury_yacht") & JET-SKIERS ("jetski_neon")
+        // =========================================================================
+        if (Array.isArray(this.map.yachtParties)) {
+            const yachtDancers = ["bikini_pink", "bikini_cyan", "vc_tommy", "bikini_yellow", "surfer_guy", "bikini_red"];
+            for (let yi = 0; yi < this.map.yachtParties.length; yi++) {
+                const yp = this.map.yachtParties[yi];
+                if (yp.x < minX - 96 || yp.x > maxX + 96 || yp.y < minY - 96 || yp.y > maxY + 96) continue;
+                const bz = yp.z || 2.0;
+                const ang = yp.angle || 0;
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+                const bob = Math.sin(this.time * 1.8 + yp.seed) * 1.2;
+                const yx = yp.x + cosA * bob;
+                const yy = yp.y + sinA * bob;
+
+                // White turquoise ocean foam wake around superyacht hull
+                const wakePulse = 1.0 + Math.sin(this.time * 2.6 + yi) * 0.05;
+                this.pushSolidQuad3D(yx, yy, bz + 0.012, 98.0 * wakePulse, 40.0 * wakePulse, ang, 0.82, 0.97, 1.0, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                // 3D Superyacht Hull & Teak Sun-Deck ("luxury_yacht", 96x38)
+                this.batchObjectSprite3D("luxury_yacht", yx, yy, bz + 0.025, ang + Math.PI * 0.5, 1.04, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
+                // Live DJ Turntable Booth ("dj_turntable_deck") on the aft flybridge deck + pulsing neon beat ring
+                const djX = yx - cosA * 18.0;
+                const djY = yy - sinA * 18.0;
+                this.batchObjectSprite3D("dj_turntable_deck", djX, djY, bz + 0.042, ang, 0.82, SPRITE_DRAW_ORDER.PEDESTRIAN);
+
+                // 3 VIP Bikini & Vice Dancers on the bow sun-pads and stern jacuzzi deck!
+                const deckOffsets = [
+                    { fwd: 22.0, lat: -6.5 },
+                    { fwd: 22.0, lat: 6.5 },
+                    { fwd: -28.0, lat: 0.0 }
+                ];
+                for (let di = 0; di < deckOffsets.length; di++) {
+                    const doff = deckOffsets[di];
+                    const dx = yx + cosA * doff.fwd - sinA * doff.lat;
+                    const dy = yy + sinA * doff.fwd + cosA * doff.lat;
+                    const dFr = 50 + (Math.floor(this.time * 6.5 + di + yi) % 4);
+                    const dPed = yachtDancers[(yi * 3 + di) % yachtDancers.length];
+                    this.batchPedSprite3D(dPed, dFr, dx, dy, bz + 0.052, ang + Math.sin(this.time * 3.2 + di) * 0.6, 1.02, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+                }
+
+                // 2 Floating Inflatable Neon Pink Flamingo Pool Rings ("flamingo_float") drifting beside the yacht!
+                for (let fi = -1; fi <= 1; fi += 2) {
+                    const fx = yx - cosA * 26.0 - sinA * (fi * 27.0) + Math.sin(this.time * 2.0 + fi + yi) * 2.5;
+                    const fy = yy - sinA * 26.0 + cosA * (fi * 27.0) + Math.cos(this.time * 1.7 + fi) * 2.5;
+                    this.pushSolidQuad3D(fx, fy, bz + 0.014, 22.0, 22.0, 0, 0.85, 0.98, 1.0, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("flamingo_float", fx, fy, bz + 0.028, this.time * 0.4 * fi + yi, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                }
+            }
+        }
+
+        if (Array.isArray(this.map.jetSkiers)) {
+            for (let ji = 0; ji < this.map.jetSkiers.length; ji++) {
+                const js = this.map.jetSkiers[ji];
+                if (js.x < minX - 96 || js.x > maxX + 96 || js.y < minY - 96 || js.y > maxY + 96) continue;
+                const bz = js.z || 2.0;
+                const t = this.time * (js.speed || 1.35) + js.seed;
+                const jx = js.x + Math.cos(t) * js.rx;
+                const jy = js.y + Math.sin(t) * js.ry;
+                const vx = -Math.sin(t) * js.rx;
+                const vy = Math.cos(t) * js.ry;
+                const jAng = Math.atan2(vy, vx);
+                const cosA = Math.cos(jAng);
+                const sinA = Math.sin(jAng);
+
+                // High-speed white V-spray water wake behind jet-ski
+                for (let wk = 1; wk <= 3; wk++) {
+                    const wx = jx - cosA * (10 + wk * 7);
+                    const wy = jy - sinA * (10 + wk * 7);
+                    this.pushSolidQuad3D(wx, wy, bz + 0.014, 10 + wk * 3, 6 + wk * 2.5, jAng, 0.90, 0.98, 1.0, 0.52 - wk * 0.12, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Neon Vice WaveRunner ("jetski_neon") + Rider seated astride saddle (frame 84)
+                this.batchObjectSprite3D("jetski_neon", jx, jy, bz + 0.026, jAng + Math.PI * 0.5, 1.02, SPRITE_DRAW_ORDER.CAR);
+                this.batchPedSprite3D(js.ped || "surfer_guy", 84, jx - cosA * 2.0, jy - sinA * 2.0, bz + 0.040, jAng, 1.02, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+            }
+        }
+
+        // =========================================================================
+        // 9. HIGH-RISE ROOFTOP POOL PARTIES (Hotel Dixon, Ocean Drive & Penthouses at 3D Roof Elevation!)
+        // =========================================================================
+        if (Array.isArray(this.map.rooftopParties)) {
+            const roofPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "surfer_guy"];
+            for (let ri = 0; ri < this.map.rooftopParties.length; ri++) {
+                const rp = this.map.rooftopParties[ri];
+                if (rp.x < minX - 64 || rp.x > maxX + 64 || rp.y < minY - 64 || rp.y > maxY + 64) continue;
+                const rz = rp.z || 4.0;
+                const floatX = rp.x + Math.sin(this.time * 1.9 + rp.seed) * 4.5;
+                const floatY = rp.y + Math.cos(this.time * 1.5 + rp.seed) * 4.5;
+
+                // Floating Neon Pink Flamingo Ring ("flamingo_float") bobbing inside the 3D turquoise rooftop pool!
+                this.batchObjectSprite3D("flamingo_float", floatX, floatY, rz + 0.022, this.time * 0.35 + ri, 0.86, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
+                // Sun lounger on the rooftop pool coping + VIP rooftop swimmer/dancer
+                this.batchObjectSprite3D("beach_lounger", rp.x - 16, rp.y - 16, rz + 0.018, 0, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const rPed = roofPeds[ri % roofPeds.length];
+                const rFr = 50 + (Math.floor(this.time * 5.8 + ri) % 4);
+                this.batchPedSprite3D(rPed, rFr, rp.x + 12, rp.y + 10, rz + 0.035, Math.sin(this.time * 2.5 + ri), 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // =========================================================================
+        // 10. WYNWOOD STREET-ART BREAKDANCE CYPHERS & OCEAN DRIVE SOCIAL-MEDIA LIVESTREAMERS
+        // =========================================================================
+        if (Array.isArray(this.map.streetEvents)) {
+            for (let ei = 0; ei < this.map.streetEvents.length; ei++) {
+                const ev = this.map.streetEvents[ei];
+                if (ev.x < minX - 64 || ev.x > maxX + 64 || ev.y < minY - 64 || ev.y > maxY + 64) continue;
+                const bz = ev.z || 2.0;
+
+                if (ev.kind === "WYNWOOD_CYPHER") {
+                    // Vibrant Wynwood Graffiti Floor Mural ("wynwood_mural_rug") + DJ Booth ("dj_turntable_deck")
+                    this.batchObjectSprite3D("wynwood_mural_rug", ev.x, ev.y, bz + 0.014, 0, 1.04, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("dj_turntable_deck", ev.x, ev.y - 18, bz + 0.032, 0, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // DJ behind turntables
+                    this.batchPedSprite3D("vc_haitian", 50 + (Math.floor(this.time * 6.0 + ei) % 4), ev.x, ev.y - 26, bz + 0.040, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Breakdancer spinning rapidly in center of graffiti mat!
+                    const spinAng = this.time * 6.8 + ei;
+                    this.batchPedSprite3D("vc_cuban", 52, ev.x, ev.y + 1, bz + 0.038, spinAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Cheering street-art spectators on left & right
+                    const specFr = 50 + (Math.floor(this.time * 5.5 + ei) % 4);
+                    this.batchPedSprite3D("g2_civ_aqua", specFr, ev.x - 20, ev.y + 4, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("bikini_pink", specFr, ev.x + 20, ev.y + 4, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else {
+                    // Ocean Drive Social-Media Influencer Livestreaming with 3D Glowing LED Ring-Light Tripod!
+                    const ringX = ev.x - 10;
+                    const ringY = ev.y;
+                    // Tripod base & vertical pole + glowing cyan/pink LED ring light
+                    this.pushSolidQuad3D(ringX, ringY, bz + 0.020, 6.5, 6.5, 0.785, 0.08, 0.10, 0.15, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(ringX, ringY, bz + 0.12, 6.0, 6.0, this.time * 2.0, 0.0, 0.95, 1.0, 0.95, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(ringX, ringY, bz + 0.125, 3.2, 3.2, this.time * 2.0, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    // Cameraman behind ring-light + Influencer dancing for viral clip + spectator
+                    this.batchPedSprite3D("vc_tourist", 51, ringX - 9, ringY, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    const infSway = Math.sin(this.time * 6.2 + ei) * 3.0;
+                    const infFr = 50 + (Math.floor(this.time * 7.5 + ei) % 4);
+                    this.batchPedSprite3D("bikini_pink", infFr, ev.x + 6, ev.y + infSway, bz + 0.040, Math.PI + Math.sin(this.time * 4.0) * 0.4, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("vc_crockett", 0, ev.x + 4, ev.y - 14, bz + 0.038, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+
+        // =========================================================================
+        // 11. MOUNT KALAGA WILDERNESS CAMPSITES, GOLF GREENS & MAMBAS STADIUM SCRIMMAGE
+        // =========================================================================
+        if (Array.isArray(this.map.wildernessCamps)) {
+            for (let ci = 0; ci < this.map.wildernessCamps.length; ci++) {
+                const cp = this.map.wildernessCamps[ci];
+                if (cp.x < minX - 64 || cp.x > maxX + 64 || cp.y < minY - 64 || cp.y > maxY + 64) continue;
+                const bz = cp.z || 2.0;
+
+                // Dome Tents ("camp_tent_green", "camp_tent_orange") + Stone Campfire Ring ("campfire_ring") + Cooler
+                this.batchObjectSprite3D(ci % 2 === 0 ? "camp_tent_green" : "camp_tent_orange", cp.x - 18, cp.y - 10, bz + 0.025, 0.3, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchObjectSprite3D(ci % 2 === 0 ? "camp_tent_orange" : "camp_tent_green", cp.x + 18, cp.y - 8, bz + 0.025, -0.35, 1.02, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchObjectSprite3D("campfire_ring", cp.x, cp.y + 8, bz + 0.020, 0, 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("beach_cooler", cp.x - 14, cp.y + 12, bz + 0.028, 0.2, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
+                // Live flickering 3D campfire flame (sprites 234..241) inside the stone ring!
+                const fireFr = 234 + (Math.floor(this.time * 12 + ci * 3) % 8);
+                this.batchObjectSprite3D(String(fireFr), cp.x, cp.y + 8, bz + 0.045, 0, 0.68, SPRITE_DRAW_ORDER.EXPLOSION);
+
+                // Campers relaxing around the campfire
+                this.batchPedSprite3D("g2_redneck_blond", 0, cp.x + 13, cp.y + 11, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("vc_tourist", 50 + (Math.floor(this.time * 4.0 + ci) % 4), cp.x - 4, cp.y + 21, bz + 0.038, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        if (Array.isArray(this.map.golfGreens)) {
+            for (let gi = 0; gi < this.map.golfGreens.length; gi++) {
+                const gg = this.map.golfGreens[gi];
+                if (gg.x < minX - 64 || gg.x > maxX + 64 || gg.y < minY - 64 || gg.y > maxY + 64) continue;
+                const bz = gg.z || 2.0;
+
+                // Manicured Putting Green & Sand Bunker ("golf_green_pin")
+                this.batchObjectSprite3D("golf_green_pin", gg.x, gg.y, bz + 0.015, 0, 1.15, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // 3D Vertical White Flagstick & Fluttering Red Pennant in z!
+                for (let s = 0; s < 5; s++) {
+                    this.pushSolidQuad3D(gg.x, gg.y, bz + 0.025 + s * 0.045, 1.8, 1.8, 0, 0.96, 0.98, 1.0, 0.98, SPRITE_DRAW_ORDER.TREES);
+                }
+                const flagWave = Math.sin(this.time * 5.0 + gi) * 0.25;
+                this.pushSolidQuad3D(gg.x + 4.5, gg.y + flagWave, bz + 0.24, 8.5, 4.5, flagWave * 0.4, 0.96, 0.18, 0.24, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+
+                // Golfer putting + rolling white golf ball toward the cup!
+                const puttProg = (this.time * 0.65 + gi * 0.4) % 1.0;
+                const ballX = gg.x - 14.0 * (1.0 - puttProg);
+                const ballY = gg.y + 6.0 * (1.0 - puttProg);
+                this.pushSolidQuad3D(ballX, ballY, bz + 0.024, 2.6, 2.6, 0, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchPedSprite3D("vc_crockett", puttProg < 0.25 ? 52 : 0, gg.x - 18, gg.y + 8, bz + 0.038, -0.35, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // Mambas Stadium Live Pitch Scrimmage (inside the emerald stadium bowl at c=112..119, r=99..105)
+        if (this.map.stadiumScrimmage) {
+            const sc = this.map.stadiumScrimmage;
+            if (sc.x >= minX - 240 && sc.x <= maxX + 240 && sc.y >= minY - 240 && sc.y <= maxY + 240) {
+                const bz = sc.z || 2.0;
+                const matchT = this.time * 1.4;
+                const playCycle = (matchT % (Math.PI * 2));
+                const ballFlight = (this.time * 0.9) % 1.0;
+
+                // 2 Teams of 4 Athletes sprinting across the Mambas Stadium emerald pitch!
+                for (let ti = 0; ti < 8; ti++) {
+                    const isHome = ti < 4;
+                    const idx = ti % 4;
+                    const baseX = sc.x + (isHome ? -55 : 55) + (idx % 2) * 24 + Math.sin(matchT + ti) * 28;
+                    const baseY = sc.y + (idx - 1.5) * 34 + Math.cos(matchT * 0.8 + ti) * 18;
+                    const pAng = (isHome ? 0 : Math.PI) + Math.sin(matchT + ti) * 0.35;
+                    const runFr = Math.floor(this.time * 8.5 + ti * 2) % 8;
+                    this.batchPedSprite3D(isHome ? "vc_jogger" : "g2_civ_aqua", runFr, baseX, baseY, bz + 0.038, pAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+                // Arcing 3D Football / Soccer Ball + Ground Shadow
+                const bx0 = sc.x - 65 + Math.sin(playCycle) * 40;
+                const bx1 = sc.x + 65 + Math.cos(playCycle) * 40;
+                const by0 = sc.y - 35 * Math.cos(playCycle);
+                const by1 = sc.y + 35 * Math.sin(playCycle);
+                const ballX = bx0 + (bx1 - bx0) * ballFlight;
+                const ballY = by0 + (by1 - by0) * ballFlight;
+                const ballZ = Math.sin(ballFlight * Math.PI) * 0.38;
+                this.pushSolidQuad3D(ballX + sunCos * 7, ballY + sunSin * 7, bz + 0.018, 6.0, 6.0, 0, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("beach_ball", ballX, ballY, bz + 0.06 + ballZ, this.time * 6.0, 0.80 + ballZ * 0.3, SPRITE_DRAW_ORDER.TREES);
+            }
+        }
     }
 
     /* GTA 2 (1999) remap pedestrian archetypes (remaps 0..52 from the GTA 2 .sty files + Vice City '86 extras).
@@ -3724,7 +4448,8 @@ class RetroRenderer {
             }
 
             if (ped.kind === "GATOR") {
-                this.pushSolidQuad3D(ped.x, ped.y, pz, 24, 7, ped.angle, 0.21, 0.33, 0.08, 1.0, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                const sway = Math.sin(this.time * 5.0 + (ped.animSeed || 0)) * 0.08;
+                this.batchObjectSprite3D("gator_3d", ped.x, ped.y, pz, (ped.angle || 0) + sway + Math.PI * 0.5, 1.02, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 continue;
             }
 

@@ -471,6 +471,7 @@ class LeonidaMap {
             return nextIdx;
         };
 
+        this.rooftopParties = [];
         for (let tilez = 2; tilez < MAP_LAYERS; tilez++) {
             const zOff = tilez * MAP_ROWS;
             for (let tiley = 3; tiley < MAP_ROWS - 3; tiley++) {
@@ -502,9 +503,27 @@ class LeonidaMap {
                     if (isHotelDixonPool) {
                         const dixonLid = (tiley === 144 && tilex === 210) || (tiley === 145 && tilex === 211) ? 35 : 31;
                         this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, dixonLid, blk.remap);
+                        if (dixonLid === 35) {
+                            this.rooftopParties.push({
+                                x: (tilex + 0.5) * TILE_SIZE,
+                                y: (tiley + 0.5) * TILE_SIZE,
+                                z: tilez + 1.0,
+                                isHotelDixon: true,
+                                seed: tilex * 13 + tiley * 7
+                            });
+                        }
                     } else if (isOceanDrivePenthouse || isInteriorFeature) {
                         const featLid = ((tilex + tiley) % 2 === 0) ? 35 : 31;
                         this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, featLid, blk.remap);
+                        if (featLid === 35 && (isOceanDrivePenthouse || ((tilex * 3 + tiley * 11) % 4 === 0))) {
+                            this.rooftopParties.push({
+                                x: (tilex + 0.5) * TILE_SIZE,
+                                y: (tiley + 0.5) * TILE_SIZE,
+                                z: tilez + 1.0,
+                                isHotelDixon: false,
+                                seed: tilex * 13 + tiley * 7
+                            });
+                        }
                     }
                 }
             }
@@ -951,6 +970,228 @@ class LeonidaMap {
                 item.y = s.y;
             }
         }
+
+        // =========================================================================
+        // 3F. GTA 6 LEONIDA & VICE CITY LIVING WORLD ECOSYSTEMS (Ground-Truth Snapped)
+        // =========================================================================
+        const isSafePedTile = (c, r) => {
+            if (c < 3 || c >= MAP_COLS - 3 || r < 3 || r >= MAP_ROWS - 3) return false;
+            const gt = this.surfaceGround[r * MAP_COLS + c];
+            if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
+            // Ensure no road or building right on the same tile
+            return (this.surfaceLayer[r * MAP_COLS + c] || 2) <= 2;
+        };
+        const snapToVerifiedPed = (px, py, maxRad = 5) => {
+            const c0 = Math.floor(px / TILE_SIZE);
+            const r0 = Math.floor(py / TILE_SIZE);
+            if (isSafePedTile(c0, r0)) return { x: px, y: py, z: 2.0 };
+            for (let rad = 1; rad <= maxRad; rad++) {
+                for (let dr = -rad; dr <= rad; dr++) {
+                    for (let dc = -rad; dc <= rad; dc++) {
+                        if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+                        const nc = c0 + dc, nr = r0 + dr;
+                        if (isSafePedTile(nc, nr)) {
+                            return { x: (nc + 0.5) * TILE_SIZE, y: (nr + 0.5) * TILE_SIZE, z: 2.0 };
+                        }
+                    }
+                }
+            }
+            return null;
+        };
+        const isDeepWaterNeighborhood = (c, r, rad = 1) => {
+            for (let dr = -rad; dr <= rad; dr++) {
+                for (let dc = -rad; dc <= rad; dc++) {
+                    if (!isCleanWaterTile(c + dc, r + dr)) return false;
+                }
+            }
+            return true;
+        };
+
+        // 1) Muscle Beach Outdoor Weightlifting & Calisthenics Gyms (Lummus Park & South Beach Sand)
+        this.muscleBeachGyms = [];
+        for (const rGym of [94, 114, 134, 155, 174]) {
+            const snapped = snapPxToCleanSand(223.6 * TILE_SIZE, (rGym + 0.5) * TILE_SIZE, false);
+            if (snapped) {
+                this.muscleBeachGyms.push({ x: snapped.x, y: snapped.y, z: 2.0, seed: rGym });
+            }
+        }
+
+        // 2) Leonida Alligators ("gator_3d"): Swimming in Lake Leonida / Grassrivers / Kalaga + Basking on Banks & Port Gellhorn Gas Station!
+        this.leonidaGators = [];
+        const rawGators = [
+            // Lake Leonida & Gator Island swimming & basking gators
+            { c: 69.5, r: 62.5, inWater: true, angle: 0.4 },
+            { c: 76.5, r: 68.5, inWater: true, angle: 2.1 },
+            { c: 84.5, r: 74.5, inWater: true, angle: -0.8 },
+            { c: 72.5, r: 81.5, inWater: true, angle: 1.2 },
+            { c: 86.5, r: 82.5, inWater: true, angle: -2.4 },
+            { c: 64.5, r: 64.5, inWater: false, angle: 0.2 }, // Basking on NW Lake Leonida bank
+            { c: 78.5, r: 74.5, inWater: false, angle: -0.5 }, // Gator Island basking
+            // South Lake Leonida Lagoon & Port Gellhorn Convenience Store / Gas Station Gator (Trailer 1 Easter Egg!)
+            { c: 68.0, r: 101.5, inWater: true, angle: 1.5 },
+            { c: 63.5, r: 123.5, inWater: true, angle: -1.2 },
+            { c: 61.2, r: 122.5, inWater: false, angle: 0.15 }, // Port Gellhorn urban gator on sidewalk!
+            // Mount Kalaga National Park Mountain Lake
+            { c: 55.5, r: 15.5, inWater: true, angle: 0.6 },
+            { c: 58.5, r: 17.0, inWater: true, angle: -2.2 },
+            // Grassrivers Everglades & Southern Wetlands
+            { c: 48.5, r: 218.5, inWater: true, angle: 0.3 },
+            { c: 64.5, r: 222.5, inWater: true, angle: 2.6 },
+            { c: 82.5, r: 216.5, inWater: true, angle: -0.7 },
+            { c: 98.5, r: 224.5, inWater: true, angle: 1.1 },
+            { c: 116.5, r: 219.5, inWater: true, angle: -1.9 },
+            { c: 134.5, r: 225.5, inWater: true, angle: 0.8 },
+            // Golf Club Water Hazard Pond gator!
+            { c: 147.5, r: 56.0, inWater: true, angle: 0.5 }
+        ];
+        for (let gi = 0; gi < rawGators.length; gi++) {
+            const g = rawGators[gi];
+            const px = g.c * TILE_SIZE;
+            const py = g.r * TILE_SIZE;
+            if (g.inWater) {
+                const sw = snapPxToCleanWater(px, py);
+                if (sw) this.leonidaGators.push({ x: sw.x, y: sw.y, z: 2.0, inWater: true, angle: g.angle, seed: gi * 1.7 });
+            } else {
+                const sp = snapToVerifiedPed(px, py, 4);
+                if (sp) this.leonidaGators.push({ x: sp.x, y: sp.y, z: 2.0, inWater: false, angle: g.angle, seed: gi * 1.7 });
+            }
+        }
+
+        // 3) Leonida Pink Flamingo Flocks ("flamingo_pink" + "lilypad_green") in Park Lagoons, Lake Leonida & Grassrivers
+        this.flamingoFlocks = [];
+        const rawFlocks = [
+            { c: 67.5, r: 60.5, count: 6 },   // Lake Leonida North Cove
+            { c: 88.5, r: 78.5, count: 6 },   // Lake Leonida East Cove
+            { c: 68.0, r: 99.5, count: 5 },   // South Lake Leonida Park Lagoon
+            { c: 147.5, r: 55.5, count: 6 },  // Vice City Golf Club Water Hazard
+            { c: 98.5, r: 65.0, count: 5 },   // Little Haiti Basin
+            { c: 110.5, r: 66.0, count: 5 },  // Wynwood West Basin
+            { c: 134.5, r: 67.0, count: 6 },  // Wynwood East Park Basin
+            { c: 135.5, r: 120.5, count: 5 }, // Downtown Reflecting Basin
+            { c: 213.5, r: 26.5, count: 7 },  // SERA Spaceport / North Beach Lagoon
+            { c: 53.5, r: 14.5, count: 5 },   // Mount Kalaga Lake
+            { c: 76.5, r: 218.5, count: 7 },  // Grassrivers Flamingo Sanctuary West
+            { c: 112.5, r: 221.5, count: 7 }  // Grassrivers Flamingo Sanctuary East
+        ];
+        for (let fi = 0; fi < rawFlocks.length; fi++) {
+            const fl = rawFlocks[fi];
+            const sw = snapPxToCleanWater(fl.c * TILE_SIZE, fl.r * TILE_SIZE);
+            if (sw) {
+                this.flamingoFlocks.push({ x: sw.x, y: sw.y, z: 2.0, count: fl.count, seed: fi * 2.3 });
+            }
+        }
+
+        // 4) Biscayne Bay, Star Island, Vice Port & Atlantic Luxury Superyacht Parties ("luxury_yacht") & Neon Jet-Skiers ("jetski_neon")
+        this.yachtParties = [];
+        const rawYachts = [
+            { c: 162, r: 92, angle: -Math.PI * 0.5 },   // Biscayne Bay North (Star Island Yacht Basin)
+            { c: 164, r: 116, angle: Math.PI * 0.5 },   // Star Island South Channel
+            { c: 162, r: 142, angle: -Math.PI * 0.35 }, // Vice Port / Biscayne Bay South
+            { c: 243, r: 78, angle: Math.PI * 0.5 },    // North Beach Atlantic Offshore Superyacht
+            { c: 244, r: 118, angle: -Math.PI * 0.5 },  // Mid-Beach Atlantic Offshore Superyacht
+            { c: 243, r: 156, angle: Math.PI * 0.45 },  // South Beach / Ocean Drive Offshore Superyacht
+            { c: 205, r: 218, angle: 0.0 },             // Leonida Keys / Vice Point Marina Offshore
+            { c: 78, r: 72, angle: 0.35 }               // Lake Leonida VIP Party Cruiser
+        ];
+        for (let yi = 0; yi < rawYachts.length; yi++) {
+            const ry = rawYachts[yi];
+            let placed = false;
+            for (let rad = 0; rad <= 6 && !placed; rad++) {
+                for (let dr = -rad; dr <= rad && !placed; dr++) {
+                    for (let dc = -rad; dc <= rad && !placed; dc++) {
+                        if (rad > 0 && Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+                        const nc = ry.c + dc, nr = ry.r + dr;
+                        if (isDeepWaterNeighborhood(nc, nr, 1)) {
+                            this.yachtParties.push({
+                                x: (nc + 0.5) * TILE_SIZE,
+                                y: (nr + 0.5) * TILE_SIZE,
+                                z: 2.0,
+                                angle: ry.angle,
+                                seed: yi * 3.1
+                            });
+                            placed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        this.jetSkiers = [];
+        const rawJetSkis = [
+            { c: 240, r: 66, rx: 18, ry: 42, speed: 1.3 },
+            { c: 239, r: 98, rx: 16, ry: 38, speed: 1.45 },
+            { c: 238, r: 132, rx: 18, ry: 44, speed: 1.35 },
+            { c: 239, r: 168, rx: 16, ry: 38, speed: 1.5 },
+            { c: 163, r: 104, rx: 22, ry: 32, speed: 1.4 },
+            { c: 163, r: 130, rx: 20, ry: 30, speed: 1.35 },
+            { c: 192, r: 214, rx: 36, ry: 22, speed: 1.5 },
+            { c: 74, r: 66, rx: 24, ry: 24, speed: 1.25 }
+        ];
+        const jetPeds = ["surfer_guy", "bikini_pink", "bikini_cyan", "vc_jogger", "bikini_red"];
+        for (let ji = 0; ji < rawJetSkis.length; ji++) {
+            const rj = rawJetSkis[ji];
+            const sw = snapPxToCleanWater(rj.c * TILE_SIZE, rj.r * TILE_SIZE);
+            if (sw && isDeepWaterNeighborhood(Math.floor(sw.x / TILE_SIZE), Math.floor(sw.y / TILE_SIZE), 1)) {
+                this.jetSkiers.push({
+                    x: sw.x,
+                    y: sw.y,
+                    z: 2.0,
+                    rx: rj.rx,
+                    ry: rj.ry,
+                    speed: rj.speed,
+                    ped: jetPeds[ji % jetPeds.length],
+                    seed: ji * 2.1
+                });
+            }
+        }
+
+        // 5) Wynwood Walls Street-Art Breakdance Cyphers & Ocean Drive Social-Media Livestreamers ("streetEvents")
+        this.streetEvents = [];
+        const rawStreetEvents = [
+            // Wynwood & Little Haiti Street-Art Mural + DJ Booth + Breakdancers
+            { c: 112.5, r: 71.5, kind: "WYNWOOD_CYPHER" },
+            { c: 124.5, r: 71.5, kind: "WYNWOOD_CYPHER" },
+            { c: 135.5, r: 72.5, kind: "WYNWOOD_CYPHER" },
+            { c: 101.5, r: 68.5, kind: "WYNWOOD_CYPHER" },
+            // Ocean Drive & South Beach Social-Media Influencer Ring-Light Livestreamers (GTA 6 Trailer 1!)
+            { c: 218.4, r: 88.5, kind: "INFLUENCER_STREAM" },
+            { c: 218.4, r: 112.5, kind: "INFLUENCER_STREAM" },
+            { c: 218.4, r: 138.5, kind: "INFLUENCER_STREAM" },
+            { c: 218.4, r: 162.5, kind: "INFLUENCER_STREAM" },
+            { c: 204.5, r: 119.5, kind: "INFLUENCER_STREAM" }
+        ];
+        for (let ei = 0; ei < rawStreetEvents.length; ei++) {
+            const ev = rawStreetEvents[ei];
+            const sp = snapToVerifiedPed(ev.c * TILE_SIZE, ev.r * TILE_SIZE, 5);
+            if (sp) {
+                this.streetEvents.push({ x: sp.x, y: sp.y, z: 2.0, kind: ev.kind, seed: ei * 1.9 });
+            }
+        }
+
+        // 6) Mount Kalaga National Park Wilderness Campsites ("wildernessCamps")
+        this.wildernessCamps = [];
+        for (const [cc, rr] of [[49.5, 11.2], [62.5, 11.2], [50.5, 20.8], [62.2, 20.8], [74.5, 16.5]]) {
+            const sp = snapToVerifiedPed(cc * TILE_SIZE, rr * TILE_SIZE, 4);
+            if (sp) {
+                this.wildernessCamps.push({ x: sp.x, y: sp.y, z: 2.0, seed: cc + rr });
+            }
+        }
+
+        // 7) Vice City Golf Club Putting Greens ("golfGreens")
+        this.golfGreens = [];
+        for (const [cc, rr] of [[144.8, 53.5], [151.8, 53.5], [144.8, 59.2], [151.8, 59.2]]) {
+            const sp = snapToVerifiedPed(cc * TILE_SIZE, rr * TILE_SIZE, 4);
+            if (sp) {
+                this.golfGreens.push({ x: sp.x, y: sp.y, z: 2.0, seed: cc * 3 + rr });
+            }
+        }
+
+        // 8) Mambas Stadium Live Football Pitch Scrimmage ("stadiumScrimmage" inside the emerald turf bowl c=112..119, r=99..105)
+        this.stadiumScrimmage = {
+            x: 115.5 * TILE_SIZE,
+            y: 102.5 * TILE_SIZE,
+            z: 2.0
+        };
 
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
         this.streetlights = [];
