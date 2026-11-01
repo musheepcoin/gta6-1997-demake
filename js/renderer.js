@@ -2142,7 +2142,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=98_11", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_23", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2152,7 +2152,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_16", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_23", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();

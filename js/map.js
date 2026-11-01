@@ -370,9 +370,38 @@ class LeonidaMap {
         fillGroundRect(106, 125, 114, 114, 8);
         fillGroundRect(106, 125, 115, 115, 9);
 
-        // 2) Mount Kalaga Mountain Lake (cx = 48..63, ry = 10..21)
+        // 2) North Vice Shores & Golden Glades Tropical Park (cx = 24..148, ry = 7..33):
+        //    Remove the 5 artificial stepped skylight-pyramids (lid 14/31 stacked at z=2..5) and replace them
+        //    with lush tropical St. Augustine park grass (lid 10) and 3 crystal-clear turquoise resort lagoons (lid 41)!
+        for (let ry = 7; ry <= 33; ry++) {
+            for (let cx = 24; cx <= 148; cx++) {
+                if (ry >= 22 && ry <= 26) continue; // Keep the northern cross-island boulevard & sidewalks intact
+                if (ry >= 27 && ((cx >= 77 && cx <= 93) || cx >= 145)) continue; // Keep legitimate north city blocks
+                let hasPyramid = false;
+                for (let tz = 2; tz < MAP_LAYERS; tz++) {
+                    const b = this.blocksData[this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx]];
+                    if (b && (b.lid === 14 || b.lid === 31 || (ry <= 21 && b.groundType === GROUND_TYPE.BUILDING))) {
+                        hasPyramid = true;
+                        break;
+                    }
+                }
+                if (hasPyramid || ry <= 21) {
+                    const b1 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx]];
+                    if (!b1 || b1.lid === 41 || (b1.lid >= 99 && b1.lid <= 101)) continue;
+                    for (let tz = 2; tz < MAP_LAYERS; tz++) {
+                        this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx] = 0;
+                    }
+                    this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx] = 10; // lid 10 tropical grass
+                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + cx] = 4;  // groundType FIELD
+                }
+            }
+        }
         fillGroundRect(48, 63, 10, 21, 10);
         fillGroundRect(51, 61, 12, 19, 41);
+        fillGroundRect(74, 88, 10, 21, 10);
+        fillGroundRect(76, 86, 12, 19, 41);
+        fillGroundRect(120, 136, 10, 21, 10);
+        fillGroundRect(122, 134, 12, 19, 41);
 
         // 3) SERA Spaceport & North Beach Reflecting Basins (cx = 209..218, ry = 23..37)
         fillGroundRect(210, 217, 34, 34, 8);
@@ -587,7 +616,7 @@ class LeonidaMap {
 
                 if (isSandTile) {
                     this.coastalSandMask[idx] = 1;
-                    if (!adjRoad && ((c * 7 + r * 13) % 14) === 0 && c >= 216 && c <= 246) {
+                    if (!adjRoad && ((c * 7 + r * 13) % 14) === 0) {
                         this.beachUmbrellas.push({
                             x: (c + 0.5) * TILE_SIZE,
                             y: (r + 0.5) * TILE_SIZE,
@@ -645,6 +674,14 @@ class LeonidaMap {
             { spr: "lifeguard_neon",   x: 239.2 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_tower",  x: 238.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_neon",   x: 237.5 * TILE_SIZE, y: 184.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            // West Coast Golden Beach & Southern Keys Lifeguard Towers
+            { spr: "lifeguard_neon",   x: 16.5 * TILE_SIZE,  y: 36.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_tower",  x: 16.5 * TILE_SIZE,  y: 72.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_neon",   x: 14.5 * TILE_SIZE,  y: 108.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_tower",  x: 14.5 * TILE_SIZE,  y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_neon",   x: 18.5 * TILE_SIZE,  y: 180.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_tower",  x: 60.5 * TILE_SIZE,  y: 207.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: 116.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             // 2. Star Island Mansion Central Lagoon Pool (on the mansion lawn at 173.0, 112.0)
             { spr: "vercetti_pool",    x: 173.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, z: 2.0, scale: 1.15, angle: 0 }
         ];
@@ -660,7 +697,12 @@ class LeonidaMap {
             { x: 224.0 * TILE_SIZE, y: 151.8 * TILE_SIZE, z: 2.0, p0: "bikini_red",    p1: "bikini_yellow", p2: "bikini_pink",  p3: "surfer_guy" },
             { x: 236.8 * TILE_SIZE, y: 154.2 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_white",  p2: "bikini_pink",  p3: "bikini_yellow" },
             { x: 224.0 * TILE_SIZE, y: 158.8 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "surfer_guy",    p2: "bikini_cyan",  p3: "bikini_red" },
-            { x: 224.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_white", p3: "surfer_guy" }
+            { x: 224.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_white", p3: "surfer_guy" },
+            // West Coast Beach & Southern Keys Volleyball Courts
+            { x: 18.5 * TILE_SIZE,  y: 48.5 * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
+            { x: 15.5 * TILE_SIZE,  y: 96.5 * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: 16.5 * TILE_SIZE,  y: 168.5 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_yellow", p2: "bikini_red",   p3: "surfer_guy" },
+            { x: 74.5 * TILE_SIZE,  y: 217.5 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_white",  p2: "bikini_cyan",  p3: "surfer_guy" }
         ];
 
         // 3B. Beach Aerobics & Retro Boombox Dance Parties on the Sand
@@ -669,7 +711,13 @@ class LeonidaMap {
             { x: 238.0 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0 },
             { x: 223.2 * TILE_SIZE, y: 155.2 * TILE_SIZE, z: 2.0 },
             { x: 223.5 * TILE_SIZE, y: 50.5 * TILE_SIZE,  z: 2.0 },
-            { x: 192.4 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0 }
+            { x: 192.4 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0 },
+            // West Coast Beach & Southern Keys Tiki Boombox Parties
+            { x: 16.5 * TILE_SIZE,  y: 60.5 * TILE_SIZE,  z: 2.0 },
+            { x: 21.5 * TILE_SIZE,  y: 120.5 * TILE_SIZE, z: 2.0 },
+            { x: 46.5 * TILE_SIZE,  y: 212.5 * TILE_SIZE, z: 2.0 },
+            { x: 88.5 * TILE_SIZE,  y: 211.5 * TILE_SIZE, z: 2.0 },
+            { x: 116.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0 }
         ];
 
         // 3C. Sunbathing Bikini Women on Striped Towels & Resort Sun Loungers shaded by 3D Umbrellas + Side Beach Props
@@ -809,7 +857,7 @@ class LeonidaMap {
                 boardSpr: boardPool[si % boardPool.length]
             });
         }
-        // Biscayne Bay swimmers & surfers along West Beach shoreline (c = 190.2)
+        // Biscayne Bay swimmers & surfers along West Beach shoreline (c = 190.2) + Gulf of Mexico West Coast & Southern Keys!
         for (const by of [103.5, 114.5, 120.5]) {
             this.beachSwimmers.push({
                 x: 190.2 * TILE_SIZE,
@@ -819,6 +867,40 @@ class LeonidaMap {
                 isSurfer: (by > 112),
                 pedType: (by > 112) ? "bikini_pink" : "bikini_cyan",
                 boardSpr: "surfboard_cyan"
+            });
+        }
+        // West Coast Golden Beach Sunbathers & Gulf Swimmers/Surfers + Southern Keys Island Sunbathers
+        const westSpots = [
+            [16.5, 24.5], [18.5, 36.5], [19.5, 48.5], [16.5, 60.5], [16.5, 72.5], [14.5, 84.5],
+            [14.5, 96.5], [14.5, 108.5], [21.5, 120.5], [14.5, 156.5], [16.5, 168.5], [18.5, 180.5],
+            [46.5, 212.5], [60.5, 207.5], [74.5, 217.5], [88.5, 211.5], [116.5, 234.5]
+        ];
+        for (let wi = 0; wi < westSpots.length; wi++) {
+            const [wc, wr] = westSpots[wi];
+            this.beachSunbathers.push({
+                x: wc * TILE_SIZE,
+                y: wr * TILE_SIZE,
+                z: 2.0,
+                angle: Math.PI,
+                pedType: bikiniPool[wi % bikiniPool.length],
+                towelSpr: towelPool[wi % towelPool.length],
+                friendPedType: (wi % 2 === 0) ? "surfer_guy" : bikiniPool[(wi + 1) % bikiniPool.length],
+                friendTowelSpr: towelPool[(wi + 2) % towelPool.length],
+                umbSpr: umbPool[wi % umbPool.length],
+                umbDx: 16,
+                umbDy: -10,
+                propSpr: sidePropPool[wi % sidePropPool.length],
+                propDx: -16,
+                propDy: 12
+            });
+            this.beachSwimmers.push({
+                x: (wc - 3.5) * TILE_SIZE,
+                y: wr * TILE_SIZE,
+                z: 2.0,
+                angle: 0,
+                isSurfer: (wi % 2 === 0),
+                pedType: (wi % 2 === 0) ? "surfer_guy" : bikiniPool[wi % bikiniPool.length],
+                boardSpr: boardPool[wi % boardPool.length]
             });
         }
 
@@ -1069,7 +1151,9 @@ class LeonidaMap {
             { c: 134.5, r: 67.0, count: 6 },  // Wynwood East Park Basin
             { c: 135.5, r: 120.5, count: 5 }, // Downtown Reflecting Basin
             { c: 213.5, r: 26.5, count: 7 },  // SERA Spaceport / North Beach Lagoon
-            { c: 53.5, r: 14.5, count: 5 },   // Mount Kalaga Lake
+            { c: 53.5, r: 14.5, count: 6 },   // North Vice Shores West Lagoon
+            { c: 81.0, r: 15.5, count: 6 },   // North Vice Shores Central Lagoon
+            { c: 128.0, r: 15.5, count: 6 },  // Golden Glades East Lagoon
             { c: 76.5, r: 218.5, count: 7 },  // Grassrivers Flamingo Sanctuary West
             { c: 112.5, r: 221.5, count: 7 }  // Grassrivers Flamingo Sanctuary East
         ];
@@ -1091,6 +1175,9 @@ class LeonidaMap {
             { c: 244, r: 118, angle: -Math.PI * 0.5 },  // Mid-Beach Atlantic Offshore Superyacht
             { c: 243, r: 156, angle: Math.PI * 0.45 },  // South Beach / Ocean Drive Offshore Superyacht
             { c: 205, r: 218, angle: 0.0 },             // Leonida Keys / Vice Point Marina Offshore
+            { c: 148, r: 222, angle: 0.15 },            // Central Leonida Keys Lagoon Superyacht
+            { c: 9, r: 76, angle: Math.PI * 0.5 },      // West Coast Gulf Offshore Superyacht
+            { c: 9, r: 136, angle: -Math.PI * 0.5 },    // Port Gellhorn / West Beach Offshore Superyacht
             { c: 78, r: 72, angle: 0.35 }               // Lake Leonida VIP Party Cruiser
         ];
         for (let yi = 0; yi < rawYachts.length; yi++) {
@@ -1574,11 +1661,11 @@ class LeonidaMap {
             },
             {
                 id: "MOUNT_KALAGA",
-                short: "MT KALAGA",
-                shortName: "MOUNT KALAGA CANYON",
-                name: "⛰️ MOUNT KALAGA NATIONAL PARK & CANYON",
-                sub: "6 3D MOUNTAIN MASSIFS, SCENIC CANYON HIGHWAY, WATERFALL GORGE & RANGER POST — 100% HP!",
-                district: "MOUNT KALAGA NATIONAL PARK",
+                short: "VICE SHORES",
+                shortName: "NORTH VICE SHORES",
+                name: "🌴 NORTH VICE SHORES & GOLDEN GLADES LAGOONS",
+                sub: "3 CRYSTAL TURQUOISE RESORT LAGOONS, FLAMINGO COVES & SCENIC NORTH BOULEVARD — 100% HP!",
+                district: "NORTH VICE SHORES & GOLDEN GLADES",
                 bx: 84.5,
                 by: 25.5,
                 x: 84.5 * TILE_SIZE,
