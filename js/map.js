@@ -1101,25 +1101,25 @@ class LeonidaMap {
 
         // 9) VCIA Airport, SERA Spaceport, Star Island & Vice Port Aviation Props ("airportProps")
         this.airportProps = [
-            // Commercial Widebody Airliners at VCIA gates & runways
-            { kind: "AIRLINER", c: 84.5,  r: 310.0, ang: 0,             scale: 1.55 },
-            { kind: "AIRLINER", c: 103.5, r: 310.0, ang: Math.PI,       scale: 1.55 },
-            { kind: "AIRLINER", c: 140.0, r: 310.0, ang: Math.PI,       scale: 1.55 },
-            { kind: "AIRLINER", c: 82.0,  r: 348.5, ang: 0,             scale: 1.65 },
-            { kind: "AIRLINER", c: 142.0, r: 314.5, ang: Math.PI,       scale: 1.65 },
+            // Commercial Widebody Airliners at VCIA open tarmac aprons (zero road or 3D building overlap)
+            { kind: "AIRLINER", c: 84.5,  r: 310.5, ang: 0,              scale: 1.55 },
+            { kind: "AIRLINER", c: 100.5, r: 310.5, ang: Math.PI,        scale: 1.55 },
+            { kind: "AIRLINER", c: 138.5, r: 310.5, ang: Math.PI,        scale: 1.55 },
+            { kind: "AIRLINER", c: 95.5,  r: 320.0, ang: 0,              scale: 1.60 },
+            { kind: "AIRLINER", c: 138.5, r: 320.0, ang: Math.PI,        scale: 1.60 },
             // VIP Executive Learjets outside Hangars & FBO Terminals
-            { kind: "LEARJET",  c: 73.0,  r: 304.0, ang: Math.PI * 0.5, scale: 1.35 },
-            { kind: "LEARJET",  c: 73.0,  r: 324.0, ang: 0,             scale: 1.35 },
-            { kind: "LEARJET",  c: 151.0, r: 304.0, ang: Math.PI,       scale: 1.35 },
-            { kind: "LEARJET",  c: 118.0, r: 358.0, ang: -Math.PI * 0.5,scale: 1.35 },
-            { kind: "LEARJET",  c: 448.0, r: 49.5,  ang: 0,             scale: 1.30 },
+            { kind: "LEARJET",  c: 73.0,  r: 304.0, ang: Math.PI * 0.5,  scale: 1.35 },
+            { kind: "LEARJET",  c: 73.0,  r: 324.0, ang: 0,              scale: 1.35 },
+            { kind: "LEARJET",  c: 151.5, r: 304.0, ang: Math.PI,        scale: 1.35 },
+            { kind: "LEARJET",  c: 118.0, r: 353.0, ang: -Math.PI * 0.5, scale: 1.35 },
+            { kind: "LEARJET",  c: 448.0, r: 49.5,  ang: 0,              scale: 1.30 },
             // Helipads with Live Spinning-Rotor Helicopters
-            { kind: "HELIPAD",  c: 122.5, r: 303.5, ang: 0.4,           scale: 1.25 },
-            { kind: "HELIPAD",  c: 158.5, r: 291.5, ang: -0.6,          scale: 1.25 },
-            { kind: "HELIPAD",  c: 451.0, r: 22.5,  ang: 0.2,           scale: 1.25 },
-            { kind: "HELIPAD",  c: 340.5, r: 166.5, ang: -0.8,          scale: 1.25 },
-            { kind: "HELIPAD",  c: 336.5, r: 318.5, ang: 0.5,           scale: 1.25 },
-            { kind: "HELIPAD",  c: 63.5,  r: 96.5,  ang: 1.1,           scale: 1.20 }
+            { kind: "HELIPAD",  c: 122.5, r: 303.5, ang: 0.4,            scale: 1.25 },
+            { kind: "HELIPAD",  c: 158.5, r: 291.5, ang: -0.6,           scale: 1.25 },
+            { kind: "HELIPAD",  c: 453.5, r: 35.5,  ang: 0.2,            scale: 1.25 },
+            { kind: "HELIPAD",  c: 338.5, r: 163.5, ang: -0.8,           scale: 1.25 },
+            { kind: "HELIPAD",  c: 336.5, r: 318.5, ang: 0.5,            scale: 1.25 },
+            { kind: "HELIPAD",  c: 63.5,  r: 96.5,  ang: 1.1,            scale: 1.20 }
         ].map((p, i) => ({
             kind: p.kind,
             x: p.c * TILE_SIZE,
@@ -1151,14 +1151,14 @@ class LeonidaMap {
 
         // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
         this.portTerminals = [
-            // Deepwater Container Barges & Freighters
+            // Deepwater Container Barges & Freighters (100% in clean open water gt=1)
             { kind: "BARGE",      c: 360.5, r: 302.5, ang: 0,              scale: 1.55 },
             { kind: "BARGE",      c: 361.5, r: 318.8, ang: Math.PI,        scale: 1.50 },
             { kind: "BARGE",      c: 362.5, r: 329.5, ang: 0,              scale: 1.60 },
-            { kind: "BARGE",      c: 36.0,  r: 184.5, ang: Math.PI,        scale: 1.50 },
+            { kind: "BARGE",      c: 24.0,  r: 186.5, ang: Math.PI,        scale: 1.50 },
             { kind: "BARGE",      c: 38.0,  r: 209.5, ang: 0,              scale: 1.55 },
             { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 1.55 },
-            { kind: "BARGE",      c: 137.0, r: 107.0, ang: -Math.PI * 0.5, scale: 1.45 },
+            { kind: "BARGE",      c: 139.5, r: 100.5, ang: -Math.PI * 0.5, scale: 1.45 },
             { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 1.45 },
             // Quayside Intermodal Container Stacks
             { kind: "CONTAINERS", c: 334.5, r: 329.5, ang: 0,              scale: 1.25 },
@@ -1172,20 +1172,20 @@ class LeonidaMap {
             { kind: "CONTAINERS", c: 79.5,  r: 242.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 151.5, r: 107.5, ang: Math.PI * 0.5,  scale: 1.20 },
             { kind: "CONTAINERS", c: 151.5, r: 118.5, ang: Math.PI * 0.5,  scale: 1.20 },
-            // Moored Harbor Yachts & Speedboats at Gator Island, Leaf Links, Hibiscus, Sunset, Vice Port & Keys Piers
+            // Moored Harbor Yachts & Speedboats in clean water beside piers
             { kind: "YACHT",      c: 325.0, r: 305.0, ang: -Math.PI * 0.5, scale: 1.30 },
             { kind: "SPEEDBOAT",  c: 325.0, r: 312.0, ang: Math.PI * 0.5,  scale: 1.20 },
             { kind: "SPEEDBOAT",  c: 105.5, r: 100.2, ang: Math.PI,        scale: 1.20 },
             { kind: "YACHT",      c: 105.5, r: 105.2, ang: Math.PI,        scale: 1.25 },
             { kind: "YACHT",      c: 373.5, r: 116.0, ang: 0,              scale: 1.30 },
             { kind: "SPEEDBOAT",  c: 373.5, r: 121.2, ang: 0,              scale: 1.20 },
-            { kind: "YACHT",      c: 374.5, r: 213.0, ang: 0,              scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 374.5, r: 217.5, ang: 0,              scale: 1.20 },
+            { kind: "YACHT",      c: 379.5, r: 208.0, ang: 0,              scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 379.5, r: 220.0, ang: 0,              scale: 1.20 },
             { kind: "YACHT",      c: 454.0, r: 394.0, ang: 0,              scale: 1.30 },
             { kind: "SPEEDBOAT",  c: 424.0, r: 426.0, ang: 0,              scale: 1.20 },
-            { kind: "YACHT",      c: 390.0, r: 454.0, ang: 0,              scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 329.0, r: 492.5, ang: Math.PI * 0.5,  scale: 1.20 },
-            { kind: "YACHT",      c: 269.0, r: 492.5, ang: Math.PI * 0.5,  scale: 1.25 }
+            { kind: "YACHT",      c: 396.0, r: 452.0, ang: 0,              scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 329.0, r: 496.5, ang: Math.PI * 0.5,  scale: 1.20 },
+            { kind: "YACHT",      c: 269.0, r: 496.5, ang: Math.PI * 0.5,  scale: 1.25 }
         ].map((p, i) => ({
             kind: p.kind,
             x: p.c * TILE_SIZE,
@@ -1237,8 +1237,8 @@ class LeonidaMap {
             { c: 336.0, r: 158.0, ang: Math.PI * 0.25 },
             { c: 376.5, r: 118.5, ang: -Math.PI * 0.5 },
             { c: 456.0, r: 396.5, ang: -Math.PI * 0.5 },
-            { c: 392.0, r: 456.5, ang: 0 },
-            { c: 162.0, r: 490.0, ang: 0 }
+            { c: 396.0, r: 456.5, ang: 0 },
+            { c: 150.0, r: 490.0, ang: 0 }
         ].map((sp, i) => ({
             x: sp.c * TILE_SIZE,
             y: sp.r * TILE_SIZE,
@@ -1247,13 +1247,12 @@ class LeonidaMap {
             seed: i * 1.9
         }));
 
-        // 14) GTA 6 Street Takeovers / Intersection Sideshow Drift Donuts ("streetTakeovers")
+        // 14) GTA 6 Street Takeovers / Sideshow Drift Donuts ("streetTakeovers" — ONLY in wide-open off-road plazas with zero buildings/doors/cars!)
         this.streetTakeovers = [
-            { c: 183.5, r: 108.5, carSpr: "4",  seed: 0.0 }, // Wynwood / Jack of Hearts Plaza
-            { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza
-            { c: 60.0,  r: 182.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn Speedway Apron
-            { c: 336.5, r: 311.5, carSpr: "6",  seed: 4.4 }, // Vice Port Dock Apron
-            { c: 441.5, r: 288.5, carSpr: "0",  seed: 5.8 }  // Ocean Drive / Hotel Dixon Forecourt
+            { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza Center
+            { c: 64.5,  r: 177.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn Speedway Open Pit Apron
+            { c: 150.5, r: 123.5, carSpr: "4",  seed: 0.0 }, // Ambrosia Refinery Open Concrete Yard
+            { c: 452.5, r: 40.5,  carSpr: "6",  seed: 4.4 }  // SERA Spaceport Open Concrete Pad
         ].map((st) => ({
             x: st.c * TILE_SIZE,
             y: st.r * TILE_SIZE,
@@ -1283,40 +1282,38 @@ class LeonidaMap {
             }
         };
 
-        // 16) Leonida Keys, Ocean Drive & Little Cuba Thatched Tiki Bars & String-Light Café Terraces ("tikiBars")
-        this.tikiBars = [];
-        const rawTikiBars = [
+        // 16) Leonida Keys, Ocean Drive Beachfront & Gator Island Thatched Tiki Bars ("tikiBars" — 100% open beach/island spots)
+        this.tikiBars = [
             { c: 434.5, r: 395.5, ang: 0 },
             { c: 403.5, r: 427.5, ang: 0 },
             { c: 366.5, r: 455.5, ang: 0 },
             { c: 328.5, r: 477.5, ang: 0 },
             { c: 269.5, r: 477.5, ang: 0 },
             { c: 220.5, r: 477.5, ang: 0 },
-            { c: 121.5, r: 105.5, ang: 0 },
+            { c: 124.5, r: 108.5, ang: 0 },
             { c: 465.5, r: 155.5, ang: Math.PI * 0.5 },
+            { c: 465.5, r: 185.5, ang: Math.PI * 0.5 },
             { c: 465.5, r: 225.5, ang: Math.PI * 0.5 },
             { c: 465.5, r: 282.5, ang: Math.PI * 0.5 },
-            { c: 439.5, r: 170.5, ang: 0 },
-            { c: 231.5, r: 246.5, ang: 0 }
-        ];
-        for (let ti = 0; ti < rawTikiBars.length; ti++) {
-            const tb = rawTikiBars[ti];
-            const sp = snapToVerifiedPed(tb.c * TILE_SIZE, tb.r * TILE_SIZE, 5);
-            if (sp) {
-                this.tikiBars.push({ x: sp.x, y: sp.y, z: 2.0, ang: tb.ang, seed: ti * 1.7 });
-            }
-        }
+            { c: 228.5, r: 108.5, ang: 0 }
+        ].map((tb, ti) => ({
+            x: tb.c * TILE_SIZE,
+            y: tb.r * TILE_SIZE,
+            z: 2.0,
+            ang: tb.ang,
+            seed: ti * 1.7
+        }));
 
         // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks & Outlaw Biker Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
         this.industrialAndParkDetails = {
             smokestacks: [
-                { x: 155.5 * TILE_SIZE, y: 103.5 * TILE_SIZE, z: 3.0, seed: 0.0 },
-                { x: 159.5 * TILE_SIZE, y: 103.5 * TILE_SIZE, z: 3.0, seed: 1.6 },
-                { x: 156.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 3.0, seed: 3.2 }
+                { x: 155.5 * TILE_SIZE, y: 102.5 * TILE_SIZE, z: 5.0, seed: 0.0 },
+                { x: 159.5 * TILE_SIZE, y: 102.5 * TILE_SIZE, z: 5.0, seed: 1.6 },
+                { x: 156.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 5.0, seed: 3.2 }
             ],
             bikerRallies: [
                 { x: 152.0 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, count: 5, seed: 0.5 }, // Ambrosia Sugar Refinery Biker Rally
-                { x: 61.5 * TILE_SIZE,  y: 263.5 * TILE_SIZE, z: 2.0, count: 4, seed: 2.1 }  // Port Gellhorn Motor Lodge Biker Hangout
+                { x: 64.5 * TILE_SIZE,  y: 268.5 * TILE_SIZE, z: 2.0, count: 4, seed: 2.1 }  // Port Gellhorn Open Plaza Biker Hangout
             ],
             miniGolf: {
                 x: 81.5 * TILE_SIZE,
