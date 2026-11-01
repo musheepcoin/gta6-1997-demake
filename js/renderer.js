@@ -14,9 +14,9 @@ class RetroRenderer {
         this.radarCtx = radarCanvas ? radarCanvas.getContext("2d") : null;
         this.map = map;
 
-        // Default camera centered on Hotel Dixon & Ocean Drive Spawn (213.5, 146.0, z=2.0)
-        this.camX = 213.5 * TILE_SIZE;
-        this.camY = 146.0 * TILE_SIZE;
+        // Default camera centered on Hotel Dixon & Ocean Drive Spawn (mx256(213.5), my256(146.0), z=2.0)
+        this.camX = mx256(213.5) * TILE_SIZE;
+        this.camY = my256(146.0) * TILE_SIZE;
         this.camZBlocks = 2.0; // Smoothed player ground elevation in blocks (0..6)
         this.followHeightBlocks = 5.0; // 20.0m / 4.0m = 5.0 blocks above player ground
         this.zoomOffsetBlocks = 0.0; // Mouse wheel zoom delta in blocks (-2.2 .. +8.0)
@@ -489,7 +489,7 @@ class RetroRenderer {
 
                     // Daytime 3D Building Cast Shadows, Building-Foot Ambient Occlusion & Warm Florida Sunlight vs. Cool Sky Shade
                     if (dayAmt > 0.01 && c.a > 0.02) {
-                        vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 256.0);
+                        vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                         float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
                         float sandMask = clamp(isSand + step(0.82, min(c.r, min(c.g, c.b))), 0.0, 1.0);
                         float bldAO = lm.g * onGround * (1.0 - sandMask * 0.88);
@@ -2142,7 +2142,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_23", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_24", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2152,14 +2152,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_23", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_24", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=98_11", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_24", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -2210,7 +2210,7 @@ class RetroRenderer {
         this.cityChunks = [];
 
         const CHUNK_SIZE = 16;
-        const NUM_CHUNKS = 16; // 16 * 16 = 256
+        const NUM_CHUNKS = Math.ceil(MAP_COLS / CHUNK_SIZE); // 32 * 16 = 512
         const RIVERBED_DEPTH = 0.42; // kDefaultRiverbedDepth from world_mesh.cpp
 
         // Compute UV bounds for golden sandy seabed tile (lid 98 in 16x51 tile atlas)
@@ -2249,10 +2249,10 @@ class RetroRenderer {
                         let waterFloor = null;
                         for (let dy = -1; dy <= 1 && waterFloor === null; dy++) {
                             const ny = y + dy;
-                            if (ny < 0 || ny >= 256) continue;
+                            if (ny < 0 || ny >= MAP_ROWS) continue;
                             for (let dx = -1; dx <= 1; dx++) {
                                 const nx = x + dx;
-                                if (nx < 0 || nx >= 256) continue;
+                                if (nx < 0 || nx >= MAP_COLS) continue;
                                 for (let wz = 0; wz < 3; wz++) {
                                     const wBlkIdx = this.map.getBlockIndex(nx, ny, wz);
                                     if (wBlkIdx === 0) continue;
@@ -2334,10 +2334,11 @@ class RetroRenderer {
         const gl = this.gl;
         if (!gl || !this.map || !this.map.cmpLoaded) return;
 
-        // 1) Compute true visible top elevation (1.0..6.0) for every 256x256 map column
-        const colTopElev = new Float32Array(256 * 256);
-        for (let r = 0; r < 256; r++) {
-            for (let c = 0; c < 256; c++) {
+        // 1) Compute true visible top elevation (1.0..6.0) for every 512x512 map column
+        const M = MAP_COLS;
+        const colTopElev = new Float32Array(M * M);
+        for (let r = 0; r < M; r++) {
+            for (let c = 0; c < M; c++) {
                 let topY = 2.0;
                 for (let z = 5; z >= 0; z--) {
                     const bIdx = this.map.getBlockIndex(c, r, z);
@@ -2348,11 +2349,11 @@ class RetroRenderer {
                         break;
                     }
                 }
-                colTopElev[r * 256 + c] = topY;
+                colTopElev[r * M + c] = topY;
             }
         }
 
-        // 2) Ray-march 512x512 sub-tile lightmap (2x2 samples per 64px tile) for:
+        // 2) Ray-march 512x512 tile lightmap (1 sample per 64px tile across 512x512 world) for:
         //    - G: 3D Building-Foot & Urban Canyon Ambient Occlusion
         //    - B: 3D Cast Shadow from South-East Sun (morning/forenoon)
         //    - A: 3D Cast Shadow from West-Southwest Sun (midday/afternoon — casts Hotel Dixon & Ocean Drive shadows onto the promenade!)
@@ -2362,26 +2363,26 @@ class RetroRenderer {
         const rawShadE = new Float32Array(LRES * LRES);
         const rawShadW = new Float32Array(LRES * LRES);
         const aoOffsets = [
-            [-0.55, 0], [0.55, 0], [0, -0.55], [0, 0.55],
-            [-0.42, -0.42], [0.42, -0.42], [-0.42, 0.42], [0.42, 0.42]
+            [-1, 0], [1, 0], [0, -1], [0, 1],
+            [-1, -1], [1, -1], [-1, 1], [1, 1]
         ];
 
         for (let ty = 0; ty < LRES; ty++) {
-            const wy = (ty + 0.5) * 0.5;
-            const cy = Math.min(255, Math.max(0, ty >> 1));
+            const wy = ty + 0.5;
+            const cy = Math.min(M - 1, Math.max(0, ty));
             for (let tx = 0; tx < LRES; tx++) {
-                const wx = (tx + 0.5) * 0.5;
-                const cx = Math.min(255, Math.max(0, tx >> 1));
+                const wx = tx + 0.5;
+                const cx = Math.min(M - 1, Math.max(0, tx));
                 const idx = ty * LRES + tx;
-                const baseElev = colTopElev[cy * 256 + cx];
+                const baseElev = colTopElev[cy * M + cx];
                 rawElev[idx] = baseElev;
 
                 // Building-foot contact Ambient Occlusion
                 let aoSum = 0.0;
                 for (let k = 0; k < 8; k++) {
-                    const nx = Math.min(255, Math.max(0, Math.floor(wx + aoOffsets[k][0])));
-                    const ny = Math.min(255, Math.max(0, Math.floor(wy + aoOffsets[k][1])));
-                    const hDiff = colTopElev[ny * 256 + nx] - baseElev;
+                    const nx = Math.min(M - 1, Math.max(0, cx + aoOffsets[k][0]));
+                    const ny = Math.min(M - 1, Math.max(0, cy + aoOffsets[k][1]));
+                    const hDiff = colTopElev[ny * M + nx] - baseElev;
                     if (hDiff > 0.2) {
                         aoSum += Math.min(1.0, hDiff * 0.38);
                     }
@@ -2397,17 +2398,17 @@ class RetroRenderer {
                     const falloff = Math.max(0.28, 1.0 - dist * 0.13);
 
                     // Caster to the North-East (+X, -Y) -> casts shadow South-West
-                    const ex = Math.min(255, Math.max(0, Math.floor(wx + 0.35 * s)));
-                    const ey = Math.min(255, Math.max(0, Math.floor(wy - 0.32 * s)));
-                    const diffE = colTopElev[ey * 256 + ex] - baseElev;
+                    const ex = Math.min(M - 1, Math.max(0, Math.floor(wx + 0.35 * s)));
+                    const ey = Math.min(M - 1, Math.max(0, Math.floor(wy - 0.32 * s)));
+                    const diffE = colTopElev[ey * M + ex] - baseElev;
                     if (diffE > reqH) {
                         shE = Math.max(shE, Math.min(1.0, falloff * Math.min(1.0, diffE * 0.52)));
                     }
 
                     // Caster to the North-West (-X, -Y) -> casts shadow South-East (matching palm & ped shadows!)
-                    const wxCaster = Math.min(255, Math.max(0, Math.floor(wx - 0.36 * s)));
-                    const wyCaster = Math.min(255, Math.max(0, Math.floor(wy - 0.32 * s)));
-                    const diffW = colTopElev[wyCaster * 256 + wxCaster] - baseElev;
+                    const wxCaster = Math.min(M - 1, Math.max(0, Math.floor(wx - 0.36 * s)));
+                    const wyCaster = Math.min(M - 1, Math.max(0, Math.floor(wy - 0.32 * s)));
+                    const diffW = colTopElev[wyCaster * M + wxCaster] - baseElev;
                     if (diffW > reqH) {
                         shW = Math.max(shW, Math.min(1.0, falloff * Math.min(1.0, diffW * 0.52)));
                     }
@@ -2461,8 +2462,8 @@ class RetroRenderer {
 
     getDayShadeAtPixel(xPx, yPx) {
         if (!this.dayShadowMap) return 0.0;
-        const tx = Math.min(511, Math.max(0, Math.floor((xPx / TILE_SIZE) * 2.0)));
-        const ty = Math.min(511, Math.max(0, Math.floor((yPx / TILE_SIZE) * 2.0)));
+        const tx = Math.min(511, Math.max(0, Math.floor(xPx / TILE_SIZE)));
+        const ty = Math.min(511, Math.max(0, Math.floor(yPx / TILE_SIZE)));
         const off = (ty * 512 + tx) * 4;
         const ao = this.dayShadowMap[off + 1] / 255.0;
         const shE = this.dayShadowMap[off + 2] / 255.0;
@@ -2677,7 +2678,7 @@ class RetroRenderer {
                 // Encode 8-neighbor non-water mask (N1|S2|W4|E8|NW16|NE32|SW64|SE128) + surrounding ground type.
                 if (y_elev === 1 && this.map) {
                     const wLid = (cx, cy) => {
-                        if (cx < 0 || cx >= 256 || cy < 0 || cy >= 256) return 41;
+                        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS) return 41;
                         const bi = this.map.getBlockIndex(cx, cy, y_elev);
                         if (!bi) return 41;
                         const nb = this.map.getBlockInfo(bi);
@@ -4413,9 +4414,9 @@ class RetroRenderer {
             const pby = Math.floor(ped.y / TILE_SIZE);
             const isBeachZone =
                 ped.missionTag === "BEACH" ||
-                ped.x >= 218.2 * TILE_SIZE ||
+                ped.x >= mx256(218.2) * TILE_SIZE ||
                 (this.map && this.map.coastalSandMask && this.map.coastalSandMask[pby * MAP_COLS + pbx] === 1) ||
-                (pbx >= 182 && pbx <= 195 && pby >= 98 && pby <= 128);
+                (pbx >= MAP_X_256[182] && pbx <= MAP_X_256[195] && pby >= MAP_Y_256[98] && pby <= MAP_Y_256[128]);
 
             if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
                 const beachPool = [
@@ -5050,7 +5051,7 @@ class RetroRenderer {
                     if (pm.x < minX || pm.x > maxX || pm.y < minY || pm.y > maxY) continue;
                     const baseZ = (pm.z !== undefined ? pm.z : 2.0);
                     // Ocean Drive & Star Island Neon Palm Trunk Uplight Ring at ground level!
-                    if (isNightGlow && pm.x >= 165 * TILE_SIZE && pm.x <= 222 * TILE_SIZE) {
+                    if (isNightGlow && pm.x >= mx256(165) * TILE_SIZE && pm.x <= mx256(222) * TILE_SIZE) {
                         const isPink = (pi % 2) === 0;
                         this.pushSolidQuad3D(
                             pm.x,
@@ -7729,7 +7730,7 @@ class RetroRenderer {
         const worldH = this.map.height;
 
         const zoomMode = this.minimapZoomMode || 0;
-        const spanBlocks = zoomMode === 0 ? 68 : (zoomMode === 1 ? 136 : 256);
+        const spanBlocks = zoomMode === 0 ? 68 : (zoomMode === 1 ? 160 : MAP_COLS);
         const viewWorldW = spanBlocks * TILE_SIZE;
         const viewWorldH = spanBlocks * TILE_SIZE;
 
@@ -8430,7 +8431,7 @@ class RetroRenderer {
 
         // Zoom span in blocks: 0 = Cruise (68 blocks), 1 = Wide (136 blocks), 2 = Full Island (256 blocks)
         const zoomMode = this.minimapZoomMode || 0;
-        const spanBlocks = zoomMode === 0 ? 68 : (zoomMode === 1 ? 136 : 256);
+        const spanBlocks = zoomMode === 0 ? 68 : (zoomMode === 1 ? 160 : MAP_COLS);
         const viewWorldW = spanBlocks * TILE_SIZE;
         const viewWorldH = spanBlocks * TILE_SIZE;
 
@@ -8810,51 +8811,7 @@ class RetroRenderer {
         const rawImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
         if (!rawImg) return;
         let srcImg = rawImg;
-        if (this.map && this.map.cmpLoaded) {
-            if (!this.liveOverviewCanvas) {
-                this.liveOverviewCanvas = document.createElement("canvas");
-                this.liveOverviewCanvas.width = 1024;
-                this.liveOverviewCanvas.height = 1024;
-            }
-            const octx = this.liveOverviewCanvas.getContext("2d");
-            octx.imageSmoothingEnabled = false;
-            octx.drawImage(rawImg, 0, 0, 1024, 1024);
-            // Mirror restored Mambas Stadium south bowl & emerald football pitch (cx=106..125, ry=106..115) from north bowl (210 - ry)
-            for (let ry = 106; ry <= 115; ry++) {
-                const srcRy = 210 - ry;
-                octx.drawImage(rawImg, 106 * 4, srcRy * 4, 20 * 4, 4, 106 * 4, ry * 4, 20 * 4, 4);
-            }
-            // Sync reshaped urban basins, park lagoons & Lummus Park greenbelt onto the live GPS overview
-            for (let ry = 1; ry < 255; ry++) {
-                for (let cx = 1; cx < 255; cx++) {
-                    let has3D = false;
-                    for (let tz = 2; tz < 6; tz++) {
-                        const b = this.map.getBlockInfo(this.map.getBlockIndex(cx, ry, tz));
-                        if (b && (b.lid !== 0 || b.w !== 0 || b.e !== 0 || b.n !== 0 || b.s !== 0)) {
-                            has3D = true;
-                            break;
-                        }
-                    }
-                    if (has3D) continue;
-                    const b1 = this.map.getBlockInfo(this.map.getBlockIndex(cx, ry, 1));
-                    if (!b1) continue;
-                    if (b1.lid === 41) {
-                        octx.fillStyle = useVice ? "#2898b8" : "#225577";
-                        octx.fillRect(cx * 4, ry * 4, 4, 4);
-                    } else if (b1.lid === 8) {
-                        octx.fillStyle = useVice ? "#dfd3c3" : "#9c9a96";
-                        octx.fillRect(cx * 4, ry * 4, 4, 4);
-                    } else if (b1.lid === 9) {
-                        octx.fillStyle = useVice ? "#efe2cf" : "#b2aba0";
-                        octx.fillRect(cx * 4, ry * 4, 4, 4);
-                    } else if (b1.lid === 10) {
-                        octx.fillStyle = useVice ? "#2ea844" : "#3a7d34";
-                        octx.fillRect(cx * 4, ry * 4, 4, 4);
-                    }
-                }
-            }
-            srcImg = this.liveOverviewCanvas;
-        }
+        this.liveOverviewCanvas = null;
         if (this.fullMapBgCanvas) {
             const fctx = this.fullMapBgCanvas.getContext("2d");
             fctx.imageSmoothingEnabled = false;

@@ -13,32 +13,32 @@ class MissionManager {
                 id: "phone_motel",
                 missionId: "M1_UNCLE_JACK",
                 name: "HOTEL DIXON PAYPHONE (OCEAN DRIVE)",
-                x: 213.5 * TILE_SIZE,
-                y: 143.5 * TILE_SIZE,
+                x: mx256(213.5) * TILE_SIZE,
+                y: my256(143.5) * TILE_SIZE,
                 completed: false
             },
             {
                 id: "phone_scurve",
                 missionId: "M2_GRASSRIVERS",
                 name: "LUMMUS PARK & VICE BEACH PAYPHONE",
-                x: 218.5 * TILE_SIZE,
-                y: 151.5 * TILE_SIZE,
+                x: mx256(218.5) * TILE_SIZE,
+                y: my256(151.5) * TILE_SIZE,
                 completed: false
             },
             {
                 id: "phone_downtown",
                 missionId: "M3_OCEAN_DRIVE",
                 name: "STAR ISLAND MANSION PAYPHONE",
-                x: 173.0 * TILE_SIZE,
-                y: 104.5 * TILE_SIZE,
+                x: mx256(173.0) * TILE_SIZE,
+                y: my256(104.5) * TILE_SIZE,
                 completed: false
             },
             {
                 id: "phone_beach",
                 missionId: "M4_ANKLE_OVERRIDE",
                 name: "PORT GELLHORN SPEEDWAY PAYPHONE",
-                x: 47.0 * TILE_SIZE,
-                y: 114.5 * TILE_SIZE,
+                x: mx256(47.0) * TILE_SIZE,
+                y: my256(114.5) * TILE_SIZE,
                 completed: false
             }
         ];
@@ -110,10 +110,10 @@ class MissionManager {
                     g.setWantedLevel(Math.max(g.wantedLevel, 2));
                     g.sendPager(
                         "JASON (PARTNER)",
-                        "REGISTER CLEARED ($15,000)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave (203, 146) to lose the heat!",
+                        "REGISTER CLEARED ($15,000)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
                         true
                     );
-                    m.targetPos = { x: 203.0 * TILE_SIZE, y: 146.5 * TILE_SIZE };
+                    m.targetPos = { x: mx256(203.0) * TILE_SIZE, y: my256(146.5) * TILE_SIZE };
                     m.objectiveLabel = "RESPRAY AT VICE CUSTOMS (COLLINS AVE)";
                 }
             } else if (m.stage === 2) {
@@ -136,7 +136,7 @@ class MissionManager {
                     m.objectiveLabel = `COLLECT BEACH & PIER CRATES (${3 - m.crates.length}/3)`;
                 } else {
                     m.stage = 2;
-                    m.targetPos = { x: 213.5 * TILE_SIZE, y: 146.0 * TILE_SIZE };
+                    m.targetPos = { x: mx256(213.5) * TILE_SIZE, y: my256(146.0) * TILE_SIZE };
                     m.objectiveLabel = "DELIVER HAUL TO HOTEL DIXON";
                     g.setWantedLevel(Math.max(g.wantedLevel, 2));
                     g.sendPager(
@@ -156,7 +156,7 @@ class MissionManager {
                     m.stage = 2;
                     m.timer = 90;
                     g.setWantedLevel(Math.max(g.wantedLevel, 3));
-                    m.targetPos = { x: 171.5 * TILE_SIZE, y: 164.5 * TILE_SIZE };
+                    m.targetPos = { x: mx256(171.5) * TILE_SIZE, y: my256(164.5) * TILE_SIZE };
                     m.objectiveLabel = "DELIVER CHEETAH TO VICE PORT CRANE";
                     g.sendPager(
                         "JASON (PARTNER)",
@@ -182,11 +182,11 @@ class MissionManager {
                     m.stage = 2;
                     g.addCash(50000, "ARMORED VAULT LOOT!");
                     g.setWantedLevel(Math.max(g.wantedLevel, 4));
-                    m.targetPos = { x: 66.5 * TILE_SIZE, y: 152.0 * TILE_SIZE };
+                    m.targetPos = { x: mx256(66.5) * TILE_SIZE, y: my256(152.0) * TILE_SIZE };
                     m.objectiveLabel = "HACK DOC RELAY AT VCIA AIRPORT";
                     g.sendPager(
                         "LUCIA & JASON",
-                        "Vault cash secured! 4-STAR SWAT MANHUNT! Race east to VCIA International Airport (66, 152) to scramble Lucia's DOC Ankle Monitor!",
+                        "Vault cash secured! 4-STAR SWAT MANHUNT! Race east to VCIA International Airport to scramble Lucia's DOC Ankle Monitor!",
                         true
                     );
                 }
@@ -211,22 +211,22 @@ class MissionManager {
                 phone: phone,
                 stage: 1,
                 timer: null,
-                targetPos: { x: 213.5 * TILE_SIZE, y: 155.5 * TILE_SIZE },
+                targetPos: { x: mx256(213.5) * TILE_SIZE, y: my256(155.5) * TILE_SIZE },
                 objectiveLabel: "HOLD UP SOUTH BEACH LIQUOR"
             };
             g.recruitJason();
             g.toggleBandana(true);
             g.sendPager(
                 "LUCIA & JASON",
-                "MISSION 1: 'TRUST?' — Red heist bandana on! Head south down Ocean Drive (213, 155), rob the register, and lose the cops at Vice Customs on Collins Ave!",
+                "MISSION 1: 'TRUST?' — Red heist bandana on! Head south down Ocean Drive, rob the register, and lose the cops at Vice Customs on Collins Ave!",
                 true
             );
             g.showBigBanner("MISSION 1: TRUST?", "ROB SOUTH BEACH LIQUOR WITH JASON", "#ff2a85", 2.4);
         } else if (phone.missionId === "M2_GRASSRIVERS") {
             const crates = [
-                { x: 224.5 * TILE_SIZE, y: 150.0 * TILE_SIZE },
-                { x: 232.5 * TILE_SIZE, y: 154.0 * TILE_SIZE },
-                { x: 245.5 * TILE_SIZE, y: 154.0 * TILE_SIZE }
+                { x: mx256(224.5) * TILE_SIZE, y: my256(150.0) * TILE_SIZE },
+                { x: mx256(232.5) * TILE_SIZE, y: my256(154.0) * TILE_SIZE },
+                { x: mx256(245.5) * TILE_SIZE, y: my256(154.0) * TILE_SIZE }
             ];
             this.activeMission = {
                 id: "M2_GRASSRIVERS",
@@ -245,7 +245,7 @@ class MissionManager {
             );
             g.showBigBanner("PIER CONTRABAND RUN", "COLLECT 3 CRATES ON VICE BEACH & OCEAN PIER", "#a3e635", 2.4);
         } else if (phone.missionId === "M3_OCEAN_DRIVE") {
-            const cheetah = new Vehicle("mission_cheetah", "VICE_CHEETAH", 173.5 * TILE_SIZE, 107.5 * TILE_SIZE, 0);
+            const cheetah = new Vehicle("mission_cheetah", "VICE_CHEETAH", mx256(173.5) * TILE_SIZE, my256(107.5) * TILE_SIZE, 0);
             cheetah.missionTag = "TARGET_CHEETAH";
             g.vehicles.push(cheetah);
 
@@ -261,12 +261,12 @@ class MissionManager {
             };
             g.sendPager(
                 "JASON (PAYPHONE)",
-                "MISSION 3: 'STAR ISLAND CHEETAH BOOST' — A VIP Grotti Cheetah is parked on Star Island (173, 107). Boost it and deliver it to the Port of Vice City!",
+                "MISSION 3: 'STAR ISLAND CHEETAH BOOST' — A VIP Grotti Cheetah is parked on Star Island. Boost it and deliver it to the Port of Vice City!",
                 true
             );
             g.showBigBanner("CHEETAH BOOST", "STEAL THE VIP CHEETAH ON STAR ISLAND", "#00f0ff", 2.4);
         } else if (phone.missionId === "M4_ANKLE_OVERRIDE") {
-            const brinks = new Vehicle("mission_brinks", "BRINKS_TRUCK", 38.5 * TILE_SIZE, 140.5 * TILE_SIZE, Math.PI * 0.5);
+            const brinks = new Vehicle("mission_brinks", "BRINKS_TRUCK", mx256(38.5) * TILE_SIZE, my256(140.5) * TILE_SIZE, Math.PI * 0.5);
             brinks.missionTag = "ARMORED_TARGET";
             g.vehicles.push(brinks);
 

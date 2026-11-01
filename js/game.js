@@ -30,8 +30,8 @@ class LeonidaGame {
 
         // Player: LUCIA CAMINOS (Starts on Ocean Drive in front of Hotel Dixon, facing Lummus Park, Vice Beach & the Atlantic Pier!)
         this.player = {
-            x: 213.5 * TILE_SIZE,
-            y: 146.0 * TILE_SIZE,
+            x: mx256(213.5) * TILE_SIZE,
+            y: my256(146.0) * TILE_SIZE,
             z: 2.0,
             angle: 0,
             hp: 100,
@@ -302,12 +302,22 @@ class LeonidaGame {
             { spec: "SUPERBIKE", c: 55.5, r: 149.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
             { spec: "PICKUP_TRUCK", c: 58.0, r: 212.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
             { spec: "AIRBOAT", c: 68.5, r: 222.5, a: 0, z: 1.0, missionTag: "LANDMARK" },
-            { spec: "STINGER_CABRIO", c: 135.0, r: 239.5, a: -Math.PI, z: 2.0, driver: "AI_TRAFFIC" }
+            { spec: "STINGER_CABRIO", c: 135.0, r: 239.5, a: -Math.PI, z: 2.0, driver: "AI_TRAFFIC" },
+
+            // --- J. Extra 512x512 Mega-Map Vehicles across Expanded Vice City & Leonida ---
+            { spec: "BANSHEE_GT", c: 446.5, r: 215.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC", raw512: true },
+            { spec: "TURISMO_CABRIO", c: 445.5, r: 280.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC", raw512: true },
+            { spec: "STINGER_CABRIO", c: 395.5, r: 247.5, a: 0, z: 2.0, driver: "AI_TRAFFIC", raw512: true },
+            { spec: "CHALLENGER_RT", c: 310.5, r: 215.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC", raw512: true },
+            { spec: "AIRBOAT", c: 195.5, r: 195.5, a: 0.4, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "AIRBOAT", c: 160.5, r: 452.5, a: 0.0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "GATOR_4X4", c: 465.5, r: 215.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "MONSTER_BUGGY", c: 468.5, r: 285.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true }
         ];
 
         parked.forEach((p, idx) => {
-            const vx = p.c * TILE_SIZE;
-            const vy = p.r * TILE_SIZE;
+            const vx = (p.raw512 ? p.c : mx256(p.c)) * TILE_SIZE;
+            const vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
             const v = new Vehicle(`parked_${idx}`, p.spec, vx, vy, p.a);
             v.z = p.z || 2.0;
             if (p.driver) {
@@ -389,8 +399,8 @@ class LeonidaGame {
         starterPeds.forEach((sp, idx) => {
             this.peds.push(new Pedestrian({
                 id: `ped_init_${idx}`,
-                x: sp.c * TILE_SIZE,
-                y: sp.r * TILE_SIZE,
+                x: (sp.raw512 ? sp.c : mx256(sp.c)) * TILE_SIZE,
+                y: (sp.raw512 ? sp.r : my256(sp.r)) * TILE_SIZE,
                 z: 2.0,
                 angle: sp.a,
                 speed: sp.dead ? 0 : 36,
@@ -769,9 +779,9 @@ class LeonidaGame {
         this.monkChain = [];
         this.monksKilled = 0;
 
-        // 7 Saffron-Robed Hare Krishna Monks marching in single file along the Lummus Park / Ocean Drive Promenade (x=218.5, y=146.5..152)!
-        const startX = 218.5 * TILE_SIZE;
-        const startY = 146.5 * TILE_SIZE;
+        // 7 Saffron-Robed Hare Krishna Monks marching in single file along the Lummus Park / Ocean Drive Promenade!
+        const startX = mx256(218.5) * TILE_SIZE;
+        const startY = my256(146.5) * TILE_SIZE;
         const spacing = 19;
 
         for (let i = 0; i < 7; i++) {
@@ -3101,12 +3111,12 @@ class LeonidaGame {
             }
             if (targetType === "POLICE") {
                 // VCPD South Beach Precinct (Collins Ave)
-                p.x = 203.0 * TILE_SIZE;
-                p.y = 146.0 * TILE_SIZE;
+                p.x = mx256(203.0) * TILE_SIZE;
+                p.y = my256(146.0) * TILE_SIZE;
             } else {
                 // Ocean Drive / Hotel Dixon Medical Suite
-                p.x = 213.5 * TILE_SIZE;
-                p.y = 146.0 * TILE_SIZE;
+                p.x = mx256(213.5) * TILE_SIZE;
+                p.y = my256(146.0) * TILE_SIZE;
             }
             p.z = this.map.getHeightAtPixel(p.x, p.y, 4.0);
             if (this.jason) {
@@ -4163,9 +4173,9 @@ class LeonidaGame {
                     leadMonk = ped;
                     ped.x += Math.cos(ped.angle) * ped.speed * dt;
                     ped.y += Math.sin(ped.angle) * ped.speed * dt;
-                    // Patrol back and forth along the Ocean Drive Boardwalk between rows 143.5 and 155.5
-                    if (ped.y < 143.5 * TILE_SIZE) ped.angle = Math.PI * 0.5;
-                    if (ped.y > 155.5 * TILE_SIZE) ped.angle = -Math.PI * 0.5;
+                    // Patrol back and forth along the Ocean Drive Boardwalk between rows my256(143.5) and my256(155.5)
+                    if (ped.y < my256(143.5) * TILE_SIZE) ped.angle = Math.PI * 0.5;
+                    if (ped.y > my256(155.5) * TILE_SIZE) ped.angle = -Math.PI * 0.5;
                 } else {
                     const dx = leadMonk.x - ped.x;
                     const dy = leadMonk.y - ped.y;
@@ -4896,9 +4906,9 @@ class LeonidaGame {
                 if (this._footstepTimer <= 0) {
                     this._footstepTimer = stepInterval;
                     this._footLeft = !this._footLeft;
-                    const bc = Math.max(0, Math.min(255, Math.floor(p.x / 64)));
-                    const br = Math.max(0, Math.min(255, Math.floor(p.y / 64)));
-                    const bIdx = br * 256 + bc;
+                    const bc = Math.max(0, Math.min(MAP_COLS - 1, Math.floor(p.x / 64)));
+                    const br = Math.max(0, Math.min(MAP_ROWS - 1, Math.floor(p.y / 64)));
+                    const bIdx = br * MAP_COLS + bc;
                     const gt = this.map.surfaceGround ? this.map.surfaceGround[bIdx] : 3;
                     const isSand = this.map.coastalSandMask && this.map.coastalSandMask[bIdx] === 1;
                     const surf = gt === 1 ? "WATER" : (isSand ? "SAND" : (gt === 4 ? "GRASS" : "PAVEMENT"));
@@ -4943,12 +4953,12 @@ class LeonidaGame {
 
         // Compute proximity to Atlantic Ocean / Biscayne Bay / Lake Leonida water tiles
         let waterProximity = 0;
-        const pc = Math.max(4, Math.min(251, Math.floor(p.x / 64)));
-        const pr = Math.max(4, Math.min(251, Math.floor(p.y / 64)));
+        const pc = Math.max(4, Math.min(MAP_COLS - 5, Math.floor(p.x / 64)));
+        const pr = Math.max(4, Math.min(MAP_ROWS - 5, Math.floor(p.y / 64)));
         if (this.map.surfaceGround) {
             for (let dr = -4; dr <= 4; dr += 2) {
                 for (let dc = -4; dc <= 4; dc += 2) {
-                    if (this.map.surfaceGround[(pr + dr) * 256 + (pc + dc)] === 1) {
+                    if (this.map.surfaceGround[(pr + dr) * MAP_COLS + (pc + dc)] === 1) {
                         const wd = Math.hypot(dc, dr);
                         waterProximity = Math.max(waterProximity, Math.max(0, 1 - wd / 5.5));
                     }

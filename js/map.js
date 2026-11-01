@@ -12,13 +12,25 @@ const METERS_PER_MAP_UNIT = 4.0;
 const PIXELS_PER_METER = PIXELS_PER_MAP_UNIT / METERS_PER_MAP_UNIT; // 16.0 px/m
 
 const TILE_SIZE = MAP_BLOCK_TEXTURE_DIMS;
-const MAP_DIMENSIONS = 256;
+const MAP_DIMENSIONS = 512;
 const MAP_COLS = MAP_DIMENSIONS;
 const MAP_ROWS = MAP_DIMENSIONS;
 const MAP_LAYERS_COUNT = 6;
 const MAP_LAYERS = MAP_LAYERS_COUNT;
 const WORLD_W = MAP_COLS * TILE_SIZE;
 const WORLD_H = MAP_ROWS * TILE_SIZE;
+
+// Canonical 256 -> 512 coordinate lookup tables (preserves exact block-internal offsets across the 4x expanded 512x512 world)
+const MAP_X_256 = [0, 1, 2, 3, 4, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 309, 310, 311, 312, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 453, 454, 455, 456, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 508, 509, 510, 511];
+const MAP_Y_256 = [0, 1, 2, 3, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 507, 508, 509, 510, 511];
+const mx256 = (x) => {
+    const ix = Math.max(0, Math.min(255, Math.floor(x)));
+    return MAP_X_256[ix] + (x - Math.floor(x));
+};
+const my256 = (y) => {
+    const iy = Math.max(0, Math.min(255, Math.floor(y)));
+    return MAP_Y_256[iy] + (y - Math.floor(y));
+};
 
 // Unit conversion helpers (blocks <-> meters <-> pixels)
 const Convert = {
@@ -148,9 +160,13 @@ class LeonidaMap {
         const numCols = dv.getUint32(0, true);
         const numBlocks = dv.getUint32(4, true);
 
+        const is512Map = arrayBuffer.byteLength >= 600000;
+        const binDim = is512Map ? 512 : 256;
+        const numBaseTiles = binDim * binDim;
+
         let pos = 8;
-        const baseTiles = new Uint32Array(65536);
-        for (let i = 0; i < 65536; i++) {
+        const baseTiles = new Uint32Array(numBaseTiles);
+        for (let i = 0; i < numBaseTiles; i++) {
             baseTiles[i] = dv.getUint32(pos, true);
             pos += 4;
         }
@@ -195,11 +211,13 @@ class LeonidaMap {
             };
         }
 
-        // Decompress 256x256 columns (GameMapManager.cpp lines 193-204)
+        // Decompress 512x512 columns (with 256->512 fallback if loading a 256x256 .CMP)
         this.voxelGrid.fill(0);
         for (let tiley = 0; tiley < MAP_ROWS; tiley++) {
+            const srcY = is512Map ? tiley : Math.min(255, tiley >> 1);
             for (let tilex = 0; tilex < MAP_COLS; tilex++) {
-                const columnElement = baseTiles[tiley * MAP_COLS + tilex] >> 1;
+                const srcX = is512Map ? tilex : Math.min(255, tilex >> 1);
+                const columnElement = baseTiles[srcY * binDim + srcX] >> 1;
                 const columnHeight = MAP_LAYERS - colData[columnElement];
                 for (let tilez = 0; tilez < columnHeight && tilez < MAP_LAYERS; tilez++) {
                     const srcBlock = colData[columnElement + columnHeight - tilez];
@@ -238,248 +256,6 @@ class LeonidaMap {
             }
         }
 
-        // South Beach / Española Way Urban Infill & Sidewalk Cleanup Pass:
-        // 1) Copy 3D stepped Art Deco hotel blocks onto the empty lots at (r=111..116) and (r=121..126) on Ocean Drive (c=209..212)
-        //    and Washington Ave (c=198..202) so mid-Ocean Drive has continuous 3D Miami Art Deco architecture.
-        // 2) Replace any accidental inland beach-sand/grass tiles (lid 98/10 at r=108..132, c=196..214) with 3ds Max stone promenade (lid 9).
-        const cleanPaveBlkIdx = this.voxelGrid[(1 * MAP_ROWS + 110) * MAP_COLS + 200];
-        if (cleanPaveBlkIdx) {
-            for (let ry = 108; ry <= 132; ry++) {
-                for (let cx = 196; cx <= 214; cx++) {
-                    const g1 = (1 * MAP_ROWS + ry) * MAP_COLS + cx;
-                    const b1 = this.blocksData[this.voxelGrid[g1]];
-                    if (b1 && (b1.lid === 98 || b1.lid === 10)) {
-                        this.voxelGrid[g1] = cleanPaveBlkIdx;
-                    }
-                }
-            }
-        }
-        for (let dy = 0; dy < 6; dy++) {
-            for (let cx = 209; cx <= 212; cx++) {
-                for (let tz = 0; tz < MAP_LAYERS; tz++) {
-                    this.voxelGrid[((tz * MAP_ROWS) + (111 + dy)) * MAP_COLS + cx] =
-                        this.voxelGrid[((tz * MAP_ROWS) + (169 + dy)) * MAP_COLS + cx];
-                    this.voxelGrid[((tz * MAP_ROWS) + (121 + dy)) * MAP_COLS + cx] =
-                        this.voxelGrid[((tz * MAP_ROWS) + (179 + dy)) * MAP_COLS + cx];
-                }
-            }
-            for (let cx = 198; cx <= 202; cx++) {
-                for (let tz = 0; tz < MAP_LAYERS; tz++) {
-                    this.voxelGrid[((tz * MAP_ROWS) + (111 + dy)) * MAP_COLS + cx] =
-                        this.voxelGrid[((tz * MAP_ROWS) + (169 + dy)) * MAP_COLS + cx];
-                    this.voxelGrid[((tz * MAP_ROWS) + (121 + dy)) * MAP_COLS + cx] =
-                        this.voxelGrid[((tz * MAP_ROWS) + (179 + dy)) * MAP_COLS + cx];
-                }
-            }
-        }
-
-        // Clean up accidental 1x1 3-story office building blocks placed on the beach sand (c >= 221, r = 40..195)
-        // so only authentic lifeguard_hut sprites, beach parasols & beach towels sit on Vice Beach!
-        const cleanSandBlkIdx = this.voxelGrid[(1 * MAP_ROWS + 144) * MAP_COLS + 225];
-        for (let ry = 40; ry <= 195; ry++) {
-            for (let cx = 221; cx <= 245; cx++) {
-                const g3 = (3 * MAP_ROWS + ry) * MAP_COLS + cx;
-                const b3 = this.blocksData[this.voxelGrid[g3]];
-                if (b3 && b3.lid === 51) {
-                    this.voxelGrid[g3] = 0;
-                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + cx] = 0;
-                    if (cleanSandBlkIdx) {
-                        this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx] = cleanSandBlkIdx;
-                    }
-                }
-            }
-        }
-
-        // Lummus Park Tropical Greenbelt Lawn along Ocean Drive (cx = 219..220, ry = 60..190):
-        // Lush St. Augustine tropical grass lawn between Ocean Drive's palm-lined sidewalk (cx = 218) and Vice Beach (cx >= 221),
-        // with irregular coral-stone beach access footpaths so park beds have varied organic lengths!
-        const cleanGrassBlkIdx = 10; // Block 10 in gta1_map.bin is (80, 0, 0, 0, 0, 0, 10) -> clean lid 10 grass!
-        const footpathRows = new Set([60, 67, 76, 85, 92, 102, 111, 118, 128, 137, 144, 152, 161, 169, 179, 187, 190]);
-        for (let ry = 60; ry <= 190; ry++) {
-            if (footpathRows.has(ry)) continue;
-            for (let cx = 219; cx <= 220; cx++) {
-                const g2 = (2 * MAP_ROWS + ry) * MAP_COLS + cx;
-                const b2 = this.blocksData[this.voxelGrid[g2]];
-                if (b2 && b2.lid !== 0) continue;
-                const g1 = (1 * MAP_ROWS + ry) * MAP_COLS + cx;
-                const b1 = this.blocksData[this.voxelGrid[g1]];
-                if (b1 && (b1.lid === 8 || b1.lid === 9)) {
-                    this.voxelGrid[g1] = cleanGrassBlkIdx;
-                }
-            }
-        }
-
-        // Map-Wide Urban Basins, Park Lagoons, Lake Leonida & Mambas Stadium Restoration Pass:
-        // Replaces all jagged 1-tile staircase water gashes and stray inland beach-sand squares (lid 98..101)
-        // with clean centered basin footprints so the 8-neighbor SDF shader renders smooth oval/curved basins
-        // with a 3D sculpted stone coping border all across the 256x256 world!
-        const has3DBuildingAt = (cx, ry) => {
-            for (let tz = 2; tz < MAP_LAYERS; tz++) {
-                const b = this.blocksData[this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx]];
-                if (b && (b.lid !== 0 || b.w !== 0 || b.e !== 0 || b.n !== 0 || b.s !== 0)) return true;
-            }
-            return false;
-        };
-        const setGroundTile = (cx, ry, lid) => {
-            if (cx < 1 || cx >= MAP_COLS - 1 || ry < 1 || ry >= MAP_ROWS - 1) return;
-            if (has3DBuildingAt(cx, ry)) return;
-            const g1 = (1 * MAP_ROWS + ry) * MAP_COLS + cx;
-            const g2 = (2 * MAP_ROWS + ry) * MAP_COLS + cx;
-            if (lid === 41) {
-                this.voxelGrid[g1] = 1;  // lid 41 water
-                this.voxelGrid[g2] = 2;  // groundType WATER
-            } else if (lid === 8) {
-                this.voxelGrid[g1] = 46; // lid 8 city sidewalk
-                this.voxelGrid[g2] = 47; // groundType PAWEMENT
-            } else if (lid === 9) {
-                this.voxelGrid[g1] = 92; // lid 9 coral stone promenade
-                this.voxelGrid[g2] = 47; // groundType PAWEMENT
-            } else if (lid === 10) {
-                this.voxelGrid[g1] = 10; // lid 10 tropical grass
-                this.voxelGrid[g2] = 4;  // groundType FIELD
-            }
-        };
-        const fillGroundRect = (x0, x1, y0, y1, lid) => {
-            for (let ry = y0; ry <= y1; ry++) {
-                for (let cx = x0; cx <= x1; cx++) {
-                    setGroundTile(cx, ry, lid);
-                }
-            }
-        };
-
-        // 1) Restore Mambas Stadium South Grandstand & Emerald Football Pitch (cx = 106..125, ry = 105..115)
-        //    where a diagonal staircase canal had cut through the SW corner of the stadium:
-        for (let ry = 106; ry <= 113; ry++) {
-            const mirrorNorthRy = 210 - ry; // 106..113 mirrors intact North bowl 104..97
-            for (let cx = 106; cx <= 125; cx++) {
-                for (let tz = 0; tz < MAP_LAYERS; tz++) {
-                    this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx] =
-                        this.voxelGrid[(tz * MAP_ROWS + mirrorNorthRy) * MAP_COLS + cx];
-                }
-            }
-        }
-        // Open South stadium entrance tunnel (cx = 115..117, ry = 111..113) all the way to the emerald pitch!
-        for (let ry = 111; ry <= 113; ry++) {
-            for (let cx = 115; cx <= 117; cx++) {
-                for (let tz = 2; tz < MAP_LAYERS; tz++) {
-                    this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx] = 0;
-                }
-            }
-        }
-        fillGroundRect(115, 117, 111, 113, 8);
-        fillGroundRect(106, 125, 114, 114, 8);
-        fillGroundRect(106, 125, 115, 115, 9);
-
-        // 2) North Vice Shores & Golden Glades Tropical Park (cx = 24..148, ry = 7..33):
-        //    Remove the 5 artificial stepped skylight-pyramids (lid 14/31 stacked at z=2..5) and replace them
-        //    with lush tropical St. Augustine park grass (lid 10) and 3 crystal-clear turquoise resort lagoons (lid 41)!
-        for (let ry = 7; ry <= 33; ry++) {
-            for (let cx = 24; cx <= 148; cx++) {
-                if (ry >= 22 && ry <= 26) continue; // Keep the northern cross-island boulevard & sidewalks intact
-                if (ry >= 27 && ((cx >= 77 && cx <= 93) || cx >= 145)) continue; // Keep legitimate north city blocks
-                let hasPyramid = false;
-                for (let tz = 2; tz < MAP_LAYERS; tz++) {
-                    const b = this.blocksData[this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx]];
-                    if (b && (b.lid === 14 || b.lid === 31 || (ry <= 21 && b.groundType === GROUND_TYPE.BUILDING))) {
-                        hasPyramid = true;
-                        break;
-                    }
-                }
-                if (hasPyramid || ry <= 21) {
-                    const b1 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx]];
-                    if (!b1 || b1.lid === 41 || (b1.lid >= 99 && b1.lid <= 101)) continue;
-                    for (let tz = 2; tz < MAP_LAYERS; tz++) {
-                        this.voxelGrid[(tz * MAP_ROWS + ry) * MAP_COLS + cx] = 0;
-                    }
-                    this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx] = 10; // lid 10 tropical grass
-                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + cx] = 4;  // groundType FIELD
-                }
-            }
-        }
-        fillGroundRect(48, 63, 10, 21, 10);
-        fillGroundRect(51, 61, 12, 19, 41);
-        fillGroundRect(74, 88, 10, 21, 10);
-        fillGroundRect(76, 86, 12, 19, 41);
-        fillGroundRect(120, 136, 10, 21, 10);
-        fillGroundRect(122, 134, 12, 19, 41);
-
-        // 3) SERA Spaceport & North Beach Reflecting Basins (cx = 209..218, ry = 23..37)
-        fillGroundRect(210, 217, 34, 34, 8);
-        fillGroundRect(209, 218, 23, 30, 10);
-        fillGroundRect(210, 217, 23, 30, 41);
-        fillGroundRect(209, 218, 35, 37, 10);
-        fillGroundRect(210, 217, 35, 37, 41);
-
-        // 4) Golf Club Water Hazard Pond (cx = 144..152, ry = 53..59)
-        fillGroundRect(144, 152, 53, 59, 10);
-        fillGroundRect(145, 150, 54, 58, 41);
-
-        // 5) Little Haiti & Wynwood Courtyard Basins (cx = 95..139, ry = 64..70)
-        fillGroundRect(95, 103, 64, 66, 8);
-        fillGroundRect(96, 101, 64, 66, 41);
-        fillGroundRect(106, 115, 64, 68, 8);
-        fillGroundRect(108, 113, 65, 67, 41);
-        fillGroundRect(118, 127, 65, 69, 8);
-        fillGroundRect(120, 125, 66, 68, 41);
-        fillGroundRect(130, 139, 65, 70, 10);
-        fillGroundRect(132, 137, 66, 68, 41);
-
-        // 6) Lake Leonida Shoreline & Gator Island (cx = 56..101, ry = 50..96):
-        //    Replace jagged inland beach-sand/surf tiles (98..101) with lush lakeshore park grass (lid 10)
-        //    and regularize 2-tile staircase jumps along the diagonal NW/NE/SE banks into clean 1:1 diagonals!
-        for (let ry = 50; ry <= 96; ry++) {
-            for (let cx = 56; cx <= 101; cx++) {
-                if (has3DBuildingAt(cx, ry)) continue;
-                const b1 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + ry) * MAP_COLS + cx]];
-                if (b1 && b1.lid >= 98 && b1.lid <= 101) {
-                    setGroundTile(cx, ry, (cx >= 75 && cx <= 80) ? 8 : 10);
-                }
-            }
-        }
-        for (let ry = 50; ry <= 61; ry++) {
-            const gStart = 121 - ry;
-            for (let cx = 59; cx <= 74; cx++) {
-                setGroundTile(cx, ry, cx < gStart ? 8 : 10);
-            }
-        }
-        for (let ry = 54; ry <= 65; ry++) {
-            const wStart = 127 - ry;
-            for (let cx = 62; cx <= 74; cx++) {
-                setGroundTile(cx, ry, cx < wStart ? 10 : 41);
-            }
-        }
-        setGroundTile(91, 68, 41);
-        setGroundTile(90, 85, 41);
-        fillGroundRect(70, 71, 93, 93, 10);
-        fillGroundRect(81, 82, 92, 92, 10);
-        fillGroundRect(88, 93, 92, 97, 8);
-        fillGroundRect(96, 103, 99, 105, 8);
-        fillGroundRect(98, 102, 100, 103, 41);
-
-        // 7) Downtown Reflecting Basin (cx = 132..138, ry = 118..123) & Bayfront Park (cx = 144..151, ry = 125..130)
-        fillGroundRect(132, 138, 118, 123, 9);
-        fillGroundRect(134, 137, 119, 122, 41);
-        fillGroundRect(144, 151, 125, 130, 10);
-        fillGroundRect(144, 144, 125, 130, 9);
-
-        // 8) South Lake Leonida Park Lagoon (cx = 60..74, ry = 94..115) & Port Gellhorn Urban Basin (cx = 60..67, ry = 118..129)
-        fillGroundRect(60, 74, 94, 115, 8);
-        fillGroundRect(64, 72, 96, 107, 10);
-        fillGroundRect(66, 70, 98, 105, 41);
-        fillGroundRect(60, 67, 118, 129, 8);
-        fillGroundRect(62, 65, 120, 127, 41);
-
-        // 9) South-West / South City Blocks (cx = 56..64, ry = 172..193 & cx = 88..101, ry = 189..193) & Vice Port (cx = 159..188, ry = 158..165)
-        fillGroundRect(59, 64, 172, 175, 8);
-        fillGroundRect(58, 63, 178, 184, 8);
-        fillGroundRect(59, 62, 179, 183, 41);
-        fillGroundRect(56, 61, 187, 193, 8);
-        fillGroundRect(88, 93, 189, 193, 8);
-        fillGroundRect(96, 101, 189, 193, 8);
-        fillGroundRect(159, 163, 158, 161, 9);
-        fillGroundRect(174, 188, 158, 165, 9);
-        fillGroundRect(179, 187, 159, 163, 41);
-
         // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
         // Enriches penthouse & hotel roof tiles (lid 46, 48, 51) with centerpiece Turquoise Rooftop Pools (lid 35)
         // and 3ds Max Glass Skylight Atriums (lid 31) while preserving 100% of their 3D side walls (w, e, n, s)!
@@ -499,6 +275,13 @@ class LeonidaMap {
             roofVariantCache.set(key, nextIdx);
             return nextIdx;
         };
+
+        const dixonY0 = MAP_Y_256[144];
+        const dixonY1 = MAP_Y_256[145];
+        const dixonX0 = MAP_X_256[210];
+        const dixonX1 = MAP_X_256[211];
+        const oceanPentMinX = MAP_X_256[198];
+        const oceanPentMaxX = MAP_X_256[212];
 
         this.rooftopParties = [];
         for (let tilez = 2; tilez < MAP_LAYERS; tilez++) {
@@ -525,12 +308,12 @@ class LeonidaMap {
                     const isPenthouseTier = (tilez >= 4) && ((nBlk && nBlk.lid > 0) || (sBlk && sBlk.lid > 0)) && ((wBlk && wBlk.lid > 0) || (eBlk && eBlk.lid > 0));
                     if (!hasNSRoof && !hasEWRoof && !isPenthouseTier) continue;
 
-                    const isHotelDixonPool = ((tiley === 144 || tiley === 145) && (tilex === 210 || tilex === 211));
-                    const isOceanDrivePenthouse = (tilex >= 198 && tilex <= 212 && tilez >= 4);
+                    const isHotelDixonPool = ((tiley === dixonY0 || tiley === dixonY1) && (tilex === dixonX0 || tilex === dixonX1));
+                    const isOceanDrivePenthouse = (tilex >= oceanPentMinX && tilex <= oceanPentMaxX && tilez >= 4);
                     const isInteriorFeature = (hasNSRoof && hasEWRoof && ((tilex * 5 + tiley * 7) % 3 === 0));
 
                     if (isHotelDixonPool) {
-                        const dixonLid = (tiley === 144 && tilex === 210) || (tiley === 145 && tilex === 211) ? 35 : 31;
+                        const dixonLid = (tiley === dixonY0 && tilex === dixonX0) || (tiley === dixonY1 && tilex === dixonX1) ? 35 : 31;
                         this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, dixonLid, blk.remap);
                         if (dixonLid === 35) {
                             this.rooftopParties.push({
@@ -632,16 +415,17 @@ class LeonidaMap {
                 // 2) Park & Lummus Park lawn palm trees: strictly on lid === 10 tropical grass away from road lanes & rounded footpath tips
                 const hasGrassN = (this.getBlockInfo(c, r - 1, 1).lid === 10);
                 const hasGrassS = (this.getBlockInfo(c, r + 1, 1).lid === 10);
+                const isLummusCol = (c === 449 || c === 451);
                 const isParkGrassPalm = (
                     (surfGt === GROUND_TYPE.FIELD || surfGt === GROUND_TYPE.PAWEMENT) &&
                     blkZ1.lid === 10 &&
-                    ((c === 219 && hasGrassN && hasGrassS && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
+                    ((isLummusCol && hasGrassN && hasGrassS && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
                 );
                 if (isPlanterPalm || isParkGrassPalm) {
                     // Varied palm sizes: crown spread 0.78..1.30 & trunk height 0.70..1.55 (young palms to towering royal palms)
                     const hs1 = (((c * 73856093) ^ (r * 19349663)) >>> 0) % 1000 / 1000;
                     const hs2 = (((c * 83492791) ^ (r * 2654435761)) >>> 0) % 1000 / 1000;
-                    const palmX = (c === 219 && !isPlanterPalm)
+                    const palmX = (isLummusCol && !isPlanterPalm)
                         ? (c + 0.68 + (hs1 - 0.5) * 0.48) * TILE_SIZE
                         : (c + 0.5) * TILE_SIZE;
                     this.vicePalms.push({
@@ -659,65 +443,74 @@ class LeonidaMap {
         // Populate Official GTA 6 S-Curving Vice Beach Lifeguard Towers, Volleyball Courts, Star Island Pool & Neon Marquees!
         this.beachProps = [
             // 1. Vice Beach Lifeguard Stands (both West/Mid Beach near Lummus Park & East Shoreline near the Atlantic surf!)
-            { spr: "lifeguard_neon",   x: 238.8 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 225.8 * TILE_SIZE, y: 44.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 238.8 * TILE_SIZE, y: 62.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 238.8 * TILE_SIZE, y: 74.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 225.8 * TILE_SIZE, y: 88.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 238.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 238.8 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 225.8 * TILE_SIZE, y: 139.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 225.8 * TILE_SIZE, y: 146.2 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 239.2 * TILE_SIZE, y: 144.0 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 239.2 * TILE_SIZE, y: 149.8 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 225.8 * TILE_SIZE, y: 153.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 239.2 * TILE_SIZE, y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_tower",  x: 238.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 237.5 * TILE_SIZE, y: 184.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(238.8) * TILE_SIZE, y: my256(36.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(225.8) * TILE_SIZE, y: my256(44.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(238.8) * TILE_SIZE, y: my256(62.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(238.8) * TILE_SIZE, y: my256(74.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(225.8) * TILE_SIZE, y: 128.5 * TILE_SIZE,        z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(225.8) * TILE_SIZE, y: my256(88.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(238.8) * TILE_SIZE, y: my256(106.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(238.8) * TILE_SIZE, y: 205.5 * TILE_SIZE,        z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(225.8) * TILE_SIZE, y: 235.5 * TILE_SIZE,        z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(238.8) * TILE_SIZE, y: my256(124.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(225.8) * TILE_SIZE, y: my256(139.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(225.8) * TILE_SIZE, y: my256(146.2) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(239.2) * TILE_SIZE, y: my256(144.0) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(239.2) * TILE_SIZE, y: my256(149.8) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(225.8) * TILE_SIZE, y: my256(153.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(239.2) * TILE_SIZE, y: my256(156.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_tower",  x: mx256(238.5) * TILE_SIZE, y: my256(168.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(237.5) * TILE_SIZE, y: 342.5 * TILE_SIZE,        z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(237.5) * TILE_SIZE, y: my256(184.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             // West Coast Golden Beach & Southern Keys Lifeguard Towers
-            { spr: "lifeguard_neon",   x: 16.5 * TILE_SIZE,  y: 36.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: Math.PI },
-            { spr: "lifeguard_tower",  x: 16.5 * TILE_SIZE,  y: 72.5 * TILE_SIZE,  z: 2.0, scale: 1.12, angle: Math.PI },
-            { spr: "lifeguard_neon",   x: 14.5 * TILE_SIZE,  y: 108.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
-            { spr: "lifeguard_tower",  x: 14.5 * TILE_SIZE,  y: 156.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
-            { spr: "lifeguard_neon",   x: 18.5 * TILE_SIZE,  y: 180.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
-            { spr: "lifeguard_tower",  x: 60.5 * TILE_SIZE,  y: 207.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
-            { spr: "lifeguard_neon",   x: 116.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(16.5) * TILE_SIZE,  y: my256(36.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_tower",  x: mx256(16.5) * TILE_SIZE,  y: my256(72.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_neon",   x: mx256(14.5) * TILE_SIZE,  y: my256(108.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_tower",  x: mx256(14.5) * TILE_SIZE,  y: my256(156.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_neon",   x: mx256(18.5) * TILE_SIZE,  y: my256(180.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: Math.PI },
+            { spr: "lifeguard_tower",  x: mx256(60.5) * TILE_SIZE,  y: my256(207.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
+            { spr: "lifeguard_neon",   x: mx256(116.5) * TILE_SIZE, y: my256(234.5) * TILE_SIZE, z: 2.0, scale: 1.12, angle: 0 },
             // 2. Star Island Mansion Central Lagoon Pool (on the mansion lawn at 173.0, 112.0)
-            { spr: "vercetti_pool",    x: 173.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, z: 2.0, scale: 1.15, angle: 0 }
+            { spr: "vercetti_pool",    x: mx256(173.0) * TILE_SIZE, y: my256(112.0) * TILE_SIZE, z: 2.0, scale: 1.15, angle: 0 }
         ];
 
         // 3A. Live Animated 3D Beach Volleyball Courts (2v2 Bikini Women & Surfers + Raised 3D Net + Flying Volleyball!)
         this.beachVolleyballCourts = [
-            { x: 224.2 * TILE_SIZE, y: 46.5 * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_yellow", p2: "bikini_cyan",  p3: "surfer_guy" },
-            { x: 225.2 * TILE_SIZE, y: 86.5 * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
-            { x: 225.2 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_pink",   p2: "bikini_yellow",p3: "surfer_guy" },
-            { x: 224.0 * TILE_SIZE, y: 137.5 * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_red",    p2: "bikini_white", p3: "surfer_guy" },
-            { x: 224.0 * TILE_SIZE, y: 144.2 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "bikini_red" },
-            { x: 236.8 * TILE_SIZE, y: 145.5 * TILE_SIZE, z: 2.0, p0: "bikini_white",  p1: "bikini_pink",   p2: "surfer_guy",   p3: "bikini_cyan" },
-            { x: 224.0 * TILE_SIZE, y: 151.8 * TILE_SIZE, z: 2.0, p0: "bikini_red",    p1: "bikini_yellow", p2: "bikini_pink",  p3: "surfer_guy" },
-            { x: 236.8 * TILE_SIZE, y: 154.2 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_white",  p2: "bikini_pink",  p3: "bikini_yellow" },
-            { x: 224.0 * TILE_SIZE, y: 158.8 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "surfer_guy",    p2: "bikini_cyan",  p3: "bikini_red" },
-            { x: 224.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_white", p3: "surfer_guy" },
+            { x: mx256(224.2) * TILE_SIZE, y: my256(46.5) * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_yellow", p2: "bikini_cyan",  p3: "surfer_guy" },
+            { x: mx256(225.2) * TILE_SIZE, y: 124.5 * TILE_SIZE,        z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "surfer_guy",   p3: "bikini_cyan" },
+            { x: mx256(225.2) * TILE_SIZE, y: my256(86.5) * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: mx256(225.2) * TILE_SIZE, y: my256(106.5) * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_pink",   p2: "bikini_yellow",p3: "surfer_guy" },
+            { x: mx256(224.2) * TILE_SIZE, y: 210.5 * TILE_SIZE,        z: 2.0, p0: "bikini_pink",   p1: "bikini_red",    p2: "bikini_white", p3: "surfer_guy" },
+            { x: mx256(224.2) * TILE_SIZE, y: 242.5 * TILE_SIZE,        z: 2.0, p0: "bikini_cyan",   p1: "bikini_yellow", p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: mx256(224.0) * TILE_SIZE, y: my256(137.5) * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_red",    p2: "bikini_white", p3: "surfer_guy" },
+            { x: mx256(224.0) * TILE_SIZE, y: my256(144.2) * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "bikini_red" },
+            { x: mx256(236.8) * TILE_SIZE, y: my256(145.5) * TILE_SIZE, z: 2.0, p0: "bikini_white",  p1: "bikini_pink",   p2: "surfer_guy",   p3: "bikini_cyan" },
+            { x: mx256(224.0) * TILE_SIZE, y: my256(151.8) * TILE_SIZE, z: 2.0, p0: "bikini_red",    p1: "bikini_yellow", p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: mx256(236.8) * TILE_SIZE, y: my256(154.2) * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_white",  p2: "bikini_pink",  p3: "bikini_yellow" },
+            { x: mx256(224.0) * TILE_SIZE, y: my256(158.8) * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "surfer_guy",    p2: "bikini_cyan",  p3: "bikini_red" },
+            { x: mx256(224.5) * TILE_SIZE, y: my256(168.5) * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_white", p3: "surfer_guy" },
+            { x: mx256(224.5) * TILE_SIZE, y: 344.5 * TILE_SIZE,        z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
             // West Coast Beach & Southern Keys Volleyball Courts
-            { x: 18.5 * TILE_SIZE,  y: 48.5 * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
-            { x: 15.5 * TILE_SIZE,  y: 96.5 * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
-            { x: 16.5 * TILE_SIZE,  y: 168.5 * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_yellow", p2: "bikini_red",   p3: "surfer_guy" },
-            { x: 74.5 * TILE_SIZE,  y: 217.5 * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_white",  p2: "bikini_cyan",  p3: "surfer_guy" }
+            { x: mx256(18.5) * TILE_SIZE,  y: my256(48.5) * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
+            { x: mx256(15.5) * TILE_SIZE,  y: my256(96.5) * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
+            { x: mx256(16.5) * TILE_SIZE,  y: my256(168.5) * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_yellow", p2: "bikini_red",   p3: "surfer_guy" },
+            { x: mx256(74.5) * TILE_SIZE,  y: my256(217.5) * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_white",  p2: "bikini_cyan",  p3: "surfer_guy" }
         ];
 
         // 3B. Beach Aerobics & Retro Boombox Dance Parties on the Sand
         this.beachParties = [
-            { x: 223.2 * TILE_SIZE, y: 147.8 * TILE_SIZE, z: 2.0 },
-            { x: 238.0 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0 },
-            { x: 223.2 * TILE_SIZE, y: 155.2 * TILE_SIZE, z: 2.0 },
-            { x: 223.5 * TILE_SIZE, y: 50.5 * TILE_SIZE,  z: 2.0 },
-            { x: 192.4 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0 },
+            { x: mx256(223.2) * TILE_SIZE, y: my256(147.8) * TILE_SIZE, z: 2.0 },
+            { x: mx256(238.0) * TILE_SIZE, y: my256(148.5) * TILE_SIZE, z: 2.0 },
+            { x: mx256(223.2) * TILE_SIZE, y: my256(155.2) * TILE_SIZE, z: 2.0 },
+            { x: mx256(223.5) * TILE_SIZE, y: my256(50.5) * TILE_SIZE,  z: 2.0 },
+            { x: mx256(223.5) * TILE_SIZE, y: 218.5 * TILE_SIZE,        z: 2.0 },
+            { x: mx256(192.4) * TILE_SIZE, y: my256(112.5) * TILE_SIZE, z: 2.0 },
             // West Coast Beach & Southern Keys Tiki Boombox Parties
-            { x: 16.5 * TILE_SIZE,  y: 60.5 * TILE_SIZE,  z: 2.0 },
-            { x: 21.5 * TILE_SIZE,  y: 120.5 * TILE_SIZE, z: 2.0 },
-            { x: 46.5 * TILE_SIZE,  y: 212.5 * TILE_SIZE, z: 2.0 },
-            { x: 88.5 * TILE_SIZE,  y: 211.5 * TILE_SIZE, z: 2.0 },
-            { x: 116.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0 }
+            { x: mx256(16.5) * TILE_SIZE,  y: my256(60.5) * TILE_SIZE,  z: 2.0 },
+            { x: mx256(21.5) * TILE_SIZE,  y: my256(120.5) * TILE_SIZE, z: 2.0 },
+            { x: mx256(46.5) * TILE_SIZE,  y: my256(212.5) * TILE_SIZE, z: 2.0 },
+            { x: mx256(88.5) * TILE_SIZE,  y: my256(211.5) * TILE_SIZE, z: 2.0 },
+            { x: mx256(116.5) * TILE_SIZE, y: my256(234.5) * TILE_SIZE, z: 2.0 }
         ];
 
         // 3C. Sunbathing Bikini Women on Striped Towels & Resort Sun Loungers shaded by 3D Umbrellas + Side Beach Props
@@ -727,15 +520,19 @@ class LeonidaMap {
         const umbPool = ["umbrella_pink", "umbrella_cyan", "umbrella_yellow"];
         const sidePropPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow", "beach_ball", "sandcastle", "beach_cooler"];
 
-        const sunbatherRowsY = [
+        const sunbatherRowsY256 = [
             42.5, 44.8, 48.8, 52.5, 56.0, 60.5, 65.0, 70.0, 76.0, 82.0,
             88.5, 92.5, 98.0, 103.5, 109.0, 115.0, 121.0, 128.0, 134.5,
             139.0, 140.8, 142.4, 146.2, 149.6, 153.4, 156.8, 160.5, 164.0, 171.0, 178.0, 184.0
         ];
-        for (let i = 0; i < sunbatherRowsY.length; i++) {
-            const by = sunbatherRowsY[i];
-            // West/Mid Beach group right next to Lummus Park (c = 222.0..226.4)
-            const westCol = 222.1 + (i % 3) * 1.45;
+        const sunbatherRows512 = [
+            ...sunbatherRowsY256.map(y => my256(y)),
+            116.5, 124.5, 132.5, 140.5, 192.5, 200.5, 208.5, 216.5, 224.5, 232.5, 240.5, 248.5, 334.5, 344.5, 354.5
+        ];
+        for (let i = 0; i < sunbatherRows512.length; i++) {
+            const by = sunbatherRows512[i];
+            // West/Mid Beach group right next to Lummus Park
+            const westCol = mx256(222.1) + (i % 4) * 3.8;
             this.beachSunbathers.push({
                 x: westCol * TILE_SIZE,
                 y: by * TILE_SIZE,
@@ -757,8 +554,8 @@ class LeonidaMap {
                 extraPropDy: 18
             });
 
-            // East Shoreline group near the Atlantic surf (c = 235.2..240.4)
-            const eastCol = 235.4 + ((i + 1) % 3) * 2.1;
+            // East Shoreline group near the Atlantic surf
+            const eastCol = mx256(235.4 + ((i + 1) % 3) * 2.1);
             this.beachSunbathers.push({
                 x: eastCol * TILE_SIZE,
                 y: (by + 0.6) * TILE_SIZE,
@@ -781,12 +578,12 @@ class LeonidaMap {
             });
         }
 
-        // Biscayne Bay West Beach (c = 191.6..193.2, r = 100..126) & Star Island Celebrity Beach (c = 184.2..185.5, r = 110..115)
+        // Biscayne Bay West Beach & Star Island Celebrity Beach
         const bayRowsY = [101.5, 105.0, 108.5, 115.5, 119.5, 123.5];
         for (let bi = 0; bi < bayRowsY.length; bi++) {
             this.beachSunbathers.push({
-                x: (191.8 + (bi % 2) * 1.1) * TILE_SIZE,
-                y: bayRowsY[bi] * TILE_SIZE,
+                x: mx256(191.8 + (bi % 2) * 1.1) * TILE_SIZE,
+                y: my256(bayRowsY[bi]) * TILE_SIZE,
                 z: 2.0,
                 angle: Math.PI,
                 pedType: bikiniPool[bi % bikiniPool.length],
@@ -803,8 +600,8 @@ class LeonidaMap {
         }
         this.beachSunbathers.push(
             {
-                x: 184.4 * TILE_SIZE,
-                y: 111.5 * TILE_SIZE,
+                x: mx256(184.4) * TILE_SIZE,
+                y: my256(111.5) * TILE_SIZE,
                 z: 2.0,
                 angle: 0,
                 pedType: "bikini_pink",
@@ -815,8 +612,8 @@ class LeonidaMap {
                 propSpr: "beach_cooler"
             },
             {
-                x: 184.4 * TILE_SIZE,
-                y: 114.2 * TILE_SIZE,
+                x: mx256(184.4) * TILE_SIZE,
+                y: my256(114.2) * TILE_SIZE,
                 z: 2.0,
                 angle: 0,
                 pedType: "bikini_yellow",
@@ -830,25 +627,29 @@ class LeonidaMap {
 
         // 3D. Atlantic & Biscayne Bay Wave Surfers & Shallow-Water Bikini Swimmers
         this.beachSwimmers = [];
-        const surfRowsY = [
+        const surfRowsY256 = [
             44.5, 51.0, 64.0, 78.0, 90.0, 105.0, 122.0,
             138.5, 141.0, 143.2, 145.5, 147.8, 150.2, 152.5, 155.0, 157.5, 160.5, 168.0, 178.0
         ];
+        const surfRows512 = [
+            ...surfRowsY256.map(y => my256(y)),
+            122.0, 138.0, 198.0, 215.0, 232.0, 248.0, 340.0
+        ];
         const boardPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow"];
-        for (let si = 0; si < surfRowsY.length; si++) {
-            const sy = surfRowsY[si];
-            // Shallow-water bikini swimmer wading/swimming at the shoreline (c = 241.6..242.4)
+        for (let si = 0; si < surfRows512.length; si++) {
+            const sy = surfRows512[si];
+            // Shallow-water bikini swimmer wading/swimming at the shoreline
             this.beachSwimmers.push({
-                x: (241.7 + (si % 2) * 0.6) * TILE_SIZE,
+                x: mx256(241.7 + (si % 2) * 0.6) * TILE_SIZE,
                 y: sy * TILE_SIZE,
                 z: 2.0,
                 angle: Math.PI,
                 isSurfer: false,
                 pedType: bikiniPool[si % bikiniPool.length]
             });
-            // Atlantic wave surfer riding/paddling on surfboard (c = 243.2..244.5)
+            // Atlantic wave surfer riding/paddling on surfboard
             this.beachSwimmers.push({
-                x: (243.3 + (si % 2) * 0.9) * TILE_SIZE,
+                x: mx256(243.3 + (si % 2) * 0.9) * TILE_SIZE,
                 y: (sy + 1.1) * TILE_SIZE,
                 z: 2.0,
                 angle: Math.PI,
@@ -857,11 +658,11 @@ class LeonidaMap {
                 boardSpr: boardPool[si % boardPool.length]
             });
         }
-        // Biscayne Bay swimmers & surfers along West Beach shoreline (c = 190.2) + Gulf of Mexico West Coast & Southern Keys!
+        // Biscayne Bay swimmers & surfers along West Beach shoreline + Gulf of Mexico West Coast & Southern Keys!
         for (const by of [103.5, 114.5, 120.5]) {
             this.beachSwimmers.push({
-                x: 190.2 * TILE_SIZE,
-                y: by * TILE_SIZE,
+                x: mx256(190.2) * TILE_SIZE,
+                y: my256(by) * TILE_SIZE,
                 z: 2.0,
                 angle: 0,
                 isSurfer: (by > 112),
@@ -878,8 +679,8 @@ class LeonidaMap {
         for (let wi = 0; wi < westSpots.length; wi++) {
             const [wc, wr] = westSpots[wi];
             this.beachSunbathers.push({
-                x: wc * TILE_SIZE,
-                y: wr * TILE_SIZE,
+                x: mx256(wc) * TILE_SIZE,
+                y: my256(wr) * TILE_SIZE,
                 z: 2.0,
                 angle: Math.PI,
                 pedType: bikiniPool[wi % bikiniPool.length],
@@ -894,8 +695,8 @@ class LeonidaMap {
                 propDy: 12
             });
             this.beachSwimmers.push({
-                x: (wc - 3.5) * TILE_SIZE,
-                y: wr * TILE_SIZE,
+                x: (mx256(wc) - 3.5) * TILE_SIZE,
+                y: my256(wr) * TILE_SIZE,
                 z: 2.0,
                 angle: 0,
                 isSurfer: (wi % 2 === 0),
@@ -907,10 +708,12 @@ class LeonidaMap {
         // Strict Ground-Truth Validation & Snap Pass for all Beach Props, Sunbathers, Courts, Parties & Swimmers:
         // Guarantees no towel, umbrella, sunbather, surfboard, volleyball court, lifeguard tower, or swimmer ever
         // lands on or adjacent to a ROAD, bridge, causeway, building, stone sidewalk, or wooden pier!
+        const starLawnMinX = MAP_X_256[183], starLawnMaxX = MAP_X_256[185];
+        const starLawnMinY = MAP_Y_256[111], starLawnMaxY = MAP_Y_256[115];
         const isCleanSandTile = (c, r, allowStarIsland = false) => {
             if (c < 2 || c >= MAP_COLS - 2 || r < 2 || r >= MAP_ROWS - 2) return false;
             const idx = r * MAP_COLS + c;
-            const isStarLawn = allowStarIsland && c >= 183 && c <= 185 && r >= 111 && r <= 115 && this.surfaceGround[idx] === GROUND_TYPE.FIELD;
+            const isStarLawn = allowStarIsland && c >= starLawnMinX && c <= starLawnMaxX && r >= starLawnMinY && r <= starLawnMaxY && this.surfaceGround[idx] === GROUND_TYPE.FIELD;
             if (!this.coastalSandMask[idx] && !isStarLawn) return false;
             for (let dr = -1; dr <= 1; dr++) {
                 for (let dc = -1; dc <= 1; dc++) {
@@ -937,7 +740,7 @@ class LeonidaMap {
             const r0 = Math.floor(ryF);
             const fracX = cxF - c0;
             if (isCleanSandTile(c0, r0, allowStarIsland)) return { x: px, y: py };
-            const offsets = [1, -1, 2, -2, 3, -3, 4, -4, 5];
+            const offsets = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6];
             for (const dc of offsets) {
                 if (isCleanSandTile(c0 + dc, r0, allowStarIsland)) {
                     return { x: (c0 + dc + fracX) * TILE_SIZE, y: py };
@@ -970,7 +773,7 @@ class LeonidaMap {
             const r0 = Math.floor(ryF);
             const fracX = cxF - c0;
             if (isCleanWaterTile(c0, r0)) return { x: px, y: py };
-            const dirs = c0 > 210 ? [1, 2, 3, 4, -1, -2] : [-1, -2, -3, -4, 1, 2];
+            const dirs = c0 > MAP_X_256[210] ? [1, 2, 3, 4, 5, 6, -1, -2] : [-1, -2, -3, -4, -5, 1, 2, 3];
             for (const dc of dirs) {
                 if (isCleanWaterTile(c0 + dc, r0)) {
                     return { x: (c0 + dc + fracX) * TILE_SIZE, y: py };
@@ -1092,9 +895,15 @@ class LeonidaMap {
         // 1) Muscle Beach Outdoor Weightlifting & Calisthenics Gyms (Lummus Park & South Beach Sand)
         this.muscleBeachGyms = [];
         for (const rGym of [94, 114, 134, 155, 174]) {
-            const snapped = snapPxToCleanSand(223.6 * TILE_SIZE, (rGym + 0.5) * TILE_SIZE, false);
+            const snapped = snapPxToCleanSand(mx256(223.6) * TILE_SIZE, my256(rGym + 0.5) * TILE_SIZE, false);
             if (snapped) {
                 this.muscleBeachGyms.push({ x: snapped.x, y: snapped.y, z: 2.0, seed: rGym });
+            }
+        }
+        for (const rGym512 of [130, 212, 240, 340]) {
+            const snapped = snapPxToCleanSand(mx256(223.6) * TILE_SIZE, (rGym512 + 0.5) * TILE_SIZE, false);
+            if (snapped) {
+                this.muscleBeachGyms.push({ x: snapped.x, y: snapped.y, z: 2.0, seed: rGym512 });
             }
         }
 
@@ -1102,29 +911,32 @@ class LeonidaMap {
         this.leonidaGators = [];
         const rawGators = [
             // Lake Leonida & Gator Island swimming & basking gators
-            { c: 69.5, r: 62.5, inWater: true, angle: 0.4 },
-            { c: 76.5, r: 68.5, inWater: true, angle: 2.1 },
-            { c: 84.5, r: 74.5, inWater: true, angle: -0.8 },
-            { c: 72.5, r: 81.5, inWater: true, angle: 1.2 },
-            { c: 86.5, r: 82.5, inWater: true, angle: -2.4 },
-            { c: 64.5, r: 64.5, inWater: false, angle: 0.2 }, // Basking on NW Lake Leonida bank
-            { c: 78.5, r: 74.5, inWater: false, angle: -0.5 }, // Gator Island basking
+            { c: mx256(69.5), r: my256(62.5), inWater: true, angle: 0.4 },
+            { c: mx256(76.5), r: my256(68.5), inWater: true, angle: 2.1 },
+            { c: mx256(84.5), r: my256(74.5), inWater: true, angle: -0.8 },
+            { c: mx256(72.5), r: my256(81.5), inWater: true, angle: 1.2 },
+            { c: mx256(86.5), r: my256(82.5), inWater: true, angle: -2.4 },
+            { c: 105.5,       r: 132.5,       inWater: true, angle: 0.9 },
+            { c: 140.5,       r: 136.5,       inWater: true, angle: -1.4 },
+            { c: mx256(64.5), r: my256(64.5), inWater: false, angle: 0.2 }, // Basking on NW Lake Leonida bank
+            { c: mx256(78.5), r: my256(74.5), inWater: false, angle: -0.5 }, // Gator Island basking
             // South Lake Leonida Lagoon & Port Gellhorn Convenience Store / Gas Station Gator (Trailer 1 Easter Egg!)
-            { c: 68.0, r: 101.5, inWater: true, angle: 1.5 },
-            { c: 63.5, r: 123.5, inWater: true, angle: -1.2 },
-            { c: 61.2, r: 122.5, inWater: false, angle: 0.15 }, // Port Gellhorn urban gator on sidewalk!
+            { c: mx256(68.0), r: my256(101.5), inWater: true, angle: 1.5 },
+            { c: 140.5,       r: 220.5,        inWater: true, angle: -0.6 },
+            { c: mx256(63.5), r: my256(123.5), inWater: true, angle: -1.2 },
+            { c: mx256(61.2), r: my256(122.5), inWater: false, angle: 0.15 }, // Port Gellhorn urban gator on sidewalk!
             // Mount Kalaga National Park Mountain Lake
-            { c: 55.5, r: 15.5, inWater: true, angle: 0.6 },
-            { c: 58.5, r: 17.0, inWater: true, angle: -2.2 },
+            { c: mx256(55.5), r: my256(15.5), inWater: true, angle: 0.6 },
+            { c: mx256(58.5), r: my256(17.0), inWater: true, angle: -2.2 },
             // Grassrivers Everglades & Southern Wetlands
-            { c: 48.5, r: 218.5, inWater: true, angle: 0.3 },
-            { c: 64.5, r: 222.5, inWater: true, angle: 2.6 },
-            { c: 82.5, r: 216.5, inWater: true, angle: -0.7 },
-            { c: 98.5, r: 224.5, inWater: true, angle: 1.1 },
-            { c: 116.5, r: 219.5, inWater: true, angle: -1.9 },
-            { c: 134.5, r: 225.5, inWater: true, angle: 0.8 },
+            { c: mx256(48.5),  r: my256(218.5), inWater: true, angle: 0.3 },
+            { c: mx256(64.5),  r: my256(222.5), inWater: true, angle: 2.6 },
+            { c: mx256(82.5),  r: my256(216.5), inWater: true, angle: -0.7 },
+            { c: mx256(98.5),  r: my256(224.5), inWater: true, angle: 1.1 },
+            { c: mx256(116.5), r: my256(219.5), inWater: true, angle: -1.9 },
+            { c: mx256(134.5), r: my256(225.5), inWater: true, angle: 0.8 },
             // Golf Club Water Hazard Pond gator!
-            { c: 147.5, r: 56.0, inWater: true, angle: 0.5 }
+            { c: mx256(147.5), r: my256(56.0), inWater: true, angle: 0.5 }
         ];
         for (let gi = 0; gi < rawGators.length; gi++) {
             const g = rawGators[gi];
@@ -1142,20 +954,21 @@ class LeonidaMap {
         // 3) Leonida Pink Flamingo Flocks ("flamingo_pink" + "lilypad_green") in Park Lagoons, Lake Leonida & Grassrivers
         this.flamingoFlocks = [];
         const rawFlocks = [
-            { c: 67.5, r: 60.5, count: 6 },   // Lake Leonida North Cove
-            { c: 88.5, r: 78.5, count: 6 },   // Lake Leonida East Cove
-            { c: 68.0, r: 99.5, count: 5 },   // South Lake Leonida Park Lagoon
-            { c: 147.5, r: 55.5, count: 6 },  // Vice City Golf Club Water Hazard
-            { c: 98.5, r: 65.0, count: 5 },   // Little Haiti Basin
-            { c: 110.5, r: 66.0, count: 5 },  // Wynwood West Basin
-            { c: 134.5, r: 67.0, count: 6 },  // Wynwood East Park Basin
-            { c: 135.5, r: 120.5, count: 5 }, // Downtown Reflecting Basin
-            { c: 213.5, r: 26.5, count: 7 },  // SERA Spaceport / North Beach Lagoon
-            { c: 53.5, r: 14.5, count: 6 },   // North Vice Shores West Lagoon
-            { c: 81.0, r: 15.5, count: 6 },   // North Vice Shores Central Lagoon
-            { c: 128.0, r: 15.5, count: 6 },  // Golden Glades East Lagoon
-            { c: 76.5, r: 218.5, count: 7 },  // Grassrivers Flamingo Sanctuary West
-            { c: 112.5, r: 221.5, count: 7 }  // Grassrivers Flamingo Sanctuary East
+            { c: mx256(67.5),  r: my256(60.5),  count: 6 }, // Lake Leonida North Cove
+            { c: mx256(88.5),  r: my256(78.5),  count: 6 }, // Lake Leonida East Cove
+            { c: mx256(68.0),  r: my256(99.5),  count: 5 }, // South Lake Leonida Park Lagoon
+            { c: 138.0,        r: 215.0,        count: 6 }, // Expanded South Lake Leonida Lagoon
+            { c: mx256(147.5), r: my256(55.5),  count: 6 }, // Vice City Golf Club Water Hazard
+            { c: mx256(98.5),  r: my256(65.0),  count: 5 }, // Little Haiti Basin
+            { c: mx256(110.5), r: my256(66.0),  count: 5 }, // Wynwood West Basin
+            { c: mx256(134.5), r: my256(67.0),  count: 6 }, // Wynwood East Park Basin
+            { c: mx256(135.5), r: my256(120.5), count: 5 }, // Downtown Reflecting Basin
+            { c: mx256(213.5), r: my256(26.5),  count: 7 }, // SERA Spaceport / North Beach Lagoon
+            { c: mx256(53.5),  r: my256(14.5),  count: 6 }, // North Vice Shores West Lagoon
+            { c: mx256(81.0),  r: my256(15.5),  count: 6 }, // North Vice Shores Central Lagoon
+            { c: mx256(128.0), r: my256(15.5),  count: 6 }, // Golden Glades East Lagoon
+            { c: mx256(76.5),  r: my256(218.5), count: 7 }, // Grassrivers Flamingo Sanctuary West
+            { c: mx256(112.5), r: my256(221.5), count: 7 }  // Grassrivers Flamingo Sanctuary East
         ];
         for (let fi = 0; fi < rawFlocks.length; fi++) {
             const fl = rawFlocks[fi];
@@ -1168,17 +981,19 @@ class LeonidaMap {
         // 4) Biscayne Bay, Star Island, Vice Port & Atlantic Luxury Superyacht Parties ("luxury_yacht") & Neon Jet-Skiers ("jetski_neon")
         this.yachtParties = [];
         const rawYachts = [
-            { c: 162, r: 92, angle: -Math.PI * 0.5 },   // Biscayne Bay North (Star Island Yacht Basin)
-            { c: 164, r: 116, angle: Math.PI * 0.5 },   // Star Island South Channel
-            { c: 162, r: 142, angle: -Math.PI * 0.35 }, // Vice Port / Biscayne Bay South
-            { c: 243, r: 78, angle: Math.PI * 0.5 },    // North Beach Atlantic Offshore Superyacht
-            { c: 244, r: 118, angle: -Math.PI * 0.5 },  // Mid-Beach Atlantic Offshore Superyacht
-            { c: 243, r: 156, angle: Math.PI * 0.45 },  // South Beach / Ocean Drive Offshore Superyacht
-            { c: 205, r: 218, angle: 0.0 },             // Leonida Keys / Vice Point Marina Offshore
-            { c: 148, r: 222, angle: 0.15 },            // Central Leonida Keys Lagoon Superyacht
-            { c: 9, r: 76, angle: Math.PI * 0.5 },      // West Coast Gulf Offshore Superyacht
-            { c: 9, r: 136, angle: -Math.PI * 0.5 },    // Port Gellhorn / West Beach Offshore Superyacht
-            { c: 78, r: 72, angle: 0.35 }               // Lake Leonida VIP Party Cruiser
+            { c: Math.round(mx256(162)), r: Math.round(my256(92)),  angle: -Math.PI * 0.5 },   // Biscayne Bay North (Star Island Yacht Basin)
+            { c: Math.round(mx256(164)), r: Math.round(my256(116)), angle: Math.PI * 0.5 },    // Star Island South Channel
+            { c: 320,                    r: 225,                    angle: Math.PI * 0.5 },    // Central Biscayne Bay Superyacht
+            { c: Math.round(mx256(162)), r: Math.round(my256(142)), angle: -Math.PI * 0.35 },  // Vice Port / Biscayne Bay South
+            { c: Math.round(mx256(243)), r: Math.round(my256(78)),  angle: Math.PI * 0.5 },    // North Beach Atlantic Offshore Superyacht
+            { c: Math.round(mx256(244)), r: 215,                    angle: -Math.PI * 0.5 },   // Mid-Beach Atlantic Offshore Superyacht
+            { c: Math.round(mx256(244)), r: Math.round(my256(118)), angle: -Math.PI * 0.5 },   // Flamingo / Mid-Beach Offshore Superyacht
+            { c: Math.round(mx256(243)), r: Math.round(my256(156)), angle: Math.PI * 0.45 },   // South Beach / Ocean Drive Offshore Superyacht
+            { c: Math.round(mx256(205)), r: Math.round(my256(218)), angle: 0.0 },              // Leonida Keys / Vice Point Marina Offshore
+            { c: Math.round(mx256(148)), r: Math.round(my256(222)), angle: 0.15 },             // Central Leonida Keys Lagoon Superyacht
+            { c: Math.round(mx256(9)),   r: Math.round(my256(76)),  angle: Math.PI * 0.5 },    // West Coast Gulf Offshore Superyacht
+            { c: Math.round(mx256(9)),   r: Math.round(my256(136)), angle: -Math.PI * 0.5 },   // Port Gellhorn / West Beach Offshore Superyacht
+            { c: Math.round(mx256(78)),  r: Math.round(my256(72)),  angle: 0.35 }              // Lake Leonida VIP Party Cruiser
         ];
         for (let yi = 0; yi < rawYachts.length; yi++) {
             const ry = rawYachts[yi];
@@ -1205,14 +1020,16 @@ class LeonidaMap {
 
         this.jetSkiers = [];
         const rawJetSkis = [
-            { c: 240, r: 66, rx: 18, ry: 42, speed: 1.3 },
-            { c: 239, r: 98, rx: 16, ry: 38, speed: 1.45 },
-            { c: 238, r: 132, rx: 18, ry: 44, speed: 1.35 },
-            { c: 239, r: 168, rx: 16, ry: 38, speed: 1.5 },
-            { c: 163, r: 104, rx: 22, ry: 32, speed: 1.4 },
-            { c: 163, r: 130, rx: 20, ry: 30, speed: 1.35 },
-            { c: 192, r: 214, rx: 36, ry: 22, speed: 1.5 },
-            { c: 74, r: 66, rx: 24, ry: 24, speed: 1.25 }
+            { c: mx256(240), r: my256(66),  rx: 18, ry: 42, speed: 1.3 },
+            { c: mx256(239), r: my256(98),  rx: 16, ry: 38, speed: 1.45 },
+            { c: mx256(239), r: 220,        rx: 18, ry: 44, speed: 1.4 },
+            { c: mx256(238), r: my256(132), rx: 18, ry: 44, speed: 1.35 },
+            { c: mx256(239), r: my256(168), rx: 16, ry: 38, speed: 1.5 },
+            { c: mx256(163), r: my256(104), rx: 22, ry: 32, speed: 1.4 },
+            { c: 368,        r: 225,        rx: 24, ry: 36, speed: 1.4 },
+            { c: mx256(163), r: my256(130), rx: 20, ry: 30, speed: 1.35 },
+            { c: mx256(192), r: my256(214), rx: 36, ry: 22, speed: 1.5 },
+            { c: mx256(74),  r: my256(66),  rx: 24, ry: 24, speed: 1.25 }
         ];
         const jetPeds = ["surfer_guy", "bikini_pink", "bikini_cyan", "vc_jogger", "bikini_red"];
         for (let ji = 0; ji < rawJetSkis.length; ji++) {
@@ -1236,16 +1053,18 @@ class LeonidaMap {
         this.streetEvents = [];
         const rawStreetEvents = [
             // Wynwood & Little Haiti Street-Art Mural + DJ Booth + Breakdancers
-            { c: 112.5, r: 71.5, kind: "WYNWOOD_CYPHER" },
-            { c: 124.5, r: 71.5, kind: "WYNWOOD_CYPHER" },
-            { c: 135.5, r: 72.5, kind: "WYNWOOD_CYPHER" },
-            { c: 101.5, r: 68.5, kind: "WYNWOOD_CYPHER" },
+            { c: mx256(112.5), r: my256(71.5), kind: "WYNWOOD_CYPHER" },
+            { c: mx256(124.5), r: my256(71.5), kind: "WYNWOOD_CYPHER" },
+            { c: mx256(135.5), r: my256(72.5), kind: "WYNWOOD_CYPHER" },
+            { c: mx256(101.5), r: my256(68.5), kind: "WYNWOOD_CYPHER" },
+            { c: 212.5,        r: 128.5,       kind: "WYNWOOD_CYPHER" },
             // Ocean Drive & South Beach Social-Media Influencer Ring-Light Livestreamers (GTA 6 Trailer 1!)
-            { c: 218.4, r: 88.5, kind: "INFLUENCER_STREAM" },
-            { c: 218.4, r: 112.5, kind: "INFLUENCER_STREAM" },
-            { c: 218.4, r: 138.5, kind: "INFLUENCER_STREAM" },
-            { c: 218.4, r: 162.5, kind: "INFLUENCER_STREAM" },
-            { c: 204.5, r: 119.5, kind: "INFLUENCER_STREAM" }
+            { c: mx256(218.4), r: my256(88.5),  kind: "INFLUENCER_STREAM" },
+            { c: mx256(218.4), r: my256(112.5), kind: "INFLUENCER_STREAM" },
+            { c: mx256(218.4), r: 222.5,        kind: "INFLUENCER_STREAM" },
+            { c: mx256(218.4), r: my256(138.5), kind: "INFLUENCER_STREAM" },
+            { c: mx256(218.4), r: my256(162.5), kind: "INFLUENCER_STREAM" },
+            { c: mx256(204.5), r: my256(119.5), kind: "INFLUENCER_STREAM" }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];
@@ -1258,7 +1077,7 @@ class LeonidaMap {
         // 6) Mount Kalaga National Park Wilderness Campsites ("wildernessCamps")
         this.wildernessCamps = [];
         for (const [cc, rr] of [[49.5, 11.2], [62.5, 11.2], [50.5, 20.8], [62.2, 20.8], [74.5, 16.5]]) {
-            const sp = snapToVerifiedPed(cc * TILE_SIZE, rr * TILE_SIZE, 4);
+            const sp = snapToVerifiedPed(mx256(cc) * TILE_SIZE, my256(rr) * TILE_SIZE, 4);
             if (sp) {
                 this.wildernessCamps.push({ x: sp.x, y: sp.y, z: 2.0, seed: cc + rr });
             }
@@ -1267,16 +1086,16 @@ class LeonidaMap {
         // 7) Vice City Golf Club Putting Greens ("golfGreens")
         this.golfGreens = [];
         for (const [cc, rr] of [[144.8, 53.5], [151.8, 53.5], [144.8, 59.2], [151.8, 59.2]]) {
-            const sp = snapToVerifiedPed(cc * TILE_SIZE, rr * TILE_SIZE, 4);
+            const sp = snapToVerifiedPed(mx256(cc) * TILE_SIZE, my256(rr) * TILE_SIZE, 4);
             if (sp) {
                 this.golfGreens.push({ x: sp.x, y: sp.y, z: 2.0, seed: cc * 3 + rr });
             }
         }
 
-        // 8) Mambas Stadium Live Football Pitch Scrimmage ("stadiumScrimmage" inside the emerald turf bowl c=112..119, r=99..105)
+        // 8) Mambas Stadium Live Football Pitch Scrimmage ("stadiumScrimmage" inside the emerald turf bowl)
         this.stadiumScrimmage = {
-            x: 115.5 * TILE_SIZE,
-            y: 102.5 * TILE_SIZE,
+            x: mx256(115.5) * TILE_SIZE,
+            y: my256(102.5) * TILE_SIZE,
             z: 2.0
         };
 
@@ -1284,6 +1103,10 @@ class LeonidaMap {
         this.streetlights = [];
         this.trafficSignals = [];
         this.viceStreetDetails = [];
+        const urbanSigMinX = MAP_X_256[102], urbanSigMaxX = MAP_X_256[226];
+        const urbanSigMinY = MAP_Y_256[34],  urbanSigMaxY = MAP_Y_256[204];
+        const oceanDriveW = MAP_X_256[213],  oceanDriveE = MAP_X_256[218];
+
         for (let r = 3; r < MAP_ROWS - 3; r++) {
             for (let c = 3; c < MAP_COLS - 3; c++) {
                 const idx = r * MAP_COLS + c;
@@ -1297,7 +1120,7 @@ class LeonidaMap {
                 const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
 
                 // Signalized Urban Intersections (1 NS + 1 EW gantry per intersection; check per-avenue distance so Collins Ave doesn't suppress Ocean Drive!)
-                const isUrbanSignalZone = (c >= 102 && c <= 226 && r >= 34 && r <= 204);
+                const isUrbanSignalZone = (c >= urbanSigMinX && c <= urbanSigMaxX && r >= urbanSigMinY && r <= urbanSigMaxY);
                 if (isUrbanSignalZone && roadCount === 2 && eRoad && (sRoad || nRoad)) {
                     const dcCorner = 1;
                     const drCorner = sRoad ? 1 : -1;
@@ -1336,7 +1159,7 @@ class LeonidaMap {
                 // Only place streetlamps along straight mid-block sidewalk curbs (1 road neighbor, never near corners or crosswalks!)
                 if (roadCount !== 1) continue;
                 // Exclude wilderness/swamp/mountain zones
-                if (c < 36 || (c < 96 && r > 185) || (c < 105 && r < 42)) continue;
+                if (c < MAP_X_256[36] || (c < MAP_X_256[96] && r > MAP_Y_256[185]) || (c < MAP_X_256[105] && r < MAP_Y_256[42])) continue;
 
                 let dc = 0, dr = 0;
                 if (eRoad) dc = 1;
@@ -1370,7 +1193,7 @@ class LeonidaMap {
                 if (!isVerticalCurb && dr < 0) continue;
 
                 // Realistic urban spacing (7 tiles on Ocean Drive, 9 tiles on avenues) with staggered quinconce offset on opposite curbs!
-                const isOceanDriveCurb = (c === 213 || c === 218) && r >= 34 && r <= 204;
+                const isOceanDriveCurb = (c === oceanDriveW || c === oceanDriveE) && r >= urbanSigMinY && r <= urbanSigMaxY;
                 const spacing = isOceanDriveCurb ? 7 : 9;
                 const sideOffset = (dc < 0 || dr < 0) ? Math.floor(spacing * 0.5) : 0;
                 const coordAlong = isVerticalCurb ? r : c;
@@ -1391,13 +1214,13 @@ class LeonidaMap {
                 // District-authentic GTA 2 / Vice City warm yellow/sodium streetlamp style
                 let style = "BOULEVARD_GOLD";
                 let colorType = "AMBER";
-                if (c >= 202 && c <= 223) {
+                if (c >= MAP_X_256[202] && c <= MAP_X_256[223]) {
                     style = "ART_DECO_NEON";
                     colorType = "AMBER";
-                } else if (c >= 152 && c <= 201) {
+                } else if (c >= MAP_X_256[152] && c <= MAP_X_256[201]) {
                     style = "STAR_RESORT";
                     colorType = "GOLD";
-                } else if (c < 95 || r >= 205) {
+                } else if (c < MAP_X_256[95] || r >= MAP_Y_256[205]) {
                     style = "SODIUM_HIGHWAY";
                     colorType = "SODIUM";
                 }
@@ -1417,13 +1240,13 @@ class LeonidaMap {
             }
         }
 
-        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Coral Promenade (c = 218, never inside the grass lawn!) & the 3 Wooden Ocean Piers
-        for (let r = 42; r <= 194; r += 10) {
-            if (this.surfaceGround[r * MAP_COLS + 218] === GROUND_TYPE.PAWEMENT) {
-                const bx = 218.55 * TILE_SIZE;
+        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Coral Promenade (c = oceanDriveE, never inside the grass lawn!) & the 3 Wooden Ocean Piers
+        for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r += 10) {
+            if (this.surfaceGround[r * MAP_COLS + oceanDriveE] === GROUND_TYPE.PAWEMENT) {
+                const bx = (oceanDriveE + 0.55) * TILE_SIZE;
                 const by = (r + 0.5) * TILE_SIZE;
                 this.streetlights.push({
-                    c: 218,
+                    c: oceanDriveE,
                     r,
                     baseX: bx,
                     baseY: by,
@@ -1436,8 +1259,8 @@ class LeonidaMap {
                 });
             }
         }
-        for (const pierR of [45, 88, 154]) {
-            for (let c = 233; c <= 245; c += 6) {
+        for (const pierR of [MAP_Y_256[45], MAP_Y_256[88], MAP_Y_256[154]]) {
+            for (let c = MAP_X_256[233]; c <= MAP_X_256[245]; c += 6) {
                 if (this.surfaceGround[pierR * MAP_COLS + c] === GROUND_TYPE.PAWEMENT) {
                     const bx = (c + 0.5) * TILE_SIZE;
                     const by = (pierR + 0.22) * TILE_SIZE;
@@ -1458,27 +1281,28 @@ class LeonidaMap {
         }
 
         // Deep-Dive Vice City Architectural Streetscape Props:
-        // A. Ocean Drive Art Deco Sidewalk Café Parasols (West sidewalk x=213.18 directly in front of 3D Art Deco hotels)
-        for (let r = 42; r <= 194; r += 3) {
-            if (this.surfaceGround[r * MAP_COLS + 213] !== GROUND_TYPE.PAWEMENT) continue;
+        // A. Ocean Drive Art Deco Sidewalk Café Parasols (West sidewalk directly in front of 3D Art Deco hotels)
+        for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r += 3) {
+            if (this.surfaceGround[r * MAP_COLS + oceanDriveW] !== GROUND_TYPE.PAWEMENT) continue;
             // Only place café parasols directly in front of actual 3D Ocean Drive buildings (never in front of parks or roads!)
-            if (this.surfaceGround[r * MAP_COLS + 212] !== GROUND_TYPE.BUILDING) continue;
-            if (this.getBlockInfo(213, r, 1)?.lid === 69) continue;
+            if (this.surfaceGround[r * MAP_COLS + (oceanDriveW - 1)] !== GROUND_TYPE.BUILDING) continue;
+            if (this.getBlockInfo(oceanDriveW, r, 1)?.lid === 69) continue;
             this.viceStreetDetails.push({
                 kind: "CAFE_TABLE",
-                x: 213.22 * TILE_SIZE,
+                x: (oceanDriveW + 0.22) * TILE_SIZE,
                 y: (r + 0.5) * TILE_SIZE,
                 z: 2.0,
                 theme: ((r >> 1) % 2 === 0) ? "PINK" : "CYAN"
             });
         }
 
-        // B. Española Way Overhead Mediterranean Bistro Light Strings (y=105..108, x=204..213)
-        for (let c = 204; c <= 212; c += 2) {
+        // B. Española Way Overhead Mediterranean Bistro Light Strings
+        const espanolaY = my256(106.5);
+        for (let c = 414; c <= oceanDriveW - 1; c += 2) {
             this.viceStreetDetails.push({
                 kind: "BISTRO_STRING",
                 x: (c + 0.5) * TILE_SIZE,
-                y: 106.5 * TILE_SIZE,
+                y: espanolaY * TILE_SIZE,
                 z: 2.0,
                 theme: (c % 4 === 0) ? "PINK" : "AMBER"
             });
@@ -1501,10 +1325,10 @@ class LeonidaMap {
                 name: "🏖️ VICE BEACH, LUMMUS PARK & OCEAN PIER",
                 sub: "S-CURVING GOLDEN SAND BEACH, 8 LIFEGUARD TOWERS, LUMMUS PARK & WOODEN PIER — +50 ARMOR!",
                 district: "VICE BEACH & SOUTH POINT PIER",
-                bx: 225.5,
-                by: 154.0,
-                x: 225.5 * TILE_SIZE,
-                y: 154.0 * TILE_SIZE,
+                bx: mx256(225.5),
+                by: my256(154.0),
+                x: mx256(225.5) * TILE_SIZE,
+                y: my256(154.0) * TILE_SIZE,
                 color: "#facc15",
                 perk: "ARMOR",
                 visited: false
@@ -1516,10 +1340,10 @@ class LeonidaMap {
                 name: "🏨 HOTEL DIXON & OCEAN DRIVE",
                 sub: "ICONIC VICE CITY NEON ART DECO HOTEL FACING LUMMUS PARK — 100% HEALTH!",
                 district: "SOUTH BEACH — OCEAN DRIVE",
-                bx: 213.5,
-                by: 146.0,
-                x: 213.5 * TILE_SIZE,
-                y: 146.0 * TILE_SIZE,
+                bx: mx256(213.5),
+                by: my256(146.0),
+                x: mx256(213.5) * TILE_SIZE,
+                y: my256(146.0) * TILE_SIZE,
                 color: "#f472b6",
                 perk: "HEAL",
                 visited: false
@@ -1531,10 +1355,10 @@ class LeonidaMap {
                 name: "🦩 ESPAÑOLA WAY PLAZA & FLAMINGO PARK",
                 sub: "PEDESTRIAN CORAL PROMENADE, MALIBU CLUB & FLAMINGO SPORTS FIELD — +1 MULTIPLIER!",
                 district: "MID-BEACH — ESPAÑOLA WAY & FLAMINGO PARK",
-                bx: 208.5,
-                by: 106.5,
-                x: 208.5 * TILE_SIZE,
-                y: 106.5 * TILE_SIZE,
+                bx: mx256(208.5),
+                by: my256(106.5),
+                x: mx256(208.5) * TILE_SIZE,
+                y: my256(106.5) * TILE_SIZE,
                 color: "#fb7185",
                 perk: "MULTIPLIER",
                 visited: false
@@ -1546,10 +1370,10 @@ class LeonidaMap {
                 name: "💃 CLUB NINE1NINE & NORTH BEACH MALL",
                 sub: "VICE CITY FLAGSHIP VIP NIGHTCLUB & OPEN-AIR SHOPPING PROMENADE — +1 MULTIPLIER!",
                 district: "NORTH BEACH — CLUB NINE1NINE",
-                bx: 213.5,
-                by: 48.0,
-                x: 213.5 * TILE_SIZE,
-                y: 48.0 * TILE_SIZE,
+                bx: mx256(213.5),
+                by: my256(48.0),
+                x: mx256(213.5) * TILE_SIZE,
+                y: my256(48.0) * TILE_SIZE,
                 color: "#22d3ee",
                 perk: "MULTIPLIER",
                 visited: false
@@ -1561,10 +1385,10 @@ class LeonidaMap {
                 name: "🚀 SERA SPACE CENTER & LAUNCH PADS 39A/39B",
                 sub: "CAPE LEONIDA VAB, BANANA RIVER LAGOON & 2 3D ROCKET GANTRY TOWERS — ROCKET & ARMOR!",
                 district: "CAPE LEONIDA — SERA SPACEPORT",
-                bx: 224.5,
-                by: 20.5,
-                x: 224.5 * TILE_SIZE,
-                y: 20.5 * TILE_SIZE,
+                bx: mx256(224.5),
+                by: my256(20.5),
+                x: mx256(224.5) * TILE_SIZE,
+                y: my256(20.5) * TILE_SIZE,
                 color: "#38bdf8",
                 perk: "ESTATE",
                 visited: false
@@ -1576,10 +1400,10 @@ class LeonidaMap {
                 name: "🏛️ STAR ISLAND & VENETIAN ARCHIPELAGO",
                 sub: "4 BISCAYNE BAY ISLANDS (HIBISCUS, SAN MARCO, BELLE ISLE & STAR MANSIONS) — FULL HP/ARMOR!",
                 district: "BISCAYNE BAY — STAR ISLAND",
-                bx: 173.0,
-                by: 106.5,
-                x: 173.0 * TILE_SIZE,
-                y: 106.5 * TILE_SIZE,
+                bx: mx256(173.0),
+                by: my256(106.5),
+                x: mx256(173.0) * TILE_SIZE,
+                y: my256(106.5) * TILE_SIZE,
                 color: "#c084fc",
                 perk: "ESTATE",
                 visited: false
@@ -1591,10 +1415,10 @@ class LeonidaMap {
                 name: "🚢 PORT OF VICE CITY & 3D MEGA CRUISE SHIPS",
                 sub: "2 GIANT DOCKED CRUISE LINERS, CONTAINER CRANES & DEEPWATER TERMINAL — +$3,000 BONUS!",
                 district: "PORT OF VICE CITY & CRUISE TERMINAL",
-                bx: 171.5,
-                by: 164.5,
-                x: 171.5 * TILE_SIZE,
-                y: 164.5 * TILE_SIZE,
+                bx: mx256(171.5),
+                by: my256(164.5),
+                x: mx256(171.5) * TILE_SIZE,
+                y: my256(164.5) * TILE_SIZE,
                 color: "#60a5fa",
                 perk: "TAXI_BONUS",
                 visited: false
@@ -1606,10 +1430,10 @@ class LeonidaMap {
                 name: "🏟️ VICE CITY MAMBAS OPEN-AIR STADIUM",
                 sub: "DRIVE RIGHT INSIDE THE 3D STADIUM BOWL ONTO THE EMERALD FOOTBALL PITCH — +1 MULTIPLIER!",
                 district: "VICE CITY MAMBAS STADIUM",
-                bx: 116.0,
-                by: 105.0,
-                x: 116.0 * TILE_SIZE,
-                y: 105.0 * TILE_SIZE,
+                bx: mx256(116.0),
+                by: my256(105.0),
+                x: mx256(116.0) * TILE_SIZE,
+                y: my256(105.0) * TILE_SIZE,
                 color: "#34d399",
                 perk: "MULTIPLIER",
                 visited: false
@@ -1621,10 +1445,10 @@ class LeonidaMap {
                 name: "🏙️ DOWNTOWN SKYLINE, BAYFRONT & GOLF CLUB",
                 sub: "CRUCIFORM SKYSCRAPERS, BAYFRONT MARINA, VICE RIVER & 9-HOLE GOLF COURSE — 100% HEALTH!",
                 district: "DOWNTOWN VICE CITY & BAYFRONT PARK",
-                bx: 141.5,
-                by: 116.5,
-                x: 141.5 * TILE_SIZE,
-                y: 116.5 * TILE_SIZE,
+                bx: mx256(141.5),
+                by: my256(116.5),
+                x: mx256(141.5) * TILE_SIZE,
+                y: my256(116.5) * TILE_SIZE,
                 color: "#818cf8",
                 perk: "HEAL",
                 visited: false
@@ -1636,10 +1460,10 @@ class LeonidaMap {
                 name: "🎨 WYNWOOD WALLS, LITTLE HAITI & JACK OF HEARTS",
                 sub: "STREET ART COURTYARDS, TOUSSAINT MARKET & BOOBIE IKE'S STRIP CLUB — +$3,000 VIP BONUS!",
                 district: "WYNWOOD WALLS & CLUB JACK OF HEARTS",
-                bx: 115.5,
-                by: 82.5,
-                x: 115.5 * TILE_SIZE,
-                y: 82.5 * TILE_SIZE,
+                bx: mx256(115.5),
+                by: my256(82.5),
+                x: mx256(115.5) * TILE_SIZE,
+                y: my256(82.5) * TILE_SIZE,
                 color: "#e879f9",
                 perk: "TAXI_BONUS",
                 visited: false
@@ -1651,10 +1475,10 @@ class LeonidaMap {
                 name: "🌊 LAKE LEONIDA GATOR ISLAND & AMBROSIA",
                 sub: "MULTI-LOBED CENTRAL LAKE, I-95 CAUSEWAY BRIDGE & SUGAR REFINERY — +50 ARMOR & AIRBOAT!",
                 district: "LAKE LEONIDA & GATOR ISLAND",
-                bx: 77.5,
-                by: 75.0,
-                x: 77.5 * TILE_SIZE,
-                y: 75.0 * TILE_SIZE,
+                bx: mx256(77.5),
+                by: my256(75.0),
+                x: mx256(77.5) * TILE_SIZE,
+                y: my256(75.0) * TILE_SIZE,
                 color: "#2dd4bf",
                 perk: "ARMOR",
                 visited: false
@@ -1666,10 +1490,10 @@ class LeonidaMap {
                 name: "🌴 NORTH VICE SHORES & GOLDEN GLADES LAGOONS",
                 sub: "3 CRYSTAL TURQUOISE RESORT LAGOONS, FLAMINGO COVES & SCENIC NORTH BOULEVARD — 100% HP!",
                 district: "NORTH VICE SHORES & GOLDEN GLADES",
-                bx: 84.5,
-                by: 25.5,
-                x: 84.5 * TILE_SIZE,
-                y: 25.5 * TILE_SIZE,
+                bx: mx256(84.5),
+                by: my256(25.5),
+                x: mx256(84.5) * TILE_SIZE,
+                y: my256(25.5) * TILE_SIZE,
                 color: "#a3e635",
                 perk: "HEAL",
                 visited: false
@@ -1681,10 +1505,10 @@ class LeonidaMap {
                 name: "🚨 LEONIDA STATE PENITENTIARY (KELLY COUNTY)",
                 sub: "ENTERABLE WALLED PRISON FORTRESS, 8 GUARD WATCHTOWERS & EXERCISE YARD — JAIL FREE CARD!",
                 district: "LEONIDA STATE PENITENTIARY",
-                bx: 31.5,
-                by: 76.5,
-                x: 31.5 * TILE_SIZE,
-                y: 76.5 * TILE_SIZE,
+                bx: mx256(31.5),
+                by: my256(76.5),
+                x: mx256(31.5) * TILE_SIZE,
+                y: my256(76.5) * TILE_SIZE,
                 color: "#f87171",
                 perk: "ESTATE",
                 visited: false
@@ -1696,10 +1520,10 @@ class LeonidaMap {
                 name: "🏁 PORT GELLHORN OVAL SPEEDWAY & HANK'S",
                 sub: "DRIVEABLE DIRT OVAL RACE TRACK, HANK'S WAFFLES, UNCLE JACK'S & DOCKS — REPAIR & 0 WANTED!",
                 district: "PORT GELLHORN DIRT SPEEDWAY",
-                bx: 47.0,
-                by: 113.5,
-                x: 47.0 * TILE_SIZE,
-                y: 113.5 * TILE_SIZE,
+                bx: mx256(47.0),
+                by: my256(113.5),
+                x: mx256(47.0) * TILE_SIZE,
+                y: my256(113.5) * TILE_SIZE,
                 color: "#fb923c",
                 perk: "REPAIR_CLEAR",
                 visited: false
@@ -1711,10 +1535,10 @@ class LeonidaMap {
                 name: "✈️ VCIA INT'L AIRPORT (DUAL RUNWAYS & JET)",
                 sub: "CROSSING RUNWAYS 18L/09, Y-TERMINAL, CONTROL TOWER & 3D PARKED AIRLINER — 100% HEALTH!",
                 district: "VCIA INTERNATIONAL AIRPORT",
-                bx: 66.5,
-                by: 152.0,
-                x: 66.5 * TILE_SIZE,
-                y: 152.0 * TILE_SIZE,
+                bx: mx256(66.5),
+                by: my256(152.0),
+                x: mx256(66.5) * TILE_SIZE,
+                y: my256(152.0) * TILE_SIZE,
                 color: "#38bdf8",
                 perk: "HEAL",
                 visited: false
@@ -1726,10 +1550,10 @@ class LeonidaMap {
                 name: "🐊 THRILLBILLY MUD PARK, EVERGLADES & KEYS",
                 sub: "FIGURE-8 MUD TRACK, GATOR SWAMP & 6 LEONIDA KEYS WITH BROKEN BRIDGE JUMP — +50 ARMOR!",
                 district: "GRASSRIVERS & THRILLBILLY MUD PARK",
-                bx: 58.0,
-                by: 214.5,
-                x: 58.0 * TILE_SIZE,
-                y: 214.5 * TILE_SIZE,
+                bx: mx256(58.0),
+                by: my256(214.5),
+                x: mx256(58.0) * TILE_SIZE,
+                y: my256(214.5) * TILE_SIZE,
                 color: "#4ade80",
                 perk: "ARMOR",
                 visited: false
@@ -1745,8 +1569,8 @@ class LeonidaMap {
                 theme: "ART_DECO_HOTEL",
                 accent: "#f472b6",
                 facing: "S",
-                doorX: 211.5 * TILE_SIZE,
-                doorY: 147.5 * TILE_SIZE,
+                doorX: mx256(211.5) * TILE_SIZE,
+                doorY: my256(147.5) * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -1791,8 +1615,8 @@ class LeonidaMap {
                 theme: "NEON_CLUB",
                 accent: "#fb923c",
                 facing: "S",
-                doorX: 211.5 * TILE_SIZE,
-                doorY: 51.5 * TILE_SIZE,
+                doorX: mx256(211.5) * TILE_SIZE,
+                doorY: my256(51.5) * TILE_SIZE,
                 w: 800,
                 h: 540,
                 npcs: [
@@ -1839,8 +1663,8 @@ class LeonidaMap {
                 theme: "STRIP_CLUB",
                 accent: "#e879f9",
                 facing: "S",
-                doorX: 111.5 * TILE_SIZE,
-                doorY: 81.5 * TILE_SIZE,
+                doorX: mx256(111.5) * TILE_SIZE,
+                doorY: my256(81.5) * TILE_SIZE,
                 w: 800,
                 h: 540,
                 npcs: [
@@ -1886,8 +1710,8 @@ class LeonidaMap {
                 theme: "MALIBU_CLUB",
                 accent: "#fb7185",
                 facing: "S",
-                doorX: 210.5 * TILE_SIZE,
-                doorY: 105.5 * TILE_SIZE,
+                doorX: mx256(210.5) * TILE_SIZE,
+                doorY: my256(105.5) * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -1932,8 +1756,8 @@ class LeonidaMap {
                 theme: "MANSION",
                 accent: "#c084fc",
                 facing: "S",
-                doorX: 176.5 * TILE_SIZE,
-                doorY: 104.5 * TILE_SIZE,
+                doorX: mx256(176.5) * TILE_SIZE,
+                doorY: my256(104.5) * TILE_SIZE,
                 w: 820,
                 h: 550,
                 npcs: [
@@ -1978,8 +1802,8 @@ class LeonidaMap {
                 theme: "SPACE_BUNKER",
                 accent: "#38bdf8",
                 facing: "S",
-                doorX: 230.5 * TILE_SIZE,
-                doorY: 17.5 * TILE_SIZE,
+                doorX: mx256(230.5) * TILE_SIZE,
+                doorY: my256(17.5) * TILE_SIZE,
                 w: 820,
                 h: 540,
                 npcs: [
@@ -2024,8 +1848,8 @@ class LeonidaMap {
                 theme: "PRISON_BLOCK",
                 accent: "#f87171",
                 facing: "S",
-                doorX: 35.5 * TILE_SIZE,
-                doorY: 76.5 * TILE_SIZE,
+                doorX: mx256(35.5) * TILE_SIZE,
+                doorY: my256(76.5) * TILE_SIZE,
                 w: 800,
                 h: 530,
                 npcs: [
@@ -2070,8 +1894,8 @@ class LeonidaMap {
                 theme: "DINER_PAWN",
                 accent: "#fb923c",
                 facing: "S",
-                doorX: 36.5 * TILE_SIZE,
-                doorY: 140.5 * TILE_SIZE,
+                doorX: mx256(36.5) * TILE_SIZE,
+                doorY: my256(140.5) * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -2124,16 +1948,16 @@ class LeonidaMap {
 
         // 10 High-Flying Unique Stunt Jump Ramps across Vice City & Leonida!
         this.stuntRamps = [
-            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: 217.5 * TILE_SIZE, y: 151.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: 217.5 * TILE_SIZE, y: 124.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: 184.0 * TILE_SIZE, y: 156.5 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: 184.0 * TILE_SIZE, y: 109.5 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 184.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: 141.5 * TILE_SIZE, y: 120.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: 116.0 * TILE_SIZE, y: 114.5 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: 47.0 * TILE_SIZE, y: 120.5 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: 66.5 * TILE_SIZE, y: 156.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: 124.0 * TILE_SIZE, y: 241.5 * TILE_SIZE, angle: 0 }
+            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: mx256(217.5) * TILE_SIZE, y: my256(151.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: mx256(217.5) * TILE_SIZE, y: my256(124.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: mx256(184.0) * TILE_SIZE, y: my256(156.5) * TILE_SIZE, angle: 0 },
+            { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: mx256(184.0) * TILE_SIZE, y: my256(109.5) * TILE_SIZE, angle: 0 },
+            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: mx256(184.0) * TILE_SIZE, y: my256(47.0) * TILE_SIZE, angle: 0 },
+            { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: mx256(141.5) * TILE_SIZE, y: my256(120.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: mx256(116.0) * TILE_SIZE, y: my256(114.5) * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: mx256(47.0) * TILE_SIZE, y: my256(120.5) * TILE_SIZE, angle: 0 },
+            { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: mx256(66.5) * TILE_SIZE, y: my256(156.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: mx256(124.0) * TILE_SIZE, y: my256(241.5) * TILE_SIZE, angle: 0 }
         ];
         return landmarksList;
     }
@@ -2666,22 +2490,22 @@ class LeonidaMap {
         // 6 PAY 'N' SPRAY SHOPS ("VICE CUSTOMS") ON STATE OF LEONIDA ROADS
         // --------------------------------------------------------------------
         this.payNSprays = [
-            { id: "pns_oceandrive", name: "VICE CUSTOMS (COLLINS AVE / SOUTH BEACH)", x: 203.0 * TILE_SIZE, y: 146.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_northbeach", name: "VICE CUSTOMS (NORTH BEACH / 919)", x: 203.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_downtown", name: "VICE CUSTOMS (BISCAYNE BLVD)", x: 141.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_wynwood", name: "WYNWOOD CUSTOMS (MAMBAS STADIUM)", x: 115.0 * TILE_SIZE, y: 92.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_gellhorn", name: "GELLHORN SPEEDWAY CUSTOMS", x: 38.0 * TILE_SIZE, y: 118.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_vcia", name: "VCIA AIRPORT CUSTOMS", x: 89.0 * TILE_SIZE, y: 148.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE }
+            { id: "pns_oceandrive", name: "VICE CUSTOMS (COLLINS AVE / SOUTH BEACH)", x: mx256(203.0) * TILE_SIZE, y: my256(146.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_northbeach", name: "VICE CUSTOMS (NORTH BEACH / 919)", x: mx256(203.0) * TILE_SIZE, y: my256(48.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_downtown", name: "VICE CUSTOMS (BISCAYNE BLVD)", x: mx256(141.0) * TILE_SIZE, y: my256(112.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_wynwood", name: "WYNWOOD CUSTOMS (MAMBAS STADIUM)", x: mx256(115.0) * TILE_SIZE, y: my256(92.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_gellhorn", name: "GELLHORN SPEEDWAY CUSTOMS", x: mx256(38.0) * TILE_SIZE, y: my256(118.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_vcia", name: "VCIA AIRPORT CUSTOMS", x: mx256(89.0) * TILE_SIZE, y: my256(148.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE }
         ];
 
         // --------------------------------------------------------------------
         // 4 BOMB SHOPS
         // --------------------------------------------------------------------
         this.bombShops = [
-            { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: 75.5 * TILE_SIZE, y: 153.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_littlehaiti", name: "AMBROSIA BOMB SHOP (LAKE LEONIDA)", x: 94.0 * TILE_SIZE, y: 80.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_sera", name: "SERA ROCKET ORDNANCE (CAPE LEONIDA)", x: 215.0 * TILE_SIZE, y: 20.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: 38.0 * TILE_SIZE, y: 140.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
+            { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: mx256(75.5) * TILE_SIZE, y: my256(153.5) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_littlehaiti", name: "AMBROSIA BOMB SHOP (LAKE LEONIDA)", x: mx256(94.0) * TILE_SIZE, y: my256(80.0) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_sera", name: "SERA ROCKET ORDNANCE (CAPE LEONIDA)", x: mx256(215.0) * TILE_SIZE, y: my256(20.0) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: mx256(38.0) * TILE_SIZE, y: my256(140.0) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
         ];
 
         // --------------------------------------------------------------------
@@ -2691,8 +2515,8 @@ class LeonidaMap {
             {
                 id: "crane_viceport",
                 name: "VICE PORT CONTAINER CRANE",
-                x: 171.5 * TILE_SIZE,
-                y: 162.5 * TILE_SIZE,
+                x: mx256(171.5) * TILE_SIZE,
+                y: my256(162.5) * TILE_SIZE,
                 w: 2.5 * TILE_SIZE,
                 h: 2.4 * TILE_SIZE,
                 armAngle: 0,
@@ -2702,8 +2526,8 @@ class LeonidaMap {
             {
                 id: "crane_docks",
                 name: "PORT GELLHORN MAGNETIC CRANE",
-                x: 29.5 * TILE_SIZE,
-                y: 132.5 * TILE_SIZE,
+                x: mx256(29.5) * TILE_SIZE,
+                y: my256(132.5) * TILE_SIZE,
                 w: 2.6 * TILE_SIZE,
                 h: 2.4 * TILE_SIZE,
                 armAngle: 0,
@@ -2719,8 +2543,8 @@ class LeonidaMap {
             {
                 id: "kf_oceandrive",
                 title: "OCEAN DRIVE FLAME FRENZY!",
-                x: 218.5 * TILE_SIZE,
-                y: 145.5 * TILE_SIZE,
+                x: mx256(218.5) * TILE_SIZE,
+                y: my256(145.5) * TILE_SIZE,
                 weapon: "FLAMETHROWER",
                 targetKills: 5,
                 timeLimit: 35,
@@ -2730,8 +2554,8 @@ class LeonidaMap {
             {
                 id: "kf_starisland",
                 title: "STAR ISLAND ROCKET RAMPAGE!",
-                x: 173.0 * TILE_SIZE,
-                y: 103.5 * TILE_SIZE,
+                x: mx256(173.0) * TILE_SIZE,
+                y: my256(103.5) * TILE_SIZE,
                 weapon: "ROCKET",
                 targetKills: 6,
                 timeLimit: 40,
@@ -2741,8 +2565,8 @@ class LeonidaMap {
             {
                 id: "kf_stadium",
                 title: "MAMBAS STADIUM BOWL RAMPAGE!",
-                x: 116.0 * TILE_SIZE,
-                y: 102.0 * TILE_SIZE,
+                x: mx256(116.0) * TILE_SIZE,
+                y: my256(102.0) * TILE_SIZE,
                 weapon: "SHOTGUN",
                 targetKills: 6,
                 timeLimit: 40,
@@ -2752,8 +2576,8 @@ class LeonidaMap {
             {
                 id: "kf_sera",
                 title: "SERA SPACEPORT LAUNCH PAD RAMPAGE!",
-                x: 228.5 * TILE_SIZE,
-                y: 20.5 * TILE_SIZE,
+                x: mx256(228.5) * TILE_SIZE,
+                y: my256(20.5) * TILE_SIZE,
                 weapon: "ROCKET",
                 targetKills: 5,
                 timeLimit: 40,
@@ -2763,8 +2587,8 @@ class LeonidaMap {
             {
                 id: "kf_prison",
                 title: "LEONIDA PENITENTIARY RIOT FRENZY!",
-                x: 31.5 * TILE_SIZE,
-                y: 67.5 * TILE_SIZE,
+                x: mx256(31.5) * TILE_SIZE,
+                y: my256(67.5) * TILE_SIZE,
                 weapon: "SHOTGUN",
                 targetKills: 6,
                 timeLimit: 40,
@@ -2774,8 +2598,8 @@ class LeonidaMap {
             {
                 id: "kf_gellhorn",
                 title: "PORT GELLHORN SPEEDWAY UZI RAMPAGE!",
-                x: 47.0 * TILE_SIZE,
-                y: 106.0 * TILE_SIZE,
+                x: mx256(47.0) * TILE_SIZE,
+                y: my256(106.0) * TILE_SIZE,
                 weapon: "UZI",
                 targetKills: 6,
                 timeLimit: 35,
@@ -2785,8 +2609,8 @@ class LeonidaMap {
             {
                 id: "kf_vcia",
                 title: "VCIA TARMAC JETLINER RAMPAGE!",
-                x: 62.5 * TILE_SIZE,
-                y: 156.0 * TILE_SIZE,
+                x: mx256(62.5) * TILE_SIZE,
+                y: my256(156.0) * TILE_SIZE,
                 weapon: "ROCKET",
                 targetKills: 5,
                 timeLimit: 40,
@@ -2796,8 +2620,8 @@ class LeonidaMap {
             {
                 id: "kf_mudpark",
                 title: "THRILLBILLY MUD PARK FLAME FRENZY!",
-                x: 58.0 * TILE_SIZE,
-                y: 216.0 * TILE_SIZE,
+                x: mx256(58.0) * TILE_SIZE,
+                y: my256(216.0) * TILE_SIZE,
                 weapon: "FLAMETHROWER",
                 targetKills: 5,
                 timeLimit: 40,
@@ -2824,14 +2648,14 @@ class LeonidaMap {
         this.crates = [];
 
         this.infoSigns = [
-            { x: 213.5 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0, text: "STATE OF LEONIDA (12 BESPOKE REGIONS): VICE BEACH, MAMBAS STADIUM, SERA SPACEPORT, PENITENTIARY, SPEEDWAY & KEYS! PRESS [M] OR USE [C] TOUR!" },
-            { x: 218.5 * TILE_SIZE, y: 152.5 * TILE_SIZE, z: 2.0, text: "LUMMUS PARK & VICE BEACH: WIPE OUT ALL 7 MONKS FOR A GOURANGA! BONUS, OR CLICK ANY OF THE 16 LANDMARKS IN THE TOP-LEFT [C] WINDOW!" }
+            { x: mx256(213.5) * TILE_SIZE, y: my256(148.5) * TILE_SIZE, z: 2.0, text: "STATE OF LEONIDA (512x512 MEGA-MAP): VICE BEACH, MAMBAS STADIUM, SERA SPACEPORT, PENITENTIARY, SPEEDWAY & KEYS! PRESS [M] OR USE [C] TOUR!" },
+            { x: mx256(218.5) * TILE_SIZE, y: my256(152.5) * TILE_SIZE, z: 2.0, text: "LUMMUS PARK & VICE BEACH: WIPE OUT ALL 7 MONKS FOR A GOURANGA! BONUS, OR CLICK ANY OF THE 16 LANDMARKS IN THE TOP-LEFT [C] WINDOW!" }
         ];
 
         // Atmospheric street fires in Port Gellhorn & Thrillbilly Mud Park
         this.streetFires = [
-            { x: 35.8 * TILE_SIZE, y: 142.2 * TILE_SIZE, z: 2.05, size: 0.85 },
-            { x: 54.0 * TILE_SIZE, y: 216.0 * TILE_SIZE, z: 2.05, size: 0.85 }
+            { x: mx256(35.8) * TILE_SIZE, y: my256(142.2) * TILE_SIZE, z: 2.05, size: 0.85 },
+            { x: mx256(54.0) * TILE_SIZE, y: my256(216.0) * TILE_SIZE, z: 2.05, size: 0.85 }
         ];
     }
 
@@ -3047,7 +2871,7 @@ class LeonidaMap {
             const cy = Math.floor(ny / TILE_SIZE);
             const baseZ = currentZBlocks !== null
                 ? Math.max(1, Math.min(MAP_LAYERS - 1, Math.floor(currentZBlocks + 0.25)))
-                : (this.surfaceLayer[Math.max(0, Math.min(255, cy)) * MAP_COLS + Math.max(0, Math.min(255, cx))] || 2);
+                : (this.surfaceLayer[Math.max(0, Math.min(MAP_ROWS - 1, cy)) * MAP_COLS + Math.max(0, Math.min(MAP_COLS - 1, cx))] || 2);
 
             for (let dy = -1; dy <= 1; dy++) {
                 for (let dx = -1; dx <= 1; dx++) {
@@ -3102,4 +2926,8 @@ window.METERS_PER_MAP_UNIT = METERS_PER_MAP_UNIT;
 window.MAP_COLS = MAP_COLS;
 window.MAP_ROWS = MAP_ROWS;
 window.MAP_LAYERS = MAP_LAYERS;
+window.MAP_X_256 = MAP_X_256;
+window.MAP_Y_256 = MAP_Y_256;
+window.mx256 = mx256;
+window.my256 = my256;
 window.LeonidaMap = LeonidaMap;
