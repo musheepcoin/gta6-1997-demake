@@ -2086,6 +2086,252 @@ class RetroRenderer {
                 }
                 ctx.restore();
                 meta.sprites.objects["container_stack"] = [csx, csy, 40, 18];
+
+                // =========================================================================
+                // 6. GTA 6 LEONIDA & VICE CITY SPECIAL WORLD UPGRADE SPRITES (Row py3 = origH + 100)
+                // =========================================================================
+                const py3 = origH + 100;
+
+                // 6A. Grassrivers Everglades Swamp Airboat ("airboat_fan", 52x28, bow facing East +X)
+                const abx = 820, aby = py3;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(abx + 3, aby + 4);
+                ctx.lineTo(abx + 36, aby + 4);
+                ctx.quadraticCurveTo(abx + 50, aby + 5, abx + 50, aby + 14);
+                ctx.quadraticCurveTo(abx + 50, aby + 23, abx + 36, aby + 24);
+                ctx.lineTo(abx + 3, aby + 24);
+                ctx.closePath();
+                ctx.fillStyle = "#475569";
+                ctx.fill();
+                ctx.lineWidth = 1.4;
+                ctx.strokeStyle = "#f97316";
+                ctx.stroke();
+                // Non-slip aluminum deck + orange bow sponsons
+                ctx.fillStyle = "#94a3b8";
+                ctx.fillRect(abx + 8, aby + 6, 28, 16);
+                ctx.fillStyle = "#f97316";
+                ctx.fillRect(abx + 36, aby + 6, 9, 4);
+                ctx.fillRect(abx + 36, aby + 18, 9, 4);
+                // Rear wire-mesh fan cage & engine block
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(abx + 4, aby + 8, 9, 12);
+                ctx.strokeStyle = "#e2e8f0";
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(abx + 4, aby + 5, 6, 18);
+                // Elevated captain bucket seat
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(abx + 20, aby + 10, 7, 8);
+                ctx.restore();
+                meta.sprites.objects["airboat_fan"] = [abx, aby, 52, 28];
+
+                // 6B. Vice City Dodo Floatplane / Sky-Banner Tow Plane ("dodo_seaplane", 62x58, nose facing East +X)
+                const dpx = 878, dpy = py3;
+                ctx.save();
+                // Twin silver amphibious pontoons/floats underneath
+                ctx.fillStyle = "#94a3b8";
+                ctx.fillRect(dpx + 18, dpy + 12, 32, 4);
+                ctx.fillRect(dpx + 18, dpy + 42, 32, 4);
+                ctx.strokeStyle = "#334155";
+                ctx.lineWidth = 1.0;
+                ctx.strokeRect(dpx + 18, dpy + 12, 32, 4);
+                ctx.strokeRect(dpx + 18, dpy + 42, 32, 4);
+                // High straight monoplane wing + rear tailplane
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillRect(dpx + 24, dpy + 2, 14, 54);
+                ctx.strokeRect(dpx + 24, dpy + 2, 14, 54);
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(dpx + 28, dpy + 3, 3, 52);
+                ctx.fillStyle = "#ec4899";
+                ctx.fillRect(dpx + 32, dpy + 3, 2, 52);
+                // Rear horizontal tail stabilizer
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillRect(dpx + 3, dpy + 17, 8, 24);
+                ctx.strokeRect(dpx + 3, dpy + 17, 8, 24);
+                // Fuselage + cockpit windshield + red engine cowling
+                ctx.beginPath();
+                ctx.moveTo(dpx + 4, dpy + 29);
+                ctx.lineTo(dpx + 16, dpy + 23);
+                ctx.lineTo(dpx + 50, dpy + 23);
+                ctx.quadraticCurveTo(dpx + 59, dpy + 24, dpx + 60, dpy + 29);
+                ctx.quadraticCurveTo(dpx + 59, dpy + 34, dpx + 50, dpy + 35);
+                ctx.lineTo(dpx + 16, dpy + 35);
+                ctx.closePath();
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = "#ec4899";
+                ctx.fillRect(dpx + 52, dpy + 24, 6, 10);
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(dpx + 39, dpy + 24.5, 8, 9);
+                ctx.restore();
+                meta.sprites.objects["dodo_seaplane"] = [dpx, dpy, 62, 58];
+
+                // 6C. Club Nine 1 Nine Trailing Aerial Banner ("sky_banner_919", 108x22, tow bridle on East +X)
+                const sbx = 946, sby = py3;
+                ctx.save();
+                // V-shaped tow harness cables on right (+X)
+                ctx.strokeStyle = "#cbd5e1";
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(sbx + 107, sby + 11);
+                ctx.lineTo(sbx + 90, sby + 3);
+                ctx.moveTo(sbx + 107, sby + 11);
+                ctx.lineTo(sbx + 90, sby + 19);
+                ctx.stroke();
+                // Banner fabric body with hot-pink & cyan border
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(sbx + 2, sby + 2, 88, 18);
+                ctx.strokeStyle = "#ec4899";
+                ctx.lineWidth = 2.0;
+                ctx.strokeRect(sbx + 2, sby + 2, 88, 18);
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(sbx + 5, sby + 5, 82, 2);
+                ctx.fillRect(sbx + 5, sby + 15, 82, 2);
+                ctx.font = "bold 9px monospace";
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillText("NINE 1 NINE", sbx + 11, sby + 14);
+                ctx.restore();
+                meta.sprites.objects["sky_banner_919"] = [sbx, sby, 108, 22];
+
+                // 6D. Street Takeover / Sideshow Tire Burnout Skid Ring ("donut_skid_ring", 62x62)
+                const drx = 1060, dry = py3;
+                ctx.save();
+                ctx.strokeStyle = "rgba(15, 23, 42, 0.72)";
+                ctx.lineWidth = 3.2;
+                ctx.beginPath();
+                ctx.arc(drx + 31, dry + 31, 24, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.lineWidth = 2.4;
+                ctx.beginPath();
+                ctx.arc(drx + 31, dry + 31, 17, 0.4, Math.PI * 1.85);
+                ctx.stroke();
+                ctx.restore();
+                meta.sprites.objects["donut_skid_ring"] = [drx, dry, 62, 62];
+
+                // 6E. Leonida Keys & Ocean Drive Thatched Tiki Bar Roof ("tiki_hut_roof", 52x36)
+                const tkx = 1128, tky = py3;
+                ctx.save();
+                ctx.fillStyle = "#78350f";
+                ctx.fillRect(tkx + 2, tky + 2, 48, 32);
+                ctx.fillStyle = "#b45309";
+                ctx.fillRect(tkx + 4, tky + 4, 44, 28);
+                ctx.fillStyle = "#d97706";
+                ctx.fillRect(tkx + 7, tky + 7, 38, 22);
+                // Woven palm thatch radial lines + bamboo ridge pole
+                ctx.strokeStyle = "#451a03";
+                ctx.lineWidth = 1.0;
+                for (let tx = tkx + 6; tx <= tkx + 46; tx += 5) {
+                    ctx.beginPath();
+                    ctx.moveTo(tx, tky + 2);
+                    ctx.lineTo(tx, tky + 34);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = "#fde047";
+                ctx.fillRect(tkx + 6, tky + 16, 40, 4);
+                // Neon pink surfboard sign on front roof eave
+                ctx.fillStyle = "#ec4899";
+                ctx.fillRect(tkx + 16, tky + 27, 20, 4);
+                ctx.restore();
+                meta.sprites.objects["tiki_hut_roof"] = [tkx, tky, 52, 36];
+
+                // 6F. Little Cuba / Española Way Sidewalk Café Umbrella Table ("cafe_table_umb", 26x26)
+                const ctx0 = 1186, cty0 = py3;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(ctx0 + 13, cty0 + 13, 11, 0, Math.PI * 2);
+                ctx.fillStyle = "#14b8a6";
+                ctx.fill();
+                ctx.strokeStyle = "#0f172a";
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+                // 4 alternating coral wedges
+                for (let w = 0; w < 4; w++) {
+                    const a0 = w * Math.PI * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(ctx0 + 13, cty0 + 13);
+                    ctx.arc(ctx0 + 13, cty0 + 13, 10.2, a0, a0 + Math.PI * 0.25);
+                    ctx.closePath();
+                    ctx.fillStyle = "#f97316";
+                    ctx.fill();
+                }
+                ctx.fillStyle = "#fef3c7";
+                ctx.beginPath();
+                ctx.arc(ctx0 + 13, cty0 + 13, 2.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["cafe_table_umb"] = [ctx0, cty0, 26, 26];
+
+                // 6G. Ambrosia Outlaw Biker Gang Custom Chopper Motorcycle ("biker_chopper", 32x14, facing East +X)
+                const bcx = 1218, bcy = py3;
+                ctx.save();
+                // Rear & front tires
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(bcx + 2, bcy + 4, 8, 6);
+                ctx.fillRect(bcx + 23, bcy + 5, 7, 4);
+                // Extended chrome front forks & handlebars
+                ctx.strokeStyle = "#e2e8f0";
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.moveTo(bcx + 16, bcy + 7);
+                ctx.lineTo(bcx + 27, bcy + 7);
+                ctx.moveTo(bcx + 18, bcy + 2);
+                ctx.lineTo(bcx + 16, bcy + 12);
+                ctx.stroke();
+                // Black leather saddle + flame-red teardrop fuel tank
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(bcx + 8, bcy + 4, 7, 6);
+                ctx.fillStyle = "#dc2626";
+                ctx.fillRect(bcx + 14, bcy + 4.5, 6, 5);
+                ctx.fillStyle = "#facc15";
+                ctx.fillRect(bcx + 15, bcy + 6, 4, 2);
+                ctx.restore();
+                meta.sprites.objects["biker_chopper"] = [bcx, bcy, 32, 14];
+
+                // 6H. Mount Kalaga Whitewater River Kayak ("kayak_orange", 38x14, facing East +X)
+                const kkx = 1256, kky = py3;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(kkx + 2, kky + 7);
+                ctx.quadraticCurveTo(kkx + 12, kky + 1, kkx + 19, kky + 2);
+                ctx.quadraticCurveTo(kkx + 26, kky + 1, kkx + 36, kky + 7);
+                ctx.quadraticCurveTo(kkx + 26, kky + 13, kkx + 19, kky + 12);
+                ctx.quadraticCurveTo(kkx + 12, kky + 13, kkx + 2, kky + 7);
+                ctx.closePath();
+                ctx.fillStyle = "#f97316";
+                ctx.fill();
+                ctx.lineWidth = 1.1;
+                ctx.strokeStyle = "#7c2d12";
+                ctx.stroke();
+                ctx.fillStyle = "#facc15";
+                ctx.fillRect(kkx + 9, kky + 5, 20, 4);
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(kkx + 15, kky + 4, 8, 6);
+                ctx.restore();
+                meta.sprites.objects["kayak_orange"] = [kkx, kky, 38, 14];
+
+                // 6I. Port Gellhorn Retro Mini-Golf Windmill Turret ("minigolf_windmill", 36x36)
+                const mgx = 1300, mgy = py3;
+                ctx.save();
+                ctx.fillStyle = "#15803d";
+                ctx.fillRect(mgx + 2, mgy + 2, 32, 32);
+                ctx.strokeStyle = "#fef08a";
+                ctx.lineWidth = 2.0;
+                ctx.strokeRect(mgx + 2, mgy + 2, 32, 32);
+                // Red & white octagonal windmill house in center
+                ctx.beginPath();
+                ctx.arc(mgx + 18, mgy + 18, 10, 0, Math.PI * 2);
+                ctx.fillStyle = "#dc2626";
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1.6;
+                ctx.stroke();
+                ctx.fillStyle = "#fef08a";
+                ctx.beginPath();
+                ctx.arc(mgx + 18, mgy + 18, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
             }
 
             return cvs;
@@ -2365,7 +2611,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_27", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_28", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2375,14 +2621,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_27", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_28", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_27", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_28", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -4452,6 +4698,269 @@ class RetroRenderer {
                 } else if (pt.kind === "SPEEDBOAT") {
                     this.pushSolidQuad3D(pt.x, pt.y, bz + 0.012, 74 * pt.scale, 28 * pt.scale, pt.ang, 0.72, 0.94, 1.0, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.batchObjectSprite3D("speedboat_v8", pt.x, pt.y, bz + 0.048 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                }
+            }
+        }
+
+        // 12) GTA 6 Grassrivers Everglades & Lake Leonida High-Speed Swamp Airboats ("airboat_fan")
+        const airboats = this.map.evergladesAirboats;
+        if (airboats && airboats.length > 0) {
+            for (let i = 0; i < airboats.length; i++) {
+                const ab = airboats[i];
+                const t = this.time * ab.speed + ab.seed;
+                const ax = ab.x + Math.cos(t) * ab.rx;
+                const ay = ab.y + Math.sin(t * 2.0) * (ab.ry * 0.55);
+                if (ax < minX - 110 || ax > maxX + 110 || ay < minY - 110 || ay > maxY + 110) continue;
+                const vx = -Math.sin(t) * ab.rx;
+                const vy = Math.cos(t * 2.0) * (ab.ry * 1.1);
+                const ang = Math.atan2(vy, vx);
+                const cs = Math.cos(ang), sn = Math.sin(ang);
+                const bz = ab.z || 2.0;
+
+                // Wide white marsh foam V-spray behind the flat-bottom airboat
+                for (let w = 1; w <= 3; w++) {
+                    const wx = ax - cs * (18 + w * 11);
+                    const wy = ay - sn * (18 + w * 11);
+                    this.pushSolidQuad3D(wx, wy, bz + 0.014, 16 + w * 5, 14 + w * 4.5, ang, 0.86, 0.98, 0.94, 0.48 - w * 0.11, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                this.batchObjectSprite3D("airboat_fan", ax, ay, bz + 0.036, ang, 1.15, SPRITE_DRAW_ORDER.CAR);
+                // Elevated swamp captain + spinning 3D twin-blade rear aero-propeller inside cage
+                this.batchPedSprite3D((i % 2 === 0) ? "g2_redneck_blond" : "g2_redneck_red", 84, ax - cs * 2, ay - sn * 2, bz + 0.055, ang, 1.04, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                const fanX = ax - cs * 21, fanY = ay - sn * 21;
+                const bladeSpan = 16.0 * Math.abs(Math.sin(this.time * 24.0 + i));
+                this.pushSolidQuad3D(fanX, fanY, bz + 0.085, 2.6, 3.0 + bladeSpan, ang, 0.92, 0.95, 0.98, 0.88, SPRITE_DRAW_ORDER.TREES);
+            }
+        }
+
+        // 13) GTA 6 Trailer 1 "NINE 1 NINE" Sky-Banner Tow Planes ("dodo_seaplane" + "sky_banner_919") & Moored Seaplanes
+        const bPlanes = this.map.bannerPlanes;
+        if (bPlanes && bPlanes.length > 0) {
+            for (let i = 0; i < bPlanes.length; i++) {
+                const bp = bPlanes[i];
+                const cyc = (this.time * bp.speed + bp.seed) % 2.0;
+                const u = cyc < 1.0 ? cyc : (2.0 - cyc);
+                const px = bp.x0 + (bp.x1 - bp.x0) * u;
+                const py = bp.y0 + (bp.y1 - bp.y0) * u;
+                if (px < minX - 240 || px > maxX + 240 || py < minY - 240 || py > maxY + 240) continue;
+                const ang = Math.atan2(bp.y1 - bp.y0, bp.x1 - bp.x0) + (cyc >= 1.0 ? Math.PI : 0);
+                const cs = Math.cos(ang), sn = Math.sin(ang);
+                const pz = bp.z || 4.65;
+
+                // Ground shadow cast on the beach/water below (z = 2.02)
+                this.pushSolidQuad3D(px + sunCos * 42, py + sunSin * 42, 2.02, 68, 62, ang, 0.02, 0.03, 0.06, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // High-altitude Dodo Tow Plane + spinning nose propeller
+                this.batchObjectSprite3D("dodo_seaplane", px, py, pz, ang, 1.24, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                const propSpan = 16.0 * Math.abs(Math.cos(this.time * 28.0 + i));
+                this.pushSolidQuad3D(px + cs * 36, py + sn * 36, pz + 0.01, 2.6, 3.0 + propSpan, ang, 0.92, 0.96, 1.0, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                // Trailing "NINE 1 NINE" Aerial Banner fluttering behind the tail!
+                const flutter = Math.sin(this.time * 7.5 + i) * 0.06;
+                const banX = px - cs * 96, banY = py - sn * 96;
+                this.batchObjectSprite3D("sky_banner_919", banX, banY, pz - 0.02, ang + flutter, 1.18, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+            }
+        }
+        const mPlanes = this.map.mooredSeaplanes;
+        if (mPlanes && mPlanes.length > 0) {
+            for (let i = 0; i < mPlanes.length; i++) {
+                const mp = mPlanes[i];
+                if (mp.x < minX - 120 || mp.x > maxX + 120 || mp.y < minY - 120 || mp.y > maxY + 120) continue;
+                const bob = Math.sin(this.time * 2.1 + mp.seed) * 0.008;
+                this.pushSolidQuad3D(mp.x, mp.y, 2.012, 68, 62, mp.ang, 0.76, 0.95, 1.0, 0.26, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("dodo_seaplane", mp.x, mp.y, 2.048 + bob, mp.ang, 1.18, SPRITE_DRAW_ORDER.CAR);
+            }
+        }
+
+        // 14) GTA 6 Street Takeovers / Intersection Sideshow Drift Donuts ("donut_skid_ring" + Drifting Muscle Car + Tire Smoke + Crowd)
+        const takeovers = this.map.streetTakeovers;
+        const vehSprites = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.vehicles;
+        if (takeovers && takeovers.length > 0 && vehSprites) {
+            const crowdPeds = ["vc_haitian", "vc_cuban", "bikini_pink", "g2_civ_aqua", "vc_tourist", "g2_mugger"];
+            for (let i = 0; i < takeovers.length; i++) {
+                const st = takeovers[i];
+                if (st.x < minX - 120 || st.x > maxX + 120 || st.y < minY - 120 || st.y > maxY + 120) continue;
+                const bz = st.z || 2.0;
+                this.batchObjectSprite3D("donut_skid_ring", st.x, st.y, bz + 0.014, st.seed, 1.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                // Muscle car drifting in a tight 360° burnout circle with slip angle!
+                const orbitAng = this.time * 3.2 + st.seed;
+                const carX = st.x + Math.cos(orbitAng) * 20.0;
+                const carY = st.y + Math.sin(orbitAng) * 20.0;
+                const driftHeading = orbitAng + Math.PI * 0.5 - 0.52;
+                const vRect = vehSprites[st.carSpr] || vehSprites["0"];
+                if (vRect) {
+                    this.pushSolidQuad3D(carX + sunCos * 4, carY + sunSin * 4, bz + 0.018, 34, 18, driftHeading, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.048, driftHeading + Math.PI * 0.5, 0.96, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                }
+                // Billowing 3D white tire-smoke puffs (sprites 200..205) trailing the rear tires
+                for (let sm = 0; sm < 3; sm++) {
+                    const smAng = orbitAng - 0.35 - sm * 0.45;
+                    const sx = st.x + Math.cos(smAng) * (21 + sm * 3);
+                    const sy = st.y + Math.sin(smAng) * (21 + sm * 3);
+                    const smokeSpr = String(200 + ((Math.floor(this.time * 10) + sm) % 6));
+                    this.batchObjectSprite3D(smokeSpr, sx, sy, bz + 0.055 + sm * 0.018, this.time * 2.0 + sm, 0.72 + sm * 0.18, SPRITE_DRAW_ORDER.EXPLOSION);
+                }
+                // Ring of 6 cheering & phone-filming hype spectators around the burnout pit
+                for (let ci = 0; ci < 6; ci++) {
+                    const ca = (ci / 6) * Math.PI * 2 + 0.3;
+                    const cx = st.x + Math.cos(ca) * 42;
+                    const cy = st.y + Math.sin(ca) * 42;
+                    const cFr = 50 + (Math.floor(this.time * 6.5 + ci + i) % 4);
+                    this.batchPedSprite3D(crowdPeds[(ci + i) % crowdPeds.length], cFr, cx, cy, bz + 0.038, ca + Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+
+        // 15) Port Gellhorn Oval Dirt Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders
+        const tr = this.map.trackRacers;
+        if (tr && vehSprites) {
+            const sp = tr.speedway;
+            if (sp && sp.cx >= minX - 800 && sp.cx <= maxX + 800 && sp.cy >= minY - 680 && sp.cy <= maxY + 680) {
+                const bz = sp.z || 2.0;
+                for (let ci = 0; ci < sp.cars.length; ci++) {
+                    const t = -this.time * (1.28 + (ci % 2) * 0.06) - ci * (Math.PI * 0.5);
+                    const laneR = (ci % 2 === 0) ? 0.94 : 1.05;
+                    const cx = sp.cx + Math.cos(t) * (sp.rx * laneR);
+                    const cy = sp.cy + Math.sin(t) * (sp.ry * laneR);
+                    const vx = -Math.sin(t) * sp.rx;
+                    const vy = Math.cos(t) * sp.ry;
+                    const cAng = Math.atan2(vy, vx) - 0.18;
+                    const vRect = vehSprites[sp.cars[ci]] || vehSprites["0"];
+                    if (vRect) {
+                        this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.018, 36, 18, cAng, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushAtlasSprite3D(vRect, cx, cy, bz + 0.048, cAng + Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                    }
+                    // Dirt rooster-tail dust puff behind stock car
+                    const dustSpr = String(200 + ((Math.floor(this.time * 12) + ci) % 6));
+                    this.batchObjectSprite3D(dustSpr, cx - Math.cos(cAng) * 20, cy - Math.sin(cAng) * 20, bz + 0.045, this.time * 3, 0.68, SPRITE_DRAW_ORDER.EXPLOSION);
+                }
+            }
+            const mp = tr.mudPark;
+            if (mp && mp.cxE >= minX - 950 && mp.cxW <= maxX + 950 && mp.cy >= minY - 720 && mp.cy <= maxY + 720) {
+                const bz = mp.z || 2.0;
+                for (let ti = 0; ti < mp.trucks.length; ti++) {
+                    const t = this.time * 1.05 + ti * (Math.PI * 0.5);
+                    const onEastLoop = (Math.floor((t / (Math.PI * 2)) * 2) % 2) === 1;
+                    const loopCx = onEastLoop ? mp.cxE : mp.cxW;
+                    const dir = onEastLoop ? -1 : 1;
+                    const angT = t * dir;
+                    const tx = loopCx + Math.cos(angT) * mp.rx;
+                    const ty = mp.cy + Math.sin(angT) * mp.ry;
+                    const vx = -Math.sin(angT) * mp.rx * dir;
+                    const vy = Math.cos(angT) * mp.ry * dir;
+                    const tAng = Math.atan2(vy, vx);
+                    const vRect = vehSprites[mp.trucks[ti]] || vehSprites["25"];
+                    if (vRect) {
+                        this.pushSolidQuad3D(tx + sunCos * 5, ty + sunSin * 5, bz + 0.018, 42, 22, tAng, 0.02, 0.03, 0.06, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushAtlasSprite3D(vRect, tx, ty, bz + 0.056, tAng + Math.PI * 0.5, 1.08, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                    }
+                    // Mud splash spray behind monster mudder tires
+                    const bx = tx - Math.cos(tAng) * 22, by = ty - Math.sin(tAng) * 22;
+                    this.pushSolidQuad3D(bx, by, bz + 0.032, 14, 12, tAng, 0.55, 0.38, 0.22, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Cheering Thrillbilly Mud Park spectators along the track berm
+                for (let si = 0; si < 6; si++) {
+                    const sx = mp.cxW - 180 + si * 210;
+                    const sy = mp.cy + ((si % 2 === 0) ? -650 : 650);
+                    const sFr = 50 + (Math.floor(this.time * 6.0 + si) % 4);
+                    this.batchPedSprite3D((si % 3 === 0) ? "bikini_red" : ((si % 2 === 0) ? "g2_redneck_blond" : "g2_redneck_red"), sFr, sx, sy, bz + 0.038, (si % 2 === 0) ? Math.PI * 0.5 : -Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+
+        // 16) Leonida Keys, Ocean Drive & Little Cuba Thatched Tiki Bars & String-Light Café Terraces ("tiki_hut_roof", "cafe_table_umb")
+        const tikis = this.map.tikiBars;
+        if (tikis && tikis.length > 0) {
+            for (let i = 0; i < tikis.length; i++) {
+                const tb = tikis[i];
+                if (tb.x < minX - 96 || tb.x > maxX + 96 || tb.y < minY - 96 || tb.y > maxY + 96) continue;
+                const bz = tb.z || 2.0;
+                // Solar ground shadow + 4 bamboo corner posts + elevated thatched Tiki Bar roof
+                this.pushSolidQuad3D(tb.x + sunCos * 8, tb.y + sunSin * 8, bz + 0.015, 52, 36, tb.ang, 0.02, 0.03, 0.06, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(tb.x, tb.y, bz + 0.042, 36, 12, tb.ang, 0.58, 0.36, 0.16, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchObjectSprite3D("tiki_hut_roof", tb.x, tb.y, bz + 0.165, tb.ang, 1.08, SPRITE_DRAW_ORDER.TREES);
+                // 2 Sidewalk Café Umbrella Tables beside the Tiki Bar + Bartender & Patrons
+                const cs = Math.cos(tb.ang), sn = Math.sin(tb.ang);
+                this.batchObjectSprite3D("cafe_table_umb", tb.x + cs * 38 - sn * 12, tb.y + sn * 38 + cs * 12, bz + 0.12, this.time * 0.2 + i, 1.0, SPRITE_DRAW_ORDER.TREES);
+                this.batchObjectSprite3D("cafe_table_umb", tb.x - cs * 38 - sn * 12, tb.y - sn * 38 + cs * 12, bz + 0.12, -this.time * 0.2 + i, 1.0, SPRITE_DRAW_ORDER.TREES);
+                this.batchPedSprite3D("vc_cuban", 0, tb.x, tb.y, bz + 0.038, tb.ang + Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                const dFr = 50 + (Math.floor(this.time * 5.8 + i) % 4);
+                this.batchPedSprite3D("bikini_pink", dFr, tb.x + sn * 22, tb.y - cs * 22, bz + 0.038, tb.ang - Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("vc_tommy", dFr, tb.x - cs * 18 + sn * 22, tb.y - sn * 18 - cs * 22, bz + 0.038, tb.ang - Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks, Outlaw Biker Chopper Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
+        const ind = this.map.industrialAndParkDetails;
+        if (ind) {
+            // 17A. Ambrosia 3D Tall Refinery Smokestacks + Billowing Industrial Steam Plumes
+            if (ind.smokestacks) {
+                for (let i = 0; i < ind.smokestacks.length; i++) {
+                    const st = ind.smokestacks[i];
+                    if (st.x < minX - 140 || st.x > maxX + 140 || st.y < minY - 140 || st.y > maxY + 140) continue;
+                    const rz = st.z || 3.0;
+                    for (let lv = 0; lv < 6; lv++) {
+                        const sz = 14.0 - lv * 1.1;
+                        const isRed = (lv % 2 === 1);
+                        this.pushSolidQuad3D(st.x, st.y, rz + lv * 0.065, sz, sz, 0, isRed ? 0.86 : 0.92, isRed ? 0.22 : 0.92, isRed ? 0.20 : 0.94, 0.98, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    }
+                    // Rising 3D steam/smoke puffs drifting from stack top
+                    for (let p = 0; p < 3; p++) {
+                        const age = ((this.time * 0.9 + st.seed + p * 0.33) % 1.0);
+                        const px = st.x + age * 26.0;
+                        const py = st.y - age * 14.0;
+                        const smSpr = String(200 + ((p + i) % 6));
+                        this.batchObjectSprite3D(smSpr, px, py, rz + 0.42 + age * 0.22, this.time + p, 0.75 + age * 0.55, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    }
+                }
+            }
+            // 17B. Outlaw Biker Gang Custom Chopper Lineup & Bikers ("biker_chopper")
+            if (ind.bikerRallies) {
+                for (let ri = 0; ri < ind.bikerRallies.length; ri++) {
+                    const br = ind.bikerRallies[ri];
+                    if (br.x < minX - 120 || br.x > maxX + 120 || br.y < minY - 120 || br.y > maxY + 120) continue;
+                    const bz = br.z || 2.0;
+                    for (let bi = 0; bi < br.count; bi++) {
+                        const bx = br.x + (bi - (br.count - 1) * 0.5) * 20;
+                        const by = br.y;
+                        this.pushSolidQuad3D(bx + sunCos * 3, by + sunSin * 3, bz + 0.015, 28, 12, 0.65, 0.02, 0.03, 0.06, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.batchObjectSprite3D("biker_chopper", bx, by, bz + 0.038, 0.65, 1.15, SPRITE_DRAW_ORDER.CAR);
+                        if (bi % 2 === 0) {
+                            this.batchPedSprite3D((bi === 0) ? "g2_russian" : "g2_redneck_blond", 50 + ((Math.floor(this.time * 4) + bi) % 4), bx + 4, by + 18, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        }
+                    }
+                }
+            }
+            // 17C. Port Gellhorn Retro Mini-Golf Course & Live Spinning 3D Windmill ("minigolf_windmill")
+            if (ind.miniGolf) {
+                const mg = ind.miniGolf;
+                if (mg.x >= minX - 120 && mg.x <= maxX + 120 && mg.y >= minY - 120 && mg.y <= maxY + 120) {
+                    const bz = mg.z || 2.0;
+                    this.batchObjectSprite3D("minigolf_windmill", mg.x, mg.y, bz + 0.035, 0, 1.35, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Live spinning 4-blade 3D Dutch Windmill Sails!
+                    const wAng = this.time * 2.2;
+                    this.pushSolidQuad3D(mg.x, mg.y + 10, bz + 0.16, 38, 4.2, wAng, 0.98, 0.94, 0.72, 0.96, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(mg.x, mg.y + 10, bz + 0.16, 38, 4.2, wAng + Math.PI * 0.5, 0.98, 0.94, 0.72, 0.96, SPRITE_DRAW_ORDER.TREES);
+                    this.batchPedSprite3D("vc_tourist", 0, mg.x - 24, mg.y + 18, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("bikini_cyan", 51, mg.x + 24, mg.y + 18, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+            // 17D. Mount Kalaga National Park Whitewater Kayakers ("kayak_orange")
+            if (ind.kayakers) {
+                for (let ki = 0; ki < ind.kayakers.length; ki++) {
+                    const kk = ind.kayakers[ki];
+                    const t = this.time * kk.speed + kk.seed;
+                    const kx = kk.x + Math.cos(t) * kk.rx;
+                    const ky = kk.y + Math.sin(t) * kk.ry;
+                    if (kx < minX - 96 || kx > maxX + 96 || ky < minY - 96 || ky > maxY + 96) continue;
+                    const vx = -Math.sin(t) * kk.rx;
+                    const vy = Math.cos(t) * kk.ry;
+                    const kAng = Math.atan2(vy, vx);
+                    const bz = kk.z || 2.0;
+                    this.pushSolidQuad3D(kx, ky, bz + 0.012, 44, 16, kAng, 0.82, 0.97, 1.0, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("kayak_orange", kx, ky, bz + 0.028, kAng, 1.12, SPRITE_DRAW_ORDER.CAR);
+                    // Double-bladed kayak paddle rocking left/right in 3D + paddler seated in cockpit
+                    const padSwing = Math.sin(this.time * 6.5 + ki) * 0.45;
+                    this.pushSolidQuad3D(kx, ky, bz + 0.048, 3.0, 26.0, kAng + padSwing, 0.98, 0.82, 0.18, 0.95, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                    this.batchPedSprite3D((ki % 2 === 0) ? "vc_jogger" : "surfer_guy", 84, kx, ky, bz + 0.042, kAng, 1.0, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
                 }
             }
         }

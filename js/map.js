@@ -1196,6 +1196,141 @@ class LeonidaMap {
             seed: i * 2.3
         }));
 
+        // 12) GTA 6 Grassrivers & Lake Leonida High-Speed Swamp Airboats ("evergladesAirboats")
+        this.evergladesAirboats = [];
+        const rawAirboats = [
+            { c: 86.0,  r: 402.0, rx: 34, ry: 22, speed: 1.15 },
+            { c: 145.0, r: 412.0, rx: 32, ry: 20, speed: 1.25 },
+            { c: 76.0,  r: 434.0, rx: 28, ry: 18, speed: 1.20 },
+            { c: 168.0, r: 454.0, rx: 30, ry: 18, speed: 1.18 },
+            { c: 112.0, r: 138.0, rx: 28, ry: 24, speed: 1.22 },
+            { c: 120.0, r: 184.0, rx: 30, ry: 24, speed: 1.16 },
+            { c: 132.0, r: 258.0, rx: 26, ry: 18, speed: 1.20 }
+        ];
+        for (let ai = 0; ai < rawAirboats.length; ai++) {
+            const ab = rawAirboats[ai];
+            const sw = snapPxToCleanWater(ab.c * TILE_SIZE, ab.r * TILE_SIZE);
+            if (sw) {
+                this.evergladesAirboats.push({
+                    x: sw.x,
+                    y: sw.y,
+                    z: 2.0,
+                    rx: ab.rx,
+                    ry: ab.ry,
+                    speed: ab.speed,
+                    seed: ai * 2.7
+                });
+            }
+        }
+
+        // 13) GTA 6 Trailer 1 "NINE 1 NINE" Sky-Banner Tow Planes ("bannerPlanes") & Moored Seaplanes ("mooredSeaplanes")
+        this.bannerPlanes = [
+            // Plane 1: Cruising N <-> S along the Vice Beach & Ocean Drive coastline
+            { x0: 492 * TILE_SIZE, y0: 72 * TILE_SIZE,  x1: 492 * TILE_SIZE, y1: 356 * TILE_SIZE, z: 4.65, speed: 0.042, seed: 0.0 },
+            // Plane 2: Cruising N <-> S over Biscayne Bay, Star Island & Vice Port
+            { x0: 332 * TILE_SIZE, y0: 84 * TILE_SIZE,  x1: 332 * TILE_SIZE, y1: 344 * TILE_SIZE, z: 4.65, speed: 0.046, seed: 1.8 },
+            // Plane 3: Cruising W <-> E across Lake Leonida, Wynwood & Club Nine 1 Nine
+            { x0: 108 * TILE_SIZE, y0: 88 * TILE_SIZE,  x1: 468 * TILE_SIZE, y1: 88 * TILE_SIZE,  z: 4.75, speed: 0.038, seed: 3.4 }
+        ];
+        this.mooredSeaplanes = [
+            { c: 101.5, r: 102.5, ang: 0 },
+            { c: 336.0, r: 158.0, ang: Math.PI * 0.25 },
+            { c: 376.5, r: 118.5, ang: -Math.PI * 0.5 },
+            { c: 456.0, r: 396.5, ang: -Math.PI * 0.5 },
+            { c: 392.0, r: 456.5, ang: 0 },
+            { c: 162.0, r: 490.0, ang: 0 }
+        ].map((sp, i) => ({
+            x: sp.c * TILE_SIZE,
+            y: sp.r * TILE_SIZE,
+            z: 2.0,
+            ang: sp.ang,
+            seed: i * 1.9
+        }));
+
+        // 14) GTA 6 Street Takeovers / Intersection Sideshow Drift Donuts ("streetTakeovers")
+        this.streetTakeovers = [
+            { c: 183.5, r: 108.5, carSpr: "10", seed: 0.0 }, // Wynwood / Jack of Hearts Plaza
+            { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza
+            { c: 60.0,  r: 182.5, carSpr: "3",  seed: 3.1 }, // Port Gellhorn Speedway Apron
+            { c: 336.5, r: 311.5, carSpr: "6",  seed: 4.4 }, // Vice Port Dock Apron
+            { c: 441.5, r: 288.5, carSpr: "0",  seed: 5.8 }  // Ocean Drive / Hotel Dixon Forecourt
+        ].map((st) => ({
+            x: st.c * TILE_SIZE,
+            y: st.r * TILE_SIZE,
+            z: 2.0,
+            carSpr: st.carSpr,
+            seed: st.seed
+        }));
+
+        // 15) Port Gellhorn Oval Dirt Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders ("trackRacers")
+        this.trackRacers = {
+            speedway: {
+                cx: 75.0 * TILE_SIZE,
+                cy: 177.0 * TILE_SIZE,
+                rx: 9.1 * TILE_SIZE,
+                ry: 7.3 * TILE_SIZE,
+                z: 2.0,
+                cars: ["0", "3", "6", "10"]
+            },
+            mudPark: {
+                cxW: 78.0 * TILE_SIZE,
+                cxE: 102.0 * TILE_SIZE,
+                cy:  464.0 * TILE_SIZE,
+                rx:  10.0 * TILE_SIZE,
+                ry:  8.5 * TILE_SIZE,
+                z:   2.0,
+                trucks: ["25", "28", "53", "25"]
+            }
+        };
+
+        // 16) Leonida Keys, Ocean Drive & Little Cuba Thatched Tiki Bars & String-Light Café Terraces ("tikiBars")
+        this.tikiBars = [];
+        const rawTikiBars = [
+            { c: 434.5, r: 395.5, ang: 0 },
+            { c: 403.5, r: 427.5, ang: 0 },
+            { c: 366.5, r: 455.5, ang: 0 },
+            { c: 328.5, r: 477.5, ang: 0 },
+            { c: 269.5, r: 477.5, ang: 0 },
+            { c: 220.5, r: 477.5, ang: 0 },
+            { c: 121.5, r: 105.5, ang: 0 },
+            { c: 465.5, r: 155.5, ang: Math.PI * 0.5 },
+            { c: 465.5, r: 225.5, ang: Math.PI * 0.5 },
+            { c: 465.5, r: 282.5, ang: Math.PI * 0.5 },
+            { c: 439.5, r: 170.5, ang: 0 },
+            { c: 231.5, r: 246.5, ang: 0 }
+        ];
+        for (let ti = 0; ti < rawTikiBars.length; ti++) {
+            const tb = rawTikiBars[ti];
+            const sp = snapToVerifiedPed(tb.c * TILE_SIZE, tb.r * TILE_SIZE, 5);
+            if (sp) {
+                this.tikiBars.push({ x: sp.x, y: sp.y, z: 2.0, ang: tb.ang, seed: ti * 1.7 });
+            }
+        }
+
+        // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks & Outlaw Biker Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
+        this.industrialAndParkDetails = {
+            smokestacks: [
+                { x: 155.5 * TILE_SIZE, y: 103.5 * TILE_SIZE, z: 3.0, seed: 0.0 },
+                { x: 159.5 * TILE_SIZE, y: 103.5 * TILE_SIZE, z: 3.0, seed: 1.6 },
+                { x: 156.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 3.0, seed: 3.2 }
+            ],
+            bikerRallies: [
+                { x: 152.0 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, count: 5, seed: 0.5 }, // Ambrosia Sugar Refinery Biker Rally
+                { x: 61.5 * TILE_SIZE,  y: 263.5 * TILE_SIZE, z: 2.0, count: 4, seed: 2.1 }  // Port Gellhorn Motor Lodge Biker Hangout
+            ],
+            miniGolf: {
+                x: 81.5 * TILE_SIZE,
+                y: 264.5 * TILE_SIZE,
+                z: 2.0
+            },
+            kayakers: [
+                { x: 138.0 * TILE_SIZE, y: 34.0 * TILE_SIZE, rx: 46, ry: 18, z: 2.0, speed: 0.85, seed: 0.0 },
+                { x: 142.0 * TILE_SIZE, y: 35.5 * TILE_SIZE, rx: 38, ry: 15, z: 2.0, speed: 0.92, seed: 2.2 },
+                { x: 228.0 * TILE_SIZE, y: 34.0 * TILE_SIZE, rx: 52, ry: 20, z: 2.0, speed: 0.88, seed: 1.1 },
+                { x: 224.0 * TILE_SIZE, y: 35.5 * TILE_SIZE, rx: 42, ry: 16, z: 2.0, speed: 0.95, seed: 3.5 }
+            ]
+        };
+
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
         this.streetlights = [];
         this.trafficSignals = [];
