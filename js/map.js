@@ -1099,6 +1099,103 @@ class LeonidaMap {
             z: 2.0
         };
 
+        // 9) VCIA Airport, SERA Spaceport, Star Island & Vice Port Aviation Props ("airportProps")
+        this.airportProps = [
+            // Commercial Widebody Airliners at VCIA gates & runways
+            { kind: "AIRLINER", c: 84.5,  r: 310.0, ang: 0,             scale: 1.55 },
+            { kind: "AIRLINER", c: 103.5, r: 310.0, ang: Math.PI,       scale: 1.55 },
+            { kind: "AIRLINER", c: 140.0, r: 310.0, ang: Math.PI,       scale: 1.55 },
+            { kind: "AIRLINER", c: 82.0,  r: 348.5, ang: 0,             scale: 1.65 },
+            { kind: "AIRLINER", c: 142.0, r: 314.5, ang: Math.PI,       scale: 1.65 },
+            // VIP Executive Learjets outside Hangars & FBO Terminals
+            { kind: "LEARJET",  c: 73.0,  r: 304.0, ang: Math.PI * 0.5, scale: 1.35 },
+            { kind: "LEARJET",  c: 73.0,  r: 324.0, ang: 0,             scale: 1.35 },
+            { kind: "LEARJET",  c: 151.0, r: 304.0, ang: Math.PI,       scale: 1.35 },
+            { kind: "LEARJET",  c: 118.0, r: 358.0, ang: -Math.PI * 0.5,scale: 1.35 },
+            { kind: "LEARJET",  c: 448.0, r: 49.5,  ang: 0,             scale: 1.30 },
+            // Helipads with Live Spinning-Rotor Helicopters
+            { kind: "HELIPAD",  c: 122.5, r: 303.5, ang: 0.4,           scale: 1.25 },
+            { kind: "HELIPAD",  c: 158.5, r: 291.5, ang: -0.6,          scale: 1.25 },
+            { kind: "HELIPAD",  c: 451.0, r: 22.5,  ang: 0.2,           scale: 1.25 },
+            { kind: "HELIPAD",  c: 340.5, r: 166.5, ang: -0.8,          scale: 1.25 },
+            { kind: "HELIPAD",  c: 336.5, r: 318.5, ang: 0.5,           scale: 1.25 },
+            { kind: "HELIPAD",  c: 63.5,  r: 96.5,  ang: 1.1,           scale: 1.20 }
+        ].map((p, i) => ({
+            kind: p.kind,
+            x: p.c * TILE_SIZE,
+            y: p.r * TILE_SIZE,
+            z: 2.0,
+            ang: p.ang,
+            scale: p.scale,
+            seed: i * 1.7
+        }));
+
+        // 10) Leonida State Penitentiary Fenced Security Compound, Searchlights & Exercise Yard ("prisonCompound")
+        this.prisonCompound = {
+            x0: 56.2 * TILE_SIZE,
+            y0: 76.2 * TILE_SIZE,
+            x1: 68.8 * TILE_SIZE,
+            y1: 146.8 * TILE_SIZE,
+            midY: 103.5 * TILE_SIZE,
+            courtX: 61.5 * TILE_SIZE,
+            courtY: 122.5 * TILE_SIZE,
+            z: 2.0,
+            towers: [
+                { x: 57.0 * TILE_SIZE, y: 79.0 * TILE_SIZE,  baseAng: 0.6 },
+                { x: 67.0 * TILE_SIZE, y: 79.0 * TILE_SIZE,  baseAng: 2.4 },
+                { x: 67.0 * TILE_SIZE, y: 100.0 * TILE_SIZE, baseAng: 2.6 },
+                { x: 67.0 * TILE_SIZE, y: 143.0 * TILE_SIZE, baseAng: -2.2 },
+                { x: 57.0 * TILE_SIZE, y: 143.0 * TILE_SIZE, baseAng: -0.8 }
+            ]
+        };
+
+        // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
+        this.portTerminals = [
+            // Deepwater Container Barges & Freighters
+            { kind: "BARGE",      c: 360.5, r: 302.5, ang: 0,              scale: 1.55 },
+            { kind: "BARGE",      c: 361.5, r: 318.8, ang: Math.PI,        scale: 1.50 },
+            { kind: "BARGE",      c: 362.5, r: 329.5, ang: 0,              scale: 1.60 },
+            { kind: "BARGE",      c: 36.0,  r: 184.5, ang: Math.PI,        scale: 1.50 },
+            { kind: "BARGE",      c: 38.0,  r: 209.5, ang: 0,              scale: 1.55 },
+            { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 1.55 },
+            { kind: "BARGE",      c: 137.0, r: 107.0, ang: -Math.PI * 0.5, scale: 1.45 },
+            { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 1.45 },
+            // Quayside Intermodal Container Stacks
+            { kind: "CONTAINERS", c: 334.5, r: 329.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.0, r: 329.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 334.5, r: 331.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.0, r: 331.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 58.5,  r: 204.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 58.5,  r: 212.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 58.5,  r: 244.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 79.5,  r: 232.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 79.5,  r: 242.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 151.5, r: 107.5, ang: Math.PI * 0.5,  scale: 1.20 },
+            { kind: "CONTAINERS", c: 151.5, r: 118.5, ang: Math.PI * 0.5,  scale: 1.20 },
+            // Moored Harbor Yachts & Speedboats at Gator Island, Leaf Links, Hibiscus, Sunset, Vice Port & Keys Piers
+            { kind: "YACHT",      c: 325.0, r: 305.0, ang: -Math.PI * 0.5, scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 325.0, r: 312.0, ang: Math.PI * 0.5,  scale: 1.20 },
+            { kind: "SPEEDBOAT",  c: 105.5, r: 100.2, ang: Math.PI,        scale: 1.20 },
+            { kind: "YACHT",      c: 105.5, r: 105.2, ang: Math.PI,        scale: 1.25 },
+            { kind: "YACHT",      c: 373.5, r: 116.0, ang: 0,              scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 373.5, r: 121.2, ang: 0,              scale: 1.20 },
+            { kind: "YACHT",      c: 374.5, r: 213.0, ang: 0,              scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 374.5, r: 217.5, ang: 0,              scale: 1.20 },
+            { kind: "YACHT",      c: 454.0, r: 394.0, ang: 0,              scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 424.0, r: 426.0, ang: 0,              scale: 1.20 },
+            { kind: "YACHT",      c: 390.0, r: 454.0, ang: 0,              scale: 1.30 },
+            { kind: "SPEEDBOAT",  c: 329.0, r: 492.5, ang: Math.PI * 0.5,  scale: 1.20 },
+            { kind: "YACHT",      c: 269.0, r: 492.5, ang: Math.PI * 0.5,  scale: 1.25 }
+        ].map((p, i) => ({
+            kind: p.kind,
+            x: p.c * TILE_SIZE,
+            y: p.r * TILE_SIZE,
+            z: 2.0,
+            ang: p.ang,
+            scale: p.scale,
+            seed: i * 2.3
+        }));
+
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
         this.streetlights = [];
         this.trafficSignals = [];

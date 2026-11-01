@@ -1863,6 +1863,229 @@ class RetroRenderer {
                 ctx.fill();
                 ctx.restore();
                 meta.sprites.objects["golf_green_pin"] = [ggx, ggy, 28, 28];
+
+                // 5N. VCIA Commercial Widebody Airliner Jet ("airliner_jet", 96x88, nose facing East +X)
+                const ajx = 1400, ajy = py2;
+                ctx.save();
+                // Twin underwing turbofan engine nacelles
+                ctx.fillStyle = "#475569";
+                ctx.fillRect(ajx + 44, ajy + 16, 16, 8);
+                ctx.fillRect(ajx + 44, ajy + 64, 16, 8);
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fillRect(ajx + 46, ajy + 17, 13, 6);
+                ctx.fillRect(ajx + 46, ajy + 65, 13, 6);
+                // Swept main wings + rear horizontal stabilizers
+                ctx.beginPath();
+                ctx.moveTo(ajx + 56, ajy + 38);
+                ctx.lineTo(ajx + 30, ajy + 3);
+                ctx.lineTo(ajx + 22, ajy + 3);
+                ctx.lineTo(ajx + 38, ajy + 38);
+                ctx.lineTo(ajx + 16, ajy + 39);
+                ctx.lineTo(ajx + 4,  ajy + 22);
+                ctx.lineTo(ajx + 1,  ajy + 22);
+                ctx.lineTo(ajx + 8,  ajy + 44);
+                ctx.lineTo(ajx + 1,  ajy + 66);
+                ctx.lineTo(ajx + 4,  ajy + 66);
+                ctx.lineTo(ajx + 16, ajy + 49);
+                ctx.lineTo(ajx + 38, ajy + 50);
+                ctx.lineTo(ajx + 22, ajy + 85);
+                ctx.lineTo(ajx + 30, ajy + 85);
+                ctx.lineTo(ajx + 56, ajy + 50);
+                ctx.closePath();
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = "#334155";
+                ctx.stroke();
+                // Wingtip red (port/top) & green (starboard/bottom) navigation strobes
+                ctx.fillStyle = "#ef4444";
+                ctx.fillRect(ajx + 23, ajy + 3, 4, 3);
+                ctx.fillStyle = "#22c55e";
+                ctx.fillRect(ajx + 23, ajy + 82, 4, 3);
+                // Cylindrical pearl-white widebody fuselage
+                ctx.beginPath();
+                ctx.moveTo(ajx + 6, ajy + 44);
+                ctx.lineTo(ajx + 20, ajy + 37);
+                ctx.lineTo(ajx + 76, ajy + 37);
+                ctx.quadraticCurveTo(ajx + 93, ajy + 38, ajx + 95, ajy + 44);
+                ctx.quadraticCurveTo(ajx + 93, ajy + 50, ajx + 76, ajy + 51);
+                ctx.lineTo(ajx + 20, ajy + 51);
+                ctx.closePath();
+                ctx.fillStyle = "#f8fafc";
+                ctx.fill();
+                ctx.strokeStyle = "#475569";
+                ctx.stroke();
+                // Vice Air cyan & neon-pink cheatline + passenger windows
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(ajx + 22, ajy + 39, 54, 2);
+                ctx.fillRect(ajx + 22, ajy + 47, 54, 2);
+                ctx.fillStyle = "#ec4899";
+                ctx.fillRect(ajx + 18, ajy + 43, 18, 2);
+                // Wrap-around sapphire cockpit windshield
+                ctx.fillStyle = "#0f172a";
+                ctx.beginPath();
+                ctx.arc(ajx + 85, ajy + 44, 4.2, -Math.PI * 0.42, Math.PI * 0.42);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["airliner_jet"] = [ajx, ajy, 96, 88];
+
+                // 5O. VIP Executive Learjet ("private_learjet", 56x52, nose facing East +X)
+                const ljx = 1502, ljy = py2;
+                ctx.save();
+                // Swept wings + rear tailplane
+                ctx.beginPath();
+                ctx.moveTo(ljx + 32, ljy + 22);
+                ctx.lineTo(ljx + 18, ljy + 3);
+                ctx.lineTo(ljx + 13, ljy + 3);
+                ctx.lineTo(ljx + 21, ljy + 22);
+                ctx.lineTo(ljx + 10, ljy + 23);
+                ctx.lineTo(ljx + 2,  ljy + 13);
+                ctx.lineTo(ljx + 5,  ljy + 26);
+                ctx.lineTo(ljx + 2,  ljy + 39);
+                ctx.lineTo(ljx + 10, ljy + 29);
+                ctx.lineTo(ljx + 21, ljy + 30);
+                ctx.lineTo(ljx + 13, ljy + 49);
+                ctx.lineTo(ljx + 18, ljy + 49);
+                ctx.lineTo(ljx + 32, ljy + 30);
+                ctx.closePath();
+                ctx.fillStyle = "#e2e8f0";
+                ctx.fill();
+                ctx.strokeStyle = "#475569";
+                ctx.lineWidth = 1.0;
+                ctx.stroke();
+                // Rear fuselage twin nacelles
+                ctx.fillStyle = "#334155";
+                ctx.fillRect(ljx + 11, ljy + 18, 9, 4);
+                ctx.fillRect(ljx + 11, ljy + 30, 9, 4);
+                // Fuselage + gold VIP stripe
+                ctx.beginPath();
+                ctx.moveTo(ljx + 4, ljy + 26);
+                ctx.lineTo(ljx + 14, ljy + 21);
+                ctx.lineTo(ljx + 43, ljy + 21);
+                ctx.quadraticCurveTo(ljx + 54, ljy + 22, ljx + 55, ljy + 26);
+                ctx.quadraticCurveTo(ljx + 54, ljy + 30, ljx + 43, ljy + 31);
+                ctx.lineTo(ljx + 14, ljy + 31);
+                ctx.closePath();
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = "#eab308";
+                ctx.fillRect(ljx + 15, ljy + 23, 28, 1.5);
+                ctx.fillRect(ljx + 15, ljy + 27.5, 28, 1.5);
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(ljx + 45, ljy + 23.5, 4, 5);
+                ctx.restore();
+                meta.sprites.objects["private_learjet"] = [ljx, ljy, 56, 52];
+
+                // 5P. Vice City Police / Tour Helicopter ("heli_vice", 56x26, nose facing East +X)
+                const hvx = 1564, hvy = py2;
+                ctx.save();
+                // Landing skids
+                ctx.strokeStyle = "#1e293b";
+                ctx.lineWidth = 2.0;
+                ctx.beginPath();
+                ctx.moveTo(hvx + 22, hvy + 3);  ctx.lineTo(hvx + 46, hvy + 3);
+                ctx.moveTo(hvx + 22, hvy + 23); ctx.lineTo(hvx + 46, hvy + 23);
+                ctx.moveTo(hvx + 28, hvy + 3);  ctx.lineTo(hvx + 28, hvy + 23);
+                ctx.moveTo(hvx + 40, hvy + 3);  ctx.lineTo(hvx + 40, hvy + 23);
+                ctx.stroke();
+                // Tail boom + stabilizer
+                ctx.fillStyle = "#0284c7";
+                ctx.fillRect(hvx + 3, hvy + 11, 22, 4);
+                ctx.fillRect(hvx + 4, hvy + 6, 3, 14);
+                // Streamlined cabin body
+                ctx.beginPath();
+                ctx.ellipse(hvx + 35, hvy + 13, 16, 8.5, 0, 0, Math.PI * 2);
+                ctx.fillStyle = "#f8fafc";
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = "#0f172a";
+                ctx.stroke();
+                // Turquoise VCPD / Vice Tour trim & tinted bubble canopy
+                ctx.fillStyle = "#06b6d4";
+                ctx.fillRect(hvx + 22, hvy + 8, 18, 10);
+                ctx.beginPath();
+                ctx.arc(hvx + 43, hvy + 13, 6.8, -Math.PI * 0.48, Math.PI * 0.48);
+                ctx.fillStyle = "#0f172a";
+                ctx.fill();
+                // Rotor mast hub
+                ctx.fillStyle = "#475569";
+                ctx.beginPath();
+                ctx.arc(hvx + 33, hvy + 13, 3.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                meta.sprites.objects["heli_vice"] = [hvx, hvy, 56, 26];
+
+                // 5Q. Helipad Touchdown Circle & "H" Marking ("helipad_mark", 48x48)
+                const hpx = 1626, hpy = py2;
+                ctx.save();
+                ctx.fillStyle = "rgba(30, 41, 59, 0.85)";
+                ctx.beginPath();
+                ctx.arc(hpx + 24, hpy + 24, 21, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "#facc15";
+                ctx.lineWidth = 2.6;
+                ctx.beginPath();
+                ctx.arc(hpx + 24, hpy + 24, 19, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = "#facc15";
+                ctx.fillRect(hpx + 15, hpy + 13, 4, 22);
+                ctx.fillRect(hpx + 29, hpy + 13, 4, 22);
+                ctx.fillRect(hpx + 15, hpy + 22, 18, 4);
+                ctx.restore();
+                meta.sprites.objects["helipad_mark"] = [hpx, hpy, 48, 48];
+
+                // 5R. Deepwater Container Cargo Barge / Freighter ("cargo_barge", 112x38, bow facing East +X)
+                const cbx = 1680, cby = py2;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(cbx + 3, cby + 4);
+                ctx.lineTo(cbx + 86, cby + 4);
+                ctx.quadraticCurveTo(cbx + 108, cby + 6, cbx + 110, cby + 19);
+                ctx.quadraticCurveTo(cbx + 108, cby + 32, cbx + 86, cby + 34);
+                ctx.lineTo(cbx + 3, cby + 34);
+                ctx.closePath();
+                ctx.fillStyle = "#1e293b";
+                ctx.fill();
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = "#dc2626";
+                ctx.stroke();
+                // Steel cargo hold deck
+                ctx.fillStyle = "#334155";
+                ctx.fillRect(cbx + 8, cby + 7, 76, 24);
+                // White aft superstructure bridge house
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillRect(cbx + 7, cby + 8, 14, 22);
+                ctx.fillStyle = "#0284c7";
+                ctx.fillRect(cbx + 18, cby + 10, 3, 18);
+                // 6 colorful 40ft intermodal containers stacked in hold
+                const contCols = ["#dc2626", "#2563eb", "#d97706", "#16a34a", "#0891b2", "#9333ea"];
+                for (let ci = 0; ci < 6; ci++) {
+                    const cx0 = cbx + 24 + (ci % 3) * 19;
+                    const cy0 = cby + 8 + Math.floor(ci / 3) * 11;
+                    ctx.fillStyle = contCols[ci];
+                    ctx.fillRect(cx0, cy0, 17, 9);
+                    ctx.strokeStyle = "rgba(15, 23, 42, 0.55)";
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeRect(cx0, cy0, 17, 9);
+                }
+                ctx.restore();
+                meta.sprites.objects["cargo_barge"] = [cbx, cby, 112, 38];
+
+                // 5S. Quayside Intermodal Shipping Container ("container_stack", 40x18)
+                const csx = 1798, csy = py2;
+                ctx.save();
+                ctx.fillStyle = "#dc2626";
+                ctx.fillRect(csx + 1, csy + 1, 38, 16);
+                ctx.strokeStyle = "#450a0a";
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(csx + 1, csy + 1, 38, 16);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+                for (let rx = csx + 5; rx <= csx + 34; rx += 4) {
+                    ctx.fillRect(rx, csy + 2, 1.5, 14);
+                }
+                ctx.restore();
+                meta.sprites.objects["container_stack"] = [csx, csy, 40, 18];
             }
 
             return cvs;
@@ -2142,7 +2365,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_26", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_27", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2152,14 +2375,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_26", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_27", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_26", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_27", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -4107,6 +4330,129 @@ class RetroRenderer {
                 const ballZ = Math.sin(ballFlight * Math.PI) * 0.38;
                 this.pushSolidQuad3D(ballX + sunCos * 7, ballY + sunSin * 7, bz + 0.018, 6.0, 6.0, 0, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 this.batchObjectSprite3D("beach_ball", ballX, ballY, bz + 0.06 + ballZ, this.time * 6.0, 0.80 + ballZ * 0.3, SPRITE_DRAW_ORDER.TREES);
+            }
+        }
+
+        // 9) VCIA Airport, SERA Spaceport, Star Island & Vice Port Aviation Props (Airliners, Learjets & Spinning-Rotor Helicopters)
+        const airProps = this.map.airportProps;
+        if (airProps && airProps.length > 0) {
+            for (let i = 0; i < airProps.length; i++) {
+                const ap = airProps[i];
+                if (ap.x < minX - 180 || ap.x > maxX + 180 || ap.y < minY - 180 || ap.y > maxY + 180) continue;
+                const bz = ap.z || 2.0;
+                const cs = Math.cos(ap.ang);
+                const sn = Math.sin(ap.ang);
+                if (ap.kind === "AIRLINER") {
+                    this.pushSolidQuad3D(ap.x + sunCos * 6, ap.y + sunSin * 6, bz + 0.015, 110, 96, ap.ang, 0.02, 0.03, 0.06, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("airliner_jet", ap.x, ap.y, bz + 0.075, ap.ang, ap.scale, SPRITE_DRAW_ORDER.CAR);
+                    // Blinking FAA wingtip & tail anti-collision strobe lights
+                    const strobeOn = Math.sin(this.time * 5.5 + ap.seed) > 0.35;
+                    if (strobeOn) {
+                        const wxL = ap.x - cs * 18 + sn * 56, wyL = ap.y - sn * 18 - cs * 56;
+                        const wxR = ap.x - cs * 18 - sn * 56, wyR = ap.y - sn * 18 + cs * 56;
+                        this.pushSolidQuad3D(wxL, wyL, bz + 0.09, 6, 6, 0, 1.0, 0.18, 0.18, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                        this.pushSolidQuad3D(wxR, wyR, bz + 0.09, 6, 6, 0, 0.15, 0.95, 0.38, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    }
+                    this.batchPedSprite3D("g2_fireman", Math.floor(this.time * 3 + i) % 8, ap.x + cs * 44 - sn * 20, ap.y + sn * 44 + cs * 20, bz + 0.038, ap.ang + Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else if (ap.kind === "LEARJET") {
+                    this.pushSolidQuad3D(ap.x + sunCos * 5, ap.y + sunSin * 5, bz + 0.015, 62, 54, ap.ang, 0.02, 0.03, 0.06, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("private_learjet", ap.x, ap.y, bz + 0.065, ap.ang, ap.scale, SPRITE_DRAW_ORDER.CAR);
+                    this.batchPedSprite3D("g2_zaibatsu", 0, ap.x + cs * 16 + sn * 18, ap.y + sn * 16 - cs * 18, bz + 0.038, ap.ang - 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else if (ap.kind === "HELIPAD") {
+                    this.batchObjectSprite3D("helipad_mark", ap.x, ap.y, bz + 0.016, 0, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(ap.x + sunCos * 5, ap.y + sunSin * 5, bz + 0.022, 54, 24, ap.ang, 0.02, 0.03, 0.06, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("heli_vice", ap.x, ap.y, bz + 0.065, ap.ang, ap.scale, SPRITE_DRAW_ORDER.CAR);
+                    // Live spinning 4-blade 3D main rotor + rotor shadow
+                    const rotAng = this.time * 14.0 + ap.seed;
+                    this.pushSolidQuad3D(ap.x, ap.y, bz + 0.125, 62, 3.2, rotAng, 0.12, 0.15, 0.20, 0.82, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(ap.x, ap.y, bz + 0.125, 62, 3.2, rotAng + Math.PI * 0.5, 0.12, 0.15, 0.20, 0.82, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(ap.x, ap.y, bz + 0.128, 5.5, 5.5, rotAng, 0.78, 0.82, 0.88, 0.95, SPRITE_DRAW_ORDER.TREES);
+                }
+            }
+        }
+
+        // 10) Leonida State Penitentiary 3D Chain-Link Security Fence, Razor Wire, Searchlights & Inmate Yard
+        const pris = this.map.prisonCompound;
+        if (pris && pris.x1 >= minX - 120 && pris.x0 <= maxX + 120 && pris.y1 >= minY - 120 && pris.y0 <= maxY + 120) {
+            const bz = pris.z || 2.0;
+            const drawFenceSpan = (xA, yA, xB, yB) => {
+                const dx = xB - xA, dy = yB - yA;
+                const len = Math.hypot(dx, dy);
+                const ang = Math.atan2(dy, dx);
+                const cx = (xA + xB) * 0.5, cy = (yA + yB) * 0.5;
+                // Ground shadow + lower mesh rail + upper razor-wire top rail
+                this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.015, len, 3.5, ang, 0.02, 0.03, 0.05, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy, bz + 0.08,  len, 3.0, ang, 0.46, 0.50, 0.56, 0.88, SPRITE_DRAW_ORDER.CAR);
+                this.pushSolidQuad3D(cx, cy, bz + 0.16,  len, 2.4, ang, 0.68, 0.72, 0.78, 0.92, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(cx, cy, bz + 0.21,  len, 3.8, ang, 0.82, 0.86, 0.92, 0.85, SPRITE_DRAW_ORDER.TREES);
+                const steps = Math.max(2, Math.floor(len / 36));
+                for (let s = 0; s <= steps; s++) {
+                    const px = xA + (dx * s) / steps;
+                    const py = yA + (dy * s) / steps;
+                    this.pushSolidQuad3D(px, py, bz + 0.14, 4.8, 4.8, 0, 0.30, 0.34, 0.40, 0.96, SPRITE_DRAW_ORDER.TREES);
+                }
+            };
+            drawFenceSpan(pris.x0, pris.y0, pris.x1, pris.y0);
+            drawFenceSpan(pris.x1, pris.y0, pris.x1, pris.y1);
+            drawFenceSpan(pris.x0, pris.y1, pris.x1, pris.y1);
+            drawFenceSpan(pris.x0, pris.y0, pris.x0, pris.y1);
+            drawFenceSpan(pris.x0, pris.midY, pris.x1, pris.midY);
+
+            // Rotating Watchtower Searchlight Cones
+            for (let ti = 0; ti < pris.towers.length; ti++) {
+                const tw = pris.towers[ti];
+                const sAng = tw.baseAng + Math.sin(this.time * 1.15 + ti * 1.4) * 0.65;
+                const beamX = tw.x + Math.cos(sAng) * 95;
+                const beamY = tw.y + Math.sin(sAng) * 95;
+                this.pushSolidQuad3D(beamX, beamY, bz + 0.022, 42, 42, sAng, 1.0, 0.95, 0.68, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(beamX, beamY, bz + 0.025, 22, 22, sAng, 1.0, 0.98, 0.82, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+
+            // Basketball Hoops & Inmates in the Exercise Yard (g2_prisoner & g2_krishna) + Patrolling Guards
+            this.pushSolidQuad3D(pris.courtX, pris.courtY - 110, bz + 0.14, 18, 4, 0, 0.95, 0.96, 0.98, 0.95, SPRITE_DRAW_ORDER.TREES);
+            this.pushSolidQuad3D(pris.courtX, pris.courtY + 110, bz + 0.14, 18, 4, 0, 0.95, 0.96, 0.98, 0.95, SPRITE_DRAW_ORDER.TREES);
+            for (let pi = 0; pi < 8; pi++) {
+                const isCourt = pi < 4;
+                const px = isCourt
+                    ? pris.courtX + ((pi % 2 === 0) ? -22 : 22) + Math.sin(this.time * 2.2 + pi) * 16
+                    : pris.courtX + ((pi % 2 === 0) ? -115 : 115);
+                const py = isCourt
+                    ? pris.courtY + (pi - 1.5) * 38 + Math.cos(this.time * 1.9 + pi) * 18
+                    : pris.courtY + (pi - 5.5) * 52 + Math.sin(this.time * 1.4 + pi) * 28;
+                const pAng = this.time * (isCourt ? 1.5 : 0.6) + pi * 1.57;
+                const fr = Math.floor(this.time * 6.5 + pi * 2) % 8;
+                this.batchPedSprite3D((pi % 2 === 0) ? "g2_prisoner" : "g2_krishna", fr, px, py, bz + 0.038, pAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+            for (let gi = 0; gi < 3; gi++) {
+                const gx = pris.x1 + 26;
+                const gy = pris.y0 + 180 + gi * 420 + Math.sin(this.time * 0.9 + gi) * 90;
+                const gAng = (Math.cos(this.time * 0.9 + gi) >= 0) ? Math.PI * 0.5 : -Math.PI * 0.5;
+                this.batchPedSprite3D((gi % 2 === 0) ? "police" : "g2_swat", Math.floor(this.time * 4.5 + gi) % 8, gx, gy, bz + 0.038, gAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // 11) Vice Port, Port Gellhorn, Ambrosia Docks & Island Marinas (Cargo Barges, Container Stacks & Boats)
+        const portTerms = this.map.portTerminals;
+        if (portTerms && portTerms.length > 0) {
+            for (let i = 0; i < portTerms.length; i++) {
+                const pt = portTerms[i];
+                if (pt.x < minX - 160 || pt.x > maxX + 160 || pt.y < minY - 160 || pt.y > maxY + 160) continue;
+                const bz = pt.z || 2.0;
+                const bob = Math.sin(this.time * 1.8 + pt.seed) * 0.008;
+                if (pt.kind === "BARGE") {
+                    this.pushSolidQuad3D(pt.x, pt.y, bz + 0.012, 168 * pt.scale, 54 * pt.scale, pt.ang, 0.72, 0.92, 0.98, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.068 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                } else if (pt.kind === "CONTAINERS") {
+                    this.pushSolidQuad3D(pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, 52 * pt.scale, 24 * pt.scale, pt.ang, 0.02, 0.03, 0.06, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("container_stack", pt.x, pt.y, bz + 0.065, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                    this.batchObjectSprite3D("container_stack", pt.x - 2, pt.y - 2, bz + 0.135, pt.ang, pt.scale * 0.96, SPRITE_DRAW_ORDER.TREES);
+                } else if (pt.kind === "YACHT") {
+                    this.pushSolidQuad3D(pt.x, pt.y, bz + 0.012, 132 * pt.scale, 50 * pt.scale, pt.ang, 0.72, 0.94, 1.0, 0.26, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.062 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                } else if (pt.kind === "SPEEDBOAT") {
+                    this.pushSolidQuad3D(pt.x, pt.y, bz + 0.012, 74 * pt.scale, 28 * pt.scale, pt.ang, 0.72, 0.94, 1.0, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("speedboat_v8", pt.x, pt.y, bz + 0.048 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                }
             }
         }
     }
