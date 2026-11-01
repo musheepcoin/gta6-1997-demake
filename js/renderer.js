@@ -5155,8 +5155,8 @@ class RetroRenderer {
                 const dz = this.map.getHeightAtPixel(intr.doorX, labelY, 2.0) + 0.04;
                 const sc = this.worldToScreen(intr.doorX, labelY, dz);
                 const isClose = dist < 95;
-                const label = isClose ? `🚪 [CLICK OR PRESS E] ENTER ${intr.name}` : `🚪 ${intr.name}`;
-                const bw = Math.max(150, ctx.measureText(label).width + 18);
+                const label = `🚪 ${intr.name}`;
+                const bw = Math.max(130, ctx.measureText(label).width + 18);
                 const bh = 22;
                 const bx = Math.round(sc.x - bw * 0.5);
                 const by = Math.round(sc.y - bh * 0.5 + 2);
@@ -6391,16 +6391,16 @@ class RetroRenderer {
         ctx.fillText("LUCIA", px, py - 26);
 
         // 6. South Threshold Welcome Mat & Glowing [🚪 EXIT TO STREET] Doorway
-        const exitW = 248;
-        const exitH = 28;
+        const exitW = 164;
+        const exitH = 26;
         const exitX = Math.round(ox + (rw - exitW) * 0.5);
         const exitY = oy + rh - exitH - 4;
         // Coir & brass welcome mat just inside the doorway
         ctx.fillStyle = "#451a03";
-        ctx.fillRect(exitX + 24, exitY - 12, exitW - 48, 14);
+        ctx.fillRect(exitX + 16, exitY - 12, exitW - 32, 14);
         ctx.strokeStyle = "#d97706";
         ctx.lineWidth = 1;
-        ctx.strokeRect(exitX + 24.5, exitY - 11.5, exitW - 49, 13);
+        ctx.strokeRect(exitX + 16.5, exitY - 11.5, exitW - 33, 13);
 
         ctx.fillStyle = "rgba(131, 24, 67, 0.94)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
@@ -6409,7 +6409,7 @@ class RetroRenderer {
         ctx.strokeRect(exitX + 0.5, exitY + 0.5, exitW - 1, exitH - 1);
         ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("🚪 EXIT TO STREET [WALK / ESC / CLICK]", ox + rw * 0.5, exitY + exitH * 0.5);
+        ctx.fillText("🚪 EXIT TO STREET", ox + rw * 0.5, exitY + exitH * 0.5);
 
         this.cheatButtons.push({
             id: "EXIT_INTERIOR",
