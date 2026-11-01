@@ -1249,9 +1249,9 @@ class LeonidaMap {
 
         // 14) GTA 6 Street Takeovers / Intersection Sideshow Drift Donuts ("streetTakeovers")
         this.streetTakeovers = [
-            { c: 183.5, r: 108.5, carSpr: "10", seed: 0.0 }, // Wynwood / Jack of Hearts Plaza
+            { c: 183.5, r: 108.5, carSpr: "4",  seed: 0.0 }, // Wynwood / Jack of Hearts Plaza
             { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza
-            { c: 60.0,  r: 182.5, carSpr: "3",  seed: 3.1 }, // Port Gellhorn Speedway Apron
+            { c: 60.0,  r: 182.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn Speedway Apron
             { c: 336.5, r: 311.5, carSpr: "6",  seed: 4.4 }, // Vice Port Dock Apron
             { c: 441.5, r: 288.5, carSpr: "0",  seed: 5.8 }  // Ocean Drive / Hotel Dixon Forecourt
         ].map((st) => ({
@@ -1270,7 +1270,7 @@ class LeonidaMap {
                 rx: 9.1 * TILE_SIZE,
                 ry: 7.3 * TILE_SIZE,
                 z: 2.0,
-                cars: ["0", "3", "6", "10"]
+                cars: ["0", "1", "4", "6"]
             },
             mudPark: {
                 cxW: 78.0 * TILE_SIZE,
@@ -1279,7 +1279,7 @@ class LeonidaMap {
                 rx:  10.0 * TILE_SIZE,
                 ry:  8.5 * TILE_SIZE,
                 z:   2.0,
-                trucks: ["25", "28", "53", "25"]
+                trucks: ["25", "27", "33", "21"]
             }
         };
 

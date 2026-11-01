@@ -2611,7 +2611,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_28", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_29", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2621,14 +2621,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_28", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_29", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_28", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_29", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -3539,7 +3539,11 @@ class RetroRenderer {
 
     pushAtlasSprite3D(rect, xPx, yPx, zBlocks, angleRad = 0, scale = 1.0, drawOrder = 4, r = 1, g = 1, b = 1, a = 1, pitchZ = 0) {
         if (!rect || !this.gta1SpritesImg.width) return;
-        const [sx, sy, sw, sh] = rect;
+        const arr = Array.isArray(rect)
+            ? rect
+            : (Array.isArray(rect.remaps) && rect.remaps.length > 0 ? rect.remaps[0] : rect.base);
+        if (!Array.isArray(arr) || arr.length < 4) return;
+        const [sx, sy, sw, sh] = arr;
         const texW = this.spritesTexW || this.gta1SpritesImg.width;
         const texH = this.spritesTexH || this.gta1SpritesImg.height;
         const u0 = (sx + 0.35) / texW;
@@ -4772,6 +4776,16 @@ class RetroRenderer {
         // 14) GTA 6 Street Takeovers / Intersection Sideshow Drift Donuts ("donut_skid_ring" + Drifting Muscle Car + Tire Smoke + Crowd)
         const takeovers = this.map.streetTakeovers;
         const vehSprites = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.vehicles;
+        const getVehRect = (idxOrSpr, remapIdx = 0) => {
+            if (!vehSprites) return null;
+            const ve = (this.vehicleBySprIdx && this.vehicleBySprIdx[String(idxOrSpr)]) || vehSprites[Number(idxOrSpr)] || vehSprites[0];
+            if (!ve) return null;
+            if (Array.isArray(ve)) return ve;
+            if (Array.isArray(ve.remaps) && ve.remaps.length > 0) {
+                return ve.remaps[Math.abs(remapIdx) % ve.remaps.length] || ve.base;
+            }
+            return ve.base || null;
+        };
         if (takeovers && takeovers.length > 0 && vehSprites) {
             const crowdPeds = ["vc_haitian", "vc_cuban", "bikini_pink", "g2_civ_aqua", "vc_tourist", "g2_mugger"];
             for (let i = 0; i < takeovers.length; i++) {
@@ -4785,10 +4799,10 @@ class RetroRenderer {
                 const carX = st.x + Math.cos(orbitAng) * 20.0;
                 const carY = st.y + Math.sin(orbitAng) * 20.0;
                 const driftHeading = orbitAng + Math.PI * 0.5 - 0.52;
-                const vRect = vehSprites[st.carSpr] || vehSprites["0"];
+                const vRect = getVehRect(st.carSpr, i);
                 if (vRect) {
                     this.pushSolidQuad3D(carX + sunCos * 4, carY + sunSin * 4, bz + 0.018, 34, 18, driftHeading, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.048, driftHeading + Math.PI * 0.5, 0.96, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                    this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.048, driftHeading - Math.PI * 0.5, 0.96, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
                 }
                 // Billowing 3D white tire-smoke puffs (sprites 200..205) trailing the rear tires
                 for (let sm = 0; sm < 3; sm++) {
@@ -4823,10 +4837,10 @@ class RetroRenderer {
                     const vx = -Math.sin(t) * sp.rx;
                     const vy = Math.cos(t) * sp.ry;
                     const cAng = Math.atan2(vy, vx) - 0.18;
-                    const vRect = vehSprites[sp.cars[ci]] || vehSprites["0"];
+                    const vRect = getVehRect(sp.cars[ci], ci + 1);
                     if (vRect) {
                         this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.018, 36, 18, cAng, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushAtlasSprite3D(vRect, cx, cy, bz + 0.048, cAng + Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                        this.pushAtlasSprite3D(vRect, cx, cy, bz + 0.048, cAng - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
                     }
                     // Dirt rooster-tail dust puff behind stock car
                     const dustSpr = String(200 + ((Math.floor(this.time * 12) + ci) % 6));
@@ -4847,10 +4861,10 @@ class RetroRenderer {
                     const vx = -Math.sin(angT) * mp.rx * dir;
                     const vy = Math.cos(angT) * mp.ry * dir;
                     const tAng = Math.atan2(vy, vx);
-                    const vRect = vehSprites[mp.trucks[ti]] || vehSprites["25"];
+                    const vRect = getVehRect(mp.trucks[ti], ti + 2);
                     if (vRect) {
                         this.pushSolidQuad3D(tx + sunCos * 5, ty + sunSin * 5, bz + 0.018, 42, 22, tAng, 0.02, 0.03, 0.06, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushAtlasSprite3D(vRect, tx, ty, bz + 0.056, tAng + Math.PI * 0.5, 1.08, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                        this.pushAtlasSprite3D(vRect, tx, ty, bz + 0.056, tAng - Math.PI * 0.5, 1.08, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
                     }
                     // Mud splash spray behind monster mudder tires
                     const bx = tx - Math.cos(tAng) * 22, by = ty - Math.sin(tAng) * 22;
