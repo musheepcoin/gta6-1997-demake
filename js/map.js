@@ -2411,6 +2411,38 @@ class LeonidaMap {
         return true;
     }
 
+    doesStraightLeadToValidExit(bx, by, dx, dy, zBlocks = 2.0, turnedInIntersection = false, entryAngle = null) {
+        const dirAngle = Math.atan2(dy, dx);
+        const isOppositeToEntry = typeof entryAngle === "number" &&
+            Math.abs(this.normalizeAngleDiff(dirAngle, entryAngle)) > 2.4;
+        if (!isOppositeToEntry && this.doesRoadExitIntersection(bx, by, dx, dy, zBlocks)) {
+            return true;
+        }
+        if (turnedInIntersection) {
+            return false;
+        }
+        for (let step = 1; step <= 4; step++) {
+            const tx = bx + dx * step;
+            const ty = by + dy * step;
+            if (tx < 1 || tx >= MAP_COLS - 1 || ty < 1 || ty >= MAP_ROWS - 1) return false;
+            const tb = this.getNavigationBlock(tx, ty, zBlocks);
+            if (!tb || tb.groundType !== GROUND_TYPE.ROAD) return false;
+            const tlid = this.getBlockInfo(tx, ty, 1).lid;
+            if (tlid !== 25) return false;
+            const subDirs = this.getAllowedRoadDirections(tx, ty, zBlocks);
+            for (const sd of subDirs) {
+                if ((sd.dx === dx && sd.dy === dy) || (sd.dx === -dx && sd.dy === -dy)) continue;
+                if (typeof entryAngle === "number" && Math.abs(this.normalizeAngleDiff(sd.angle, entryAngle)) > 2.4) {
+                    continue;
+                }
+                if (this.doesRoadExitIntersection(tx, ty, sd.dx, sd.dy, zBlocks)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     hasClearLineOfSightForVehicle(x1, y1, x2, y2, zBlocks = 2.0) {
         const dist = Math.hypot(x2 - x1, y2 - y1);
         if (dist < 24) return true;
@@ -2444,7 +2476,7 @@ class LeonidaMap {
         return false;
     }
 
-    chooseTargetGuidedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks = 2.0, turnedInIntersection = false) {
+    chooseTargetGuidedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks = 2.0, turnedInIntersection = false, entryAngle = null) {
         const dirs = this.getAllowedRoadDirections(bx, by, zBlocks);
         const cardinals = [
             { key: "U", dx: 0, dy: -1, angle: -Math.PI * 0.5 },
@@ -2465,8 +2497,11 @@ class LeonidaMap {
             }
             const absDiff = Math.abs(this.normalizeAngleDiff(d.angle, currentAngle));
             const isTurn = absDiff > 0.45;
-            const isUturn = absDiff > 2.4;
-            const exitsIntersection = this.doesRoadExitIntersection(bx, by, d.dx, d.dy, zBlocks);
+            const isEntryUturn = typeof entryAngle === "number" && Math.abs(this.normalizeAngleDiff(d.angle, entryAngle)) > 2.4;
+            const isUturn = absDiff > 2.4 || isEntryUturn;
+            const exitsIntersection = isTurn
+                ? (!isEntryUturn && this.doesRoadExitIntersection(bx, by, d.dx, d.dy, zBlocks))
+                : this.doesStraightLeadToValidExit(bx, by, d.dx, d.dy, zBlocks, turnedInIntersection, entryAngle);
 
             // Project 4 blocks ahead along (d.dx, d.dy) to score how well this road approaches (targetX, targetY)
             const lookX = (bx + d.dx * 4 + 0.5) * TILE_SIZE;
@@ -2474,9 +2509,9 @@ class LeonidaMap {
             const distToTarget = Math.hypot(targetX - lookX, targetY - lookY);
             const penalty =
                 (nb.groundType === GROUND_TYPE.ROAD ? 0 : 220) +
-                (exitsIntersection ? 0 : 180) +
-                (isUturn ? 320 : 0) +
-                (isTurn && turnedInIntersection ? 260 : 0);
+                (exitsIntersection ? 0 : 380) +
+                (isUturn ? 520 : 0) +
+                (isTurn && turnedInIntersection ? 420 : 0);
 
             candidates.push({
                 ...d,
@@ -2491,13 +2526,13 @@ class LeonidaMap {
         }
 
         if (candidates.length === 0) {
-            return this.chooseNextRoadBlock(bx, by, currentAngle, zBlocks, 0.2, turnedInIntersection);
+            return this.chooseNextRoadBlock(bx, by, currentAngle, zBlocks, 0.2, turnedInIntersection, entryAngle);
         }
         candidates.sort((a, b) => b.score - a.score);
         return candidates[0];
     }
 
-    chooseNextRoadBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, turnedInIntersection = false) {
+    chooseNextRoadBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, turnedInIntersection = false, entryAngle = null) {
         const normSeed = ((turnSeed % 1.0) + 1.0) % 1.0;
         const dirs = this.getAllowedRoadDirections(bx, by, zBlocks);
         if (dirs.length === 0) {
@@ -2523,9 +2558,13 @@ class LeonidaMap {
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
             const absDiff = Math.abs(this.normalizeAngleDiff(d.angle, currentAngle));
             const isTurn = absDiff > 0.45;
-            const isUturn = absDiff > 2.4;
+            const isEntryUturn = typeof entryAngle === "number" && Math.abs(this.normalizeAngleDiff(d.angle, entryAngle)) > 2.4;
+            const isUturn = absDiff > 2.4 || isEntryUturn;
             const exitsIntersection = this.doesRoadExitIntersection(bx, by, d.dx, d.dy, zBlocks);
-            const entry = { ...d, bx: nx, by: ny, absDiff, isTurn, isUturn, exitsIntersection };
+            const straightValid = !isTurn
+                ? this.doesStraightLeadToValidExit(bx, by, d.dx, d.dy, zBlocks, turnedInIntersection, entryAngle)
+                : false;
+            const entry = { ...d, bx: nx, by: ny, absDiff, isTurn, isUturn, exitsIntersection, straightValid };
             if (nb.groundType === GROUND_TYPE.ROAD) {
                 roadCandidates.push(entry);
             } else if (nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER) {
@@ -2540,19 +2579,21 @@ class LeonidaMap {
             absDiff: Math.abs(this.normalizeAngleDiff(d.angle, currentAngle)),
             isTurn: Math.abs(this.normalizeAngleDiff(d.angle, currentAngle)) > 0.45,
             isUturn: Math.abs(this.normalizeAngleDiff(d.angle, currentAngle)) > 2.4,
-            exitsIntersection: true
+            exitsIntersection: true,
+            straightValid: true
         })));
 
         const nonUturn = pool.filter((c) => !c.isUturn);
         if (nonUturn.length > 0) pool = nonUturn;
 
-        // Filter out turns that either:
-        // 1) happen after the car already turned once inside this intersection, OR
-        // 2) turn into an oncoming lane or dead-end T-intersection stub when going straight is valid
+        // Filter out:
+        // 1) straight steps inside an intersection that only lead to a wall/dead-end or force a U-turn,
+        // 2) turns after the car already turned once inside this intersection, OR
+        // 3) turns into an oncoming lane or dead-end stub
         const validFiltered = pool.filter((c) => {
-            if (!c.isTurn) return true;
+            if (!c.isTurn) return Boolean(c.straightValid);
             if (turnedInIntersection) return false;
-            return c.exitsIntersection;
+            return Boolean(c.exitsIntersection);
         });
         if (validFiltered.length > 0) {
             pool = validFiltered;

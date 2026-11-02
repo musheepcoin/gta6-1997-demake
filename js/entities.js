@@ -1264,9 +1264,12 @@ class Vehicle {
         const curBlk = map.getNavigationBlock ? map.getNavigationBlock(bx, by, curZ) : null;
         const lidZ1 = (map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0);
 
-        // Reset single-turn intersection guard once the car exits the intersection (lidZ1 !== 25)
+        // Reset single-turn intersection guard and record entry heading whenever outside an intersection (lidZ1 !== 25)
         if (lidZ1 !== 25) {
             this.aiTurnedInIntersection = false;
+            this.aiIntersectionEntryAngle = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number")
+                ? this.aiChosenDir.angle
+                : this.angle;
         }
 
         // 1. Commit to a valid outgoing NYC.CMP arrow direction upon entering each road block.
@@ -1276,6 +1279,9 @@ class Vehicle {
             const refAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number"
                 ? this.aiChosenDir.angle
                 : this.angle;
+            const entryAngle = (lidZ1 === 25 && typeof this.aiIntersectionEntryAngle === "number")
+                ? this.aiIntersectionEntryAngle
+                : refAngle;
             this.aiBlockX = bx;
             this.aiBlockY = by;
             this.aiTurnSeed = (this.aiTurnSeed * 1.6180339887 + 0.31) % 1.0;
@@ -1286,7 +1292,8 @@ class Vehicle {
                     refAngle,
                     curZ,
                     this.aiTurnSeed,
-                    Boolean(this.aiTurnedInIntersection)
+                    Boolean(this.aiTurnedInIntersection),
+                    entryAngle
                 );
             } else {
                 const snapAngle = Math.round(refAngle / (Math.PI * 0.5)) * (Math.PI * 0.5);
@@ -1631,23 +1638,33 @@ class Vehicle {
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
         if (lidZ1 !== 25) {
             this.aiTurnedInIntersection = false;
+            this.aiIntersectionEntryAngle = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number")
+                ? this.aiChosenDir.angle
+                : this.angle;
         }
 
         if (this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir)) {
+            const refAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number"
+                ? this.aiChosenDir.angle
+                : this.angle;
+            const entryAngle = (lidZ1 === 25 && typeof this.aiIntersectionEntryAngle === "number")
+                ? this.aiIntersectionEntryAngle
+                : refAngle;
             this.aiBlockX = bx;
             this.aiBlockY = by;
             if (typeof map.chooseTargetGuidedRoadBlock === "function") {
                 this.aiChosenDir = map.chooseTargetGuidedRoadBlock(
                     bx,
                     by,
-                    this.angle,
+                    refAngle,
                     targetX,
                     targetY,
                     curZ,
-                    Boolean(this.aiTurnedInIntersection)
+                    Boolean(this.aiTurnedInIntersection),
+                    entryAngle
                 );
             } else {
-                this.aiChosenDir = map.chooseNextRoadBlock(bx, by, this.angle, curZ, 0.2, Boolean(this.aiTurnedInIntersection));
+                this.aiChosenDir = map.chooseNextRoadBlock(bx, by, refAngle, curZ, 0.2, Boolean(this.aiTurnedInIntersection), entryAngle);
             }
             if (this.aiChosenDir.isTurn) {
                 this.aiTurnedInIntersection = true;
