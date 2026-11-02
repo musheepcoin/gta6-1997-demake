@@ -806,7 +806,9 @@ class RetroRenderer {
                 g2PackEndY = Math.max(g2PackEndY, cy + shelfH + 4);
             }
 
-            const H = g2PackEndY;
+            // Dedicated non-overlapping atlas shelf for Leonida 3D Arboretum Flora (fy1, fy2)
+            const floraPackStartY = g2PackEndY + 12;
+            const H = floraPackStartY + 180;
             this.spritesTexW = W;
             this.spritesTexH = H;
             const cvs = document.createElement("canvas");
@@ -2036,8 +2038,8 @@ class RetroRenderer {
                 //  tropical_shrub, sawgrass_clump)
                 // =========================================================================
                 meta.sprites.objects["palm_tree"] = meta.sprites.objects["palm_tree"] || meta.sprites.objects["257"];
-                const fy1 = origH + 8;
-                const fy2 = origH + 80;
+                const fy1 = floraPackStartY + 6;
+                const fy2 = floraPackStartY + 84;
 
                 // 1) Sabal Palmetto (Florida State Fan Palm, 48x48)
                 {
