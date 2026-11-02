@@ -436,6 +436,8 @@ class RetroRenderer {
                             bool iSW = bSW && !bS && !bW;
                             bool iSE = bSE && !bS && !bE;
 
+                            bool isNarrow = (bW && bE) || (bN && bS);
+
                             // Single continuous 2D world-space shoreline offset w(p) so adjacent tiles join with 0.0000 seam error!
                             // For natural beaches (waterSurType > 2.5), wBase = 0.385 places the water edge (w + 0.115 = 0.50) at the exact tile midpoint so convex & concave curves have equal 0.50 radius!
                             float wBase = (waterSurType > 2.5) ? (isNarrow ? 0.22 : 0.385) : (isNarrow ? 0.18 : 0.28);
@@ -449,7 +451,6 @@ class RetroRenderer {
 
                             float xDist = min(dW, dE);
                             float yDist = min(dN, dS);
-                            bool isNarrow = (bW && bE) || (bN && bS);
                             bool isDiagPair = bW == bN;
                             bool isStair = !isNarrow && (isDiagPair ? (!bNE || !bSW) : (!bNW || !bSE));
                             float kOuter = isStair ? 1.50 : 1.90;
@@ -2348,7 +2349,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_45", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_46", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -3709,7 +3710,7 @@ class RetroRenderer {
 
     renderMiamiPalmTree3D(x, y, baseZ, baseAngle = 0, scale = 1.0, seedIdx = 0, heightMul = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.objects) return;
-        const palmRect = this.gta1Meta.sprites.objects["palm_tree"] || this.gta1Meta.sprites.objects["257"];
+        const palmRect = this.gta1Meta.sprites.objects["257"] || this.gta1Meta.sprites.objects["palm_tree"];
         if (!palmRect) return;
 
         const sc = scale || 1.0;
@@ -3743,7 +3744,7 @@ class RetroRenderer {
             const tx = x + leanX * t;
             const ty = y + leanY * t;
             const tz = baseZ + 0.045 + t * 0.27 * hm;
-            const sz = (7.2 - t * 2.0) * sc;
+            const sz = (3.0 - t * 0.8) * sc;
             const isRing = (s % 2) === 1;
             this.pushSolidQuad3D(
                 tx,
@@ -3822,14 +3823,12 @@ class RetroRenderer {
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.5 + pm.x * 0.015 + pm.y * 0.018) * 0.035;
             this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist, pm.y + Math.sin(shAngle) * shDist, groundZ + 0.016, (pm.angle || 0) + breeze, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.04, 6.2 * sc, 6.2 * sc, pm.angle || 0, 0.45, 0.28, 0.14, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.22 * hm, (pm.angle || 0) + breeze, sc * 1.02, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "swamp_cypress") {
             const spr = this.gta1Meta.sprites.objects["swamp_cypress"];
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.25 + pm.x * 0.012 + pm.y * 0.015) * 0.03;
             this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.1, pm.y + Math.sin(shAngle) * shDist * 1.1, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.03, 8.5 * sc, 8.5 * sc, pm.angle || 0, 0.38, 0.22, 0.10, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.26 * hm, (pm.angle || 0) + 0.35 - breeze * 0.6, sc * 0.96, SPRITE_DRAW_ORDER.TREES, 0.78, 0.88, 0.72, 0.95);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.38 * hm, (pm.angle || 0) + breeze, sc * 1.05, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "mangrove") {
@@ -3844,7 +3843,6 @@ class RetroRenderer {
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.1 + pm.x * 0.01) * 0.02;
             this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.3, pm.y + Math.sin(shAngle) * shDist * 1.3, groundZ + 0.016, pm.angle || 0, sc * 1.25, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.15);
-            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.04, 10.0 * sc, 10.0 * sc, pm.angle || 0, 0.32, 0.20, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.28 * hm, (pm.angle || 0) + 0.5 - breeze, sc * 1.18, SPRITE_DRAW_ORDER.TREES, 0.68, 0.82, 0.65, 0.95);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.42 * hm, (pm.angle || 0) + breeze, sc * 1.30, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "live_oak") {
@@ -3852,7 +3850,6 @@ class RetroRenderer {
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.2 + pm.y * 0.016) * 0.028;
             this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.2, pm.y + Math.sin(shAngle) * shDist * 1.2, groundZ + 0.016, pm.angle || 0, sc * 1.1, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.04, 8.0 * sc, 8.0 * sc, pm.angle || 0, 0.36, 0.24, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.32 * hm, (pm.angle || 0) + breeze, sc * 1.15, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "bougainvillea_bush") {
             const spr = this.gta1Meta.sprites.objects["bougainvillea_bush"];
