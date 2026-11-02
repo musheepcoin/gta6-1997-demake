@@ -2692,6 +2692,10 @@ class TrafficManager {
 
         for (let by = outerRect.minY; by <= outerRect.maxY; by++) {
             for (let bx = outerRect.minX; bx <= outerRect.maxX; bx++) {
+                // Never spawn street pedestrians on VCIA Airport active runways/tarmac or on prison double-fence perimeter strips
+                if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
+                if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
+
                 const inScreen = this.isPointInRect(bx, by, onScreenArea);
                 if (inScreen && !allowEdgeOnScreen) continue;
                 const pedX = (bx + 0.5) * TILE_SIZE;
@@ -2700,8 +2704,12 @@ class TrafficManager {
 
                 const nav = map.getNavigationBlock(bx, by, camZ);
                 if (!nav) continue;
-                if (nav.groundType === GROUND_TYPE.PAWEMENT || (nav.groundType === GROUND_TYPE.FIELD && bx >= 216)) {
-                    candidates.push({ bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT });
+                const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
+                if (
+                    nav.groundType === GROUND_TYPE.PAWEMENT ||
+                    (nav.groundType === GROUND_TYPE.FIELD && (bx >= 216 || inPrisonYard))
+                ) {
+                    candidates.push({ bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT, inPrisonYard });
                 }
             }
         }
@@ -2728,6 +2736,17 @@ class TrafficManager {
 
             const pedZ = map.getHeightAtPixel(pedX, pedY, 4.0);
             const pedAngle = dirs[Math.floor(Math.random() * dirs.length)];
+            const isPrisonGuard = pick.inPrisonYard && (attempt % 5 === 0);
+            const pedProp = pick.inPrisonYard
+                ? (isPrisonGuard
+                    ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110 }
+                    : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45 })
+                : {
+                    kind: "CIVILIAN",
+                    g24Type: civTypes[Math.floor(Math.random() * civTypes.length)],
+                    shirtColor: "#06b6d4",
+                    hp: 35
+                };
 
             game.peds.push(new Pedestrian({
                 x: pedX,
@@ -2735,10 +2754,7 @@ class TrafficManager {
                 z: pedZ,
                 angle: pedAngle,
                 speed: 35 + Math.random() * 9,
-                kind: "CIVILIAN",
-                g24Type: civTypes[Math.floor(Math.random() * civTypes.length)],
-                shirtColor: "#06b6d4",
-                hp: 35,
+                ...pedProp,
                 dead: false,
                 panicTimer: 0,
                 turnSeed: (game.peds.length + attempt + 1)

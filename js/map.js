@@ -363,15 +363,16 @@ class LeonidaMap {
                 this.surfaceGround[r * MAP_COLS + c] = surfGt;
 
                 // Open ground tiles store their visible lid at z = 1 and their navigation groundType at z = 2 (with lid = 0)
+                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369);
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
-                if (surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && blkZ1 && blkZ1.lid === 69 && surfGt === GROUND_TYPE.PAWEMENT) {
+                if (!isInsidePrisonOrAirport && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && blkZ1 && blkZ1.lid === 69 && surfGt === GROUND_TYPE.PAWEMENT) {
                     this.trees.push({ x: (c + 0.5) * TILE_SIZE, y: (r + 0.5) * TILE_SIZE, z: 2.0, scale: 1.0 });
                 }
             }
         }
 
-        // Second pass: Identify true sand tiles (lid 98..101) & place Vice City / GTA 6 tropical palm trees strictly on lid 69 sidewalk planters and lid 10 park lawns (NEVER on roads or roofs!)
+        // Second pass: Identify true sand tiles (lid 98..101) & place Vice City / GTA 6 tropical palm trees strictly on lid 69 sidewalk planters and lid 10 park lawns (NEVER on roads, roofs, or inside the Penitentiary / Airport!)
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
                 const idx = r * MAP_COLS + c;
@@ -396,6 +397,11 @@ class LeonidaMap {
 
                 if (isSandTile) {
                     this.coastalSandMask[idx] = 1;
+                }
+
+                // Never plant tropical resort palm trees inside Leonida State Penitentiary or VCIA Airport tarmac
+                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369)) {
+                    continue;
                 }
 
                 // 1) Sidewalk palm trees: strictly inside authentic lid === 69 circular stone tree-pit planters
@@ -1119,34 +1125,66 @@ class LeonidaMap {
         }));
 
         // 10) Leonida State Penitentiary Fenced Security Compound, Searchlights & Exercise Yard ("prisonCompound")
-        const prisX0 = 56.2 * TILE_SIZE, prisY0 = 76.2 * TILE_SIZE, prisX1 = 68.8 * TILE_SIZE, prisY1 = 146.8 * TILE_SIZE, prisMidY = 103.5 * TILE_SIZE;
+        const prisX0 = 56.15 * TILE_SIZE, prisY0 = 76.15 * TILE_SIZE, prisX1 = 68.85 * TILE_SIZE, prisY1 = 146.85 * TILE_SIZE, prisMidY = 103.5 * TILE_SIZE;
+        const prisInX0 = 56.92 * TILE_SIZE, prisInX1 = 68.08 * TILE_SIZE, prisInY1 = 145.92 * TILE_SIZE;
         this.prisonCompound = {
             x0: prisX0,
             y0: prisY0,
             x1: prisX1,
             y1: prisY1,
+            inX0: prisInX0,
+            inX1: prisInX1,
+            inY1: prisInY1,
             midY: prisMidY,
-            courtX: 61.5 * TILE_SIZE,
-            courtY: 122.5 * TILE_SIZE,
+            courtX: 62.0 * TILE_SIZE,
+            courtY: 123.5 * TILE_SIZE,
             z: 2.0,
             spans: [
-                { xA: prisX0, yA: prisY0,   xB: 60.2 * TILE_SIZE, yB: prisY0 },
-                { xA: 63.8 * TILE_SIZE, yA: prisY0, xB: prisX1,   yB: prisY0 },
-                { xA: prisX1, yA: prisY0,   xB: prisX1,           yB: prisY1 },
-                { xA: prisX0, yA: prisY1,   xB: prisX1,           yB: prisY1 },
-                { xA: prisX0, yA: prisY0,   xB: prisX0,           yB: prisY1 },
-                { xA: prisX0, yA: prisMidY, xB: 60.5 * TILE_SIZE, yB: prisMidY },
-                { xA: 63.5 * TILE_SIZE, yA: prisMidY, xB: prisX1, yB: prisMidY }
+                // Outer Maximum-Security Perimeter Fence (with North Sally-Port Gatehouse at c=60.8..63.2)
+                { xA: prisX0,           yA: prisY0,   xB: 60.8 * TILE_SIZE, yB: prisY0,   isPrison: true },
+                { xA: 63.2 * TILE_SIZE, yA: prisY0,   xB: prisX1,           yB: prisY0,   isPrison: true },
+                { xA: prisX1,           yA: prisY0,   xB: prisX1,           yB: prisY1,   isPrison: true },
+                { xA: prisX0,           yA: prisY1,   xB: prisX1,           yB: prisY1,   isPrison: true },
+                { xA: prisX0,           yA: prisY0,   xB: prisX0,           yB: prisY1,   isPrison: true },
+                // Inner Razor-Wire Security Fence (Double-Fence No-Man's-Land along East, West & South perimeter)
+                { xA: prisInX1,         yA: prisY0,   xB: prisInX1,         yB: prisInY1, isPrison: true },
+                { xA: prisInX0,         yA: prisY0,   xB: prisInX0,         yB: prisInY1, isPrison: true },
+                { xA: prisInX0,         yA: prisInY1, xB: prisInX1,         yB: prisInY1, isPrison: true },
+                // Internal Courtyard Security Divider (y = 103.5) with guarded center sally-port at c=61.0..63.0
+                { xA: prisInX0,         yA: prisMidY, xB: 61.0 * TILE_SIZE, yB: prisMidY, isPrison: true },
+                { xA: 63.0 * TILE_SIZE, yA: prisMidY, xB: prisInX1,         yB: prisMidY, isPrison: true }
+            ],
+            // Solid thick AABB barrier boxes: 100% impossible to tunnel through or exit-vehicle through along all walls!
+            barrierBoxes: [
+                // West Double-Fence Wall (58px thick solid barrier)
+                { minX: 56.05 * TILE_SIZE, maxX: 56.98 * TILE_SIZE, minY: 76.05 * TILE_SIZE, maxY: 146.95 * TILE_SIZE },
+                // East Double-Fence Wall (58px thick solid barrier blocking the entire East side & c=68 strip)
+                { minX: 68.02 * TILE_SIZE, maxX: 68.95 * TILE_SIZE, minY: 76.05 * TILE_SIZE, maxY: 146.95 * TILE_SIZE },
+                // South Double-Fence Wall (62px thick solid barrier)
+                { minX: 56.05 * TILE_SIZE, maxX: 68.95 * TILE_SIZE, minY: 145.88 * TILE_SIZE, maxY: 146.95 * TILE_SIZE },
+                // North-West & North-East Perimeter Walls
+                { minX: 56.05 * TILE_SIZE, maxX: 60.85 * TILE_SIZE, minY: 76.05 * TILE_SIZE, maxY: 76.92 * TILE_SIZE },
+                { minX: 63.15 * TILE_SIZE, maxX: 68.95 * TILE_SIZE, minY: 76.05 * TILE_SIZE, maxY: 76.92 * TILE_SIZE },
+                // North Main Gatehouse Steel-Bar Vehicle Barrier (blocks 100% of cars/bikes; allows on-foot breach with 3★ alarm)
+                { minX: 60.80 * TILE_SIZE, maxX: 63.20 * TILE_SIZE, minY: 76.08 * TILE_SIZE, maxY: 76.85 * TILE_SIZE, vehiclesOnly: true },
+                // Internal Courtyard Divider Walls (y = 103.5) + Vehicle Barrier at center gate
+                { minX: 56.05 * TILE_SIZE, maxX: 61.00 * TILE_SIZE, minY: 103.15 * TILE_SIZE, maxY: 103.85 * TILE_SIZE },
+                { minX: 63.00 * TILE_SIZE, maxX: 68.95 * TILE_SIZE, minY: 103.15 * TILE_SIZE, maxY: 103.85 * TILE_SIZE },
+                { minX: 60.95 * TILE_SIZE, maxX: 63.05 * TILE_SIZE, minY: 103.18 * TILE_SIZE, maxY: 103.82 * TILE_SIZE, vehiclesOnly: true }
             ],
             gates: [
-                { x: 62.0 * TILE_SIZE, y: prisY0, w: 3.6 * TILE_SIZE, ang: 0, label: "PENITENTIARY MAIN GATE" }
+                { x: 62.0 * TILE_SIZE, y: prisY0,   w: 2.4 * TILE_SIZE, boothX: 60.1 * TILE_SIZE, boothY: 76.5 * TILE_SIZE, label: "PENITENTIARY MAIN SALLY-PORT" },
+                { x: 62.0 * TILE_SIZE, y: prisMidY, w: 2.0 * TILE_SIZE, boothX: 60.2 * TILE_SIZE, boothY: 103.5 * TILE_SIZE, label: "YARD SECURITY CHECKPOINT" }
             ],
             towers: [
-                { x: 57.0 * TILE_SIZE, y: 79.0 * TILE_SIZE,  baseAng: 0.6 },
-                { x: 67.0 * TILE_SIZE, y: 79.0 * TILE_SIZE,  baseAng: 2.4 },
-                { x: 67.0 * TILE_SIZE, y: 100.0 * TILE_SIZE, baseAng: 2.6 },
-                { x: 67.0 * TILE_SIZE, y: 143.0 * TILE_SIZE, baseAng: -2.2 },
-                { x: 57.0 * TILE_SIZE, y: 143.0 * TILE_SIZE, baseAng: -0.8 }
+                { x: 56.55 * TILE_SIZE, y: 76.6 * TILE_SIZE,  baseAng: 0.7 },
+                { x: 68.45 * TILE_SIZE, y: 76.6 * TILE_SIZE,  baseAng: 2.4 },
+                { x: 56.55 * TILE_SIZE, y: 103.5 * TILE_SIZE, baseAng: 0.2 },
+                { x: 68.45 * TILE_SIZE, y: 103.5 * TILE_SIZE, baseAng: 2.8 },
+                { x: 56.55 * TILE_SIZE, y: 124.5 * TILE_SIZE, baseAng: -0.2 },
+                { x: 68.45 * TILE_SIZE, y: 124.5 * TILE_SIZE, baseAng: -2.8 },
+                { x: 56.55 * TILE_SIZE, y: 146.3 * TILE_SIZE, baseAng: -0.7 },
+                { x: 68.45 * TILE_SIZE, y: 146.3 * TILE_SIZE, baseAng: -2.4 }
             ]
         };
 
@@ -1190,6 +1228,9 @@ class LeonidaMap {
         this.securityFenceSpans = [
             ...this.prisonCompound.spans,
             ...this.airportCompound.spans
+        ];
+        this.securityBarrierBoxes = [
+            ...this.prisonCompound.barrierBoxes
         ];
 
         // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
@@ -1775,12 +1816,12 @@ class LeonidaMap {
                 short: "PRISON",
                 shortName: "LEONIDA PENITENTIARY",
                 name: "🚨 LEONIDA STATE PENITENTIARY (KELLY COUNTY)",
-                sub: "ENTERABLE WALLED PRISON FORTRESS, 8 GUARD WATCHTOWERS & EXERCISE YARD — JAIL FREE CARD!",
+                sub: "MAXIMUM-SECURITY PRISON FORTRESS, 8 GUARD WATCHTOWERS, ORANGE-JUMPSUIT INMATES & EXERCISE YARD!",
                 district: "LEONIDA STATE PENITENTIARY",
-                bx: mx256(31.5),
-                by: my256(76.5),
-                x: mx256(31.5) * TILE_SIZE,
-                y: my256(76.5) * TILE_SIZE,
+                bx: 62.0,
+                by: 75.2,
+                x: 62.0 * TILE_SIZE,
+                y: 75.2 * TILE_SIZE,
                 color: "#f87171",
                 perk: "ESTATE",
                 visited: false
@@ -3180,36 +3221,76 @@ class LeonidaMap {
             }
         }
 
+        // Physical collision against Solid Security Barrier Boxes (Leonida State Penitentiary Double-Fence Perimeter & Gatehouses)
+        if (this.securityBarrierBoxes && this.securityBarrierBoxes.length > 0 && (currentZBlocks === null || currentZBlocks < 2.8)) {
+            for (let pass = 0; pass < 2; pass++) {
+                for (let i = 0; i < this.securityBarrierBoxes.length; i++) {
+                    const bb = this.securityBarrierBoxes[i];
+                    if (bb.vehiclesOnly && radius < 11.5) continue;
+                    if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
+
+                    const clX = Math.max(bb.minX, Math.min(nx, bb.maxX));
+                    const clY = Math.max(bb.minY, Math.min(ny, bb.maxY));
+                    const ddx = nx - clX;
+                    const ddy = ny - clY;
+                    const distSq = ddx * ddx + ddy * ddy;
+
+                    if (distSq < radius * radius) {
+                        hit = true;
+                        if (distSq > 0.0001) {
+                            const dist = Math.sqrt(distSq);
+                            const overlap = radius - dist;
+                            nx += (ddx / dist) * overlap;
+                            ny += (ddy / dist) * overlap;
+                        } else {
+                            // Center is inside the box: push out along nearest face
+                            const dLeft = nx - bb.minX;
+                            const dRight = bb.maxX - nx;
+                            const dTop = ny - bb.minY;
+                            const dBot = bb.maxY - ny;
+                            const m = Math.min(dLeft, dRight, dTop, dBot);
+                            if (m === dLeft) nx = bb.minX - radius;
+                            else if (m === dRight) nx = bb.maxX + radius;
+                            else if (m === dTop) ny = bb.minY - radius;
+                            else ny = bb.maxY + radius;
+                        }
+                    }
+                }
+            }
+        }
+
         // Physical collision against 3D Perimeter Security Fences (VCIA Airport & Leonida State Penitentiary)
         if (this.securityFenceSpans && this.securityFenceSpans.length > 0 && (currentZBlocks === null || currentZBlocks < 2.8)) {
-            const fenceRadius = radius + 2.5;
+            const fenceRadius = radius + 6.5;
             const fenceRadSq = fenceRadius * fenceRadius;
-            for (let i = 0; i < this.securityFenceSpans.length; i++) {
-                const sp = this.securityFenceSpans[i];
-                const minX = Math.min(sp.xA, sp.xB) - fenceRadius;
-                const maxX = Math.max(sp.xA, sp.xB) + fenceRadius;
-                const minY = Math.min(sp.yA, sp.yB) - fenceRadius;
-                const maxY = Math.max(sp.yA, sp.yB) + fenceRadius;
-                if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
+            for (let pass = 0; pass < 2; pass++) {
+                for (let i = 0; i < this.securityFenceSpans.length; i++) {
+                    const sp = this.securityFenceSpans[i];
+                    const minX = Math.min(sp.xA, sp.xB) - fenceRadius;
+                    const maxX = Math.max(sp.xA, sp.xB) + fenceRadius;
+                    const minY = Math.min(sp.yA, sp.yB) - fenceRadius;
+                    const maxY = Math.max(sp.yA, sp.yB) + fenceRadius;
+                    if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
 
-                const vx = sp.xB - sp.xA;
-                const vy = sp.yB - sp.yA;
-                const lenSq = vx * vx + vy * vy;
-                const t = lenSq > 0.001 ? Math.max(0.0, Math.min(1.0, ((nx - sp.xA) * vx + (ny - sp.yA) * vy) / lenSq)) : 0.0;
-                const cx = sp.xA + t * vx;
-                const cy = sp.yA + t * vy;
-                const ddx = nx - cx;
-                const ddy = ny - cy;
-                const distSq = ddx * ddx + ddy * ddy;
-                if (distSq < fenceRadSq) {
-                    hit = true;
-                    const dist = Math.sqrt(distSq) || 0.001;
-                    const overlap = fenceRadius - dist;
-                    if (dist > 0.01) {
-                        nx += (ddx / dist) * overlap;
-                        ny += (ddy / dist) * overlap;
-                    } else {
-                        nx += fenceRadius;
+                    const vx = sp.xB - sp.xA;
+                    const vy = sp.yB - sp.yA;
+                    const lenSq = vx * vx + vy * vy;
+                    const t = lenSq > 0.001 ? Math.max(0.0, Math.min(1.0, ((nx - sp.xA) * vx + (ny - sp.yA) * vy) / lenSq)) : 0.0;
+                    const cx = sp.xA + t * vx;
+                    const cy = sp.yA + t * vy;
+                    const ddx = nx - cx;
+                    const ddy = ny - cy;
+                    const distSq = ddx * ddx + ddy * ddy;
+                    if (distSq < fenceRadSq) {
+                        hit = true;
+                        const dist = Math.sqrt(distSq) || 0.001;
+                        const overlap = fenceRadius - dist;
+                        if (dist > 0.01) {
+                            nx += (ddx / dist) * overlap;
+                            ny += (ddy / dist) * overlap;
+                        } else {
+                            nx += fenceRadius;
+                        }
                     }
                 }
             }

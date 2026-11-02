@@ -4656,66 +4656,224 @@ class RetroRenderer {
         }
 
         // 10) Leonida State Penitentiary & VCIA International Airport 3D Chain-Link Security Fences, Razor Wire, Checkpoints & Searchlights
-        const drawSecurityFenceSpan = (xA, yA, xB, yB, bz = 2.0) => {
+        const drawSecurityFenceSpan = (xA, yA, xB, yB, bz = 2.0, isPrison = false) => {
             if (Math.max(xA, xB) < minX - 60 || Math.min(xA, xB) > maxX + 60 || Math.max(yA, yB) < minY - 60 || Math.min(yA, yB) > maxY + 60) return;
             const dx = xB - xA, dy = yB - yA;
             const len = Math.hypot(dx, dy);
             const ang = Math.atan2(dy, dx);
             const cx = (xA + xB) * 0.5, cy = (yA + yB) * 0.5;
-            // Ground shadow + lower mesh rail + galvanized chain-link mesh + upper razor-wire top rail
-            this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.015, len, 4.0, ang, 0.02, 0.03, 0.05, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
-            this.pushSolidQuad3D(cx, cy, bz + 0.08,  len, 3.2, ang, 0.44, 0.48, 0.54, 0.90, SPRITE_DRAW_ORDER.CAR);
-            this.pushSolidQuad3D(cx, cy, bz + 0.16,  len, 2.6, ang, 0.66, 0.70, 0.76, 0.94, SPRITE_DRAW_ORDER.TREES);
-            this.pushSolidQuad3D(cx, cy, bz + 0.22,  len, 4.2, ang, 0.84, 0.88, 0.94, 0.88, SPRITE_DRAW_ORDER.TREES);
-            const steps = Math.max(2, Math.floor(len / 36));
+            // Ground shadow + dark concrete security curb + galvanized chain-link mesh + upper concertina razor-wire coil
+            this.pushSolidQuad3D(cx + sunCos * 5, cy + sunSin * 5, bz + 0.015, len, isPrison ? 6.0 : 4.2, ang, 0.02, 0.03, 0.05, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            this.pushSolidQuad3D(cx, cy, bz + 0.035, len, isPrison ? 6.8 : 4.6, ang, 0.18, 0.21, 0.26, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushSolidQuad3D(cx, cy, bz + 0.11,  len, isPrison ? 4.2 : 3.2, ang, 0.42, 0.46, 0.52, 0.94, SPRITE_DRAW_ORDER.CAR);
+            this.pushSolidQuad3D(cx, cy, bz + 0.20,  len, isPrison ? 3.4 : 2.6, ang, 0.68, 0.72, 0.78, 0.96, SPRITE_DRAW_ORDER.TREES);
+            this.pushSolidQuad3D(cx, cy, bz + 0.28,  len, isPrison ? 5.2 : 4.2, ang, 0.88, 0.91, 0.96, 0.92, SPRITE_DRAW_ORDER.TREES);
+            const stepDist = isPrison ? 28 : 36;
+            const steps = Math.max(2, Math.floor(len / stepDist));
             for (let s = 0; s <= steps; s++) {
                 const px = xA + (dx * s) / steps;
                 const py = yA + (dy * s) / steps;
                 if (px < minX - 32 || px > maxX + 32 || py < minY - 32 || py > maxY + 32) continue;
-                this.pushSolidQuad3D(px, py, bz + 0.15, 5.2, 5.2, 0, 0.28, 0.32, 0.38, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(px, py, bz + 0.18, isPrison ? 6.4 : 5.2, isPrison ? 6.4 : 5.2, 0, 0.22, 0.26, 0.32, 0.99, SPRITE_DRAW_ORDER.TREES);
+                if (isPrison && s % 2 === 0) {
+                    this.pushSolidQuad3D(px, py, bz + 0.30, 3.6, 3.6, 0.785, 0.95, 0.75, 0.15, 0.95, SPRITE_DRAW_ORDER.TREES);
+                }
             }
         };
 
         const pris = this.map.prisonCompound;
-        if (pris && pris.x1 >= minX - 120 && pris.x0 <= maxX + 120 && pris.y1 >= minY - 120 && pris.y0 <= maxY + 120) {
+        if (pris && pris.x1 >= minX - 140 && pris.x0 <= maxX + 140 && pris.y1 >= minY - 140 && pris.y0 <= maxY + 140) {
             const bz = pris.z || 2.0;
+            const pScale = 1.34;
+
+            // 10.1 Dark Gunmetal No-Man's-Land Security Strip between the Inner & Outer Perimeter Fences (West, East & South)
+            const stripW = pris.x1 - pris.inX1;
+            const totalH = pris.y1 - pris.y0;
+            const midStripY = (pris.y0 + pris.y1) * 0.5;
+            this.pushSolidQuad3D((pris.inX1 + pris.x1) * 0.5, midStripY, bz + 0.012, stripW, totalH, 0, 0.16, 0.19, 0.24, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            this.pushSolidQuad3D((pris.x0 + pris.inX0) * 0.5, midStripY, bz + 0.012, stripW, totalH, 0, 0.16, 0.19, 0.24, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            this.pushSolidQuad3D((pris.x0 + pris.x1) * 0.5, (pris.inY1 + pris.y1) * 0.5, bz + 0.012, pris.x1 - pris.x0, pris.y1 - pris.inY1, 0, 0.16, 0.19, 0.24, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+            // 10.2 Double-Row 3D Chain-Link & Concertina Razor-Wire Perimeter Fences
             if (Array.isArray(pris.spans)) {
                 for (let si = 0; si < pris.spans.length; si++) {
                     const sp = pris.spans[si];
-                    drawSecurityFenceSpan(sp.xA, sp.yA, sp.xB, sp.yB, bz);
+                    drawSecurityFenceSpan(sp.xA, sp.yA, sp.xB, sp.yB, bz, true);
                 }
             }
 
-            // Rotating Watchtower Searchlight Cones
-            for (let ti = 0; ti < pris.towers.length; ti++) {
-                const tw = pris.towers[ti];
-                const sAng = tw.baseAng + Math.sin(this.time * 1.15 + ti * 1.4) * 0.65;
-                const beamX = tw.x + Math.cos(sAng) * 95;
-                const beamY = tw.y + Math.sin(sAng) * 95;
-                this.pushSolidQuad3D(beamX, beamY, bz + 0.022, 42, 42, sAng, 1.0, 0.95, 0.68, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(beamX, beamY, bz + 0.025, 22, 22, sAng, 1.0, 0.98, 0.82, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            // 10.3 3D Sally-Port Gatehouses & Heavy Steel-Bar Vehicle Barriers (North Main Gate & Internal Yard Checkpoint)
+            if (Array.isArray(pris.gates)) {
+                for (let gi = 0; gi < pris.gates.length; gi++) {
+                    const gt = pris.gates[gi];
+                    if (gt.x < minX - 180 || gt.x > maxX + 180 || gt.y < minY - 180 || gt.y > maxY + 180) continue;
+                    // Yellow & Black Hazard Security Stripes across the gate threshold
+                    this.pushSolidQuad3D(gt.x, gt.y, bz + 0.018, gt.w, 16, 0, 0.14, 0.16, 0.20, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const nStripes = Math.floor(gt.w / 18);
+                    for (let st = 0; st < nStripes; st++) {
+                        const sx = gt.x - gt.w * 0.5 + 9 + st * 18;
+                        this.pushSolidQuad3D(sx, gt.y, bz + 0.022, 9, 12, 0.35, 0.96, 0.76, 0.12, 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    // Heavy Overhead Steel-Bar Prison Gate Portal + Vertical Steel Bars blocking vehicles
+                    this.pushSolidQuad3D(gt.x, gt.y, bz + 0.32, gt.w + 10, 8, 0, 0.24, 0.28, 0.34, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(gt.x, gt.y, bz + 0.35, gt.w * 0.75, 4, 0, 0.92, 0.22, 0.18, 0.96, SPRITE_DRAW_ORDER.TREES);
+                    const nBars = Math.floor(gt.w / 14);
+                    for (let bi = 0; bi <= nBars; bi++) {
+                        const bx = gt.x - gt.w * 0.5 + (gt.w * bi) / nBars;
+                        this.pushSolidQuad3D(bx, gt.y, bz + 0.16, 4.2, 6.5, 0, 0.30, 0.35, 0.42, 0.98, SPRITE_DRAW_ORDER.CAR);
+                    }
+                    // 3D Guardhouse Booth beside the gate + flashing red strobe
+                    if (gt.boothX && gt.boothY) {
+                        this.pushSolidQuad3D(gt.boothX + sunCos * 5, gt.boothY + sunSin * 5, bz + 0.016, 36, 28, 0, 0.02, 0.03, 0.06, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(gt.boothX, gt.boothY, bz + 0.12, 34, 26, 0, 0.28, 0.32, 0.38, 0.98, SPRITE_DRAW_ORDER.CAR);
+                        this.pushSolidQuad3D(gt.boothX, gt.boothY, bz + 0.24, 30, 22, 0, 0.14, 0.20, 0.28, 0.98, SPRITE_DRAW_ORDER.TREES);
+                        this.pushSolidQuad3D(gt.boothX, gt.boothY, bz + 0.34, 36, 28, 0, 0.42, 0.46, 0.54, 0.99, SPRITE_DRAW_ORDER.TREES);
+                        const beaconOn = Math.sin(this.time * 9.0 + gi * 1.7) >= 0;
+                        this.pushSolidQuad3D(gt.boothX, gt.boothY, bz + 0.38, 7, 7, 0, beaconOn ? 1.0 : 0.2, beaconOn ? 0.15 : 0.65, beaconOn ? 0.15 : 1.0, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        this.batchPedSprite3D("g2_swat", 0, gt.boothX + 24, gt.boothY + 12, bz + 0.04, Math.PI * 0.5, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("police", 0, gt.x + gt.w * 0.5 + 16, gt.y + 14, bz + 0.04, -Math.PI * 0.5, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                }
             }
 
-            // Basketball Hoops & Inmates in the Exercise Yard (g2_prisoner & g2_krishna) + Patrolling Guards
-            this.pushSolidQuad3D(pris.courtX, pris.courtY - 110, bz + 0.14, 18, 4, 0, 0.95, 0.96, 0.98, 0.95, SPRITE_DRAW_ORDER.TREES);
-            this.pushSolidQuad3D(pris.courtX, pris.courtY + 110, bz + 0.14, 18, 4, 0, 0.95, 0.96, 0.98, 0.95, SPRITE_DRAW_ORDER.TREES);
-            for (let pi = 0; pi < 8; pi++) {
-                const isCourt = pi < 4;
-                const px = isCourt
-                    ? pris.courtX + ((pi % 2 === 0) ? -22 : 22) + Math.sin(this.time * 2.2 + pi) * 16
-                    : pris.courtX + ((pi % 2 === 0) ? -115 : 115);
-                const py = isCourt
-                    ? pris.courtY + (pi - 1.5) * 38 + Math.cos(this.time * 1.9 + pi) * 18
-                    : pris.courtY + (pi - 5.5) * 52 + Math.sin(this.time * 1.4 + pi) * 28;
-                const pAng = this.time * (isCourt ? 1.5 : 0.6) + pi * 1.57;
-                const fr = Math.floor(this.time * 6.5 + pi * 2) % 8;
-                this.batchPedSprite3D((pi % 2 === 0) ? "g2_prisoner" : "g2_krishna", fr, px, py, bz + 0.038, pAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            // 10.4 8 3D Concrete Guard Watchtowers along West & East Walls + Armed Tower Snipers & Rotating Searchlight Cones
+            for (let ti = 0; ti < pris.towers.length; ti++) {
+                const tw = pris.towers[ti];
+                if (tw.x >= minX - 180 && tw.x <= maxX + 180 && tw.y >= minY - 180 && tw.y <= maxY + 180) {
+                    // 3D Stacked Concrete Watchtower Structure
+                    this.pushSolidQuad3D(tw.x + sunCos * 7, tw.y + sunSin * 7, bz + 0.016, 40, 40, 0, 0.02, 0.03, 0.06, 0.40, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(tw.x, tw.y, bz + 0.12, 34, 34, 0, 0.30, 0.34, 0.40, 0.98, SPRITE_DRAW_ORDER.CAR);
+                    this.pushSolidQuad3D(tw.x, tw.y, bz + 0.26, 30, 30, 0, 0.40, 0.45, 0.52, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(tw.x, tw.y, bz + 0.38, 38, 38, 0, 0.20, 0.24, 0.30, 0.99, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(tw.x, tw.y, bz + 0.42, 32, 32, 0, 0.52, 0.56, 0.64, 0.99, SPRITE_DRAW_ORDER.TREES);
+                    const sAng = tw.baseAng + Math.sin(this.time * 1.15 + ti * 1.4) * 0.65;
+                    this.batchPedSprite3D("g2_swat", 0, tw.x, tw.y, bz + 0.44, sAng, 1.18, false, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    const beamX = tw.x + Math.cos(sAng) * 95;
+                    const beamY = tw.y + Math.sin(sAng) * 95;
+                    this.pushSolidQuad3D(beamX, beamY, bz + 0.022, 44, 44, sAng, 1.0, 0.95, 0.68, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(beamX, beamY, bz + 0.025, 22, 22, sAng, 1.0, 0.98, 0.82, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
             }
-            for (let gi = 0; gi < 3; gi++) {
-                const gx = pris.x1 + 26;
-                const gy = pris.y0 + 180 + gi * 420 + Math.sin(this.time * 0.9 + gi) * 90;
-                const gAng = (Math.cos(this.time * 0.9 + gi) >= 0) ? Math.PI * 0.5 : -Math.PI * 0.5;
-                this.batchPedSprite3D((gi % 2 === 0) ? "police" : "g2_swat", Math.floor(this.time * 4.5 + gi) % 8, gx, gy, bz + 0.038, gAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+
+            // 10.5 Outdoor Prison Weightlifting Benches ("gym_bench") & Lifters in Central Plaza (r=97..101) & Upper Exercise Lawn (r=108..114)
+            const prisonGymBenches = [
+                { x: 58.6 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: 0 },
+                { x: 65.4 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: Math.PI },
+                { x: 59.2 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
+                { x: 62.0 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
+                { x: 64.8 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
+                { x: 60.5 * TILE_SIZE, y: 113.5 * TILE_SIZE, ang: Math.PI },
+                { x: 63.5 * TILE_SIZE, y: 113.5 * TILE_SIZE, ang: Math.PI }
+            ];
+            for (let bi = 0; bi < prisonGymBenches.length; bi++) {
+                const gb = prisonGymBenches[bi];
+                if (gb.x < minX - 64 || gb.x > maxX + 64 || gb.y < minY - 64 || gb.y > maxY + 64) continue;
+                this.batchObjectSprite3D("gym_bench", gb.x, gb.y, bz + 0.022, gb.ang, 1.15, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                // Prisoner lying on bench pressing barbell + spotter in bright orange jumpsuit!
+                this.batchPedSprite3D("g2_prisoner", 42, gb.x, gb.y, bz + 0.036, gb.ang, pScale * 0.95, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                const spotFr = 50 + (Math.floor(this.time * 5.0 + bi) % 4);
+                this.batchPedSprite3D("g2_prisoner", spotFr, gb.x + Math.cos(gb.ang) * 20, gb.y + Math.sin(gb.ang) * 20, bz + 0.038, gb.ang + Math.PI, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+
+            // 10.6 Orange-Jumpsuit Prisoners ("g2_prisoner") across North Cellblock Walkways (r=80..95), Central Roll-Call Plaza (r=96..102) & Upper Exercise Lawn (r=105..115)
+            const yardGroups = [
+                // North Reception & Cellblock Walkways (r = 79..94)
+                { x: 58.5 * TILE_SIZE, y: 81.0 * TILE_SIZE, rx: 18, ry: 36, spd: 1.1, seed: 0.4 },
+                { x: 65.5 * TILE_SIZE, y: 81.0 * TILE_SIZE, rx: 18, ry: 36, spd: 1.2, seed: 1.7 },
+                { x: 58.3 * TILE_SIZE, y: 89.5 * TILE_SIZE, rx: 14, ry: 48, spd: 1.0, seed: 2.9 },
+                { x: 65.7 * TILE_SIZE, y: 89.5 * TILE_SIZE, rx: 14, ry: 48, spd: 1.1, seed: 4.1 },
+                // Central Roll-Call Plaza (r = 96.5..102.0 — directly visible in upper yard!)
+                { x: 60.2 * TILE_SIZE, y: 97.5 * TILE_SIZE, rx: 32, ry: 14, spd: 1.3, seed: 0.8 },
+                { x: 63.8 * TILE_SIZE, y: 97.5 * TILE_SIZE, rx: 32, ry: 14, spd: 1.2, seed: 2.2 },
+                { x: 61.0 * TILE_SIZE, y: 101.2 * TILE_SIZE, rx: 36, ry: 12, spd: 1.1, seed: 3.5 },
+                { x: 64.2 * TILE_SIZE, y: 101.2 * TILE_SIZE, rx: 36, ry: 12, spd: 1.4, seed: 5.0 },
+                // Upper-Middle Grass Exercise Lawn (r = 105.5..115.0 — directly visible in middle yard!)
+                { x: 58.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, rx: 28, ry: 22, spd: 1.2, seed: 1.1 },
+                { x: 65.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, rx: 28, ry: 22, spd: 1.3, seed: 2.6 },
+                { x: 58.6 * TILE_SIZE, y: 112.0 * TILE_SIZE, rx: 24, ry: 34, spd: 1.1, seed: 3.9 },
+                { x: 66.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, rx: 24, ry: 34, spd: 1.2, seed: 5.4 }
+            ];
+            for (let yi = 0; yi < yardGroups.length; yi++) {
+                const yg = yardGroups[yi];
+                const t = this.time * yg.spd + yg.seed;
+                const px = yg.x + Math.cos(t) * yg.rx;
+                const py = yg.y + Math.sin(t) * yg.ry;
+                if (px < minX - 48 || px > maxX + 48 || py < minY - 48 || py > maxY + 48) continue;
+                const vx = -Math.sin(t) * yg.rx;
+                const vy = Math.cos(t) * yg.ry;
+                const pAng = Math.atan2(vy, vx);
+                const fr = Math.floor(this.time * 6.5 + yi * 3) % 8;
+                this.batchPedSprite3D("g2_prisoner", fr, px, py, bz + 0.038, pAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+
+            // 10.7 Central Concrete Basketball Court (c=59..64, r=117..130): Painted Court Lines, 3D Hoops, Arcing Basketball & 8 Orange-Jumpsuit Players
+            const cx = pris.courtX, cy = pris.courtY;
+            if (cx >= minX - 240 && cx <= maxX + 240 && cy >= minY - 280 && cy <= maxY + 280) {
+                // Crisp painted white court boundary lines, center line & orange key paint
+                this.pushSolidQuad3D(cx, cy, bz + 0.012, 168, 256, 0, 0.22, 0.26, 0.32, 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy, bz + 0.015, 156, 244, 0, 0.34, 0.38, 0.44, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy - 92, bz + 0.018, 56, 52, 0, 0.88, 0.38, 0.12, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy + 92, bz + 0.018, 56, 52, 0, 0.88, 0.38, 0.12, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy, bz + 0.018, 156, 3, 0, 0.95, 0.96, 0.98, 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // North & South 3D Basketball Backboards + Orange Hoops
+                this.pushSolidQuad3D(cx, cy - 116, bz + 0.18, 26, 4.5, 0, 0.96, 0.97, 0.99, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(cx, cy - 110, bz + 0.15, 9, 9, 0, 0.98, 0.42, 0.08, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(cx, cy + 116, bz + 0.18, 26, 4.5, 0, 0.96, 0.97, 0.99, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(cx, cy + 110, bz + 0.15, 9, 9, 0, 0.98, 0.42, 0.08, 0.98, SPRITE_DRAW_ORDER.TREES);
+                // Animated 3D Orange Basketball arcing toward the hoops!
+                const ballPh = (this.time * 0.95) % 2.0;
+                const ballT = ballPh < 1.0 ? ballPh : (2.0 - ballPh);
+                const ballX = cx + Math.sin(this.time * 1.9) * 18;
+                const ballY = (cy - 106) + ballT * 212;
+                const ballZ = bz + 0.06 + Math.sin(ballT * Math.PI) * 0.24;
+                this.pushSolidQuad3D(ballX, ballY, bz + 0.02, 6, 6, 0, 0.02, 0.03, 0.06, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(ballX, ballY, ballZ, 7.5, 7.5, this.time * 4.0, 0.98, 0.45, 0.08, 0.99, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+
+                for (let pi = 0; pi < 8; pi++) {
+                    const isCourt = pi < 6;
+                    const px = isCourt
+                        ? cx + ((pi % 2 === 0) ? -32 : 32) + Math.sin(this.time * 2.3 + pi) * 20
+                        : cx + ((pi % 2 === 0) ? -102 : 102);
+                    const py = isCourt
+                        ? cy + (pi - 2.5) * 34 + Math.cos(this.time * 2.0 + pi) * 22
+                        : cy + (pi - 6.5) * 48;
+                    const pAng = Math.atan2(ballY - py, ballX - px);
+                    const fr = isCourt ? (Math.floor(this.time * 7.0 + pi * 2) % 8) : (50 + (Math.floor(this.time * 5.5 + pi) % 4));
+                    this.batchPedSprite3D("g2_prisoner", fr, px, py, bz + 0.038, pAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+
+            // 10.8 South Yard Fight Ring (c=61.5, r=141.5): 2 Prisoners Brawling surrounded by Cheering Orange-Jumpsuit Inmates
+            const fightX = 62.0 * TILE_SIZE, fightY = 141.5 * TILE_SIZE;
+            if (fightX >= minX - 160 && fightX <= maxX + 160 && fightY >= minY - 160 && fightY <= maxY + 160) {
+                const fAng = this.time * 2.4;
+                const fFr = 50 + (Math.floor(this.time * 8.0) % 4);
+                this.batchPedSprite3D("g2_prisoner", fFr, fightX + Math.cos(fAng) * 11, fightY + Math.sin(fAng) * 11, bz + 0.038, fAng + Math.PI, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("g2_prisoner", fFr, fightX - Math.cos(fAng) * 11, fightY - Math.sin(fAng) * 11, bz + 0.038, fAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                for (let ci = 0; ci < 6; ci++) {
+                    const ca = (ci / 6) * Math.PI * 2 + 0.2;
+                    const cFr = 50 + (Math.floor(this.time * 6.0 + ci) % 4);
+                    this.batchPedSprite3D("g2_prisoner", cFr, fightX + Math.cos(ca) * 36, fightY + Math.sin(ca) * 36, bz + 0.038, ca + Math.PI, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+
+            // 10.9 Armed Correctional Officers ("police" & "g2_swat") patrolling inside the prison yard
+            const guardPatrols = [
+                { x: 66.8 * TILE_SIZE, y: 96.5 * TILE_SIZE,  dx: 0,  dy: 45, seed: 0.3 },
+                { x: 57.6 * TILE_SIZE, y: 103.5 * TILE_SIZE, dx: 35, dy: 0,  seed: 1.6 },
+                { x: 66.8 * TILE_SIZE, y: 112.0 * TILE_SIZE, dx: 0,  dy: 55, seed: 2.9 },
+                { x: 57.8 * TILE_SIZE, y: 124.0 * TILE_SIZE, dx: 0,  dy: 55, seed: 4.2 },
+                { x: 66.5 * TILE_SIZE, y: 138.0 * TILE_SIZE, dx: 0,  dy: 45, seed: 5.5 }
+            ];
+            for (let gi = 0; gi < guardPatrols.length; gi++) {
+                const gp = guardPatrols[gi];
+                const ph = Math.sin(this.time * 0.95 + gp.seed);
+                const gx = gp.x + gp.dx * ph;
+                const gy = gp.y + gp.dy * ph;
+                if (gx < minX - 48 || gx > maxX + 48 || gy < minY - 48 || gy > maxY + 48) continue;
+                const dirSign = Math.cos(this.time * 0.95 + gp.seed) >= 0 ? 1 : -1;
+                const gAng = Math.atan2(gp.dy * dirSign, gp.dx * dirSign);
+                this.batchPedSprite3D((gi % 2 === 0) ? "police" : "g2_swat", Math.floor(this.time * 4.8 + gi) % 8, gx, gy, bz + 0.038, gAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
 
@@ -5112,7 +5270,7 @@ class RetroRenderer {
             { key: "g2_russian",      shirt: [98, 62, 36],    pants: [44, 44, 52],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light },
             { key: "g2_redneck_red",  shirt: [238, 236, 226], pants: JEANS,           sleeves: "tank",  legs: "pants",  hair: H.red, skin: SK.light },
             { key: "g2_redneck_blond",shirt: [200, 40, 40],   pants: JEANS,           sleeves: "short", legs: "pants",  hair: H.blond, skin: SK.light, pattern: "plaid", shirt2: [40, 30, 34] },
-            { key: "g2_prisoner",     shirt: [255, 116, 24],  pants: [255, 116, 24],  sleeves: "short", legs: "pants",  hairMode: "bald", skin: SK.brown },
+            { key: "g2_prisoner",     shirt: [255, 102, 8],   pants: [255, 102, 8],   sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.tan, pattern: "jacket", shirt2: [248, 250, 252] },
             { key: "g2_mugger",       shirt: [36, 36, 42],    pants: [62, 66, 80],    sleeves: "long",  legs: "pants",  hairMode: "hood", skin: SK.tan },
             { key: "g2_hulk",         shirt: [96, 204, 64],   pants: [118, 44, 158],  sleeves: "bare",  legs: "shorts", hair: H.black, skin: [96, 204, 64] },
             // --- GTA 2 civilian dummy remaps (26..52) ---
@@ -5153,8 +5311,8 @@ class RetroRenderer {
             "vc_hawaiian_red", "vc_tourist", "vc_tommy", "vc_crockett", "vc_tubbs", "vc_jogger",
             "vc_sailor", "vc_bodybuilder",
             "g2_civ_redtee", "g2_civ_greysuit", "vc_hawaiian_red", "vc_tourist", "g2_civ_aqua", "g2_civ_pink",
-            // rarer street icons & off-duty services
-            "g2_elvis", "g2_krishna", "g2_medic", "g2_fireman", "g2_scientist", "g2_prisoner",
+            // rarer street icons & off-duty services (prisoners stay strictly inside Leonida State Penitentiary!)
+            "g2_elvis", "g2_krishna", "g2_medic", "g2_fireman", "g2_scientist",
             "g2_swat", "g2_army", "g2_hulk",
             // keep a few original GTA 1 civilians in the mix
             "civ0", "civ1", "civ2", "civ3"
@@ -5376,13 +5534,20 @@ class RetroRenderer {
             let pedType = ped.g24Type;
             const pbx = Math.floor(ped.x / TILE_SIZE);
             const pby = Math.floor(ped.y / TILE_SIZE);
+            const isPrisonZone =
+                ped.missionTag === "PRISONER" ||
+                (pbx >= 56 && pbx <= 68 && pby >= 76 && pby <= 146);
             const isBeachZone =
                 ped.missionTag === "BEACH" ||
                 ped.x >= mx256(218.2) * TILE_SIZE ||
                 (this.map && this.map.coastalSandMask && this.map.coastalSandMask[pby * MAP_COLS + pbx] === 1) ||
                 (pbx >= MAP_X_256[182] && pbx <= MAP_X_256[195] && pby >= MAP_Y_256[98] && pby <= MAP_Y_256[128]);
 
-            if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
+            if (isPrisonZone && ped.kind !== "COP") {
+                pedType = "g2_prisoner";
+                ped.g24Type = "g2_prisoner";
+                ped.g2Remapped = true;
+            } else if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
                 const beachPool = [
                     "bikini_pink", "bikini_cyan", "bikini_yellow",
                     "bikini_red", "bikini_white", "bikini_pink", "surfer_guy"

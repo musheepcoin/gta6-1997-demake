@@ -569,8 +569,67 @@ class LeonidaGame {
             ped.targetBy = null;
         }
         this.populateNearbySidewalks(this.player.x, this.player.y, 32, 14);
+        this.seedPenitentiaryInmatesAndGuards();
         this.currentDistrict = this.map.getDistrictName(this.player.x, this.player.y);
         this.districtPopupTimer = 0;
+    }
+
+    seedPenitentiaryInmatesAndGuards() {
+        if (!this.map || !this.map.cmpLoaded) return;
+        // Pre-seed interactive Orange-Jumpsuit Prison Inmates & Correctional Officers across all courtyards of Leonida State Penitentiary (c=57..67, r=78..144)
+        const inmateSpots = [
+            [58.5, 78.5], [64.5, 78.5], [58.5, 85.5], [65.5, 85.5], [58.5, 92.5], [65.5, 92.5],
+            [58.5, 97.5], [61.5, 98.5], [64.5, 97.5], [59.5, 101.5], [63.5, 101.5],
+            [58.5, 106.5], [65.5, 106.5], [59.5, 110.5], [62.5, 111.5], [65.5, 110.5],
+            [58.5, 114.5], [64.5, 114.5], [60.5, 120.5], [63.5, 126.5], [59.5, 136.5], [63.5, 141.5]
+        ];
+        for (let i = 0; i < inmateSpots.length; i++) {
+            const [bx, by] = inmateSpots[i];
+            const px = bx * TILE_SIZE;
+            const py = by * TILE_SIZE;
+            const pz = this.map.getHeightAtPixel(px, py, 4.0);
+            this.peds.push(new Pedestrian({
+                x: px,
+                y: py,
+                z: pz,
+                angle: (i % 4) * Math.PI * 0.5,
+                speed: 34 + (i % 5) * 2,
+                kind: "CIVILIAN",
+                g24Type: "g2_prisoner",
+                g2Remapped: true,
+                missionTag: "PRISONER",
+                shirtColor: "#ff6608",
+                hp: 45,
+                dead: false,
+                panicTimer: 0,
+                turnSeed: i + 101
+            }));
+        }
+        const guardSpots = [
+            [61.5, 77.4], [66.5, 96.5], [66.5, 104.5], [58.5, 123.5], [65.5, 139.5]
+        ];
+        for (let g = 0; g < guardSpots.length; g++) {
+            const [bx, by] = guardSpots[g];
+            const px = bx * TILE_SIZE;
+            const py = by * TILE_SIZE;
+            const pz = this.map.getHeightAtPixel(px, py, 4.0);
+            this.peds.push(new Pedestrian({
+                x: px,
+                y: py,
+                z: pz,
+                angle: (g % 2 === 0) ? Math.PI * 0.5 : -Math.PI * 0.5,
+                speed: 38,
+                kind: "COP",
+                g24Type: "police",
+                missionTag: "PRISON_GUARD",
+                copWeapon: "SHOTGUN",
+                shirtColor: "#1e3a8a",
+                hp: 115,
+                dead: false,
+                panicTimer: 0,
+                turnSeed: g + 201
+            }));
+        }
     }
 
     populateNearbySidewalks(centerX, centerY, targetCount = 30, radiusBlocks = 14) {
@@ -594,9 +653,13 @@ class LeonidaGame {
         for (let by = minY; by <= maxY; by++) {
             for (let bx = minX; bx <= maxX; bx++) {
                 if (Math.abs(bx - cBx) <= 1 && Math.abs(by - cBy) <= 1) continue;
+                // Exclude VCIA Airport tarmac and Prison perimeter double-fence strips
+                if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
+                if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
                 const nav = this.map.getNavigationBlock(bx, by, 2.0);
-                if (nav && nav.groundType === GROUND_TYPE.PAWEMENT) {
-                    candidates.push({ bx, by });
+                const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
+                if (nav && (nav.groundType === GROUND_TYPE.PAWEMENT || (inPrisonYard && nav.groundType === GROUND_TYPE.FIELD))) {
+                    candidates.push({ bx, by, inPrisonYard });
                 }
             }
         }
@@ -620,16 +683,24 @@ class LeonidaGame {
             }
             if (tooClose) continue;
             const pz = this.map.getHeightAtPixel(px, py, 4.0);
+            const isPrisonGuard = pick.inPrisonYard && (i % 5 === 0);
+            const pedProps = pick.inPrisonYard
+                ? (isPrisonGuard
+                    ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 115 }
+                    : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45 })
+                : {
+                    kind: "CIVILIAN",
+                    g24Type: civTypes[(this.peds.length + i) % civTypes.length],
+                    shirtColor: "#06b6d4",
+                    hp: 35
+                };
             this.peds.push(new Pedestrian({
                 x: px,
                 y: py,
                 z: pz,
                 angle: dirs[Math.floor(Math.random() * dirs.length)],
                 speed: 35 + Math.random() * 9,
-                kind: "CIVILIAN",
-                g24Type: civTypes[(this.peds.length + i) % civTypes.length],
-                shirtColor: "#06b6d4",
-                hp: 35,
+                ...pedProps,
                 dead: false,
                 panicTimer: 0,
                 turnSeed: this.peds.length + i + 1
@@ -4445,6 +4516,25 @@ class LeonidaGame {
                         ped.targetBy = by;
                     }
                 }
+                // Keep prison inmates & prison guards strictly inside the prison yard (57..67, 77..145), and block street civilians from entering!
+                const isPrisonInmateOrGuard = (ped.missionTag === "PRISONER" || ped.missionTag === "PRISON_GUARD" || ped.g24Type === "g2_prisoner");
+                const newInPrison = (newBx >= 56 && newBx <= 68 && newBy >= 76 && newBy <= 146);
+                if (isPrisonInmateOrGuard) {
+                    const minPx = 57.15 * TILE_SIZE, maxPx = 67.85 * TILE_SIZE, minPy = 77.15 * TILE_SIZE, maxPy = 145.65 * TILE_SIZE;
+                    if (ped.x < minPx || ped.x > maxPx || ped.y < minPy || ped.y > maxPy) {
+                        ped.x = Math.max(minPx, Math.min(maxPx, prevX));
+                        ped.y = Math.max(minPy, Math.min(maxPy, prevY));
+                        ped.angle += Math.PI;
+                        ped.targetBx = null;
+                        ped.targetBy = null;
+                    }
+                } else if (newInPrison && ped.kind === "CIVILIAN") {
+                    ped.x = prevX;
+                    ped.y = prevY;
+                    ped.angle += Math.PI;
+                    ped.targetBx = null;
+                    ped.targetBy = null;
+                }
             }
 
             if (ped.kind !== "GATOR" && this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) {
@@ -4889,6 +4979,32 @@ class LeonidaGame {
         }
         if (this.districtPopupTimer > 0) {
             this.districtPopupTimer = Math.max(0, this.districtPopupTimer - dt);
+        }
+
+        if (!p.dead && this.map.prisonCompound) {
+            const pc = this.map.prisonCompound;
+            const inPrisonCompound = (p.x > pc.inX0 + 10 && p.x < pc.inX1 - 10 && p.y > pc.y0 + 24 && p.y < pc.inY1 - 10);
+            if (inPrisonCompound) {
+                const isAuthorized = Boolean((p.inVehicle && p.inVehicle.isPolice) || p.charId === "DETECTIVE" || p.charId === "CROCKETT");
+                if (!isAuthorized) {
+                    if (!this._inRestrictedPrison) {
+                        this._inRestrictedPrison = true;
+                        if (this.wantedLevel < 3) {
+                            this.setWantedLevel(3);
+                            this.wantedDecayTimer = 0;
+                        }
+                        this.addFloatingText(p.x, p.y - 30, "🚨 PENITENTIARY BREACH — 3★ WANTED!", "#ef4444");
+                        this.sendPager(
+                            "LEONIDA CORRECTIONS HQ",
+                            "LOCKDOWN ALERT! Trespasser inside Leonida State Penitentiary yard! Correctional Officers & SWAT authorized to use lethal force!",
+                            true
+                        );
+                    }
+                    this.wantedDecayTimer = 0;
+                }
+            } else {
+                this._inRestrictedPrison = false;
+            }
         }
 
         if (!p.dead && this.map.airportCompound) {
