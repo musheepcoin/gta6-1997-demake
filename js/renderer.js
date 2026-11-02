@@ -2349,7 +2349,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_46", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_47", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -3710,7 +3710,7 @@ class RetroRenderer {
 
     renderMiamiPalmTree3D(x, y, baseZ, baseAngle = 0, scale = 1.0, seedIdx = 0, heightMul = 1.0) {
         if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.objects) return;
-        const palmRect = this.gta1Meta.sprites.objects["257"] || this.gta1Meta.sprites.objects["palm_tree"];
+        const palmRect = this.gta1Meta.sprites.objects["palm_tree"] || this.gta1Meta.sprites.objects["257"];
         if (!palmRect) return;
 
         const sc = scale || 1.0;

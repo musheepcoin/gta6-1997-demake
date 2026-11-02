@@ -433,62 +433,61 @@ class LeonidaMap {
                 let posY = (r + 0.5 + (hs2 - 0.5) * 0.28) * TILE_SIZE;
                 let plantZ = (surfGt === GROUND_TYPE.WATER) ? 1.0 : 2.0;
 
-                // 1) Sidewalk Planters (lid === 69)
-                if (blkZ1.lid === 69 && surfGt === GROUND_TYPE.PAWEMENT) {
-                    posX = (c + 0.5) * TILE_SIZE;
-                    posY = (r + 0.5) * TILE_SIZE;
-                    if (c >= 430 && r <= 365) {
-                        // Ocean Drive / South Beach / Mid-Beach
-                        if (seed % 10 < 5) { chosenKind = "palm_tree"; scaleMul = 0.82 + hs1 * 0.40; heightMul = 0.75 + hs2 * 0.85; }
-                        else if (seed % 10 < 8) { chosenKind = "fan_palm"; scaleMul = 0.80 + hs1 * 0.35; heightMul = 0.70 + hs2 * 0.60; }
-                        else { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; heightMul = 0.80; }
-                    } else if (c >= 325 && c <= 365 && r >= 160 && r <= 190) {
-                        // Star Island luxury planters
-                        if (seed % 10 < 4) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; }
-                        else if (seed % 10 < 7) { chosenKind = "bougainvillea_bush"; scaleMul = 0.85 + hs1 * 0.35; }
-                        else { chosenKind = "tropical_shrub"; scaleMul = 0.95 + hs1 * 0.30; }
-                    } else {
-                        // Downtown Vice City / Wynwood / Little Haiti
-                        if (seed % 10 < 5) { chosenKind = "palm_tree"; scaleMul = 0.80 + hs1 * 0.40; }
-                        else if (seed % 10 < 8) { chosenKind = "fan_palm"; scaleMul = 0.85 + hs1 * 0.35; }
-                        else { chosenKind = "bougainvillea_bush"; scaleMul = 0.80 + hs1 * 0.30; }
-                    }
-                }
-                // 2) Lummus Park & Ocean Drive lawns (c=448..453, r=25..295, lid==10)
-                else if (c >= 448 && c <= 453 && r >= 25 && r <= 295 && blkZ1.lid === 10) {
-                    const isLummusCol = (c === 449 || c === 451);
-                    if (isLummusCol && (r % 5 === 2)) {
+                // 1) Ocean Drive Iconic Palm Boulevard & Beach Promenade (c=443 West sidewalk & c=448..452 East promenade)
+                if (c >= 443 && c <= 452 && r >= 20 && r <= 365) {
+                    const isWestSidewalk = (c === 443);
+                    const isEastPromenade = (c === 448);
+                    const isParkLawnVerge = (c >= 449 && c <= 452);
+
+                    if (isWestSidewalk && (r % 4 === 0)) {
                         chosenKind = "palm_tree";
-                        posX = (c + 0.68 + (hs1 - 0.5) * 0.48) * TILE_SIZE;
-                        scaleMul = 0.95 + hs1 * 0.45;
-                        heightMul = 0.85 + hs2 * 0.85;
-                    } else if (seed % 10 === 0) {
-                        chosenKind = "palm_tree";
-                        scaleMul = 0.88 + hs1 * 0.40;
-                        heightMul = 0.80 + hs2 * 0.70;
-                    } else if (seed % 10 === 1) {
-                        chosenKind = "fan_palm";
-                        scaleMul = 0.90 + hs1 * 0.35;
-                    } else if (seed % 10 === 2) {
-                        chosenKind = "bougainvillea_bush";
+                        posX = (c + 0.32 + (hs1 - 0.5) * 0.15) * TILE_SIZE; // Slender royal palm line near Art Deco hotel facades
                         scaleMul = 0.95 + hs1 * 0.35;
-                    } else if (seed % 10 === 3) {
-                        chosenKind = "tropical_shrub";
-                        scaleMul = 0.90 + hs1 * 0.30;
+                        heightMul = 0.90 + hs2 * 0.65;
+                    } else if (isEastPromenade && ((r + 2) % 4 === 0)) {
+                        chosenKind = "palm_tree";
+                        posX = (c + 0.68 + (hs1 - 0.5) * 0.15) * TILE_SIZE; // Curbside royal palm row facing Lummus Park & the Atlantic
+                        scaleMul = 1.05 + hs1 * 0.40;
+                        heightMul = 1.00 + hs2 * 0.70;
+                    } else if (isParkLawnVerge && !adjRoad) {
+                        if (seed % 10 < 5) {
+                            chosenKind = "palm_tree";
+                            scaleMul = 0.90 + hs1 * 0.45;
+                            heightMul = 0.85 + hs2 * 0.75;
+                        } else if (seed % 10 < 8) {
+                            chosenKind = "fan_palm";
+                            scaleMul = 0.85 + hs1 * 0.35;
+                        } else if (seed % 10 === 8) {
+                            chosenKind = "bougainvillea_bush";
+                            scaleMul = 0.90 + hs1 * 0.30;
+                        } else {
+                            chosenKind = "tropical_shrub";
+                            scaleMul = 0.85 + hs1 * 0.30;
+                        }
                     }
                 }
-                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape (sand lid==98 near grass/promenade ONLY)
-                // STRICT RULE: Never place flora on open sunbathing sand (c >= 457) or volleyball courts!
-                else if (c >= 454 && c <= 456 && r >= 20 && r <= 360 && blkZ1.lid === 98) {
-                    let nearWalkable = false;
-                    for (let dr = -1; dr <= 1; dr++) {
-                        for (let dc = -1; dc <= 1; dc++) {
-                            const nlid = this.getBlockInfo(c + dc, r + dr, 1).lid;
-                            if (nlid === 8 || nlid === 9 || nlid === 10) { nearWalkable = true; break; }
-                        }
-                        if (nearWalkable) break;
+                // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road)
+                else if ((blkZ1.lid === 69 || (blkZ1.lid === 8 && adjRoad)) && (surfGt === GROUND_TYPE.PAWEMENT || surfGt === GROUND_TYPE.FIELD)) {
+                    if (seed % 12 === 0) {
+                        chosenKind = "palm_tree";
+                        scaleMul = 0.88 + hs1 * 0.38;
+                        heightMul = 0.80 + hs2 * 0.60;
+                    } else if (seed % 12 === 1) {
+                        chosenKind = "fan_palm";
+                        scaleMul = 0.82 + hs1 * 0.32;
+                    } else if (seed % 12 === 2) {
+                        chosenKind = "bougainvillea_bush";
+                        scaleMul = 0.85 + hs1 * 0.30;
                     }
-                    if (nearWalkable && seed % 18 === 0) {
+                }
+                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape & Coconut Palms (sand lid==98 near promenade ONLY)
+                // STRICT RULE: Never place flora on open sunbathing sand (c >= 457) or volleyball courts!
+                else if (c >= 453 && c <= 456 && r >= 20 && r <= 360 && blkZ1.lid === 98) {
+                    if (c === 453 && (seed % 9 === 0)) {
+                        chosenKind = "palm_tree";
+                        scaleMul = 0.92 + hs1 * 0.40;
+                        heightMul = 0.85 + hs2 * 0.70;
+                    } else if (seed % 16 === 0) {
                         chosenKind = "sea_grape";
                         scaleMul = 0.82 + hs1 * 0.35;
                     }
