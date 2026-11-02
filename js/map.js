@@ -1412,6 +1412,90 @@ class LeonidaMap {
             ]
         };
 
+        // 18) Solid 3D OBB / AABB Collision Hulls for all Stationary Aviation, Marine, Port & World Props
+        const pushPropOBB = (cx, cy, hw, hh, ang = 0) => {
+            const cosA = Math.cos(ang);
+            const sinA = Math.sin(ang);
+            const ex = Math.abs(cosA) * hw + Math.abs(sinA) * hh;
+            const ey = Math.abs(sinA) * hw + Math.abs(cosA) * hh;
+            this.securityBarrierBoxes.push({
+                cx,
+                cy,
+                hw,
+                hh,
+                cosA,
+                sinA,
+                minX: cx - ex,
+                maxX: cx + ex,
+                minY: cy - ey,
+                maxY: cy + ey
+            });
+        };
+
+        // 18A. Airport Widebody Airliners (Fuselage + Swept Wings/Engines + Tailplane), Executive Learjets & Helicopters
+        for (const ap of this.airportProps) {
+            const cs = Math.cos(ap.ang);
+            const sn = Math.sin(ap.ang);
+            const sc = ap.scale || 1.0;
+            if (ap.kind === "AIRLINER") {
+                pushPropOBB(ap.x, ap.y, 48 * sc, 9.5 * sc, ap.ang);
+                pushPropOBB(ap.x - cs * 6 * sc, ap.y - sn * 6 * sc, 13 * sc, 43 * sc, ap.ang);
+                pushPropOBB(ap.x - cs * 38 * sc, ap.y - sn * 38 * sc, 7 * sc, 21 * sc, ap.ang);
+            } else if (ap.kind === "LEARJET") {
+                pushPropOBB(ap.x, ap.y, 27 * sc, 6.5 * sc, ap.ang);
+                pushPropOBB(ap.x - cs * 3 * sc, ap.y - sn * 3 * sc, 8 * sc, 24 * sc, ap.ang);
+            } else if (ap.kind === "HELIPAD") {
+                pushPropOBB(ap.x, ap.y, 26 * sc, 10 * sc, ap.ang);
+            }
+        }
+
+        // 18B. Airport & Penitentiary Security Guardhouse Booths & Watchtowers
+        for (const gt of this.airportCompound.gates) {
+            if (gt.boothX && gt.boothY) pushPropOBB(gt.boothX, gt.boothY, 13, 10, 0);
+        }
+        for (const gt of this.prisonCompound.gates) {
+            if (gt.boothX && gt.boothY) pushPropOBB(gt.boothX, gt.boothY, 17, 13, 0);
+        }
+        for (const tw of this.prisonCompound.towers) {
+            pushPropOBB(tw.x, tw.y, 17, 17, 0);
+        }
+
+        // 18C. Port Terminals (Intermodal Container Stacks, Cargo Barges, Moored Yachts & Speedboats)
+        for (const pt of this.portTerminals) {
+            const sc = pt.scale || 1.0;
+            if (pt.kind === "CONTAINERS") {
+                pushPropOBB(pt.x, pt.y, 19 * sc, 8.5 * sc, pt.ang);
+            } else if (pt.kind === "BARGE") {
+                pushPropOBB(pt.x, pt.y, 53 * sc, 17 * sc, pt.ang);
+            } else if (pt.kind === "YACHT") {
+                pushPropOBB(pt.x, pt.y, 44 * sc, 16 * sc, pt.ang);
+            } else if (pt.kind === "SPEEDBOAT") {
+                pushPropOBB(pt.x, pt.y, 27 * sc, 12 * sc, pt.ang);
+            }
+        }
+
+        // 18D. Moored Dodo Seaplanes, Superyacht Parties, Thatched Tiki Bars, Mini-Golf Windmill & Outlaw Biker Chopper Lineups
+        for (const mp of this.mooredSeaplanes) {
+            const cs = Math.cos(mp.ang);
+            const sn = Math.sin(mp.ang);
+            pushPropOBB(mp.x, mp.y, 28 * 1.18, 17 * 1.18, mp.ang);
+            pushPropOBB(mp.x + cs * 2, mp.y + sn * 2, 8 * 1.18, 27 * 1.18, mp.ang);
+        }
+        if (Array.isArray(this.yachtParties)) {
+            for (const yp of this.yachtParties) {
+                pushPropOBB(yp.x, yp.y, 45, 16, yp.angle || 0);
+            }
+        }
+        for (const tb of this.tikiBars) {
+            pushPropOBB(tb.x, tb.y, 22, 14, tb.ang);
+        }
+        if (this.industrialAndParkDetails.miniGolf) {
+            pushPropOBB(this.industrialAndParkDetails.miniGolf.x, this.industrialAndParkDetails.miniGolf.y, 18, 18, 0);
+        }
+        for (const br of this.industrialAndParkDetails.bikerRallies) {
+            pushPropOBB(br.x, br.y, br.count * 10, 12, 0);
+        }
+
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
         this.streetlights = [];
         this.trafficSignals = [];
@@ -3270,30 +3354,65 @@ class LeonidaMap {
                     if (bb.vehiclesOnly && radius < 11.5) continue;
                     if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
 
-                    const clX = Math.max(bb.minX, Math.min(nx, bb.maxX));
-                    const clY = Math.max(bb.minY, Math.min(ny, bb.maxY));
-                    const ddx = nx - clX;
-                    const ddy = ny - clY;
-                    const distSq = ddx * ddx + ddy * ddy;
+                    if (bb.cx !== undefined) {
+                        const relX = nx - bb.cx;
+                        const relY = ny - bb.cy;
+                        const lx = relX * bb.cosA + relY * bb.sinA;
+                        const ly = -relX * bb.sinA + relY * bb.cosA;
+                        const clX = Math.max(-bb.hw, Math.min(lx, bb.hw));
+                        const clY = Math.max(-bb.hh, Math.min(ly, bb.hh));
+                        const dlx = lx - clX;
+                        const dly = ly - clY;
+                        const distSq = dlx * dlx + dly * dly;
+                        if (distSq < radius * radius) {
+                            hit = true;
+                            let pushLX = 0;
+                            let pushLY = 0;
+                            if (distSq > 0.0001) {
+                                const dist = Math.sqrt(distSq);
+                                const overlap = radius - dist;
+                                pushLX = (dlx / dist) * overlap;
+                                pushLY = (dly / dist) * overlap;
+                            } else {
+                                const dLeft = lx + bb.hw;
+                                const dRight = bb.hw - lx;
+                                const dTop = ly + bb.hh;
+                                const dBot = bb.hh - ly;
+                                const m = Math.min(dLeft, dRight, dTop, dBot);
+                                if (m === dLeft) pushLX = -(dLeft + radius);
+                                else if (m === dRight) pushLX = dRight + radius;
+                                else if (m === dTop) pushLY = -(dTop + radius);
+                                else pushLY = dBot + radius;
+                            }
+                            nx += pushLX * bb.cosA - pushLY * bb.sinA;
+                            ny += pushLX * bb.sinA + pushLY * bb.cosA;
+                        }
+                    } else {
+                        const clX = Math.max(bb.minX, Math.min(nx, bb.maxX));
+                        const clY = Math.max(bb.minY, Math.min(ny, bb.maxY));
+                        const ddx = nx - clX;
+                        const ddy = ny - clY;
+                        const distSq = ddx * ddx + ddy * ddy;
 
-                    if (distSq < radius * radius) {
-                        hit = true;
-                        if (distSq > 0.0001) {
-                            const dist = Math.sqrt(distSq);
-                            const overlap = radius - dist;
-                            nx += (ddx / dist) * overlap;
-                            ny += (ddy / dist) * overlap;
-                        } else {
-                            // Center is inside the box: push out along nearest face
-                            const dLeft = nx - bb.minX;
-                            const dRight = bb.maxX - nx;
-                            const dTop = ny - bb.minY;
-                            const dBot = bb.maxY - ny;
-                            const m = Math.min(dLeft, dRight, dTop, dBot);
-                            if (m === dLeft) nx = bb.minX - radius;
-                            else if (m === dRight) nx = bb.maxX + radius;
-                            else if (m === dTop) ny = bb.minY - radius;
-                            else ny = bb.maxY + radius;
+                        if (distSq < radius * radius) {
+                            hit = true;
+                            if (distSq > 0.0001) {
+                                const dist = Math.sqrt(distSq);
+                                const overlap = radius - dist;
+                                nx += (ddx / dist) * overlap;
+                                ny += (ddy / dist) * overlap;
+                            } else {
+                                // Center is inside the box: push out along nearest face
+                                const dLeft = nx - bb.minX;
+                                const dRight = bb.maxX - nx;
+                                const dTop = ny - bb.minY;
+                                const dBot = bb.maxY - ny;
+                                const m = Math.min(dLeft, dRight, dTop, dBot);
+                                if (m === dLeft) nx = bb.minX - radius;
+                                else if (m === dRight) nx = bb.maxX + radius;
+                                else if (m === dTop) ny = bb.minY - radius;
+                                else ny = bb.maxY + radius;
+                            }
                         }
                     }
                 }
