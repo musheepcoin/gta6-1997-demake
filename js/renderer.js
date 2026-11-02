@@ -1392,36 +1392,85 @@ class RetroRenderer {
                 meta.sprites.objects["beach_towel_coral"] = [860, py, 32, 20];
 
                 // Miami Art Deco Sun Lounger ("beach_lounger")
-                ctx.fillStyle = "#1e293b";
-                ctx.fillRect(900, py + 1, 34, 18);
-                ctx.fillStyle = "#f8fafc";
-                ctx.fillRect(901, py + 2, 32, 16);
-                ctx.fillStyle = "#38bdf8";
-                ctx.fillRect(903, py + 4, 28, 12);
-                ctx.fillStyle = "#fef08a";
-                ctx.fillRect(904, py + 4, 6, 12); // pillow headrest
-                meta.sprites.objects["beach_lounger"] = [900, py, 34, 20];
+                {
+                    const lx = 900, ly = py;
+                    // Ground shadow / perimeter
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fillRect(lx, ly, 36, 20);
+                    // Aluminum tubular frame
+                    const frmGrad = ctx.createLinearGradient(lx, ly, lx, ly + 20);
+                    frmGrad.addColorStop(0, "#cbd5e1");
+                    frmGrad.addColorStop(0.5, "#f8fafc");
+                    frmGrad.addColorStop(1, "#94a3b8");
+                    ctx.fillStyle = frmGrad;
+                    ctx.fillRect(lx + 1, ly + 1, 34, 18);
+                    // Padded turquoise mattress with 3D cylindrical slats
+                    const matGrad = ctx.createLinearGradient(lx, ly + 3, lx, ly + 17);
+                    matGrad.addColorStop(0, "#0284c7");
+                    matGrad.addColorStop(0.2, "#38bdf8");
+                    matGrad.addColorStop(0.5, "#7dd3fc");
+                    matGrad.addColorStop(0.85, "#0369a1");
+                    matGrad.addColorStop(1, "#075985");
+                    ctx.fillStyle = matGrad;
+                    ctx.fillRect(lx + 3, ly + 3, 30, 14);
+                    // Mattress stitched segment lines
+                    ctx.strokeStyle = "rgba(15, 23, 42, 0.45)";
+                    ctx.lineWidth = 1;
+                    for (let sx = lx + 8; sx <= lx + 28; sx += 5) {
+                        ctx.beginPath(); ctx.moveTo(sx, ly + 3); ctx.lineTo(sx, ly + 17); ctx.stroke();
+                    }
+                    // Sculpted headrest pillow with sun highlight
+                    const pilGrad = ctx.createRadialGradient(lx + 7, ly + 10, 1, lx + 7, ly + 10, 7);
+                    pilGrad.addColorStop(0, "#ffffff");
+                    pilGrad.addColorStop(0.4, "#fef08a");
+                    pilGrad.addColorStop(1, "#eab308");
+                    ctx.fillStyle = pilGrad;
+                    ctx.fillRect(lx + 4, ly + 4, 7, 12);
+                    meta.sprites.objects["beach_lounger"] = [lx, ly, 36, 20];
+                }
 
                 // Octagonal Yellow/Orange Beach Umbrella ("umbrella_yellow")
-                const ux = 962, uy = py + 20, ur = 18;
-                for (let w = 0; w < 8; w++) {
-                    const a0 = (w / 8) * Math.PI * 2;
-                    const a1 = ((w + 1) / 8) * Math.PI * 2;
+                {
+                    const ux = 964, uy = py + 20, ur = 18;
+                    // Dark outer bevel
                     ctx.beginPath();
-                    ctx.moveTo(ux, uy);
-                    ctx.arc(ux, uy, ur, a0, a1);
-                    ctx.closePath();
-                    ctx.fillStyle = (w % 2 === 0) ? "#facc15" : "#f97316";
+                    ctx.arc(ux, uy, ur + 1, 0, Math.PI * 2);
+                    ctx.fillStyle = "#0b111e";
                     ctx.fill();
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = "#78350f";
-                    ctx.stroke();
+                    // 3ds Max 3D conical spherical dome shading
+                    for (let w = 0; w < 8; w++) {
+                        const a0 = (w / 8) * Math.PI * 2;
+                        const a1 = ((w + 1) / 8) * Math.PI * 2;
+                        const domeGrad = ctx.createRadialGradient(ux - 4, uy - 4, 2, ux, uy, ur);
+                        if (w % 2 === 0) {
+                            domeGrad.addColorStop(0, "#fef08a");
+                            domeGrad.addColorStop(0.5, "#facc15");
+                            domeGrad.addColorStop(1, "#ca8a04");
+                        } else {
+                            domeGrad.addColorStop(0, "#fdba74");
+                            domeGrad.addColorStop(0.5, "#f97316");
+                            domeGrad.addColorStop(1, "#c2410c");
+                        }
+                        ctx.beginPath();
+                        ctx.moveTo(ux, uy);
+                        ctx.arc(ux, uy, ur, a0, a1);
+                        ctx.closePath();
+                        ctx.fillStyle = domeGrad;
+                        ctx.fill();
+                        // Rib seam
+                        ctx.strokeStyle = "rgba(15, 23, 42, 0.55)";
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                    // Center chrome cap / finial
+                    const finGrad = ctx.createRadialGradient(ux - 1, uy - 1, 0.5, ux, uy, 3.5);
+                    finGrad.addColorStop(0, "#ffffff");
+                    finGrad.addColorStop(0.6, "#e2e8f0");
+                    finGrad.addColorStop(1, "#475569");
+                    ctx.fillStyle = finGrad;
+                    ctx.beginPath(); ctx.arc(ux, uy, 3.5, 0, Math.PI * 2); ctx.fill();
+                    meta.sprites.objects["umbrella_yellow"] = [944, py, 40, 40];
                 }
-                ctx.fillStyle = "#ffffff";
-                ctx.beginPath();
-                ctx.arc(ux, uy, 2.5, 0, Math.PI * 2);
-                ctx.fill();
-                meta.sprites.objects["umbrella_yellow"] = [942, py, 40, 40];
 
                 // Pointed Malibu Surfboards ("surfboard_pink", "surfboard_cyan", "surfboard_yellow")
                 const drawSurfboard = (sx, sy, bodyCol, stripeCol) => {
@@ -1611,104 +1660,205 @@ class RetroRenderer {
                 meta.sprites.objects["flamingo_float"] = [flx, fly, 26, 26];
 
                 // 5D. Biscayne Bay 3D Luxury Party Superyacht ("luxury_yacht", 96x38, bow facing East +X)
-                const yx = 930, yy = py2;
-                ctx.save();
-                // Outer dark marine shadow / hull rub-rail
-                ctx.beginPath();
-                ctx.moveTo(yx + 4, yy + 5);
-                ctx.lineTo(yx + 64, yy + 3);
-                ctx.quadraticCurveTo(yx + 86, yy + 5, ctx.moveTo ? yx + 94 : yx + 94, yy + 19);
-                ctx.quadraticCurveTo(yx + 86, yy + 33, yx + 64, yy + 35);
-                ctx.lineTo(yx + 4, yy + 33);
-                ctx.closePath();
-                ctx.fillStyle = "#0f172a";
-                ctx.fill();
-                // Crisp pearl-white fiberglass superyacht hull
-                ctx.beginPath();
-                ctx.moveTo(yx + 5, yy + 6);
-                ctx.lineTo(yx + 64, yy + 4);
-                ctx.quadraticCurveTo(yx + 85, yy + 6, yx + 92, yy + 19);
-                ctx.quadraticCurveTo(yx + 85, yy + 32, yx + 64, yy + 34);
-                ctx.lineTo(yx + 5, yy + 32);
-                ctx.closePath();
-                ctx.fillStyle = "#f8fafc";
-                ctx.fill();
-                // Warm Burmese teak wood deck inset (stern swim platform + bow sun-deck)
-                ctx.beginPath();
-                ctx.moveTo(yx + 8, yy + 8);
-                ctx.lineTo(yx + 62, yy + 6);
-                ctx.quadraticCurveTo(yx + 80, yy + 8, yx + 86, yy + 19);
-                ctx.quadraticCurveTo(yx + 80, yy + 30, yx + 62, yy + 32);
-                ctx.lineTo(yx + 8, yy + 30);
-                ctx.closePath();
-                ctx.fillStyle = "#d97706";
-                ctx.fill();
-                // Teak plank lines
-                ctx.strokeStyle = "#92400e";
-                ctx.lineWidth = 0.8;
-                for (let ty = yy + 10; ty <= yy + 28; ty += 3) {
+                {
+                    const yx = 930, yy = py2;
+                    ctx.save();
+                    // 1. Outer dark marine silhouette / hull rub-rail (#0b111e)
                     ctx.beginPath();
-                    ctx.moveTo(yx + 9, ty);
-                    ctx.lineTo(yx + 80, ty);
+                    ctx.moveTo(yx + 3, yy + 5);
+                    ctx.lineTo(yx + 64, yy + 3);
+                    ctx.quadraticCurveTo(yx + 87, yy + 5, yx + 95, yy + 19);
+                    ctx.quadraticCurveTo(yx + 87, yy + 33, yx + 64, yy + 35);
+                    ctx.lineTo(yx + 3, yy + 35);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // 2. 3ds Max Sculpted Deep-V Fiberglass Hull with transverse cylindrical Phong gradient
+                    const hullGrad = ctx.createLinearGradient(yx, yy + 4, yx, yy + 34);
+                    hullGrad.addColorStop(0.0, "#94a3b8"); // port flank shadow
+                    hullGrad.addColorStop(0.18, "#cbd5e1");
+                    hullGrad.addColorStop(0.38, "#f8fafc"); // upper deck highlight
+                    hullGrad.addColorStop(0.50, "#ffffff"); // keel specular ridge
+                    hullGrad.addColorStop(0.72, "#e2e8f0");
+                    hullGrad.addColorStop(1.0, "#64748b"); // starboard flank shadow
+                    ctx.beginPath();
+                    ctx.moveTo(yx + 4, yy + 6);
+                    ctx.lineTo(yx + 64, yy + 4);
+                    ctx.quadraticCurveTo(yx + 86, yy + 6, yx + 93, yy + 19);
+                    ctx.quadraticCurveTo(yx + 86, yy + 32, yx + 64, yy + 34);
+                    ctx.lineTo(yx + 4, yy + 32);
+                    ctx.closePath();
+                    ctx.fillStyle = hullGrad;
+                    ctx.fill();
+
+                    // 3. Inset Burmese Teak Wood Deck with Gunwale AO Shadow
+                    const teakGrad = ctx.createLinearGradient(yx + 7, yy + 7, yx + 7, yy + 31);
+                    teakGrad.addColorStop(0.0, "#92400e"); // dark gunwale shadow
+                    teakGrad.addColorStop(0.15, "#d97706");
+                    teakGrad.addColorStop(0.50, "#f59e0b"); // warm sunlit teak
+                    teakGrad.addColorStop(0.85, "#d97706");
+                    teakGrad.addColorStop(1.0, "#78350f"); // starboard shadow
+                    ctx.beginPath();
+                    ctx.moveTo(yx + 7, yy + 7);
+                    ctx.lineTo(yx + 63, yy + 5);
+                    ctx.quadraticCurveTo(yx + 82, yy + 8, yx + 88, yy + 19);
+                    ctx.quadraticCurveTo(yx + 82, yy + 30, yx + 63, yy + 33);
+                    ctx.lineTo(yx + 7, yy + 31);
+                    ctx.closePath();
+                    ctx.fillStyle = teakGrad;
+                    ctx.fill();
+
+                    // Delicate Teak Deck Plank Seams
+                    ctx.strokeStyle = "rgba(120, 53, 15, 0.45)";
+                    ctx.lineWidth = 0.8;
+                    for (let ty = yy + 9; ty <= yy + 29; ty += 2.8) {
+                        ctx.beginPath(); ctx.moveTo(yx + 8, ty); ctx.lineTo(yx + (ty < yy + 14 || ty > yy + 24 ? 76 : 84), ty); ctx.stroke();
+                    }
+
+                    // 4. Stern Turquoise Spa / Jacuzzi with Frosted Rim & Water Reflection
+                    const jacGrad = ctx.createRadialGradient(yx + 13, yy + 19, 1, yx + 13, yy + 19, 8);
+                    jacGrad.addColorStop(0.0, "#a5f3fc");
+                    jacGrad.addColorStop(0.45, "#06b6d4");
+                    jacGrad.addColorStop(1.0, "#0e7490");
+                    ctx.fillStyle = jacGrad;
+                    ctx.fillRect(yx + 8, yy + 12, 10, 14);
+                    ctx.strokeStyle = "#e0f2fe";
+                    ctx.lineWidth = 1.0;
+                    ctx.strokeRect(yx + 8.5, yy + 12.5, 9, 13);
+                    // Chrome boarding ladder steps
+                    ctx.fillStyle = "#cbd5e1";
+                    ctx.fillRect(yx + 5, yy + 14, 3, 2);
+                    ctx.fillRect(yx + 5, yy + 18, 3, 2);
+                    ctx.fillRect(yx + 5, yy + 22, 3, 2);
+
+                    // 5. Multi-Tiered Superstructure Cabin casting AO drop shadow on deck
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.45)";
+                    ctx.fillRect(yx + 20, yy + 6, 42, 26);
+
+                    const cabGrad = ctx.createLinearGradient(yx + 22, yy + 7, yx + 22, yy + 31);
+                    cabGrad.addColorStop(0.0, "#cbd5e1");
+                    cabGrad.addColorStop(0.35, "#ffffff");
+                    cabGrad.addColorStop(1.0, "#94a3b8");
+                    ctx.fillStyle = cabGrad;
+                    ctx.fillRect(yx + 22, yy + 7, 38, 24);
+
+                    // 6. Wrap-around 3ds Max Smoked Sapphire Bridge Windshield with Sky Glint
+                    const winGrad = ctx.createLinearGradient(yx + 48, yy + 8, yx + 60, yy + 30);
+                    winGrad.addColorStop(0.0, "#071326");
+                    winGrad.addColorStop(0.35, "#38bdf8"); // bright diagonal sky reflection
+                    winGrad.addColorStop(0.55, "#bae6fd"); // white glint
+                    winGrad.addColorStop(0.75, "#0369a1");
+                    winGrad.addColorStop(1.0, "#082f49");
+                    ctx.beginPath();
+                    ctx.moveTo(yx + 48, yy + 8);
+                    ctx.lineTo(yx + 60, yy + 10);
+                    ctx.lineTo(yx + 60, yy + 28);
+                    ctx.lineTo(yx + 48, yy + 30);
+                    ctx.closePath();
+                    ctx.fillStyle = winGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 1.0;
                     ctx.stroke();
+
+                    // 7. Sculpted Flybridge Hardtop & Sky-Lounge Glass Sunroof
+                    const hardGrad = ctx.createLinearGradient(yx + 26, yy + 9, yx + 26, yy + 29);
+                    hardGrad.addColorStop(0.0, "#e2e8f0");
+                    hardGrad.addColorStop(0.4, "#ffffff");
+                    hardGrad.addColorStop(1.0, "#cbd5e1");
+                    ctx.fillStyle = hardGrad;
+                    ctx.fillRect(yx + 25, yy + 9, 25, 20);
+
+                    // Sky-lounge panoramic sunroof
+                    const sunrfGrad = ctx.createLinearGradient(yx + 29, yy + 12, yx + 42, yy + 26);
+                    sunrfGrad.addColorStop(0.0, "#0f172a");
+                    sunrfGrad.addColorStop(0.45, "#0ea5e9");
+                    sunrfGrad.addColorStop(0.7, "#7dd3fc");
+                    sunrfGrad.addColorStop(1.0, "#0284c7");
+                    ctx.fillStyle = sunrfGrad;
+                    ctx.fillRect(yx + 29, yy + 12, 14, 14);
+
+                    // Dual Satellite Domes & Radar Arch
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath(); ctx.arc(yx + 27, yy + 12, 2.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(yx + 27, yy + 26, 2.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = "#64748b"; ctx.lineWidth = 0.8;
+                    ctx.strokeRect(yx + 25, yy + 18, 2, 8);
+
+                    // 8. Foredeck Quilted VIP Sun-Pads
+                    const padGrad = ctx.createLinearGradient(yx + 64, yy + 11, yx + 64, yy + 18);
+                    padGrad.addColorStop(0.0, "#f8fafc");
+                    padGrad.addColorStop(0.5, "#ffffff");
+                    padGrad.addColorStop(1.0, "#cbd5e1");
+                    ctx.fillStyle = padGrad;
+                    ctx.fillRect(yx + 63, yy + 11, 14, 7);
+                    ctx.fillRect(yx + 63, yy + 20, 14, 7);
+                    ctx.strokeStyle = "rgba(100, 116, 139, 0.45)";
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeRect(yx + 63, yy + 11, 14, 7);
+                    ctx.strokeRect(yx + 63, yy + 20, 14, 7);
+                    ctx.restore();
+                    meta.sprites.objects["luxury_yacht"] = [yx, yy, 96, 38];
                 }
-                // Rear turquoise jacuzzi / swim-platform steps at stern (left)
-                ctx.fillStyle = "#06b6d4";
-                ctx.fillRect(yx + 9, yy + 12, 9, 14);
-                ctx.strokeStyle = "#e0f2fe";
-                ctx.strokeRect(yx + 9, yy + 12, 9, 14);
-                // Sculpted white superstructure cabin & wrap-around smoked-sapphire bridge windshield
-                ctx.fillStyle = "#e2e8f0";
-                ctx.fillRect(yx + 22, yy + 8, 36, 22);
-                ctx.fillStyle = "#0f172a";
-                ctx.beginPath();
-                ctx.moveTo(yx + 48, yy + 8);
-                ctx.lineTo(yx + 60, yy + 10);
-                ctx.lineTo(yx + 60, yy + 28);
-                ctx.lineTo(yx + 48, yy + 30);
-                ctx.closePath();
-                ctx.fill();
-                // White flybridge hardtop & radar arch
-                ctx.fillStyle = "#ffffff";
-                ctx.fillRect(yx + 25, yy + 10, 24, 18);
-                ctx.fillStyle = "#38bdf8";
-                ctx.fillRect(yx + 30, yy + 13, 12, 12); // sky-lounge glass sunroof
-                // Foredeck white VIP sun-pads on the bow
-                ctx.fillStyle = "#f1f5f9";
-                ctx.fillRect(yx + 63, yy + 11, 13, 7);
-                ctx.fillRect(yx + 63, yy + 20, 13, 7);
-                ctx.restore();
-                meta.sprites.objects["luxury_yacht"] = [yx, yy, 96, 38];
 
                 // 5E. Neon Vice Jet-Ski / WaveRunner ("jetski_neon", 32x14, facing East +X)
-                const jx = 1032, jy = py2;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(jx + 2, jy + 3);
-                ctx.lineTo(jx + 21, jy + 2);
-                ctx.quadraticCurveTo(jx + 30, jy + 4, jx + 31, jy + 7);
-                ctx.quadraticCurveTo(jx + 30, jy + 10, jx + 21, jy + 12);
-                ctx.lineTo(jx + 2, jy + 11);
-                ctx.closePath();
-                ctx.fillStyle = "#00f0ff";
-                ctx.fill();
-                ctx.lineWidth = 1.2;
-                ctx.strokeStyle = "#0f172a";
-                ctx.stroke();
-                // Hot pink racing stripe & black seat saddle
-                ctx.fillStyle = "#ff2a85";
-                ctx.fillRect(jx + 16, jy + 5, 11, 4);
-                ctx.fillStyle = "#1e293b";
-                ctx.fillRect(jx + 6, jy + 4, 12, 6);
-                // Handlebars
-                ctx.strokeStyle = "#f8fafc";
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(jx + 18, jy + 2);
-                ctx.lineTo(jx + 18, jy + 12);
-                ctx.stroke();
-                ctx.restore();
-                meta.sprites.objects["jetski_neon"] = [jx, jy, 32, 14];
+                {
+                    const jx = 1032, jy = py2;
+                    ctx.save();
+                    // Dark outer silhouette
+                    ctx.beginPath();
+                    ctx.moveTo(jx + 1, jy + 3);
+                    ctx.lineTo(jx + 21, jy + 1);
+                    ctx.quadraticCurveTo(jx + 31, jy + 3, jx + 32, jy + 7);
+                    ctx.quadraticCurveTo(jx + 31, jy + 11, jx + 21, jy + 13);
+                    ctx.lineTo(jx + 1, jy + 11);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // Sculpted 3ds Max Cyan Clearcoat Hull
+                    const jsGrad = ctx.createLinearGradient(jx, jy + 2, jx, jy + 12);
+                    jsGrad.addColorStop(0.0, "#0891b2");
+                    jsGrad.addColorStop(0.3, "#00f0ff");
+                    jsGrad.addColorStop(0.6, "#a5f3fc");
+                    jsGrad.addColorStop(1.0, "#0e7490");
+                    ctx.beginPath();
+                    ctx.moveTo(jx + 2, jy + 3);
+                    ctx.lineTo(jx + 21, jy + 2);
+                    ctx.quadraticCurveTo(jx + 30, jy + 4, jx + 31, jy + 7);
+                    ctx.quadraticCurveTo(jx + 30, jy + 10, jx + 21, jy + 12);
+                    ctx.lineTo(jx + 2, jy + 11);
+                    ctx.closePath();
+                    ctx.fillStyle = jsGrad;
+                    ctx.fill();
+
+                    // Hot Pink Racing Decal Strip
+                    const decGrad = ctx.createLinearGradient(jx + 16, jy + 4, jx + 16, jy + 10);
+                    decGrad.addColorStop(0, "#be185d");
+                    decGrad.addColorStop(0.5, "#ff2a85");
+                    decGrad.addColorStop(1, "#f43f5e");
+                    ctx.fillStyle = decGrad;
+                    ctx.fillRect(jx + 16, jy + 5, 11, 4);
+
+                    // 3D Contoured Saddle Seat & Handlebars
+                    const seatGrad = ctx.createLinearGradient(jx + 6, jy + 4, jx + 6, jy + 10);
+                    seatGrad.addColorStop(0, "#0f172a");
+                    seatGrad.addColorStop(0.5, "#334155");
+                    seatGrad.addColorStop(1, "#020617");
+                    ctx.fillStyle = seatGrad;
+                    ctx.fillRect(jx + 5, jy + 4, 13, 6);
+
+                    // Chrome Handlebar Crossbar with Grip Ends
+                    ctx.strokeStyle = "#f8fafc";
+                    ctx.lineWidth = 1.6;
+                    ctx.beginPath(); ctx.moveTo(jx + 18, jy + 2); ctx.lineTo(jx + 18, jy + 12); ctx.stroke();
+                    ctx.fillStyle = "#ef4444";
+                    ctx.fillRect(jx + 17, jy + 1, 2, 2);
+                    ctx.fillRect(jx + 17, jy + 11, 2, 2);
+                    ctx.restore();
+                    meta.sprites.objects["jetski_neon"] = [jx, jy, 32, 14];
+                }
 
                 // 5F. Muscle Beach Weightlifting Bench & Heavy Barbell ("gym_bench", 30x22)
                 const gbx = 1070, gby = py2;
@@ -1890,227 +2040,537 @@ class RetroRenderer {
                 meta.sprites.objects["golf_green_pin"] = [ggx, ggy, 28, 28];
 
                 // 5N. VCIA Commercial Widebody Airliner Jet ("airliner_jet", 96x88, nose facing East +X)
-                const ajx = 1400, ajy = py2;
-                ctx.save();
-                // Twin underwing turbofan engine nacelles
-                ctx.fillStyle = "#475569";
-                ctx.fillRect(ajx + 44, ajy + 16, 16, 8);
-                ctx.fillRect(ajx + 44, ajy + 64, 16, 8);
-                ctx.fillStyle = "#cbd5e1";
-                ctx.fillRect(ajx + 46, ajy + 17, 13, 6);
-                ctx.fillRect(ajx + 46, ajy + 65, 13, 6);
-                // Swept main wings + rear horizontal stabilizers
-                ctx.beginPath();
-                ctx.moveTo(ajx + 56, ajy + 38);
-                ctx.lineTo(ajx + 30, ajy + 3);
-                ctx.lineTo(ajx + 22, ajy + 3);
-                ctx.lineTo(ajx + 38, ajy + 38);
-                ctx.lineTo(ajx + 16, ajy + 39);
-                ctx.lineTo(ajx + 4,  ajy + 22);
-                ctx.lineTo(ajx + 1,  ajy + 22);
-                ctx.lineTo(ajx + 8,  ajy + 44);
-                ctx.lineTo(ajx + 1,  ajy + 66);
-                ctx.lineTo(ajx + 4,  ajy + 66);
-                ctx.lineTo(ajx + 16, ajy + 49);
-                ctx.lineTo(ajx + 38, ajy + 50);
-                ctx.lineTo(ajx + 22, ajy + 85);
-                ctx.lineTo(ajx + 30, ajy + 85);
-                ctx.lineTo(ajx + 56, ajy + 50);
-                ctx.closePath();
-                ctx.fillStyle = "#cbd5e1";
-                ctx.fill();
-                ctx.lineWidth = 1.2;
-                ctx.strokeStyle = "#334155";
-                ctx.stroke();
-                // Wingtip red (port/top) & green (starboard/bottom) navigation strobes
-                ctx.fillStyle = "#ef4444";
-                ctx.fillRect(ajx + 23, ajy + 3, 4, 3);
-                ctx.fillStyle = "#22c55e";
-                ctx.fillRect(ajx + 23, ajy + 82, 4, 3);
-                // Cylindrical pearl-white widebody fuselage
-                ctx.beginPath();
-                ctx.moveTo(ajx + 6, ajy + 44);
-                ctx.lineTo(ajx + 20, ajy + 37);
-                ctx.lineTo(ajx + 76, ajy + 37);
-                ctx.quadraticCurveTo(ajx + 93, ajy + 38, ajx + 95, ajy + 44);
-                ctx.quadraticCurveTo(ajx + 93, ajy + 50, ajx + 76, ajy + 51);
-                ctx.lineTo(ajx + 20, ajy + 51);
-                ctx.closePath();
-                ctx.fillStyle = "#f8fafc";
-                ctx.fill();
-                ctx.strokeStyle = "#475569";
-                ctx.stroke();
-                // Vice Air cyan & neon-pink cheatline + passenger windows
-                ctx.fillStyle = "#06b6d4";
-                ctx.fillRect(ajx + 22, ajy + 39, 54, 2);
-                ctx.fillRect(ajx + 22, ajy + 47, 54, 2);
-                ctx.fillStyle = "#ec4899";
-                ctx.fillRect(ajx + 18, ajy + 43, 18, 2);
-                // Wrap-around sapphire cockpit windshield
-                ctx.fillStyle = "#0f172a";
-                ctx.beginPath();
-                ctx.arc(ajx + 85, ajy + 44, 4.2, -Math.PI * 0.42, Math.PI * 0.42);
-                ctx.fill();
-                ctx.restore();
-                meta.sprites.objects["airliner_jet"] = [ajx, ajy, 96, 88];
+                {
+                    const ajx = 1400, ajy = py2;
+                    ctx.save();
+                    // 1. Outer dark silhouette rim (#0b111e)
+                    ctx.fillStyle = "#0b111e";
+                    // Swept main wing + stabilizers outer path
+                    ctx.beginPath();
+                    ctx.moveTo(ajx + 57, ajy + 37);
+                    ctx.lineTo(ajx + 30, ajy + 1);
+                    ctx.lineTo(ajx + 20, ajy + 1);
+                    ctx.lineTo(ajx + 38, ajy + 37);
+                    ctx.lineTo(ajx + 15, ajy + 38);
+                    ctx.lineTo(ajx + 3,  ajy + 20);
+                    ctx.lineTo(ajx + 0,  ajy + 20);
+                    ctx.lineTo(ajx + 7,  ajy + 44);
+                    ctx.lineTo(ajx + 0,  ajy + 68);
+                    ctx.lineTo(ajx + 3,  ajy + 68);
+                    ctx.lineTo(ajx + 15, ajy + 50);
+                    ctx.lineTo(ajx + 38, ajy + 51);
+                    ctx.lineTo(ajx + 20, ajy + 87);
+                    ctx.lineTo(ajx + 30, ajy + 87);
+                    ctx.lineTo(ajx + 57, ajy + 51);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 2. Swept 3D Wings with metallic airfoil gradient + leading-edge slats
+                    const wingGrad = ctx.createLinearGradient(ajx + 20, ajy + 1, ajx + 56, ajy + 87);
+                    wingGrad.addColorStop(0.0, "#94a3b8"); // port tip shadow
+                    wingGrad.addColorStop(0.25, "#cbd5e1");
+                    wingGrad.addColorStop(0.50, "#f1f5f9"); // wing root
+                    wingGrad.addColorStop(0.75, "#cbd5e1");
+                    wingGrad.addColorStop(1.0, "#64748b"); // starboard tip shadow
+                    ctx.beginPath();
+                    ctx.moveTo(ajx + 56, ajy + 38);
+                    ctx.lineTo(ajx + 30, ajy + 2);
+                    ctx.lineTo(ajx + 21, ajy + 2);
+                    ctx.lineTo(ajx + 38, ajy + 38);
+                    ctx.lineTo(ajx + 15, ajy + 39);
+                    ctx.lineTo(ajx + 4,  ajy + 21);
+                    ctx.lineTo(ajx + 1,  ajy + 21);
+                    ctx.lineTo(ajx + 8,  ajy + 44);
+                    ctx.lineTo(ajx + 1,  ajy + 67);
+                    ctx.lineTo(ajx + 4,  ajy + 67);
+                    ctx.lineTo(ajx + 15, ajy + 49);
+                    ctx.lineTo(ajx + 38, ajy + 50);
+                    ctx.lineTo(ajx + 21, ajy + 86);
+                    ctx.lineTo(ajx + 30, ajy + 86);
+                    ctx.lineTo(ajx + 56, ajy + 50);
+                    ctx.closePath();
+                    ctx.fillStyle = wingGrad;
+                    ctx.fill();
+
+                    // Chrome leading edge slat line
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.0;
+                    ctx.beginPath();
+                    ctx.moveTo(ajx + 56, ajy + 38); ctx.lineTo(ajx + 30, ajy + 2);
+                    ctx.moveTo(ajx + 56, ajy + 50); ctx.lineTo(ajx + 30, ajy + 86);
+                    ctx.stroke();
+
+                    // Trailing edge flap and aileron control surface seams
+                    ctx.strokeStyle = "rgba(51, 65, 85, 0.55)";
+                    ctx.lineWidth = 0.9;
+                    ctx.beginPath();
+                    ctx.moveTo(ajx + 25, ajy + 12); ctx.lineTo(ajx + 39, ajy + 38);
+                    ctx.moveTo(ajx + 25, ajy + 76); ctx.lineTo(ajx + 39, ajy + 50);
+                    ctx.stroke();
+
+                    // 3. Twin 3ds Max Underwing Turbofan Engines with chrome intake lips & dark fan throats
+                    for (const engY of [ajy + 15, ajy + 63]) {
+                        // Engine pylon drop shadow
+                        ctx.fillStyle = "rgba(15, 23, 42, 0.45)";
+                        ctx.fillRect(ajx + 40, engY + 1, 20, 10);
+                        // Engine cylindrical cowl
+                        const cowlGrad = ctx.createLinearGradient(ajx + 42, engY, ajx + 42, engY + 10);
+                        cowlGrad.addColorStop(0.0, "#64748b");
+                        cowlGrad.addColorStop(0.3, "#f8fafc");
+                        cowlGrad.addColorStop(0.7, "#cbd5e1");
+                        cowlGrad.addColorStop(1.0, "#334155");
+                        ctx.fillStyle = cowlGrad;
+                        ctx.fillRect(ajx + 43, engY + 1, 17, 8);
+                        // Polished chrome intake lip (+X)
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(ajx + 59, engY + 1.5, 2, 7);
+                        // Dark turbine fan throat with center spinner
+                        ctx.fillStyle = "#090d16";
+                        ctx.fillRect(ajx + 57, engY + 2, 2, 6);
+                        ctx.fillStyle = "#38bdf8";
+                        ctx.fillRect(ajx + 58, engY + 4, 1.5, 2);
+                        // Hot exhaust nozzle cone (-X)
+                        ctx.fillStyle = "#1e293b";
+                        ctx.fillRect(ajx + 41, engY + 2.5, 2, 5);
+                    }
+
+                    // Wingtip Port (Red) and Starboard (Green) Navigation Strobes
+                    ctx.fillStyle = "#ef4444"; ctx.fillRect(ajx + 22, ajy + 2, 4, 3);
+                    ctx.fillStyle = "#22c55e"; ctx.fillRect(ajx + 22, ajy + 83, 4, 3);
+
+                    // 4. Fuselage Dark Outer Silhouette
+                    ctx.beginPath();
+                    ctx.moveTo(ajx + 5, ajy + 44);
+                    ctx.lineTo(ajx + 19, ajy + 36);
+                    ctx.lineTo(ajx + 76, ajy + 36);
+                    ctx.quadraticCurveTo(ajx + 95, ajy + 37, ajx + 96, ajy + 44);
+                    ctx.quadraticCurveTo(ajx + 95, ajy + 51, ajx + 76, ajy + 52);
+                    ctx.lineTo(ajx + 19, ajy + 52);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // 5. 3ds Max Cylindrical Widebody Fuselage with Transverse Phong Specular Crown
+                    const fuseGrad = ctx.createLinearGradient(ajx, ajy + 37, ajx, ajy + 51);
+                    fuseGrad.addColorStop(0.0, "#475569"); // port shadow flank
+                    fuseGrad.addColorStop(0.18, "#cbd5e1");
+                    fuseGrad.addColorStop(0.38, "#ffffff"); // off-center sunlit crown highlight
+                    fuseGrad.addColorStop(0.65, "#f1f5f9");
+                    fuseGrad.addColorStop(0.85, "#cbd5e1");
+                    fuseGrad.addColorStop(1.0, "#475569"); // starboard shadow flank
+                    ctx.beginPath();
+                    ctx.moveTo(ajx + 6, ajy + 44);
+                    ctx.lineTo(ajx + 20, ajy + 37);
+                    ctx.lineTo(ajx + 76, ajy + 37);
+                    ctx.quadraticCurveTo(ajx + 93, ajy + 38, ajx + 95, ajy + 44);
+                    ctx.quadraticCurveTo(ajx + 93, ajy + 50, ajx + 76, ajy + 51);
+                    ctx.lineTo(ajx + 20, ajy + 51);
+                    ctx.closePath();
+                    ctx.fillStyle = fuseGrad;
+                    ctx.fill();
+
+                    // 6. Vice Air Metallic Cyan & Hot-Pink Cheatlines + Dark Passenger Window Ribbons
+                    const cheatCyan = ctx.createLinearGradient(ajx + 22, ajy + 39, ajx + 76, ajy + 39);
+                    cheatCyan.addColorStop(0, "#0891b2"); cheatCyan.addColorStop(0.5, "#00f0ff"); cheatCyan.addColorStop(1, "#06b6d4");
+                    ctx.fillStyle = cheatCyan;
+                    ctx.fillRect(ajx + 22, ajy + 39, 54, 1.8);
+                    ctx.fillRect(ajx + 22, ajy + 47.2, 54, 1.8);
+                    ctx.fillStyle = "#ff2a85";
+                    ctx.fillRect(ajx + 18, ajy + 43, 20, 2);
+
+                    // Passenger Windows (small dark apertures)
+                    ctx.fillStyle = "#0f172a";
+                    for (let wx = ajx + 24; wx <= ajx + 72; wx += 4) {
+                        ctx.fillRect(wx, ajy + 40, 2, 1.2);
+                        ctx.fillRect(wx, ajy + 46.8, 2, 1.2);
+                    }
+
+                    // 7. 3ds Max Smoked Sapphire Cockpit Windshield with Sky Reflection Band
+                    const cockGrad = ctx.createLinearGradient(ajx + 82, ajy + 40, ajx + 90, ajy + 48);
+                    cockGrad.addColorStop(0.0, "#081b33");
+                    cockGrad.addColorStop(0.35, "#38bdf8"); // sky reflection
+                    cockGrad.addColorStop(0.60, "#ffffff"); // specular glint
+                    cockGrad.addColorStop(0.85, "#0369a1");
+                    cockGrad.addColorStop(1.0, "#07172c");
+                    ctx.beginPath();
+                    ctx.arc(ajx + 86, ajy + 44, 4.4, -Math.PI * 0.44, Math.PI * 0.44);
+                    ctx.fillStyle = cockGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+
+                    // Vertical Tail Fin Shadow & Satcom Antenna Domes
+                    ctx.fillStyle = "#64748b";
+                    ctx.fillRect(ajx + 12, ajy + 43, 14, 2);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath(); ctx.arc(ajx + 48, ajy + 44, 2.0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(ajx + 62, ajy + 44, 1.6, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                    meta.sprites.objects["airliner_jet"] = [ajx, ajy, 96, 88];
+                }
 
                 // 5O. VIP Executive Learjet ("private_learjet", 56x52, nose facing East +X)
-                const ljx = 1502, ljy = py2;
-                ctx.save();
-                // Swept wings + rear tailplane
-                ctx.beginPath();
-                ctx.moveTo(ljx + 32, ljy + 22);
-                ctx.lineTo(ljx + 18, ljy + 3);
-                ctx.lineTo(ljx + 13, ljy + 3);
-                ctx.lineTo(ljx + 21, ljy + 22);
-                ctx.lineTo(ljx + 10, ljy + 23);
-                ctx.lineTo(ljx + 2,  ljy + 13);
-                ctx.lineTo(ljx + 5,  ljy + 26);
-                ctx.lineTo(ljx + 2,  ljy + 39);
-                ctx.lineTo(ljx + 10, ljy + 29);
-                ctx.lineTo(ljx + 21, ljy + 30);
-                ctx.lineTo(ljx + 13, ljy + 49);
-                ctx.lineTo(ljx + 18, ljy + 49);
-                ctx.lineTo(ljx + 32, ljy + 30);
-                ctx.closePath();
-                ctx.fillStyle = "#e2e8f0";
-                ctx.fill();
-                ctx.strokeStyle = "#475569";
-                ctx.lineWidth = 1.0;
-                ctx.stroke();
-                // Rear fuselage twin nacelles
-                ctx.fillStyle = "#334155";
-                ctx.fillRect(ljx + 11, ljy + 18, 9, 4);
-                ctx.fillRect(ljx + 11, ljy + 30, 9, 4);
-                // Fuselage + gold VIP stripe
-                ctx.beginPath();
-                ctx.moveTo(ljx + 4, ljy + 26);
-                ctx.lineTo(ljx + 14, ljy + 21);
-                ctx.lineTo(ljx + 43, ljy + 21);
-                ctx.quadraticCurveTo(ljx + 54, ljy + 22, ljx + 55, ljy + 26);
-                ctx.quadraticCurveTo(ljx + 54, ljy + 30, ljx + 43, ljy + 31);
-                ctx.lineTo(ljx + 14, ljy + 31);
-                ctx.closePath();
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = "#eab308";
-                ctx.fillRect(ljx + 15, ljy + 23, 28, 1.5);
-                ctx.fillRect(ljx + 15, ljy + 27.5, 28, 1.5);
-                ctx.fillStyle = "#0f172a";
-                ctx.fillRect(ljx + 45, ljy + 23.5, 4, 5);
-                ctx.restore();
-                meta.sprites.objects["private_learjet"] = [ljx, ljy, 56, 52];
+                {
+                    const ljx = 1502, ljy = py2;
+                    ctx.save();
+                    // 1. Dark silhouette rim (#0b111e)
+                    ctx.fillStyle = "#0b111e";
+                    ctx.beginPath();
+                    ctx.moveTo(ljx + 33, ljy + 21);
+                    ctx.lineTo(ljx + 18, ljy + 2);
+                    ctx.lineTo(ljx + 12, ljy + 2);
+                    ctx.lineTo(ljx + 21, ljy + 21);
+                    ctx.lineTo(ljx + 9,  ljy + 22);
+                    ctx.lineTo(ljx + 1,  ljy + 12);
+                    ctx.lineTo(ljx + 4,  ljy + 26);
+                    ctx.lineTo(ljx + 1,  ljy + 40);
+                    ctx.lineTo(ljx + 9,  ljy + 30);
+                    ctx.lineTo(ljx + 21, ljy + 31);
+                    ctx.lineTo(ljx + 12, ljy + 50);
+                    ctx.lineTo(ljx + 18, ljy + 50);
+                    ctx.lineTo(ljx + 33, ljy + 31);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 2. Swept 3D Main Wings + Wingtip Tanks / Winglets
+                    const ljwGrad = ctx.createLinearGradient(ljx + 12, ljy + 2, ljx + 32, ljy + 50);
+                    ljwGrad.addColorStop(0.0, "#94a3b8");
+                    ljwGrad.addColorStop(0.3, "#cbd5e1");
+                    ljwGrad.addColorStop(0.5, "#ffffff");
+                    ljwGrad.addColorStop(0.7, "#cbd5e1");
+                    ljwGrad.addColorStop(1.0, "#64748b");
+                    ctx.beginPath();
+                    ctx.moveTo(ljx + 32, ljy + 22);
+                    ctx.lineTo(ljx + 18, ljy + 3);
+                    ctx.lineTo(ljx + 13, ljy + 3);
+                    ctx.lineTo(ljx + 21, ljy + 22);
+                    ctx.lineTo(ljx + 10, ljy + 23);
+                    ctx.lineTo(ljx + 2,  ljy + 13);
+                    ctx.lineTo(ljx + 5,  ljy + 26);
+                    ctx.lineTo(ljx + 2,  ljy + 39);
+                    ctx.lineTo(ljx + 10, ljy + 29);
+                    ctx.lineTo(ljx + 21, ljy + 30);
+                    ctx.lineTo(ljx + 13, ljy + 49);
+                    ctx.lineTo(ljx + 18, ljy + 49);
+                    ctx.lineTo(ljx + 32, ljy + 30);
+                    ctx.closePath();
+                    ctx.fillStyle = ljwGrad;
+                    ctx.fill();
+
+                    // Chrome leading edges & wingtip tanks
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.0;
+                    ctx.beginPath();
+                    ctx.moveTo(ljx + 32, ljy + 22); ctx.lineTo(ljx + 18, ljy + 3);
+                    ctx.moveTo(ljx + 32, ljy + 30); ctx.lineTo(ljx + 18, ljy + 49);
+                    ctx.stroke();
+                    ctx.fillStyle = "#facc15";
+                    ctx.fillRect(ljx + 13, ljy + 2, 5, 2.5);
+                    ctx.fillRect(ljx + 13, ljy + 47.5, 5, 2.5);
+
+                    // 3. Rear Fuselage Twin Turbofan Nacelles
+                    for (const ny0 of [ljy + 17, ljy + 29]) {
+                        const nacGrad = ctx.createLinearGradient(ljx + 11, ny0, ljx + 11, ny0 + 6);
+                        nacGrad.addColorStop(0, "#475569");
+                        nacGrad.addColorStop(0.4, "#ffffff");
+                        nacGrad.addColorStop(1, "#1e293b");
+                        ctx.fillStyle = nacGrad;
+                        ctx.fillRect(ljx + 11, ny0, 10, 5.5);
+                        ctx.fillStyle = "#ffffff"; // chrome intake ring
+                        ctx.fillRect(ljx + 20, ny0 + 0.5, 1.5, 4.5);
+                        ctx.fillStyle = "#0f172a"; // intake hole
+                        ctx.fillRect(ljx + 19, ny0 + 1, 1.5, 3.5);
+                    }
+
+                    // 4. Cylindrical Pearl-White VIP Fuselage
+                    const ljfGrad = ctx.createLinearGradient(ljx, ljy + 21, ljx, ljy + 31);
+                    ljfGrad.addColorStop(0.0, "#64748b");
+                    ljfGrad.addColorStop(0.2, "#e2e8f0");
+                    ljfGrad.addColorStop(0.4, "#ffffff");
+                    ljfGrad.addColorStop(0.7, "#f8fafc");
+                    ljfGrad.addColorStop(1.0, "#475569");
+                    ctx.beginPath();
+                    ctx.moveTo(ljx + 4, ljy + 26);
+                    ctx.lineTo(ljx + 14, ljy + 21);
+                    ctx.lineTo(ljx + 43, ljy + 21);
+                    ctx.quadraticCurveTo(ljx + 55, ljy + 22, ljx + 56, ljy + 26);
+                    ctx.quadraticCurveTo(ljx + 55, ljy + 30, ljx + 43, ljy + 31);
+                    ctx.lineTo(ljx + 14, ljy + 31);
+                    ctx.closePath();
+                    ctx.fillStyle = ljfGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 1.0;
+                    ctx.stroke();
+
+                    // Gold Executive Livery Stripes
+                    const goldGrad = ctx.createLinearGradient(ljx + 15, ljy + 23, ljx + 44, ljy + 23);
+                    goldGrad.addColorStop(0, "#ca8a04"); goldGrad.addColorStop(0.5, "#fef08a"); goldGrad.addColorStop(1, "#eab308");
+                    ctx.fillStyle = goldGrad;
+                    ctx.fillRect(ljx + 15, ljy + 23, 29, 1.4);
+                    ctx.fillRect(ljx + 15, ljy + 27.6, 29, 1.4);
+
+                    // Smoked Sapphire Cockpit Glass with Glint
+                    const ljcGrad = ctx.createLinearGradient(ljx + 44, ljy + 23, ljx + 50, ljy + 29);
+                    ljcGrad.addColorStop(0.0, "#0f172a");
+                    ljcGrad.addColorStop(0.4, "#38bdf8");
+                    ljcGrad.addColorStop(0.7, "#ffffff");
+                    ljcGrad.addColorStop(1.0, "#0369a1");
+                    ctx.fillStyle = ljcGrad;
+                    ctx.fillRect(ljx + 45, ljy + 23.5, 4.5, 5);
+                    ctx.restore();
+                    meta.sprites.objects["private_learjet"] = [ljx, ljy, 56, 52];
+                }
 
                 // 5P. Vice City Police / Tour Helicopter ("heli_vice", 56x26, nose facing East +X)
-                const hvx = 1564, hvy = py2;
-                ctx.save();
-                // Landing skids
-                ctx.strokeStyle = "#1e293b";
-                ctx.lineWidth = 2.0;
-                ctx.beginPath();
-                ctx.moveTo(hvx + 22, hvy + 3);  ctx.lineTo(hvx + 46, hvy + 3);
-                ctx.moveTo(hvx + 22, hvy + 23); ctx.lineTo(hvx + 46, hvy + 23);
-                ctx.moveTo(hvx + 28, hvy + 3);  ctx.lineTo(hvx + 28, hvy + 23);
-                ctx.moveTo(hvx + 40, hvy + 3);  ctx.lineTo(hvx + 40, hvy + 23);
-                ctx.stroke();
-                // Tail boom + stabilizer
-                ctx.fillStyle = "#0284c7";
-                ctx.fillRect(hvx + 3, hvy + 11, 22, 4);
-                ctx.fillRect(hvx + 4, hvy + 6, 3, 14);
-                // Streamlined cabin body
-                ctx.beginPath();
-                ctx.ellipse(hvx + 35, hvy + 13, 16, 8.5, 0, 0, Math.PI * 2);
-                ctx.fillStyle = "#f8fafc";
-                ctx.fill();
-                ctx.lineWidth = 1.2;
-                ctx.strokeStyle = "#0f172a";
-                ctx.stroke();
-                // Turquoise VCPD / Vice Tour trim & tinted bubble canopy
-                ctx.fillStyle = "#06b6d4";
-                ctx.fillRect(hvx + 22, hvy + 8, 18, 10);
-                ctx.beginPath();
-                ctx.arc(hvx + 43, hvy + 13, 6.8, -Math.PI * 0.48, Math.PI * 0.48);
-                ctx.fillStyle = "#0f172a";
-                ctx.fill();
-                // Rotor mast hub
-                ctx.fillStyle = "#475569";
-                ctx.beginPath();
-                ctx.arc(hvx + 33, hvy + 13, 3.2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-                meta.sprites.objects["heli_vice"] = [hvx, hvy, 56, 26];
+                {
+                    const hvx = 1564, hvy = py2;
+                    ctx.save();
+                    // 1. Tubular Steel Landing Skids with Cross-Struts & Drop Shadow
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.4)";
+                    ctx.fillRect(hvx + 21, hvy + 4, 26, 2);
+                    ctx.fillRect(hvx + 21, hvy + 22, 26, 2);
+
+                    const skidGrad = ctx.createLinearGradient(hvx + 20, hvy + 2, hvx + 20, hvy + 24);
+                    skidGrad.addColorStop(0, "#ffffff"); skidGrad.addColorStop(0.5, "#64748b"); skidGrad.addColorStop(1, "#334155");
+                    ctx.strokeStyle = skidGrad;
+                    ctx.lineWidth = 2.0;
+                    ctx.beginPath();
+                    ctx.moveTo(hvx + 22, hvy + 3);  ctx.lineTo(hvx + 46, hvy + 3);
+                    ctx.moveTo(hvx + 22, hvy + 23); ctx.lineTo(hvx + 46, hvy + 23);
+                    ctx.moveTo(hvx + 28, hvy + 3);  ctx.lineTo(hvx + 28, hvy + 23);
+                    ctx.moveTo(hvx + 40, hvy + 3);  ctx.lineTo(hvx + 40, hvy + 23);
+                    ctx.stroke();
+
+                    // 2. Tapered 3D Cylindrical Tail Boom + Horizontal Stabilizer & Tail Rotor
+                    const boomGrad = ctx.createLinearGradient(hvx + 3, hvy + 11, hvx + 3, hvy + 15);
+                    boomGrad.addColorStop(0, "#0284c7");
+                    boomGrad.addColorStop(0.4, "#38bdf8");
+                    boomGrad.addColorStop(1, "#0369a1");
+                    ctx.fillStyle = boomGrad;
+                    ctx.fillRect(hvx + 3, hvy + 11, 23, 4);
+                    // Vertical stabilizer fin & tail rotor blade
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(hvx + 4, hvy + 6, 3, 14);
+                    ctx.fillStyle = "#ef4444";
+                    ctx.fillRect(hvx + 4, hvy + 5, 3, 2);
+                    ctx.fillRect(hvx + 4, hvy + 19, 3, 2);
+
+                    // 3. Sculpted 3D Teardrop Fuselage Body
+                    const bodyGrad = ctx.createLinearGradient(hvx + 20, hvy + 4, hvx + 20, hvy + 22);
+                    bodyGrad.addColorStop(0.0, "#475569");
+                    bodyGrad.addColorStop(0.2, "#cbd5e1");
+                    bodyGrad.addColorStop(0.4, "#ffffff");
+                    bodyGrad.addColorStop(0.75, "#e2e8f0");
+                    bodyGrad.addColorStop(1.0, "#334155");
+                    ctx.beginPath();
+                    ctx.ellipse(hvx + 35, hvy + 13, 16.5, 9.0, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = bodyGrad;
+                    ctx.fill();
+                    ctx.lineWidth = 1.0;
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.stroke();
+
+                    // 4. Turquoise Vice Police/Tour Accent Panel
+                    const vcGrad = ctx.createLinearGradient(hvx + 22, hvy + 8, hvx + 40, hvy + 18);
+                    vcGrad.addColorStop(0, "#0891b2"); vcGrad.addColorStop(0.5, "#00f0ff"); vcGrad.addColorStop(1, "#0e7490");
+                    ctx.fillStyle = vcGrad;
+                    ctx.fillRect(hvx + 22, hvy + 8, 18, 10);
+
+                    // 5. Wrap-Around 3ds Max Smoked Sapphire Bubble Canopy with Dual Specular Reflections
+                    const canGrad = ctx.createLinearGradient(hvx + 38, hvy + 7, hvx + 48, hvy + 19);
+                    canGrad.addColorStop(0.0, "#071326");
+                    canGrad.addColorStop(0.35, "#38bdf8");
+                    canGrad.addColorStop(0.55, "#ffffff");
+                    canGrad.addColorStop(0.8, "#0284c7");
+                    canGrad.addColorStop(1.0, "#0f172a");
+                    ctx.beginPath();
+                    ctx.arc(hvx + 43, hvy + 13, 7.2, -Math.PI * 0.48, Math.PI * 0.48);
+                    ctx.fillStyle = canGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+
+                    // 6. Top Turbine Engine Cowling & 3D Metallic Swashplate Mast
+                    const mastGrad = ctx.createRadialGradient(hvx + 33, hvy + 13, 1, hvx + 33, hvy + 13, 5);
+                    mastGrad.addColorStop(0, "#ffffff"); mastGrad.addColorStop(0.5, "#94a3b8"); mastGrad.addColorStop(1, "#334155");
+                    ctx.fillStyle = mastGrad;
+                    ctx.beginPath(); ctx.arc(hvx + 33, hvy + 13, 4.0, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = "#0b111e"; ctx.lineWidth = 1; ctx.stroke();
+                    ctx.restore();
+                    meta.sprites.objects["heli_vice"] = [hvx, hvy, 56, 26];
+                }
 
                 // 5Q. Helipad Touchdown Circle & "H" Marking ("helipad_mark", 48x48)
-                const hpx = 1626, hpy = py2;
-                ctx.save();
-                ctx.fillStyle = "rgba(30, 41, 59, 0.85)";
-                ctx.beginPath();
-                ctx.arc(hpx + 24, hpy + 24, 21, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = "#facc15";
-                ctx.lineWidth = 2.6;
-                ctx.beginPath();
-                ctx.arc(hpx + 24, hpy + 24, 19, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.fillStyle = "#facc15";
-                ctx.fillRect(hpx + 15, hpy + 13, 4, 22);
-                ctx.fillRect(hpx + 29, hpy + 13, 4, 22);
-                ctx.fillRect(hpx + 15, hpy + 22, 18, 4);
-                ctx.restore();
-                meta.sprites.objects["helipad_mark"] = [hpx, hpy, 48, 48];
+                {
+                    const hpx = 1626, hpy = py2;
+                    ctx.save();
+                    // Concrete pad with radial wear
+                    const padGrad = ctx.createRadialGradient(hpx + 24, hpy + 24, 6, hpx + 24, hpy + 24, 23);
+                    padGrad.addColorStop(0.0, "rgba(51, 65, 85, 0.95)");
+                    padGrad.addColorStop(0.85, "rgba(30, 41, 59, 0.95)");
+                    padGrad.addColorStop(1.0, "rgba(15, 23, 42, 0.98)");
+                    ctx.fillStyle = padGrad;
+                    ctx.beginPath(); ctx.arc(hpx + 24, hpy + 24, 22, 0, Math.PI * 2); ctx.fill();
+
+                    // Yellow High-Visibility Outer Ring
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 2.8;
+                    ctx.beginPath(); ctx.arc(hpx + 24, hpy + 24, 19.5, 0, Math.PI * 2); ctx.stroke();
+
+                    // Inner White Alignment Marks
+                    ctx.strokeStyle = "rgba(248, 250, 252, 0.55)";
+                    ctx.lineWidth = 1.0;
+                    ctx.beginPath(); ctx.arc(hpx + 24, hpy + 24, 15.0, 0, Math.PI * 2); ctx.stroke();
+
+                    // Bold Yellow "H" Marking with Bevel
+                    ctx.fillStyle = "#facc15";
+                    ctx.fillRect(hpx + 14, hpy + 12, 4.5, 24);
+                    ctx.fillRect(hpx + 29.5, hpy + 12, 4.5, 24);
+                    ctx.fillRect(hpx + 14, hpy + 21.5, 20, 5);
+
+                    ctx.fillStyle = "#ffffff"; // sunlit top bevel
+                    ctx.fillRect(hpx + 14, hpy + 12, 4.5, 1.2);
+                    ctx.fillRect(hpx + 29.5, hpy + 12, 4.5, 1.2);
+                    ctx.fillRect(hpx + 14, hpy + 21.5, 20, 1.2);
+                    ctx.restore();
+                    meta.sprites.objects["helipad_mark"] = [hpx, hpy, 48, 48];
+                }
 
                 // 5R. Deepwater Container Cargo Barge / Freighter ("cargo_barge", 112x38, bow facing East +X)
-                const cbx = 1680, cby = py2;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(cbx + 3, cby + 4);
-                ctx.lineTo(cbx + 86, cby + 4);
-                ctx.quadraticCurveTo(cbx + 108, cby + 6, cbx + 110, cby + 19);
-                ctx.quadraticCurveTo(cbx + 108, cby + 32, cbx + 86, cby + 34);
-                ctx.lineTo(cbx + 3, cby + 34);
-                ctx.closePath();
-                ctx.fillStyle = "#1e293b";
-                ctx.fill();
-                ctx.lineWidth = 1.5;
-                ctx.strokeStyle = "#dc2626";
-                ctx.stroke();
-                // Steel cargo hold deck
-                ctx.fillStyle = "#334155";
-                ctx.fillRect(cbx + 8, cby + 7, 76, 24);
-                // White aft superstructure bridge house
-                ctx.fillStyle = "#f8fafc";
-                ctx.fillRect(cbx + 7, cby + 8, 14, 22);
-                ctx.fillStyle = "#0284c7";
-                ctx.fillRect(cbx + 18, cby + 10, 3, 18);
-                // 6 colorful 40ft intermodal containers stacked in hold
-                const contCols = ["#dc2626", "#2563eb", "#d97706", "#16a34a", "#0891b2", "#9333ea"];
-                for (let ci = 0; ci < 6; ci++) {
-                    const cx0 = cbx + 24 + (ci % 3) * 19;
-                    const cy0 = cby + 8 + Math.floor(ci / 3) * 11;
-                    ctx.fillStyle = contCols[ci];
-                    ctx.fillRect(cx0, cy0, 17, 9);
-                    ctx.strokeStyle = "rgba(15, 23, 42, 0.55)";
-                    ctx.lineWidth = 0.8;
-                    ctx.strokeRect(cx0, cy0, 17, 9);
+                {
+                    const cbx = 1680, cby = py2;
+                    ctx.save();
+                    // 1. Dark silhouette outline
+                    ctx.beginPath();
+                    ctx.moveTo(cbx + 2, cby + 3);
+                    ctx.lineTo(cbx + 86, cby + 3);
+                    ctx.quadraticCurveTo(cbx + 109, cby + 5, cbx + 111, cby + 19);
+                    ctx.quadraticCurveTo(cbx + 109, cby + 33, cbx + 86, cby + 35);
+                    ctx.lineTo(cbx + 2, cby + 35);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // 2. Heavy Steel Hull with Red Oxide Waterline & Gunmetal Coaming
+                    const hullGrad = ctx.createLinearGradient(cbx, cby + 4, cbx, cby + 34);
+                    hullGrad.addColorStop(0.0, "#334155");
+                    hullGrad.addColorStop(0.2, "#475569");
+                    hullGrad.addColorStop(0.5, "#64748b");
+                    hullGrad.addColorStop(0.8, "#334155");
+                    hullGrad.addColorStop(1.0, "#1e293b");
+                    ctx.beginPath();
+                    ctx.moveTo(cbx + 3, cby + 4);
+                    ctx.lineTo(cbx + 86, cby + 4);
+                    ctx.quadraticCurveTo(cbx + 108, cby + 6, cbx + 110, cby + 19);
+                    ctx.quadraticCurveTo(cbx + 108, cby + 32, cbx + 86, cby + 34);
+                    ctx.lineTo(cbx + 3, cby + 34);
+                    ctx.closePath();
+                    ctx.fillStyle = hullGrad;
+                    ctx.fill();
+                    // Red oxide anti-fouling trim
+                    ctx.strokeStyle = "#dc2626";
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+
+                    // 3. Recessed Cargo Hold with Dark AO Shadow
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(cbx + 7, cby + 6, 78, 26);
+                    ctx.fillStyle = "#1e293b";
+                    ctx.fillRect(cbx + 8, cby + 7, 76, 24);
+
+                    // 4. White Aft Bridge House & Smokestacks
+                    const bridgeGrad = ctx.createLinearGradient(cbx + 7, cby + 7, cbx + 22, cby + 31);
+                    bridgeGrad.addColorStop(0.0, "#94a3b8");
+                    bridgeGrad.addColorStop(0.4, "#ffffff");
+                    bridgeGrad.addColorStop(1.0, "#cbd5e1");
+                    ctx.fillStyle = bridgeGrad;
+                    ctx.fillRect(cbx + 7, cby + 7, 15, 24);
+                    // Blue navigation bridge windows
+                    ctx.fillStyle = "#0284c7";
+                    ctx.fillRect(cbx + 18, cby + 9, 3, 20);
+                    // Twin yellow/black exhaust smokestacks
+                    ctx.fillStyle = "#facc15";
+                    ctx.fillRect(cbx + 9, cby + 9, 4, 4);
+                    ctx.fillRect(cbx + 9, cby + 25, 4, 4);
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(cbx + 11, cby + 10, 2, 2);
+                    ctx.fillRect(cbx + 11, cby + 26, 2, 2);
+
+                    // 5. 6 Intermodal 40ft Shipping Containers with 3ds Max Corrugated Rib Shading
+                    const contCols = [
+                        ["#dc2626", "#ef4444", "#991b1b"], // Red
+                        ["#2563eb", "#60a5fa", "#1e40af"], // Blue
+                        ["#d97706", "#fbbf24", "#92400e"], // Amber
+                        ["#16a34a", "#4ade80", "#166534"], // Green
+                        ["#0891b2", "#22d3ee", "#155e75"], // Cyan
+                        ["#9333ea", "#c084fc", "#6b21a8"]  // Purple
+                    ];
+                    for (let ci = 0; ci < 6; ci++) {
+                        const cx0 = cbx + 24 + (ci % 3) * 19;
+                        const cy0 = cby + 8 + Math.floor(ci / 3) * 11;
+                        const [cBase, cLight, cDark] = contCols[ci];
+                        // Container base
+                        ctx.fillStyle = cBase;
+                        ctx.fillRect(cx0, cy0, 17, 9);
+                        // Corrugated roof ribs (alternating sunlit & shadowed 2px ribs)
+                        for (let rx = cx0 + 2; rx <= cx0 + 14; rx += 3) {
+                            ctx.fillStyle = cLight;
+                            ctx.fillRect(rx, cy0 + 1, 1.2, 7);
+                            ctx.fillStyle = cDark;
+                            ctx.fillRect(rx + 1.2, cy0 + 1, 1.2, 7);
+                        }
+                        // White Corner Twistlock Castings
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(cx0, cy0, 1.5, 1.5);
+                        ctx.fillRect(cx0 + 15.5, cy0, 1.5, 1.5);
+                        ctx.fillRect(cx0, cy0 + 7.5, 1.5, 1.5);
+                        ctx.fillRect(cx0 + 15.5, cy0 + 7.5, 1.5, 1.5);
+                        // Dark outline
+                        ctx.strokeStyle = "rgba(15, 23, 42, 0.65)";
+                        ctx.lineWidth = 0.8;
+                        ctx.strokeRect(cx0, cy0, 17, 9);
+                    }
+                    ctx.restore();
+                    meta.sprites.objects["cargo_barge"] = [cbx, cby, 112, 38];
                 }
-                ctx.restore();
-                meta.sprites.objects["cargo_barge"] = [cbx, cby, 112, 38];
 
                 // 5S. Quayside Intermodal Shipping Container ("container_stack", 40x18)
-                const csx = 1798, csy = py2;
-                ctx.save();
-                ctx.fillStyle = "#dc2626";
-                ctx.fillRect(csx + 1, csy + 1, 38, 16);
-                ctx.strokeStyle = "#450a0a";
-                ctx.lineWidth = 1.2;
-                ctx.strokeRect(csx + 1, csy + 1, 38, 16);
-                ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
-                for (let rx = csx + 5; rx <= csx + 34; rx += 4) {
-                    ctx.fillRect(rx, csy + 2, 1.5, 14);
+                {
+                    const csx = 1798, csy = py2;
+                    ctx.save();
+                    // Ground shadow
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fillRect(csx, csy, 40, 18);
+                    // Red corrugated cargo container body
+                    const contGrad = ctx.createLinearGradient(csx, csy + 1, csx, csy + 17);
+                    contGrad.addColorStop(0.0, "#991b1b");
+                    contGrad.addColorStop(0.3, "#ef4444");
+                    contGrad.addColorStop(0.7, "#dc2626");
+                    contGrad.addColorStop(1.0, "#7f1d1d");
+                    ctx.fillStyle = contGrad;
+                    ctx.fillRect(csx + 1, csy + 1, 38, 16);
+                    // 3ds Max Corrugated Steel Ribs
+                    for (let rx = csx + 4; rx <= csx + 34; rx += 3.5) {
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.45)"; // sunlit rib edge
+                        ctx.fillRect(rx, csy + 2, 1.2, 14);
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.35)"; // shadowed rib edge
+                        ctx.fillRect(rx + 1.2, csy + 2, 1.2, 14);
+                    }
+                    // Corner Twistlocks
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(csx + 1, csy + 1, 2.5, 2.5);
+                    ctx.fillRect(csx + 36.5, csy + 1, 2.5, 2.5);
+                    ctx.fillRect(csx + 1, csy + 14.5, 2.5, 2.5);
+                    ctx.fillRect(csx + 36.5, csy + 14.5, 2.5, 2.5);
+                    ctx.strokeStyle = "#450a0a";
+                    ctx.lineWidth = 1.0;
+                    ctx.strokeRect(csx + 1, csy + 1, 38, 16);
+                    ctx.restore();
+                    meta.sprites.objects["container_stack"] = [csx, csy, 40, 18];
                 }
-                ctx.restore();
-                meta.sprites.objects["container_stack"] = [csx, csy, 40, 18];
 
                 // =========================================================================
                 // 6. GTA 6 LEONIDA & VICE CITY SPECIAL WORLD UPGRADE SPRITES (Row py3 = origH + 100)
@@ -2118,245 +2578,549 @@ class RetroRenderer {
                 const py3 = origH + 100;
 
                 // 6A. Grassrivers Everglades Swamp Airboat ("airboat_fan", 52x28, bow facing East +X)
-                const abx = 820, aby = py3;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(abx + 3, aby + 4);
-                ctx.lineTo(abx + 36, aby + 4);
-                ctx.quadraticCurveTo(abx + 50, aby + 5, abx + 50, aby + 14);
-                ctx.quadraticCurveTo(abx + 50, aby + 23, abx + 36, aby + 24);
-                ctx.lineTo(abx + 3, aby + 24);
-                ctx.closePath();
-                ctx.fillStyle = "#475569";
-                ctx.fill();
-                ctx.lineWidth = 1.4;
-                ctx.strokeStyle = "#f97316";
-                ctx.stroke();
-                // Non-slip aluminum deck + orange bow sponsons
-                ctx.fillStyle = "#94a3b8";
-                ctx.fillRect(abx + 8, aby + 6, 28, 16);
-                ctx.fillStyle = "#f97316";
-                ctx.fillRect(abx + 36, aby + 6, 9, 4);
-                ctx.fillRect(abx + 36, aby + 18, 9, 4);
-                // Rear wire-mesh fan cage & engine block
-                ctx.fillStyle = "#1e293b";
-                ctx.fillRect(abx + 4, aby + 8, 9, 12);
-                ctx.strokeStyle = "#e2e8f0";
-                ctx.lineWidth = 1.2;
-                ctx.strokeRect(abx + 4, aby + 5, 6, 18);
-                // Elevated captain bucket seat
-                ctx.fillStyle = "#0f172a";
-                ctx.fillRect(abx + 20, aby + 10, 7, 8);
-                ctx.restore();
-                meta.sprites.objects["airboat_fan"] = [abx, aby, 52, 28];
+                {
+                    const abx = 820, aby = py3;
+                    ctx.save();
+                    // 1. Dark silhouette outer rim
+                    ctx.beginPath();
+                    ctx.moveTo(abx + 2, aby + 3);
+                    ctx.lineTo(abx + 36, aby + 3);
+                    ctx.quadraticCurveTo(abx + 51, aby + 4, abx + 51, aby + 14);
+                    ctx.quadraticCurveTo(abx + 51, aby + 24, abx + 36, aby + 25);
+                    ctx.lineTo(abx + 2, aby + 25);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // 2. 3ds Max Flat-Bottom Aluminum Hull with Transverse Lighting & Orange Chine Rails
+                    const abHullGrad = ctx.createLinearGradient(abx, aby + 4, abx, aby + 24);
+                    abHullGrad.addColorStop(0.0, "#475569");
+                    abHullGrad.addColorStop(0.2, "#cbd5e1");
+                    abHullGrad.addColorStop(0.5, "#f1f5f9"); // sunlit deck highlight
+                    abHullGrad.addColorStop(0.8, "#94a3b8");
+                    abHullGrad.addColorStop(1.0, "#334155");
+                    ctx.beginPath();
+                    ctx.moveTo(abx + 3, aby + 4);
+                    ctx.lineTo(abx + 36, aby + 4);
+                    ctx.quadraticCurveTo(abx + 50, aby + 5, abx + 50, aby + 14);
+                    ctx.quadraticCurveTo(abx + 50, aby + 23, abx + 36, aby + 24);
+                    ctx.lineTo(abx + 3, aby + 24);
+                    ctx.closePath();
+                    ctx.fillStyle = abHullGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#f97316"; // high-visibility orange bumper
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+
+                    // 3. Diamond-Plate Aluminum Deck Inset with subtle ribs
+                    ctx.fillStyle = "#64748b";
+                    ctx.fillRect(abx + 8, aby + 6, 28, 16);
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+                    ctx.lineWidth = 0.8;
+                    for (let lx = abx + 10; lx <= abx + 34; lx += 4) {
+                        ctx.beginPath(); ctx.moveTo(lx, aby + 7); ctx.lineTo(lx, aby + 21); ctx.stroke();
+                    }
+
+                    // 4. Rear Stainless-Steel Wire Propeller Cage & V8 Engine Block
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
+                    ctx.fillRect(abx + 3, aby + 4, 10, 20); // cage drop shadow
+
+                    // Chromed V8 Engine Block with Air Intake
+                    const engGrad = ctx.createLinearGradient(abx + 5, aby + 9, abx + 5, aby + 19);
+                    engGrad.addColorStop(0, "#cbd5e1"); engGrad.addColorStop(0.5, "#ffffff"); engGrad.addColorStop(1, "#334155");
+                    ctx.fillStyle = engGrad;
+                    ctx.fillRect(abx + 6, aby + 9, 8, 10);
+                    ctx.fillStyle = "#ef4444"; // red valve covers
+                    ctx.fillRect(abx + 7, aby + 7.5, 6, 1.8);
+                    ctx.fillRect(abx + 7, aby + 18.7, 6, 1.8);
+
+                    // Galvanized Propeller Cage Perimeter & Mesh
+                    ctx.strokeStyle = "#f8fafc";
+                    ctx.lineWidth = 1.4;
+                    ctx.strokeRect(abx + 3.5, aby + 4.5, 7, 19);
+                    ctx.strokeStyle = "rgba(226, 232, 240, 0.65)";
+                    ctx.lineWidth = 0.8;
+                    ctx.beginPath();
+                    ctx.moveTo(abx + 3.5, aby + 8);  ctx.lineTo(abx + 10.5, aby + 20);
+                    ctx.moveTo(abx + 3.5, aby + 20); ctx.lineTo(abx + 10.5, aby + 8);
+                    ctx.stroke();
+
+                    // 5. Elevated Captain Bucket Seat with Tubular Stand
+                    ctx.fillStyle = "#020617";
+                    ctx.fillRect(abx + 20, aby + 9, 8, 10);
+                    const seatGrad = ctx.createLinearGradient(abx + 21, aby + 10, abx + 21, aby + 18);
+                    seatGrad.addColorStop(0, "#1e293b"); seatGrad.addColorStop(0.5, "#475569"); seatGrad.addColorStop(1, "#0f172a");
+                    ctx.fillStyle = seatGrad;
+                    ctx.fillRect(abx + 21, aby + 10, 6, 8);
+                    ctx.restore();
+                    meta.sprites.objects["airboat_fan"] = [abx, aby, 52, 28];
+                }
 
                 // 6B. Vice City Dodo Floatplane / Sky-Banner Tow Plane ("dodo_seaplane", 62x58, nose facing East +X)
-                const dpx = 878, dpy = py3;
-                ctx.save();
-                // Twin silver amphibious pontoons/floats underneath
-                ctx.fillStyle = "#94a3b8";
-                ctx.fillRect(dpx + 18, dpy + 12, 32, 4);
-                ctx.fillRect(dpx + 18, dpy + 42, 32, 4);
-                ctx.strokeStyle = "#334155";
-                ctx.lineWidth = 1.0;
-                ctx.strokeRect(dpx + 18, dpy + 12, 32, 4);
-                ctx.strokeRect(dpx + 18, dpy + 42, 32, 4);
-                // High straight monoplane wing + rear tailplane
-                ctx.fillStyle = "#f8fafc";
-                ctx.fillRect(dpx + 24, dpy + 2, 14, 54);
-                ctx.strokeRect(dpx + 24, dpy + 2, 14, 54);
-                ctx.fillStyle = "#06b6d4";
-                ctx.fillRect(dpx + 28, dpy + 3, 3, 52);
-                ctx.fillStyle = "#ec4899";
-                ctx.fillRect(dpx + 32, dpy + 3, 2, 52);
-                // Rear horizontal tail stabilizer
-                ctx.fillStyle = "#f8fafc";
-                ctx.fillRect(dpx + 3, dpy + 17, 8, 24);
-                ctx.strokeRect(dpx + 3, dpy + 17, 8, 24);
-                // Fuselage + cockpit windshield + red engine cowling
-                ctx.beginPath();
-                ctx.moveTo(dpx + 4, dpy + 29);
-                ctx.lineTo(dpx + 16, dpy + 23);
-                ctx.lineTo(dpx + 50, dpy + 23);
-                ctx.quadraticCurveTo(dpx + 59, dpy + 24, dpx + 60, dpy + 29);
-                ctx.quadraticCurveTo(dpx + 59, dpy + 34, dpx + 50, dpy + 35);
-                ctx.lineTo(dpx + 16, dpy + 35);
-                ctx.closePath();
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = "#ec4899";
-                ctx.fillRect(dpx + 52, dpy + 24, 6, 10);
-                ctx.fillStyle = "#0f172a";
-                ctx.fillRect(dpx + 39, dpy + 24.5, 8, 9);
-                ctx.restore();
-                meta.sprites.objects["dodo_seaplane"] = [dpx, dpy, 62, 58];
+                {
+                    const dpx = 878, dpy = py3;
+                    ctx.save();
+                    // 1. Dark silhouette outer rim
+                    ctx.fillStyle = "#0b111e";
+                    // Floats + struts + wings silhouette
+                    ctx.fillRect(dpx + 17, dpy + 11, 34, 6);
+                    ctx.fillRect(dpx + 17, dpy + 41, 34, 6);
+                    ctx.fillRect(dpx + 23, dpy + 1, 16, 56);
+                    ctx.fillRect(dpx + 2, dpy + 16, 10, 26);
+
+                    // 2. Twin 3D Aluminum Amphibious Pontoons with Stepped Keels & Water Rudders
+                    for (const floatY of [dpy + 12, dpy + 42]) {
+                        const fltGrad = ctx.createLinearGradient(dpx + 18, floatY, dpx + 18, floatY + 4);
+                        fltGrad.addColorStop(0.0, "#94a3b8");
+                        fltGrad.addColorStop(0.3, "#ffffff");
+                        fltGrad.addColorStop(0.7, "#cbd5e1");
+                        fltGrad.addColorStop(1.0, "#475569");
+                        ctx.fillStyle = fltGrad;
+                        ctx.fillRect(dpx + 18, floatY, 32, 4);
+                        // Pontoon pointed nose (+X) & water rudder (-X)
+                        ctx.fillStyle = "#e2e8f0";
+                        ctx.fillRect(dpx + 49, floatY + 0.5, 3, 3);
+                        ctx.fillStyle = "#0f172a";
+                        ctx.fillRect(dpx + 16, floatY + 1, 2, 2);
+                        // Black rubber step tread on float tops
+                        ctx.fillStyle = "#0f172a";
+                        ctx.fillRect(dpx + 26, floatY + 1, 8, 2);
+                    }
+
+                    // Chrome Float Spreader Bars & Cross Struts
+                    ctx.strokeStyle = "#cbd5e1";
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.moveTo(dpx + 24, dpy + 14); ctx.lineTo(dpx + 24, dpy + 44);
+                    ctx.moveTo(dpx + 42, dpy + 14); ctx.lineTo(dpx + 42, dpy + 44);
+                    ctx.stroke();
+
+                    // 3. 3ds Max High-Camber Wing with Airfoil Gradient & Livery Stripes
+                    const dodoWGrad = ctx.createLinearGradient(dpx + 24, dpy + 2, dpx + 38, dpy + 2);
+                    dodoWGrad.addColorStop(0.0, "#94a3b8"); // leading edge shadow
+                    dodoWGrad.addColorStop(0.2, "#ffffff"); // leading edge reflection glint
+                    dodoWGrad.addColorStop(0.5, "#f1f5f9"); // main chord
+                    dodoWGrad.addColorStop(0.85, "#cbd5e1");
+                    dodoWGrad.addColorStop(1.0, "#64748b"); // trailing edge flap shadow
+                    ctx.fillStyle = dodoWGrad;
+                    ctx.fillRect(dpx + 24, dpy + 2, 14, 54);
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 1.0;
+                    ctx.strokeRect(dpx + 24, dpy + 2, 14, 54);
+
+                    // Vice City Cyan & Magenta Livery Stripes along wingspan
+                    ctx.fillStyle = "#00f0ff"; ctx.fillRect(dpx + 28, dpy + 3, 3, 52);
+                    ctx.fillStyle = "#ff2a85"; ctx.fillRect(dpx + 32, dpy + 3, 2, 52);
+
+                    // Wingtip navigation strobes
+                    ctx.fillStyle = "#ef4444"; ctx.fillRect(dpx + 24, dpy + 2, 3, 2.5);
+                    ctx.fillStyle = "#22c55e"; ctx.fillRect(dpx + 24, dpy + 53.5, 3, 2.5);
+
+                    // Horizontal Tail Stabilizers & Elevator Seam
+                    const tailGrad = ctx.createLinearGradient(dpx + 3, dpy + 17, dpx + 11, dpy + 17);
+                    tailGrad.addColorStop(0, "#ffffff"); tailGrad.addColorStop(1, "#94a3b8");
+                    ctx.fillStyle = tailGrad;
+                    ctx.fillRect(dpx + 3, dpy + 17, 8, 24);
+                    ctx.strokeStyle = "#0b111e"; ctx.lineWidth = 0.8;
+                    ctx.strokeRect(dpx + 3, dpy + 17, 8, 24);
+
+                    // 4. Cylindrical Fuselage with 3ds Max Crown Shading
+                    const dodoFGrad = ctx.createLinearGradient(dpx, dpy + 23, dpx, dpy + 35);
+                    dodoFGrad.addColorStop(0.0, "#475569");
+                    dodoFGrad.addColorStop(0.25, "#e2e8f0");
+                    dodoFGrad.addColorStop(0.45, "#ffffff");
+                    dodoFGrad.addColorStop(0.75, "#f8fafc");
+                    dodoFGrad.addColorStop(1.0, "#334155");
+                    ctx.beginPath();
+                    ctx.moveTo(dpx + 4, dpy + 29);
+                    ctx.lineTo(dpx + 16, dpy + 23);
+                    ctx.lineTo(dpx + 50, dpy + 23);
+                    ctx.quadraticCurveTo(dpx + 59, dpy + 24, dpx + 60, dpy + 29);
+                    ctx.quadraticCurveTo(dpx + 59, dpy + 34, dpx + 50, dpy + 35);
+                    ctx.lineTo(dpx + 16, dpy + 35);
+                    ctx.closePath();
+                    ctx.fillStyle = dodoFGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 1.0;
+                    ctx.stroke();
+
+                    // Crimson & Chrome Radial Engine Cowling & Spinner Hub
+                    const cowlGrad = ctx.createLinearGradient(dpx + 52, dpy + 24, dpx + 52, dpy + 34);
+                    cowlGrad.addColorStop(0, "#991b1b"); cowlGrad.addColorStop(0.4, "#ef4444"); cowlGrad.addColorStop(1, "#7f1d1d");
+                    ctx.fillStyle = cowlGrad;
+                    ctx.fillRect(dpx + 52, dpy + 24, 7, 10);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(dpx + 58, dpy + 27, 2, 4); // chrome spinner
+
+                    // Smoked Sapphire Cockpit Windshield & Skylight with Diagonal Glint
+                    const winGrad = ctx.createLinearGradient(dpx + 38, dpy + 24, dpx + 48, dpy + 34);
+                    winGrad.addColorStop(0.0, "#081a33");
+                    winGrad.addColorStop(0.4, "#38bdf8");
+                    winGrad.addColorStop(0.6, "#ffffff");
+                    winGrad.addColorStop(1.0, "#0284c7");
+                    ctx.fillStyle = winGrad;
+                    ctx.fillRect(dpx + 39, dpy + 24.5, 8, 9);
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeRect(dpx + 39, dpy + 24.5, 8, 9);
+                    ctx.restore();
+                    meta.sprites.objects["dodo_seaplane"] = [dpx, dpy, 62, 58];
+                }
 
                 // 6C. Club Nine 1 Nine Trailing Aerial Banner ("sky_banner_919", 108x22, tow bridle on East +X)
-                const sbx = 946, sby = py3;
-                ctx.save();
-                // V-shaped tow harness cables on right (+X)
-                ctx.strokeStyle = "#cbd5e1";
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                ctx.moveTo(sbx + 107, sby + 11);
-                ctx.lineTo(sbx + 90, sby + 3);
-                ctx.moveTo(sbx + 107, sby + 11);
-                ctx.lineTo(sbx + 90, sby + 19);
-                ctx.stroke();
-                // Banner fabric body with hot-pink & cyan border
-                ctx.fillStyle = "#0f172a";
-                ctx.fillRect(sbx + 2, sby + 2, 88, 18);
-                ctx.strokeStyle = "#ec4899";
-                ctx.lineWidth = 2.0;
-                ctx.strokeRect(sbx + 2, sby + 2, 88, 18);
-                ctx.fillStyle = "#06b6d4";
-                ctx.fillRect(sbx + 5, sby + 5, 82, 2);
-                ctx.fillRect(sbx + 5, sby + 15, 82, 2);
-                ctx.font = "bold 9px monospace";
-                ctx.fillStyle = "#f8fafc";
-                ctx.fillText("NINE 1 NINE", sbx + 11, sby + 14);
-                ctx.restore();
-                meta.sprites.objects["sky_banner_919"] = [sbx, sby, 108, 22];
+                {
+                    const sbx = 946, sby = py3;
+                    ctx.save();
+                    // High-tensile steel tow harness bridle lines
+                    ctx.strokeStyle = "#cbd5e1";
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(sbx + 107, sby + 11); ctx.lineTo(sbx + 90, sby + 3);
+                    ctx.moveTo(sbx + 107, sby + 11); ctx.lineTo(sbx + 90, sby + 19);
+                    ctx.stroke();
+
+                    // Dark outer shadow border
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fillRect(sbx + 1, sby + 1, 90, 20);
+
+                    // Deep obsidian banner fabric with horizontal cloth wave gradient
+                    const banGrad = ctx.createLinearGradient(sbx + 2, sby + 2, sbx + 90, sby + 2);
+                    banGrad.addColorStop(0.0, "#090d16");
+                    banGrad.addColorStop(0.25, "#1e293b");
+                    banGrad.addColorStop(0.50, "#0f172a");
+                    banGrad.addColorStop(0.75, "#1e293b");
+                    banGrad.addColorStop(1.0, "#090d16");
+                    ctx.fillStyle = banGrad;
+                    ctx.fillRect(sbx + 2, sby + 2, 88, 18);
+
+                    // Vibrant Neon Magenta Glowing Frame
+                    ctx.strokeStyle = "#ff2a85";
+                    ctx.lineWidth = 2.0;
+                    ctx.strokeRect(sbx + 2, sby + 2, 88, 18);
+
+                    // Electric Cyan Inner Trim Ribbons
+                    ctx.fillStyle = "#00f0ff";
+                    ctx.fillRect(sbx + 5, sby + 4.5, 82, 1.8);
+                    ctx.fillRect(sbx + 5, sby + 15.7, 82, 1.8);
+
+                    // Crisp Glowing "NINE 1 NINE" VIP Club Typography
+                    ctx.font = "bold 9.5px 'Arial Black', Impact, sans-serif";
+                    ctx.fillStyle = "#ff2a85";
+                    ctx.fillText("NINE 1 NINE", sbx + 12, sby + 15);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillText("NINE 1 NINE", sbx + 11, sby + 14);
+                    ctx.restore();
+                    meta.sprites.objects["sky_banner_919"] = [sbx, sby, 108, 22];
+                }
 
                 // 6D. Street Takeover / Sideshow Tire Burnout Skid Ring ("donut_skid_ring", 62x62)
-                const drx = 1060, dry = py3;
-                ctx.save();
-                ctx.strokeStyle = "rgba(15, 23, 42, 0.72)";
-                ctx.lineWidth = 3.2;
-                ctx.beginPath();
-                ctx.arc(drx + 31, dry + 31, 24, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.lineWidth = 2.4;
-                ctx.beginPath();
-                ctx.arc(drx + 31, dry + 31, 17, 0.4, Math.PI * 1.85);
-                ctx.stroke();
-                ctx.restore();
-                meta.sprites.objects["donut_skid_ring"] = [drx, dry, 62, 62];
+                {
+                    const drx = 1060, dry = py3;
+                    ctx.save();
+                    // Multi-layer rubberized asphalt burn marks
+                    ctx.strokeStyle = "rgba(11, 17, 30, 0.78)";
+                    ctx.lineWidth = 3.6;
+                    ctx.beginPath(); ctx.arc(drx + 31, dry + 31, 24, 0, Math.PI * 2); ctx.stroke();
+
+                    ctx.strokeStyle = "rgba(30, 41, 59, 0.65)";
+                    ctx.lineWidth = 2.8;
+                    ctx.beginPath(); ctx.arc(drx + 31, dry + 31, 18, 0.35, Math.PI * 1.85); ctx.stroke();
+
+                    ctx.strokeStyle = "rgba(15, 23, 42, 0.50)";
+                    ctx.lineWidth = 2.0;
+                    ctx.beginPath(); ctx.arc(drx + 31, dry + 31, 12, 0.8, Math.PI * 2.2); ctx.stroke();
+                    ctx.restore();
+                    meta.sprites.objects["donut_skid_ring"] = [drx, dry, 62, 62];
+                }
 
                 // 6E. Leonida Keys & Ocean Drive Thatched Tiki Bar Roof ("tiki_hut_roof", 52x36)
-                const tkx = 1128, tky = py3;
-                ctx.save();
-                ctx.fillStyle = "#78350f";
-                ctx.fillRect(tkx + 2, tky + 2, 48, 32);
-                ctx.fillStyle = "#b45309";
-                ctx.fillRect(tkx + 4, tky + 4, 44, 28);
-                ctx.fillStyle = "#d97706";
-                ctx.fillRect(tkx + 7, tky + 7, 38, 22);
-                // Woven palm thatch radial lines + bamboo ridge pole
-                ctx.strokeStyle = "#451a03";
-                ctx.lineWidth = 1.0;
-                for (let tx = tkx + 6; tx <= tkx + 46; tx += 5) {
-                    ctx.beginPath();
-                    ctx.moveTo(tx, tky + 2);
-                    ctx.lineTo(tx, tky + 34);
-                    ctx.stroke();
+                {
+                    const tkx = 1128, tky = py3;
+                    ctx.save();
+                    // Ground shadow
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fillRect(tkx + 1, tky + 1, 50, 34);
+
+                    // 3ds Max Woven Palm Thatch Roof with Dome Lighting
+                    const tikiGrad = ctx.createLinearGradient(tkx + 2, tky + 2, tkx + 2, tky + 34);
+                    tikiGrad.addColorStop(0.0, "#78350f");
+                    tikiGrad.addColorStop(0.2, "#b45309");
+                    tikiGrad.addColorStop(0.5, "#d97706");
+                    tikiGrad.addColorStop(0.8, "#b45309");
+                    tikiGrad.addColorStop(1.0, "#451a03");
+                    ctx.fillStyle = tikiGrad;
+                    ctx.fillRect(tkx + 2, tky + 2, 48, 32);
+
+                    // Thatch Radial Leaf Ribs
+                    ctx.strokeStyle = "rgba(69, 26, 3, 0.65)";
+                    ctx.lineWidth = 1.0;
+                    for (let tx = tkx + 5; tx <= tkx + 47; tx += 4.5) {
+                        ctx.beginPath(); ctx.moveTo(tx, tky + 2); ctx.lineTo(tx, tky + 34); ctx.stroke();
+                    }
+
+                    // Sunlit Bamboo Ridge Pole
+                    const bamGrad = ctx.createLinearGradient(tkx + 4, tky + 15, tkx + 4, tky + 21);
+                    bamGrad.addColorStop(0, "#fde047"); bamGrad.addColorStop(0.5, "#ffffff"); bamGrad.addColorStop(1, "#ca8a04");
+                    ctx.fillStyle = bamGrad;
+                    ctx.fillRect(tkx + 4, tky + 16, 44, 4);
+
+                    // Neon Pink Surfboard Sign on Eave
+                    ctx.fillStyle = "#ff2a85";
+                    ctx.fillRect(tkx + 16, tky + 27, 20, 4);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(tkx + 18, tky + 28.5, 16, 1.2);
+                    ctx.restore();
+                    meta.sprites.objects["tiki_hut_roof"] = [tkx, tky, 52, 36];
                 }
-                ctx.fillStyle = "#fde047";
-                ctx.fillRect(tkx + 6, tky + 16, 40, 4);
-                // Neon pink surfboard sign on front roof eave
-                ctx.fillStyle = "#ec4899";
-                ctx.fillRect(tkx + 16, tky + 27, 20, 4);
-                ctx.restore();
-                meta.sprites.objects["tiki_hut_roof"] = [tkx, tky, 52, 36];
 
                 // 6F. Little Cuba / Española Way Sidewalk Café Umbrella Table ("cafe_table_umb", 26x26)
-                const ctx0 = 1186, cty0 = py3;
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(ctx0 + 13, cty0 + 13, 11, 0, Math.PI * 2);
-                ctx.fillStyle = "#14b8a6";
-                ctx.fill();
-                ctx.strokeStyle = "#0f172a";
-                ctx.lineWidth = 1.2;
-                ctx.stroke();
-                // 4 alternating coral wedges
-                for (let w = 0; w < 4; w++) {
-                    const a0 = w * Math.PI * 0.5;
-                    ctx.beginPath();
-                    ctx.moveTo(ctx0 + 13, cty0 + 13);
-                    ctx.arc(ctx0 + 13, cty0 + 13, 10.2, a0, a0 + Math.PI * 0.25);
-                    ctx.closePath();
-                    ctx.fillStyle = "#f97316";
-                    ctx.fill();
+                {
+                    const ctx0 = 1186, cty0 = py3;
+                    ctx.save();
+                    // Dark rim
+                    ctx.beginPath(); ctx.arc(ctx0 + 13, cty0 + 13, 12, 0, Math.PI * 2); ctx.fillStyle = "#0b111e"; ctx.fill();
+
+                    // Conical Umbrella Shade
+                    const umbGrad = ctx.createRadialGradient(ctx0 + 10, cty0 + 10, 2, ctx0 + 13, cty0 + 13, 12);
+                    umbGrad.addColorStop(0, "#5eead4"); umbGrad.addColorStop(0.5, "#14b8a6"); umbGrad.addColorStop(1, "#0f766e");
+                    ctx.beginPath(); ctx.arc(ctx0 + 13, cty0 + 13, 11, 0, Math.PI * 2); ctx.fillStyle = umbGrad; ctx.fill();
+
+                    // Coral wedges
+                    for (let w = 0; w < 4; w++) {
+                        const a0 = w * Math.PI * 0.5;
+                        const wGrad = ctx.createRadialGradient(ctx0 + 10, cty0 + 10, 2, ctx0 + 13, cty0 + 13, 11);
+                        wGrad.addColorStop(0, "#fed7aa"); wGrad.addColorStop(0.5, "#f97316"); wGrad.addColorStop(1, "#c2410c");
+                        ctx.beginPath();
+                        ctx.moveTo(ctx0 + 13, cty0 + 13);
+                        ctx.arc(ctx0 + 13, cty0 + 13, 10.5, a0, a0 + Math.PI * 0.25);
+                        ctx.closePath();
+                        ctx.fillStyle = wGrad;
+                        ctx.fill();
+                    }
+                    // Center finial
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath(); ctx.arc(ctx0 + 13, cty0 + 13, 2.4, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                    meta.sprites.objects["cafe_table_umb"] = [ctx0, cty0, 26, 26];
                 }
-                ctx.fillStyle = "#fef3c7";
-                ctx.beginPath();
-                ctx.arc(ctx0 + 13, cty0 + 13, 2.2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-                meta.sprites.objects["cafe_table_umb"] = [ctx0, cty0, 26, 26];
 
                 // 6G. Ambrosia Outlaw Biker Gang Custom Chopper Motorcycle ("biker_chopper", 32x14, facing East +X)
-                const bcx = 1218, bcy = py3;
-                ctx.save();
-                // Rear & front tires
-                ctx.fillStyle = "#0f172a";
-                ctx.fillRect(bcx + 2, bcy + 4, 8, 6);
-                ctx.fillRect(bcx + 23, bcy + 5, 7, 4);
-                // Extended chrome front forks & handlebars
-                ctx.strokeStyle = "#e2e8f0";
-                ctx.lineWidth = 1.8;
-                ctx.beginPath();
-                ctx.moveTo(bcx + 16, bcy + 7);
-                ctx.lineTo(bcx + 27, bcy + 7);
-                ctx.moveTo(bcx + 18, bcy + 2);
-                ctx.lineTo(bcx + 16, bcy + 12);
-                ctx.stroke();
-                // Black leather saddle + flame-red teardrop fuel tank
-                ctx.fillStyle = "#1e293b";
-                ctx.fillRect(bcx + 8, bcy + 4, 7, 6);
-                ctx.fillStyle = "#dc2626";
-                ctx.fillRect(bcx + 14, bcy + 4.5, 6, 5);
-                ctx.fillStyle = "#facc15";
-                ctx.fillRect(bcx + 15, bcy + 6, 4, 2);
-                ctx.restore();
-                meta.sprites.objects["biker_chopper"] = [bcx, bcy, 32, 14];
+                {
+                    const bcx = 1218, bcy = py3;
+                    ctx.save();
+                    // Wide rear drag slick tire & skinny front tire
+                    ctx.fillStyle = "#090d16";
+                    ctx.fillRect(bcx + 1, bcy + 3.5, 9, 7);
+                    ctx.fillRect(bcx + 23, bcy + 4.5, 8, 5);
+
+                    // Chrome Extended Front Forks & Handlebars
+                    const chGrad = ctx.createLinearGradient(bcx + 16, bcy + 2, bcx + 28, bcy + 12);
+                    chGrad.addColorStop(0, "#ffffff"); chGrad.addColorStop(0.5, "#cbd5e1"); chGrad.addColorStop(1, "#475569");
+                    ctx.strokeStyle = chGrad;
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.moveTo(bcx + 15, bcy + 7); ctx.lineTo(bcx + 27, bcy + 7);
+                    ctx.moveTo(bcx + 18, bcy + 2); ctx.lineTo(bcx + 16, bcy + 12);
+                    ctx.stroke();
+
+                    // Bolstered Black Leather Saddle
+                    ctx.fillStyle = "#1e293b";
+                    ctx.fillRect(bcx + 7, bcy + 4, 8, 6);
+
+                    // Metallic Crimson Teardrop Flame Tank
+                    const tankGrad = ctx.createRadialGradient(bcx + 16, bcy + 6, 1, bcx + 17, bcy + 7, 5);
+                    tankGrad.addColorStop(0, "#fde047"); // flame highlight
+                    tankGrad.addColorStop(0.35, "#ef4444");
+                    tankGrad.addColorStop(1, "#7f1d1d");
+                    ctx.fillStyle = tankGrad;
+                    ctx.fillRect(bcx + 14, bcy + 4.5, 6, 5);
+                    ctx.restore();
+                    meta.sprites.objects["biker_chopper"] = [bcx, bcy, 32, 14];
+                }
 
                 // 6H. Mount Kalaga Whitewater River Kayak ("kayak_orange", 38x14, facing East +X)
-                const kkx = 1256, kky = py3;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(kkx + 2, kky + 7);
-                ctx.quadraticCurveTo(kkx + 12, kky + 1, kkx + 19, kky + 2);
-                ctx.quadraticCurveTo(kkx + 26, kky + 1, kkx + 36, kky + 7);
-                ctx.quadraticCurveTo(kkx + 26, kky + 13, kkx + 19, kky + 12);
-                ctx.quadraticCurveTo(kkx + 12, kky + 13, kkx + 2, kky + 7);
-                ctx.closePath();
-                ctx.fillStyle = "#f97316";
-                ctx.fill();
-                ctx.lineWidth = 1.1;
-                ctx.strokeStyle = "#7c2d12";
-                ctx.stroke();
-                ctx.fillStyle = "#facc15";
-                ctx.fillRect(kkx + 9, kky + 5, 20, 4);
-                ctx.fillStyle = "#0f172a";
-                ctx.fillRect(kkx + 15, kky + 4, 8, 6);
-                ctx.restore();
-                meta.sprites.objects["kayak_orange"] = [kkx, kky, 38, 14];
+                {
+                    const kkx = 1256, kky = py3;
+                    ctx.save();
+                    // Silhouette
+                    ctx.beginPath();
+                    ctx.moveTo(kkx + 1, kky + 7);
+                    ctx.quadraticCurveTo(kkx + 12, kky + 0.5, kkx + 19, kky + 1.5);
+                    ctx.quadraticCurveTo(kkx + 26, kky + 0.5, kkx + 37, kky + 7);
+                    ctx.quadraticCurveTo(kkx + 26, kky + 13.5, kkx + 19, kky + 12.5);
+                    ctx.quadraticCurveTo(kkx + 12, kky + 13.5, kkx + 1, kky + 7);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // 3ds Max Sculpted Rotomolded Polyethylene Hull
+                    const kayakGrad = ctx.createLinearGradient(kkx, kky + 2, kkx, kky + 12);
+                    kayakGrad.addColorStop(0.0, "#c2410c");
+                    kayakGrad.addColorStop(0.25, "#fb923c");
+                    kayakGrad.addColorStop(0.50, "#ffffff"); // sunlit deck ridge
+                    kayakGrad.addColorStop(0.75, "#f97316");
+                    kayakGrad.addColorStop(1.0, "#9a3412");
+                    ctx.beginPath();
+                    ctx.moveTo(kkx + 2, kky + 7);
+                    ctx.quadraticCurveTo(kkx + 12, kky + 1, kkx + 19, kky + 2);
+                    ctx.quadraticCurveTo(kkx + 26, kky + 1, kkx + 36, kky + 7);
+                    ctx.quadraticCurveTo(kkx + 26, kky + 13, kkx + 19, kky + 12);
+                    ctx.quadraticCurveTo(kkx + 12, kky + 13, kkx + 2, kky + 7);
+                    ctx.closePath();
+                    ctx.fillStyle = kayakGrad;
+                    ctx.fill();
+
+                    // Recessed Cockpit Coaming & Seat
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(kkx + 15, kky + 4, 8, 6);
+                    ctx.fillStyle = "#334155";
+                    ctx.fillRect(kkx + 16, kky + 5, 6, 4);
+                    ctx.restore();
+                    meta.sprites.objects["kayak_orange"] = [kkx, kky, 38, 14];
+                }
 
                 // 6I. Port Gellhorn Retro Mini-Golf Windmill Turret ("minigolf_windmill", 36x36)
-                const mgx = 1300, mgy = py3;
-                ctx.save();
-                ctx.fillStyle = "#15803d";
-                ctx.fillRect(mgx + 2, mgy + 2, 32, 32);
-                ctx.strokeStyle = "#fef08a";
-                ctx.lineWidth = 2.0;
-                ctx.strokeRect(mgx + 2, mgy + 2, 32, 32);
-                // Red & white octagonal windmill house in center
-                ctx.beginPath();
-                ctx.arc(mgx + 18, mgy + 18, 10, 0, Math.PI * 2);
-                ctx.fillStyle = "#dc2626";
-                ctx.fill();
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 1.6;
-                ctx.stroke();
-                ctx.fillStyle = "#fef08a";
-                ctx.beginPath();
-                ctx.arc(mgx + 18, mgy + 18, 3.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-                meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
+                {
+                    const mgx = 1300, mgy = py3;
+                    ctx.save();
+                    ctx.fillStyle = "#15803d";
+                    ctx.fillRect(mgx + 2, mgy + 2, 32, 32);
+                    ctx.strokeStyle = "#fef08a";
+                    ctx.lineWidth = 2.0;
+                    ctx.strokeRect(mgx + 2, mgy + 2, 32, 32);
+                    // Red & white octagonal windmill house in center
+                    const wmilGrad = ctx.createRadialGradient(mgx + 16, mgy + 16, 2, mgx + 18, mgy + 18, 11);
+                    wmilGrad.addColorStop(0, "#f87171"); wmilGrad.addColorStop(0.5, "#dc2626"); wmilGrad.addColorStop(1, "#991b1b");
+                    ctx.beginPath();
+                    ctx.arc(mgx + 18, mgy + 18, 10, 0, Math.PI * 2);
+                    ctx.fillStyle = wmilGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.6;
+                    ctx.stroke();
+                    ctx.fillStyle = "#fef08a";
+                    ctx.beginPath();
+                    ctx.arc(mgx + 18, mgy + 18, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
+                }
+
+                // 6J. 3ds Max Offshore V8 Cigarette Speedboat ("speedboat_v8", 58x30, bow facing East +X)
+                {
+                    const sbx = 1344, sby = py3;
+                    ctx.save();
+                    // 1. Dark silhouette outer rim (#0b111e)
+                    ctx.beginPath();
+                    ctx.moveTo(sbx + 5, sby + 3);
+                    ctx.lineTo(sbx + 36, sby + 3);
+                    ctx.quadraticCurveTo(sbx + 54, sby + 6, sbx + 57, sby + 15);
+                    ctx.quadraticCurveTo(sbx + 54, sby + 24, sbx + 36, sby + 27);
+                    ctx.lineTo(sbx + 5, sby + 27);
+                    ctx.closePath();
+                    ctx.fillStyle = "#0b111e";
+                    ctx.fill();
+
+                    // 2. Sculpted Deep-V Cigarette Hull with 3ds Max Transverse Cylindrical Shading
+                    const sbHullGrad = ctx.createLinearGradient(sbx, sby + 4, sbx, sby + 26);
+                    sbHullGrad.addColorStop(0.0, "#991b1b"); // port shadow
+                    sbHullGrad.addColorStop(0.2, "#ef4444");
+                    sbHullGrad.addColorStop(0.42, "#ffffff"); // sunlit crown reflection
+                    sbHullGrad.addColorStop(0.70, "#dc2626");
+                    sbHullGrad.addColorStop(1.0, "#7f1d1d"); // starboard shadow
+                    ctx.beginPath();
+                    ctx.moveTo(sbx + 6, sby + 4);
+                    ctx.lineTo(sbx + 36, sby + 4);
+                    ctx.quadraticCurveTo(sbx + 53, sby + 7, sbx + 56, sby + 15);
+                    ctx.quadraticCurveTo(sbx + 53, sby + 23, sbx + 36, sby + 26);
+                    ctx.lineTo(sbx + 6, sby + 26);
+                    ctx.closePath();
+                    ctx.fillStyle = sbHullGrad;
+                    ctx.fill();
+
+                    // Twin Pearl-White Racing Stripes on foredeck
+                    const sbStripeGrad = ctx.createLinearGradient(sbx + 30, sby + 4, sbx + 56, sby + 15);
+                    sbStripeGrad.addColorStop(0, "#f8fafc"); sbStripeGrad.addColorStop(0.5, "#ffffff"); sbStripeGrad.addColorStop(1, "#cbd5e1");
+                    ctx.fillStyle = sbStripeGrad;
+                    ctx.fillRect(sbx + 32, sby + 12.5, 20, 2);
+                    ctx.fillRect(sbx + 32, sby + 15.5, 20, 2);
+
+                    // 3. Recessed Cockpit Well with 4 Bolstered Sports Bucket Seats
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(sbx + 12, sby + 6, 20, 18);
+
+                    // Front Bucket Seats & Rear Bench
+                    const seatGrad = ctx.createLinearGradient(sbx + 14, sby + 8, sbx + 14, sby + 22);
+                    seatGrad.addColorStop(0, "#cbd5e1"); seatGrad.addColorStop(0.5, "#ffffff"); seatGrad.addColorStop(1, "#94a3b8");
+                    ctx.fillStyle = seatGrad;
+                    // Front 2 bucket seats
+                    ctx.fillRect(sbx + 22, sby + 8, 6, 5);
+                    ctx.fillRect(sbx + 22, sby + 17, 6, 5);
+                    // Rear bench
+                    ctx.fillRect(sbx + 14, sby + 7.5, 5, 15);
+
+                    // 4. Wrap-Around 3ds Max Smoked Sapphire Windshield with Sky Glint
+                    const sbWinGrad = ctx.createLinearGradient(sbx + 26, sby + 6, sbx + 32, sby + 24);
+                    sbWinGrad.addColorStop(0.0, "#081a33");
+                    sbWinGrad.addColorStop(0.35, "#38bdf8");
+                    sbWinGrad.addColorStop(0.60, "#ffffff"); // glint
+                    sbWinGrad.addColorStop(1.0, "#0369a1");
+                    ctx.beginPath();
+                    ctx.moveTo(sbx + 27, sby + 6);
+                    ctx.lineTo(sbx + 32, sby + 8);
+                    ctx.lineTo(sbx + 32, sby + 22);
+                    ctx.lineTo(sbx + 27, sby + 24);
+                    ctx.closePath();
+                    ctx.fillStyle = sbWinGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b111e";
+                    ctx.lineWidth = 0.9;
+                    ctx.stroke();
+
+                    // 5. Twin Mercury Racing V8 Outboard Motors at the Stern (-X)
+                    for (const mY of [sby + 6, sby + 18]) {
+                        const outbGrad = ctx.createLinearGradient(sbx, mY, sbx + 6, mY + 6);
+                        outbGrad.addColorStop(0, "#020617");
+                        outbGrad.addColorStop(0.4, "#475569");
+                        outbGrad.addColorStop(0.7, "#ffffff");
+                        outbGrad.addColorStop(1, "#0f172a");
+                        ctx.fillStyle = outbGrad;
+                        ctx.fillRect(sbx + 1, mY, 6, 6);
+                        ctx.fillStyle = "#ef4444"; // Mercury racing red stripe
+                        ctx.fillRect(sbx + 3, mY + 1, 1.5, 4);
+                    }
+                    ctx.restore();
+                    meta.sprites.objects["speedboat_v8"] = [sbx, sby, 58, 30];
+                }
+
+                // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
+                // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
+                {
+                    const postData = ctx.getImageData(0, origH, W, H - origH);
+                    const pd = postData.data;
+                    const pW = W;
+                    const pH = H - origH;
+                    for (let py = 1; py < pH - 1; py++) {
+                        const rowOff = py * pW;
+                        for (let px = 1; px < pW - 1; px++) {
+                            const p = (rowOff + px) * 4;
+                            if (pd[p + 3] !== 0) continue;
+                            let sr = 0, sg = 0, sb = 0, cnt = 0;
+                            const n1 = p - 4, n2 = p + 4, n3 = p - pW * 4, n4 = p + pW * 4;
+                            if (pd[n1 + 3] > 32) { sr += pd[n1]; sg += pd[n1 + 1]; sb += pd[n1 + 2]; cnt++; }
+                            if (pd[n2 + 3] > 32) { sr += pd[n2]; sg += pd[n2 + 1]; sb += pd[n2 + 2]; cnt++; }
+                            if (pd[n3 + 3] > 32) { sr += pd[n3]; sg += pd[n3 + 1]; sb += pd[n3 + 2]; cnt++; }
+                            if (pd[n4 + 3] > 32) { sr += pd[n4]; sg += pd[n4 + 1]; sb += pd[n4 + 2]; cnt++; }
+                            if (cnt > 0) {
+                                pd[p] = (sr / cnt) | 0;
+                                pd[p + 1] = (sg / cnt) | 0;
+                                pd[p + 2] = (sb / cnt) | 0;
+                            }
+                        }
+                    }
+                    ctx.putImageData(postData, 0, origH);
+                }
             }
 
             return cvs;
@@ -2636,7 +3400,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_35", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_36", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2646,14 +3410,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_35", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_36", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_35", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_36", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
