@@ -438,7 +438,7 @@ class RetroRenderer {
 
                             // Single continuous 2D world-space shoreline offset w(p) so adjacent tiles join with 0.0000 seam error!
                             // For natural beaches (waterSurType > 2.5), wBase = 0.385 places the water edge (w + 0.115 = 0.50) at the exact tile midpoint so convex & concave curves have equal 0.50 radius!
-                            float wBase = (waterSurType > 2.5) ? 0.385 : 0.28;
+                            float wBase = (waterSurType > 2.5) ? (isNarrow ? 0.22 : 0.385) : (isNarrow ? 0.18 : 0.28);
                             float w = wBase + 0.055 * sin(p.x * 0.52 + p.y * 0.48) + 0.035 * cos(p.y * 1.12 - p.x * 0.44);
                             float R = 1.0 - w;
 
@@ -2348,7 +2348,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_44", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_45", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2919,19 +2919,31 @@ class RetroRenderer {
                     if (lSE !== 41) bits += 128;
                     if (bits > 0) {
                         const nbs = [lN, lS, lW, lE, lNW, lNE, lSW, lSE];
-                        // Keep stone borders ONLY for enclosed urban park basins & reflecting lagoons
-                        const isEnclosedUrbanBasin = (
-                            (x >= 95 && x <= 320 && z_south >= 22 && z_south <= 46) ||
-                            (x >= 180 && x <= 312 && z_south >= 95 && z_south <= 295) ||
-                            (x >= 404 && x <= 422 && z_south >= 268 && z_south <= 298)
-                        );
-                        let surType = 0; // 0: city sidewalk basin (lid 8), 1: coral promenade basin (lid 9), 2: park lawn basin (lid 10), 3: natural beach/coastline surf (lid 98)
-                        if (nbs.indexOf(98) >= 0 || !isEnclosedUrbanBasin) surType = 3;
-                        else if (nbs.indexOf(10) >= 0) surType = 2;
-                        else if (nbs.indexOf(9) >= 0 || nbs.indexOf(69) >= 0) surType = 1;
+                        const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
+                        const hasRoadNeighbor = nbs.some((l) => ROAD_LIDS.indexOf(l) >= 0);
+                        const hasPaveNeighbor = nbs.some((l) => l === 8 || l === 9 || l === 69);
+                        const hasLawnNeighbor = nbs.some((l) => l === 10);
+                        const isOuterOceanCoast = (x >= 458 && z_south <= 370);
+
+                        // surType:
+                        // 0: Chiselled urban granite canal / seawall coping (clean stone boundary at roads & sidewalks)
+                        // 1: Coral promenade / travertine limestone coping (Star Island & resort pools)
+                        // 2: Park lawn lagoon / pond basin (Lummus Park & Lake Leonida natural edges)
+                        // 3: Atlantic ocean open surf (only outer eastern coastline)
+                        let surType = 0;
+                        if (isOuterOceanCoast && !hasRoadNeighbor && !hasPaveNeighbor) {
+                            surType = 3;
+                        } else if (hasLawnNeighbor && !hasRoadNeighbor && !hasPaveNeighbor) {
+                            surType = 2;
+                        } else if (hasPaveNeighbor || nbs.indexOf(9) >= 0) {
+                            surType = 1;
+                        } else {
+                            surType = 0;
+                        }
+
                         let paveBits = 0;
                         if (surType === 2) {
-                            const isPave = (l) => (l === 8 || l === 9 || l === 69);
+                            const isPave = (l) => (l === 8 || l === 9 || l === 69 || ROAD_LIDS.indexOf(l) >= 0);
                             if (isPave(lN))  paveBits += 1;
                             if (isPave(lS))  paveBits += 2;
                             if (isPave(lW))  paveBits += 4;
@@ -3867,6 +3879,12 @@ class RetroRenderer {
             const breeze = Math.sin(this.time * 2.2 + pm.x * 0.025 + pm.y * 0.02) * 0.05;
             this.pushAtlasSprite3D(spr, pm.x + 2 * sc, pm.y + 2 * sc, groundZ + 0.015, breeze * 0.5, sc * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.7);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.045, (pm.angle || 0) + breeze, sc * 1.02, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "slash_pine") {
+            const spr = this.gta1Meta.sprites.objects["slash_pine"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.4 + pm.x * 0.015) * 0.035;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.25, pm.y + Math.sin(shAngle) * shDist * 1.25, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.35 * hm, (pm.angle || 0) + breeze, sc * 1.08, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         }
     }
 

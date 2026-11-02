@@ -477,19 +477,20 @@ class LeonidaMap {
                         scaleMul = 0.90 + hs1 * 0.30;
                     }
                 }
-                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape (sand lid==98 near grass/promenade)
-                else if (c >= 454 && c <= 485 && r >= 20 && r <= 360 && blkZ1.lid === 98) {
+                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape (sand lid==98 near grass/promenade ONLY)
+                // STRICT RULE: Never place flora on open sunbathing sand (c >= 457) or volleyball courts!
+                else if (c >= 454 && c <= 456 && r >= 20 && r <= 360 && blkZ1.lid === 98) {
                     let nearWalkable = false;
-                    for (let dr = -2; dr <= 2; dr++) {
-                        for (let dc = -2; dc <= 2; dc++) {
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
                             const nlid = this.getBlockInfo(c + dc, r + dr, 1).lid;
                             if (nlid === 8 || nlid === 9 || nlid === 10) { nearWalkable = true; break; }
                         }
                         if (nearWalkable) break;
                     }
-                    if (nearWalkable && seed % 14 === 0) {
+                    if (nearWalkable && seed % 18 === 0) {
                         chosenKind = "sea_grape";
-                        scaleMul = 0.85 + hs1 * 0.40;
+                        scaleMul = 0.82 + hs1 * 0.35;
                     }
                 }
                 // 4) Star Island Waterfront Mansions (c=330..360, r=162..184)
@@ -515,12 +516,13 @@ class LeonidaMap {
                 // 6) Lake Leonida & Gator Island (c=75..175, r=180..260)
                 else if (c >= 75 && c <= 175 && r >= 180 && r <= 260) {
                     if (surfGt === GROUND_TYPE.WATER && nearLand) {
-                        if (seed % 18 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
-                        else if (seed % 22 === 0) { chosenKind = "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
+                        if (seed % 16 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 20 === 0) { chosenKind = "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
                     } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
-                        if (seed % 12 === 0) { chosenKind = "live_oak"; scaleMul = 1.0 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.5; }
-                        else if (seed % 14 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.90 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.6; }
-                        else if (seed % 16 === 0) { chosenKind = "fan_palm"; scaleMul = 0.85 + hs1 * 0.35; }
+                        if (seed % 10 === 0) { chosenKind = "slash_pine"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.6; }
+                        else if (seed % 14 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.92 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 18 === 0) { chosenKind = "live_oak"; scaleMul = 0.95 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.5; }
+                        else if (seed % 22 === 0) { chosenKind = "fan_palm"; scaleMul = 0.85 + hs1 * 0.35; }
                     }
                 }
                 // 7) Leonida Keys (c=180..460, r=410..495)
