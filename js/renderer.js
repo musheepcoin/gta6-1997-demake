@@ -257,8 +257,10 @@ class RetroRenderer {
                 float w = sin(p.y * 0.72 + 0.4) * 0.50 + cos(p.y * 1.65 - 0.9) * 0.32 + (aNoise(vec2(p.y * 2.3, 5.0)) - 0.5) * 0.36;
                 return clamp(0.28 + w * 0.16, 0.14, 0.44);
             }
-            float cornerNorm(float u, float v, float k) {
-                return mix(u + v, length(vec2(u, v)), k);
+            float cornerNorm(float u, float v, float p) {
+                vec2 a = max(vec2(0.0), vec2(u, v));
+                float m = max(a.x, a.y);
+                return (m > 0.0001) ? (m * pow(pow(a.x / m, p) + pow(a.y / m, p), 1.0 / p)) : 0.0;
             }
 
             void main() {
@@ -360,7 +362,7 @@ class RetroRenderer {
                             bool iSE = bSE && !bS && !bE;
 
                             // Single continuous 2D world-space wave offset w(p) so neighboring tiles match with 0.0000 seam error!
-                            float w = 0.33 + 0.05 * sin(p.x * 0.62 + p.y * 0.58) + 0.03 * cos(p.y * 1.25 - p.x * 0.50);
+                            float w = 0.45 + 0.05 * sin(p.x * 0.62 + p.y * 0.58) + 0.03 * cos(p.y * 1.25 - p.x * 0.50);
                             float R = 1.0 - w;
 
                             float dW = bW ? (lp.x - w) : 10.0;
@@ -373,16 +375,16 @@ class RetroRenderer {
                             bool isNarrow = (bW && bE) || (bN && bS);
                             bool isDiagPair = bW == bN;
                             bool isStair = !isNarrow && (isDiagPair ? (!bNE || !bSW) : (!bNW || !bSE));
-                            float kOuter = isStair ? 0.18 : 0.62;
+                            float kOuter = isStair ? 1.50 : 1.90;
                             float dCard = (xDist < R && yDist < R)
                                 ? (R - cornerNorm(R - xDist, R - yDist, kOuter))
                                 : min(xDist, yDist);
 
                             float dCorner = 10.0;
-                            if (iNW) dCorner = min(dCorner, cornerNorm(lp.x, lp.y, 0.18) - w);
-                            if (iNE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, lp.y, 0.18) - w);
-                            if (iSW) dCorner = min(dCorner, cornerNorm(lp.x, 1.0 - lp.y, 0.18) - w);
-                            if (iSE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, 1.0 - lp.y, 0.18) - w);
+                            if (iNW) dCorner = min(dCorner, cornerNorm(lp.x, lp.y, 1.50) - w);
+                            if (iNE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, lp.y, 1.50) - w);
+                            if (iSW) dCorner = min(dCorner, cornerNorm(lp.x, 1.0 - lp.y, 1.50) - w);
+                            if (iSE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, 1.0 - lp.y, 1.50) - w);
 
                             float tuft = (aNoise(p * 16.0 + 3.0) - 0.5) * 0.026 + (aHash(floor(p * 44.0)) - 0.5) * 0.012;
                             float dLawn = min(dCard, dCorner) + tuft;
@@ -435,7 +437,9 @@ class RetroRenderer {
                             bool iSE = bSE && !bS && !bE;
 
                             // Single continuous 2D world-space shoreline offset w(p) so adjacent tiles join with 0.0000 seam error!
-                            float w = 0.28 + 0.05 * sin(p.x * 0.62 + p.y * 0.58) + 0.03 * cos(p.y * 1.25 - p.x * 0.50);
+                            // For natural beaches (waterSurType > 2.5), wBase = 0.385 places the water edge (w + 0.115 = 0.50) at the exact tile midpoint so convex & concave curves have equal 0.50 radius!
+                            float wBase = (waterSurType > 2.5) ? 0.385 : 0.28;
+                            float w = wBase + 0.055 * sin(p.x * 0.52 + p.y * 0.48) + 0.035 * cos(p.y * 1.12 - p.x * 0.44);
                             float R = 1.0 - w;
 
                             float dW = bW ? (lp.x - w) : 10.0;
@@ -448,16 +452,16 @@ class RetroRenderer {
                             bool isNarrow = (bW && bE) || (bN && bS);
                             bool isDiagPair = bW == bN;
                             bool isStair = !isNarrow && (isDiagPair ? (!bNE || !bSW) : (!bNW || !bSE));
-                            float kOuter = isStair ? 0.18 : 0.62;
+                            float kOuter = isStair ? 1.50 : 1.90;
                             float dCard = (xDist < R && yDist < R)
                                 ? (R - cornerNorm(R - xDist, R - yDist, kOuter))
                                 : min(xDist, yDist);
 
                             float dCorner = 10.0;
-                            if (iNW) dCorner = min(dCorner, cornerNorm(lp.x, lp.y, 0.18) - w);
-                            if (iNE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, lp.y, 0.18) - w);
-                            if (iSW) dCorner = min(dCorner, cornerNorm(lp.x, 1.0 - lp.y, 0.18) - w);
-                            if (iSE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, 1.0 - lp.y, 0.18) - w);
+                            if (iNW) dCorner = min(dCorner, cornerNorm(lp.x, lp.y, 1.50) - w);
+                            if (iNE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, lp.y, 1.50) - w);
+                            if (iSW) dCorner = min(dCorner, cornerNorm(lp.x, 1.0 - lp.y, 1.50) - w);
+                            if (iSE) dCorner = min(dCorner, cornerNorm(1.0 - lp.x, 1.0 - lp.y, 1.50) - w);
 
                             float stoneGrain = (aNoise(p * 18.0 + 11.0) - 0.5) * 0.006;
                             dWater = min(dCard, dCorner) + stoneGrain;
@@ -2326,12 +2330,12 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_39", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_40", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_39", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_40", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2341,14 +2345,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_39", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_40", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_39", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_40", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
