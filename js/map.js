@@ -1537,6 +1537,220 @@ class LeonidaMap {
             seed: ti * 1.7
         }));
 
+        // 17B) GTA 6 Leonida 3D Pre-Rendered Architectural Residential Estates & Waterfront Mansions
+        // Authentic Florida Architecture: Star Island Palazzos, Venetian Modern Villas, North Vice Canal Villas,
+        // Leonida Keys Stilt Lodges & Mainland Pastel Bungalows.
+        this.residentialHouses = [
+            // A. Star Island & Venetian Isles Waterfront Mansions (c=336..356, r=166..180)
+            {
+                id: "star_palazzo_north",
+                name: "Villa de la Rosa — Star Island",
+                district: "STAR ISLAND",
+                kind: "mansion_star_island",
+                c: 340.0, r: 168.0,
+                x: 340.0 * TILE_SIZE, y: 168.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.06, hw: 46, hh: 34,
+                drivewayCar: { sprIdx: 3, dx: 26, dy: 36, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: -24, dy: -36, ang: -Math.PI * 0.5 }
+            },
+            {
+                id: "venetian_modern_north",
+                name: "The Venetian Minimalist Villa",
+                district: "VENETIAN ISLES",
+                kind: "mansion_modern_luxury",
+                c: 352.0, r: 168.0,
+                x: 352.0 * TILE_SIZE, y: 168.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.05, hw: 40, hh: 30,
+                drivewayCar: { sprIdx: 12, dx: 28, dy: 28, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: -26, dy: -30, ang: -Math.PI * 0.5 }
+            },
+            {
+                id: "star_palazzo_south",
+                name: "Palazzo di Biscayne — Star Island",
+                district: "STAR ISLAND",
+                kind: "mansion_star_island",
+                c: 340.0, r: 178.0,
+                x: 340.0 * TILE_SIZE, y: 178.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 1.06, hw: 46, hh: 34,
+                drivewayCar: { sprIdx: 7, dx: 26, dy: 36, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: -24, dy: -36, ang: Math.PI * 0.5 }
+            },
+            {
+                id: "venetian_modern_south",
+                name: "Biscayne Bay Contemporary Estate",
+                district: "VENETIAN ISLES",
+                kind: "mansion_modern_luxury",
+                c: 352.0, r: 178.0,
+                x: 352.0 * TILE_SIZE, y: 178.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 1.05, hw: 40, hh: 30,
+                drivewayCar: { sprIdx: 5, dx: 28, dy: 28, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: -26, dy: -30, ang: Math.PI * 0.5 }
+            },
+
+            // B. North Vice Shores & Golden Glades Lagoons (c=152..166, r=46..62)
+            {
+                id: "shores_canal_villa_1",
+                name: "Pelican Bay Canal Villa",
+                district: "NORTH VICE SHORES",
+                kind: "house_canal_villa",
+                c: 154.0, r: 48.0,
+                x: 154.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.04, hw: 36, hh: 28,
+                drivewayCar: { sprIdx: 2, dx: 20, dy: 28, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: 28, dy: -24, ang: 0 }
+            },
+            {
+                id: "shores_canal_villa_2",
+                name: "Golden Glades Waterfront Residence",
+                district: "NORTH VICE SHORES",
+                kind: "house_canal_villa",
+                c: 164.0, r: 48.0,
+                x: 164.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.04, hw: 36, hh: 28,
+                drivewayCar: { sprIdx: 9, dx: 20, dy: 28, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: 28, dy: -24, ang: 0 }
+            },
+            {
+                id: "shores_modern_villa",
+                name: "Lagoon Overlook Modernist Home",
+                district: "NORTH VICE SHORES",
+                kind: "mansion_modern_luxury",
+                c: 154.0, r: 58.0,
+                x: 154.0 * TILE_SIZE, y: 58.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 1.02, hw: 40, hh: 30,
+                drivewayCar: { sprIdx: 4, dx: 28, dy: 28, ang: 0 }
+            },
+            {
+                id: "shores_canal_villa_3",
+                name: "Emerald Cove Canal Cottage",
+                district: "NORTH VICE SHORES",
+                kind: "house_canal_villa",
+                c: 164.0, r: 58.0,
+                x: 164.0 * TILE_SIZE, y: 58.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 1.04, hw: 36, hh: 28,
+                drivewayCar: { sprIdx: 1, dx: 20, dy: 28, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: 28, dy: -24, ang: Math.PI }
+            },
+            {
+                id: "shores_pastel_bungalow",
+                name: "Flamingo Road Coastal Bungalow",
+                district: "NORTH VICE SHORES",
+                kind: "house_florida_bungalow",
+                c: 160.0, r: 53.0,
+                x: 160.0 * TILE_SIZE, y: 53.0 * TILE_SIZE, z: 2.0,
+                ang: -Math.PI * 0.5, scale: 1.05, hw: 30, hh: 22,
+                drivewayCar: { sprIdx: 6, dx: 22, dy: 6, ang: 0 }
+            },
+
+            // C. Leonida Keys Coastal Stilt Houses (c=220..405, r=425..478)
+            {
+                id: "keys_stilt_key_largo",
+                name: "Key Largo Coastal Stilt House",
+                district: "LEONIDA KEYS",
+                kind: "house_keys_stilt",
+                c: 401.0, r: 425.0,
+                x: 401.0 * TILE_SIZE, y: 425.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.06, hw: 28, hh: 22,
+                drivewayCar: { sprIdx: 8, dx: -26, dy: 20, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: 0, dy: 30, ang: 0 }
+            },
+            {
+                id: "keys_stilt_islamorada",
+                name: "Islamorada Flats Stilt Lodge",
+                district: "LEONIDA KEYS",
+                kind: "house_keys_stilt",
+                c: 368.0, r: 453.0,
+                x: 368.0 * TILE_SIZE, y: 453.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.06, hw: 28, hh: 22,
+                drivewayCar: { sprIdx: 11, dx: -26, dy: 20, ang: 0 }
+            },
+            {
+                id: "keys_stilt_marathon",
+                name: "Marathon Outboard Fishing Lodge",
+                district: "LEONIDA KEYS",
+                kind: "house_keys_stilt",
+                c: 326.0, r: 475.0,
+                x: 326.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.06, hw: 28, hh: 22,
+                drivewayCar: { sprIdx: 10, dx: -26, dy: 20, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: 0, dy: 30, ang: 0 }
+            },
+            {
+                id: "keys_stilt_big_pine",
+                name: "Big Pine Key Solar Stilt Home",
+                district: "LEONIDA KEYS",
+                kind: "house_keys_stilt",
+                c: 271.0, r: 475.0,
+                x: 271.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.06, hw: 28, hh: 22,
+                drivewayCar: { sprIdx: 13, dx: -26, dy: 20, ang: 0 }
+            },
+            {
+                id: "keys_stilt_key_west",
+                name: "Key West Historic Harbor Stilt Lodge",
+                district: "LEONIDA KEYS",
+                kind: "house_keys_stilt",
+                c: 222.0, r: 475.0,
+                x: 222.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.06, hw: 28, hh: 22,
+                drivewayCar: { sprIdx: 2, dx: -26, dy: 20, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: 0, dy: 30, ang: 0 }
+            },
+
+            // D. Mainland Suburbs — Little Haiti & Vice Gardens (c=182..194, r=104..116)
+            {
+                id: "suburb_coral_bungalow",
+                name: "Coral Palms Ranch Bungalow",
+                district: "VICE GARDENS",
+                kind: "house_florida_bungalow",
+                c: 184.0, r: 106.0,
+                x: 184.0 * TILE_SIZE, y: 106.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.05, hw: 30, hh: 22,
+                drivewayCar: { sprIdx: 0, dx: 22, dy: 6, ang: 0 }
+            },
+            {
+                id: "suburb_mint_bungalow",
+                name: "Mint Breeze Florida Home",
+                district: "VICE GARDENS",
+                kind: "house_florida_bungalow",
+                c: 192.0, r: 106.0,
+                x: 192.0 * TILE_SIZE, y: 106.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.05, hw: 30, hh: 22,
+                drivewayCar: { sprIdx: 1, dx: 22, dy: 6, ang: 0 }
+            },
+            {
+                id: "suburb_yellow_bungalow",
+                name: "Sunshine State Single-Family Bungalow",
+                district: "VICE GARDENS",
+                kind: "house_florida_bungalow",
+                c: 184.0, r: 114.0,
+                x: 184.0 * TILE_SIZE, y: 114.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 1.05, hw: 30, hh: 22,
+                drivewayCar: { sprIdx: 4, dx: 22, dy: 6, ang: 0 }
+            },
+            {
+                id: "suburb_garden_bungalow",
+                name: "Little Haiti Family Residence",
+                district: "LITTLE HAITI",
+                kind: "house_florida_bungalow",
+                c: 192.0, r: 114.0,
+                x: 192.0 * TILE_SIZE, y: 114.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 1.05, hw: 30, hh: 22,
+                drivewayCar: { sprIdx: 5, dx: 22, dy: 6, ang: 0 }
+            },
+            {
+                id: "suburb_haiti_villa",
+                name: "Bayshore Neighborhood Community Villa",
+                district: "LITTLE HAITI",
+                kind: "house_canal_villa",
+                c: 188.0, r: 110.0,
+                x: 188.0 * TILE_SIZE, y: 110.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.04, hw: 36, hh: 28,
+                drivewayCar: { sprIdx: 3, dx: 20, dy: 28, ang: 0 }
+            }
+        ];
+
+
         // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks & Outlaw Biker Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
         this.industrialAndParkDetails = {
             smokestacks: [
@@ -1643,6 +1857,13 @@ class LeonidaMap {
         }
         for (const br of this.industrialAndParkDetails.bikerRallies) {
             pushPropOBB(br.x, br.y, br.count * 10, 12, 0);
+        }
+
+        // 18E. GTA 6 Leonida Residential Estates & Waterfront Mansions Solid OBB Collision Hulls
+        if (Array.isArray(this.residentialHouses)) {
+            for (const h of this.residentialHouses) {
+                pushPropOBB(h.x, h.y, h.hw * (h.scale || 1.0), h.hh * (h.scale || 1.0), h.ang);
+            }
         }
 
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details

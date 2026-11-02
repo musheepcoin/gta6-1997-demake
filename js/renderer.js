@@ -2350,7 +2350,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_51", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_52", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2365,7 +2365,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_51", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_52", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -4975,6 +4975,72 @@ class RetroRenderer {
                 const dFr = 50 + (Math.floor(this.time * 5.8 + i) % 4);
                 this.batchPedSprite3D("bikini_pink", dFr, tb.x + sn * 22, tb.y - cs * 22, bz + 0.038, tb.ang - Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 this.batchPedSprite3D("vc_tommy", dFr, tb.x - cs * 18 + sn * 22, tb.y - sn * 18 - cs * 22, bz + 0.038, tb.ang - Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // =========================================================================
+        // 16B) GTA 6 LEONIDA 3D PRE-RENDERED RESIDENTIAL ESTATES & WATERFRONT MANSIONS
+        // ("mansion_star_island", "mansion_modern_luxury", "house_canal_villa", "house_florida_bungalow", "house_keys_stilt")
+        // =========================================================================
+        const resHouses = this.map.residentialHouses;
+        if (Array.isArray(resHouses) && resHouses.length > 0) {
+            const vehSpritesList = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.vehicles;
+            const getHouseCarRect = (idxOrSpr, remapIdx = 0) => {
+                if (!vehSpritesList) return null;
+                const ve = (this.vehicleBySprIdx && this.vehicleBySprIdx[String(idxOrSpr)]) || vehSpritesList[Number(idxOrSpr)] || vehSpritesList[0];
+                if (!ve) return null;
+                if (Array.isArray(ve)) return ve;
+                if (Array.isArray(ve.remaps) && ve.remaps.length > 0) {
+                    return ve.remaps[Math.abs(remapIdx) % ve.remaps.length] || ve.base;
+                }
+                return ve.base || null;
+            };
+
+            for (let i = 0; i < resHouses.length; i++) {
+                const h = resHouses[i];
+                if (h.x < minX - 160 || h.x > maxX + 160 || h.y < minY - 160 || h.y > maxY + 160) continue;
+                const bz = h.z || 2.0;
+                const sc = h.scale || 1.0;
+                const cosA = Math.cos(h.ang);
+                const sinA = Math.sin(h.ang);
+
+                // 1. Ambient Contact Occlusion & Directional Sun Silhouette Shadow
+                this.batchObjectSprite3D(h.kind, h.x + sunCos * 7, h.y + sunSin * 7, bz + 0.015, h.ang, sc * 1.04, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
+
+                // 2. Main 3D Pre-Rendered Architectural Structure (High Draw Order above pedestrians/ground)
+                this.batchObjectSprite3D(h.kind, h.x, h.y, bz + 0.165, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
+
+                // 3. Driveway Parked Vehicle (Luxury sports cars, convertibles, sedans, pickups)
+                if (h.drivewayCar) {
+                    const dc = h.drivewayCar;
+                    const carX = h.x + cosA * dc.dx - sinA * dc.dy;
+                    const carY = h.y + sinA * dc.dx + cosA * dc.dy;
+                    const carAng = h.ang + (dc.ang || 0);
+                    const vRect = getHouseCarRect(dc.sprIdx, i);
+                    if (vRect) {
+                        this.pushSolidQuad3D(carX + sunCos * 3, carY + sunSin * 3, bz + 0.018, 32, 16, carAng, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.048, carAng - Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                    }
+                }
+
+                // 4. Private Waterfront Canal / Jetty Moored Watercraft (Speedboats, WaveRunners)
+                if (h.dockBoat) {
+                    const db = h.dockBoat;
+                    const boatX = h.x + cosA * db.dx - sinA * db.dy;
+                    const boatY = h.y + sinA * db.dx + cosA * db.dy;
+                    const boatAng = h.ang + (db.ang || 0);
+                    const bob = Math.sin(this.time * 2.2 + i * 1.3) * 0.008;
+                    this.batchObjectSprite3D(db.spr, boatX + sunCos * 3, boatY + sunSin * 3, bz + 0.015, boatAng, 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.28);
+                    this.batchObjectSprite3D(db.spr, boatX, boatY, bz + 0.045 + bob, boatAng, 1.0, SPRITE_DRAW_ORDER.CAR);
+                }
+
+                // 5. Night Mode Cozy Golden Window Glow
+                if (this.nightFactor > 0.15) {
+                    const nightGlow = Math.min(1.0, (this.nightFactor - 0.15) / 0.70);
+                    const flicker = 0.94 + Math.sin(this.time * 3.5 + i * 2.1) * 0.06;
+                    const winPulse = nightGlow * flicker;
+                    this.pushSolidQuad3D(h.x, h.y, bz + 0.18, 22 * sc, 16 * sc, h.ang, 0.98, 0.75, 0.28, 0.42 * winPulse, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                }
             }
         }
 
