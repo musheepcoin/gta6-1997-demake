@@ -141,6 +141,7 @@ class LeonidaMap {
         this.pickups = [];
         this.trees = [];
         this.vicePalms = [];
+        this.floraGrid = new Map();
         this.beachUmbrellas = [];
         this.beachProps = [];
         this.crates = [];
@@ -562,6 +563,21 @@ class LeonidaMap {
                     });
                 }
             }
+        }
+
+        // Build O(1) Spatial Hash Grid for Leonida Flora & Tree Trunks (eliminates pedestrian/player tree-clipping)
+        this.floraGrid = new Map();
+        for (let pi = 0; pi < this.vicePalms.length; pi++) {
+            const pm = this.vicePalms[pi];
+            const fbx = Math.floor(pm.x / TILE_SIZE);
+            const fby = Math.floor(pm.y / TILE_SIZE);
+            const fkey = (fby << 16) | (fbx & 0xffff);
+            let cell = this.floraGrid.get(fkey);
+            if (!cell) {
+                cell = [];
+                this.floraGrid.set(fkey, cell);
+            }
+            cell.push(pm);
         }
 
         // Populate Official GTA 6 S-Curving Vice Beach Lifeguard Towers, Volleyball Courts, Star Island Pool & Neon Marquees!
@@ -2917,9 +2933,7 @@ class LeonidaMap {
         //    Pedestrians NEVER step from a sidewalk (PAWEMENT/FIELD) onto a ROAD block!
         let pool = sidewalkDirs;
         if (pool.length === 0) {
-            pool = roadDirs;
-        }
-        if (pool.length === 0) {
+            // Reached dead-end or corner of sidewalk: U-turn back along sidewalk, NEVER step onto road!
             const revAngle = this.normalizeAngleDiff(currentAngle + Math.PI, 0);
             const dx = Math.round(Math.cos(revAngle));
             const dy = Math.round(Math.sin(revAngle));
@@ -3607,6 +3621,40 @@ class LeonidaMap {
         ny = Math.max(TILE_SIZE * 1.5, Math.min(this.height - TILE_SIZE * 1.5, ny));
 
         return { x: nx, y: ny, hit };
+    }
+
+    resolveCircleFloraCollision(x, y, radius = 8) {
+        if (!this.floraGrid || this.floraGrid.size === 0) return { hit: false, x, y };
+        const cx = Math.floor(x / TILE_SIZE);
+        const cy = Math.floor(y / TILE_SIZE);
+        let nx = x;
+        let ny = y;
+        let hit = false;
+
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const key = ((cy + dy) << 16) | ((cx + dx) & 0xffff);
+                const cell = this.floraGrid.get(key);
+                if (!cell) continue;
+                for (let i = 0; i < cell.length; i++) {
+                    const pm = cell[i];
+                    // Solid trunk collision: Palmetto, Cypress, Palm, Banyan, Oak
+                    const trunkR = Math.max(9, Math.min(16, 12 * (pm.scale || 1.0)));
+                    const ex = nx - pm.x;
+                    const ey = ny - pm.y;
+                    const dist2 = ex * ex + ey * ey;
+                    const minDist = radius + trunkR;
+                    if (dist2 < minDist * minDist && dist2 > 0.0001) {
+                        const dist = Math.sqrt(dist2);
+                        const push = minDist - dist;
+                        nx += (ex / dist) * push;
+                        ny += (ey / dist) * push;
+                        hit = true;
+                    }
+                }
+            }
+        }
+        return { hit, x: nx, y: ny };
     }
 }
 

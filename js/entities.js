@@ -2760,7 +2760,9 @@ class TrafficManager {
             if (tooClose) continue;
 
             const pedZ = map.getHeightAtPixel(pedX, pedY, 4.0);
-            const pedAngle = dirs[Math.floor(Math.random() * dirs.length)];
+            const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];
+            const pedStep = map.chooseNextSidewalkBlock ? map.chooseNextSidewalkBlock(pick.bx, pick.by, rawAngle, camZ, Math.random(), false) : null;
+            const pedAngle = pedStep ? pedStep.angle : rawAngle;
             const isPrisonGuard = pick.inPrisonYard && (attempt % 5 === 0);
             const pedProp = pick.inPrisonYard
                 ? (isPrisonGuard
@@ -2782,6 +2784,8 @@ class TrafficManager {
                 ...pedProp,
                 dead: false,
                 panicTimer: 0,
+                targetBx: pedStep ? pedStep.bx : null,
+                targetBy: pedStep ? pedStep.by : null,
                 turnSeed: (game.peds.length + attempt + 1)
             }));
             spawned++;

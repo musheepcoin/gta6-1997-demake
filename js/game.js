@@ -696,15 +696,20 @@ class LeonidaGame {
                     shirtColor: "#06b6d4",
                     hp: 35
                 };
+            const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];
+            const pedStep = this.map.chooseNextSidewalkBlock ? this.map.chooseNextSidewalkBlock(pick.bx, pick.by, rawAngle, pz, Math.random(), false) : null;
+            const pedAngle = pedStep ? pedStep.angle : rawAngle;
             this.peds.push(new Pedestrian({
                 x: px,
                 y: py,
                 z: pz,
-                angle: dirs[Math.floor(Math.random() * dirs.length)],
+                angle: pedAngle,
                 speed: 35 + Math.random() * 9,
                 ...pedProps,
                 dead: false,
                 panicTimer: 0,
+                targetBx: pedStep ? pedStep.bx : null,
+                targetBy: pedStep ? pedStep.by : null,
                 turnSeed: this.peds.length + i + 1
             }));
             spawned++;
@@ -846,25 +851,71 @@ class LeonidaGame {
         this.updateHud();
     }
 
+    getMonkTrackPosition(s) {
+        const xA = mx256(218.2) * TILE_SIZE;
+        const xB = mx256(219.6) * TILE_SIZE;
+        const yTop = my256(143.5) * TILE_SIZE;
+        const yBottom = my256(155.0) * TILE_SIZE;
+        const segTop = xB - xA;
+        const segRight = yBottom - yTop;
+        const segBottom = segTop;
+        const segLeft = segRight;
+        const P = segTop + segRight + segBottom + segLeft;
+
+        let dist = ((s % P) + P) % P;
+
+        // Segment 1: Top (A -> B, East)
+        if (dist < segTop) {
+            return {
+                x: xA + dist,
+                y: yTop,
+                angle: 0
+            };
+        }
+        dist -= segTop;
+        // Segment 2: Right (B -> C, South)
+        if (dist < segRight) {
+            return {
+                x: xB,
+                y: yTop + dist,
+                angle: Math.PI * 0.5
+            };
+        }
+        dist -= segRight;
+        // Segment 3: Bottom (C -> D, West)
+        if (dist < segBottom) {
+            return {
+                x: xB - dist,
+                y: yBottom,
+                angle: Math.PI
+            };
+        }
+        dist -= segBottom;
+        // Segment 4: Left (D -> A, North)
+        return {
+            x: xA,
+            y: yBottom - dist,
+            angle: -Math.PI * 0.5
+        };
+    }
+
     spawnMonkChain() {
         // Remove any old dead monk entries
         this.peds = this.peds.filter((p) => p.kind !== "MONK");
         this.monkChain = [];
         this.monksKilled = 0;
+        this.monkLeadS = (this.monkLeadS !== undefined ? this.monkLeadS : 160);
 
-        // 7 Saffron-Robed Hare Krishna Monks marching in single file along the Lummus Park / Ocean Drive Promenade!
-        const startX = mx256(218.5) * TILE_SIZE;
-        const startY = my256(146.5) * TILE_SIZE;
-        const spacing = 19;
-
+        // 7 Saffron-Robed Hare Krishna Monks marching in single file along a closed promenade circuit!
         for (let i = 0; i < 7; i++) {
+            const trackPos = this.getMonkTrackPosition(this.monkLeadS - i * 22);
             const monk = new Pedestrian({
                 id: `monk_${i}`,
-                x: startX,
-                y: startY + i * spacing,
+                x: trackPos.x,
+                y: trackPos.y,
                 z: 2.0,
-                angle: -Math.PI * 0.5,
-                speed: 42,
+                angle: trackPos.angle,
+                speed: 38,
                 kind: "MONK",
                 g24Type: "monk",
                 monkIndex: i,
@@ -3720,6 +3771,12 @@ class LeonidaGame {
                 const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0);
                 p.x = col.x;
                 p.y = col.y;
+
+                if (this.map.resolveCircleFloraCollision) {
+                    const fcol = this.map.resolveCircleFloraCollision(p.x, p.y, 11);
+                    p.x = fcol.x;
+                    p.y = fcol.y;
+                }
                 p.z = this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0);
 
                 // Walk directly onto a glowing Venue Door Mat (< 20px) to enter its Interior!
@@ -4131,7 +4188,6 @@ class LeonidaGame {
             typeof this.net.isClientWorldSyncActive === "function" &&
             this.net.isClientWorldSyncActive()
         );
-        let leadMonk = null;
         for (const ped of this.peds) {
             if (ped.dead) {
                 ped.deadTimer = (ped.deadTimer || 0) + dt;
@@ -4241,24 +4297,32 @@ class LeonidaGame {
             }
 
             if (ped.kind === "MONK") {
-                // Single-file GOURANGA chain of 7 saffron-robed monks!
-                if (!leadMonk) {
-                    leadMonk = ped;
-                    ped.x += Math.cos(ped.angle) * ped.speed * dt;
-                    ped.y += Math.sin(ped.angle) * ped.speed * dt;
-                    // Patrol back and forth along the Ocean Drive Boardwalk between rows my256(143.5) and my256(155.5)
-                    if (ped.y < my256(143.5) * TILE_SIZE) ped.angle = Math.PI * 0.5;
-                    if (ped.y > my256(155.5) * TILE_SIZE) ped.angle = -Math.PI * 0.5;
+                // Single-file GOURANGA chain of 7 saffron-robed monks marching in a smooth closed promenade circuit!
+                if ((ped.panicTimer || 0) > 0 || (ped.stunnedTimer || 0) > 0) {
+                    if (ped.panicTimer > 0) ped.panicTimer -= dt;
+                    if (ped.stunnedTimer > 0) ped.stunnedTimer -= dt;
+                    ped.x += Math.cos(ped.angle) * 75 * dt;
+                    ped.y += Math.sin(ped.angle) * 75 * dt;
+                    ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
+                    continue;
+                }
+
+                // Lead monk advances the parade forward along the circuit
+                if (ped.monkIndex === 0) {
+                    this.monkLeadS = (this.monkLeadS || 0) + 38 * dt;
+                }
+
+                const targetPos = this.getMonkTrackPosition((this.monkLeadS || 0) - ped.monkIndex * 22);
+                const dTarget = Math.hypot(targetPos.x - ped.x, targetPos.y - ped.y);
+                if (dTarget > 4) {
+                    ped.angle = Math.atan2(targetPos.y - ped.y, targetPos.x - ped.x);
+                    const catchSpeed = Math.min(62, Math.max(34, dTarget * 3.5));
+                    ped.x += Math.cos(ped.angle) * catchSpeed * dt;
+                    ped.y += Math.sin(ped.angle) * catchSpeed * dt;
                 } else {
-                    const dx = leadMonk.x - ped.x;
-                    const dy = leadMonk.y - ped.y;
-                    const dist = Math.hypot(dx, dy);
-                    if (dist > 17) {
-                        ped.angle = Math.atan2(dy, dx);
-                        ped.x += Math.cos(ped.angle) * (ped.speed * 1.08) * dt;
-                        ped.y += Math.sin(ped.angle) * (ped.speed * 1.08) * dt;
-                    }
-                    leadMonk = ped;
+                    ped.x = targetPos.x;
+                    ped.y = targetPos.y;
+                    ped.angle = targetPos.angle;
                 }
                 ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
                 continue;
@@ -4504,18 +4568,18 @@ class LeonidaGame {
                 const curNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;
                 const newBx = Math.floor(ped.x / TILE_SIZE);
                 const newBy = Math.floor(ped.y / TILE_SIZE);
-                if (
-                    curNav &&
-                    (curNav.groundType === GROUND_TYPE.PAWEMENT || curNav.groundType === GROUND_TYPE.FIELD) &&
-                    (newBx !== bx || newBy !== by)
-                ) {
+                if (curNav && (curNav.groundType === GROUND_TYPE.PAWEMENT || curNav.groundType === GROUND_TYPE.FIELD)) {
                     const nextNav = this.map.getNavigationBlock(newBx, newBy, pz);
                     if (nextNav && nextNav.groundType === GROUND_TYPE.ROAD) {
                         ped.x = prevX;
                         ped.y = prevY;
-                        ped.angle += Math.PI;
+                        ped.angle += Math.PI * 0.75 + (Math.random() - 0.5) * 0.5;
                         ped.targetBx = bx;
                         ped.targetBy = by;
+                    }
+                } else if (curNav && curNav.groundType === GROUND_TYPE.ROAD) {
+                    if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0) {
+                        ped.panicTimer = 1.6; // Hasten off the asphalt road!
                     }
                 }
                 // Keep prison inmates & prison guards strictly inside the prison yard (57..67, 77..145), and block street civilians from entering!
@@ -4555,7 +4619,60 @@ class LeonidaGame {
                 ped.targetBx = null;
                 ped.targetBy = null;
             }
+
+            // Physical collision against Leonida Tree Trunks and Sabal Palms
+            if (this.map.resolveCircleFloraCollision) {
+                const fCol = this.map.resolveCircleFloraCollision(ped.x, ped.y, 8);
+                if (fCol.hit) {
+                    ped.x = fCol.x;
+                    ped.y = fCol.y;
+                    ped.angle += Math.PI * 0.5;
+                    ped.targetBx = null;
+                    ped.targetBy = null;
+                }
+            }
             ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
+        }
+
+        // 6B. Pedestrian-to-Pedestrian Mutual Separation & Reciprocal Collision Avoidance (RVO)
+        // Eliminates conga lines, stacking, clumping, and ghost pass-throughs
+        const nearPeds = [];
+        const pCamX = this.player.x, pCamY = this.player.y;
+        for (let i = 0; i < this.peds.length; i++) {
+            const p = this.peds[i];
+            if (!p.dead && Math.abs(p.x - pCamX) < 800 && Math.abs(p.y - pCamY) < 600) {
+                nearPeds.push(p);
+            }
+        }
+        for (let i = 0; i < nearPeds.length; i++) {
+            const p1 = nearPeds[i];
+            for (let j = i + 1; j < nearPeds.length; j++) {
+                const p2 = nearPeds[j];
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const dist2 = dx * dx + dy * dy;
+                const minDist = 18; // 18px separation diameter
+                if (dist2 < minDist * minDist && dist2 > 0.001) {
+                    const dist = Math.sqrt(dist2);
+                    const overlap = (minDist - dist) * 0.5;
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    p1.x += nx * overlap;
+                    p1.y += ny * overlap;
+                    p2.x -= nx * overlap;
+                    p2.y -= ny * overlap;
+
+                    // If pedestrians are heading towards each other, step slightly to their right (reciprocal detour)
+                    const dot = Math.cos(p1.angle) * Math.cos(p2.angle) + Math.sin(p1.angle) * Math.sin(p2.angle);
+                    if (dot < -0.3) {
+                        const sideStep = 14 * dt;
+                        p1.x += -Math.sin(p1.angle) * sideStep;
+                        p1.y += Math.cos(p1.angle) * sideStep;
+                        p2.x += -Math.sin(p2.angle) * sideStep;
+                        p2.y += Math.cos(p2.angle) * sideStep;
+                    }
+                }
+            }
         }
 
         // 7. VCPD Police Spawner, Roadblocks (Wanted >= 3) & Wanted Decay
