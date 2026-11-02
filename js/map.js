@@ -1869,7 +1869,7 @@ class LeonidaMap {
                     if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
                     // STRICT BEACH SAND BAN: Never allow any tree or shrub on open Atlantic sand (c >= 454) or beach sand blocks
                     if (c >= 454 && c <= 485 && r <= 390) return false;
-                    const blk = this.getBlock(c, r, 1);
+                    const blk = this.getBlockInfo(c, r, 1);
                     if (blk && (blk.lid >= 98 && blk.lid <= 101) && c >= 454) return false;
                 }
                 if (this.beachVolleyballCourts) {
