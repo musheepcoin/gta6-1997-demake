@@ -2326,12 +2326,12 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_37", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_39", () => {
             spritesLoaded = true;
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_37", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_39", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -2341,14 +2341,14 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_37", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_39", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_37", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_39", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();

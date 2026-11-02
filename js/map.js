@@ -185,7 +185,8 @@ class LeonidaMap {
             const fe = dv.getUint8(pos + 4);
             const fn = dv.getUint8(pos + 5);
             const fs = dv.getUint8(pos + 6);
-            const flid = dv.getUint8(pos + 7);
+            const rawLid = dv.getUint8(pos + 7);
+            const flid = (rawLid >= 99 && rawLid <= 101) ? 98 : rawLid;
             pos += 8;
 
             this.blocksData[i] = {
