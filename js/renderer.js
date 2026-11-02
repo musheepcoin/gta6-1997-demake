@@ -767,7 +767,7 @@ class RetroRenderer {
         if (!img || !img.width || !img.height || !meta || !meta.sprites) return img;
         try {
             const W = img.width;
-            const origH = 3307;
+            const origH = Math.max(3570, img.height || 3570);
 
             // Pre-compute the shelf-packed atlas layout of the GTA 2 (1999) remap pedestrian archetypes
             // (synthesized from the GTA 1 civilian base `civ0`) so the in-memory atlas can grow to fit them.
@@ -806,9 +806,7 @@ class RetroRenderer {
                 g2PackEndY = Math.max(g2PackEndY, cy + shelfH + 4);
             }
 
-            // Dedicated non-overlapping atlas shelf for Leonida 3D Arboretum Flora (fy1, fy2)
-            const floraPackStartY = g2PackEndY + 12;
-            const H = floraPackStartY + 180;
+            const H = g2PackEndY + 8;
             this.spritesTexW = W;
             this.spritesTexH = H;
             const cvs = document.createElement("canvas");
@@ -2033,402 +2031,21 @@ class RetroRenderer {
 
                 // =========================================================================
                 // 6K. GTA 6 LEONIDA DIVERSE FLORA & ARBORETUM SPRITES
+                // True 3ds Max / Raytraced 1999 DMA Design baked flora (y = 3480 in gta1_sprites.png)
                 // (10 distinct plant/tree species: palm_tree, fan_palm, swamp_cypress,
                 //  mangrove, banyan_tree, live_oak, bougainvillea_bush, sea_grape,
                 //  tropical_shrub, sawgrass_clump)
                 // =========================================================================
                 meta.sprites.objects["palm_tree"] = meta.sprites.objects["palm_tree"] || meta.sprites.objects["257"];
-                const fy1 = floraPackStartY + 6;
-                const fy2 = floraPackStartY + 84;
-
-                // 1) Sabal Palmetto (Florida State Fan Palm, 48x48)
-                {
-                    const ox = 10, oy = fy1;
-                    const cx = ox + 24, cy = oy + 24;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.32)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 21, 0, Math.PI * 2); ctx.fill();
-                    for (let i = 0; i < 16; i++) {
-                        const ang = i * (Math.PI * 2 / 16) + 0.1;
-                        ctx.strokeStyle = "#14532d";
-                        ctx.lineWidth = 2.2;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * 9, cy + Math.sin(ang) * 9); ctx.stroke();
-                        for (const sub of [-0.25, -0.15, -0.05, 0.05, 0.15, 0.25]) {
-                            const fang = ang + sub;
-                            const flen = 19 - Math.abs(sub) * 12;
-                            const fx = cx + Math.cos(fang) * flen;
-                            const fy = cy + Math.sin(fang) * flen;
-                            ctx.strokeStyle = (Math.abs(sub) < 0.1) ? "#4ade80" : "#16a34a";
-                            ctx.lineWidth = (Math.abs(sub) < 0.08) ? 2.0 : 1.2;
-                            ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * 8, cy + Math.sin(ang) * 8); ctx.lineTo(fx, fy); ctx.stroke();
-                            ctx.fillStyle = "#bef264";
-                            ctx.fillRect(Math.round(fx), Math.round(fy), 1.5, 1.5);
-                        }
-                    }
-                    ctx.fillStyle = "#451a03";
-                    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#78350f";
-                    ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = "#b45309";
-                    ctx.lineWidth = 1.0;
-                    for (const a of [0.7, 2.3, 3.8, 5.4]) {
-                        ctx.beginPath();
-                        ctx.moveTo(cx - Math.cos(a) * 4, cy - Math.sin(a) * 4);
-                        ctx.lineTo(cx + Math.cos(a) * 4, cy + Math.sin(a) * 4);
-                        ctx.stroke();
-                    }
-                    ctx.fillStyle = "#fef08a";
-                    ctx.beginPath(); ctx.arc(cx, cy, 2.4, 0, Math.PI * 2); ctx.fill();
-                    ctx.restore();
-                    meta.sprites.objects["fan_palm"] = [ox, oy, 48, 48];
-                }
-
-                // 2) Bald Cypress (Swamp Cypress with Root Knees & Spanish Moss, 56x56)
-                {
-                    const ox = 64, oy = fy1;
-                    const cx = ox + 28, cy = oy + 28;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.30)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 25, 0, Math.PI * 2); ctx.fill();
-                    for (let i = 0; i < 10; i++) {
-                        const kang = i * (Math.PI * 2 / 10) + 0.2;
-                        const kdist = 11 + (i % 3) * 2.5;
-                        const kx = cx + Math.cos(kang) * kdist;
-                        const ky = cy + Math.sin(kang) * kdist;
-                        ctx.fillStyle = "#451a03";
-                        ctx.beginPath(); ctx.arc(kx, ky, 3, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = "#92400e";
-                        ctx.beginPath(); ctx.arc(kx, ky, 2, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = "#d97706";
-                        ctx.beginPath(); ctx.arc(kx, ky, 1, 0, Math.PI * 2); ctx.fill();
-                    }
-                    const tiers = [
-                        [23, "rgba(63, 98, 18, 0.88)", 16],
-                        [18, "rgba(101, 163, 13, 0.94)", 14],
-                        [13, "rgba(132, 204, 22, 1.0)", 10],
-                        [8,  "rgba(163, 230, 53, 1.0)", 7],
-                        [4,  "rgba(217, 249, 157, 1.0)", 4]
-                    ];
-                    for (const [r, col, cnt] of tiers) {
-                        for (let i = 0; i < cnt; i++) {
-                            const ang = i * (Math.PI * 2 / cnt) + (r * 0.45);
-                            const bx = cx + Math.cos(ang) * (r * 0.76);
-                            const by = cy + Math.sin(ang) * (r * 0.76);
-                            ctx.fillStyle = col;
-                            ctx.beginPath(); ctx.arc(bx, by, r * 0.42, 0, Math.PI * 2); ctx.fill();
-                            ctx.strokeStyle = "rgba(190, 242, 100, 0.75)";
-                            ctx.lineWidth = 1.0;
-                            for (const sub of [-0.2, 0.2]) {
-                                ctx.beginPath();
-                                ctx.moveTo(bx, by);
-                                ctx.lineTo(bx + Math.cos(ang + sub) * (r * 0.35), by + Math.sin(ang + sub) * (r * 0.35));
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                    for (let i = 0; i < 9; i++) {
-                        const mang = i * 0.72 + 0.15;
-                        const mx = cx + Math.cos(mang) * 20;
-                        const my = cy + Math.sin(mang) * 20;
-                        ctx.strokeStyle = "rgba(203, 213, 225, 0.90)";
-                        ctx.lineWidth = 2.0;
-                        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 1, my + 6); ctx.stroke();
-                        ctx.strokeStyle = "rgba(148, 163, 184, 0.75)";
-                        ctx.lineWidth = 1.0;
-                        ctx.beginPath(); ctx.moveTo(mx - 1, my + 3); ctx.lineTo(mx + 2, my + 9); ctx.stroke();
-                    }
-                    ctx.fillStyle = "#371905";
-                    ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#78350f";
-                    ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.restore();
-                    meta.sprites.objects["swamp_cypress"] = [ox, oy, 56, 56];
-                }
-
-                // 3) Red Mangrove (Spider-Leg Stilt Roots & Glossy Leaves, 54x54)
-                {
-                    const ox = 126, oy = fy1;
-                    const cx = ox + 27, cy = oy + 27;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.30)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 24, 0, Math.PI * 2); ctx.fill();
-                    for (let i = 0; i < 14; i++) {
-                        const rang = i * (Math.PI * 2 / 14) + (i % 2) * 0.12;
-                        const rx = cx + Math.cos(rang) * 23;
-                        const ry = cy + Math.sin(rang) * 23;
-                        const midx = cx + Math.cos(rang + 0.28) * 13;
-                        const midy = cy + Math.sin(rang + 0.28) * 13;
-                        ctx.strokeStyle = "#451a03";
-                        ctx.lineWidth = 3.0;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(midx, midy); ctx.stroke();
-                        ctx.strokeStyle = "#78350f";
-                        ctx.lineWidth = 2.0;
-                        ctx.beginPath(); ctx.moveTo(midx, midy); ctx.lineTo(rx, ry); ctx.stroke();
-                        ctx.fillStyle = "#b45309";
-                        ctx.beginPath(); ctx.arc(rx, ry, 1.5, 0, Math.PI * 2); ctx.fill();
-                    }
-                    const mtiers = [
-                        [16, "rgba(20, 83, 45, 0.96)", 8],
-                        [11, "rgba(22, 163, 74, 1.0)", 7],
-                        [7,  "rgba(74, 222, 128, 1.0)", 5],
-                        [3,  "rgba(187, 247, 208, 1.0)", 3]
-                    ];
-                    for (const [r, col, cnt] of mtiers) {
-                        for (let i = 0; i < cnt; i++) {
-                            const ang = i * (Math.PI * 2 / cnt) + (r * 0.5);
-                            const lx = cx + Math.cos(ang) * (r * 0.7);
-                            const ly = cy + Math.sin(ang) * (r * 0.7);
-                            ctx.fillStyle = col;
-                            ctx.beginPath(); ctx.arc(lx, ly, r * 0.48, 0, Math.PI * 2); ctx.fill();
-                            ctx.strokeStyle = "rgba(240, 253, 244, 0.70)";
-                            ctx.lineWidth = 1.0;
-                            ctx.beginPath(); ctx.moveTo(lx - 1.5, ly - 1.5); ctx.lineTo(lx + 1.5, ly + 1.5); ctx.stroke();
-                        }
-                    }
-                    ctx.fillStyle = "#451a03";
-                    ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.restore();
-                    meta.sprites.objects["mangrove"] = [ox, oy, 54, 54];
-                }
-
-                // 4) Giant Florida Banyan / Ficus (Sprawling Canopy & Aerial Roots, 68x68)
-                {
-                    const ox = 186, oy = fy1;
-                    const cx = ox + 34, cy = oy + 34;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.34)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 31, 0, Math.PI * 2); ctx.fill();
-                    const btiers = [
-                        [28, "rgba(5, 46, 22, 0.96)", 11],
-                        [22, "rgba(20, 83, 45, 0.98)", 9],
-                        [15, "rgba(22, 163, 74, 1.0)", 7],
-                        [9,  "rgba(74, 222, 128, 1.0)", 5],
-                        [4,  "rgba(187, 247, 208, 1.0)", 3]
-                    ];
-                    for (const [r, col, cnt] of btiers) {
-                        for (let i = 0; i < cnt; i++) {
-                            const ang = i * (Math.PI * 2 / cnt) + (r * 0.58);
-                            const lx = cx + Math.cos(ang) * (r * 0.78);
-                            const ly = cy + Math.sin(ang) * (r * 0.78);
-                            ctx.fillStyle = col;
-                            ctx.beginPath(); ctx.arc(lx, ly, r * 0.46, 0, Math.PI * 2); ctx.fill();
-                            if (r <= 15) {
-                                ctx.fillStyle = "rgba(240, 253, 244, 0.85)";
-                                ctx.fillRect(Math.round(lx + 1), Math.round(ly - 1), 1.5, 1.5);
-                            }
-                        }
-                    }
-                    for (let i = 0; i < 8; i++) {
-                        const aang = i * 0.8;
-                        const adist = 8 + (i % 3) * 3;
-                        const ax = cx + Math.cos(aang) * adist;
-                        const ay = cy + Math.sin(aang) * adist;
-                        ctx.strokeStyle = "#3f2817";
-                        ctx.lineWidth = 2.0;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ax, ay); ctx.stroke();
-                        ctx.fillStyle = "#5e3a20";
-                        ctx.beginPath(); ctx.arc(ax, ay, 2, 0, Math.PI * 2); ctx.fill();
-                    }
-                    ctx.fillStyle = "#372314";
-                    ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.restore();
-                    meta.sprites.objects["banyan_tree"] = [ox, oy, 68, 68];
-                }
-
-                // 5) Gnarled Florida Live Oak with Spanish Moss (60x60)
-                {
-                    const ox = 260, oy = fy1;
-                    const cx = ox + 30, cy = oy + 30;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.32)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 27, 0, Math.PI * 2); ctx.fill();
-                    const boughs = [
-                        [0.4, 23, 13, 0.35],
-                        [1.8, 22, 12, -0.4],
-                        [3.0, 24, 14, 0.45],
-                        [4.3, 21, 11, -0.3],
-                        [5.5, 23, 13, 0.35]
-                    ];
-                    for (const [ang, elen, mlen, bend] of boughs) {
-                        const mx = cx + Math.cos(ang + bend) * mlen;
-                        const my = cy + Math.sin(ang + bend) * mlen;
-                        const ex = cx + Math.cos(ang) * elen;
-                        const ey = cy + Math.sin(ang) * elen;
-                        ctx.strokeStyle = "#422006";
-                        ctx.lineWidth = 4.0;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(mx, my); ctx.stroke();
-                        ctx.strokeStyle = "#713f12";
-                        ctx.lineWidth = 3.0;
-                        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ex, ey); ctx.stroke();
-                    }
-                    const otiers = [
-                        [22, "rgba(28, 69, 34, 0.94)", 8],
-                        [15, "rgba(45, 106, 54, 0.98)", 7],
-                        [9,  "rgba(74, 150, 80, 1.0)", 5],
-                        [4,  "rgba(134, 239, 172, 1.0)", 3]
-                    ];
-                    for (const [r, col, cnt] of otiers) {
-                        for (let i = 0; i < cnt; i++) {
-                            const ang = i * (Math.PI * 2 / cnt) + (r * 0.72);
-                            const lx = cx + Math.cos(ang) * (r * 0.75);
-                            const ly = cy + Math.sin(ang) * (r * 0.75);
-                            ctx.fillStyle = col;
-                            ctx.beginPath(); ctx.arc(lx, ly, r * 0.48, 0, Math.PI * 2); ctx.fill();
-                        }
-                    }
-                    for (let i = 0; i < 10; i++) {
-                        const mang = i * 0.65 + 0.1;
-                        const mx = cx + Math.cos(mang) * 20;
-                        const my = cy + Math.sin(mang) * 20;
-                        ctx.strokeStyle = "rgba(203, 213, 225, 0.90)";
-                        ctx.lineWidth = 2.0;
-                        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 1, my + 8); ctx.stroke();
-                        ctx.strokeStyle = "rgba(148, 163, 184, 0.75)";
-                        ctx.lineWidth = 1.0;
-                        ctx.beginPath(); ctx.moveTo(mx - 1.5, my + 3); ctx.lineTo(mx + 1, my + 11); ctx.stroke();
-                    }
-                    ctx.fillStyle = "#422006";
-                    ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.restore();
-                    meta.sprites.objects["live_oak"] = [ox, oy, 60, 60];
-                }
-
-                // 6) Bougainvillea Flowering Bush (Vibrant Tropical Blooms, 36x36)
-                {
-                    const ox = 10, oy = fy2;
-                    const cx = ox + 18, cy = oy + 18;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.32)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#14532d";
-                    ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#16a34a";
-                    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
-                    const bflowers = [
-                        [-8, -6, 5, "#f43f5e"],
-                        [7, -7, 6, "#ff1493"],
-                        [-6, 7, 5.5, "#fb923c"],
-                        [8, 6, 6, "#c026d3"],
-                        [0, -9, 5, "#f43f5e"],
-                        [-9, 0, 5, "#ff1493"],
-                        [9, 0, 5.5, "#fb923c"],
-                        [0, 9, 5, "#f43f5e"],
-                        [0, 0, 7, "#ff1493"],
-                        [-2, -2, 4, "#fda4af"],
-                        [3, 2, 4, "#fed7aa"]
-                    ];
-                    for (const [fx, fy, fr, col] of bflowers) {
-                        ctx.fillStyle = col;
-                        ctx.beginPath(); ctx.arc(cx + fx, cy + fy, fr, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = "#ffffff";
-                        ctx.fillRect(Math.round(cx + fx - 0.7), Math.round(cy + fy - 0.7), 1.5, 1.5);
-                    }
-                    ctx.restore();
-                    meta.sprites.objects["bougainvillea_bush"] = [ox, oy, 36, 36];
-                }
-
-                // 7) Sea Grape Coastal Dune Bush (Round Leaves & Red Veins, 38x38)
-                {
-                    const ox = 52, oy = fy2;
-                    const cx = ox + 19, cy = oy + 19;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.30)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
-                    for (let i = 0; i < 5; i++) {
-                        const ang = i * 1.25 + 0.15;
-                        ctx.strokeStyle = "#78350f";
-                        ctx.lineWidth = 2.0;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * 12, cy + Math.sin(ang) * 12); ctx.stroke();
-                    }
-                    const sgleaves = [
-                        [-7, -7, 7, "#65a30d"],
-                        [7, -6, 6.5, "#84cc16"],
-                        [-7, 7, 7.5, "#4d7c0f"],
-                        [7, 7, 7, "#65a30d"],
-                        [0, -9, 6.5, "#84cc16"],
-                        [-10, 0, 6, "#65a30d"],
-                        [10, 0, 6.5, "#4d7c0f"],
-                        [0, 8, 6.5, "#84cc16"],
-                        [0, 0, 8, "#a3e635"]
-                    ];
-                    for (const [lx, ly, lr, col] of sgleaves) {
-                        const px = cx + lx, py = cy + ly;
-                        ctx.fillStyle = col;
-                        ctx.beginPath(); ctx.arc(px, py, lr, 0, Math.PI * 2); ctx.fill();
-                        ctx.strokeStyle = "rgba(220, 38, 38, 0.85)";
-                        ctx.lineWidth = 1.0;
-                        ctx.beginPath(); ctx.moveTo(px - lr * 0.5, py); ctx.lineTo(px + lr * 0.5, py); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(px, py - lr * 0.5); ctx.lineTo(px, py + lr * 0.5); ctx.stroke();
-                    }
-                    ctx.restore();
-                    meta.sprites.objects["sea_grape"] = [ox, oy, 38, 38];
-                }
-
-                // 8) Tropical Shrub (Bird of Paradise / Heliconia in Planter Pot, 32x32)
-                {
-                    const ox = 96, oy = fy2;
-                    const cx = ox + 16, cy = oy + 16;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.32)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#b45309";
-                    ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = "#d97706";
-                    ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fill();
-                    for (let i = 0; i < 7; i++) {
-                        const ang = i * (Math.PI * 2 / 7) + 0.2;
-                        const lx = cx + Math.cos(ang) * 12;
-                        const ly = cy + Math.sin(ang) * 12;
-                        ctx.strokeStyle = "#14532d";
-                        ctx.lineWidth = 3.0;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(lx, ly); ctx.stroke();
-                        ctx.fillStyle = "#22c55e";
-                        ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
-                        ctx.strokeStyle = "rgba(187, 247, 208, 0.70)";
-                        ctx.lineWidth = 1.0;
-                        ctx.beginPath(); ctx.moveTo(lx - 1.5, ly); ctx.lineTo(lx + 1.5, ly); ctx.stroke();
-                    }
-                    ctx.fillStyle = "#f97316";
-                    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 6, cy - 6); ctx.lineTo(cx + 3, cy - 1); ctx.closePath(); ctx.fill();
-                    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - 6, cy + 4); ctx.lineTo(cx - 2, cy + 5); ctx.closePath(); ctx.fill();
-                    ctx.strokeStyle = "#06b6d4";
-                    ctx.lineWidth = 2.0;
-                    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 5, cy - 5); ctx.stroke();
-                    ctx.restore();
-                    meta.sprites.objects["tropical_shrub"] = [ox, oy, 32, 32];
-                }
-
-                // 9) Sawgrass Clump with Marsh Cattails (Everglades Wetlands, 34x34)
-                {
-                    const ox = 134, oy = fy2;
-                    const cx = ox + 17, cy = oy + 17;
-                    ctx.save();
-                    ctx.fillStyle = "rgba(10, 20, 25, 0.25)";
-                    ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill();
-                    for (let i = 0; i < 18; i++) {
-                        const ang = i * (Math.PI * 2 / 18) + (i % 3) * 0.12;
-                        const blen = 10 + (i % 4) * 3;
-                        const bx = cx + Math.cos(ang) * blen;
-                        const by = cy + Math.sin(ang) * blen;
-                        ctx.strokeStyle = (i % 2 === 0) ? "#65a30d" : "#a3e635";
-                        ctx.lineWidth = (i % 3 === 0) ? 2.0 : 1.2;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
-                        ctx.fillStyle = "#fef08a";
-                        ctx.fillRect(Math.round(bx), Math.round(by), 1.5, 1.5);
-                    }
-                    for (const [cdx, cdy] of [[-4, -3], [3, -4], [-2, 4], [4, 3]]) {
-                        const cpx = cx + cdx, cpy = cy + cdy;
-                        ctx.strokeStyle = "#78350f";
-                        ctx.lineWidth = 2.0;
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cpx, cpy); ctx.stroke();
-                        ctx.fillStyle = "#451a03";
-                        ctx.beginPath(); ctx.arc(cpx, cpy, 2.2, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = "#92400e";
-                        ctx.beginPath(); ctx.arc(cpx, cpy, 1.2, 0, Math.PI * 2); ctx.fill();
-                    }
-                    ctx.restore();
-                    meta.sprites.objects["sawgrass_clump"] = [ox, oy, 34, 34];
-                }
+                meta.sprites.objects["banyan_tree"] = meta.sprites.objects["banyan_tree"] || [10, 3480, 68, 68];
+                meta.sprites.objects["live_oak"] = meta.sprites.objects["live_oak"] || [88, 3480, 60, 60];
+                meta.sprites.objects["swamp_cypress"] = meta.sprites.objects["swamp_cypress"] || [158, 3480, 56, 56];
+                meta.sprites.objects["mangrove"] = meta.sprites.objects["mangrove"] || [224, 3480, 54, 54];
+                meta.sprites.objects["fan_palm"] = meta.sprites.objects["fan_palm"] || [288, 3480, 48, 48];
+                meta.sprites.objects["sea_grape"] = meta.sprites.objects["sea_grape"] || [346, 3480, 38, 38];
+                meta.sprites.objects["bougainvillea_bush"] = meta.sprites.objects["bougainvillea_bush"] || [394, 3480, 36, 36];
+                meta.sprites.objects["sawgrass_clump"] = meta.sprites.objects["sawgrass_clump"] || [440, 3480, 34, 34];
+                meta.sprites.objects["tropical_shrub"] = meta.sprites.objects["tropical_shrub"] || [484, 3480, 32, 32];
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
@@ -2731,7 +2348,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_41", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_44", () => {
             spritesLoaded = true;
             checkReady();
         });
