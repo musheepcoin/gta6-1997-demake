@@ -4878,7 +4878,7 @@ class LeonidaGame {
             }
         }
 
-        // 11. District Change Detection
+        // 11. District Change Detection & Restricted Security Compound Trespass (VCIA Tarmac & Leonida Penitentiary Yard)
         const newDist = this.map.getDistrictName(p.x, p.y);
         if (newDist !== this.currentDistrict) {
             this.currentDistrict = newDist;
@@ -4889,6 +4889,33 @@ class LeonidaGame {
         }
         if (this.districtPopupTimer > 0) {
             this.districtPopupTimer = Math.max(0, this.districtPopupTimer - dt);
+        }
+
+        if (!p.dead && this.map.airportCompound) {
+            const ac = this.map.airportCompound;
+            const inAirportCompound = (p.x > ac.x0 + 36 && p.x < ac.x1 - 36 && p.y > ac.y0 + 36 && p.y < ac.y1 - 36);
+            if (inAirportCompound) {
+                const isAuthorizedVehicle = Boolean(p.inVehicle && (p.inVehicle.isPolice || p.inVehicle.isEmergency));
+                const isCopOutfit = (p.charId === "DETECTIVE" || p.charId === "CROCKETT");
+                if (!isAuthorizedVehicle && !isCopOutfit) {
+                    if (!this._inRestrictedAirport) {
+                        this._inRestrictedAirport = true;
+                        if (this.wantedLevel < 2) {
+                            this.setWantedLevel(2);
+                            this.wantedDecayTimer = 0;
+                        }
+                        this.addFloatingText(p.x, p.y - 30, "🚨 RESTRICTED AIRFIELD TARMAC — 2★ WANTED!", "#ef4444");
+                        this.sendPager(
+                            "VCIA AIRPORT SECURITY",
+                            "ALERT! Unauthorized trespass past VCIA security checkpoint onto active runways! VCPD Airport Units dispatched!",
+                            true
+                        );
+                    }
+                    this.wantedDecayTimer = 0;
+                }
+            } else {
+                this._inRestrictedAirport = false;
+            }
         }
 
         // 12. Missions, Online P2P Network, Footsteps & Spatial Ambient Audio Update

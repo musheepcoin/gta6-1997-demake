@@ -1119,15 +1119,28 @@ class LeonidaMap {
         }));
 
         // 10) Leonida State Penitentiary Fenced Security Compound, Searchlights & Exercise Yard ("prisonCompound")
+        const prisX0 = 56.2 * TILE_SIZE, prisY0 = 76.2 * TILE_SIZE, prisX1 = 68.8 * TILE_SIZE, prisY1 = 146.8 * TILE_SIZE, prisMidY = 103.5 * TILE_SIZE;
         this.prisonCompound = {
-            x0: 56.2 * TILE_SIZE,
-            y0: 76.2 * TILE_SIZE,
-            x1: 68.8 * TILE_SIZE,
-            y1: 146.8 * TILE_SIZE,
-            midY: 103.5 * TILE_SIZE,
+            x0: prisX0,
+            y0: prisY0,
+            x1: prisX1,
+            y1: prisY1,
+            midY: prisMidY,
             courtX: 61.5 * TILE_SIZE,
             courtY: 122.5 * TILE_SIZE,
             z: 2.0,
+            spans: [
+                { xA: prisX0, yA: prisY0,   xB: 60.2 * TILE_SIZE, yB: prisY0 },
+                { xA: 63.8 * TILE_SIZE, yA: prisY0, xB: prisX1,   yB: prisY0 },
+                { xA: prisX1, yA: prisY0,   xB: prisX1,           yB: prisY1 },
+                { xA: prisX0, yA: prisY1,   xB: prisX1,           yB: prisY1 },
+                { xA: prisX0, yA: prisY0,   xB: prisX0,           yB: prisY1 },
+                { xA: prisX0, yA: prisMidY, xB: 60.5 * TILE_SIZE, yB: prisMidY },
+                { xA: 63.5 * TILE_SIZE, yA: prisMidY, xB: prisX1, yB: prisMidY }
+            ],
+            gates: [
+                { x: 62.0 * TILE_SIZE, y: prisY0, w: 3.6 * TILE_SIZE, ang: 0, label: "PENITENTIARY MAIN GATE" }
+            ],
             towers: [
                 { x: 57.0 * TILE_SIZE, y: 79.0 * TILE_SIZE,  baseAng: 0.6 },
                 { x: 67.0 * TILE_SIZE, y: 79.0 * TILE_SIZE,  baseAng: 2.4 },
@@ -1136,6 +1149,48 @@ class LeonidaMap {
                 { x: 57.0 * TILE_SIZE, y: 143.0 * TILE_SIZE, baseAng: -0.8 }
             ]
         };
+
+        // 10B) VCIA International Airport 3D Perimeter Security Fence, Guardhouse Checkpoints, Animated Boom Barriers & Tarmac Trespass Zone ("airportCompound")
+        const airX0 = 64.25 * TILE_SIZE, airY0 = 299.25 * TILE_SIZE, airX1 = 165.75 * TILE_SIZE, airY1 = 368.75 * TILE_SIZE;
+        this.airportCompound = {
+            x0: airX0,
+            y0: airY0,
+            x1: airX1,
+            y1: airY1,
+            z: 2.0,
+            spans: [
+                // North Perimeter Fence (y = 299.25) with 5 road checkpoints
+                { xA: airX0,             yA: airY0, xB: 75.8 * TILE_SIZE,  yB: airY0 },
+                { xA: 78.2 * TILE_SIZE,  yA: airY0, xB: 109.8 * TILE_SIZE, yB: airY0 },
+                { xA: 112.2 * TILE_SIZE, yA: airY0, xB: 125.6 * TILE_SIZE, yB: airY0 },
+                { xA: 130.4 * TILE_SIZE, yA: airY0, xB: 147.8 * TILE_SIZE, yB: airY0 },
+                { xA: 150.2 * TILE_SIZE, yA: airY0, xB: airX1,             yB: airY0 },
+                // South Perimeter Fence (y = 368.75) with South Cargo Gate at c=126..130
+                { xA: airX0,             yA: airY1, xB: 125.6 * TILE_SIZE, yB: airY1 },
+                { xA: 130.4 * TILE_SIZE, yA: airY1, xB: airX1,             yB: airY1 },
+                // West & East Continuous Perimeter Fences
+                { xA: airX0,             yA: airY0, xB: airX0,             yB: airY1 },
+                { xA: airX1,             yA: airY0, xB: airX1,             yB: airY1 }
+            ],
+            gates: [
+                { x: 77.0 * TILE_SIZE,  y: airY0, w: 2.4 * TILE_SIZE, boothX: 75.1 * TILE_SIZE,  boothY: 300.2 * TILE_SIZE, guardAng: 0,       name: "WEST HANGAR GATE" },
+                { x: 111.0 * TILE_SIZE, y: airY0, w: 2.4 * TILE_SIZE, boothX: 109.1 * TILE_SIZE, boothY: 300.2 * TILE_SIZE, guardAng: 0,       name: "CENTRAL APRON GATE" },
+                { x: 128.0 * TILE_SIZE, y: airY0, w: 4.8 * TILE_SIZE, boothX: 124.8 * TILE_SIZE, boothY: 300.3 * TILE_SIZE, guardAng: 0,       name: "MAIN TERMINAL CHECKPOINT" },
+                { x: 149.0 * TILE_SIZE, y: airY0, w: 2.4 * TILE_SIZE, boothX: 147.1 * TILE_SIZE, boothY: 300.2 * TILE_SIZE, guardAng: 0,       name: "EAST CARGO GATE" },
+                { x: 128.0 * TILE_SIZE, y: airY1, w: 4.8 * TILE_SIZE, boothX: 124.8 * TILE_SIZE, boothY: 367.7 * TILE_SIZE, guardAng: Math.PI, name: "SOUTH RUNWAY CHECKPOINT" }
+            ],
+            patrolGuards: [
+                { x: 79.0 * TILE_SIZE,  y: 300.6 * TILE_SIZE, dx: 0,  dy: 28, seed: 0.2 },
+                { x: 113.0 * TILE_SIZE, y: 300.6 * TILE_SIZE, dx: 0,  dy: 28, seed: 1.5 },
+                { x: 131.2 * TILE_SIZE, y: 300.6 * TILE_SIZE, dx: 26, dy: 0,  seed: 2.8 },
+                { x: 151.0 * TILE_SIZE, y: 300.6 * TILE_SIZE, dx: 0,  dy: 28, seed: 4.1 },
+                { x: 131.2 * TILE_SIZE, y: 367.4 * TILE_SIZE, dx: 26, dy: 0,  seed: 5.3 }
+            ]
+        };
+        this.securityFenceSpans = [
+            ...this.prisonCompound.spans,
+            ...this.airportCompound.spans
+        ];
 
         // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
         this.portTerminals = [
@@ -1750,12 +1805,12 @@ class LeonidaMap {
                 short: "VCIA AIRPORT",
                 shortName: "VCIA INT'L AIRPORT",
                 name: "✈️ VCIA INT'L AIRPORT (DUAL RUNWAYS & JET)",
-                sub: "CROSSING RUNWAYS 18L/09, Y-TERMINAL, CONTROL TOWER & 3D PARKED AIRLINER — 100% HEALTH!",
+                sub: "FENCED RESTRICTED TARMAC, SECURITY CHECKPOINTS, CROSSING RUNWAYS 18L/09 & 3D AIRLINERS!",
                 district: "VCIA INTERNATIONAL AIRPORT",
-                bx: mx256(66.5),
-                by: my256(152.0),
-                x: mx256(66.5) * TILE_SIZE,
-                y: my256(152.0) * TILE_SIZE,
+                bx: 128.0,
+                by: 297.5,
+                x: 128.0 * TILE_SIZE,
+                y: 297.5 * TILE_SIZE,
                 color: "#38bdf8",
                 perk: "HEAL",
                 visited: false
@@ -3120,6 +3175,41 @@ class LeonidaMap {
                                 nx += radius;
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Physical collision against 3D Perimeter Security Fences (VCIA Airport & Leonida State Penitentiary)
+        if (this.securityFenceSpans && this.securityFenceSpans.length > 0 && (currentZBlocks === null || currentZBlocks < 2.8)) {
+            const fenceRadius = radius + 2.5;
+            const fenceRadSq = fenceRadius * fenceRadius;
+            for (let i = 0; i < this.securityFenceSpans.length; i++) {
+                const sp = this.securityFenceSpans[i];
+                const minX = Math.min(sp.xA, sp.xB) - fenceRadius;
+                const maxX = Math.max(sp.xA, sp.xB) + fenceRadius;
+                const minY = Math.min(sp.yA, sp.yB) - fenceRadius;
+                const maxY = Math.max(sp.yA, sp.yB) + fenceRadius;
+                if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
+
+                const vx = sp.xB - sp.xA;
+                const vy = sp.yB - sp.yA;
+                const lenSq = vx * vx + vy * vy;
+                const t = lenSq > 0.001 ? Math.max(0.0, Math.min(1.0, ((nx - sp.xA) * vx + (ny - sp.yA) * vy) / lenSq)) : 0.0;
+                const cx = sp.xA + t * vx;
+                const cy = sp.yA + t * vy;
+                const ddx = nx - cx;
+                const ddy = ny - cy;
+                const distSq = ddx * ddx + ddy * ddy;
+                if (distSq < fenceRadSq) {
+                    hit = true;
+                    const dist = Math.sqrt(distSq) || 0.001;
+                    const overlap = fenceRadius - dist;
+                    if (dist > 0.01) {
+                        nx += (ddx / dist) * overlap;
+                        ny += (ddy / dist) * overlap;
+                    } else {
+                        nx += fenceRadius;
                     }
                 }
             }

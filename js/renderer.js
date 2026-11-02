@@ -4655,32 +4655,36 @@ class RetroRenderer {
             }
         }
 
-        // 10) Leonida State Penitentiary 3D Chain-Link Security Fence, Razor Wire, Searchlights & Inmate Yard
+        // 10) Leonida State Penitentiary & VCIA International Airport 3D Chain-Link Security Fences, Razor Wire, Checkpoints & Searchlights
+        const drawSecurityFenceSpan = (xA, yA, xB, yB, bz = 2.0) => {
+            if (Math.max(xA, xB) < minX - 60 || Math.min(xA, xB) > maxX + 60 || Math.max(yA, yB) < minY - 60 || Math.min(yA, yB) > maxY + 60) return;
+            const dx = xB - xA, dy = yB - yA;
+            const len = Math.hypot(dx, dy);
+            const ang = Math.atan2(dy, dx);
+            const cx = (xA + xB) * 0.5, cy = (yA + yB) * 0.5;
+            // Ground shadow + lower mesh rail + galvanized chain-link mesh + upper razor-wire top rail
+            this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.015, len, 4.0, ang, 0.02, 0.03, 0.05, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            this.pushSolidQuad3D(cx, cy, bz + 0.08,  len, 3.2, ang, 0.44, 0.48, 0.54, 0.90, SPRITE_DRAW_ORDER.CAR);
+            this.pushSolidQuad3D(cx, cy, bz + 0.16,  len, 2.6, ang, 0.66, 0.70, 0.76, 0.94, SPRITE_DRAW_ORDER.TREES);
+            this.pushSolidQuad3D(cx, cy, bz + 0.22,  len, 4.2, ang, 0.84, 0.88, 0.94, 0.88, SPRITE_DRAW_ORDER.TREES);
+            const steps = Math.max(2, Math.floor(len / 36));
+            for (let s = 0; s <= steps; s++) {
+                const px = xA + (dx * s) / steps;
+                const py = yA + (dy * s) / steps;
+                if (px < minX - 32 || px > maxX + 32 || py < minY - 32 || py > maxY + 32) continue;
+                this.pushSolidQuad3D(px, py, bz + 0.15, 5.2, 5.2, 0, 0.28, 0.32, 0.38, 0.98, SPRITE_DRAW_ORDER.TREES);
+            }
+        };
+
         const pris = this.map.prisonCompound;
         if (pris && pris.x1 >= minX - 120 && pris.x0 <= maxX + 120 && pris.y1 >= minY - 120 && pris.y0 <= maxY + 120) {
             const bz = pris.z || 2.0;
-            const drawFenceSpan = (xA, yA, xB, yB) => {
-                const dx = xB - xA, dy = yB - yA;
-                const len = Math.hypot(dx, dy);
-                const ang = Math.atan2(dy, dx);
-                const cx = (xA + xB) * 0.5, cy = (yA + yB) * 0.5;
-                // Ground shadow + lower mesh rail + upper razor-wire top rail
-                this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.015, len, 3.5, ang, 0.02, 0.03, 0.05, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(cx, cy, bz + 0.08,  len, 3.0, ang, 0.46, 0.50, 0.56, 0.88, SPRITE_DRAW_ORDER.CAR);
-                this.pushSolidQuad3D(cx, cy, bz + 0.16,  len, 2.4, ang, 0.68, 0.72, 0.78, 0.92, SPRITE_DRAW_ORDER.TREES);
-                this.pushSolidQuad3D(cx, cy, bz + 0.21,  len, 3.8, ang, 0.82, 0.86, 0.92, 0.85, SPRITE_DRAW_ORDER.TREES);
-                const steps = Math.max(2, Math.floor(len / 36));
-                for (let s = 0; s <= steps; s++) {
-                    const px = xA + (dx * s) / steps;
-                    const py = yA + (dy * s) / steps;
-                    this.pushSolidQuad3D(px, py, bz + 0.14, 4.8, 4.8, 0, 0.30, 0.34, 0.40, 0.96, SPRITE_DRAW_ORDER.TREES);
+            if (Array.isArray(pris.spans)) {
+                for (let si = 0; si < pris.spans.length; si++) {
+                    const sp = pris.spans[si];
+                    drawSecurityFenceSpan(sp.xA, sp.yA, sp.xB, sp.yB, bz);
                 }
-            };
-            drawFenceSpan(pris.x0, pris.y0, pris.x1, pris.y0);
-            drawFenceSpan(pris.x1, pris.y0, pris.x1, pris.y1);
-            drawFenceSpan(pris.x0, pris.y1, pris.x1, pris.y1);
-            drawFenceSpan(pris.x0, pris.y0, pris.x0, pris.y1);
-            drawFenceSpan(pris.x0, pris.midY, pris.x1, pris.midY);
+            }
 
             // Rotating Watchtower Searchlight Cones
             for (let ti = 0; ti < pris.towers.length; ti++) {
@@ -4712,6 +4716,63 @@ class RetroRenderer {
                 const gy = pris.y0 + 180 + gi * 420 + Math.sin(this.time * 0.9 + gi) * 90;
                 const gAng = (Math.cos(this.time * 0.9 + gi) >= 0) ? Math.PI * 0.5 : -Math.PI * 0.5;
                 this.batchPedSprite3D((gi % 2 === 0) ? "police" : "g2_swat", Math.floor(this.time * 4.5 + gi) % 8, gx, gy, bz + 0.038, gAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+
+        // 10B) VCIA International Airport 3D Perimeter Security Fence, Guardhouse Booths, Boom Barriers & Armed Airport Police
+        const airComp = this.map.airportCompound;
+        if (airComp && airComp.x1 >= minX - 120 && airComp.x0 <= maxX + 120 && airComp.y1 >= minY - 120 && airComp.y0 <= maxY + 120) {
+            const bz = airComp.z || 2.0;
+            if (Array.isArray(airComp.spans)) {
+                for (let si = 0; si < airComp.spans.length; si++) {
+                    const sp = airComp.spans[si];
+                    drawSecurityFenceSpan(sp.xA, sp.yA, sp.xB, sp.yB, bz);
+                }
+            }
+            if (Array.isArray(airComp.gates)) {
+                for (let gi = 0; gi < airComp.gates.length; gi++) {
+                    const gt = airComp.gates[gi];
+                    if (gt.x < minX - 220 || gt.x > maxX + 220 || gt.y < minY - 220 || gt.y > maxY + 220) continue;
+                    const halfW = gt.w * 0.5;
+                    // Yellow & black hazard stop stripe across the road checkpoint
+                    this.pushSolidQuad3D(gt.x, gt.y, bz + 0.016, gt.w - 8, 6.0, 0, 0.98, 0.80, 0.12, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Left & Right 3D Security Gate Pillars with flashing amber/red warning beacons
+                    for (const side of [-1, 1]) {
+                        const px = gt.x + side * (halfW - 4);
+                        const py = gt.y;
+                        this.pushSolidQuad3D(px + sunCos * 4, py + sunSin * 4, bz + 0.015, 11, 11, 0, 0.02, 0.03, 0.05, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(px, py, bz + 0.10, 9.5, 9.5, 0, 0.22, 0.26, 0.32, 0.98, SPRITE_DRAW_ORDER.CAR);
+                        this.pushSolidQuad3D(px, py, bz + 0.22, 7.5, 7.5, 0, 0.92, 0.72, 0.14, 0.98, SPRITE_DRAW_ORDER.TREES);
+                        const beaconOn = Math.sin(this.time * 6.5 + gi * 1.7 + side) > 0.0;
+                        if (beaconOn) {
+                            this.pushSolidQuad3D(px, py, bz + 0.26, 5.5, 5.5, 0, 1.0, 0.22, 0.16, 0.92, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                        }
+                        // Red & white striped security boom barrier arm extending from each pillar
+                        const armLen = halfW * 0.44;
+                        const armCx = px - side * (armLen * 0.5 + 3);
+                        this.pushSolidQuad3D(armCx, py, bz + 0.14, armLen, 3.4, 0, 0.95, 0.18, 0.18, 0.96, SPRITE_DRAW_ORDER.TREES);
+                        this.pushSolidQuad3D(armCx, py, bz + 0.145, armLen * 0.45, 3.4, 0, 0.98, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.TREES);
+                    }
+                    // 3D Airport Security Guardhouse Booth beside the checkpoint
+                    const bx = gt.boothX, by = gt.boothY;
+                    this.pushSolidQuad3D(bx + sunCos * 6, by + sunSin * 6, bz + 0.015, 28, 22, 0, 0.02, 0.03, 0.06, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bx, by, bz + 0.12, 24, 18, 0, 0.82, 0.86, 0.92, 0.98, SPRITE_DRAW_ORDER.CAR);
+                    this.pushSolidQuad3D(bx, by, bz + 0.20, 20, 14, 0, 0.16, 0.42, 0.68, 0.95, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(bx, by, bz + 0.28, 26, 20, 0, 0.24, 0.28, 0.36, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(bx, by, bz + 0.29, 18, 4.0, 0, 0.98, 0.78, 0.12, 0.98, SPRITE_DRAW_ORDER.TREES);
+                }
+            }
+            if (Array.isArray(airComp.patrolGuards)) {
+                for (let pi = 0; pi < airComp.patrolGuards.length; pi++) {
+                    const pg = airComp.patrolGuards[pi];
+                    const osc = Math.sin(this.time * 1.1 + pg.seed);
+                    const gx = pg.x + pg.dx * osc;
+                    const gy = pg.y + pg.dy * osc;
+                    if (gx < minX - 80 || gx > maxX + 80 || gy < minY - 80 || gy > maxY + 80) continue;
+                    const gAng = Math.atan2(pg.dy * Math.cos(this.time * 1.1 + pg.seed), pg.dx * Math.cos(this.time * 1.1 + pg.seed) || 0.01);
+                    const fr = Math.floor(this.time * 5.0 + pi * 2) % 8;
+                    this.batchPedSprite3D(pi % 2 === 0 ? "police" : "g2_swat", fr, gx, gy, bz + 0.038, gAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
             }
         }
 
