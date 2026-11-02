@@ -226,6 +226,18 @@ class LeonidaMap {
             }
         }
 
+        // Clean up VCIA North Perimeter Highway (y = 295..298) where internal airport runway strips (x = 76..77, 110..111, 148..149)
+        // touched the highway from the south without any city street to the north: restore continuous East/West highway lanes (from x = 74)
+        // so city traffic cruises smoothly past the airport fence and never treats airport runway gates as public street intersections!
+        for (const falseJuncX of [76, 77, 110, 111, 148, 149]) {
+            for (let y = 295; y <= 298; y++) {
+                for (let z = 0; z < MAP_LAYERS; z++) {
+                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + falseJuncX] =
+                        this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 74];
+                }
+            }
+        }
+
         // Seamless GTA 2 Road Continuity Pass: record original intersection stop-line blocks (lid 24)
         // in stopLineMask, then replace disruptive barcode crosswalk blocks with their adjacent continuous lane block (lid 1, 80, or 74)
         // so curbs, yellow edge lines & lane dividers run unbroken to every junction while Traffic AI still knows every stop line!
@@ -1506,6 +1518,7 @@ class LeonidaMap {
 
         for (let r = 3; r < MAP_ROWS - 3; r++) {
             for (let c = 3; c < MAP_COLS - 3; c++) {
+                if (this.isRestrictedNoTrafficZone(c, r)) continue;
                 const idx = r * MAP_COLS + c;
                 if (this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT) continue;
                 if (this.coastalSandMask[idx]) continue;
@@ -2400,6 +2413,14 @@ class LeonidaMap {
        AUTHENTIC NYC.CMP ROAD ARROW & LANE NAVIGATION GRAPH (1997 GTA 1)
        Uses BlockStyle directional bitmask (up/down/left/right) & trafficHint
        ======================================================================== */
+    isRestrictedNoTrafficZone(bx, by) {
+        // VCIA International Airport Fenced Tarmac & Runways (c = 64..165, r = 299..368)
+        if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) return true;
+        // Leonida State Penitentiary Fenced Compound (c = 56..68, r = 76..146)
+        if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146) return true;
+        return false;
+    }
+
     getNavigationBlock(bx, by, zBlocks = 2.0) {
         const cx = Math.max(0, Math.min(MAP_COLS - 1, bx | 0));
         const cy = Math.max(0, Math.min(MAP_ROWS - 1, by | 0));
@@ -2473,10 +2494,12 @@ class LeonidaMap {
     }
 
     doesRoadExitIntersection(bx, by, dx, dy, zBlocks = 2.0) {
+        const startInRestricted = this.isRestrictedNoTrafficZone(bx, by);
         for (let step = 1; step <= 6; step++) {
             const tx = bx + dx * step;
             const ty = by + dy * step;
             if (tx < 1 || tx >= MAP_COLS - 1 || ty < 1 || ty >= MAP_ROWS - 1) return false;
+            if (!startInRestricted && this.isRestrictedNoTrafficZone(tx, ty)) return false;
             const tb = this.getNavigationBlock(tx, ty, zBlocks);
             if (!tb || tb.groundType !== GROUND_TYPE.ROAD) return false;
             const tlid = this.getBlockInfo(tx, ty, 1).lid;
@@ -2496,6 +2519,7 @@ class LeonidaMap {
     }
 
     doesStraightLeadToValidExit(bx, by, dx, dy, zBlocks = 2.0, turnedInIntersection = false, entryAngle = null) {
+        const startInRestricted = this.isRestrictedNoTrafficZone(bx, by);
         const dirAngle = Math.atan2(dy, dx);
         const isOppositeToEntry = typeof entryAngle === "number" &&
             Math.abs(this.normalizeAngleDiff(dirAngle, entryAngle)) > 2.4;
@@ -2509,6 +2533,7 @@ class LeonidaMap {
             const tx = bx + dx * step;
             const ty = by + dy * step;
             if (tx < 1 || tx >= MAP_COLS - 1 || ty < 1 || ty >= MAP_ROWS - 1) return false;
+            if (!startInRestricted && this.isRestrictedNoTrafficZone(tx, ty)) return false;
             const tb = this.getNavigationBlock(tx, ty, zBlocks);
             if (!tb || tb.groundType !== GROUND_TYPE.ROAD) return false;
             const tlid = this.getBlockInfo(tx, ty, 1).lid;
@@ -2571,10 +2596,12 @@ class LeonidaMap {
         const sourceDirs = dirs.length > 0 ? dirs : cardinals;
         const candidates = [];
 
+        const startInRestricted = this.isRestrictedNoTrafficZone(bx, by);
         for (const d of sourceDirs) {
             const nx = bx + d.dx;
             const ny = by + d.dy;
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
+            if (!startInRestricted && this.isRestrictedNoTrafficZone(nx, ny)) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
             if (!nb || nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) {
                 continue;
@@ -2633,12 +2660,14 @@ class LeonidaMap {
             };
         }
 
+        const startInRestricted = this.isRestrictedNoTrafficZone(bx, by);
         const roadCandidates = [];
         const anyDrivable = [];
         for (const d of dirs) {
             const nx = bx + d.dx;
             const ny = by + d.dy;
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
+            if (!startInRestricted && this.isRestrictedNoTrafficZone(nx, ny)) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
             const absDiff = Math.abs(this.normalizeAngleDiff(d.angle, currentAngle));
             const isTurn = absDiff > 0.45;

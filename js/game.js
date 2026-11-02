@@ -465,6 +465,7 @@ class LeonidaGame {
                 const sc = meta.startup_cars[i];
                 const bx = Math.floor(sc.x);
                 const by = Math.floor(sc.y);
+                if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
                 const lidZ1 = this.map.getBlockInfo ? this.map.getBlockInfo(bx, by, 1).lid : 0;
                 if (lidZ1 === 25) continue;
                 const vx = (bx + 0.5) * TILE_SIZE;
@@ -499,11 +500,12 @@ class LeonidaGame {
             let by = Math.floor(v.y / TILE_SIZE);
             const nav = this.map.getNavigationBlock(bx, by, v.z);
             if (v.driver === "AI_TRAFFIC" || v.driver === "AI_EMERGENCY") {
-                if (nav && nav.groundType !== GROUND_TYPE.ROAD) {
-                    for (let r = 1; r <= 4; r++) {
+                if ((nav && nav.groundType !== GROUND_TYPE.ROAD) || (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by))) {
+                    for (let r = 1; r <= 6; r++) {
                         let foundRoad = false;
                         for (let dy = -r; dy <= r && !foundRoad; dy++) {
                             for (let dx = -r; dx <= r && !foundRoad; dx++) {
+                                if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx + dx, by + dy)) continue;
                                 const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z);
                                 if (nb && nb.groundType === GROUND_TYPE.ROAD) {
                                     bx += dx;
@@ -4601,6 +4603,7 @@ class LeonidaGame {
                     const distB = 11.5 + Math.random() * 4.5; // 736..1024px away so police arrive progressively from a distance
                     const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                     const by = Math.floor(baseBy + Math.sin(ang) * distB);
+                    if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
                     const navBlk = this.map.getNavigationBlock(bx, by, pz);
                     if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                         const sx = (bx + 0.5) * TILE_SIZE;
@@ -4629,7 +4632,9 @@ class LeonidaGame {
                 this.roadblockCooldown = 28;
                 const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 480;
                 const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 480;
-                if (this.map.isRoadAtPixel(rbX, rbY)) {
+                const rbBx = Math.floor(rbX / TILE_SIZE);
+                const rbBy = Math.floor(rbY / TILE_SIZE);
+                if (this.map.isRoadAtPixel(rbX, rbY) && !(this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(rbBx, rbBy))) {
                     const rbSpec = tWanted >= 4 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
                     const rbCar = new Vehicle(`rb_${Date.now()}`, rbSpec, rbX, rbY, (spawnTarget.angle || 0) + Math.PI * 0.5);
                     this.vehicles.push(rbCar);
@@ -4709,6 +4714,7 @@ class LeonidaGame {
                             const distB = 8.0 + Math.random() * 5.0;
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                             const by = Math.floor(baseBy + Math.sin(ang) * distB);
+                            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
                             const navBlk = this.map.getNavigationBlock(bx, by, pz);
                             if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                                 const sx = (bx + 0.5) * TILE_SIZE;

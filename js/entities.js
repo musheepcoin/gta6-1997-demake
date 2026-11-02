@@ -1184,6 +1184,7 @@ class Vehicle {
             const nbx = bx + perpX * side;
             const nby = by + perpY * side;
             if (nbx < 2 || nbx >= MAP_COLS - 2 || nby < 2 || nby >= MAP_ROWS - 2) continue;
+            if (map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(nbx, nby)) continue;
 
             const nb = map.getNavigationBlock ? map.getNavigationBlock(nbx, nby, curZ) : null;
             if (!nb || nb.groundType !== GROUND_TYPE.ROAD || nb.isRailway) continue;
@@ -2540,9 +2541,9 @@ class TrafficManager {
 
     removeOffscreenCars(viewports) {
         const game = this.game;
+        const map = game.map;
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
         const minKeep = 24 + (vps.length - 1) * 10;
-        if (game.vehicles.length <= minKeep) return;
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
 
         for (let i = game.vehicles.length - 1; i >= 0; i--) {
@@ -2550,15 +2551,21 @@ class TrafficManager {
             const anyWanted = game.wantedLevel > 0 || (game.net && typeof game.net.getMaxWantedLevel === "function" && game.net.getMaxWantedLevel() > 0);
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
+                v.driver === "AI_EMERGENCY" ||
                 (!anyWanted && v.driver === "AI_COP");
             if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE") continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
+            // Immediately remove any civilian/emergency traffic car that ever wanders or spawns inside a restricted compound (VCIA Airport / Penitentiary)
+            if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(bx, by)) {
+                game.vehicles.splice(i, 1);
+                continue;
+            }
+            if (game.vehicles.length <= minKeep) continue;
             const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
                 game.vehicles.splice(i, 1);
-                if (game.vehicles.length <= minKeep) break;
             }
         }
     }
@@ -2586,6 +2593,7 @@ class TrafficManager {
         for (let by = outerRect.minY; by <= outerRect.maxY; by += 2) {
             for (let bx = outerRect.minX; bx <= outerRect.maxX; bx += 2) {
                 if (this.isPointInRect(bx, by, onScreenArea)) continue;
+                if (map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(bx, by)) continue;
                 const navBlk = map.getNavigationBlock(bx, by, camZ);
                 if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD || navBlk.isRailway) continue;
                 // 1997 GTA 1 TrafficManager.cpp:368-374 — ONLY spawn on single-direction straight lane blocks (bits === 1), never intersections!
