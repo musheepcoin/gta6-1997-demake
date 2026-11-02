@@ -462,27 +462,36 @@ class RetroRenderer {
                             float stoneGrain = (aNoise(p * 18.0 + 11.0) - 0.5) * 0.006;
                             dWater = min(dCard, dCorner) + stoneGrain;
 
-                            // Outer contact shadow on surrounding ground & 3D sculpted limestone/granite coping rim (dWater in [-0.045, 0.145])
-                            if (dWater < 0.155) {
-                                float outerAO = mix(0.76, 1.0, smoothstep(-0.002, -0.045, dWater));
-                                vec3 groundCol = c.rgb * outerAO;
+                            if (waterSurType > 2.5) {
+                                // Natural beach & coastal shoreline: NO stone border! Smooth transition from dry golden sand to warm wet sand
+                                if (dWater < 0.24) {
+                                    float wetMix = smoothstep(-0.04, 0.14, dWater);
+                                    vec3 wetSand = c.rgb * vec3(0.84, 0.77, 0.65);
+                                    c.rgb = mix(c.rgb, wetSand, wetMix);
+                                }
+                            } else {
+                                // Enclosed urban park basin / lagoon: 3D sculpted limestone/granite coping rim (dWater in [-0.045, 0.145])
+                                if (dWater < 0.155) {
+                                    float outerAO = mix(0.76, 1.0, smoothstep(-0.002, -0.045, dWater));
+                                    vec3 groundCol = c.rgb * outerAO;
 
-                                // Architectural stone coping rim (margelle en pierre de taille / quai)
-                                float copingNorm = clamp(dWater / 0.14, 0.0, 1.0);
-                                vec3 stoneBase = (waterSurType > 0.5 && waterSurType < 2.5)
-                                    ? vec3(0.86, 0.81, 0.72) // Warm Florida coquina / travertine limestone for park & promenade lagoons
-                                    : vec3(0.76, 0.77, 0.80); // Chiselled light urban granite for city plazas & canals
-                                float blockNoise = (aNoise(p * 26.0 + 5.0) - 0.5) * 0.06 + (aHash(floor(p * 52.0)) - 0.5) * 0.03;
-                                float jointGrid = abs(sin((p.x + p.y) * 9.42477)) * abs(cos((p.x - p.y) * 9.42477));
-                                float mortarJoint = 1.0 - 0.22 * smoothstep(0.035, 0.0, jointGrid);
-                                float outerChamfer = smoothstep(0.0, 0.22, copingNorm);
-                                float crownTop = sin(copingNorm * 3.14159) * 0.14;
-                                float innerDropWall = 1.0 - 0.42 * smoothstep(0.68, 0.98, copingNorm);
-                                vec3 copingCol = (stoneBase + blockNoise + crownTop) * (0.88 + 0.16 * outerChamfer) * innerDropWall * mortarJoint;
+                                    // Architectural stone coping rim (margelle en pierre de taille / bassin)
+                                    float copingNorm = clamp(dWater / 0.14, 0.0, 1.0);
+                                    vec3 stoneBase = (waterSurType > 0.5 && waterSurType < 2.5)
+                                        ? vec3(0.86, 0.81, 0.72) // Warm Florida coquina / travertine limestone for park & promenade lagoons
+                                        : vec3(0.76, 0.77, 0.80); // Chiselled light urban granite for city plazas & canals
+                                    float blockNoise = (aNoise(p * 26.0 + 5.0) - 0.5) * 0.06 + (aHash(floor(p * 52.0)) - 0.5) * 0.03;
+                                    float jointGrid = abs(sin((p.x + p.y) * 9.42477)) * abs(cos((p.x - p.y) * 9.42477));
+                                    float mortarJoint = 1.0 - 0.22 * smoothstep(0.035, 0.0, jointGrid);
+                                    float outerChamfer = smoothstep(0.0, 0.22, copingNorm);
+                                    float crownTop = sin(copingNorm * 3.14159) * 0.14;
+                                    float innerDropWall = 1.0 - 0.42 * smoothstep(0.68, 0.98, copingNorm);
+                                    vec3 copingCol = (stoneBase + blockNoise + crownTop) * (0.88 + 0.16 * outerChamfer) * innerDropWall * mortarJoint;
 
-                                float rimMask = smoothstep(-0.008, 0.012, dWater);
-                                c.rgb = mix(groundCol, copingCol, rimMask);
-                                isSand *= (1.0 - rimMask);
+                                    float rimMask = smoothstep(-0.008, 0.012, dWater);
+                                    c.rgb = mix(groundCol, copingCol, rimMask);
+                                    isSand *= (1.0 - rimMask);
+                                }
                             }
                         }
                     }
@@ -524,19 +533,35 @@ class RetroRenderer {
                         c.a = mix(waterCol.a, 1.0, shoreAlpha);
                         waterCoverage = 1.0 - shoreAlpha;
                     }
-                    // For curved basins, ponds, canals & lakes (isCurvedWater), transition from the 3D stone coping rim into animated water!
-                    if (isCurvedWater && dWater > 0.125) {
+                    // For curved basins, ponds, canals & beaches (isCurvedWater), transition from shoreline into animated water!
+                    if (isCurvedWater && dWater > 0.065) {
                         vec4 waterCol = sampleOceanWater(dayAmt);
-                        // Submerged vertical basin wall shadow + turquoise shallow shelf + animated white water-line ripple (meniscus)
-                        float wallShade = mix(0.62, 1.0, smoothstep(0.135, 0.27, dWater));
-                        float shallowShelf = exp(-max(0.0, dWater - 0.135) * 8.5);
-                        float rippleWave = 0.5 + 0.5 * sin(dWater * 48.0 - uTime * 3.2 + sin(vWorldPos.x * 5.0 + vWorldPos.z * 5.0) * 1.4);
-                        float meniscus = exp(-pow((dWater - 0.148) / 0.018, 2.0)) * (0.55 + 0.45 * rippleWave);
-                        vec3 basinWater = waterCol.rgb * wallShade + vec3(0.04, 0.16, 0.18) * shallowShelf * (0.35 + 0.65 * dayAmt) + vec3(0.70, 0.88, 0.95) * meniscus * 0.42;
-                        float waterMix = smoothstep(0.126, 0.144, dWater);
-                        c.rgb = mix(c.rgb, min(vec3(1.0), basinWater), waterMix);
-                        c.a = mix(1.0, waterCol.a, waterMix);
-                        waterCoverage = waterMix;
+                        if (waterSurType > 2.5) {
+                            // Natural beach & coastline surf shoreline: warm wet sand -> animated white ocean surf foam -> turquoise shallows -> ocean
+                            float tide = 0.028 * sin(uTime * 2.1 + vWorldPos.x * 0.55 + vWorldPos.z * 0.45) + 0.012 * cos(uTime * 3.4 - vWorldPos.z * 1.1);
+                            float dSurf = dWater + tide;
+                            float shallowShelf = exp(-max(0.0, dSurf - 0.11) * 5.2);
+                            float foam1 = exp(-pow((dSurf - 0.118) / 0.026, 2.0)) * 0.86;
+                            float foam2 = exp(-pow((dSurf - 0.205) / 0.022, 2.0)) * 0.38;
+                            float foam = clamp(foam1 + foam2, 0.0, 0.92) * (0.42 + 0.58 * dayAmt);
+                            vec3 shallowCol = waterCol.rgb + vec3(0.06, 0.22, 0.22) * shallowShelf * (0.35 + 0.65 * dayAmt);
+                            vec3 shoreWater = mix(min(vec3(1.0), shallowCol), vec3(0.95, 0.98, 1.0), foam);
+                            float waterMix = smoothstep(0.092, 0.135, dSurf);
+                            c.rgb = mix(c.rgb, shoreWater, waterMix);
+                            c.a = mix(1.0, waterCol.a, smoothstep(0.11, 0.18, dSurf));
+                            waterCoverage = waterMix * (1.0 - foam * 0.75);
+                        } else if (dWater > 0.125) {
+                            // Enclosed urban basin: submerged vertical basin wall shadow + turquoise shallow shelf + animated white water-line ripple
+                            float wallShade = mix(0.62, 1.0, smoothstep(0.135, 0.27, dWater));
+                            float shallowShelf = exp(-max(0.0, dWater - 0.135) * 8.5);
+                            float rippleWave = 0.5 + 0.5 * sin(dWater * 48.0 - uTime * 3.2 + sin(vWorldPos.x * 5.0 + vWorldPos.z * 5.0) * 1.4);
+                            float meniscus = exp(-pow((dWater - 0.148) / 0.018, 2.0)) * (0.55 + 0.45 * rippleWave);
+                            vec3 basinWater = waterCol.rgb * wallShade + vec3(0.04, 0.16, 0.18) * shallowShelf * (0.35 + 0.65 * dayAmt) + vec3(0.70, 0.88, 0.95) * meniscus * 0.42;
+                            float waterMix = smoothstep(0.126, 0.144, dWater);
+                            c.rgb = mix(c.rgb, min(vec3(1.0), basinWater), waterMix);
+                            c.a = mix(1.0, waterCol.a, waterMix);
+                            waterCoverage = waterMix;
+                        }
                     }
                 }
 
@@ -3143,7 +3168,7 @@ class RetroRenderer {
 
             if (effTileIdx === 41) {
                 animType = 1.0; // Animated water
-                // Non-orthogonal organic curved water basins, park lagoons & canals with 3D stone coping border:
+                // Non-orthogonal organic curved water basins, park lagoons & natural beach/coastline surf:
                 // Encode 8-neighbor non-water mask (N1|S2|W4|E8|NW16|NE32|SW64|SE128) + surrounding ground type.
                 if (y_elev === 1 && this.map) {
                     const wLid = (cx, cy) => {
@@ -3153,6 +3178,9 @@ class RetroRenderer {
                         const nb = this.map.getBlockInfo(bi);
                         if (!nb) return 41;
                         if (nb.lid === 0 || nb.lid === 41 || nb.lid === 77 || (nb.lid >= 99 && nb.lid <= 101)) return 41;
+                        // Ignore roads/bridges and any 3D structures with vertical side walls (wooden piers, barges, quays)
+                        if (nb.lid === 1 || nb.lid === 2 || nb.lid === 24 || nb.lid === 25 || nb.lid === 74 || nb.lid === 75 || nb.lid === 80 || nb.lid === 81 || nb.lid === 82) return 41;
+                        if (nb.w > 0 || nb.e > 0 || nb.n > 0 || nb.s > 0) return 41;
                         return nb.lid;
                     };
                     const lN  = wLid(x, z_south - 1);
@@ -3174,8 +3202,14 @@ class RetroRenderer {
                     if (lSE !== 41) bits += 128;
                     if (bits > 0) {
                         const nbs = [lN, lS, lW, lE, lNW, lNE, lSW, lSE];
-                        let surType = 0; // 0: city sidewalk (lid 8), 1: coral promenade (lid 9), 2: park lawn (lid 10), 3: golden sand (lid 98)
-                        if (nbs.indexOf(98) >= 0) surType = 3;
+                        // Keep stone borders ONLY for enclosed urban park basins & reflecting lagoons
+                        const isEnclosedUrbanBasin = (
+                            (x >= 95 && x <= 320 && z_south >= 22 && z_south <= 46) ||
+                            (x >= 180 && x <= 312 && z_south >= 95 && z_south <= 295) ||
+                            (x >= 404 && x <= 422 && z_south >= 268 && z_south <= 298)
+                        );
+                        let surType = 0; // 0: city sidewalk basin (lid 8), 1: coral promenade basin (lid 9), 2: park lawn basin (lid 10), 3: natural beach/coastline surf (lid 98)
+                        if (nbs.indexOf(98) >= 0 || !isEnclosedUrbanBasin) surType = 3;
                         else if (nbs.indexOf(10) >= 0) surType = 2;
                         else if (nbs.indexOf(9) >= 0 || nbs.indexOf(69) >= 0) surType = 1;
                         let paveBits = 0;

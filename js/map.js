@@ -396,15 +396,6 @@ class LeonidaMap {
 
                 if (isSandTile) {
                     this.coastalSandMask[idx] = 1;
-                    if (!adjRoad && ((c * 7 + r * 13) % 14) === 0) {
-                        this.beachUmbrellas.push({
-                            x: (c + 0.5) * TILE_SIZE,
-                            y: (r + 0.5) * TILE_SIZE,
-                            z: 2.0,
-                            spr: ((c + r) % 2 === 0) ? "umbrella_pink" : "umbrella_cyan",
-                            angle: ((c * 31 + r * 17) % 628) * 0.01
-                        });
-                    }
                 }
 
                 // 1) Sidewalk palm trees: strictly inside authentic lid === 69 circular stone tree-pit planters
