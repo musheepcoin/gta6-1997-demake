@@ -480,17 +480,20 @@ class LeonidaMap {
                         scaleMul = 0.85 + hs1 * 0.30;
                     }
                 }
-                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape & Coconut Palms (sand lid==98 near promenade ONLY)
-                // STRICT RULE: Never place flora on open sunbathing sand (c >= 457) or volleyball courts!
-                else if (c >= 453 && c <= 456 && r >= 20 && r <= 360 && blkZ1.lid === 98) {
-                    if (c === 453 && (seed % 9 === 0)) {
+                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape & Coconut Palms
+                // STRICT RULE: ZERO flora on open sunbathing sand (c >= 454)! Clean golden sand for beachgoers & volleyball!
+                else if ((blkZ1.lid >= 98 && blkZ1.lid <= 101) || (blkZ1.lid >= 488 && blkZ1.lid <= 495) || (c >= 453 && c <= 485 && r <= 390)) {
+                    if (c === 453 && (seed % 14 === 0)) {
                         chosenKind = "palm_tree";
+                        posX = (c + 0.15 + (hs1 - 0.5) * 0.10) * TILE_SIZE; // Hugging the concrete promenade seawall
                         scaleMul = 0.92 + hs1 * 0.40;
                         heightMul = 0.85 + hs2 * 0.70;
-                    } else if (seed % 16 === 0) {
+                    } else if (c === 453 && (seed % 20 === 0)) {
                         chosenKind = "sea_grape";
+                        posX = (c + 0.20 + (hs1 - 0.5) * 0.10) * TILE_SIZE;
                         scaleMul = 0.82 + hs1 * 0.35;
                     }
+                    // c >= 454: 100% pristine open golden sand for towels, beach umbrellas, volleyball & lifeguard towers!
                 }
                 // 4) Star Island Waterfront Mansions (c=330..360, r=162..184)
                 else if (c >= 330 && c <= 360 && r >= 162 && r <= 184 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
@@ -544,8 +547,8 @@ class LeonidaMap {
                     else if (seed % 10 === 3) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
                     else if (seed % 10 === 4) { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; }
                 }
-                // 9) General mainland fields / countryside / North Vice Shores
-                else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                // 9) General mainland fields / countryside / North Vice Shores (NEVER beach sand!)
+                else if (surfGt === GROUND_TYPE.FIELD && !adjRoad && c < 453 && blkZ1.lid !== 98 && blkZ1.lid !== 99 && blkZ1.lid !== 100 && blkZ1.lid !== 101) {
                     if (seed % 22 === 0) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
                     else if (seed % 24 === 0) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
                     else if (seed % 26 === 0) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
@@ -1864,6 +1867,10 @@ class LeonidaMap {
                 if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
                     const gt = this.surfaceGround[r * MAP_COLS + c];
                     if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
+                    // STRICT BEACH SAND BAN: Never allow any tree or shrub on open Atlantic sand (c >= 454) or beach sand blocks
+                    if (c >= 454 && c <= 485 && r <= 390) return false;
+                    const blk = this.getBlock(c, r, 1);
+                    if (blk && (blk.lid >= 98 && blk.lid <= 101) && c >= 454) return false;
                 }
                 if (this.beachVolleyballCourts) {
                     for (let i = 0; i < this.beachVolleyballCourts.length; i++) {

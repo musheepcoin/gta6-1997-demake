@@ -2038,15 +2038,16 @@ class RetroRenderer {
                 //  tropical_shrub, sawgrass_clump)
                 // =========================================================================
                 meta.sprites.objects["palm_tree"] = meta.sprites.objects["palm_tree"] || meta.sprites.objects["257"];
-                meta.sprites.objects["banyan_tree"] = meta.sprites.objects["banyan_tree"] || [10, 3480, 68, 68];
-                meta.sprites.objects["live_oak"] = meta.sprites.objects["live_oak"] || [88, 3480, 60, 60];
-                meta.sprites.objects["swamp_cypress"] = meta.sprites.objects["swamp_cypress"] || [158, 3480, 56, 56];
-                meta.sprites.objects["mangrove"] = meta.sprites.objects["mangrove"] || [224, 3480, 54, 54];
-                meta.sprites.objects["fan_palm"] = meta.sprites.objects["fan_palm"] || [288, 3480, 48, 48];
-                meta.sprites.objects["sea_grape"] = meta.sprites.objects["sea_grape"] || [346, 3480, 38, 38];
-                meta.sprites.objects["bougainvillea_bush"] = meta.sprites.objects["bougainvillea_bush"] || [394, 3480, 36, 36];
-                meta.sprites.objects["sawgrass_clump"] = meta.sprites.objects["sawgrass_clump"] || [440, 3480, 34, 34];
-                meta.sprites.objects["tropical_shrub"] = meta.sprites.objects["tropical_shrub"] || [484, 3480, 32, 32];
+                meta.sprites.objects["banyan_tree"] = meta.sprites.objects["banyan_tree"] || [12, 3470, 84, 84];
+                meta.sprites.objects["live_oak"] = meta.sprites.objects["live_oak"] || [104, 3470, 76, 76];
+                meta.sprites.objects["swamp_cypress"] = meta.sprites.objects["swamp_cypress"] || [188, 3470, 68, 68];
+                meta.sprites.objects["slash_pine"] = meta.sprites.objects["slash_pine"] || [264, 3470, 68, 68];
+                meta.sprites.objects["mangrove"] = meta.sprites.objects["mangrove"] || [340, 3470, 64, 64];
+                meta.sprites.objects["fan_palm"] = meta.sprites.objects["fan_palm"] || [412, 3470, 56, 56];
+                meta.sprites.objects["bougainvillea_bush"] = meta.sprites.objects["bougainvillea_bush"] || [476, 3470, 48, 48];
+                meta.sprites.objects["sea_grape"] = meta.sprites.objects["sea_grape"] || [532, 3470, 48, 48];
+                meta.sprites.objects["tropical_shrub"] = meta.sprites.objects["tropical_shrub"] || [588, 3470, 42, 42];
+                meta.sprites.objects["sawgrass_clump"] = meta.sprites.objects["sawgrass_clump"] || [638, 3470, 42, 42];
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
@@ -2349,7 +2350,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_47", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_48", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2364,7 +2365,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_41", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_48", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -3822,35 +3823,32 @@ class RetroRenderer {
             const spr = this.gta1Meta.sprites.objects["fan_palm"];
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.5 + pm.x * 0.015 + pm.y * 0.018) * 0.035;
-            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist, pm.y + Math.sin(shAngle) * shDist, groundZ + 0.016, (pm.angle || 0) + breeze, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.22 * hm, (pm.angle || 0) + breeze, sc * 1.02, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 0.9, pm.y + Math.sin(shAngle) * shDist * 0.9, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.22 * hm, (pm.angle || 0) + breeze, sc * 1.0, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "swamp_cypress") {
             const spr = this.gta1Meta.sprites.objects["swamp_cypress"];
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.25 + pm.x * 0.012 + pm.y * 0.015) * 0.03;
-            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.1, pm.y + Math.sin(shAngle) * shDist * 1.1, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.26 * hm, (pm.angle || 0) + 0.35 - breeze * 0.6, sc * 0.96, SPRITE_DRAW_ORDER.TREES, 0.78, 0.88, 0.72, 0.95);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.38 * hm, (pm.angle || 0) + breeze, sc * 1.05, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.1, pm.y + Math.sin(shAngle) * shDist * 1.1, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.35 * hm, (pm.angle || 0) + breeze, sc * 1.05, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "mangrove") {
             const spr = this.gta1Meta.sprites.objects["mangrove"];
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.35 + pm.x * 0.018) * 0.025;
-            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 0.8, pm.y + Math.sin(shAngle) * shDist * 0.8, groundZ + 0.016, pm.angle || 0, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.025, (pm.angle || 0) + 0.4, sc * 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT, 0.55, 0.45, 0.35, 0.98);
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 0.8, pm.y + Math.sin(shAngle) * shDist * 0.8, groundZ + 0.016, pm.angle || 0, sc * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.18 * hm, (pm.angle || 0) + breeze, sc * 1.02, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "banyan_tree") {
             const spr = this.gta1Meta.sprites.objects["banyan_tree"];
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.1 + pm.x * 0.01) * 0.02;
-            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.3, pm.y + Math.sin(shAngle) * shDist * 1.3, groundZ + 0.016, pm.angle || 0, sc * 1.25, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.15);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.28 * hm, (pm.angle || 0) + 0.5 - breeze, sc * 1.18, SPRITE_DRAW_ORDER.TREES, 0.68, 0.82, 0.65, 0.95);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.42 * hm, (pm.angle || 0) + breeze, sc * 1.30, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.25, pm.y + Math.sin(shAngle) * shDist * 1.25, groundZ + 0.016, pm.angle || 0, sc * 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.1);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.38 * hm, (pm.angle || 0) + breeze, sc * 1.08, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "live_oak") {
             const spr = this.gta1Meta.sprites.objects["live_oak"];
             if (!spr) return;
             const breeze = Math.sin(this.time * 1.2 + pm.y * 0.016) * 0.028;
-            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.2, pm.y + Math.sin(shAngle) * shDist * 1.2, groundZ + 0.016, pm.angle || 0, sc * 1.1, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
-            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.32 * hm, (pm.angle || 0) + breeze, sc * 1.15, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.15, pm.y + Math.sin(shAngle) * shDist * 1.15, groundZ + 0.016, pm.angle || 0, sc * 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.32 * hm, (pm.angle || 0) + breeze, sc * 1.05, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         } else if (kind === "bougainvillea_bush") {
             const spr = this.gta1Meta.sprites.objects["bougainvillea_bush"];
             if (!spr) return;
