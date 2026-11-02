@@ -433,51 +433,50 @@ class LeonidaMap {
                 let posY = (r + 0.5 + (hs2 - 0.5) * 0.28) * TILE_SIZE;
                 let plantZ = (surfGt === GROUND_TYPE.WATER) ? 1.0 : 2.0;
 
-                // 1) Ocean Drive Iconic Palm Boulevard & Beach Promenade (c=443 West sidewalk & c=448..452 East promenade)
+                // 1) Ocean Drive Iconic Palm Boulevard & Lummus Park Promenade (c=443 West sidewalk & c=448..452 East promenade)
+                // AUTHENTIC MIAMI SOUTH BEACH LAYOUT:
+                // - West sidewalk (c=443): Single elegant row of slender Royal Palms spaced every 8 blocks in front of Art Deco hotels.
+                // - East promenade curb (c=448): Single matching row of Royal Palms spaced every 8 blocks (offset by 4 in alternating zipper).
+                // - Paved pedestrian promenade walkway (c=449..450): 100% WIDE OPEN WALKWAY for pedestrians, cyclists & tourists! ZERO TREES!
+                // - Lummus Park garden verge (c=451..452): Spaced tropical planters (1 every 14 blocks), never an impassable jungle!
                 if (c >= 443 && c <= 452 && r >= 20 && r <= 365) {
                     const isWestSidewalk = (c === 443);
-                    const isEastPromenade = (c === 448);
-                    const isParkLawnVerge = (c >= 449 && c <= 452);
+                    const isEastCurbside = (c === 448);
+                    const isGardenVerge = (c >= 451 && c <= 452);
 
-                    if (isWestSidewalk && (r % 4 === 0)) {
+                    if (isWestSidewalk && (r % 8 === 0)) {
                         chosenKind = "palm_tree";
-                        posX = (c + 0.32 + (hs1 - 0.5) * 0.15) * TILE_SIZE; // Slender royal palm line near Art Deco hotel facades
-                        scaleMul = 0.95 + hs1 * 0.35;
-                        heightMul = 0.90 + hs2 * 0.65;
-                    } else if (isEastPromenade && ((r + 2) % 4 === 0)) {
+                        posX = (c + 0.22 + (hs1 - 0.5) * 0.10) * TILE_SIZE; // Slender royal palm curbside in front of Art Deco hotel facades
+                        scaleMul = 0.95 + hs1 * 0.30;
+                        heightMul = 0.90 + hs2 * 0.55;
+                    } else if (isEastCurbside && ((r + 4) % 8 === 0)) {
                         chosenKind = "palm_tree";
-                        posX = (c + 0.68 + (hs1 - 0.5) * 0.15) * TILE_SIZE; // Curbside royal palm row facing Lummus Park & the Atlantic
-                        scaleMul = 1.05 + hs1 * 0.40;
-                        heightMul = 1.00 + hs2 * 0.70;
-                    } else if (isParkLawnVerge && !adjRoad) {
-                        if (seed % 10 < 5) {
-                            chosenKind = "palm_tree";
-                            scaleMul = 0.90 + hs1 * 0.45;
-                            heightMul = 0.85 + hs2 * 0.75;
-                        } else if (seed % 10 < 8) {
+                        posX = (c + 0.78 + (hs1 - 0.5) * 0.10) * TILE_SIZE; // Curbside royal palm row facing Lummus Park
+                        scaleMul = 1.02 + hs1 * 0.35;
+                        heightMul = 0.95 + hs2 * 0.60;
+                    } else if (isGardenVerge && (r % 14 === 0) && (seed % 3 === 0)) {
+                        if (seed % 6 === 0) {
                             chosenKind = "fan_palm";
-                            scaleMul = 0.85 + hs1 * 0.35;
-                        } else if (seed % 10 === 8) {
-                            chosenKind = "bougainvillea_bush";
-                            scaleMul = 0.90 + hs1 * 0.30;
-                        } else {
-                            chosenKind = "tropical_shrub";
                             scaleMul = 0.85 + hs1 * 0.30;
+                        } else {
+                            chosenKind = "bougainvillea_bush";
+                            scaleMul = 0.88 + hs1 * 0.28;
                         }
                     }
+                    // c=449..450: ZERO TREES! 100% open paved sunny promenade for walking, rollerblading & driving!
                 }
                 // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road)
-                else if ((blkZ1.lid === 69 || (blkZ1.lid === 8 && adjRoad)) && (surfGt === GROUND_TYPE.PAWEMENT || surfGt === GROUND_TYPE.FIELD)) {
-                    if (seed % 12 === 0) {
+                else if ((blkZ1.lid === 69 || (blkZ1.lid === 8 && adjRoad)) && (surfGt === GROUND_TYPE.PAWEMENT || surfGt === GROUND_TYPE.FIELD) && c < 443) {
+                    if (seed % 28 === 0) {
                         chosenKind = "palm_tree";
-                        scaleMul = 0.88 + hs1 * 0.38;
-                        heightMul = 0.80 + hs2 * 0.60;
-                    } else if (seed % 12 === 1) {
+                        scaleMul = 0.88 + hs1 * 0.35;
+                        heightMul = 0.80 + hs2 * 0.55;
+                    } else if (seed % 28 === 1) {
                         chosenKind = "fan_palm";
-                        scaleMul = 0.82 + hs1 * 0.32;
-                    } else if (seed % 12 === 2) {
+                        scaleMul = 0.82 + hs1 * 0.30;
+                    } else if (seed % 28 === 2) {
                         chosenKind = "bougainvillea_bush";
-                        scaleMul = 0.85 + hs1 * 0.30;
+                        scaleMul = 0.85 + hs1 * 0.28;
                     }
                 }
                 // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape & Coconut Palms
