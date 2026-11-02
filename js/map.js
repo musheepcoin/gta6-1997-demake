@@ -385,62 +385,179 @@ class LeonidaMap {
             }
         }
 
-        // Second pass: Identify true sand tiles (lid 98..101) & place Vice City / GTA 6 tropical palm trees strictly on lid 69 sidewalk planters and lid 10 park lawns (NEVER on roads, roofs, or inside the Penitentiary / Airport!)
+        // Second pass: Identify true sand tiles (lid 98..101) & place Vice City / GTA 6 Leonida diverse flora
+        // (10 distinct species: palm_tree, fan_palm, swamp_cypress, mangrove, banyan_tree, live_oak,
+        //  bougainvillea_bush, sea_grape, tropical_shrub, sawgrass_clump) coherently distributed across
+        //  the official map biomes (Ocean Drive, Star Island, Grassrivers, Lake Leonida, Keys, mainland).
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
                 const idx = r * MAP_COLS + c;
                 const surfGt = this.surfaceGround[idx];
                 const surfZ = this.surfaceLayer[idx];
                 if (surfZ > 2) continue;
-                if (surfGt !== GROUND_TYPE.PAWEMENT && surfGt !== GROUND_TYPE.FIELD) continue;
+                if (surfGt !== GROUND_TYPE.PAWEMENT && surfGt !== GROUND_TYPE.FIELD && surfGt !== GROUND_TYPE.WATER) continue;
 
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
                 if (!blkZ1 || (blkZ2 && blkZ2.lid !== 0)) continue;
 
                 const isSandTile = (blkZ1.lid >= 98 && blkZ1.lid <= 101);
-
-                let adjRoad = false;
-                for (let dr = -1; dr <= 1; dr++) {
-                    for (let dc = -1; dc <= 1; dc++) {
-                        const ngt = this.surfaceGround[(r + dr) * MAP_COLS + (c + dc)];
-                        if (ngt === GROUND_TYPE.ROAD) adjRoad = true;
-                    }
-                }
-
                 if (isSandTile) {
                     this.coastalSandMask[idx] = 1;
                 }
 
-                // Never plant tropical resort palm trees inside Leonida State Penitentiary or VCIA Airport tarmac
+                // Never plant flora inside Leonida State Penitentiary or VCIA Airport active runways/tarmac
                 if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369)) {
                     continue;
                 }
 
-                // 1) Sidewalk palm trees: strictly inside authentic lid === 69 circular stone tree-pit planters
-                const isPlanterPalm = (surfGt === GROUND_TYPE.PAWEMENT && blkZ1.lid === 69);
-                // 2) Park & Lummus Park lawn palm trees: strictly on lid === 10 tropical grass away from road lanes & rounded footpath tips
-                const hasGrassN = (this.getBlockInfo(c, r - 1, 1).lid === 10);
-                const hasGrassS = (this.getBlockInfo(c, r + 1, 1).lid === 10);
-                const isLummusCol = (c === 449 || c === 451);
-                const isParkGrassPalm = (
-                    (surfGt === GROUND_TYPE.FIELD || surfGt === GROUND_TYPE.PAWEMENT) &&
-                    blkZ1.lid === 10 &&
-                    ((isLummusCol && hasGrassN && hasGrassS && (r % 5 === 2)) || (surfGt === GROUND_TYPE.FIELD && !adjRoad && ((c * 17 + r * 7) % 14 === 0)))
-                );
-                if (isPlanterPalm || isParkGrassPalm) {
-                    // Varied palm sizes: crown spread 0.78..1.30 & trunk height 0.70..1.55 (young palms to towering royal palms)
-                    const hs1 = (((c * 73856093) ^ (r * 19349663)) >>> 0) % 1000 / 1000;
-                    const hs2 = (((c * 83492791) ^ (r * 2654435761)) >>> 0) % 1000 / 1000;
-                    const palmX = (isLummusCol && !isPlanterPalm)
-                        ? (c + 0.68 + (hs1 - 0.5) * 0.48) * TILE_SIZE
-                        : (c + 0.5) * TILE_SIZE;
+                let adjRoad = false;
+                let nearLand = false;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const ngt = this.surfaceGround[(r + dr) * MAP_COLS + (c + dc)];
+                        if (ngt === GROUND_TYPE.ROAD) adjRoad = true;
+                        if (ngt === GROUND_TYPE.PAWEMENT || ngt === GROUND_TYPE.FIELD) nearLand = true;
+                    }
+                }
+
+                const hs1 = (((c * 73856093) ^ (r * 19349663)) >>> 0) % 10000 / 10000;
+                const hs2 = (((c * 83492791) ^ (r * 2654435761)) >>> 0) % 10000 / 10000;
+                const seed = Math.floor(hs1 * 10000);
+
+                let chosenKind = null;
+                let scaleMul = 1.0;
+                let heightMul = 1.0;
+                let posX = (c + 0.5 + (hs1 - 0.5) * 0.28) * TILE_SIZE;
+                let posY = (r + 0.5 + (hs2 - 0.5) * 0.28) * TILE_SIZE;
+                let plantZ = (surfGt === GROUND_TYPE.WATER) ? 1.0 : 2.0;
+
+                // 1) Sidewalk Planters (lid === 69)
+                if (blkZ1.lid === 69 && surfGt === GROUND_TYPE.PAWEMENT) {
+                    posX = (c + 0.5) * TILE_SIZE;
+                    posY = (r + 0.5) * TILE_SIZE;
+                    if (c >= 430 && r <= 365) {
+                        // Ocean Drive / South Beach / Mid-Beach
+                        if (seed % 10 < 5) { chosenKind = "palm_tree"; scaleMul = 0.82 + hs1 * 0.40; heightMul = 0.75 + hs2 * 0.85; }
+                        else if (seed % 10 < 8) { chosenKind = "fan_palm"; scaleMul = 0.80 + hs1 * 0.35; heightMul = 0.70 + hs2 * 0.60; }
+                        else { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; heightMul = 0.80; }
+                    } else if (c >= 325 && c <= 365 && r >= 160 && r <= 190) {
+                        // Star Island luxury planters
+                        if (seed % 10 < 4) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; }
+                        else if (seed % 10 < 7) { chosenKind = "bougainvillea_bush"; scaleMul = 0.85 + hs1 * 0.35; }
+                        else { chosenKind = "tropical_shrub"; scaleMul = 0.95 + hs1 * 0.30; }
+                    } else {
+                        // Downtown Vice City / Wynwood / Little Haiti
+                        if (seed % 10 < 5) { chosenKind = "palm_tree"; scaleMul = 0.80 + hs1 * 0.40; }
+                        else if (seed % 10 < 8) { chosenKind = "fan_palm"; scaleMul = 0.85 + hs1 * 0.35; }
+                        else { chosenKind = "bougainvillea_bush"; scaleMul = 0.80 + hs1 * 0.30; }
+                    }
+                }
+                // 2) Lummus Park & Ocean Drive lawns (c=448..453, r=25..295, lid==10)
+                else if (c >= 448 && c <= 453 && r >= 25 && r <= 295 && blkZ1.lid === 10) {
+                    const isLummusCol = (c === 449 || c === 451);
+                    if (isLummusCol && (r % 5 === 2)) {
+                        chosenKind = "palm_tree";
+                        posX = (c + 0.68 + (hs1 - 0.5) * 0.48) * TILE_SIZE;
+                        scaleMul = 0.95 + hs1 * 0.45;
+                        heightMul = 0.85 + hs2 * 0.85;
+                    } else if (seed % 10 === 0) {
+                        chosenKind = "palm_tree";
+                        scaleMul = 0.88 + hs1 * 0.40;
+                        heightMul = 0.80 + hs2 * 0.70;
+                    } else if (seed % 10 === 1) {
+                        chosenKind = "fan_palm";
+                        scaleMul = 0.90 + hs1 * 0.35;
+                    } else if (seed % 10 === 2) {
+                        chosenKind = "bougainvillea_bush";
+                        scaleMul = 0.95 + hs1 * 0.35;
+                    } else if (seed % 10 === 3) {
+                        chosenKind = "tropical_shrub";
+                        scaleMul = 0.90 + hs1 * 0.30;
+                    }
+                }
+                // 3) Vice Beach & Cape Leonida Coastal Dunes Sea Grape (sand lid==98 near grass/promenade)
+                else if (c >= 454 && c <= 485 && r >= 20 && r <= 360 && blkZ1.lid === 98) {
+                    let nearWalkable = false;
+                    for (let dr = -2; dr <= 2; dr++) {
+                        for (let dc = -2; dc <= 2; dc++) {
+                            const nlid = this.getBlockInfo(c + dc, r + dr, 1).lid;
+                            if (nlid === 8 || nlid === 9 || nlid === 10) { nearWalkable = true; break; }
+                        }
+                        if (nearWalkable) break;
+                    }
+                    if (nearWalkable && seed % 14 === 0) {
+                        chosenKind = "sea_grape";
+                        scaleMul = 0.85 + hs1 * 0.40;
+                    }
+                }
+                // 4) Star Island Waterfront Mansions (c=330..360, r=162..184)
+                else if (c >= 330 && c <= 360 && r >= 162 && r <= 184 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                    if (seed % 8 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 8 === 1) { chosenKind = "bougainvillea_bush"; scaleMul = 0.95 + hs1 * 0.35; }
+                    else if (seed % 8 === 2) { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; }
+                    else if (seed % 8 === 3) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.9 + hs2 * 0.7; }
+                }
+                // 5) Grassrivers / Everglades / Thrillbilly Mud Park (c=60..230, r=370..495)
+                else if (c >= 60 && c <= 230 && r >= 370 && r <= 495) {
+                    if (surfGt === GROUND_TYPE.WATER && nearLand) {
+                        if (seed % 16 === 0) { chosenKind = "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
+                        else if (seed % 22 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 22 === 1) { chosenKind = "mangrove"; scaleMul = 0.85 + hs1 * 0.40; }
+                    } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                        if (seed % 14 === 0) { chosenKind = "sawgrass_clump"; scaleMul = 0.90 + hs1 * 0.35; }
+                        else if (seed % 16 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 16 === 1) { chosenKind = "mangrove"; scaleMul = 0.90 + hs1 * 0.40; }
+                        else if (seed % 20 === 0) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    }
+                }
+                // 6) Lake Leonida & Gator Island (c=75..175, r=180..260)
+                else if (c >= 75 && c <= 175 && r >= 180 && r <= 260) {
+                    if (surfGt === GROUND_TYPE.WATER && nearLand) {
+                        if (seed % 18 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 22 === 0) { chosenKind = "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
+                    } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                        if (seed % 12 === 0) { chosenKind = "live_oak"; scaleMul = 1.0 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.5; }
+                        else if (seed % 14 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.90 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 16 === 0) { chosenKind = "fan_palm"; scaleMul = 0.85 + hs1 * 0.35; }
+                    }
+                }
+                // 7) Leonida Keys (c=180..460, r=410..495)
+                else if (c >= 180 && c <= 460 && r >= 410 && r <= 495) {
+                    if (surfGt === GROUND_TYPE.WATER && nearLand && (seed % 18 === 0)) {
+                        chosenKind = "mangrove"; scaleMul = 0.90 + hs1 * 0.40;
+                    } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                        if (seed % 12 === 0) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.40; }
+                        else if (seed % 14 === 0) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
+                        else if (seed % 16 === 0) { chosenKind = "mangrove"; scaleMul = 0.85 + hs1 * 0.40; }
+                        else if (seed % 18 === 0) { chosenKind = "sea_grape"; scaleMul = 0.85 + hs1 * 0.35; }
+                        else if (seed % 20 === 0) { chosenKind = "bougainvillea_bush"; scaleMul = 0.90 + hs1 * 0.35; }
+                    }
+                }
+                // 8) Bayfront Park & Downtown Urban Parks (c=210..245, r=40..85, gt==FIELD)
+                else if (c >= 210 && c <= 245 && r >= 40 && r <= 85 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                    if (seed % 10 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
+                    else if (seed % 10 === 1) { chosenKind = "bougainvillea_bush"; scaleMul = 0.95 + hs1 * 0.35; }
+                    else if (seed % 10 === 2) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 10 === 3) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
+                    else if (seed % 10 === 4) { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; }
+                }
+                // 9) General mainland fields / countryside / North Vice Shores
+                else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                    if (seed % 22 === 0) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 24 === 0) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
+                    else if (seed % 26 === 0) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
+                    else if (seed % 30 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
+                }
+
+                if (chosenKind) {
                     this.vicePalms.push({
-                        x: palmX,
-                        y: (r + 0.5) * TILE_SIZE,
-                        z: 2.0,
-                        scale: (isPlanterPalm ? 0.80 : 0.84) + hs1 * 0.46,
-                        height: 0.70 + hs2 * 0.85,
+                        kind: chosenKind,
+                        x: posX,
+                        y: posY,
+                        z: plantZ,
+                        scale: scaleMul,
+                        height: heightMul,
                         angle: ((c * 23 + r * 41) % 628) * 0.01
                     });
                 }
