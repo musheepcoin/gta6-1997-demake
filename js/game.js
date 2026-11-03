@@ -6874,6 +6874,18 @@ class LeonidaGame {
 
         const p = this.player;
 
+        if (targetType === "POLICE") {
+
+            const maxHp = p.maxHp || 100;
+
+            if (p.inVehicle || p.hp >= maxHp * 0.25) {
+
+                return;
+
+            }
+
+        }
+
         p.dead = true;
 
         if (p.inVehicle) {
@@ -9130,19 +9142,15 @@ class LeonidaGame {
 
                     const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
 
-                    if (dPlayer <= 28) {
+                    if (dPlayer <= 28 && !p.inVehicle) {
 
-                        const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 46;
+                        const maxHp = p.maxHp || 100;
 
-                        if (!p.inVehicle && p.hp < 55) {
+                        if (p.hp < maxHp * 0.25) {
 
                             this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
 
-                        } else if (inSlowCar) {
-
-                            this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
-
-                        } else if (!p.inVehicle) {
+                        } else {
 
                             this.damagePlayer(18 * dt);
 
@@ -9416,21 +9424,21 @@ class LeonidaGame {
 
                         if (!copTarget.isRemote && !p.dead && !((ped.bustedGraceTimer || 0) > 0)) {
 
-                            // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
+                            // Cops never bust a player inside a vehicle; on foot, arrest only triggers below 25% HP!
 
-                            const inSlowCar = p.inVehicle && !p.inVehicle.crushesCars && Math.abs(p.inVehicle.speed) < 46;
+                            if (!p.inVehicle) {
 
-                            if (!p.inVehicle && p.hp < 55) {
+                                const maxHp = p.maxHp || 100;
 
-                                this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
+                                if (p.hp < maxHp * 0.25) {
 
-                            } else if (inSlowCar) {
+                                    this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
 
-                                this.triggerWastedOrBusted("BUSTED!", "PULLED OUT OF VEHICLE BY VCPD OFFICER!", "#38bdf8", "POLICE");
+                                } else {
 
-                            } else if (!p.inVehicle) {
+                                    this.damagePlayer(18 * dt);
 
-                                this.damagePlayer(18 * dt);
+                                }
 
                             }
 
