@@ -8258,9 +8258,10 @@ class RetroRenderer {
                 const npc = intr.npcs[i];
                 if (!npc.label) continue;
                 const isDancing = !!(npc.dancing || npc.label === "DANCER" || npc.label === "CLUBBER");
-                const nx = npc.x + (isDancing ? Math.sin(this.time * 4.0 + i) * 7.5 : Math.sin(this.time * 1.4 + i * 2.1) * 2.0);
-                const ny = npc.y + (isDancing ? Math.cos(this.time * 4.0 + i) * 5.5 : Math.cos(this.time * 1.1 + i * 1.7) * 1.2);
-                const nScr = this.worldToScreen(nx, ny, 2.22);
+                const nx = npc.x + (isDancing ? Math.sin(this.time * 4.0 + i) * 7.5 : Math.sin(this.time * 1.4 + i * 2.1) * 1.4);
+                const ny = npc.y + (isDancing ? Math.cos(this.time * 4.0 + i) * 5.5 : Math.cos(this.time * 1.1 + i * 1.7) * 1.0);
+                const npcZ = (npc.z || 2.055) + 0.165;
+                const nScr = this.worldToScreen(nx, ny, npcZ);
 
                 ctx.font = "bold 9px Consolas, monospace";
                 const tw = ctx.measureText(npc.label).width + 10;
@@ -8275,7 +8276,8 @@ class RetroRenderer {
         }
 
         // Companion Tag (Jason or Lucia standing watch near the entrance)
-        const partnerName = (p && p.charId === "jason") ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
+        const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
+        const partnerName = isJasonPlayer ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
         const jScr = this.worldToScreen(rw * 0.5 - 64, rh - 62, 2.22);
         ctx.font = "bold 9px Consolas, monospace";
         const jTw = ctx.measureText(partnerName).width + 10;
