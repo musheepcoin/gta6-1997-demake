@@ -4642,11 +4642,7 @@ class LeonidaGame {
 
             if (closest.isPolice) {
 
-                if (Math.random() < 0.75) {
-
-                    this.setWantedLevel(Math.max(this.wantedLevel, 1));
-
-                }
+                this.setWantedLevel(Math.max(this.wantedLevel, 1));
 
             } else {
 
@@ -4832,6 +4828,8 @@ class LeonidaGame {
 
             const copWep = isSwat ? "SHOTGUN" : (this.wantedLevel >= 3 ? "UZI" : "PISTOL");
 
+            const isCarjacked = reason === "CARJACK";
+
             this.peds.push(new Pedestrian({
 
                 x: doorX,
@@ -4842,7 +4840,7 @@ class LeonidaGame {
 
                 angle: Math.atan2(this.player.y - doorY, this.player.x - doorX),
 
-                speed: isSwat ? 104 : 96,
+                speed: isSwat ? 104 : 98,
 
                 kind: "COP",
 
@@ -4856,6 +4854,14 @@ class LeonidaGame {
 
                 copWeapon: copWep,
 
+                carjackedCop: isCarjacked,
+
+                stunnedTimer: isCarjacked ? 1.15 : 0,
+
+                bustedGraceTimer: isCarjacked ? 2.2 : 0,
+
+                shootCooldown: isCarjacked ? 1.30 : 0.25,
+
                 dead: false,
 
                 panicTimer: 0,
@@ -4863,6 +4869,12 @@ class LeonidaGame {
                 exitAnimTimer: 0.32
 
             }));
+
+            if (isCarjacked) {
+
+                this.addFloatingText(doorX, doorY - 22, "🚓 VCPD OFFICER YANKED OUT! STEP ON IT!", "#38bdf8");
+
+            }
 
             if (isSwat && reason === "COP_DEPLOY") {
 
@@ -8736,9 +8748,29 @@ class LeonidaGame {
 
                 }
 
-            } else if (ped.kind === "COP" && (this.wantedLevel > 0 || (this.net && this.net.getMaxWantedLevel && this.net.getMaxWantedLevel() > 0))) {
+            } else if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop || (this.net && this.net.getMaxWantedLevel && this.net.getMaxWantedLevel() > 0))) {
 
-                const copTarget = this.getNearestWantedTarget(ped.x, ped.y);
+                if ((ped.bustedGraceTimer || 0) > 0) {
+
+                    ped.bustedGraceTimer = Math.max(0, ped.bustedGraceTimer - dt);
+
+                }
+
+                const copTarget = this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
+
+                    x: p.inVehicle ? p.inVehicle.x : p.x,
+
+                    y: p.inVehicle ? p.inVehicle.y : p.y,
+
+                    vx: p.inVehicle ? (p.inVehicle.vx || 0) : 0,
+
+                    vy: p.inVehicle ? (p.inVehicle.vy || 0) : 0,
+
+                    isRemote: false,
+
+                    wantedLevel: Math.max(1, this.wantedLevel || 1)
+
+                } : null);
 
                 if (copTarget) {
 
@@ -8760,7 +8792,7 @@ class LeonidaGame {
 
                         ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
 
-                        if (!copTarget.isRemote && !p.dead) {
+                        if (!copTarget.isRemote && !p.dead && !((ped.bustedGraceTimer || 0) > 0)) {
 
                             // Authentic GTA 1 BUSTED: Cop grabs Lucia on foot OR pulls her out of a stopped/slow car!
 
