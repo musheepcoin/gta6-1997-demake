@@ -291,8 +291,8 @@ class WorldObjectEngine {
             southernmostBuoy: { x: 204.2 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0 },
             highwayGantries: [
                 // 4 Full-Span Twin-Pylon 3D Overhead Green FDOT Highway Gantries (pylons strictly on PAVE/FIELD shoulders!)
-                { id: "gantry_vcia_exp",   x: 130.0 * TILE_SIZE, y: 296.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 296, fullSpan: true },
-                { id: "gantry_downtown",   x: 285.5 * TILE_SIZE, y: 230.0 * TILE_SIZE, z: 2.0, ang: 0,             spanPx: 296, fullSpan: true },
+                { id: "gantry_vcia_exp",   x: 130.0 * TILE_SIZE, y: 296.8 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 332, fullSpan: true },
+                { id: "gantry_downtown",   x: 285.8 * TILE_SIZE, y: 230.0 * TILE_SIZE, z: 2.0, ang: 0,             spanPx: 332, fullSpan: true },
                 { id: "gantry_gellhorn",   x: 88.5 * TILE_SIZE,  y: 220.0 * TILE_SIZE, z: 2.0, ang: 0,             spanPx: 216, fullSpan: true },
                 { id: "gantry_keys_hwy",   x: 260.0 * TILE_SIZE, y: 480.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 216, fullSpan: true },
                 // 4 Cantilevered Single-Pylon 3D Overhead Green FDOT Causeway & Beach Gantries (pylon on PAVE, arm over ROAD!)
@@ -349,9 +349,9 @@ class WorldObjectEngine {
         this.sodaMachines = [
             { x: 442.5 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
             { x: 442.5 * TILE_SIZE, y: 256.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 442.5 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 443.4 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
             { x: 352.0 * TILE_SIZE, y: 176.2 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 282.5 * TILE_SIZE, y: 250.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 282.5 * TILE_SIZE, y: 246.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
             { x: 224.5 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
             { x: 115.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "eCOLA",  ad: "ad_ecola"  },
             { x: 64.5 * TILE_SIZE,  y: 186.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
@@ -378,13 +378,13 @@ class WorldObjectEngine {
             { id: "gator_little_haiti", name: "LITTLE HAITI MARKET GATOR",     x: 226.5 * TILE_SIZE, y: 111.5 * TILE_SIZE, z: 2.0, ang: 0.80, active: true, cooldown: 0 },
             { id: "gator_grassrivers",  name: "GRASSRIVERS BULL GATOR",        x: 110.5 * TILE_SIZE, y: 390.5 * TILE_SIZE, z: 2.0, ang: -1.10, active: true, cooldown: 0 }
         ];
-        // 2. VCPD High-Speed Radar Speed Traps & Nitrous Boost Portals
+        // 2. VCPD High-Speed Radar Speed Traps & Nitrous Boost Portals (strictly on PAVE/FIELD sidewalks beside the road!)
         this.speedTraps = [
-            { id: "radar_ocean_dr",   name: "OCEAN DRIVE NEON RADAR",       x: 446.3 * TILE_SIZE, y: 240.0 * TILE_SIZE, roadX: 445.5 * TILE_SIZE, roadY: 240.0 * TILE_SIZE, z: 2.0, ang: 0,            cooldown: 0, flashTimer: 0, bestMph: 145 },
-            { id: "radar_macarthur",  name: "MACARTHUR CAUSEWAY RADAR",     x: 360.0 * TILE_SIZE, y: 296.3 * TILE_SIZE, roadX: 360.0 * TILE_SIZE, roadY: 297.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 155 },
-            { id: "radar_venetian",   name: "VENETIAN CAUSEWAY RADAR",      x: 360.0 * TILE_SIZE, y: 172.3 * TILE_SIZE, roadX: 360.0 * TILE_SIZE, roadY: 173.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 150 },
-            { id: "radar_julia",      name: "JULIA TUTTLE NORTH BAY RADAR", x: 360.0 * TILE_SIZE, y: 73.8 * TILE_SIZE,  roadX: 360.0 * TILE_SIZE, roadY: 75.0 * TILE_SIZE,  z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 160 },
-            { id: "radar_keys_hwy",   name: "OVERSEAS HIGHWAY KEYS RADAR",  x: 300.0 * TILE_SIZE, y: 479.3 * TILE_SIZE, roadX: 300.0 * TILE_SIZE, roadY: 480.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 155 },
+            { id: "radar_ocean_dr",   name: "OCEAN DRIVE NEON RADAR",       x: 448.3 * TILE_SIZE, y: 240.0 * TILE_SIZE, roadX: 446.0 * TILE_SIZE, roadY: 240.0 * TILE_SIZE, z: 2.0, ang: 0,            cooldown: 0, flashTimer: 0, bestMph: 145 },
+            { id: "radar_macarthur",  name: "MACARTHUR CAUSEWAY RADAR",     x: 344.5 * TILE_SIZE, y: 299.3 * TILE_SIZE, roadX: 344.5 * TILE_SIZE, roadY: 297.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 155 },
+            { id: "radar_venetian",   name: "VENETIAN CAUSEWAY RADAR",      x: 344.5 * TILE_SIZE, y: 176.3 * TILE_SIZE, roadX: 344.5 * TILE_SIZE, roadY: 174.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 150 },
+            { id: "radar_julia",      name: "JULIA TUTTLE NORTH BAY RADAR", x: 430.0 * TILE_SIZE, y: 76.3 * TILE_SIZE,  roadX: 430.0 * TILE_SIZE, roadY: 74.0 * TILE_SIZE,  z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 160 },
+            { id: "radar_keys_hwy",   name: "OVERSEAS HIGHWAY KEYS RADAR",  x: 263.0 * TILE_SIZE, y: 479.3 * TILE_SIZE, roadX: 263.0 * TILE_SIZE, roadY: 480.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 155 },
             { id: "radar_vcia_blvd",  name: "VCIA EXPRESSWAY RADAR",        x: 87.3 * TILE_SIZE,  y: 275.0 * TILE_SIZE, roadX: 88.5 * TILE_SIZE,  roadY: 275.0 * TILE_SIZE, z: 2.0, ang: 0,            cooldown: 0, flashTimer: 0, bestMph: 145 }
         ];
         // 3. Grupo Seguro Armored Cash Truck 3D Briefcase Drops & Viral Social Media Reels State
@@ -4032,15 +4032,7 @@ class WorldObjectEngine {
             }
         }
 
-        // Render VCPD Speed Trap Road Detection Strips, Armored Truck Gold Halos & Cash Drop Rings
-        if (Array.isArray(this.speedTraps)) {
-            for (let i = 0; i < this.speedTraps.length; i++) {
-                const st = this.speedTraps[i];
-                if (st.roadX < minX - 140 || st.roadX > maxX + 140 || st.roadY < minY - 140 || st.roadY > maxY + 140) continue;
-                const pulse = 0.28 + 0.16 * Math.sin(renderer.time * 5.0 + i);
-                renderer.pushSolidQuad3D(st.roadX, st.roadY, 2.022, 34, 14, st.ang || 0, 0.18, 0.88, 0.98, pulse, SPRITE_DRAW_ORDER.TIRE_MARKS);
-            }
-        }
+        // Render Armored Truck Gold Halos & Cash Drop Rings
         if (game && Array.isArray(game.vehicles)) {
             for (const v of game.vehicles) {
                 if (!v.isArmoredCashTruck || (v.cashBagsLeft || 0) <= 0) continue;
