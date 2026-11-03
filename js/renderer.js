@@ -5260,9 +5260,8 @@ class RetroRenderer {
 
         for (const ph of game.missions.payphones) {
             if (ph.x < minX || ph.x > maxX || ph.y < minY || ph.y > maxY) continue;
-            const isRinging = !ph.completed && !game.missions.activeMission;
-            const phoneFrame = isRinging ? 274 + (Math.floor(this.time * 12) % 3) : 274;
-            this.batchObjectSprite3D(String(phoneFrame), ph.x, ph.y, this.getEntityZ(ph, 0.06), 0, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            // Static silent payphone booth prop (never rings; missions are launched via Smartphone!)
+            this.batchObjectSprite3D("274", ph.x, ph.y, this.getEntityZ(ph, 0.06), 0, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
         }
 
         const m = game.missions.activeMission;
@@ -6525,15 +6524,6 @@ class RetroRenderer {
                 if (sc.x < -140 || sc.x > W + 140 || sc.y < -140 || sc.y > H + 140) continue;
                 const pxScale = (sc.scale * H) / 128.0;
                 addLightPool(sc.x, sc.y, 82 * pxScale, "rgba(57, 255, 20, 0.85)", "rgba(16, 185, 129, 0.34)");
-            }
-        }
-        if (game.missions && Array.isArray(game.missions.payphones)) {
-            for (const ph of game.missions.payphones) {
-                if (ph.completed) continue;
-                const sc = this.worldToScreen(ph.x, ph.y, this.getEntityZ(ph, 0.08));
-                if (sc.x < -80 || sc.x > W + 80 || sc.y < -80 || sc.y > H + 80) continue;
-                const pxScale = (sc.scale * H) / 128.0;
-                addLightPool(sc.x, sc.y, 42 * pxScale, "rgba(80, 255, 120, 0.80)", "rgba(20, 180, 90, 0.28)");
             }
         }
 
@@ -8623,10 +8613,74 @@ class RetroRenderer {
             lines.push(curLine);
         }
 
-        let textY = smsY + 35;
-        for (let i = 0; i < lines.length; i++) {
+        let textY = smsY + 33;
+        const maxLines = Math.min(2, lines.length);
+        for (let i = 0; i < maxLines; i++) {
             ctx.fillText(lines[i], smsX + 7, textY);
-            textY += 13.5;
+            textY += 12.5;
+        }
+
+        // Interactive Smartphone Mission Launcher Bar inside Messages Card
+        const mBarY = smsY + smsH - 24;
+        const mBarH = 19;
+        const activeM = game && game.missions ? game.missions.activeMission : null;
+        const selPhone = (game && game.missions && typeof game.missions.getSelectedPhone === "function")
+            ? game.missions.getSelectedPhone()
+            : null;
+
+        if (activeM) {
+            const abortW = 54;
+            const statW = smsW - abortW - 14;
+            rrect(smsX + 6, mBarY, statW, mBarH, 5);
+            ctx.fillStyle = "rgba(190, 24, 93, 0.28)";
+            ctx.fill();
+            ctx.strokeStyle = "#ff2a85";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 8.2px -apple-system, 'Segoe UI', sans-serif";
+            const objShort = String(activeM.objectiveLabel || activeM.title || "ACTIVE MISSION").slice(0, 21);
+            ctx.fillText(`🎯 ${objShort}`, smsX + 11, mBarY + mBarH * 0.5 + 0.5);
+
+            const abX = smsX + 8 + statW;
+            rrect(abX, mBarY, abortW, mBarH, 5);
+            ctx.fillStyle = "rgba(153, 27, 27, 0.85)";
+            ctx.fill();
+            ctx.strokeStyle = "#f87171";
+            ctx.stroke();
+            ctx.fillStyle = "#ffffff";
+            ctx.textAlign = "center";
+            ctx.fillText("✖ ABORT", abX + abortW * 0.5, mBarY + mBarH * 0.5 + 0.5);
+            ctx.textAlign = "left";
+            this.cheatButtons.push({ id: "PHONE_MISSION_ABORT", x: abX, y: mBarY, w: abortW, h: mBarH });
+        } else if (selPhone) {
+            const nextW = 24;
+            const startW = smsW - nextW - 14;
+            rrect(smsX + 6, mBarY, startW, mBarH, 5);
+            ctx.fillStyle = selPhone.completed ? "rgba(30, 58, 138, 0.72)" : "rgba(21, 128, 61, 0.78)";
+            ctx.fill();
+            ctx.strokeStyle = selPhone.completed ? "#38bdf8" : "#4ade80";
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "bold 8.4px -apple-system, 'Segoe UI', sans-serif";
+            const btnTitle = selPhone.shortTitle || "MISSION";
+            const prefix = selPhone.completed ? "🔄 REPLAY " : "📲 START ";
+            ctx.fillText(`${prefix}${btnTitle}`, smsX + 11, mBarY + mBarH * 0.5 + 0.5);
+            this.cheatButtons.push({ id: "PHONE_MISSION_START", x: smsX + 6, y: mBarY, w: startW, h: mBarH });
+
+            const nxX = smsX + 8 + startW;
+            rrect(nxX, mBarY, nextW, mBarH, 5);
+            ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
+            ctx.fill();
+            ctx.strokeStyle = "#38bdf8";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = "#38bdf8";
+            ctx.textAlign = "center";
+            ctx.fillText("⏭", nxX + nextW * 0.5, mBarY + mBarH * 0.5 + 0.5);
+            ctx.textAlign = "left";
+            this.cheatButtons.push({ id: "PHONE_MISSION_NEXT", x: nxX, y: mBarY, w: nextW, h: mBarH });
         }
 
         // ====================================================================
@@ -8778,17 +8832,6 @@ class RetroRenderer {
                 ctx.strokeStyle = "#39ff14";
                 ctx.lineWidth = 1;
                 ctx.strokeRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
-            }
-        }
-
-        // Ringing Payphones
-        if (game.missions && Array.isArray(game.missions.payphones)) {
-            for (const ph of game.missions.payphones) {
-                if (ph.completed) continue;
-                const pt = worldToMini(ph.x, ph.y);
-                if (pt.x < mx - 6 || pt.x > mx + mw + 6 || pt.y < my - 6 || pt.y > my + mh + 6) continue;
-                ctx.fillStyle = "#39ff14";
-                ctx.fillRect(pt.x - 3, pt.y - 3, 6, 6);
             }
         }
 
@@ -9009,6 +9052,21 @@ class RetroRenderer {
                 }
                 if (btn.id === "PHONE_ONLINE_BTN" && game && game.net && typeof game.net.triggerOnlineAction === "function") {
                     game.net.triggerOnlineAction();
+                    return true;
+                }
+                if (btn.id === "PHONE_MISSION_START" && game && game.missions && typeof game.missions.startMobileMission === "function") {
+                    game.missions.startMobileMission();
+                    if (typeof game.updateHud === "function") game.updateHud();
+                    return true;
+                }
+                if (btn.id === "PHONE_MISSION_NEXT" && game && game.missions && typeof game.missions.cycleSelectedMission === "function") {
+                    game.missions.cycleSelectedMission(1);
+                    if (typeof game.updateHud === "function") game.updateHud();
+                    return true;
+                }
+                if (btn.id === "PHONE_MISSION_ABORT" && game && game.missions && typeof game.missions.abortMission === "function") {
+                    game.missions.abortMission();
+                    if (typeof game.updateHud === "function") game.updateHud();
                     return true;
                 }
                 if (btn.id === "OPEN_CHAR_SELECT") {
@@ -9489,17 +9547,6 @@ class RetroRenderer {
             }
         }
 
-        // 4. Ringing Payphones
-        if (game.missions && Array.isArray(game.missions.payphones)) {
-            for (const ph of game.missions.payphones) {
-                if (ph.completed) continue;
-                const pt = worldToMini(ph.x, ph.y);
-                if (pt.x < mx - 6 || pt.x > mx + mw + 6 || pt.y < my - 6 || pt.y > my + mh + 6) continue;
-                ctx.fillStyle = "#39ff14";
-                ctx.fillRect(pt.x - 3, pt.y - 3, 6, 6);
-            }
-        }
-
         // 5. Nearby Vehicles & VCPD Cop Cars
         if (Array.isArray(game.vehicles) && zoomMode < 2) {
             const copFlash = Math.floor(this.time * 8) % 2 === 0;
@@ -9814,17 +9861,6 @@ class RetroRenderer {
             fctx.strokeStyle = "#39ff14";
             fctx.lineWidth = 1.5;
             fctx.strokeRect(px - 5, py - 5, 10, 10);
-        }
-
-        for (const ph of game.missions.payphones) {
-            if (ph.completed) continue;
-            const px = Math.round(ph.x * sx);
-            const py = Math.round(ph.y * sy);
-            fctx.fillStyle = "#39ff14";
-            fctx.fillRect(px - 4, py - 4, 8, 8);
-            fctx.strokeStyle = "#052e16";
-            fctx.lineWidth = 1.5;
-            fctx.strokeRect(px - 4, py - 4, 8, 8);
         }
 
         // Official Vice City Landmarks ("Lieux Officiels") on the [M] Full Map

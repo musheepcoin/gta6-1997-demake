@@ -1,18 +1,23 @@
 /* ============================================================================
-   GRAND THEFT AUTO: LEONIDA '97 — STORY MISSIONS & PAYPHONE SYSTEM ON NYC.CMP
-   Transposing GTA VI's Lucia & Jason Storyline into 1997 GTA 1 Payphone Missions
+   GRAND THEFT AUTO: LEONIDA '97 — SMARTPHONE STORY MISSION SYSTEM
+   All story missions are launched & managed directly from Lucia's Smartphone.
+   Street payphone booths remain physically present on sidewalks as silent props.
    ============================================================================ */
 
 class MissionManager {
     constructor(game) {
         this.game = game;
 
-        // Ringing Payphones placed on the 12-region bespoke GTA 6 (State of Leonida) sidewalks
+        // Static sidewalk payphone booth locations + Smartphone Mission Contracts
         this.payphones = [
             {
                 id: "phone_motel",
                 missionId: "M1_UNCLE_JACK",
-                name: "HOTEL DIXON PAYPHONE (OCEAN DRIVE)",
+                shortTitle: "M1: LIQUOR HOLD-UP",
+                caller: "Jason Duval",
+                rewardCash: 25000,
+                name: "SOUTH BEACH LIQUOR HOLD-UP",
+                briefing: "MISSION 1 (TRUST?): Hold up South Beach Liquor on Ocean Drive with Jason, then lose VCPD at Vice Customs!",
                 x: mx256(213.5) * TILE_SIZE,
                 y: my256(143.5) * TILE_SIZE,
                 completed: false
@@ -20,7 +25,11 @@ class MissionManager {
             {
                 id: "phone_scurve",
                 missionId: "M2_GRASSRIVERS",
-                name: "LUMMUS PARK & VICE BEACH PAYPHONE",
+                shortTitle: "M2: PIER CONTRABAND",
+                caller: "Dre'Quan Priest",
+                rewardCash: 45000,
+                name: "VICE BEACH PIER CONTRABAND",
+                briefing: "MISSION 2 (CONTRABAND): Collect 3 contraband crates on Vice Beach & Ocean Pier, then deliver to Hotel Dixon!",
                 x: mx256(218.5) * TILE_SIZE,
                 y: my256(151.5) * TILE_SIZE,
                 completed: false
@@ -28,7 +37,11 @@ class MissionManager {
             {
                 id: "phone_downtown",
                 missionId: "M3_OCEAN_DRIVE",
-                name: "STAR ISLAND MANSION PAYPHONE",
+                shortTitle: "M3: CHEETAH BOOST",
+                caller: "Jason Duval",
+                rewardCash: 75000,
+                name: "STAR ISLAND CHEETAH BOOST",
+                briefing: "MISSION 3 (CHEETAH BOOST): Steal the VIP Grotti Cheetah on Star Island and deliver it to Vice Port Crane!",
                 x: mx256(173.0) * TILE_SIZE,
                 y: my256(104.5) * TILE_SIZE,
                 completed: false
@@ -36,15 +49,68 @@ class MissionManager {
             {
                 id: "phone_beach",
                 missionId: "M4_ANKLE_OVERRIDE",
-                name: "PORT GELLHORN SPEEDWAY PAYPHONE",
+                shortTitle: "M4: ANKLE OVERRIDE",
+                caller: "Lucia & Jason",
+                rewardCash: 150000,
+                name: "DOC ANKLE MONITOR OVERRIDE",
+                briefing: "MISSION 4 (THE BIG SCORE): Ambush the Armored Van in Port Gellhorn, then hack the DOC Relay at VCIA Airport!",
                 x: mx256(47.0) * TILE_SIZE,
                 y: my256(114.5) * TILE_SIZE,
                 completed: false
             }
         ];
 
+        this.selectedMissionIdx = 0;
         this.activeMission = null;
         this.ringTimer = 0;
+    }
+
+    getSelectedPhone() {
+        if (!Array.isArray(this.payphones) || this.payphones.length === 0) return null;
+        const idx = Math.max(0, Math.min(this.payphones.length - 1, this.selectedMissionIdx || 0));
+        return this.payphones[idx];
+    }
+
+    cycleSelectedMission(delta = 1) {
+        if (!Array.isArray(this.payphones) || this.payphones.length === 0) return null;
+        this.selectedMissionIdx = (this.selectedMissionIdx + delta + this.payphones.length) % this.payphones.length;
+        const sel = this.getSelectedPhone();
+        if (sel && this.game && typeof this.game.sendPager === "function") {
+            const statusTag = sel.completed ? " [REPLAY]" : ` [$${(sel.rewardCash || 25000).toLocaleString()}]`;
+            this.game.sendPager(
+                `📱 ${sel.caller.toUpperCase()}`,
+                `${sel.briefing}${statusTag}`,
+                false
+            );
+        }
+        return sel;
+    }
+
+    startMobileMission() {
+        if (this.activeMission) return false;
+        const sel = this.getSelectedPhone();
+        if (!sel) return false;
+        this.startMission(sel);
+        return true;
+    }
+
+    abortMission() {
+        if (!this.activeMission) return false;
+        const g = this.game;
+        this.activeMission = null;
+        if (g) {
+            if (typeof g.showBigBanner === "function") {
+                g.showBigBanner("MISSION CANCELED", "CONTRACT ABORTED FROM SMARTPHONE", "#f87171", 2.2);
+            }
+            if (typeof g.sendPager === "function") {
+                g.sendPager(
+                    "📱 SMARTPHONE // DISPATCH",
+                    "Mission contract aborted. Tap [START] on your Smartphone whenever you want to launch a mission.",
+                    false
+                );
+            }
+        }
+        return true;
     }
 
     getTargetPosition() {
@@ -56,17 +122,7 @@ class MissionManager {
                 color: "#ff2a85"
             };
         }
-
-        const nextPhone = this.payphones.find(p => !p.completed);
-        if (nextPhone) {
-            return {
-                x: nextPhone.x,
-                y: nextPhone.y,
-                label: "ANSWER PAYPHONE: " + nextPhone.name,
-                color: "#39ff14"
-            };
-        }
-
+        // Payphones never ring or act as mission triggers anymore; missions are launched via Smartphone!
         return null;
     }
 
@@ -74,21 +130,7 @@ class MissionManager {
         const g = this.game;
         const p = g.player;
 
-        this.ringTimer += dt;
-
         if (!this.activeMission) {
-            for (const phone of this.payphones) {
-                if (phone.completed) continue;
-                const d = Math.hypot(p.x - phone.x, p.y - phone.y);
-                if (d < 220 && this.ringTimer > 2.2) {
-                    this.ringTimer = 0;
-                    g.audio.playPayphoneRing();
-                }
-                if (d < 46 && !p.inVehicle) {
-                    this.startMission(phone);
-                    break;
-                }
-            }
             return;
         }
 
@@ -109,7 +151,7 @@ class MissionManager {
                     g.addCash(15000, "REGISTER ROBBED!");
                     g.setWantedLevel(Math.max(g.wantedLevel, 2));
                     g.sendPager(
-                        "JASON (PARTNER)",
+                        "JASON (SMARTPHONE)",
                         "REGISTER CLEARED ($15,000)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
                         true
                     );
@@ -140,7 +182,7 @@ class MissionManager {
                     m.objectiveLabel = "DELIVER HAUL TO HOTEL DIXON";
                     g.setWantedLevel(Math.max(g.wantedLevel, 2));
                     g.sendPager(
-                        "DRE'QUAN (VICE BEACH)",
+                        "DRE'QUAN (SMARTPHONE)",
                         "All 3 beach contraband crates secured! Bring the stash back to Hotel Dixon on Ocean Drive!",
                         true
                     );
@@ -159,7 +201,7 @@ class MissionManager {
                     m.targetPos = { x: mx256(171.5) * TILE_SIZE, y: my256(164.5) * TILE_SIZE };
                     m.objectiveLabel = "DELIVER CHEETAH TO VICE PORT CRANE";
                     g.sendPager(
-                        "JASON (PARTNER)",
+                        "JASON (SMARTPHONE)",
                         "Sweet ride! 3-Star VCPD alert! Punch it south across the causeway to the Port of Vice City Container Crane before time runs out!",
                         true
                     );
@@ -239,7 +281,7 @@ class MissionManager {
                 objectiveLabel: "COLLECT BEACH & PIER CRATES (0/3)"
             };
             g.sendPager(
-                "DRE'QUAN (PAYPHONE)",
+                "DRE'QUAN (SMARTPHONE)",
                 "MISSION 2: 'VICE BEACH PIER CONTRABAND' — Grab all 3 contraband crates across Vice Beach and the Wooden Ocean Pier before the VCPD arrives!",
                 true
             );
@@ -260,7 +302,7 @@ class MissionManager {
                 objectiveLabel: "STEAL THE CHEETAH ON STAR ISLAND"
             };
             g.sendPager(
-                "JASON (PAYPHONE)",
+                "JASON (SMARTPHONE)",
                 "MISSION 3: 'STAR ISLAND CHEETAH BOOST' — A VIP Grotti Cheetah is parked on Star Island. Boost it and deliver it to the Port of Vice City!",
                 true
             );
@@ -299,17 +341,19 @@ class MissionManager {
         g.audio.playCashSound();
         g.showBigBanner("MISSION PASSED!", `${title} — +$${reward.toLocaleString()} (MULTIPLIER x${g.multiplier})`, "#39ff14", 3.5);
 
-        const nextPhone = this.payphones.find(p => !p.completed);
-        if (nextPhone) {
+        const nextIdx = this.payphones.findIndex(p => !p.completed);
+        if (nextIdx !== -1) {
+            this.selectedMissionIdx = nextIdx;
+            const nextPhone = this.payphones[nextIdx];
             g.sendPager(
-                "JASON (PAGER)",
-                `Score locked in! Multiplier is now x${g.multiplier}. Next ringing payphone is at ${nextPhone.name} — follow the yellow arrow!`,
+                "JASON (SMARTPHONE)",
+                `Score locked in! Multiplier is now x${g.multiplier}. Next contract ready on your Smartphone: ${nextPhone.shortTitle}!`,
                 false
             );
         } else {
             g.sendPager(
                 "STATE OF LEONIDA",
-                "ALL STORY MISSIONS COMPLETED! Lucia's DOC Ankle Monitor is permanently scrambled. Rule the streets of Leonida!",
+                "ALL STORY MISSIONS COMPLETED! Lucia's DOC Ankle Monitor is permanently scrambled. You can replay any mission from your Smartphone!",
                 true
             );
         }
@@ -320,8 +364,8 @@ class MissionManager {
         this.activeMission = null;
         g.showBigBanner("MISSION FAILED", reason, "#ff1e38", 3.0);
         g.sendPager(
-            "DISPATCH // PAGER",
-            `${reason} — Head back to the ringing payphone whenever you're ready to retry.`,
+            "SMARTPHONE // DISPATCH",
+            `${reason} — Tap [START] on your Smartphone whenever you're ready to retry the contract.`,
             true
         );
     }
