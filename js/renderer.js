@@ -5304,9 +5304,13 @@ class RetroRenderer {
         if (Array.isArray(this.map.stuntRamps)) {
             for (const ramp of this.map.stuntRamps) {
                 if (ramp.x < minX || ramp.x > maxX || ramp.y < minY || ramp.y > maxY) continue;
-                const rz = this.map.getHeightAtPixel(ramp.x, ramp.y, 2.0) + 0.025;
-                this.pushSolidQuad3D(ramp.x, ramp.y, rz, 36, 22, ramp.angle || 0, 0.98, 0.68, 0.08, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.pushSolidQuad3D(ramp.x, ramp.y, rz + 0.01, 24, 14, ramp.angle || 0, 0.99, 0.92, 0.25, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                const rz = this.map.getHeightAtPixel(ramp.x, ramp.y, 2.0) + 0.022;
+                const rAng = ramp.angle || 0;
+                const ex = ramp.x - Math.cos(rAng) * 28.0;
+                const ey = ramp.y - Math.sin(rAng) * 28.0;
+                const pulse = 0.45 + 0.25 * Math.sin(this.time * 6.0);
+                // Glowing neon entry marker ahead of the true 3D sloped wedge ramp (rendered by WorldObjectEngine)
+                this.pushSolidQuad3D(ex, ey, rz, 14, 22, rAng, 0.99, 0.86, 0.16, pulse, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
 

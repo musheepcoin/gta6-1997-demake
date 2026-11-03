@@ -7310,7 +7310,15 @@ class LeonidaGame {
 
 
 
-                // A. Unique Stunt Jump Ramps! Launching bikes & cars high into 3D air!
+                // A. Unique 3D Stunt Jump Ramps! Launching bikes & cars high into 3D air with Cinematic Camera Pullback!
+
+                if (mySeat === 0 && this.renderer && v.appliedStuntZoom) {
+
+                    this.renderer.zoomOffsetBlocks = Math.max(-2.2, Math.min(8.0, (this.renderer.zoomOffsetBlocks || 0) - v.appliedStuntZoom));
+
+                    v.appliedStuntZoom = 0;
+
+                }
 
                 if ((v.stuntAirTimer || 0) > 0) {
 
@@ -7319,6 +7327,14 @@ class LeonidaGame {
                     const prog = 1.0 - v.stuntAirTimer / (v.stuntMaxTime || 1.15);
 
                     v.stuntZOffset = Math.sin(prog * Math.PI) * 1.45;
+
+                    if (mySeat === 0 && this.renderer) {
+
+                        v.appliedStuntZoom = v.stuntZOffset * 1.15;
+
+                        this.renderer.zoomOffsetBlocks = Math.max(-2.2, Math.min(8.0, (this.renderer.zoomOffsetBlocks || 0) + v.appliedStuntZoom));
+
+                    }
 
                     if (v.stuntAirTimer <= 0) {
 
@@ -7342,21 +7358,21 @@ class LeonidaGame {
 
                     const vSpd = Math.hypot(v.vx, v.vy);
 
-                    if (vSpd > 145) {
+                    if (vSpd > 125) {
 
                         for (const ramp of this.map.stuntRamps) {
 
-                            if (Math.hypot(v.x - ramp.x, v.y - ramp.y) < 42) {
+                            if (Math.hypot(v.x - ramp.x, v.y - ramp.y) < 46) {
 
-                                v.stuntMaxTime = Math.min(1.45, Math.max(0.95, vSpd / 290));
+                                v.stuntMaxTime = Math.min(1.45, Math.max(0.95, vSpd / 280));
 
                                 v.stuntAirTimer = v.stuntMaxTime;
 
                                 v.lastRampName = ramp.name;
 
-                                v.vx *= 1.18;
+                                v.vx *= 1.22;
 
-                                v.vy *= 1.18;
+                                v.vy *= 1.22;
 
                                 this.audio.playBeep(520, 0.12, "sawtooth", 0.08);
 

@@ -306,6 +306,29 @@ class WorldObjectEngine {
             capsuleX: 490.6 * TILE_SIZE,
             capsuleY: 35.0 * TILE_SIZE
         };
+        // GTA 6 Trailer 1 & Screenshots "Instant Fun" Interactive Encounters:
+        // 1. Rogue Leonida Alligators (Convenience Stores, Mansion Pools & Sidewalks)
+        this.gatorEncounters = [
+            { id: "gator_ocean_liquor", name: "OCEAN DRIVE 24/7 LIQUOR GATOR", x: 442.5 * TILE_SIZE, y: 288.0 * TILE_SIZE, z: 2.0, ang: 0.35, active: true, cooldown: 0 },
+            { id: "gator_star_pool",    name: "STAR ISLAND POOL GATOR",        x: 351.2 * TILE_SIZE, y: 169.2 * TILE_SIZE, z: 2.0, ang: -0.60, active: true, cooldown: 0 },
+            { id: "gator_venetian",     name: "VENETIAN VILLA ROGUE GATOR",    x: 393.5 * TILE_SIZE, y: 121.8 * TILE_SIZE, z: 2.0, ang: 1.15, active: true, cooldown: 0 },
+            { id: "gator_gellhorn",     name: "PORT GELLHORN GAS STATION GATOR", x: 64.5 * TILE_SIZE, y: 182.5 * TILE_SIZE, z: 2.0, ang: -0.25, active: true, cooldown: 0 },
+            { id: "gator_little_haiti", name: "LITTLE HAITI MARKET GATOR",     x: 226.5 * TILE_SIZE, y: 111.5 * TILE_SIZE, z: 2.0, ang: 0.80, active: true, cooldown: 0 },
+            { id: "gator_grassrivers",  name: "GRASSRIVERS BULL GATOR",        x: 110.5 * TILE_SIZE, y: 390.5 * TILE_SIZE, z: 2.0, ang: -1.10, active: true, cooldown: 0 }
+        ];
+        // 2. VCPD High-Speed Radar Speed Traps & Nitrous Boost Portals
+        this.speedTraps = [
+            { id: "radar_ocean_dr",   name: "OCEAN DRIVE NEON RADAR",       x: 446.3 * TILE_SIZE, y: 240.0 * TILE_SIZE, roadX: 445.5 * TILE_SIZE, roadY: 240.0 * TILE_SIZE, z: 2.0, ang: 0,            cooldown: 0, flashTimer: 0, bestMph: 145 },
+            { id: "radar_macarthur",  name: "MACARTHUR CAUSEWAY RADAR",     x: 360.0 * TILE_SIZE, y: 296.3 * TILE_SIZE, roadX: 360.0 * TILE_SIZE, roadY: 297.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 155 },
+            { id: "radar_venetian",   name: "VENETIAN CAUSEWAY RADAR",      x: 360.0 * TILE_SIZE, y: 172.3 * TILE_SIZE, roadX: 360.0 * TILE_SIZE, roadY: 173.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 150 },
+            { id: "radar_julia",      name: "JULIA TUTTLE NORTH BAY RADAR", x: 360.0 * TILE_SIZE, y: 73.8 * TILE_SIZE,  roadX: 360.0 * TILE_SIZE, roadY: 75.0 * TILE_SIZE,  z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 160 },
+            { id: "radar_keys_hwy",   name: "OVERSEAS HIGHWAY KEYS RADAR",  x: 300.0 * TILE_SIZE, y: 479.3 * TILE_SIZE, roadX: 300.0 * TILE_SIZE, roadY: 480.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, flashTimer: 0, bestMph: 155 },
+            { id: "radar_vcia_blvd",  name: "VCIA EXPRESSWAY RADAR",        x: 87.3 * TILE_SIZE,  y: 275.0 * TILE_SIZE, roadX: 88.5 * TILE_SIZE,  roadY: 275.0 * TILE_SIZE, z: 2.0, ang: 0,            cooldown: 0, flashTimer: 0, bestMph: 145 }
+        ];
+        // 3. Grupo Seguro Armored Cash Truck 3D Briefcase Drops & Viral Social Media Reels State
+        this.cashDrops = [];
+        this.viralCooldown = 0;
+        this.viralDriftTimer = 0;
         this.meshVbo = null;
         this.meshVertexCount = 0;
         this.dynVbo = null;
@@ -935,6 +958,43 @@ class WorldObjectEngine {
             }
         }
 
+        // 0B. GTA 6 Trailer 1 Rogue Leonida Alligator Wrangler Action ([E] on foot!)
+        if (Array.isArray(this.gatorEncounters)) {
+            for (const ge of this.gatorEncounters) {
+                if (ge.active && Math.hypot(px - ge.x, py - ge.y) < 68) {
+                    ge.active = false;
+                    ge.cooldown = 35.0;
+                    if (typeof game.addScore === "function") game.addScore(2500);
+                    if (typeof game.addCash === "function") game.addCash(2500, "🐊 GATOR WRANGLER BOUNTY!");
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🐊 LEONIDA GATOR WRANGLED!", `${ge.name} BAGGED • +$2,500 ANIMAL CONTROL BOUNTY!`, "#4ade80", 2.8);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ge.x,
+                            y: ge.y,
+                            z: 2.65,
+                            text: "🐊 ROGUE GATOR WRANGLED! +$2,500 & VIRAL REEL!",
+                            color: "#4ade80",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0C. Breach Grupo Seguro Armored Cash Truck Rear Vault Doors on Foot ([E]!)
+        if (Array.isArray(game.vehicles)) {
+            for (const v of game.vehicles) {
+                if (v.isArmoredCashTruck && (v.cashBagsLeft || 0) > 0 && Math.hypot(px - v.x, py - v.y) < 76) {
+                    this.ejectArmoredCashDrops(game, v, Math.min(3, v.cashBagsLeft));
+                    return true;
+                }
+            }
+        }
+
         if (!this.heistTargets || this.heistTargets.length === 0) return false;
 
         for (let i = 0; i < this.heistTargets.length; i++) {
@@ -1226,6 +1286,209 @@ class WorldObjectEngine {
                 }
             }
         }
+
+        // 4. Update GTA 6 Trailer 1 Rogue Leonida Alligators (Poolside & Convenience Store Forecourts)
+        if (Array.isArray(this.gatorEncounters)) {
+            const pCar = p && p.car ? p.car : null;
+            for (const ge of this.gatorEncounters) {
+                if (!ge.active) {
+                    ge.cooldown = Math.max(0, (ge.cooldown || 0) - dt);
+                    if (ge.cooldown <= 0 && Math.hypot(px - ge.x, py - ge.y) > 420) {
+                        ge.active = true;
+                    }
+                    continue;
+                }
+                // Slowly turn head toward player if close
+                const dPlayer = Math.hypot(px - ge.x, py - ge.y);
+                if (dPlayer < 140 && dPlayer > 12) {
+                    const targetAng = Math.atan2(py - ge.y, px - ge.x);
+                    let diff = targetAng - ge.ang;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    ge.ang += diff * Math.min(1.0, dt * 2.5);
+                }
+                // Vehicle roadkill impact on rogue gator!
+                if (pCar && Math.hypot(pCar.x - ge.x, pCar.y - ge.y) < 38) {
+                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+                    if (spd > 45) {
+                        ge.active = false;
+                        ge.cooldown = 35.0;
+                        if (typeof game.addScore === "function") game.addScore(1500);
+                        if (typeof game.addCash === "function") game.addCash(1500, "🐊 ROGUE GATOR ROADKILL!");
+                        if (game.audio) game.audio.playPickup("SCORE");
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: ge.x,
+                                y: ge.y,
+                                z: 2.55,
+                                text: "🐊 LEONIDA GATOR ROADKILL! +$1,500",
+                                color: "#4ade80",
+                                life: 2.2
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Update GTA 6 VCPD High-Speed Radar Speed Traps & Nitrous Boost Portals
+        if (Array.isArray(this.speedTraps)) {
+            const pCar = p && p.car ? p.car : null;
+            for (const st of this.speedTraps) {
+                if (st.cooldown > 0) st.cooldown = Math.max(0, st.cooldown - dt);
+                if (st.flashTimer > 0) st.flashTimer = Math.max(0, st.flashTimer - dt);
+                if (pCar && st.cooldown <= 0 && Math.hypot(pCar.x - st.roadX, pCar.y - st.roadY) < 62) {
+                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+                    if (spd > 135) {
+                        const mph = Math.max(85, Math.round(spd * 0.52));
+                        st.cooldown = 12.0;
+                        st.flashTimer = 0.45;
+                        const isRecord = mph > (st.bestMph || 140);
+                        if (isRecord) st.bestMph = mph;
+                        const bonus = isRecord ? 5000 : 3500;
+                        // Apply Nitrous Oxide Overdrive Boost!
+                        pCar.vx = (pCar.vx || 0) * 1.28;
+                        pCar.vy = (pCar.vy || 0) * 1.28;
+                        if (typeof game.addScore === "function") game.addScore(bonus);
+                        if (typeof game.addCash === "function") game.addCash(bonus, `📸 ${st.name}: ${mph} MPH!`);
+                        if (game.audio) game.audio.playPickup("WEAPON");
+                        if (typeof game.showBigBanner === "function") {
+                            game.showBigBanner(
+                                `📸 VCPD RADAR: ${mph} MPH!`,
+                                `${st.name} • +$${bonus.toLocaleString()} & NITROUS OVERDRIVE BOOST!`,
+                                "#38bdf8",
+                                2.4
+                            );
+                        }
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: pCar.x,
+                                y: pCar.y,
+                                z: 2.75,
+                                text: `📸 ${mph} MPH CLOCKED! +$${bonus.toLocaleString()} + NITRO BOOST!`,
+                                color: "#38bdf8",
+                                life: 2.6
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. Update Grupo Seguro Armored Cash Trucks & 3D Spinning Emerald/Gold Cash Briefcase Drops
+        if (Array.isArray(game.vehicles)) {
+            const pCar = p && p.car ? p.car : null;
+            for (const v of game.vehicles) {
+                if (!v.isArmoredCashTruck) continue;
+                if (v.lastCashHitHp === undefined) v.lastCashHitHp = v.hp;
+                if ((v.cashBagsLeft || 0) > 0) {
+                    const rammedByPlayer = pCar && pCar !== v && Math.hypot(pCar.x - v.x, pCar.y - v.y) < 58 &&
+                        Math.hypot(pCar.vx || 0, pCar.vy || 0) > 75;
+                    if (v.hp < v.lastCashHitHp - 8 || v.destroyed || rammedByPlayer) {
+                        v.lastCashHitHp = v.hp;
+                        const dropCount = v.destroyed ? v.cashBagsLeft : Math.min(2, v.cashBagsLeft);
+                        this.ejectArmoredCashDrops(game, v, dropCount);
+                    }
+                }
+            }
+        }
+        if (Array.isArray(this.cashDrops) && this.cashDrops.length > 0) {
+            for (let i = this.cashDrops.length - 1; i >= 0; i--) {
+                const cd = this.cashDrops[i];
+                cd.age = (cd.age || 0) + dt;
+                cd.x += (cd.vx || 0) * dt;
+                cd.y += (cd.vy || 0) * dt;
+                cd.vx *= Math.pow(0.15, dt);
+                cd.vy *= Math.pow(0.15, dt);
+                if (p && Math.hypot(px - cd.x, py - cd.y) < 44) {
+                    this.cashDrops.splice(i, 1);
+                    if (typeof game.addScore === "function") game.addScore(2500);
+                    if (typeof game.addCash === "function") game.addCash(2500, "💼 ARMORED VAULT CASH!");
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cd.x,
+                            y: cd.y,
+                            z: 2.55,
+                            text: "💼 GRUPO SEGURO CASH BRIEFCASE! +$2,500!",
+                            color: "#fde047",
+                            life: 2.2
+                        });
+                    }
+                } else if (cd.age > 45.0) {
+                    this.cashDrops.splice(i, 1);
+                }
+            }
+        }
+
+        // 7. Update GTA 6 Leonida Social Media Viral Reels Meter (Drifting / Wheelies / Stunts for Live Streamers!)
+        if (this.viralCooldown > 0) {
+            this.viralCooldown = Math.max(0, this.viralCooldown - dt);
+        }
+        if (p && p.inVehicle && p.car && game.input && game.input.handbrake) {
+            const spd = Math.hypot(p.car.vx || 0, p.car.vy || 0);
+            if (spd > 135) {
+                this.viralDriftTimer = (this.viralDriftTimer || 0) + dt;
+                if (this.viralDriftTimer >= 0.85 && this.viralCooldown <= 0) {
+                    this.viralDriftTimer = 0;
+                    this.viralCooldown = 15.0;
+                    const viewsK = 45 + Math.floor(Math.random() * 85);
+                    if (typeof game.addScore === "function") game.addScore(3000);
+                    if (typeof game.addCash === "function") game.addCash(3000, `📱 VIRAL REEL (+${viewsK}K VIEWS)!`);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: p.car.x,
+                            y: p.car.y,
+                            z: 2.68,
+                            text: `📱 GOING VIRAL ON LEONIDA REELS! +${viewsK}K VIEWS • +$3,000!`,
+                            color: "#f472b6",
+                            life: 2.6
+                        });
+                    }
+                }
+            } else {
+                this.viralDriftTimer = Math.max(0, (this.viralDriftTimer || 0) - dt);
+            }
+        } else {
+            this.viralDriftTimer = 0;
+        }
+    }
+
+    ejectArmoredCashDrops(game, v, count) {
+        if (!v || (v.cashBagsLeft || 0) <= 0) return;
+        const n = Math.min(count, v.cashBagsLeft);
+        v.cashBagsLeft -= n;
+        const backAng = (v.angle || 0) + Math.PI;
+        for (let i = 0; i < n; i++) {
+            const spread = (i - (n - 1) * 0.5) * 0.55 + (Math.random() - 0.5) * 0.25;
+            const ejAng = backAng + spread;
+            const dist = 34 + i * 10;
+            this.cashDrops.push({
+                x: v.x + Math.cos(ejAng) * dist,
+                y: v.y + Math.sin(ejAng) * dist,
+                z: v.z || 2.0,
+                vx: Math.cos(ejAng) * (95 + Math.random() * 55),
+                vy: Math.sin(ejAng) * (95 + Math.random() * 55),
+                seed: Math.random() * 6.28,
+                age: 0
+            });
+        }
+        if (game.wantedSystem) {
+            game.wantedSystem.addChaos(120, "ARMORED_TRUCK_HEIST", game);
+            if ((game.wantedSystem.level || 0) < 2) game.wantedSystem.level = 2;
+        }
+        if (game.audio) game.audio.playPickup("WEAPON");
+        if (Array.isArray(game.floatingTexts)) {
+            game.floatingTexts.push({
+                x: v.x,
+                y: v.y,
+                z: 2.75,
+                text: `💰 ARMORED TRUCK DOORS BREACHED! ${n}x CASH BRIEFCASES EJECTED!`,
+                color: "#fde047",
+                life: 2.8
+            });
+        }
     }
 
     /* ========================================================================
@@ -1397,6 +1660,25 @@ class WorldObjectEngine {
                     v.isEstateCar = true;
                     game.vehicles.push(v);
                 }
+            }
+        }
+
+        // Spawn 3 Interactive GTA 6 "Grupo Seguro" Armored Cash Trucks ($15,000 Vault Payload each!)
+        if (typeof Vehicle === "function") {
+            const armoredSpecs = [
+                { id: "armored_ocean_dr",  x: 445.5 * TILE_SIZE, y: 222.0 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "armored_downtown",  x: 285.5 * TILE_SIZE, y: 250.0 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "armored_vice_port", x: 342.0 * TILE_SIZE, y: 326.0 * TILE_SIZE, ang: 0 }
+            ];
+            for (const as of armoredSpecs) {
+                if (game.vehicles.some(v => Math.hypot(v.x - as.x, v.y - as.y) < 36)) continue;
+                const av = new Vehicle(as.id, "BRINKS_TRUCK", as.x, as.y, as.ang);
+                av.z = 2.0;
+                av.missionTag = "LANDMARK";
+                av.isArmoredCashTruck = true;
+                av.cashBagsLeft = 6;
+                av.lastCashHitHp = av.hp;
+                game.vehicles.push(av);
             }
         }
     }
@@ -2637,6 +2919,67 @@ class WorldObjectEngine {
             emitCylinder3D(wt.x, wt.y, 54, 0, 2.2, 1.0, bz + 2.26, bz + 2.62, 8, [0.92, 0.94, 0.98], 5, true);
         }
 
+        // H5. 10 TRUE 3D SLOPED TRIANGULAR WEDGE STUNT JUMP RAMPS (this.map.stuntRamps)
+        //     Replaces flat 2D yellow rectangles with authentic 3D steel-truss & hazard-chevron launch wedges!
+        if (this.map && Array.isArray(this.map.stuntRamps)) {
+            const [tu0, tv0, tu1, tv1] = getTileAtlasUV(363, 0.0, 0.0, 1.0, 1.0); // S363 alpha-cutout steel truss
+            for (const ramp of this.map.stuntRamps) {
+                const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
+                    ? this.map.getHeightAtPixel(ramp.x, ramp.y, 2.0)
+                    : 2.0;
+                const ang = ramp.angle || 0;
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+                const hw = 22.0; // 44px long along launch direction
+                const hd = 13.0; // 26px wide
+                const yLow = bz + 0.015;
+                const yMid = bz + 0.185;
+                const yHigh = bz + 0.285;
+                const xMid = hw * 0.30;
+
+                emitAOShadow3D(ramp.x, ramp.y, cosA, sinA, 2, 0, 48, 30, bz, 0.38);
+
+                // Low entry corners (-hw), mid deck transition (xMid), and high launch lip (+hw)
+                const bNW = toWorld(ramp.x, ramp.y, cosA, sinA, -hw, -hd, yLow);
+                const bSW = toWorld(ramp.x, ramp.y, cosA, sinA, -hw,  hd, yLow);
+                const mNW = toWorld(ramp.x, ramp.y, cosA, sinA, xMid, -hd, yMid);
+                const mSW = toWorld(ramp.x, ramp.y, cosA, sinA, xMid,  hd, yMid);
+                const tNE = toWorld(ramp.x, ramp.y, cosA, sinA,  hw, -hd, yHigh);
+                const tSE = toWorld(ramp.x, ramp.y, cosA, sinA,  hw,  hd, yHigh);
+                const bNE = toWorld(ramp.x, ramp.y, cosA, sinA,  hw, -hd, bz);
+                const bSE = toWorld(ramp.x, ramp.y, cosA, sinA,  hw,  hd, bz);
+
+                // 1. Sloped Steel Ramp Deck: Lower section (L45 brushed steel plate) + Upper Launch Lip (MAT 3 Hazard Chevrons)
+                pushTileQuad3D(bNW, mNW, bSW, mSW, 390 + 45, 0.94, 0.96, 1.00, 1.0);
+                pushMatQuad3D(mNW, tNE, mSW, tSE, 3, 1.00, 0.88, 0.18, 1.0);
+
+                // 2. Left & Right Triangular S363 Alpha-Cutout Steel Truss Side Walls
+                pushTri3D(bNW, tNE, bNE, [tu0, tv1], [tu1, tv0], [tu1, tv1], 0.92, 0.95, 0.99, 1.0);
+                pushTri3D(bSW, bSE, tSE, [tu0, tv1], [tu1, tv1], [tu1, tv0], 0.92, 0.95, 0.99, 1.0);
+
+                // 3. High Launch Back-Face Bulkhead (MAT 3 Hazard Chevrons)
+                pushMatQuad3D(tSE, tNE, bSE, bNE, 3, 0.92, 0.78, 0.16, 1.0);
+            }
+        }
+
+        // H6. 6 3D ROADSIDE VCPD RADAR SPEED TRAP GANTRIES (this.speedTraps)
+        if (Array.isArray(this.speedTraps)) {
+            for (const st of this.speedTraps) {
+                const bz = st.z || 2.0;
+                const cosA = Math.cos(st.ang || 0);
+                const sinA = Math.sin(st.ang || 0);
+                emitAOShadow3D(st.x, st.y, cosA, sinA, 0, 0, 26, 26, bz, 0.36);
+                // S177 Concrete Foundation Pad + MAT 3 Yellow/Black Hazard Base Collar
+                emitTileBox3D(st.x, st.y, cosA, sinA, 0, 0, 16, 16, bz, bz + 0.10, 177, 177, 71, [0.92, 0.94, 0.98], false);
+                emitSolidBox3D(st.x, st.y, cosA, sinA, 0, 0, 14, 14, bz + 0.10, bz + 0.20, [0.96, 0.82, 0.16], 3);
+                // S249 Alpha-Cutout Vertical Steel Truss Mast
+                emitTileBox3D(st.x, st.y, cosA, sinA, 0, 0, 9, 9, bz + 0.20, bz + 0.68, 249, 249, 64, [0.90, 0.94, 0.98], false);
+                // S199 VCPD Digital Radar Camera Box + Dual Flash Hoods
+                emitTileBox3D(st.x, st.y, cosA, sinA, 0, 0, 18, 14, bz + 0.68, bz + 0.92, 199, 172, 86, [0.96, 0.98, 1.00], false);
+                emitSolidBox3D(st.x, st.y, cosA, sinA, 0, 0, 20, 16, bz + 0.92, bz + 0.96, [0.96, 0.80, 0.16], 3);
+            }
+        }
+
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
         }
@@ -3094,6 +3437,67 @@ class WorldObjectEngine {
             }
         }
 
+        // 5. 3D Articulated GTA 6 Trailer 1 Rogue Leonida Alligators (Poolside & Convenience Store Forecourts!)
+        if (Array.isArray(this.gatorEncounters)) {
+            for (let i = 0; i < this.gatorEncounters.length; i++) {
+                const ge = this.gatorEncounters[i];
+                if (!ge.active || ge.x < minX - 120 || ge.x > maxX + 120 || ge.y < minY - 120 || ge.y > maxY + 120) continue;
+                const bz = ge.z || 2.0;
+                const cosA = Math.cos(ge.ang || 0);
+                const sinA = Math.sin(ge.ang || 0);
+                const tailSwing = Math.sin(t * 5.2 + i * 1.7) * 3.8;
+                const jawLift = Math.max(0, Math.sin(t * 4.2 + i * 1.3)) * 0.052;
+
+                // Armored scaly olive-emerald torso + 3 dorsal osteoderm scute ridges (MAT 6 ribbed texture)
+                emitDynBox(ge.x, ge.y, cosA, sinA, 0, 0, 24, 11, bz + 0.015, bz + 0.105, [0.22, 0.44, 0.24], 1.0, 6);
+                emitDynBox(ge.x, ge.y, cosA, sinA, -2, 0, 18, 5, bz + 0.105, bz + 0.135, [0.15, 0.32, 0.16], 1.0, 6);
+                // 4 Splayed Muscular Gator Legs
+                for (const [lx, ly] of [[7, -7.5], [7, 7.5], [-7, -7.5], [-7, 7.5]]) {
+                    emitDynBox(ge.x, ge.y, cosA, sinA, lx, ly, 5, 4.5, bz + 0.01, bz + 0.065, [0.18, 0.38, 0.20], 1.0, 1);
+                }
+                // 2-Segment Articulated Swishing Tail
+                emitDynBox(ge.x, ge.y, cosA, sinA, -16, tailSwing * 0.45, 11, 7, bz + 0.015, bz + 0.085, [0.20, 0.40, 0.22], 1.0, 6);
+                emitDynBox(ge.x, ge.y, cosA, sinA, -25, tailSwing, 10, 4.5, bz + 0.015, bz + 0.065, [0.16, 0.34, 0.18], 1.0, 6);
+                // Hinged Lower Jaw + Snapping Upper Snout + Ivory Teeth + Glowing Amber Eyes
+                emitDynBox(ge.x, ge.y, cosA, sinA, 16, 0, 12, 8.5, bz + 0.015, bz + 0.050, [0.28, 0.50, 0.28], 1.0, 1);
+                emitDynBox(ge.x, ge.y, cosA, sinA, 16, 0, 10, 7.0, bz + 0.050, bz + 0.050 + jawLift * 0.6, [0.96, 0.94, 0.86], 1.0, 1);
+                emitDynBox(ge.x, ge.y, cosA, sinA, 16, 0, 12.5, 9.0, bz + 0.052 + jawLift, bz + 0.102 + jawLift, [0.22, 0.45, 0.24], 1.0, 6);
+                emitDynBox(ge.x, ge.y, cosA, sinA, 11.5, -3.2, 2.8, 2.2, bz + 0.102 + jawLift, bz + 0.125 + jawLift, [1.0, 0.78, 0.12], 1.0, 7);
+                emitDynBox(ge.x, ge.y, cosA, sinA, 11.5,  3.2, 2.8, 2.2, bz + 0.102 + jawLift, bz + 0.125 + jawLift, [1.0, 0.78, 0.12], 1.0, 7);
+            }
+        }
+
+        // 6. 3D VCPD Radar Speed Trap Strobe Flash & Pulsing LED Speed Readout
+        if (Array.isArray(this.speedTraps)) {
+            for (let i = 0; i < this.speedTraps.length; i++) {
+                const st = this.speedTraps[i];
+                if (st.x < minX - 140 || st.x > maxX + 140 || st.y < minY - 140 || st.y > maxY + 140) continue;
+                const bz = st.z || 2.0;
+                const cosA = Math.cos(st.ang || 0);
+                const sinA = Math.sin(st.ang || 0);
+                const isFlashing = (st.flashTimer || 0) > 0;
+                const ledCol = isFlashing ? [1.0, 1.0, 1.0] : ((Math.sin(t * 6.0 + i) > 0) ? [0.18, 0.92, 1.0] : [1.0, 0.24, 0.32]);
+                emitDynBox(st.x, st.y, cosA, sinA, 0, 0, 14, 15.5, bz + 0.72, bz + 0.88, ledCol, 1.0, 7);
+                if (isFlashing) {
+                    emitDynCylinder(st.x, st.y, 0, 0, 22.0, 22.0, bz + 0.65, bz + 1.08, 12, [1.0, 0.98, 0.88], 7, true, 0.85);
+                }
+            }
+        }
+
+        // 7. 3D Spinning Emerald & Gold Cash Briefcases (Ejected from Grupo Seguro Armored Cash Trucks!)
+        if (Array.isArray(this.cashDrops) && this.cashDrops.length > 0) {
+            for (let i = 0; i < this.cashDrops.length; i++) {
+                const cd = this.cashDrops[i];
+                if (cd.x < minX - 100 || cd.x > maxX + 100 || cd.y < minY - 100 || cd.y > maxY + 100) continue;
+                const bz = (cd.z || 2.0) + 0.02 + Math.abs(Math.sin(t * 4.5 + cd.seed)) * 0.04;
+                const bAng = t * 3.2 + cd.seed;
+                const cosA = Math.cos(bAng);
+                const sinA = Math.sin(bAng);
+                emitDynBox(cd.x, cd.y, cosA, sinA, 0, 0, 14, 10, bz, bz + 0.08, [0.12, 0.78, 0.38], 1.0, 5);
+                emitDynBox(cd.x, cd.y, cosA, sinA, 0, 0, 15, 3.5, bz + 0.01, bz + 0.09, [0.98, 0.82, 0.18], 1.0, 7);
+            }
+        }
+
         if (dVerts.length === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -3255,6 +3659,55 @@ class WorldObjectEngine {
                 }
             }
         }
+
+        // Render GTA 6 Rogue Alligator Bystander Livestreamers & Pulsing Gator Bounty Rings
+        if (Array.isArray(this.gatorEncounters)) {
+            const pFrame = Math.floor(renderer.time * 4.5) % 8;
+            for (let i = 0; i < this.gatorEncounters.length; i++) {
+                const ge = this.gatorEncounters[i];
+                if (!ge.active || ge.x < minX - 160 || ge.x > maxX + 160 || ge.y < minY - 160 || ge.y > maxY + 160) continue;
+                const bz = ge.z || 2.0;
+                const rSz = 26 + Math.sin(renderer.time * 5.5 + i) * 3.5;
+                renderer.pushSolidQuad3D(ge.x, ge.y, bz + 0.025, rSz, rSz, renderer.time * 1.1, 0.18, 0.94, 0.44, 0.44, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // 2 Bystander Tourists filming the rogue gator on glowing cyan smartphones!
+                for (let bi = 0; bi < 2; bi++) {
+                    const bAng = (ge.ang || 0) + (bi === 0 ? 1.85 : -1.85);
+                    const bx = ge.x + Math.cos(bAng) * 36.0;
+                    const by = ge.y + Math.sin(bAng) * 36.0;
+                    const faceGator = Math.atan2(ge.y - by, ge.x - bx);
+                    renderer.batchPedSprite3D(bi === 0 ? "bikini_pink" : "civ1", pFrame, bx, by, bz + 0.045, faceGator, 1.22, false, SPRITE_DRAW_ORDER.PED);
+                    const phX = bx + Math.cos(faceGator) * 9.0;
+                    const phY = by + Math.sin(faceGator) * 9.0;
+                    renderer.pushSolidQuad3D(phX, phY, bz + 0.075, 4.5, 3.0, faceGator, 0.22, 0.94, 1.0, 0.92, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                }
+            }
+        }
+
+        // Render VCPD Speed Trap Road Detection Strips, Armored Truck Gold Halos & Cash Drop Rings
+        if (Array.isArray(this.speedTraps)) {
+            for (let i = 0; i < this.speedTraps.length; i++) {
+                const st = this.speedTraps[i];
+                if (st.roadX < minX - 140 || st.roadX > maxX + 140 || st.roadY < minY - 140 || st.roadY > maxY + 140) continue;
+                const pulse = 0.28 + 0.16 * Math.sin(renderer.time * 5.0 + i);
+                renderer.pushSolidQuad3D(st.roadX, st.roadY, 2.022, 34, 14, st.ang || 0, 0.18, 0.88, 0.98, pulse, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (game && Array.isArray(game.vehicles)) {
+            for (const v of game.vehicles) {
+                if (!v.isArmoredCashTruck || (v.cashBagsLeft || 0) <= 0) continue;
+                if (v.x < minX - 140 || v.x > maxX + 140 || v.y < minY - 140 || v.y > maxY + 140) continue;
+                const rSz = 44 + Math.sin(renderer.time * 5.0) * 4.5;
+                renderer.pushSolidQuad3D(v.x, v.y, (v.z || 2.0) + 0.024, rSz, 28, v.angle || 0, 0.98, 0.82, 0.16, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (Array.isArray(this.cashDrops)) {
+            for (let i = 0; i < this.cashDrops.length; i++) {
+                const cd = this.cashDrops[i];
+                if (cd.x < minX - 100 || cd.x > maxX + 100 || cd.y < minY - 100 || cd.y > maxY + 100) continue;
+                const rSz = 20 + Math.sin(renderer.time * 6.0 + cd.seed) * 2.5;
+                renderer.pushSolidQuad3D(cd.x, cd.y, (cd.z || 2.0) + 0.024, rSz, rSz, renderer.time * 2.0, 0.98, 0.84, 0.18, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
     }
 
     /* ========================================================================
@@ -3319,6 +3772,43 @@ class WorldObjectEngine {
                 ctx.font = "700 11px monospace";
                 ctx.fillStyle = "#38bdf8";
                 ctx.fillText("AUTO-ZOOM ACTIVE • THERMAL BLAST CLEAR • ORION SPLASHDOWN NEXT", cx, cy + 14);
+            }
+        }
+
+        // 0B. Rogue Leonida Gator Wrangler & Grupo Seguro Armored Cash Truck Prompts
+        if (Array.isArray(this.gatorEncounters)) {
+            for (const ge of this.gatorEncounters) {
+                if (ge.active && Math.hypot(px - ge.x, py - ge.y) < 110) {
+                    const scr = renderer.worldToScreen(ge.x, ge.y - 16, (ge.z || 2.0) + 0.25);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 165, scr.y - 22, 330, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 165, scr.y - 22, 330, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText(
+                        p.inVehicle ? "🐊 RAM ROGUE LEONIDA GATOR (+$1,500)" : "🐊 [E] WRANGLE ROGUE LEONIDA GATOR (+$2,500)",
+                        scr.x,
+                        scr.y - 7
+                    );
+                }
+            }
+        }
+        if (Array.isArray(game.vehicles)) {
+            for (const v of game.vehicles) {
+                if (v.isArmoredCashTruck && (v.cashBagsLeft || 0) > 0 && Math.hypot(px - v.x, py - v.y) < 145) {
+                    const scr = renderer.worldToScreen(v.x, v.y - 18, (v.z || 2.0) + 0.38);
+                    const cashRem = v.cashBagsLeft * 2500;
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 185, scr.y - 22, 370, 22);
+                    ctx.strokeStyle = "#fde047";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 185, scr.y - 22, 370, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`💰 RAM, SHOOT OR [E] BREACH ARMORED VAN ($${cashRem.toLocaleString()})`, scr.x, scr.y - 7);
+                }
             }
         }
 
