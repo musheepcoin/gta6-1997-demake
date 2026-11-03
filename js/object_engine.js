@@ -4713,6 +4713,7 @@ class WorldObjectEngine {
         this.meshVbo = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVbo);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+        verts.length = 0;
     }
 
     /* ========================================================================
@@ -5450,8 +5451,12 @@ class WorldObjectEngine {
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
         }
+        if (!this.dynFloatBuf || this.dynFloatBuf.length < dVerts.length) {
+            this.dynFloatBuf = new Float32Array(Math.max(16384, dVerts.length * 2));
+        }
+        this.dynFloatBuf.set(dVerts, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.dynVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dVerts), gl.STREAM_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, this.dynFloatBuf.subarray(0, dVerts.length), gl.STREAM_DRAW);
         gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
         gl.vertexAttribPointer(this.meshLocs.aUV, 2, gl.FLOAT, false, stride, 12);
         gl.vertexAttribPointer(this.meshLocs.aColor, 4, gl.FLOAT, false, stride, 20);
@@ -7061,9 +7066,13 @@ class WorldObjectEngine {
         if (!this.interiorVbo) {
             this.interiorVbo = gl.createBuffer();
         }
+        if (!this.interiorFloatBuf || this.interiorFloatBuf.length < iVerts.length) {
+            this.interiorFloatBuf = new Float32Array(Math.max(32768, iVerts.length * 2));
+        }
+        this.interiorFloatBuf.set(iVerts, 0);
         const stride = 9 * 4;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.interiorVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(iVerts), gl.STREAM_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, this.interiorFloatBuf.subarray(0, iVerts.length), gl.STREAM_DRAW);
         gl.enableVertexAttribArray(this.meshLocs.aPos);
         gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
         gl.enableVertexAttribArray(this.meshLocs.aUV);

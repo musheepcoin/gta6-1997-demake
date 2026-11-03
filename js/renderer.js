@@ -35,6 +35,7 @@ class RetroRenderer {
             window.innerHeight <= 560 ||
             (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
         );
+        this.isMobileInit = isMobileInit;
         this.showCheatsWindow = !isMobileInit;
         this.cheatsCollapsed = true;
         this.cheatButtons = [];
@@ -89,17 +90,58 @@ class RetroRenderer {
        Matches 1997 GTA 1 2.5D Engine MapRenderer.cpp + SpriteBatch.cpp + GameCamera.cpp
        ======================================================================== */
     initWebGL() {
-        const gl = this.glCanvas.getContext("webgl", {
+        const ctxOpts = {
             alpha: false,
             depth: true,
             antialias: false,
-            preserveDrawingBuffer: true
-        });
+            preserveDrawingBuffer: false,
+            powerPreference: "high-performance"
+        };
+        const gl =
+            this.glCanvas.getContext("webgl", ctxOpts) ||
+            this.glCanvas.getContext("experimental-webgl", ctxOpts);
         if (!gl) {
             console.error("WebGL not supported!");
             return;
         }
         this.gl = gl;
+        this.glLost = false;
+
+        if (!this._contextListenersAttached) {
+            this._contextListenersAttached = true;
+            this.glCanvas.addEventListener("webglcontextlost", (e) => {
+                e.preventDefault();
+                this.glLost = true;
+                console.warn("WebGL context lost — awaiting restore");
+            }, false);
+            this.glCanvas.addEventListener("webglcontextrestored", () => {
+                console.info("WebGL context restored — rebuilding GPU resources");
+                this.glLost = false;
+                this.cityChunks = [];
+                this.initWebGL();
+                if (this.gta1Ready && this.gta1Meta) {
+                    const enhancedViceTiles = this.processViceTilesRtx(this.gta1TilesViceImg);
+                    this.tilesTexVice = this.createGLTexture(enhancedViceTiles, true);
+                    this.tilesTexNyc = (this.gta1TilesImg && this.gta1TilesImg.width > 0)
+                        ? this.createGLTexture(this.gta1TilesImg, true)
+                        : this.tilesTexVice;
+                    this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
+                    const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
+                    this.spritesTex = this.createGLTexture(enhancedSprites, true);
+                    if (enhancedSprites && enhancedSprites !== this.gta1SpritesImg) {
+                        enhancedSprites.width = 1;
+                        enhancedSprites.height = 1;
+                    }
+                    if (this.map && this.map.objectEngine) {
+                        this.map.objectEngine.meshProg = null;
+                        this.map.objectEngine.meshVbo = null;
+                        this.map.objectEngine.dynVbo = null;
+                        this.map.objectEngine.interiorVbo = null;
+                    }
+                    this.buildCityMesh();
+                }
+            }, false);
+        }
 
         // 1A. CityMesh Shader: Perspective projection + animated water/fan UV offset + alpha discard
         const cityVS = `
@@ -767,11 +809,14 @@ class RetroRenderer {
     processGtaSpritesRtx(img, meta) {
         if (!img || !img.width || !img.height || !meta || !meta.sprites) return img;
         try {
-            const W = img.width;
-            const origH = Math.max(3570, img.height || 3570);
+            const W = img.width || 2048;
+            // Fixed y=3307 band for beachArchetypes, py=3315, py2=3361, py3=3407 inside the 2048x4096 atlas
+            // so the texture height H NEVER exceeds 4096 (mobile WebGL MAX_TEXTURE_SIZE & iOS Safari canvas limit)!
+            const origH = 3307;
+            const H = Math.min(4096, Math.max(3570, img.height || 4096));
 
             // Pre-compute the shelf-packed atlas layout of the GTA 2 (1999) remap pedestrian archetypes
-            // (synthesized from the GTA 1 civilian base `civ0`) so the in-memory atlas can grow to fit them.
+            // (synthesized from the GTA 1 civilian base `civ0`) inside verified empty shelves of 2048x4096.
             const g2Archs = this.getGta2PedArchetypes();
             const g2SrcFrames = (meta.sprites.peds && meta.sprites.peds.civ0) || null;
             const g2FrameKeys = [
@@ -783,31 +828,56 @@ class RetroRenderer {
                 "97", "98", "99", "100", "101", "102", "103", "104", "105", "106",
                 "136", "137", "138", "139", "140", "141", "142", "143", "152"
             ];
+            // Verified 100% empty & meta-free 26px-tall shelves inside gta1_sprites.png (2048x4096)
+            const g2Shelves = [
+                [4, 826, 1622], [4, 852, 1622], [512, 956, 863], [767, 982, 937],
+                [547, 1216, 1497], [4, 1320, 529], [875, 1320, 875], [4, 1346, 529],
+                [875, 1346, 874], [4, 1866, 746], [4, 1892, 782], [4, 1918, 782],
+                [1330, 1918, 714], [606, 1980, 448], [892, 2110, 796], [454, 2240, 624],
+                [1630, 2292, 312], [44, 2318, 240], [1630, 2318, 414], [4, 2344, 1032],
+                [1630, 2344, 414], [966, 2396, 322], [4, 2422, 374], [446, 2422, 1134],
+                [4, 2448, 1576], [4, 2474, 1576], [964, 2656, 1080], [341, 2760, 220],
+                [370, 2786, 1674], [1405, 3306, 639], [1405, 3332, 639], [1642, 3436, 402],
+                [1405, 3462, 639], [1175, 3488, 869], [1175, 3514, 869], [182, 3540, 536],
+                [1011, 3540, 1033], [1738, 3566, 306], [1738, 3592, 306], [1738, 3618, 306],
+                [1738, 3644, 306], [1738, 3670, 306], [1738, 3696, 306], [1738, 3722, 306],
+                [584, 3748, 1460], [772, 3852, 1272], [356, 3878, 1688], [1506, 3982, 538],
+                [344, 4060, 448], [936, 4060, 1108]
+            ];
             const g2Layout = [];
-            let g2PackEndY = origH + 220;
             if (g2SrcFrames) {
-                let cx = 2;
-                let cy = origH + 172;
-                let shelfH = 0;
+                let sIdx = 0;
+                let cx = g2Shelves[0][0];
+                let cy = g2Shelves[0][1];
+                let maxX = g2Shelves[0][0] + g2Shelves[0][2];
+                // Dedicated 60px-tall empty shelf [1262, 4008, 782] for the 36 tall corpse frames (fk === "53", 12x32)
+                let tallCx = 1262;
+                const tallCy = 4008;
                 // +1 archetype slot for the GTA 2 electrocution X-ray skeleton ("g2_xray")
                 for (let ai = 0; ai <= g2Archs.length; ai++) {
                     for (const fk of g2FrameKeys) {
                         const r = g2SrcFrames[fk];
                         if (!Array.isArray(r) || r.length < 4) continue;
-                        if (cx + r[2] + 2 > W) {
-                            cx = 2;
-                            cy += shelfH + 2;
-                            shelfH = 0;
+                        if (r[3] > 24) {
+                            if (tallCx + r[2] + 2 <= 2044) {
+                                g2Layout.push({ ai, fk, dx: tallCx, dy: tallCy });
+                                tallCx += r[2] + 2;
+                            }
+                            continue;
+                        }
+                        if (cx + r[2] + 2 > maxX) {
+                            sIdx++;
+                            if (sIdx >= g2Shelves.length) break;
+                            cx = g2Shelves[sIdx][0];
+                            cy = g2Shelves[sIdx][1];
+                            maxX = g2Shelves[sIdx][0] + g2Shelves[sIdx][2];
                         }
                         g2Layout.push({ ai, fk, dx: cx, dy: cy });
                         cx += r[2] + 2;
-                        shelfH = Math.max(shelfH, r[3]);
                     }
                 }
-                g2PackEndY = Math.max(g2PackEndY, cy + shelfH + 4);
             }
 
-            const H = g2PackEndY + 8;
             this.spritesTexW = W;
             this.spritesTexH = H;
             const cvs = document.createElement("canvas");
@@ -823,13 +893,23 @@ class RetroRenderer {
             // - Upgrades flat 1997 8-bit car roofs/hoods with GTA 2's curved 3ds Max metallic clearcoat dome & contoured side fenders
             // - Transforms flat grey/black car windows into GTA 2 glossy sapphire-tinted windshields with diagonal sky reflections!
             // - Remasters pedestrian sprites (`isPed = true`) to GTA 2 (1999) 3D pre-rendered character quality (spherical head/shoulder dome + dark contour)!
+            let sharedBufCap = 128 * 128;
+            let sharedExt = new Uint8Array(sharedBufCap);
+            let sharedQueue = new Int32Array(sharedBufCap);
             const closeBoxHoles = (rect, isVehicle = false, isPed = false) => {
                 if (!Array.isArray(rect) || rect.length < 4) return;
                 const [sx, sy, sw, sh] = rect;
                 if (sw <= 3 || sh <= 3 || sx < 0 || sy < 0 || sx + sw > W || sy + sh > H) return;
                 const size = sw * sh;
-                const ext = new Uint8Array(size);
-                const queue = new Int32Array(size);
+                if (size > sharedBufCap) {
+                    sharedBufCap = size * 2;
+                    sharedExt = new Uint8Array(sharedBufCap);
+                    sharedQueue = new Int32Array(sharedBufCap);
+                } else {
+                    sharedExt.fill(0, 0, size);
+                }
+                const ext = sharedExt;
+                const queue = sharedQueue;
                 let head = 0;
                 let tail = 0;
 
@@ -1353,21 +1433,24 @@ class RetroRenderer {
 
             // 3. BleedTransparentEdges (src/alpha_bleed.h):
             // 1-pass RGB color dilation into alpha=0 border texels (keeping alpha=0) to prevent dark fringe bleeding
-            for (let y = 1; y < H - 1; y++) {
-                const rowOff = y * W;
-                for (let x = 1; x < W - 1; x++) {
-                    const p = (rowOff + x) * 4;
-                    if (d[p + 3] !== 0) continue;
-                    let sr = 0, sg = 0, sb = 0, cnt = 0;
-                    const n1 = p - 4, n2 = p + 4, n3 = p - W * 4, n4 = p + W * 4;
-                    if (d[n1 + 3] > 32) { sr += d[n1]; sg += d[n1 + 1]; sb += d[n1 + 2]; cnt++; }
-                    if (d[n2 + 3] > 32) { sr += d[n2]; sg += d[n2 + 1]; sb += d[n2 + 2]; cnt++; }
-                    if (d[n3 + 3] > 32) { sr += d[n3]; sg += d[n3 + 1]; sb += d[n3 + 2]; cnt++; }
-                    if (d[n4 + 3] > 32) { sr += d[n4]; sg += d[n4 + 1]; sb += d[n4 + 2]; cnt++; }
-                    if (cnt > 0) {
-                        d[p] = (sr / cnt) | 0;
-                        d[p + 1] = (sg / cnt) | 0;
-                        d[p + 2] = (sb / cnt) | 0;
+            // (Skipped on mobile to avoid an 8.4M-pixel synchronous main-thread stall during startup)
+            if (!this.isMobileInit) {
+                for (let y = 1; y < H - 1; y++) {
+                    const rowOff = y * W;
+                    for (let x = 1; x < W - 1; x++) {
+                        const p = (rowOff + x) * 4;
+                        if (d[p + 3] !== 0) continue;
+                        let sr = 0, sg = 0, sb = 0, cnt = 0;
+                        const n1 = p - 4, n2 = p + 4, n3 = p - W * 4, n4 = p + W * 4;
+                        if (d[n1 + 3] > 32) { sr += d[n1]; sg += d[n1 + 1]; sb += d[n1 + 2]; cnt++; }
+                        if (d[n2 + 3] > 32) { sr += d[n2]; sg += d[n2 + 1]; sb += d[n2 + 2]; cnt++; }
+                        if (d[n3 + 3] > 32) { sr += d[n3]; sg += d[n3 + 1]; sb += d[n3 + 2]; cnt++; }
+                        if (d[n4 + 3] > 32) { sr += d[n4]; sg += d[n4 + 1]; sb += d[n4 + 2]; cnt++; }
+                        if (cnt > 0) {
+                            d[p] = (sr / cnt) | 0;
+                            d[p + 1] = (sg / cnt) | 0;
+                            d[p + 2] = (sb / cnt) | 0;
+                        }
                     }
                 }
             }
@@ -2096,13 +2179,14 @@ class RetroRenderer {
                 meta.sprites.objects["ad_ammunation"]             = [1640, 3780, 128, 64];
                 meta.sprites.objects["ad_call_morgan"]            = [1780, 3780, 128, 64];
 
-                // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
-                // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
+                // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 165)
+                // Ensures all custom props have seamless 3D edge filtering without dark alpha halos
                 {
-                    const postData = ctx.getImageData(0, origH, W, H - origH);
+                    const customBandH = Math.min(165, H - origH);
+                    const postData = ctx.getImageData(0, origH, W, customBandH);
                     const pd = postData.data;
                     const pW = W;
-                    const pH = H - origH;
+                    const pH = customBandH;
                     for (let py = 1; py < pH - 1; py++) {
                         const rowOff = py * pW;
                         for (let px = 1; px < pW - 1; px++) {
@@ -2139,14 +2223,13 @@ class RetroRenderer {
             const cvs = document.createElement("canvas");
             cvs.width = w;
             cvs.height = h;
-            const ctx = cvs.getContext("2d", { willReadFrequently: true });
+            const ctx = cvs.getContext("2d");
             ctx.drawImage(img, 0, 0);
-            const imgData = ctx.getImageData(0, 0, w, h);
-            const d = imgData.data;
 
             // 1. Make animated ocean water & seabed tiles (lid 41 at 431/585, lid 98 at 488, & aux 25..35 at 723..733) 100% seamlessly tileable across 64x64 borders
+            //    Only read/write the 14 individual 64x64 tiles (16 KB) instead of allocating a 13.4 MB full-atlas ImageData!
             const waterIndices = [431, 488, 585, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733];
-            const tileBuf = new Uint8ClampedArray(64 * 64 * 4);
+            const BAND = 14;
             for (const idx of waterIndices) {
                 const col = idx % 16;
                 const row = Math.floor(idx / 16);
@@ -2154,19 +2237,10 @@ class RetroRenderer {
                 const y0 = row * 64;
                 if (y0 + 64 > h) continue;
 
-                for (let ty = 0; ty < 64; ty++) {
-                    for (let tx = 0; tx < 64; tx++) {
-                        const sp = ((y0 + ty) * w + (x0 + tx)) * 4;
-                        const dp = (ty * 64 + tx) * 4;
-                        tileBuf[dp]     = d[sp];
-                        tileBuf[dp + 1] = d[sp + 1];
-                        tileBuf[dp + 2] = d[sp + 2];
-                        tileBuf[dp + 3] = d[sp + 3];
-                    }
-                }
+                const tileImg = ctx.getImageData(x0, y0, 64, 64);
+                const tileBuf = tileImg.data;
 
                 // Toroidal edge cross-fade over 14-pixel border band so adjacent 64x64 water tiles have zero seam
-                const BAND = 14;
                 for (let ty = 0; ty < 64; ty++) {
                     for (let tx = 0; tx < BAND; tx++) {
                         const t = (BAND - tx) / (BAND * 2.0);
@@ -2194,15 +2268,7 @@ class RetroRenderer {
                     }
                 }
 
-                for (let ty = 0; ty < 64; ty++) {
-                    for (let tx = 0; tx < 64; tx++) {
-                        const sp = (ty * 64 + tx) * 4;
-                        const dp = ((y0 + ty) * w + (x0 + tx)) * 4;
-                        d[dp]     = tileBuf[sp];
-                        d[dp + 1] = tileBuf[sp + 1];
-                        d[dp + 2] = tileBuf[sp + 2];
-                    }
-                }
+                ctx.putImageData(tileImg, x0, y0);
             }
 
             // 2. Beach Shoreline Tiles (lid 99 straight, lid 100 convex corner, lid 101 concave corner):
@@ -2217,19 +2283,22 @@ class RetroRenderer {
                 const y0 = row * 64;
                 if (y0 + 64 > h) continue;
 
+                const tileImg = ctx.getImageData(x0, y0, 64, 64);
+                const td = tileImg.data;
+
                 for (let ty = 0; ty < 64; ty++) {
                     for (let tx = 0; tx < 64; tx++) {
-                        const p = ((y0 + ty) * w + (x0 + tx)) * 4;
-                        isSandMask[ty * 64 + tx] = (d[p] > d[p + 2] + 12) ? 1 : 0;
+                        const p = (ty * 64 + tx) * 4;
+                        isSandMask[ty * 64 + tx] = (td[p] > td[p + 2] + 12) ? 1 : 0;
                     }
                 }
 
                 for (let ty = 0; ty < 64; ty++) {
                     for (let tx = 0; tx < 64; tx++) {
-                        const p = ((y0 + ty) * w + (x0 + tx)) * 4;
-                        const r = d[p];
-                        const g = d[p + 1];
-                        const b = d[p + 2];
+                        const p = (ty * 64 + tx) * 4;
+                        const r = td[p];
+                        const g = td[p + 1];
+                        const b = td[p + 2];
 
                         if (isSandMask[ty * 64 + tx]) {
                             // Opaque beach sand: normalize dry sand near tile edges so adjacent sand tiles blend without seams
@@ -2237,12 +2306,12 @@ class RetroRenderer {
                                 const edgeDist = Math.min(tx, 63 - tx, ty, 63 - ty);
                                 if (edgeDist < 6) {
                                     const blend = (6 - edgeDist) / 6.0 * 0.65;
-                                    d[p]     = Math.round(r * (1.0 - blend) + 242 * blend);
-                                    d[p + 1] = Math.round(g * (1.0 - blend) + 213 * blend);
-                                    d[p + 2] = Math.round(b * (1.0 - blend) + 156 * blend);
+                                    td[p]     = Math.round(r * (1.0 - blend) + 242 * blend);
+                                    td[p + 1] = Math.round(g * (1.0 - blend) + 213 * blend);
+                                    td[p + 2] = Math.round(b * (1.0 - blend) + 156 * blend);
                                 }
                             }
-                            d[p + 3] = 255;
+                            td[p + 3] = 255;
                             continue;
                         }
 
@@ -2263,29 +2332,30 @@ class RetroRenderer {
 
                         if (minSandDistSq <= 2) {
                             // 1px contact line right against the wet sand: warm wet-sand-to-surf transition (eliminates cyan trench!)
-                            d[p]     = 230;
-                            d[p + 1] = 212;
-                            d[p + 2] = 172;
-                            d[p + 3] = 242;
+                            td[p]     = 230;
+                            td[p + 1] = 212;
+                            td[p + 2] = 172;
+                            td[p + 3] = 242;
                         } else if (minSandDistSq <= 5) {
                             // 2px contact zone: creamy white surf washing directly onto the wet sand
-                            d[p]     = 244;
-                            d[p + 1] = 248;
-                            d[p + 2] = 242;
-                            d[p + 3] = 210;
+                            td[p]     = 244;
+                            td[p + 1] = 248;
+                            td[p + 2] = 242;
+                            td[p + 3] = 210;
                         } else {
                             // Seaward surf foam & water zone: pure white surf crest where r > 165, 100% transparent (alpha = 0) across all flat cyan!
                             const foamStrength = Math.max(0.0, Math.min(1.0, (r - 165.0) / (255.0 - 165.0)));
-                            d[p]     = 246;
-                            d[p + 1] = 253;
-                            d[p + 2] = 255;
-                            d[p + 3] = Math.round(foamStrength * foamStrength * 195.0);
+                            td[p]     = 246;
+                            td[p + 1] = 253;
+                            td[p + 2] = 255;
+                            td[p + 3] = Math.round(foamStrength * foamStrength * 195.0);
                         }
                     }
                 }
+
+                ctx.putImageData(tileImg, x0, y0);
             }
 
-            ctx.putImageData(imgData, 0, 0);
             return cvs;
         } catch (err) {
             console.warn("processViceTilesRtx fallback:", err);
@@ -2299,6 +2369,7 @@ class RetroRenderer {
         let viceTilesLoaded = false;
         let spritesLoaded = false;
         let mapBinBuffer = null;
+        let buildingPipeline = false;
 
         const checkReady = () => {
             this.loadProgress =
@@ -2307,7 +2378,8 @@ class RetroRenderer {
                 (this.gta1Meta ? 1 : 0) +
                 (mapBinBuffer ? 1 : 0);
 
-            if (viceTilesLoaded && spritesLoaded && this.gta1Meta && mapBinBuffer && !this.gta1Ready) {
+            if (viceTilesLoaded && spritesLoaded && this.gta1Meta && mapBinBuffer && !this.gta1Ready && !buildingPipeline) {
+                buildingPipeline = true;
                 this.vehicleBySprIdx = {};
                 if (Array.isArray(this.gta1Meta.sprites.vehicles)) {
                     for (const ve of this.gta1Meta.sprites.vehicles) {
@@ -2317,32 +2389,52 @@ class RetroRenderer {
                 if (this.gl) {
                     const enhancedViceTiles = this.processViceTilesRtx(this.gta1TilesViceImg);
                     this.tilesTexVice = this.createGLTexture(enhancedViceTiles, true);
+                    if (enhancedViceTiles && enhancedViceTiles !== this.gta1TilesViceImg) {
+                        enhancedViceTiles.width = 1;
+                        enhancedViceTiles.height = 1;
+                    }
                     this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
                     this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
-                    const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
-                    this.enhancedSpritesCanvas = enhancedSprites;
-                    this.spritesTex = this.createGLTexture(enhancedSprites, true);
-                }
-                // Decompress NYC.CMP 256x256x6 voxel map into LeonidaMap and build 3D WebGL CityMesh!
-                this.map.mapStyle = this.mapStyle;
-                this.map.loadCmpBinary(mapBinBuffer, this.gta1Meta.districts);
-                this.buildCityMesh();
-                this.gta1Ready = true;
-                this.cmpReady = true;
-                this.bakeRadarBackground();
-
-                if (window.game && typeof window.game.onCmpLoaded === "function") {
-                    window.game.onCmpLoaded(this.gta1Meta);
                 }
 
-                // Lazily load secondary NYC classic tile atlas after main Vice City world is already live
-                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
+                // Stagger heavy sprite-atlas processing and 3D CityMesh generation across animation frames
+                // so mobile browsers (iOS Safari / Android Chrome) can garbage-collect temporary buffers between steps!
+                requestAnimationFrame(() => {
                     if (this.gl) {
-                        this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
-                        if (this.mapStyle === "NYC") {
-                            this.tilesTex = this.tilesTexNyc;
+                        const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
+                        this.spritesTex = this.createGLTexture(enhancedSprites, true);
+                        if (enhancedSprites && enhancedSprites !== this.gta1SpritesImg) {
+                            enhancedSprites.width = 1;
+                            enhancedSprites.height = 1;
                         }
                     }
+
+                    requestAnimationFrame(() => {
+                        // Decompress NYC.CMP 256x256x6 voxel map into LeonidaMap and build 3D WebGL CityMesh!
+                        this.map.mapStyle = this.mapStyle;
+                        this.map.loadCmpBinary(mapBinBuffer, this.gta1Meta.districts);
+                        mapBinBuffer = null;
+                        this.buildCityMesh();
+                        this.gta1Ready = true;
+                        this.cmpReady = true;
+                        this.bakeRadarBackground();
+
+                        if (window.game && typeof window.game.onCmpLoaded === "function") {
+                            window.game.onCmpLoaded(this.gta1Meta);
+                        }
+
+                        // Only preload secondary NYC classic tile atlas on desktop; on mobile, lazy-load only if user switches to NYC
+                        if (!this.isMobileInit) {
+                            loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
+                                if (this.gl) {
+                                    this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
+                                    if (this.mapStyle === "NYC") {
+                                        this.tilesTex = this.tilesTexNyc;
+                                    }
+                                }
+                            });
+                        }
+                    });
                 });
             }
         };
@@ -2365,6 +2457,7 @@ class RetroRenderer {
             };
             img.src = baseUrl;
         };
+        this._loadImageWithRetry = loadImageWithRetry;
 
         const fetchWithRetry = (url, asArrayBuffer = false, maxRetries = 5) => {
             let attempt = 0;
@@ -2407,10 +2500,12 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
-            this.nycOverviewReady = true;
-            this.bakeRadarBackground();
-        });
+        if (!this.isMobileInit) {
+            loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
+                this.nycOverviewReady = true;
+                this.bakeRadarBackground();
+            });
+        }
 
         fetchWithRetry("assets/gta1/gta1_meta.json?v=99_72", false)
             .then((meta) => {
@@ -2432,6 +2527,24 @@ class RetroRenderer {
         if (this.map) {
             this.map.mapStyle = this.mapStyle;
         }
+        if (this.mapStyle === "NYC" && this._loadImageWithRetry) {
+            if (!this.gta1TilesImg.src) {
+                this._loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
+                    if (this.gl) {
+                        this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
+                        if (this.mapStyle === "NYC") {
+                            this.tilesTex = this.tilesTexNyc;
+                        }
+                    }
+                });
+            }
+            if (!this.nycOverviewImg.src) {
+                this._loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
+                    this.nycOverviewReady = true;
+                    this.bakeRadarBackground();
+                });
+            }
+        }
         this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
         this.buildCityMesh();
         this.bakeRadarBackground();
@@ -2442,11 +2555,13 @@ class RetroRenderer {
     }
 
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        const w = Math.max(1, Math.min(2560, window.innerWidth || 800));
+        const h = Math.max(1, Math.min(1600, window.innerHeight || 600));
+        this.canvas.width = w;
+        this.canvas.height = h;
         if (this.glCanvas) {
-            this.glCanvas.width = window.innerWidth;
-            this.glCanvas.height = window.innerHeight;
+            this.glCanvas.width = w;
+            this.glCanvas.height = h;
         }
     }
 
@@ -3551,14 +3666,9 @@ class RetroRenderer {
             effectiveViewProj = this.computeViewProjMatrixWithSpeed(speedZoomBlocks);
         }
 
-        // 1. Render 3D WebGL CityMesh (or 3D WebGL Interior Room!) + 3D SpriteBatch into this.glCanvas
-        this.renderWebGLScene(game, effectiveViewProj);
-
-        // 2. Composite WebGL 3D scene onto 2D main canvas + draw dynamic Night Lighting, floating scores, HUD & Smartphone
         const ctx = this.ctx;
         ctx.save();
         ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(this.glCanvas, 0, 0);
 
         if (!this.gta1Ready || !this.cmpReady) {
             const W = this.canvas.width;
@@ -3603,6 +3713,12 @@ class RetroRenderer {
             ctx.fillRect(bx + 3, by + 3, fillW, bh - 6);
             ctx.restore();
             return;
+        }
+
+        // 1. Render 3D WebGL CityMesh (or 3D WebGL Interior Room!) + 3D SpriteBatch into this.glCanvas
+        if (!this.glLost) {
+            this.renderWebGLScene(game, effectiveViewProj);
+            ctx.drawImage(this.glCanvas, 0, 0);
         }
 
         // 2A. Daytime Ambient Florida Sunlight, Volumetric Sunbeams & Tropical Sky-Shadow Atmosphere
