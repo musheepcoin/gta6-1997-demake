@@ -4668,27 +4668,7 @@ class WorldObjectEngine {
                 }
             }
 
-            // 20B. LUMMUS PARK 3D PASTEL ART DECO SERPENTINE BEACH WALL (Separating Boardwalk c=451 from Vice Beach Sand c=452)
-            const wallX = 451.88 * TILE_SIZE;
-            for (let r = 42; r <= 360; r++) {
-                if ((r >= 130 && r <= 138) || (r >= 191 && r <= 198)) continue;
-                const wy = (r + 0.5) * TILE_SIZE;
-                const isEntry = (r % 14 === 0) || (r % 14 === 7);
-                const capCol = ((Math.floor(r / 7) % 2) === 0) ? [0.24, 0.92, 0.96] : [0.98, 0.48, 0.78];
-                if (isEntry) {
-                    // Twin Art Deco Gate Pillars flanking the beach access opening
-                    emitSolidBox3D(wallX, wy - 22, 1, 0, 0, 0, 9.5, 9.5, 2.0, 2.24, [0.97, 0.95, 0.92], 5);
-                    emitSolidBox3D(wallX, wy - 22, 1, 0, 0, 0, 10.5, 10.5, 2.24, 2.29, capCol, 6);
-                    emitSolidBox3D(wallX, wy + 22, 1, 0, 0, 0, 9.5, 9.5, 2.0, 2.24, [0.97, 0.95, 0.92], 5);
-                    emitSolidBox3D(wallX, wy + 22, 1, 0, 0, 0, 10.5, 10.5, 2.24, 2.29, capCol, 6);
-                } else {
-                    const waveOff = Math.sin(r * 0.65) * 2.2;
-                    emitSolidBox3D(wallX + waveOff, wy, 1, 0, 0, 0, 6.8, 64.0, 2.0, 2.13, [0.96, 0.94, 0.90], 5);
-                    emitSolidBox3D(wallX + waveOff, wy, 1, 0, 0, 0, 7.8, 64.0, 2.13, 2.165, capCol, 6);
-                }
-            }
-
-            // 20C. ESPAÑOLA WAY & LITTLE HAVANA 3D OVERHEAD FESTOON STRING LIGHTS (Warm Miami Night Ambiance)
+            // 20B. ESPAÑOLA WAY & LITTLE HAVANA 3D OVERHEAD FESTOON STRING LIGHTS (Warm Miami Night Ambiance)
             const festoonSpans = [
                 // Española Way Pedestrian Plaza & Cafe Terrace (c = 434..441, r = 160..174)
                 { x1: 434.2 * TILE_SIZE, x2: 441.8 * TILE_SIZE, rStart: 160, rEnd: 174, step: 2 },

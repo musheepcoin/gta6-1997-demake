@@ -291,30 +291,26 @@ class LeonidaMap {
         }
 
         // Authentic Miami South Beach Lummus Park & Vice Beach Shoreline Layout Pass:
-        // In the 256->512 expansion, columns 448..452 were all duplicated coral sidewalk (lid 9), pushing Lummus Park grass (lid 10)
-        // out to a 1-tile sliver at x=453 and hiding the golden beach sand (lid 98) off-screen at x=454+.
+        // In the 512x512 binary map, columns 448..451 were 4 wide columns of uniform pink concrete (lid 9) with no grass park at all!
         // Transform the East side of Ocean Drive (y=42..362, preserving all cross-roads, lighthouse plaza & pier boardwalk) into:
         // - x=448: East Curbside Coral Promenade (lid 9) with Royal Palms & parked classic cars
-        // - x=449..450: Lush Lummus Park Tropical Grass Lawns (lid 10, rounded organic corners via shader animType 30.0) with coral cross-paths every 14 rows
-        // - x=451: Oceanfront Rollerblading Boardwalk Promenade (lid 9)
-        // - x=452..453: Vice Beach Golden Sand (lid 98) visible directly from Ocean Drive!
+        // - x=449..450: Lush Lummus Park Tropical Grass Lawns (lid 10 from (339,165), rounded organic corners via shader animType 30.0) with coral cross-paths every 14 rows
+        // - x=451: Oceanfront Rollerblading Boardwalk Promenade (lid 9) bordering the golden beach sand (x=452+)
         for (let y = 42; y <= 362; y++) {
             if ((y >= 131 && y <= 137) || (y >= 192 && y <= 197)) continue;
             const blk448 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + y) * MAP_COLS + 448]];
-            const blk453 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + y) * MAP_COLS + 453]];
-            const blk454 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + y) * MAP_COLS + 454]];
-            if (!blk448 || !blk453 || !blk454) continue;
-            if (blk453.lid === 10 && blk454.lid === 98 && (blk448.lid === 9 || blk448.lid === 8 || blk448.lid === 69)) {
+            const blk449 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + y) * MAP_COLS + 449]];
+            const blk450 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + y) * MAP_COLS + 450]];
+            if (!blk448 || !blk449 || !blk450) continue;
+            // Only convert sidewalk/pavement rows (never overwrite road junctions)
+            if ((blk448.lid === 9 || blk448.lid === 8) && (blk449.lid === 9 || blk449.lid === 8 || blk449.lid === 10)) {
                 const isCrossWalk = ((y % 14) < 2);
-                for (let z = 0; z < MAP_LAYERS; z++) {
-                    const grassCol = this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 453];
-                    const coralCol = this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 448];
-                    const sandCol  = this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 454];
-                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 449] = isCrossWalk ? coralCol : grassCol;
-                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 450] = isCrossWalk ? coralCol : grassCol;
-                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 451] = coralCol;
-                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 452] = sandCol;
-                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 453] = sandCol;
+                if (!isCrossWalk) {
+                    for (let z = 0; z < MAP_LAYERS; z++) {
+                        const grassVoxel = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 339];
+                        this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 449] = grassVoxel;
+                        this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 450] = grassVoxel;
+                    }
                 }
             }
         }
