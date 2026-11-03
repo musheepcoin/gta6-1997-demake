@@ -2049,6 +2049,16 @@ class RetroRenderer {
                 meta.sprites.objects["tropical_shrub"] = meta.sprites.objects["tropical_shrub"] || [588, 3470, 42, 42];
                 meta.sprites.objects["sawgrass_clump"] = meta.sprites.objects["sawgrass_clump"] || [638, 3470, 42, 42];
 
+                // =========================================================================
+                // 6L. GTA 6 LEONIDA 3D PRE-RENDERED RESIDENTIAL ESTATES & WATERFRONT MANSIONS
+                // Raytraced 3ds Max baked architectural models (y = 3474 in gta1_sprites.png)
+                // =========================================================================
+                meta.sprites.objects["mansion_star_island"] = meta.sprites.objects["mansion_star_island"] || [704, 3474, 116, 86];
+                meta.sprites.objects["mansion_modern_luxury"] = meta.sprites.objects["mansion_modern_luxury"] || [828, 3474, 96, 76];
+                meta.sprites.objects["house_canal_villa"] = meta.sprites.objects["house_canal_villa"] || [932, 3474, 90, 72];
+                meta.sprites.objects["house_florida_bungalow"] = meta.sprites.objects["house_florida_bungalow"] || [1030, 3474, 74, 58];
+                meta.sprites.objects["house_keys_stilt"] = meta.sprites.objects["house_keys_stilt"] || [1112, 3474, 70, 58];
+
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
                 {
@@ -2350,7 +2360,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_52", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_53", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2365,7 +2375,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_52", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_53", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -4998,8 +5008,10 @@ class RetroRenderer {
 
             for (let i = 0; i < resHouses.length; i++) {
                 const h = resHouses[i];
-                if (h.x < minX - 160 || h.x > maxX + 160 || h.y < minY - 160 || h.y > maxY + 160) continue;
-                const bz = h.z || 2.0;
+                if (h.x < minX - 250 || h.x > maxX + 250 || h.y < minY - 250 || h.y > maxY + 250) continue;
+                const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
+                    ? this.map.getHeightAtPixel(h.x, h.y, 4.0)
+                    : (h.z || 2.0);
                 const sc = h.scale || 1.0;
                 const cosA = Math.cos(h.ang);
                 const sinA = Math.sin(h.ang);

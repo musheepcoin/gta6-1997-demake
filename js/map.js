@@ -1541,6 +1541,57 @@ class LeonidaMap {
         // Authentic Florida Architecture: Star Island Palazzos, Venetian Modern Villas, North Vice Canal Villas,
         // Leonida Keys Stilt Lodges & Mainland Pastel Bungalows.
         this.residentialHouses = [
+            // S. South Beach & Ocean Drive Residential Neighborhood (Immediate Player Spawn Area)
+            {
+                id: "sobe_bungalow_1",
+                name: "Flamingo Park Classic Bungalow",
+                district: "SOUTH BEACH",
+                kind: "house_florida_bungalow",
+                c: 437.0, r: 282.0,
+                x: 437.0 * TILE_SIZE, y: 282.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.05, hw: 30, hh: 24,
+                drivewayCar: { sprIdx: 3, dx: 18, dy: 24, ang: 0 }
+            },
+            {
+                id: "sobe_villa_1",
+                name: "Española Way Mediterranean Villa",
+                district: "SOUTH BEACH",
+                kind: "house_canal_villa",
+                c: 437.0, r: 290.0,
+                x: 437.0 * TILE_SIZE, y: 290.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.05, hw: 36, hh: 28,
+                drivewayCar: { sprIdx: 12, dx: 22, dy: 28, ang: 0 }
+            },
+            {
+                id: "sobe_modern_1",
+                name: "Lummus View Art Deco Villa",
+                district: "SOUTH BEACH",
+                kind: "mansion_modern_luxury",
+                c: 441.0, r: 268.0,
+                x: 441.0 * TILE_SIZE, y: 268.0 * TILE_SIZE, z: 2.0,
+                ang: Math.PI * 0.5, scale: 1.02, hw: 38, hh: 30,
+                drivewayCar: { sprIdx: 7, dx: 24, dy: 26, ang: Math.PI * 0.5 }
+            },
+            {
+                id: "sobe_palazzo_1",
+                name: "South Pointe Oceanfront Villa",
+                district: "SOUTH BEACH",
+                kind: "mansion_star_island",
+                c: 442.0, r: 302.0,
+                x: 442.0 * TILE_SIZE, y: 302.0 * TILE_SIZE, z: 3.0,
+                ang: 0, scale: 1.04, hw: 44, hh: 32,
+                drivewayCar: { sprIdx: 5, dx: 26, dy: 34, ang: 0 }
+            },
+            {
+                id: "sobe_bungalow_2",
+                name: "Meridian Pastel Cottage",
+                district: "SOUTH BEACH",
+                kind: "house_florida_bungalow",
+                c: 437.0, r: 274.0,
+                x: 437.0 * TILE_SIZE, y: 274.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.02, hw: 30, hh: 24,
+                drivewayCar: { sprIdx: 2, dx: 18, dy: 24, ang: 0 }
+            },
             // A. Star Island & Venetian Isles Waterfront Mansions (c=336..356, r=166..180)
             {
                 id: "star_palazzo_north",
@@ -2180,6 +2231,51 @@ class LeonidaMap {
                 y: my256(154.0) * TILE_SIZE,
                 color: "#facc15",
                 perk: "ARMOR",
+                visited: false
+            },
+            {
+                id: "SOBE_RESIDENTIAL",
+                short: "SOBE VILLAS",
+                shortName: "SOUTH BEACH VILLAS",
+                name: "🌴 SOUTH BEACH RESIDENTIAL VILLAS & BUNGALOWS",
+                sub: "HISTORIC FLORIDIAN PASTEL BUNGALOWS & MODERN VILLAS MINUTES FROM OCEAN DRIVE — 100% HEALTH!",
+                district: "SOUTH BEACH — RESIDENTIAL DISTRICT",
+                bx: 437.0,
+                by: 282.0,
+                x: 437.0 * TILE_SIZE,
+                y: 282.0 * TILE_SIZE,
+                color: "#34d399",
+                perk: "HEAL",
+                visited: false
+            },
+            {
+                id: "STAR_ISLAND_HOMES",
+                short: "STAR MANSIONS",
+                shortName: "STAR ISLAND MANSIONS",
+                name: "🏛️ STAR ISLAND WATERFRONT MANSIONS",
+                sub: "BILLIONAIRE WATERFRONT PALAZZOS WITH PRIVATE DOCKS, SPEEDBOATS & LUXURY SUPERCARS!",
+                district: "BISCAYNE BAY — STAR ISLAND",
+                bx: 340.0,
+                by: 168.0,
+                x: 340.0 * TILE_SIZE,
+                y: 168.0 * TILE_SIZE,
+                color: "#e879f9",
+                perk: "ESTATE",
+                visited: false
+            },
+            {
+                id: "KEYS_STILT_LODGE",
+                short: "KEYS STILT HOMES",
+                shortName: "LEONIDA KEYS STILT HOMES",
+                name: "🌊 LEONIDA KEYS WATERFRONT STILT HOUSES",
+                sub: "CARIBBEAN-STYLE STILT HOUSES SUSPENDED OVER TURQUOISE WATER WITH DOCKED WAVE RUNNERS!",
+                district: "LEONIDA KEYS",
+                bx: 368.0,
+                by: 453.0,
+                x: 368.0 * TILE_SIZE,
+                y: 453.0 * TILE_SIZE,
+                color: "#38bdf8",
+                perk: "ESTATE",
                 visited: false
             },
             {
