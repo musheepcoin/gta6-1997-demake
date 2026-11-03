@@ -1714,6 +1714,12 @@ class LeonidaMap {
             }
         ];
 
+        // 16C) Initialize Unified 3D Volumetric World Object & Prefab Engine (validates road clearance, 1:1 scale & lot flora)
+        this.objectEngine = typeof WorldObjectEngine !== "undefined" ? new WorldObjectEngine(this) : null;
+        if (this.objectEngine) {
+            this.objectEngine.validateAndPrepareLots();
+        }
+
         // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks & Outlaw Biker Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
         this.industrialAndParkDetails = {
             smokestacks: [

@@ -2381,7 +2381,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_57", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_58", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2396,7 +2396,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_57", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_58", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -2570,6 +2570,11 @@ class RetroRenderer {
             }
         }
 
+        // 2B. Build True 3D Volumetric Architectural Prefab Mesh (WorldObjectEngine)
+        if (this.map && this.map.objectEngine) {
+            this.map.objectEngine.buildStatic3DMesh(gl, this);
+        }
+
         // 3. Build 512x512 Ray-Marched 3D Building Solar Cast Shadow & Ambient Occlusion Lightmap (this.dayLightTex)
         this.buildDayLightTexture();
     }
@@ -2595,6 +2600,9 @@ class RetroRenderer {
                 }
                 colTopElev[r * M + c] = topY;
             }
+        }
+        if (this.map && this.map.objectEngine) {
+            this.map.objectEngine.applyToElevationMap(colTopElev);
         }
 
         // 2) Ray-march 512x512 tile lightmap (1 sample per 64px tile across 512x512 world) for:
@@ -3712,6 +3720,11 @@ class RetroRenderer {
             gl.enableVertexAttribArray(this.cityLocs.aAnim);
             gl.vertexAttribPointer(this.cityLocs.aAnim, 1, gl.FLOAT, false, stride, 20);
             gl.drawArrays(gl.TRIANGLES, ch.flatOffset, ch.flatCount);
+        }
+
+        // A3. Render Hardware Z-Buffered 3D Volumetric Architectural Prefabs (WorldObjectEngine)
+        if (this.map && this.map.objectEngine) {
+            this.map.objectEngine.renderStatic3DMesh(gl, this, viewProj, nf, sf);
         }
 
         // B. Populate & Flush 3D Depth-Tested SpriteBatch
@@ -5010,178 +5023,12 @@ class RetroRenderer {
         }
 
         // =========================================================================
-        // 16B) GTA 6 LEONIDA TRUE 3D MULTI-STORY RESIDENTIAL ESTATES & WATERFRONT MANSIONS
-        // True 3D vertical architectural facades (pushWallSprite3D) + multi-tier 3D roofs +
-        // 1:1 full-scale game vehicles, pools, loungers & sunbathers!
+        // 16B) GTA 6 LEONIDA 3D VOLUMETRIC ARCHITECTURAL PREFABS & CHILD SOCKETS (WorldObjectEngine)
+        // True 3D sloped roofs & walls are rendered in hardware Z-buffered 3D mesh pass;
+        // dynamic child sockets (pools, loungers, sunbathers, umbrellas, boats) batched here.
         // =========================================================================
-        const resHouses = this.map.residentialHouses;
-        if (Array.isArray(resHouses) && resHouses.length > 0 && this.gta1Meta && this.gta1Meta.sprites) {
-            const objSprites = this.gta1Meta.sprites.objects;
-            const vehSpritesList = this.gta1Meta.sprites.vehicles;
-            const texW = this.spritesTexW || this.gta1SpritesImg.width || 2048;
-            const texH = this.spritesTexH || this.gta1SpritesImg.height || 4096;
-
-            const getHouseCarRect = (idxOrSpr, remapIdx = 0) => {
-                if (!vehSpritesList) return null;
-                const ve = (this.vehicleBySprIdx && this.vehicleBySprIdx[String(idxOrSpr)]) || vehSpritesList[Number(idxOrSpr)] || vehSpritesList[0];
-                if (!ve) return null;
-                if (Array.isArray(ve)) return ve;
-                if (Array.isArray(ve.remaps) && ve.remaps.length > 0) {
-                    return ve.remaps[Math.abs(remapIdx) % ve.remaps.length] || ve.base;
-                }
-                return ve.base || null;
-            };
-
-            const emit3DWallBox = (frontKey, sideKey, cx, cy, zBot, zTop, wPx, dPx, ang) => {
-                const fRect = objSprites[frontKey];
-                const sRect = objSprites[sideKey || frontKey];
-                if (!fRect || !sRect) return;
-                const cs = Math.cos(ang);
-                const sn = Math.sin(ang);
-                const hw = wPx * 0.5;
-                const hd = dPx * 0.5;
-                const zMid = (zBot + zTop) * 0.5;
-                const halfZ = (zTop - zBot) * 0.5;
-                const walls = [
-                    { lx: 0,   ly: hd,  nx: -sn, ny: cs,  w: wPx, a: ang,                rect: fRect, sh: 1.00 },
-                    { lx: 0,   ly: -hd, nx: sn,  ny: -cs, w: wPx, a: ang + Math.PI,      rect: sRect, sh: 0.78 },
-                    { lx: hw,  ly: 0,   nx: cs,  ny: sn,  w: dPx, a: ang - Math.PI * 0.5, rect: sRect, sh: 0.86 },
-                    { lx: -hw, ly: 0,   nx: -cs, ny: -sn, w: dPx, a: ang + Math.PI * 0.5, rect: sRect, sh: 0.94 }
-                ];
-                for (let wIdx = 0; wIdx < 4; wIdx++) {
-                    const wl = walls[wIdx];
-                    const wx = cx + wl.lx * cs - wl.ly * sn;
-                    const wy = cy + wl.lx * sn + wl.ly * cs;
-                    if ((this.camX - wx) * wl.nx + (this.camY - wy) * wl.ny > -12.0) {
-                        const [sx, sy, sw, sh] = wl.rect;
-                        const u0 = (sx + 0.5) / texW;
-                        const v0 = (sy + 0.5) / texH;
-                        const u1 = (sx + sw - 0.5) / texW;
-                        const v1 = (sy + sh - 0.5) / texH;
-                        this.pushSpriteQuad3D(wx, wy, zMid, wl.w, 0.35, wl.a, u0, v0, u1, v1, wl.sh, wl.sh, wl.sh, 1.0, SPRITE_DRAW_ORDER.TREES, -halfZ);
-                    }
-                }
-            };
-
-            const HOUSE_SPECS = {
-                mansion_star_island: {
-                    w1: 286, d1: 170, h1: 0.64,
-                    w2: 164, d2: 106, h2: 0.50,
-                    front1: "wall_star_front", side1: "wall_star_side",
-                    upper: "wall_star_upper", topRoof: "mansion_star_island_top"
-                },
-                mansion_modern_luxury: {
-                    w1: 242, d1: 154, h1: 0.62,
-                    w2: 140, d2: 92,  h2: 0.48,
-                    front1: "wall_modern_front", side1: "wall_modern_side",
-                    upper: "wall_modern_upper", topRoof: "mansion_modern_luxury_top"
-                },
-                house_canal_villa: {
-                    w1: 226, d1: 146, h1: 0.58,
-                    w2: 120, d2: 82,  h2: 0.44,
-                    front1: "wall_canal_front", side1: "wall_canal_side",
-                    upper: "wall_canal_upper", topRoof: "house_canal_villa_top"
-                },
-                house_florida_bungalow: {
-                    w1: 198, d1: 136, h1: 0.54,
-                    w2: 0,   d2: 0,   h2: 0,
-                    front1: "wall_bungalow_front", side1: "wall_bungalow_side",
-                    topRoof: "house_florida_bungalow_top"
-                },
-                house_keys_stilt: {
-                    w1: 188, d1: 138, h1: 0.68,
-                    w2: 0,   d2: 0,   h2: 0,
-                    front1: "wall_keys_front", side1: "wall_keys_side",
-                    topRoof: "house_keys_stilt_top"
-                }
-            };
-
-            for (let i = 0; i < resHouses.length; i++) {
-                const h = resHouses[i];
-                if (h.x < minX - 320 || h.x > maxX + 320 || h.y < minY - 320 || h.y > maxY + 320) continue;
-                const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
-                    ? this.map.getHeightAtPixel(h.x, h.y, 4.0)
-                    : (h.z || 2.0);
-                const sc = h.scale || 1.0;
-                const cosA = Math.cos(h.ang);
-                const sinA = Math.sin(h.ang);
-                const spec = HOUSE_SPECS[h.kind] || HOUSE_SPECS.house_canal_villa;
-
-                // 1. Directional Solar Cast Shadow at Ground Level
-                this.batchObjectSprite3D(h.kind, h.x + sunCos * 12, h.y + sunSin * 12, bz + 0.015, h.ang, sc * 1.03, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.38);
-
-                // 2. 1st-Floor True 3D Vertical Facade Walls + Overhanging 1st-Floor Roof & Stepped Hip Ridge
-                const z1 = bz + spec.h1 * sc;
-                emit3DWallBox(spec.front1, spec.side1, h.x, h.y, bz, z1, spec.w1 * sc, spec.d1 * sc, h.ang);
-                this.batchObjectSprite3D(h.kind, h.x, h.y, z1, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
-                this.batchObjectSprite3D(h.kind, h.x, h.y, z1 + 0.06 * sc, h.ang, sc * 0.86, SPRITE_DRAW_ORDER.TREES);
-
-                // 3. 2nd-Floor True 3D Tower / Penthouse Walls + Overhanging 2nd-Floor Roof (or Raised Clerestory Cupola)
-                if (spec.w2 > 0 && spec.upper && spec.topRoof) {
-                    const z2 = z1 + spec.h2 * sc;
-                    emit3DWallBox(spec.upper, spec.upper, h.x, h.y, z1 + 0.06 * sc, z2, spec.w2 * sc, spec.d2 * sc, h.ang);
-                    this.batchObjectSprite3D(spec.topRoof, h.x, h.y, z2, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
-                    this.batchObjectSprite3D(spec.topRoof, h.x, h.y, z2 + 0.06 * sc, h.ang, sc * 0.80, SPRITE_DRAW_ORDER.TREES);
-                } else if (spec.topRoof) {
-                    this.batchObjectSprite3D(spec.topRoof, h.x, h.y, z1 + 0.12 * sc, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
-                }
-
-                // 4. Private Swimming Pool & 1:1 Pedestrian-Scale Sun Loungers, Bikini Sunbathers & Parasol
-                if (h.pool) {
-                    const pl = h.pool;
-                    const px = h.x + cosA * pl.dx - sinA * pl.dy;
-                    const py = h.y + sinA * pl.dx + cosA * pl.dy;
-                    const pAng = h.ang + (pl.ang || 0);
-                    const pSc = pl.scale || 0.90;
-                    const csP = Math.cos(pAng);
-                    const snP = Math.sin(pAng);
-                    this.batchObjectSprite3D("vercetti_pool", px, py, bz + 0.018, pAng, pSc, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    // 2 Full-scale poolside sun loungers + sunbathers + umbrella
-                    for (let li = -1; li <= 1; li += 2) {
-                        const lx = px + csP * (-58 * pSc) - snP * (li * 18 * pSc);
-                        const ly = py + snP * (-58 * pSc) + csP * (li * 18 * pSc);
-                        this.batchObjectSprite3D("beach_lounger", lx, ly, bz + 0.024, pAng, 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.batchPedSprite3D(li < 0 ? "bikini_pink" : "bikini_cyan", 42, lx, ly, bz + 0.032, pAng, 1.24, false, SPRITE_DRAW_ORDER.CORPSE);
-                    }
-                    const ux = px + csP * (-58 * pSc);
-                    const uy = py + snP * (-58 * pSc);
-                    this.batchObjectSprite3D("beach_umbrella_pink", ux + sunCos * 4, uy + sunSin * 4, bz + 0.020, 0, 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
-                    this.batchObjectSprite3D("beach_umbrella_pink", ux, uy, bz + 0.14, this.time * 0.2 + i, 1.05, SPRITE_DRAW_ORDER.TREES);
-                }
-
-                // 5. Real Full-Scale Driveway Parked Vehicles (100% 1:1 scale = 58x28 px, matching road cars!)
-                const cars = Array.isArray(h.drivewayCars) ? h.drivewayCars : (h.drivewayCar ? [h.drivewayCar] : []);
-                for (let ci = 0; ci < cars.length; ci++) {
-                    const dc = cars[ci];
-                    const carX = h.x + cosA * dc.dx - sinA * dc.dy;
-                    const carY = h.y + sinA * dc.dx + cosA * dc.dy;
-                    const carAng = h.ang + (dc.ang || 0);
-                    const vRect = getHouseCarRect(dc.sprIdx, i + ci * 2);
-                    if (vRect) {
-                        this.pushAtlasSprite3D(vRect, carX + sunCos * 4.2, carY + sunSin * 4.2, bz + 0.018, carAng - Math.PI * 0.5, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.35);
-                        this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.052, carAng - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
-                    }
-                }
-
-                // 6. Private Waterfront Canal / Jetty Moored Watercraft (Speedboats, WaveRunners)
-                if (h.dockBoat) {
-                    const db = h.dockBoat;
-                    const boatX = h.x + cosA * db.dx - sinA * db.dy;
-                    const boatY = h.y + sinA * db.dx + cosA * db.dy;
-                    const boatAng = h.ang + (db.ang || 0);
-                    const bob = Math.sin(this.time * 2.2 + i * 1.3) * 0.008;
-                    this.batchObjectSprite3D(db.spr, boatX + sunCos * 3.5, boatY + sunSin * 3.5, 2.015, boatAng, 1.12, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.28);
-                    this.batchObjectSprite3D(db.spr, boatX, boatY, 2.045 + bob, boatAng, 1.12, SPRITE_DRAW_ORDER.CAR);
-                }
-
-                // 7. Night Mode Warm Interior Window Glow
-                if (this.nightFactor > 0.15) {
-                    const nightGlow = Math.min(1.0, (this.nightFactor - 0.15) / 0.70);
-                    const flicker = 0.94 + Math.sin(this.time * 3.5 + i * 2.1) * 0.06;
-                    const winPulse = nightGlow * flicker;
-                    this.pushSolidQuad3D(h.x, h.y + sinA * 20, bz + 0.22, 48 * sc, 24 * sc, h.ang, 0.98, 0.76, 0.30, 0.45 * winPulse, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
-                }
-            }
+        if (this.map && this.map.objectEngine) {
+            this.map.objectEngine.batchDynamicSockets3D(this, game, minX, minY, maxX, maxY, sunCos, sunSin);
         }
 
         // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks, Outlaw Biker Chopper Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
@@ -9954,11 +9801,17 @@ class RetroRenderer {
             const fctx = this.fullMapBgCanvas.getContext("2d");
             fctx.imageSmoothingEnabled = false;
             fctx.drawImage(srcImg, 0, 0, this.fullMapBgCanvas.width, this.fullMapBgCanvas.height);
+            if (useVice && this.map && this.map.objectEngine) {
+                this.map.objectEngine.paintOnOverviewCanvas(fctx, this.fullMapBgCanvas.width, this.fullMapBgCanvas.height);
+            }
         }
         if (this.radarBgCanvas) {
             const rctx = this.radarBgCanvas.getContext("2d");
             rctx.imageSmoothingEnabled = false;
             rctx.drawImage(srcImg, 0, 0, this.radarBgCanvas.width, this.radarBgCanvas.height);
+            if (useVice && this.map && this.map.objectEngine) {
+                this.map.objectEngine.paintOnOverviewCanvas(rctx, this.radarBgCanvas.width, this.radarBgCanvas.height);
+            }
         }
     }
 

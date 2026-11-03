@@ -489,6 +489,11 @@ class LeonidaGame {
             }
         }
 
+        // 1B. Spawn real interactive 1:1 scale drivable luxury vehicles in 3D estate driveways (WorldObjectEngine)
+        if (this.map && this.map.objectEngine) {
+            this.map.objectEngine.spawnPrefabVehicles(this);
+        }
+
         // 2. Refresh exact 3D elevation z & reset AI lane state once binary map is loaded
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
         if (this.jason) {
