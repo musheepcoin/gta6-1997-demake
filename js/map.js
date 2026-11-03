@@ -240,10 +240,20 @@ class LeonidaMap {
             }
         }
 
-        // Convert generic 1997 brick office blocks on East Star Island (x=347..355, y=164..170 & y=178..185)
-        // into lush Star Island emerald waterfront estate lawns (copying grass column x=339, y=165)
-        for (let x = 347; x <= 355; x++) {
-            for (const [y0, y1] of [[164, 170], [178, 185]]) {
+        // Convert generic 1997 brick office blocks on Star Island & Venetian Isles into lush emerald waterfront estate lawns:
+        // - East Star Island (x=347..355, y=164..170 & y=178..185)
+        // - Southwest Star Island (x=335..342, y=178..183)
+        // - Venetian Isles North (x=398..403, y=125..129)
+        // - Venetian Isles South (x=389..403, y=205..209)
+        const islandLawnBoxes = [
+            [347, 355, 164, 170],
+            [347, 355, 178, 185],
+            [335, 342, 178, 183],
+            [398, 403, 125, 129],
+            [389, 403, 205, 209]
+        ];
+        for (const [x0, x1, y0, y1] of islandLawnBoxes) {
+            for (let x = x0; x <= x1; x++) {
                 for (let y = y0; y <= y1; y++) {
                     for (let z = 0; z < MAP_LAYERS; z++) {
                         this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] =
@@ -1550,167 +1560,338 @@ class LeonidaMap {
             seed: ti * 1.7
         }));
 
-        // 17B) GTA 6 Leonida True 3D Volumetric Architectural Estates & Waterfront Mansions
+        // 17B) GTA 6 Leonida True 3D Volumetric Architectural Estates & Waterfront Mansions (23 Verified Estates across 7 Districts)
         // 1:1 Game Scale (TILE_SIZE = 64, vehicles = 58x28 px, peds = 24x24 px):
-        // Multi-story 3D vertical walls + overhanging roofs + real pools & full-size driveway supercars!
+        // Multi-story 3D vertical walls + overhanging sloped/cantilevered roofs + pools, moored boats & drivable driveway cars!
         this.residentialHouses = [
             // =====================================================================
-            // 1. STAR ISLAND BILLIONAIRE WATERFRONT ESTATES (Cleared 9x7 tile open lawns)
+            // 1. STAR ISLAND BILLIONAIRE WATERFRONT ESTATES (3 Grand Estates)
             // =====================================================================
             {
-                id: "star_palazzo_grand",
-                name: "Villa de la Rosa — Star Island Grand Estate",
+                id: "star_vercetti_palazzo",
+                name: "Villa de la Rosa — Star Island Grand Palazzo",
                 district: "STAR ISLAND",
                 kind: "mansion_star_island",
                 c: 351.2, r: 166.5,
                 x: 351.2 * TILE_SIZE, y: 166.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 142, hh: 84,
-                pool: { dx: 0, dy: -142, scale: 0.90 },
+                pool: { dx: 0, dy: -136, scale: 0.90 },
                 drivewayCars: [
                     { sprIdx: 0, dx: -82, dy: 118, ang: 0 },
                     { sprIdx: 6, dx: 82, dy: 118, ang: Math.PI }
                 ],
-                dockBoat: { spr: "speedboat_v8", dx: 40, dy: -265, ang: 0 }
+                dockBoat: { spr: "speedboat_v8", dx: 180, dy: -180, ang: 0 }
             },
             {
-                id: "star_modern_villa",
-                name: "Biscayne Bay Minimalist Waterfront Villa",
-                district: "STAR ISLAND",
-                kind: "mansion_modern_luxury",
-                c: 337.5, r: 163.5,
-                x: 337.5 * TILE_SIZE, y: 163.5 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 0.92, hw: 112, hh: 72,
-                drivewayCars: [
-                    { sprIdx: 1, dx: -64, dy: 102, ang: 0 }
-                ],
-                dockBoat: { spr: "jetski_neon", dx: -95, dy: -115, ang: -Math.PI * 0.5 }
-            },
-            {
-                id: "star_south_estate",
-                name: "South Star Island Waterfront Palazzo",
+                id: "star_south_palazzo",
+                name: "Villa di Leonida — South Star Island Palazzo",
                 district: "STAR ISLAND",
                 kind: "mansion_star_island",
                 c: 351.2, r: 181.5,
                 x: 351.2 * TILE_SIZE, y: 181.5 * TILE_SIZE, z: 2.0,
                 ang: Math.PI, scale: 1.0, hw: 142, hh: 84,
-                pool: { dx: 0, dy: -142, scale: 0.90 },
+                pool: { dx: 0, dy: -136, scale: 0.90 },
                 drivewayCars: [
-                    { sprIdx: 4, dx: -82, dy: 118, ang: 0 }
+                    { sprIdx: 4, dx: -82, dy: 118, ang: 0 },
+                    { sprIdx: 1, dx: 82, dy: 118, ang: Math.PI }
                 ],
-                dockBoat: { spr: "speedboat_v8", dx: 0, dy: -280, ang: 0 }
+                dockBoat: { spr: "speedboat_v8", dx: -160, dy: -220, ang: 0 }
+            },
+            {
+                id: "star_southwest_modern",
+                name: "Biscayne Bay Minimalist Glass Villa",
+                district: "STAR ISLAND",
+                kind: "mansion_modern_luxury",
+                c: 338.8, r: 180.5,
+                x: 338.8 * TILE_SIZE, y: 180.5 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 0.94, hw: 116, hh: 74,
+                pool: { dx: 0, dy: -124, scale: 0.85 },
+                drivewayCars: [
+                    { sprIdx: 1, dx: -64, dy: 104, ang: 0 }
+                ],
+                dockBoat: { spr: "jetski_neon", dx: 150, dy: -180, ang: 0 }
             },
 
             // =====================================================================
-            // 2. SOUTH BEACH RESIDENTIAL GARDEN DISTRICT (Oriented along N-S 4x8 grass lots)
+            // 2. VENETIAN ISLES WATERFRONT VILLAS (4 Luxury Canal & Bay Estates)
             // =====================================================================
             {
-                id: "sobe_modern_oceanfront",
-                name: "Ocean Drive Contemporary Luxury Villa",
-                district: "SOUTH BEACH",
+                id: "venetian_north_villa_1",
+                name: "San Marco Island Waterfront Villa",
+                district: "VENETIAN ISLES",
+                kind: "house_canal_villa",
+                c: 393.5, r: 120.5,
+                x: 393.5 * TILE_SIZE, y: 120.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.95, hw: 108, hh: 70,
+                pool: { dx: 0, dy: -120, scale: 0.84 },
+                drivewayCars: [
+                    { sprIdx: 6, dx: -64, dy: 102, ang: 0 }
+                ],
+                dockBoat: { spr: "jetski_neon", dx: 0, dy: -220, ang: 0 }
+            },
+            {
+                id: "venetian_north_modern",
+                name: "Biscayne Island Contemporary Residence",
+                district: "VENETIAN ISLES",
                 kind: "mansion_modern_luxury",
+                c: 400.2, r: 126.8,
+                x: 400.2 * TILE_SIZE, y: 126.8 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 0.92, hw: 114, hh: 72,
+                drivewayCars: [
+                    { sprIdx: 0, dx: -64, dy: 102, ang: 0 }
+                ],
+                dockBoat: { spr: "speedboat_v8", dx: -160, dy: -160, ang: 0 }
+            },
+            {
+                id: "venetian_south_palazzo",
+                name: "Casa Bella — Belle Isle Grand Palazzo",
+                district: "VENETIAN ISLES",
+                kind: "mansion_star_island",
+                c: 392.5, r: 206.8,
+                x: 392.5 * TILE_SIZE, y: 206.8 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 0.95, hw: 136, hh: 80,
+                pool: { dx: 0, dy: -128, scale: 0.86 },
+                drivewayCars: [
+                    { sprIdx: 0, dx: -76, dy: 112, ang: 0 }
+                ],
+                dockBoat: { spr: "speedboat_v8", dx: 0, dy: -220, ang: 0 }
+            },
+            {
+                id: "venetian_south_villa",
+                name: "Rivo Alto Canal Villa",
+                district: "VENETIAN ISLES",
+                kind: "house_canal_villa",
+                c: 400.2, r: 206.8,
+                x: 400.2 * TILE_SIZE, y: 206.8 * TILE_SIZE, z: 2.0,
+                ang: Math.PI, scale: 0.95, hw: 108, hh: 70,
+                drivewayCars: [
+                    { sprIdx: 4, dx: -62, dy: 100, ang: 0 }
+                ],
+                dockBoat: { spr: "jetski_neon", dx: -150, dy: -180, ang: 0 }
+            },
+
+            // =====================================================================
+            // 3. SOUTH BEACH & FLAMINGO PARK (3 Art Deco & Tropical Estates)
+            // =====================================================================
+            {
+                id: "sobe_artdeco_villa_1",
+                name: "Flamingo Court Tropical Art Deco Villa",
+                district: "SOUTH BEACH",
+                kind: "villa_art_deco",
                 c: 441.0, r: 265.5,
                 x: 441.0 * TILE_SIZE, y: 265.5 * TILE_SIZE, z: 2.0,
-                ang: -Math.PI * 0.5, scale: 0.90, hw: 110, hh: 70,
+                ang: -Math.PI * 0.5, scale: 0.94, hw: 104, hh: 70,
+                pool: { dx: 0, dy: -118, scale: 0.84 },
                 drivewayCars: [
                     { sprIdx: 6, dx: -62, dy: 96, ang: 0 }
                 ]
             },
             {
                 id: "sobe_flamingo_bungalow",
-                name: "Flamingo Park Classic Florida Bungalow",
+                name: "Flamingo Park Pastel Conch Bungalow",
                 district: "SOUTH BEACH",
                 kind: "house_florida_bungalow",
                 c: 431.0, r: 265.5,
                 x: 431.0 * TILE_SIZE, y: 265.5 * TILE_SIZE, z: 2.0,
-                ang: -Math.PI * 0.5, scale: 0.92, hw: 92, hh: 64,
+                ang: -Math.PI * 0.5, scale: 0.94, hw: 94, hh: 66,
                 drivewayCars: [
                     { sprIdx: 13, dx: 0, dy: 92, ang: 0 }
                 ]
             },
+            {
+                id: "sobe_artdeco_villa_2",
+                name: "Meridian Avenue Streamline Moderne Villa",
+                district: "SOUTH BEACH",
+                kind: "villa_art_deco",
+                c: 456.5, r: 213.5,
+                x: 456.5 * TILE_SIZE, y: 213.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.94, hw: 104, hh: 70,
+                drivewayCars: [
+                    { sprIdx: 1, dx: -58, dy: 96, ang: 0 }
+                ]
+            },
 
             // =====================================================================
-            // 3. NORTH VICE SHORES & GOLDEN GLADES LAGOON RESIDENCES (30x8 open lawn)
+            // 4. NORTH VICE SHORES & GOLDEN GLADES LAGOON (3 Waterfront Villas)
             // =====================================================================
+            {
+                id: "shores_modern_villa",
+                name: "Lagoon Overlook Modernist Glass Home",
+                district: "NORTH VICE SHORES",
+                kind: "mansion_modern_luxury",
+                c: 149.0, r: 47.0,
+                x: 149.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.96, hw: 118, hh: 75,
+                pool: { dx: 0, dy: -124, scale: 0.85 },
+                drivewayCars: [
+                    { sprIdx: 0, dx: -66, dy: 104, ang: 0 }
+                ],
+                dockBoat: { spr: "speedboat_v8", dx: -160, dy: -160, ang: 0 }
+            },
             {
                 id: "shores_canal_villa_1",
                 name: "Pelican Bay Lagoon Waterfront Villa",
                 district: "NORTH VICE SHORES",
                 kind: "house_canal_villa",
-                c: 153.0, r: 47.0,
-                x: 153.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.0, hw: 114, hh: 74,
-                pool: { dx: 0, dy: -130, scale: 0.85 },
+                c: 159.0, r: 47.0,
+                x: 159.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.96, hw: 110, hh: 72,
+                pool: { dx: 0, dy: -124, scale: 0.85 },
                 drivewayCars: [
-                    { sprIdx: 1, dx: -66, dy: 104, ang: 0 }
+                    { sprIdx: 1, dx: -64, dy: 102, ang: 0 }
                 ],
-                dockBoat: { spr: "jetski_neon", dx: 50, dy: -240, ang: 0 }
+                dockBoat: { spr: "jetski_neon", dx: 0, dy: -220, ang: 0 }
             },
             {
                 id: "shores_canal_villa_2",
                 name: "Golden Glades Waterfront Residence",
                 district: "NORTH VICE SHORES",
                 kind: "house_canal_villa",
-                c: 164.0, r: 47.0,
-                x: 164.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.0, hw: 114, hh: 74,
-                pool: { dx: 0, dy: -130, scale: 0.85 },
+                c: 169.0, r: 47.0,
+                x: 169.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.96, hw: 110, hh: 72,
+                pool: { dx: 0, dy: -124, scale: 0.85 },
                 drivewayCars: [
-                    { sprIdx: 4, dx: -66, dy: 104, ang: 0 }
-                ]
-            },
-            {
-                id: "shores_modern_villa",
-                name: "Lagoon Overlook Modernist Home",
-                district: "NORTH VICE SHORES",
-                kind: "mansion_modern_luxury",
-                c: 142.0, r: 47.0,
-                x: 142.0 * TILE_SIZE, y: 47.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.0, hw: 120, hh: 76,
-                drivewayCars: [
-                    { sprIdx: 0, dx: -68, dy: 108, ang: 0 }
+                    { sprIdx: 4, dx: -64, dy: 102, ang: 0 }
                 ]
             },
 
             // =====================================================================
-            // 4. LEONIDA KEYS CARIBBEAN WATERFRONT STILT HOUSES
+            // 5. LITTLE HAITI & LITTLE HAVANA (4 Pastel Florida Bungalows & Villas)
+            // =====================================================================
+            {
+                id: "haiti_bungalow_1",
+                name: "Toussaint Louverture Pastel Conch Home",
+                district: "LITTLE HAITI",
+                kind: "house_florida_bungalow",
+                c: 230.5, r: 83.5,
+                x: 230.5 * TILE_SIZE, y: 83.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.94, hw: 94, hh: 66,
+                drivewayCars: [
+                    { sprIdx: 13, dx: -52, dy: 92, ang: 0 }
+                ]
+            },
+            {
+                id: "haiti_bungalow_2",
+                name: "Kreyol Garden Tropical Bungalow",
+                district: "LITTLE HAITI",
+                kind: "house_florida_bungalow",
+                c: 230.5, r: 91.5,
+                x: 230.5 * TILE_SIZE, y: 91.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.94, hw: 94, hh: 66,
+                drivewayCars: [
+                    { sprIdx: 4, dx: -52, dy: 92, ang: 0 }
+                ]
+            },
+            {
+                id: "havana_bungalow_1",
+                name: "Calle Ocho Coral Stucco Bungalow",
+                district: "LITTLE HAVANA",
+                kind: "house_florida_bungalow",
+                c: 292.5, r: 183.5,
+                x: 292.5 * TILE_SIZE, y: 183.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.94, hw: 94, hh: 66,
+                drivewayCars: [
+                    { sprIdx: 13, dx: -52, dy: 92, ang: 0 }
+                ]
+            },
+            {
+                id: "havana_artdeco_villa",
+                name: "Domino Park Art Deco Residence",
+                district: "LITTLE HAVANA",
+                kind: "villa_art_deco",
+                c: 297.5, r: 183.5,
+                x: 297.5 * TILE_SIZE, y: 183.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.92, hw: 102, hh: 68,
+                drivewayCars: [
+                    { sprIdx: 1, dx: -56, dy: 94, ang: 0 }
+                ]
+            },
+
+            // =====================================================================
+            // 6. LAKE LEONIDA & GRASSRIVERS EVERGLADES (2 Bayou Stilted Shacks)
+            // =====================================================================
+            {
+                id: "lake_bayou_shack",
+                name: "Lake Leonida Cypress Bayou Hideout",
+                district: "LAKE LEONIDA",
+                kind: "shack_everglades_bayou",
+                c: 94.0, r: 190.5,
+                x: 94.0 * TILE_SIZE, y: 190.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.96, hw: 86, hh: 64,
+                drivewayCars: [
+                    { sprIdx: 25, dx: -50, dy: 92, ang: 0 }
+                ],
+                dockBoat: { spr: "airboat_gator", dx: 180, dy: 0, ang: 0 }
+            },
+            {
+                id: "grassrivers_shack",
+                name: "Grassrivers Swamp Stilted Cabin",
+                district: "GRASSRIVERS",
+                kind: "shack_everglades_bayou",
+                c: 109.5, r: 388.5,
+                x: 109.5 * TILE_SIZE, y: 388.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 0.96, hw: 86, hh: 64,
+                drivewayCars: [
+                    { sprIdx: 25, dx: -50, dy: 92, ang: 0 }
+                ],
+                dockBoat: { spr: "airboat_gator", dx: -160, dy: 120, ang: 0 }
+            },
+
+            // =====================================================================
+            // 7. LEONIDA KEYS CARIBBEAN WATERFRONT STILT HOUSES (4 Conch Lodges)
             // =====================================================================
             {
                 id: "keys_stilt_islamorada",
                 name: "Islamorada Turquoise Water Stilt Lodge",
                 district: "LEONIDA KEYS",
                 kind: "house_keys_stilt",
-                c: 368.5, r: 453.5,
-                x: 368.5 * TILE_SIZE, y: 453.5 * TILE_SIZE, z: 2.0,
+                c: 368.5, r: 452.5,
+                x: 368.5 * TILE_SIZE, y: 452.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
                     { sprIdx: 25, dx: -56, dy: 102, ang: 0 }
                 ],
-                dockBoat: { spr: "jetski_neon", dx: 125, dy: -180, ang: Math.PI * 0.5 }
+                dockBoat: { spr: "jetski_neon", dx: 180, dy: -120, ang: Math.PI * 0.5 }
+            },
+            {
+                id: "keys_stilt_marathon",
+                name: "Marathon Key Reef-Side Conch House",
+                district: "LEONIDA KEYS",
+                kind: "house_keys_stilt",
+                c: 330.5, r: 473.5,
+                x: 330.5 * TILE_SIZE, y: 473.5 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.0, hw: 94, hh: 70,
+                drivewayCars: [
+                    { sprIdx: 1, dx: -56, dy: 102, ang: 0 }
+                ],
+                dockBoat: { spr: "speedboat_v8", dx: 180, dy: -120, ang: Math.PI * 0.5 }
             },
             {
                 id: "keys_stilt_big_pine",
                 name: "Big Pine Key Offshore Stilt Cabin",
                 district: "LEONIDA KEYS",
                 kind: "house_keys_stilt",
-                c: 271.5, r: 475.5,
-                x: 271.5 * TILE_SIZE, y: 475.5 * TILE_SIZE, z: 2.0,
+                c: 272.5, r: 474.5,
+                x: 272.5 * TILE_SIZE, y: 474.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
                     { sprIdx: 13, dx: -56, dy: 102, ang: 0 }
-                ]
+                ],
+                dockBoat: { spr: "jetski_neon", dx: 180, dy: -120, ang: 0 }
             },
             {
                 id: "keys_stilt_key_west",
-                name: "Key West Sunset Shanty Lodge",
+                name: "Key West Sunset Conch Stilt Lodge",
                 district: "LEONIDA KEYS",
                 kind: "house_keys_stilt",
-                c: 222.0, r: 475.5,
-                x: 222.0 * TILE_SIZE, y: 475.5 * TILE_SIZE, z: 2.0,
+                c: 222.0, r: 475.0,
+                x: 222.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
                     { sprIdx: 25, dx: -56, dy: 102, ang: 0 }
                 ],
-                dockBoat: { spr: "speedboat_v8", dx: 160, dy: -80, ang: Math.PI * 0.5 }
+                dockBoat: { spr: "speedboat_v8", dx: 180, dy: -120, ang: Math.PI * 0.5 }
             }
         ];
 

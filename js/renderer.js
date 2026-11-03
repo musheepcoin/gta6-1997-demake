@@ -2058,6 +2058,8 @@ class RetroRenderer {
                 meta.sprites.objects["house_canal_villa"]         = [598,  3580, 240, 160];
                 meta.sprites.objects["house_florida_bungalow"]    = [854,  3580, 212, 148];
                 meta.sprites.objects["house_keys_stilt"]          = [1082, 3580, 204, 152];
+                meta.sprites.objects["roof_artdeco_terrazzo"]     = [1302, 3580, 220, 156];
+                meta.sprites.objects["roof_rusted_tin"]           = [1538, 3580, 200, 148];
 
                 meta.sprites.objects["mansion_star_island_top"]    = [10,  3780, 176, 118];
                 meta.sprites.objects["mansion_modern_luxury_top"]  = [202, 3780, 152, 104];
@@ -2072,6 +2074,8 @@ class RetroRenderer {
                 meta.sprites.objects["wall_canal_front"]          = [874,  3915, 224, 60];
                 meta.sprites.objects["wall_bungalow_front"]       = [1108, 3915, 198, 56];
                 meta.sprites.objects["wall_keys_front"]           = [1316, 3915, 188, 72];
+                meta.sprites.objects["wall_artdeco_front"]        = [1516, 3915, 220, 64];
+                meta.sprites.objects["wall_shack_front"]          = [1748, 3915, 180, 64];
 
                 meta.sprites.objects["wall_star_side"]            = [10,   3995, 168, 64];
                 meta.sprites.objects["wall_modern_side"]          = [190,  3995, 152, 64];
@@ -2079,6 +2083,8 @@ class RetroRenderer {
                 meta.sprites.objects["wall_canal_upper"]          = [514,  3995, 120, 52];
                 meta.sprites.objects["wall_bungalow_side"]        = [646,  3995, 136, 56];
                 meta.sprites.objects["wall_keys_side"]            = [794,  3995, 140, 72];
+                meta.sprites.objects["wall_artdeco_side"]         = [946,  3995, 156, 64];
+                meta.sprites.objects["wall_shack_side"]           = [1114, 3995, 148, 64];
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
@@ -5007,10 +5013,8 @@ class RetroRenderer {
                 const tb = tikis[i];
                 if (tb.x < minX - 96 || tb.x > maxX + 96 || tb.y < minY - 96 || tb.y > maxY + 96) continue;
                 const bz = tb.z || 2.0;
-                // Solar ground shadow + 4 bamboo corner posts + elevated thatched Tiki Bar roof
+                // Solar ground shadow (true 3D bamboo posts, mahogany bar & 3D pitched thatch roof rendered by WorldObjectEngine)
                 this.batchObjectSprite3D("tiki_hut_roof", tb.x + sunCos * 8, tb.y + sunSin * 8, bz + 0.015, tb.ang, 1.08, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.32);
-                this.pushSolidQuad3D(tb.x, tb.y, bz + 0.042, 36, 12, tb.ang, 0.58, 0.36, 0.16, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.batchObjectSprite3D("tiki_hut_roof", tb.x, tb.y, bz + 0.165, tb.ang, 1.08, SPRITE_DRAW_ORDER.TREES);
                 // 2 Sidewalk Café Umbrella Tables beside the Tiki Bar + Bartender & Patrons
                 const cs = Math.cos(tb.ang), sn = Math.sin(tb.ang);
                 this.batchObjectSprite3D("cafe_table_umb", tb.x + cs * 38 - sn * 12, tb.y + sn * 38 + cs * 12, bz + 0.12, this.time * 0.2 + i, 1.0, SPRITE_DRAW_ORDER.TREES);
@@ -5040,11 +5044,7 @@ class RetroRenderer {
                     const st = ind.smokestacks[i];
                     if (st.x < minX - 140 || st.x > maxX + 140 || st.y < minY - 140 || st.y > maxY + 140) continue;
                     const rz = st.z || 3.0;
-                    for (let lv = 0; lv < 6; lv++) {
-                        const sz = 14.0 - lv * 1.1;
-                        const isRed = (lv % 2 === 1);
-                        this.pushSolidQuad3D(st.x, st.y, rz + lv * 0.065, sz, sz, 0, isRed ? 0.86 : 0.92, isRed ? 0.22 : 0.92, isRed ? 0.20 : 0.94, 0.98, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
-                    }
+                    // True 3D red-and-white striped refinery smokestack tower rendered in WorldObjectEngine.buildStatic3DMesh
                     // Rising 3D steam/smoke puffs drifting from stack top
                     for (let p = 0; p < 3; p++) {
                         const age = ((this.time * 0.9 + st.seed + p * 0.33) % 1.0);
