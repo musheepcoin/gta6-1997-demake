@@ -6593,8 +6593,8 @@ class LeonidaGame {
 
         if (isBicycle) {
             // A pedal bicycle crumples mechanically without any fireball or explosion!
-            if (this.audio && typeof this.audio.playCrash === "function") {
-                this.audio.playCrash(0.55);
+            if (this.audio && typeof this.audio.playCarCrash === "function") {
+                this.audio.playCarCrash(0.55);
             }
             for (let i = 0; i < 8; i++) {
                 this.spawnParticle(

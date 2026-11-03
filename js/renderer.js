@@ -7105,32 +7105,24 @@ class RetroRenderer {
                 if (gSc.x < -160 || gSc.x > W + 160 || gSc.y < -160 || gSc.y > H + 160) continue;
                 const pxScale = (gSc.scale * H) / 128.0;
 
-                // Elevated 3D lamp head position for the warm, progressively diffuse golden-yellow radial halo
+                // Elevated 3D lamp head position for the soft, translucent golden-yellow radial halo
                 const hSc = this.worldToScreen(effHX, effHY, sz + 0.56 - zDrop);
 
                 if (sl.colorType === "SODIUM") {
-                    addLightPool(gSc.x, gSc.y, 96 * pxScale, "rgba(255, 198, 82, 0.90)", "rgba(230, 140, 30, 0.38)");
-                    addLightPool(hSc.x, hSc.y, 38 * pxScale, "rgba(255, 215, 105, 0.75)", "rgba(235, 155, 40, 0.25)");
+                    addLightPool(gSc.x, gSc.y, 68 * pxScale, "rgba(255, 196, 82, 0.56)", "rgba(225, 138, 30, 0.20)");
                     highResFlares.push({
                         x: hSc.x,
                         y: hSc.y,
-                        r: 36 * pxScale,
-                        gx: gSc.x,
-                        gy: gSc.y,
-                        gr: 58 * pxScale,
+                        r: 24 * pxScale,
                         isLampHalo: true,
                         warmSodium: true
                     });
                 } else {
-                    addLightPool(gSc.x, gSc.y, 98 * pxScale, "rgba(255, 216, 98, 0.92)", "rgba(240, 168, 45, 0.40)");
-                    addLightPool(hSc.x, hSc.y, 40 * pxScale, "rgba(255, 228, 120, 0.78)", "rgba(240, 175, 50, 0.26)");
+                    addLightPool(gSc.x, gSc.y, 70 * pxScale, "rgba(255, 214, 96, 0.58)", "rgba(235, 165, 42, 0.22)");
                     highResFlares.push({
                         x: hSc.x,
                         y: hSc.y,
-                        r: 38 * pxScale,
-                        gx: gSc.x,
-                        gy: gSc.y,
-                        gr: 60 * pxScale,
+                        r: 25 * pxScale,
                         isLampHalo: true,
                         warmSodium: false
                     });
@@ -7147,8 +7139,8 @@ class RetroRenderer {
                 if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
                 const pxScale = (sc.scale * H) / 128.0;
                 if (vd.kind === "BISTRO_STRING") {
-                    addLightPool(sc.x, sc.y, 68 * pxScale, "rgba(255, 205, 120, 0.84)", "rgba(235, 145, 55, 0.32)");
-                    highResFlares.push({ x: sc.x, y: sc.y, r: 28 * pxScale, isLampHalo: true, warmSodium: false });
+                    addLightPool(sc.x, sc.y, 54 * pxScale, "rgba(255, 200, 118, 0.55)", "rgba(235, 140, 55, 0.20)");
+                    highResFlares.push({ x: sc.x, y: sc.y, r: 18 * pxScale, isLampHalo: true, warmSodium: false });
                 } else if (vd.kind === "SERPENTINE_WALL") {
                     const isPink = vd.theme === "PINK";
                     addLightPool(
@@ -7494,34 +7486,20 @@ class RetroRenderer {
             for (const f of highResFlares) {
                 const r = Math.max(2, f.r);
                 if (f.isLampHalo) {
-                    // 1. Soft diffuse golden-yellow ground scatter beneath the streetlamp
-                    if (f.gx !== undefined && f.gy !== undefined && f.gr > 2) {
-                        const gg = ctx.createRadialGradient(f.gx, f.gy, 0, f.gx, f.gy, f.gr);
-                        gg.addColorStop(0.0, f.warmSodium ? "rgba(255, 205, 85, 0.22)" : "rgba(255, 220, 105, 0.24)");
-                        gg.addColorStop(0.45, f.warmSodium ? "rgba(250, 180, 55, 0.10)" : "rgba(255, 200, 75, 0.11)");
-                        gg.addColorStop(0.80, "rgba(240, 160, 35, 0.03)");
-                        gg.addColorStop(1.0, "rgba(240, 160, 35, 0.0)");
-                        ctx.fillStyle = gg;
-                        ctx.beginPath();
-                        ctx.arc(f.gx, f.gy, f.gr, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-
-                    // 2. Progressively diffuse multi-stop golden-yellow radial halo around the luminaire bulb (no star spikes!)
+                    // Subtle, translucent multi-stop golden-yellow radial halo around the luminaire bulb
+                    // (keeps alpha low so the 3D streetlamp pole, cantilever arm & hood remain 100% visible!)
                     const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
                     if (f.warmSodium) {
-                        g.addColorStop(0.00, "rgba(255, 246, 200, 0.90)");
-                        g.addColorStop(0.10, "rgba(255, 222, 118, 0.68)");
-                        g.addColorStop(0.24, "rgba(255, 198, 72, 0.38)");
-                        g.addColorStop(0.46, "rgba(248, 172, 42, 0.17)");
-                        g.addColorStop(0.72, "rgba(238, 148, 24, 0.06)");
-                        g.addColorStop(1.00, "rgba(238, 148, 24, 0.0)");
+                        g.addColorStop(0.00, "rgba(255, 228, 125, 0.32)");
+                        g.addColorStop(0.18, "rgba(255, 205, 82, 0.20)");
+                        g.addColorStop(0.42, "rgba(248, 178, 48, 0.10)");
+                        g.addColorStop(0.72, "rgba(238, 152, 28, 0.04)");
+                        g.addColorStop(1.00, "rgba(238, 152, 28, 0.0)");
                     } else {
-                        g.addColorStop(0.00, "rgba(255, 250, 215, 0.92)");
-                        g.addColorStop(0.10, "rgba(255, 232, 135, 0.70)");
-                        g.addColorStop(0.24, "rgba(255, 212, 85, 0.40)");
-                        g.addColorStop(0.46, "rgba(252, 188, 52, 0.18)");
-                        g.addColorStop(0.72, "rgba(245, 165, 32, 0.06)");
+                        g.addColorStop(0.00, "rgba(255, 236, 140, 0.34)");
+                        g.addColorStop(0.18, "rgba(255, 215, 92, 0.22)");
+                        g.addColorStop(0.42, "rgba(252, 190, 56, 0.11)");
+                        g.addColorStop(0.72, "rgba(245, 165, 32, 0.04)");
                         g.addColorStop(1.00, "rgba(245, 165, 32, 0.0)");
                     }
                     ctx.fillStyle = g;

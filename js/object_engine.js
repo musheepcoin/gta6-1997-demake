@@ -2934,15 +2934,13 @@ class WorldObjectEngine {
         const cx = pCar ? pCar.x : (player ? player.x : 0);
         const cy = pCar ? pCar.y : (player ? player.y : 0);
         const isMicroVeh = pCar && (pCar.specKey === "BMX_BIKE" || pCar.specKey === "E_SCOOTER");
-        const isHeavyVeh = pCar && !isMicroVeh && (
-            pCar.crushesCars ||
-            (pCar.w || 0) >= 54 ||
-            (pCar.maxHp || 0) >= 210 ||
-            [
-                "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "SWAT_VAN", "ARMORED_TRUCK",
-                "SEMI_TRUCK", "PICKUP_TRUCK", "GATOR_4X4", "MONSTER_BUGGY", "MEDIC_AMBULANCE"
-            ].includes(pCar.specKey)
-        );
+        const heavySpecs = [
+            "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "TOUR_COACH", "TANKER_RIG",
+            "FLATBED_TRUCK", "BRINKS_TRUCK", "SWAT_ENFORCER", "BOXVILLE_VAN",
+            "HOTDOG_VAN", "MEDIC_AMBULANCE", "MONSTER_BUGGY", "GATOR_4X4",
+            "PICKUP_TRUCK", "CAMPER_PICKUP"
+        ];
+        const isHeavyVeh = Boolean(pCar && !isMicroVeh && (pCar.crushesCars || heavySpecs.includes(pCar.specKey)));
 
         if (this.streetProps && this.streetProps.length > 0) {
             for (let i = 0; i < this.streetProps.length; i++) {
@@ -2984,36 +2982,44 @@ class WorldObjectEngine {
                     continue;
                 }
 
-                if (pCar && !isMicroVeh && Math.abs(pCar.x - sp.x) < 32 && Math.abs(pCar.y - sp.y) < 32) {
+                if (pCar && !isMicroVeh && Math.abs(pCar.x - sp.x) < 30 && Math.abs(pCar.y - sp.y) < 30) {
                     const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                    if (spd > 24 && Math.hypot(pCar.x - sp.x, pCar.y - sp.y) < 28 && (sp.hitCooldown || 0) <= 0) {
+                    const dist = Math.hypot(pCar.x - sp.x, pCar.y - sp.y);
+                    if (dist < 24 && spd > 42 && (sp.hitCooldown || 0) <= 0) {
                         const dx = sp.x - pCar.x;
                         const dy = sp.y - pCar.y;
                         const d = Math.hypot(dx, dy) || 1.0;
 
-                        if (sp.kind === "STREETLIGHT_NEON" && !isHeavyVeh && !sp.damaged && spd < 185) {
-                            // Normal car bends/damages the streetlamp first!
+                        if (sp.kind === "STREETLIGHT_NEON" && !isHeavyVeh) {
+                            // Standard cars ONLY bend/damage streetlamps — they never knock them down!
+                            const wasDamaged = sp.damaged;
                             sp.damaged = true;
-                            sp.hitCooldown = 0.65;
+                            sp.hitCooldown = 0.75;
                             const impAng = Math.atan2(pCar.vy || Math.sin(pCar.angle), pCar.vx || Math.cos(pCar.angle));
                             sp.tiltDx = Math.cos(impAng) * 6.5;
                             sp.tiltDy = Math.sin(impAng) * 6.5;
-                            pCar.vx *= 0.62;
-                            pCar.vy *= 0.62;
+                            // Push car back off the steel pole & damp velocity
+                            pCar.x = sp.x - (dx / d) * 25;
+                            pCar.y = sp.y - (dy / d) * 25;
+                            pCar.vx *= -0.28;
+                            pCar.vy *= -0.28;
+                            pCar.speed = Math.hypot(pCar.vx, pCar.vy);
                             if (typeof pCar.receiveImpactDamage === "function") {
-                                pCar.receiveImpactDamage(9, sp.x, sp.y);
+                                pCar.receiveImpactDamage(10, sp.x, sp.y);
                             }
-                            if (game.audio && typeof game.audio.playCrash === "function") {
-                                game.audio.playCrash(0.45);
+                            if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                game.audio.playCarCrash(0.85);
                             }
                             if (typeof game.spawnParticle === "function") {
                                 for (let k = 0; k < 6; k++) {
                                     game.spawnParticle(sp.x + (Math.random() - 0.5) * 10, sp.y + (Math.random() - 0.5) * 10, "SPARK");
                                 }
                             }
-                            if (typeof game.addScore === "function") game.addScore(40);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ LAMPADAIRE ABÎMÉ! +$40", color: "#fde047", life: 1.15 });
+                            if (!wasDamaged) {
+                                if (typeof game.addScore === "function") game.addScore(40);
+                                if (Array.isArray(game.floatingTexts)) {
+                                    game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ LAMPADAIRE ABÎMÉ! +$40", color: "#fde047", life: 1.15 });
+                                }
                             }
                             continue;
                         }
@@ -3025,6 +3031,12 @@ class WorldObjectEngine {
                         sp.vy = (dy / d) * launchSpd;
                         sp.vz = 0.55;
                         sp.vang = (Math.random() - 0.5) * 16.0;
+                        if (game.audio && typeof game.audio.playCarCrash === "function") {
+                            game.audio.playCarCrash(1.1);
+                        }
+                        if (game.audio && typeof game.audio.playCrateSmash === "function") {
+                            game.audio.playCrateSmash();
+                        }
 
                         if (sp.kind === "HYDRANT") {
                             sp.geyserTimer = 14.0;
@@ -3033,9 +3045,6 @@ class WorldObjectEngine {
                                 game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST! +$125", color: "#38bdf8", life: 1.3 });
                             }
                         } else if (sp.kind === "STREETLIGHT_NEON") {
-                            if (game.audio && typeof game.audio.playCrash === "function") {
-                                game.audio.playCrash(0.65);
-                            }
                             if (typeof game.spawnParticle === "function") {
                                 for (let k = 0; k < 10; k++) {
                                     game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "SPARK");
@@ -3057,8 +3066,8 @@ class WorldObjectEngine {
         }
 
         // 3. Main 3D Curb Streetlamps (this.map.streetlights):
-        //    - Heavy vehicles (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
-        //    - Normal cars bend & damage them on impact ("abîmé", state = 1, tilting pole + flickering bulb + car bump), or snap them if already damaged!
+        //    - Heavy vehicles ONLY (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
+        //    - Standard cars ONLY bend & damage them ("abîmé", state = 1, tilting pole + flickering bulb + physical bounce & crash sound)!
         if (this.map && Array.isArray(this.map.streetlights)) {
             for (let i = 0; i < this.map.streetlights.length; i++) {
                 const sl = this.map.streetlights[i];
@@ -3087,17 +3096,19 @@ class WorldObjectEngine {
                     continue;
                 }
 
-                if (pCar && !isMicroVeh && Math.abs(pCar.x - sl.baseX) < 30 && Math.abs(pCar.y - sl.baseY) < 30) {
-                    const dist = Math.hypot(pCar.x - sl.baseX, pCar.y - sl.baseY);
+                if (pCar && !isMicroVeh && Math.abs(pCar.x - sl.baseX) < 28 && Math.abs(pCar.y - sl.baseY) < 28) {
+                    const dx = sl.baseX - pCar.x;
+                    const dy = sl.baseY - pCar.y;
+                    const dist = Math.hypot(dx, dy) || 1.0;
                     const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                    if (dist < 25 && spd > 22 && (sl.hitCooldown || 0) <= 0) {
+                    if (dist < 22 && spd > 42 && (sl.hitCooldown || 0) <= 0) {
                         const impAng = Math.atan2(
                             pCar.vy || Math.sin(pCar.angle),
                             pCar.vx || Math.cos(pCar.angle)
                         );
-                        const knockDown = isHeavyVeh || (sl.state === 1 && spd > 90) || spd >= 185;
 
-                        if (knockDown) {
+                        if (isHeavyVeh) {
+                            // Heavy vehicle uproots and knocks down the streetlamp!
                             sl.state = 2;
                             sl.timer = 0;
                             sl.hitCooldown = 0.8;
@@ -3109,18 +3120,13 @@ class WorldObjectEngine {
                             sl.fallVy = Math.sin(impAng) * launchSpd;
                             sl.fallVang = (Math.random() - 0.5) * 8.5;
 
-                            if (isHeavyVeh) {
-                                pCar.vx *= 0.93;
-                                pCar.vy *= 0.93;
-                            } else {
-                                pCar.vx *= 0.68;
-                                pCar.vy *= 0.68;
-                                if (typeof pCar.receiveImpactDamage === "function") {
-                                    pCar.receiveImpactDamage(11, sl.baseX, sl.baseY);
-                                }
+                            pCar.vx *= 0.90;
+                            pCar.vy *= 0.90;
+                            if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                game.audio.playCarCrash(1.15);
                             }
-                            if (game.audio && typeof game.audio.playCrash === "function") {
-                                game.audio.playCrash(0.65);
+                            if (game.audio && typeof game.audio.playCrateSmash === "function") {
+                                game.audio.playCrateSmash();
                             }
                             if (typeof game.spawnParticle === "function") {
                                 for (let k = 0; k < 10; k++) {
@@ -3143,18 +3149,22 @@ class WorldObjectEngine {
                                 });
                             }
                         } else {
-                            // Normal car bends & damages the streetlamp!
+                            // Standard car ONLY bends & damages the streetlamp and bounces off the pole!
+                            const wasDamaged = (sl.state === 1);
                             sl.state = 1;
-                            sl.hitCooldown = 0.65;
+                            sl.hitCooldown = 0.75;
                             sl.tiltDx = Math.cos(impAng) * 7.5;
                             sl.tiltDy = Math.sin(impAng) * 7.5;
-                            pCar.vx *= 0.60;
-                            pCar.vy *= 0.60;
+                            pCar.x = sl.baseX - (dx / dist) * 23;
+                            pCar.y = sl.baseY - (dy / dist) * 23;
+                            pCar.vx *= -0.30;
+                            pCar.vy *= -0.30;
+                            pCar.speed = Math.hypot(pCar.vx, pCar.vy);
                             if (typeof pCar.receiveImpactDamage === "function") {
-                                pCar.receiveImpactDamage(9, sl.baseX, sl.baseY);
+                                pCar.receiveImpactDamage(11, sl.baseX, sl.baseY);
                             }
-                            if (game.audio && typeof game.audio.playCrash === "function") {
-                                game.audio.playCrash(0.45);
+                            if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                game.audio.playCarCrash(0.85);
                             }
                             if (typeof game.spawnParticle === "function") {
                                 for (let k = 0; k < 6; k++) {
@@ -3165,16 +3175,18 @@ class WorldObjectEngine {
                                     );
                                 }
                             }
-                            if (typeof game.addScore === "function") game.addScore(40);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({
-                                    x: sl.baseX,
-                                    y: sl.baseY,
-                                    z: 2.38,
-                                    text: "⚡ LAMPADAIRE ABÎMÉ! +$40",
-                                    color: "#fde047",
-                                    life: 1.15
-                                });
+                            if (!wasDamaged) {
+                                if (typeof game.addScore === "function") game.addScore(40);
+                                if (Array.isArray(game.floatingTexts)) {
+                                    game.floatingTexts.push({
+                                        x: sl.baseX,
+                                        y: sl.baseY,
+                                        z: 2.38,
+                                        text: "⚡ LAMPADAIRE ABÎMÉ! +$40",
+                                        color: "#fde047",
+                                        life: 1.15
+                                    });
+                                }
                             }
                         }
                     }
