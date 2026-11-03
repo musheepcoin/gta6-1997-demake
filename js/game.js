@@ -5282,6 +5282,100 @@ class LeonidaGame {
 
 
 
+        if (reason === "CRIMINAL_DEPLOY") {
+
+            const gangPool = ["vc_haitian", "vc_cuban", "g2_zaibatsu", "g2_russian", "g2_mugger"];
+
+            const gType1 = gangPool[Math.floor(Math.random() * gangPool.length)];
+
+            const gType2 = gangPool[Math.floor(Math.random() * gangPool.length)];
+
+            this.peds.push(new Pedestrian({
+
+                x: doorX,
+
+                y: doorY,
+
+                z: vz,
+
+                angle: vehicle.angle + Math.PI,
+
+                speed: 98,
+
+                kind: "CRIMINAL",
+
+                g24Type: gType1,
+
+                g2Remapped: true,
+
+                shirtColor: "#ef4444",
+
+                hp: 95,
+
+                maxHp: 95,
+
+                copWeapon: "UZI",
+
+                shootCooldown: 0.25,
+
+                dead: false,
+
+                panicTimer: 0,
+
+                exitAnimTimer: 0.32
+
+            }));
+
+            const doorX2 = vehicle.x + Math.sin(vehicle.angle) * 28;
+
+            const doorY2 = vehicle.y - Math.cos(vehicle.angle) * 28;
+
+            this.peds.push(new Pedestrian({
+
+                x: doorX2,
+
+                y: doorY2,
+
+                z: vz,
+
+                angle: vehicle.angle + Math.PI,
+
+                speed: 96,
+
+                kind: "CRIMINAL",
+
+                g24Type: gType2,
+
+                g2Remapped: true,
+
+                shirtColor: "#f97316",
+
+                hp: 85,
+
+                maxHp: 85,
+
+                copWeapon: Math.random() < 0.45 ? "SHOTGUN" : "PISTOL",
+
+                shootCooldown: 0.35,
+
+                dead: false,
+
+                panicTimer: 0,
+
+                exitAnimTimer: 0.32
+
+            }));
+
+            vehicle.wasCriminalCar = true;
+
+            this.addFloatingText(doorX, doorY - 22, "🔫 GANGSTERS BAILED OUT — SHOOTOUT!", "#f97316");
+
+            return;
+
+        }
+
+
+
         if (reason === "COP_DEPLOY" || vehicle.isPolice) {
 
             const isSwat = vehicle.specKey === "SWAT_ENFORCER";
@@ -5292,6 +5386,8 @@ class LeonidaGame {
 
             const isCarjacked = reason === "CARJACK";
 
+            const deployTarget = this.getNearestWantedTarget(doorX, doorY) || this.player;
+
             this.peds.push(new Pedestrian({
 
                 x: doorX,
@@ -5300,7 +5396,7 @@ class LeonidaGame {
 
                 z: vz,
 
-                angle: Math.atan2(this.player.y - doorY, this.player.x - doorX),
+                angle: Math.atan2(deployTarget.y - doorY, deployTarget.x - doorX),
 
                 speed: isSwat ? 104 : 98,
 
@@ -6058,11 +6154,9 @@ class LeonidaGame {
 
         const effectiveGlobalWanted = Math.max(this.wantedLevel || 0, anyRemoteWanted ? this.net.getMaxWantedLevel() : 0);
 
-        if (effectiveGlobalWanted <= 0) return null;
 
 
-
-        if (p && !p.dead && (this.wantedLevel > 0 || !anyRemoteWanted)) {
+        if (effectiveGlobalWanted > 0 && p && !p.dead && (this.wantedLevel > 0 || !anyRemoteWanted)) {
 
             const v = p.inVehicle;
 
@@ -6086,6 +6180,8 @@ class LeonidaGame {
 
                 isRemote: false,
 
+                isCriminalNPC: false,
+
                 wantedLevel: this.wantedLevel || effectiveGlobalWanted
 
             });
@@ -6094,7 +6190,7 @@ class LeonidaGame {
 
 
 
-        if (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0) {
+        if (effectiveGlobalWanted > 0 && this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0) {
 
             for (const rp of this.net.remotePlayers.values()) {
 
@@ -6122,6 +6218,8 @@ class LeonidaGame {
 
                         isRemote: true,
 
+                        isCriminalNPC: false,
+
                         wantedLevel: rp.wantedLevel || effectiveGlobalWanted
 
                     });
@@ -6130,6 +6228,50 @@ class LeonidaGame {
 
             }
 
+        }
+
+
+
+        // Ambient Crime Targets (AI_CRIMINAL getaway vehicles & CRIMINAL bandits on foot within 950px)
+        if (Array.isArray(this.vehicles)) {
+            for (const v of this.vehicles) {
+                if (v.destroyed || v.driver !== "AI_CRIMINAL") continue;
+                if (Math.hypot(v.x - fromX, v.y - fromY) > 950) continue;
+                candidates.push({
+                    x: v.x,
+                    y: v.y,
+                    z: v.z || 2.0,
+                    angle: v.angle || 0,
+                    vx: v.vx || 0,
+                    vy: v.vy || 0,
+                    speed: v.speed || Math.hypot(v.vx || 0, v.vy || 0),
+                    inVehicle: true,
+                    isRemote: false,
+                    isCriminalNPC: true,
+                    vehRef: v,
+                    wantedLevel: 2
+                });
+            }
+        }
+        if (Array.isArray(this.peds)) {
+            for (const ped of this.peds) {
+                if (ped.dead || ped.kind !== "CRIMINAL") continue;
+                if (Math.hypot(ped.x - fromX, ped.y - fromY) > 950) continue;
+                candidates.push({
+                    x: ped.x,
+                    y: ped.y,
+                    z: ped.z || 2.0,
+                    angle: ped.angle || 0,
+                    vx: Math.cos(ped.angle || 0) * (ped.speed || 0),
+                    vy: Math.sin(ped.angle || 0) * (ped.speed || 0),
+                    speed: ped.speed || 0,
+                    inVehicle: false,
+                    isRemote: false,
+                    isCriminalNPC: true,
+                    pedRef: ped,
+                    wantedLevel: 2
+                });
+            }
         }
 
 
@@ -6622,29 +6764,35 @@ class LeonidaGame {
 
         if (playerResponsible) {
 
-            this.addCash(500, `${v.name} WRECKED!`);
+            const isCriminalCar = (v.driver === "AI_CRIMINAL" || v.wasCriminalCar);
+
+            this.addCash(500, isCriminalCar ? `⚖️ VIGILANTE TAKEDOWN! (${v.name})` : `${v.name} WRECKED!`);
 
             this.recordFrenzyKill();
 
-            this.wantedDecayTimer = 0;
+            if (!isCriminalCar) {
 
-            if (v.isPolice) {
+                this.wantedDecayTimer = 0;
 
-                if (Math.random() < 0.85) {
+                if (v.isPolice) {
 
-                    this.crimeHeat = (this.crimeHeat || 0) + 3;
+                    if (Math.random() < 0.85) {
 
-                    this.setWantedLevel(Math.max(2, this.wantedLevel + 1));
+                        this.crimeHeat = (this.crimeHeat || 0) + 3;
+
+                        this.setWantedLevel(Math.max(2, this.wantedLevel + 1));
+
+                    }
+
+                } else if (Math.random() < 0.60) {
+
+                    this.crimeHeat = (this.crimeHeat || 0) + 2;
+
+                    const targetWanted = Math.min(6, Math.max(this.wantedLevel, 1 + Math.floor(this.crimeHeat / 4)));
+
+                    this.setWantedLevel(targetWanted);
 
                 }
-
-            } else if (Math.random() < 0.60) {
-
-                this.crimeHeat = (this.crimeHeat || 0) + 2;
-
-                const targetWanted = Math.min(6, Math.max(this.wantedLevel, 1 + Math.floor(this.crimeHeat / 4)));
-
-                this.setWantedLevel(targetWanted);
 
             }
 
@@ -6730,7 +6878,11 @@ class LeonidaGame {
 
         this.recordFrenzyKill();
 
-        this.wantedDecayTimer = 0;
+        if (ped.kind !== "CRIMINAL") {
+
+            this.wantedDecayTimer = 0;
+
+        }
 
 
 
@@ -6744,7 +6896,7 @@ class LeonidaGame {
 
             }
 
-        } else if (ped.kind !== "GATOR" && Math.random() < 0.38) {
+        } else if (ped.kind !== "GATOR" && ped.kind !== "CRIMINAL" && Math.random() < 0.38) {
 
             this.crimeHeat = (this.crimeHeat || 0) + 1;
 
@@ -6794,9 +6946,9 @@ class LeonidaGame {
 
 
 
-        const reward = ped.kind === "COP" ? 1000 : (ped.kind === "GATOR" ? 600 : 100);
+        const reward = ped.kind === "COP" ? 1000 : (ped.kind === "GATOR" ? 600 : (ped.kind === "CRIMINAL" ? 500 : 100));
 
-        const label = ped.kind === "COP" ? "COP DOWN!" : (ped.kind === "GATOR" ? "GATOR BAG!" : "");
+        const label = ped.kind === "COP" ? "COP DOWN!" : (ped.kind === "GATOR" ? "GATOR BAG!" : (ped.kind === "CRIMINAL" ? "⚖️ VIGILANTE BONUS!" : ""));
 
         this.addCash(reward, label);
 
@@ -7104,11 +7256,13 @@ class LeonidaGame {
 
 
 
-    fireWeapon(shooterX, shooterY, angle, weaponKey, isPlayer = true, fromJason = false) {
+    fireWeapon(shooterX, shooterY, angle, weaponKey, isPlayer = true, fromJason = false, npcFaction = null) {
 
         const spec = WEAPON_SPECS[weaponKey] || WEAPON_SPECS.PISTOL;
 
-        this.audio.playShot(weaponKey);
+        if (isPlayer || !this.player || Math.hypot(shooterX - this.player.x, shooterY - this.player.y) < 560) {
+            this.audio.playShot(weaponKey);
+        }
 
 
 
@@ -7268,6 +7422,8 @@ class LeonidaGame {
 
                 fromJason: Boolean(fromJason),
 
+                npcFaction: npcFaction || null,
+
                 r: spec.isFlame ? 9 : 4
 
             };
@@ -7313,6 +7469,420 @@ class LeonidaGame {
     updatePedestrianSpawner(_dt) {
 
         // Handled by TrafficManager::UpdateTraffic(dt) (generateTrafficPeds + removeOffscreenPeds)
+
+    }
+
+
+
+    updateAmbientCrimeEvents(dt) {
+
+        const p = this.player;
+
+        if (!p || p.dead || this.activeInterior) return;
+
+
+
+        if (this.ambientCrimeCooldown === undefined) {
+
+            this.ambientCrimeCooldown = 16.0;
+
+        }
+
+        this.ambientCrimeCooldown -= dt;
+
+        if (this.ambientCrimeCooldown > 0) return;
+
+
+
+        // Check if an ambient crime event is already unfolding nearby
+
+        let activeNearby = 0;
+
+        for (const v of this.vehicles) {
+
+            if (!v.destroyed && v.driver === "AI_CRIMINAL" && Math.hypot(v.x - p.x, v.y - p.y) < 880) {
+
+                activeNearby++;
+
+            }
+
+        }
+
+        for (const ped of this.peds) {
+
+            if (!ped.dead && ped.kind === "CRIMINAL" && Math.hypot(ped.x - p.x, ped.y - p.y) < 880) {
+
+                activeNearby++;
+
+            }
+
+        }
+
+        if (activeNearby > 0) {
+
+            this.ambientCrimeCooldown = 12.0;
+
+            return;
+
+        }
+
+
+
+        // Pick a road block 250..500px from the player (biased slightly ahead of player's heading)
+
+        const baseHeading = p.inVehicle ? p.inVehicle.angle : p.angle;
+
+        let chosenPos = null;
+
+        for (let attempt = 0; attempt < 22; attempt++) {
+
+            const angOffset = attempt < 14 ? (Math.random() - 0.5) * 1.9 : (Math.random() - 0.5) * Math.PI * 2;
+
+            const ang = baseHeading + angOffset;
+
+            const dist = 255 + Math.random() * 235;
+
+            const tx = Math.floor((p.x + Math.cos(ang) * dist) / TILE_SIZE);
+
+            const ty = Math.floor((p.y + Math.sin(ang) * dist) / TILE_SIZE);
+
+            const blk = this.map.getBlockAt(tx, ty, 0);
+
+            if (!blk || blk.groundType !== GROUND_TYPE.ROAD) continue;
+
+            const wx = (tx + 0.5) * TILE_SIZE;
+
+            const wy = (ty + 0.5) * TILE_SIZE;
+
+            if (Math.hypot(wx - p.x, wy - p.y) < 210) continue;
+
+            const bCol = this.map.resolveCircleBuildingCollision(wx, wy, 24, 2.0);
+
+            if (bCol && bCol.hit) continue;
+
+            const roadEast = this.map.getGroundTypeAt(wx + TILE_SIZE, wy) === GROUND_TYPE.ROAD || this.map.getGroundTypeAt(wx - TILE_SIZE, wy) === GROUND_TYPE.ROAD;
+
+            const roadSouth = this.map.getGroundTypeAt(wx, wy + TILE_SIZE) === GROUND_TYPE.ROAD || this.map.getGroundTypeAt(wx, wy - TILE_SIZE) === GROUND_TYPE.ROAD;
+
+            let roadAng = 0;
+
+            if (roadEast && !roadSouth) roadAng = Math.random() < 0.5 ? 0 : Math.PI;
+
+            else if (roadSouth && !roadEast) roadAng = Math.random() < 0.5 ? Math.PI * 0.5 : -Math.PI * 0.5;
+
+            else roadAng = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5][Math.floor(Math.random() * 4)];
+
+            chosenPos = { x: wx, y: wy, z: this.map.getHeightAtPixel(wx, wy, 2.0), roadAng };
+
+            break;
+
+        }
+
+
+
+        if (!chosenPos) {
+
+            this.ambientCrimeCooldown = 6.0;
+
+            return;
+
+        }
+
+
+
+        this.ambientCrimeCooldown = 32.0 + Math.random() * 18.0;
+
+        const { x, y, z, roadAng } = chosenPos;
+
+        const fwdX = Math.cos(roadAng);
+
+        const fwdY = Math.sin(roadAng);
+
+        const sideX = -fwdY;
+
+        const sideY = fwdX;
+
+
+
+        const getawayPool = ["CRIMSON_STINGER", "NEON_BANSHEE", "SABRE_TURBO", "MUSCLE_97", "CHEETAH_GT"];
+
+        const getawayKey = getawayPool[Math.floor(Math.random() * getawayPool.length)];
+
+        const roll = Math.random();
+
+
+
+        if (roll < 0.42) {
+
+            // 1. HIGH_SPEED_CHASE: Getaway sports car fleeing at high speed with 1-2 VCPD / SWAT units in hot pursuit!
+
+            const crimCar = new Vehicle(x + fwdX * 26, y + fwdY * 26, getawayKey, z);
+
+            crimCar.angle = roadAng;
+
+            crimCar.driver = "AI_CRIMINAL";
+
+            crimCar.wasCriminalCar = true;
+
+            crimCar.speed = 195;
+
+            crimCar.vx = fwdX * 195;
+
+            crimCar.vy = fwdY * 195;
+
+            this.vehicles.push(crimCar);
+
+
+
+            const copCount = Math.random() < 0.45 ? 2 : 1;
+
+            for (let i = 0; i < copCount; i++) {
+
+                const backDist = 68 + i * 56;
+
+                const latOff = (i === 0 ? 1 : -1) * 10;
+
+                const copSpec = (i === 1 && Math.random() < 0.4) ? "SWAT_ENFORCER" : "POLICE_CRUISER";
+
+                const copCar = new Vehicle(x - fwdX * backDist + sideX * latOff, y - fwdY * backDist + sideY * latOff, copSpec, z);
+
+                copCar.angle = roadAng;
+
+                copCar.driver = "AI_COP";
+
+                copCar.sirenActive = true;
+
+                copCar.speed = 190;
+
+                copCar.vx = fwdX * 190;
+
+                copCar.vy = fwdY * 190;
+
+                this.vehicles.push(copCar);
+
+            }
+
+            this.addFloatingText(x, y - 28, "🚨 10-80 VCPD PURSUIT IN PROGRESS!", "#f97316");
+
+        } else if (roll < 0.78) {
+
+            // 2. GANG_HEIST_SHOOTOUT: Armed heist crew exchanging heavy gunfire with VCPD & SWAT officers in the street!
+
+            const crimCar = new Vehicle(x + fwdX * 20 + sideX * 12, y + fwdY * 20 + sideY * 12, getawayKey, z);
+
+            crimCar.angle = roadAng + 0.25;
+
+            crimCar.driver = null;
+
+            crimCar.wasCriminalCar = true;
+
+            crimCar.doorOpenTimer = 0.65;
+
+            this.vehicles.push(crimCar);
+
+
+
+            const banditCount = 2 + Math.floor(Math.random() * 2);
+
+            for (let i = 0; i < banditCount; i++) {
+
+                const bx = x + fwdX * (12 + i * 16) + sideX * ((i % 2 === 0 ? 1 : -1) * 20);
+
+                const by = y + fwdY * (12 + i * 16) + sideY * ((i % 2 === 0 ? 1 : -1) * 20);
+
+                this.peds.push(new Pedestrian({
+
+                    x: bx,
+
+                    y: by,
+
+                    z,
+
+                    kind: "CRIMINAL",
+
+                    hp: 95,
+
+                    copWeapon: i === 0 ? "SHOTGUN" : "UZI",
+
+                    angle: roadAng + Math.PI
+
+                }));
+
+            }
+
+
+
+            const copSpec = Math.random() < 0.38 ? "SWAT_ENFORCER" : "POLICE_CRUISER";
+
+            const copCar = new Vehicle(x - fwdX * 62 - sideX * 10, y - fwdY * 62 - sideY * 10, copSpec, z);
+
+            copCar.angle = roadAng - 0.22;
+
+            copCar.driver = "AI_COP";
+
+            copCar.sirenActive = true;
+
+            copCar.doorOpenTimer = 0.65;
+
+            this.vehicles.push(copCar);
+
+
+
+            const isSwat = copSpec === "SWAT_ENFORCER";
+
+            for (let i = 0; i < 2; i++) {
+
+                const cx = x - fwdX * (42 + i * 16) + sideX * ((i === 0 ? -1 : 1) * 22);
+
+                const cy = y - fwdY * (42 + i * 16) + sideY * ((i === 0 ? -1 : 1) * 22);
+
+                this.peds.push(new Pedestrian({
+
+                    x: cx,
+
+                    y: cy,
+
+                    z,
+
+                    kind: "COP",
+
+                    isSwat,
+
+                    hp: isSwat ? 140 : 105,
+
+                    copWeapon: isSwat ? "SHOTGUN" : (i === 0 ? "UZI" : "PISTOL"),
+
+                    angle: roadAng
+
+                }));
+
+            }
+
+            this.addFloatingText(x, y - 28, "🚨 10-71 GANG ROBBERY & VCPD SHOOTOUT!", "#f97316");
+
+        } else {
+
+            // 3. STREET_CARJACK_INTERVENTION: Bandits carjacking a sports car while VCPD intervenes!
+
+            const jackedCar = new Vehicle(x, y, getawayKey, z);
+
+            jackedCar.angle = roadAng;
+
+            jackedCar.driver = "AI_CRIMINAL";
+
+            jackedCar.wasCriminalCar = true;
+
+            jackedCar.doorOpenTimer = 0.55;
+
+            jackedCar.speed = 95;
+
+            jackedCar.vx = fwdX * 95;
+
+            jackedCar.vy = fwdY * 95;
+
+            this.vehicles.push(jackedCar);
+
+
+
+            // Ejected civilian owner fleeing in panic
+
+            const victim = new Pedestrian({
+
+                x: x + sideX * 24,
+
+                y: y + sideY * 24,
+
+                z,
+
+                kind: "CIVILIAN",
+
+                angle: roadAng + Math.PI * 0.5
+
+            });
+
+            victim.panicTimer = 7.0;
+
+            this.peds.push(victim);
+
+
+
+            // Accomplice bandit providing cover fire on foot
+
+            this.peds.push(new Pedestrian({
+
+                x: x - fwdX * 16 - sideX * 18,
+
+                y: y - fwdY * 16 - sideY * 18,
+
+                z,
+
+                kind: "CRIMINAL",
+
+                hp: 90,
+
+                copWeapon: "UZI",
+
+                angle: roadAng + Math.PI
+
+            }));
+
+
+
+            // Responding VCPD cruiser + officer
+
+            const copCar = new Vehicle(x - fwdX * 72, y - fwdY * 72, "POLICE_CRUISER", z);
+
+            copCar.angle = roadAng;
+
+            copCar.driver = "AI_COP";
+
+            copCar.sirenActive = true;
+
+            copCar.speed = 155;
+
+            copCar.vx = fwdX * 155;
+
+            copCar.vy = fwdY * 155;
+
+            this.vehicles.push(copCar);
+
+
+
+            this.peds.push(new Pedestrian({
+
+                x: x - fwdX * 50 + sideX * 22,
+
+                y: y - fwdY * 50 + sideY * 22,
+
+                z,
+
+                kind: "COP",
+
+                hp: 105,
+
+                copWeapon: "PISTOL",
+
+                angle: roadAng
+
+            }));
+
+            this.addFloatingText(x, y - 28, "🚨 10-31 ARMED CARJACKING — VCPD INTERVENING!", "#f97316");
+
+        }
+
+
+
+        // Nearby civilians panic when a shootout or pursuit erupts
+
+        for (const ped of this.peds) {
+
+            if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - x, ped.y - y) < 280) {
+
+                ped.panicTimer = 6.0;
+
+            }
+
+        }
 
     }
 
@@ -8634,7 +9204,11 @@ class LeonidaGame {
 
                         b.driver === "PLAYER" ||
 
-                        (this.wantedLevel > 0 && (a.driver === "AI_COP" || b.driver === "AI_COP"));
+                        a.driver === "AI_CRIMINAL" ||
+
+                        b.driver === "AI_CRIMINAL" ||
+
+                        ((a.driver === "AI_COP" || b.driver === "AI_COP") && (this.wantedLevel > 0 || a.sirenActive || b.sirenActive));
 
 
 
@@ -9066,6 +9640,8 @@ class LeonidaGame {
 
             if (ped.exitAnimTimer > 0) ped.exitAnimTimer = Math.max(0, ped.exitAnimTimer - dt);
 
+            if (ped.muzzleTimer > 0) ped.muzzleTimer = Math.max(0, ped.muzzleTimer - dt);
+
 
 
             if (isClientWorldSync) {
@@ -9378,7 +9954,7 @@ class LeonidaGame {
 
                 }
 
-            } else if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop || (this.net && this.net.getMaxWantedLevel && this.net.getMaxWantedLevel() > 0))) {
+            } else if (ped.kind === "COP") {
 
                 if ((ped.bustedGraceTimer || 0) > 0) {
 
@@ -9402,6 +9978,8 @@ class LeonidaGame {
 
                 } : null);
 
+                ped.inCombat = Boolean(copTarget);
+
                 if (copTarget) {
 
                     const dTarget = Math.hypot(copTarget.x - ped.x, copTarget.y - ped.y);
@@ -9410,7 +9988,9 @@ class LeonidaGame {
 
                     const copRunSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 104 : 96;
 
-                    if (dTarget > 28) {
+                    const idealDist = copTarget.isCriminalNPC ? 95 : 28;
+
+                    if (dTarget > idealDist) {
 
                         ped.angle = this.steerPedWithObstacleFeelers(ped, copTarget.x, copTarget.y);
 
@@ -9422,7 +10002,17 @@ class LeonidaGame {
 
                         ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
 
-                        if (!copTarget.isRemote && !p.dead && !((ped.bustedGraceTimer || 0) > 0)) {
+                        if (copTarget.isCriminalNPC && dTarget < 60) {
+
+                            // Tactical strafe when dueling armed criminals
+
+                            const strafeAng = ped.angle + Math.PI * 0.5 * ((ped.id % 2 === 0) ? 1 : -1);
+
+                            ped.x += Math.cos(strafeAng) * 52 * dt;
+
+                            ped.y += Math.sin(strafeAng) * 52 * dt;
+
+                        } else if (!copTarget.isRemote && !copTarget.isCriminalNPC && !p.dead && !((ped.bustedGraceTimer || 0) > 0)) {
 
                             // Cops never bust a player inside a vehicle; on foot, arrest only triggers below 25% HP!
 
@@ -9448,7 +10038,7 @@ class LeonidaGame {
 
                     ped.shootCooldown = (ped.shootCooldown || 0) - dt;
 
-                    if (dTarget < 310 && ped.shootCooldown <= 0) {
+                    if (dTarget < 325 && ped.shootCooldown <= 0) {
 
                         const blocked = this.map.traceSegment2D
 
@@ -9470,9 +10060,9 @@ class LeonidaGame {
 
                             ped.angle = aimAng;
 
-                            ped.muzzleTimer = 0.08;
+                            ped.muzzleTimer = 0.09;
 
-                            this.fireWeapon(ped.x, ped.y, aimAng, wep, false);
+                            this.fireWeapon(ped.x, ped.y, aimAng, wep, false, false, "COP");
 
                         } else {
 
@@ -9481,6 +10071,162 @@ class LeonidaGame {
                         }
 
                     }
+
+                } else {
+
+                    // Routine VCPD foot patrol when no wanted player or active criminal is nearby
+
+                    ped.x += Math.cos(ped.angle) * 42 * dt;
+
+                    ped.y += Math.sin(ped.angle) * 42 * dt;
+
+                    if (Math.random() < 0.015) ped.angle += (Math.random() - 0.5) * 1.2;
+
+                }
+
+            } else if (ped.kind === "CRIMINAL") {
+
+                // Ambient Bandit / Heist Crew AI: engages VCPD officers & cruisers in street shootouts (and player if attacked by player)
+
+                let crimTarget = null;
+
+                let bestCopDist = 440;
+
+                for (const other of this.peds) {
+
+                    if (!other.dead && other.kind === "COP") {
+
+                        const d = Math.hypot(other.x - ped.x, other.y - ped.y);
+
+                        if (d < bestCopDist) {
+
+                            bestCopDist = d;
+
+                            crimTarget = { x: other.x, y: other.y, vx: 0, vy: 0 };
+
+                        }
+
+                    }
+
+                }
+
+                for (const cv of this.vehicles) {
+
+                    if (!cv.destroyed && cv.driver === "AI_COP") {
+
+                        const d = Math.hypot(cv.x - ped.x, cv.y - ped.y);
+
+                        if (d < bestCopDist) {
+
+                            bestCopDist = d;
+
+                            crimTarget = { x: cv.x, y: cv.y, vx: cv.vx || 0, vy: cv.vy || 0 };
+
+                        }
+
+                    }
+
+                }
+
+                if (ped.attackedByPlayer && p && !p.dead) {
+
+                    const px = p.inVehicle ? p.inVehicle.x : p.x;
+
+                    const py = p.inVehicle ? p.inVehicle.y : p.y;
+
+                    const dp = Math.hypot(px - ped.x, py - ped.y);
+
+                    if (dp < bestCopDist) {
+
+                        bestCopDist = dp;
+
+                        crimTarget = { x: px, y: py, vx: p.inVehicle ? (p.inVehicle.vx || 0) : 0, vy: p.inVehicle ? (p.inVehicle.vy || 0) : 0 };
+
+                    }
+
+                }
+
+                if (crimTarget) {
+
+                    if (bestCopDist > 125) {
+
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, crimTarget.x, crimTarget.y);
+
+                        ped.x += Math.cos(ped.angle) * 86 * dt;
+
+                        ped.y += Math.sin(ped.angle) * 86 * dt;
+
+                    } else if (bestCopDist < 72) {
+
+                        const retreatAng = Math.atan2(ped.y - crimTarget.y, ped.x - crimTarget.x);
+
+                        ped.angle = Math.atan2(crimTarget.y - ped.y, crimTarget.x - ped.x);
+
+                        ped.x += Math.cos(retreatAng) * 68 * dt;
+
+                        ped.y += Math.sin(retreatAng) * 68 * dt;
+
+                    } else {
+
+                        // Tactical street shootout strafe
+
+                        ped.angle = Math.atan2(crimTarget.y - ped.y, crimTarget.x - ped.x);
+
+                        const strafeDir = ((Math.floor(performance.now() * 0.0012) + (ped.id || 0)) % 2 === 0) ? 1 : -1;
+
+                        const strafeAng = ped.angle + Math.PI * 0.5 * strafeDir;
+
+                        ped.x += Math.cos(strafeAng) * 58 * dt;
+
+                        ped.y += Math.sin(strafeAng) * 58 * dt;
+
+                    }
+
+                    ped.shootCooldown = (ped.shootCooldown || 0) - dt;
+
+                    if (bestCopDist < 330 && ped.shootCooldown <= 0) {
+
+                        const blocked = this.map.traceSegment2D
+
+                            ? this.map.traceSegment2D(ped.x, ped.y, crimTarget.x, crimTarget.y, ped.z || 2.0).hit
+
+                            : false;
+
+                        if (!blocked) {
+
+                            const wep = ped.copWeapon || "UZI";
+
+                            ped.shootCooldown = wep === "UZI" ? 0.30 : (wep === "SHOTGUN" ? 1.10 : 0.78);
+
+                            const leadX = crimTarget.x + (crimTarget.vx || 0) * 0.11;
+
+                            const leadY = crimTarget.y + (crimTarget.vy || 0) * 0.11;
+
+                            const aimAng = Math.atan2(leadY - ped.y, leadX - ped.x);
+
+                            ped.angle = aimAng;
+
+                            ped.muzzleTimer = 0.09;
+
+                            this.fireWeapon(ped.x, ped.y, aimAng, wep, false, false, "CRIMINAL");
+
+                        } else {
+
+                            ped.shootCooldown = 0.32;
+
+                        }
+
+                    }
+
+                } else {
+
+                    // All pursuing cops neutralized — bandits sprint away down the street with the loot!
+
+                    ped.x += Math.cos(ped.angle) * 96 * dt;
+
+                    ped.y += Math.sin(ped.angle) * 96 * dt;
+
+                    if (Math.random() < 0.025) ped.angle += (Math.random() - 0.5) * 1.1;
 
                 }
 
@@ -10460,6 +11206,9 @@ class LeonidaGame {
 
             }
 
+            // 7c. Ambient Random Street Crime & Police Intervention Events (Independent of Player)
+            this.updateAmbientCrimeEvents(dt);
+
         }
 
 
@@ -10558,7 +11307,11 @@ class LeonidaGame {
 
                     if (pr.fromPlayer && p.inVehicle === v) continue;
 
-                    if (!pr.fromPlayer && v.isPolice && p.inVehicle !== v) continue;
+                    if (!pr.fromPlayer && pr.npcFaction === "COP" && v.isPolice && p.inVehicle !== v) continue;
+
+                    if (!pr.fromPlayer && pr.npcFaction === "CRIMINAL" && v.driver === "AI_CRIMINAL") continue;
+
+                    if (!pr.fromPlayer && !pr.npcFaction && v.isPolice && p.inVehicle !== v) continue;
 
                     if (Math.hypot(v.x - pr.x, v.y - pr.y) < 24) {
 
@@ -10624,7 +11377,7 @@ class LeonidaGame {
 
             // Hit pedestrian?
 
-            if (!hitSomething && pr.fromPlayer) {
+            if (!hitSomething && (pr.fromPlayer || pr.npcFaction === "COP" || pr.npcFaction === "CRIMINAL")) {
 
                 for (const ped of this.peds) {
 
@@ -10632,7 +11385,15 @@ class LeonidaGame {
 
                     // Jason's cover fire never hits innocent civilians or monks!
 
-                    if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE") continue;
+                    if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE" && ped.kind !== "CRIMINAL") continue;
+
+                    // Police bullets only hit armed criminals on foot (never friendly fire other cops or civilians)
+
+                    if (pr.npcFaction === "COP" && ped.kind !== "CRIMINAL") continue;
+
+                    // Criminal bullets hit VCPD officers (and occasionally stray-hit nearby panicking civilians)
+
+                    if (pr.npcFaction === "CRIMINAL" && ped.kind !== "COP") continue;
 
                     if (Math.hypot(ped.x - pr.x, ped.y - pr.y) < 13) {
 
@@ -10644,7 +11405,7 @@ class LeonidaGame {
 
                                 ped.electroTimer = 1.5;
 
-                                ped.electroByPlayer = true;
+                                ped.electroByPlayer = Boolean(pr.fromPlayer);
 
                                 ped.burnTimer = 0;
 
@@ -10660,11 +11421,19 @@ class LeonidaGame {
 
                         }
 
-                        ped.hp -= pr.damage;
+                        const pedDmg = pr.fromPlayer ? pr.damage : pr.damage * 0.62;
+
+                        ped.hp -= pedDmg;
+
+                        if (pr.fromPlayer && ped.kind === "CRIMINAL") {
+
+                            ped.attackedByPlayer = true;
+
+                        }
 
                         this.spawnParticle(pr.x, pr.y, "BLOOD");
 
-                        if (ped.kind === "COP" && Math.random() < 0.80) {
+                        if (pr.fromPlayer && ped.kind === "COP" && Math.random() < 0.80) {
 
                             this.setWantedLevel(Math.max(this.wantedLevel, 2));
 
@@ -10680,9 +11449,9 @@ class LeonidaGame {
 
                             ped.burnTimer = 3.2;
 
-                            ped.panicTimer = ped.kind === "COP" ? 0 : 4.5;
+                            ped.panicTimer = (ped.kind === "COP" || ped.kind === "CRIMINAL") ? 0 : 4.5;
 
-                            if (ped.kind !== "COP") ped.angle = Math.random() * Math.PI * 2;
+                            if (ped.kind !== "COP" && ped.kind !== "CRIMINAL") ped.angle = Math.random() * Math.PI * 2;
 
                         }
 
@@ -10690,7 +11459,7 @@ class LeonidaGame {
 
                             if (pr.isFlame) ped.deathKind = "BURNT";
 
-                            this.killPed(ped, true);
+                            this.killPed(ped, Boolean(pr.fromPlayer));
 
                         }
 
@@ -10748,11 +11517,19 @@ class LeonidaGame {
 
 
 
-            // Hit player?
+            // Hit player? (Stray police bullets during an NPC crime shootout do NOT hurt an innocent bystander player!)
 
             if (!hitSomething && !pr.fromPlayer && !p.inVehicle) {
 
-                if (Math.hypot(p.x - pr.x, p.y - pr.y) < 13) {
+                const canHitPlayer =
+
+                    Boolean(pr.fromRemoteId) ||
+
+                    (pr.npcFaction === "COP" && this.wantedLevel > 0) ||
+
+                    (!pr.npcFaction && this.wantedLevel > 0);
+
+                if (canHitPlayer && Math.hypot(p.x - pr.x, p.y - pr.y) < 13) {
 
                     if (pr.fromRemoteId) {
 

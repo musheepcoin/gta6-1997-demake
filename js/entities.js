@@ -1841,8 +1841,19 @@ class Vehicle {
         }
         this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
 
-        // Wanted player off-road nearby (beach, plaza, park): cruiser leaves the asphalt and drives straight at them
+        // Wanted player or ambient criminal off-road nearby (beach, plaza, park): cruiser leaves the asphalt and drives straight at them
         const forceDirect = !targetOnRoad && distToPlayer < 720;
+
+        // When pursuing an ambient AI_CRIMINAL getaway vehicle, the police passenger fires bursts at the fleeing car!
+        if (wantedTarget.isCriminalNPC && wantedTarget.inVehicle && distToPlayer < 260 && game && typeof game.fireWeapon === "function") {
+            this.copDriveByTimer = (this.copDriveByTimer || 0) - dt;
+            if (this.copDriveByTimer <= 0) {
+                this.copDriveByTimer = 0.65 + Math.random() * 0.45;
+                const aimAng = Math.atan2(wantedTarget.y - this.y, wantedTarget.x - this.x);
+                game.fireWeapon(this.x, this.y, aimAng, this.specKey === "SWAT_ENFORCER" ? "UZI" : "PISTOL", false, false, "COP");
+            }
+        }
+
         return this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -1855,6 +1866,65 @@ class Vehicle {
             Boolean(wantedTarget.inVehicle && targetOnRoad),
             forceDirect
         );
+    }
+
+    /* ========================================================================
+       AMBIENT GANG / BANDIT GETAWAY VEHICLE AI (AI_CRIMINAL)
+       Speeds through traffic, exchanges drive-by gunfire with VCPD, and bails
+       out on foot for a street shootout when boxed in or heavily damaged!
+       ======================================================================== */
+    computeCriminalControls(dt, map, game) {
+        this.aiPanicTimer = Math.max(this.aiPanicTimer || 0, 8.0);
+        const ctrl = this.computeTrafficControls(dt, map, game);
+        ctrl.throttle = Math.max(ctrl.throttle, 0.86);
+
+        if (game) {
+            let nearestCop = null;
+            let bestCopDist = 340;
+            for (const v of game.vehicles) {
+                if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
+                    const d = Math.hypot(v.x - this.x, v.y - this.y);
+                    if (d < bestCopDist) {
+                        bestCopDist = d;
+                        nearestCop = v;
+                    }
+                }
+            }
+            for (const ped of game.peds) {
+                if (!ped.dead && ped.kind === "COP") {
+                    const d = Math.hypot(ped.x - this.x, ped.y - this.y);
+                    if (d < bestCopDist) {
+                        bestCopDist = d;
+                        nearestCop = ped;
+                    }
+                }
+            }
+
+            // Drive-by gunfire from the bandit getaway car at pursuing police!
+            if (nearestCop && bestCopDist < 285 && typeof game.fireWeapon === "function") {
+                this.crimDriveByTimer = (this.crimDriveByTimer || 0) - dt;
+                if (this.crimDriveByTimer <= 0) {
+                    this.crimDriveByTimer = 0.52 + Math.random() * 0.42;
+                    const aimAng = Math.atan2(nearestCop.y - this.y, nearestCop.x - this.x);
+                    game.fireWeapon(this.x, this.y, aimAng, "UZI", false, false, "CRIMINAL");
+                }
+            }
+
+            // Bail out on foot for a street gunfight if boxed in by police or vehicle is heavily damaged!
+            const boxedByCop = nearestCop && bestCopDist < 145 && Math.abs(this.speed || 0) < 34;
+            const heavilyDamaged = this.hp < this.maxHp * 0.44;
+            if (boxedByCop || heavilyDamaged) {
+                this.aiBailTimer = (this.aiBailTimer || 0) + dt;
+                if ((this.aiBailTimer > 0.75 || heavilyDamaged) && typeof game.ejectVehicleDriver === "function") {
+                    this.aiBailTimer = 0;
+                    game.ejectVehicleDriver(this, "CRIMINAL_DEPLOY");
+                    return { throttle: 0, steer: 0, handbrake: true };
+                }
+            } else {
+                this.aiBailTimer = Math.max(0, (this.aiBailTimer || 0) - dt);
+            }
+        }
+        return ctrl;
     }
 
     // Tracks whether an emergency vehicle is actually getting closer to its target; returns seconds without progress
@@ -2265,6 +2335,11 @@ class Vehicle {
                 throttle = copCtrl.throttle;
                 steer = copCtrl.steer;
                 handbrake = copCtrl.handbrake;
+            } else if (this.driver === "AI_CRIMINAL") {
+                const crimCtrl = this.computeCriminalControls(dt, map, game);
+                throttle = crimCtrl.throttle;
+                steer = crimCtrl.steer;
+                handbrake = crimCtrl.handbrake;
             }
 
             this.updateSteer(dt, steer);
@@ -2622,6 +2697,7 @@ class TrafficManager {
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
                 v.driver === "AI_EMERGENCY" ||
+                v.driver === "AI_CRIMINAL" ||
                 (!anyWanted && v.driver === "AI_COP");
             if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE") continue;
 
@@ -2747,15 +2823,23 @@ class TrafficManager {
         const game = this.game;
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 2));
+        const farRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 7));
 
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
-            if (ped.kind !== "CIVILIAN" || ped.missionTag) continue;
+            if (ped.missionTag) continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
-            const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
-            if (!nearAnyPlayer) {
-                game.peds.splice(i, 1);
+            if (ped.kind === "CIVILIAN") {
+                const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
+                if (!nearAnyPlayer) {
+                    game.peds.splice(i, 1);
+                }
+            } else if (ped.kind === "CRIMINAL" || (ped.kind === "COP" && (game.wantedLevel || 0) === 0)) {
+                const withinFar = farRects.some((r) => this.isPointInRect(bx, by, r));
+                if (!withinFar) {
+                    game.peds.splice(i, 1);
+                }
             }
         }
     }

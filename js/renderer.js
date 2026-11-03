@@ -5987,10 +5987,10 @@ class RetroRenderer {
                 const bh = Math.abs(Math.floor((ped.turnSeed || 1) * 17 + ped.animSeed * 313)) % beachPool.length;
                 pedType = beachPool[bh];
                 ped.g24Type = pedType;
-            } else if ((ped.kind === "CIVILIAN" || ped.kind === "HOSTILE") && !ped.g2Remapped && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
+            } else if ((ped.kind === "CIVILIAN" || ped.kind === "HOSTILE" || ped.kind === "CRIMINAL") && !ped.g2Remapped && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
                 // GTA 2 (1999) remap variety: re-dress generic GTA 1 civilians & gang members once
                 ped.g2Remapped = true;
-                const isGang = ped.kind === "HOSTILE" || pedType === "gang";
+                const isGang = ped.kind === "HOSTILE" || ped.kind === "CRIMINAL" || pedType === "gang";
                 const g2Type = this.pickGta2PedType(ped, isGang);
                 if (g2Type) {
                     pedType = g2Type;
@@ -6000,7 +6000,7 @@ class RetroRenderer {
             if (!pedType) {
                 if (ped.kind === "MONK") pedType = "monk";
                 else if (ped.kind === "COP") pedType = "police";
-                else if (ped.kind === "HOSTILE" || ped.archetype === "PAULY" || ped.archetype === "DELL") pedType = "gang";
+                else if (ped.kind === "HOSTILE" || ped.kind === "CRIMINAL" || ped.archetype === "PAULY" || ped.archetype === "DELL") pedType = "gang";
                 else {
                     const civTypes = ["gang", "civ0", "civ1", "civ2", "civ3"];
                     const h = Math.abs(Math.floor(ped.x * 0.13 + ped.y * 0.07)) % civTypes.length;
@@ -6038,8 +6038,12 @@ class RetroRenderer {
                 frameIdx = this.getPedFrameIndex("FIST", true, false, walkPhase);
             } else if (ped.kind === "COP") {
                 const walkPhase = this.time * 1.8 + ped.animSeed;
-                const copWeapon = (game.wantedLevel || 0) > 0 ? "PISTOL" : "FIST";
-                frameIdx = this.getPedFrameIndex(copWeapon, ped.speed > 0, (game.wantedLevel || 0) > 0, walkPhase);
+                const copActive = (game.wantedLevel || 0) > 0 || Boolean(ped.inCombat);
+                const copWeapon = copActive ? (ped.copWeapon || "PISTOL") : "FIST";
+                frameIdx = this.getPedFrameIndex(copWeapon, ped.speed > 0, copActive, walkPhase);
+            } else if (ped.kind === "CRIMINAL") {
+                const walkPhase = this.time * 2.1 + ped.animSeed;
+                frameIdx = this.getPedFrameIndex(ped.copWeapon || "UZI", ped.speed > 0, true, walkPhase);
             } else if (ped.kind === "HOSTILE") {
                 const walkPhase = this.time * 2.2 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex("FIST", true, true, walkPhase);
@@ -6113,7 +6117,7 @@ class RetroRenderer {
                 this.pushSolidQuad3D(ped.x + skateSwayX + skSin * 3.2, ped.y + skateSwayY - skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
-            this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, false, pedDrawOrder, pr, pg, pb);
+            this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
 
             // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm adult civilian pedestrians smoke a glowing cigarette ember after dusk!
             if (!isChildPed && nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
@@ -9462,7 +9466,7 @@ class RetroRenderer {
             }
         }
 
-        // Nearby Vehicles & Cops
+        // Nearby Vehicles, Cops & Ambient Crime Shootouts
         if (Array.isArray(game.vehicles) && zoomMode < 2) {
             const copFlash = Math.floor(this.time * 8) % 2 === 0;
             for (const v of game.vehicles) {
@@ -9472,8 +9476,21 @@ class RetroRenderer {
                 if (v.driver === "AI_COP" || v.isPolice) {
                     ctx.fillStyle = copFlash ? "#ef4444" : "#3b82f6";
                     ctx.fillRect(pt.x - 2.5, pt.y - 2.5, 5, 5);
+                } else if (v.driver === "AI_CRIMINAL") {
+                    ctx.fillStyle = "#f97316";
+                    ctx.fillRect(pt.x - 2.5, pt.y - 2.5, 5, 5);
                 } else if (v.missionTag === "LANDMARK") {
                     ctx.fillStyle = "#ffd13b";
+                    ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+                }
+            }
+            if (Array.isArray(game.peds)) {
+                for (const ped of game.peds) {
+                    if (ped.dead) continue;
+                    if (ped.kind !== "CRIMINAL" && !(ped.kind === "COP" && ped.inCombat)) continue;
+                    const pt = worldToMini(ped.x, ped.y);
+                    if (pt.x < mx || pt.x > mx + mw || pt.y < my || pt.y > my + mh) continue;
+                    ctx.fillStyle = ped.kind === "CRIMINAL" ? "#f97316" : (copFlash ? "#ef4444" : "#3b82f6");
                     ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
                 }
             }
