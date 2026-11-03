@@ -289,6 +289,12 @@ class WorldObjectEngine {
             alliedSugarSilos: { x: 160.5 * TILE_SIZE, y: 109.0 * TILE_SIZE, z: 2.0 },
             grassriversOutpost: { x: 116.5 * TILE_SIZE, y: 398.5 * TILE_SIZE, z: 2.0 },
             southernmostBuoy: { x: 204.2 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0 },
+            // GTA 6 Deepsearch Geographical Landmarks (Thrillbilly Mud Club, Gellhorn Speedway, Wynwood Walls, Gator Island, Seven Mile Bridge):
+            thrillbillyArena: { x: 82.0 * TILE_SIZE, y: 455.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            gellhornSpeedway: { x: 72.0 * TILE_SIZE, y: 178.0 * TILE_SIZE, z: 2.0, pitX: 72.0 * TILE_SIZE, pitY: 172.2 * TILE_SIZE },
+            wynwoodWalls: { x: 189.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0 },
+            lakeLeonidaOutpost: { x: 125.5 * TILE_SIZE, y: 103.0 * TILE_SIZE, z: 2.0 },
+            sevenMileOldSpan: { x: 202.0 * TILE_SIZE, y: 478.6 * TILE_SIZE, z: 2.0, jumpX: 202.0 * TILE_SIZE, jumpY: 480.5 * TILE_SIZE, cooldown: 0 },
             highwayGantries: [
                 // 4 Full-Span Twin-Pylon 3D Overhead Green FDOT Highway Gantries (pylons strictly on PAVE/FIELD shoulders!)
                 { id: "gantry_vcia_exp",   x: 130.0 * TILE_SIZE, y: 296.8 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 332, fullSpan: true },
@@ -392,6 +398,40 @@ class WorldObjectEngine {
         this.cashDrops = [];
         this.viralCooldown = 0;
         this.viralDriftTimer = 0;
+        // 4. Wynwood Walls & Leonida Street-Art 3D Graffiti Tagging Challenge (6 Mural Monoliths)
+        this.graffitiWalls = [
+            { id: "tag_wynwood_main",  name: "WYNWOOD GALLERY MAIN WALL",     x: 189.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, ang: 0,             tagged: false, neon: [0.98, 0.24, 0.78], ad: "ad_vice26"     },
+            { id: "tag_wynwood_east",  name: "WYNWOOD ARTS DISTRICT ALLEY",   x: 212.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, ang: 0,             tagged: false, neon: [0.18, 0.94, 0.98], ad: "ad_sprunk"     },
+            { id: "tag_little_haiti",  name: "LITTLE HAITI CARIBBEAN MURAL",  x: 224.5 * TILE_SIZE, y: 110.5 * TILE_SIZE, z: 2.0, ang: 0,             tagged: false, neon: [0.98, 0.82, 0.16], ad: "ad_call_morgan"},
+            { id: "tag_ocean_alley",   name: "OCEAN DRIVE ART DECO MURAL",    x: 442.5 * TILE_SIZE, y: 264.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, tagged: false, neon: [0.98, 0.30, 0.68], ad: "ad_vice26"     },
+            { id: "tag_downtown_arts", name: "DOWNTOWN METROMOVER PLAZA WALL",x: 282.5 * TILE_SIZE, y: 228.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, tagged: false, neon: [0.24, 0.96, 0.48], ad: "ad_ecola"      },
+            { id: "tag_gellhorn_yard", name: "PORT GELLHORN RAILYARD MURAL",  x: 64.5 * TILE_SIZE,  y: 198.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, tagged: false, neon: [0.98, 0.52, 0.16], ad: "ad_ammunation" }
+        ];
+        // 5. Lake Leonida, Grassrivers & Leonida Keys 3D Floating Smuggler Contraband Airdrop Crates
+        this.smugglerDrops = [
+            { id: "drop_lake_nw",      name: "LAKE LEONIDA NORTHWEST DROP",   x: 112.5 * TILE_SIZE, y: 95.5 * TILE_SIZE,  z: 2.0, active: true, cooldown: 0, seed: 0.4 },
+            { id: "drop_lake_ne",      name: "LAKE LEONIDA NORTHEAST DROP",   x: 138.5 * TILE_SIZE, y: 96.5 * TILE_SIZE,  z: 2.0, active: true, cooldown: 0, seed: 1.5 },
+            { id: "drop_lake_south",   name: "GATOR ISLAND SOUTH COVE DROP",  x: 125.5 * TILE_SIZE, y: 116.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 2.6 },
+            { id: "drop_ambrosia_cov", name: "AMBROSIA SUGAR CANAL DROP",     x: 141.5 * TILE_SIZE, y: 110.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 3.7 },
+            { id: "drop_bayou_north",  name: "GRASSRIVERS BAYOU DROP",        x: 116.5 * TILE_SIZE, y: 405.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 4.8 },
+            { id: "drop_bayou_west",   name: "EVERGLADES MANGROVE DROP",      x: 96.5 * TILE_SIZE,  y: 425.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 5.9 },
+            { id: "drop_biscayne_bay", name: "BISCAYNE BAY SMUGGLER DROP",    x: 362.5 * TILE_SIZE, y: 235.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 1.1 },
+            { id: "drop_keys_channel", name: "SEVEN MILE CHANNEL DROP",       x: 202.0 * TILE_SIZE, y: 484.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 2.2 }
+        ];
+        // 6. Port Gellhorn International Raceway 3D Hot-Lap Time Trial Circuit State
+        this.speedwayRace = {
+            active: false,
+            timer: 0,
+            bestTime: 38.5,
+            checkpointIdx: 0,
+            pitCooldown: 0,
+            checkpoints: [
+                { name: "EAST BANKING TURN 1", x: 95.0 * TILE_SIZE, y: 165.0 * TILE_SIZE },
+                { name: "NORTH BACKSTRETCH",   x: 72.0 * TILE_SIZE, y: 152.0 * TILE_SIZE },
+                { name: "WEST HAIRPIN TURN 3", x: 49.0 * TILE_SIZE, y: 165.0 * TILE_SIZE },
+                { name: "START/FINISH GANTRY", x: 72.0 * TILE_SIZE, y: 178.0 * TILE_SIZE }
+            ]
+        };
         this.meshVbo = null;
         this.meshVertexCount = 0;
         this.dynVbo = null;
@@ -684,6 +724,40 @@ class WorldObjectEngine {
             if (this.landmarks3D.southernmostBuoy) {
                 clearZones.push({ x: this.landmarks3D.southernmostBuoy.x, y: this.landmarks3D.southernmostBuoy.y, r: 64 });
             }
+            if (this.landmarks3D.thrillbillyArena) {
+                clearZones.push({ x: this.landmarks3D.thrillbillyArena.x, y: this.landmarks3D.thrillbillyArena.y, r: 195 });
+            }
+            if (this.landmarks3D.gellhornSpeedway) {
+                clearZones.push({ x: this.landmarks3D.gellhornSpeedway.x, y: this.landmarks3D.gellhornSpeedway.y, r: 165 });
+                clearZones.push({ x: this.landmarks3D.gellhornSpeedway.pitX, y: this.landmarks3D.gellhornSpeedway.pitY, r: 95 });
+            }
+            if (this.landmarks3D.wynwoodWalls) {
+                const ww = this.landmarks3D.wynwoodWalls;
+                if (map.surfaceGround) {
+                    const wc = Math.floor(ww.x / TILE_SIZE);
+                    const wr = Math.floor(ww.y / TILE_SIZE);
+                    for (let r = Math.max(2, wr - 2); r <= Math.min(MAP_ROWS - 3, wr + 2); r++) {
+                        for (let c = Math.max(2, wc - 2); c <= Math.min(M - 3, wc + 2); c++) {
+                            const idx = r * M + c;
+                            if (map.surfaceGround[idx] === GROUND_TYPE.BUILDING && map.voxelGrid) {
+                                for (let z = 0; z < MAP_LAYERS; z++) {
+                                    map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
+                                        map.voxelGrid[(z * MAP_ROWS + 165) * M + 339];
+                                }
+                                map.surfaceGround[idx] = GROUND_TYPE.PAWEMENT;
+                                map.surfaceLayer[idx] = 2;
+                            }
+                        }
+                    }
+                }
+                clearZones.push({ x: ww.x, y: ww.y, r: 135 });
+            }
+            if (this.landmarks3D.lakeLeonidaOutpost) {
+                clearZones.push({ x: this.landmarks3D.lakeLeonidaOutpost.x, y: this.landmarks3D.lakeLeonidaOutpost.y, r: 120 });
+            }
+            if (this.landmarks3D.sevenMileOldSpan) {
+                clearZones.push({ x: this.landmarks3D.sevenMileOldSpan.x, y: this.landmarks3D.sevenMileOldSpan.y, r: 110 });
+            }
             if (Array.isArray(this.landmarks3D.lighthouses)) {
                 for (const lh of this.landmarks3D.lighthouses) {
                     clearZones.push({ x: lh.x, y: lh.y, r: 96 });
@@ -703,6 +777,32 @@ class WorldObjectEngine {
                 for (const st of this.landmarks3D.speedTraps) {
                     clearZones.push({ x: st.x, y: st.y, r: 52 });
                 }
+            }
+        }
+        if (Array.isArray(this.graffitiWalls) && map.surfaceGround) {
+            for (const gw of this.graffitiWalls) {
+                const c0 = Math.floor(gw.x / TILE_SIZE);
+                const r0 = Math.floor(gw.y / TILE_SIZE);
+                if (map.surfaceGround[r0 * M + c0] === GROUND_TYPE.ROAD) {
+                    for (let rad = 1; rad <= 5; rad++) {
+                        let found = false;
+                        for (let dr = -rad; dr <= rad && !found; dr++) {
+                            for (let dc = -rad; dc <= rad && !found; dc++) {
+                                const nc = c0 + dc, nr = r0 + dr;
+                                if (nc > 2 && nc < M - 3 && nr > 2 && nr < MAP_ROWS - 3) {
+                                    const gt = map.surfaceGround[nr * M + nc];
+                                    if (gt === GROUND_TYPE.PAWEMENT || gt === GROUND_TYPE.FIELD) {
+                                        gw.x = (nc + 0.5) * TILE_SIZE;
+                                        gw.y = (nr + 0.5) * TILE_SIZE;
+                                        found = true;
+                                    }
+                                }
+                            }
+                        }
+                        if (found) break;
+                    }
+                }
+                clearZones.push({ x: gw.x, y: gw.y, r: 56 });
             }
         }
         if (Array.isArray(this.sodaMachines)) {
@@ -1119,6 +1219,114 @@ class WorldObjectEngine {
                             life: 2.4
                         });
                     }
+                    return true;
+                }
+            }
+        }
+
+        // 0E. Wynwood Walls & Leonida Street-Art 3D Graffiti Tagging Challenge ([E] on foot!)
+        if (Array.isArray(this.graffitiWalls)) {
+            for (const gw of this.graffitiWalls) {
+                if (!gw.tagged && Math.hypot(px - gw.x, py - gw.y) < 76) {
+                    gw.tagged = true;
+                    const taggedCount = this.graffitiWalls.filter(w => w.tagged).length;
+                    const totalWalls = this.graffitiWalls.length;
+                    const isAllTagged = taggedCount === totalWalls;
+                    const reward = isAllTagged ? 28500 : 3500;
+                    if (typeof game.addScore === "function") game.addScore(reward);
+                    if (typeof game.addCash === "function") game.addCash(reward, `🎨 ${gw.name} TAGGED!`);
+                    if (game.wantedSystem && (game.wantedSystem.level || 0) > 0) {
+                        game.wantedSystem.level = Math.max(0, game.wantedSystem.level - 1);
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            isAllTagged ? "🎨 KING OF WYNWOOD! ALL 6 MURALS TAGGED!" : `🎨 VICE 26 PIECE PAINTED! (${taggedCount}/${totalWalls})`,
+                            isAllTagged
+                                ? `${gw.name} COMPLETED • +$28,500 GRAND BONUS & WANTED CLEARED!`
+                                : `${gw.name} • +$3,500 STREET CRED & -1 WANTED STAR!`,
+                            "#f472b6",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gw.x,
+                            y: gw.y,
+                            z: 2.68,
+                            text: isAllTagged
+                                ? "🎨 KING OF WYNWOOD! ALL 6 MURALS TAGGED! +$28,500!"
+                                : `🎨 STREET-ART PIECE TAGGED (${taggedCount}/${totalWalls})! +$3,500 & -1 STAR!`,
+                            color: "#f472b6",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0F. Thrillbilly Mud Club Announcer Stand & Flaming Ring Derby Trigger ([E]!)
+        if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
+            const tb = this.landmarks3D.thrillbillyArena;
+            if ((tb.cooldown || 0) <= 0 && (Math.hypot(px - tb.x, py - (tb.y - 126)) < 82 || Math.hypot(px - tb.x, py - tb.y) < 88)) {
+                tb.cooldown = 18.0;
+                if (typeof game.addScore === "function") game.addScore(10000);
+                if (typeof game.addCash === "function") game.addCash(10000, "🔥 THRILLBILLY MUD-BOGGING DERBY!");
+                if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("🔥 THRILLBILLY MUD CLUB CHAMPION!", "FLAMING RING MONSTER MUD DERBY • +$10,000 & +1 MULTIPLIER!", "#f97316", 3.0);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: tb.x,
+                        y: tb.y,
+                        z: 2.85,
+                        text: "🔥 THRILLBILLY MUD-BOGGING CHAMPION! +$10,000 + +1X!",
+                        color: "#f97316",
+                        life: 3.0
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0G. Port Gellhorn International Raceway Pit Stop & Hot-Lap Time Trial Start ([E]!)
+        if (this.landmarks3D && this.landmarks3D.gellhornSpeedway && this.speedwayRace) {
+            const gs = this.landmarks3D.gellhornSpeedway;
+            const sr = this.speedwayRace;
+            if (Math.hypot(px - gs.pitX, py - gs.pitY) < 86 || Math.hypot(px - gs.x, py - gs.y) < 86) {
+                game.player.hp = game.player.maxHp || 100;
+                game.player.armor = Math.max(game.player.armor || 0, 100);
+                if (!sr.active) {
+                    sr.active = true;
+                    sr.timer = 0;
+                    sr.checkpointIdx = 0;
+                }
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("🏁 GELLHORN HOT-LAP CIRCUIT STARTED!", "PIT CREW FULL TUNE-UP • HIT ALL 4 TRACK CHECKPOINTS FOR +$15,000!", "#facc15", 2.8);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: px,
+                        y: py,
+                        z: 2.68,
+                        text: "🏁 GELLHORN SPEEDWAY HOT-LAP STARTED! FULL HP/ARMOR!",
+                        color: "#facc15",
+                        life: 2.8
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0H. Lake Leonida & Grassrivers Floating Smuggler Contraband Crate Pickup ([E]!)
+        if (Array.isArray(this.smugglerDrops)) {
+            for (const sd of this.smugglerDrops) {
+                if (sd.active && Math.hypot(px - sd.x, py - sd.y) < 72) {
+                    this.collectSmugglerDrop(game, sd);
                     return true;
                 }
             }
@@ -1582,6 +1790,195 @@ class WorldObjectEngine {
             }
         } else {
             this.viralDriftTimer = 0;
+        }
+
+        // 8. Update Thrillbilly Mud Club Flaming Hoop Vehicle Jump & Mud-Bogging Boost (c=82.0, r=455.0)
+        if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
+            const tb = this.landmarks3D.thrillbillyArena;
+            if ((tb.cooldown || 0) > 0) tb.cooldown = Math.max(0, tb.cooldown - dt);
+            if (pVeh && (tb.cooldown || 0) <= 0 && Math.hypot(pVeh.x - tb.x, pVeh.y - tb.y) < 58) {
+                const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
+                if (spd > 65) {
+                    tb.cooldown = 18.0;
+                    pVeh.vx = (pVeh.vx || 0) * 1.32;
+                    pVeh.vy = (pVeh.vy || 0) * 1.32;
+                    pVeh.vz = Math.max(pVeh.vz || 0, 0.14);
+                    if (typeof game.addScore === "function") game.addScore(10000);
+                    if (typeof game.addCash === "function") game.addCash(10000, "🔥 THRILLBILLY FLAMING HOOP JUMP!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🔥 THRILLBILLY FLAMING HOOP STUNT!", "GRASSRIVERS MONSTER MUD JUMP • +$10,000 + NITRO & +1X!", "#f97316", 3.0);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: tb.x,
+                            y: tb.y,
+                            z: 2.85,
+                            text: "🔥 FLAMING RING MONSTER STUNT! +$10,000 + NITRO!",
+                            color: "#f97316",
+                            life: 3.0
+                        });
+                    }
+                }
+            }
+        }
+
+        // 9. Update Port Gellhorn International Raceway Start/Finish Gantry, Pit Repair & Hot-Lap Time Trial (c=72.0, r=178.0)
+        if (this.landmarks3D && this.landmarks3D.gellhornSpeedway && this.speedwayRace) {
+            const gs = this.landmarks3D.gellhornSpeedway;
+            const sr = this.speedwayRace;
+            if ((sr.pitCooldown || 0) > 0) sr.pitCooldown = Math.max(0, sr.pitCooldown - dt);
+
+            // Driving through Start/Finish Gantry or Pit Lane repairs vehicle & starts Hot-Lap Circuit if not active
+            if (pVeh && !sr.active && (sr.pitCooldown || 0) <= 0 &&
+                (Math.hypot(pVeh.x - gs.x, pVeh.y - gs.y) < 76 || Math.hypot(pVeh.x - gs.pitX, pVeh.y - gs.pitY) < 76)) {
+                const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
+                if (spd > 45) {
+                    sr.active = true;
+                    sr.timer = 0;
+                    sr.checkpointIdx = 0;
+                    sr.pitCooldown = 8.0;
+                    pVeh.hp = pVeh.maxHp || 100;
+                    pVeh.vx = (pVeh.vx || 0) * 1.24;
+                    pVeh.vy = (pVeh.vy || 0) * 1.24;
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🏁 GELLHORN HOT-LAP CIRCUIT!", "CAR 100% REPAIRED • HIT ALL 4 OVAL CHECKPOINTS FOR +$15,000!", "#facc15", 2.6);
+                    }
+                }
+            }
+
+            if (sr.active) {
+                sr.timer += dt;
+                const cp = sr.checkpoints[sr.checkpointIdx];
+                if (cp && Math.hypot(px - cp.x, py - cp.y) < 120) {
+                    sr.checkpointIdx++;
+                    if (sr.checkpointIdx >= sr.checkpoints.length) {
+                        const lapTime = sr.timer;
+                        sr.active = false;
+                        sr.pitCooldown = 10.0;
+                        const isRecord = lapTime < (sr.bestTime || 40.0);
+                        if (isRecord) sr.bestTime = lapTime;
+                        const prize = isRecord ? 20000 : 15000;
+                        if (typeof game.addScore === "function") game.addScore(prize);
+                        if (typeof game.addCash === "function") game.addCash(prize, `🏆 SPEEDWAY LAP: ${lapTime.toFixed(1)}s!`);
+                        if (typeof game.addMultiplier === "function") game.addMultiplier(2);
+                        if (game.audio) game.audio.playPickup("WEAPON");
+                        if (typeof game.showBigBanner === "function") {
+                            game.showBigBanner(
+                                `🏆 HOT-LAP COMPLETE: ${lapTime.toFixed(1)}s!`,
+                                `PORT GELLHORN RACEWAY CHAMPION • +$${prize.toLocaleString()} & +2 MULTIPLIER!`,
+                                "#4ade80",
+                                3.4
+                            );
+                        }
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: px,
+                                y: py,
+                                z: 2.80,
+                                text: `🏆 GELLHORN HOT-LAP (${lapTime.toFixed(1)}s)! +$${prize.toLocaleString()} + +2X!`,
+                                color: "#4ade80",
+                                life: 3.2
+                            });
+                        }
+                    } else {
+                        if (typeof game.addScore === "function") game.addScore(2000);
+                        if (typeof game.addCash === "function") game.addCash(2000, `🏁 CHECKPOINT ${sr.checkpointIdx}/4!`);
+                        if (game.audio) game.audio.playPickup("SCORE");
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: cp.x,
+                                y: cp.y,
+                                z: 2.65,
+                                text: `🏁 SPLIT ${sr.checkpointIdx}/4 (${sr.timer.toFixed(1)}s) • +$2,000!`,
+                                color: "#facc15",
+                                life: 2.0
+                            });
+                        }
+                    }
+                } else if (sr.timer > 75.0) {
+                    sr.active = false;
+                }
+            }
+        }
+
+        // 10. Update Lake Leonida, Grassrivers & Keys Floating Smuggler Contraband Airdrop Crates
+        if (Array.isArray(this.smugglerDrops)) {
+            for (const sd of this.smugglerDrops) {
+                if (!sd.active) {
+                    sd.cooldown = Math.max(0, (sd.cooldown || 0) - dt);
+                    if (sd.cooldown <= 0 && Math.hypot(px - sd.x, py - sd.y) > 420) {
+                        sd.active = true;
+                    }
+                    continue;
+                }
+                if (p && Math.hypot(px - sd.x, py - sd.y) < 52) {
+                    this.collectSmugglerDrop(game, sd);
+                }
+            }
+        }
+
+        // 11. Update Leonida Keys Old Seven Mile Bridge Broken Span Overwater Jump Bonus (c=202.0, r=478.6)
+        if (this.landmarks3D && this.landmarks3D.sevenMileOldSpan) {
+            const sm = this.landmarks3D.sevenMileOldSpan;
+            if ((sm.cooldown || 0) > 0) sm.cooldown = Math.max(0, sm.cooldown - dt);
+            if (pVeh && (sm.cooldown || 0) <= 0 &&
+                (Math.hypot(pVeh.x - sm.x, pVeh.y - sm.y) < 64 || Math.hypot(pVeh.x - sm.jumpX, pVeh.y - sm.jumpY) < 62)) {
+                const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
+                if (spd > 125) {
+                    sm.cooldown = 20.0;
+                    pVeh.vz = Math.max(pVeh.vz || 0, 0.13);
+                    if (typeof game.addScore === "function") game.addScore(7500);
+                    if (typeof game.addCash === "function") game.addCash(7500, "🌴 SEVEN MILE BRIDGE OVERWATER JUMP!");
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🌴 SEVEN MILE BRIDGE STUNT!", "LEONIDA KEYS OVERWATER GAP CLEARED • +$7,500!", "#2dd4bf", 2.8);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: pVeh.x,
+                            y: pVeh.y,
+                            z: 2.75,
+                            text: "🌴 SEVEN MILE BRIDGE OVERWATER STUNT! +$7,500!",
+                            color: "#2dd4bf",
+                            life: 2.8
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    collectSmugglerDrop(game, sd) {
+        if (!sd || !sd.active) return;
+        sd.active = false;
+        sd.cooldown = 55.0;
+        if (game.player) {
+            game.player.armor = Math.min(100, (game.player.armor || 0) + 50);
+            game.player.hp = Math.min(game.player.maxHp || 100, (game.player.hp || 100) + 40);
+            if (game.player.ammo) {
+                game.player.ammo.UZI = (game.player.ammo.UZI || 0) + 90;
+                game.player.ammo.SHOTGUN = (game.player.ammo.SHOTGUN || 0) + 25;
+                game.player.ammo.ROCKET = (game.player.ammo.ROCKET || 0) + 5;
+            }
+        }
+        if (typeof game.addScore === "function") game.addScore(5000);
+        if (typeof game.addCash === "function") game.addCash(5000, `📦 ${sd.name}!`);
+        if (game.audio) game.audio.playPickup("WEAPON");
+        if (typeof game.showBigBanner === "function") {
+            game.showBigBanner("📦 SMUGGLER CONTRABAND CRATE!", `${sd.name} • +$5,000 + HEAVY AMMO & +50 ARMOR!`, "#38bdf8", 2.6);
+        }
+        if (Array.isArray(game.floatingTexts)) {
+            game.floatingTexts.push({
+                x: sd.x,
+                y: sd.y,
+                z: 2.65,
+                text: "📦 SMUGGLER AIRDROP RECOVERED! +$5,000 + HEAVY AMMO & ARMOR!",
+                color: "#38bdf8",
+                life: 2.8
+            });
         }
     }
 
@@ -3471,6 +3868,149 @@ class WorldObjectEngine {
             }
         }
 
+        // 15. GTA 6 THRILLBILLY MUD CLUB & FLAMING RING MONSTER STUNT ARENA (Grassrivers / Redhill, c=82.0, r=455.0)
+        if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
+            const tb = this.landmarks3D.thrillbillyArena;
+            const bz = tb.z || 2.0;
+            const [tu0, tv0, tu1, tv1] = getTileAtlasUV(363, 0.0, 0.0, 1.0, 1.0);
+
+            // A. North Rustic Timber & Open-Lattice Steel Entrance Archway + Announcer Stand (offY = -126)
+            emitAOShadow3D(tb.x, tb.y, 1, 0, 0, -126, 148, 42, bz, 0.38);
+            for (const px of [-54, 54]) {
+                emitTileBox3D(tb.x, tb.y, 1, 0, px, -126, 16, 16, bz, bz + 0.18, 177, 177, 77, [0.76, 0.58, 0.38], false);
+                emitTileBox3D(tb.x, tb.y, 1, 0, px, -126, 12, 12, bz + 0.18, bz + 1.12, 363, 246, 77, [0.84, 0.46, 0.24], false);
+            }
+            emitTileBox3D(tb.x, tb.y, 1, 0, 0, -126, 128, 16, bz + 0.96, bz + 1.14, 250, 363, 77, [0.82, 0.62, 0.38], false);
+            emitBox3D(tb.x, tb.y, 1, 0, -28, -126, 52, 10, bz + 1.14, bz + 1.44, "ad_patriot_beer", "ad_patriot_beer", [0.96, 0.28, 0.32]);
+            emitBox3D(tb.x, tb.y, 1, 0,  28, -126, 52, 10, bz + 1.14, bz + 1.44, "ad_pisswasser", "ad_pisswasser", [0.98, 0.82, 0.18]);
+            // Announcer Podium & Derby Trigger Console at (0, -126)
+            emitTileBox3D(tb.x, tb.y, 1, 0, 0, -126, 22, 16, bz, bz + 0.26, 172, 173, 77, [0.92, 0.78, 0.54], false);
+            emitCylinder3D(tb.x, tb.y, 0, -126, 5.0, 5.0, bz + 0.26, bz + 0.34, 10, [0.98, 0.44, 0.14], 5, true);
+
+            // B. South 3-Tier Stepped Wooden Spectator Bleachers (offY = +132, L77 boardwalk planks)
+            emitAOShadow3D(tb.x, tb.y, 1, 0, 0, 134, 168, 52, bz, 0.40);
+            emitTileBox3D(tb.x, tb.y, 1, 0, 0, 122, 152, 14, bz, bz + 0.14, 177, 177, 77, [0.82, 0.64, 0.42], false);
+            emitTileBox3D(tb.x, tb.y, 1, 0, 0, 134, 152, 14, bz, bz + 0.28, 177, 177, 77, [0.76, 0.58, 0.38], false);
+            emitTileBox3D(tb.x, tb.y, 1, 0, 0, 146, 152, 14, bz, bz + 0.42, 177, 177, 77, [0.70, 0.52, 0.34], false);
+
+            // C. Twin Opposing 3D Sloped Monster Mud Launch Ramps (at offX = -78 launching East, offX = +78 launching West)
+            for (const dir of [-1, 1]) {
+                const rx = tb.x + dir * 78;
+                const ry = tb.y;
+                const cA = -dir; // -1 -> launches East (+1), +1 -> launches West (-1)
+                const hw = 26.0, hd = 16.0;
+                const yLow = bz + 0.015, yMid = bz + 0.18, yHigh = bz + 0.30;
+                const bNW = toWorld(rx, ry, cA, 0, -hw, -hd, yLow);
+                const bSW = toWorld(rx, ry, cA, 0, -hw,  hd, yLow);
+                const mNW = toWorld(rx, ry, cA, 0, hw * 0.25, -hd, yMid);
+                const mSW = toWorld(rx, ry, cA, 0, hw * 0.25,  hd, yMid);
+                const tNE = toWorld(rx, ry, cA, 0,  hw, -hd, yHigh);
+                const tSE = toWorld(rx, ry, cA, 0,  hw,  hd, yHigh);
+                const bNE = toWorld(rx, ry, cA, 0,  hw, -hd, bz);
+                const bSE = toWorld(rx, ry, cA, 0,  hw,  hd, bz);
+                pushTileQuad3D(bNW, mNW, bSW, mSW, 390 + 77, 0.86, 0.68, 0.46, 1.0);
+                pushMatQuad3D(mNW, tNE, mSW, tSE, 3, 1.00, 0.82, 0.16, 1.0);
+                pushTri3D(bNW, tNE, bNE, [tu0, tv1], [tu1, tv0], [tu1, tv1], 0.88, 0.72, 0.50, 1.0);
+                pushTri3D(bSW, bSE, tSE, [tu0, tv1], [tu1, tv1], [tu1, tv0], 0.88, 0.72, 0.50, 1.0);
+                pushMatQuad3D(tSE, tNE, bSE, bNE, 3, 0.92, 0.74, 0.14, 1.0);
+            }
+
+            // D. Centerpiece Elevated 3D Flaming Hoop Steel Scaffold (at offX = 0, offY = -36 & +36 so cars drive right through!)
+            for (const py of [-36, 36]) {
+                emitTileBox3D(tb.x, tb.y, 1, 0, 0, py, 10, 10, bz, bz + 0.96, 246, 363, 64, [0.90, 0.34, 0.24], false);
+            }
+            emitTileBox3D(tb.x, tb.y, 1, 0, 0, 0, 12, 82, bz + 0.88, bz + 1.00, 250, 363, 64, [0.96, 0.48, 0.16], false);
+        }
+
+        // 16. PORT GELLHORN INTERNATIONAL RACEWAY 3D START/FINISH GANTRY, GRANDSTAND & PIT GARAGE (c=72.0, r=178.0)
+        if (this.landmarks3D && this.landmarks3D.gellhornSpeedway) {
+            const gs = this.landmarks3D.gellhornSpeedway;
+            const bz = gs.z || 2.0;
+
+            // A. Twin Open-Lattice Steel Race Gantry Pylons on North & South Track Shoulders (offY = -148 & +148)
+            for (const sy of [-148, 148]) {
+                emitAOShadow3D(gs.x, gs.y, 1, 0, 0, sy, 28, 28, bz, 0.38);
+                emitTileBox3D(gs.x, gs.y, 1, 0, 0, sy, 18, 18, bz, bz + 0.18, 177, 177, 71, [0.92, 0.94, 0.98], false);
+                emitSolidBox3D(gs.x, gs.y, 1, 0, 0, sy, 16, 16, bz + 0.18, bz + 0.28, [0.98, 0.82, 0.16], 3);
+                emitTileBox3D(gs.x, gs.y, 1, 0, 0, sy, 12, 12, bz + 0.28, bz + 1.28, 363, 246, 64, [0.94, 0.96, 0.99], false);
+            }
+            // High Overhead Start/Finish Steel Truss Bridge (bz+1.14..1.28 — 100% clear for cars underneath!)
+            emitTileBox3D(gs.x, gs.y, 1, 0, 0, 0, 18, 312, bz + 1.14, bz + 1.28, 250, 363, 64, [0.94, 0.96, 0.99], false);
+            emitBox3D(gs.x, gs.y, 0, 1, -68, 0, 88, 10, bz + 1.28, bz + 1.58, "ad_vice26", "ad_vice26", [0.98, 0.30, 0.72]);
+            emitBox3D(gs.x, gs.y, 0, 1,  68, 0, 88, 10, bz + 1.28, bz + 1.58, "ad_sprunk", "ad_sprunk", [0.22, 0.96, 0.42]);
+
+            // B. Pit Crew Repair Garage & Tool Bay in Infield (at gs.pitX, gs.pitY)
+            emitAOShadow3D(gs.pitX, gs.pitY, 1, 0, 0, 0, 112, 62, bz, 0.42);
+            emitTileBox3D(gs.pitX, gs.pitY, 1, 0, 0, 0, 96, 46, bz, bz + 0.46, 86, 199, 86, [0.94, 0.96, 1.00], false);
+            emitSolidBox3D(gs.pitX, gs.pitY, 1, 0, 0, 0, 102, 50, bz + 0.46, bz + 0.54, [0.92, 0.24, 0.20], 5);
+            emitBox3D(gs.pitX, gs.pitY, 1, 0, 0, 0, 74, 10, bz + 0.54, bz + 0.80, "ad_pisswasser", "ad_pisswasser", [0.98, 0.82, 0.18]);
+        }
+
+        // 17. WYNWOOD WALLS 3D OPEN-AIR GRAFFITI GALLERY & 6 LEONIDA STREET-ART MURAL MONOLITHS
+        if (this.landmarks3D && this.landmarks3D.wynwoodWalls) {
+            const ww = this.landmarks3D.wynwoodWalls;
+            const bz = ww.z || 2.0;
+            emitAOShadow3D(ww.x, ww.y, 1, 0, 0, 0, 136, 96, bz, 0.38);
+            emitOctagonPad3D(ww.x, ww.y, 0, 0, 56, 42, 52, 38, 0.24, bz, bz + 0.08, [0.92, 0.90, 0.88], [0.84, 0.82, 0.80], 2, 177, 8);
+            // Twin Overhead S363 Neon Festival Light Columns & Spanning S250 Arch
+            for (const wx of [-46, 46]) {
+                emitTileBox3D(ww.x, ww.y, 1, 0, wx, -18, 10, 10, bz + 0.08, bz + 1.06, 363, 363, 64, [0.96, 0.32, 0.76], false);
+            }
+            emitTileBox3D(ww.x, ww.y, 1, 0, 0, -18, 104, 12, bz + 0.96, bz + 1.08, 250, 363, 64, [0.20, 0.92, 0.98], false);
+        }
+        if (Array.isArray(this.graffitiWalls)) {
+            for (const gw of this.graffitiWalls) {
+                const bz = gw.z || 2.0;
+                const gCos = Math.cos(gw.ang || 0);
+                const gSin = Math.sin(gw.ang || 0);
+                const nc = gw.neon || [0.98, 0.24, 0.78];
+                emitAOShadow3D(gw.x, gw.y, gCos, gSin, 0, 0, 68, 24, bz, 0.36);
+                // Brutalist Concrete Mural Plinth & Wall Monolith (S177 + S86)
+                emitTileBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 58, 14, bz, bz + 0.08, 177, 177, 71, [0.88, 0.90, 0.94], false);
+                emitTileBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 54, 10, bz + 0.08, bz + 0.56, 86, 86, 46, [0.82, 0.84, 0.88], false);
+                // Street-Art Mural Canvas Panel + Neon Crown Frame
+                emitBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 48, 11.2, bz + 0.12, bz + 0.52, gw.ad, gw.ad, nc);
+                emitSolidBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 56, 12, bz + 0.56, bz + 0.61, nc, 7);
+            }
+        }
+
+        // 18. LAKE LEONIDA GATOR ISLAND 3D SMUGGLER RADAR OUTPOST & AIRBOAT DOCK (c=125.5, r=103.0)
+        if (this.landmarks3D && this.landmarks3D.lakeLeonidaOutpost) {
+            const lo = this.landmarks3D.lakeLeonidaOutpost;
+            const bz = lo.z || 2.0;
+            emitAOShadow3D(lo.x, lo.y, 1, 0, 0, 18, 138, 148, bz, 0.42);
+            // 1. Stilted Cypress Smuggler Cabin (at offX = -28, offY = -12)
+            emitBox3D(lo.x, lo.y, 1, 0, -28, -12, 64, 48, bz, bz + 0.48, "wall_shack_front", "wall_shack_side", [0.52, 0.38, 0.26]);
+            emitHippedRoof3D(lo.x, lo.y, 1, 0, -28, -12, 74, 58, bz + 0.48, 0.22, "roof_rusted_tin", [0.76, 0.38, 0.22], [0.58, 0.28, 0.16]);
+            // 2. 4-Tier Open-Lattice S363 Smuggler Radio & Radar Tower (at offX = +36, offY = -12)
+            emitOctagonPad3D(lo.x, lo.y, 36, -12, 24, 24, 22, 22, 0.26, bz, bz + 0.12, [0.84, 0.86, 0.90], [0.76, 0.78, 0.82], 2, 177, 71);
+            for (let lv = 0; lv < 4; lv++) {
+                const y0 = bz + 0.12 + lv * 0.34;
+                const w = 18 - lv * 2.0;
+                emitTileBox3D(lo.x, lo.y, 1, 0, 36, -12, w, w, y0, y0 + 0.34, (lv % 2 === 0) ? 246 : 363, 363, 64, [0.90, 0.92, 0.96], false);
+            }
+            // 3. Wooden Airboat Smuggler Dock Pier extending South into Lake Leonida (L77) + Stacked Contraband Crates (MAT 6)
+            emitTileBox3D(lo.x, lo.y, 1, 0, 0, 68, 32, 112, bz + 0.04, bz + 0.14, 177, 177, 77, [0.82, 0.64, 0.42], true);
+            emitSolidBox3D(lo.x, lo.y, 1, 0, 12, 18, 22, 16, bz + 0.10, bz + 0.28, [0.24, 0.54, 0.30], 6);
+            emitSolidBox3D(lo.x, lo.y, 1, 0, 12, 18, 18, 14, bz + 0.28, bz + 0.42, [0.88, 0.46, 0.16], 6);
+        }
+
+        // 19. LEONIDA KEYS HISTORIC OLD SEVEN MILE BRIDGE 3D BROKEN SPAN PIER (c=202.0, r=478.6)
+        if (this.landmarks3D && this.landmarks3D.sevenMileOldSpan) {
+            const sm = this.landmarks3D.sevenMileOldSpan;
+            const bz = sm.z || 2.0;
+            // West & East Broken Concrete Bridge Spans supported on 3D Cylindrical Concrete Pilings over the Keys Channel!
+            for (const dir of [-1, 1]) {
+                const sx = sm.x + dir * 74;
+                for (const pxOff of [-22, 22]) {
+                    emitCylinder3D(sx, sm.y, pxOff, -12, 4.5, 4.0, bz - 0.05, bz + 0.32, 10, [0.78, 0.80, 0.84], 2, false);
+                    emitCylinder3D(sx, sm.y, pxOff,  12, 4.5, 4.0, bz - 0.05, bz + 0.32, 10, [0.78, 0.80, 0.84], 2, false);
+                }
+                emitTileBox3D(sx, sm.y, 1, 0, 0, 0, 82, 34, bz + 0.28, bz + 0.38, 177, 177, 71, [0.88, 0.90, 0.94], true);
+                emitSolidBox3D(sx, sm.y, 1, 0, -dir * 34, 0, 14, 34, bz + 0.38, bz + 0.44, [0.98, 0.82, 0.16], 3);
+            }
+        }
+
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
         }
@@ -4017,6 +4557,109 @@ class WorldObjectEngine {
             }
         }
 
+        // 9. Thrillbilly Mud Club Animated 3D Flaming Hoop Ring (c=82.0, r=455.0)
+        if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
+            const tb = this.landmarks3D.thrillbillyArena;
+            if (tb.x >= minX - 220 && tb.x <= maxX + 220 && tb.y >= minY - 220 && tb.y <= maxY + 220) {
+                const bz = tb.z || 2.0;
+                const ringCenterElev = bz + 0.52;
+                const ringRadY = 26.0;
+                const ringRadZ = 0.34;
+                for (let fi = 0; fi < 12; fi++) {
+                    const ang = (fi * Math.PI * 2.0) / 12.0 + t * 1.4;
+                    const fy = tb.y + Math.cos(ang) * ringRadY;
+                    const fz = ringCenterElev + Math.sin(ang) * ringRadZ;
+                    const flick = 0.85 + 0.25 * Math.sin(t * 18.0 + fi * 2.1);
+                    const fCol = (fi % 2 === 0) ? [1.0, 0.48, 0.10] : [1.0, 0.88, 0.22];
+                    emitDynBox(tb.x, fy, 1, 0, 0, 0, 7 * flick, 7 * flick, fz - 0.04, fz + 0.06 * flick, fCol, 0.92, 7);
+                }
+            }
+        }
+
+        // 10. Port Gellhorn International Raceway 3D Starting Tree Lights & Active Hot-Lap Checkpoint Pylons
+        if (this.landmarks3D && this.landmarks3D.gellhornSpeedway) {
+            const gs = this.landmarks3D.gellhornSpeedway;
+            if (gs.x >= minX - 320 && gs.x <= maxX + 320 && gs.y >= minY - 320 && gs.y <= maxY + 320) {
+                const bz = gs.z || 2.0;
+                const stage = Math.floor(t * 2.5) % 4;
+                for (const ly of [-42, 0, 42]) {
+                    const col = stage === 0 ? [1.0, 0.18, 0.20] : (stage === 1 ? [1.0, 0.78, 0.14] : [0.18, 0.98, 0.42]);
+                    emitDynBox(gs.x, gs.y, 1, 0, 0, ly, 20, 12, bz + 1.06, bz + 1.14, col, 0.96, 7);
+                }
+            }
+            if (this.speedwayRace && this.speedwayRace.active) {
+                const cp = this.speedwayRace.checkpoints[this.speedwayRace.checkpointIdx];
+                if (cp && cp.x >= minX - 220 && cp.x <= maxX + 220 && cp.y >= minY - 220 && cp.y <= maxY + 220) {
+                    const pulse = 0.72 + 0.24 * Math.sin(t * 8.0);
+                    emitDynCylinder(cp.x, cp.y, 0, 0, 32.0, 26.0, 2.02, 2.55, 16, [0.98, 0.84, 0.16], 7, false, pulse * 0.65);
+                }
+            }
+        }
+
+        // 11. Wynwood Walls Live-Rotating 3D Neon Pop-Art Sculpture & Tagged Graffiti Mural Glow
+        if (this.landmarks3D && this.landmarks3D.wynwoodWalls) {
+            const ww = this.landmarks3D.wynwoodWalls;
+            if (ww.x >= minX - 180 && ww.x <= maxX + 180 && ww.y >= minY - 180 && ww.y <= maxY + 180) {
+                const bz = ww.z || 2.0;
+                const sAng = t * 1.8;
+                const cA = Math.cos(sAng), sA = Math.sin(sAng);
+                const bob = Math.sin(t * 3.0) * 0.04;
+                emitDynBox(ww.x, ww.y + 18, cA, sA, 0, 0, 16, 16, bz + 0.18 + bob, bz + 0.44 + bob, [0.98, 0.26, 0.78], 0.94, 7);
+                emitDynBox(ww.x, ww.y + 18, -sA, cA, 0, 0, 12, 12, bz + 0.44 + bob, bz + 0.64 + bob, [0.18, 0.94, 0.98], 0.94, 7);
+            }
+        }
+        if (Array.isArray(this.graffitiWalls)) {
+            for (let i = 0; i < this.graffitiWalls.length; i++) {
+                const gw = this.graffitiWalls[i];
+                if (gw.x < minX - 140 || gw.x > maxX + 140 || gw.y < minY - 140 || gw.y > maxY + 140) continue;
+                const bz = gw.z || 2.0;
+                const gCos = Math.cos(gw.ang || 0);
+                const gSin = Math.sin(gw.ang || 0);
+                if (gw.tagged) {
+                    const nc = gw.neon || [0.98, 0.24, 0.78];
+                    const pulse = 0.82 + 0.18 * Math.sin(t * 6.0 + i);
+                    emitDynBox(gw.x, gw.y, gCos, gSin, 0, 0, 52, 12.2, bz + 0.10, bz + 0.54, nc, pulse * 0.55, 7);
+                    emitDynBox(gw.x, gw.y, gCos, gSin, 0, 0, 58, 13.0, bz + 0.56, bz + 0.65, [0.22, 0.96, 0.98], 0.95, 7);
+                } else {
+                    // Spinning 3D Neon Spray-Paint Can icon in front of untagged wall
+                    const cAng = t * 3.2 + i;
+                    const bob = Math.sin(t * 4.2 + i) * 0.03;
+                    emitDynCylinder(gw.x - gSin * 18, gw.y + gCos * 18, 0, 0, 4.5, 4.5, bz + 0.06 + bob, bz + 0.22 + bob, 10, gw.neon || [0.98, 0.28, 0.76], 7, true);
+                    emitDynCylinder(gw.x - gSin * 18, gw.y + gCos * 18, 0, 0, 2.2, 2.2, bz + 0.22 + bob, bz + 0.27 + bob, 8, [0.96, 0.98, 1.00], 5, true);
+                }
+            }
+        }
+
+        // 12. Lake Leonida Gator Island Live-Rotating Smuggler Radar Dish & 8 Bobbing 3D Contraband Airdrop Crates
+        if (this.landmarks3D && this.landmarks3D.lakeLeonidaOutpost) {
+            const lo = this.landmarks3D.lakeLeonidaOutpost;
+            if (lo.x >= minX - 200 && lo.x <= maxX + 200 && lo.y >= minY - 200 && lo.y <= maxY + 200) {
+                const bz = lo.z || 2.0;
+                const rAng = t * 2.4;
+                emitDynBox(lo.x + 36, lo.y - 12, Math.cos(rAng), Math.sin(rAng), 0, 0, 24, 5, bz + 1.48, bz + 1.58, [0.92, 0.95, 0.99], 1.0, 4);
+                if (Math.sin(t * 7.5) > 0) {
+                    emitDynCylinder(lo.x + 36, lo.y - 12, 0, 0, 3.0, 3.0, bz + 1.58, bz + 1.66, 8, [0.18, 0.98, 0.48], 7, true);
+                }
+            }
+        }
+        if (Array.isArray(this.smugglerDrops)) {
+            for (let i = 0; i < this.smugglerDrops.length; i++) {
+                const sd = this.smugglerDrops[i];
+                if (!sd.active || sd.x < minX - 140 || sd.x > maxX + 140 || sd.y < minY - 140 || sd.y > maxY + 140) continue;
+                const bob = Math.sin(t * 2.8 + sd.seed) * 0.022;
+                const bz = (sd.z || 2.0) + 0.01 + bob;
+                const cAng = t * 0.6 + sd.seed;
+                const cA = Math.cos(cAng), sA = Math.sin(cAng);
+                // Yellow Inflatable Flotation Collar + Military Olive & Hazard-Orange 3D Supply Crate + Blinking Strobe!
+                emitDynCylinder(sd.x, sd.y, 0, 0, 15.0, 15.0, bz, bz + 0.06, 12, [0.96, 0.78, 0.14], 5, true);
+                emitDynBox(sd.x, sd.y, cA, sA, 0, 0, 18, 18, bz + 0.05, bz + 0.24, [0.22, 0.48, 0.26], 1.0, 6);
+                emitDynBox(sd.x, sd.y, cA, sA, 0, 0, 19, 6, bz + 0.11, bz + 0.19, [0.96, 0.48, 0.14], 1.0, 3);
+                if (Math.sin(t * 8.5 + sd.seed) > -0.2) {
+                    emitDynCylinder(sd.x, sd.y, 0, 0, 3.5, 3.5, bz + 0.24, bz + 0.32, 8, [0.22, 0.94, 0.98], 7, true);
+                }
+            }
+        }
+
         if (dVerts.length === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -4219,6 +4862,46 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(cd.x, cd.y, (cd.z || 2.0) + 0.024, rSz, rSz, renderer.time * 2.0, 0.98, 0.84, 0.18, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
+
+        // Render Pulsing Ground/Water Rings for Thrillbilly Mud Club, Gellhorn Speedway, Wynwood Graffiti Walls & Smuggler Drops
+        if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
+            const tb = this.landmarks3D.thrillbillyArena;
+            if (tb.x >= minX - 200 && tb.x <= maxX + 200 && tb.y >= minY - 200 && tb.y <= maxY + 200) {
+                const rSz = 46 + Math.sin(renderer.time * 6.0) * 5.0;
+                renderer.pushSolidQuad3D(tb.x, tb.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.48, 0.12, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                renderer.pushSolidQuad3D(tb.x, tb.y - 126, 2.03, 28, 28, renderer.time * 1.2, 0.98, 0.78, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (this.landmarks3D && this.landmarks3D.gellhornSpeedway) {
+            const gs = this.landmarks3D.gellhornSpeedway;
+            if (gs.x >= minX - 240 && gs.x <= maxX + 240 && gs.y >= minY - 240 && gs.y <= maxY + 240) {
+                renderer.pushSolidQuad3D(gs.pitX, gs.pitY, 2.03, 34, 34, renderer.time * 1.2, 0.22, 0.94, 0.48, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+            if (this.speedwayRace && this.speedwayRace.active) {
+                const cp = this.speedwayRace.checkpoints[this.speedwayRace.checkpointIdx];
+                if (cp && cp.x >= minX - 240 && cp.x <= maxX + 240 && cp.y >= minY - 240 && cp.y <= maxY + 240) {
+                    const rSz = 64 + Math.sin(renderer.time * 7.0) * 6.0;
+                    renderer.pushSolidQuad3D(cp.x, cp.y, 2.035, rSz, rSz, renderer.time * 1.8, 0.98, 0.84, 0.16, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.graffitiWalls)) {
+            for (let i = 0; i < this.graffitiWalls.length; i++) {
+                const gw = this.graffitiWalls[i];
+                if (gw.tagged || gw.x < minX - 120 || gw.x > maxX + 120 || gw.y < minY - 120 || gw.y > maxY + 120) continue;
+                const gCos = Math.cos(gw.ang || 0), gSin = Math.sin(gw.ang || 0);
+                const rSz = 26 + Math.sin(renderer.time * 5.5 + i) * 3.0;
+                renderer.pushSolidQuad3D(gw.x - gSin * 18, gw.y + gCos * 18, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.28, 0.78, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (Array.isArray(this.smugglerDrops)) {
+            for (let i = 0; i < this.smugglerDrops.length; i++) {
+                const sd = this.smugglerDrops[i];
+                if (!sd.active || sd.x < minX - 140 || sd.x > maxX + 140 || sd.y < minY - 140 || sd.y > maxY + 140) continue;
+                const rSz = 36 + Math.sin(renderer.time * 5.0 + sd.seed) * 4.5;
+                renderer.pushSolidQuad3D(sd.x, sd.y, 2.025, rSz, rSz, renderer.time * 1.2, 0.22, 0.92, 0.98, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
     }
 
     /* ========================================================================
@@ -4336,6 +5019,89 @@ class WorldObjectEngine {
                     ctx.strokeRect(scr.x - 155, scr.y - 22, 310, 22);
                     ctx.fillStyle = col;
                     ctx.fillText(`🥤 [E] DRINK ICE-COLD ${sm.brand} (+35 HP & +$250)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+
+        // 0C. Wynwood Street-Art Graffiti Tagging, Thrillbilly Mud Club, Gellhorn Speedway & Smuggler Drop Prompts
+        if (Array.isArray(this.graffitiWalls)) {
+            for (const gw of this.graffitiWalls) {
+                if (!gw.tagged && Math.hypot(px - gw.x, py - gw.y) < 105) {
+                    const scr = renderer.worldToScreen(gw.x, gw.y - 16, (gw.z || 2.0) + 0.56);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 180, scr.y - 22, 360, 22);
+                    ctx.strokeStyle = "#f472b6";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 180, scr.y - 22, 360, 22);
+                    ctx.fillStyle = "#f472b6";
+                    ctx.fillText("🎨 [E] SPRAY-PAINT VICE 26 MURAL (+$3,500 & -1 STAR)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
+            const tb = this.landmarks3D.thrillbillyArena;
+            if ((tb.cooldown || 0) <= 0 && (Math.hypot(px - tb.x, py - tb.y) < 155 || Math.hypot(px - tb.x, py - (tb.y - 126)) < 115)) {
+                const scr = renderer.worldToScreen(tb.x, tb.y - 18, 2.75);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 190, scr.y - 22, 380, 22);
+                ctx.strokeStyle = "#f97316";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 190, scr.y - 22, 380, 22);
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(
+                    p.inVehicle
+                        ? "🔥 JUMP FLAMING MUD RING (+$10,000 + NITRO & +1X)"
+                        : "🔥 [E] THRILLBILLY MUD-BOGGING DERBY (+$10,000 & +1X)",
+                    scr.x,
+                    scr.y - 7
+                );
+            }
+        }
+        if (this.landmarks3D && this.landmarks3D.gellhornSpeedway && this.speedwayRace) {
+            const gs = this.landmarks3D.gellhornSpeedway;
+            const sr = this.speedwayRace;
+            if (!sr.active && (Math.hypot(px - gs.x, py - gs.y) < 140 || Math.hypot(px - gs.pitX, py - gs.pitY) < 120)) {
+                const scr = renderer.worldToScreen(gs.x, gs.y - 18, 2.65);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.strokeStyle = "#facc15";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.fillStyle = "#facc15";
+                ctx.fillText("🏁 DRIVE THROUGH OR [E] START GELLHORN HOT-LAP (+$15,000)", scr.x, scr.y - 7);
+            } else if (sr.active) {
+                const cp = sr.checkpoints[sr.checkpointIdx];
+                const distM = cp ? Math.round(Math.hypot(px - cp.x, py - cp.y) / 16) : 0;
+                const cx = ctx.canvas.width * 0.5;
+                const cy = 62;
+                ctx.fillStyle = "rgba(10, 14, 26, 0.92)";
+                ctx.fillRect(cx - 235, cy - 24, 470, 48);
+                ctx.strokeStyle = "#facc15";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cx - 235, cy - 24, 470, 48);
+                ctx.font = "900 12px monospace";
+                ctx.fillStyle = "#facc15";
+                ctx.fillText(`🏁 PORT GELLHORN HOT-LAP — TIME: ${sr.timer.toFixed(1)}s (BEST: ${sr.bestTime.toFixed(1)}s)`, cx, cy - 6);
+                ctx.font = "700 11px monospace";
+                ctx.fillStyle = "#4ade80";
+                ctx.fillText(`CHECKPOINT ${sr.checkpointIdx + 1}/4: ${cp ? cp.name : "FINISH"} (${distM}m) • +$15,000 PRIZE`, cx, cy + 14);
+            }
+        }
+        if (Array.isArray(this.smugglerDrops)) {
+            for (const sd of this.smugglerDrops) {
+                if (sd.active && Math.hypot(px - sd.x, py - sd.y) < 130) {
+                    const scr = renderer.worldToScreen(sd.x, sd.y - 14, 2.38);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText("📦 TOUCH OR [E] COLLECT SMUGGLER CRATE (+$5,000 & AMMO)", scr.x, scr.y - 7);
                 }
             }
         }
@@ -4493,6 +5259,26 @@ class WorldObjectEngine {
         if (lm.grassriversOutpost) {
             ctx.fillStyle = "#b88655";
             ctx.fillRect((lm.grassriversOutpost.x - 18) * sx, (lm.grassriversOutpost.y - 12) * sy, 36 * sx, 160 * sy);
+        }
+        if (lm.thrillbillyArena) {
+            ctx.fillStyle = "#f97316";
+            ctx.fillRect((lm.thrillbillyArena.x - 78) * sx, (lm.thrillbillyArena.y - 48) * sy, 156 * sx, 96 * sy);
+        }
+        if (lm.gellhornSpeedway) {
+            ctx.fillStyle = "#facc15";
+            ctx.fillRect((lm.gellhornSpeedway.x - 24) * sx, (lm.gellhornSpeedway.y - 128) * sy, 48 * sx, 256 * sy);
+        }
+        if (lm.wynwoodWalls) {
+            ctx.fillStyle = "#ec4899";
+            ctx.fillRect((lm.wynwoodWalls.x - 54) * sx, (lm.wynwoodWalls.y - 36) * sy, 108 * sx, 72 * sy);
+        }
+        if (lm.lakeLeonidaOutpost) {
+            ctx.fillStyle = "#2dd4bf";
+            ctx.fillRect((lm.lakeLeonidaOutpost.x - 42) * sx, (lm.lakeLeonidaOutpost.y - 42) * sy, 84 * sx, 84 * sy);
+        }
+        if (lm.sevenMileOldSpan) {
+            ctx.fillStyle = "#94a3b8";
+            ctx.fillRect((lm.sevenMileOldSpan.x - 110) * sx, (lm.sevenMileOldSpan.y - 18) * sy, 220 * sx, 36 * sy);
         }
 
         for (let i = 0; i < this.instances.length; i++) {
