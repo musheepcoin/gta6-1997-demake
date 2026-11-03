@@ -276,7 +276,7 @@ class WorldObjectEngine {
                 z: 2.0,
                 consoleX: 460.8 * TILE_SIZE,
                 consoleY: 35.0 * TILE_SIZE,
-                splashX: 473.5 * TILE_SIZE,
+                splashX: 490.6 * TILE_SIZE,
                 splashY: 35.0 * TILE_SIZE
             },
             ferrisWheel: { x: 464.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
@@ -303,7 +303,7 @@ class WorldObjectEngine {
             appliedZoom: 0,
             capsuleActive: false,
             capsuleAlt: 0,
-            capsuleX: 473.5 * TILE_SIZE,
+            capsuleX: 490.6 * TILE_SIZE,
             capsuleY: 35.0 * TILE_SIZE
         };
         this.meshVbo = null;
@@ -573,6 +573,15 @@ class WorldObjectEngine {
             }
             if (this.landmarks3D.ferrisWheel) {
                 clearZones.push({ x: this.landmarks3D.ferrisWheel.x, y: this.landmarks3D.ferrisWheel.y, r: 165 });
+            }
+            if (this.landmarks3D.pierArch) {
+                clearZones.push({ x: this.landmarks3D.pierArch.x, y: this.landmarks3D.pierArch.y, r: 95 });
+            }
+            if (this.landmarks3D.atcTower) {
+                clearZones.push({ x: this.landmarks3D.atcTower.x, y: this.landmarks3D.atcTower.y, r: 120 });
+            }
+            if (this.landmarks3D.waterTower) {
+                clearZones.push({ x: this.landmarks3D.waterTower.x + 20, y: this.landmarks3D.waterTower.y, r: 115 });
             }
             if (Array.isArray(this.landmarks3D.lighthouses)) {
                 for (const lh of this.landmarks3D.lighthouses) {
@@ -1338,6 +1347,11 @@ class WorldObjectEngine {
             if (this.landmarks3D.atcTower) stampTower(this.landmarks3D.atcTower.x, this.landmarks3D.atcTower.y, 1, 4.2);
             if (this.landmarks3D.waterTower) stampTower(this.landmarks3D.waterTower.x, this.landmarks3D.waterTower.y, 1, 4.0);
             for (const lh of this.landmarks3D.lighthouses) stampTower(lh.x, lh.y, 1, 3.8);
+        }
+        if (this.map && this.map.prisonCompound && Array.isArray(this.map.prisonCompound.towers)) {
+            for (const tw of this.map.prisonCompound.towers) {
+                stampTower(tw.x, tw.y, 0, 2.85);
+            }
         }
     }
 
@@ -2277,8 +2291,8 @@ class WorldObjectEngine {
         }
 
         // ====================================================================
-        // E. COMPILE 3D AIRPORT CHECKPOINT GUARDHOUSES (airportCompound.gates)
-        //    (Textured with real 64x64 GTA 1 tiles: S177 concrete, S199 glass booth, L86 HVAC roof)
+        // E. COMPILE 3D AIRPORT CHECKPOINT GUARDHOUSES & LEONIDA STATE PENITENTIARY
+        //    WATCHTOWERS + SALLY-PORT GATEHOUSES (100% gta1_tiles_vice.png)
         // ====================================================================
         if (this.map && this.map.airportCompound && Array.isArray(this.map.airportCompound.gates)) {
             for (const gt of this.map.airportCompound.gates) {
@@ -2288,6 +2302,55 @@ class WorldObjectEngine {
                 emitTileBox3D(bx, by, 1, 0, 0, 0, 24, 18, bz + 0.18, bz + 0.38, 199, 199, 31, [0.96, 0.98, 1.00], false);
                 emitTileBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.38, bz + 0.44, 173, 173, 86, [0.92, 0.94, 0.98], false);
                 emitSolidBox3D(bx, by, 1, 0, 0, 0, 18, 5, bz + 0.44, bz + 0.48, [0.94, 0.74, 0.14], 3);
+            }
+        }
+
+        if (this.map && this.map.prisonCompound) {
+            const pris = this.map.prisonCompound;
+            // E.1: 2 Prison 3D Sally-Port Gatehouses & Overhead Steel Portals
+            if (Array.isArray(pris.gates)) {
+                for (const gt of pris.gates) {
+                    const bz = 2.0;
+                    if (gt.boothX && gt.boothY) {
+                        const bx = gt.boothX, by = gt.boothY;
+                        emitAOShadow3D(bx, by, 1, 0, 0, 0, 46, 36, bz, 0.42);
+                        // Brutalist Concrete Bunker Base (S177 bevelled stone + S86 ribbed concrete + L46 roof)
+                        emitTileBox3D(bx, by, 1, 0, 0, 0, 36, 28, bz, bz + 0.20, 177, 86, 46, [0.86, 0.88, 0.92], true);
+                        // 360° Armored Observation Window Tier (S199 glass + L31 skylight)
+                        emitTileBox3D(bx, by, 1, 0, 0, 0, 32, 24, bz + 0.20, bz + 0.40, 199, 199, 31, [0.92, 0.96, 1.00], false);
+                        // Reinforced Overhanging Concrete Roof Slab + HVAC (S177 + L86)
+                        emitTileBox3D(bx, by, 1, 0, 0, 0, 38, 30, bz + 0.40, bz + 0.48, 177, 177, 86, [0.84, 0.86, 0.90], false);
+                    }
+                    // Heavy 3D Overhead Sally-Port Steel Gantry Portal spanning the vehicle gate
+                    const gw = (gt.w || 110) + 12;
+                    // Left & Right Concrete Portal Columns (S86)
+                    emitTileBox3D(gt.x, gt.y, 1, 0, -gw * 0.48, 0, 10, 12, bz, bz + 0.46, 86, 86, 46, [0.84, 0.86, 0.90], true);
+                    emitTileBox3D(gt.x, gt.y, 1, 0,  gw * 0.48, 0, 10, 12, bz, bz + 0.46, 86, 86, 46, [0.84, 0.86, 0.90], true);
+                    // Overhead Riveted Steel Cross-Beam + Alpha-Cutout S250 Steel Truss
+                    emitTileBox3D(gt.x, gt.y, 1, 0, 0, 0, gw + 8, 12, bz + 0.36, bz + 0.46, 250, 363, 45, [0.88, 0.90, 0.94], false);
+                    emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, gw * 0.82, 8, bz + 0.46, bz + 0.52, [0.94, 0.74, 0.14], 3);
+                }
+            }
+            // E.2: 8 Leonida State Penitentiary 3D Concrete & Steel Guard Watchtowers
+            if (Array.isArray(pris.towers)) {
+                for (const tw of pris.towers) {
+                    const tx = tw.x, ty = tw.y, bz = 2.0;
+                    emitAOShadow3D(tx, ty, 1, 0, 0, 0, 52, 52, bz, 0.46);
+                    // 1. Octagonal Bevelled Concrete Blast Plinth (S177 stone walls + L71 concrete top)
+                    emitOctagonPad3D(tx, ty, 0, 0, 42, 42, 38, 38, 0.25, bz, bz + 0.14, [0.88, 0.90, 0.94], [0.82, 0.84, 0.88], 2, 177, 71);
+                    // 2. Brutalist Ribbed Concrete Watchtower Shaft (S86 columns + L46 concrete deck)
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 26, 26, bz + 0.14, bz + 0.52, 86, 86, 46, [0.88, 0.90, 0.94], false);
+                    // 3. Alpha-Cutout Vertical Steel Service Ladder (S249) mounted on inner yard face
+                    const ladOffX = (tw.baseAng === 0) ? 14.5 : -14.5;
+                    emitTileBox3D(tx, ty, 1, 0, ladOffX, 0, 2.5, 8, bz + 0.14, bz + 0.54, 249, 249, 45, [0.92, 0.94, 0.98], false);
+                    // 4. Cantilevered Steel Grate Sniper Catwalk Deck & Safety Railing (S363 truss + L45 steel plate)
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 40, 40, bz + 0.52, bz + 0.58, 363, 363, 45, [0.86, 0.88, 0.92], false);
+                    // 5. 360° Armored Glass Guardhouse Cab (S199 windows + L31 skylight)
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 32, 32, bz + 0.58, bz + 0.78, 199, 199, 31, [0.94, 0.98, 1.00], false);
+                    // 6. Overhanging Concrete Roof Slab & Searchlight Turret Pedestal (S177 + L86)
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 38, 38, bz + 0.78, bz + 0.85, 177, 177, 86, [0.88, 0.90, 0.94], false);
+                    emitCylinder3D(tx, ty, 0, 0, 6.5, 5.0, bz + 0.85, bz + 0.93, 8, [0.36, 0.40, 0.46], 5, true);
+                }
             }
         }
 

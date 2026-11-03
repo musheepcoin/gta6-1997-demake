@@ -1458,7 +1458,7 @@ class LeonidaMap {
             { kind: "CONTAINERS", c: 79.5,  r: 232.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 79.5,  r: 242.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 151.5, r: 107.5, ang: Math.PI * 0.5,  scale: 1.20 },
-            { kind: "CONTAINERS", c: 151.5, r: 118.5, ang: Math.PI * 0.5,  scale: 1.20 },
+            { kind: "CONTAINERS", c: 152.5, r: 114.5, ang: Math.PI * 0.5,  scale: 1.20 },
             // Moored Harbor Yachts & Speedboats in clean water beside piers
             { kind: "YACHT",      c: 325.0, r: 305.0, ang: -Math.PI * 0.5, scale: 1.30 },
             { kind: "SPEEDBOAT",  c: 325.0, r: 312.0, ang: Math.PI * 0.5,  scale: 1.20 },
@@ -2048,6 +2048,31 @@ class LeonidaMap {
         }
         for (const br of this.industrialAndParkDetails.bikerRallies) {
             pushPropOBB(br.x, br.y, br.count * 10, 12, 0);
+        }
+
+        // 18D-2. 3D Landmarks & Monuments Solid OBB Collision Hulls (Launchpad, ATC Tower, Water Tower, Pier Arch Pylons, Ferris Wheel & Gantry Legs)
+        pushPropOBB(465.0 * TILE_SIZE, 35.0 * TILE_SIZE, 78, 78, 0);              // SERA Launchpad MLP & Umbilical Tower
+        pushPropOBB(460.8 * TILE_SIZE, 35.0 * TILE_SIZE, 28, 36, 0);              // SERA Launch Control Bunker
+        pushPropOBB(106.5 * TILE_SIZE, 307.5 * TILE_SIZE, 38, 38, 0);             // VCIA 3D Air Traffic Control Tower
+        pushPropOBB(148.5 * TILE_SIZE, 118.5 * TILE_SIZE, 32, 32, 0);             // Kelly County 3D Water Tower
+        pushPropOBB(148.5 * TILE_SIZE + 54, 118.5 * TILE_SIZE, 14, 14, 0);        // Kelly County 3D Radio Mast
+        pushPropOBB(456.5 * TILE_SIZE, 194.5 * TILE_SIZE - 42, 16, 16, 0);        // Vice Beach Pier Arch North Pylon (road stays open!)
+        pushPropOBB(456.5 * TILE_SIZE, 194.5 * TILE_SIZE + 42, 16, 16, 0);        // Vice Beach Pier Arch South Pylon (road stays open!)
+        pushPropOBB(464.5 * TILE_SIZE, 194.5 * TILE_SIZE - 20, 42, 8, 0);         // Vice Beach Ferris Wheel North A-Frame Base
+        pushPropOBB(464.5 * TILE_SIZE, 194.5 * TILE_SIZE + 20, 42, 8, 0);         // Vice Beach Ferris Wheel South A-Frame Base
+        pushPropOBB(199.5 * TILE_SIZE, 476.5 * TILE_SIZE, 24, 24, 0);             // Key West Lighthouse
+        pushPropOBB(464.5 * TILE_SIZE, 134.5 * TILE_SIZE, 24, 24, 0);             // Cape Leonida Lighthouse
+        const gantryLocs = [
+            { x: 359.4 * TILE_SIZE, y: 322.8 * TILE_SIZE },
+            { x: 359.4 * TILE_SIZE, y: 335.4 * TILE_SIZE },
+            { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE },
+            { x: 57.2 * TILE_SIZE,  y: 243.5 * TILE_SIZE }
+        ];
+        for (const gl of gantryLocs) {
+            pushPropOBB(gl.x - 24, gl.y - 26, 7, 7, 0);
+            pushPropOBB(gl.x + 24, gl.y - 26, 7, 7, 0);
+            pushPropOBB(gl.x - 24, gl.y + 26, 7, 7, 0);
+            pushPropOBB(gl.x + 24, gl.y + 26, 7, 7, 0);
         }
 
         // 18E. GTA 6 Leonida Residential Estates & Waterfront Mansions Solid OBB Collision Hulls
