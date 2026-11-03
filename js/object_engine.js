@@ -336,13 +336,14 @@ class WorldObjectEngine {
                 { x: 57.2 * TILE_SIZE,  y: 243.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
             ],
             // 16 Satirical GTA 6 & GTA Universe 3D Illuminated Roadside Advertising Billboards
+            // (Placed on highway verges, causeways & commercial strips — NEVER on Ocean Drive beachfront sidewalks or parked cars!)
             gtaBillboards: [
-                { x: 448.5 * TILE_SIZE, y: 285.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_pisswasser",   neon: [0.98, 0.82, 0.18] }, // Ocean Drive South
-                { x: 448.5 * TILE_SIZE, y: 252.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ecola",        neon: [0.98, 0.22, 0.28] }, // Ocean Drive Mid
-                { x: 448.5 * TILE_SIZE, y: 202.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Ocean Drive Pier
-                { x: 448.5 * TILE_SIZE, y: 165.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_angstipan",    neon: [0.22, 0.92, 0.96] }, // North Beach
-                { x: 352.0 * TILE_SIZE, y: 299.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_patriot_beer", neon: [0.96, 0.28, 0.32] }, // MacArthur Causeway
-                { x: 352.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_burgershot",   neon: [0.98, 0.62, 0.16] }, // Venetian Causeway
+                { x: 398.0 * TILE_SIZE, y: 299.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_pisswasser",   neon: [0.98, 0.82, 0.18] }, // MacArthur Causeway East Approach
+                { x: 432.5 * TILE_SIZE, y: 242.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ecola",        neon: [0.98, 0.22, 0.28] }, // Collins Ave Mid Strip
+                { x: 398.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Venetian Causeway East Approach
+                { x: 432.5 * TILE_SIZE, y: 165.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_angstipan",    neon: [0.22, 0.92, 0.96] }, // North Beach Collins Strip
+                { x: 352.0 * TILE_SIZE, y: 299.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_patriot_beer", neon: [0.96, 0.28, 0.32] }, // MacArthur Causeway West
+                { x: 352.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_burgershot",   neon: [0.98, 0.62, 0.16] }, // Venetian Causeway West
                 { x: 282.5 * TILE_SIZE, y: 248.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_call_morgan",  neon: [0.98, 0.84, 0.18] }, // Downtown South
                 { x: 282.5 * TILE_SIZE, y: 215.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ammunation",   neon: [0.96, 0.24, 0.24] }, // Downtown North
                 { x: 224.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Little Haiti
@@ -858,7 +859,8 @@ class WorldObjectEngine {
             }
             if (Array.isArray(this.landmarks3D.gtaBillboards)) {
                 for (const bb of this.landmarks3D.gtaBillboards) {
-                    clearZones.push({ x: bb.x, y: bb.y, r: 58 });
+                    snapOffRoad(bb);
+                    clearZones.push({ x: bb.x, y: bb.y, r: 64 });
                 }
             }
             if (Array.isArray(this.landmarks3D.speedTraps)) {
@@ -867,6 +869,7 @@ class WorldObjectEngine {
                 }
             }
         }
+        this.clearZones = clearZones;
         if (Array.isArray(this.graffitiWalls) && map.surfaceGround) {
             for (const gw of this.graffitiWalls) {
                 const c0 = Math.floor(gw.x / TILE_SIZE);
@@ -2809,6 +2812,7 @@ class WorldObjectEngine {
 
                     if (!isDryLotPoint(vx, vy, 26)) continue;
                     if (this.map && typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(vx, vy, 26)) continue;
+                    if (Array.isArray(this.clearZones) && this.clearZones.some(cz => Math.hypot(cz.x - vx, cz.y - vy) < Math.max(58, cz.r || 58))) continue;
                     if (game.vehicles.some(v => Math.hypot(v.x - vx, v.y - vy) < 46)) continue;
 
                     chosen = { vx, vy, vang };

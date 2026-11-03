@@ -500,13 +500,13 @@ class LeonidaGame {
 
         const parked = [
 
-            // --- A. Ocean Drive & Hotel Dixon Spawn: Curb-parked Hero Tulip & Motorcycles on the Promenade edge (x=218.55, off the 4 road lanes 214..217!) ---
+            // --- A. Ocean Drive & Hotel Dixon Spawn: Curb-parked Hero Tulip & Motorcycles along the Curbside Edge (x=218.18, clear of sidewalks & road lanes 214..217!) ---
 
-            { spec: "TULIP_MUSCLE", c: 218.55, r: 144.2, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
+            { spec: "TULIP_MUSCLE", c: 218.18, r: 143.5, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
 
-            { spec: "SUPERBIKE", c: 218.55, r: 146.8, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "SUPERBIKE", c: 218.18, r: 146.2, a: -Math.PI * 0.5, z: 2.0 },
 
-            { spec: "HARLEY_BIKE", c: 218.55, r: 149.2, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "HARLEY_BIKE", c: 218.18, r: 148.8, a: -Math.PI * 0.5, z: 2.0 },
 
             // Active moving traffic on Ocean Drive & Collins Ave (never parked stationary in the road!)
 
@@ -690,15 +690,15 @@ class LeonidaGame {
 
             { c: 213.5, r: 158.6, a: Math.PI * 0.5, type: "civ2" },
 
-            { c: 218.5, r: 140.5, a: Math.PI * 0.5, type: "bikini_pink", missionTag: "BEACH" },
+            { c: 219.5, r: 140.5, a: Math.PI * 0.5, type: "bikini_pink", missionTag: "BEACH" },
 
-            { c: 218.5, r: 144.8, a: -Math.PI * 0.5, type: "bikini_cyan", missionTag: "BEACH" },
+            { c: 220.2, r: 144.8, a: -Math.PI * 0.5, type: "bikini_cyan", missionTag: "BEACH" },
 
-            { c: 218.5, r: 148.6, a: Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 219.5, r: 148.6, a: Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
 
-            { c: 218.5, r: 152.4, a: -Math.PI * 0.5, type: "surfer_guy", missionTag: "BEACH" },
+            { c: 220.2, r: 152.4, a: -Math.PI * 0.5, type: "surfer_guy", missionTag: "BEACH" },
 
-            { c: 218.5, r: 156.8, a: Math.PI * 0.5, type: "bikini_red", missionTag: "BEACH" },
+            { c: 219.5, r: 156.8, a: Math.PI * 0.5, type: "bikini_red", missionTag: "BEACH" },
 
             { c: 219.5, r: 142.5, a: Math.PI * 0.5, type: "bikini_white", missionTag: "BEACH" },
 
@@ -1064,45 +1064,60 @@ class LeonidaGame {
 
                 v.aiTurnedInIntersection = false;
 
-            } else if (!v.driver && nav && nav.groundType === GROUND_TYPE.ROAD) {
+            } else if (!v.driver) {
 
-                // Never leave a driverless parked car blocking an active road lane!
+                const czList = (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.clearZones))
+                    ? this.map.objectEngine.clearZones
+                    : [];
+                const hitsClearZone = (px, py) => czList.some(cz => Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54));
 
-                for (let r = 1; r <= 4; r++) {
+                if ((nav && nav.groundType === GROUND_TYPE.ROAD) || hitsClearZone(v.x, v.y)) {
 
-                    let foundCurb = false;
+                    // Never leave a driverless parked car blocking an active road lane or underneath a 3D billboard/landmark!
 
-                    for (let dy = -r; dy <= r && !foundCurb; dy++) {
+                    for (let r = 1; r <= 4; r++) {
 
-                        for (let dx = -r; dx <= r && !foundCurb; dx++) {
+                        let foundCurb = false;
 
-                            const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z);
+                        for (let dy = -r; dy <= r && !foundCurb; dy++) {
 
-                            if (nb && (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)) {
+                            for (let dx = -r; dx <= r && !foundCurb; dx++) {
 
-                                const candX = (bx + dx + 0.5) * TILE_SIZE;
+                                const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z);
 
-                                const candY = (by + dy + 0.5) * TILE_SIZE;
+                                if (nb && (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)) {
 
-                                if (typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(candX, candY, 24)) {
+                                    const candX = (bx + dx + 0.5) * TILE_SIZE;
 
-                                    continue;
+                                    const candY = (by + dy + 0.5) * TILE_SIZE;
+
+                                    if (typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(candX, candY, 24)) {
+
+                                        continue;
+
+                                    }
+
+                                    if (hitsClearZone(candX, candY)) {
+
+                                        continue;
+
+                                    }
+
+                                    v.x = candX;
+
+                                    v.y = candY;
+
+                                    foundCurb = true;
 
                                 }
-
-                                v.x = candX;
-
-                                v.y = candY;
-
-                                foundCurb = true;
 
                             }
 
                         }
 
-                    }
+                        if (foundCurb) break;
 
-                    if (foundCurb) break;
+                    }
 
                 }
 
