@@ -2460,6 +2460,12 @@ class LeonidaMap {
                     [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
                 ];
                 this.trees = this.trees.filter(tr => {
+                    const c = Math.floor(tr.x / TILE_SIZE);
+                    const r = Math.floor(tr.y / TILE_SIZE);
+                    if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
+                        const gt = this.surfaceGround[r * MAP_COLS + c];
+                        if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
+                    }
                     for (let i = 0; i < payphoneSpots.length; i++) {
                         if (Math.hypot(tr.x - payphoneSpots[i][0], tr.y - payphoneSpots[i][1]) < 58) return false;
                     }
@@ -2467,19 +2473,26 @@ class LeonidaMap {
                 });
             }
 
-            // Rebuild O(1) Spatial Hash Grid for Leonida Flora & Tree Trunks
+            // Rebuild O(1) Spatial Hash Grid for Leonida Flora (Palms & Trees)
             this.floraGrid = new Map();
-            for (let pi = 0; pi < this.vicePalms.length; pi++) {
-                const pm = this.vicePalms[pi];
-                const fbx = Math.floor(pm.x / TILE_SIZE);
-                const fby = Math.floor(pm.y / TILE_SIZE);
+            const addFloraToGrid = (item) => {
+                const fbx = Math.floor(item.x / TILE_SIZE);
+                const fby = Math.floor(item.y / TILE_SIZE);
                 const fkey = (fby << 16) | (fbx & 0xffff);
                 let cell = this.floraGrid.get(fkey);
                 if (!cell) {
                     cell = [];
                     this.floraGrid.set(fkey, cell);
                 }
-                cell.push(pm);
+                cell.push(item);
+            };
+            for (let pi = 0; pi < this.vicePalms.length; pi++) {
+                addFloraToGrid(this.vicePalms[pi]);
+            }
+            if (Array.isArray(this.trees)) {
+                for (let ti = 0; ti < this.trees.length; ti++) {
+                    addFloraToGrid(this.trees[ti]);
+                }
             }
         }
 
@@ -4290,6 +4303,16 @@ class LeonidaMap {
             }
         }
 
+        // Physical collision against Solid Tree & Palm Trunks (this.vicePalms + this.trees in this.floraGrid)
+        if (currentZBlocks === null || currentZBlocks < 2.8) {
+            const floraCol = this.resolveCircleFloraCollision(nx, ny, radius);
+            if (floraCol.hit) {
+                nx = floraCol.x;
+                ny = floraCol.y;
+                hit = true;
+            }
+        }
+
         nx = Math.max(TILE_SIZE * 1.5, Math.min(this.width - TILE_SIZE * 1.5, nx));
         ny = Math.max(TILE_SIZE * 1.5, Math.min(this.height - TILE_SIZE * 1.5, ny));
 
@@ -4311,17 +4334,21 @@ class LeonidaMap {
                 if (!cell) continue;
                 for (let i = 0; i < cell.length; i++) {
                     const pm = cell[i];
-                    // Solid trunk collision: Palmetto, Cypress, Palm, Banyan, Oak
-                    const trunkR = Math.max(9, Math.min(16, 12 * (pm.scale || 1.0)));
+                    // Solid trunk collision: Royal Palm, Coconut Palm, Palmetto, Bald Cypress, Live Oak & Banyan
+                    const trunkR = Math.max(10, Math.min(16, 13 * (pm.scale || 1.0)));
                     const ex = nx - pm.x;
                     const ey = ny - pm.y;
                     const dist2 = ex * ex + ey * ey;
                     const minDist = radius + trunkR;
-                    if (dist2 < minDist * minDist && dist2 > 0.0001) {
-                        const dist = Math.sqrt(dist2);
-                        const push = minDist - dist;
-                        nx += (ex / dist) * push;
-                        ny += (ey / dist) * push;
+                    if (dist2 < minDist * minDist) {
+                        if (dist2 > 0.0001) {
+                            const dist = Math.sqrt(dist2);
+                            const push = minDist - dist;
+                            nx += (ex / dist) * push;
+                            ny += (ey / dist) * push;
+                        } else {
+                            nx += minDist;
+                        }
                         hit = true;
                     }
                 }

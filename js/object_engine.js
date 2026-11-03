@@ -2690,20 +2690,29 @@ class WorldObjectEngine {
             }
         }
 
-        // Rebuild map.floraGrid after all WorldObjectEngine flora & booth clearance passes
-        if (Array.isArray(map.vicePalms)) {
+        // Rebuild map.floraGrid after all WorldObjectEngine flora & booth clearance passes (includes both vicePalms and trees!)
+        if (Array.isArray(map.vicePalms) || Array.isArray(map.trees)) {
             map.floraGrid = new Map();
-            for (let pi = 0; pi < map.vicePalms.length; pi++) {
-                const pm = map.vicePalms[pi];
-                const fbx = Math.floor(pm.x / TILE_SIZE);
-                const fby = Math.floor(pm.y / TILE_SIZE);
+            const addFlora = (item) => {
+                const fbx = Math.floor(item.x / TILE_SIZE);
+                const fby = Math.floor(item.y / TILE_SIZE);
                 const fkey = (fby << 16) | (fbx & 0xffff);
                 let cell = map.floraGrid.get(fkey);
                 if (!cell) {
                     cell = [];
                     map.floraGrid.set(fkey, cell);
                 }
-                cell.push(pm);
+                cell.push(item);
+            };
+            if (Array.isArray(map.vicePalms)) {
+                for (let pi = 0; pi < map.vicePalms.length; pi++) {
+                    addFlora(map.vicePalms[pi]);
+                }
+            }
+            if (Array.isArray(map.trees)) {
+                for (let ti = 0; ti < map.trees.length; ti++) {
+                    addFlora(map.trees[ti]);
+                }
             }
         }
     }
