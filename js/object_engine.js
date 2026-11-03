@@ -1412,19 +1412,90 @@ class WorldObjectEngine {
             uniform sampler2D uTex;
             uniform float uNightTint;
             uniform float uSunsetTint;
+
+            float hash21(vec2 p) {
+                p = fract(p * vec2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return fract(p.x * p.y);
+            }
+
             void main() {
                 vec4 c;
                 if (vUV.x < -0.5) {
+                    float rawX = -vUV.x;
+                    float matId = floor(rawX + 0.001);
+                    vec2 puv = vec2(clamp((rawX - matId) / 0.85, 0.0, 1.0), clamp(vUV.y, 0.0, 1.0));
                     c = vColor;
+
+                    // World-space micro-grain so no untextured surface ever looks flat plastic
+                    float grain = (hash21(floor(vWorldPos.xz * 24.0 + vWorldPos.y * 16.0)) - 0.5) * 0.055;
+
+                    if (matId < 1.5) {
+                        // MAT 1: Architectural Stucco / Trim / Columns (beveled edges + vertical AO)
+                        float edgeX = min(puv.x, 1.0 - puv.x);
+                        float edgeY = min(puv.y, 1.0 - puv.y);
+                        float bevel = smoothstep(0.0, 0.08, min(edgeX, edgeY));
+                        float vAO = mix(0.88, 1.04, puv.y);
+                        c.rgb = c.rgb * vAO * (0.95 + 0.07 * bevel) + grain;
+                    } else if (matId < 2.5) {
+                        // MAT 2: Industrial Concrete Blast Pad & Tarmac (expansion slab grid + blast scorch + aggregate)
+                        vec2 slab = abs(fract(vWorldPos.xz * 1.25) - 0.5);
+                        float joint = smoothstep(0.46, 0.495, max(slab.x, slab.y));
+                        float rad = length(puv - vec2(0.5, 0.5)) * 2.0;
+                        float scorch = smoothstep(0.15, 0.78, rad);
+                        float curb = smoothstep(0.88, 0.96, max(abs(puv.x - 0.5), abs(puv.y - 0.5)) * 2.0);
+                        c.rgb = c.rgb * mix(0.76, 1.02, scorch) * (1.0 - joint * 0.16) + curb * 0.07 + grain * 1.3;
+                    } else if (matId < 3.5) {
+                        // MAT 3: Diagonal Yellow/Black Industrial Hazard Chevrons
+                        float stripe = sin((vWorldPos.x + vWorldPos.z + vWorldPos.y * 0.5) * 26.0);
+                        vec3 hazYellow = vec3(0.96, 0.76, 0.10);
+                        vec3 hazDark = vec3(0.14, 0.16, 0.20);
+                        c.rgb = mix(hazDark, hazYellow, smoothstep(-0.15, 0.15, stripe)) + grain;
+                    } else if (matId < 4.5) {
+                        // MAT 4: Open-Lattice 3D Structural Steel Truss (Umbilical Tower, Gantry Cranes, Swing Arms)
+                        float frameX = min(puv.x, 1.0 - puv.x);
+                        float frameY = min(puv.y, 1.0 - puv.y);
+                        float d1 = abs(puv.x - puv.y);
+                        float d2 = abs(puv.x - (1.0 - puv.y));
+                        bool isOuter = (frameX < 0.16) || (frameY < 0.15);
+                        bool isCross = (d1 < 0.115) || (d2 < 0.115);
+                        if (!isOuter && !isCross) discard;
+                        float barHighlight = isOuter ? 1.04 : 0.88;
+                        c.rgb = c.rgb * barHighlight + grain * 0.8;
+                    } else if (matId < 5.5) {
+                        // MAT 5: Aerospace Fuselage / Cryogenic Tank / Cylindrical Monument (stringers + weld rings + sheen)
+                        float ring = smoothstep(0.43, 0.49, abs(fract(puv.y * 4.0) - 0.5));
+                        float stringer = smoothstep(0.42, 0.49, abs(fract(puv.x * 8.0) - 0.5));
+                        float sheen = pow(max(0.0, 1.0 - abs(puv.x - 0.38) * 2.1), 2.4) * 0.14;
+                        c.rgb = c.rgb * (1.0 - ring * 0.10 - stringer * 0.05) + sheen + grain * 0.5;
+                    } else if (matId < 6.5) {
+                        // MAT 6: Corrugated Steel Shipping Container (deep ribs + frame border)
+                        float rib = sin(puv.x * 54.0) * 0.10;
+                        float border = (min(puv.x, 1.0 - puv.x) < 0.06 || min(puv.y, 1.0 - puv.y) < 0.08) ? 0.08 : 0.0;
+                        c.rgb = clamp(c.rgb + rib + border + grain, 0.0, 1.0);
+                    } else if (matId < 7.5) {
+                        // MAT 7: Architectural / Fresnel Lantern Glass (mullion grid + sky reflection)
+                        float mullionX = smoothstep(0.42, 0.48, abs(fract(puv.x * 4.0) - 0.5));
+                        float mullionY = smoothstep(0.42, 0.48, abs(fract(puv.y * 2.0) - 0.5));
+                        float mullion = max(mullionX, mullionY);
+                        float refl = smoothstep(0.1, 0.9, puv.x * 0.6 + puv.y * 0.4) * 0.18;
+                        c.rgb = mix(c.rgb + refl, vec3(0.16, 0.20, 0.26), mullion * 0.65);
+                    } else if (matId < 8.5) {
+                        // MAT 8: Soft Ground Ambient Occlusion Contact Shadow Skirt
+                        vec2 d = abs(puv - vec2(0.5, 0.5)) * 2.0;
+                        float dist = max(d.x, d.y);
+                        float falloff = 1.0 - smoothstep(0.45, 0.98, dist);
+                        c = vec4(0.02, 0.03, 0.06, vColor.a * falloff);
+                    }
                 } else {
                     c = texture2D(uTex, vUV) * vColor;
                     if (c.a < 0.12) discard;
                 }
-                if (uSunsetTint > 0.01) {
+                if (uSunsetTint > 0.01 && vUV.x > -7.5) {
                     vec3 sunsetRgb = c.rgb * vec3(1.12, 0.90, 0.78);
                     c.rgb = mix(c.rgb, sunsetRgb, uSunsetTint * 0.52);
                 }
-                if (uNightTint > 0.01) {
+                if (uNightTint > 0.01 && vUV.x > -7.5) {
                     float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
                     float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
                     float isWindow = clamp((lum - 0.50) * 3.4 + (sat - 0.28) * 2.6, 0.0, 1.0);
@@ -1461,6 +1532,10 @@ class WorldObjectEngine {
         const pushV = (x, yElev, z, u, v, r, g, b, a = 1.0) => {
             verts.push(x, yElev, z, u, v, r, g, b, a);
         };
+        const encodeMatUV = (matId, u, v) => [
+            -matId - Math.max(0.01, Math.min(0.99, u)) * 0.85,
+            Math.max(0.01, Math.min(0.99, v))
+        ];
         const pushQuad3D = (p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a = 1.0) => {
             pushV(p0[0], p0[1], p0[2], u0, v0, r, g, b, a);
             pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
@@ -1470,6 +1545,11 @@ class WorldObjectEngine {
             pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
             pushV(p3[0], p3[1], p3[2], u1, v1, r, g, b, a);
         };
+        const pushMatQuad3D = (p0, p1, p2, p3, matId, r, g, b, a = 1.0) => {
+            const [u0, v0] = encodeMatUV(matId, 0.02, 0.98);
+            const [u1, v1] = encodeMatUV(matId, 0.98, 0.02);
+            pushQuad3D(p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a);
+        };
         const pushTri3D = (p0, p1, p2, uv0, uv1, uv2, r, g, b, a = 1.0) => {
             pushV(p0[0], p0[1], p0[2], uv0[0], uv0[1], r, g, b, a);
             pushV(p1[0], p1[1], p1[2], uv1[0], uv1[1], r, g, b, a);
@@ -1478,7 +1558,7 @@ class WorldObjectEngine {
 
         const getUV = (key) => {
             const rect = objSprites[key];
-            if (!rect) return [-1, -1, -1, -1];
+            if (!rect) return [-1.4, 0.5, -1.4, 0.5];
             const [sx, sy, sw, sh] = rect;
             return [
                 (sx + 0.5) / texW,
@@ -1516,11 +1596,11 @@ class WorldObjectEngine {
             pushQuad3D(tSE, tNE, bSE, bNE, su0, sv0, su1, sv1, 0.86, 0.87, 0.90, 1.0);
 
             if (topColor) {
-                pushQuad3D(tNW, tNE, tSW, tSE, -1, -1, -1, -1, topColor[0], topColor[1], topColor[2], 1.0);
+                pushMatQuad3D(tNW, tNE, tSW, tSE, 1, topColor[0], topColor[1], topColor[2], 1.0);
             }
         };
 
-        const emitSolidBox3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, col) => {
+        const emitSolidBox3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, col, matId = 1, alpha = 1.0) => {
             const hw = wPx * 0.5;
             const hd = dPx * 0.5;
             const [r, g, b] = col;
@@ -1533,11 +1613,148 @@ class WorldObjectEngine {
             const bSW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY + hd, yBot);
             const bSE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY + hd, yBot);
 
-            pushQuad3D(tSW, tSE, bSW, bSE, -1, -1, -1, -1, r * 1.00, g * 1.00, b * 1.00, 1.0);
-            pushQuad3D(tNE, tNW, bNE, bNW, -1, -1, -1, -1, r * 0.76, g * 0.78, b * 0.82, 1.0);
-            pushQuad3D(tNW, tSW, bNW, bSW, -1, -1, -1, -1, r * 0.92, g * 0.92, b * 0.94, 1.0);
-            pushQuad3D(tSE, tNE, bSE, bNE, -1, -1, -1, -1, r * 0.84, g * 0.85, b * 0.88, 1.0);
-            pushQuad3D(tNW, tNE, tSW, tSE, -1, -1, -1, -1, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), 1.0);
+            pushMatQuad3D(tSW, tSE, bSW, bSE, matId, r * 1.00, g * 1.00, b * 1.00, alpha);
+            pushMatQuad3D(tNE, tNW, bNE, bNW, matId, r * 0.76, g * 0.78, b * 0.82, alpha);
+            pushMatQuad3D(tNW, tSW, bNW, bSW, matId, r * 0.92, g * 0.92, b * 0.94, alpha);
+            pushMatQuad3D(tSE, tNE, bSE, bNE, matId, r * 0.84, g * 0.85, b * 0.88, alpha);
+            if (matId !== 4) {
+                pushMatQuad3D(tNW, tNE, tSW, tSE, matId, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+            }
+        };
+
+        const emitAOShadow3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yGround, alpha = 0.44) => {
+            const hw = wPx * 0.5;
+            const hd = dPx * 0.5;
+            const yS = yGround + 0.012;
+            const pNW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY - hd, yS);
+            const pNE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY - hd, yS);
+            const pSW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY + hd, yS);
+            const pSE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY + hd, yS);
+            pushMatQuad3D(pNW, pNE, pSW, pSE, 8, 0.02, 0.03, 0.06, alpha);
+        };
+
+        // True 3D Multi-Segment Cylinder / Frustum with Smooth Radial Sun Shading & Circular Cap
+        const emitCylinder3D = (cxPx, cyPx, offX, offY, rBotPx, rTopPx, yBot, yTop, segs, col, matId = 5, capTop = true) => {
+            const [r, g, b] = col;
+            const centerTop = toWorld(cxPx, cyPx, 1, 0, offX, offY, yTop);
+            const uvCenter = encodeMatUV(matId, 0.5, 0.5);
+            for (let s = 0; s < segs; s++) {
+                const a0 = (s * Math.PI * 2.0) / segs;
+                const a1 = ((s + 1) * Math.PI * 2.0) / segs;
+                const aMid = (a0 + a1) * 0.5;
+                const nx = Math.cos(aMid);
+                const ny = Math.sin(aMid);
+                // Directional sun from South-East (0.65, 0.76)
+                const sunDot = nx * 0.65 + ny * 0.76;
+                const shade = 0.86 + 0.18 * sunDot + Math.pow(Math.max(0, sunDot), 4.0) * 0.08;
+                const sr = Math.min(1.0, r * shade);
+                const sg = Math.min(1.0, g * shade);
+                const sb = Math.min(1.0, b * shade);
+
+                const b0 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a0) * rBotPx, offY + Math.sin(a0) * rBotPx, yBot);
+                const b1 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a1) * rBotPx, offY + Math.sin(a1) * rBotPx, yBot);
+                const t0 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a0) * rTopPx, offY + Math.sin(a0) * rTopPx, yTop);
+                const t1 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a1) * rTopPx, offY + Math.sin(a1) * rTopPx, yTop);
+
+                const [u0, v0] = encodeMatUV(matId, s / segs, 0.98);
+                const [u1, v1] = encodeMatUV(matId, (s + 1) / segs, 0.02);
+                pushQuad3D(t0, t1, b0, b1, u0, v0, u1, v1, sr, sg, sb, 1.0);
+
+                if (capTop && rTopPx > 0.5) {
+                    const uv0 = encodeMatUV(matId, 0.5 + 0.45 * Math.cos(a0), 0.5 + 0.45 * Math.sin(a0));
+                    const uv1 = encodeMatUV(matId, 0.5 + 0.45 * Math.cos(a1), 0.5 + 0.45 * Math.sin(a1));
+                    pushTri3D(centerTop, t0, t1, uvCenter, uv0, uv1, Math.min(1, r * 1.07), Math.min(1, g * 1.07), Math.min(1, b * 1.07), 1.0);
+                }
+            }
+        };
+
+        // True 3D Conical Nose Cone / Dome Cap with Smooth Circumferential Shading
+        const emitCone3D = (cxPx, cyPx, offX, offY, rBotPx, yBot, yTop, segs, col, matId = 5) => {
+            const [r, g, b] = col;
+            const apex = toWorld(cxPx, cyPx, 1, 0, offX, offY, yTop);
+            const uvApex = encodeMatUV(matId, 0.5, 0.98);
+            for (let s = 0; s < segs; s++) {
+                const a0 = (s * Math.PI * 2.0) / segs;
+                const a1 = ((s + 1) * Math.PI * 2.0) / segs;
+                const aMid = (a0 + a1) * 0.5;
+                const sunDot = Math.cos(aMid) * 0.65 + Math.sin(aMid) * 0.76;
+                const shade = 0.88 + 0.18 * sunDot;
+                const b0 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a0) * rBotPx, offY + Math.sin(a0) * rBotPx, yBot);
+                const b1 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a1) * rBotPx, offY + Math.sin(a1) * rBotPx, yBot);
+                const uv0 = encodeMatUV(matId, s / segs, 0.05);
+                const uv1 = encodeMatUV(matId, (s + 1) / segs, 0.05);
+                pushTri3D(apex, b0, b1, uvApex, uv0, uv1, Math.min(1, r * shade), Math.min(1, g * shade), Math.min(1, b * shade), 1.0);
+            }
+        };
+
+        // True 3D Geodesic UV Sphere (for Cryogenic LOX/LH2 Propellant Spheres & Radomes)
+        const emitSphere3D = (cxPx, cyPx, offX, offY, rPx, yCenter, rElev, latSegs, lonSegs, col, matId = 5) => {
+            const [r, g, b] = col;
+            for (let la = 0; la < latSegs; la++) {
+                const phi0 = -Math.PI * 0.42 + (la / latSegs) * (Math.PI * 0.92);
+                const phi1 = -Math.PI * 0.42 + ((la + 1) / latSegs) * (Math.PI * 0.92);
+                const y0 = yCenter + Math.sin(phi0) * rElev;
+                const y1 = yCenter + Math.sin(phi1) * rElev;
+                const pr0 = Math.cos(phi0) * rPx;
+                const pr1 = Math.cos(phi1) * rPx;
+                for (let lo = 0; lo < lonSegs; lo++) {
+                    const a0 = (lo * Math.PI * 2.0) / lonSegs;
+                    const a1 = ((lo + 1) * Math.PI * 2.0) / lonSegs;
+                    const aMid = (a0 + a1) * 0.5;
+                    const phiMid = (phi0 + phi1) * 0.5;
+                    const nx = Math.cos(phiMid) * Math.cos(aMid);
+                    const ny = Math.sin(phiMid);
+                    const nz = Math.cos(phiMid) * Math.sin(aMid);
+                    const sunDot = nx * 0.52 + ny * 0.62 + nz * 0.58;
+                    const spec = Math.pow(Math.max(0, sunDot), 6.0) * 0.14;
+                    const shade = 0.80 + 0.22 * sunDot + spec;
+
+                    const b0 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a0) * pr0, offY + Math.sin(a0) * pr0, y0);
+                    const b1 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a1) * pr0, offY + Math.sin(a1) * pr0, y0);
+                    const t0 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a0) * pr1, offY + Math.sin(a0) * pr1, y1);
+                    const t1 = toWorld(cxPx, cyPx, 1, 0, offX + Math.cos(a1) * pr1, offY + Math.sin(a1) * pr1, y1);
+
+                    const [u0, v0] = encodeMatUV(matId, lo / lonSegs, (la + 1) / latSegs);
+                    const [u1, v1] = encodeMatUV(matId, (lo + 1) / lonSegs, la / latSegs);
+                    pushQuad3D(t0, t1, b0, b1, u0, v0, u1, v1, Math.min(1, r * shade), Math.min(1, g * shade), Math.min(1, b * shade), 1.0);
+                }
+            }
+        };
+
+        // True 8-Sided Chamfered Concrete Pad with Sloped Blast Apron Walls
+        const emitOctagonPad3D = (cxPx, cyPx, offX, offY, rxBot, ryBot, rxTop, ryTop, bevelRatio, yBot, yTop, sideCol, topCol, matId = 2) => {
+            const makeOctPts = (rx, ry, yE) => {
+                const bx = rx * (1.0 - bevelRatio);
+                const by = ry * (1.0 - bevelRatio);
+                return [
+                    toWorld(cxPx, cyPx, 1, 0, offX - bx, offY - ry, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX + bx, offY - ry, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX + rx, offY - by, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX + rx, offY + by, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX + bx, offY + ry, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX - bx, offY + ry, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX - rx, offY + by, yE),
+                    toWorld(cxPx, cyPx, 1, 0, offX - rx, offY - by, yE)
+                ];
+            };
+            const botPts = makeOctPts(rxBot, ryBot, yBot);
+            const topPts = makeOctPts(rxTop, ryTop, yTop);
+            const centerTop = toWorld(cxPx, cyPx, 1, 0, offX, offY, yTop);
+            const uvCenter = encodeMatUV(matId, 0.5, 0.5);
+            for (let i = 0; i < 8; i++) {
+                const ni = (i + 1) % 8;
+                const shade = 0.82 + 0.16 * Math.sin((i / 8.0) * Math.PI * 2.0);
+                pushMatQuad3D(
+                    topPts[i], topPts[ni], botPts[i], botPts[ni],
+                    matId,
+                    sideCol[0] * shade, sideCol[1] * shade, sideCol[2] * shade, 1.0
+                );
+                const a0 = (i / 8.0) * Math.PI * 2.0;
+                const a1 = (ni / 8.0) * Math.PI * 2.0;
+                const uv0 = encodeMatUV(matId, 0.5 + 0.46 * Math.cos(a0), 0.5 + 0.46 * Math.sin(a0));
+                const uv1 = encodeMatUV(matId, 0.5 + 0.46 * Math.cos(a1), 0.5 + 0.46 * Math.sin(a1));
+                pushTri3D(centerTop, topPts[i], topPts[ni], uvCenter, uv0, uv1, topCol[0], topCol[1], topCol[2], 1.0);
+            }
         };
 
         const emitHippedRoof3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yEave, pitchH, roofKey, trimCol, ridgeCol) => {
@@ -1613,6 +1830,7 @@ class WorldObjectEngine {
             const d1 = spec.d1 * sc;
             const ovh = (spec.roofOverhang || 10) * sc;
             let zBase = bz;
+            emitAOShadow3D(cx, cy, cosA, sinA, 0, 0, w1 + 36 * sc, d1 + 36 * sc, bz, 0.38);
 
             if (spec.hasStiltDeck && spec.stiltH > 0) {
                 const stiltTop = bz + spec.stiltH * sc;
@@ -1763,22 +1981,27 @@ class WorldObjectEngine {
                 for (let i = 0; i < ind.smokestacks.length; i++) {
                     const st = ind.smokestacks[i];
                     const rz = st.z || 3.0;
+                    emitAOShadow3D(st.x, st.y, 1, 0, 0, 0, 34, 34, rz, 0.36);
                     for (let lv = 0; lv < 7; lv++) {
-                        const sz = 24.0 - lv * 1.6;
+                        const r0 = 12.5 - lv * 0.75;
+                        const r1 = 12.5 - (lv + 1) * 0.75;
                         const y0 = rz + lv * 0.14;
                         const y1 = y0 + 0.14;
-                        const col = (lv % 2 === 1) ? [0.88, 0.20, 0.18] : [0.94, 0.94, 0.96];
-                        emitSolidBox3D(st.x, st.y, 1, 0, 0, 0, sz, sz, y0, y1, col);
+                        const col = (lv % 2 === 1) ? [0.88, 0.20, 0.18] : [0.94, 0.95, 0.97];
+                        emitCylinder3D(st.x, st.y, 0, 0, r0, r1, y0, y1, 16, col, 5, lv === 6);
                     }
+                    // Dark soot exhaust crown ring at top of chimney
+                    emitCylinder3D(st.x, st.y, 0, 0, 7.6, 8.0, rz + 0.96, rz + 1.02, 16, [0.16, 0.18, 0.22], 5, true);
                 }
             }
             if (ind.miniGolf) {
                 const mg = ind.miniGolf;
                 const bz = mg.z || 2.0;
-                // 3D Tapered Dutch Windmill Tower + Conical Terracotta Cap
-                emitSolidBox3D(mg.x, mg.y, 1, 0, 0, 0, 36, 36, bz, bz + 0.24, [0.86, 0.34, 0.24]);
-                emitSolidBox3D(mg.x, mg.y, 1, 0, 0, 0, 30, 30, bz + 0.24, bz + 0.48, [0.96, 0.94, 0.88]);
-                emitHippedRoof3D(mg.x, mg.y, 1, 0, 0, 0, 36, 36, bz + 0.48, 0.18, "mansion_star_island_top", [0.42, 0.28, 0.18], [0.92, 0.72, 0.24]);
+                emitAOShadow3D(mg.x, mg.y, 1, 0, 0, 0, 56, 56, bz, 0.40);
+                // 3D Octagonal Tapered Dutch Windmill Tower + Conical Timber Cap
+                emitCylinder3D(mg.x, mg.y, 0, 0, 20, 17, bz, bz + 0.25, 8, [0.84, 0.34, 0.24], 1, false);
+                emitCylinder3D(mg.x, mg.y, 0, 0, 17, 14, bz + 0.25, bz + 0.50, 8, [0.96, 0.94, 0.88], 1, true);
+                emitCone3D(mg.x, mg.y, 0, 0, 18.5, bz + 0.50, bz + 0.74, 12, [0.42, 0.26, 0.16], 1);
             }
         }
 
@@ -1788,15 +2011,16 @@ class WorldObjectEngine {
         if (this.map && this.map.airportCompound && Array.isArray(this.map.airportCompound.gates)) {
             for (const gt of this.map.airportCompound.gates) {
                 const bx = gt.boothX, by = gt.boothY, bz = 2.0;
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 28, 22, bz, bz + 0.18, [0.86, 0.89, 0.94]);
-                emitBox3D(bx, by, 1, 0, 0, 0, 24, 18, bz + 0.18, bz + 0.38, "wall_modern_upper", "wall_modern_upper", [0.24, 0.28, 0.36]);
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.38, bz + 0.43, [0.22, 0.26, 0.34]);
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 18, 5, bz + 0.43, bz + 0.47, [0.98, 0.78, 0.12]);
+                emitAOShadow3D(bx, by, 1, 0, 0, 0, 42, 34, bz, 0.38);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 28, 22, bz, bz + 0.18, [0.86, 0.89, 0.94], 2);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 24, 18, bz + 0.18, bz + 0.38, [0.32, 0.62, 0.84], 7);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.38, bz + 0.43, [0.22, 0.26, 0.34], 1);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 18, 5, bz + 0.43, bz + 0.47, [0.98, 0.78, 0.12], 3);
             }
         }
 
         // ====================================================================
-        // F. COMPILE 3D SHIPPING CONTAINER STACKS & 3D PORT GANTRY CRANES
+        // F. COMPILE 3D CORRUGATED SHIPPING CONTAINERS & SEE-THROUGH PORT GANTRY CRANES
         // ====================================================================
         if (this.map && Array.isArray(this.map.portTerminals)) {
             const containerPalette = [
@@ -1815,17 +2039,18 @@ class WorldObjectEngine {
                 const sc = pt.scale || 1.2;
                 const cw = 54 * sc;
                 const cd = 22 * sc;
-                // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers
+                emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, cw + 18, cd * 2.4 + 16, bz, 0.44);
+                // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers (MAT 6)
                 for (let row = -1; row <= 1; row += 2) {
                     const oy = row * (cd * 0.55);
                     const c1 = containerPalette[(i + (row > 0 ? 1 : 0)) % containerPalette.length];
                     const c2 = containerPalette[(i + (row > 0 ? 3 : 2)) % containerPalette.length];
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz, bz + 0.24, c1);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz + 0.245, bz + 0.48, c2);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz, bz + 0.24, c1, 6);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz + 0.245, bz + 0.48, c2, 6);
                 }
                 if (i % 2 === 0) {
                     const c3 = containerPalette[(i + 4) % containerPalette.length];
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, cw, cd, bz + 0.485, bz + 0.72, c3);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, cw, cd, bz + 0.485, bz + 0.72, c3, 6);
                 }
             }
         }
@@ -1838,112 +2063,160 @@ class WorldObjectEngine {
                 const red = [0.88, 0.18, 0.16];
                 const white = [0.95, 0.96, 0.98];
                 const steel = [0.26, 0.30, 0.36];
-                // 4 Mega-Port Panamax Portal Legs (leaves wide 64px drive-through lane underneath!)
+                emitAOShadow3D(gc.x, gc.y, cosA, sinA, 0, 0, 96, 96, bz, 0.38);
+                // 4 Mega-Port Panamax Portal Legs with MAT 4 Steel Truss Bracing
                 for (const lx of [-34, 34]) {
                     for (const ly of [-36, 36]) {
-                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 10, 10, bz, bz + 1.15, red);
-                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 8.5, 8.5, bz + 1.15, bz + 1.95, white);
+                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 10, 10, bz, bz + 0.95, red, 1);
+                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 9,  9,  bz + 0.95, bz + 1.65, white, 4);
                     }
                 }
-                // Cross-Portal Beam + Operator Glass Cab + 210px Long Over-Water Hammerhead Boom
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 84, 86, bz + 1.08, bz + 1.20, red);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 18, 0, 26, 22, bz + 1.68, bz + 1.92, white);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 54, 0, 214, 18, bz + 1.92, bz + 2.08, red);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 26, 26, bz + 2.08, bz + 2.50, white);
-                // Spreader steel cables + suspended 3D Maersk/Hapag container in mid-air
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, -8, 3, 3, bz + 0.82, bz + 1.92, steel);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108,  8, 3, 3, bz + 0.82, bz + 1.92, steel);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 28, 16, bz + 0.74, bz + 0.82, [0.96, 0.76, 0.12]);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 24, 56, bz + 0.48, bz + 0.74, [0.14, 0.54, 0.78]);
+                // Cross-Portal Beam + Operator Glass Cab (MAT 7) + 210px Open-Lattice Hammerhead Boom (MAT 4)
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 84, 86, bz + 0.90, bz + 1.02, red, 4);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 18, 0, 26, 22, bz + 1.42, bz + 1.64, [0.36, 0.68, 0.88], 7);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 54, 0, 214, 18, bz + 1.64, bz + 1.82, red, 4);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 24, 24, bz + 1.82, bz + 2.15, white, 4);
+                // Spreader steel cables + suspended 3D Maersk/Hapag corrugated container (MAT 6)
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, -8, 2.5, 2.5, bz + 0.78, bz + 1.64, steel, 1);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108,  8, 2.5, 2.5, bz + 0.78, bz + 1.64, steel, 1);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 28, 16, bz + 0.70, bz + 0.78, [0.96, 0.76, 0.12], 3);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 24, 56, bz + 0.44, bz + 0.70, [0.14, 0.54, 0.78], 6);
             }
         }
 
         // ====================================================================
-        // G. COMPILE COLOSSAL SERA SPACE CENTER LAUNCH COMPLEX 39A
-        //    (320x280px Blast Pad, Crawlerway, Flame Trench, LOX/LH2 Spheres,
-        //     4 Towering Lightning Masts, Launch Control Bunker & 3.65-Block LUT)
+        // G. COMPILE SERA SPACE CENTER LAUNCH COMPLEX 39A (KENNEDY / CAPE CANAVERAL)
+        //    (Chamfered Octagonal Concrete Blast Pad, Recessed Scorched Flame Trench,
+        //     True 3D Geodesic Spherical LOX/LH2 Cryo Tanks, Open-Lattice Steel LUT
+        //     Umbilical Tower, Tapered Cylindrical Lightning Masts & Control Bunker)
         // ====================================================================
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             const bz = lp.z || 2.0;
 
-            // 1. West Crawlerway Access Ramp & Launch Control Console Bunker (near road at lp.consoleX)
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -138, 0, 118, 96, bz, bz + 0.10, [0.58, 0.60, 0.65]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -138, -28, 114, 6, bz + 0.10, bz + 0.15, [0.96, 0.76, 0.12]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -138,  28, 114, 6, bz + 0.10, bz + 0.15, [0.96, 0.76, 0.12]);
-            // Launch Control Bunker & Glowing Red Ignition Console
-            emitBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 48, 32, bz, bz + 0.36, "wall_modern_upper", "wall_modern_upper", [0.88, 0.92, 0.96]);
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 54, 38, bz + 0.36, bz + 0.42, [0.22, 0.26, 0.34]);
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 18, 14, bz + 0.10, bz + 0.32, [0.20, 0.24, 0.30]);
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 14, 10, bz + 0.32, bz + 0.38, [0.98, 0.18, 0.18]);
+            // 0. Soft Ground Ambient Occlusion Contact Shadow Skirt (blends complex into coast!)
+            emitAOShadow3D(lp.x, lp.y, 1, 0, -16, 0, 328, 296, bz, 0.48);
 
-            // 2. Colossal Stepped Concrete Launch Complex 39A Blast Pad (270 x 260 px)
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 270, 260, bz, bz + 0.16, [0.68, 0.70, 0.75]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 212, 204, bz + 0.16, bz + 0.30, [0.54, 0.56, 0.62]);
-            // Deep East-West Flame Deflector Trench + Hazard Blast Deflector Walls
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 18, 0, 176, 68, bz + 0.30, bz + 0.33, [0.16, 0.18, 0.22]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 18, -38, 176, 8, bz + 0.30, bz + 0.44, [0.96, 0.74, 0.12]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 18,  38, 176, 8, bz + 0.30, bz + 0.44, [0.96, 0.74, 0.12]);
+            // 1. West Crawlerway Access Roadway & Launch Control Console Bunker (at lp.consoleX)
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -136, 0, 116, 92, bz, bz + 0.06, [0.34, 0.37, 0.42], 2);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -136, -18, 108, 10, bz + 0.06, bz + 0.09, [0.52, 0.55, 0.60], 2);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -136,  18, 108, 10, bz + 0.06, bz + 0.09, [0.52, 0.55, 0.60], 2);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -136, -42, 112, 6, bz + 0.06, bz + 0.11, [0.96, 0.76, 0.12], 3);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -136,  42, 112, 6, bz + 0.06, bz + 0.11, [0.96, 0.76, 0.12], 3);
 
-            // 3. Twin Giant Cryogenic LOX / LH2 Propellant Storage Spheres & Feed Pipes
-            for (const sy of [-92, 92]) {
-                emitSolidBox3D(lp.x, lp.y, 1, 0, 68, sy, 48, 48, bz + 0.16, bz + 0.34, [0.36, 0.40, 0.46]);
-                emitSolidBox3D(lp.x, lp.y, 1, 0, 68, sy, 62, 62, bz + 0.34, bz + 0.86, [0.96, 0.98, 1.00]);
-                emitSolidBox3D(lp.x, lp.y, 1, 0, 68, sy, 44, 44, bz + 0.86, bz + 1.04, [0.92, 0.95, 0.99]);
-                // Cryogenic pipeline connecting tank to rocket pad
-                emitSolidBox3D(lp.x, lp.y, 1, 0, 42, sy * 0.52, 8, 46, bz + 0.30, bz + 0.42, [0.82, 0.86, 0.92]);
+            // Reinforced Concrete Launch Control Bunker with Reflective Observation Glass & Telemetry Dish
+            emitAOShadow3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 72, 54, bz, 0.42);
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 52, 34, bz, bz + 0.20, [0.76, 0.79, 0.84], 2);
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 46, 28, bz + 0.20, bz + 0.36, [0.28, 0.58, 0.82], 7);
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 54, 38, bz + 0.36, bz + 0.42, [0.24, 0.28, 0.36], 2);
+            emitCylinder3D(lp.consoleX, lp.consoleY, -14, -48, 2.5, 2.5, bz + 0.42, bz + 0.58, 10, [0.82, 0.86, 0.90], 5, true);
+            emitCone3D(lp.consoleX, lp.consoleY, -14, -48, 10.0, bz + 0.64, bz + 0.54, 14, [0.94, 0.96, 0.99], 5);
+            // Armored Ignition Pedestal at (lp.consoleX, lp.consoleY)
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 18, 14, bz + 0.06, bz + 0.28, [0.22, 0.26, 0.32], 3);
+            emitCylinder3D(lp.consoleX, lp.consoleY, 0, 0, 5.5, 5.5, bz + 0.28, bz + 0.35, 12, [0.98, 0.16, 0.16], 5, true);
+
+            // 2. Stepped Chamfered Octagonal Concrete Blast Pad (LC-39A)
+            //    Tier 1: Dark Asphalt/Tarmac Security Compound Apron (rx=138, ry=130)
+            emitOctagonPad3D(lp.x, lp.y, 0, 0, 138, 130, 132, 124, 0.24, bz, bz + 0.09, [0.42, 0.45, 0.50], [0.36, 0.39, 0.44], 2);
+            //    Tier 2: Sloped Reinforced Concrete Blast Deck (rx=108, ry=102)
+            emitOctagonPad3D(lp.x, lp.y, 0, 0, 108, 102, 96, 90, 0.26, bz + 0.09, bz + 0.24, [0.62, 0.65, 0.70], [0.56, 0.59, 0.64], 2);
+
+            // Deep East-West Scorched Flame Deflector Trench + Hazard Blast Deflector Walls + Steel MLP Platform
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, 0, 156, 48, bz + 0.24, bz + 0.265, [0.14, 0.16, 0.20], 2);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, -27, 156, 6, bz + 0.24, bz + 0.34, [0.96, 0.74, 0.12], 3);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 14,  27, 156, 6, bz + 0.24, bz + 0.34, [0.96, 0.74, 0.12], 3);
+            // Mobile Launcher Platform (MLP) Steel Deck straddling the Flame Trench under the Rocket
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, 0, 68, 66, bz + 0.24, bz + 0.32, [0.44, 0.48, 0.54], 2);
+            for (const [hx, hy] of [[-6, -20], [34, -20], [-6, 20], [34, 20]]) {
+                emitCylinder3D(lp.x, lp.y, hx, hy, 3.5, 2.8, bz + 0.32, bz + 0.42, 10, [0.30, 0.34, 0.40], 5, true);
             }
 
-            // 4. Four Towering Perimeter Lightning Arrestor Masts (rising to Y = 5.45!)
-            for (const [mx, my] of [[-118, -112], [118, -112], [-118, 112], [118, 112]]) {
-                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 14, 14, bz + 0.16, bz + 0.95, [0.76, 0.79, 0.84]);
-                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 9,  9,  bz + 0.95, bz + 3.15, [0.86, 0.88, 0.92]);
-                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 6,  6,  bz + 3.15, bz + 3.45, [0.98, 0.18, 0.18]);
+            // 3. Twin True 3D Geodesic Spherical Cryogenic LOX / LH2 Propellant Storage Tanks
+            for (const sy of [-70, 70]) {
+                const tx = 74;
+                // Concrete tank circular pad & 6 cylindrical support legs
+                emitCylinder3D(lp.x, lp.y, tx, sy, 24, 23, bz + 0.09, bz + 0.16, 16, [0.48, 0.52, 0.58], 2, true);
+                for (let li = 0; li < 6; li++) {
+                    const la = (li * Math.PI * 2.0) / 6;
+                    emitCylinder3D(lp.x, lp.y, tx + Math.cos(la) * 17.5, sy + Math.sin(la) * 17.5, 2.2, 2.2, bz + 0.16, bz + 0.46, 8, [0.34, 0.38, 0.44], 5, false);
+                }
+                // Equatorial structural steel ring + Gleaming 3D Geodesic Cryo Sphere (10x18 segments!)
+                emitCylinder3D(lp.x, lp.y, tx, sy, 22.5, 22.5, bz + 0.42, bz + 0.48, 18, [0.88, 0.22, 0.18], 5, false);
+                emitSphere3D(lp.x, lp.y, tx, sy, 21.5, bz + 0.46, 0.30, 9, 18, [0.95, 0.97, 1.00], 5);
+                // Insulated aluminum cryogenic feed pipeline connecting sphere to MLP
+                emitSolidBox3D(lp.x, lp.y, 1, 0, 44, sy * 0.52, 6, 36, bz + 0.24, bz + 0.31, [0.82, 0.86, 0.92], 5);
             }
 
-            // 5. Colossal 3D Red & White NASA/SERA Steel Umbilical Launch Tower (LUT) (56x56px, rising to Y = 5.65!)
-            for (let lv = 0; lv < 10; lv++) {
-                const y0 = bz + 0.30 + lv * 0.33;
-                const col = (lv % 2 === 0) ? [0.88, 0.20, 0.16] : [0.94, 0.96, 0.99];
-                emitSolidBox3D(lp.x, lp.y, 1, 0, -56, 0, 54, 54, y0, y0 + 0.30, col);
+            // 4. Four Sleek Tapered Cylindrical Perimeter Lightning Arrestor Masts (at Outer Octagon Corners)
+            for (const [mx, my] of [[-110, -104], [110, -104], [-110, 104], [110, 104]]) {
+                // Steel lattice truss pedestal base (MAT 4) + Tapered 12-sided cylindrical mast + Red aviation beacon
+                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 14, 14, bz + 0.09, bz + 0.46, [0.76, 0.80, 0.86], 4);
+                emitCylinder3D(lp.x, lp.y, mx, my, 4.2, 1.5, bz + 0.46, bz + 1.52, 12, [0.88, 0.91, 0.96], 5, true);
+                emitCone3D(lp.x, lp.y, mx, my, 2.5, bz + 1.52, bz + 1.66, 10, [0.98, 0.16, 0.16], 5);
             }
-            // Top White Hammerhead Crane Boom on Umbilical Tower
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -34, 0, 96, 26, bz + 3.60, bz + 3.78, [0.96, 0.97, 1.00]);
+
+            // 5. True Open-Lattice 3D Steel Umbilical Launch Tower (LUT) at North-West Pad Deck (offX=-44, offY=-32)
+            //    Uses MAT 4 (See-Through X-Brace Truss) + 4 Corner Columns + Floor Grating Decks so it NEVER looks like a solid brick!
+            const lutX = -44;
+            const lutY = -32;
+            for (let lv = 0; lv < 7; lv++) {
+                const y0 = bz + 0.24 + lv * 0.28;
+                const y1 = y0 + 0.28;
+                const isRed = (lv % 2 === 0);
+                const trussCol = isRed ? [0.86, 0.22, 0.18] : [0.92, 0.95, 0.98];
+                // Open see-through X-brace steel truss walls (MAT 4 discards cutout windows!)
+                emitSolidBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 38, 38, y0, y1, trussCol, 4);
+                // Thin horizontal steel walk-grating floor deck at each level
+                emitSolidBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 40, 40, y1 - 0.025, y1, [0.32, 0.36, 0.42], 2);
+            }
+            // 4 Solid Steel Corner I-Beam Columns & Central Dark Elevator Core inside the open lattice
+            for (const [cxOff, cyOff] of [[-18, -18], [18, -18], [-18, 18], [18, 18]]) {
+                emitCylinder3D(lp.x, lp.y, lutX + cxOff, lutY + cyOff, 2.4, 2.2, bz + 0.24, bz + 2.20, 8, [0.84, 0.20, 0.16], 5, true);
+            }
+            emitSolidBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 13, 13, bz + 0.24, bz + 2.22, [0.22, 0.26, 0.32], 5);
+            // Top Open-Lattice Hammerhead Crane Boom on Umbilical Tower (MAT 4)
+            emitSolidBox3D(lp.x, lp.y, 1, 0, lutX + 16, lutY, 68, 18, bz + 2.20, bz + 2.34, [0.95, 0.97, 1.00], 4);
         }
 
         // ====================================================================
-        // H. COMPILE SUPERSIZED 3D COASTAL LIGHTHOUSES & 3D NEON FERRIS WHEEL
+        // H. COMPILE TRUE CYLINDRICAL 3D COASTAL LIGHTHOUSES & 3D NEON FERRIS WHEEL
         // ====================================================================
         if (this.landmarks3D && Array.isArray(this.landmarks3D.lighthouses)) {
             for (const lh of this.landmarks3D.lighthouses) {
                 const bz = lh.z || 2.0;
-                // Keeper's Coral-Roofed Villa + 8-Tier Monumental Tapered Red & White Lighthouse Tower (rising to Y = 4.85!)
-                emitBox3D(lh.x, lh.y, 1, 0, -42, 16, 72, 52, bz, bz + 0.56, "wall_keys_front", "wall_keys_side", [0.96, 0.96, 0.98]);
-                emitHippedRoof3D(lh.x, lh.y, 1, 0, -42, 16, 82, 62, bz + 0.56, 0.22, "mansion_star_island_top", [0.92, 0.92, 0.94], [0.84, 0.32, 0.20]);
-                for (let lv = 0; lv < 8; lv++) {
-                    const sz = 52.0 - lv * 2.8;
-                    const y0 = bz + lv * 0.30;
+                emitAOShadow3D(lh.x, lh.y, 1, 0, -18, 8, 136, 96, bz, 0.44);
+                // Keeper's Coral-Roofed Villa
+                emitBox3D(lh.x, lh.y, 1, 0, -44, 16, 70, 50, bz, bz + 0.54, "wall_keys_front", "wall_keys_side", [0.96, 0.96, 0.98]);
+                emitHippedRoof3D(lh.x, lh.y, 1, 0, -44, 16, 80, 60, bz + 0.54, 0.22, "mansion_star_island_top", [0.92, 0.92, 0.94], [0.84, 0.32, 0.20]);
+                // Octagonal Masonry Foundation Base
+                emitCylinder3D(lh.x, lh.y, 0, 0, 26, 24, bz, bz + 0.22, 12, [0.68, 0.70, 0.74], 2, true);
+                // 7-Tier Smooth 20-Sided Tapered Cylindrical Red & White Lighthouse Tower (rising to bz + 2.18)
+                for (let lv = 0; lv < 7; lv++) {
+                    const r0 = 23.0 - lv * 1.25;
+                    const r1 = 23.0 - (lv + 1) * 1.25;
+                    const y0 = bz + 0.22 + lv * 0.26;
                     const col = (lv % 2 === 1) ? [0.88, 0.18, 0.18] : [0.97, 0.97, 0.99];
-                    emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, sz, sz, y0, y0 + 0.30, col);
+                    emitCylinder3D(lh.x, lh.y, 0, 0, r0, r1, y0, y0 + 0.26, 20, col, 5, lv === 6);
                 }
-                // Black Iron Lantern Gallery + Glowing Glass Fresnel Beacon Room + Copper Dome
-                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 38, 38, bz + 2.40, bz + 2.48, [0.16, 0.18, 0.22]);
-                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 26, 26, bz + 2.48, bz + 2.78, [1.00, 0.94, 0.62]);
-                emitHippedRoof3D(lh.x, lh.y, 1, 0, 0, 0, 36, 36, bz + 2.78, 0.20, "mansion_star_island_top", [0.82, 0.18, 0.18], [0.98, 0.82, 0.24]);
+                // Circular Black Iron Watch Gallery Deck + Glowing Cylindrical Fresnel Glass Lantern Room + Conical Copper Dome
+                emitCylinder3D(lh.x, lh.y, 0, 0, 17.5, 17.5, bz + 2.04, bz + 2.11, 20, [0.16, 0.18, 0.22], 5, true);
+                emitCylinder3D(lh.x, lh.y, 0, 0, 12.5, 12.5, bz + 2.11, bz + 2.38, 16, [1.00, 0.94, 0.62], 7, true);
+                emitCone3D(lh.x, lh.y, 0, 0, 16.0, bz + 2.38, bz + 2.64, 20, [0.82, 0.18, 0.18], 5);
             }
         }
 
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
             const bz = fw.z || 2.0;
-            // Giant Wooden Boardwalk Deck + Twin A-Frame Steel Support Towers + Central Neon Axle Hub
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 196, 84, bz, bz + 0.10, [0.64, 0.42, 0.24]);
+            emitAOShadow3D(fw.x, fw.y, 1, 0, 0, 0, 210, 98, bz, 0.42);
+            // Giant Wooden Boardwalk Deck + Twin Open-Truss A-Frame Steel Support Towers (MAT 4) + Central Neon Axle Hub
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 196, 84, bz, bz + 0.10, [0.64, 0.42, 0.24], 1);
             for (const sideY of [-26, 26]) {
-                emitSolidBox3D(fw.x, fw.y, 1, 0, -38, sideY, 10, 10, bz + 0.10, bz + 1.48, [0.94, 0.96, 0.99]);
-                emitSolidBox3D(fw.x, fw.y, 1, 0,  38, sideY, 10, 10, bz + 0.10, bz + 1.48, [0.94, 0.96, 0.99]);
-                emitSolidBox3D(fw.x, fw.y, 1, 0,   0, sideY, 22, 14, bz + 1.42, bz + 1.58, [0.98, 0.24, 0.68]);
+                emitSolidBox3D(fw.x, fw.y, 1, 0, -34, sideY, 10, 10, bz + 0.10, bz + 1.38, [0.94, 0.96, 0.99], 4);
+                emitSolidBox3D(fw.x, fw.y, 1, 0,  34, sideY, 10, 10, bz + 0.10, bz + 1.38, [0.94, 0.96, 0.99], 4);
+                emitSolidBox3D(fw.x, fw.y, 1, 0,   0, sideY, 22, 14, bz + 1.32, bz + 1.48, [0.98, 0.24, 0.68], 5);
             }
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 14, 62, bz + 1.46, bz + 1.56, [0.18, 0.88, 0.98]);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 14, 62, bz + 1.36, bz + 1.46, [0.18, 0.88, 0.98], 5);
         }
 
         if (this.meshVbo) {
@@ -1989,7 +2262,7 @@ class WorldObjectEngine {
         gl.drawArrays(gl.TRIANGLES, 0, this.meshVertexCount);
 
         // Pass 2: Dynamic 3D Animated Landmarks (Vertically-Rotating 3D Ferris Wheel,
-        //         3D Windmill Sails) & 3D Destructible Street Furniture + 3D Water Geysers!
+        //         3D Windmill Sails, Cylindrical Artemis VI Rocket) & 3D Street Furniture!
         this.renderDynamic3DMeshes(gl, renderer, stride);
     }
 
@@ -2003,18 +2276,29 @@ class WorldObjectEngine {
         const t = renderer.time || 0;
 
         const dVerts = [];
-        const pushV = (x, yElev, z, r, g, b, a = 1.0) => {
-            dVerts.push(x, yElev, z, -1.0, -1.0, r, g, b, a);
+        const encUV = (matId, u, v) => [
+            -matId - Math.max(0.01, Math.min(0.99, u)) * 0.85,
+            Math.max(0.01, Math.min(0.99, v))
+        ];
+        const pushV = (x, yElev, z, u, v, r, g, b, a = 1.0) => {
+            dVerts.push(x, yElev, z, u, v, r, g, b, a);
         };
-        const pushQ = (p0, p1, p2, p3, r, g, b, a = 1.0) => {
-            pushV(p0[0], p0[1], p0[2], r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], r, g, b, a);
-            pushV(p3[0], p3[1], p3[2], r, g, b, a);
+        const pushQ = (p0, p1, p2, p3, matId, r, g, b, a = 1.0) => {
+            const [u0, v0] = encUV(matId, 0.02, 0.98);
+            const [u1, v1] = encUV(matId, 0.98, 0.02);
+            pushV(p0[0], p0[1], p0[2], u0, v0, r, g, b, a);
+            pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
+            pushV(p1[0], p1[1], p1[2], u1, v0, r, g, b, a);
+            pushV(p1[0], p1[1], p1[2], u1, v0, r, g, b, a);
+            pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
+            pushV(p3[0], p3[1], p3[2], u1, v1, r, g, b, a);
         };
-        const emitDynBox = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, col, alpha = 1.0) => {
+        const pushTri = (p0, p1, p2, uv0, uv1, uv2, r, g, b, a = 1.0) => {
+            pushV(p0[0], p0[1], p0[2], uv0[0], uv0[1], r, g, b, a);
+            pushV(p1[0], p1[1], p1[2], uv1[0], uv1[1], r, g, b, a);
+            pushV(p2[0], p2[1], p2[2], uv2[0], uv2[1], r, g, b, a);
+        };
+        const emitDynBox = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, col, alpha = 1.0, matId = 1) => {
             const hw = wPx * 0.5;
             const hd = dPx * 0.5;
             const [r, g, b] = col;
@@ -2032,20 +2316,77 @@ class WorldObjectEngine {
             const bSW = toW(offX - hw, offY + hd, yBot);
             const bSE = toW(offX + hw, offY + hd, yBot);
 
-            pushQ(tSW, tSE, bSW, bSE, r, g, b, alpha);
-            pushQ(tNE, tNW, bNE, bNW, r * 0.78, g * 0.80, b * 0.84, alpha);
-            pushQ(tNW, tSW, bNW, bSW, r * 0.92, g * 0.92, b * 0.95, alpha);
-            pushQ(tSE, tNE, bSE, bNE, r * 0.85, g * 0.86, b * 0.90, alpha);
-            pushQ(tNW, tNE, tSW, tSE, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+            pushQ(tSW, tSE, bSW, bSE, matId, r, g, b, alpha);
+            pushQ(tNE, tNW, bNE, bNW, matId, r * 0.78, g * 0.80, b * 0.84, alpha);
+            pushQ(tNW, tSW, bNW, bSW, matId, r * 0.92, g * 0.92, b * 0.95, alpha);
+            pushQ(tSE, tNE, bSE, bNE, matId, r * 0.85, g * 0.86, b * 0.90, alpha);
+            if (matId !== 4) {
+                pushQ(tNW, tNE, tSW, tSE, matId, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+            }
+        };
+        const emitDynCylinder = (cxPx, cyPx, offX, offY, rBotPx, rTopPx, yBot, yTop, segs, col, matId = 5, capTop = true, alpha = 1.0, checkerRoll = false) => {
+            const [r, g, b] = col;
+            const toW = (lx, ly, yE) => [(cxPx + lx) / TILE_SIZE, yE, (cyPx + ly) / TILE_SIZE];
+            const centerTop = toW(offX, offY, yTop);
+            const uvCenter = encUV(matId, 0.5, 0.5);
+            for (let s = 0; s < segs; s++) {
+                const a0 = (s * Math.PI * 2.0) / segs;
+                const a1 = ((s + 1) * Math.PI * 2.0) / segs;
+                const aMid = (a0 + a1) * 0.5;
+                const sunDot = Math.cos(aMid) * 0.65 + Math.sin(aMid) * 0.76;
+                const shade = 0.85 + 0.19 * sunDot + Math.pow(Math.max(0, sunDot), 4.0) * 0.08;
+                const isBlk = checkerRoll && (s % 4 < 2);
+                const cr = (isBlk ? 0.14 : r) * shade;
+                const cg = (isBlk ? 0.16 : g) * shade;
+                const cb = (isBlk ? 0.20 : b) * shade;
+
+                const b0 = toW(offX + Math.cos(a0) * rBotPx, offY + Math.sin(a0) * rBotPx, yBot);
+                const b1 = toW(offX + Math.cos(a1) * rBotPx, offY + Math.sin(a1) * rBotPx, yBot);
+                const t0 = toW(offX + Math.cos(a0) * rTopPx, offY + Math.sin(a0) * rTopPx, yTop);
+                const t1 = toW(offX + Math.cos(a1) * rTopPx, offY + Math.sin(a1) * rTopPx, yTop);
+
+                const [u0, v0] = encUV(matId, s / segs, 0.98);
+                const [u1, v1] = encUV(matId, (s + 1) / segs, 0.02);
+                pushV(t0[0], t0[1], t0[2], u0, v0, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+                pushV(b0[0], b0[1], b0[2], u0, v1, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+                pushV(t1[0], t1[1], t1[2], u1, v0, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+                pushV(t1[0], t1[1], t1[2], u1, v0, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+                pushV(b0[0], b0[1], b0[2], u0, v1, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+                pushV(b1[0], b1[1], b1[2], u1, v1, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+
+                if (capTop && rTopPx > 0.5) {
+                    const uv0 = encUV(matId, 0.5 + 0.45 * Math.cos(a0), 0.5 + 0.45 * Math.sin(a0));
+                    const uv1 = encUV(matId, 0.5 + 0.45 * Math.cos(a1), 0.5 + 0.45 * Math.sin(a1));
+                    pushTri(centerTop, t0, t1, uvCenter, uv0, uv1, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+                }
+            }
+        };
+        const emitDynCone = (cxPx, cyPx, offX, offY, rBotPx, yBot, yTop, segs, col, matId = 5, alpha = 1.0) => {
+            const [r, g, b] = col;
+            const toW = (lx, ly, yE) => [(cxPx + lx) / TILE_SIZE, yE, (cyPx + ly) / TILE_SIZE];
+            const apex = toW(offX, offY, yTop);
+            const uvApex = encUV(matId, 0.5, 0.98);
+            for (let s = 0; s < segs; s++) {
+                const a0 = (s * Math.PI * 2.0) / segs;
+                const a1 = ((s + 1) * Math.PI * 2.0) / segs;
+                const aMid = (a0 + a1) * 0.5;
+                const sunDot = Math.cos(aMid) * 0.65 + Math.sin(aMid) * 0.76;
+                const shade = 0.88 + 0.18 * sunDot;
+                const b0 = toW(offX + Math.cos(a0) * rBotPx, offY + Math.sin(a0) * rBotPx, yBot);
+                const b1 = toW(offX + Math.cos(a1) * rBotPx, offY + Math.sin(a1) * rBotPx, yBot);
+                const uv0 = encUV(matId, s / segs, 0.05);
+                const uv1 = encUV(matId, (s + 1) / segs, 0.05);
+                pushTri(apex, b0, b1, uvApex, uv0, uv1, Math.min(1, r * shade), Math.min(1, g * shade), Math.min(1, b * shade), alpha);
+            }
         };
 
         // 1. Live Vertically-Rotating Supersized 3D Neon Ferris Wheel at Vice Beach Pier
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
             if (fw.x >= minX - 240 && fw.x <= maxX + 240 && fw.y >= minY - 240 && fw.y <= maxY + 240) {
-                const hubElev = (fw.z || 2.0) + 1.50;
-                const radPx = 82.0;
-                const radElev = 1.25;
+                const hubElev = (fw.z || 2.0) + 1.40;
+                const radPx = 78.0;
+                const radElev = 1.15;
                 const numGondolas = 12;
                 for (let gi = 0; gi < numGondolas; gi++) {
                     const theta = t * 0.65 + (gi * Math.PI * 2.0) / numGondolas;
@@ -2053,79 +2394,92 @@ class WorldObjectEngine {
                     const gyElev = hubElev + Math.sin(theta) * radElev;
                     const isPink = (gi % 2 === 0);
                     const gCol = isPink ? [0.98, 0.28, 0.72] : [0.18, 0.90, 0.98];
-                    // Large 3D Passenger Gondola Cabin hanging at (gx, gyElev, fw.y)
-                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 22, 28, gyElev - 0.14, gyElev + 0.06, gCol);
-                    // Half-radius neon spoke bar + outer rim glow block
+                    // 3D Cylindrical Passenger Gondola Cabin + Radial Spoke
+                    emitDynCylinder(gx, fw.y, 0, 0, 10.5, 11.5, gyElev - 0.12, gyElev + 0.05, 10, gCol, 5, true);
                     const mx = fw.x + Math.cos(theta) * (radPx * 0.52);
                     const myElev = hubElev + Math.sin(theta) * (radElev * 0.52);
-                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 8, 36, myElev - 0.04, myElev + 0.04, [0.98, 0.94, 0.52]);
+                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 7, 32, myElev - 0.035, myElev + 0.035, [0.98, 0.94, 0.52], 1.0, 4);
                 }
             }
         }
 
-        // 1B. COLOSSAL DYNAMIC 3D SERA HEAVY-LIFT ARTEMIS VI ROCKET + RETRACTABLE SWING ARMS + 3D LIFTOFF PLUME
+        // 1B. TRUE 3D CYLINDRICAL & CONICAL SERA ARTEMIS VI HEAVY-LIFT ROCKET + SEE-THROUGH TRUSS SWING ARMS + LIFTOFF PLUME
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             if (lp.x >= minX - 360 && lp.x <= maxX + 360 && lp.y >= minY - 360 && lp.y <= maxY + 360) {
                 const bz = lp.z || 2.0;
                 const rl = this.rocketLaunch || { state: "IDLE", timer: 0, liftZ: 0, armSwing: 0 };
 
-                // A. 3 Giant Retractable Red Umbilical Crew/Service Swing Arms (pivoting at tower x = lp.x - 36)
-                const armAng = -(rl.armSwing || 0);
+                // A. 3 Open-Lattice Steel Umbilical Swing Arms (MAT 4) pivoting from LUT at (lp.x - 44, lp.y - 32) toward Rocket at (lp.x + 14, lp.y)
+                const baseAng = 0.50; // Points from (-44, -32) to (+14, 0)
+                const armAng = baseAng - (rl.armSwing || 0);
                 const armCos = Math.cos(armAng);
                 const armSin = Math.sin(armAng);
-                const pivotX = lp.x - 34;
-                const pivotY = lp.y - 18;
-                for (const armZ of [bz + 1.15, bz + 2.05, bz + 2.95]) {
-                    emitDynBox(pivotX, pivotY, armCos, armSin, 32, 18, 68, 16, armZ, armZ + 0.14, [0.90, 0.20, 0.16]);
+                const pivotX = lp.x - 32;
+                const pivotY = lp.y - 24;
+                for (const armZ of [bz + 0.85, bz + 1.40, bz + 1.95]) {
+                    emitDynBox(pivotX, pivotY, armCos, armSin, 24, 0, 52, 9, armZ, armZ + 0.10, [0.88, 0.22, 0.18], 1.0, 4);
                 }
 
-                // B. Render the Colossal 3D Multi-Stage SERA Artemis VI Heavy-Lift Rocket (unless in COOLDOWN)
+                // B. True 20-Sided Cylindrical & Conical SERA Artemis VI Heavy-Lift Rocket (unless in COOLDOWN)
                 if (rl.state !== "COOLDOWN") {
-                    const rx = lp.x + 18;
+                    const rx = lp.x + 14;
                     const ry = lp.y;
-                    const rBase = bz + 0.30 + (rl.liftZ || 0);
+                    const rBase = bz + 0.32 + (rl.liftZ || 0);
 
-                    // 1. 4 Cruciform Aerodynamic Delta Tail Fins + 4 Dark Metallic RS-25 Main Engine Bells
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 96, 16, rBase + 0.08, rBase + 0.56, [0.92, 0.94, 0.98]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 16, 96, rBase + 0.08, rBase + 0.56, [0.92, 0.94, 0.98]);
-                    for (const [nx, ny] of [[-13, -13], [13, -13], [-13, 13], [13, 13]]) {
-                        emitDynBox(rx, ry, 1, 0, nx, ny, 18, 18, rBase - 0.06, rBase + 0.12, [0.22, 0.25, 0.30]);
+                    // 1. 4 Clustered Conical RS-25 Liquid Hydrogen Main Engine Nozzles (Gunmetal Steel)
+                    for (const [nx, ny] of [[-7.5, -7.5], [7.5, -7.5], [-7.5, 7.5], [7.5, 7.5]]) {
+                        emitDynCylinder(rx, ry, nx, ny, 5.8, 3.2, rBase - 0.04, rBase + 0.10, 12, [0.22, 0.25, 0.32], 5, false);
                     }
 
-                    // 2. Twin Solid Rocket Boosters (SRBs) on North & South Flanks (30x30px wide each, rising +2.55 blocks!)
-                    for (const srbY of [-38, 38]) {
-                        emitDynBox(rx, ry, 1, 0, 0, srbY, 26, 26, rBase - 0.04, rBase + 0.10, [0.24, 0.26, 0.32]);
-                        emitDynBox(rx, ry, 1, 0, 0, srbY, 30, 30, rBase + 0.10, rBase + 1.85, [0.96, 0.97, 1.00]);
-                        emitDynBox(rx, ry, 1, 0, 0, srbY, 31, 31, rBase + 1.25, rBase + 1.42, [0.90, 0.18, 0.16]);
-                        emitDynBox(rx, ry, 1, 0, 0, srbY, 22, 22, rBase + 1.85, rBase + 2.28, [0.96, 0.97, 1.00]);
-                        emitDynBox(rx, ry, 1, 0, 0, srbY, 12, 12, rBase + 2.28, rBase + 2.58, [0.90, 0.18, 0.16]);
+                    // 2. Twin 16-Sided Cylindrical Solid Rocket Boosters (SRBs) on North & South Flanks (offY = -26 and +26)
+                    for (const srbY of [-26, 26]) {
+                        // Flared aft booster skirt + nozzle
+                        emitDynCylinder(rx, ry, 0, srbY, 9.8, 8.2, rBase - 0.02, rBase + 0.12, 16, [0.26, 0.29, 0.35], 5, false);
+                        // White segmented SRB cylindrical casing (MAT 5)
+                        emitDynCylinder(rx, ry, 0, srbY, 8.2, 8.2, rBase + 0.12, rBase + 1.42, 16, [0.96, 0.97, 1.00], 5, false);
+                        // NASA Red separation ring & black telemetry band
+                        emitDynCylinder(rx, ry, 0, srbY, 8.4, 8.4, rBase + 1.02, rBase + 1.12, 16, [0.88, 0.18, 0.16], 5, false);
+                        emitDynCylinder(rx, ry, 0, srbY, 8.3, 8.3, rBase + 1.36, rBase + 1.43, 16, [0.16, 0.18, 0.22], 5, false);
+                        // Smooth 16-Sided Aerodynamic Conical SRB Nose Cone + Red Tip!
+                        emitDynCone(rx, ry, 0, srbY, 8.2, rBase + 1.42, rBase + 1.76, 16, [0.97, 0.98, 1.00], 5);
+                        emitDynCone(rx, ry, 0, srbY, 3.2, rBase + 1.66, rBase + 1.80, 12, [0.90, 0.18, 0.16], 5);
+                        // Structural attach struts between SRB and Core Stage
+                        emitDynBox(rx, ry, 1, 0, 0, srbY * 0.65, 6, 10, rBase + 0.28, rBase + 0.34, [0.36, 0.40, 0.46], 1.0, 5);
+                        emitDynBox(rx, ry, 1, 0, 0, srbY * 0.65, 6, 10, rBase + 1.24, rBase + 1.30, [0.36, 0.40, 0.46], 1.0, 5);
                     }
 
-                    // 3. Massive Cryogenic Core Stage (52x52px wide!) + NASA Roll-Pattern Intertank + White Upper Stage + Crew Capsule Spire
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 52, 52, rBase + 0.10, rBase + 1.52, [0.92, 0.44, 0.14]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 54, 54, rBase + 1.52, rBase + 1.88, [0.16, 0.18, 0.24]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 44, 44, rBase + 1.88, rBase + 2.74, [0.97, 0.98, 1.00]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 45, 45, rBase + 2.20, rBase + 2.34, [0.90, 0.18, 0.16]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 32, 32, rBase + 2.74, rBase + 3.16, [0.24, 0.28, 0.34]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 22, 22, rBase + 3.16, rBase + 3.48, [0.98, 0.98, 1.00]);
-                    emitDynBox(rx, ry, 1, 0, 0, 0, 9,  9,  rBase + 3.48, rBase + 3.96, [0.96, 0.18, 0.18]);
+                    // 3. Colossal 20-Sided Cylindrical Cryogenic Core Stage (NASA SLS Orange, r = 17.0px)
+                    emitDynCylinder(rx, ry, 0, 0, 17.0, 17.0, rBase + 0.08, rBase + 0.18, 20, [0.94, 0.96, 0.99], 5, false);
+                    emitDynCylinder(rx, ry, 0, 0, 17.0, 17.0, rBase + 0.18, rBase + 1.44, 20, [0.92, 0.45, 0.14], 5, false);
+                    // Ribbed Dark Cryogenic Intertank Band & External LOX Feedline Tunnel
+                    emitDynCylinder(rx, ry, 0, 0, 17.4, 17.4, rBase + 0.98, rBase + 1.14, 20, [0.22, 0.25, 0.32], 6, false);
+                    emitDynCylinder(rx, ry, 16.2, 0, 2.2, 2.2, rBase + 0.14, rBase + 1.38, 8, [0.84, 0.87, 0.92], 5, true);
 
-                    // C. Volumetric 3D Main Engine Exhaust Fireball & Flame Trench Shockwave Plume during COUNTDOWN / LIFTOFF!
+                    // 4. Saturn V / Artemis Black-and-White Checker Roll-Pattern Ring + Tapered Upper Stage Adapter
+                    emitDynCylinder(rx, ry, 0, 0, 17.1, 17.1, rBase + 1.44, rBase + 1.58, 20, [0.96, 0.98, 1.00], 5, false, 1.0, true);
+                    emitDynCylinder(rx, ry, 0, 0, 17.0, 11.8, rBase + 1.58, rBase + 1.82, 20, [0.96, 0.97, 1.00], 5, false);
+
+                    // 5. Cylindrical Orion Service Module + Smooth Conical Crew Capsule + Launch Abort System (LAS) Escape Tower!
+                    emitDynCylinder(rx, ry, 0, 0, 11.8, 11.8, rBase + 1.82, rBase + 2.04, 20, [0.97, 0.98, 1.00], 5, false);
+                    emitDynCylinder(rx, ry, 0, 0, 12.0, 12.0, rBase + 1.90, rBase + 1.96, 20, [0.88, 0.18, 0.16], 5, false);
+                    emitDynCone(rx, ry, 0, 0, 11.8, rBase + 2.04, rBase + 2.34, 20, [0.98, 0.98, 1.00], 5);
+                    emitDynCylinder(rx, ry, 0, 0, 2.2, 1.1, rBase + 2.30, rBase + 2.58, 12, [0.94, 0.20, 0.18], 5, true);
+
+                    // C. Cylindrical & Conical 3D Main Engine Supersonic Exhaust Plume & Flame Trench Steam Billows
                     if (rl.state === "COUNTDOWN" || rl.state === "LIFTOFF") {
-                        const flicker = 0.85 + 0.15 * Math.sin(t * 42.0);
-                        // Blazing White-Gold Supersonic Exhaust Core directly under the 4 RS-25s & 2 SRBs
-                        emitDynBox(rx, ry, 1, 0, 0, 0, 68 * flicker, 88 * flicker, Math.max(bz + 0.30, rBase - 0.85), rBase, [1.0, 0.96, 0.72], 0.96);
-                        emitDynBox(rx, ry, 1, 0, 0, 0, 96 * flicker, 118 * flicker, Math.max(bz + 0.30, rBase - 1.55), Math.max(bz + 0.35, rBase - 0.25), [1.0, 0.52, 0.12], 0.88);
-                        // Rolling 3D Fire & Steam Billows pouring East & West out of the Flame Deflector Trench
+                        const flicker = 0.88 + 0.12 * Math.sin(t * 42.0);
+                        const pBot = Math.max(bz + 0.25, rBase - 0.95);
+                        emitDynCylinder(rx, ry, 0, 0, 28 * flicker, 18 * flicker, pBot, rBase, 16, [1.0, 0.96, 0.72], 5, false, 0.95);
+                        emitDynCylinder(rx, ry, 0, 0, 42 * flicker, 26 * flicker, Math.max(bz + 0.25, rBase - 1.45), Math.max(bz + 0.30, rBase - 0.18), 16, [1.0, 0.54, 0.14], 5, false, 0.85);
                         for (let fb = 0; fb < 6; fb++) {
                             const phase = ((t * 2.6 + fb * 0.17) % 1.0);
                             const dir = (fb % 2 === 0) ? 1 : -1;
-                            const fx = rx + dir * (35 + phase * 145);
-                            const fSz = 42 + phase * 68;
-                            const fTop = bz + 0.45 + phase * 0.95;
-                            const col = phase < 0.4 ? [1.0, 0.64, 0.18] : [0.92, 0.94, 0.98];
-                            emitDynBox(fx, ry, 1, 0, 0, 0, fSz, fSz * 0.85, bz + 0.30, fTop, col, 0.84 - phase * 0.55);
+                            const fx = rx + dir * (32 + phase * 135);
+                            const fRad = 18 + phase * 28;
+                            const fTop = bz + 0.38 + phase * 0.65;
+                            const col = phase < 0.4 ? [1.0, 0.64, 0.18] : [0.92, 0.95, 0.99];
+                            emitDynCylinder(fx, ry, 0, 0, fRad, fRad * 0.75, bz + 0.25, fTop, 12, col, 5, true, 0.82 - phase * 0.55);
                         }
                     }
                 }
@@ -2142,7 +2496,7 @@ class WorldObjectEngine {
                     for (const step of [0.45, 0.85]) {
                         const sx = mg.x + Math.cos(ang) * (24.0 * step);
                         const syElev = hubElev + Math.sin(ang) * (0.34 * step);
-                        emitDynBox(sx, mg.y + 19, 1, 0, 0, 0, 7, 4, syElev - 0.03, syElev + 0.03, [0.98, 0.92, 0.68]);
+                        emitDynBox(sx, mg.y + 19, 1, 0, 0, 0, 7, 4, syElev - 0.03, syElev + 0.03, [0.98, 0.92, 0.68], 1.0, 4);
                     }
                 }
             }
@@ -2348,7 +2702,7 @@ class WorldObjectEngine {
                     const bAng = renderer.time * 1.15 + lh.seed;
                     const bx = lh.x + Math.cos(bAng) * 44;
                     const by = lh.y + Math.sin(bAng) * 44;
-                    renderer.pushSolidQuad3D(bx, by, 3.56, 76, 18, bAng, 1.0, 0.96, 0.68, 0.42, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    renderer.pushSolidQuad3D(bx, by, (lh.z || 2.0) + 2.24, 76, 18, bAng, 1.0, 0.96, 0.68, 0.42, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                 }
             }
         }
