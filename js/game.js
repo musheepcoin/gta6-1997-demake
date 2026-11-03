@@ -5306,9 +5306,11 @@ class LeonidaGame {
 
                 kind: "COP",
 
-                g24Type: "police",
+                g24Type: isSwat ? "g2_swat" : "police",
 
-                shirtColor: "#1e3a8a",
+                isSwat,
+
+                shirtColor: isSwat ? "#1e293b" : "#1e3a8a",
 
                 hp: copHp,
 
@@ -5358,9 +5360,11 @@ class LeonidaGame {
 
                     kind: "COP",
 
-                    g24Type: "police",
+                    g24Type: "g2_swat",
 
-                    shirtColor: "#1e3a8a",
+                    isSwat: true,
+
+                    shirtColor: "#1e293b",
 
                     hp: copHp,
 
@@ -10222,9 +10226,11 @@ class LeonidaGame {
 
                             kind: "COP",
 
-                            g24Type: "police",
+                            g24Type: tWanted >= 4 ? "g2_swat" : "police",
 
-                            shirtColor: "#1e3a8a",
+                            isSwat: tWanted >= 4,
+
+                            shirtColor: tWanted >= 4 ? "#1e293b" : "#1e3a8a",
 
                             hp: 115,
 

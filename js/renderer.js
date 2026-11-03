@@ -1418,14 +1418,30 @@ class RetroRenderer {
                                     col = arch.shirt;
                                     shade *= 0.78;
                                 } else if (arch.hairMode === "helmet") {
-                                    col = arch.helmet;
-                                    shade = 0.82 + Math.max(0, 1.0 - dist / 2.4) * 0.42;
+                                    if (arch.key === "g2_swat" && dy >= 0.7 && dy <= 2.3 && Math.abs(dx) <= 2.2) {
+                                        col = [165, 224, 252]; // Reflective SWAT ballistic visor / goggles
+                                        shade = 1.12;
+                                    } else {
+                                        col = arch.helmet;
+                                        shade = 0.86 + Math.max(0, 1.0 - dist / 2.4) * 0.48;
+                                    }
                                 } else {
                                     col = arch.hair;
                                 }
                             } else if (isSkin) {
-                                shade = Math.max(0.6, Math.min(1.2, r / 175));
-                                col = arch.skin;
+                                if (arch.key === "g2_swat" && dist <= 3.2) {
+                                    // Full-head SWAT balaclava + ballistic visor & helmet rim
+                                    if (dy >= 0.7 && dy <= 2.2 && Math.abs(dx) <= 2.1) {
+                                        col = [165, 224, 252];
+                                        shade = 1.10;
+                                    } else {
+                                        col = arch.helmet;
+                                        shade = 0.84 + Math.max(0, 1.0 - dist / 2.5) * 0.44;
+                                    }
+                                } else {
+                                    shade = Math.max(0.6, Math.min(1.2, r / 175));
+                                    col = arch.skin;
+                                }
                             }
 
                             if (col) {
@@ -5622,7 +5638,7 @@ class RetroRenderer {
             { key: "g2_krishna",      shirt: [255, 142, 22],  pants: [255, 142, 22],  sleeves: "short", legs: "pants",  hairMode: "bald", skin: SK.tan },
             { key: "g2_medic",        shirt: [244, 246, 250], pants: [244, 246, 250], sleeves: "short", legs: "pants",  hair: H.brown, skin: SK.light, pattern: "hivis", shirt2: [226, 34, 44] },
             { key: "g2_fireman",      shirt: [150, 112, 52],  pants: [96, 74, 40],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [250, 204, 24], skin: SK.light, pattern: "hivis", shirt2: [236, 238, 120] },
-            { key: "g2_swat",         shirt: [34, 38, 50],    pants: [34, 38, 50],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [26, 28, 36], skin: SK.light },
+            { key: "g2_swat",         shirt: [30, 41, 59],    pants: [24, 34, 50],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [62, 84, 116], skin: SK.light, pattern: "jacket", shirt2: [82, 106, 142] },
             { key: "g2_army",         shirt: [92, 104, 52],   pants: [80, 90, 46],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [70, 82, 40], skin: SK.tan, pattern: "plaid", shirt2: [66, 74, 36] },
             { key: "g2_scientist",    shirt: [240, 244, 246], pants: [112, 114, 124], sleeves: "long",  legs: "pants",  hair: H.grey, skin: SK.light, pattern: "jacket", shirt2: [120, 170, 200] },
             { key: "g2_zaibatsu",     shirt: [30, 30, 36],    pants: [76, 78, 88],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [210, 210, 214] },
@@ -5727,6 +5743,20 @@ class RetroRenderer {
             const fx = x + Math.cos(angle) * 10;
             const fy = y + Math.sin(angle) * 10;
             this.pushAtlasSprite3D(fl, fx, fy, zBlocks + 0.02, rot, 0.55, SPRITE_DRAW_ORDER.PROJECTILES);
+        }
+
+        // Crisp 3D Tactical Ballistic Helmet Dome + Reflective Visor on SWAT Officers ("g2_swat")
+        if (pedType === "g2_swat" && drawOrder !== SPRITE_DRAW_ORDER.CORPSE && frameIdx !== 42) {
+            const cA = Math.cos(angle);
+            const sA = Math.sin(angle);
+            const hX = x + cA * (1.2 * scale);
+            const hY = y + sA * (1.2 * scale);
+            // Outer Kevlar tactical helmet shell (matte gunmetal-navy)
+            this.pushSolidQuad3D(hX, hY, zBlocks + 0.012, 7.6 * scale, 7.2 * scale, angle, 0.16, 0.22, 0.32, 0.98, drawOrder);
+            // Inner rounded ballistic dome highlight
+            this.pushSolidQuad3D(hX - cA * (0.4 * scale), hY - sA * (0.4 * scale), zBlocks + 0.015, 5.2 * scale, 5.0 * scale, angle, 0.28, 0.38, 0.52, 0.98, drawOrder);
+            // Front reflective ballistic visor / tactical goggles band
+            this.pushSolidQuad3D(hX + cA * (2.6 * scale), hY + sA * (2.6 * scale), zBlocks + 0.016, 2.2 * scale, 5.8 * scale, angle, 0.62, 0.88, 0.99, 0.98, drawOrder);
         }
     }
 
@@ -5843,7 +5873,7 @@ class RetroRenderer {
             const pz = this.getEntityZ(ped, 0.025);
             let pedType = ped.g24Type || "civ2";
             if (ped.kind === "MONK") pedType = "monk";
-            else if (ped.kind === "COP") pedType = "police";
+            else if (ped.kind === "COP") pedType = ped.g24Type || "police";
             if (ped.deathKind === "BURNT" || ped.deathKind === "ELECTRO") {
                 // GTA 2 charred corpse: scorched ash mark, blackened body & rising smoke wisps
                 const age = this.time - ped.deathRenderT;
