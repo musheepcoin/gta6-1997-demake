@@ -1754,10 +1754,19 @@ class ViceNetworkManager {
         // Cycle teleport to the next real connected player in the room
         this._tpIdx = ((this._tpIdx || 0) + 1) % remotes.length;
         const target = remotes[this._tpIdx];
+        if (this.game && this.game.activeInterior) {
+            this.game.activeInterior = null;
+        }
+        if (this.game && this.game.audio && typeof this.game.audio.resetLoops === "function") {
+            this.game.audio.resetLoops();
+        }
         const targetObj = p.inVehicle || p;
         targetObj.x = target.x - 64;
         targetObj.y = target.y;
         targetObj.z = target.z || 2.0;
+        targetObj.vx = 0;
+        targetObj.vy = 0;
+        if (targetObj.speed !== undefined) targetObj.speed = 0;
         this.game.addFloatingText(targetObj.x, targetObj.y - 30, `🌐 TELEPORTED TO ${target.name}!`, target.color || "#00f0ff");
         this.addChatLog("VICE NET", `🌐 Teleported to ${target.name}`, target.color || "#00f0ff", true);
     }

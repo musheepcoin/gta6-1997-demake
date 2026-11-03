@@ -1606,23 +1606,67 @@ class LeonidaGame {
 
     teleportToBlock(blockX, blockY, enterScurveCar = false) {
 
-        const tx = blockX * TILE_SIZE;
+        if (this.activeInterior) {
 
-        const ty = blockY * TILE_SIZE;
+            this.activeInterior = null;
 
-        const tz = this.map.getHeightAtPixel(tx, ty, 4.0);
+        }
+
+        if (this.fullMapOpen) {
+
+            this.toggleFullMap(false);
+
+        }
+
+        if (this.audio && typeof this.audio.resetLoops === "function") {
+
+            this.audio.resetLoops();
+
+        }
+
+
+
+        let tx = blockX * TILE_SIZE;
+
+        let ty = blockY * TILE_SIZE;
+
+        let tz = this.map.getHeightAtPixel(tx, ty, 4.0);
+
+        if (!enterScurveCar && this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+
+            const safePos = this.map.resolveCircleBuildingCollision(tx, ty, 12, tz, false);
+
+            tx = safePos.x;
+
+            ty = safePos.y;
+
+            tz = this.map.getHeightAtPixel(tx, ty, 4.0);
+
+        }
 
 
 
         if (this.player.inVehicle) {
 
+            const prevVeh = this.player.inVehicle;
+
             if ((this.player.seatIndex || 0) === 0) {
 
-                this.player.inVehicle.driver = null;
+                prevVeh.driver = null;
+
+                prevVeh.vx = 0;
+
+                prevVeh.vy = 0;
+
+                prevVeh.speed = 0;
+
+                prevVeh.drifting = false;
+
+                prevVeh.sirenActive = false;
 
             }
 
-            this.player.inVehicle.hasJason = false;
+            prevVeh.hasJason = false;
 
             this.player.inVehicle = null;
 
@@ -1643,6 +1687,14 @@ class LeonidaGame {
         this.player.y = ty;
 
         this.player.z = tz;
+
+        this.player.vx = 0;
+
+        this.player.vy = 0;
+
+        this.player.isMoving = false;
+
+        this.player.enteringVehicle = null;
 
 
 
@@ -4168,9 +4220,27 @@ class LeonidaGame {
 
             v.vy = 0;
 
+            v.speed = 0;
+
+            v.drifting = false;
+
+            v.sirenActive = false;
+
             p.inVehicle = null;
 
             if (this.jason) this.jason.inVehicle = null;
+
+        }
+
+        p.vx = 0;
+
+        p.vy = 0;
+
+        p.isMoving = false;
+
+        if (this.audio && typeof this.audio.resetLoops === "function") {
+
+            this.audio.resetLoops();
 
         }
 
@@ -4254,6 +4324,12 @@ class LeonidaGame {
 
         this.interiorCooldown = 0.6;
 
+        if (this.audio && typeof this.audio.resetLoops === "function") {
+
+            this.audio.resetLoops();
+
+        }
+
         const dnx = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
 
         this.player.x = intr.doorX + dnx[0] * 26;
@@ -4261,6 +4337,12 @@ class LeonidaGame {
         this.player.y = intr.doorY + dnx[1] * 26;
 
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
+
+        this.player.vx = 0;
+
+        this.player.vy = 0;
+
+        this.player.isMoving = false;
 
         if (this.jason) {
 
@@ -6628,13 +6710,49 @@ class LeonidaGame {
 
         p.dead = true;
 
-        p.inVehicle = null;
+        if (p.inVehicle) {
+
+            const prevVeh = p.inVehicle;
+
+            if ((p.seatIndex || 0) === 0) {
+
+                prevVeh.driver = null;
+
+                prevVeh.vx = 0;
+
+                prevVeh.vy = 0;
+
+                prevVeh.speed = 0;
+
+                prevVeh.drifting = false;
+
+                prevVeh.sirenActive = false;
+
+            }
+
+            p.inVehicle = null;
+
+            p.seatIndex = 0;
+
+        }
+
+        p.vx = 0;
+
+        p.vy = 0;
+
+        p.isMoving = false;
 
         if (this.jason) this.jason.inVehicle = null;
 
         this.killFrenzy = null;
 
         this.setWantedLevel(0);
+
+        if (this.audio && typeof this.audio.resetLoops === "function") {
+
+            this.audio.resetLoops();
+
+        }
 
         if (this.audio && typeof this.audio.playFanfare === "function") {
 
@@ -6777,6 +6895,18 @@ class LeonidaGame {
             }
 
             p.z = this.map.getHeightAtPixel(p.x, p.y, 4.0);
+
+            p.vx = 0;
+
+            p.vy = 0;
+
+            p.isMoving = false;
+
+            if (this.audio && typeof this.audio.resetLoops === "function") {
+
+                this.audio.resetLoops();
+
+            }
 
             if (this.jason) {
 
@@ -7215,6 +7345,66 @@ class LeonidaGame {
         // The companion stays outside while the player is in a venue
 
         if (this.jason) this.jason.isMoving = false;
+
+
+
+        // Keep audio loops silenced and footsteps active while walking inside an interior!
+
+        if (this.audio) {
+
+            if (p.isMoving) {
+
+                this._footstepTimer = (this._footstepTimer || 0) - dt;
+
+                const stepInterval = this.input.sprint ? 0.25 : 0.34;
+
+                if (this._footstepTimer <= 0) {
+
+                    this._footstepTimer = stepInterval;
+
+                    this._footLeft = !this._footLeft;
+
+                    this.audio.playFootstep("PAVEMENT", this._footLeft);
+
+                }
+
+            } else {
+
+                this._footstepTimer = 0.06;
+
+            }
+
+            if (typeof this.audio.update === "function") {
+
+                this.audio.update(dt, {
+
+                    inVehicle: false,
+
+                    vehicleSpeed: 0,
+
+                    vehicleDrifting: false,
+
+                    playerSirenActive: false,
+
+                    wantedLevel: 0,
+
+                    nearestCopDist: 9999,
+
+                    nearestSirenDist: 9999,
+
+                    nearestTrafficDist: 9999,
+
+                    nearestTrafficSpeed: 0,
+
+                    waterProximity: 0,
+
+                    nightFactor: 0
+
+                });
+
+            }
+
+        }
 
 
 

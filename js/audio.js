@@ -541,26 +541,86 @@ class RetroAudioEngine {
         }
         try {
             const now = this.ctx.currentTime;
+            if (!this._lastSampleByKey) this._lastSampleByKey = {};
+            const isUiOrPickup = key.startsWith("gta_pickup") || key.startsWith("pickup_") || key.startsWith("gta_vocal_") || key.startsWith("gta_phone") || key.startsWith("gta_pager");
+            const minKeyGap = isUiOrPickup ? 0.095 : 0.032;
+            if (this._lastSampleByKey[key] && (now - this._lastSampleByKey[key]) < minKeyGap) {
+                return true;
+            }
+            this._lastSampleByKey[key] = now;
+
+            const safeRate = Math.max(0.35, Math.min(2.4, rate));
             const src = this.ctx.createBufferSource();
             src.buffer = buf;
-            src.playbackRate.setValueAtTime(Math.max(0.35, Math.min(2.4, rate)), now);
+            src.loop = false;
+            src.playbackRate.setValueAtTime(safeRate, now);
             const g = this.ctx.createGain();
             const scaledVol = vol * 0.85;
             g.gain.setValueAtTime(scaledVol, now);
-            if (maxDuration > 0 && maxDuration < buf.duration / rate) {
+            const naturalDur = buf.duration / safeRate;
+            const effDur = (maxDuration > 0 && maxDuration < naturalDur) ? maxDuration : naturalDur;
+            if (maxDuration > 0 && maxDuration < naturalDur) {
                 g.gain.setValueAtTime(scaledVol, now + Math.max(0.02, maxDuration - 0.04));
                 g.gain.exponentialRampToValueAtTime(0.001, now + maxDuration);
             }
             src.connect(g);
             g.connect(this.sfxOut());
             src.start(now);
-            if (maxDuration > 0) {
-                src.stop(now + maxDuration + 0.01);
-            }
+            src.stop(now + effDur + 0.02);
+            src.onended = () => {
+                try {
+                    src.disconnect();
+                    g.disconnect();
+                } catch (_e) {}
+            };
             return true;
         } catch (_e) {
             return false;
         }
+    }
+
+    resetLoops() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.inVehicle = false;
+        this._stopEngineLayers();
+        if (this._skidLoopNode) {
+            try {
+                this._skidLoopNode.stop();
+                this._skidLoopNode.disconnect();
+            } catch (_e) {}
+            this._skidLoopNode = null;
+        }
+        if (this._skidLoopGain) {
+            try {
+                this._skidLoopGain.gain.cancelScheduledValues(now);
+                this._skidLoopGain.gain.setValueAtTime(0.0, now);
+                this._skidLoopGain.disconnect();
+            } catch (_e) {}
+            this._skidLoopGain = null;
+        }
+        if (this._sirenNode) {
+            try {
+                this._sirenNode.stop();
+                this._sirenNode.disconnect();
+            } catch (_e) {}
+            this._sirenNode = null;
+            this._activeSirenKey = null;
+        }
+        for (const gainNode of [this.engineMasterGain, this.sirenGain, this.trafficGain, this.oceanGain, this.cityHumGain]) {
+            if (gainNode && gainNode.gain) {
+                try {
+                    gainNode.gain.cancelScheduledValues(now);
+                    gainNode.gain.setValueAtTime(0.0, now);
+                } catch (_e) {}
+            }
+        }
+        this._currentGear = 1;
+        this._smoothedRpm = 0;
+        this._prevThrottle = 0;
+        this._prevAbsSpeed = 0;
+        this._shiftCooldown = 0;
+        this._shiftDipTimer = 0;
     }
 
     _stopEngineLayers() {
@@ -693,8 +753,14 @@ class RetroAudioEngine {
                 this._skidLoopGain.gain.setTargetAtTime(targetGain, now, 0.04);
                 this._skidLoopNode.playbackRate.setTargetAtTime(0.92 + speedRatio * 0.22, now, 0.05);
             }
-        } else if (this._skidLoopGain) {
-            this._skidLoopGain.gain.setTargetAtTime(0.0, now, 0.06);
+        } else if (this._skidLoopNode) {
+            try {
+                this._skidLoopNode.stop();
+                this._skidLoopNode.disconnect();
+                if (this._skidLoopGain) this._skidLoopGain.disconnect();
+            } catch (_e) {}
+            this._skidLoopNode = null;
+            this._skidLoopGain = null;
         }
     }
 
@@ -831,8 +897,12 @@ class RetroAudioEngine {
             this._prevThrottle = throttle;
             this._prevAbsSpeed = absSpeed;
         } else {
+            if (this._engineLayers.length > 0) {
+                this._stopEngineLayers();
+            }
             if (this.engineMasterGain) {
-                this.engineMasterGain.gain.setTargetAtTime(0.0, now, 0.08);
+                this.engineMasterGain.gain.cancelScheduledValues(now);
+                this.engineMasterGain.gain.setValueAtTime(0.0, now);
             }
             this._updateSkidLoop(now, false, 0);
             this._currentGear = 1;
@@ -856,7 +926,16 @@ class RetroAudioEngine {
                 this._sirenNode.playbackRate.setTargetAtTime(doppler, now, 0.06);
             }
         } else if (this.sirenGain) {
-            this.sirenGain.gain.setTargetAtTime(0.0, now, 0.08);
+            if (this._sirenNode) {
+                try {
+                    this._sirenNode.stop();
+                    this._sirenNode.disconnect();
+                } catch (_e) {}
+                this._sirenNode = null;
+                this._activeSirenKey = null;
+            }
+            this.sirenGain.gain.cancelScheduledValues(now);
+            this.sirenGain.gain.setValueAtTime(0.0, now);
         }
 
         // 3. Spatial AI Traffic Pass-By Sample Loop (with Doppler shift & motorcycle vs car engine!)
@@ -1034,6 +1113,9 @@ class RetroAudioEngine {
 
     playExplosion() {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastExplosionTime && now - this._lastExplosionTime < 0.12) return;
+        this._lastExplosionTime = now;
         const ok = this.playSample("explosion_modern", 0.110, 0.90 + Math.random() * 0.14, 1.35);
         this.playSample("gta_explosion", 0.075, 0.94 + Math.random() * 0.10, 1.45);
         this.playSample("gta_huge_explosion", 0.052, 0.96 + Math.random() * 0.08, 1.85);
@@ -1055,11 +1137,28 @@ class RetroAudioEngine {
 
     playCashSound() {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastCashTime && now - this._lastCashTime < 0.14) return;
+        this._lastCashTime = now;
         const ok = this.playSample("gta_pickup", 0.12, 1.0 + Math.random() * 0.05, 0.85);
         this.playSample("pickup_weapon", 0.068, 1.08 + Math.random() * 0.08, 0.35);
         if (!ok) {
             this.playBeep(987.77, 0.06, "square", 0.06);
             setTimeout(() => this.playBeep(1318.51, 0.12, "square", 0.06), 60);
+        }
+    }
+
+    playPickup(kind = "SCORE") {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastPickupTime && now - this._lastPickupTime < 0.14) return;
+        this._lastPickupTime = now;
+        if (kind === "WEAPON") {
+            const ok = this.playSample("pickup_weapon", 0.115, 0.98 + Math.random() * 0.06, 0.45);
+            this.playSample("gta_pickup", 0.085, 1.02, 0.70);
+            if (!ok) this.playCashSound();
+        } else {
+            this.playCashSound();
         }
     }
 
@@ -1076,6 +1175,9 @@ class RetroAudioEngine {
 
     playAnkleMonitorAlert() {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastAnkleAlertTime && now - this._lastAnkleAlertTime < 0.45) return;
+        this._lastAnkleAlertTime = now;
         const ok = this.playSample("gta_pager", 0.11, 1.04, 0.55);
         this.playSample("ankle_alarm", 0.072, 1.12, 0.35);
         if (!ok) {
@@ -1137,6 +1239,9 @@ class RetroAudioEngine {
 
     playFanfare(kind = "MISSION") {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastFanfareTime && now - this._lastFanfareTime < 0.45) return;
+        this._lastFanfareTime = now;
         let vocalKey = "gta_vocal_mission_complete";
         if (kind === "FRENZY") {
             vocalKey = "gta_vocal_kill_frenzy";
@@ -1163,6 +1268,9 @@ class RetroAudioEngine {
 
     playCrateSmash() {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastCrateSmashTime && now - this._lastCrateSmashTime < 0.14) return;
+        this._lastCrateSmashTime = now;
         if (!this.playSample("gta_crate_break", 0.135, 0.94 + Math.random() * 0.12, 0.75)) {
             this.playNoise(0.16, 850, 0.11);
             this.playBeep(160, 0.1, "triangle", 0.07);
@@ -1171,6 +1279,9 @@ class RetroAudioEngine {
 
     playFootstep(surface = "PAVEMENT", isLeft = false) {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastFootstepTime && now - this._lastFootstepTime < 0.12) return;
+        this._lastFootstepTime = now;
         const pitchJit = (isLeft ? 0.95 : 1.05) * (0.96 + Math.random() * 0.08);
 
         if (surface === "WATER") {
@@ -1197,6 +1308,9 @@ class RetroAudioEngine {
 
     playWaterSplash(scale = 1.0) {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastWaterSplashTime && now - this._lastWaterSplashTime < 0.22) return;
+        this._lastWaterSplashTime = now;
         const splashKey = Math.random() < 0.5 ? "water_splash_1" : "water_splash_2";
         const ok = this.playSample(splashKey, 0.095 * scale, 0.92 + Math.random() * 0.16, 0.65);
         this.playSample("gta_water_splash", 0.062 * scale, 0.96 + Math.random() * 0.08, 0.65);
