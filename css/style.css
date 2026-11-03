@@ -1232,14 +1232,14 @@ html, body {
    ============================================================================ */
 #yt-radio-widget {
     position: fixed;
-    left: 0;
-    bottom: 0;
+    left: -196px;
+    top: -196px;
     width: 200px;
     height: 200px;
-    opacity: 0.01;
+    opacity: 0.08;
     pointer-events: none;
     overflow: hidden;
-    z-index: 0;
+    z-index: 12;
 }
 
 .yt-radio-header {
@@ -1352,17 +1352,17 @@ html, body {
     height: 10px;
 }
 
-/* Keep the audio stream engine strictly invisible to the eye while >=200x200 in-viewport so mobile browsers never auto-pause it */
+/* Keep the audio stream engine strictly invisible to the eye while >=200x200 in-viewport and above canvas so mobile browsers never auto-pause it */
 .yt-hidden-audio-engine {
-    position: fixed;
+    position: absolute;
     left: 0;
-    bottom: 0;
+    top: 0;
     width: 200px;
     height: 200px;
     opacity: 1;
     pointer-events: none;
     overflow: hidden;
-    z-index: 0;
+    z-index: 12;
 }
 
 #yt-player-iframe {

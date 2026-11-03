@@ -324,6 +324,7 @@ class RetroAudioEngine {
             copy,
             (audioBuf) => {
                 this.buffers[key] = audioBuf;
+                delete this._rawArrayBuffers[key];
                 this._decodingKeys.delete(key);
                 // If traffic loop buffers just finished decoding, wire them up
                 if ((key === "sedan_low" || key === "moto_low") && this.initialized) {

@@ -2818,7 +2818,13 @@ class LeonidaGame {
 
         this.ytVolume = 28;
 
+        this.ytPlayerState = -1;
+
         this.ytActuallyPlaying = false;
+
+        this._ytBuffering = false;
+
+        this._ytGestureUnlocked = false;
 
         this._lastYtKickMs = 0;
 
@@ -2844,7 +2850,29 @@ class LeonidaGame {
 
             try {
 
-                iframe.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*");
+                iframe.contentWindow.postMessage(
+
+                    JSON.stringify({ event: "listening", id: 1, channel: "widget" }),
+
+                    "*"
+
+                );
+
+                iframe.contentWindow.postMessage(
+
+                    JSON.stringify({ event: "command", func: "addEventListener", args: ["onStateChange"], id: 1, channel: "widget" }),
+
+                    "*"
+
+                );
+
+                iframe.contentWindow.postMessage(
+
+                    JSON.stringify({ event: "command", func: "addEventListener", args: ["onError"], id: 1, channel: "widget" }),
+
+                    "*"
+
+                );
 
             } catch (_e) {}
 
@@ -2852,7 +2880,71 @@ class LeonidaGame {
 
 
 
-        const tryAutoStart = () => {
+        const handleYtStateChange = (st) => {
+
+            if (typeof st !== "number") return;
+
+            this.ytPlayerState = st;
+
+            if (st === 1) {
+
+                this.ytActuallyPlaying = true;
+
+                this._ytBuffering = false;
+
+                this._lastYtProgressMs = performance.now();
+
+            } else if (st === 3) {
+
+                // Buffering: do NOT interrupt or re-kick while stream is buffering on mobile
+
+                this._ytBuffering = true;
+
+                this._lastYtProgressMs = performance.now();
+
+            } else if (st === 0) {
+
+                // Ended: loop immediately
+
+                this.ytActuallyPlaying = false;
+
+                this._ytBuffering = false;
+
+                if (this.ytMusicEnabled) {
+
+                    this.sendYouTubeCommand("seekTo", [0, true]);
+
+                    this.sendYouTubeCommand("playVideo", []);
+
+                }
+
+            } else if (st === 2 || st === 5 || st === -1) {
+
+                this.ytActuallyPlaying = false;
+
+                this._ytBuffering = false;
+
+                if (st === 2 && this.ytMusicEnabled && !document.hidden) {
+
+                    const nowMs = performance.now();
+
+                    if (nowMs - (this._lastYtKickMs || 0) > 900) {
+
+                        this._lastYtKickMs = nowMs;
+
+                        this.sendYouTubeCommand("playVideo", []);
+
+                    }
+
+                }
+
+            }
+
+        };
+
+
+
+        const tryAutoStart = (fromUserGesture = false) => {
 
             if (!this.ytMusicEnabled) return;
 
@@ -2860,13 +2952,97 @@ class LeonidaGame {
 
             const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
 
-            this.sendYouTubeCommand("unMute", []);
+            if (fromUserGesture) {
 
-            this.sendYouTubeCommand("setVolume", [vol]);
+                this.sendYouTubeCommand("unMute", []);
 
-            this.sendYouTubeCommand("playVideo", []);
+                this.sendYouTubeCommand("setVolume", [vol]);
+
+                this.sendYouTubeCommand("playVideo", []);
+
+                this._ytGestureUnlocked = true;
+
+            } else if (!this.ytActuallyPlaying && !this._ytBuffering) {
+
+                // Outside a user gesture, only send playVideo (never unMute, which mobile WebKit blocks/pauses)
+
+                this.sendYouTubeCommand("playVideo", []);
+
+            }
 
         };
+
+
+
+        // Load official YouTube IFrame API so YT.Player keeps widget channel & mobile media state synchronized
+
+        if (iframe && typeof window !== "undefined" && !window._vc26YtApiLoaded) {
+
+            window._vc26YtApiLoaded = true;
+
+            const prevReady = window.onYouTubeIframeAPIReady;
+
+            window.onYouTubeIframeAPIReady = () => {
+
+                if (typeof prevReady === "function") {
+
+                    try { prevReady(); } catch (_e) {}
+
+                }
+
+                try {
+
+                    if (window.YT && window.YT.Player) {
+
+                        this.ytPlayerInstance = new window.YT.Player("yt-player-iframe", {
+
+                            events: {
+
+                                onReady: () => {
+
+                                    subscribeYtEvents();
+
+                                    if (this.ytMusicEnabled && !this.ytActuallyPlaying && !this._ytBuffering) {
+
+                                        this.sendYouTubeCommand("playVideo", []);
+
+                                    }
+
+                                },
+
+                                onStateChange: (ev) => {
+
+                                    if (ev && typeof ev.data === "number") {
+
+                                        handleYtStateChange(ev.data);
+
+                                    }
+
+                                }
+
+                            }
+
+                        });
+
+                    }
+
+                } catch (_e) {}
+
+            };
+
+            try {
+
+                const tag = document.createElement("script");
+
+                tag.src = "https://www.youtube.com/iframe_api";
+
+                tag.async = true;
+
+                document.head.appendChild(tag);
+
+            } catch (_e) {}
+
+        }
 
 
 
@@ -2882,6 +3058,12 @@ class LeonidaGame {
 
                 if (!msg) return;
 
+                if (msg.event === "onReady") {
+
+                    subscribeYtEvents();
+
+                }
+
                 const info = msg.info && typeof msg.info === "object" ? msg.info : null;
 
                 const st = (info && typeof info.playerState === "number")
@@ -2894,27 +3076,25 @@ class LeonidaGame {
 
                 if (info && typeof info.currentTime === "number") {
 
-                    this._lastYtTime = info.currentTime;
+                    if (info.currentTime !== this._lastYtTime) {
 
-                    this._lastYtProgressMs = performance.now();
+                        this._lastYtTime = info.currentTime;
+
+                        this._lastYtProgressMs = performance.now();
+
+                        this.ytActuallyPlaying = true;
+
+                        this._ytBuffering = false;
+
+                    }
 
                 }
 
 
 
-                if (st === 1) {
+                if (typeof st === "number") {
 
-                    this.ytActuallyPlaying = true;
-
-                } else if (st === 2 || st === 0) {
-
-                    this.ytActuallyPlaying = false;
-
-                    if (this.ytMusicEnabled && !document.hidden) {
-
-                        this.sendYouTubeCommand("playVideo", []);
-
-                    }
+                    handleYtStateChange(st);
 
                 }
 
@@ -2928,9 +3108,9 @@ class LeonidaGame {
 
             iframe.addEventListener("load", () => {
 
-                setTimeout(tryAutoStart, 250);
+                setTimeout(() => subscribeYtEvents(), 200);
 
-                setTimeout(tryAutoStart, 1000);
+                setTimeout(() => tryAutoStart(false), 600);
 
             });
 
@@ -2938,21 +3118,65 @@ class LeonidaGame {
 
 
 
-        // Start/resume YouTube audio on any user gesture (touchstart, touchend, pointerdown, keydown, click)
+        // Start/resume YouTube audio on any user gesture in capture phase (before canvas/joystick e.preventDefault())
 
         const unlockGesture = () => {
 
             if (this.audio) this.audio.resume();
 
-            if (this.ytMusicEnabled && !this.ytActuallyPlaying) {
+            if (!this.ytMusicEnabled) return;
 
-                const nowMs = performance.now();
+            const nowMs = performance.now();
 
-                if (nowMs - (this._lastYtKickMs || 0) > 1500) {
+            if (!this.ytActuallyPlaying && !this._ytBuffering) {
+
+                if (nowMs - (this._lastYtKickMs || 0) > 1200) {
 
                     this._lastYtKickMs = nowMs;
 
-                    tryAutoStart();
+                    tryAutoStart(true);
+
+                }
+
+            } else if (!this._ytGestureUnlocked) {
+
+                this._ytGestureUnlocked = true;
+
+                const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
+
+                this.sendYouTubeCommand("unMute", []);
+
+                this.sendYouTubeCommand("setVolume", [vol]);
+
+            }
+
+        };
+
+        window.addEventListener("pointerdown", unlockGesture, { capture: true, passive: true });
+
+        window.addEventListener("touchstart", unlockGesture, { capture: true, passive: true });
+
+        window.addEventListener("touchend", unlockGesture, { capture: true, passive: true });
+
+        window.addEventListener("click", unlockGesture, { capture: true, passive: true });
+
+        window.addEventListener("keydown", unlockGesture, { capture: true, passive: true });
+
+
+
+        // Auto-resume when returning to tab or unlocking mobile screen
+
+        const onVisOrFocus = () => {
+
+            if (!document.hidden && this.ytMusicEnabled) {
+
+                if (this.audio) this.audio.resume();
+
+                subscribeYtEvents();
+
+                if (!this.ytActuallyPlaying && !this._ytBuffering) {
+
+                    this.sendYouTubeCommand("playVideo", []);
 
                 }
 
@@ -2960,19 +3184,15 @@ class LeonidaGame {
 
         };
 
-        window.addEventListener("pointerdown", unlockGesture, { passive: true });
+        document.addEventListener("visibilitychange", onVisOrFocus);
 
-        window.addEventListener("touchstart", unlockGesture, { passive: true });
+        window.addEventListener("pageshow", onVisOrFocus);
 
-        window.addEventListener("touchend", unlockGesture, { passive: true });
-
-        window.addEventListener("click", unlockGesture, { passive: true });
-
-        window.addEventListener("keydown", unlockGesture, { passive: true });
+        window.addEventListener("focus", onVisOrFocus);
 
 
 
-        // Periodic watchdog: ensure YouTube stream stays alive while Music is ON
+        // Periodic watchdog: gently resume ONLY if paused/stopped (never interrupt active playback or buffering!)
 
         setInterval(() => {
 
@@ -2984,15 +3204,15 @@ class LeonidaGame {
 
                 }
 
-                if (!this.ytActuallyPlaying || (this._lastYtProgressMs > 0 && performance.now() - this._lastYtProgressMs > 4000)) {
+                if (!this.ytActuallyPlaying && !this._ytBuffering) {
 
-                    tryAutoStart();
+                    tryAutoStart(false);
 
                 }
 
             }
 
-        }, 2500);
+        }, 3500);
 
 
 
@@ -3062,6 +3282,8 @@ class LeonidaGame {
 
             this.sendYouTubeCommand("playVideo", []);
 
+            this._ytGestureUnlocked = true;
+
             if (toggleBtn) {
 
                 toggleBtn.textContent = "🔊 MUSIC: ON";
@@ -3079,6 +3301,10 @@ class LeonidaGame {
         } else {
 
             this.ytActuallyPlaying = false;
+
+            this._ytBuffering = false;
+
+            this.ytPlayerState = 2;
 
             this.sendYouTubeCommand("pauseVideo", []);
 
@@ -3104,6 +3330,18 @@ class LeonidaGame {
 
     sendYouTubeCommand(func, args = []) {
 
+        if (this.ytPlayerInstance && typeof this.ytPlayerInstance[func] === "function") {
+
+            try {
+
+                this.ytPlayerInstance[func](...args);
+
+                return;
+
+            } catch (_e) {}
+
+        }
+
         const iframe = document.getElementById("yt-player-iframe");
 
         if (!iframe || !iframe.contentWindow) return;
@@ -3112,7 +3350,7 @@ class LeonidaGame {
 
             iframe.contentWindow.postMessage(
 
-                JSON.stringify({ event: "command", func, args }),
+                JSON.stringify({ event: "command", func, args, id: 1, channel: "widget" }),
 
                 "*"
 
