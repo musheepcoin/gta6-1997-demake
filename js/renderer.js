@@ -2144,72 +2144,147 @@ class RetroRenderer {
                     meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
                 }
 
-                // 6J2. Miami Neon Electric Scooter ("veh_escooter", 16x32, facing South +Y) & South Beach Cruiser Bicycle ("veh_bicycle", 16x34, facing South +Y)
+                // 6J2. Crisp Pixel-Art 1997 GTA 1 / GTA 2 Electric Scooter ("veh_escooter", 16x34) & Beach Cruiser Bicycle ("veh_bicycle", 16x38)
+                // Drawn with exact integer pixel matrices (alpha = 255 / 0, zero Canvas2D sub-pixel blur) facing South (+Y = bottom = front wheel)
                 {
-                    // 1) Electric Scooter ("veh_escooter", 16x32 at 1342, py3)
-                    const scx = 1342, scy = py3;
-                    ctx.save();
-                    // Rear wheel (top) & Front wheel (bottom)
-                    ctx.fillStyle = "#090d16";
-                    ctx.fillRect(scx + 6, scy + 1, 4, 6);
-                    ctx.fillRect(scx + 6, scy + 25, 4, 6);
-                    // Grip-tape standing deck with Neon Lime & Cyan side LED rails
-                    ctx.fillStyle = "#0f172a";
-                    ctx.fillRect(scx + 4, scy + 6, 8, 19);
-                    ctx.fillStyle = "#39ff14";
-                    ctx.fillRect(scx + 4, scy + 7, 1.6, 17);
-                    ctx.fillRect(scx + 10.4, scy + 7, 1.6, 17);
-                    ctx.fillStyle = "#1e293b";
-                    ctx.fillRect(scx + 6, scy + 8, 4, 14);
-                    // Rear red brake LED & fender
-                    ctx.fillStyle = "#ef4444";
-                    ctx.fillRect(scx + 6, scy + 4, 4, 2.2);
-                    // Front steering stem, wide handlebars & cyan/lime handgrips (at bottom = front +Y)
-                    ctx.fillStyle = "#cbd5e1";
-                    ctx.fillRect(scx + 2, scy + 23, 12, 2.4);
-                    ctx.fillStyle = "#00f0ff";
-                    ctx.fillRect(scx + 1, scy + 22.5, 3, 3);
-                    ctx.fillRect(scx + 12, scy + 22.5, 3, 3);
-                    // Front LED headlight
-                    ctx.fillStyle = "#fef08a";
-                    ctx.fillRect(scx + 6.5, scy + 25, 3, 2);
-                    ctx.restore();
-                    meta.sprites.objects["veh_escooter"] = [scx, scy, 16, 32];
+                    ctx.clearRect(1340, py3, 56, 42);
 
-                    // 2) South Beach Cruiser / BMX Bicycle ("veh_bicycle", 16x34 at 1364, py3)
+                    const drawPixelMatrix = (ox, oy, rows, pal) => {
+                        const h = rows.length;
+                        const w = rows[0].length;
+                        const id = ctx.createImageData(w, h);
+                        const data = id.data;
+                        for (let y = 0; y < h; y++) {
+                            const row = rows[y];
+                            for (let x = 0; x < w; x++) {
+                                const ch = row[x];
+                                const col = pal[ch];
+                                const p = (y * w + x) * 4;
+                                if (!col) {
+                                    data[p] = 0;
+                                    data[p + 1] = 0;
+                                    data[p + 2] = 0;
+                                    data[p + 3] = 0;
+                                } else {
+                                    data[p] = col[0];
+                                    data[p + 1] = col[1];
+                                    data[p + 2] = col[2];
+                                    data[p + 3] = 255;
+                                }
+                            }
+                        }
+                        ctx.putImageData(id, ox, oy);
+                    };
+
+                    const bikePal = {
+                        K: [11, 15, 25],    // Crisp 1px dark silhouette outline
+                        T: [22, 28, 40],    // Dark vulcanized tire rubber
+                        t: [51, 65, 85],    // Tire tread highlight
+                        W: [203, 213, 225], // Silver wheel rim & spokes
+                        w: [248, 250, 252], // Gleaming chrome highlight
+                        C: [148, 163, 184], // Brushed chrome / aluminum
+                        F: [2, 132, 199],   // Frame paint shadow bevel (Miami Ocean Blue/Cyan)
+                        f: [6, 182, 212],   // Frame paint mid-tone
+                        H: [103, 232, 249], // Frame 3D cylinder top specular
+                        S: [69, 26, 3],     // Dark espresso leather saddle border
+                        s: [146, 64, 14],   // Warm saddle leather cushion
+                        L: [217, 119, 6],   // Saddle crown highlight
+                        G: [30, 41, 59],    // Ribbed dark rubber handgrip / pedal
+                        A: [245, 158, 11],  // Amber pedal reflector / brass bell
+                        R: [239, 68, 68],   // Ruby red rear brake/fender LED
+                        r: [252, 165, 165], // Bright red LED core
+                        E: [5, 150, 105],   // Emerald scooter anodized rail shadow
+                        e: [52, 211, 153],  // Neon mint-emerald scooter rail highlight
+                        D: [15, 23, 42],    // Dark charcoal grip-tape standing deck
+                        d: [30, 41, 59],    // Grip-tape anti-slip groove
+                        Y: [254, 240, 138]  // Front Xenon LED headlight
+                    };
+
+                    // 1) Modern Miami Electric Kick-Scooter ("veh_escooter", 16x34 at 1342, py3, facing South +Y)
+                    const scx = 1342, scy = py3;
+                    const scooterRows = [
+                        "......KKKK......",
+                        ".....KTTTTK.....",
+                        ".....KTttTK.....",
+                        ".....KTRrTK.....",
+                        "....KKERRRKK....",
+                        "...KEedddddeEK..",
+                        "...KEdDDDDdEK...",
+                        "...KEdDDDDdEK...",
+                        "...KEddddddeK...",
+                        "...KEdDDDDdEK...",
+                        "...KEdDDDDdEK...",
+                        "...KEddddddeK...",
+                        "...KEdDDDDdEK...",
+                        "...KEdDDDDdEK...",
+                        "...KEddddddeK...",
+                        "...KEdDDDDdEK...",
+                        "...KEdDDDDdEK...",
+                        "...KEddddddeK...",
+                        "...KEdDDDDdEK...",
+                        "...KEedddddeEK..",
+                        "....KKEwwwEKK...",
+                        ".....KCwwwCK....",
+                        ".....KCfHfCK....",
+                        ".KKKKKKKKKKKKKK.",
+                        "KeGGCCCCCCCCGGeK",
+                        "KeGGCCCwwCCCGGeK",
+                        ".KKKKKCYYCKKKKK.",
+                        ".....KTTTTK.....",
+                        ".....KTWWtK.....",
+                        ".....KTWWtK.....",
+                        ".....KTttTK.....",
+                        ".....KTTTTK.....",
+                        "......KKKK......",
+                        "................"
+                    ];
+                    drawPixelMatrix(scx, scy, scooterRows, bikePal);
+                    meta.sprites.objects["veh_escooter"] = [scx, scy, 16, 34];
+
+                    // 2) South Beach Cruiser / BMX Bicycle ("veh_bicycle", 16x38 at 1364, py3, facing South +Y)
                     const bkx = 1364, bky = py3;
-                    ctx.save();
-                    // Rear & Front whitewall beach cruiser tires
-                    ctx.fillStyle = "#090d16";
-                    ctx.fillRect(bkx + 6, bky + 1, 4, 9);
-                    ctx.fillRect(bkx + 6, bky + 24, 4, 9);
-                    ctx.fillStyle = "#e2e8f0";
-                    ctx.fillRect(bkx + 7, bky + 2, 2, 7);
-                    ctx.fillRect(bkx + 7, bky + 25, 2, 7);
-                    // Turquoise & Flamingo Pink tubular cruiser frame
-                    ctx.fillStyle = "#00f0ff";
-                    ctx.fillRect(bkx + 6.5, bky + 8, 3, 17);
-                    ctx.fillStyle = "#ff2a85";
-                    ctx.fillRect(bkx + 5.5, bky + 14, 5, 3);
-                    // Left & Right pedals
-                    ctx.fillStyle = "#cbd5e1";
-                    ctx.fillRect(bkx + 3, bky + 15, 2.5, 2);
-                    ctx.fillRect(bkx + 10.5, bky + 17, 2.5, 2);
-                    // Tan leather beach cruiser saddle (over rear/mid frame)
-                    ctx.fillStyle = "#78350f";
-                    ctx.fillRect(bkx + 5, bky + 9, 6, 5);
-                    ctx.fillStyle = "#b45309";
-                    ctx.fillRect(bkx + 6, bky + 10, 4, 3.5);
-                    // Swept-back chrome cruiser handlebars & grips (front +Y) + woven beach basket
-                    ctx.fillStyle = "#f8fafc";
-                    ctx.fillRect(bkx + 1.5, bky + 21, 13, 2.4);
-                    ctx.fillStyle = "#ff2a85";
-                    ctx.fillRect(bkx + 1, bky + 19.5, 2.5, 3.5);
-                    ctx.fillRect(bkx + 12.5, bky + 19.5, 2.5, 3.5);
-                    ctx.fillStyle = "#fde68a";
-                    ctx.fillRect(bkx + 5, bky + 23.5, 6, 3.5);
-                    ctx.restore();
-                    meta.sprites.objects["veh_bicycle"] = [bkx, bky, 16, 34];
+                    const bicycleRows = [
+                        "......KKKK......",
+                        ".....KTTTTK.....",
+                        ".....KTttTK.....",
+                        ".....KTWWTK.....",
+                        ".....KTWWTK.....",
+                        "....KKTWWTKK....",
+                        "....KFTWWTFK....",
+                        "....KFKTWTFK....",
+                        ".....KFTWTFK....",
+                        "....KSSSSSSK....",
+                        "...KSssssssSK...",
+                        "...KSsLLLLsSK...",
+                        "...KSssssssSK...",
+                        "....KSSssSSK....",
+                        ".....KSssSK.....",
+                        "..KKK.KffK......",
+                        ".KGAKKKfHfK.....",
+                        "..KKK.KfHfK.....",
+                        "......KfHfKKK...",
+                        "......KfHfKGAK..",
+                        "......KffK.KKK..",
+                        "......KfHfK.....",
+                        "......KfHfK.....",
+                        ".KKK..KfHfK..KKK",
+                        "KGGK..KfHfK..KGG",
+                        "KGGCK.KfHfK.KCGG",
+                        ".KCCwKKfHfKKACCK",
+                        "..KKCwwwwwwwCKK.",
+                        "....KKFwwwFKK...",
+                        "....KFTWWTFK....",
+                        "....KFTWWTFK....",
+                        "....KKTWWTKK....",
+                        ".....KTWWTK.....",
+                        ".....KTWWTK.....",
+                        ".....KTttTK.....",
+                        ".....KTTTTK.....",
+                        "......KKKK......",
+                        "................"
+                    ];
+                    drawPixelMatrix(bkx, bky, bicycleRows, bikePal);
+                    meta.sprites.objects["veh_bicycle"] = [bkx, bky, 16, 38];
                 }
 
                 // =========================================================================
@@ -6093,7 +6168,9 @@ class RetroRenderer {
             if (!rect) continue;
             const rot = v.angle - Math.PI * 0.5;
             const airZ = v.stuntZOffset || 0;
-            const vScale = carScale * (1.0 + airZ * 0.22);
+            const isMicroTwoWheeler = (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER");
+            const baseVehScale = isMicroTwoWheeler ? (carScale * 1.12) : carScale;
+            const vScale = baseVehScale * (1.0 + airZ * 0.22);
             const vDrawOrder = airZ > 0.05 ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.CAR;
             const cosA = Math.cos(v.angle);
             const sinA = Math.sin(v.angle);
@@ -6110,7 +6187,7 @@ class RetroRenderer {
                     v.y + sunSin * motoShOff,
                     vz - 0.025,
                     rot,
-                    carScale,
+                    baseVehScale,
                     SPRITE_DRAW_ORDER.TIRE_MARKS,
                     0.02,
                     0.03,
@@ -6224,7 +6301,8 @@ class RetroRenderer {
 
             // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp):
             // Physical Front Headlight Glass Lenses + Day/Night Rear Taillights, Brake Lamps & Reverse Lamps!
-            if (!v.destroyed && !mapInfo.isTank) {
+            // (Skipped on bicycles & e-scooters so car headlight/taillight quads don't cover thin bicycle wheels!)
+            if (!v.destroyed && !mapInfo.isTank && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
                 const frontDist = (v.w || 48) * 0.45;
                 const rearDist = -(v.w || 48) * 0.45;
                 const latSpread = mapInfo.isMotorcycle ? 0 : ((v.h || 24) * 0.29);
@@ -6282,27 +6360,33 @@ class RetroRenderer {
                     const bikerTypes = (isScooter || isBicycle)
                         ? ["vc_jogger", "vc_tourist", "bikini_cyan", "g2_civ_pink", "vc_tommy", "kid_skater"]
                         : ["vc_tommy", "vc_crockett", "vc_hawaiian_red", "g2_civ_aqua", "gang", "civ0"];
-                    const pedalFrame = (isBicycle && Math.abs(v.speed || 0) > 12)
-                        ? (Math.floor(this.time * 7.5 + idHash) % 8)
-                        : (isScooter ? 98 : 84);
+                    // Always use frame 84 (sitting_on_bike: hands forward gripping handlebars, legs straddling frame)
+                    // so the rider's hands align with the bicycle/scooter handlebars and never obscure the front wheel!
                     const riderFrame = (v.doorOpenTimer || 0) > 0
                         ? (80 + Math.min(3, Math.floor((1.0 - v.doorOpenTimer / 0.48) * 4)))
-                        : pedalFrame;
+                        : 84;
+                    const pedalSway = (isBicycle && Math.abs(v.speed || 0) > 12)
+                        ? Math.sin(this.time * 11.5 + idHash) * 0.065
+                        : 0;
+                    const seatLongOff = isBicycle ? -4.2 : (isScooter ? -3.8 : 1.5);
 
                     if (occSeats.length > 0) {
                         for (const occ of occSeats) {
-                            const sPos = typeof v.getSeatWorldPos === "function"
-                                ? v.getSeatWorldPos(occ.seat)
-                                : { x: v.x + cosA * (occ.seat === 0 ? 1.5 : -7.5), y: v.y + sinA * (occ.seat === 0 ? 1.5 : -7.5) };
+                            const sPos = (occ.seat === 0 && (isBicycle || isScooter))
+                                ? { x: v.x + cosA * seatLongOff, y: v.y + sinA * seatLongOff }
+                                : (typeof v.getSeatWorldPos === "function"
+                                    ? v.getSeatWorldPos(occ.seat)
+                                    : { x: v.x + cosA * (occ.seat === 0 ? 1.5 : -7.5), y: v.y + sinA * (occ.seat === 0 ? 1.5 : -7.5) });
                             const isCustom24 = !((occ.pedType || "").startsWith("civ") || occ.pedType === "gang" || occ.pedType === "police" || occ.pedType === "monk");
-                            const rScale = vScale * (isCustom24 ? 0.94 : 1.04);
+                            const baseRScale = carScale * (1.0 + airZ * 0.22) * (isCustom24 ? 0.94 : 1.04);
+                            const rScale = (isBicycle || isScooter) ? (baseRScale * 0.82) : baseRScale;
                             this.batchPedSprite3D(
                                 occ.pedType || "gang",
                                 occ.seat === 0 ? riderFrame : 84,
                                 sPos.x,
                                 sPos.y,
                                 vz + airZ + 0.014 + occ.seat * 0.002,
-                                v.angle,
+                                v.angle + (occ.seat === 0 ? pedalSway : 0),
                                 rScale,
                                 (occ.muzzleTimer || 0) > 0,
                                 riderDrawOrder
@@ -6310,14 +6394,16 @@ class RetroRenderer {
                         }
                     } else {
                         const aiPedType = v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length];
-                        const aiScale = aiPedType.startsWith("kid_") ? (vScale * 0.78) : (vScale * 1.02);
+                        const aiScale = aiPedType.startsWith("kid_")
+                            ? (carScale * 0.72)
+                            : (carScale * ((isBicycle || isScooter) ? 0.82 : 1.02));
                         this.batchPedSprite3D(
                             aiPedType,
                             riderFrame,
-                            v.x + cosA * (isScooter ? 0.0 : 1.5),
-                            v.y + sinA * (isScooter ? 0.0 : 1.5),
+                            v.x + cosA * seatLongOff,
+                            v.y + sinA * seatLongOff,
                             vz + airZ + 0.014,
-                            v.angle,
+                            v.angle + pedalSway,
                             aiScale,
                             false,
                             riderDrawOrder
