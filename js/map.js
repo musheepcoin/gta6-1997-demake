@@ -2046,19 +2046,9 @@ class LeonidaMap {
         if (this.industrialAndParkDetails.miniGolf) {
             pushPropOBB(this.industrialAndParkDetails.miniGolf.x, this.industrialAndParkDetails.miniGolf.y, 18, 18, 0);
         }
-        for (const br of this.industrialAndParkDetails.bikerRallies) {
-            pushPropOBB(br.x, br.y, br.count * 10, 12, 0);
-        }
-        if (Array.isArray(this.streetTakeovers)) {
-            for (const st of this.streetTakeovers) {
-                pushPropOBB(st.x, st.y, 44, 44, 0);
-            }
-        }
-        if (Array.isArray(this.streetEvents)) {
-            for (const ev of this.streetEvents) {
-                pushPropOBB(ev.x, ev.y, 32, 32, 0);
-            }
-        }
+        // NOTE: Open-air animated pedestrian/biker scenes (bikerRallies, streetTakeovers, streetEvents, beachParties, etc.)
+        // intentionally have ZERO solid collision boxes in securityBarrierBoxes so the player can drive through and
+        // physically run over / scatter the participants! Vehicle spawners use this.isInsideLivingEventZone(x, y) instead.
 
         // 18D-2. 3D Landmarks & Monuments Solid OBB Collision Hulls (Launchpad, ATC Tower, Water Tower, Pier Arch Pylons, Ferris Wheel & Gantry Legs)
         pushPropOBB(465.0 * TILE_SIZE, 35.0 * TILE_SIZE, 78, 78, 0);              // SERA Launchpad MLP & Umbilical Tower
@@ -2091,12 +2081,18 @@ class LeonidaMap {
             pushPropOBB(gl.x + 24, gl.y + 26, 7, 7, 0);
         }
 
-        // 18E. GTA 6 Leonida Residential Estates & Waterfront Mansions Solid OBB Collision Hulls
+        // 18E. GTA 6 Leonida Residential Estates & Waterfront Mansions Solid OBB Collision Hulls (exact 3D wall footprint, no roof overhang spill)
         if (Array.isArray(this.residentialHouses)) {
             for (const h of this.residentialHouses) {
-                pushPropOBB(h.x, h.y, h.hw * (h.scale || 1.0), h.hh * (h.scale || 1.0), h.ang);
+                const sc = h.scale || 1.0;
+                const spec = (this.objectEngine && typeof this.objectEngine.getPrefab === "function")
+                    ? this.objectEngine.getPrefab(h.kind)
+                    : null;
+                const wallHw = spec ? (spec.w1 * 0.5 * sc) : (h.hw * 0.88);
+                const wallHh = spec ? (spec.d1 * 0.5 * sc) : (h.hh * 0.88);
+                pushPropOBB(h.x, h.y, wallHw, wallHh, h.ang);
                 // Clear any overlapping flora within the house boundary + front yard
-                const clearRad = Math.max(h.hw, h.hh) * (h.scale || 1.0) + 20;
+                const clearRad = Math.max(wallHw, wallHh) + 20;
                 if (Array.isArray(this.vicePalms)) {
                     this.vicePalms = this.vicePalms.filter(p => Math.hypot(p.x - h.x, p.y - h.y) > clearRad);
                 }
@@ -4302,6 +4298,63 @@ class LeonidaMap {
             }
         }
         return { hit, x: nx, y: ny };
+    }
+
+    /**
+     * Non-physical spawn-exclusion check for open-air animated pedestrian/biker scenes
+     * (streetEvents, streetTakeovers, bikerRallies, beachParties, volleyball, gyms, camps, golfGreens).
+     * Keeps vehicle spawners clear of living animations WITHOUT placing any solid OBB wall around them!
+     */
+    isInsideLivingEventZone(x, y, extraMargin = 32) {
+        if (Array.isArray(this.streetEvents)) {
+            for (let i = 0; i < this.streetEvents.length; i++) {
+                const ev = this.streetEvents[i];
+                if (Math.hypot(x - ev.x, y - ev.y) < 34 + extraMargin) return true;
+            }
+        }
+        if (Array.isArray(this.streetTakeovers)) {
+            for (let i = 0; i < this.streetTakeovers.length; i++) {
+                const st = this.streetTakeovers[i];
+                if (Math.hypot(x - st.x, y - st.y) < 46 + extraMargin) return true;
+            }
+        }
+        if (this.industrialAndParkDetails && Array.isArray(this.industrialAndParkDetails.bikerRallies)) {
+            for (let i = 0; i < this.industrialAndParkDetails.bikerRallies.length; i++) {
+                const br = this.industrialAndParkDetails.bikerRallies[i];
+                if (Math.hypot(x - br.x, y - br.y) < (br.count || 4) * 10 + 18 + extraMargin) return true;
+            }
+        }
+        if (Array.isArray(this.beachParties)) {
+            for (let i = 0; i < this.beachParties.length; i++) {
+                const bp = this.beachParties[i];
+                if (Math.hypot(x - bp.x, y - bp.y) < 34 + extraMargin) return true;
+            }
+        }
+        if (Array.isArray(this.beachVolleyballCourts)) {
+            for (let i = 0; i < this.beachVolleyballCourts.length; i++) {
+                const vc = this.beachVolleyballCourts[i];
+                if (Math.hypot(x - vc.x, y - vc.y) < 36 + extraMargin) return true;
+            }
+        }
+        if (Array.isArray(this.muscleBeachGyms)) {
+            for (let i = 0; i < this.muscleBeachGyms.length; i++) {
+                const gm = this.muscleBeachGyms[i];
+                if (Math.hypot(x - gm.x, y - gm.y) < 34 + extraMargin) return true;
+            }
+        }
+        if (Array.isArray(this.wildernessCamps)) {
+            for (let i = 0; i < this.wildernessCamps.length; i++) {
+                const cp = this.wildernessCamps[i];
+                if (Math.hypot(x - cp.x, y - cp.y) < 34 + extraMargin) return true;
+            }
+        }
+        if (Array.isArray(this.golfGreens)) {
+            for (let i = 0; i < this.golfGreens.length; i++) {
+                const gg = this.golfGreens[i];
+                if (Math.hypot(x - gg.x, y - gg.y) < 28 + extraMargin) return true;
+            }
+        }
+        return false;
     }
 }
 

@@ -1204,8 +1204,9 @@ class WorldObjectEngine {
     updateHeists(game, dt) {
         if (!game || !this.heistTargets) return;
         const p = game.player;
-        const px = p ? (p.car ? p.car.x : p.x) : 0;
-        const py = p ? (p.car ? p.car.y : p.y) : 0;
+        const pVeh = p ? (p.inVehicle || p.car || null) : null;
+        const px = pVeh ? pVeh.x : (p ? p.x : 0);
+        const py = pVeh ? pVeh.y : (p ? p.y : 0);
         const t = performance.now() * 0.001;
 
         for (let i = 0; i < this.heistTargets.length; i++) {
@@ -1259,8 +1260,8 @@ class WorldObjectEngine {
             const ht = this.activeHeist.target;
             const dist = Math.hypot(px - ht.inst.x, py - ht.inst.y);
             if (dist > this.activeHeist.escapeRadius) {
-                const escapeBonus = (p.inVehicle && p.car && p.car.isEstateCar) ? 8000 : 5000;
-                const bonusText = (p.inVehicle && p.car && p.car.isEstateCar)
+                const escapeBonus = (p.inVehicle && pVeh && pVeh.isEstateCar) ? 8000 : 5000;
+                const bonusText = (p.inVehicle && pVeh && pVeh.isEstateCar)
                     ? `🏎️ SUPERCAR HEIST GETAWAY COMPLETE! +$${escapeBonus.toLocaleString()}!`
                     : `🏆 VILLA HEIST ESCAPE COMPLETE! +$${escapeBonus.toLocaleString()}!`;
                 if (typeof game.addScore === "function") game.addScore(escapeBonus);
@@ -1418,7 +1419,7 @@ class WorldObjectEngine {
 
         // 4. Update GTA 6 Trailer 1 Rogue Leonida Alligators (Poolside & Convenience Store Forecourts)
         if (Array.isArray(this.gatorEncounters)) {
-            const pCar = p && p.car ? p.car : null;
+            const pCar = pVeh;
             for (const ge of this.gatorEncounters) {
                 if (!ge.active) {
                     ge.cooldown = Math.max(0, (ge.cooldown || 0) - dt);
@@ -1462,7 +1463,7 @@ class WorldObjectEngine {
 
         // 5. Update GTA 6 VCPD High-Speed Radar Speed Traps & Nitrous Boost Portals
         if (Array.isArray(this.speedTraps)) {
-            const pCar = p && p.car ? p.car : null;
+            const pCar = pVeh;
             for (const st of this.speedTraps) {
                 if (st.cooldown > 0) st.cooldown = Math.max(0, st.cooldown - dt);
                 if (st.flashTimer > 0) st.flashTimer = Math.max(0, st.flashTimer - dt);
@@ -1506,7 +1507,7 @@ class WorldObjectEngine {
 
         // 6. Update Grupo Seguro Armored Cash Trucks & 3D Spinning Emerald/Gold Cash Briefcase Drops
         if (Array.isArray(game.vehicles)) {
-            const pCar = p && p.car ? p.car : null;
+            const pCar = pVeh;
             for (const v of game.vehicles) {
                 if (!v.isArmoredCashTruck) continue;
                 if (v.lastCashHitHp === undefined) v.lastCashHitHp = v.hp;
@@ -1554,8 +1555,8 @@ class WorldObjectEngine {
         if (this.viralCooldown > 0) {
             this.viralCooldown = Math.max(0, this.viralCooldown - dt);
         }
-        if (p && p.inVehicle && p.car && game.input && game.input.handbrake) {
-            const spd = Math.hypot(p.car.vx || 0, p.car.vy || 0);
+        if (p && pVeh && game.input && game.input.handbrake) {
+            const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0);
             if (spd > 135) {
                 this.viralDriftTimer = (this.viralDriftTimer || 0) + dt;
                 if (this.viralDriftTimer >= 0.85 && this.viralCooldown <= 0) {
@@ -1567,8 +1568,8 @@ class WorldObjectEngine {
                     if (game.audio) game.audio.playPickup("SCORE");
                     if (Array.isArray(game.floatingTexts)) {
                         game.floatingTexts.push({
-                            x: p.car.x,
-                            y: p.car.y,
+                            x: pVeh.x,
+                            y: pVeh.y,
                             z: 2.68,
                             text: `📱 GOING VIRAL ON LEONIDA REELS! +${viewsK}K VIEWS • +$3,000!`,
                             color: "#f472b6",
@@ -1900,6 +1901,7 @@ class WorldObjectEngine {
                     const vang = inst.ang + relAng;
 
                     if (!isDryLotPoint(vx, vy, 26)) continue;
+                    if (this.map && typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(vx, vy, 26)) continue;
                     if (game.vehicles.some(v => Math.hypot(v.x - vx, v.y - vy) < 46)) continue;
 
                     chosen = { vx, vy, vang };
@@ -1966,7 +1968,7 @@ class WorldObjectEngine {
     updateAndCollideProps(game, dt) {
         if (!game) return;
         const player = game.player;
-        const pCar = player && player.car ? player.car : null;
+        const pCar = player ? (player.inVehicle || player.car || null) : null;
 
         // 1. Poolside & Terrace Props
         for (let i = 0; i < this.interactiveProps.length; i++) {
@@ -4226,8 +4228,9 @@ class WorldObjectEngine {
         if (!ctx || !renderer || !game || !game.player || game.activeInterior) return;
 
         const p = game.player;
-        const px = p.car ? p.car.x : p.x;
-        const py = p.car ? p.car.y : p.y;
+        const pVeh = p ? (p.inVehicle || p.car || null) : null;
+        const px = pVeh ? pVeh.x : p.x;
+        const py = pVeh ? pVeh.y : p.y;
 
         ctx.save();
         ctx.textAlign = "center";

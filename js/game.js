@@ -1080,9 +1080,19 @@ class LeonidaGame {
 
                             if (nb && (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)) {
 
-                                v.x = (bx + dx + 0.5) * TILE_SIZE;
+                                const candX = (bx + dx + 0.5) * TILE_SIZE;
 
-                                v.y = (by + dy + 0.5) * TILE_SIZE;
+                                const candY = (by + dy + 0.5) * TILE_SIZE;
+
+                                if (typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(candX, candY, 24)) {
+
+                                    continue;
+
+                                }
+
+                                v.x = candX;
+
+                                v.y = candY;
 
                                 foundCurb = true;
 
@@ -6046,6 +6056,10 @@ class LeonidaGame {
 
         }
 
+        // Wipe out open-air living events / street animations within blast radius
+
+        this.checkAndWipeoutLivingEvents(x, y, radius, byPlayer, false);
+
 
 
         // Damage player if on foot nearby
@@ -7847,6 +7861,10 @@ class LeonidaGame {
                     }
 
                 }
+
+                // Allow vehicles to plow through open-air street/beach animations (Influencer Livestreamers, Breakdance Cyphers, Street Takeovers, Volleyball, Aerobics, Biker Rallies, etc.)!
+
+                this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true);
 
             }
 
@@ -10074,6 +10092,20 @@ class LeonidaGame {
 
 
 
+            // Hit open-air street/beach animation participants?
+
+            if (!hitSomething && pr.fromPlayer) {
+
+                if (this.checkAndWipeoutLivingEvents(pr.x, pr.y, 20, true, false)) {
+
+                    this.spawnParticle(pr.x, pr.y, "BLOOD");
+
+                    hitSomething = true;
+
+                }
+
+            }
+
             // Hit remote online player or Rival Bot?
 
             if (!hitSomething && pr.fromPlayer && this.net && this.net.remotePlayers.size > 0) {
@@ -10281,6 +10313,8 @@ class LeonidaGame {
             this.districtPopupTimer = Math.max(0, this.districtPopupTimer - dt);
 
         }
+
+        this.updateLivingEventsRespawn(dt);
 
 
 
@@ -10597,6 +10631,216 @@ class LeonidaGame {
     }
 
 
+
+    updateLivingEventsRespawn(dt) {
+        if (!this.map || !this.player) return;
+        const px = this.player.x;
+        const py = this.player.y;
+        const tickArray = (arr) => {
+            if (!Array.isArray(arr)) return;
+            for (let i = 0; i < arr.length; i++) {
+                const it = arr[i];
+                if ((it.wipeoutTimer || 0) > 0 && Math.hypot(it.x - px, it.y - py) > 360) {
+                    it.wipeoutTimer = Math.max(0, it.wipeoutTimer - dt);
+                }
+            }
+        };
+        tickArray(this.map.streetEvents);
+        tickArray(this.map.streetTakeovers);
+        tickArray(this.map.beachVolleyballCourts);
+        tickArray(this.map.beachParties);
+        tickArray(this.map.muscleBeachGyms);
+        tickArray(this.map.wildernessCamps);
+        tickArray(this.map.golfGreens);
+        if (this.map.industrialAndParkDetails) {
+            tickArray(this.map.industrialAndParkDetails.bikerRallies);
+        }
+    }
+
+    checkAndWipeoutLivingEvents(hitX, hitY, hitRad = 28, byPlayer = true, isVehicleImpact = false) {
+        if (!this.map) return false;
+        let triggeredAny = false;
+
+        const spawnScenePeds = (scene, members, labelText) => {
+            scene.wipeoutTimer = 40.0;
+            triggeredAny = true;
+            const bz = scene.z || this.map.getHeightAtPixel(scene.x, scene.y, 4.0);
+            let killedCount = 0;
+            for (let i = 0; i < members.length; i++) {
+                const m = members[i];
+                const ped = new Pedestrian({
+                    x: m.x,
+                    y: m.y,
+                    z: bz,
+                    angle: Math.atan2(m.y - hitY, m.x - hitX),
+                    speed: 52,
+                    kind: "CIVILIAN",
+                    g24Type: m.ped || "vc_tourist",
+                    g2Remapped: true,
+                    shirtColor: "#f43f5e",
+                    hp: 25,
+                    dead: false,
+                    panicTimer: 8.5,
+                    turnSeed: i + 17
+                });
+                this.peds.push(ped);
+                const d = Math.hypot(m.x - hitX, m.y - hitY);
+                if (d <= hitRad + 16 || (i === 0 && killedCount === 0)) {
+                    this.killPed(ped, byPlayer);
+                    killedCount++;
+                }
+            }
+            if (byPlayer && labelText) {
+                this.addFloatingText(scene.x, scene.y - 22, labelText, "#ff2a85");
+                if (isVehicleImpact && this.audio && typeof this.audio.playPedDeath === "function") {
+                    this.audio.playPedDeath(null, true);
+                }
+            }
+        };
+
+        // 1. Street Events (Wynwood Breakdance Cyphers & Ocean Drive Livestreamers)
+        if (Array.isArray(this.map.streetEvents)) {
+            for (let i = 0; i < this.map.streetEvents.length; i++) {
+                const ev = this.map.streetEvents[i];
+                if ((ev.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(ev.x - hitX, ev.y - hitY) < hitRad + 26) {
+                    if (ev.kind === "WYNWOOD_CYPHER") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_cuban", x: ev.x, y: ev.y + 1 },
+                            { ped: "vc_haitian", x: ev.x, y: ev.y - 26 },
+                            { ped: "g2_civ_aqua", x: ev.x - 20, y: ev.y + 4 },
+                            { ped: "bikini_pink", x: ev.x + 20, y: ev.y + 4 }
+                        ], "💥 CYPHER CRASHED!");
+                    } else {
+                        spawnScenePeds(ev, [
+                            { ped: "bikini_pink", x: ev.x + 6, y: ev.y },
+                            { ped: "vc_tourist", x: ev.x - 19, y: ev.y },
+                            { ped: "vc_crockett", x: ev.x + 4, y: ev.y - 14 }
+                        ], "📱 LIVESTREAM PHOTOBOMBED!");
+                    }
+                }
+            }
+        }
+
+        // 2. Street Takeovers
+        if (Array.isArray(this.map.streetTakeovers)) {
+            const crowdPeds = ["vc_haitian", "vc_cuban", "bikini_pink", "g2_civ_aqua", "vc_tourist", "g2_mugger"];
+            for (let i = 0; i < this.map.streetTakeovers.length; i++) {
+                const st = this.map.streetTakeovers[i];
+                if ((st.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(st.x - hitX, st.y - hitY) < hitRad + 46) {
+                    const members = [
+                        { ped: "vc_cuban", x: st.x + 12, y: st.y },
+                        { ped: "vc_haitian", x: st.x - 12, y: st.y }
+                    ];
+                    for (let ci = 0; ci < 6; ci++) {
+                        const ca = (ci / 6) * Math.PI * 2 + 0.3;
+                        members.push({
+                            ped: crowdPeds[(ci + i) % crowdPeds.length],
+                            x: st.x + Math.cos(ca) * 42,
+                            y: st.y + Math.sin(ca) * 42
+                        });
+                    }
+                    spawnScenePeds(st, members, "💥 TAKEOVER CROWD SCATTERED!");
+                }
+            }
+        }
+
+        // 3. Beach Volleyball Courts
+        if (Array.isArray(this.map.beachVolleyballCourts)) {
+            for (let i = 0; i < this.map.beachVolleyballCourts.length; i++) {
+                const vc = this.map.beachVolleyballCourts[i];
+                if ((vc.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(vc.x - hitX, vc.y - hitY) < hitRad + 28) {
+                    spawnScenePeds(vc, [
+                        { ped: vc.p0 || "bikini_pink", x: vc.x - 11, y: vc.y - 21 },
+                        { ped: vc.p1 || "bikini_yellow", x: vc.x + 11, y: vc.y - 19 },
+                        { ped: vc.p2 || "bikini_cyan", x: vc.x - 11, y: vc.y + 20 },
+                        { ped: vc.p3 || "surfer_guy", x: vc.x + 11, y: vc.y + 22 }
+                    ], "🏐 VOLLEYBALL MATCH CRASHED!");
+                }
+            }
+        }
+
+        // 4. Beach Aerobics & Boombox Dance Parties
+        if (Array.isArray(this.map.beachParties)) {
+            const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white"];
+            for (let i = 0; i < this.map.beachParties.length; i++) {
+                const bp = this.map.beachParties[i];
+                if ((bp.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(bp.x - hitX, bp.y - hitY) < hitRad + 28) {
+                    const members = [{ ped: "bikini_red", x: bp.x - 4, y: bp.y }];
+                    for (let di = 0; di < 4; di++) {
+                        const row = (di % 2) === 0 ? -11 : 11;
+                        const col = di < 2 ? 12 : 24;
+                        members.push({ ped: dancerPeds[(di + i) % dancerPeds.length], x: bp.x + col, y: bp.y + row });
+                    }
+                    spawnScenePeds(bp, members, "📻 BEACH PARTY CRASHED!");
+                }
+            }
+        }
+
+        // 5. Muscle Beach Outdoor Fitness Gyms
+        if (Array.isArray(this.map.muscleBeachGyms)) {
+            for (let i = 0; i < this.map.muscleBeachGyms.length; i++) {
+                const gm = this.map.muscleBeachGyms[i];
+                if ((gm.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(gm.x - hitX, gm.y - hitY) < hitRad + 26) {
+                    spawnScenePeds(gm, [
+                        { ped: "vc_bodybuilder", x: gm.x - 6, y: gm.y - 14 },
+                        { ped: "surfer_guy", x: gm.x - 6, y: gm.y + 14 },
+                        { ped: "vc_jogger", x: gm.x + 16, y: gm.y - 11 },
+                        { ped: "bikini_red", x: gm.x + 16, y: gm.y + 11 },
+                        { ped: "vc_bodybuilder", x: gm.x + 2, y: gm.y }
+                    ], "💪 MUSCLE BEACH WIPEOUT!");
+                }
+            }
+        }
+
+        // 6. Wilderness Camps & Golf Greens
+        if (Array.isArray(this.map.wildernessCamps)) {
+            for (let i = 0; i < this.map.wildernessCamps.length; i++) {
+                const cp = this.map.wildernessCamps[i];
+                if ((cp.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(cp.x - hitX, cp.y - hitY) < hitRad + 24) {
+                    spawnScenePeds(cp, [
+                        { ped: "g2_redneck_blond", x: cp.x + 13, y: cp.y + 11 },
+                        { ped: "vc_tourist", x: cp.x - 4, y: cp.y + 21 }
+                    ], "🏕️ CAMPSITE AMBUSHED!");
+                }
+            }
+        }
+        if (Array.isArray(this.map.golfGreens)) {
+            for (let i = 0; i < this.map.golfGreens.length; i++) {
+                const gg = this.map.golfGreens[i];
+                if ((gg.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(gg.x - hitX, gg.y - hitY) < hitRad + 22) {
+                    spawnScenePeds(gg, [
+                        { ped: "vc_crockett", x: gg.x - 18, y: gg.y + 8 }
+                    ], "⛳ FORE! GOLFER DOWN!");
+                }
+            }
+        }
+
+        // 7. Outlaw Biker Gang Chopper Rallies
+        if (this.map.industrialAndParkDetails && Array.isArray(this.map.industrialAndParkDetails.bikerRallies)) {
+            const rallies = this.map.industrialAndParkDetails.bikerRallies;
+            for (let i = 0; i < rallies.length; i++) {
+                const br = rallies[i];
+                if ((br.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(br.x - hitX, br.y - hitY) < hitRad + 38) {
+                    const members = [];
+                    for (let bi = 0; bi < br.count; bi += 2) {
+                        const bx = br.x + (bi - (br.count - 1) * 0.5) * 20;
+                        members.push({ ped: (bi === 0) ? "g2_russian" : "g2_redneck_blond", x: bx + 4, y: br.y + 18 });
+                    }
+                    spawnScenePeds(br, members, "🏍️ BIKER RALLY CRASHED!");
+                }
+            }
+        }
+
+        return triggeredAny;
+    }
 
     showDistrictBanner(name) {
 

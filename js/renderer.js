@@ -4048,51 +4048,56 @@ class RetroRenderer {
                 this.pushSolidQuad3D(vc.x, vc.y, bz + 0.17, 44, 1.8, 0, 0.22, 0.26, 0.32, 0.82, SPRITE_DRAW_ORDER.TREES);
                 this.pushSolidQuad3D(vc.x, vc.y, bz + 0.22, 45, 2.4, 0, 0.98, 0.98, 1.00, 0.98, SPRITE_DRAW_ORDER.TREES);
 
-                // Rally animation timing (ball flies North <-> South over the net)
-                const rallyPhase = (this.time * 1.45 + ci * 0.73) % 2.0;
-                const goingSouth = rallyPhase < 1.0;
-                const flight = goingSouth ? rallyPhase : (2.0 - rallyPhase);
-                const rallyCycle = Math.floor(this.time * 1.45 + ci * 0.73);
-                const northLeftActive = (rallyCycle % 2) === 0;
-                const southRightActive = ((rallyCycle + 1) % 2) === 0;
+                if (!((vc.wipeoutTimer || 0) > 0)) {
+                    // Rally animation timing (ball flies North <-> South over the net)
+                    const rallyPhase = (this.time * 1.45 + ci * 0.73) % 2.0;
+                    const goingSouth = rallyPhase < 1.0;
+                    const flight = goingSouth ? rallyPhase : (2.0 - rallyPhase);
+                    const rallyCycle = Math.floor(this.time * 1.45 + ci * 0.73);
+                    const northLeftActive = (rallyCycle % 2) === 0;
+                    const southRightActive = ((rallyCycle + 1) % 2) === 0;
 
-                const players = [
-                    { ped: vc.p0 || "bikini_pink",   bx: vc.x - 11, by: vc.y - 21, face: Math.PI * 0.5,  isNorth: true,  active: northLeftActive },
-                    { ped: vc.p1 || "bikini_yellow", bx: vc.x + 11, by: vc.y - 19, face: Math.PI * 0.5,  isNorth: true,  active: !northLeftActive },
-                    { ped: vc.p2 || "bikini_cyan",   bx: vc.x - 11, by: vc.y + 20, face: -Math.PI * 0.5, isNorth: false, active: !southRightActive },
-                    { ped: vc.p3 || "surfer_guy",    bx: vc.x + 11, by: vc.y + 22, face: -Math.PI * 0.5, isNorth: false, active: southRightActive }
-                ];
+                    const players = [
+                        { ped: vc.p0 || "bikini_pink",   bx: vc.x - 11, by: vc.y - 21, face: Math.PI * 0.5,  isNorth: true,  active: northLeftActive },
+                        { ped: vc.p1 || "bikini_yellow", bx: vc.x + 11, by: vc.y - 19, face: Math.PI * 0.5,  isNorth: true,  active: !northLeftActive },
+                        { ped: vc.p2 || "bikini_cyan",   bx: vc.x - 11, by: vc.y + 20, face: -Math.PI * 0.5, isNorth: false, active: !southRightActive },
+                        { ped: vc.p3 || "surfer_guy",    bx: vc.x + 11, by: vc.y + 22, face: -Math.PI * 0.5, isNorth: false, active: southRightActive }
+                    ];
 
-                let northTargetX = vc.x;
-                let southTargetX = vc.x;
+                    let northTargetX = vc.x;
+                    let southTargetX = vc.x;
 
-                for (let pi = 0; pi < 4; pi++) {
-                    const pl = players[pi];
-                    const moveX = Math.sin(this.time * 3.2 + pi * 1.7 + ci) * 4.5;
-                    const moveY = Math.cos(this.time * 2.8 + pi * 1.3 + ci) * 3.2;
-                    const px = pl.bx + moveX;
-                    const py = pl.by + moveY;
-                    if (pl.isNorth && pl.active) northTargetX = px;
-                    if (!pl.isNorth && pl.active) southTargetX = px;
+                    for (let pi = 0; pi < 4; pi++) {
+                        const pl = players[pi];
+                        const moveX = Math.sin(this.time * 3.2 + pi * 1.7 + ci) * 4.5;
+                        const moveY = Math.cos(this.time * 2.8 + pi * 1.3 + ci) * 3.2;
+                        const px = pl.bx + moveX;
+                        const py = pl.by + moveY;
+                        if (pl.isNorth && pl.active) northTargetX = px;
+                        if (!pl.isNorth && pl.active) southTargetX = px;
 
-                    // Player jumps in 3D when spiking/receiving the volleyball!
-                    const distToHit = pl.isNorth ? flight : (1.0 - flight);
-                    const jumpZ = (pl.active && distToHit < 0.24)
-                        ? Math.sin((1.0 - distToHit / 0.24) * Math.PI) * 0.14
-                        : 0.0;
-                    const fr = (jumpZ > 0.03)
-                        ? (50 + (Math.floor(this.time * 8 + pi) % 4))
-                        : (Math.floor(this.time * 6 + pi * 2) % 8);
+                        // Player jumps in 3D when spiking/receiving the volleyball!
+                        const distToHit = pl.isNorth ? flight : (1.0 - flight);
+                        const jumpZ = (pl.active && distToHit < 0.24)
+                            ? Math.sin((1.0 - distToHit / 0.24) * Math.PI) * 0.14
+                            : 0.0;
+                        const fr = (jumpZ > 0.03)
+                            ? (50 + (Math.floor(this.time * 8 + pi) % 4))
+                            : (Math.floor(this.time * 6 + pi * 2) % 8);
 
-                    this.batchPedSprite3D(pl.ped, fr, px, py, bz + 0.040 + jumpZ, pl.face, 1.06 + jumpZ * 0.4, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D(pl.ped, fr, px, py, bz + 0.040 + jumpZ, pl.face, 1.06 + jumpZ * 0.4, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+
+                    // 3D Flying Volleyball arcing over the net + ground shadow on the sand!
+                    const ballX = northTargetX + (southTargetX - northTargetX) * flight;
+                    const ballY = (vc.y - 20) + flight * 40;
+                    const ballArcZ = Math.sin(flight * Math.PI) * 0.34;
+                    this.pushSolidQuad3D(ballX + sunCos * 8, ballY + sunSin * 8, bz + 0.020, 6.5, 6.5, 0, 0.03, 0.04, 0.08, 0.36 * (1.0 - nfGlobal * 0.5), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.batchObjectSprite3D("beach_ball", ballX, ballY, bz + 0.08 + ballArcZ, this.time * 5.0 + ci, 0.82 + ballArcZ * 0.35, SPRITE_DRAW_ORDER.TREES);
+                } else {
+                    // Volleyball resting on sand when players have been wiped out
+                    this.batchObjectSprite3D("beach_ball", vc.x + 8, vc.y + 12, bz + 0.028, ci, 0.78, SPRITE_DRAW_ORDER.MAP_OBJECT);
                 }
-
-                // 3D Flying Volleyball arcing over the net + ground shadow on the sand!
-                const ballX = northTargetX + (southTargetX - northTargetX) * flight;
-                const ballY = (vc.y - 20) + flight * 40;
-                const ballArcZ = Math.sin(flight * Math.PI) * 0.34;
-                this.pushSolidQuad3D(ballX + sunCos * 8, ballY + sunSin * 8, bz + 0.020, 6.5, 6.5, 0, 0.03, 0.04, 0.08, 0.36 * (1.0 - nfGlobal * 0.5), SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.batchObjectSprite3D("beach_ball", ballX, ballY, bz + 0.08 + ballArcZ, this.time * 5.0 + ci, 0.82 + ballArcZ * 0.35, SPRITE_DRAW_ORDER.TREES);
             }
         }
 
@@ -4115,25 +4120,27 @@ class RetroRenderer {
                 this.batchObjectSprite3D("beach_cooler", boomX - 4, boomY + 14, bz + 0.030, 0.2, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
                 this.batchObjectSprite3D("sandcastle", boomX - 4, boomY - 15, bz + 0.028, 0, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
-                // Bikini Aerobics Instructor facing East toward dancers
-                const instSway = Math.sin(this.time * 5.5) * 3.0;
-                const instFr = 50 + (Math.floor(this.time * 6.5) % 4);
-                this.batchPedSprite3D("bikini_red", instFr, bp.x - 4, bp.y + instSway, bz + 0.040, 0, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                if (!((bp.wipeoutTimer || 0) > 0)) {
+                    // Bikini Aerobics Instructor facing East toward dancers
+                    const instSway = Math.sin(this.time * 5.5) * 3.0;
+                    const instFr = 50 + (Math.floor(this.time * 6.5) % 4);
+                    this.batchPedSprite3D("bikini_red", instFr, bp.x - 4, bp.y + instSway, bz + 0.040, 0, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
-                // Synchronized Bikini & Surfer Dancers in a 2x2 formation
-                const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white"];
-                for (let di = 0; di < 4; di++) {
-                    const row = (di % 2) === 0 ? -11 : 11;
-                    const col = di < 2 ? 12 : 24;
-                    const stepX = Math.cos(this.time * 5.5 + di * 0.8) * 2.5;
-                    const stepY = Math.sin(this.time * 5.5 + di * 0.4) * 3.5;
-                    const dx = bp.x + col + stepX;
-                    const dy = bp.y + row + stepY;
-                    const dFr = ((di + Math.floor(this.time * 3.0)) % 2 === 0)
-                        ? (50 + (Math.floor(this.time * 6.5 + di) % 4))
-                        : (Math.floor(this.time * 7.0 + di * 2) % 8);
-                    const dAng = Math.PI + Math.sin(this.time * 2.8 + di) * 0.35;
-                    this.batchPedSprite3D(dancerPeds[(di + pi) % dancerPeds.length], dFr, dx, dy, bz + 0.040, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Synchronized Bikini & Surfer Dancers in a 2x2 formation
+                    const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white"];
+                    for (let di = 0; di < 4; di++) {
+                        const row = (di % 2) === 0 ? -11 : 11;
+                        const col = di < 2 ? 12 : 24;
+                        const stepX = Math.cos(this.time * 5.5 + di * 0.8) * 2.5;
+                        const stepY = Math.sin(this.time * 5.5 + di * 0.4) * 3.5;
+                        const dx = bp.x + col + stepX;
+                        const dy = bp.y + row + stepY;
+                        const dFr = ((di + Math.floor(this.time * 3.0)) % 2 === 0)
+                            ? (50 + (Math.floor(this.time * 6.5 + di) % 4))
+                            : (Math.floor(this.time * 7.0 + di * 2) % 8);
+                        const dAng = Math.PI + Math.sin(this.time * 2.8 + di) * 0.35;
+                        this.batchPedSprite3D(dancerPeds[(di + pi) % dancerPeds.length], dFr, dx, dy, bz + 0.040, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
             }
         }
@@ -4175,28 +4182,33 @@ class RetroRenderer {
                 if (gm.x < minX - 64 || gm.x > maxX + 64 || gm.y < minY - 64 || gm.y > maxY + 64) continue;
                 const bz = gm.z || 2.0;
 
+                const gymWiped = (gm.wipeoutTimer || 0) > 0;
                 // Two Olympic Weightlifting Benches ("gym_bench") with animated Bodybuilders pumping 3D iron!
                 for (let bi = -1; bi <= 1; bi += 2) {
                     const bx = gm.x - 8;
                     const by = gm.y + bi * 14;
                     this.batchObjectSprite3D("gym_bench", bx, by, bz + 0.018, 0, 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    // Bodybuilder lying on bench pressing heavy barbell up & down in 3D z!
-                    const liftT = 0.5 + 0.5 * Math.sin(this.time * 4.2 + gi + bi);
-                    const lifterPed = bi < 0 ? "vc_bodybuilder" : "surfer_guy";
-                    this.batchPedSprite3D(lifterPed, 42, bx + 2, by, bz + 0.032, 0, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    // Animated 3D chrome barbell + cast-iron plates rising above chest (z + 0.05..0.14)
-                    const barZ = bz + 0.055 + liftT * 0.085;
-                    this.pushSolidQuad3D(bx + 6, by, barZ, 2.2, 19.0, 0, 0.88, 0.92, 0.96, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(bx + 6, by - 8.2, barZ + 0.004, 5.5, 3.6, 0, 0.08, 0.10, 0.15, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(bx + 6, by + 8.2, barZ + 0.004, 5.5, 3.6, 0, 0.08, 0.10, 0.15, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (!gymWiped) {
+                        // Bodybuilder lying on bench pressing heavy barbell up & down in 3D z!
+                        const liftT = 0.5 + 0.5 * Math.sin(this.time * 4.2 + gi + bi);
+                        const lifterPed = bi < 0 ? "vc_bodybuilder" : "surfer_guy";
+                        this.batchPedSprite3D(lifterPed, 42, bx + 2, by, bz + 0.032, 0, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        // Animated 3D chrome barbell + cast-iron plates rising above chest (z + 0.05..0.14)
+                        const barZ = bz + 0.055 + liftT * 0.085;
+                        this.pushSolidQuad3D(bx + 6, by, barZ, 2.2, 19.0, 0, 0.88, 0.92, 0.96, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.pushSolidQuad3D(bx + 6, by - 8.2, barZ + 0.004, 5.5, 3.6, 0, 0.08, 0.10, 0.15, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.pushSolidQuad3D(bx + 6, by + 8.2, barZ + 0.004, 5.5, 3.6, 0, 0.08, 0.10, 0.15, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
 
                 // Cyan Fitness Mats ("gym_mat_cyan") + Spotters / Calisthenics Athletes
                 this.batchObjectSprite3D("gym_mat_cyan", gm.x + 16, gm.y - 11, bz + 0.016, 0, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 this.batchObjectSprite3D("gym_mat_cyan", gm.x + 16, gm.y + 11, bz + 0.016, 0, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                const spotFr = 50 + (Math.floor(this.time * 6.0 + gi) % 4);
-                this.batchPedSprite3D("vc_jogger", spotFr, gm.x + 16, gm.y - 11, bz + 0.036, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.batchPedSprite3D("bikini_red", spotFr, gm.x + 16, gm.y + 11, bz + 0.036, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                if (!gymWiped) {
+                    const spotFr = 50 + (Math.floor(this.time * 6.0 + gi) % 4);
+                    this.batchPedSprite3D("vc_jogger", spotFr, gm.x + 16, gm.y - 11, bz + 0.036, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("bikini_red", spotFr, gm.x + 16, gm.y + 11, bz + 0.036, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
 
                 // 3D Steel Pull-Up Bar Frame on North side of gym station + athlete doing pull-ups!
                 const px = gm.x + 2, py = gm.y;
@@ -4206,8 +4218,10 @@ class RetroRenderer {
                     this.pushSolidQuad3D(px, py + 5.5, pz, 2.4, 2.4, 0, 0.78, 0.84, 0.92, 0.98, SPRITE_DRAW_ORDER.TREES);
                 }
                 this.pushSolidQuad3D(px, py, bz + 0.25, 2.2, 13.0, 0, 0.94, 0.72, 0.12, 0.98, SPRITE_DRAW_ORDER.TREES);
-                const pullZ = Math.max(0, Math.sin(this.time * 3.8 + gi)) * 0.09;
-                this.batchPedSprite3D("vc_bodybuilder", 52, px, py, bz + 0.04 + pullZ, 0, 1.06, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+                if (!gymWiped) {
+                    const pullZ = Math.max(0, Math.sin(this.time * 3.8 + gi)) * 0.09;
+                    this.batchPedSprite3D("vc_bodybuilder", 52, px, py, bz + 0.04 + pullZ, 0, 1.06, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+                }
             }
         }
 
@@ -4391,33 +4405,42 @@ class RetroRenderer {
                 if (ev.x < minX - 64 || ev.x > maxX + 64 || ev.y < minY - 64 || ev.y > maxY + 64) continue;
                 const bz = ev.z || 2.0;
 
+                const evWiped = (ev.wipeoutTimer || 0) > 0;
                 if (ev.kind === "WYNWOOD_CYPHER") {
                     // Vibrant Wynwood Graffiti Floor Mural ("wynwood_mural_rug") + DJ Booth ("dj_turntable_deck")
                     this.batchObjectSprite3D("wynwood_mural_rug", ev.x, ev.y, bz + 0.014, 0, 1.04, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.batchObjectSprite3D("dj_turntable_deck", ev.x, ev.y - 18, bz + 0.032, 0, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    // DJ behind turntables
-                    this.batchPedSprite3D("vc_haitian", 50 + (Math.floor(this.time * 6.0 + ei) % 4), ev.x, ev.y - 26, bz + 0.040, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    // Breakdancer spinning rapidly in center of graffiti mat!
-                    const spinAng = this.time * 6.8 + ei;
-                    this.batchPedSprite3D("vc_cuban", 52, ev.x, ev.y + 1, bz + 0.038, spinAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    // Cheering street-art spectators on left & right
-                    const specFr = 50 + (Math.floor(this.time * 5.5 + ei) % 4);
-                    this.batchPedSprite3D("g2_civ_aqua", specFr, ev.x - 20, ev.y + 4, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.batchPedSprite3D("bikini_pink", specFr, ev.x + 20, ev.y + 4, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (!evWiped) {
+                        // DJ behind turntables
+                        this.batchPedSprite3D("vc_haitian", 50 + (Math.floor(this.time * 6.0 + ei) % 4), ev.x, ev.y - 26, bz + 0.040, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        // Breakdancer spinning rapidly in center of graffiti mat!
+                        const spinAng = this.time * 6.8 + ei;
+                        this.batchPedSprite3D("vc_cuban", 52, ev.x, ev.y + 1, bz + 0.038, spinAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        // Cheering street-art spectators on left & right
+                        const specFr = 50 + (Math.floor(this.time * 5.5 + ei) % 4);
+                        this.batchPedSprite3D("g2_civ_aqua", specFr, ev.x - 20, ev.y + 4, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_pink", specFr, ev.x + 20, ev.y + 4, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 } else {
                     // Ocean Drive Social-Media Influencer Livestreaming with 3D Glowing LED Ring-Light Tripod!
                     const ringX = ev.x - 10;
                     const ringY = ev.y;
-                    // Tripod base & vertical pole + glowing cyan/pink LED ring light
-                    this.pushSolidQuad3D(ringX, ringY, bz + 0.020, 6.5, 6.5, 0.785, 0.08, 0.10, 0.15, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    this.pushSolidQuad3D(ringX, ringY, bz + 0.12, 6.0, 6.0, this.time * 2.0, 0.0, 0.95, 1.0, 0.95, SPRITE_DRAW_ORDER.HUD_ARROW);
-                    this.pushSolidQuad3D(ringX, ringY, bz + 0.125, 3.2, 3.2, this.time * 2.0, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
-                    // Cameraman behind ring-light + Influencer dancing for viral clip + spectator
-                    this.batchPedSprite3D("vc_tourist", 51, ringX - 9, ringY, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    const infSway = Math.sin(this.time * 6.2 + ei) * 3.0;
-                    const infFr = 50 + (Math.floor(this.time * 7.5 + ei) % 4);
-                    this.batchPedSprite3D("bikini_pink", infFr, ev.x + 6, ev.y + infSway, bz + 0.040, Math.PI + Math.sin(this.time * 4.0) * 0.4, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.batchPedSprite3D("vc_crockett", 0, ev.x + 4, ev.y - 14, bz + 0.038, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (!evWiped) {
+                        // Tripod base & vertical pole + glowing cyan/pink LED ring light
+                        this.pushSolidQuad3D(ringX, ringY, bz + 0.020, 6.5, 6.5, 0.785, 0.08, 0.10, 0.15, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                        this.pushSolidQuad3D(ringX, ringY, bz + 0.12, 6.0, 6.0, this.time * 2.0, 0.0, 0.95, 1.0, 0.95, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        this.pushSolidQuad3D(ringX, ringY, bz + 0.125, 3.2, 3.2, this.time * 2.0, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        // Cameraman behind ring-light + Influencer dancing for viral clip + spectator
+                        this.batchPedSprite3D("vc_tourist", 51, ringX - 9, ringY, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        const infSway = Math.sin(this.time * 6.2 + ei) * 3.0;
+                        const infFr = 50 + (Math.floor(this.time * 7.5 + ei) % 4);
+                        this.batchPedSprite3D("bikini_pink", infFr, ev.x + 6, ev.y + infSway, bz + 0.040, Math.PI + Math.sin(this.time * 4.0) * 0.4, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_crockett", 0, ev.x + 4, ev.y - 14, bz + 0.038, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    } else {
+                        // Knocked-over LED ring-light lying flat on the sidewalk after impact!
+                        this.pushSolidQuad3D(ringX + 4, ringY + 3, bz + 0.018, 9.5, 2.2, 0.45, 0.12, 0.14, 0.18, 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(ringX + 8, ringY + 5, bz + 0.022, 5.5, 5.5, 0.45, 0.0, 0.85, 0.95, 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
                 }
             }
         }
@@ -4441,9 +4464,11 @@ class RetroRenderer {
                 const fireFr = 234 + (Math.floor(this.time * 12 + ci * 3) % 8);
                 this.batchObjectSprite3D(String(fireFr), cp.x, cp.y + 8, bz + 0.045, 0, 0.68, SPRITE_DRAW_ORDER.EXPLOSION);
 
-                // Campers relaxing around the campfire
-                this.batchPedSprite3D("g2_redneck_blond", 0, cp.x + 13, cp.y + 11, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.batchPedSprite3D("vc_tourist", 50 + (Math.floor(this.time * 4.0 + ci) % 4), cp.x - 4, cp.y + 21, bz + 0.038, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                if (!((cp.wipeoutTimer || 0) > 0)) {
+                    // Campers relaxing around the campfire
+                    this.batchPedSprite3D("g2_redneck_blond", 0, cp.x + 13, cp.y + 11, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("vc_tourist", 50 + (Math.floor(this.time * 4.0 + ci) % 4), cp.x - 4, cp.y + 21, bz + 0.038, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
             }
         }
 
@@ -4462,12 +4487,14 @@ class RetroRenderer {
                 const flagWave = Math.sin(this.time * 5.0 + gi) * 0.25;
                 this.pushSolidQuad3D(gg.x + 4.5, gg.y + flagWave, bz + 0.24, 8.5, 4.5, flagWave * 0.4, 0.96, 0.18, 0.24, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
 
-                // Golfer putting + rolling white golf ball toward the cup!
-                const puttProg = (this.time * 0.65 + gi * 0.4) % 1.0;
-                const ballX = gg.x - 14.0 * (1.0 - puttProg);
-                const ballY = gg.y + 6.0 * (1.0 - puttProg);
-                this.pushSolidQuad3D(ballX, ballY, bz + 0.024, 2.6, 2.6, 0, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.batchPedSprite3D("vc_crockett", puttProg < 0.25 ? 52 : 0, gg.x - 18, gg.y + 8, bz + 0.038, -0.35, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                if (!((gg.wipeoutTimer || 0) > 0)) {
+                    // Golfer putting + rolling white golf ball toward the cup!
+                    const puttProg = (this.time * 0.65 + gi * 0.4) % 1.0;
+                    const ballX = gg.x - 14.0 * (1.0 - puttProg);
+                    const ballY = gg.y + 6.0 * (1.0 - puttProg);
+                    this.pushSolidQuad3D(ballX, ballY, bz + 0.024, 2.6, 2.6, 0, 1.0, 1.0, 1.0, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.batchPedSprite3D("vc_crockett", puttProg < 0.25 ? 52 : 0, gg.x - 18, gg.y + 8, bz + 0.038, -0.35, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
             }
         }
 
@@ -4921,20 +4948,22 @@ class RetroRenderer {
                 this.batchObjectSprite3D("donut_skid_ring", st.x, st.y, bz + 0.014, st.seed, 1.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 this.batchObjectSprite3D("beach_boombox", st.x, st.y - 26, bz + 0.028, 0, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
-                // 2 Street Dancers / Challengers inside the circle (zero vehicles inside the circle!)
-                const dAng = this.time * 2.8 + st.seed;
-                const dFr1 = 50 + (Math.floor(this.time * 7.5 + i) % 4);
-                const dFr2 = 50 + (Math.floor(this.time * 7.5 + i + 2) % 4);
-                this.batchPedSprite3D("vc_cuban", dFr1, st.x + Math.cos(dAng) * 12, st.y + Math.sin(dAng) * 12, bz + 0.038, dAng + Math.PI, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.batchPedSprite3D("vc_haitian", dFr2, st.x - Math.cos(dAng) * 12, st.y - Math.sin(dAng) * 12, bz + 0.038, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                if (!((st.wipeoutTimer || 0) > 0)) {
+                    // 2 Street Dancers / Challengers inside the circle (zero vehicles inside the circle!)
+                    const dAng = this.time * 2.8 + st.seed;
+                    const dFr1 = 50 + (Math.floor(this.time * 7.5 + i) % 4);
+                    const dFr2 = 50 + (Math.floor(this.time * 7.5 + i + 2) % 4);
+                    this.batchPedSprite3D("vc_cuban", dFr1, st.x + Math.cos(dAng) * 12, st.y + Math.sin(dAng) * 12, bz + 0.038, dAng + Math.PI, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("vc_haitian", dFr2, st.x - Math.cos(dAng) * 12, st.y - Math.sin(dAng) * 12, bz + 0.038, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
-                // Ring of 6 cheering & phone-filming spectators around the circle
-                for (let ci = 0; ci < 6; ci++) {
-                    const ca = (ci / 6) * Math.PI * 2 + 0.3;
-                    const cx = st.x + Math.cos(ca) * 42;
-                    const cy = st.y + Math.sin(ca) * 42;
-                    const cFr = 50 + (Math.floor(this.time * 6.5 + ci + i) % 4);
-                    this.batchPedSprite3D(crowdPeds[(ci + i) % crowdPeds.length], cFr, cx, cy, bz + 0.038, ca + Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Ring of 6 cheering & phone-filming spectators around the circle
+                    for (let ci = 0; ci < 6; ci++) {
+                        const ca = (ci / 6) * Math.PI * 2 + 0.3;
+                        const cx = st.x + Math.cos(ca) * 42;
+                        const cy = st.y + Math.sin(ca) * 42;
+                        const cFr = 50 + (Math.floor(this.time * 6.5 + ci + i) % 4);
+                        this.batchPedSprite3D(crowdPeds[(ci + i) % crowdPeds.length], cFr, cx, cy, bz + 0.038, ca + Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
             }
         }
@@ -5056,7 +5085,7 @@ class RetroRenderer {
                         const by = br.y;
                         this.batchObjectSprite3D("biker_chopper", bx + sunCos * 3, by + sunSin * 3, bz + 0.015, 0.65, 1.15, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.35);
                         this.batchObjectSprite3D("biker_chopper", bx, by, bz + 0.038, 0.65, 1.15, SPRITE_DRAW_ORDER.CAR);
-                        if (bi % 2 === 0) {
+                        if (bi % 2 === 0 && !((br.wipeoutTimer || 0) > 0)) {
                             this.batchPedSprite3D((bi === 0) ? "g2_russian" : "g2_redneck_blond", 50 + ((Math.floor(this.time * 4) + bi) % 4), bx + 4, by + 18, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         }
                     }
