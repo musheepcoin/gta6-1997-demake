@@ -700,33 +700,33 @@ class LeonidaGame {
 
             { c: 213.5, r: 158.6, a: Math.PI * 0.5, type: "civ2" },
 
-            { c: 219.5, r: 140.5, a: Math.PI * 0.5, type: "bikini_pink", missionTag: "BEACH" },
+            { c: 219.5, r: 140.5, a: Math.PI * 0.5, type: "vc_tommy" },
 
-            { c: 220.2, r: 144.8, a: -Math.PI * 0.5, type: "bikini_cyan", missionTag: "BEACH" },
+            { c: 220.2, r: 144.8, a: -Math.PI * 0.5, type: "bikini_pink" },
 
-            { c: 219.5, r: 148.6, a: Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 219.5, r: 148.6, a: Math.PI * 0.5, type: "vc_crockett" },
 
-            { c: 220.2, r: 152.4, a: -Math.PI * 0.5, type: "surfer_guy", missionTag: "BEACH" },
+            { c: 220.2, r: 152.4, a: -Math.PI * 0.5, type: "vc_hawaiian_red" },
 
-            { c: 219.5, r: 156.8, a: Math.PI * 0.5, type: "bikini_red", missionTag: "BEACH" },
+            { c: 219.5, r: 156.8, a: Math.PI * 0.5, type: "vc_jogger" },
 
-            { c: 219.5, r: 142.5, a: Math.PI * 0.5, type: "bikini_white", missionTag: "BEACH" },
+            { c: 219.5, r: 142.5, a: Math.PI * 0.5, type: "g2_civ_aqua" },
 
-            { c: 219.5, r: 145.5, a: Math.PI * 0.5, type: "bikini_pink", missionTag: "BEACH" },
+            { c: 219.5, r: 145.5, a: Math.PI * 0.5, type: "bikini_cyan" },
 
-            { c: 219.5, r: 150.2, a: -Math.PI * 0.5, type: "bikini_cyan", missionTag: "BEACH" },
+            { c: 219.5, r: 150.2, a: -Math.PI * 0.5, type: "vc_tourist" },
 
-            { c: 219.5, r: 154.5, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 219.5, r: 154.5, a: -Math.PI * 0.5, type: "g2_civ_pink" },
 
-            { c: 219.5, r: 158.2, a: Math.PI * 0.5, type: "surfer_guy", missionTag: "BEACH" },
+            { c: 219.5, r: 158.2, a: Math.PI * 0.5, type: "vc_tubbs" },
 
-            // Lummus Park Oceanfront Boardwalk Rollerbladers (c = 451.5 raw512, gliding along the beach seawall!)
-            { c: 451.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   isRollerblader: true, missionTag: "BEACH" },
-            { c: 451.5, r: 228.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   isRollerblader: true, missionTag: "BEACH" },
-            { c: 451.5, r: 234.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_yellow", isRollerblader: true, missionTag: "BEACH" },
-            { c: 451.5, r: 240.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    isRollerblader: true, missionTag: "BEACH" },
-            { c: 451.5, r: 246.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_red",    isRollerblader: true, missionTag: "BEACH" },
-            { c: 451.5, r: 252.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_white",  isRollerblader: true, missionTag: "BEACH" },
+            // Lummus Park Oceanfront Boardwalk Rollerbladers (c = 451.5 raw512, gliding along the beach promenade!)
+            { c: 451.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "vc_jogger",     isRollerblader: true },
+            { c: 451.5, r: 228.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   isRollerblader: true },
+            { c: 451.5, r: 234.0, raw512: true, a: Math.PI * 0.5,  type: "g2_civ_pink",   isRollerblader: true },
+            { c: 451.5, r: 240.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist",    isRollerblader: true },
+            { c: 451.5, r: 246.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   isRollerblader: true },
+            { c: 451.5, r: 252.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_aqua",   isRollerblader: true },
 
 
 

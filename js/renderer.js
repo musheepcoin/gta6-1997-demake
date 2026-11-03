@@ -1097,15 +1097,8 @@ class RetroRenderer {
                     closeBoxHoles(meta.sprites.wrecked[k], false, false);
                 }
             }
-            if (meta.sprites.peds) {
-                for (const roleKey of Object.keys(meta.sprites.peds)) {
-                    const roleFrames = meta.sprites.peds[roleKey];
-                    if (!roleFrames) continue;
-                    for (const frameKey of Object.keys(roleFrames)) {
-                        closeBoxHoles(roleFrames[frameKey], false, true);
-                    }
-                }
-            }
+            // Note: closeBoxHoles on meta.sprites.peds runs AFTER 2B (beachArchetypes) and 2C (g2Archs)
+            // so that 2B and 2C read the clean, un-highlighted source pixels of `lucia` and `civ0`!
 
             // 2. ConvertEffectToAlpha (dll/src/texture_store.cpp & tools/triage_textures.py):
             // Convert 8-bit cutout fire (234..241), explosions (242..249), smoke (200..210) & sparks (219..223)
@@ -1184,6 +1177,23 @@ class RetroRenderer {
                         const dy0 = rowY;
                         if (dx0 + sw >= W || dy0 + sh >= H) continue;
 
+                        // Pass 1: find head/hair center (hx, hy) for this frame so clothing regions track walking/pose frames accurately!
+                        let hxSum = 0, hySum = 0, hCnt = 0;
+                        for (let ly = 0; ly < sh; ly++) {
+                            for (let lx = 0; lx < sw; lx++) {
+                                const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                                if (d[sp + 3] < 16) continue;
+                                const r = d[sp], g = d[sp + 1], b = d[sp + 2];
+                                if (r < 78 && g < 78 && b < 86) {
+                                    hxSum += lx;
+                                    hySum += ly;
+                                    hCnt++;
+                                }
+                            }
+                        }
+                        const hx = hCnt > 0 ? hxSum / hCnt : (sw - 1) * 0.5;
+                        const hy = hCnt > 0 ? hySum / hCnt : (sh - 1) * 0.5;
+
                         for (let ly = 0; ly < sh; ly++) {
                             for (let lx = 0; lx < sw; lx++) {
                                 const sp = ((sy + ly) * W + (sx + lx)) * 4;
@@ -1210,38 +1220,43 @@ class RetroRenderer {
                                     continue;
                                 }
 
-                                const isPinkTop = (r > 165 && r > g + 42 && b > 65);
-                                const isBlueJeans = (b > r + 14 && b > 65);
-                                const isDarkHair = (!isPerim && r < 72 && g < 72 && b < 80);
+                                const isPinkTop = (r > 145 && r > g + 32 && b > 55);
+                                const isBlueJeans = (b > r + 12 && b > 60);
+                                const isDarkHair = (!isPerim && r < 76 && g < 76 && b < 84);
                                 const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 182.0;
-                                const shade = Math.max(0.76, Math.min(1.22, lum));
+                                const shade = Math.max(0.78, Math.min(1.24, lum));
+                                const dx = lx - hx;
+                                const dy = ly - hy;
+                                const dist = Math.hypot(dx, dy);
 
                                 let nr = Math.round(arch.skin[0] * shade);
                                 let ng = Math.round(arch.skin[1] * shade);
                                 let nb = Math.round(arch.skin[2] * shade);
 
                                 if (isDarkHair) {
-                                    const dome = Math.max(0, 1.0 - Math.hypot((lx - 11.5) * 0.22, (ly - 13.0) * 0.22));
-                                    const hMult = 0.82 + 0.36 * dome;
+                                    const dome = Math.max(0, 1.0 - Math.hypot(dx * 0.28, dy * 0.28));
+                                    const hMult = 0.84 + 0.36 * dome;
                                     nr = Math.round(arch.hair[0] * hMult);
                                     ng = Math.round(arch.hair[1] * hMult);
                                     nb = Math.round(arch.hair[2] * hMult);
-                                    // Sunglasses on lying sunbather frame 42
                                     if (fKey === "42" && ly === 7 && lx >= 10 && lx <= 13) {
                                         nr = lx === 11 ? 56 : 18;
                                         ng = lx === 11 ? 189 : 24;
                                         nb = lx === 11 ? 248 : 38;
                                     }
                                 } else if (arch.isSurfer) {
-                                    // Shirtless bronzed surfer guy: bare muscular upper torso/arms, neon boardshorts at hips/thighs, bare lower calves
-                                    if (isBlueJeans && ly >= 10 && ly <= 17) {
-                                        const isStripe = (lx <= 8 || lx >= 15);
-                                        nr = Math.round((isStripe ? 249 : arch.bik[0]) * shade);
-                                        ng = Math.round((isStripe ? 115 : arch.bik[1]) * shade);
-                                        nb = Math.round((isStripe ? 22 : arch.bik[2]) * shade);
+                                    // Surfer / Miami Beach guy: open tropical unbuttoned shirt trim on outer torso + vibrant striped boardshorts!
+                                    if (isPinkTop && Math.abs(dx) >= 2.2 && Math.abs(dx) <= 4.4) {
+                                        nr = Math.round(arch.bik[0] * shade);
+                                        ng = Math.round(arch.bik[1] * shade);
+                                        nb = Math.round(arch.bik[2] * shade);
+                                    } else if (isBlueJeans && dist <= 6.8) {
+                                        const isStripe = (Math.abs(dx) >= 2.6);
+                                        nr = Math.round((isStripe ? 252 : arch.bik[0]) * shade);
+                                        ng = Math.round((isStripe ? 118 : arch.bik[1]) * shade);
+                                        nb = Math.round((isStripe ? 34  : arch.bik[2]) * shade);
                                     }
                                 } else if (fKey === "42") {
-                                    // Lying down Sunbather on towel: distinct two-piece bikini top (ly 9..11) + bare tanned stomach (ly 12..13) + bikini bottom (ly 14..15) + bare tanned legs (ly >= 16)
                                     const inBikiniTop = (ly >= 9 && ly <= 11 && lx >= 8 && lx <= 15 && (isPinkTop || isBlueJeans));
                                     const inBikiniBot = ((ly === 14 || ly === 15) && lx >= 8 && lx <= 15 && (isPinkTop || isBlueJeans));
                                     if (inBikiniTop || inBikiniBot) {
@@ -1251,13 +1266,12 @@ class RetroRenderer {
                                         nb = Math.round(arch.bik[2] * shade * cupSpec);
                                     }
                                 } else {
-                                    // Standing / Walking / Jumping Bikini Woman:
-                                    // Bare tanned shoulders/arms (lx <= 8 || lx >= 15), bare midriff (ly === 13), bare tanned legs (ly <= 9 || ly >= 16),
-                                    // vibrant Two-Piece Bikini Top (ly 10..12, lx 9..14) & Bikini Bottom (ly 14..15, lx 9..14)!
-                                    const inTop = isPinkTop && lx >= 9 && lx <= 14 && ly >= 10 && ly <= 12;
-                                    const inBot = (isBlueJeans || isPinkTop) && lx >= 9 && lx <= 14 && (ly === 14 || ly === 15);
+                                    // Standing / Walking / Rollerblading Bikini & Beachwear Woman:
+                                    // Clearly visible Two-Piece Bikini Top across torso (`Math.abs(dx) <= 4.0`) + Matching Bottom/Shorts (`dist <= 5.6`) + Bare Tanned Arms & Legs!
+                                    const inTop = isPinkTop && Math.abs(dx) <= 4.0;
+                                    const inBot = isBlueJeans && dist <= 5.6;
                                     if (inTop || inBot) {
-                                        const cupBoost = (inTop && (lx === 10 || lx === 13)) ? 1.12 : 1.0;
+                                        const cupBoost = inTop ? 1.12 : 1.02;
                                         nr = Math.round(arch.bik[0] * shade * cupBoost);
                                         ng = Math.round(arch.bik[1] * shade * cupBoost);
                                         nb = Math.round(arch.bik[2] * shade * cupBoost);
@@ -1363,24 +1377,24 @@ class RetroRenderer {
                             let col = null;
                             let shade = 1.0;
                             if (isShirt) {
-                                shade = Math.max(0.35, Math.min(1.3, g / 190));
+                                shade = Math.max(0.45, Math.min(1.32, g / 185));
                                 const ax = Math.abs(dx);
                                 const bareArm =
                                     arch.sleeves === "bare" ||
-                                    (arch.sleeves === "tank" && ax >= 3.5) ||
-                                    (arch.sleeves === "short" && ax >= 4.5);
+                                    (arch.sleeves === "tank" && ax >= 4.2) ||
+                                    (arch.sleeves === "short" && ax >= 5.2);
                                 if (bareArm) {
                                     col = arch.skin;
-                                    shade = Math.max(0.6, Math.min(1.2, shade * 1.05));
+                                    shade = Math.max(0.68, Math.min(1.18, shade * 1.04));
                                 } else {
                                     col = arch.shirt;
                                     if (arch.pattern === "hawaiian") {
-                                        if ((lx + ly * 2 + ent.ai) % 5 === 0) col = arch.shirt2;
-                                        else if ((lx * 3 + ly + ent.ai) % 7 === 0) col = arch.shirt3 || arch.shirt2;
+                                        if ((lx + ly * 2 + ent.ai) % 4 === 0) col = arch.shirt2;
+                                        else if ((lx * 3 + ly + ent.ai) % 5 === 0) col = arch.shirt3 || arch.shirt2;
                                     } else if (arch.pattern === "stripes") {
                                         if (ly % 2 === 0) col = arch.shirt2;
                                     } else if (arch.pattern === "jacket") {
-                                        if (ax <= 1.2) col = arch.shirt2;
+                                        if (ax <= 1.6) col = arch.shirt2;
                                     } else if (arch.pattern === "hivis") {
                                         if ((ly + 1) % 4 === 0) col = arch.shirt2;
                                     } else if (arch.pattern === "plaid") {
@@ -1388,10 +1402,10 @@ class RetroRenderer {
                                     }
                                 }
                             } else if (isPants) {
-                                shade = Math.max(0.4, Math.min(1.35, b / 105));
-                                if (arch.legs === "shorts" && dist > 4.2) {
+                                shade = Math.max(0.48, Math.min(1.35, b / 102));
+                                if (arch.legs === "shorts" && dist > 5.8) {
                                     col = arch.skin;
-                                    shade = Math.max(0.65, Math.min(1.15, shade));
+                                    shade = Math.max(0.70, Math.min(1.15, shade));
                                 } else {
                                     col = arch.pants;
                                 }
@@ -1435,6 +1449,17 @@ class RetroRenderer {
                     meta.sprites.peds[g2Archs[ai].key] = { ...g2SrcFrames, ...newFrames[ai] };
                 }
                 meta.sprites.peds["g2_xray"] = { ...g2SrcFrames, ...xrayFrames };
+            }
+
+            // Apply GTA 2 3D spherical head/shoulder shading & 1px dark contour to all ped sprites after synthesis
+            if (meta.sprites.peds) {
+                for (const roleKey of Object.keys(meta.sprites.peds)) {
+                    const roleFrames = meta.sprites.peds[roleKey];
+                    if (!roleFrames) continue;
+                    for (const frameKey of Object.keys(roleFrames)) {
+                        closeBoxHoles(roleFrames[frameKey], false, true);
+                    }
+                }
             }
 
             // 3. BleedTransparentEdges (src/alpha_bleed.h):
@@ -5369,49 +5394,47 @@ class RetroRenderer {
             { key: "g2_prisoner",     shirt: [255, 102, 8],   pants: [255, 102, 8],   sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.tan, pattern: "jacket", shirt2: [248, 250, 252] },
             { key: "g2_mugger",       shirt: [36, 36, 42],    pants: [62, 66, 80],    sleeves: "long",  legs: "pants",  hairMode: "hood", skin: SK.tan },
             { key: "g2_hulk",         shirt: [96, 204, 64],   pants: [118, 44, 158],  sleeves: "bare",  legs: "shorts", hair: H.black, skin: [96, 204, 64] },
-            // --- GTA 2 civilian dummy remaps (26..52) ---
-            { key: "g2_civ_redtee",   shirt: [232, 96, 96],   pants: KHAKI,           sleeves: "short", legs: "shorts", hair: H.brown, skin: SK.light },
-            { key: "g2_civ_blueshorts",shirt: [64, 120, 220], pants: [54, 92, 190],   sleeves: "short", legs: "shorts", hair: H.blond, skin: SK.tan },
-            { key: "g2_civ_yellowtee",shirt: [246, 214, 60],  pants: KHAKI,           sleeves: "short", legs: "shorts", hair: H.black, skin: SK.dark },
-            { key: "g2_civ_lilac",    shirt: [190, 150, 222], pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.auburn, skin: SK.light },
-            { key: "g2_civ_burgundy", shirt: [128, 30, 50],   pants: [176, 144, 100], sleeves: "short", legs: "pants",  hair: H.black, skin: SK.brown },
-            { key: "g2_civ_aqua",     shirt: [60, 210, 210],  pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.brown, skin: SK.tan },
-            { key: "g2_civ_greysuit", shirt: [124, 128, 140], pants: [80, 82, 92],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [236, 236, 240] },
-            { key: "g2_civ_pink",     shirt: [246, 132, 186], pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.blond, skin: SK.light },
-            { key: "g2_civ_darkgreen",shirt: [36, 96, 52],    pants: [190, 160, 210], sleeves: "short", legs: "pants",  hair: H.black, skin: SK.dark },
-            { key: "g2_civ_granny",   shirt: [196, 168, 220], pants: [230, 230, 236], sleeves: "long",  legs: "pants",  hair: H.white, skin: SK.light },
-            // --- Vice City '86 street extras ---
-            { key: "vc_hawaiian_red", shirt: [222, 44, 52],   shirt2: [255, 226, 80], shirt3: [40, 160, 80], pants: [236, 232, 220], sleeves: "short", legs: "pants",  hair: H.brown, skin: SK.tan, pattern: "hawaiian" },
-            { key: "vc_tourist",      shirt: [70, 150, 230],  shirt2: [250, 250, 250], shirt3: [255, 120, 180], pants: KHAKI, sleeves: "short", legs: "shorts", hairMode: "bald", skin: [246, 176, 150], pattern: "hawaiian" },
-            { key: "vc_tommy",        shirt: [40, 170, 210],  shirt2: [30, 110, 60], shirt3: [240, 240, 230], pants: JEANS, sleeves: "short", legs: "pants", hair: H.black, skin: SK.tan, pattern: "hawaiian" },
-            { key: "vc_crockett",     shirt: [242, 240, 234], shirt2: [250, 150, 190], pants: [242, 240, 234], sleeves: "long", legs: "pants", hair: H.blond, skin: SK.tan, pattern: "jacket" },
-            { key: "vc_tubbs",        shirt: [70, 72, 86],    shirt2: [60, 200, 220], pants: [70, 72, 86], sleeves: "long", legs: "pants", hair: H.black, skin: SK.dark, pattern: "jacket" },
-            { key: "vc_jogger",       shirt: [255, 60, 160],  pants: [30, 30, 36],    sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.tan },
-            { key: "vc_sailor",       shirt: [244, 244, 248], shirt2: [34, 54, 120], pants: [214, 40, 50], sleeves: "short", legs: "shorts", hair: H.auburn, skin: SK.light, pattern: "stripes" },
-            { key: "vc_cuban",        shirt: [40, 150, 70],   shirt2: [250, 250, 240], shirt3: [250, 200, 60], pants: [30, 30, 34], sleeves: "short", legs: "pants", hair: H.black, skin: SK.brown, pattern: "hawaiian" },
-            { key: "vc_haitian",      shirt: [26, 82, 40],    pants: [38, 44, 40],    sleeves: "tank",  legs: "pants",  hair: H.black, skin: SK.dark },
-            { key: "vc_bodybuilder",  shirt: [250, 220, 40],  pants: [214, 40, 50],   sleeves: "bare",  legs: "shorts", hairMode: "bald", skin: SK.brown }
+            // --- Vice City & Miami Tropical Street & Promenade Outfits (26..52) ---
+            { key: "g2_civ_redtee",   shirt: [252, 72, 118],  pants: [244, 242, 234], sleeves: "short", legs: "shorts", hair: H.brown,  skin: SK.light, pattern: "hawaiian", shirt2: [255, 232, 92],  shirt3: [44, 212, 198] },
+            { key: "g2_civ_blueshorts",shirt: [28, 214, 236], pants: [242, 240, 232], sleeves: "short", legs: "shorts", hair: H.blond,  skin: SK.tan,   pattern: "stripes",  shirt2: [250, 250, 252] },
+            { key: "g2_civ_yellowtee",shirt: [252, 212, 42],  pants: [52, 118, 212],  sleeves: "short", legs: "shorts", hair: H.black,  skin: SK.dark,  pattern: "hawaiian", shirt2: [255, 82, 146],  shirt3: [250, 250, 250] },
+            { key: "g2_civ_lilac",    shirt: [204, 128, 252], pants: [244, 244, 248], sleeves: "long",  legs: "pants",  hair: H.auburn, skin: SK.light, pattern: "jacket",   shirt2: [48, 228, 238] },
+            { key: "g2_civ_burgundy", shirt: [255, 108, 52],  pants: [242, 238, 224], sleeves: "short", legs: "pants",  hair: H.black,  skin: SK.brown, pattern: "stripes",  shirt2: [18, 196, 188] },
+            { key: "g2_civ_aqua",     shirt: [24, 228, 218],  pants: [246, 246, 248], sleeves: "short", legs: "pants",  hair: H.brown,  skin: SK.tan,   pattern: "jacket",   shirt2: [255, 92, 172] },
+            { key: "g2_civ_greysuit", shirt: [246, 246, 248], pants: [242, 242, 246], sleeves: "long",  legs: "pants",  hair: H.blond,  skin: SK.tan,   pattern: "jacket",   shirt2: [38, 220, 236] },
+            { key: "g2_civ_pink",     shirt: [255, 84, 176],  pants: JEANS,           sleeves: "short", legs: "shorts", hair: H.blond,  skin: SK.light, pattern: "stripes",  shirt2: [250, 250, 252] },
+            { key: "g2_civ_darkgreen",shirt: [44, 218, 146],  pants: [242, 238, 226], sleeves: "short", legs: "pants",  hair: H.black,  skin: SK.dark,  pattern: "hawaiian", shirt2: [254, 218, 68],  shirt3: [255, 94, 154] },
+            { key: "g2_civ_granny",   shirt: [250, 148, 212], pants: [244, 244, 248], sleeves: "short", legs: "pants",  hair: H.blond,  skin: SK.light, pattern: "jacket",   shirt2: [250, 250, 252] },
+            // --- Vice City '86 & Miami Beach Icons ---
+            { key: "vc_hawaiian_red", shirt: [242, 48, 68],   shirt2: [255, 228, 72],  shirt3: [36, 214, 168], pants: [244, 240, 228], sleeves: "short", legs: "pants",  hair: H.brown, skin: SK.tan,   pattern: "hawaiian" },
+            { key: "vc_tourist",      shirt: [42, 186, 248],  shirt2: [255, 234, 84],  shirt3: [255, 96, 176], pants: KHAKI,           sleeves: "short", legs: "shorts", hair: H.blond, skin: SK.light, pattern: "hawaiian" },
+            { key: "vc_tommy",        shirt: [28, 192, 232],  shirt2: [24, 138, 82],   shirt3: [248, 248, 240], pants: JEANS,          sleeves: "short", legs: "pants",  hair: H.black, skin: SK.tan,   pattern: "hawaiian" },
+            { key: "vc_crockett",     shirt: [246, 244, 240], shirt2: [255, 112, 182], pants: [246, 244, 240], sleeves: "long",  legs: "pants",  hair: H.blond, skin: SK.tan,   pattern: "jacket" },
+            { key: "vc_tubbs",        shirt: [88, 148, 196],  shirt2: [48, 232, 242],  pants: [88, 148, 196],  sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "jacket" },
+            { key: "vc_jogger",       shirt: [255, 52, 164],  shirt2: [36, 232, 248],  pants: [36, 220, 242],  sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.tan,   pattern: "stripes" },
+            { key: "vc_sailor",       shirt: [248, 248, 252], shirt2: [32, 188, 224],  pants: [242, 62, 82],   sleeves: "short", legs: "shorts", hair: H.auburn,skin: SK.light, pattern: "stripes" },
+            { key: "vc_cuban",        shirt: [246, 244, 232], shirt2: [52, 198, 168],  shirt3: [252, 204, 56], pants: [42, 48, 62],    sleeves: "short", legs: "pants",  hair: H.black, skin: SK.brown, pattern: "jacket" },
+            { key: "vc_haitian",      shirt: [238, 48, 72],   shirt2: [38, 128, 236],  pants: JEANS,           sleeves: "short", legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "jacket" },
+            { key: "vc_bodybuilder",  shirt: [252, 214, 38],  shirt2: [255, 68, 148],  pants: [232, 48, 68],   sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.brown, pattern: "stripes" }
         ];
         return this._g2Archs;
     }
 
-    // Weighted spawn pools for the GTA 2 remap archetypes
+    // Weighted spawn pools for the Vice City & Miami Beach pedestrian archetypes
     pickGta2PedType(ped, isGang) {
         const gangPool = [
-            "g2_zaibatsu", "g2_yakuza", "g2_loony", "g2_russian",
-            "g2_redneck_red", "g2_redneck_blond", "vc_cuban", "vc_haitian", "g2_mugger"
+            "vc_cuban", "vc_haitian", "g2_zaibatsu", "g2_yakuza",
+            "g2_loony", "g2_russian", "g2_redneck_red", "g2_redneck_blond", "g2_mugger"
         ];
         const civPool = [
-            "g2_civ_redtee", "g2_civ_blueshorts", "g2_civ_yellowtee", "g2_civ_lilac", "g2_civ_burgundy",
-            "g2_civ_aqua", "g2_civ_greysuit", "g2_civ_pink", "g2_civ_darkgreen", "g2_civ_granny",
-            "vc_hawaiian_red", "vc_tourist", "vc_tommy", "vc_crockett", "vc_tubbs", "vc_jogger",
-            "vc_sailor", "vc_bodybuilder",
-            "g2_civ_redtee", "g2_civ_greysuit", "vc_hawaiian_red", "vc_tourist", "g2_civ_aqua", "g2_civ_pink",
-            // rarer street icons & off-duty services (prisoners stay strictly inside Leonida State Penitentiary!)
-            "g2_elvis", "g2_krishna", "g2_medic", "g2_fireman", "g2_scientist",
-            "g2_swat", "g2_army", "g2_hulk",
-            // keep a few original GTA 1 civilians in the mix
-            "civ0", "civ1", "civ2", "civ3"
+            "vc_tommy", "vc_crockett", "vc_tubbs", "vc_hawaiian_red", "vc_tourist",
+            "vc_jogger", "vc_sailor", "vc_cuban", "vc_bodybuilder",
+            "g2_civ_aqua", "g2_civ_pink", "g2_civ_redtee", "g2_civ_blueshorts",
+            "g2_civ_yellowtee", "g2_civ_lilac", "g2_civ_burgundy", "g2_civ_greysuit",
+            "g2_civ_darkgreen", "g2_civ_granny",
+            "vc_tommy", "vc_crockett", "vc_hawaiian_red", "vc_tourist", "vc_jogger",
+            "g2_civ_aqua", "g2_civ_pink", "g2_civ_redtee", "g2_civ_blueshorts",
+            "bikini_pink", "bikini_cyan", "bikini_yellow"
         ];
         const pool = isGang ? gangPool : civPool;
         const seed = Math.abs(Math.floor((ped.animSeed || 0) * 7919 + (ped.turnSeed || 0) * 131 + (ped.x || 0) * 0.37));
@@ -5638,7 +5661,7 @@ class RetroRenderer {
                 (pbx >= 56 && pbx <= 68 && pby >= 76 && pby <= 146);
             const isBeachZone =
                 ped.missionTag === "BEACH" ||
-                ped.x >= mx256(218.2) * TILE_SIZE ||
+                ped.x >= 452.0 * TILE_SIZE ||
                 (this.map && this.map.coastalSandMask && this.map.coastalSandMask[pby * MAP_COLS + pbx] === 1) ||
                 (pbx >= MAP_X_256[182] && pbx <= MAP_X_256[195] && pby >= MAP_Y_256[98] && pby <= MAP_Y_256[128]);
 
@@ -5649,7 +5672,8 @@ class RetroRenderer {
             } else if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
                 const beachPool = [
                     "bikini_pink", "bikini_cyan", "bikini_yellow",
-                    "bikini_red", "bikini_white", "bikini_pink", "surfer_guy"
+                    "bikini_red", "bikini_white", "surfer_guy",
+                    "vc_tommy", "vc_hawaiian_red", "vc_jogger", "vc_tourist"
                 ];
                 const bh = Math.abs(Math.floor((ped.turnSeed || 1) * 17 + ped.animSeed * 313)) % beachPool.length;
                 pedType = beachPool[bh];
