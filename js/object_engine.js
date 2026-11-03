@@ -2607,7 +2607,7 @@ class WorldObjectEngine {
 
         const M = MAP_COLS;
         const g = map.surfaceGround;
-        const kinds = ["STREETLIGHT_NEON", "HYDRANT", "STREETLIGHT_NEON", "NEWS_STAND", "PAYPHONE_BOOTH", "HYDRANT"];
+        const kinds = ["HYDRANT", "NEWS_STAND", "PAYPHONE_BOOTH", "HYDRANT"];
         let kIdx = 0;
 
         // Scan sidewalk curb tiles (PAWEMENT adjacent to ROAD) with deterministic spacing
@@ -2636,8 +2636,11 @@ class WorldObjectEngine {
                 const px = (c + 0.5) * TILE_SIZE + curbDx;
                 const py = (r + 0.5) * TILE_SIZE + curbDy;
 
-                // Ensure not blocking any interior door, tree/palm canopy, café parasol, soda machine, or mission payphone
+                // Ensure not blocking any interior door, tree/palm canopy, café parasol, soda machine, streetlamp, or mission payphone
                 if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - px, it.doorY - py) < 52)) {
+                    continue;
+                }
+                if (Array.isArray(map.streetlights) && map.streetlights.some(sl => Math.hypot(sl.baseX - px, sl.baseY - py) < 46)) {
                     continue;
                 }
                 if (Array.isArray(map.vicePalms) && map.vicePalms.some(pm => Math.hypot(pm.x - px, pm.y - py) < 56)) {
@@ -5572,6 +5575,107 @@ class WorldObjectEngine {
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz + 0.11, bz + 0.16, [0.94, 0.95, 0.98], 1.0, 7);
                     }
                 }
+            }
+        }
+
+        // 3B. True 3D Volumetric Hardware-Z-Buffered Curb Streetlamps (this.map.streetlights)
+        if (this.map && Array.isArray(this.map.streetlights)) {
+            const nf = Math.max(0, Math.min(1, renderer.nightFactor || 0));
+            const lightsOn = nf > 0.12;
+            for (let i = 0; i < this.map.streetlights.length; i++) {
+                const sl = this.map.streetlights[i];
+                if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
+                const bz = sl.z || 2.0;
+                const isDeco = sl.style === "ART_DECO_NEON" || sl.style === "PROMENADE_TWIN";
+                const poleCol = isDeco ? [0.78, 0.84, 0.92] : [0.52, 0.58, 0.66];
+                const baseCol = isDeco ? [0.58, 0.64, 0.74] : [0.34, 0.38, 0.45];
+                const hoodCol = isDeco ? [0.64, 0.70, 0.80] : [0.38, 0.43, 0.50];
+
+                // State 2: Knocked-down / Uprooted 3D Streetlamp lying on the ground ("défoncé")
+                if (sl.state === 2) {
+                    const fx = sl.fallenX ?? sl.baseX;
+                    const fy = sl.fallenY ?? sl.baseY;
+                    const fAng = sl.fallAngle || 0;
+                    const fCos = Math.cos(fAng);
+                    const fSin = Math.sin(fAng);
+                    // Sheared cast-iron anchor flange at curb
+                    emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 4.4, 3.8, bz, bz + 0.04, 8, [0.24, 0.27, 0.32], 9, true);
+                    // Toppled 3D steel pole shaft lying on the street
+                    emitDynBox(fx, fy, fCos, fSin, 0, 0, 36.0, 3.2, bz, bz + 0.05, poleCol, 1.0, 9);
+                    // Detached / bent cantilever arm & shattered cobra-head luminaire hood at the tip
+                    emitDynBox(fx, fy, fCos, fSin, 17.5, 2.5, 11.0, 6.2, bz, bz + 0.06, hoodCol, 1.0, 9);
+                    continue;
+                }
+
+                const isDamaged = sl.state === 1;
+                const tDx = isDamaged ? (sl.tiltDx || 6.5) : 0;
+                const tDy = isDamaged ? (sl.tiltDy || 0) : 0;
+                const zDrop = isDamaged ? 0.06 : 0.0;
+                const topPoleX = sl.baseX + tDx;
+                const topPoleY = sl.baseY + tDy;
+                const effHeadX = sl.headX + tDx;
+                const effHeadY = sl.headY + tDy;
+                const armCos = Math.cos(sl.armAngle);
+                const armSin = Math.sin(sl.armAngle);
+                const armLen = Math.max(12, Math.hypot(effHeadX - topPoleX, effHeadY - topPoleY) + 3.0);
+                const midX = (topPoleX + effHeadX) * 0.5;
+                const midY = (topPoleY + effHeadY) * 0.5;
+
+                // 1. 2-Tier Octagonal Fluted Cast-Iron / Aluminum Curb Base Pedestal (MAT 9)
+                emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 4.6, 4.2, bz, bz + 0.08, 8, baseCol, 9, true);
+                emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 3.5, 2.6, bz + 0.08, bz + 0.16, 8, poleCol, 9, true);
+
+                // 2. Continuous 3D Vertical Tapered Pole Shaft (bz + 0.16 .. bz + 0.56 - zDrop)
+                if (isDamaged) {
+                    emitDynBox(sl.baseX + tDx * 0.25, sl.baseY + tDy * 0.25, armCos, armSin, 0, 0, 3.6, 3.6, bz + 0.15, bz + 0.36 - zDrop * 0.5, poleCol, 1.0, 9);
+                    emitDynBox(sl.baseX + tDx * 0.75, sl.baseY + tDy * 0.75, armCos, armSin, 0, 0, 3.2, 3.2, bz + 0.34 - zDrop * 0.5, bz + 0.56 - zDrop, poleCol, 1.0, 9);
+                } else {
+                    emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 2.2, 1.75, bz + 0.16, bz + 0.56, 8, poleCol, 9, true);
+                    if (isDeco) {
+                        const decoCol = (i % 2 === 0) ? [0.22, 0.92, 0.98] : [0.98, 0.36, 0.78];
+                        emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 2.5, 2.5, bz + 0.36, bz + 0.46, 8, decoCol, 10, true);
+                    }
+                }
+
+                // 3. 3D Diagonal Support Gusset Bracket + Overhanging Cantilever Mast Arm (MAT 9)
+                emitDynBox(
+                    topPoleX + armCos * 4.5,
+                    topPoleY + armSin * 4.5,
+                    armCos,
+                    armSin,
+                    0,
+                    0,
+                    9.0,
+                    2.0,
+                    bz + 0.47 - zDrop,
+                    bz + 0.54 - zDrop,
+                    baseCol,
+                    1.0,
+                    9
+                );
+                emitDynBox(midX, midY, armCos, armSin, 0, 0, armLen, 2.6, bz + 0.535 - zDrop, bz + 0.565 - zDrop, poleCol, 1.0, 9);
+
+                // 4. 3D Aerodynamic Cobra-Head Luminaire Housing (MAT 9) + Glowing Warm Golden-Amber Lens (MAT 10)
+                emitDynBox(effHeadX, effHeadY, armCos, armSin, 0, 0, 11.2, 6.4, bz + 0.54 - zDrop, bz + 0.58 - zDrop, hoodCol, 1.0, 9);
+                const bulbLit = lightsOn && (!isDamaged || Math.sin(t * 28.0 + sl.baseX) > -0.25);
+                const bulbCol = bulbLit
+                    ? (sl.colorType === "SODIUM" ? [1.0, 0.82, 0.32] : [1.0, 0.90, 0.44])
+                    : [0.86, 0.84, 0.74];
+                emitDynBox(
+                    effHeadX,
+                    effHeadY,
+                    armCos,
+                    armSin,
+                    0.5,
+                    0,
+                    8.2,
+                    4.6,
+                    bz + 0.522 - zDrop,
+                    bz + 0.544 - zDrop,
+                    bulbCol,
+                    1.0,
+                    bulbLit ? 10 : 9
+                );
             }
         }
 

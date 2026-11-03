@@ -2256,11 +2256,11 @@ class LeonidaMap {
                 if (this.streetlights.some(sl => Math.hypot(sl.c - c, sl.r - r) < 4.5)) continue;
 
                 const surfZ = this.surfaceLayer[idx] || 2.0;
-                // Position base near the curb edge of the sidewalk (+20px toward road), overhanging luminaire head +13px out over the street
-                const baseX = (c + 0.5) * TILE_SIZE + dc * 20.0;
-                const baseY = (r + 0.5) * TILE_SIZE + dr * 20.0;
-                const headX = baseX + dc * 13.0;
-                const headY = baseY + dr * 13.0;
+                // Position base near the curb edge of the sidewalk (+22px toward road), overhanging luminaire head +18px out over the street
+                const baseX = (c + 0.5) * TILE_SIZE + dc * 22.0;
+                const baseY = (r + 0.5) * TILE_SIZE + dr * 22.0;
+                const headX = baseX + dc * 18.0;
+                const headY = baseY + dr * 18.0;
                 const armAngle = Math.atan2(dr, dc);
 
                 // District-authentic GTA 2 / Vice City warm yellow/sodium streetlamp style
@@ -2292,25 +2292,7 @@ class LeonidaMap {
             }
         }
 
-        // Add Ornamental Twin-Globe Bollard Streetlamps along Lummus Park Coral Promenade (c = oceanDriveE, never inside the grass lawn!) & the 3 Wooden Ocean Piers
-        for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r += 10) {
-            if (this.surfaceGround[r * MAP_COLS + oceanDriveE] === GROUND_TYPE.PAWEMENT) {
-                const bx = (oceanDriveE + 0.55) * TILE_SIZE;
-                const by = (r + 0.5) * TILE_SIZE;
-                this.streetlights.push({
-                    c: oceanDriveE,
-                    r,
-                    baseX: bx,
-                    baseY: by,
-                    headX: bx + 6.0,
-                    headY: by,
-                    z: 2.0,
-                    armAngle: 0,
-                    style: "PROMENADE_TWIN",
-                    colorType: "AMBER"
-                });
-            }
-        }
+        // Add Ornamental Streetlamps along the 3 Wooden Ocean Piers
         for (const pierR of [MAP_Y_256[45], MAP_Y_256[88], MAP_Y_256[154]]) {
             for (let c = MAP_X_256[233]; c <= MAP_X_256[245]; c += 6) {
                 if (this.surfaceGround[pierR * MAP_COLS + c] === GROUND_TYPE.PAWEMENT) {
