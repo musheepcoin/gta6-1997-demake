@@ -7066,19 +7066,26 @@ class RetroRenderer {
             this.map.objectEngine.renderHeistPrompts(ctx, this, game);
         }
 
-        // 1. Glowing Enterable Venue Interior Door Badges
+        // 1. Glowing Enterable Venue Interior Door Badges (anchored at the physical door threshold)
         if (Array.isArray(this.map.interiors)) {
             for (const intr of this.map.interiors) {
-                const dist = Math.hypot(p.x - intr.doorX, p.y - intr.doorY);
-                if (dist > 185) continue;
-                // Never draw a South-facing door badge when the player is on the North/back side of the 3D building
-                if ((!intr.facing || intr.facing === "S") && p.y < intr.doorY - TILE_SIZE * 0.65) continue;
-                if (dist > 58 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, intr.doorX, intr.doorY, 2.0).hit) continue;
+                const fnv = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[intr.facing] || [0, 1];
+                const tcx = intr.facing ? (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorX;
+                const tcy = intr.facing ? (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorY;
+                const threshX = intr.facing ? (tcx - fnv[0] * 22) : intr.doorX;
+                const threshY = intr.facing ? (tcy - fnv[1] * 22) : intr.doorY;
 
-                const labelY = (!intr.facing || intr.facing === "S") ? intr.doorY + 10 : intr.doorY;
-                const dz = this.map.getHeightAtPixel(intr.doorX, labelY, 2.0) + 0.04;
-                const sc = this.worldToScreen(intr.doorX, labelY, dz);
-                const isClose = dist < 95;
+                const dist = Math.hypot(p.x - threshX, p.y - threshY);
+                if (dist > 165) continue;
+                // Never draw a South-facing door badge when the player is on the North/back side of the 3D building
+                if ((!intr.facing || intr.facing === "S") && p.y < tcy - TILE_SIZE * 0.52) continue;
+                if (dist > 48 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, intr.doorX, intr.doorY, 2.0).hit) continue;
+
+                const labelX = intr.facing ? (tcx - fnv[0] * 14) : intr.doorX;
+                const labelY = intr.facing ? (tcy - fnv[1] * 14) : intr.doorY;
+                const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.04;
+                const sc = this.worldToScreen(labelX, labelY, dz);
+                const isClose = dist < 24;
                 const label = `🚪 ${intr.name}`;
                 const bw = Math.max(130, ctx.measureText(label).width + 18);
                 const bh = 22;
@@ -7092,15 +7099,6 @@ class RetroRenderer {
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
                 ctx.fillStyle = "#ffffff";
                 ctx.fillText(label, sc.x, by + bh * 0.5);
-
-                this.cheatButtons.push({
-                    id: "ENTER_INTERIOR",
-                    x: bx,
-                    y: by,
-                    w: bw,
-                    h: bh,
-                    interiorId: intr.id
-                });
             }
         }
 

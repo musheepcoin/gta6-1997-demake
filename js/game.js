@@ -4207,6 +4207,60 @@ class LeonidaGame {
 
 
 
+    getDoorThresholdPos(intr) {
+
+        if (!intr) return { x: 0, y: 0, fnv: [0, 1] };
+
+        const fnv = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
+
+        if (!intr.facing) {
+
+            return { x: intr.doorX, y: intr.doorY, fnv };
+
+        }
+
+        const tcx = Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
+
+        const tcy = Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
+
+        // Building wall is at tcx - fnv * 32; black doormat step is at tcx - fnv * 24.
+        // With player collision radius = 10px, physical contact with the door occurs at tcx - fnv * 22.
+        return {
+
+            x: tcx - fnv[0] * 22,
+
+            y: tcy - fnv[1] * 22,
+
+            fnv
+
+        };
+
+    }
+
+
+
+    isTouchingInteriorDoor(intr, px = this.player.x, py = this.player.y) {
+
+        if (!intr) return false;
+
+        const { x, y, fnv } = this.getDoorThresholdPos(intr);
+
+        if (!intr.facing) {
+
+            return Math.hypot(px - x, py - y) <= 13;
+
+        }
+
+        const normalDist = Math.abs((px - x) * fnv[0] + (py - y) * fnv[1]);
+
+        const lateralDist = Math.abs((px - x) * fnv[1] - (py - y) * fnv[0]);
+
+        return normalDist <= 6.5 && lateralDist <= 15.0;
+
+    }
+
+
+
     enterInterior(interiorOrId) {
 
         if (!Array.isArray(this.map.interiors)) return false;
@@ -4261,13 +4315,13 @@ class LeonidaGame {
 
 
 
-        // Remember exterior coordinates right outside this venue's door
+        // Remember exterior coordinates right outside this venue's door on the sidewalk
 
-        const dn = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
+        const { x: dtx, y: dty, fnv: dn } = this.getDoorThresholdPos(intr);
 
-        p.x = intr.doorX + dn[0] * 24;
+        p.x = dtx + dn[0] * 18;
 
-        p.y = intr.doorY + dn[1] * 24;
+        p.y = dty + dn[1] * 18;
 
         p.z = this.map.getHeightAtPixel(p.x, p.y, 4.0);
 
@@ -4345,11 +4399,11 @@ class LeonidaGame {
 
         }
 
-        const dnx = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
+        const { x: dtx, y: dty, fnv: dnx } = this.getDoorThresholdPos(intr);
 
-        this.player.x = intr.doorX + dnx[0] * 26;
+        this.player.x = dtx + dnx[0] * 18;
 
-        this.player.y = intr.doorY + dnx[1] * 26;
+        this.player.y = dty + dnx[1] * 18;
 
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
 
@@ -4691,7 +4745,7 @@ class LeonidaGame {
 
 
 
-        // If inside a building interior, [E] / [F] / [Enter] activates a nearby station or exits the interior!
+        // If inside a building interior, [E] / [F] / [Enter] activates a touched station or exits when on the door mat!
 
         if (this.activeInterior) {
 
@@ -4701,7 +4755,7 @@ class LeonidaGame {
 
                 for (const st of intr.stations) {
 
-                    if (Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 62 && (st.cooldown || 0) <= 0) {
+                    if (Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 32 && (st.cooldown || 0) <= 0) {
 
                         this.triggerInteriorStation(st);
 
@@ -4713,7 +4767,11 @@ class LeonidaGame {
 
             }
 
-            this.exitInterior();
+            if (this.interiorY >= intr.h - 44 && Math.abs(this.interiorX - intr.w * 0.5) < 56) {
+
+                this.exitInterior();
+
+            }
 
             return;
 
@@ -4731,13 +4789,13 @@ class LeonidaGame {
 
 
 
-        // If on foot near a landmark interior entrance door, [E] / [F] / [Enter] enters the interior!
+        // If on foot in direct physical contact with a building entrance door, [E] / [F] / [Enter] enters the interior!
 
         if (!p.inVehicle && Array.isArray(this.map.interiors)) {
 
             for (const intr of this.map.interiors) {
 
-                if (Math.hypot(p.x - intr.doorX, p.y - intr.doorY) < 64) {
+                if (this.isTouchingInteriorDoor(intr, p.x, p.y)) {
 
                     this.enterInterior(intr);
 
@@ -7423,13 +7481,13 @@ class LeonidaGame {
 
 
 
-        // Step onto any interactive station pad inside the venue to trigger its perk/heist/minigame!
+        // Step directly onto any interactive station pad inside the venue to trigger its perk/heist/minigame!
 
         if (Array.isArray(intr.stations)) {
 
             for (const st of intr.stations) {
 
-                if (!st.effect && (st.cooldown || 0) <= 0 && Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 34) {
+                if (!st.effect && (st.cooldown || 0) <= 0 && Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 22) {
 
                     this.triggerInteriorStation(st);
 
@@ -7443,13 +7501,13 @@ class LeonidaGame {
 
 
 
-        // Step onto the bottom EXIT DOOR mat (near center bottom) to return to the street!
+        // Step directly onto the bottom EXIT DOOR mat (near center bottom) to return to the street!
 
         if (this.interiorCooldown <= 0 &&
 
-            this.interiorY >= intr.h - 60 &&
+            this.interiorY >= intr.h - 38 &&
 
-            Math.abs(this.interiorX - intr.w * 0.5) < 95) {
+            Math.abs(this.interiorX - intr.w * 0.5) < 52) {
 
             this.exitInterior();
 
@@ -7519,7 +7577,7 @@ class LeonidaGame {
 
                 for (const intr of this.map.interiors) {
 
-                    if (Math.hypot(pp.x - intr.doorX, pp.y - intr.doorY) < 80) {
+                    if (this.isTouchingInteriorDoor(intr, pp.x, pp.y)) {
 
                         this.doorRearmBlock = intr;
 
@@ -8071,15 +8129,13 @@ class LeonidaGame {
 
 
 
-                // Walk directly onto a glowing Venue Door Mat (< 20px) to enter its Interior!
-
-                // Proximity entry: just walk up to a door (re-armed only after stepping away from the door you just left)
+                // Direct physical contact entry: walk right up to touch the building door / threshold step!
 
                 if (Array.isArray(this.map.interiors)) {
 
                     if (this.doorRearmBlock) {
 
-                        if (Math.hypot(p.x - this.doorRearmBlock.doorX, p.y - this.doorRearmBlock.doorY) > 80) {
+                        if (!this.isTouchingInteriorDoor(this.doorRearmBlock, p.x, p.y)) {
 
                             this.doorRearmBlock = null;
 
@@ -8089,7 +8145,7 @@ class LeonidaGame {
 
                         for (const intr of this.map.interiors) {
 
-                            if (Math.hypot(p.x - intr.doorX, p.y - intr.doorY) < 42) {
+                            if (this.isTouchingInteriorDoor(intr, p.x, p.y)) {
 
                                 this.enterInterior(intr);
 
