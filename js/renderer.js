@@ -3506,24 +3506,52 @@ class RetroRenderer {
             this.vehicleBannerTimer = Math.max(0, this.vehicleBannerTimer - dt);
         }
 
-        // FollowCameraController.cpp: Smoothly track player X, Y and ground elevation Z
-        const target = game.player.inVehicle || game.player;
-        const leadX = curVeh ? Math.cos(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
-        const leadY = curVeh ? Math.sin(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
+        // FollowCameraController.cpp: Smoothly track player X, Y and ground elevation Z (or 3D Interior Room camera!)
+        let effectiveViewProj;
+        if (game.activeInterior) {
+            const intr = game.activeInterior;
+            const rw = intr.w || 780;
+            const rh = intr.h || 530;
+            const px = game.interiorX || rw * 0.5;
+            const py = game.interiorY || rh - 78;
+            // Subtle 22% 3D perspective camera shift as the player walks across the rooms so 3D walls, lintels & columns reveal their depth!
+            const targetCamX = rw * 0.5 + (px - rw * 0.5) * 0.22;
+            const targetCamY = rh * 0.5 + 12 + (py - rh * 0.5) * 0.22;
+            if (!this._wasInInterior) {
+                this.camX = targetCamX;
+                this.camY = targetCamY;
+                this.camZBlocks = 2.0;
+                this._wasInInterior = true;
+            } else {
+                this.camX += (targetCamX - this.camX) * Math.min(1, dt * 8.5);
+                this.camY += (targetCamY - this.camY) * Math.min(1, dt * 8.5);
+                this.camZBlocks = 2.0;
+            }
+            effectiveViewProj = this.computeInteriorViewProjMatrix(intr);
+        } else {
+            const target = game.player.inVehicle || game.player;
+            if (this._wasInInterior) {
+                this.camX = target.x;
+                this.camY = target.y;
+                this._wasInInterior = false;
+            }
+            const leadX = curVeh ? Math.cos(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
+            const leadY = curVeh ? Math.sin(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
 
-        this.camX += (target.x + leadX - this.camX) * Math.min(1, dt * 8.5);
-        this.camY += (target.y + leadY - this.camY) * Math.min(1, dt * 8.5);
+            this.camX += (target.x + leadX - this.camX) * Math.min(1, dt * 8.5);
+            this.camY += (target.y + leadY - this.camY) * Math.min(1, dt * 8.5);
 
-        const rawTargetZ = target.z !== undefined
-            ? target.z
-            : this.map.getHeightAtPixel(target.x, target.y, this.camZBlocks);
-        this.camZBlocks += (rawTargetZ - this.camZBlocks) * Math.min(1, dt * 6.0);
+            const rawTargetZ = target.z !== undefined
+                ? target.z
+                : this.map.getHeightAtPixel(target.x, target.y, this.camZBlocks);
+            this.camZBlocks += (rawTargetZ - this.camZBlocks) * Math.min(1, dt * 6.0);
 
-        // Velocity zoom-out when driving fast (FollowCameraController.cpp mStartupSpeedMax)
-        const speedZoomBlocks = curVeh ? Math.min(1.6, Math.abs(curVeh.speed) / 260.0) : 0.0;
-        const effectiveViewProj = this.computeViewProjMatrixWithSpeed(speedZoomBlocks);
+            // Velocity zoom-out when driving fast (FollowCameraController.cpp mStartupSpeedMax)
+            const speedZoomBlocks = curVeh ? Math.min(1.6, Math.abs(curVeh.speed) / 260.0) : 0.0;
+            effectiveViewProj = this.computeViewProjMatrixWithSpeed(speedZoomBlocks);
+        }
 
-        // 1. Render 3D WebGL CityMesh + 3D SpriteBatch into this.glCanvas
+        // 1. Render 3D WebGL CityMesh (or 3D WebGL Interior Room!) + 3D SpriteBatch into this.glCanvas
         this.renderWebGLScene(game, effectiveViewProj);
 
         // 2. Composite WebGL 3D scene onto 2D main canvas + draw dynamic Night Lighting, floating scores, HUD & Smartphone
@@ -3637,6 +3665,46 @@ class RetroRenderer {
         return mat;
     }
 
+    computeInteriorViewProjMatrix(intr) {
+        const W = Math.max(1, this.canvas.width);
+        const H = Math.max(1, this.canvas.height);
+        const aspect = W / H;
+        const fovyRad = (55.0 * Math.PI) / 180.0;
+        const f = 1.0 / Math.tan(fovyRad * 0.5);
+
+        const rw = (intr && intr.w) || 780;
+        const rh = (intr && intr.h) || 530;
+        const rwBlocks = (rw + 96) / TILE_SIZE;
+        const rhBlocks = (rh + 96) / TILE_SIZE;
+
+        // Fit the 3D cutaway interior cleanly between the left Smartphone HUD and right Chat panel
+        const availFracW = W >= 1000 ? Math.max(0.54, (W - 470) / W) : 0.90;
+        const availFracH = Math.max(0.68, (H - 126) / H);
+        const distW = (rwBlocks * (f / aspect)) / (availFracW * 2.0);
+        const distH = (rhBlocks * f) / (availFracH * 2.0);
+        const distBlocks = Math.max(8.2, distW, distH);
+
+        const camXBlocks = this.camX / TILE_SIZE;
+        const camYBlocks = this.camY / TILE_SIZE;
+        const camElev = 2.0 + distBlocks;
+        this.currentCamElev = camElev;
+        this.currentCamDist = distBlocks;
+
+        const near = 0.25;
+        const far = 64.0;
+        const A = (far + near) / (far - near);
+        const B = (-2.0 * far * near) / (far - near);
+        const sx = f / aspect;
+        const sy = -f;
+
+        return new Float32Array([
+            sx,  0,   0,  0,
+            0,   0,  -A, -1,
+            0,   sy,  0,  0,
+            -camXBlocks * sx, -camYBlocks * sy, A * camElev + B, camElev
+        ]);
+    }
+
     renderWebGLScene(game, viewProj) {
         const gl = this.gl;
         if (!gl) return;
@@ -3645,6 +3713,21 @@ class RetroRenderer {
         const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0.0));
 
         gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
+
+        // Dedicated True 3D Hardware Z-Buffered Interior Pass when inside any of the 14 building themes!
+        if (game && game.activeInterior) {
+            gl.clearColor(0.02, 0.03, 0.07, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            if (!this.gta1Ready || !this.cmpReady) return;
+            if (this.map && this.map.objectEngine) {
+                this.map.objectEngine.renderInterior3DMesh(gl, this, game, viewProj);
+                this.beginSpriteBatch();
+                this.map.objectEngine.batchInteriorSprites3D(this, game);
+                this.flushSpriteBatch(viewProj);
+            }
+            return;
+        }
+
         if (this.mapStyle === "VICE") {
             // Smoothly interpolate Tropical Atlantic turquoise sea-level clear color from Day -> Sunset -> Midnight Navy
             const r = 0.03 * (1.0 - nf) + 0.012 * nf + sf * 0.06;
@@ -7960,100 +8043,85 @@ class RetroRenderer {
         const H = this.canvas.height;
         const rw = intr.w || 780;
         const rh = intr.h || 530;
-        // Full-screen room: scale up to fill the viewport (keeps aspect), leaving room for the side HUD (phone / chat)
-        const sideMargin = W >= 1000 ? 250 : 8;
-        const availW = Math.max(200, W - sideMargin * 2);
-        const availH = Math.max(200, H - 110);
-        const iScale = Math.max(0.3, Math.min(3.0, availW / rw, availH / rh));
-        const baseOx = Math.round((W - rw * iScale) * 0.5);
-        const baseOy = Math.round(Math.max(54, (H - rh * iScale) * 0.5 + 18));
-        const ox = 0;
-        const oy = 0;
-        const btnStartIdx = this.cheatButtons.length;
 
         ctx.save();
-
-        // Solid black backdrop: the city is fully hidden while inside
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, W, H);
-        ctx.translate(baseOx, baseOy);
-        ctx.scale(iScale, iScale);
-
-        // 1 & 2. Render Pixel-Art Procedural Floor Zones, 2.5D Multi-Room Architecture & Detailed Furniture
-        this.drawInteriorArchitectureAndDecor(ctx, intr, ox, oy, rw, rh);
-
-        // 2b. Integrated Cornice Header Banner along the Top Wall Cap (y = 2..42)
-        ctx.fillStyle = "rgba(7, 11, 22, 0.94)";
-        ctx.fillRect(ox + 18, oy + 3, rw - 36, 39);
-        ctx.strokeStyle = intr.accent || "#00f0ff";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(ox + 18.5, oy + 3.5, rw - 37, 38);
-
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+
+        // 1. Subtle Volumetric Indoor Spotlight around Player & Stations (over the 3D WebGL Room)
+        const p = game.player;
+        const px = game.interiorX || rw * 0.5;
+        const py = game.interiorY || rh - 78;
+        const pScr = this.worldToScreen(px, py, 2.05);
+        const spotGrad = ctx.createRadialGradient(pScr.x, pScr.y, 12, pScr.x, pScr.y, 92);
+        spotGrad.addColorStop(0, "rgba(255, 240, 200, 0.14)");
+        spotGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        ctx.fillStyle = spotGrad;
+        ctx.beginPath();
+        ctx.arc(pScr.x, pScr.y, 92, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. 3D-Projected Top Cornice Architectural Header Banner
+        const topNW = this.worldToScreen(16, 40, 2.78);
+        const topNE = this.worldToScreen(rw - 16, 40, 2.78);
+        const banW = Math.max(380, Math.min(W - 360, Math.round(topNE.x - topNW.x)));
+        const banH = 42;
+        const banX = Math.round((topNW.x + topNE.x) * 0.5 - banW * 0.5);
+        const banY = Math.max(44, Math.min(110, Math.round(topNW.y - banH - 4)));
+
+        ctx.fillStyle = "rgba(7, 11, 22, 0.92)";
+        ctx.fillRect(banX, banY, banW, banH);
+        ctx.strokeStyle = intr.accent || "#00f0ff";
+        ctx.lineWidth = 2.0;
+        ctx.strokeRect(banX + 0.5, banY + 0.5, banW - 1, banH - 1);
+
         ctx.font = "bold 15px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(intr.name, ox + rw * 0.5, oy + 15);
+        ctx.fillText(intr.name, banX + banW * 0.5, banY + 15);
         ctx.font = "bold 10px Consolas, 'Courier New', monospace";
         ctx.fillStyle = intr.accent || "#38bdf8";
-        ctx.fillText(intr.subtitle, ox + rw * 0.5, oy + 31);
+        ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 31);
 
-        // 3. Sleek Interactive Station Floor Pads & Compact Glassmorphic Floating Badges
+        // 3. 3D-Projected Interactive Station Glow Halos & Glassmorphic Pill Badges
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
-                const sx = ox + st.x;
-                const sy = oy + st.y;
+                const stFloor = this.worldToScreen(st.x, st.y, 2.04);
+                const stTop = this.worldToScreen(st.x, st.y, 2.28);
                 const ready = (st.cooldown || 0) <= 0;
-                const distToPlayer = Math.hypot((game.interiorX || 0) - st.x, (game.interiorY || 0) - st.y);
-                const isNear = distToPlayer < 78;
+                const distToPlayer = Math.hypot(px - st.x, py - st.y);
+                const isNear = distToPlayer < 82;
                 const stCol = ready ? (st.color || "#39ff14") : "#64748b";
-                const pulseR = (isNear ? 24 : 20) + Math.sin(this.time * 6) * 2.5;
+                const pulseR = (isNear ? 30 : 22) + Math.sin(this.time * 6) * 3.0;
 
-                // Outer radial floor glow
-                const pGrad = ctx.createRadialGradient(sx, sy, 3, sx, sy, pulseR + 8);
-                pGrad.addColorStop(0, ready ? "rgba(57, 255, 20, 0.30)" : "rgba(100, 116, 139, 0.14)");
+                // Soft radial 3D floor glow
+                const pGrad = ctx.createRadialGradient(stFloor.x, stFloor.y, 4, stFloor.x, stFloor.y, pulseR + 10);
+                pGrad.addColorStop(0, ready ? "rgba(56, 189, 248, 0.25)" : "rgba(100, 116, 139, 0.12)");
                 pGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
                 ctx.fillStyle = pGrad;
                 ctx.beginPath();
-                ctx.arc(sx, sy, pulseR + 8, 0, Math.PI * 2);
+                ctx.arc(stFloor.x, stFloor.y, pulseR + 10, 0, Math.PI * 2);
                 ctx.fill();
 
-                // 3D Beveled Floor Pad Ring
-                ctx.fillStyle = ready ? "rgba(15, 23, 42, 0.55)" : "rgba(15, 23, 42, 0.40)";
-                ctx.beginPath();
-                ctx.arc(sx, sy, pulseR * 0.78, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = stCol;
-                ctx.lineWidth = isNear ? 2.5 : 1.75;
-                ctx.stroke();
+                // Compact Glassmorphic Pill Badge projected above the 3D station pedestal
+                const bw = isNear ? 186 : 162;
+                const bh = isNear ? 32 : 28;
+                const bx = Math.round(stTop.x - bw * 0.5);
+                const by = Math.round(stTop.y - bh - (isNear ? 10 : 6));
 
-                // Inner target ring
-                ctx.strokeStyle = "rgba(255,255,255,0.35)";
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(sx, sy, pulseR * 0.42, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Compact Glassmorphic Pill Badge (never blocks the room's counters!)
-                const bw = isNear ? 174 : 154;
-                const bh = isNear ? 31 : 27;
-                const bx = Math.round(sx - bw * 0.5);
-                const by = Math.round(sy - (isNear ? 44 : 39));
-                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.92)" : "rgba(9, 14, 28, 0.78)";
+                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.92)" : "rgba(9, 14, 28, 0.80)";
                 ctx.fillRect(bx, by, bw, bh);
-                // Left neon accent bar on pill
                 ctx.fillStyle = stCol;
-                ctx.fillRect(bx, by, 3, bh);
+                ctx.fillRect(bx, by, 3.5, bh);
                 ctx.strokeStyle = stCol;
-                ctx.lineWidth = isNear ? 1.6 : 1.0;
+                ctx.lineWidth = isNear ? 1.8 : 1.1;
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
-                ctx.font = isNear ? "bold 10px Consolas, 'Courier New', monospace" : "bold 9.5px Consolas, 'Courier New', monospace";
+                ctx.font = isNear ? "bold 10.5px Consolas, 'Courier New', monospace" : "bold 9.5px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = ready ? "#ffffff" : "#94a3b8";
-                ctx.fillText(st.label, sx + 1, by + 9.5);
-                ctx.font = "8.5px Consolas, 'Courier New', monospace";
+                ctx.fillText(st.label, stTop.x + 2, by + 10);
+                ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = stCol;
-                ctx.fillText(ready ? st.sub : `RECHARGING (${Math.ceil(st.cooldown)}S)`, sx + 1, by + 20.5);
+                ctx.fillText(ready ? (isNear ? `[E] ${st.sub}` : st.sub) : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 21.5);
 
                 if (ready) {
                     this.cheatButtons.push({
@@ -8061,71 +8129,64 @@ class RetroRenderer {
                         x: bx,
                         y: by,
                         w: bw,
-                        h: bh + 42,
+                        h: bh + 44,
                         station: st
                     });
                 }
             }
         }
 
-        // 4. Venue NPCs (Bartenders, DJs, Dancers, Guards, Astronauts) with soft floor shadow
+        // 4. 3D-Projected Venue NPC Role Labels & Partner Tag
         if (Array.isArray(intr.npcs)) {
             for (let i = 0; i < intr.npcs.length; i++) {
                 const npc = intr.npcs[i];
-                const nx = ox + npc.x + (npc.dancing ? Math.sin(this.time * 4 + i) * 8 : 0);
-                const ny = oy + npc.y + (npc.dancing ? Math.cos(this.time * 4 + i) * 6 : 0);
-                const nAng = npc.dancing ? (npc.angle + Math.sin(this.time * 3 + i) * 0.7) : npc.angle;
-                const fIdx = npc.dancing ? (Math.floor(this.time * 6 + i * 2) % 8) : 98;
+                if (!npc.label) continue;
+                const isDancing = !!(npc.dancing || npc.label === "DANCER" || npc.label === "CLUBBER");
+                const nx = npc.x + (isDancing ? Math.sin(this.time * 4.0 + i) * 7.5 : Math.sin(this.time * 1.4 + i * 2.1) * 2.0);
+                const ny = npc.y + (isDancing ? Math.cos(this.time * 4.0 + i) * 5.5 : Math.cos(this.time * 1.1 + i * 1.7) * 1.2);
+                const nScr = this.worldToScreen(nx, ny, 2.22);
 
-                ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
-                ctx.beginPath();
-                ctx.ellipse(nx + 2, ny + 4, 11, 8, 0, 0, Math.PI * 2);
-                ctx.fill();
-
-                this.drawPedSprite2D(ctx, npc.type || "civ2", fIdx, nx, ny, nAng, 2.35);
-
-                if (npc.label) {
-                    ctx.font = "bold 8.5px Consolas, monospace";
-                    ctx.fillStyle = "rgba(9, 13, 24, 0.72)";
-                    const tw = ctx.measureText(npc.label).width + 8;
-                    ctx.fillRect(nx - tw * 0.5, ny - 29, tw, 12);
-                    ctx.fillStyle = "#e2e8f0";
-                    ctx.fillText(npc.label, nx, ny - 23);
-                }
+                ctx.font = "bold 9px Consolas, monospace";
+                const tw = ctx.measureText(npc.label).width + 10;
+                ctx.fillStyle = "rgba(8, 12, 24, 0.82)";
+                ctx.fillRect(nScr.x - tw * 0.5, nScr.y - 18, tw, 13);
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.45)";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(nScr.x - tw * 0.5, nScr.y - 18, tw, 13);
+                ctx.fillStyle = "#e2e8f0";
+                ctx.fillText(npc.label, nScr.x, nScr.y - 11.5);
             }
         }
 
-        // 5. The player walks inside the room with a dynamic shadow & warm spotlight
-        const p = game.player;
-        const px = ox + game.interiorX;
-        const py = oy + game.interiorY;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
-        ctx.beginPath();
-        ctx.ellipse(px + 2, py + 4, 12, 9, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // Companion Tag (Jason or Lucia standing watch near the entrance)
+        const partnerName = (p && p.charId === "jason") ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
+        const jScr = this.worldToScreen(rw * 0.5 - 64, rh - 62, 2.22);
+        ctx.font = "bold 9px Consolas, monospace";
+        const jTw = ctx.measureText(partnerName).width + 10;
+        ctx.fillStyle = "rgba(8, 12, 24, 0.84)";
+        ctx.fillRect(jScr.x - jTw * 0.5, jScr.y - 18, jTw, 13);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillText(partnerName, jScr.x, jScr.y - 11.5);
 
-        const lFrame = this.getPedFrameIndex(
-            "FIST",
-            Boolean(p.isMoving),
-            Boolean(game.input.sprint),
-            p.walkPhase || 0
-        );
-        this.drawPedSprite2D(ctx, "lucia", lFrame, px, py, game.interiorAngle, 2.6);
-        ctx.font = "bold 9.5px Consolas, monospace";
-        ctx.fillStyle = "#f472b6";
-        ctx.fillText("LUCIA", px, py - 26);
-
-        // 6. South Threshold Welcome Mat & Glowing [🚪 EXIT TO STREET] Doorway
-        const exitW = 164;
-        const exitH = 26;
-        const exitX = Math.round(ox + (rw - exitW) * 0.5);
-        const exitY = oy + rh - exitH - 4;
-        // Coir & brass welcome mat just inside the doorway
-        ctx.fillStyle = "#451a03";
-        ctx.fillRect(exitX + 16, exitY - 12, exitW - 32, 14);
-        ctx.strokeStyle = "#d97706";
+        // 5. 3D-Projected Active Player Tag
+        const pTopScr = this.worldToScreen(px, py, 2.24);
+        const pLabel = (p && p.charId ? p.charId : "lucia").toUpperCase();
+        ctx.font = "bold 10px Consolas, monospace";
+        const pTw = ctx.measureText(pLabel).width + 10;
+        ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+        ctx.fillRect(pTopScr.x - pTw * 0.5, pTopScr.y - 18, pTw, 14);
+        ctx.strokeStyle = "#f472b6";
         ctx.lineWidth = 1;
-        ctx.strokeRect(exitX + 16.5, exitY - 11.5, exitW - 33, 13);
+        ctx.strokeRect(pTopScr.x - pTw * 0.5, pTopScr.y - 18, pTw, 14);
+        ctx.fillStyle = "#f472b6";
+        ctx.fillText(pLabel, pTopScr.x, pTopScr.y - 11);
+
+        // 6. 3D-Projected South Threshold [🚪 EXIT TO STREET] Button
+        const exScr = this.worldToScreen(rw * 0.5, rh - 8, 2.08);
+        const exitW = 176;
+        const exitH = 28;
+        const exitX = Math.round(exScr.x - exitW * 0.5);
+        const exitY = Math.min(H - 36, Math.round(exScr.y - exitH * 0.5));
 
         ctx.fillStyle = "rgba(131, 24, 67, 0.94)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
@@ -8134,7 +8195,7 @@ class RetroRenderer {
         ctx.strokeRect(exitX + 0.5, exitY + 0.5, exitW - 1, exitH - 1);
         ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("🚪 EXIT TO STREET", ox + rw * 0.5, exitY + exitH * 0.5);
+        ctx.fillText("🚪 EXIT TO STREET", exitX + exitW * 0.5, exitY + exitH * 0.5);
 
         this.cheatButtons.push({
             id: "EXIT_INTERIOR",
@@ -8143,16 +8204,6 @@ class RetroRenderer {
             w: exitW,
             h: exitH
         });
-
-        {
-            for (let bi = btnStartIdx; bi < this.cheatButtons.length; bi++) {
-                const b = this.cheatButtons[bi];
-                b.x = baseOx + b.x * iScale;
-                b.y = baseOy + b.y * iScale;
-                b.w *= iScale;
-                b.h *= iScale;
-            }
-        }
 
         ctx.restore();
     }
