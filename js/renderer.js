@@ -1343,7 +1343,22 @@ class RetroRenderer {
                             const sp = ((sy + ly) * W + (sx + lx)) * 4;
                             const dp = ((ent.dy + ly) * W + (ent.dx + lx)) * 4;
                             const a = d[sp + 3];
-                            if (a < 16) {
+                            const dx = lx - hx;
+                            const dy = ly - hy;
+                            const dist = Math.hypot(dx, dy);
+                            const swatHelmetDist = Math.hypot(dx * 0.94, (dy - 0.12) * 0.96);
+                            const inSwatHelmetDome = (
+                                !isXray &&
+                                arch &&
+                                arch.key === "g2_swat" &&
+                                hCnt >= 3 &&
+                                ent.fk !== "42" &&
+                                ent.fk !== "53" &&
+                                lx >= 1 && lx < sw - 1 &&
+                                ly >= 1 && ly < sh - 1 &&
+                                swatHelmetDist <= 3.15
+                            );
+                            if (a < 16 && !inSwatHelmetDome) {
                                 d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
                                 continue;
                             }
@@ -1352,9 +1367,6 @@ class RetroRenderer {
                             const isShirt = !isHair && g > r + 8 && g > b + 20;
                             const isPants = !isHair && !isShirt && b > r + 25 && b + 6 >= g;
                             const isSkin = !isHair && !isShirt && !isPants && r >= 120 && g >= 55 && r > g + 20 && g > b;
-                            const dx = lx - hx;
-                            const dy = ly - hy;
-                            const dist = Math.hypot(dx, dy);
 
                             if (isXray) {
                                 // GTA 2 electrocution: glowing blue body outline + white bones + skull
@@ -1374,6 +1386,39 @@ class RetroRenderer {
                                 continue;
                             }
 
+                            if (inSwatHelmetDome) {
+                                // Pixel-art rounded SWAT PASGT/FAST ballistic helmet dome + curved front visor
+                                const isOuterRim = swatHelmetDist > 2.58;
+                                const isVisorBand = (dy >= 1.05 && dy <= 2.55 && Math.abs(dx) <= 2.05);
+                                const isEarPod = (!isVisorBand && Math.abs(dx) >= 1.85 && Math.abs(dy) <= 0.95);
+                                if (isVisorBand) {
+                                    if (isOuterRim) {
+                                        d[dp] = 16; d[dp + 1] = 28; d[dp + 2] = 46; d[dp + 3] = 255;
+                                    } else if (dx >= -1.25 && dx <= -0.15 && dy >= 1.15 && dy <= 2.15) {
+                                        // Crisp white-cyan visor specular reflection
+                                        d[dp] = 218; d[dp + 1] = 246; d[dp + 2] = 255; d[dp + 3] = 255;
+                                    } else if (dx > 0.85) {
+                                        // Shaded right curve of ballistic visor
+                                        d[dp] = 32; d[dp + 1] = 126; d[dp + 2] = 196; d[dp + 3] = 255;
+                                    } else {
+                                        // Sapphire-cyan ballistic visor glass
+                                        d[dp] = 64; d[dp + 1] = 196; d[dp + 2] = 250; d[dp + 3] = 255;
+                                    }
+                                } else if (isOuterRim) {
+                                    d[dp] = 18; d[dp + 1] = 24; d[dp + 2] = 36; d[dp + 3] = 255;
+                                } else if (isEarPod) {
+                                    d[dp] = 28; d[dp + 1] = 38; d[dp + 2] = 54; d[dp + 3] = 255;
+                                } else {
+                                    const domeSpec = Math.max(0, 1.0 - Math.hypot((dx + 0.45) * 0.44, (dy + 0.55) * 0.44));
+                                    const railBoost = (Math.abs(dx) <= 0.45 && dy >= -1.6 && dy <= 0.6) ? 14 : 0;
+                                    d[dp] = clamp8(40 + domeSpec * 64 + railBoost);
+                                    d[dp + 1] = clamp8(56 + domeSpec * 78 + railBoost);
+                                    d[dp + 2] = clamp8(82 + domeSpec * 96 + railBoost);
+                                    d[dp + 3] = 255;
+                                }
+                                continue;
+                            }
+
                             let col = null;
                             let shade = 1.0;
                             if (isShirt) {
@@ -1386,6 +1431,18 @@ class RetroRenderer {
                                 if (bareArm) {
                                     col = arch.skin;
                                     shade = Math.max(0.68, Math.min(1.18, shade * 1.04));
+                                } else if (arch.key === "g2_swat") {
+                                    // Heavy Kevlar plate-carrier vest over navy tactical sleeves + crisp white back/chest SWAT stencil
+                                    if (ax <= 2.6 && Math.abs(dy) <= 4.2) {
+                                        if (ax <= 1.5 && dy >= -2.3 && dy <= -1.2) {
+                                            col = [214, 228, 246]; // Crisp SWAT back/shoulder tactical stencil bar
+                                            shade = 1.05;
+                                        } else {
+                                            col = [22, 30, 44]; // Matte black-navy Kevlar plate carrier
+                                        }
+                                    } else {
+                                        col = [42, 58, 86]; // Navy-slate tactical uniform sleeves
+                                    }
                                 } else {
                                     col = arch.shirt;
                                     if (arch.pattern === "hawaiian") {
@@ -1418,26 +1475,16 @@ class RetroRenderer {
                                     col = arch.shirt;
                                     shade *= 0.78;
                                 } else if (arch.hairMode === "helmet") {
-                                    if (arch.key === "g2_swat" && dy >= 0.7 && dy <= 2.3 && Math.abs(dx) <= 2.2) {
-                                        col = [165, 224, 252]; // Reflective SWAT ballistic visor / goggles
-                                        shade = 1.12;
-                                    } else {
-                                        col = arch.helmet;
-                                        shade = 0.86 + Math.max(0, 1.0 - dist / 2.4) * 0.48;
-                                    }
+                                    col = arch.helmet;
+                                    shade = 0.86 + Math.max(0, 1.0 - dist / 2.4) * 0.48;
                                 } else {
                                     col = arch.hair;
                                 }
                             } else if (isSkin) {
-                                if (arch.key === "g2_swat" && dist <= 3.2) {
-                                    // Full-head SWAT balaclava + ballistic visor & helmet rim
-                                    if (dy >= 0.7 && dy <= 2.2 && Math.abs(dx) <= 2.1) {
-                                        col = [165, 224, 252];
-                                        shade = 1.10;
-                                    } else {
-                                        col = arch.helmet;
-                                        shade = 0.84 + Math.max(0, 1.0 - dist / 2.5) * 0.44;
-                                    }
+                                if (arch.key === "g2_swat") {
+                                    // Tactical black-charcoal gloves on hands & balaclava on neck
+                                    col = [28, 36, 48];
+                                    shade = 0.95;
                                 } else {
                                     shade = Math.max(0.6, Math.min(1.2, r / 175));
                                     col = arch.skin;
@@ -5743,20 +5790,6 @@ class RetroRenderer {
             const fx = x + Math.cos(angle) * 10;
             const fy = y + Math.sin(angle) * 10;
             this.pushAtlasSprite3D(fl, fx, fy, zBlocks + 0.02, rot, 0.55, SPRITE_DRAW_ORDER.PROJECTILES);
-        }
-
-        // Crisp 3D Tactical Ballistic Helmet Dome + Reflective Visor on SWAT Officers ("g2_swat")
-        if (pedType === "g2_swat" && drawOrder !== SPRITE_DRAW_ORDER.CORPSE && frameIdx !== 42) {
-            const cA = Math.cos(angle);
-            const sA = Math.sin(angle);
-            const hX = x + cA * (1.2 * scale);
-            const hY = y + sA * (1.2 * scale);
-            // Outer Kevlar tactical helmet shell (matte gunmetal-navy)
-            this.pushSolidQuad3D(hX, hY, zBlocks + 0.012, 7.6 * scale, 7.2 * scale, angle, 0.16, 0.22, 0.32, 0.98, drawOrder);
-            // Inner rounded ballistic dome highlight
-            this.pushSolidQuad3D(hX - cA * (0.4 * scale), hY - sA * (0.4 * scale), zBlocks + 0.015, 5.2 * scale, 5.0 * scale, angle, 0.28, 0.38, 0.52, 0.98, drawOrder);
-            // Front reflective ballistic visor / tactical goggles band
-            this.pushSolidQuad3D(hX + cA * (2.6 * scale), hY + sA * (2.6 * scale), zBlocks + 0.016, 2.2 * scale, 5.8 * scale, angle, 0.62, 0.88, 0.99, 0.98, drawOrder);
         }
     }
 
