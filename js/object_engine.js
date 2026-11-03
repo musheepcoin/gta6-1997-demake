@@ -2643,6 +2643,9 @@ class WorldObjectEngine {
                 if (Array.isArray(map.streetlights) && map.streetlights.some(sl => Math.hypot(sl.baseX - px, sl.baseY - py) < 46)) {
                     continue;
                 }
+                if (Array.isArray(map.trafficSignals) && map.trafficSignals.some(ts => Math.hypot(ts.baseX - px, ts.baseY - py) < 46)) {
+                    continue;
+                }
                 if (Array.isArray(map.vicePalms) && map.vicePalms.some(pm => Math.hypot(pm.x - px, pm.y - py) < 56)) {
                     continue;
                 }
@@ -3236,6 +3239,135 @@ class WorldObjectEngine {
                                         text: "⚡ LAMPADAIRE ABÎMÉ! +$40",
                                         color: "#fde047",
                                         life: 1.15
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3B. 3D Junction Traffic Signal Gantries (this.map.trafficSignals):
+        //     - Heavy vehicles ONLY (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
+        //     - Standard cars ONLY bend & damage them ("abîmé", state = 1, tilting gantry + malfunctioning flashing signal + bounce & crash sound)!
+        if (this.map && Array.isArray(this.map.trafficSignals)) {
+            for (let i = 0; i < this.map.trafficSignals.length; i++) {
+                const ts = this.map.trafficSignals[i];
+                if (ts.hitCooldown > 0) ts.hitCooldown = Math.max(0, ts.hitCooldown - dt);
+
+                if (ts.state === 2) {
+                    ts.timer = (ts.timer || 0) + dt;
+                    if (ts.fallVx || ts.fallVy) {
+                        ts.fallenX = (ts.fallenX ?? ts.baseX) + ts.fallVx * dt;
+                        ts.fallenY = (ts.fallenY ?? ts.baseY) + ts.fallVy * dt;
+                        ts.fallAngle = (ts.fallAngle || 0) + (ts.fallVang || 0) * dt;
+                        ts.fallVx *= Math.pow(0.16, dt);
+                        ts.fallVy *= Math.pow(0.16, dt);
+                        ts.fallVang = (ts.fallVang || 0) * Math.pow(0.22, dt);
+                        if (Math.hypot(ts.fallVx, ts.fallVy) < 2.0) {
+                            ts.fallVx = 0;
+                            ts.fallVy = 0;
+                        }
+                    }
+                    if (ts.timer > 30.0 && Math.hypot(cx - ts.baseX, cy - ts.baseY) > 360) {
+                        ts.state = 0;
+                        ts.timer = 0;
+                        ts.tiltDx = 0;
+                        ts.tiltDy = 0;
+                    }
+                    continue;
+                }
+
+                if (pCar && !isMicroVeh && Math.abs(pCar.x - ts.baseX) < 30 && Math.abs(pCar.y - ts.baseY) < 30) {
+                    const dx = ts.baseX - pCar.x;
+                    const dy = ts.baseY - pCar.y;
+                    const dist = Math.hypot(dx, dy) || 1.0;
+                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+                    if (dist < 23 && spd > 42 && (ts.hitCooldown || 0) <= 0) {
+                        const impAng = Math.atan2(
+                            pCar.vy || Math.sin(pCar.angle),
+                            pCar.vx || Math.cos(pCar.angle)
+                        );
+
+                        if (isHeavyVeh) {
+                            // Heavy vehicle uproots and knocks down the traffic signal gantry!
+                            ts.state = 2;
+                            ts.timer = 0;
+                            ts.hitCooldown = 0.8;
+                            ts.fallAngle = impAng;
+                            ts.fallenX = ts.baseX + Math.cos(impAng) * 16;
+                            ts.fallenY = ts.baseY + Math.sin(impAng) * 16;
+                            const launchSpd = Math.min(255, Math.max(95, spd * 1.12));
+                            ts.fallVx = Math.cos(impAng) * launchSpd;
+                            ts.fallVy = Math.sin(impAng) * launchSpd;
+                            ts.fallVang = (Math.random() - 0.5) * 8.0;
+
+                            pCar.vx *= 0.90;
+                            pCar.vy *= 0.90;
+                            if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                game.audio.playCarCrash(1.15);
+                            }
+                            if (game.audio && typeof game.audio.playCrateSmash === "function") {
+                                game.audio.playCrateSmash();
+                            }
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 12; k++) {
+                                    game.spawnParticle(
+                                        ts.baseX + (Math.random() - 0.5) * 16,
+                                        ts.baseY + (Math.random() - 0.5) * 16,
+                                        "SPARK"
+                                    );
+                                }
+                            }
+                            if (typeof game.addScore === "function") game.addScore(125);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({
+                                    x: ts.baseX,
+                                    y: ts.baseY,
+                                    z: 2.45,
+                                    text: "💥 FEU ROUGE DÉFONCÉ! +$125",
+                                    color: "#ef4444",
+                                    life: 1.3
+                                });
+                            }
+                        } else {
+                            // Standard car ONLY bends & damages the traffic signal gantry and bounces off the pole!
+                            const wasDamaged = (ts.state === 1);
+                            ts.state = 1;
+                            ts.hitCooldown = 0.75;
+                            ts.tiltDx = Math.cos(impAng) * 7.5;
+                            ts.tiltDy = Math.sin(impAng) * 7.5;
+                            pCar.x = ts.baseX - (dx / dist) * 24;
+                            pCar.y = ts.baseY - (dy / dist) * 24;
+                            pCar.vx *= -0.30;
+                            pCar.vy *= -0.30;
+                            pCar.speed = Math.hypot(pCar.vx, pCar.vy);
+                            if (typeof pCar.receiveImpactDamage === "function") {
+                                pCar.receiveImpactDamage(12, ts.baseX, ts.baseY);
+                            }
+                            if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                game.audio.playCarCrash(0.85);
+                            }
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 6; k++) {
+                                    game.spawnParticle(
+                                        ts.baseX + (Math.random() - 0.5) * 10,
+                                        ts.baseY + (Math.random() - 0.5) * 10,
+                                        "SPARK"
+                                    );
+                                }
+                            }
+                            if (!wasDamaged) {
+                                if (typeof game.addScore === "function") game.addScore(50);
+                                if (Array.isArray(game.floatingTexts)) {
+                                    game.floatingTexts.push({
+                                        x: ts.baseX,
+                                        y: ts.baseY,
+                                        z: 2.42,
+                                        text: "⚡ FEU ROUGE ABÎMÉ! +$50",
+                                        color: "#fde047",
+                                        life: 1.2
                                     });
                                 }
                             }
@@ -5676,6 +5808,115 @@ class WorldObjectEngine {
                     1.0,
                     bulbLit ? 10 : 9
                 );
+            }
+        }
+
+        // 3C. True 3D Volumetric Hardware-Z-Buffered Traffic Signal Gantries (this.map.trafficSignals)
+        if (this.map && Array.isArray(this.map.trafficSignals)) {
+            const ph = ((renderer.lastGameRef ? renderer.lastGameRef.trafficLightTimer : t) || t) % 12.0;
+            const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
+            const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+
+            for (let i = 0; i < this.map.trafficSignals.length; i++) {
+                const ts = this.map.trafficSignals[i];
+                if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
+                const bz = ts.z || 2.0;
+                const poleCol = [0.44, 0.49, 0.57];
+                const baseCol = [0.28, 0.32, 0.38];
+                const ywCol = [0.96, 0.75, 0.12];
+                const blkCol = [0.10, 0.12, 0.16];
+
+                // State 2: Knocked-down / Uprooted 3D Traffic Signal Gantry lying flat on the street ("défoncé")
+                if (ts.state === 2) {
+                    const fx = ts.fallenX ?? ts.baseX;
+                    const fy = ts.fallenY ?? ts.baseY;
+                    const fAng = ts.fallAngle || 0;
+                    const fCos = Math.cos(fAng);
+                    const fSin = Math.sin(fAng);
+                    // Sheared cast-steel corner foundation flange
+                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.2, 4.4, bz, bz + 0.045, 8, [0.22, 0.25, 0.30], 9, true);
+                    // Toppled 3D heavy gantry mast pole lying on the street
+                    emitDynBox(fx, fy, fCos, fSin, 0, 0, 40.0, 3.8, bz, bz + 0.055, poleCol, 1.0, 9);
+                    // Bent cantilever mast arm + smashed Florida Highway-Yellow 3-lens signal box
+                    emitDynBox(fx, fy, fCos, fSin, 16.0, 5.0, 22.0, 3.2, bz, bz + 0.05, poleCol, 1.0, 9);
+                    emitDynBox(fx, fy, fCos, fSin, 20.0, 8.5, 24.0, 10.6, bz, bz + 0.075, ywCol, 1.0, 9);
+                    emitDynBox(fx, fy, fCos, fSin, 20.0, 8.5, 20.8, 7.8, bz + 0.05, bz + 0.082, blkCol, 1.0, 9);
+                    continue;
+                }
+
+                const isDamaged = ts.state === 1;
+                const tDx = isDamaged ? (ts.tiltDx || 7.5) : 0;
+                const tDy = isDamaged ? (ts.tiltDy || 0) : 0;
+                const zDrop = isDamaged ? 0.065 : 0.0;
+                const topPoleX = ts.baseX + tDx;
+                const topPoleY = ts.baseY + tDy;
+                const effHeadX = ts.headX + tDx;
+                const effHeadY = ts.headY + tDy;
+                const armCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle);
+                const armSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle);
+                const armLen = Math.max(18, Math.hypot(effHeadX - topPoleX, effHeadY - topPoleY) + 4.0);
+                const midX = (topPoleX + effHeadX) * 0.5;
+                const midY = (topPoleY + effHeadY) * 0.5;
+                const st = ts.axis === "NS" ? nsState : ewState;
+
+                // 1. 2-Tier Heavy Octagonal Steel Corner Mast Foundation (MAT 9)
+                emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.4, 4.8, bz, bz + 0.09, 8, baseCol, 9, true);
+                emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 4.0, 3.2, bz + 0.09, bz + 0.18, 8, poleCol, 9, true);
+
+                // 2. Continuous 3D Vertical Gantry Mast Column + Yellow Pedestrian Crosswalk Call-Button Box
+                if (isDamaged) {
+                    emitDynBox(ts.baseX + tDx * 0.25, ts.baseY + tDy * 0.25, armCos, armSin, 0, 0, 4.4, 4.4, bz + 0.17, bz + 0.38 - zDrop * 0.5, poleCol, 1.0, 9);
+                    emitDynBox(ts.baseX + tDx * 0.28, ts.baseY + tDy * 0.28, armCos, armSin, 0, 0, 5.4, 5.4, bz + 0.22, bz + 0.28, ywCol, 1.0, 9);
+                    emitDynBox(ts.baseX + tDx * 0.75, ts.baseY + tDy * 0.75, armCos, armSin, 0, 0, 3.8, 3.8, bz + 0.36 - zDrop * 0.5, bz + 0.60 - zDrop, poleCol, 1.0, 9);
+                } else {
+                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 2.6, 2.1, bz + 0.18, bz + 0.60, 8, poleCol, 9, true);
+                    emitDynBox(ts.baseX, ts.baseY, armCos, armSin, 0, 0, 5.4, 5.4, bz + 0.22, bz + 0.28, ywCol, 1.0, 9);
+                }
+
+                // 3. 3D Diagonal Gusset Brace + Overhanging Horizontal Cantilever Mast Arm reaching over the road lane
+                emitDynBox(
+                    topPoleX + armCos * 6.0,
+                    topPoleY + armSin * 6.0,
+                    armCos,
+                    armSin,
+                    0,
+                    0,
+                    12.0,
+                    2.4,
+                    bz + 0.49 - zDrop,
+                    bz + 0.57 - zDrop,
+                    baseCol,
+                    1.0,
+                    9
+                );
+                emitDynBox(midX, midY, armCos, armSin, 0, 0, armLen, 3.5, bz + 0.565 - zDrop, bz + 0.60 - zDrop, poleCol, 1.0, 9);
+
+                // 4. Authentic 3D Volumetric Miami / Florida 3-Lens Traffic Signal Box ([ RED | AMBER | GREEN ])
+                // Florida Highway-Yellow 3D reflective casing + matte black 3-compartment interior box
+                emitDynBox(effHeadX, effHeadY, armCos, armSin, 0, 0, 25.0, 11.0, bz + 0.552 - zDrop, bz + 0.602 - zDrop, ywCol, 1.0, 9);
+                emitDynBox(effHeadX, effHeadY, armCos, armSin, 0, 0, 21.6, 8.2, bz + 0.558 - zDrop, bz + 0.610 - zDrop, blkCol, 1.0, 9);
+
+                // 3 Circular/Square Signal Bays along the housing: Red (+6.8 tip), Amber (0.0 mid), Green (-6.8 inner)
+                const redX = effHeadX + armCos * 6.8, redY = effHeadY + armSin * 6.8;
+                const ambX = effHeadX,                ambY = effHeadY;
+                const grnX = effHeadX - armCos * 6.8, grnY = effHeadY - armSin * 6.8;
+
+                // Visor hoods & dark unlit lens glass for all 3 bays
+                emitDynBox(redX, redY, armCos, armSin, 0, 0, 5.6, 5.6, bz + 0.606 - zDrop, bz + 0.616 - zDrop, [0.28, 0.05, 0.07], 1.0, 9);
+                emitDynBox(ambX, ambY, armCos, armSin, 0, 0, 5.6, 5.6, bz + 0.606 - zDrop, bz + 0.616 - zDrop, [0.28, 0.18, 0.04], 1.0, 9);
+                emitDynBox(grnX, grnY, armCos, armSin, 0, 0, 5.6, 5.6, bz + 0.606 - zDrop, bz + 0.616 - zDrop, [0.04, 0.25, 0.12], 1.0, 9);
+
+                // Active Emissive 3D Signal Lens (flickers when the gantry is damaged/bent!)
+                const lensOn = !isDamaged || Math.sin(t * 28.0 + ts.baseX) > -0.25;
+                if (lensOn) {
+                    if (st === "RED") {
+                        emitDynBox(redX, redY, armCos, armSin, 0, 0, 4.8, 4.8, bz + 0.612 - zDrop, bz + 0.626 - zDrop, [1.0, 0.14, 0.20], 1.0, 10);
+                    } else if (st === "AMBER") {
+                        emitDynBox(ambX, ambY, armCos, armSin, 0, 0, 4.8, 4.8, bz + 0.612 - zDrop, bz + 0.626 - zDrop, [1.0, 0.76, 0.08], 1.0, 10);
+                    } else {
+                        emitDynBox(grnX, grnY, armCos, armSin, 0, 0, 4.8, 4.8, bz + 0.612 - zDrop, bz + 0.626 - zDrop, [0.08, 0.98, 0.42], 1.0, 10);
+                    }
+                }
             }
         }
 
