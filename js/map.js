@@ -430,8 +430,28 @@ class LeonidaMap {
                 const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369);
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
-                if (!isInsidePrisonOrAirport && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && blkZ1 && blkZ1.lid === 69 && surfGt === GROUND_TYPE.PAWEMENT) {
-                    this.trees.push({ x: (c + 0.5) * TILE_SIZE, y: (r + 0.5) * TILE_SIZE, z: 2.0, scale: 1.0 });
+                if (blkZ1 && blkZ1.lid === 69) {
+                    // Break rigid 4-corner symmetry of NYC.CMP circular sidewalk planters (lid 69):
+                    // Keep only ~28% of circular planters asymmetrically across intersections (and 0% inside prison/airport),
+                    // replacing the remaining ~72% with their natural adjacent sidewalk stone paver (lid 8 or lid 9).
+                    const planterHash = (((c * 92837111) ^ (r * 689287499) ^ ((c * r) * 283927)) >>> 0) % 100;
+                    const keepPlanter = !isInsidePrisonOrAirport && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28);
+                    if (keepPlanter) {
+                        this.trees.push({ x: (c + 0.5) * TILE_SIZE, y: (r + 0.5) * TILE_SIZE, z: 2.0, scale: 1.0 });
+                    } else {
+                        const gIdx1 = (1 * MAP_ROWS + r) * MAP_COLS + c;
+                        const origIdx1 = this.voxelGrid[gIdx1];
+                        let targetPaverLid = 8;
+                        const nCoords = [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]];
+                        for (let ni = 0; ni < nCoords.length; ni++) {
+                            const nb = this.getBlockInfo(nCoords[ni][0], nCoords[ni][1], 1);
+                            if (nb && (nb.lid === 8 || nb.lid === 9)) {
+                                targetPaverLid = nb.lid;
+                                break;
+                            }
+                        }
+                        this.voxelGrid[gIdx1] = getRoofVariantIdx(origIdx1, targetPaverLid, blkZ1.remap || 0);
+                    }
                 }
             }
         }
