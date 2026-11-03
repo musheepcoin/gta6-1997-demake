@@ -1542,7 +1542,7 @@ class LeonidaMap {
         // Leonida Keys Stilt Lodges & Mainland Pastel Bungalows.
         this.residentialHouses = [
             // =====================================================================
-            // 1. STAR ISLAND BILLIONAIRE WATERFRONT ESTATES (Grand open waterfront island lawns)
+            // 1. STAR ISLAND BILLIONAIRE WATERFRONT ESTATES (Pristine open island lawns)
             // =====================================================================
             {
                 id: "star_palazzo_grand",
@@ -1551,9 +1551,9 @@ class LeonidaMap {
                 kind: "mansion_star_island",
                 c: 349.0, r: 164.0,
                 x: 349.0 * TILE_SIZE, y: 164.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.55, hw: 68, hh: 48,
-                drivewayCar: { sprIdx: 3, dx: 38, dy: 44, ang: 0 },
-                dockBoat: { spr: "speedboat_v8", dx: -35, dy: -52, ang: -Math.PI * 0.5 }
+                ang: 0, scale: 1.85, hw: 78, hh: 58,
+                drivewayCar: { sprIdx: 3, dx: 48, dy: 52, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: -45, dy: -65, ang: -Math.PI * 0.5 }
             },
             {
                 id: "star_modern_villa",
@@ -1562,9 +1562,9 @@ class LeonidaMap {
                 kind: "mansion_modern_luxury",
                 c: 337.0, r: 163.5,
                 x: 337.0 * TILE_SIZE, y: 163.5 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.45, hw: 58, hh: 44,
-                drivewayCar: { sprIdx: 12, dx: 34, dy: 38, ang: 0 },
-                dockBoat: { spr: "jetski_neon", dx: -38, dy: -40, ang: -Math.PI * 0.5 }
+                ang: 0, scale: 1.65, hw: 68, hh: 52,
+                drivewayCar: { sprIdx: 12, dx: 42, dy: 46, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: -45, dy: -48, ang: -Math.PI * 0.5 }
             },
             {
                 id: "star_south_estate",
@@ -1573,13 +1573,13 @@ class LeonidaMap {
                 kind: "mansion_star_island",
                 c: 349.0, r: 183.5,
                 x: 349.0 * TILE_SIZE, y: 183.5 * TILE_SIZE, z: 2.0,
-                ang: Math.PI, scale: 1.45, hw: 62, hh: 46,
-                drivewayCar: { sprIdx: 7, dx: 36, dy: 40, ang: Math.PI },
-                dockBoat: { spr: "speedboat_v8", dx: -35, dy: 48, ang: Math.PI * 0.5 }
+                ang: Math.PI, scale: 1.70, hw: 72, hh: 54,
+                drivewayCar: { sprIdx: 7, dx: 42, dy: 48, ang: Math.PI },
+                dockBoat: { spr: "speedboat_v8", dx: -45, dy: 58, ang: Math.PI * 0.5 }
             },
 
             // =====================================================================
-            // 2. SOUTH BEACH & OCEAN DRIVE RESIDENTIAL HOUSES (Spawn Neighborhood)
+            // 2. SOUTH BEACH RESIDENTIAL GARDEN DISTRICT (Placed in pure open grass lots, ZERO on roads!)
             // =====================================================================
             {
                 id: "sobe_modern_oceanfront",
@@ -1588,38 +1588,18 @@ class LeonidaMap {
                 kind: "mansion_modern_luxury",
                 c: 441.0, r: 268.0,
                 x: 441.0 * TILE_SIZE, y: 268.0 * TILE_SIZE, z: 2.0,
-                ang: Math.PI * 0.5, scale: 1.45, hw: 58, hh: 44,
-                drivewayCar: { sprIdx: 3, dx: 36, dy: 38, ang: Math.PI * 0.5 }
+                ang: 0, scale: 1.65, hw: 68, hh: 52,
+                drivewayCar: { sprIdx: 3, dx: 44, dy: 46, ang: 0 }
             },
             {
                 id: "sobe_flamingo_bungalow",
                 name: "Flamingo Park Classic Florida Bungalow",
                 district: "SOUTH BEACH",
                 kind: "house_florida_bungalow",
-                c: 437.0, r: 282.0,
-                x: 437.0 * TILE_SIZE, y: 282.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.35, hw: 44, hh: 34,
-                drivewayCar: { sprIdx: 2, dx: 24, dy: 30, ang: 0 }
-            },
-            {
-                id: "sobe_espanola_villa",
-                name: "Española Way Mediterranean Villa",
-                district: "SOUTH BEACH",
-                kind: "house_canal_villa",
-                c: 437.0, r: 290.0,
-                x: 437.0 * TILE_SIZE, y: 290.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.40, hw: 52, hh: 40,
-                drivewayCar: { sprIdx: 12, dx: 28, dy: 34, ang: 0 }
-            },
-            {
-                id: "sobe_meridian_cottage",
-                name: "Meridian Ave Historic Pastel Cottage",
-                district: "SOUTH BEACH",
-                kind: "house_florida_bungalow",
-                c: 437.0, r: 274.0,
-                x: 437.0 * TILE_SIZE, y: 274.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.30, hw: 42, hh: 32,
-                drivewayCar: { sprIdx: 5, dx: 24, dy: 30, ang: 0 }
+                c: 431.0, r: 268.0,
+                x: 431.0 * TILE_SIZE, y: 268.0 * TILE_SIZE, z: 2.0,
+                ang: 0, scale: 1.60, hw: 54, hh: 42,
+                drivewayCar: { sprIdx: 2, dx: 32, dy: 38, ang: 0 }
             },
 
             // =====================================================================
@@ -1632,9 +1612,9 @@ class LeonidaMap {
                 kind: "house_canal_villa",
                 c: 154.0, r: 48.0,
                 x: 154.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.42, hw: 52, hh: 40,
-                drivewayCar: { sprIdx: 2, dx: 28, dy: 34, ang: 0 },
-                dockBoat: { spr: "jetski_neon", dx: 38, dy: -36, ang: 0 }
+                ang: 0, scale: 1.60, hw: 62, hh: 48,
+                drivewayCar: { sprIdx: 2, dx: 36, dy: 42, ang: 0 },
+                dockBoat: { spr: "jetski_neon", dx: 45, dy: -42, ang: 0 }
             },
             {
                 id: "shores_canal_villa_2",
@@ -1643,9 +1623,9 @@ class LeonidaMap {
                 kind: "house_canal_villa",
                 c: 164.0, r: 48.0,
                 x: 164.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.40, hw: 50, hh: 38,
-                drivewayCar: { sprIdx: 7, dx: 28, dy: 34, ang: 0 },
-                dockBoat: { spr: "speedboat_v8", dx: -38, dy: -42, ang: 0 }
+                ang: 0, scale: 1.55, hw: 60, hh: 46,
+                drivewayCar: { sprIdx: 7, dx: 36, dy: 42, ang: 0 },
+                dockBoat: { spr: "speedboat_v8", dx: -45, dy: -48, ang: 0 }
             },
             {
                 id: "shores_modern_villa",
@@ -1654,8 +1634,8 @@ class LeonidaMap {
                 kind: "mansion_modern_luxury",
                 c: 154.0, r: 58.0,
                 x: 154.0 * TILE_SIZE, y: 58.0 * TILE_SIZE, z: 2.0,
-                ang: Math.PI, scale: 1.38, hw: 54, hh: 40,
-                drivewayCar: { sprIdx: 12, dx: 30, dy: 34, ang: Math.PI }
+                ang: Math.PI, scale: 1.55, hw: 64, hh: 48,
+                drivewayCar: { sprIdx: 12, dx: 38, dy: 42, ang: Math.PI }
             },
 
             // =====================================================================
@@ -1668,8 +1648,8 @@ class LeonidaMap {
                 kind: "house_keys_stilt",
                 c: 368.0, r: 453.0,
                 x: 368.0 * TILE_SIZE, y: 453.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.50, hw: 48, hh: 40,
-                dockBoat: { spr: "jetski_neon", dx: -36, dy: 24, ang: Math.PI * 0.5 }
+                ang: 0, scale: 1.80, hw: 58, hh: 48,
+                dockBoat: { spr: "jetski_neon", dx: -44, dy: 28, ang: Math.PI * 0.5 }
             },
             {
                 id: "keys_stilt_big_pine",
@@ -1678,8 +1658,8 @@ class LeonidaMap {
                 kind: "house_keys_stilt",
                 c: 271.0, r: 475.0,
                 x: 271.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
-                ang: -Math.PI * 0.5, scale: 1.45, hw: 46, hh: 38,
-                dockBoat: { spr: "jetski_neon", dx: 32, dy: 22, ang: 0 }
+                ang: -Math.PI * 0.5, scale: 1.70, hw: 54, hh: 46,
+                dockBoat: { spr: "jetski_neon", dx: 38, dy: 26, ang: 0 }
             },
             {
                 id: "keys_stilt_key_west",
@@ -1688,8 +1668,8 @@ class LeonidaMap {
                 kind: "house_keys_stilt",
                 c: 222.0, r: 475.0,
                 x: 222.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
-                ang: Math.PI * 0.5, scale: 1.45, hw: 46, hh: 38,
-                dockBoat: { spr: "speedboat_v8", dx: -36, dy: -28, ang: 0 }
+                ang: Math.PI * 0.5, scale: 1.70, hw: 54, hh: 46,
+                dockBoat: { spr: "speedboat_v8", dx: -42, dy: -34, ang: 0 }
             }
         ];
 
@@ -2156,7 +2136,7 @@ class LeonidaMap {
                 sub: "CONTEMPORARY ULTRA-LUXURY MIAMI BEACH ESTATE MINUTES FROM OCEAN DRIVE — 100% HEALTH!",
                 district: "SOUTH BEACH — RESIDENTIAL DISTRICT",
                 bx: 441.0,
-                by: 271.5,
+                by: 271.0,
                 x: 441.0 * TILE_SIZE,
                 y: 271.5 * TILE_SIZE,
                 color: "#34d399",
