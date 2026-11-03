@@ -4882,7 +4882,7 @@ class RetroRenderer {
             }
         }
 
-        // 14) GTA 6 Street Takeovers / Intersection Sideshow Drift Donuts ("donut_skid_ring" + Drifting Muscle Car + Tire Smoke + Crowd)
+        // 14) GTA 6 Street Cypher / Plaza Game Circles (NO cars inside pedestrian circles!)
         const takeovers = this.map.streetTakeovers;
         const vehSprites = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.vehicles;
         const getVehRect = (idxOrSpr, remapIdx = 0) => {
@@ -4895,33 +4895,23 @@ class RetroRenderer {
             }
             return ve.base || null;
         };
-        if (takeovers && takeovers.length > 0 && vehSprites) {
+        if (takeovers && takeovers.length > 0) {
             const crowdPeds = ["vc_haitian", "vc_cuban", "bikini_pink", "g2_civ_aqua", "vc_tourist", "g2_mugger"];
             for (let i = 0; i < takeovers.length; i++) {
                 const st = takeovers[i];
                 if (st.x < minX - 120 || st.x > maxX + 120 || st.y < minY - 120 || st.y > maxY + 120) continue;
                 const bz = st.z || 2.0;
                 this.batchObjectSprite3D("donut_skid_ring", st.x, st.y, bz + 0.014, st.seed, 1.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("beach_boombox", st.x, st.y - 26, bz + 0.028, 0, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
-                // Muscle car drifting in a tight 360° burnout circle with slip angle!
-                const orbitAng = this.time * 3.2 + st.seed;
-                const carX = st.x + Math.cos(orbitAng) * 20.0;
-                const carY = st.y + Math.sin(orbitAng) * 20.0;
-                const driftHeading = orbitAng + Math.PI * 0.5 - 0.52;
-                const vRect = getVehRect(st.carSpr, i);
-                if (vRect) {
-                    this.pushSolidQuad3D(carX + sunCos * 4, carY + sunSin * 4, bz + 0.018, 34, 18, driftHeading, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.048, driftHeading - Math.PI * 0.5, 0.96, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
-                }
-                // Billowing 3D white tire-smoke puffs (sprites 200..205) trailing the rear tires
-                for (let sm = 0; sm < 3; sm++) {
-                    const smAng = orbitAng - 0.35 - sm * 0.45;
-                    const sx = st.x + Math.cos(smAng) * (21 + sm * 3);
-                    const sy = st.y + Math.sin(smAng) * (21 + sm * 3);
-                    const smokeSpr = String(200 + ((Math.floor(this.time * 10) + sm) % 6));
-                    this.batchObjectSprite3D(smokeSpr, sx, sy, bz + 0.055 + sm * 0.018, this.time * 2.0 + sm, 0.72 + sm * 0.18, SPRITE_DRAW_ORDER.EXPLOSION);
-                }
-                // Ring of 6 cheering & phone-filming hype spectators around the burnout pit
+                // 2 Street Dancers / Challengers inside the circle (zero vehicles inside the circle!)
+                const dAng = this.time * 2.8 + st.seed;
+                const dFr1 = 50 + (Math.floor(this.time * 7.5 + i) % 4);
+                const dFr2 = 50 + (Math.floor(this.time * 7.5 + i + 2) % 4);
+                this.batchPedSprite3D("vc_cuban", dFr1, st.x + Math.cos(dAng) * 12, st.y + Math.sin(dAng) * 12, bz + 0.038, dAng + Math.PI, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("vc_haitian", dFr2, st.x - Math.cos(dAng) * 12, st.y - Math.sin(dAng) * 12, bz + 0.038, dAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+
+                // Ring of 6 cheering & phone-filming spectators around the circle
                 for (let ci = 0; ci < 6; ci++) {
                     const ca = (ci / 6) * Math.PI * 2 + 0.3;
                     const cx = st.x + Math.cos(ca) * 42;

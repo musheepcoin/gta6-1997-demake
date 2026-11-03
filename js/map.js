@@ -2049,6 +2049,16 @@ class LeonidaMap {
         for (const br of this.industrialAndParkDetails.bikerRallies) {
             pushPropOBB(br.x, br.y, br.count * 10, 12, 0);
         }
+        if (Array.isArray(this.streetTakeovers)) {
+            for (const st of this.streetTakeovers) {
+                pushPropOBB(st.x, st.y, 44, 44, 0);
+            }
+        }
+        if (Array.isArray(this.streetEvents)) {
+            for (const ev of this.streetEvents) {
+                pushPropOBB(ev.x, ev.y, 32, 32, 0);
+            }
+        }
 
         // 18D-2. 3D Landmarks & Monuments Solid OBB Collision Hulls (Launchpad, ATC Tower, Water Tower, Pier Arch Pylons, Ferris Wheel & Gantry Legs)
         pushPropOBB(465.0 * TILE_SIZE, 35.0 * TILE_SIZE, 78, 78, 0);              // SERA Launchpad MLP & Umbilical Tower
