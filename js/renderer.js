@@ -7002,11 +7002,14 @@ class RetroRenderer {
             g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
             lctx.fillStyle = g;
 
-            // Draw 3 feathered wide-base trapezoidal fan layers so the beam starts wide across both headlights and has soft side edges
+            // Draw smooth feathered wide-base trapezoidal fan layers so the beam starts across both headlights with soft, band-free side edges
             const layers = [
-                { sp: spreadRad * 1.14, wMult: 1.12, alpha: 0.34 },
-                { sp: spreadRad * 0.90, wMult: 1.00, alpha: 0.44 },
-                { sp: spreadRad * 0.60, wMult: 0.76, alpha: 0.38 }
+                { sp: spreadRad * 1.15, wMult: 1.10, alpha: 0.14 },
+                { sp: spreadRad * 1.00, wMult: 1.02, alpha: 0.18 },
+                { sp: spreadRad * 0.85, wMult: 0.94, alpha: 0.22 },
+                { sp: spreadRad * 0.70, wMult: 0.84, alpha: 0.24 },
+                { sp: spreadRad * 0.52, wMult: 0.72, alpha: 0.24 },
+                { sp: spreadRad * 0.34, wMult: 0.56, alpha: 0.20 }
             ];
             const prevAlpha = lctx.globalAlpha;
             for (const ly of layers) {
@@ -7227,7 +7230,8 @@ class RetroRenderer {
             const frontDist = (v.w || 48) * 0.46;
             const rearDist = -(v.w || 48) * 0.46;
             const latSpread = v.isMotorcycle ? 0 : ((v.h || 24) * 0.32);
-            const beamAng = v.angle + (v.steerAngleRad || 0) * 0.42;
+            // Headlights are rigidly mounted to the front bumper: always aligned straight with the vehicle chassis (v.angle)
+            const beamAng = v.angle;
 
             // Warm ambient glow around the vehicle chassis
             addLightPool(sc.x, sc.y, 38 * pxScale, "rgba(200, 215, 255, 0.42)", "rgba(100, 130, 190, 0.15)");
@@ -7401,9 +7405,12 @@ class RetroRenderer {
                 ctx.fillStyle = g;
 
                 const layers = [
-                    { sp: c.spread * 1.12, wMult: 1.08, alpha: 0.35 },
-                    { sp: c.spread * 0.86, wMult: 0.96, alpha: 0.42 },
-                    { sp: c.spread * 0.56, wMult: 0.72, alpha: 0.35 }
+                    { sp: c.spread * 1.14, wMult: 1.08, alpha: 0.14 },
+                    { sp: c.spread * 0.98, wMult: 1.00, alpha: 0.18 },
+                    { sp: c.spread * 0.82, wMult: 0.92, alpha: 0.20 },
+                    { sp: c.spread * 0.66, wMult: 0.82, alpha: 0.22 },
+                    { sp: c.spread * 0.48, wMult: 0.70, alpha: 0.20 },
+                    { sp: c.spread * 0.30, wMult: 0.54, alpha: 0.16 }
                 ];
                 for (const ly of layers) {
                     const w = bw * ly.wMult;
