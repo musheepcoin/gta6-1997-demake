@@ -295,6 +295,10 @@ class WorldObjectEngine {
             wynwoodWalls: { x: 189.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0 },
             lakeLeonidaOutpost: { x: 125.5 * TILE_SIZE, y: 103.0 * TILE_SIZE, z: 2.0 },
             sevenMileOldSpan: { x: 202.0 * TILE_SIZE, y: 478.6 * TILE_SIZE, z: 2.0, jumpX: 202.0 * TILE_SIZE, jumpY: 480.5 * TILE_SIZE, cooldown: 0 },
+            // GTA 6 Trailer 1, Trailer 2 & 70 Official Screenshots Iconic Landmarks:
+            briansBoatyard: { x: 216.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            jackOfHearts: { x: 193.5 * TILE_SIZE, y: 131.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            calHamptonOutpost: { x: 149.5 * TILE_SIZE, y: 125.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             highwayGantries: [
                 // 4 Full-Span Twin-Pylon 3D Overhead Green FDOT Highway Gantries (pylons strictly on PAVE/FIELD shoulders!)
                 { id: "gantry_vcia_exp",   x: 130.0 * TILE_SIZE, y: 296.8 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 332, fullSpan: true },
@@ -452,6 +456,25 @@ class WorldObjectEngine {
         this.takeoverCooldown = 0;
         this.gymCooldown = 0;
         this.tikiCooldown = 0;
+        // 8. GTA 6 Trailer 1 & 2 Iconic Bandana Stick-Up Robbery Stores (Uncle Jack's Liquor, Pawn & Gun, Hank's Waffles, etc.)
+        this.stickUpStores = [
+            { id: "rob_uncle_jacks",  name: "UNCLE JACK'S LIQUOR (TRAILER 1)",   x: 442.5 * TILE_SIZE, y: 282.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, robbedOnce: false, neon: [0.98, 0.28, 0.68], ad: "ad_pisswasser"   },
+            { id: "rob_pawn_and_gun", name: "PORT GELLHORN PAWN & GUN",          x: 64.5 * TILE_SIZE,  y: 179.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, robbedOnce: false, neon: [0.98, 0.82, 0.16], ad: "ad_ammunation"   },
+            { id: "rob_hanks_waffle", name: "HANK'S WAFFLES DINER (GELLHORN)",   x: 68.5 * TILE_SIZE,  y: 191.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.22, 0.92, 0.98], ad: "ad_burgershot"   },
+            { id: "rob_haiti_mercad", name: "LITTLE HAITI CARIBBEAN MERCADO",    x: 224.5 * TILE_SIZE, y: 116.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.24, 0.96, 0.46], ad: "ad_sprunk"       },
+            { id: "rob_rusty_anchor", name: "THE RUSTY ANCHOR BIKER BAR",        x: 152.5 * TILE_SIZE, y: 126.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.98, 0.52, 0.16], ad: "ad_patriot_beer" },
+            { id: "rob_keys_tackle",  name: "ISLAMORADA BAIT & LIQUOR",          x: 258.5 * TILE_SIZE, y: 478.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.18, 0.94, 0.86], ad: "ad_ecola"        }
+        ];
+        // 9. GTA 6 70+ Official Screenshots: Leonida Snapmatic / Social-Media Photo Safari Viewpoints
+        this.photoSafariSpots = [
+            { id: "snap_ocean_drive", name: "OCEAN DRIVE ART DECO NEON STRIP",   x: 443.5 * TILE_SIZE, y: 272.5 * TILE_SIZE, z: 2.0, snapped: false },
+            { id: "snap_keys_iguana", name: "LEONIDA KEYS GREEN IGUANA SEAWALL", x: 212.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, snapped: false },
+            { id: "snap_grassrivers", name: "GRASSRIVERS FLAMINGO AIRBOAT BAYOU",x: 114.5 * TILE_SIZE, y: 395.5 * TILE_SIZE, z: 2.0, snapped: false },
+            { id: "snap_kalaga_peak", name: "MOUNT KALAGA CANYON TRAIL OVERLOOK",x: 138.5 * TILE_SIZE, y: 25.5 * TILE_SIZE,  z: 2.0, snapped: false },
+            { id: "snap_vice_cruise", name: "VICE PORT MEGA-CRUISE SHIP QUAY",   x: 356.5 * TILE_SIZE, y: 318.5 * TILE_SIZE, z: 2.0, snapped: false },
+            { id: "snap_star_sunset", name: "STAR ISLAND SUNSET SUPERYACHT PIER",x: 344.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, snapped: false }
+        ];
+        this.cameraFlashTimer = 0;
         this.meshVbo = null;
         this.meshVertexCount = 0;
         this.dynVbo = null;
@@ -777,6 +800,54 @@ class WorldObjectEngine {
             }
             if (this.landmarks3D.sevenMileOldSpan) {
                 clearZones.push({ x: this.landmarks3D.sevenMileOldSpan.x, y: this.landmarks3D.sevenMileOldSpan.y, r: 110 });
+            }
+            const snapOffRoad = (pt) => {
+                if (!pt || !map.surfaceGround) return;
+                const c0 = Math.floor(pt.x / TILE_SIZE);
+                const r0 = Math.floor(pt.y / TILE_SIZE);
+                if (c0 > 2 && c0 < M - 3 && r0 > 2 && r0 < MAP_ROWS - 3 && map.surfaceGround[r0 * M + c0] === GROUND_TYPE.ROAD) {
+                    for (let rad = 1; rad <= 5; rad++) {
+                        let found = false;
+                        for (let dr = -rad; dr <= rad && !found; dr++) {
+                            for (let dc = -rad; dc <= rad && !found; dc++) {
+                                const nc = c0 + dc, nr = r0 + dr;
+                                if (nc > 2 && nc < M - 3 && nr > 2 && nr < MAP_ROWS - 3) {
+                                    const gt = map.surfaceGround[nr * M + nc];
+                                    if (gt === GROUND_TYPE.PAWEMENT || gt === GROUND_TYPE.FIELD) {
+                                        pt.x = (nc + 0.5) * TILE_SIZE;
+                                        pt.y = (nr + 0.5) * TILE_SIZE;
+                                        found = true;
+                                    }
+                                }
+                            }
+                        }
+                        if (found) break;
+                    }
+                }
+            };
+            if (this.landmarks3D.briansBoatyard) {
+                snapOffRoad(this.landmarks3D.briansBoatyard);
+                clearZones.push({ x: this.landmarks3D.briansBoatyard.x, y: this.landmarks3D.briansBoatyard.y, r: 92 });
+            }
+            if (this.landmarks3D.jackOfHearts) {
+                snapOffRoad(this.landmarks3D.jackOfHearts);
+                clearZones.push({ x: this.landmarks3D.jackOfHearts.x, y: this.landmarks3D.jackOfHearts.y, r: 92 });
+            }
+            if (this.landmarks3D.calHamptonOutpost) {
+                snapOffRoad(this.landmarks3D.calHamptonOutpost);
+                clearZones.push({ x: this.landmarks3D.calHamptonOutpost.x, y: this.landmarks3D.calHamptonOutpost.y, r: 82 });
+            }
+            if (Array.isArray(this.stickUpStores)) {
+                for (const su of this.stickUpStores) {
+                    snapOffRoad(su);
+                    clearZones.push({ x: su.x, y: su.y, r: 54 });
+                }
+            }
+            if (Array.isArray(this.photoSafariSpots)) {
+                for (const ps of this.photoSafariSpots) {
+                    snapOffRoad(ps);
+                    clearZones.push({ x: ps.x, y: ps.y, r: 44 });
+                }
             }
             if (Array.isArray(this.landmarks3D.lighthouses)) {
                 for (const lh of this.landmarks3D.lighthouses) {
@@ -1484,6 +1555,209 @@ class WorldObjectEngine {
             }
         }
 
+        // 0N. GTA 6 Trailer 2: Brian Heder's Leonida Keys Boatyard & Jason's Rooftop Smuggling Stash ([E]!)
+        if (this.landmarks3D && this.landmarks3D.briansBoatyard) {
+            const bb = this.landmarks3D.briansBoatyard;
+            if ((bb.cooldown || 0) <= 0 && Math.hypot(px - bb.x, py - bb.y) < 88) {
+                bb.cooldown = 22.0;
+                game.player.hp = game.player.maxHp || 100;
+                game.player.armor = 100;
+                if (game.player.ammo) {
+                    game.player.ammo.UZI = (game.player.ammo.UZI || 0) + 120;
+                    game.player.ammo.SHOTGUN = (game.player.ammo.SHOTGUN || 0) + 30;
+                    game.player.ammo.ROCKET = (game.player.ammo.ROCKET || 0) + 6;
+                }
+                if (game.wantedSystem && (game.wantedSystem.level || 0) > 0) {
+                    game.wantedSystem.level = Math.max(0, game.wantedSystem.level - 2);
+                }
+                if (typeof game.addScore === "function") game.addScore(12000);
+                if (typeof game.addCash === "function") game.addCash(12000, "🛥️ BRIAN'S KEYS BOATYARD STASH!");
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("🛥️ BRIAN'S BOATYARD SMUGGLING RUN!", "JASON & BRIAN KEYS STASH • +$12,000 + FULL ARMOR & -2 STARS!", "#2dd4bf", 3.0);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: bb.x,
+                        y: bb.y,
+                        z: 2.78,
+                        text: "🛥️ BRIAN'S KEYS SMUGGLING STASH! +$12,000 + HEAVY WEAPONS!",
+                        color: "#2dd4bf",
+                        life: 3.0
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0O. GTA 6 Trailer 1 & 2: Boobie Ike's "Jack of Hearts" VIP Club Make-It-Rain Cash Drop ([E]!)
+        if (this.landmarks3D && this.landmarks3D.jackOfHearts) {
+            const jh = this.landmarks3D.jackOfHearts;
+            if ((jh.cooldown || 0) <= 0 && Math.hypot(px - jh.x, py - jh.y) < 88) {
+                jh.cooldown = 20.0;
+                if (typeof game.addScore === "function") game.addScore(10000);
+                if (typeof game.addCash === "function") game.addCash(10000, "💎 BOOBIE IKE'S JACK OF HEARTS VIP!");
+                if (typeof game.addMultiplier === "function") game.addMultiplier(2);
+                // Eject 3 bonus spinning cash briefcases around the VIP red carpet!
+                for (let k = 0; k < 3; k++) {
+                    const ang = (k * Math.PI * 2.0) / 3.0 + 0.4;
+                    this.cashDrops.push({
+                        x: jh.x + Math.cos(ang) * 32,
+                        y: jh.y + Math.sin(ang) * 32,
+                        z: jh.z || 2.0,
+                        vx: Math.cos(ang) * 85,
+                        vy: Math.sin(ang) * 85,
+                        seed: Math.random() * 6.28,
+                        age: 0
+                    });
+                }
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("💎 BOOBIE IKE'S JACK OF HEARTS!", "MAKE IT RAIN VIP CLUB PAYOUT • +$10,000 + +2X & CASH SHOWER!", "#f472b6", 3.0);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: jh.x,
+                        y: jh.y,
+                        z: 2.82,
+                        text: "💎 JACK OF HEARTS VIP MAKE IT RAIN! +$10,000 + +2X!",
+                        color: "#f472b6",
+                        life: 3.0
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0P. GTA 6 Trailer 2: Cal Hampton's Coast Guard & VCPD Radio Scanner Jammer ([E]!)
+        if (this.landmarks3D && this.landmarks3D.calHamptonOutpost) {
+            const ch = this.landmarks3D.calHamptonOutpost;
+            if ((ch.cooldown || 0) <= 0 && Math.hypot(px - ch.x, py - ch.y) < 84) {
+                ch.cooldown = 20.0;
+                if (game.wantedSystem) {
+                    game.wantedSystem.level = 0;
+                    if (typeof game.wantedSystem.clearWanted === "function") game.wantedSystem.clearWanted(game);
+                }
+                if (Array.isArray(this.smugglerDrops)) {
+                    for (const sd of this.smugglerDrops) sd.active = true;
+                }
+                if (typeof game.addScore === "function") game.addScore(7500);
+                if (typeof game.addCash === "function") game.addCash(7500, "📡 CAL HAMPTON SCANNER HACK!");
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("📡 CAL HAMPTON'S RADIO SCANNER!", "VCPD & COAST GUARD FREQUENCIES JAMMED • 0★ WANTED & +$7,500!", "#38bdf8", 3.0);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: ch.x,
+                        y: ch.y,
+                        z: 2.75,
+                        text: "📡 VCPD DISPATCH JAMMED BY CAL HAMPTON! 0★ WANTED + $7,500!",
+                        color: "#38bdf8",
+                        life: 3.0
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
+        if (Array.isArray(this.stickUpStores)) {
+            for (const su of this.stickUpStores) {
+                if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 76) {
+                    su.cooldown = 35.0;
+                    su.robbedOnce = true;
+                    game.player.bandanaOn = true;
+                    const robbedCount = this.stickUpStores.filter(s => s.robbedOnce).length;
+                    const totalStores = this.stickUpStores.length;
+                    const isAllRobbed = robbedCount === totalStores;
+                    const take = isAllRobbed ? 25000 : 6500;
+                    if (typeof game.addScore === "function") game.addScore(take);
+                    if (typeof game.addCash === "function") game.addCash(take, `🔫 ${su.name} STICK-UP!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.wantedSystem) {
+                        game.wantedSystem.addChaos(90, "STORE_STICKUP", game);
+                        if ((game.wantedSystem.level || 0) < 2) game.wantedSystem.level = 2;
+                    }
+                    // Eject a bonus cash briefcase in front of the door
+                    const fCos = Math.cos(su.ang || 0), fSin = Math.sin(su.ang || 0);
+                    this.cashDrops.push({
+                        x: su.x - fSin * 20,
+                        y: su.y + fCos * 20,
+                        z: su.z || 2.0,
+                        vx: -fSin * 70,
+                        vy: fCos * 70,
+                        seed: Math.random() * 6.28,
+                        age: 0
+                    });
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            isAllRobbed ? "🔫 TRUST! ALL 6 LEONIDA STORES ROBBED!" : `🔫 BANDANA STICK-UP! (${robbedCount}/${totalStores})`,
+                            isAllRobbed
+                                ? `${su.name} • +$25,000 BONNIE & CLYDE SPREE BONUS!`
+                                : `${su.name} • BANDANA ON + +$6,500 REGISTER TAKE!`,
+                            "#facc15",
+                            3.0
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: su.x,
+                            y: su.y,
+                            z: 2.75,
+                            text: isAllRobbed
+                                ? "🔫 BONNIE & CLYDE OF LEONIDA! ALL 6 STORES ROBBED! +$25,000!"
+                                : `🔫 BANDANA STICK-UP (${robbedCount}/${totalStores})! +$6,500 + BRIEFCASE!`,
+                            color: "#facc15",
+                            life: 3.0
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0R. GTA 6 70+ Official Screenshots: Leonida Snapmatic / Social-Media Photo Safari Viewpoints ([E]!)
+        if (Array.isArray(this.photoSafariSpots)) {
+            for (const ps of this.photoSafariSpots) {
+                if (!ps.snapped && Math.hypot(px - ps.x, py - ps.y) < 76) {
+                    ps.snapped = true;
+                    this.cameraFlashTimer = 0.38;
+                    const snapCount = this.photoSafariSpots.filter(s => s.snapped).length;
+                    const totalSnaps = this.photoSafariSpots.length;
+                    const isAllSnapped = snapCount === totalSnaps;
+                    const prize = isAllSnapped ? 30000 : 5000;
+                    if (typeof game.addScore === "function") game.addScore(prize);
+                    if (typeof game.addCash === "function") game.addCash(prize, `📸 ${ps.name} PHOTO!`);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            isAllSnapped ? "📸 ALL 6 GTA 6 OFFICIAL POSTCARDS CAPTURED!" : `📸 VIRAL LEONIDA PHOTO! (${snapCount}/${totalSnaps})`,
+                            isAllSnapped
+                                ? `${ps.name} • +$30,000 LEONIDA PHOTOGRAPHER OF THE YEAR!`
+                                : `${ps.name} • +$5,000 SOCIAL MEDIA SPONSOR PAYOUT!`,
+                            "#38bdf8",
+                            3.0
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ps.x,
+                            y: ps.y,
+                            z: 2.75,
+                            text: isAllSnapped
+                                ? "📸 ALL 6 GTA 6 POSTCARD SCREENSHOTS SNAPPED! +$30,000!"
+                                : `📸 VIRAL SCREENSHOT (${snapCount}/${totalSnaps})! +$5,000!`,
+                            color: "#38bdf8",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         if (!this.heistTargets || this.heistTargets.length === 0) return false;
 
         for (let i = 0; i < this.heistTargets.length; i++) {
@@ -2106,6 +2380,23 @@ class WorldObjectEngine {
         if ((this.gymCooldown || 0) > 0) this.gymCooldown = Math.max(0, this.gymCooldown - dt);
         if ((this.tikiCooldown || 0) > 0) this.tikiCooldown = Math.max(0, this.tikiCooldown - dt);
         if ((this.takeoverCooldown || 0) > 0) this.takeoverCooldown = Math.max(0, this.takeoverCooldown - dt);
+        if ((this.cameraFlashTimer || 0) > 0) this.cameraFlashTimer = Math.max(0, this.cameraFlashTimer - dt);
+        if (this.landmarks3D) {
+            if (this.landmarks3D.briansBoatyard && (this.landmarks3D.briansBoatyard.cooldown || 0) > 0) {
+                this.landmarks3D.briansBoatyard.cooldown = Math.max(0, this.landmarks3D.briansBoatyard.cooldown - dt);
+            }
+            if (this.landmarks3D.jackOfHearts && (this.landmarks3D.jackOfHearts.cooldown || 0) > 0) {
+                this.landmarks3D.jackOfHearts.cooldown = Math.max(0, this.landmarks3D.jackOfHearts.cooldown - dt);
+            }
+            if (this.landmarks3D.calHamptonOutpost && (this.landmarks3D.calHamptonOutpost.cooldown || 0) > 0) {
+                this.landmarks3D.calHamptonOutpost.cooldown = Math.max(0, this.landmarks3D.calHamptonOutpost.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.stickUpStores)) {
+            for (const su of this.stickUpStores) {
+                if ((su.cooldown || 0) > 0) su.cooldown = Math.max(0, su.cooldown - dt);
+            }
+        }
         if (this.mambasStadium) {
             const ms = this.mambasStadium;
             if ((ms.cooldown || 0) > 0) ms.cooldown = Math.max(0, ms.cooldown - dt);
@@ -4325,6 +4616,96 @@ class WorldObjectEngine {
             emitBox3D(ms.x, ms.y, 1, 0, 0, -124, 88, 11.5, bz + 0.60, bz + 1.06, "ad_vice26", "ad_sprunk", [0.22, 0.94, 0.98]);
         }
 
+        // 24. GTA 6 TRAILER 2: BRIAN HEDER'S LEONIDA KEYS BOATYARD, DRY-DOCK HOIST GANTRY & JASON'S LADDER (c=216.5, r=476.5)
+        if (this.landmarks3D && this.landmarks3D.briansBoatyard) {
+            const bb = this.landmarks3D.briansBoatyard;
+            const bz = bb.z || 2.0;
+            emitAOShadow3D(bb.x, bb.y, 1, 0, 0, 0, 96, 72, bz, 0.40);
+            // Wooden Marina Dry-Dock Deck (L77 boardwalk planks)
+            emitTileBox3D(bb.x, bb.y, 1, 0, 0, 0, 84, 56, bz, bz + 0.08, 177, 177, 77, [0.86, 0.70, 0.48], true);
+            // Twin Open-Lattice S363 Steel Boat-Hoist Gantry Towers & S250 Overhead Cross-Beam
+            for (const gx of [-32, 32]) {
+                emitTileBox3D(bb.x, bb.y, 1, 0, gx, -16, 9, 9, bz + 0.08, bz + 0.94, 363, 246, 64, [0.92, 0.74, 0.18], false);
+                emitTileBox3D(bb.x, bb.y, 1, 0, gx,  16, 9, 9, bz + 0.08, bz + 0.94, 363, 246, 64, [0.92, 0.74, 0.18], false);
+                emitTileBox3D(bb.x, bb.y, 1, 0, gx,   0, 9, 42, bz + 0.86, bz + 0.96, 250, 363, 64, [0.94, 0.78, 0.20], false);
+            }
+            emitTileBox3D(bb.x, bb.y, 1, 0, 0, 0, 74, 12, bz + 0.92, bz + 1.02, 250, 363, 64, [0.90, 0.92, 0.96], false);
+            // Suspended 3D Keys Cigarette Smuggling Boat Hull in Dry-Dock Cradle + Jason's S249 Rooftop Ladder & Stash Crates
+            emitSolidBox3D(bb.x, bb.y, 1, 0, 0, 0, 48, 18, bz + 0.24, bz + 0.42, [0.94, 0.96, 0.99], 5);
+            emitSolidBox3D(bb.x, bb.y, 1, 0, 0, 0, 50, 19, bz + 0.34, bz + 0.39, [0.18, 0.84, 0.78], 7);
+            emitTileBox3D(bb.x, bb.y, 1, 0, -37, 0, 3, 8, bz + 0.08, bz + 0.92, 249, 249, 45, [0.92, 0.94, 0.98], false);
+            emitSolidBox3D(bb.x, bb.y, 1, 0, 22, 18, 18, 14, bz + 0.08, bz + 0.26, [0.24, 0.52, 0.28], 6);
+        }
+
+        // 25. GTA 6 TRAILER 1 & 2: BOOBIE IKE'S "JACK OF HEARTS" CLUB & STUDIO 3D NEON MARQUEE (c=193.5, r=131.5)
+        if (this.landmarks3D && this.landmarks3D.jackOfHearts) {
+            const jh = this.landmarks3D.jackOfHearts;
+            const bz = jh.z || 2.0;
+            emitAOShadow3D(jh.x, jh.y, 1, 0, 0, 0, 88, 56, bz, 0.42);
+            // Velvet-Rope VIP Red Carpet Entrance Podium
+            emitSolidBox3D(jh.x, jh.y, 1, 0, 0, 0, 72, 42, bz, bz + 0.06, [0.16, 0.14, 0.24], 2);
+            emitSolidBox3D(jh.x, jh.y, 1, 0, 0, 4, 34, 34, bz + 0.06, bz + 0.085, [0.78, 0.12, 0.24], 1);
+            // Twin Gold Brass Velvet-Rope Stanchions
+            for (const sx of [-22, 22]) {
+                emitCylinder3D(jh.x, jh.y, sx, 16, 2.5, 2.5, bz + 0.06, bz + 0.24, 8, [0.98, 0.82, 0.20], 5, true);
+            }
+            // Twin Hot-Pink & Gold 3D Neon Marquee Columns + Grand Jack of Hearts Signboard
+            for (const cxOff of [-28, 28]) {
+                emitTileBox3D(jh.x, jh.y, 1, 0, cxOff, -10, 10, 10, bz + 0.06, bz + 0.98, 164, 165, 86, [0.98, 0.28, 0.72], false);
+                emitSolidBox3D(jh.x, jh.y, 1, 0, cxOff, -10, 12, 12, bz + 0.48, bz + 0.54, [0.98, 0.82, 0.18], 7);
+            }
+            emitSolidBox3D(jh.x, jh.y, 1, 0, 0, -10, 76, 14, bz + 0.78, bz + 1.18, [0.22, 0.08, 0.28], 5);
+            emitBox3D(jh.x, jh.y, 1, 0, 0, -10, 68, 15.5, bz + 0.82, bz + 1.14, "ad_vice26", "ad_vice26", [0.98, 0.26, 0.74]);
+            emitSolidBox3D(jh.x, jh.y, 1, 0, 0, -10, 78, 16, bz + 1.18, bz + 1.24, [0.98, 0.82, 0.18], 7);
+        }
+
+        // 26. GTA 6 TRAILER 2: CAL HAMPTON'S COAST GUARD SCANNER & CONSPIRACY RADIO OUTPOST (c=149.5, r=125.5)
+        if (this.landmarks3D && this.landmarks3D.calHamptonOutpost) {
+            const ch = this.landmarks3D.calHamptonOutpost;
+            const bz = ch.z || 2.0;
+            emitAOShadow3D(ch.x, ch.y, 1, 0, 0, 0, 68, 52, bz, 0.38);
+            // Wooden Radio Trailer Deck (L77) + Armored Communications Shelter Box (MAT 6) + Patriot Beer Cooler
+            emitTileBox3D(ch.x, ch.y, 1, 0, 0, 0, 56, 40, bz, bz + 0.08, 177, 177, 77, [0.82, 0.66, 0.46], false);
+            emitSolidBox3D(ch.x, ch.y, 1, 0, -10, -4, 32, 22, bz + 0.08, bz + 0.38, [0.28, 0.36, 0.28], 6);
+            emitBox3D(ch.x, ch.y, 1, 0, -10, -4, 26, 23.5, bz + 0.12, bz + 0.34, "ad_patriot_beer", "ad_patriot_beer", [0.96, 0.28, 0.32]);
+            emitSolidBox3D(ch.x, ch.y, 1, 0, 16, 8, 14, 10, bz + 0.08, bz + 0.20, [0.92, 0.20, 0.22], 5); // Red beer cooler
+            // 3-Tier S363 Open-Lattice Coast Guard Scanner Antenna Mast (at offX = +16, offY = -8)
+            for (let lv = 0; lv < 3; lv++) {
+                const y0 = bz + 0.08 + lv * 0.32;
+                emitTileBox3D(ch.x, ch.y, 1, 0, 16, -8, 10 - lv * 1.5, 10 - lv * 1.5, y0, y0 + 0.32, 363, 246, 64, [0.90, 0.92, 0.96], false);
+            }
+        }
+
+        // 27. GTA 6 TRAILER 1 & 2: 6 ICONIC BANDANA STICK-UP STOREFRONT CANOPIES & CASH REGISTERS (this.stickUpStores)
+        if (Array.isArray(this.stickUpStores)) {
+            for (const su of this.stickUpStores) {
+                const bz = su.z || 2.0;
+                const sCos = Math.cos(su.ang || 0);
+                const sSin = Math.sin(su.ang || 0);
+                const nc = su.neon || [0.98, 0.28, 0.68];
+                emitAOShadow3D(su.x, su.y, sCos, sSin, 0, 0, 52, 32, bz, 0.36);
+                // Sidewalk Storefront Entrance Mat + Armored Cash Register Pedestal + Overhead Neon Awning & Ad Sign
+                emitTileBox3D(su.x, su.y, sCos, sSin, 0, 0, 44, 24, bz, bz + 0.05, 177, 177, 8, [0.90, 0.92, 0.96], false);
+                emitSolidBox3D(su.x, su.y, sCos, sSin, 0, 0, 18, 12, bz + 0.05, bz + 0.24, [0.20, 0.24, 0.32], 5);
+                emitSolidBox3D(su.x, su.y, sCos, sSin, 0, 0, 14, 10, bz + 0.24, bz + 0.32, [0.98, 0.82, 0.16], 7);
+                for (const pxOff of [-18, 18]) {
+                    emitTileBox3D(su.x, su.y, sCos, sSin, pxOff, -8, 4.5, 4.5, bz + 0.05, bz + 0.48, 363, 363, 45, [0.88, 0.90, 0.94], false);
+                }
+                emitSolidBox3D(su.x, su.y, sCos, sSin, 0, -2, 46, 22, bz + 0.46, bz + 0.52, nc, 7);
+                emitBox3D(su.x, su.y, sCos, sSin, 0, -2, 40, 8, bz + 0.52, bz + 0.72, su.ad, su.ad, nc);
+            }
+        }
+
+        // 28. GTA 6 70+ OFFICIAL SCREENSHOTS: 6 PHOTO SAFARI VIEWPOINT PEDESTALS (this.photoSafariSpots)
+        if (Array.isArray(this.photoSafariSpots)) {
+            for (const ps of this.photoSafariSpots) {
+                const bz = ps.z || 2.0;
+                emitAOShadow3D(ps.x, ps.y, 1, 0, 0, 0, 32, 32, bz, 0.32);
+                emitCylinder3D(ps.x, ps.y, 0, 0, 11.0, 9.5, bz, bz + 0.07, 12, [0.88, 0.90, 0.94], 2, true);
+                emitCylinder3D(ps.x, ps.y, 0, 0, 3.0, 2.2, bz + 0.07, bz + 0.26, 8, [0.24, 0.28, 0.34], 5, true);
+            }
+        }
+
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
         }
@@ -5015,6 +5396,56 @@ class WorldObjectEngine {
             }
         }
 
+        // 15. GTA 6 Trailer 1 & 2: Boobie Ike's "Jack of Hearts" Rotating Sky-Tracker Searchlights & Neon Heart Crown
+        if (this.landmarks3D && this.landmarks3D.jackOfHearts) {
+            const jh = this.landmarks3D.jackOfHearts;
+            if (jh.x >= minX - 220 && jh.x <= maxX + 220 && jh.y >= minY - 220 && jh.y <= maxY + 220) {
+                const bz = jh.z || 2.0;
+                const hAng = t * 2.2;
+                const cA = Math.cos(hAng), sA = Math.sin(hAng);
+                const pulse = 0.84 + 0.16 * Math.sin(t * 7.0);
+                // 3D Rotating Hot-Pink & Gold Neon Heart Sculpture atop the Marquee
+                emitDynBox(jh.x, jh.y - 10, cA, sA, -6, 0, 14, 8, bz + 1.26, bz + 1.44, [0.98, 0.20, 0.68], pulse, 7);
+                emitDynBox(jh.x, jh.y - 10, cA, sA,  6, 0, 14, 8, bz + 1.26, bz + 1.44, [0.98, 0.20, 0.68], pulse, 7);
+                emitDynBox(jh.x, jh.y - 10, cA, sA,  0, 0, 12, 9, bz + 1.20, bz + 1.32, [0.98, 0.82, 0.18], 0.96, 7);
+                // Twin Sweeping 3D Nightclub Sky-Tracker Searchlight Beams
+                for (const dir of [-1, 1]) {
+                    const bAng = t * 1.6 * dir;
+                    const bx = jh.x + dir * 28 + Math.cos(bAng) * 18;
+                    const by = jh.y - 10 + Math.sin(bAng) * 18;
+                    emitDynCylinder(bx, by, 0, 0, 6.0, 18.0, bz + 1.24, bz + 2.15, 10, dir < 0 ? [0.98, 0.30, 0.78] : [0.22, 0.94, 0.98], 7, false, 0.42);
+                }
+            }
+        }
+
+        // 16. GTA 6 Trailer 2: Cal Hampton's Live-Rotating Coast Guard Parabolic Scanner Dish
+        if (this.landmarks3D && this.landmarks3D.calHamptonOutpost) {
+            const ch = this.landmarks3D.calHamptonOutpost;
+            if (ch.x >= minX - 180 && ch.x <= maxX + 180 && ch.y >= minY - 180 && ch.y <= maxY + 180) {
+                const bz = ch.z || 2.0;
+                const dAng = t * 2.6;
+                emitDynBox(ch.x + 16, ch.y - 8, Math.cos(dAng), Math.sin(dAng), 0, 0, 22, 5, bz + 1.04, bz + 1.14, [0.92, 0.96, 1.00], 1.0, 4);
+                if (Math.sin(t * 8.0) > 0) {
+                    emitDynCylinder(ch.x + 16, ch.y - 8, 0, 0, 2.8, 2.8, bz + 1.14, bz + 1.22, 8, [0.22, 0.94, 0.98], 7, true);
+                }
+            }
+        }
+
+        // 17. GTA 6 70+ Official Screenshots: Spinning 3D Golden Camera Icons on Photo Safari Pedestals
+        if (Array.isArray(this.photoSafariSpots)) {
+            for (let i = 0; i < this.photoSafariSpots.length; i++) {
+                const ps = this.photoSafariSpots[i];
+                if (ps.x < minX - 140 || ps.x > maxX + 140 || ps.y < minY - 140 || ps.y > maxY + 140) continue;
+                const bz = ps.z || 2.0;
+                const cAng = t * 2.8 + i;
+                const cA = Math.cos(cAng), sA = Math.sin(cAng);
+                const bob = Math.sin(t * 4.0 + i) * 0.03;
+                const camCol = ps.snapped ? [0.22, 0.96, 0.54] : [0.98, 0.84, 0.18];
+                emitDynBox(ps.x, ps.y, cA, sA, 0, 0, 14, 9, bz + 0.28 + bob, bz + 0.40 + bob, camCol, 0.96, 7);
+                emitDynBox(ps.x, ps.y, cA, sA, 0, 6, 6, 5, bz + 0.30 + bob, bz + 0.38 + bob, [0.22, 0.92, 0.98], 0.98, 7);
+            }
+        }
+
         if (dVerts.length === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -5255,6 +5686,39 @@ class WorldObjectEngine {
                 if (!sd.active || sd.x < minX - 140 || sd.x > maxX + 140 || sd.y < minY - 140 || sd.y > maxY + 140) continue;
                 const rSz = 36 + Math.sin(renderer.time * 5.0 + sd.seed) * 4.5;
                 renderer.pushSolidQuad3D(sd.x, sd.y, 2.025, rSz, rSz, renderer.time * 1.2, 0.22, 0.92, 0.98, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (this.landmarks3D) {
+            const bb = this.landmarks3D.briansBoatyard;
+            if (bb && (bb.cooldown || 0) <= 0 && bb.x >= minX - 160 && bb.x <= maxX + 160 && bb.y >= minY - 160 && bb.y <= maxY + 160) {
+                const rSz = 34 + Math.sin(renderer.time * 5.5) * 4.0;
+                renderer.pushSolidQuad3D(bb.x, bb.y, 2.03, rSz, rSz, renderer.time * 1.3, 0.18, 0.88, 0.78, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+            const jh = this.landmarks3D.jackOfHearts;
+            if (jh && (jh.cooldown || 0) <= 0 && jh.x >= minX - 160 && jh.x <= maxX + 160 && jh.y >= minY - 160 && jh.y <= maxY + 160) {
+                const rSz = 34 + Math.sin(renderer.time * 6.0) * 4.0;
+                renderer.pushSolidQuad3D(jh.x, jh.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.26, 0.74, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+            const ch = this.landmarks3D.calHamptonOutpost;
+            if (ch && (ch.cooldown || 0) <= 0 && ch.x >= minX - 160 && ch.x <= maxX + 160 && ch.y >= minY - 160 && ch.y <= maxY + 160) {
+                const rSz = 30 + Math.sin(renderer.time * 5.5) * 3.5;
+                renderer.pushSolidQuad3D(ch.x, ch.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.22, 0.78, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (Array.isArray(this.stickUpStores)) {
+            for (let i = 0; i < this.stickUpStores.length; i++) {
+                const su = this.stickUpStores[i];
+                if ((su.cooldown || 0) > 0 || su.x < minX - 140 || su.x > maxX + 140 || su.y < minY - 140 || su.y > maxY + 140) continue;
+                const rSz = 26 + Math.sin(renderer.time * 5.8 + i) * 3.0;
+                renderer.pushSolidQuad3D(su.x, su.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.82, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (Array.isArray(this.photoSafariSpots)) {
+            for (let i = 0; i < this.photoSafariSpots.length; i++) {
+                const ps = this.photoSafariSpots[i];
+                if (ps.snapped || ps.x < minX - 140 || ps.x > maxX + 140 || ps.y < minY - 140 || ps.y > maxY + 140) continue;
+                const rSz = 24 + Math.sin(renderer.time * 5.2 + i) * 3.0;
+                renderer.pushSolidQuad3D(ps.x, ps.y, 2.03, rSz, rSz, renderer.time * 1.6, 0.22, 0.90, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
     }
@@ -5533,6 +5997,78 @@ class WorldObjectEngine {
                 }
             }
         }
+        if ((this.cameraFlashTimer || 0) > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.85, this.cameraFlashTimer * 2.2)})`;
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        }
+        if (!p.inVehicle && this.landmarks3D) {
+            const bb = this.landmarks3D.briansBoatyard;
+            if (bb && (bb.cooldown || 0) <= 0 && Math.hypot(px - bb.x, py - bb.y) < 125) {
+                const scr = renderer.worldToScreen(bb.x, bb.y - 18, 2.65);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.strokeStyle = "#2dd4bf";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.fillStyle = "#2dd4bf";
+                ctx.fillText("🛥️ [E] BRIAN'S BOATYARD SMUGGLING RUN (+$12,000 & ARMOR)", scr.x, scr.y - 7);
+            }
+            const jh = this.landmarks3D.jackOfHearts;
+            if (jh && (jh.cooldown || 0) <= 0 && Math.hypot(px - jh.x, py - jh.y) < 125) {
+                const scr = renderer.worldToScreen(jh.x, jh.y - 18, 2.75);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.strokeStyle = "#f472b6";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.fillStyle = "#f472b6";
+                ctx.fillText("💎 [E] BOOBIE IKE'S JACK OF HEARTS VIP (+$10,000 & +2X)", scr.x, scr.y - 7);
+            }
+            const ch = this.landmarks3D.calHamptonOutpost;
+            if (ch && (ch.cooldown || 0) <= 0 && Math.hypot(px - ch.x, py - ch.y) < 120) {
+                const scr = renderer.worldToScreen(ch.x, ch.y - 18, 2.62);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.strokeStyle = "#38bdf8";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillText("📡 [E] CAL HAMPTON VCPD SCANNER JAMMER (0★ & +$7,500)", scr.x, scr.y - 7);
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
+            for (const su of this.stickUpStores) {
+                if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
+                    const scr = renderer.worldToScreen(su.x, su.y - 16, 2.55);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.fillStyle = "#facc15";
+                    ctx.fillText(`🔫 [E] BANDANA STICK-UP: ${su.name} (+$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.photoSafariSpots)) {
+            for (const ps of this.photoSafariSpots) {
+                if (!ps.snapped && Math.hypot(px - ps.x, py - ps.y) < 110) {
+                    const scr = renderer.worldToScreen(ps.x, ps.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`📸 [E] SNAP GTA 6 POSTCARD: ${ps.name} (+$5,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
 
         if (!this.heistTargets || this.heistTargets.length === 0) {
             ctx.restore();
@@ -5707,6 +6243,18 @@ class WorldObjectEngine {
         if (lm.sevenMileOldSpan) {
             ctx.fillStyle = "#94a3b8";
             ctx.fillRect((lm.sevenMileOldSpan.x - 110) * sx, (lm.sevenMileOldSpan.y - 18) * sy, 220 * sx, 36 * sy);
+        }
+        if (lm.briansBoatyard) {
+            ctx.fillStyle = "#2dd4bf";
+            ctx.fillRect((lm.briansBoatyard.x - 42) * sx, (lm.briansBoatyard.y - 28) * sy, 84 * sx, 56 * sy);
+        }
+        if (lm.jackOfHearts) {
+            ctx.fillStyle = "#f472b6";
+            ctx.fillRect((lm.jackOfHearts.x - 42) * sx, (lm.jackOfHearts.y - 28) * sy, 84 * sx, 56 * sy);
+        }
+        if (lm.calHamptonOutpost) {
+            ctx.fillStyle = "#38bdf8";
+            ctx.fillRect((lm.calHamptonOutpost.x - 32) * sx, (lm.calHamptonOutpost.y - 24) * sy, 64 * sx, 48 * sy);
         }
 
         for (let i = 0; i < this.instances.length; i++) {
