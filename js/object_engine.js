@@ -7163,28 +7163,7 @@ class WorldObjectEngine {
         const theme = intr.theme || "SHOP_CONVENIENCE";
         const t = renderer.time || 0;
 
-        // 1. 3D Potted Tropical Miami Palms inside Hotels, Mansions, Boutiques & Clubs
-        if (
-            theme === "SHOP_HOTEL" ||
-            theme === "ART_DECO_HOTEL" ||
-            theme === "MANSION" ||
-            theme === "SHOP_CLOTHES" ||
-            theme === "MALIBU_CLUB" ||
-            theme === "NEON_CLUB"
-        ) {
-            const palmSpots = [
-                [rw * 0.5 - 108, rh - 52, 1.1],
-                [rw * 0.5 + 108, rh - 52, 2.7]
-            ];
-            if (theme === "MANSION") {
-                palmSpots.push([268, 124, 3.9], [552, 124, 5.1]);
-            }
-            for (const [px, py, seed] of palmSpots) {
-                renderer.renderMiamiPalmTree3D(px, py, 2.02, 0.48, seed);
-            }
-        }
-
-        // 2. Theme-Specific 3D Props (Jacuzzi Flamingo Float, Sizzling Kitchen Steam, Boutique Mannequins)
+        // 1. Theme-Specific 3D Props (Jacuzzi Flamingo Float, Sizzling Kitchen Steam, Boutique Mannequins)
         if (theme === "SHOP_HOTEL" || theme === "ART_DECO_HOTEL") {
             const fx = 640 + Math.sin(t * 2.0) * 8;
             const fy = 400 + Math.cos(t * 1.6) * 6;
