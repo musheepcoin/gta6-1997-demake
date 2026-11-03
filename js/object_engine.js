@@ -270,7 +270,13 @@ class WorldObjectEngine {
         this.interactiveProps = [];
         this.streetProps = [];
         this.landmarks3D = {
-            launchpad: { x: 458.5 * TILE_SIZE, y: 35.5 * TILE_SIZE, z: 2.0 },
+            launchpad: {
+                x: 461.8 * TILE_SIZE,
+                y: 35.5 * TILE_SIZE,
+                z: 2.0,
+                consoleX: 459.1 * TILE_SIZE,
+                consoleY: 35.5 * TILE_SIZE
+            },
             ferrisWheel: { x: 464.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
             lighthouses: [
                 { id: "key_west_lh", x: 215.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, seed: 0.0 },
@@ -282,6 +288,13 @@ class WorldObjectEngine {
                 { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE, z: 2.0, ang: Math.PI },
                 { x: 57.2 * TILE_SIZE,  y: 240.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
             ]
+        };
+        this.rocketLaunch = {
+            state: "IDLE", // IDLE | COUNTDOWN | LIFTOFF | COOLDOWN
+            timer: 0,
+            liftZ: 0,
+            velZ: 0,
+            armSwing: 0
         };
         this.meshVbo = null;
         this.meshVertexCount = 0;
@@ -815,11 +828,49 @@ class WorldObjectEngine {
         this.startHeistEscape(game, ht, "INTERIOR VAULT CRACKED");
     }
 
+    triggerRocketLaunch(game) {
+        if (!this.rocketLaunch || this.rocketLaunch.state !== "IDLE") return false;
+        this.rocketLaunch.state = "COUNTDOWN";
+        this.rocketLaunch.timer = 0;
+        this.rocketLaunch.liftZ = 0;
+        this.rocketLaunch.velZ = 0;
+        this.rocketLaunch.armSwing = 0;
+
+        if (game) {
+            if (typeof game.addScore === "function") game.addScore(25000);
+            if (game.audio) game.audio.playPickup("WEAPON");
+            if (typeof game.showBigBanner === "function") {
+                game.showBigBanner("🚀 SERA ARTEMIS VI — IGNITION SEQUENCE!", "MAIN ENGINES START • UMBILICAL ARMS RETRACTING • +$25,000", "#f97316", 3.2);
+            }
+            const lp = this.landmarks3D && this.landmarks3D.launchpad;
+            if (lp && Array.isArray(game.floatingTexts)) {
+                game.floatingTexts.push({
+                    x: lp.x,
+                    y: lp.y,
+                    z: 3.2,
+                    text: "🚀 T-MINUS 3s — MAIN ENGINE START! +$25,000!",
+                    color: "#f97316",
+                    life: 3.2
+                });
+            }
+        }
+        return true;
+    }
+
     tryTriggerHeistAction(game) {
         if (!game || !game.player || game.player.inVehicle || game.activeInterior) return false;
-        if (!this.heistTargets || this.heistTargets.length === 0) return false;
         const px = game.player.x;
         const py = game.player.y;
+
+        // 0. SERA Space Center Launch Complex 39A — Exterior Launch Control Console!
+        if (this.landmarks3D && this.landmarks3D.launchpad) {
+            const lp = this.landmarks3D.launchpad;
+            if (Math.hypot(px - lp.consoleX, py - lp.consoleY) < 72 || Math.hypot(px - lp.x, py - lp.y) < 155) {
+                if (this.triggerRocketLaunch(game)) return true;
+            }
+        }
+
+        if (!this.heistTargets || this.heistTargets.length === 0) return false;
 
         for (let i = 0; i < this.heistTargets.length; i++) {
             const ht = this.heistTargets[i];
@@ -971,6 +1022,53 @@ class WorldObjectEngine {
                     });
                 }
                 this.activeHeist = null;
+            }
+        }
+
+        // Update SERA Space Center 3D Rocket Launch Sequence
+        if (this.rocketLaunch && this.rocketLaunch.state !== "IDLE") {
+            const rl = this.rocketLaunch;
+            rl.timer += dt;
+            if (rl.state === "COUNTDOWN") {
+                rl.armSwing = Math.min(1.42, (rl.timer / 2.6) * 1.42);
+                if (game.camera) {
+                    game.camera.shake = Math.max(game.camera.shake || 0, 2.5);
+                }
+                if (rl.timer >= 3.0) {
+                    rl.state = "LIFTOFF";
+                    rl.timer = 0;
+                    rl.velZ = 0.08;
+                    const lp = this.landmarks3D && this.landmarks3D.launchpad;
+                    if (lp && Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: lp.x,
+                            y: lp.y,
+                            z: 3.8,
+                            text: "🔥 LIFTOFF! WE HAVE LIFTOFF OF SERA ARTEMIS VI!",
+                            color: "#fde047",
+                            life: 3.8
+                        });
+                    }
+                }
+            } else if (rl.state === "LIFTOFF") {
+                rl.armSwing = 1.42;
+                rl.velZ += (0.22 + rl.timer * 0.16) * dt;
+                rl.liftZ += rl.velZ * dt;
+                if (game.camera && rl.liftZ < 6.0) {
+                    game.camera.shake = Math.max(game.camera.shake || 0, 5.5 - rl.liftZ * 0.7);
+                }
+                if (rl.liftZ > 15.0) {
+                    rl.state = "COOLDOWN";
+                    rl.timer = 0;
+                }
+            } else if (rl.state === "COOLDOWN") {
+                if (rl.timer > 16.0) {
+                    rl.state = "IDLE";
+                    rl.timer = 0;
+                    rl.liftZ = 0;
+                    rl.velZ = 0;
+                    rl.armSwing = 0;
+                }
             }
         }
     }
@@ -1713,88 +1811,112 @@ class WorldObjectEngine {
                 const red = [0.88, 0.18, 0.16];
                 const white = [0.95, 0.96, 0.98];
                 const steel = [0.26, 0.30, 0.36];
-                // 4 Portal Legs (leaves wide 48px drive-through lane underneath!)
-                for (const lx of [-24, 24]) {
-                    for (const ly of [-26, 26]) {
-                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 7, 7, bz, bz + 0.75, red);
-                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 6, 6, bz + 0.75, bz + 1.25, white);
+                // 4 Mega-Port Panamax Portal Legs (leaves wide 64px drive-through lane underneath!)
+                for (const lx of [-34, 34]) {
+                    for (const ly of [-36, 36]) {
+                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 10, 10, bz, bz + 1.15, red);
+                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 8.5, 8.5, bz + 1.15, bz + 1.95, white);
                     }
                 }
-                // Cross-Portal Beam + Operator Glass Cab + Long Over-Water Hammerhead Boom
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 58, 60, bz + 0.72, bz + 0.80, red);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 12, 0, 18, 16, bz + 1.08, bz + 1.24, white);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 38, 0, 148, 14, bz + 1.24, bz + 1.34, red);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 18, 18, bz + 1.34, bz + 1.62, white);
-                // Spreader cable + suspended container hook block
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 78, 0, 3, 3, bz + 0.55, bz + 1.24, steel);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 78, 0, 18, 10, bz + 0.48, bz + 0.55, [0.96, 0.76, 0.12]);
+                // Cross-Portal Beam + Operator Glass Cab + 210px Long Over-Water Hammerhead Boom
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 84, 86, bz + 1.08, bz + 1.20, red);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 18, 0, 26, 22, bz + 1.68, bz + 1.92, white);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 54, 0, 214, 18, bz + 1.92, bz + 2.08, red);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 26, 26, bz + 2.08, bz + 2.50, white);
+                // Spreader steel cables + suspended 3D Maersk/Hapag container in mid-air
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, -8, 3, 3, bz + 0.82, bz + 1.92, steel);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108,  8, 3, 3, bz + 0.82, bz + 1.92, steel);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 28, 16, bz + 0.74, bz + 0.82, [0.96, 0.76, 0.12]);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 24, 56, bz + 0.48, bz + 0.74, [0.14, 0.54, 0.78]);
             }
         }
 
         // ====================================================================
-        // G. COMPILE SERA SPACE CENTER 3D LAUNCH PAD 39A & APOLLO/ARTEMIS ROCKET
+        // G. COMPILE COLOSSAL SERA SPACE CENTER LAUNCH COMPLEX 39A
+        //    (320x280px Blast Pad, Crawlerway, Flame Trench, LOX/LH2 Spheres,
+        //     4 Towering Lightning Masts, Launch Control Bunker & 3.65-Block LUT)
         // ====================================================================
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             const bz = lp.z || 2.0;
-            // Concrete Octagonal Flame Trench Pad + 4 Perimeter Lightning Masts
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 112, 112, bz, bz + 0.14, [0.68, 0.70, 0.74]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 82, 82, bz + 0.14, bz + 0.24, [0.52, 0.54, 0.58]);
-            for (const [mx, my] of [[-50, -50], [50, -50], [-50, 50], [50, 50]]) {
-                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 4, 4, bz + 0.14, bz + 1.45, [0.82, 0.84, 0.88]);
+
+            // 1. West Crawlerway Access Ramp & Launch Control Console Bunker (near road at lp.consoleX)
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -138, 0, 118, 96, bz, bz + 0.10, [0.58, 0.60, 0.65]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -138, -28, 114, 6, bz + 0.10, bz + 0.15, [0.96, 0.76, 0.12]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -138,  28, 114, 6, bz + 0.10, bz + 0.15, [0.96, 0.76, 0.12]);
+            // Launch Control Bunker & Glowing Red Ignition Console
+            emitBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 48, 32, bz, bz + 0.36, "wall_modern_upper", "wall_modern_upper", [0.88, 0.92, 0.96]);
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 54, 38, bz + 0.36, bz + 0.42, [0.22, 0.26, 0.34]);
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 18, 14, bz + 0.10, bz + 0.32, [0.20, 0.24, 0.30]);
+            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 14, 10, bz + 0.32, bz + 0.38, [0.98, 0.18, 0.18]);
+
+            // 2. Colossal Stepped Concrete Launch Complex 39A Blast Pad (270 x 260 px)
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 270, 260, bz, bz + 0.16, [0.68, 0.70, 0.75]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 212, 204, bz + 0.16, bz + 0.30, [0.54, 0.56, 0.62]);
+            // Deep East-West Flame Deflector Trench + Hazard Blast Deflector Walls
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 18, 0, 176, 68, bz + 0.30, bz + 0.33, [0.16, 0.18, 0.22]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 18, -38, 176, 8, bz + 0.30, bz + 0.44, [0.96, 0.74, 0.12]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 18,  38, 176, 8, bz + 0.30, bz + 0.44, [0.96, 0.74, 0.12]);
+
+            // 3. Twin Giant Cryogenic LOX / LH2 Propellant Storage Spheres & Feed Pipes
+            for (const sy of [-92, 92]) {
+                emitSolidBox3D(lp.x, lp.y, 1, 0, 68, sy, 48, 48, bz + 0.16, bz + 0.34, [0.36, 0.40, 0.46]);
+                emitSolidBox3D(lp.x, lp.y, 1, 0, 68, sy, 62, 62, bz + 0.34, bz + 0.86, [0.96, 0.98, 1.00]);
+                emitSolidBox3D(lp.x, lp.y, 1, 0, 68, sy, 44, 44, bz + 0.86, bz + 1.04, [0.92, 0.95, 0.99]);
+                // Cryogenic pipeline connecting tank to rocket pad
+                emitSolidBox3D(lp.x, lp.y, 1, 0, 42, sy * 0.52, 8, 46, bz + 0.30, bz + 0.42, [0.82, 0.86, 0.92]);
             }
-            // 3D Steel Umbilical Launch Tower (West of Rocket) + 3 Swing Access Arms
-            for (let lv = 0; lv < 8; lv++) {
-                const y0 = bz + 0.24 + lv * 0.20;
-                emitSolidBox3D(lp.x, lp.y, 1, 0, -26, 0, 20, 20, y0, y0 + 0.18, (lv % 2 === 0) ? [0.86, 0.22, 0.18] : [0.88, 0.90, 0.94]);
+
+            // 4. Four Towering Perimeter Lightning Arrestor Masts (rising to Y = 5.45!)
+            for (const [mx, my] of [[-118, -112], [118, -112], [-118, 112], [118, 112]]) {
+                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 14, 14, bz + 0.16, bz + 0.95, [0.76, 0.79, 0.84]);
+                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 9,  9,  bz + 0.95, bz + 3.15, [0.86, 0.88, 0.92]);
+                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 6,  6,  bz + 3.15, bz + 3.45, [0.98, 0.18, 0.18]);
             }
-            for (const armZ of [bz + 0.75, bz + 1.15, bz + 1.55]) {
-                emitSolidBox3D(lp.x, lp.y, 1, 0, -10, 0, 24, 6, armZ, armZ + 0.05, [0.86, 0.22, 0.18]);
+
+            // 5. Colossal 3D Red & White NASA/SERA Steel Umbilical Launch Tower (LUT) (56x56px, rising to Y = 5.65!)
+            for (let lv = 0; lv < 10; lv++) {
+                const y0 = bz + 0.30 + lv * 0.33;
+                const col = (lv % 2 === 0) ? [0.88, 0.20, 0.16] : [0.94, 0.96, 0.99];
+                emitSolidBox3D(lp.x, lp.y, 1, 0, -56, 0, 54, 54, y0, y0 + 0.30, col);
             }
-            // 3D Multi-Stage Heavy Space Rocket + Twin Solid Rocket Boosters
-            // SRBs
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, -12, 8, 8, bz + 0.24, bz + 1.32, [0.96, 0.96, 0.98]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 6,  12, 8, 8, bz + 0.24, bz + 1.32, [0.96, 0.96, 0.98]);
-            // Core Cryogenic Orange Stage + White Upper Stage + Crew Capsule Spire
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 16, 16, bz + 0.24, bz + 1.24, [0.90, 0.44, 0.16]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 14, 14, bz + 1.24, bz + 1.72, [0.97, 0.98, 1.00]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 10, 10, bz + 1.72, bz + 1.98, [0.18, 0.20, 0.24]);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 4,  4,  bz + 1.98, bz + 2.22, [0.98, 0.22, 0.22]);
+            // Top White Hammerhead Crane Boom on Umbilical Tower
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -34, 0, 96, 26, bz + 3.60, bz + 3.78, [0.96, 0.97, 1.00]);
         }
 
         // ====================================================================
-        // H. COMPILE 3D COASTAL LIGHTHOUSES & 3D FERRIS WHEEL SUPPORT FRAME
+        // H. COMPILE SUPERSIZED 3D COASTAL LIGHTHOUSES & 3D NEON FERRIS WHEEL
         // ====================================================================
         if (this.landmarks3D && Array.isArray(this.landmarks3D.lighthouses)) {
             for (const lh of this.landmarks3D.lighthouses) {
                 const bz = lh.z || 2.0;
-                // Keeper's Coral-Roofed Cottage Base + 6-Tier Tapered Red & White Lighthouse Tower
-                emitBox3D(lh.x, lh.y, 1, 0, -24, 10, 44, 34, bz, bz + 0.38, "wall_keys_front", "wall_keys_side", [0.96, 0.96, 0.98]);
-                emitHippedRoof3D(lh.x, lh.y, 1, 0, -24, 10, 52, 42, bz + 0.38, 0.16, "mansion_star_island_top", [0.92, 0.92, 0.94], [0.84, 0.32, 0.20]);
-                for (let lv = 0; lv < 6; lv++) {
-                    const sz = 28.0 - lv * 2.4;
-                    const y0 = bz + lv * 0.24;
+                // Keeper's Coral-Roofed Villa + 8-Tier Monumental Tapered Red & White Lighthouse Tower (rising to Y = 4.85!)
+                emitBox3D(lh.x, lh.y, 1, 0, -42, 16, 72, 52, bz, bz + 0.56, "wall_keys_front", "wall_keys_side", [0.96, 0.96, 0.98]);
+                emitHippedRoof3D(lh.x, lh.y, 1, 0, -42, 16, 82, 62, bz + 0.56, 0.22, "mansion_star_island_top", [0.92, 0.92, 0.94], [0.84, 0.32, 0.20]);
+                for (let lv = 0; lv < 8; lv++) {
+                    const sz = 52.0 - lv * 2.8;
+                    const y0 = bz + lv * 0.30;
                     const col = (lv % 2 === 1) ? [0.88, 0.18, 0.18] : [0.97, 0.97, 0.99];
-                    emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, sz, sz, y0, y0 + 0.24, col);
+                    emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, sz, sz, y0, y0 + 0.30, col);
                 }
-                // Black Iron Lantern Walk + Glowing Glass Beacon Room + Conical Copper Dome
-                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 20, 20, bz + 1.44, bz + 1.49, [0.16, 0.18, 0.22]);
-                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 14, 14, bz + 1.49, bz + 1.68, [1.00, 0.94, 0.62]);
-                emitHippedRoof3D(lh.x, lh.y, 1, 0, 0, 0, 20, 20, bz + 1.68, 0.14, "mansion_star_island_top", [0.82, 0.18, 0.18], [0.98, 0.82, 0.24]);
+                // Black Iron Lantern Gallery + Glowing Glass Fresnel Beacon Room + Copper Dome
+                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 38, 38, bz + 2.40, bz + 2.48, [0.16, 0.18, 0.22]);
+                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 26, 26, bz + 2.48, bz + 2.78, [1.00, 0.94, 0.62]);
+                emitHippedRoof3D(lh.x, lh.y, 1, 0, 0, 0, 36, 36, bz + 2.78, 0.20, "mansion_star_island_top", [0.82, 0.18, 0.18], [0.98, 0.82, 0.24]);
             }
         }
 
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
             const bz = fw.z || 2.0;
-            // Wooden Boardwalk Deck + Twin A-Frame Steel Support Towers + Central Axle Hub
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 116, 52, bz, bz + 0.06, [0.64, 0.42, 0.24]);
-            for (const sideY of [-16, 16]) {
-                emitSolidBox3D(fw.x, fw.y, 1, 0, -22, sideY, 6, 6, bz + 0.06, bz + 0.92, [0.94, 0.96, 0.99]);
-                emitSolidBox3D(fw.x, fw.y, 1, 0,  22, sideY, 6, 6, bz + 0.06, bz + 0.92, [0.94, 0.96, 0.99]);
-                emitSolidBox3D(fw.x, fw.y, 1, 0,   0, sideY, 12, 8, bz + 0.88, bz + 0.98, [0.98, 0.24, 0.68]);
+            // Giant Wooden Boardwalk Deck + Twin A-Frame Steel Support Towers + Central Neon Axle Hub
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 196, 84, bz, bz + 0.10, [0.64, 0.42, 0.24]);
+            for (const sideY of [-26, 26]) {
+                emitSolidBox3D(fw.x, fw.y, 1, 0, -38, sideY, 10, 10, bz + 0.10, bz + 1.48, [0.94, 0.96, 0.99]);
+                emitSolidBox3D(fw.x, fw.y, 1, 0,  38, sideY, 10, 10, bz + 0.10, bz + 1.48, [0.94, 0.96, 0.99]);
+                emitSolidBox3D(fw.x, fw.y, 1, 0,   0, sideY, 22, 14, bz + 1.42, bz + 1.58, [0.98, 0.24, 0.68]);
             }
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 8, 38, bz + 0.90, bz + 0.96, [0.18, 0.88, 0.98]);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 14, 62, bz + 1.46, bz + 1.56, [0.18, 0.88, 0.98]);
         }
 
         if (this.meshVbo) {
@@ -1890,26 +2012,95 @@ class WorldObjectEngine {
             pushQ(tNW, tNE, tSW, tSE, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
         };
 
-        // 1. Live Vertically-Rotating 3D Neon Ferris Wheel at Vice Beach Pier
+        // 1. Live Vertically-Rotating Supersized 3D Neon Ferris Wheel at Vice Beach Pier
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
-            if (fw.x >= minX - 180 && fw.x <= maxX + 180 && fw.y >= minY - 180 && fw.y <= maxY + 180) {
-                const hubElev = (fw.z || 2.0) + 0.93;
-                const radPx = 46.0;
-                const radElev = 0.68;
-                const numGondolas = 10;
+            if (fw.x >= minX - 240 && fw.x <= maxX + 240 && fw.y >= minY - 240 && fw.y <= maxY + 240) {
+                const hubElev = (fw.z || 2.0) + 1.50;
+                const radPx = 82.0;
+                const radElev = 1.25;
+                const numGondolas = 12;
                 for (let gi = 0; gi < numGondolas; gi++) {
                     const theta = t * 0.65 + (gi * Math.PI * 2.0) / numGondolas;
                     const gx = fw.x + Math.cos(theta) * radPx;
                     const gyElev = hubElev + Math.sin(theta) * radElev;
                     const isPink = (gi % 2 === 0);
                     const gCol = isPink ? [0.98, 0.28, 0.72] : [0.18, 0.90, 0.98];
-                    // 3D Passenger Gondola Cabin hanging at (gx, gyElev, fw.y)
-                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 14, 18, gyElev - 0.08, gyElev + 0.04, gCol);
-                    // Half-radius neon spoke bar
-                    const mx = fw.x + Math.cos(theta) * (radPx * 0.5);
-                    const myElev = hubElev + Math.sin(theta) * (radElev * 0.5);
-                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 5, 24, myElev - 0.02, myElev + 0.02, [0.98, 0.94, 0.52]);
+                    // Large 3D Passenger Gondola Cabin hanging at (gx, gyElev, fw.y)
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 22, 28, gyElev - 0.14, gyElev + 0.06, gCol);
+                    // Half-radius neon spoke bar + outer rim glow block
+                    const mx = fw.x + Math.cos(theta) * (radPx * 0.52);
+                    const myElev = hubElev + Math.sin(theta) * (radElev * 0.52);
+                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 8, 36, myElev - 0.04, myElev + 0.04, [0.98, 0.94, 0.52]);
+                }
+            }
+        }
+
+        // 1B. COLOSSAL DYNAMIC 3D SERA HEAVY-LIFT ARTEMIS VI ROCKET + RETRACTABLE SWING ARMS + 3D LIFTOFF PLUME
+        if (this.landmarks3D && this.landmarks3D.launchpad) {
+            const lp = this.landmarks3D.launchpad;
+            if (lp.x >= minX - 360 && lp.x <= maxX + 360 && lp.y >= minY - 360 && lp.y <= maxY + 360) {
+                const bz = lp.z || 2.0;
+                const rl = this.rocketLaunch || { state: "IDLE", timer: 0, liftZ: 0, armSwing: 0 };
+
+                // A. 3 Giant Retractable Red Umbilical Crew/Service Swing Arms (pivoting at tower x = lp.x - 36)
+                const armAng = -(rl.armSwing || 0);
+                const armCos = Math.cos(armAng);
+                const armSin = Math.sin(armAng);
+                const pivotX = lp.x - 34;
+                const pivotY = lp.y - 18;
+                for (const armZ of [bz + 1.15, bz + 2.05, bz + 2.95]) {
+                    emitDynBox(pivotX, pivotY, armCos, armSin, 32, 18, 68, 16, armZ, armZ + 0.14, [0.90, 0.20, 0.16]);
+                }
+
+                // B. Render the Colossal 3D Multi-Stage SERA Artemis VI Heavy-Lift Rocket (unless in COOLDOWN)
+                if (rl.state !== "COOLDOWN") {
+                    const rx = lp.x + 18;
+                    const ry = lp.y;
+                    const rBase = bz + 0.30 + (rl.liftZ || 0);
+
+                    // 1. 4 Cruciform Aerodynamic Delta Tail Fins + 4 Dark Metallic RS-25 Main Engine Bells
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 96, 16, rBase + 0.08, rBase + 0.56, [0.92, 0.94, 0.98]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 16, 96, rBase + 0.08, rBase + 0.56, [0.92, 0.94, 0.98]);
+                    for (const [nx, ny] of [[-13, -13], [13, -13], [-13, 13], [13, 13]]) {
+                        emitDynBox(rx, ry, 1, 0, nx, ny, 18, 18, rBase - 0.06, rBase + 0.12, [0.22, 0.25, 0.30]);
+                    }
+
+                    // 2. Twin Solid Rocket Boosters (SRBs) on North & South Flanks (30x30px wide each, rising +2.55 blocks!)
+                    for (const srbY of [-38, 38]) {
+                        emitDynBox(rx, ry, 1, 0, 0, srbY, 26, 26, rBase - 0.04, rBase + 0.10, [0.24, 0.26, 0.32]);
+                        emitDynBox(rx, ry, 1, 0, 0, srbY, 30, 30, rBase + 0.10, rBase + 1.85, [0.96, 0.97, 1.00]);
+                        emitDynBox(rx, ry, 1, 0, 0, srbY, 31, 31, rBase + 1.25, rBase + 1.42, [0.90, 0.18, 0.16]);
+                        emitDynBox(rx, ry, 1, 0, 0, srbY, 22, 22, rBase + 1.85, rBase + 2.28, [0.96, 0.97, 1.00]);
+                        emitDynBox(rx, ry, 1, 0, 0, srbY, 12, 12, rBase + 2.28, rBase + 2.58, [0.90, 0.18, 0.16]);
+                    }
+
+                    // 3. Massive Cryogenic Core Stage (52x52px wide!) + NASA Roll-Pattern Intertank + White Upper Stage + Crew Capsule Spire
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 52, 52, rBase + 0.10, rBase + 1.52, [0.92, 0.44, 0.14]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 54, 54, rBase + 1.52, rBase + 1.88, [0.16, 0.18, 0.24]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 44, 44, rBase + 1.88, rBase + 2.74, [0.97, 0.98, 1.00]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 45, 45, rBase + 2.20, rBase + 2.34, [0.90, 0.18, 0.16]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 32, 32, rBase + 2.74, rBase + 3.16, [0.24, 0.28, 0.34]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 22, 22, rBase + 3.16, rBase + 3.48, [0.98, 0.98, 1.00]);
+                    emitDynBox(rx, ry, 1, 0, 0, 0, 9,  9,  rBase + 3.48, rBase + 3.96, [0.96, 0.18, 0.18]);
+
+                    // C. Volumetric 3D Main Engine Exhaust Fireball & Flame Trench Shockwave Plume during COUNTDOWN / LIFTOFF!
+                    if (rl.state === "COUNTDOWN" || rl.state === "LIFTOFF") {
+                        const flicker = 0.85 + 0.15 * Math.sin(t * 42.0);
+                        // Blazing White-Gold Supersonic Exhaust Core directly under the 4 RS-25s & 2 SRBs
+                        emitDynBox(rx, ry, 1, 0, 0, 0, 68 * flicker, 88 * flicker, Math.max(bz + 0.30, rBase - 0.85), rBase, [1.0, 0.96, 0.72], 0.96);
+                        emitDynBox(rx, ry, 1, 0, 0, 0, 96 * flicker, 118 * flicker, Math.max(bz + 0.30, rBase - 1.55), Math.max(bz + 0.35, rBase - 0.25), [1.0, 0.52, 0.12], 0.88);
+                        // Rolling 3D Fire & Steam Billows pouring East & West out of the Flame Deflector Trench
+                        for (let fb = 0; fb < 6; fb++) {
+                            const phase = ((t * 2.6 + fb * 0.17) % 1.0);
+                            const dir = (fb % 2 === 0) ? 1 : -1;
+                            const fx = rx + dir * (35 + phase * 145);
+                            const fSz = 42 + phase * 68;
+                            const fTop = bz + 0.45 + phase * 0.95;
+                            const col = phase < 0.4 ? [1.0, 0.64, 0.18] : [0.92, 0.94, 0.98];
+                            emitDynBox(fx, ry, 1, 0, 0, 0, fSz, fSz * 0.85, bz + 0.30, fTop, col, 0.84 - phase * 0.55);
+                        }
+                    }
                 }
             }
         }
@@ -2158,6 +2349,28 @@ class WorldObjectEngine {
                 }
             }
         }
+
+        // Render Glowing Ignition Console Ring at SERA Space Center Launch Complex 39A
+        if (this.landmarks3D && this.landmarks3D.launchpad) {
+            const lp = this.landmarks3D.launchpad;
+            if (lp.consoleX >= minX - 180 && lp.consoleX <= maxX + 180 && lp.consoleY >= minY - 180 && lp.consoleY <= maxY + 180) {
+                const isIdle = !this.rocketLaunch || this.rocketLaunch.state === "IDLE";
+                const rSz = 30 + Math.sin(renderer.time * 5.0) * 4.0;
+                renderer.pushSolidQuad3D(
+                    lp.consoleX,
+                    lp.consoleY,
+                    2.12,
+                    rSz,
+                    rSz,
+                    renderer.time * 1.4,
+                    isIdle ? 0.98 : 0.38,
+                    isIdle ? 0.36 : 0.86,
+                    0.12,
+                    0.52,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                );
+            }
+        }
     }
 
     /* ========================================================================
@@ -2165,7 +2378,6 @@ class WorldObjectEngine {
        ======================================================================== */
     renderHeistPrompts(ctx, renderer, game) {
         if (!ctx || !renderer || !game || !game.player || game.activeInterior) return;
-        if (!this.heistTargets || this.heistTargets.length === 0) return;
 
         const p = game.player;
         const px = p.car ? p.car.x : p.x;
@@ -2173,6 +2385,52 @@ class WorldObjectEngine {
 
         ctx.save();
         ctx.textAlign = "center";
+
+        // 0. SERA Space Center Launch Complex 39A Ignition Console Prompt & Live Launch Telemetry Banner
+        if (this.landmarks3D && this.landmarks3D.launchpad) {
+            const lp = this.landmarks3D.launchpad;
+            const rl = this.rocketLaunch || { state: "IDLE", timer: 0, liftZ: 0, velZ: 0 };
+            if (!p.inVehicle && rl.state === "IDLE") {
+                if (Math.hypot(px - lp.consoleX, py - lp.consoleY) < 92 || Math.hypot(px - lp.x, py - lp.y) < 165) {
+                    const scr = renderer.worldToScreen(lp.consoleX, lp.consoleY - 18, 2.52);
+                    ctx.font = "900 12px monospace";
+                    ctx.fillStyle = "rgba(10,14,26,0.92)";
+                    ctx.fillRect(scr.x - 185, scr.y - 24, 370, 24);
+                    ctx.strokeStyle = "#f97316";
+                    ctx.lineWidth = 2.0;
+                    ctx.strokeRect(scr.x - 185, scr.y - 24, 370, 24);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText("🚀 [E] IGNITE SERA ARTEMIS VI ROCKET (+$25,000)", scr.x, scr.y - 8);
+                }
+            } else if (rl.state === "COUNTDOWN" || rl.state === "LIFTOFF") {
+                const cx = ctx.canvas.width * 0.5;
+                const cy = 62;
+                const altMeters = Math.round((rl.liftZ || 0) * 2850);
+                const mach = ((rl.velZ || 0) * 3.8).toFixed(1);
+                ctx.fillStyle = "rgba(10, 14, 26, 0.92)";
+                ctx.fillRect(cx - 240, cy - 24, 480, 48);
+                ctx.strokeStyle = "#f97316";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cx - 240, cy - 24, 480, 48);
+                ctx.font = "900 12px monospace";
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(
+                    rl.state === "COUNTDOWN"
+                        ? `🚀 SERA LAUNCH COMPLEX 39A — T-MINUS ${Math.max(0, (3.0 - rl.timer)).toFixed(1)}s (MAIN ENGINE START)`
+                        : `🚀 SERA ARTEMIS VI LIFTOFF — ALTITUDE: ${altMeters.toLocaleString()}m | SPEED: MACH ${mach}`,
+                    cx,
+                    cy - 6
+                );
+                ctx.font = "700 11px monospace";
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillText("UMBILICAL SWING ARMS RETRACTED • FULL THRUST ORBITAL ASCENT", cx, cy + 14);
+            }
+        }
+
+        if (!this.heistTargets || this.heistTargets.length === 0) {
+            ctx.restore();
+            return;
+        }
 
         // 1. On-Foot Proximity Prompts for Keypads, 3D Cartel Vaults, and Getaway Boats
         if (!p.inVehicle) {
