@@ -2931,74 +2931,251 @@ class WorldObjectEngine {
         }
 
         // 2. 3D Sidewalk Street Furniture (Hydrants, Neon Streetlights, Payphones, News Stands)
-        if (!this.streetProps || this.streetProps.length === 0) return;
         const cx = pCar ? pCar.x : (player ? player.x : 0);
         const cy = pCar ? pCar.y : (player ? player.y : 0);
+        const isMicroVeh = pCar && (pCar.specKey === "BMX_BIKE" || pCar.specKey === "E_SCOOTER");
+        const isHeavyVeh = pCar && !isMicroVeh && (
+            pCar.crushesCars ||
+            (pCar.w || 0) >= 54 ||
+            (pCar.maxHp || 0) >= 210 ||
+            [
+                "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "SWAT_VAN", "ARMORED_TRUCK",
+                "SEMI_TRUCK", "PICKUP_TRUCK", "GATOR_4X4", "MONSTER_BUGGY", "MEDIC_AMBULANCE"
+            ].includes(pCar.specKey)
+        );
 
-        for (let i = 0; i < this.streetProps.length; i++) {
-            const sp = this.streetProps[i];
-            if (sp.broken) {
-                sp.timer += dt;
-                if (sp.geyserTimer > 0) {
-                    sp.geyserTimer = Math.max(0, sp.geyserTimer - dt);
-                }
-                sp.x += sp.vx * dt;
-                sp.y += sp.vy * dt;
-                sp.z += sp.vz * dt;
-                if (sp.z > 2.02) {
-                    sp.vz -= 1.85 * dt;
-                } else {
-                    sp.z = 2.02;
-                    sp.vz = Math.abs(sp.vz) > 0.15 ? Math.abs(sp.vz) * 0.35 : 0;
-                }
-                sp.vx *= Math.pow(0.20, dt);
-                sp.vy *= Math.pow(0.20, dt);
-                sp.ang += sp.vang * dt;
-                sp.vang *= Math.pow(0.28, dt);
-
-                if (sp.timer > 24.0 && Math.hypot(cx - sp.homeX, cy - sp.homeY) > 320) {
-                    sp.broken = false;
-                    sp.timer = 0;
-                    sp.geyserTimer = 0;
-                    sp.x = sp.homeX;
-                    sp.y = sp.homeY;
-                    sp.z = 2.0;
-                    sp.vx = 0;
-                    sp.vy = 0;
-                    sp.vz = 0;
-                }
-                continue;
-            }
-
-            if (pCar && Math.abs(pCar.x - sp.x) < 32 && Math.abs(pCar.y - sp.y) < 32) {
-                const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                if (spd > 28 && Math.hypot(pCar.x - sp.x, pCar.y - sp.y) < 28) {
-                    sp.broken = true;
-                    sp.timer = 0;
-                    const dx = sp.x - pCar.x;
-                    const dy = sp.y - pCar.y;
-                    const d = Math.hypot(dx, dy) || 1.0;
-                    const launchSpd = Math.min(310, Math.max(110, spd * 1.25));
-                    sp.vx = (dx / d) * launchSpd;
-                    sp.vy = (dy / d) * launchSpd;
-                    sp.vz = 0.55;
-                    sp.vang = (Math.random() - 0.5) * 16.0;
-
-                    if (sp.kind === "HYDRANT") {
-                        sp.geyserTimer = 14.0;
-                        if (typeof game.addScore === "function") game.addScore(125);
-                        if (Array.isArray(game.floatingTexts)) {
-                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST! +$125", color: "#38bdf8", life: 1.3 });
-                        }
-                    } else if (sp.kind === "STREETLIGHT_NEON") {
-                        if (typeof game.addScore === "function") game.addScore(100);
-                        if (Array.isArray(game.floatingTexts)) {
-                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "⚡ STREET MAYHEM! +$100", color: "#f472b6", life: 1.2 });
-                        }
+        if (this.streetProps && this.streetProps.length > 0) {
+            for (let i = 0; i < this.streetProps.length; i++) {
+                const sp = this.streetProps[i];
+                if (sp.hitCooldown > 0) sp.hitCooldown = Math.max(0, sp.hitCooldown - dt);
+                if (sp.broken) {
+                    sp.timer += dt;
+                    if (sp.geyserTimer > 0) {
+                        sp.geyserTimer = Math.max(0, sp.geyserTimer - dt);
+                    }
+                    sp.x += sp.vx * dt;
+                    sp.y += sp.vy * dt;
+                    sp.z += sp.vz * dt;
+                    if (sp.z > 2.02) {
+                        sp.vz -= 1.85 * dt;
                     } else {
-                        if (typeof game.addScore === "function") game.addScore(75);
-                        if (Array.isArray(game.floatingTexts)) {
-                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "💥 PROP SMASH! +$75", color: "#fde047", life: 1.1 });
+                        sp.z = 2.02;
+                        sp.vz = Math.abs(sp.vz) > 0.15 ? Math.abs(sp.vz) * 0.35 : 0;
+                    }
+                    sp.vx *= Math.pow(0.20, dt);
+                    sp.vy *= Math.pow(0.20, dt);
+                    sp.ang += sp.vang * dt;
+                    sp.vang *= Math.pow(0.28, dt);
+
+                    if (sp.timer > 24.0 && Math.hypot(cx - sp.homeX, cy - sp.homeY) > 320) {
+                        sp.broken = false;
+                        sp.damaged = false;
+                        sp.tiltDx = 0;
+                        sp.tiltDy = 0;
+                        sp.timer = 0;
+                        sp.geyserTimer = 0;
+                        sp.x = sp.homeX;
+                        sp.y = sp.homeY;
+                        sp.z = 2.0;
+                        sp.vx = 0;
+                        sp.vy = 0;
+                        sp.vz = 0;
+                    }
+                    continue;
+                }
+
+                if (pCar && !isMicroVeh && Math.abs(pCar.x - sp.x) < 32 && Math.abs(pCar.y - sp.y) < 32) {
+                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+                    if (spd > 24 && Math.hypot(pCar.x - sp.x, pCar.y - sp.y) < 28 && (sp.hitCooldown || 0) <= 0) {
+                        const dx = sp.x - pCar.x;
+                        const dy = sp.y - pCar.y;
+                        const d = Math.hypot(dx, dy) || 1.0;
+
+                        if (sp.kind === "STREETLIGHT_NEON" && !isHeavyVeh && !sp.damaged && spd < 185) {
+                            // Normal car bends/damages the streetlamp first!
+                            sp.damaged = true;
+                            sp.hitCooldown = 0.65;
+                            const impAng = Math.atan2(pCar.vy || Math.sin(pCar.angle), pCar.vx || Math.cos(pCar.angle));
+                            sp.tiltDx = Math.cos(impAng) * 6.5;
+                            sp.tiltDy = Math.sin(impAng) * 6.5;
+                            pCar.vx *= 0.62;
+                            pCar.vy *= 0.62;
+                            if (typeof pCar.receiveImpactDamage === "function") {
+                                pCar.receiveImpactDamage(9, sp.x, sp.y);
+                            }
+                            if (game.audio && typeof game.audio.playCrash === "function") {
+                                game.audio.playCrash(0.45);
+                            }
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 6; k++) {
+                                    game.spawnParticle(sp.x + (Math.random() - 0.5) * 10, sp.y + (Math.random() - 0.5) * 10, "SPARK");
+                                }
+                            }
+                            if (typeof game.addScore === "function") game.addScore(40);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ LAMPADAIRE ABÎMÉ! +$40", color: "#fde047", life: 1.15 });
+                            }
+                            continue;
+                        }
+
+                        sp.broken = true;
+                        sp.timer = 0;
+                        const launchSpd = Math.min(310, Math.max(110, spd * 1.25));
+                        sp.vx = (dx / d) * launchSpd;
+                        sp.vy = (dy / d) * launchSpd;
+                        sp.vz = 0.55;
+                        sp.vang = (Math.random() - 0.5) * 16.0;
+
+                        if (sp.kind === "HYDRANT") {
+                            sp.geyserTimer = 14.0;
+                            if (typeof game.addScore === "function") game.addScore(125);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST! +$125", color: "#38bdf8", life: 1.3 });
+                            }
+                        } else if (sp.kind === "STREETLIGHT_NEON") {
+                            if (game.audio && typeof game.audio.playCrash === "function") {
+                                game.audio.playCrash(0.65);
+                            }
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 10; k++) {
+                                    game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "SPARK");
+                                }
+                            }
+                            if (typeof game.addScore === "function") game.addScore(100);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "💥 LAMPADAIRE DÉFONCÉ! +$100", color: "#f472b6", life: 1.2 });
+                            }
+                        } else {
+                            if (typeof game.addScore === "function") game.addScore(75);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "💥 PROP SMASH! +$75", color: "#fde047", life: 1.1 });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Main 3D Curb Streetlamps (this.map.streetlights):
+        //    - Heavy vehicles (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
+        //    - Normal cars bend & damage them on impact ("abîmé", state = 1, tilting pole + flickering bulb + car bump), or snap them if already damaged!
+        if (this.map && Array.isArray(this.map.streetlights)) {
+            for (let i = 0; i < this.map.streetlights.length; i++) {
+                const sl = this.map.streetlights[i];
+                if (sl.hitCooldown > 0) sl.hitCooldown = Math.max(0, sl.hitCooldown - dt);
+
+                if (sl.state === 2) {
+                    sl.timer = (sl.timer || 0) + dt;
+                    if (sl.fallVx || sl.fallVy) {
+                        sl.fallenX = (sl.fallenX ?? sl.baseX) + sl.fallVx * dt;
+                        sl.fallenY = (sl.fallenY ?? sl.baseY) + sl.fallVy * dt;
+                        sl.fallAngle = (sl.fallAngle || 0) + (sl.fallVang || 0) * dt;
+                        sl.fallVx *= Math.pow(0.16, dt);
+                        sl.fallVy *= Math.pow(0.16, dt);
+                        sl.fallVang = (sl.fallVang || 0) * Math.pow(0.22, dt);
+                        if (Math.hypot(sl.fallVx, sl.fallVy) < 2.0) {
+                            sl.fallVx = 0;
+                            sl.fallVy = 0;
+                        }
+                    }
+                    if (sl.timer > 30.0 && Math.hypot(cx - sl.baseX, cy - sl.baseY) > 360) {
+                        sl.state = 0;
+                        sl.timer = 0;
+                        sl.tiltDx = 0;
+                        sl.tiltDy = 0;
+                    }
+                    continue;
+                }
+
+                if (pCar && !isMicroVeh && Math.abs(pCar.x - sl.baseX) < 30 && Math.abs(pCar.y - sl.baseY) < 30) {
+                    const dist = Math.hypot(pCar.x - sl.baseX, pCar.y - sl.baseY);
+                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+                    if (dist < 25 && spd > 22 && (sl.hitCooldown || 0) <= 0) {
+                        const impAng = Math.atan2(
+                            pCar.vy || Math.sin(pCar.angle),
+                            pCar.vx || Math.cos(pCar.angle)
+                        );
+                        const knockDown = isHeavyVeh || (sl.state === 1 && spd > 90) || spd >= 185;
+
+                        if (knockDown) {
+                            sl.state = 2;
+                            sl.timer = 0;
+                            sl.hitCooldown = 0.8;
+                            sl.fallAngle = impAng;
+                            sl.fallenX = sl.baseX + Math.cos(impAng) * 14;
+                            sl.fallenY = sl.baseY + Math.sin(impAng) * 14;
+                            const launchSpd = Math.min(250, Math.max(90, spd * 1.12));
+                            sl.fallVx = Math.cos(impAng) * launchSpd;
+                            sl.fallVy = Math.sin(impAng) * launchSpd;
+                            sl.fallVang = (Math.random() - 0.5) * 8.5;
+
+                            if (isHeavyVeh) {
+                                pCar.vx *= 0.93;
+                                pCar.vy *= 0.93;
+                            } else {
+                                pCar.vx *= 0.68;
+                                pCar.vy *= 0.68;
+                                if (typeof pCar.receiveImpactDamage === "function") {
+                                    pCar.receiveImpactDamage(11, sl.baseX, sl.baseY);
+                                }
+                            }
+                            if (game.audio && typeof game.audio.playCrash === "function") {
+                                game.audio.playCrash(0.65);
+                            }
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 10; k++) {
+                                    game.spawnParticle(
+                                        sl.baseX + (Math.random() - 0.5) * 14,
+                                        sl.baseY + (Math.random() - 0.5) * 14,
+                                        "SPARK"
+                                    );
+                                }
+                            }
+                            if (typeof game.addScore === "function") game.addScore(100);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({
+                                    x: sl.baseX,
+                                    y: sl.baseY,
+                                    z: 2.42,
+                                    text: "💥 LAMPADAIRE DÉFONCÉ! +$100",
+                                    color: "#fb923c",
+                                    life: 1.25
+                                });
+                            }
+                        } else {
+                            // Normal car bends & damages the streetlamp!
+                            sl.state = 1;
+                            sl.hitCooldown = 0.65;
+                            sl.tiltDx = Math.cos(impAng) * 7.5;
+                            sl.tiltDy = Math.sin(impAng) * 7.5;
+                            pCar.vx *= 0.60;
+                            pCar.vy *= 0.60;
+                            if (typeof pCar.receiveImpactDamage === "function") {
+                                pCar.receiveImpactDamage(9, sl.baseX, sl.baseY);
+                            }
+                            if (game.audio && typeof game.audio.playCrash === "function") {
+                                game.audio.playCrash(0.45);
+                            }
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 6; k++) {
+                                    game.spawnParticle(
+                                        sl.baseX + (Math.random() - 0.5) * 10,
+                                        sl.baseY + (Math.random() - 0.5) * 10,
+                                        "SPARK"
+                                    );
+                                }
+                            }
+                            if (typeof game.addScore === "function") game.addScore(40);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({
+                                    x: sl.baseX,
+                                    y: sl.baseY,
+                                    z: 2.38,
+                                    text: "⚡ LAMPADAIRE ABÎMÉ! +$40",
+                                    color: "#fde047",
+                                    life: 1.15
+                                });
+                            }
                         }
                     }
                 }
@@ -5255,7 +5432,17 @@ class WorldObjectEngine {
                     if (sp.broken) {
                         // Knocked-down 3D streetlight pole lying horizontal on the ground
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 38, 4, bz, bz + 0.05, [0.78, 0.82, 0.88], 1.0, 5);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 16, 0, 10, 6, bz, bz + 0.06, neonCol, 1.0, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 16, 0, 10, 6, bz, bz + 0.06, [0.35, 0.38, 0.44], 1.0, 5);
+                    } else if (sp.damaged) {
+                        // Bent / damaged 3D Art Deco pole + flickering neon arm
+                        const tx = sp.tiltDx || 5.0;
+                        const ty = sp.tiltDy || 0.0;
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.24, [0.76, 0.80, 0.86], 1.0, 5);
+                        emitDynBox(sp.x + tx * 0.65, sp.y + ty * 0.65, cosA, sinA, 0, 0, 4.5, 4.5, bz + 0.22, bz + 0.46, [0.76, 0.80, 0.86], 1.0, 5);
+                        emitDynBox(sp.x + tx, sp.y + ty, cosA, sinA, 9, 0, 18, 4.0, bz + 0.43, bz + 0.47, [0.76, 0.80, 0.86], 1.0, 5);
+                        if (Math.sin(t * 28.0 + sp.x) > -0.25) {
+                            emitDynBox(sp.x + tx, sp.y + ty, cosA, sinA, 14, 0, 10, 6.0, bz + 0.40, bz + 0.44, neonCol, 1.0, 7);
+                        }
                     } else {
                         // Vertical 3D Art Deco pole + cantilevered glowing neon luminary arm
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.54, [0.82, 0.86, 0.92], 1.0, 5);

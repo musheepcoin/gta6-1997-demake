@@ -6667,9 +6667,40 @@ class RetroRenderer {
             for (const sl of this.map.streetlights) {
                 if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
                 const sz = sl.z || 2.0;
-                const midX = (sl.baseX + sl.headX) * 0.5;
-                const midY = (sl.baseY + sl.headY) * 0.5;
-                const armLen = Math.max(8, Math.hypot(sl.headX - sl.baseX, sl.headY - sl.baseY) + 3);
+                const isDeco = sl.style === "ART_DECO_NEON" || sl.style === "PROMENADE_TWIN";
+                const pr = isDeco ? 0.76 : 0.46;
+                const pg = isDeco ? 0.82 : 0.52;
+                const pb = isDeco ? 0.90 : 0.60;
+
+                // State 2: Knocked-down / Uprooted Streetlamp lying flat on the ground!
+                if (sl.state === 2) {
+                    const fx = sl.fallenX ?? sl.baseX;
+                    const fy = sl.fallenY ?? sl.baseY;
+                    const fAng = sl.fallAngle || 0;
+                    const fCos = Math.cos(fAng);
+                    const fSin = Math.sin(fAng);
+                    // Sheared base stump at curb
+                    this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.02, 5.5, 5.5, 0, 0.28, 0.31, 0.36, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Toppled pole shaft lying on the street
+                    this.pushSolidQuad3D(fx, fy, sz + 0.03, 34.0, 3.2, fAng, pr * 0.85, pg * 0.85, pb * 0.85, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Detached / bent cantilever arm & shattered luminaire hood at the tip
+                    const tipX = fx + fCos * 16.0;
+                    const tipY = fy + fSin * 16.0;
+                    this.pushSolidQuad3D(tipX, tipY, sz + 0.035, 7.2, 4.8, fAng + 0.5, pr * 0.72, pg * 0.72, pb * 0.72, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    continue;
+                }
+
+                const isDamaged = sl.state === 1;
+                const tDx = isDamaged ? (sl.tiltDx || 6.5) : 0;
+                const tDy = isDamaged ? (sl.tiltDy || 0) : 0;
+                const zDrop = isDamaged ? 0.06 : 0.0;
+                const effHeadX = sl.headX + tDx;
+                const effHeadY = sl.headY + tDy;
+                const topPoleX = sl.baseX + tDx;
+                const topPoleY = sl.baseY + tDy;
+                const midX = (topPoleX + effHeadX) * 0.5;
+                const midY = (topPoleY + effHeadY) * 0.5;
+                const armLen = Math.max(8, Math.hypot(effHeadX - topPoleX, effHeadY - topPoleY) + 3);
 
                 // 1. Daytime solar-tracked ground shadow on the sidewalk (rotates & lengthens with the 24h sun!)
                 if (nf < 0.85) {
@@ -6679,32 +6710,29 @@ class RetroRenderer {
                 }
 
                 // 2. Curb Base Pedestal (z = sz + 0.03)
-                const isDeco = sl.style === "ART_DECO_NEON" || sl.style === "PROMENADE_TWIN";
-                const pr = isDeco ? 0.76 : 0.46;
-                const pg = isDeco ? 0.82 : 0.52;
-                const pb = isDeco ? 0.90 : 0.60;
                 this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.03, 6.2, 6.2, 0, pr * 0.72, pg * 0.72, pb * 0.72, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
-                // 3. 3D Rising Vertical Pole Segments (true 3D perspective parallax from sz+0.14 to sz+0.50!)
-                this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.15, 3.8, 3.8, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
-                this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.28, 3.4, 3.4, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                // 3. 3D Rising Vertical Pole Segments (leaning by tDx, tDy when damaged by a car!)
+                this.pushSolidQuad3D(sl.baseX + tDx * 0.28, sl.baseY + tDy * 0.28, sz + 0.15 - zDrop * 0.25, 3.8, 3.8, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(sl.baseX + tDx * 0.58, sl.baseY + tDy * 0.58, sz + 0.28 - zDrop * 0.55, 3.4, 3.4, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
 
                 // Warm golden-yellow ring on upper pole shaft for boulevard lamps
                 if (isDeco) {
-                    this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.40, 4.2, 4.2, 0, 0.96, 0.80, 0.32, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(sl.baseX + tDx * 0.85, sl.baseY + tDy * 0.85, sz + 0.40 - zDrop * 0.80, 4.2, 4.2, 0, 0.96, 0.80, 0.32, 0.98, SPRITE_DRAW_ORDER.TREES);
                 } else {
-                    this.pushSolidQuad3D(sl.baseX, sl.baseY, sz + 0.40, 3.1, 3.1, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(sl.baseX + tDx * 0.85, sl.baseY + tDy * 0.85, sz + 0.40 - zDrop * 0.80, 3.1, 3.1, 0, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
                 }
 
-                // 4. Overhanging Cantilever Arm reaching out over the road (z = sz + 0.53)
-                this.pushSolidQuad3D(midX, midY, sz + 0.53, armLen, 2.8, sl.armAngle, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
+                // 4. Overhanging Cantilever Arm reaching out over the road (z = sz + 0.53 - zDrop)
+                this.pushSolidQuad3D(midX, midY, sz + 0.53 - zDrop, armLen, 2.8, sl.armAngle, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
 
-                // 5. Luminaire Cobra/Deco Hood & Warm Golden-Yellow Lamp Bulb at (headX, headY, sz + 0.55)
-                this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.54, 7.2, 4.8, sl.armAngle, pr * 0.85, pg * 0.85, pb * 0.85, 0.98, SPRITE_DRAW_ORDER.TREES);
-                if (lightsOn) {
-                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.555, 3.6, 2.8, sl.armAngle, 1.0, 0.90, 0.48, 0.92, SPRITE_DRAW_ORDER.TREES);
+                // 5. Luminaire Cobra/Deco Hood & Warm Golden-Yellow Lamp Bulb at (effHeadX, effHeadY, sz + 0.55 - zDrop)
+                this.pushSolidQuad3D(effHeadX, effHeadY, sz + 0.54 - zDrop, 7.2, 4.8, sl.armAngle, pr * 0.85, pg * 0.85, pb * 0.85, 0.98, SPRITE_DRAW_ORDER.TREES);
+                const bulbLit = lightsOn && (!isDamaged || Math.sin(this.time * 28.0 + sl.baseX) > -0.25);
+                if (bulbLit) {
+                    this.pushSolidQuad3D(effHeadX, effHeadY, sz + 0.555 - zDrop, 3.6, 2.8, sl.armAngle, 1.0, 0.90, 0.48, 0.92, SPRITE_DRAW_ORDER.TREES);
                 } else {
-                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.55, 3.6, 2.8, sl.armAngle, 0.95, 0.90, 0.72, 0.90, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(effHeadX, effHeadY, sz + 0.55 - zDrop, 3.6, 2.8, sl.armAngle, 0.95, 0.90, 0.72, 0.90, SPRITE_DRAW_ORDER.TREES);
                 }
             }
         }
@@ -7032,15 +7060,23 @@ class RetroRenderer {
         // 2. GTA 2 Style 3D Curb Streetlamps, Ocean Drive Neon Palms & Española Bistro Lights!
         if (this.map && Array.isArray(this.map.streetlights)) {
             for (const sl of this.map.streetlights) {
-                if (Math.abs(sl.headX - this.camX) > 920 || Math.abs(sl.headY - this.camY) > 680) continue;
+                // Knocked-down streetlamps (state === 2) have their bulb smashed and emit no light!
+                if (sl.state === 2) continue;
+                // Damaged/bent streetlamps (state === 1) flicker intermittently!
+                if (sl.state === 1 && Math.sin(this.time * 28.0 + sl.baseX) <= -0.25) continue;
+
+                const effHX = sl.headX + (sl.state === 1 ? (sl.tiltDx || 0) : 0);
+                const effHY = sl.headY + (sl.state === 1 ? (sl.tiltDy || 0) : 0);
+                if (Math.abs(effHX - this.camX) > 920 || Math.abs(effHY - this.camY) > 680) continue;
                 const sz = sl.z || 2.0;
+                const zDrop = sl.state === 1 ? 0.06 : 0.0;
                 // Ground light pool projected on the street directly beneath the overhanging luminaire head
-                const gSc = this.worldToScreen(sl.headX, sl.headY, sz + 0.04);
+                const gSc = this.worldToScreen(effHX, effHY, sz + 0.04);
                 if (gSc.x < -160 || gSc.x > W + 160 || gSc.y < -160 || gSc.y > H + 160) continue;
                 const pxScale = (gSc.scale * H) / 128.0;
 
                 // Elevated 3D lamp head position for the warm, progressively diffuse golden-yellow radial halo
-                const hSc = this.worldToScreen(sl.headX, sl.headY, sz + 0.56);
+                const hSc = this.worldToScreen(effHX, effHY, sz + 0.56 - zDrop);
 
                 if (sl.colorType === "SODIUM") {
                     addLightPool(gSc.x, gSc.y, 96 * pxScale, "rgba(255, 198, 82, 0.90)", "rgba(230, 140, 30, 0.38)");
