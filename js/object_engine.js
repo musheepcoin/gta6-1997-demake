@@ -1,29 +1,25 @@
 /* ============================================================================
-   VICE CITY 26 — TRUE 3D VOLUMETRIC WORLD OBJECT & PREFAB ENGINE
+   VICE CITY 26 — TRUE 3D VOLUMETRIC WORLD OBJECT, LANDMARK & PROP ENGINE
    (js/object_engine.js)
    ----------------------------------------------------------------------------
-   Unified 3D Architectural & World Object Engine solving:
+   Unified 3D Architectural, Monument & Interactive Street Prop Engine:
    1. Strict 1:1 Physical Metric Scale (1 tile = 64 px = 8m, Car = 58x28 px,
       Pedestrian = 24x24 px, Garage Bay = 62 px, Double Entry Door = 38 px).
    2. Hardware Z-Buffered 3D WebGL Mesh Pipeline (gl.depthMask(true)):
-      - 10 3D Prefab Archetypes (Palazzos, Modern Villas, Canal Villas, Florida
-        Bungalows, Keys Stilt Houses, Art Deco Villas, Everglades Bayou Shacks,
-        3D Tiki Pavilions, 3D Lifeguard Towers, 3D Refinery Smokestacks)
-      - True 3D vertical walls with per-face directional solar normal lighting
-      - True 3D sloped/hipped roofs (4-sided pyramid/hip & gable 3D geometry)
-      - True 3D cantilevered penthouses, porticos, Corinthian columns, timber
-        stilts, exterior staircases, wooden boat piers & recessed swimming pools
-      - Dynamic Sunset & Night-mode emissive interior window & neon trim shader
-   3. Topographical Lot Scanner, Shoreline Pier Snapper & Auto-Clearance:
-      - Clears legacy 1997 .cmp brick blocks on designated island/estate parcels
-      - Enforces road/sidewalk clearance margins so no object overhangs a street
-      - Automatically snaps waterfront dockBoat sockets to verified deep WATER
-        tiles and generates a 3D wooden pier connecting the shore to the boat
-      - Injects 3D roof elevations into the 512x512 ray-marched solar shadow map
-   4. Live Entity Sockets, Enterable Interiors & Destructible Prop Physics:
-      - Spawns real drivable Vehicle entities in driveways (press [F] to drive!)
-      - Registers walkable luxury interiors at 3D portico doors (press [E]!)
-      - Simulates destructible/interactive terrace & poolside props on impact
+      - 23 Verified 3D Residential Estates across 7 Districts
+      - 3D Iconic GTA 6 Monuments & Infrastructure:
+        * SERA Space Center Launch Pad 39A, 3D Umbilical Tower & Multi-Stage Rocket
+        * Vice Port & Port Gellhorn 3D Corrugated Container Stacks & 3D Gantry Cranes
+        * Key West & Cape Leonida 3D Coastal Lighthouses with Rotating Beacons
+        * Vice Beach Pier 3D Vertically-Rotating Neon Ferris Wheel & Gondolas
+        * Port Gellhorn 3D Dutch Mini-Golf Windmill with Vertically-Rotating 3D Sails
+        * VCIA Airport 3D Security Checkpoint Guardhouses, 3D Tiki Bars,
+          3D Beach Lifeguard Towers & 3D Allied Crystal Refinery Smokestacks
+   3. 3D Destructible Street Furniture & Chaos Physics (this.streetProps):
+      - 180+ True-3D Sidewalk Props (Cast-Iron Fire Hydrants with 3D Water Geysers,
+        Art Deco Neon Streetlights, Glass Payphone Booths, Newspaper Stands)
+      - Full 3D rigid-body knockback, gravity, bounce, electric sparks, 3D water
+        geysers & "$100 STREET MAYHEM!" score bonuses on vehicle impact!
    ============================================================================ */
 
 const WORLD_METRICS = {
@@ -240,6 +236,30 @@ const PREFAB_CATALOG = {
         category: "LANDMARK_PROP",
         label: "3D Allied Crystal Refinery Smokestack",
         w1: 28, d1: 28, h1: 0.85
+    },
+    sera_rocket_launchpad: {
+        id: "sera_rocket_launchpad",
+        category: "MONUMENT_3D",
+        label: "SERA Space Center Launch Pad 39A & Rocket",
+        w1: 120, d1: 120, h1: 2.15
+    },
+    port_gantry_crane_3d: {
+        id: "port_gantry_crane_3d",
+        category: "MONUMENT_3D",
+        label: "3D Port Intermodal Hammerhead Gantry Crane",
+        w1: 96, d1: 68, h1: 1.55
+    },
+    lighthouse_coastal_3d: {
+        id: "lighthouse_coastal_3d",
+        category: "MONUMENT_3D",
+        label: "3D Leonida Coastal Lighthouse & Beacon",
+        w1: 56, d1: 56, h1: 1.80
+    },
+    ferris_wheel_3d: {
+        id: "ferris_wheel_3d",
+        category: "MONUMENT_3D",
+        label: "Vice Beach Pier 3D Neon Ferris Wheel",
+        w1: 112, d1: 54, h1: 1.65
     }
 };
 
@@ -248,12 +268,29 @@ class WorldObjectEngine {
         this.map = map;
         this.instances = [];
         this.interactiveProps = [];
+        this.streetProps = [];
+        this.landmarks3D = {
+            launchpad: { x: 458.5 * TILE_SIZE, y: 35.5 * TILE_SIZE, z: 2.0 },
+            ferrisWheel: { x: 464.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
+            lighthouses: [
+                { id: "key_west_lh", x: 215.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, seed: 0.0 },
+                { id: "cape_leonida_lh", x: 464.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, seed: 2.4 }
+            ],
+            gantryCranes: [
+                { x: 336.8 * TILE_SIZE, y: 328.0 * TILE_SIZE, z: 2.0, ang: 0 },
+                { x: 336.8 * TILE_SIZE, y: 333.0 * TILE_SIZE, z: 2.0, ang: 0 },
+                { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE, z: 2.0, ang: Math.PI },
+                { x: 57.2 * TILE_SIZE,  y: 240.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
+            ]
+        };
         this.meshVbo = null;
         this.meshVertexCount = 0;
+        this.dynVbo = null;
         this.meshProg = null;
         this.meshLocs = null;
         this.vehiclesSpawned = false;
         this.interiorsRegistered = false;
+        this.streetPropsGenerated = false;
     }
 
     getPrefab(kind) {
@@ -299,7 +336,6 @@ class WorldObjectEngine {
             let wx = raw.x !== undefined ? raw.x : raw.c * TILE_SIZE;
             let wy = raw.y !== undefined ? raw.y : raw.r * TILE_SIZE;
 
-            // Road Safety Margin Solver: push away if any tile within (extX + 16px, extY + 16px) is ROAD
             if (map.surfaceGround) {
                 for (let iter = 0; iter < 4; iter++) {
                     const minC = Math.max(2, Math.floor((wx - extX - 16) / TILE_SIZE));
@@ -337,7 +373,6 @@ class WorldObjectEngine {
             raw.hw = hw;
             raw.hh = hh;
 
-            // Clear any legacy .cmp building blocks directly inside the estate parcel
             if (map.voxelGrid && map.surfaceGround && map.surfaceLayer) {
                 const minC = Math.max(2, Math.floor((wx - extX - 24) / TILE_SIZE));
                 const maxC = Math.min(M - 3, Math.floor((wx + extX + 24) / TILE_SIZE));
@@ -358,7 +393,6 @@ class WorldObjectEngine {
                 }
             }
 
-            // Clear random flora (palms & trees) inside building + driveway + pool radius
             const clearRad = Math.max(hw, hh) + 46;
             if (Array.isArray(map.vicePalms)) {
                 map.vicePalms = map.vicePalms.filter(p => Math.hypot(p.x - wx, p.y - wy) > clearRad);
@@ -367,7 +401,6 @@ class WorldObjectEngine {
                 map.trees = map.trees.filter(t => Math.hypot(t.x - wx, t.y - wy) > clearRad);
             }
 
-            // Validate Pool Socket (ensure pool does not land on ROAD or WATER)
             let validPool = null;
             if (raw.pool && map.surfaceGround) {
                 const pl = raw.pool;
@@ -381,7 +414,6 @@ class WorldObjectEngine {
                 }
             }
 
-            // Validate & Auto-Snap Waterfront DockBoat Socket to Verified Deep WATER + Compute 3D Pier Span
             let validBoat = null;
             if (raw.dockBoat && map.surfaceGround) {
                 const db = raw.dockBoat;
@@ -391,7 +423,6 @@ class WorldObjectEngine {
                 let br = Math.floor(by / TILE_SIZE);
 
                 if (!isDeepWater(bc, br)) {
-                    // Search outward around (bc, br) and estate (wx, wy) for nearest deep water tile
                     let bestW = null;
                     for (let rad = 1; rad <= 10; rad++) {
                         for (let dr = -rad; dr <= rad; dr++) {
@@ -418,7 +449,6 @@ class WorldObjectEngine {
                 }
 
                 if (isDeepWater(bc, br)) {
-                    // Trace back toward the estate (wx, wy) to find the exact shoreline edge for the 3D wooden pier
                     const dirX = bx - wx;
                     const dirY = by - wy;
                     const dirLen = Math.hypot(dirX, dirY) || 1.0;
@@ -489,7 +519,6 @@ class WorldObjectEngine {
             };
             this.instances.push(inst);
 
-            // Populate interactive/destructible poolside & terrace props for vehicle impact physics
             if (validPool) {
                 const pAng = ang + (validPool.ang || 0);
                 const pSc = validPool.scale || 0.90;
@@ -515,6 +544,7 @@ class WorldObjectEngine {
         }
 
         this.registerEstateInteriors();
+        this.generate3DStreetProps();
     }
 
     /* ========================================================================
@@ -536,7 +566,6 @@ class WorldObjectEngine {
             };
         };
 
-        // 1. Snap the existing STAR_ISLAND landmark interior door directly to star_vercetti_palazzo's 3D Corinthian Portico!
         const vercetti = findInst("star_vercetti_palazzo");
         const starIntr = map.interiors.find(it => it.id === "STAR_ISLAND");
         if (vercetti && starIntr) {
@@ -546,7 +575,6 @@ class WorldObjectEngine {
             starIntr.facing = "S";
         }
 
-        // 2. Register walkable luxury interiors at 6 flagship 3D estates across Leonida
         const estateDoors = [
             {
                 instId: "star_south_palazzo",
@@ -629,7 +657,74 @@ class WorldObjectEngine {
     }
 
     /* ========================================================================
-       2. INJECT 3D ROOF HEIGHTS INTO RAY-MARCHED SOLAR SHADOW LIGHTMAP
+       1C. GENERATE 180+ VERIFIED 3D DESTRUCTIBLE SIDEWALK FURNITURE PROPS
+       (Fire Hydrants with 3D Water Geysers, Art Deco Neon Streetlights,
+        Glass Payphone Booths & Newspaper Stands along Curb Edges)
+       ======================================================================== */
+    generate3DStreetProps() {
+        const map = this.map;
+        if (!map || !map.surfaceGround || this.streetPropsGenerated) return;
+        this.streetPropsGenerated = true;
+        this.streetProps = [];
+
+        const M = MAP_COLS;
+        const g = map.surfaceGround;
+        const kinds = ["STREETLIGHT_NEON", "HYDRANT", "STREETLIGHT_NEON", "NEWS_STAND", "PAYPHONE_BOOTH", "HYDRANT"];
+        let kIdx = 0;
+
+        // Scan sidewalk curb tiles (PAWEMENT adjacent to ROAD) with deterministic spacing
+        for (let r = 24; r < MAP_ROWS - 24; r += 7) {
+            for (let c = 24; c < M - 24; c += 7) {
+                if (this.streetProps.length >= 210) break;
+                const idx = r * M + c;
+                if (g[idx] !== GROUND_TYPE.PAWEMENT) continue;
+                // Check which neighbor is a ROAD tile so we place the prop near the curb facing the street
+                let curbDx = 0, curbDy = 0, armAng = 0, hasRoad = false;
+                if (g[r * M + (c + 1)] === GROUND_TYPE.ROAD) {
+                    curbDx = 18; curbDy = 0; armAng = 0; hasRoad = true;
+                } else if (g[r * M + (c - 1)] === GROUND_TYPE.ROAD) {
+                    curbDx = -18; curbDy = 0; armAng = Math.PI; hasRoad = true;
+                } else if (g[(r + 1) * M + c] === GROUND_TYPE.ROAD) {
+                    curbDx = 0; curbDy = 18; armAng = Math.PI * 0.5; hasRoad = true;
+                } else if (g[(r - 1) * M + c] === GROUND_TYPE.ROAD) {
+                    curbDx = 0; curbDy = -18; armAng = -Math.PI * 0.5; hasRoad = true;
+                }
+                if (!hasRoad) continue;
+
+                const px = (c + 0.5) * TILE_SIZE + curbDx;
+                const py = (r + 0.5) * TILE_SIZE + curbDy;
+
+                // Ensure not blocking any interior door
+                if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - px, it.doorY - py) < 52)) {
+                    continue;
+                }
+
+                const kind = kinds[kIdx % kinds.length];
+                kIdx++;
+                this.streetProps.push({
+                    id: `stprop_${kIdx}`,
+                    kind,
+                    homeX: px,
+                    homeY: py,
+                    x: px,
+                    y: py,
+                    z: 2.0,
+                    vx: 0,
+                    vy: 0,
+                    vz: 0,
+                    ang: armAng,
+                    vang: 0,
+                    broken: false,
+                    timer: 0,
+                    geyserTimer: 0,
+                    neonPink: (kIdx % 2 === 0)
+                });
+            }
+        }
+    }
+
+    /* ========================================================================
+       2. INJECT 3D ROOF & LANDMARK HEIGHTS INTO RAY-MARCHED SOLAR LIGHTMAP
        ======================================================================== */
     applyToElevationMap(colTopElev) {
         if (!colTopElev || !this.instances || this.instances.length === 0) return;
@@ -660,6 +755,24 @@ class WorldObjectEngine {
                     }
                 }
             }
+        }
+        // Inject 3D Coastal Lighthouses & SERA Launchpad into solar shadow map
+        const stampTower = (wx, wy, radTiles, topElev) => {
+            const c0 = Math.round(wx / TILE_SIZE);
+            const r0 = Math.round(wy / TILE_SIZE);
+            for (let dr = -radTiles; dr <= radTiles; dr++) {
+                for (let dc = -radTiles; dc <= radTiles; dc++) {
+                    const c = c0 + dc, r = r0 + dr;
+                    if (c >= 1 && c < M - 1 && r >= 1 && r < MAP_ROWS - 1) {
+                        const idx = r * M + c;
+                        if (topElev > colTopElev[idx]) colTopElev[idx] = topElev;
+                    }
+                }
+            }
+        };
+        if (this.landmarks3D) {
+            if (this.landmarks3D.launchpad) stampTower(this.landmarks3D.launchpad.x, this.landmarks3D.launchpad.y, 1, 4.1);
+            for (const lh of this.landmarks3D.lighthouses) stampTower(lh.x, lh.y, 1, 3.8);
         }
     }
 
@@ -710,13 +823,14 @@ class WorldObjectEngine {
     }
 
     /* ========================================================================
-       3B. DESTRUCTIBLE / INTERACTIVE WORLD PROP PHYSICS ON VEHICLE IMPACT
+       3B. DESTRUCTIBLE / INTERACTIVE WORLD PROP & STREET FURNITURE PHYSICS
        ======================================================================== */
     updateAndCollideProps(game, dt) {
-        if (!game || !this.interactiveProps || this.interactiveProps.length === 0) return;
+        if (!game) return;
         const player = game.player;
         const pCar = player && player.car ? player.car : null;
 
+        // 1. Poolside & Terrace Props
         for (let i = 0; i < this.interactiveProps.length; i++) {
             const pr = this.interactiveProps[i];
             if (pr.broken) {
@@ -749,10 +863,85 @@ class WorldObjectEngine {
                 }
             }
         }
+
+        // 2. 3D Sidewalk Street Furniture (Hydrants, Neon Streetlights, Payphones, News Stands)
+        if (!this.streetProps || this.streetProps.length === 0) return;
+        const cx = pCar ? pCar.x : (player ? player.x : 0);
+        const cy = pCar ? pCar.y : (player ? player.y : 0);
+
+        for (let i = 0; i < this.streetProps.length; i++) {
+            const sp = this.streetProps[i];
+            if (sp.broken) {
+                sp.timer += dt;
+                if (sp.geyserTimer > 0) {
+                    sp.geyserTimer = Math.max(0, sp.geyserTimer - dt);
+                }
+                sp.x += sp.vx * dt;
+                sp.y += sp.vy * dt;
+                sp.z += sp.vz * dt;
+                if (sp.z > 2.02) {
+                    sp.vz -= 1.85 * dt;
+                } else {
+                    sp.z = 2.02;
+                    sp.vz = Math.abs(sp.vz) > 0.15 ? Math.abs(sp.vz) * 0.35 : 0;
+                }
+                sp.vx *= Math.pow(0.20, dt);
+                sp.vy *= Math.pow(0.20, dt);
+                sp.ang += sp.vang * dt;
+                sp.vang *= Math.pow(0.28, dt);
+
+                if (sp.timer > 24.0 && Math.hypot(cx - sp.homeX, cy - sp.homeY) > 320) {
+                    sp.broken = false;
+                    sp.timer = 0;
+                    sp.geyserTimer = 0;
+                    sp.x = sp.homeX;
+                    sp.y = sp.homeY;
+                    sp.z = 2.0;
+                    sp.vx = 0;
+                    sp.vy = 0;
+                    sp.vz = 0;
+                }
+                continue;
+            }
+
+            if (pCar && Math.abs(pCar.x - sp.x) < 32 && Math.abs(pCar.y - sp.y) < 32) {
+                const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+                if (spd > 28 && Math.hypot(pCar.x - sp.x, pCar.y - sp.y) < 28) {
+                    sp.broken = true;
+                    sp.timer = 0;
+                    const dx = sp.x - pCar.x;
+                    const dy = sp.y - pCar.y;
+                    const d = Math.hypot(dx, dy) || 1.0;
+                    const launchSpd = Math.min(310, Math.max(110, spd * 1.25));
+                    sp.vx = (dx / d) * launchSpd;
+                    sp.vy = (dy / d) * launchSpd;
+                    sp.vz = 0.55;
+                    sp.vang = (Math.random() - 0.5) * 16.0;
+
+                    if (sp.kind === "HYDRANT") {
+                        sp.geyserTimer = 14.0;
+                        if (typeof game.addScore === "function") game.addScore(125);
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST! +$125", color: "#38bdf8", life: 1.3 });
+                        }
+                    } else if (sp.kind === "STREETLIGHT_NEON") {
+                        if (typeof game.addScore === "function") game.addScore(100);
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "⚡ STREET MAYHEM! +$100", color: "#f472b6", life: 1.2 });
+                        }
+                    } else {
+                        if (typeof game.addScore === "function") game.addScore(75);
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "💥 PROP SMASH! +$75", color: "#fde047", life: 1.1 });
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /* ========================================================================
-       4. HARDWARE Z-BUFFERED 3D ARCHITECTURAL MESH COMPILER & SHADER
+       4. HARDWARE Z-BUFFERED 3D ARCHITECTURAL & MONUMENT MESH COMPILER
        ======================================================================== */
     initShader(gl, renderer) {
         if (this.meshProg) return;
@@ -794,7 +983,6 @@ class WorldObjectEngine {
                 if (uNightTint > 0.01) {
                     float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
                     float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                    // Emissive window glass & neon Art Deco architectural frieze lighting on 3D facades
                     float isWindow = clamp((lum - 0.50) * 3.4 + (sat - 0.28) * 2.6, 0.0, 1.0);
                     vec3 darkWall = c.rgb * vec3(0.46, 0.54, 0.78);
                     vec3 warmGlow = min(vec3(1.0), mix(c.rgb * 1.38, vec3(1.0, 0.86, 0.52), 0.42));
@@ -878,13 +1066,9 @@ class WorldObjectEngine {
             const bSW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY + hd, yBot);
             const bSE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY + hd, yBot);
 
-            // South (+Y local) Front Facade — full sunlight (1.02)
             pushQuad3D(tSW, tSE, bSW, bSE, fu0, fv0, fu1, fv1, 1.02, 1.01, 0.99, 1.0);
-            // North (-Y local) Rear Facade — ambient shade (0.80)
             pushQuad3D(tNE, tNW, bNE, bNW, su0, sv0, su1, sv1, 0.80, 0.82, 0.86, 1.0);
-            // West (-X local) Side Facade — warm afternoon sun (0.94)
             pushQuad3D(tNW, tSW, bNW, bSW, su0, sv0, su1, sv1, 0.94, 0.94, 0.95, 1.0);
-            // East (+X local) Side Facade — soft shade (0.86)
             pushQuad3D(tSE, tNE, bSE, bNE, su0, sv0, su1, sv1, 0.86, 0.87, 0.90, 1.0);
 
             if (topColor) {
@@ -934,18 +1118,13 @@ class WorldObjectEngine {
             const rW = toWorld(cxPx, cyPx, cosA, sinA, offX - ridgeHalf, offY, yTop);
             const rE = toWorld(cxPx, cyPx, cosA, sinA, offX + ridgeHalf, offY, yTop);
 
-            // North Sloped Trapezoid — Sunlit (1.06)
             pushTri3D(eNW, rW, eNE, [u0, v0], [uMidL, vMid], [u1, v0], 1.06, 1.04, 1.00, 1.0);
             pushTri3D(eNE, rW, rE,  [u1, v0], [uMidL, vMid], [uMidR, vMid], 1.06, 1.04, 1.00, 1.0);
 
-            // South Sloped Trapezoid — Warm Southern Slope (0.94)
             pushTri3D(rW, eSW, rE,  [uMidL, vMid], [u0, v1], [uMidR, vMid], 0.94, 0.92, 0.90, 1.0);
             pushTri3D(rE, eSW, eSE, [uMidR, vMid], [u0, v1], [u1, v1], 0.94, 0.92, 0.90, 1.0);
 
-            // West Sloped Hip Triangle — Bright West Slope (1.02)
             pushTri3D(eNW, eSW, rW, [u0, v0], [u0, v1], [uMidL, vMid], 1.02, 1.00, 0.98, 1.0);
-
-            // East Sloped Hip Triangle — Shaded East Slope (0.85)
             pushTri3D(rE, eSE, eNE, [uMidR, vMid], [u1, v1], [u1, v0], 0.85, 0.84, 0.86, 1.0);
 
             if (ridgeCol && ridgeHalf > 4) {
@@ -972,7 +1151,7 @@ class WorldObjectEngine {
         };
 
         // ====================================================================
-        // A. COMPILE ALL 3D RESIDENTIAL ESTATES, MANSIONS, VILLAS & SHACKS
+        // A. COMPILE ALL 23 3D RESIDENTIAL ESTATES, MANSIONS, VILLAS & SHACKS
         // ====================================================================
         for (let i = 0; i < this.instances.length; i++) {
             const inst = this.instances[i];
@@ -991,7 +1170,6 @@ class WorldObjectEngine {
             const ovh = (spec.roofOverhang || 10) * sc;
             let zBase = bz;
 
-            // 0. Elevated Timber Stilts & Wrap-Around Deck (for Leonida Keys Stilt Houses & Bayou Shacks)
             if (spec.hasStiltDeck && spec.stiltH > 0) {
                 const stiltTop = bz + spec.stiltH * sc;
                 const deckW = w1 + (spec.deckPad || 16) * 2 * sc;
@@ -1013,11 +1191,9 @@ class WorldObjectEngine {
                 emitSolidBox3D(cx, cy, cosA, sinA, 0, 0, w1 + 8 * sc, d1 + 8 * sc, bz, bz + 0.045, spec.trimColor);
             }
 
-            // 1. First-Floor 3D Architectural Volume (N/S/E/W Vertical Textured Facade Walls)
             const z1 = zBase + spec.h1 * sc;
             emitBox3D(cx, cy, cosA, sinA, 0, 0, w1, d1, zBase + 0.04, z1, spec.frontWall1, spec.sideWall1, spec.wallColor);
 
-            // 1B. Protruding 3D Entrance Portico & Corinthian Columns (or Bungalow Covered Front Porch)
             if (spec.hasPortico) {
                 const pw = (spec.porticoW || 76) * sc;
                 const pd = (spec.porticoD || 26) * sc;
@@ -1037,14 +1213,12 @@ class WorldObjectEngine {
                 }
             }
 
-            // 2. First-Floor 3D Overhanging Roof
             if (spec.roofStyle === "FLAT_CANTILEVER") {
                 emitModernFlatRoof3D(cx, cy, cosA, sinA, 0, 0, w1 + ovh * 2, d1 + ovh * 2, z1, 0.09 * sc, spec.roofTex1, spec.trimColor);
             } else {
                 emitHippedRoof3D(cx, cy, cosA, sinA, 0, 0, w1 + ovh * 2, d1 + ovh * 2, z1, (spec.roofPitch1 || 0.25) * sc, spec.roofTex1, spec.trimColor, spec.roofRidgeColor);
             }
 
-            // 3. Second-Floor 3D Tower / Penthouse / Clerestory Volume + Second-Floor 3D Roof
             if (spec.w2 > 0 && spec.h2 > 0) {
                 const w2 = spec.w2 * sc;
                 const d2 = spec.d2 * sc;
@@ -1072,14 +1246,12 @@ class WorldObjectEngine {
                 }
             }
 
-            // 4. Private 3D Travertine Pool Deck & Coping Rim
             if (inst.pool) {
                 const pl = inst.pool;
                 const pSc = pl.scale || 0.90;
                 emitSolidBox3D(cx, cy, cosA, sinA, pl.dx, pl.dy, 152 * pSc, 92 * pSc, bz, bz + 0.032, [0.92, 0.90, 0.86]);
             }
 
-            // 5. Shoreline-to-Water 3D Timber Boat Pier (auto-aligned to verified WATER tile!)
             if (inst.dockBoat) {
                 const db = inst.dockBoat;
                 const pCos = Math.cos(db.pierAng);
@@ -1103,7 +1275,6 @@ class WorldObjectEngine {
                 const cosA = Math.cos(tb.ang || 0);
                 const sinA = Math.sin(tb.ang || 0);
                 const bz = tb.z || 2.0;
-                // 3D Bamboo Corner Posts + 3D Mahogany Bar Counter + 3D Pitched Thatch Roof
                 for (const px of [-24, 24]) {
                     for (const py of [-18, 18]) {
                         emitSolidBox3D(tb.x, tb.y, cosA, sinA, px, py, 5, 5, bz, bz + 0.36, [0.68, 0.48, 0.22]);
@@ -1128,7 +1299,6 @@ class WorldObjectEngine {
                 const isCyan = pr.spr.includes("cyan");
                 const cabinCol = isPink ? [0.98, 0.56, 0.72] : (isCyan ? [0.36, 0.88, 0.92] : [0.98, 0.82, 0.32]);
                 const roofCol = isPink ? [0.24, 0.86, 0.82] : [0.96, 0.44, 0.58];
-                // 4 3D Timber Stilt Legs + 3D Observation Deck + 3D Lifeguard Cabin + 3D Pitched Roof
                 for (const sx of [-14, 14]) {
                     for (const sy of [-12, 12]) {
                         emitSolidBox3D(pr.x, pr.y, cosA, sinA, sx, sy, 4, 4, bz, bz + 0.22, [0.92, 0.92, 0.94]);
@@ -1141,21 +1311,171 @@ class WorldObjectEngine {
         }
 
         // ====================================================================
-        // D. COMPILE 3D REFINERY SMOKESTACKS (this.map.industrialAndParkDetails)
+        // D. COMPILE 3D REFINERY SMOKESTACKS & 3D MINI-GOLF WINDMILL TOWER
         // ====================================================================
-        if (this.map && this.map.industrialAndParkDetails && Array.isArray(this.map.industrialAndParkDetails.smokestacks)) {
-            const stacks = this.map.industrialAndParkDetails.smokestacks;
-            for (let i = 0; i < stacks.length; i++) {
-                const st = stacks[i];
-                const rz = st.z || 3.0;
-                for (let lv = 0; lv < 7; lv++) {
-                    const sz = 24.0 - lv * 1.6;
-                    const y0 = rz + lv * 0.14;
-                    const y1 = y0 + 0.14;
-                    const col = (lv % 2 === 1) ? [0.88, 0.20, 0.18] : [0.94, 0.94, 0.96];
-                    emitSolidBox3D(st.x, st.y, 1, 0, 0, 0, sz, sz, y0, y1, col);
+        if (this.map && this.map.industrialAndParkDetails) {
+            const ind = this.map.industrialAndParkDetails;
+            if (Array.isArray(ind.smokestacks)) {
+                for (let i = 0; i < ind.smokestacks.length; i++) {
+                    const st = ind.smokestacks[i];
+                    const rz = st.z || 3.0;
+                    for (let lv = 0; lv < 7; lv++) {
+                        const sz = 24.0 - lv * 1.6;
+                        const y0 = rz + lv * 0.14;
+                        const y1 = y0 + 0.14;
+                        const col = (lv % 2 === 1) ? [0.88, 0.20, 0.18] : [0.94, 0.94, 0.96];
+                        emitSolidBox3D(st.x, st.y, 1, 0, 0, 0, sz, sz, y0, y1, col);
+                    }
                 }
             }
+            if (ind.miniGolf) {
+                const mg = ind.miniGolf;
+                const bz = mg.z || 2.0;
+                // 3D Tapered Dutch Windmill Tower + Conical Terracotta Cap
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 0, 0, 36, 36, bz, bz + 0.24, [0.86, 0.34, 0.24]);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 0, 0, 30, 30, bz + 0.24, bz + 0.48, [0.96, 0.94, 0.88]);
+                emitHippedRoof3D(mg.x, mg.y, 1, 0, 0, 0, 36, 36, bz + 0.48, 0.18, "mansion_star_island_top", [0.42, 0.28, 0.18], [0.92, 0.72, 0.24]);
+            }
+        }
+
+        // ====================================================================
+        // E. COMPILE 3D AIRPORT CHECKPOINT GUARDHOUSES (airportCompound.gates)
+        // ====================================================================
+        if (this.map && this.map.airportCompound && Array.isArray(this.map.airportCompound.gates)) {
+            for (const gt of this.map.airportCompound.gates) {
+                const bx = gt.boothX, by = gt.boothY, bz = 2.0;
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 28, 22, bz, bz + 0.18, [0.86, 0.89, 0.94]);
+                emitBox3D(bx, by, 1, 0, 0, 0, 24, 18, bz + 0.18, bz + 0.38, "wall_modern_upper", "wall_modern_upper", [0.24, 0.28, 0.36]);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.38, bz + 0.43, [0.22, 0.26, 0.34]);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 18, 5, bz + 0.43, bz + 0.47, [0.98, 0.78, 0.12]);
+            }
+        }
+
+        // ====================================================================
+        // F. COMPILE 3D SHIPPING CONTAINER STACKS & 3D PORT GANTRY CRANES
+        // ====================================================================
+        if (this.map && Array.isArray(this.map.portTerminals)) {
+            const containerPalette = [
+                [0.84, 0.22, 0.18], // Hapag Crimson
+                [0.14, 0.54, 0.78], // Maersk Cyan-Blue
+                [0.16, 0.62, 0.36], // Evergreen
+                [0.92, 0.52, 0.12], // Hazard Orange
+                [0.24, 0.36, 0.68]  // Cosco Navy
+            ];
+            for (let i = 0; i < this.map.portTerminals.length; i++) {
+                const pt = this.map.portTerminals[i];
+                if (pt.kind !== "CONTAINERS") continue;
+                const cosA = Math.cos(pt.ang || 0);
+                const sinA = Math.sin(pt.ang || 0);
+                const bz = pt.z || 2.0;
+                const sc = pt.scale || 1.2;
+                const cw = 54 * sc;
+                const cd = 22 * sc;
+                // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers
+                for (let row = -1; row <= 1; row += 2) {
+                    const oy = row * (cd * 0.55);
+                    const c1 = containerPalette[(i + (row > 0 ? 1 : 0)) % containerPalette.length];
+                    const c2 = containerPalette[(i + (row > 0 ? 3 : 2)) % containerPalette.length];
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz, bz + 0.24, c1);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz + 0.245, bz + 0.48, c2);
+                }
+                if (i % 2 === 0) {
+                    const c3 = containerPalette[(i + 4) % containerPalette.length];
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, cw, cd, bz + 0.485, bz + 0.72, c3);
+                }
+            }
+        }
+
+        if (this.landmarks3D && Array.isArray(this.landmarks3D.gantryCranes)) {
+            for (const gc of this.landmarks3D.gantryCranes) {
+                const cosA = Math.cos(gc.ang || 0);
+                const sinA = Math.sin(gc.ang || 0);
+                const bz = gc.z || 2.0;
+                const red = [0.88, 0.18, 0.16];
+                const white = [0.95, 0.96, 0.98];
+                const steel = [0.26, 0.30, 0.36];
+                // 4 Portal Legs (leaves wide 48px drive-through lane underneath!)
+                for (const lx of [-24, 24]) {
+                    for (const ly of [-26, 26]) {
+                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 7, 7, bz, bz + 0.75, red);
+                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 6, 6, bz + 0.75, bz + 1.25, white);
+                    }
+                }
+                // Cross-Portal Beam + Operator Glass Cab + Long Over-Water Hammerhead Boom
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 58, 60, bz + 0.72, bz + 0.80, red);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 12, 0, 18, 16, bz + 1.08, bz + 1.24, white);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 38, 0, 148, 14, bz + 1.24, bz + 1.34, red);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 18, 18, bz + 1.34, bz + 1.62, white);
+                // Spreader cable + suspended container hook block
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 78, 0, 3, 3, bz + 0.55, bz + 1.24, steel);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 78, 0, 18, 10, bz + 0.48, bz + 0.55, [0.96, 0.76, 0.12]);
+            }
+        }
+
+        // ====================================================================
+        // G. COMPILE SERA SPACE CENTER 3D LAUNCH PAD 39A & APOLLO/ARTEMIS ROCKET
+        // ====================================================================
+        if (this.landmarks3D && this.landmarks3D.launchpad) {
+            const lp = this.landmarks3D.launchpad;
+            const bz = lp.z || 2.0;
+            // Concrete Octagonal Flame Trench Pad + 4 Perimeter Lightning Masts
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 112, 112, bz, bz + 0.14, [0.68, 0.70, 0.74]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 0, 0, 82, 82, bz + 0.14, bz + 0.24, [0.52, 0.54, 0.58]);
+            for (const [mx, my] of [[-50, -50], [50, -50], [-50, 50], [50, 50]]) {
+                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 4, 4, bz + 0.14, bz + 1.45, [0.82, 0.84, 0.88]);
+            }
+            // 3D Steel Umbilical Launch Tower (West of Rocket) + 3 Swing Access Arms
+            for (let lv = 0; lv < 8; lv++) {
+                const y0 = bz + 0.24 + lv * 0.20;
+                emitSolidBox3D(lp.x, lp.y, 1, 0, -26, 0, 20, 20, y0, y0 + 0.18, (lv % 2 === 0) ? [0.86, 0.22, 0.18] : [0.88, 0.90, 0.94]);
+            }
+            for (const armZ of [bz + 0.75, bz + 1.15, bz + 1.55]) {
+                emitSolidBox3D(lp.x, lp.y, 1, 0, -10, 0, 24, 6, armZ, armZ + 0.05, [0.86, 0.22, 0.18]);
+            }
+            // 3D Multi-Stage Heavy Space Rocket + Twin Solid Rocket Boosters
+            // SRBs
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, -12, 8, 8, bz + 0.24, bz + 1.32, [0.96, 0.96, 0.98]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 6,  12, 8, 8, bz + 0.24, bz + 1.32, [0.96, 0.96, 0.98]);
+            // Core Cryogenic Orange Stage + White Upper Stage + Crew Capsule Spire
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 16, 16, bz + 0.24, bz + 1.24, [0.90, 0.44, 0.16]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 14, 14, bz + 1.24, bz + 1.72, [0.97, 0.98, 1.00]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 10, 10, bz + 1.72, bz + 1.98, [0.18, 0.20, 0.24]);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 6, 0, 4,  4,  bz + 1.98, bz + 2.22, [0.98, 0.22, 0.22]);
+        }
+
+        // ====================================================================
+        // H. COMPILE 3D COASTAL LIGHTHOUSES & 3D FERRIS WHEEL SUPPORT FRAME
+        // ====================================================================
+        if (this.landmarks3D && Array.isArray(this.landmarks3D.lighthouses)) {
+            for (const lh of this.landmarks3D.lighthouses) {
+                const bz = lh.z || 2.0;
+                // Keeper's Coral-Roofed Cottage Base + 6-Tier Tapered Red & White Lighthouse Tower
+                emitBox3D(lh.x, lh.y, 1, 0, -24, 10, 44, 34, bz, bz + 0.38, "wall_keys_front", "wall_keys_side", [0.96, 0.96, 0.98]);
+                emitHippedRoof3D(lh.x, lh.y, 1, 0, -24, 10, 52, 42, bz + 0.38, 0.16, "mansion_star_island_top", [0.92, 0.92, 0.94], [0.84, 0.32, 0.20]);
+                for (let lv = 0; lv < 6; lv++) {
+                    const sz = 28.0 - lv * 2.4;
+                    const y0 = bz + lv * 0.24;
+                    const col = (lv % 2 === 1) ? [0.88, 0.18, 0.18] : [0.97, 0.97, 0.99];
+                    emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, sz, sz, y0, y0 + 0.24, col);
+                }
+                // Black Iron Lantern Walk + Glowing Glass Beacon Room + Conical Copper Dome
+                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 20, 20, bz + 1.44, bz + 1.49, [0.16, 0.18, 0.22]);
+                emitSolidBox3D(lh.x, lh.y, 1, 0, 0, 0, 14, 14, bz + 1.49, bz + 1.68, [1.00, 0.94, 0.62]);
+                emitHippedRoof3D(lh.x, lh.y, 1, 0, 0, 0, 20, 20, bz + 1.68, 0.14, "mansion_star_island_top", [0.82, 0.18, 0.18], [0.98, 0.82, 0.24]);
+            }
+        }
+
+        if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
+            const fw = this.landmarks3D.ferrisWheel;
+            const bz = fw.z || 2.0;
+            // Wooden Boardwalk Deck + Twin A-Frame Steel Support Towers + Central Axle Hub
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 116, 52, bz, bz + 0.06, [0.64, 0.42, 0.24]);
+            for (const sideY of [-16, 16]) {
+                emitSolidBox3D(fw.x, fw.y, 1, 0, -22, sideY, 6, 6, bz + 0.06, bz + 0.92, [0.94, 0.96, 0.99]);
+                emitSolidBox3D(fw.x, fw.y, 1, 0,  22, sideY, 6, 6, bz + 0.06, bz + 0.92, [0.94, 0.96, 0.99]);
+                emitSolidBox3D(fw.x, fw.y, 1, 0,   0, sideY, 12, 8, bz + 0.88, bz + 0.98, [0.98, 0.24, 0.68]);
+            }
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 8, 38, bz + 0.90, bz + 0.96, [0.18, 0.88, 0.98]);
         }
 
         if (this.meshVbo) {
@@ -1168,7 +1488,7 @@ class WorldObjectEngine {
     }
 
     /* ========================================================================
-       5. RENDER HARDWARE-DEPTH-BUFFERED 3D ARCHITECTURAL MESHES
+       5. RENDER HARDWARE-DEPTH-BUFFERED 3D STATIC + DYNAMIC ANIMATED MESHES
        ======================================================================== */
     renderStatic3DMesh(gl, renderer, viewProj, nf = 0.0, sf = 0.0) {
         if (!gl || !this.meshVbo || this.meshVertexCount === 0 || !this.meshProg || !renderer.spritesTex) return;
@@ -1182,8 +1502,8 @@ class WorldObjectEngine {
         gl.bindTexture(gl.TEXTURE_2D, renderer.spritesTex);
         gl.uniform1i(this.meshLocs.uTex, 0);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVbo);
         const stride = 9 * 4;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVbo);
         gl.enableVertexAttribArray(this.meshLocs.aPos);
         gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
         gl.enableVertexAttribArray(this.meshLocs.aUV);
@@ -1197,11 +1517,170 @@ class WorldObjectEngine {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
+        // Pass 1: Static 3D Estates & Landmarks
         gl.drawArrays(gl.TRIANGLES, 0, this.meshVertexCount);
+
+        // Pass 2: Dynamic 3D Animated Landmarks (Vertically-Rotating 3D Ferris Wheel,
+        //         3D Windmill Sails) & 3D Destructible Street Furniture + 3D Water Geysers!
+        this.renderDynamic3DMeshes(gl, renderer, stride);
+    }
+
+    renderDynamic3DMeshes(gl, renderer, stride) {
+        const camX = renderer.camX || 0;
+        const camY = renderer.camY || 0;
+        const minX = camX - 920;
+        const maxX = camX + 920;
+        const minY = camY - 720;
+        const maxY = camY + 720;
+        const t = renderer.time || 0;
+
+        const dVerts = [];
+        const pushV = (x, yElev, z, r, g, b, a = 1.0) => {
+            dVerts.push(x, yElev, z, -1.0, -1.0, r, g, b, a);
+        };
+        const pushQ = (p0, p1, p2, p3, r, g, b, a = 1.0) => {
+            pushV(p0[0], p0[1], p0[2], r, g, b, a);
+            pushV(p2[0], p2[1], p2[2], r, g, b, a);
+            pushV(p1[0], p1[1], p1[2], r, g, b, a);
+            pushV(p1[0], p1[1], p1[2], r, g, b, a);
+            pushV(p2[0], p2[1], p2[2], r, g, b, a);
+            pushV(p3[0], p3[1], p3[2], r, g, b, a);
+        };
+        const emitDynBox = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, col, alpha = 1.0) => {
+            const hw = wPx * 0.5;
+            const hd = dPx * 0.5;
+            const [r, g, b] = col;
+            const toW = (lx, ly, yE) => [
+                (cxPx + lx * cosA - ly * sinA) / TILE_SIZE,
+                yE,
+                (cyPx + lx * sinA + ly * cosA) / TILE_SIZE
+            ];
+            const tNW = toW(offX - hw, offY - hd, yTop);
+            const tNE = toW(offX + hw, offY - hd, yTop);
+            const tSW = toW(offX - hw, offY + hd, yTop);
+            const tSE = toW(offX + hw, offY + hd, yTop);
+            const bNW = toW(offX - hw, offY - hd, yBot);
+            const bNE = toW(offX + hw, offY - hd, yBot);
+            const bSW = toW(offX - hw, offY + hd, yBot);
+            const bSE = toW(offX + hw, offY + hd, yBot);
+
+            pushQ(tSW, tSE, bSW, bSE, r, g, b, alpha);
+            pushQ(tNE, tNW, bNE, bNW, r * 0.78, g * 0.80, b * 0.84, alpha);
+            pushQ(tNW, tSW, bNW, bSW, r * 0.92, g * 0.92, b * 0.95, alpha);
+            pushQ(tSE, tNE, bSE, bNE, r * 0.85, g * 0.86, b * 0.90, alpha);
+            pushQ(tNW, tNE, tSW, tSE, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+        };
+
+        // 1. Live Vertically-Rotating 3D Neon Ferris Wheel at Vice Beach Pier
+        if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
+            const fw = this.landmarks3D.ferrisWheel;
+            if (fw.x >= minX - 180 && fw.x <= maxX + 180 && fw.y >= minY - 180 && fw.y <= maxY + 180) {
+                const hubElev = (fw.z || 2.0) + 0.93;
+                const radPx = 46.0;
+                const radElev = 0.68;
+                const numGondolas = 10;
+                for (let gi = 0; gi < numGondolas; gi++) {
+                    const theta = t * 0.65 + (gi * Math.PI * 2.0) / numGondolas;
+                    const gx = fw.x + Math.cos(theta) * radPx;
+                    const gyElev = hubElev + Math.sin(theta) * radElev;
+                    const isPink = (gi % 2 === 0);
+                    const gCol = isPink ? [0.98, 0.28, 0.72] : [0.18, 0.90, 0.98];
+                    // 3D Passenger Gondola Cabin hanging at (gx, gyElev, fw.y)
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 14, 18, gyElev - 0.08, gyElev + 0.04, gCol);
+                    // Half-radius neon spoke bar
+                    const mx = fw.x + Math.cos(theta) * (radPx * 0.5);
+                    const myElev = hubElev + Math.sin(theta) * (radElev * 0.5);
+                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 5, 24, myElev - 0.02, myElev + 0.02, [0.98, 0.94, 0.52]);
+                }
+            }
+        }
+
+        // 2. Live Vertically-Rotating 3D Dutch Windmill Sails at Port Gellhorn Mini-Golf
+        if (this.map && this.map.industrialAndParkDetails && this.map.industrialAndParkDetails.miniGolf) {
+            const mg = this.map.industrialAndParkDetails.miniGolf;
+            if (mg.x >= minX - 140 && mg.x <= maxX + 140 && mg.y >= minY - 140 && mg.y <= maxY + 140) {
+                const hubElev = (mg.z || 2.0) + 0.42;
+                for (let bi = 0; bi < 4; bi++) {
+                    const ang = t * 1.8 + bi * (Math.PI * 0.5);
+                    for (const step of [0.45, 0.85]) {
+                        const sx = mg.x + Math.cos(ang) * (24.0 * step);
+                        const syElev = hubElev + Math.sin(ang) * (0.34 * step);
+                        emitDynBox(sx, mg.y + 19, 1, 0, 0, 0, 7, 4, syElev - 0.03, syElev + 0.03, [0.98, 0.92, 0.68]);
+                    }
+                }
+            }
+        }
+
+        // 3. 180+ True 3D Destructible Sidewalk Street Props & 3D Water Geysers
+        if (this.streetProps && this.streetProps.length > 0) {
+            for (let i = 0; i < this.streetProps.length; i++) {
+                const sp = this.streetProps[i];
+                if (sp.x < minX || sp.x > maxX || sp.y < minY || sp.y > maxY) continue;
+                const cosA = Math.cos(sp.ang);
+                const sinA = Math.sin(sp.ang);
+                const bz = sp.z || 2.0;
+
+                if (sp.kind === "HYDRANT") {
+                    if (sp.broken) {
+                        // Toppled hydrant body flying / lying on street
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 7, bz, bz + 0.07, [0.92, 0.20, 0.16]);
+                        // High-pressure 3D Water Geyser erupting from homeX, homeY!
+                        if (sp.geyserTimer > 0) {
+                            for (let w = 0; w < 5; w++) {
+                                const phase = ((t * 3.8 + w * 0.2) % 1.0);
+                                const wyElev = 2.02 + phase * 0.78;
+                                const spread = 5.0 + phase * 14.0;
+                                emitDynBox(sp.homeX, sp.homeY, 1, 0, 0, 0, spread, spread, wyElev, wyElev + 0.11, [0.68, 0.94, 1.0], 0.78 - phase * 0.45);
+                            }
+                        }
+                    } else {
+                        emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 7, 7, bz, bz + 0.12, [0.92, 0.20, 0.16]);
+                        emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 9, 5, bz + 0.06, bz + 0.09, [0.96, 0.84, 0.18]);
+                    }
+                } else if (sp.kind === "STREETLIGHT_NEON") {
+                    const neonCol = sp.neonPink ? [0.98, 0.32, 0.78] : [0.18, 0.92, 0.98];
+                    if (sp.broken) {
+                        // Knocked-down 3D streetlight pole lying horizontal on the ground
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 38, 4, bz, bz + 0.05, [0.78, 0.82, 0.88]);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 16, 0, 10, 6, bz, bz + 0.06, neonCol);
+                    } else {
+                        // Vertical 3D Art Deco pole + cantilevered glowing neon luminary arm
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.54, [0.82, 0.86, 0.92]);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 9, 0, 18, 4.0, bz + 0.50, bz + 0.54, [0.82, 0.86, 0.92]);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 14, 0, 10, 6.0, bz + 0.47, bz + 0.51, neonCol);
+                    }
+                } else if (sp.kind === "PAYPHONE_BOOTH") {
+                    if (sp.broken) {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 22, 12, bz, bz + 0.09, [0.18, 0.68, 0.88]);
+                    } else {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 14, bz, bz + 0.28, [0.18, 0.68, 0.88]);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 16, bz + 0.28, bz + 0.32, [0.96, 0.98, 1.0]);
+                    }
+                } else if (sp.kind === "NEWS_STAND") {
+                    if (sp.broken) {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 10, bz, bz + 0.07, [0.96, 0.68, 0.14]);
+                    } else {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz, bz + 0.16, [0.96, 0.68, 0.14]);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz + 0.11, bz + 0.16, [0.96, 0.96, 0.98]);
+                    }
+                }
+            }
+        }
+
+        if (dVerts.length === 0) return;
+        if (!this.dynVbo) {
+            this.dynVbo = gl.createBuffer();
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.dynVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dVerts), gl.STREAM_DRAW);
+        gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
+        gl.vertexAttribPointer(this.meshLocs.aUV, 2, gl.FLOAT, false, stride, 12);
+        gl.vertexAttribPointer(this.meshLocs.aColor, 4, gl.FLOAT, false, stride, 20);
+        gl.drawArrays(gl.TRIANGLES, 0, dVerts.length / 9);
     }
 
     /* ========================================================================
-       6. RENDER DYNAMIC CHILD SOCKETS (POOLS, SUNBATHERS, MOORED BOATS, PROPS)
+       6. RENDER DYNAMIC CHILD SOCKETS (POOLS, SUNBATHERS, BOATS, BEACONS)
        ======================================================================== */
     batchDynamicSockets3D(renderer, game, minX, minY, maxX, maxY, sunCos, sunSin) {
         if (!renderer || !this.instances || this.instances.length === 0) return;
@@ -1221,7 +1700,6 @@ class WorldObjectEngine {
                 : (h.z || 2.0);
             const sc = h.scale || 1.0;
 
-            // 1. Directional Solar Cast Shadow at Ground Level
             renderer.batchObjectSprite3D(
                 h.spec.roofTex1 || "mansion_star_island",
                 h.x + sunCos * 14,
@@ -1233,7 +1711,6 @@ class WorldObjectEngine {
                 0.02, 0.03, 0.06, 0.36
             );
 
-            // 2. Private Swimming Pool Socket (Turquoise Pool Water + Sunbathers + Flamingo Float)
             if (h.pool) {
                 const pl = h.pool;
                 const px = pl.worldX;
@@ -1256,7 +1733,6 @@ class WorldObjectEngine {
                 }
             }
 
-            // 3. Private Waterfront Canal / Jetty Moored Watercraft Socket (Guaranteed on WATER!)
             if (h.dockBoat) {
                 const db = h.dockBoat;
                 const boatX = db.worldX;
@@ -1268,13 +1744,34 @@ class WorldObjectEngine {
             }
         }
 
-        // 4. Render Interactive / Destructible Poolside & Terrace Props
+        // Render Poolside Interactive Props
         for (let i = 0; i < this.interactiveProps.length; i++) {
             const pr = this.interactiveProps[i];
             if (pr.x < minX - 120 || pr.x > maxX + 120 || pr.y < minY - 120 || pr.y > maxY + 120) continue;
             const zElev = pr.spr.includes("umbrella") ? (pr.z + (pr.broken ? 0.05 : 0.16)) : (pr.z + 0.040);
             const drawOrder = pr.spr.includes("umbrella") ? SPRITE_DRAW_ORDER.TREES : SPRITE_DRAW_ORDER.TIRE_MARKS;
             renderer.batchObjectSprite3D(pr.spr, pr.x, pr.y, zElev, pr.ang, pr.scale, drawOrder);
+        }
+
+        // Render SERA Rocket Cryogenic Vapor Plumes & Coastal Lighthouse Rotating Searchlight Beams
+        if (this.landmarks3D) {
+            const lp = this.landmarks3D.launchpad;
+            if (lp && lp.x >= minX - 220 && lp.x <= maxX + 220 && lp.y >= minY - 220 && lp.y <= maxY + 220) {
+                for (let p = 0; p < 3; p++) {
+                    const age = ((renderer.time * 0.85 + p * 0.33) % 1.0);
+                    const smSpr = String(200 + (p % 6));
+                    renderer.batchObjectSprite3D(smSpr, lp.x + 12 + age * 28, lp.y + age * 8, 2.55 + age * 0.65, renderer.time + p, 0.72 + age * 0.45, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                }
+            }
+            if (Array.isArray(this.landmarks3D.lighthouses)) {
+                for (const lh of this.landmarks3D.lighthouses) {
+                    if (lh.x < minX - 260 || lh.x > maxX + 260 || lh.y < minY - 260 || lh.y > maxY + 260) continue;
+                    const bAng = renderer.time * 1.15 + lh.seed;
+                    const bx = lh.x + Math.cos(bAng) * 44;
+                    const by = lh.y + Math.sin(bAng) * 44;
+                    renderer.pushSolidQuad3D(bx, by, 3.56, 76, 18, bAng, 1.0, 0.96, 0.68, 0.42, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                }
+            }
         }
     }
 
@@ -1287,7 +1784,6 @@ class WorldObjectEngine {
         const sy = canvasH / (MAP_ROWS * TILE_SIZE);
 
         ctx.save();
-        // 1. Paint lush emerald lawns over all cleared 1997 brick office footprints on Star Island & Venetian Isles
         ctx.fillStyle = "#16a34a";
         const clearedLawns = [
             [347, 355, 164, 170],
@@ -1304,7 +1800,6 @@ class WorldObjectEngine {
             ctx.fillRect(rx, ry, rw, rh);
         }
 
-        // 2. Paint each 3D estate roof & pool footprint onto the overview map
         for (let i = 0; i < this.instances.length; i++) {
             const inst = this.instances[i];
             const spec = inst.spec;

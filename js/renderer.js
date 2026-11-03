@@ -4781,13 +4781,9 @@ class RetroRenderer {
                         this.pushSolidQuad3D(armCx, py, bz + 0.14, armLen, 3.4, 0, 0.95, 0.18, 0.18, 0.96, SPRITE_DRAW_ORDER.TREES);
                         this.pushSolidQuad3D(armCx, py, bz + 0.145, armLen * 0.45, 3.4, 0, 0.98, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.TREES);
                     }
-                    // 3D Airport Security Guardhouse Booth beside the checkpoint
+                    // 3D Airport Security Guardhouse Booth shadow (true 3D mesh rendered by WorldObjectEngine)
                     const bx = gt.boothX, by = gt.boothY;
                     this.pushSolidQuad3D(bx + sunCos * 6, by + sunSin * 6, bz + 0.015, 28, 22, 0, 0.02, 0.03, 0.06, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(bx, by, bz + 0.12, 24, 18, 0, 0.82, 0.86, 0.92, 0.98, SPRITE_DRAW_ORDER.CAR);
-                    this.pushSolidQuad3D(bx, by, bz + 0.20, 20, 14, 0, 0.16, 0.42, 0.68, 0.95, SPRITE_DRAW_ORDER.TREES);
-                    this.pushSolidQuad3D(bx, by, bz + 0.28, 26, 20, 0, 0.24, 0.28, 0.36, 0.98, SPRITE_DRAW_ORDER.TREES);
-                    this.pushSolidQuad3D(bx, by, bz + 0.29, 18, 4.0, 0, 0.98, 0.78, 0.12, 0.98, SPRITE_DRAW_ORDER.TREES);
                 }
             }
             if (Array.isArray(airComp.patrolGuards)) {
@@ -4817,9 +4813,8 @@ class RetroRenderer {
                     this.batchObjectSprite3D("cargo_barge", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.32);
                     this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.068 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
                 } else if (pt.kind === "CONTAINERS") {
+                    // Ground shadow (true 3D multi-tiered shipping container stacks rendered by WorldObjectEngine)
                     this.batchObjectSprite3D("container_stack", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
-                    this.batchObjectSprite3D("container_stack", pt.x, pt.y, bz + 0.065, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
-                    this.batchObjectSprite3D("container_stack", pt.x - 2, pt.y - 2, bz + 0.135, pt.ang, pt.scale * 0.96, SPRITE_DRAW_ORDER.TREES);
                 } else if (pt.kind === "YACHT") {
                     this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.012, pt.ang, pt.scale * 1.06, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.30);
                     this.batchObjectSprite3D("luxury_yacht", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
@@ -5077,13 +5072,9 @@ class RetroRenderer {
                 const mg = ind.miniGolf;
                 if (mg.x >= minX - 120 && mg.x <= maxX + 120 && mg.y >= minY - 120 && mg.y <= maxY + 120) {
                     const bz = mg.z || 2.0;
-                    this.batchObjectSprite3D("minigolf_windmill", mg.x, mg.y, bz + 0.035, 0, 1.35, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    // Live spinning 4-blade 3D Dutch Windmill Sails!
-                    const wAng = this.time * 2.2;
-                    this.pushSolidQuad3D(mg.x, mg.y + 10, bz + 0.16, 38, 4.2, wAng, 0.98, 0.94, 0.72, 0.96, SPRITE_DRAW_ORDER.TREES);
-                    this.pushSolidQuad3D(mg.x, mg.y + 10, bz + 0.16, 38, 4.2, wAng + Math.PI * 0.5, 0.98, 0.94, 0.72, 0.96, SPRITE_DRAW_ORDER.TREES);
-                    this.batchPedSprite3D("vc_tourist", 0, mg.x - 24, mg.y + 18, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.batchPedSprite3D("bikini_cyan", 51, mg.x + 24, mg.y + 18, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // True 3D Windmill tower & vertically-rotating 3D sails rendered by WorldObjectEngine
+                    this.batchPedSprite3D("vc_tourist", 0, mg.x - 24, mg.y + 24, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("bikini_cyan", 51, mg.x + 24, mg.y + 24, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 }
             }
             // 17D. Mount Kalaga National Park Whitewater Kayakers ("kayak_orange")
