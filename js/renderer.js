@@ -2086,6 +2086,16 @@ class RetroRenderer {
                 meta.sprites.objects["wall_artdeco_side"]         = [946,  3995, 156, 64];
                 meta.sprites.objects["wall_shack_side"]           = [1114, 3995, 148, 64];
 
+                // 6M. Satirical GTA 6 & GTA Universe Advertising Billboards (baked at y = 3780, x = 800..1920 in gta1_sprites.png)
+                meta.sprites.objects["ad_pisswasser"]             = [800,  3780, 128, 64];
+                meta.sprites.objects["ad_ecola"]                  = [940,  3780, 128, 64];
+                meta.sprites.objects["ad_sprunk"]                 = [1080, 3780, 128, 64];
+                meta.sprites.objects["ad_angstipan"]              = [1220, 3780, 128, 64];
+                meta.sprites.objects["ad_patriot_beer"]           = [1360, 3780, 128, 64];
+                meta.sprites.objects["ad_burgershot"]             = [1500, 3780, 128, 64];
+                meta.sprites.objects["ad_ammunation"]             = [1640, 3780, 128, 64];
+                meta.sprites.objects["ad_call_morgan"]            = [1780, 3780, 128, 64];
+
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
                 {
@@ -2387,7 +2397,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_58", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_72", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2402,7 +2412,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_58", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_72", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -4865,10 +4875,13 @@ class RetroRenderer {
                 this.batchObjectSprite3D("dodo_seaplane", px, py, pz, ang, 1.24, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                 const propSpan = 16.0 * Math.abs(Math.cos(this.time * 28.0 + i));
                 this.pushSolidQuad3D(px + cs * 36, py + sn * 36, pz + 0.01, 2.6, 3.0 + propSpan, ang, 0.92, 0.96, 1.0, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
-                // Trailing "NINE 1 NINE" Aerial Banner fluttering behind the tail!
+                // Trailing GTA Satirical Aerial Banner ("NINE 1 NINE", "Pißwasser", "Sprunk", "eCola") fluttering behind the tail!
                 const flutter = Math.sin(this.time * 7.5 + i) * 0.06;
                 const banX = px - cs * 96, banY = py - sn * 96;
-                this.batchObjectSprite3D("sky_banner_919", banX, banY, pz - 0.02, ang + flutter, 1.18, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                const skyAds = ["sky_banner_919", "ad_pisswasser", "ad_sprunk", "ad_ecola"];
+                const skyAdKey = skyAds[i % skyAds.length];
+                const skyAdScale = skyAdKey === "sky_banner_919" ? 1.18 : 0.72;
+                this.batchObjectSprite3D(skyAdKey, banX, banY, pz - 0.02, ang + flutter, skyAdScale, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
             }
         }
         const mPlanes = this.map.mooredSeaplanes;

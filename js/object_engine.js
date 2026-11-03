@@ -324,8 +324,38 @@ class WorldObjectEngine {
                 { x: 359.4 * TILE_SIZE, y: 335.4 * TILE_SIZE, z: 2.0, ang: 0 },
                 { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE, z: 2.0, ang: Math.PI },
                 { x: 57.2 * TILE_SIZE,  y: 243.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
+            ],
+            // 16 Satirical GTA 6 & GTA Universe 3D Illuminated Roadside Advertising Billboards
+            gtaBillboards: [
+                { x: 448.5 * TILE_SIZE, y: 285.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_pisswasser",   neon: [0.98, 0.82, 0.18] }, // Ocean Drive South
+                { x: 448.5 * TILE_SIZE, y: 252.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ecola",        neon: [0.98, 0.22, 0.28] }, // Ocean Drive Mid
+                { x: 448.5 * TILE_SIZE, y: 202.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Ocean Drive Pier
+                { x: 448.5 * TILE_SIZE, y: 165.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_angstipan",    neon: [0.22, 0.92, 0.96] }, // North Beach
+                { x: 352.0 * TILE_SIZE, y: 299.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_patriot_beer", neon: [0.96, 0.28, 0.32] }, // MacArthur Causeway
+                { x: 352.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_burgershot",   neon: [0.98, 0.62, 0.16] }, // Venetian Causeway
+                { x: 282.5 * TILE_SIZE, y: 248.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_call_morgan",  neon: [0.98, 0.84, 0.18] }, // Downtown South
+                { x: 282.5 * TILE_SIZE, y: 215.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ammunation",   neon: [0.96, 0.24, 0.24] }, // Downtown North
+                { x: 224.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Little Haiti
+                { x: 214.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_ecola",        neon: [0.98, 0.22, 0.28] }, // Wynwood
+                { x: 112.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_angstipan",    neon: [0.22, 0.92, 0.96] }, // VCIA West
+                { x: 142.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_call_morgan",  neon: [0.98, 0.84, 0.18] }, // VCIA East
+                { x: 64.5 * TILE_SIZE,  y: 192.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_patriot_beer", neon: [0.96, 0.28, 0.32] }, // Port Gellhorn Strip
+                { x: 86.5 * TILE_SIZE,  y: 235.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ammunation",   neon: [0.96, 0.24, 0.24] }, // Port Gellhorn South
+                { x: 152.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_pisswasser",   neon: [0.98, 0.82, 0.18] }, // Ambrosia Refinery
+                { x: 260.0 * TILE_SIZE, y: 478.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_burgershot",   neon: [0.98, 0.62, 0.16] }  // Leonida Keys Highway
             ]
         };
+        // 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines + Ad Kiosks
+        this.sodaMachines = [
+            { x: 442.5 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 442.5 * TILE_SIZE, y: 256.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 442.5 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 352.0 * TILE_SIZE, y: 176.2 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 282.5 * TILE_SIZE, y: 250.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 224.5 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 115.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 64.5 * TILE_SIZE,  y: 186.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
+        ];
         this.rocketLaunch = {
             state: "IDLE", // IDLE | COUNTDOWN | LIFTOFF | COOLDOWN
             timer: 0,
@@ -1042,6 +1072,32 @@ class WorldObjectEngine {
             }
         }
 
+        // 0D. Drink Ice-Cold eCola or Sprunk from 3D Illuminated Sidewalk Soda Vending Machines ([E] on foot!)
+        if (Array.isArray(this.sodaMachines)) {
+            for (const sm of this.sodaMachines) {
+                if (Math.hypot(px - sm.x, py - sm.y) < 58) {
+                    const maxHp = game.player.maxHp || 100;
+                    game.player.hp = Math.min(maxHp, (game.player.hp || 100) + 35);
+                    if (typeof game.addScore === "function") game.addScore(250);
+                    if (typeof game.addCash === "function") game.addCash(250, `🥤 ${sm.brand} SUGAR RUSH!`);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sm.x,
+                            y: sm.y,
+                            z: 2.55,
+                            text: sm.brand === "SPRUNK"
+                                ? "🥤 ICE-COLD SPRUNK! THE ESSENCE OF LIFE! +35 HP & +$250!"
+                                : "🥤 ICE-COLD eCOLA! INFECTIOUSLY DELICIOUS! +35 HP & +$250!",
+                            color: sm.brand === "SPRUNK" ? "#4ade80" : "#f87171",
+                            life: 2.4
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         if (!this.heistTargets || this.heistTargets.length === 0) return false;
 
         for (let i = 0; i < this.heistTargets.length; i++) {
@@ -1660,6 +1716,9 @@ class WorldObjectEngine {
             if (this.landmarks3D.kalagaLookout) stampTower(this.landmarks3D.kalagaLookout.x, this.landmarks3D.kalagaLookout.y, 1, 4.1);
             if (this.landmarks3D.alliedSugarSilos) stampTower(this.landmarks3D.alliedSugarSilos.x, this.landmarks3D.alliedSugarSilos.y, 1, 3.7);
             for (const lh of this.landmarks3D.lighthouses) stampTower(lh.x, lh.y, 1, 3.8);
+            if (Array.isArray(this.landmarks3D.gtaBillboards)) {
+                for (const bb of this.landmarks3D.gtaBillboards) stampTower(bb.x, bb.y, 0, 2.95);
+            }
         }
         if (this.map && this.map.prisonCompound && Array.isArray(this.map.prisonCompound.towers)) {
             for (const tw of this.map.prisonCompound.towers) {
@@ -3190,6 +3249,58 @@ class WorldObjectEngine {
             emitCylinder3D(sb.x, sb.y, 0, 0, 10.5,  7.5, bz + 0.78, bz + 0.94, 18, [0.14, 0.16, 0.20], 5, true);
         }
 
+        // 13. 16 Satirical GTA 6 & GTA Universe 3D Illuminated Roadside Advertising Billboards
+        //     (Pißwasser, eCola, Sprunk, Angstipan Rx, Patriot Beer, Burger Shot, Phil's Ammu-Nation, Call Morgan!)
+        if (this.landmarks3D && Array.isArray(this.landmarks3D.gtaBillboards)) {
+            for (const bb of this.landmarks3D.gtaBillboards) {
+                const bz = bb.z || 2.0;
+                const bCos = Math.cos(bb.ang || 0);
+                const bSin = Math.sin(bb.ang || 0);
+                const nc = bb.neon || [0.98, 0.82, 0.18];
+
+                emitAOShadow3D(bb.x, bb.y, bCos, bSin, 0, 0, 86, 26, bz, 0.36);
+                // Twin Reinforced Concrete Footings (S177)
+                emitTileBox3D(bb.x, bb.y, bCos, bSin, -26, 0, 10, 10, bz, bz + 0.12, 177, 177, 71, [0.88, 0.90, 0.94]);
+                emitTileBox3D(bb.x, bb.y, bCos, bSin,  26, 0, 10, 10, bz, bz + 0.12, 177, 177, 71, [0.88, 0.90, 0.94]);
+                // Twin Alpha-Cutout Open Steel Truss Columns (S363) + Maintenance Ladder (S249)
+                emitTileBox3D(bb.x, bb.y, bCos, bSin, -26, 0, 6.5, 6.5, bz + 0.12, bz + 0.48, 363, 363, 45, [0.76, 0.80, 0.86]);
+                emitTileBox3D(bb.x, bb.y, bCos, bSin,  26, 0, 6.5, 6.5, bz + 0.12, bz + 0.48, 363, 363, 45, [0.76, 0.80, 0.86]);
+                emitTileBox3D(bb.x, bb.y, bCos, bSin, -30, 0, 2.5, 3.5, bz + 0.12, bz + 0.50, 249, 249, 45, [0.92, 0.84, 0.32]);
+                // Front & Back Maintenance Catwalk Grilles (S250) + Upward Halogen Floodlight Bars
+                emitTileBox3D(bb.x, bb.y, bCos, bSin, 0,  8, 76, 5, bz + 0.45, bz + 0.49, 250, 250, 45, [0.78, 0.82, 0.88]);
+                emitTileBox3D(bb.x, bb.y, bCos, bSin, 0, -8, 76, 5, bz + 0.45, bz + 0.49, 250, 250, 45, [0.78, 0.82, 0.88]);
+                for (let lx = -24; lx <= 24; lx += 24) {
+                    emitProcBox3D(bb.x, bb.y, bCos, bSin, lx,  9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], [0.95, 0.90, 0.72], 1);
+                    emitProcBox3D(bb.x, bb.y, bCos, bSin, lx, -9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], [0.95, 0.90, 0.72], 1);
+                }
+                // Structural Steel Backing Frame (L45) & Illuminated Neon Crown Header
+                emitProcBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 82, 7.5, bz + 0.46, bz + 0.90, [0.16, 0.20, 0.28], [0.12, 0.15, 0.22], 5);
+                emitProcBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 84, 9.0, bz + 0.90, bz + 0.94, nc, nc, 1);
+                // Double-Sided High-Resolution 128x64 Satirical GTA Advertising Panel (MODE D from gta1_sprites.png!)
+                emitBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 78, 9.2, bz + 0.48, bz + 0.88, bb.ad, bb.ad, [0.22, 0.26, 0.34]);
+            }
+        }
+
+        // 14. 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines + Ad Kiosks
+        if (Array.isArray(this.sodaMachines)) {
+            for (const sm of this.sodaMachines) {
+                const bz = sm.z || 2.0;
+                const sCos = Math.cos(sm.ang || 0);
+                const sSin = Math.sin(sm.ang || 0);
+                const isSprunk = sm.brand === "SPRUNK";
+                const bodyCol = isSprunk ? [0.12, 0.78, 0.32] : [0.86, 0.14, 0.18];
+                const glowCol = isSprunk ? [0.32, 0.98, 0.48] : [0.98, 0.28, 0.32];
+
+                emitAOShadow3D(sm.x, sm.y, sCos, sSin, 0, 0, 22, 18, bz, 0.34);
+                // Concrete Plinth & Enamel Vending Cabinet Body
+                emitTileBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 16, 12, bz, bz + 0.05, 177, 177, 71, [0.86, 0.88, 0.92]);
+                emitProcBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 14, 10, bz + 0.05, bz + 0.29, bodyCol, glowCol, 5);
+                // Illuminated Front/Back Branded Graphic Panel (ad_ecola / ad_sprunk) + Neon Top Canopy
+                emitBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 12.5, 10.6, bz + 0.08, bz + 0.26, sm.ad, sm.ad, glowCol);
+                emitProcBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 15, 11, bz + 0.29, bz + 0.32, glowCol, glowCol, 1);
+            }
+        }
+
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
         }
@@ -4046,6 +4157,22 @@ class WorldObjectEngine {
                     ctx.strokeRect(scr.x - 185, scr.y - 22, 370, 22);
                     ctx.fillStyle = "#fde047";
                     ctx.fillText(`💰 RAM, SHOOT OR [E] BREACH ARMORED VAN ($${cashRem.toLocaleString()})`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.sodaMachines)) {
+            for (const sm of this.sodaMachines) {
+                if (Math.hypot(px - sm.x, py - sm.y) < 68) {
+                    const scr = renderer.worldToScreen(sm.x, sm.y - 14, (sm.z || 2.0) + 0.34);
+                    const col = sm.brand === "SPRUNK" ? "#4ade80" : "#f87171";
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 155, scr.y - 22, 310, 22);
+                    ctx.strokeStyle = col;
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 155, scr.y - 22, 310, 22);
+                    ctx.fillStyle = col;
+                    ctx.fillText(`🥤 [E] DRINK ICE-COLD ${sm.brand} (+35 HP & +$250)`, scr.x, scr.y - 7);
                 }
             }
         }
