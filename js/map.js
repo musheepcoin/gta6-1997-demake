@@ -263,12 +263,29 @@ class LeonidaMap {
             }
         }
 
-        // Pave SERA Space Center Launch Complex 39A security apron (x=458..471, y=29..40) with native GTA 1 stone/concrete pavers (lid 8)
-        for (let x = 458; x <= 471; x++) {
-            for (let y = 29; y <= 40; y++) {
+        // Pave SERA Space Center Launch Complex 39A security apron (x=458..471, y=29..40),
+        // Cape Leonida Lighthouse headland plaza (x=457..466, y=132..136), and Key West Lighthouse plaza (x=197..201, y=475..478)
+        // with native GTA 1 stone/concrete pavers (lid 8), and Vice Beach Pier boardwalk (x=455..467, y=193..196) with wooden planks (lid 77)!
+        const stonePaverBoxes = [
+            [458, 471, 29, 40],
+            [457, 466, 132, 136],
+            [197, 201, 475, 478]
+        ];
+        for (const [x0, x1, y0, y1] of stonePaverBoxes) {
+            for (let x = x0; x <= x1; x++) {
+                for (let y = y0; y <= y1; y++) {
+                    for (let z = 0; z < MAP_LAYERS; z++) {
+                        this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] =
+                            this.voxelGrid[(z * MAP_ROWS + 41) * MAP_COLS + 462];
+                    }
+                }
+            }
+        }
+        for (let x = 455; x <= 467; x++) {
+            for (let y = 193; y <= 196; y++) {
                 for (let z = 0; z < MAP_LAYERS; z++) {
                     this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] =
-                        this.voxelGrid[(z * MAP_ROWS + 41) * MAP_COLS + 462];
+                        this.voxelGrid[(z * MAP_ROWS + 321) * MAP_COLS + 358];
                 }
             }
         }
@@ -888,7 +905,10 @@ class LeonidaMap {
         const starLawnMinY = MAP_Y_256[111], starLawnMaxY = MAP_Y_256[115];
         const isCleanSandTile = (c, r, allowStarIsland = false) => {
             if (c < 2 || c >= MAP_COLS - 2 || r < 2 || r >= MAP_ROWS - 2) return false;
-            if (r <= 46 && c >= 455) return false; // Exclude SERA Spaceport security perimeter from beach sunbathers
+            if (r <= 46 && c >= 455) return false; // Exclude SERA Spaceport security perimeter
+            if (r >= 131 && r <= 137 && c >= 456 && c <= 467) return false; // Exclude Cape Leonida Lighthouse Plaza
+            if (r >= 192 && r <= 197 && c >= 454 && c <= 468) return false; // Exclude Vice Beach Pier Boardwalk
+            if (r >= 474 && r <= 479 && c >= 196 && c <= 202) return false; // Exclude Key West Lighthouse Plaza
             const idx = r * MAP_COLS + c;
             const isStarLawn = allowStarIsland && c >= starLawnMinX && c <= starLawnMaxX && r >= starLawnMinY && r <= starLawnMaxY && this.surfaceGround[idx] === GROUND_TYPE.FIELD;
             if (!this.coastalSandMask[idx] && !isStarLawn) return false;
