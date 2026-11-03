@@ -1130,6 +1130,19 @@ class Vehicle {
        ======================================================================== */
     receiveImpactDamage(amount, hitX, hitY, isExplosive = false) {
         if (this.destroyed || amount <= 0) return;
+        if (this.specKey === "BMX_BIKE") {
+            // A pedal bicycle has no engine or fuel tank: normal wall/curb bumps never set it on fire or blow it up!
+            this.burnTimer = 0;
+            if (!isExplosive && amount < 38) {
+                this.hp = Math.max(15, this.hp - amount * 0.35);
+                return;
+            }
+            this.hp -= amount;
+            if (this.hp <= 0) {
+                this.hp = 0;
+            }
+            return;
+        }
         const wasBurning = this.burnTimer > 0 || this.hp <= 30;
         this.hp -= amount;
         if (!isExplosive && this.hp <= 0) {
@@ -2118,6 +2131,12 @@ class Vehicle {
 
         // 1997 GTA 1 Delayed Chain-Reaction Explosion (mCarExplosionChainDelayTime)
         if (this.chainExplodeTimer > 0) {
+            if (this.specKey === "BMX_BIKE") {
+                this.chainExplodeTimer = 0;
+                this.burnTimer = 0;
+                game.explodeVehicle(this);
+                return;
+            }
             this.chainExplodeTimer -= dt;
             if (Math.random() < 0.5) {
                 game.spawnParticle(this.x + (Math.random() - 0.5) * 20, this.y + (Math.random() - 0.5) * 20, "FIRE");
@@ -2147,8 +2166,15 @@ class Vehicle {
             }
         }
 
-        // Burning vehicle countdown to explosion + AI Driver Bail-Out!
-        if ((this.hp <= 30 || this.burnTimer > 0) && !this.destroyed && !map.isWaterAtPixel(this.x, this.y)) {
+        // Pedal bicycles never catch fire, emit engine smoke, or explode!
+        if (this.specKey === "BMX_BIKE") {
+            this.burnTimer = 0;
+            if (this.hp <= 0 && !this.destroyed) {
+                game.explodeVehicle(this);
+                return;
+            }
+        } else if ((this.hp <= 30 || this.burnTimer > 0) && !this.destroyed && !map.isWaterAtPixel(this.x, this.y)) {
+            // Burning vehicle countdown to explosion + AI Driver Bail-Out!
             this.burnTimer += dt;
             this.heavyDented = true;
             if (this.burnTimer > 0.35 && this.driver && this.driver !== "PLAYER" && typeof game.ejectVehicleDriver === "function") {

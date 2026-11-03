@@ -2147,7 +2147,7 @@ class RetroRenderer {
                 // 6J2. Crisp Pixel-Art 1997 GTA 1 / GTA 2 Electric Scooter ("veh_escooter", 16x34) & Beach Cruiser Bicycle ("veh_bicycle", 16x38)
                 // Drawn with exact integer pixel matrices (alpha = 255 / 0, zero Canvas2D sub-pixel blur) facing South (+Y = bottom = front wheel)
                 {
-                    ctx.clearRect(1340, py3, 56, 42);
+                    ctx.clearRect(1340, py3, 92, 42);
 
                     const drawPixelMatrix = (ox, oy, rows, pal) => {
                         const h = rows.length;
@@ -2285,6 +2285,94 @@ class RetroRenderer {
                     ];
                     drawPixelMatrix(bkx, bky, bicycleRows, bikePal);
                     meta.sprites.objects["veh_bicycle"] = [bkx, bky, 16, 38];
+
+                    // 3) Wrecked / Broken E-Scooter ("veh_escooter_wreck", 16x34 at 1386, py3)
+                    const scwx = 1386, scwy = py3;
+                    const scooterWreckRows = [
+                        "....KKKK........",
+                        "...KTTTTK.......",
+                        "...KTttTK.......",
+                        "....KTRrTK......",
+                        "....KKERRKK.....",
+                        "...KEeddddeEK...",
+                        "..KEdDDDDdEK....",
+                        "..KEdDDdDdEK....",
+                        "...KEdddddeK....",
+                        "...KEdDDdDdEK...",
+                        "....KEdDDdEK....",
+                        "...KEddddddeK...",
+                        "..KEdDDDDdEK....",
+                        "..KEdDDdDdEK....",
+                        "...KEdddddeK....",
+                        "...KEdDDDDdEK...",
+                        "....KEdDDdEK....",
+                        "...KEddddddeK...",
+                        "...KEdDDDDdEK...",
+                        "....KEeddddeEK..",
+                        ".....KKEwwEKK...",
+                        "......KCwwCK....",
+                        "...KKKKCfHCK....",
+                        "..KeGGCCCCCCKKK.",
+                        "..KeGGCCwwCCGGeK",
+                        "...KKKKCddCKGGeK",
+                        "......KTTTTKKKK.",
+                        ".....KTWWtK.....",
+                        ".....KTWWtK.....",
+                        "......KTttTK....",
+                        "......KTTTTK....",
+                        ".......KKKK.....",
+                        "................",
+                        "................"
+                    ];
+                    drawPixelMatrix(scwx, scwy, scooterWreckRows, bikePal);
+                    meta.sprites.objects["veh_escooter_wreck"] = [scwx, scwy, 16, 34];
+                    if (meta.sprites.wrecked) meta.sprites.wrecked["veh_escooter_wreck"] = [scwx, scwy, 16, 34];
+
+                    // 4) Bent / Crumpled Beach Cruiser Bicycle ("veh_bicycle_wreck", 16x38 at 1408, py3 — bent wheel & handlebars, zero fire!)
+                    const bkwx = 1408, bkwy = py3;
+                    const bicycleWreckRows = [
+                        "....KKKK........",
+                        "...KTTTTK.......",
+                        "...KTttTK.......",
+                        "....KTWWTK......",
+                        "....KTWWTK......",
+                        "....KKTWWTKK....",
+                        ".....KFTWWTFK...",
+                        ".....KFKTWTFK...",
+                        ".....KFTWTFK....",
+                        "....KSSSSSSK....",
+                        "...KSssssssSK...",
+                        "...KSsLLLLsSK...",
+                        "....KSsssssSK...",
+                        ".....KSSssSSK...",
+                        "......KSssSK....",
+                        "..KKK..KffK.....",
+                        ".KGAKKKfHfK.....",
+                        "..KKK.KfHfK.....",
+                        ".....KfHfKKK....",
+                        ".....KfHfKGAK...",
+                        "......KffK.KKK..",
+                        "......KfHfK.....",
+                        ".....KfHfK......",
+                        ".KKK.KfHfK......",
+                        "KGGKKKfHfK..KKK.",
+                        "KGGCK.KfHfKKCGGK",
+                        ".KCCwKKfHfKACCK.",
+                        "..KKCwwwwwwCKK..",
+                        "....KKFwwwFKK...",
+                        ".....KFTWWTFK...",
+                        "......KFTWWTFK..",
+                        ".....KKTWWTKK...",
+                        "....KTWWTK......",
+                        "....KTWWTK......",
+                        ".....KTttTK.....",
+                        ".....KTTTTK.....",
+                        "......KKKK......",
+                        "................"
+                    ];
+                    drawPixelMatrix(bkwx, bkwy, bicycleWreckRows, bikePal);
+                    meta.sprites.objects["veh_bicycle_wreck"] = [bkwx, bkwy, 16, 38];
+                    if (meta.sprites.wrecked) meta.sprites.wrecked["veh_bicycle_wreck"] = [bkwx, bkwy, 16, 38];
                 }
 
                 // =========================================================================
@@ -6120,14 +6208,24 @@ class RetroRenderer {
             let sirens = [];
 
             if (v.destroyed) {
-                let wId = "979";
-                if (mapInfo.isTank) {
-                    wId = "983";
+                if (v.specKey === "BMX_BIKE") {
+                    rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_bicycle_wreck"]) ||
+                        this.gta1Meta.sprites.objects["veh_bicycle_wreck"] ||
+                        this.gta1Meta.sprites.objects["veh_bicycle"];
+                } else if (v.specKey === "E_SCOOTER") {
+                    rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_escooter_wreck"]) ||
+                        this.gta1Meta.sprites.objects["veh_escooter_wreck"] ||
+                        this.gta1Meta.sprites.objects["veh_escooter"];
                 } else {
-                    const wreckIds = ["979", "980"];
-                    wId = wreckIds[Math.abs((v.id || "0").charCodeAt((v.id || "0").length - 1)) % wreckIds.length];
+                    let wId = "979";
+                    if (mapInfo.isTank) {
+                        wId = "983";
+                    } else {
+                        const wreckIds = ["979", "980"];
+                        wId = wreckIds[Math.abs((v.id || "0").charCodeAt((v.id || "0").length - 1)) % wreckIds.length];
+                    }
+                    rect = this.gta1Meta.sprites.wrecked[wId] || this.gta1Meta.sprites.wrecked["979"];
                 }
-                rect = this.gta1Meta.sprites.wrecked[wId] || this.gta1Meta.sprites.wrecked["979"];
             } else {
                 const vehEntry = this.vehicleBySprIdx ? this.vehicleBySprIdx[mapInfo.sprId] : null;
                 if (vehEntry) {
@@ -6472,7 +6570,7 @@ class RetroRenderer {
                 }
             }
 
-            if (v.destroyed) {
+            if (v.destroyed && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
                 const frameId = 234 + (Math.floor(this.time * 11 + Math.abs(v.x * 0.1)) % 8);
                 this.batchObjectSprite3D(String(frameId), v.x, v.y, vz + 0.03, 0, 1.0, SPRITE_DRAW_ORDER.EXPLOSION);
             }
@@ -7093,6 +7191,7 @@ class RetroRenderer {
             const pxScale = (sc.scale * H) / 128.0;
 
             if (v.destroyed || (v.burnTimer || 0) > 0) {
+                if (v.specKey === "BMX_BIKE" || (v.specKey === "E_SCOOTER" && v.destroyed)) continue;
                 const flick = 0.88 + Math.sin(this.time * 22 + v.x) * 0.12;
                 addLightPool(sc.x, sc.y, 110 * pxScale * flick, "rgba(255, 165, 50, 0.95)", "rgba(235, 65, 15, 0.45)");
                 highResFlares.push({ x: sc.x, y: sc.y, r: 26 * pxScale, col: "rgba(255, 140, 35, 0.65)" });

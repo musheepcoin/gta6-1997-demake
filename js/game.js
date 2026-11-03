@@ -6411,11 +6411,13 @@ class LeonidaGame {
                 }
 
                 if (v.hp <= 0 && !v.destroyed && (v.chainExplodeTimer || 0) <= 0) {
+                    if (v.specKey === "BMX_BIKE") {
+                        this.explodeVehicle(v, byPlayer);
+                    } else {
+                        v.hp = 1;
 
-                    v.hp = 1;
-
-                    v.chainExplodeTimer = 0.28 + Math.random() * 0.18;
-
+                        v.chainExplodeTimer = 0.28 + Math.random() * 0.18;
+                    }
                 }
 
             }
@@ -6534,11 +6536,14 @@ class LeonidaGame {
 
         v.destroyed = true;
 
+        v.burnTimer = 0;
+
         v.vx = 0;
 
         v.vy = 0;
 
-
+        const isBicycle = (v.specKey === "BMX_BIKE");
+        const isScooter = (v.specKey === "E_SCOOTER");
 
         if (!fromNetwork && this.net && typeof this.net.broadcastWorldEvent === "function") {
 
@@ -6568,11 +6573,11 @@ class LeonidaGame {
 
             this.player.seatIndex = 0;
 
-            this.player.x = v.x - 32;
+            this.player.x = v.x - (isBicycle || isScooter ? 18 : 32);
 
-            this.player.y = v.y - 32;
+            this.player.y = v.y - (isBicycle || isScooter ? 18 : 32);
 
-            this.damagePlayer(45);
+            this.damagePlayer(isBicycle ? 8 : (isScooter ? 18 : 45));
 
         }
 
@@ -6582,7 +6587,32 @@ class LeonidaGame {
 
         }
 
+        if (isBicycle) {
+            // A pedal bicycle crumples mechanically without any fireball or explosion!
+            if (this.audio && typeof this.audio.playCrash === "function") {
+                this.audio.playCrash(0.55);
+            }
+            for (let i = 0; i < 8; i++) {
+                this.spawnParticle(
+                    v.x + (Math.random() - 0.5) * 14,
+                    v.y + (Math.random() - 0.5) * 14,
+                    i % 2 === 0 ? "SPARK" : "WHITE_SMOKE"
+                );
+            }
+            if (playerResponsible) {
+                this.addCash(50, `${v.name} TRASHED!`);
+            }
+            return;
+        }
 
+        if (isScooter) {
+            // Small electric battery pop rather than a massive V8 car explosion
+            this.explodeAt(v.x, v.y, 44, 48, playerResponsible);
+            if (playerResponsible) {
+                this.addCash(150, `${v.name} WRECKED!`);
+            }
+            return;
+        }
 
         this.explodeAt(v.x, v.y, 130, 200, playerResponsible);
 
