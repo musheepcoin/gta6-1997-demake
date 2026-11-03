@@ -510,15 +510,7 @@ class LeonidaGame {
 
             { spec: "SUPERBIKE", c: 218.18, r: 146.2, a: -Math.PI * 0.5, z: 2.0 },
 
-            { spec: "E_SCOOTER", c: 213.82, r: 147.6, a: Math.PI * 0.5, z: 2.0 },
-
-            { spec: "BMX_BIKE", c: 213.82, r: 150.8, a: -Math.PI * 0.5, z: 2.0 },
-
             { spec: "HARLEY_BIKE", c: 218.18, r: 148.8, a: -Math.PI * 0.5, z: 2.0 },
-
-            { spec: "E_SCOOTER", c: 218.18, r: 150.2, a: -Math.PI * 0.5, z: 2.0 },
-
-            { spec: "BMX_BIKE", c: 218.18, r: 153.4, a: -Math.PI * 0.5, z: 2.0 },
 
             { spec: "BANSHEE_GT", c: 218.18, r: 151.8, a: -Math.PI * 0.5, z: 2.0 },
 
@@ -526,20 +518,7 @@ class LeonidaGame {
 
             { spec: "PORKA_TURBO", c: 218.18, r: 158.5, a: -Math.PI * 0.5, z: 2.0 },
 
-            // Lummus Park Boardwalk Parked & Active E-Scooters and Beach Cruiser Bicycles
-            { spec: "E_SCOOTER", c: 450.8, r: 231.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
-            { spec: "BMX_BIKE", c: 450.8, r: 237.5, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
-            { spec: "E_SCOOTER", c: 450.8, r: 244.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
-
             // Active moving traffic on Ocean Drive & Collins Ave (never parked stationary in the road!)
-
-            { spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-
-            { spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-
-            { spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-
-            { spec: "BMX_BIKE", c: 214.5, r: 139.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
             { spec: "SUPERBIKE", c: 216.5, r: 148.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
@@ -563,9 +542,9 @@ class LeonidaGame {
 
             // --- B. S-Curving Vice Beach Sand & South Wooden Pier (off-road on beach sand & water) ---
 
-            { spec: "MONSTER_BUGGY", c: 224.5, r: 148.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "MONSTER_BUGGY", c: 463.5, r: 280.5, raw512: true, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
 
-            { spec: "GATOR_4X4", c: 225.5, r: 156.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "GATOR_4X4", c: 464.5, r: 300.0, raw512: true, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
 
             { spec: "AIRBOAT", c: 250.5, r: 154.0, a: 0, z: 1.0, missionTag: "LANDMARK" },
 
@@ -655,9 +634,22 @@ class LeonidaGame {
 
             { spec: "AIRBOAT", c: 145.0, r: 412.0, a: 0.0, z: 1.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "GATOR_4X4", c: 465.5, r: 215.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "GATOR_4X4", c: 465.5, r: 219.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "MONSTER_BUGGY", c: 468.5, r: 285.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true }
+            { spec: "MONSTER_BUGGY", c: 468.5, r: 274.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+
+            // --- M. Ocean Drive & Lummus Park Boardwalk E-Scooters & BMX Cruisers (appended at end to preserve legacy parked_N IDs) ---
+            { id: "micromob_0", spec: "E_SCOOTER", c: 213.82, r: 147.6, a: Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_1", spec: "BMX_BIKE", c: 213.82, r: 150.8, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_2", spec: "E_SCOOTER", c: 218.18, r: 150.2, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_3", spec: "BMX_BIKE", c: 218.18, r: 153.4, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_4", spec: "E_SCOOTER", c: 450.8, r: 231.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_5", spec: "BMX_BIKE", c: 450.8, r: 238.5, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_6", spec: "E_SCOOTER", c: 450.8, r: 244.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_7", spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_8", spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_9", spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 139.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" }
 
         ];
 
@@ -669,7 +661,7 @@ class LeonidaGame {
 
             const vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
 
-            const v = new Vehicle(`parked_${idx}`, p.spec, vx, vy, p.a);
+            const v = new Vehicle(p.id || `parked_${idx}`, p.spec, vx, vy, p.a);
 
             v.z = p.z || 2.0;
 
@@ -1127,7 +1119,16 @@ class LeonidaGame {
                 const czList = (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.clearZones))
                     ? this.map.objectEngine.clearZones
                     : [];
-                const hitsClearZone = (px, py) => czList.some(cz => Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54));
+                const beachStructs = [
+                    ...(this.map && Array.isArray(this.map.beachProps) ? this.map.beachProps : []),
+                    ...(this.map && Array.isArray(this.map.tikiBars) ? this.map.tikiBars : []),
+                    ...(this.map && Array.isArray(this.map.muscleBeachGyms) ? this.map.muscleBeachGyms : []),
+                    ...(this.map && Array.isArray(this.map.beachVolleyballCourts) ? this.map.beachVolleyballCourts : []),
+                    ...(this.map && Array.isArray(this.map.beachParties) ? this.map.beachParties : [])
+                ];
+                const hitsClearZone = (px, py) =>
+                    czList.some(cz => Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54)) ||
+                    beachStructs.some(bs => Math.hypot(bs.x - px, bs.y - py) < 76);
 
                 if ((nav && nav.groundType === GROUND_TYPE.ROAD) || hitsClearZone(v.x, v.y)) {
 

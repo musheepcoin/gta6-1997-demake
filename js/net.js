@@ -1112,9 +1112,27 @@ class ViceNetworkManager {
 
             for (const row of pkt.vehs) {
                 if (!Array.isArray(row) || row.length < 11) continue;
-                const [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag] = row;
+                let [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag] = row;
+                if (g.map && Array.isArray(g.map.beachProps)) {
+                    for (const bp of g.map.beachProps) {
+                        const dx = x - bp.x;
+                        const dy = y - bp.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < 68) {
+                            const pushAng = dist > 1 ? Math.atan2(dy, dx) : 0;
+                            x = bp.x + Math.cos(pushAng) * 76;
+                            y = bp.y + Math.sin(pushAng) * 76;
+                        }
+                    }
+                }
                 seenIds.add(id);
                 let v = existingById.get(id);
+                if (v && specKey && v.specKey !== specKey) {
+                    const idx = g.vehicles.indexOf(v);
+                    if (idx !== -1) g.vehicles.splice(idx, 1);
+                    existingById.delete(id);
+                    v = null;
+                }
                 if (!v) {
                     v = new Vehicle(id, specKey, x, y, a);
                     v.z = z;

@@ -303,7 +303,7 @@ class LeonidaMap {
             const blk450 = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + y) * MAP_COLS + 450]];
             if (!blk448 || !blk449 || !blk450) continue;
             // Only convert sidewalk/pavement rows (never overwrite road junctions)
-            if ((blk448.lid === 9 || blk448.lid === 8) && (blk449.lid === 9 || blk449.lid === 8 || blk449.lid === 10)) {
+            if ((blk448.lid === 9 || blk448.lid === 8 || blk448.lid === 69) && (blk449.lid === 9 || blk449.lid === 8 || blk449.lid === 10 || blk449.lid === 69)) {
                 const isCrossWalk = ((y % 14) < 2);
                 if (!isCrossWalk) {
                     for (let z = 0; z < MAP_LAYERS; z++) {
@@ -1770,11 +1770,11 @@ class LeonidaMap {
                 name: "Meridian Avenue Streamline Moderne Villa",
                 district: "SOUTH BEACH",
                 kind: "villa_art_deco",
-                c: 456.5, r: 213.5,
-                x: 456.5 * TILE_SIZE, y: 213.5 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 0.94, hw: 104, hh: 70,
+                c: 431.0, r: 235.5,
+                x: 431.0 * TILE_SIZE, y: 235.5 * TILE_SIZE, z: 2.0,
+                ang: -Math.PI * 0.5, scale: 0.94, hw: 104, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 1, dx: -58, dy: 148, ang: 0 }
+                    { sprIdx: 1, dx: 148, dy: 48, ang: Math.PI * 0.5 }
                 ]
             },
 
@@ -2077,7 +2077,19 @@ class LeonidaMap {
             }
         }
         for (const tb of this.tikiBars) {
-            pushPropOBB(tb.x, tb.y, 22, 14, tb.ang);
+            pushPropOBB(tb.x, tb.y, 26, 18, tb.ang || 0);
+        }
+        if (Array.isArray(this.beachProps)) {
+            for (const bp of this.beachProps) {
+                if (bp.spr && bp.spr.startsWith("lifeguard_")) {
+                    pushPropOBB(bp.x, bp.y, 24, 22, bp.angle || 0);
+                }
+            }
+        }
+        if (Array.isArray(this.muscleBeachGyms)) {
+            for (const gym of this.muscleBeachGyms) {
+                pushPropOBB(gym.x, gym.y, 22, 18, 0);
+            }
         }
         if (this.industrialAndParkDetails.miniGolf) {
             pushPropOBB(this.industrialAndParkDetails.miniGolf.x, this.industrialAndParkDetails.miniGolf.y, 18, 18, 0);

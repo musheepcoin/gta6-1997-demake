@@ -901,6 +901,21 @@ class WorldObjectEngine {
                 clearZones.push({ x: sm.x, y: sm.y, r: 58 });
             }
         }
+        if (Array.isArray(map.beachProps)) {
+            for (const bp of map.beachProps) {
+                clearZones.push({ x: bp.x, y: bp.y, r: 72 });
+            }
+        }
+        if (Array.isArray(map.tikiBars)) {
+            for (const tb of map.tikiBars) {
+                clearZones.push({ x: tb.x, y: tb.y, r: 68 });
+            }
+        }
+        if (Array.isArray(map.muscleBeachGyms)) {
+            for (const gym of map.muscleBeachGyms) {
+                clearZones.push({ x: gym.x, y: gym.y, r: 68 });
+            }
+        }
         for (const [px, py] of [
             [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
             [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
