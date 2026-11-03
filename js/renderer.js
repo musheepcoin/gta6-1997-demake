@@ -2360,7 +2360,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_53", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_54", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2375,7 +2375,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_53", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_54", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
