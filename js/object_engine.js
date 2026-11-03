@@ -283,6 +283,38 @@ class WorldObjectEngine {
             pierArch: { x: 456.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
             atcTower: { x: 106.5 * TILE_SIZE, y: 307.5 * TILE_SIZE, z: 2.0 },
             waterTower: { x: 148.5 * TILE_SIZE, y: 118.5 * TILE_SIZE, z: 2.0 },
+            // GTA 6 Leonida Regional 3D World-Building Monuments:
+            viceSign: { x: 118.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0 },
+            kalagaLookout: { x: 135.5 * TILE_SIZE, y: 23.5 * TILE_SIZE, z: 2.0 },
+            alliedSugarSilos: { x: 160.5 * TILE_SIZE, y: 109.0 * TILE_SIZE, z: 2.0 },
+            grassriversOutpost: { x: 116.5 * TILE_SIZE, y: 398.5 * TILE_SIZE, z: 2.0 },
+            southernmostBuoy: { x: 204.2 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0 },
+            highwayGantries: [
+                // 4 Full-Span Twin-Pylon 3D Overhead Green FDOT Highway Gantries (pylons strictly on PAVE/FIELD shoulders!)
+                { id: "gantry_vcia_exp",   x: 130.0 * TILE_SIZE, y: 296.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 296, fullSpan: true },
+                { id: "gantry_downtown",   x: 285.5 * TILE_SIZE, y: 230.0 * TILE_SIZE, z: 2.0, ang: 0,             spanPx: 296, fullSpan: true },
+                { id: "gantry_gellhorn",   x: 88.5 * TILE_SIZE,  y: 220.0 * TILE_SIZE, z: 2.0, ang: 0,             spanPx: 216, fullSpan: true },
+                { id: "gantry_keys_hwy",   x: 260.0 * TILE_SIZE, y: 480.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, spanPx: 216, fullSpan: true },
+                // 4 Cantilevered Single-Pylon 3D Overhead Green FDOT Causeway & Beach Gantries (pylon on PAVE, arm over ROAD!)
+                { id: "gantry_macarthur",  x: 345.0 * TILE_SIZE, y: 299.3 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, armPx: 148, fullSpan: false },
+                { id: "gantry_venetian",   x: 345.0 * TILE_SIZE, y: 176.3 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, armPx: 148, fullSpan: false },
+                { id: "gantry_ocean_nth",  x: 448.3 * TILE_SIZE, y: 210.0 * TILE_SIZE, z: 2.0, ang: Math.PI,        armPx: 148, fullSpan: false },
+                { id: "gantry_ocean_sth",  x: 448.3 * TILE_SIZE, y: 275.0 * TILE_SIZE, z: 2.0, ang: Math.PI,        armPx: 148, fullSpan: false }
+            ],
+            marineBuoys: [
+                { x: 320.0 * TILE_SIZE, y: 310.0 * TILE_SIZE, z: 2.0, isRed: true,  seed: 0.0 },
+                { x: 320.0 * TILE_SIZE, y: 325.0 * TILE_SIZE, z: 2.0, isRed: false, seed: 1.1 },
+                { x: 368.0 * TILE_SIZE, y: 285.0 * TILE_SIZE, z: 2.0, isRed: true,  seed: 2.2 },
+                { x: 368.0 * TILE_SIZE, y: 200.0 * TILE_SIZE, z: 2.0, isRed: false, seed: 3.3 },
+                { x: 335.0 * TILE_SIZE, y: 152.0 * TILE_SIZE, z: 2.0, isRed: true,  seed: 4.4 },
+                { x: 335.0 * TILE_SIZE, y: 188.0 * TILE_SIZE, z: 2.0, isRed: false, seed: 5.5 },
+                { x: 112.0 * TILE_SIZE, y: 150.0 * TILE_SIZE, z: 2.0, isRed: true,  seed: 0.7 },
+                { x: 118.0 * TILE_SIZE, y: 184.0 * TILE_SIZE, z: 2.0, isRed: false, seed: 1.8 },
+                { x: 498.0 * TILE_SIZE, y: 250.0 * TILE_SIZE, z: 2.0, isRed: true,  seed: 2.9 },
+                { x: 492.0 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0, isRed: false, seed: 4.0 },
+                { x: 325.0 * TILE_SIZE, y: 494.0 * TILE_SIZE, z: 2.0, isRed: true,  seed: 5.1 },
+                { x: 190.0 * TILE_SIZE, y: 476.0 * TILE_SIZE, z: 2.0, isRed: false, seed: 6.2 }
+            ],
             lighthouses: [
                 { id: "key_west_lh", x: 199.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, seed: 0.0 },
                 { id: "cape_leonida_lh", x: 464.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, seed: 2.4 }
@@ -605,6 +637,21 @@ class WorldObjectEngine {
             }
             if (this.landmarks3D.waterTower) {
                 clearZones.push({ x: this.landmarks3D.waterTower.x + 20, y: this.landmarks3D.waterTower.y, r: 115 });
+            }
+            if (this.landmarks3D.viceSign) {
+                clearZones.push({ x: this.landmarks3D.viceSign.x, y: this.landmarks3D.viceSign.y, r: 120 });
+            }
+            if (this.landmarks3D.kalagaLookout) {
+                clearZones.push({ x: this.landmarks3D.kalagaLookout.x, y: this.landmarks3D.kalagaLookout.y, r: 115 });
+            }
+            if (this.landmarks3D.alliedSugarSilos) {
+                clearZones.push({ x: this.landmarks3D.alliedSugarSilos.x, y: this.landmarks3D.alliedSugarSilos.y, r: 125 });
+            }
+            if (this.landmarks3D.grassriversOutpost) {
+                clearZones.push({ x: this.landmarks3D.grassriversOutpost.x, y: this.landmarks3D.grassriversOutpost.y, r: 115 });
+            }
+            if (this.landmarks3D.southernmostBuoy) {
+                clearZones.push({ x: this.landmarks3D.southernmostBuoy.x, y: this.landmarks3D.southernmostBuoy.y, r: 64 });
             }
             if (Array.isArray(this.landmarks3D.lighthouses)) {
                 for (const lh of this.landmarks3D.lighthouses) {
@@ -1609,6 +1656,9 @@ class WorldObjectEngine {
             if (this.landmarks3D.launchpad) stampTower(this.landmarks3D.launchpad.x, this.landmarks3D.launchpad.y, 1, 4.1);
             if (this.landmarks3D.atcTower) stampTower(this.landmarks3D.atcTower.x, this.landmarks3D.atcTower.y, 1, 4.2);
             if (this.landmarks3D.waterTower) stampTower(this.landmarks3D.waterTower.x, this.landmarks3D.waterTower.y, 1, 4.0);
+            if (this.landmarks3D.viceSign) stampTower(this.landmarks3D.viceSign.x, this.landmarks3D.viceSign.y, 1, 3.6);
+            if (this.landmarks3D.kalagaLookout) stampTower(this.landmarks3D.kalagaLookout.x, this.landmarks3D.kalagaLookout.y, 1, 4.1);
+            if (this.landmarks3D.alliedSugarSilos) stampTower(this.landmarks3D.alliedSugarSilos.x, this.landmarks3D.alliedSugarSilos.y, 1, 3.7);
             for (const lh of this.landmarks3D.lighthouses) stampTower(lh.x, lh.y, 1, 3.8);
         }
         if (this.map && this.map.prisonCompound && Array.isArray(this.map.prisonCompound.towers)) {
@@ -2980,6 +3030,166 @@ class WorldObjectEngine {
             }
         }
 
+        // H7. COLOSSAL GTA 6 STYLIZED 3D "VICE" AIRPORT WELCOME SIGN ON OPEN-LATTICE STEEL TRUSS SCAFFOLD (c=118.5, r=293.5)
+        if (this.landmarks3D && this.landmarks3D.viceSign) {
+            const vs = this.landmarks3D.viceSign;
+            const bz = vs.z || 2.0;
+            emitAOShadow3D(vs.x, vs.y, 1, 0, 0, 0, 184, 68, bz, 0.44);
+            // 1. Reinforced Concrete Foundation Plinth (S177 / L71) + MAT 3 Hazard Perimeter Trim
+            emitTileBox3D(vs.x, vs.y, 1, 0, 0, 0, 168, 48, bz, bz + 0.14, 177, 177, 71, [0.92, 0.94, 0.98], true);
+            // 2. 4 Open-Lattice S363 Steel Truss Support Columns & 3 Horizontal S250 Catwalk Girders
+            for (const sx of [-64, -22, 22, 64]) {
+                emitTileBox3D(vs.x, vs.y, 1, 0, sx, -10, 12, 12, bz + 0.14, bz + 1.48, 363, 363, 64, [0.88, 0.92, 0.96], false);
+                // Upward ground floodlight housing in front of each letter
+                emitSolidBox3D(vs.x, vs.y, 1, 0, sx, 16, 10, 8, bz + 0.14, bz + 0.22, [0.22, 0.26, 0.34], 5);
+                emitSolidBox3D(vs.x, vs.y, 1, 0, sx, 15, 8, 6, bz + 0.22, bz + 0.26, [0.98, 0.96, 0.78], 7);
+            }
+            for (const gy of [bz + 0.48, bz + 0.96, bz + 1.44]) {
+                emitTileBox3D(vs.x, vs.y, 1, 0, 0, -10, 156, 14, gy, gy + 0.08, 250, 363, 64, [0.90, 0.93, 0.98], false);
+            }
+            // 3. Sculpted 3D Block Letters "V - I - C - E" (Crisp White MAT 1 Masonry + Hot-Pink & Cyan Neon Front Trim MAT 7)
+            const yL0 = bz + 0.52, yL1 = bz + 1.52;
+            const white = [0.98, 0.98, 1.00];
+            const pink  = [0.98, 0.32, 0.76];
+            const cyan  = [0.20, 0.90, 0.98];
+            // Letter 'V' (centered at offX = -60)
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -68, 4, 9, 10, yL0 + 0.22, yL1, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -52, 4, 9, 10, yL0 + 0.22, yL1, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -60, 4, 14, 10, yL0, yL0 + 0.26, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -60, 9.5, 24, 3, yL0, yL1, pink, 7);
+            // Letter 'I' (centered at offX = -20)
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -20, 4, 24, 10, yL1 - 0.18, yL1, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -20, 4, 10, 10, yL0 + 0.18, yL1 - 0.18, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -20, 4, 24, 10, yL0, yL0 + 0.18, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, -20, 9.5, 10, 3, yL0, yL1, cyan, 7);
+            // Letter 'C' (centered at offX = +20)
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 20, 4, 26, 10, yL1 - 0.18, yL1, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 11, 4, 9, 10, yL0 + 0.18, yL1 - 0.18, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 20, 4, 26, 10, yL0, yL0 + 0.18, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 11, 9.5, 9, 3, yL0, yL1, pink, 7);
+            // Letter 'E' (centered at offX = +60)
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 60, 4, 26, 10, yL1 - 0.18, yL1, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 58, 4, 20, 10, yL0 + 0.42, yL0 + 0.58, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 60, 4, 26, 10, yL0, yL0 + 0.18, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 51, 4, 9, 10, yL0 + 0.18, yL1 - 0.18, white, 1);
+            emitSolidBox3D(vs.x, vs.y, 1, 0, 51, 9.5, 9, 3, yL0, yL1, cyan, 7);
+        }
+
+        // H8. 8 TRUE 3D LEONIDA INTERSTATE & CAUSEWAY OVERHEAD GREEN FDOT HIGHWAY GANTRIES (this.landmarks3D.highwayGantries)
+        if (this.landmarks3D && Array.isArray(this.landmarks3D.highwayGantries)) {
+            for (const hg of this.landmarks3D.highwayGantries) {
+                const bz = hg.z || 2.0;
+                const cosA = Math.cos(hg.ang || 0);
+                const sinA = Math.sin(hg.ang || 0);
+                if (hg.fullSpan) {
+                    const halfSpan = (hg.spanPx || 256) * 0.5;
+                    for (const sideX of [-halfSpan, halfSpan]) {
+                        emitAOShadow3D(hg.x, hg.y, cosA, sinA, sideX, 0, 26, 26, bz, 0.36);
+                        emitTileBox3D(hg.x, hg.y, cosA, sinA, sideX, 0, 16, 16, bz, bz + 0.18, 177, 177, 71, [0.92, 0.94, 0.98], false);
+                        emitSolidBox3D(hg.x, hg.y, cosA, sinA, sideX, 0, 14, 14, bz + 0.18, bz + 0.28, [0.96, 0.82, 0.16], 3);
+                        emitTileBox3D(hg.x, hg.y, cosA, sinA, sideX, 0, 11, 11, bz + 0.28, bz + 1.28, 363, 363, 64, [0.90, 0.94, 0.98], false);
+                    }
+                    // Overhead Spanning S250 Steel Truss Box Girder (bz+1.14..1.28 — cars & trucks pass cleanly underneath!)
+                    emitTileBox3D(hg.x, hg.y, cosA, sinA, 0, 0, hg.spanPx + 14, 14, bz + 1.14, bz + 1.28, 250, 363, 64, [0.92, 0.95, 0.99], false);
+                    // Twin Emerald-Green FDOT Highway Sign Boards + White Reflective Border Trim
+                    for (const bxOff of [-halfSpan * 0.44, halfSpan * 0.44]) {
+                        emitSolidBox3D(hg.x, hg.y, cosA, sinA, bxOff, 0, 74, 8, bz + 1.06, bz + 1.44, [0.96, 0.98, 1.00], 1);
+                        emitSolidBox3D(hg.x, hg.y, cosA, sinA, bxOff, 0, 68, 9.5, bz + 1.09, bz + 1.41, [0.04, 0.48, 0.34], 1);
+                    }
+                } else {
+                    const armLen = hg.armPx || 148;
+                    emitAOShadow3D(hg.x, hg.y, cosA, sinA, 0, 0, 28, 28, bz, 0.38);
+                    emitTileBox3D(hg.x, hg.y, cosA, sinA, 0, 0, 18, 18, bz, bz + 0.20, 177, 177, 71, [0.92, 0.94, 0.98], false);
+                    emitSolidBox3D(hg.x, hg.y, cosA, sinA, 0, 0, 16, 16, bz + 0.20, bz + 0.30, [0.96, 0.82, 0.16], 3);
+                    emitTileBox3D(hg.x, hg.y, cosA, sinA, 0, 0, 12, 12, bz + 0.30, bz + 1.30, 363, 363, 64, [0.90, 0.94, 0.98], false);
+                    // Cantilevered S250 Truss Arm + Emerald-Green FDOT Highway Sign Board extending out over the road!
+                    emitTileBox3D(hg.x, hg.y, cosA, sinA, armLen * 0.5, 0, armLen, 13, bz + 1.14, bz + 1.28, 250, 363, 64, [0.92, 0.95, 0.99], false);
+                    emitSolidBox3D(hg.x, hg.y, cosA, sinA, armLen * 0.62, 0, 82, 8, bz + 1.06, bz + 1.44, [0.96, 0.98, 1.00], 1);
+                    emitSolidBox3D(hg.x, hg.y, cosA, sinA, armLen * 0.62, 0, 76, 9.5, bz + 1.09, bz + 1.41, [0.04, 0.48, 0.34], 1);
+                }
+            }
+        }
+
+        // H9. MOUNT KALAGA NATIONAL PARK 3D WILDERNESS FIRE LOOKOUT TOWER & RANGER STATION (c=135.5, r=23.5)
+        if (this.landmarks3D && this.landmarks3D.kalagaLookout) {
+            const kl = this.landmarks3D.kalagaLookout;
+            const bz = kl.z || 2.0;
+            emitAOShadow3D(kl.x, kl.y, 1, 0, -18, 0, 148, 104, bz, 0.44);
+            // 1. Stone & Timber Foundation Pad (S177 / L8) + Log Ranger Cabin Outpost at offX = -52
+            emitOctagonPad3D(kl.x, kl.y, 0, 0, 38, 38, 35, 35, 0.26, bz, bz + 0.12, [0.76, 0.72, 0.66], [0.68, 0.64, 0.58], 2, 177, 8);
+            emitBox3D(kl.x, kl.y, 1, 0, -56, 8, 62, 46, bz, bz + 0.48, "wall_shack_front", "wall_shack_side", [0.48, 0.36, 0.26]);
+            emitHippedRoof3D(kl.x, kl.y, 1, 0, -56, 8, 72, 56, bz + 0.48, 0.22, "roof_rusted_tin", [0.24, 0.46, 0.30], [0.18, 0.36, 0.22]);
+            // 2. 4 Open-Lattice S363 Timber/Steel Truss Legs + Central S249 Alpha-Cutout Climbing Ladder Shaft
+            for (const lx of [-18, 18]) {
+                for (const ly of [-18, 18]) {
+                    emitTileBox3D(kl.x, kl.y, 1, 0, lx, ly, 10, 10, bz + 0.12, bz + 1.56, 363, 363, 64, [0.72, 0.54, 0.36], false);
+                }
+            }
+            emitTileBox3D(kl.x, kl.y, 1, 0, 0, 0, 28, 28, bz + 0.82, bz + 0.90, 250, 250, 77, [0.68, 0.50, 0.32], false);
+            emitTileBox3D(kl.x, kl.y, 1, 0, 0, 0, 10, 10, bz + 0.12, bz + 1.56, 249, 249, 77, [0.82, 0.76, 0.68], false);
+            // 3. Elevated L77 Wooden Wrap-Around Observation Catwalk + 360-Degree S199 Glass Fire-Spotter Cab + Pyramidal Forest-Green Roof!
+            emitTileBox3D(kl.x, kl.y, 1, 0, 0, 0, 56, 56, bz + 1.56, bz + 1.66, 177, 177, 77, [0.84, 0.66, 0.44], true);
+            emitTileBox3D(kl.x, kl.y, 1, 0, 0, 0, 38, 38, bz + 1.66, bz + 1.98, 199, 199, 77, [0.94, 0.96, 0.99], false);
+            emitHippedRoof3D(kl.x, kl.y, 1, 0, 0, 0, 52, 52, bz + 1.98, 0.28, "roof_rusted_tin", [0.20, 0.48, 0.30], [0.14, 0.36, 0.22]);
+        }
+
+        // H10. AMBROSIA "ALLIED CRYSTAL" SUGAR REFINERY 3D CYLINDRICAL MOLASSES SILO COMPLEX & CONVEYOR BRIDGE (c=160.5, r=109.0)
+        if (this.landmarks3D && this.landmarks3D.alliedSugarSilos) {
+            const as = this.landmarks3D.alliedSugarSilos;
+            const bz = as.z || 2.0;
+            emitAOShadow3D(as.x, as.y, 1, 0, 0, 0, 156, 86, bz, 0.44);
+            emitTileBox3D(as.x, as.y, 1, 0, 0, 0, 144, 72, bz, bz + 0.12, 177, 177, 71, [0.88, 0.90, 0.94], true);
+            // 3 Colossal 20-Sided Cylindrical Sugar & Molasses Silos (at offX = -44, 0, +44)
+            for (const [si, sx] of [[-44, 0], [0, 1], [44, 2]]) {
+                emitCylinder3D(as.x, as.y, si, 0, 19.5, 19.5, bz + 0.12, bz + 1.38, 20, [0.92, 0.91, 0.88], 5, false);
+                // Weathered Allied Crystal Rust-Orange & Ribbed Steel Bands (MAT 6)
+                emitCylinder3D(as.x, as.y, si, 0, 19.8, 19.8, bz + 0.68, bz + 0.84, 20, [0.82, 0.38, 0.18], 6, false);
+                emitCylinder3D(as.x, as.y, si, 0, 19.8, 19.8, bz + 1.24, bz + 1.38, 20, [0.24, 0.28, 0.34], 6, true);
+                emitCone3D(as.x, as.y, si, 0, 20.5, bz + 1.38, bz + 1.64, 20, [0.78, 0.34, 0.18], 5);
+                // External S249 Alpha-Cutout Safety Ladder on South Face
+                emitTileBox3D(as.x, as.y, 1, 0, si, 21, 8, 5, bz + 0.12, bz + 1.42, 249, 249, 64, [0.86, 0.88, 0.92], false);
+            }
+            // High-Level S250 / S363 Open-Lattice Steel Truss Overhead Conveyor Bridge linking all 3 Silos!
+            emitTileBox3D(as.x, as.y, 1, 0, 0, 0, 118, 16, bz + 1.62, bz + 1.78, 250, 363, 64, [0.90, 0.92, 0.96], false);
+        }
+
+        // H11. GRASSRIVERS EVERGLADES 3D STILTED WOODEN SWAMP BOARDWALK, AIRBOAT DOCK & GIANT ROADSIDE 3D GATOR STATUE (c=116.5, r=398.5)
+        if (this.landmarks3D && this.landmarks3D.grassriversOutpost) {
+            const go = this.landmarks3D.grassriversOutpost;
+            const bz = go.z || 2.0;
+            emitAOShadow3D(go.x, go.y, 1, 0, 0, 48, 118, 196, bz, 0.38);
+            // 1. Elevated L77 Wooden Swamp Boardwalk extending 160px South into the Grassrivers Bayou Water!
+            emitTileBox3D(go.x, go.y, 1, 0, 0, 72, 34, 168, bz + 0.04, bz + 0.14, 177, 177, 77, [0.82, 0.64, 0.42], true);
+            // Thatched Bayou Airboat Dock Pavilion at the southern pier end (offY = +132)
+            for (const px of [-13, 13]) {
+                for (const py of [112, 148]) {
+                    emitCylinder3D(go.x, go.y, px, py, 2.5, 2.5, bz + 0.14, bz + 0.56, 8, [0.54, 0.36, 0.20], 1, false);
+                }
+            }
+            emitHippedRoof3D(go.x, go.y, 1, 0, 0, 130, 46, 52, bz + 0.56, 0.22, "mansion_star_island", [0.76, 0.58, 0.32], [0.88, 0.68, 0.38]);
+            // 2. Giant Roadside 3D Florida Gator Mascot Monument on Stone Plinth (at offX = -42, offY = -12)
+            emitTileBox3D(go.x, go.y, 1, 0, -42, -12, 54, 26, bz, bz + 0.16, 177, 177, 8, [0.90, 0.88, 0.82], false);
+            emitSolidBox3D(go.x, go.y, 1, 0, -42, -12, 36, 16, bz + 0.16, bz + 0.34, [0.20, 0.48, 0.24], 6);
+            emitSolidBox3D(go.x, go.y, 1, 0, -42, -12, 26, 8,  bz + 0.34, bz + 0.40, [0.14, 0.36, 0.16], 6);
+            emitSolidBox3D(go.x, go.y, 1, 0, -18, -12, 18, 13, bz + 0.16, bz + 0.24, [0.26, 0.54, 0.28], 1);
+            emitSolidBox3D(go.x, go.y, 1, 0, -18, -12, 16, 11, bz + 0.24, bz + 0.30, [0.98, 0.96, 0.90], 1);
+            emitSolidBox3D(go.x, go.y, 1, 0, -18, -12, 18, 13, bz + 0.30, bz + 0.39, [0.20, 0.48, 0.24], 6);
+        }
+
+        // H12. KEY WEST 3D "SOUTHERNMOST POINT IN LEONIDA — 90 MILES TO CUBA" STRIPED CONCRETE BUOY MONUMENT (c=204.2, r=476.5)
+        if (this.landmarks3D && this.landmarks3D.southernmostBuoy) {
+            const sb = this.landmarks3D.southernmostBuoy;
+            const bz = sb.z || 2.0;
+            emitAOShadow3D(sb.x, sb.y, 1, 0, 0, 0, 52, 52, bz, 0.40);
+            emitOctagonPad3D(sb.x, sb.y, 0, 0, 22, 22, 20, 20, 0.28, bz, bz + 0.12, [0.92, 0.90, 0.86], [0.84, 0.82, 0.78], 2, 177, 8);
+            // 5-Tier Multi-Colored Striped Cylindrical Concrete Buoy (Red Base, White Mid, Yellow Stripe, Red Upper, Black Top!)
+            emitCylinder3D(sb.x, sb.y, 0, 0, 12.5, 13.0, bz + 0.12, bz + 0.30, 18, [0.86, 0.20, 0.18], 5, false);
+            emitCylinder3D(sb.x, sb.y, 0, 0, 13.0, 12.8, bz + 0.30, bz + 0.50, 18, [0.96, 0.97, 0.99], 5, false);
+            emitCylinder3D(sb.x, sb.y, 0, 0, 12.8, 12.2, bz + 0.50, bz + 0.60, 18, [0.98, 0.82, 0.16], 5, false);
+            emitCylinder3D(sb.x, sb.y, 0, 0, 12.2, 10.5, bz + 0.60, bz + 0.78, 18, [0.86, 0.20, 0.18], 5, false);
+            emitCylinder3D(sb.x, sb.y, 0, 0, 10.5,  7.5, bz + 0.78, bz + 0.94, 18, [0.14, 0.16, 0.20], 5, true);
+        }
+
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
         }
@@ -3498,6 +3708,34 @@ class WorldObjectEngine {
             }
         }
 
+        // 8. 12 Bobbing 3D Red Port & Green Starboard Marine Channel Navigation Buoys + Mount Kalaga Lookout Beacon
+        if (this.landmarks3D && Array.isArray(this.landmarks3D.marineBuoys)) {
+            for (let i = 0; i < this.landmarks3D.marineBuoys.length; i++) {
+                const mb = this.landmarks3D.marineBuoys[i];
+                if (mb.x < minX - 120 || mb.x > maxX + 120 || mb.y < minY - 120 || mb.y > maxY + 120) continue;
+                const bob = Math.sin(t * 2.5 + mb.seed) * 0.018;
+                const bz = (mb.z || 2.0) + 0.01 + bob;
+                const col = mb.isRed ? [0.88, 0.20, 0.18] : [0.14, 0.76, 0.38];
+                emitDynCylinder(mb.x, mb.y, 0, 0, 9.5, 8.5, bz, bz + 0.08, 12, col, 5, true);
+                emitDynBox(mb.x, mb.y, 1, 0, 0, 0, 7.5, 7.5, bz + 0.08, bz + 0.34, col, 1.0, 4);
+                if (Math.sin(t * 5.5 + mb.seed) > -0.1) {
+                    const led = mb.isRed ? [1.0, 0.18, 0.22] : [0.18, 0.98, 0.48];
+                    emitDynCylinder(mb.x, mb.y, 0, 0, 3.5, 3.5, bz + 0.34, bz + 0.42, 8, led, 7, true);
+                }
+            }
+        }
+        if (this.landmarks3D && this.landmarks3D.kalagaLookout) {
+            const kl = this.landmarks3D.kalagaLookout;
+            if (kl.x >= minX - 180 && kl.x <= maxX + 180 && kl.y >= minY - 180 && kl.y <= maxY + 180) {
+                const bz = kl.z || 2.0;
+                const vAng = t * 2.8;
+                emitDynBox(kl.x, kl.y, Math.cos(vAng), Math.sin(vAng), 0, 0, 18, 3.5, bz + 2.26, bz + 2.31, [0.92, 0.94, 0.98], 1.0, 5);
+                if (Math.sin(t * 6.0) > 0) {
+                    emitDynCylinder(kl.x, kl.y, 0, 0, 2.8, 2.8, bz + 2.31, bz + 2.38, 8, [0.98, 0.62, 0.14], 7, true);
+                }
+            }
+        }
+
         if (dVerts.length === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -3929,25 +4167,42 @@ class WorldObjectEngine {
         ctx.fillRect(455 * TILE_SIZE * sx, 193 * TILE_SIZE * sy, 13 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
 
         // Major 3D Landmarks on GPS / Overview Map
-        if (this.launchpad) {
+        const lm = this.landmarks3D || {};
+        if (lm.launchpad) {
             ctx.fillStyle = "#94a3b8";
-            ctx.fillRect((this.launchpad.x - 104) * sx, (this.launchpad.y - 104) * sy, 208 * sx, 208 * sy);
+            ctx.fillRect((lm.launchpad.x - 104) * sx, (lm.launchpad.y - 104) * sy, 208 * sx, 208 * sy);
             ctx.fillStyle = "#ea580c";
-            ctx.fillRect((this.launchpad.x - 24) * sx, (this.launchpad.y - 24) * sy, 48 * sx, 48 * sy);
+            ctx.fillRect((lm.launchpad.x - 24) * sx, (lm.launchpad.y - 24) * sy, 48 * sx, 48 * sy);
         }
-        if (this.atcTower) {
+        if (lm.atcTower) {
             ctx.fillStyle = "#cbd5e1";
-            ctx.fillRect((this.atcTower.x - 42) * sx, (this.atcTower.y - 42) * sy, 84 * sx, 84 * sy);
+            ctx.fillRect((lm.atcTower.x - 42) * sx, (lm.atcTower.y - 42) * sy, 84 * sx, 84 * sy);
             ctx.fillStyle = "#38bdf8";
-            ctx.fillRect((this.atcTower.x - 20) * sx, (this.atcTower.y - 20) * sy, 40 * sx, 40 * sy);
+            ctx.fillRect((lm.atcTower.x - 20) * sx, (lm.atcTower.y - 20) * sy, 40 * sx, 40 * sy);
         }
-        if (this.waterTower) {
+        if (lm.waterTower) {
             ctx.fillStyle = "#ef4444";
-            ctx.fillRect((this.waterTower.x - 32) * sx, (this.waterTower.y - 32) * sy, 64 * sx, 64 * sy);
+            ctx.fillRect((lm.waterTower.x - 32) * sx, (lm.waterTower.y - 32) * sy, 64 * sx, 64 * sy);
         }
-        if (this.ferrisWheel) {
+        if (lm.ferrisWheel) {
             ctx.fillStyle = "#ec4899";
-            ctx.fillRect((this.ferrisWheel.x - 36) * sx, (this.ferrisWheel.y - 16) * sy, 72 * sx, 32 * sy);
+            ctx.fillRect((lm.ferrisWheel.x - 36) * sx, (lm.ferrisWheel.y - 16) * sy, 72 * sx, 32 * sy);
+        }
+        if (lm.viceSign) {
+            ctx.fillStyle = "#f472b6";
+            ctx.fillRect((lm.viceSign.x - 72) * sx, (lm.viceSign.y - 18) * sy, 144 * sx, 36 * sy);
+        }
+        if (lm.kalagaLookout) {
+            ctx.fillStyle = "#22c55e";
+            ctx.fillRect((lm.kalagaLookout.x - 36) * sx, (lm.kalagaLookout.y - 36) * sy, 72 * sx, 72 * sy);
+        }
+        if (lm.alliedSugarSilos) {
+            ctx.fillStyle = "#f97316";
+            ctx.fillRect((lm.alliedSugarSilos.x - 64) * sx, (lm.alliedSugarSilos.y - 28) * sy, 128 * sx, 56 * sy);
+        }
+        if (lm.grassriversOutpost) {
+            ctx.fillStyle = "#b88655";
+            ctx.fillRect((lm.grassriversOutpost.x - 18) * sx, (lm.grassriversOutpost.y - 12) * sy, 36 * sx, 160 * sy);
         }
 
         for (let i = 0; i < this.instances.length; i++) {

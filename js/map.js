@@ -2072,6 +2072,12 @@ class LeonidaMap {
         pushPropOBB(464.5 * TILE_SIZE, 194.5 * TILE_SIZE + 20, 42, 8, 0);         // Vice Beach Ferris Wheel South A-Frame Base
         pushPropOBB(199.5 * TILE_SIZE, 476.5 * TILE_SIZE, 24, 24, 0);             // Key West Lighthouse
         pushPropOBB(464.5 * TILE_SIZE, 134.5 * TILE_SIZE, 24, 24, 0);             // Cape Leonida Lighthouse
+        pushPropOBB(118.5 * TILE_SIZE, 293.5 * TILE_SIZE, 82, 22, 0);             // VCIA Colossal 3D "VICE" Welcome Sign
+        pushPropOBB(135.5 * TILE_SIZE, 23.5 * TILE_SIZE, 26, 26, 0);              // Mount Kalaga 3D Fire Lookout Tower
+        pushPropOBB(135.5 * TILE_SIZE - 56, 23.5 * TILE_SIZE + 8, 30, 22, 0);     // Mount Kalaga Ranger Cabin
+        pushPropOBB(160.5 * TILE_SIZE, 109.0 * TILE_SIZE, 68, 26, 0);             // Ambrosia "Allied Crystal" 3D Sugar Silos
+        pushPropOBB(116.5 * TILE_SIZE - 36, 398.5 * TILE_SIZE - 12, 26, 13, 0);   // Grassrivers Giant 3D Roadside Gator Statue
+        pushPropOBB(204.2 * TILE_SIZE, 476.5 * TILE_SIZE, 16, 16, 0);             // Key West Southernmost Point 3D Buoy Monument
         const gantryLocs = [
             { x: 359.4 * TILE_SIZE, y: 322.8 * TILE_SIZE },
             { x: 359.4 * TILE_SIZE, y: 335.4 * TILE_SIZE },
