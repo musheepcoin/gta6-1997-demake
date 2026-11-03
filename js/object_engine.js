@@ -432,6 +432,26 @@ class WorldObjectEngine {
                 { name: "START/FINISH GANTRY", x: 72.0 * TILE_SIZE, y: 178.0 * TILE_SIZE }
             ]
         };
+        // 7. Vice City Mambas Stadium 3D Arena, Mount Kalaga Skunk Ape Cryptid, Muscle Beach & Street Takeovers
+        this.mambasStadium = {
+            x: 188.0 * TILE_SIZE,
+            y: 172.0 * TILE_SIZE,
+            z: 2.0,
+            cooldown: 0,
+            fireworkTimer: 0
+        };
+        this.skunkApe = {
+            name: "MOUNT KALAGA SKUNK APE (BIGFOOT)",
+            x: 132.8 * TILE_SIZE,
+            y: 24.5 * TILE_SIZE,
+            z: 2.0,
+            ang: 0.4,
+            active: true,
+            cooldown: 0
+        };
+        this.takeoverCooldown = 0;
+        this.gymCooldown = 0;
+        this.tikiCooldown = 0;
         this.meshVbo = null;
         this.meshVertexCount = 0;
         this.dynVbo = null;
@@ -1332,6 +1352,138 @@ class WorldObjectEngine {
             }
         }
 
+        // 0I. Muscle Beach 3D Outdoor Weightlifting Bench-Press Challenge ([E]!)
+        if (this.map && Array.isArray(this.map.muscleBeachGyms) && (this.gymCooldown || 0) <= 0) {
+            for (const mg of this.map.muscleBeachGyms) {
+                if (Math.hypot(px - mg.x, py - mg.y) < 68) {
+                    this.gymCooldown = 14.0;
+                    game.player.maxHp = 150;
+                    game.player.hp = 150;
+                    if (typeof game.addScore === "function") game.addScore(2000);
+                    if (typeof game.addCash === "function") game.addCash(2000, "💪 MUSCLE BEACH BENCH-PRESS RECORD!");
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("💪 MUSCLE BEACH IRON PUMPED!", "315 LBS BENCH-PRESS REP RECORD • MAX HP UPGRADED TO 150 & +$2,000!", "#4ade80", 2.8);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: mg.x,
+                            y: mg.y,
+                            z: 2.65,
+                            text: "💪 MUSCLE BEACH GAINS! 150 MAX HP + $2,000!",
+                            color: "#4ade80",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0J. Leonida Keys, Gator Island & Vice Beach 3D Thatched Tiki Bar Tropical Mojito ([E]!)
+        if (this.map && Array.isArray(this.map.tikiBars) && (this.tikiCooldown || 0) <= 0) {
+            for (const tb of this.map.tikiBars) {
+                if (Math.hypot(px - tb.x, py - tb.y) < 68) {
+                    this.tikiCooldown = 10.0;
+                    const maxHp = game.player.maxHp || 100;
+                    game.player.hp = maxHp;
+                    game.player.armor = Math.min(100, (game.player.armor || 0) + 50);
+                    if (typeof game.addScore === "function") game.addScore(1500);
+                    if (typeof game.addCash === "function") game.addCash(1500, "🍹 KEYS TIKI MOJITO HAPPY HOUR!");
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: tb.x,
+                            y: tb.y,
+                            z: 2.60,
+                            text: "🍹 LEONIDA TIKI BAR MOJITO! FULL HP + +50 ARMOR & +$1,500!",
+                            color: "#2dd4bf",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0K. Vice City Mambas Stadium Field-Goal / Touchdown Show ([E]!)
+        if (this.mambasStadium && (this.mambasStadium.cooldown || 0) <= 0) {
+            const ms = this.mambasStadium;
+            if (Math.hypot(px - ms.x, py - ms.y) < 135) {
+                ms.cooldown = 18.0;
+                ms.fireworkTimer = 8.0;
+                if (typeof game.addScore === "function") game.addScore(10000);
+                if (typeof game.addCash === "function") game.addCash(10000, "🏈 MAMBAS STADIUM TOUCHDOWN!");
+                if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("🏈 VICE CITY MAMBAS TOUCHDOWN!", "HALFTIME PYROTECHNICS SHOW • +$10,000 & +1X MULTIPLIER!", "#facc15", 3.0);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: ms.x,
+                        y: ms.y,
+                        z: 2.85,
+                        text: "🏈 MAMBAS STADIUM TOUCHDOWN! +$10,000 + FIREWORKS!",
+                        color: "#facc15",
+                        life: 3.0
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0L. Mount Kalaga National Park "Skunk Ape" (Florida Bigfoot) Cryptid Encounter ([E]!)
+        if (this.skunkApe && this.skunkApe.active && Math.hypot(px - this.skunkApe.x, py - this.skunkApe.y) < 84) {
+            this.skunkApe.active = false;
+            this.skunkApe.cooldown = 50.0;
+            if (typeof game.addScore === "function") game.addScore(25000);
+            if (typeof game.addCash === "function") game.addCash(25000, "🦶 KALAGA SKUNK APE CRYPTID BOUNTY!");
+            if (typeof game.addMultiplier === "function") game.addMultiplier(2);
+            if (game.audio) game.audio.playPickup("WEAPON");
+            if (typeof game.showBigBanner === "function") {
+                game.showBigBanner("🦶 LEONIDA SKUNK APE DISCOVERED!", "MOUNT KALAGA BIGFOOT VIRAL EVIDENCE • +$25,000 & +2X MULTIPLIER!", "#f97316", 3.4);
+            }
+            if (Array.isArray(game.floatingTexts)) {
+                game.floatingTexts.push({
+                    x: this.skunkApe.x,
+                    y: this.skunkApe.y,
+                    z: 2.85,
+                    text: "🦶 MOUNT KALAGA SKUNK APE FOUND! +$25,000 + +2X!",
+                    color: "#f97316",
+                    life: 3.4
+                });
+            }
+            return true;
+        }
+
+        // 0M. GTA 6 Street Takeover / Sideshow Drift Ring Crowd Hype ([E]!)
+        if (this.map && Array.isArray(this.map.streetTakeovers) && (this.takeoverCooldown || 0) <= 0) {
+            for (const st of this.map.streetTakeovers) {
+                if (Math.hypot(px - st.x, py - st.y) < 88) {
+                    this.takeoverCooldown = 15.0;
+                    if (typeof game.addScore === "function") game.addScore(8500);
+                    if (typeof game.addCash === "function") game.addCash(8500, "🔥 LEONIDA STREET TAKEOVER KING!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🔥 LEONIDA STREET TAKEOVER!", "SIDESHOW DRIFT PIT CHAMPION • +$8,500 & +1X MULTIPLIER!", "#ec4899", 2.8);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: st.x,
+                            y: st.y,
+                            z: 2.75,
+                            text: "🔥 STREET TAKEOVER SIDESHOW KING! +$8,500 + +1X!",
+                            color: "#ec4899",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         if (!this.heistTargets || this.heistTargets.length === 0) return false;
 
         for (let i = 0; i < this.heistTargets.length; i++) {
@@ -1945,6 +2097,76 @@ class WorldObjectEngine {
                             color: "#2dd4bf",
                             life: 2.8
                         });
+                    }
+                }
+            }
+        }
+
+        // 12. Update Muscle Beach, Tiki Bars, Mambas Stadium, Mount Kalaga Skunk Ape & Street Takeover Drift Rings
+        if ((this.gymCooldown || 0) > 0) this.gymCooldown = Math.max(0, this.gymCooldown - dt);
+        if ((this.tikiCooldown || 0) > 0) this.tikiCooldown = Math.max(0, this.tikiCooldown - dt);
+        if ((this.takeoverCooldown || 0) > 0) this.takeoverCooldown = Math.max(0, this.takeoverCooldown - dt);
+        if (this.mambasStadium) {
+            const ms = this.mambasStadium;
+            if ((ms.cooldown || 0) > 0) ms.cooldown = Math.max(0, ms.cooldown - dt);
+            if ((ms.fireworkTimer || 0) > 0) ms.fireworkTimer = Math.max(0, ms.fireworkTimer - dt);
+            if (pVeh && (ms.cooldown || 0) <= 0 &&
+                (Math.hypot(pVeh.x - ms.x, pVeh.y - (ms.y - 96)) < 54 || Math.hypot(pVeh.x - ms.x, pVeh.y - (ms.y + 96)) < 54)) {
+                const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
+                if (spd > 65) {
+                    ms.cooldown = 18.0;
+                    ms.fireworkTimer = 8.0;
+                    pVeh.vz = Math.max(pVeh.vz || 0, 0.14);
+                    if (typeof game.addScore === "function") game.addScore(10000);
+                    if (typeof game.addCash === "function") game.addCash(10000, "🏈 MAMBAS STADIUM FIELD-GOAL JUMP!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🏈 IT'S GOOD! MAMBAS FIELD-GOAL STUNT!", "HALFTIME PYROTECHNICS SHOW • +$10,000 & +1X MULTIPLIER!", "#facc15", 3.0);
+                    }
+                }
+            }
+        }
+        if (this.skunkApe) {
+            const sa = this.skunkApe;
+            if (!sa.active) {
+                sa.cooldown = Math.max(0, (sa.cooldown || 0) - dt);
+                if (sa.cooldown <= 0 && Math.hypot(px - sa.x, py - sa.y) > 450) {
+                    sa.active = true;
+                }
+            } else {
+                const dP = Math.hypot(px - sa.x, py - sa.y);
+                if (dP < 180 && dP > 12) {
+                    sa.ang = Math.atan2(py - sa.y, px - sa.x);
+                }
+            }
+        }
+        if (pVeh && this.map && Array.isArray(this.map.streetTakeovers) && (this.takeoverCooldown || 0) <= 0) {
+            const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
+            if (spd > 85) {
+                for (const st of this.map.streetTakeovers) {
+                    if (Math.hypot(pVeh.x - st.x, pVeh.y - st.y) < 92) {
+                        this.takeoverCooldown = 16.0;
+                        pVeh.vx = (pVeh.vx || 0) * 1.25;
+                        pVeh.vy = (pVeh.vy || 0) * 1.25;
+                        if (typeof game.addScore === "function") game.addScore(8500);
+                        if (typeof game.addCash === "function") game.addCash(8500, "🔥 LEONIDA SIDESHOW DRIFT KING!");
+                        if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                        if (game.audio) game.audio.playPickup("WEAPON");
+                        if (typeof game.showBigBanner === "function") {
+                            game.showBigBanner("🔥 LEONIDA STREET TAKEOVER KING!", "SIDESHOW DONUT RING BONUS • +$8,500 + NITRO & +1X!", "#ec4899", 2.8);
+                        }
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: st.x,
+                                y: st.y,
+                                z: 2.75,
+                                text: "🔥 SIDESHOW DRIFT TAKEOVER! +$8,500 + NITRO!",
+                                color: "#ec4899",
+                                life: 2.8
+                            });
+                        }
+                        break;
                     }
                 }
             }
@@ -4011,6 +4233,98 @@ class WorldObjectEngine {
             }
         }
 
+        // 20. VICE BEACH 3D PASTEL ART DECO LIFEGUARD TOWERS ON STILTS (this.map.beachProps)
+        if (this.map && Array.isArray(this.map.beachProps)) {
+            const pastelPal = [
+                [0.98, 0.42, 0.76], // Miami Hot Pink
+                [0.24, 0.90, 0.96], // South Beach Cyan
+                [0.98, 0.84, 0.24]  // Sunburst Yellow
+            ];
+            let lgIdx = 0;
+            for (const bp of this.map.beachProps) {
+                if (!bp.spr || !bp.spr.startsWith("lifeguard_")) continue;
+                const bz = bp.z || 2.0;
+                const col = pastelPal[lgIdx % pastelPal.length];
+                lgIdx++;
+                emitAOShadow3D(bp.x, bp.y, 1, 0, 0, 0, 44, 38, bz, 0.36);
+                // 4 Timber Stilts (S363) + Elevated Wooden Observation Deck (L77)
+                for (const [lx, ly] of [[-12, -10], [12, -10], [-12, 10], [12, 10]]) {
+                    emitTileBox3D(bp.x, bp.y, 1, 0, lx, ly, 4.5, 4.5, bz, bz + 0.18, 363, 363, 77, [0.86, 0.72, 0.54], false);
+                }
+                emitTileBox3D(bp.x, bp.y, 1, 0, 0, 0, 34, 28, bz + 0.18, bz + 0.24, 177, 177, 77, [0.92, 0.86, 0.76], false);
+                // Pastel Art Deco Lifeguard Cabin (S199 windows) + Cantilevered Sunburst Roof Canopy
+                emitTileBox3D(bp.x, bp.y, 1, 0, -2, 0, 22, 20, bz + 0.24, bz + 0.48, 199, 199, 86, [0.98, 0.98, 1.00], false);
+                emitSolidBox3D(bp.x, bp.y, 1, 0, -2, 0, 24, 22, bz + 0.34, bz + 0.39, col, 5);
+                emitSolidBox3D(bp.x, bp.y, 1, 0, 0, 0, 32, 26, bz + 0.48, bz + 0.54, col, 5);
+            }
+        }
+
+        // 21. MUSCLE BEACH 3D OUTDOOR WEIGHTLIFTING PAVILIONS & BENCH-PRESS RACKS (this.map.muscleBeachGyms)
+        if (this.map && Array.isArray(this.map.muscleBeachGyms)) {
+            for (const mg of this.map.muscleBeachGyms) {
+                const bz = mg.z || 2.0;
+                emitAOShadow3D(mg.x, mg.y, 1, 0, 0, 0, 56, 42, bz, 0.34);
+                // Rubberized Outdoor Gym Mat Plinth (L87)
+                emitTileBox3D(mg.x, mg.y, 1, 0, 0, 0, 48, 34, bz, bz + 0.04, 177, 177, 87, [0.36, 0.42, 0.52], false);
+                // 3D Chrome Calisthenics Pull-Up Frame (at offX = -14)
+                emitTileBox3D(mg.x, mg.y, 1, 0, -14, -10, 3.5, 3.5, bz + 0.04, bz + 0.32, 363, 363, 45, [0.92, 0.94, 0.98], false);
+                emitTileBox3D(mg.x, mg.y, 1, 0, -14,  10, 3.5, 3.5, bz + 0.04, bz + 0.32, 363, 363, 45, [0.92, 0.94, 0.98], false);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, -14, 0, 4.0, 24, bz + 0.29, bz + 0.33, [0.98, 0.82, 0.18], 5);
+                // 3D Bench-Press Pad & Heavy Olympic Barbell Discs (at offX = +10)
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 10, 0, 18, 7, bz + 0.04, bz + 0.12, [0.88, 0.20, 0.22], 5);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 16, 0, 2.5, 22, bz + 0.16, bz + 0.19, [0.88, 0.92, 0.96], 5);
+                emitCylinder3D(mg.x, mg.y, 16, -9, 4.5, 4.5, bz + 0.13, bz + 0.22, 10, [0.16, 0.18, 0.22], 5, true);
+                emitCylinder3D(mg.x, mg.y, 16,  9, 4.5, 4.5, bz + 0.13, bz + 0.22, 10, [0.16, 0.18, 0.22], 5, true);
+            }
+        }
+
+        // 22. LEONIDA KEYS, GATOR ISLAND & VICE BEACH 3D THATCHED TIKI BARS (this.map.tikiBars)
+        if (this.map && Array.isArray(this.map.tikiBars)) {
+            for (const tb of this.map.tikiBars) {
+                const bz = tb.z || 2.0;
+                const tCos = Math.cos(tb.ang || 0);
+                const tSin = Math.sin(tb.ang || 0);
+                emitAOShadow3D(tb.x, tb.y, tCos, tSin, 0, 0, 54, 38, bz, 0.38);
+                // Bamboo & Wooden Deck (L77) + Wrap-Around Tiki Cocktail Counter (MAT 6)
+                emitTileBox3D(tb.x, tb.y, tCos, tSin, 0, 0, 46, 30, bz, bz + 0.06, 177, 177, 77, [0.84, 0.66, 0.44], false);
+                emitSolidBox3D(tb.x, tb.y, tCos, tSin, 0, 6, 34, 10, bz + 0.06, bz + 0.20, [0.68, 0.46, 0.24], 6);
+                emitSolidBox3D(tb.x, tb.y, tCos, tSin, 0, 6, 36, 12, bz + 0.20, bz + 0.23, [0.92, 0.78, 0.54], 1);
+                // 4 Corner Bamboo Posts + Hipped Thatched Palm Roof + Glowing Neon Cocktail Sign
+                for (const [px, py] of [[-18, -11], [18, -11], [-18, 11], [18, 11]]) {
+                    const wx = tb.x + px * tCos - py * tSin;
+                    const wy = tb.y + px * tSin + py * tCos;
+                    emitCylinder3D(wx, wy, 0, 0, 2.2, 2.2, bz + 0.06, bz + 0.42, 8, [0.58, 0.38, 0.20], 1, false);
+                }
+                emitHippedRoof3D(tb.x, tb.y, tCos, tSin, 0, 0, 52, 36, bz + 0.42, 0.20, "mansion_star_island", [0.80, 0.62, 0.34], [0.90, 0.72, 0.40]);
+                emitSolidBox3D(tb.x, tb.y, tCos, tSin, 0, 14, 22, 3, bz + 0.38, bz + 0.44, [0.98, 0.30, 0.74], 7);
+            }
+        }
+
+        // 23. VICE CITY MAMBAS STADIUM 3D GOALPOSTS, 4 FLOODLIGHT PYLONS & JUMBOTRON SCOREBOARD (c=188.0, r=172.0)
+        if (this.mambasStadium) {
+            const ms = this.mambasStadium;
+            const bz = ms.z || 2.0;
+            const gold = [0.98, 0.84, 0.16];
+            // A. North & South Endzone 3D Tubular Golden Football Goalposts (offY = -96 & +96)
+            for (const gy of [-96, 96]) {
+                emitCylinder3D(ms.x, ms.y, 0, gy, 2.5, 2.5, bz, bz + 0.34, 8, gold, 5, true);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, gy, 38, 3.5, bz + 0.32, bz + 0.36, gold, 7);
+                emitCylinder3D(ms.x, ms.y, -17, gy, 1.8, 1.8, bz + 0.34, bz + 0.88, 8, gold, 7, true);
+                emitCylinder3D(ms.x, ms.y,  17, gy, 1.8, 1.8, bz + 0.34, bz + 0.88, 8, gold, 7, true);
+            }
+            // B. 4 Towering Open-Lattice S363 Stadium Floodlight Pylons at Pitch Corners
+            for (const [fx, fy] of [[-86, -108], [86, -108], [-86, 108], [86, 108]]) {
+                emitTileBox3D(ms.x, ms.y, 1, 0, fx, fy, 12, 12, bz, bz + 1.48, 363, 363, 64, [0.88, 0.92, 0.96], false);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, fx, fy, 26, 8, bz + 1.48, bz + 1.68, [0.98, 0.98, 0.90], 7);
+            }
+            // C. North Endzone 3D Mambas Jumbotron Scoreboard Gantry (offY = -124)
+            for (const jx of [-38, 38]) {
+                emitTileBox3D(ms.x, ms.y, 1, 0, jx, -124, 10, 10, bz, bz + 0.96, 363, 246, 64, [0.86, 0.90, 0.96], false);
+            }
+            emitSolidBox3D(ms.x, ms.y, 1, 0, 0, -124, 96, 10, bz + 0.56, bz + 1.12, [0.14, 0.18, 0.26], 5);
+            emitBox3D(ms.x, ms.y, 1, 0, 0, -124, 88, 11.5, bz + 0.60, bz + 1.06, "ad_vice26", "ad_sprunk", [0.22, 0.94, 0.98]);
+        }
+
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
         }
@@ -4660,6 +4974,47 @@ class WorldObjectEngine {
             }
         }
 
+        // 13. Vice City Mambas Stadium 3D Halftime Pyrotechnics & Fireworks Show
+        if (this.mambasStadium && (this.mambasStadium.fireworkTimer || 0) > 0) {
+            const ms = this.mambasStadium;
+            if (ms.x >= minX - 280 && ms.x <= maxX + 280 && ms.y >= minY - 280 && ms.y <= maxY + 280) {
+                const bz = ms.z || 2.0;
+                const fwCols = [[0.98, 0.24, 0.78], [0.20, 0.94, 0.98], [0.98, 0.86, 0.16], [0.24, 0.98, 0.46]];
+                for (let b = 0; b < 4; b++) {
+                    const phase = ((t * 1.4 + b * 0.25) % 1.0);
+                    const bx = ms.x + (b - 1.5) * 48;
+                    const by = ms.y - 96;
+                    const rad = 8 + phase * 38;
+                    const zElev = bz + 0.75 + phase * 0.85;
+                    const col = fwCols[b % fwCols.length];
+                    for (let sp = 0; sp < 8; sp++) {
+                        const a = (sp * Math.PI * 2.0) / 8.0 + t * 2.0;
+                        emitDynBox(bx + Math.cos(a) * rad, by + Math.sin(a) * rad, 1, 0, 0, 0, 6, 6, zElev, zElev + 0.08, col, 1.0 - phase * 0.7, 7);
+                    }
+                }
+            }
+        }
+
+        // 14. Mount Kalaga National Park 3D Animated "Skunk Ape" (Florida Bigfoot) Cryptid
+        if (this.skunkApe && this.skunkApe.active) {
+            const sa = this.skunkApe;
+            if (sa.x >= minX - 140 && sa.x <= maxX + 140 && sa.y >= minY - 140 && sa.y <= maxY + 140) {
+                const bz = sa.z || 2.0;
+                const cA = Math.cos(sa.ang || 0), sA = Math.sin(sa.ang || 0);
+                const stride = Math.sin(t * 4.5) * 3.2;
+                const fur = [0.28, 0.18, 0.12];
+                // Muscular bipedal legs + shaggy hominid torso + swinging arms + head with glowing amber eyes!
+                emitDynBox(sa.x, sa.y, cA, sA,  stride, -4.5, 6, 5, bz, bz + 0.12, fur, 1.0, 6);
+                emitDynBox(sa.x, sa.y, cA, sA, -stride,  4.5, 6, 5, bz, bz + 0.12, fur, 1.0, 6);
+                emitDynBox(sa.x, sa.y, cA, sA, 0, 0, 12, 16, bz + 0.11, bz + 0.29, [0.34, 0.22, 0.14], 1.0, 6);
+                emitDynBox(sa.x, sa.y, cA, sA, -stride * 1.1, -9.5, 5, 4.5, bz + 0.12, bz + 0.27, fur, 1.0, 6);
+                emitDynBox(sa.x, sa.y, cA, sA,  stride * 1.1,  9.5, 5, 4.5, bz + 0.12, bz + 0.27, fur, 1.0, 6);
+                emitDynBox(sa.x, sa.y, cA, sA, 1, 0, 9, 9, bz + 0.29, bz + 0.39, fur, 1.0, 6);
+                emitDynBox(sa.x, sa.y, cA, sA, 5.2, -2.2, 2.2, 2.0, bz + 0.33, bz + 0.36, [1.0, 0.78, 0.14], 1.0, 7);
+                emitDynBox(sa.x, sa.y, cA, sA, 5.2,  2.2, 2.2, 2.0, bz + 0.33, bz + 0.36, [1.0, 0.78, 0.14], 1.0, 7);
+            }
+        }
+
         if (dVerts.length === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -5102,6 +5457,79 @@ class WorldObjectEngine {
                     ctx.strokeRect(scr.x - 175, scr.y - 22, 350, 22);
                     ctx.fillStyle = "#38bdf8";
                     ctx.fillText("📦 TOUCH OR [E] COLLECT SMUGGLER CRATE (+$5,000 & AMMO)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && this.map && Array.isArray(this.map.muscleBeachGyms) && (this.gymCooldown || 0) <= 0) {
+            for (const mg of this.map.muscleBeachGyms) {
+                if (Math.hypot(px - mg.x, py - mg.y) < 92) {
+                    const scr = renderer.worldToScreen(mg.x, mg.y - 14, 2.34);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText("💪 [E] PUMP IRON AT MUSCLE BEACH (150 MAX HP & +$2,000)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && this.map && Array.isArray(this.map.tikiBars) && (this.tikiCooldown || 0) <= 0) {
+            for (const tb of this.map.tikiBars) {
+                if (Math.hypot(px - tb.x, py - tb.y) < 92) {
+                    const scr = renderer.worldToScreen(tb.x, tb.y - 14, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.strokeStyle = "#2dd4bf";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.fillStyle = "#2dd4bf";
+                    ctx.fillText("🍹 [E] ORDER KEYS TIKI MOJITO (FULL HP + +50 ARMOR)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (this.mambasStadium && (this.mambasStadium.cooldown || 0) <= 0 && Math.hypot(px - this.mambasStadium.x, py - this.mambasStadium.y) < 165) {
+            const scr = renderer.worldToScreen(this.mambasStadium.x, this.mambasStadium.y - 24, 2.65);
+            ctx.font = "900 11px monospace";
+            ctx.fillStyle = "rgba(8,12,22,0.92)";
+            ctx.fillRect(scr.x - 190, scr.y - 22, 380, 22);
+            ctx.strokeStyle = "#facc15";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(scr.x - 190, scr.y - 22, 380, 22);
+            ctx.fillStyle = "#facc15";
+            ctx.fillText("🏈 [E] OR DRIVE GOALPOSTS: MAMBAS TOUCHDOWN (+$10,000)", scr.x, scr.y - 7);
+        }
+        if (this.skunkApe && this.skunkApe.active && Math.hypot(px - this.skunkApe.x, py - this.skunkApe.y) < 145) {
+            const scr = renderer.worldToScreen(this.skunkApe.x, this.skunkApe.y - 16, 2.45);
+            ctx.font = "900 11px monospace";
+            ctx.fillStyle = "rgba(8,12,22,0.92)";
+            ctx.fillRect(scr.x - 190, scr.y - 22, 380, 22);
+            ctx.strokeStyle = "#f97316";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(scr.x - 190, scr.y - 22, 380, 22);
+            ctx.fillStyle = "#fde047";
+            ctx.fillText("🦶 [E] PHOTOGRAPH MOUNT KALAGA SKUNK APE (+$25,000)", scr.x, scr.y - 7);
+        }
+        if (this.map && Array.isArray(this.map.streetTakeovers) && (this.takeoverCooldown || 0) <= 0) {
+            for (const st of this.map.streetTakeovers) {
+                if (Math.hypot(px - st.x, py - st.y) < 135) {
+                    const scr = renderer.worldToScreen(st.x, st.y - 18, 2.42);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 190, scr.y - 22, 380, 22);
+                    ctx.strokeStyle = "#ec4899";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 190, scr.y - 22, 380, 22);
+                    ctx.fillStyle = "#ec4899";
+                    ctx.fillText(
+                        p.inVehicle
+                            ? "🔥 DRIFT IN SIDESHOW RING (+$8,500 + NITRO & +1X)"
+                            : "🔥 [E] HYPE STREET TAKEOVER SIDESHOW (+$8,500 & +1X)",
+                        scr.x,
+                        scr.y - 7
+                    );
                 }
             }
         }
