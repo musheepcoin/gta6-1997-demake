@@ -205,10 +205,16 @@ class RetroRenderer {
                 float w1 = sin(vWorldPos.x * 5.4 + uTime * 2.3 + swell * 0.8) * cos(vWorldPos.z * 5.4 - uTime * 1.8);
                 float w2 = sin((vWorldPos.x + vWorldPos.z) * 3.9 - uTime * 2.7);
                 float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
-                vec3 lagunaBase = mix(vec3(0.11, 0.57, 0.69), vec3(0.24, 0.76, 0.84), clamp(0.5 + swell * 0.38, 0.0, 1.0));
-                vec3 rgb = mix(texW, lagunaBase, 0.72);
-                vec3 crestFoam = vec3(0.88, 0.97, 0.99);
-                rgb = mix(rgb, crestFoam, caust * 0.18 * (1.0 - uNightTint * 0.65));
+                // Miami / Bahamas Shallow Turquoise Lagoon Gradation & Breaking Surf Rollers along Vice Beach
+                float beachDist = abs(vWorldPos.x - 483.5);
+                float shallowFactor = clamp(1.0 - beachDist / 18.0, 0.0, 1.0);
+                vec3 deepBase = mix(vec3(0.09, 0.54, 0.68), vec3(0.20, 0.74, 0.84), clamp(0.5 + swell * 0.38, 0.0, 1.0));
+                vec3 reefTurquoise = vec3(0.16, 0.90, 0.86);
+                vec3 lagunaBase = mix(deepBase, reefTurquoise, shallowFactor * 0.68);
+                vec3 rgb = mix(texW, lagunaBase, 0.76);
+                float surfWave = pow(max(0.0, sin(vWorldPos.x * 3.2 + uTime * 2.6 + sin(vWorldPos.z * 0.8) * 1.4)), 6.0) * shallowFactor;
+                vec3 crestFoam = vec3(0.90, 0.98, 1.00);
+                rgb = mix(rgb, crestFoam, clamp((caust * 0.18 + surfWave * 0.52) * (1.0 - uNightTint * 0.60), 0.0, 0.85));
                 float sunGlint = pow(caust, 3.0) * dayAmt;
                 rgb = min(vec3(1.0), rgb + vec3(0.36, 0.34, 0.24) * sunGlint);
                 return vec4(rgb, 0.78);
@@ -5757,7 +5763,20 @@ class RetroRenderer {
                 pb *= k * 0.82;
             }
 
-            this.batchPedSprite3D(pedType, frameIdx, ped.x, ped.y, pz, ped.angle, pedScale, false, pedDrawOrder, pr, pg, pb);
+            const skateSwayX = ped.isRollerblader ? Math.cos(ped.angle + Math.PI * 0.5) * Math.sin(this.time * 5.2 + (ped.animSeed || 0) * 10) * 3.2 : 0;
+            const skateSwayY = ped.isRollerblader ? Math.sin(ped.angle + Math.PI * 0.5) * Math.sin(this.time * 5.2 + (ped.animSeed || 0) * 10) * 3.2 : 0;
+            if (ped.isRollerblader && !ped.dead) {
+                const skCos = Math.cos(ped.angle);
+                const skSin = Math.sin(ped.angle);
+                const isPinkSkate = (Math.abs(Math.floor((ped.animSeed || 0) * 100)) % 2) === 0;
+                const sr = isPinkSkate ? 1.0 : 0.12;
+                const sg = isPinkSkate ? 0.25 : 0.94;
+                const sb = isPinkSkate ? 0.78 : 0.98;
+                this.pushSolidQuad3D(ped.x + skateSwayX - skSin * 3.2, ped.y + skateSwayY + skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(ped.x + skateSwayX + skSin * 3.2, ped.y + skateSwayY - skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+
+            this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, pedScale, false, pedDrawOrder, pr, pg, pb);
 
             // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm civilian pedestrians smoke a glowing cigarette ember after dusk!
             if (nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
@@ -6042,6 +6061,31 @@ class RetroRenderer {
                 );
             }
 
+            // A2. Miami / Vice City Custom Neon Underglow for Sports Cars, Convertibles & Muscle Cars!
+            if (!v.destroyed && airZ < 0.08) {
+                const sk = v.specKey || "";
+                const hasUnderglow = (
+                    sk === "BANSHEE_GT" || sk === "STINGER_CABRIO" || sk === "TURISMO_CABRIO" ||
+                    sk === "PENETRATOR_GT" || sk === "CHALLENGER_RT" || sk === "TULIP_MUSCLE" ||
+                    sk === "VICE_CHEETAH" || sk === "PORKA_TURBO" || sk === "SUPERBIKE"
+                );
+                if (hasUnderglow) {
+                    const ugAlpha = Math.max(0.18, Math.min(0.68, 0.22 + nfGlobal * 0.46));
+                    let ugR = 0.08, ugG = 0.94, ugB = 1.00; // South Beach Cyan
+                    if (sk === "STINGER_CABRIO" || sk === "TULIP_MUSCLE") {
+                        ugR = 1.00; ugG = 0.18; ugB = 0.76; // Flamingo Magenta
+                    } else if (sk === "CHALLENGER_RT" || sk === "PENETRATOR_GT") {
+                        ugR = 0.68; ugG = 0.24; ugB = 1.00; // Ultra-Violet Purple
+                    } else if (sk === "TURISMO_CABRIO" || sk === "SUPERBIKE") {
+                        ugR = 0.22; ugG = 1.00; ugB = 0.64; // Neon Mint Lime
+                    }
+                    const ugW = (v.w || 46) * (mapInfo.isMotorcycle ? 0.68 : 0.92);
+                    const ugH = (v.h || 22) * (mapInfo.isMotorcycle ? 0.62 : 0.96);
+                    this.pushSolidQuad3D(v.x, v.y, vz - 0.020, ugW * 1.16, ugH * 1.24, v.angle, ugR, ugG, ugB, ugAlpha * 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(v.x, v.y, vz - 0.019, ugW * 0.88, ugH * 0.92, v.angle, ugR, ugG, ugB, ugAlpha * 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+
             // B. GTA 2 live_geometry.cpp SetSpriteConform (kSmoothing = 0.25f): 4-Corner Ground Slope Pitch + Wheelie/Stunt Pitch!
             const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
             const hRear = this.map.getHeightAtPixel(v.x - cosA * 20, v.y - sinA * 20, vz);
@@ -6253,6 +6297,7 @@ class RetroRenderer {
         if (this.mapStyle === "VICE") {
             if (this.map.beachProps) {
                 for (const bp of this.map.beachProps) {
+                    if (bp.spr && bp.spr.startsWith("lifeguard_")) continue;
                     if (bp.x < minX || bp.x > maxX || bp.y < minY || bp.y > maxY) continue;
                     const bz = this.getEntityZ(bp, 0.04) + (bp.zOff || 0.03);
                     this.batchObjectSprite3D(bp.spr, bp.x, bp.y, bz, bp.angle || 0, bp.scale || 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
@@ -6774,6 +6819,42 @@ class RetroRenderer {
                 const pxScale = (sc.scale * H) / 128.0;
                 addLightPool(sc.x, sc.y, 82 * pxScale, "rgba(57, 255, 20, 0.85)", "rgba(16, 185, 129, 0.34)");
             }
+        }
+
+        // 3B. Ocean Drive Art Deco Hotel Blade Neon Reflections, Royal Palm Uplighting & Española Way Festoons!
+        if (this.map && Array.isArray(this.map.vicePalms)) {
+            for (let pi = 0; pi < this.map.vicePalms.length; pi++) {
+                const pm = this.map.vicePalms[pi];
+                // Uplight Royal Palms along Ocean Drive & Lummus Park promenade (c = 442.5..451.8)
+                if (pm.x < 442.5 * 64 || pm.x > 451.8 * 64) continue;
+                const sc = this.worldToScreen(pm.x, pm.y, 2.08);
+                if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                const isPink = (pi % 2) === 0;
+                addLightPool(
+                    sc.x,
+                    sc.y,
+                    48 * pxScale,
+                    isPink ? "rgba(255, 70, 200, 0.78)" : "rgba(0, 235, 255, 0.78)",
+                    isPink ? "rgba(220, 30, 150, 0.28)" : "rgba(0, 160, 220, 0.28)"
+                );
+            }
+        }
+        // Ocean Drive Hotel Neon Blade Reflections across the West Curb & Asphalt (every 8 rows, r = 44..356)
+        for (let r = 44; r <= 356; r += 8) {
+            const bx = 443.6 * 64;
+            const by = (r + 0.5) * 64;
+            const sc = this.worldToScreen(bx, by, 2.02);
+            if (sc.x < -160 || sc.x > W + 160 || sc.y < -160 || sc.y > H + 160) continue;
+            const pxScale = (sc.scale * H) / 128.0;
+            const isCyan = ((r / 8) % 2) === 0;
+            addLightPool(
+                sc.x,
+                sc.y,
+                92 * pxScale,
+                isCyan ? "rgba(30, 240, 255, 0.82)" : "rgba(255, 65, 195, 0.82)",
+                isCyan ? "rgba(0, 175, 235, 0.32)" : "rgba(210, 20, 145, 0.32)"
+            );
         }
 
         // 4. Lucia & Jason Subtle Visibility Halo (plus Muzzle Flash light when firing!)

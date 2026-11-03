@@ -3764,27 +3764,51 @@ class WorldObjectEngine {
 
         // ====================================================================
         // C. COMPILE 3D ART DECO BEACH LIFEGUARD TOWERS (this.map.beachProps)
-        //    (Textured with L77 Wooden Observation Deck & S177 Pilings)
+        //    (Stilts, Wooden Stairs, Pastel Art Deco Cabin, Rescue Board & Flag)
         // ====================================================================
         if (this.map && Array.isArray(this.map.beachProps)) {
+            const pastelCabins = [
+                [0.98, 0.52, 0.74], // Flamingo Pink
+                [0.28, 0.90, 0.94], // Turquoise Cyan
+                [0.98, 0.84, 0.28], // Sunburst Yellow
+                [0.98, 0.58, 0.36], // Coral Orange
+                [0.42, 0.94, 0.76]  // Mint Aqua
+            ];
+            const pastelRoofs = [
+                [0.24, 0.88, 0.86],
+                [0.98, 0.44, 0.68],
+                [0.28, 0.78, 0.96],
+                [0.98, 0.86, 0.28],
+                [0.96, 0.48, 0.72]
+            ];
             for (let i = 0; i < this.map.beachProps.length; i++) {
                 const pr = this.map.beachProps[i];
                 if (!pr.spr || !pr.spr.startsWith("lifeguard_")) continue;
                 const cosA = Math.cos(pr.ang || 0);
                 const sinA = Math.sin(pr.ang || 0);
                 const bz = pr.z || 2.0;
-                const isPink = pr.spr.includes("pink");
-                const isCyan = pr.spr.includes("cyan");
-                const cabinCol = isPink ? [0.98, 0.56, 0.72] : (isCyan ? [0.36, 0.88, 0.92] : [0.98, 0.82, 0.32]);
-                const roofCol = isPink ? [0.24, 0.86, 0.82] : [0.96, 0.44, 0.58];
+                const cabinCol = pastelCabins[i % pastelCabins.length];
+                const roofCol = pastelRoofs[i % pastelRoofs.length];
+                emitAOShadow3D(pr.x, pr.y, cosA, sinA, 0, 0, 48, 42, bz, 0.36);
+                // 4 Timber Stilts + Cross-Bracing
                 for (const sx of [-14, 14]) {
                     for (const sy of [-12, 12]) {
-                        emitTileBox3D(pr.x, pr.y, cosA, sinA, sx, sy, 4.5, 4.5, bz, bz + 0.22, 177, 177, 46, [0.92, 0.92, 0.94], false);
+                        emitTileBox3D(pr.x, pr.y, cosA, sinA, sx, sy, 4.5, 4.5, bz, bz + 0.22, 363, 363, 77, [0.88, 0.76, 0.58], false);
                     }
                 }
-                emitTileBox3D(pr.x, pr.y, cosA, sinA, 0, 0, 44, 40, bz + 0.20, bz + 0.24, 177, 177, 77, [0.96, 0.94, 0.90], true);
-                emitBox3D(pr.x, pr.y, cosA, sinA, 0, 0, 32, 28, bz + 0.24, bz + 0.52, "wall_artdeco_side", "wall_artdeco_side", cabinCol);
-                emitHippedRoof3D(pr.x, pr.y, cosA, sinA, 0, 0, 40, 36, bz + 0.52, 0.14, "roof_artdeco_terrazzo", roofCol, cabinCol);
+                // West-side Wooden Entry Steps leading up from the sand to the observation deck
+                emitTileBox3D(pr.x, pr.y, cosA, sinA, -24, 0, 10, 14, bz, bz + 0.08, 177, 177, 77, [0.90, 0.80, 0.64], false);
+                emitTileBox3D(pr.x, pr.y, cosA, sinA, -19, 0, 10, 14, bz + 0.08, bz + 0.16, 177, 177, 77, [0.92, 0.84, 0.68], false);
+                // Elevated Wooden Observation Deck (L77) + White Guardrail Trim
+                emitTileBox3D(pr.x, pr.y, cosA, sinA, 0, 0, 44, 40, bz + 0.20, bz + 0.25, 177, 177, 77, [0.96, 0.92, 0.84], true);
+                // Pastel Art Deco Cabin + Wrap-Around Horizon Window Band
+                emitBox3D(pr.x, pr.y, cosA, sinA, -2, 0, 30, 28, bz + 0.25, bz + 0.54, "wall_artdeco_side", "wall_artdeco_side", cabinCol);
+                emitSolidBox3D(pr.x, pr.y, cosA, sinA, -2, 0, 32, 30, bz + 0.38, bz + 0.44, roofCol, 6);
+                // Pitched Art Deco Roof + Vertical Red/Yellow Baywatch Rescue Surfboard & Wind Flag
+                emitHippedRoof3D(pr.x, pr.y, cosA, sinA, -2, 0, 38, 36, bz + 0.54, 0.15, "roof_artdeco_terrazzo", roofCol, cabinCol);
+                emitSolidBox3D(pr.x, pr.y, cosA, sinA, 8, -19, 5, 3, bz + 0.18, bz + 0.52, [0.98, 0.22, 0.24], 5);
+                emitSolidBox3D(pr.x, pr.y, cosA, sinA, 14, 14, 1.8, 1.8, bz + 0.54, bz + 0.78, [0.94, 0.96, 0.98], 5);
+                emitSolidBox3D(pr.x, pr.y, cosA, sinA, 18, 14, 8.0, 2.0, bz + 0.70, bz + 0.77, [0.98, 0.18, 0.26], 6);
             }
         }
 
@@ -4585,29 +4609,106 @@ class WorldObjectEngine {
             }
         }
 
-        // 20. VICE BEACH 3D PASTEL ART DECO LIFEGUARD TOWERS ON STILTS (this.map.beachProps)
-        if (this.map && Array.isArray(this.map.beachProps)) {
-            const pastelPal = [
-                [0.98, 0.42, 0.76], // Miami Hot Pink
-                [0.24, 0.90, 0.96], // South Beach Cyan
-                [0.98, 0.84, 0.24]  // Sunburst Yellow
+        // 20A. OCEAN DRIVE 3D ART DECO HOTEL FACADE ENHANCEMENTS (Eyebrows, Rooftop Neon Crowns, Vertical Blade Signs & Pastel Awnings)
+        if (this.map && typeof this.map.getBlockInfo === "function") {
+            const neonTrimPal = [
+                [0.98, 0.36, 0.78], // Hot Flamingo Pink
+                [0.14, 0.94, 0.98], // South Beach Cyan
+                [0.34, 0.98, 0.76], // Mint Pastel
+                [1.00, 0.82, 0.24], // Warm Neon Gold
+                [0.78, 0.42, 0.98]  // Ultra-Violet Purple
             ];
-            let lgIdx = 0;
-            for (const bp of this.map.beachProps) {
-                if (!bp.spr || !bp.spr.startsWith("lifeguard_")) continue;
-                const bz = bp.z || 2.0;
-                const col = pastelPal[lgIdx % pastelPal.length];
-                lgIdx++;
-                emitAOShadow3D(bp.x, bp.y, 1, 0, 0, 0, 44, 38, bz, 0.36);
-                // 4 Timber Stilts (S363) + Elevated Wooden Observation Deck (L77)
-                for (const [lx, ly] of [[-12, -10], [12, -10], [-12, 10], [12, 10]]) {
-                    emitTileBox3D(bp.x, bp.y, 1, 0, lx, ly, 4.5, 4.5, bz, bz + 0.18, 363, 363, 77, [0.86, 0.72, 0.54], false);
+            const bladeTextures = ["ad_hotel_dixon", "ad_vice_neon", "ad_ocean_drive", "ad_mambos_latin", "ad_pi_beer"];
+            const interiorsList = Array.isArray(this.map.interiors) ? this.map.interiors : [];
+
+            for (let r = 44; r <= 358; r++) {
+                // Check if c=442 has a tall Art Deco hotel building block (z=2..3+)
+                const b2 = this.map.getBlockInfo(442, r, 2);
+                const b3 = this.map.getBlockInfo(442, r, 3);
+                if (!b2 || !b2.lid || !b3 || !b3.lid) continue;
+                let topZ = 4.0;
+                for (let zTest = 4; zTest <= 5; zTest++) {
+                    const bt = this.map.getBlockInfo(442, r, zTest);
+                    if (bt && bt.lid > 0) topZ = zTest + 1.0;
                 }
-                emitTileBox3D(bp.x, bp.y, 1, 0, 0, 0, 34, 28, bz + 0.18, bz + 0.24, 177, 177, 77, [0.92, 0.86, 0.76], false);
-                // Pastel Art Deco Lifeguard Cabin (S199 windows) + Cantilevered Sunburst Roof Canopy
-                emitTileBox3D(bp.x, bp.y, 1, 0, -2, 0, 22, 20, bz + 0.24, bz + 0.48, 199, 199, 86, [0.98, 0.98, 1.00], false);
-                emitSolidBox3D(bp.x, bp.y, 1, 0, -2, 0, 24, 22, bz + 0.34, bz + 0.39, col, 5);
-                emitSolidBox3D(bp.x, bp.y, 1, 0, 0, 0, 32, 26, bz + 0.48, bz + 0.54, col, 5);
+                const facadeX = 443.0 * TILE_SIZE;
+                const rowY = (r + 0.5) * TILE_SIZE;
+                const trimCol = neonTrimPal[Math.floor(r / 4) % neonTrimPal.length];
+                const altCol  = neonTrimPal[(Math.floor(r / 4) + 1) % neonTrimPal.length];
+
+                // 1) Pastel Art Deco Horizontal "Eyebrow" Window Sun-Ledges along the East hotel face
+                emitSolidBox3D(facadeX + 2.5, rowY, 1, 0, 0, 0, 5.0, 56.0, 2.94, 3.00, trimCol, 6);
+                if (topZ >= 4.0) {
+                    emitSolidBox3D(facadeX + 2.2, rowY, 1, 0, 0, 0, 4.4, 56.0, 3.88, 3.94, altCol, 6);
+                }
+
+                // 2) Stepped Art Deco Rooftop Neon Crown & Central Vertical Fin Spire (every 5 building rows)
+                if (r % 5 === 2) {
+                    emitSolidBox3D(facadeX - 4.0, rowY, 1, 0, 0, 0, 10.0, 52.0, topZ, topZ + 0.16, [0.96, 0.94, 0.98], 5);
+                    emitSolidBox3D(facadeX - 2.5, rowY, 1, 0, 0, 0, 8.0, 34.0, topZ + 0.16, topZ + 0.30, trimCol, 6);
+                    emitSolidBox3D(facadeX + 1.0, rowY, 1, 0, 0, 0, 12.0, 6.0, topZ + 0.10, topZ + 0.52, altCol, 6);
+                }
+
+                // 3) Vertical 3D Illuminated Hotel Blade Sign projecting over Ocean Drive West Sidewalk
+                if (r % 8 === 4) {
+                    const bladeTex = bladeTextures[Math.floor(r / 8) % bladeTextures.length];
+                    emitSolidBox3D(facadeX + 5.0, rowY, 1, 0, 0, 0, 10.0, 3.0, 2.75, 2.82, [0.24, 0.28, 0.34], 5);
+                    emitSolidBox3D(facadeX + 5.0, rowY, 1, 0, 0, 0, 10.0, 3.0, 3.82, 3.89, [0.24, 0.28, 0.34], 5);
+                    emitBox3D(facadeX + 11.0, rowY, 1, 0, 0, 0, 11.0, 4.8, 2.62, 3.98, bladeTex, bladeTex, [1.0, 1.0, 1.0]);
+                    emitSolidBox3D(facadeX + 17.0, rowY, 1, 0, 0, 0, 2.2, 5.6, 2.58, 4.02, trimCol, 6);
+                }
+
+                // 4) Pastel Striped Storefront Cafe Awning over West Sidewalk (skipping building entrance doors!)
+                if (r % 3 === 1) {
+                    const nearDoor = interiorsList.some(intr => Math.abs(intr.doorX - facadeX) < 96 && Math.abs(intr.doorY - rowY) < 42);
+                    if (!nearDoor) {
+                        emitSolidBox3D(facadeX + 9.0, rowY, 1, 0, 0, 0, 18.0, 48.0, 2.38, 2.48, trimCol, 5);
+                        emitSolidBox3D(facadeX + 17.5, rowY, 1, 0, 0, 0, 2.5, 48.0, 2.34, 2.40, [0.98, 0.98, 1.00], 6);
+                    }
+                }
+            }
+
+            // 20B. LUMMUS PARK 3D PASTEL ART DECO SERPENTINE BEACH WALL (Separating Boardwalk c=451 from Vice Beach Sand c=452)
+            const wallX = 451.88 * TILE_SIZE;
+            for (let r = 42; r <= 360; r++) {
+                if ((r >= 130 && r <= 138) || (r >= 191 && r <= 198)) continue;
+                const wy = (r + 0.5) * TILE_SIZE;
+                const isEntry = (r % 14 === 0) || (r % 14 === 7);
+                const capCol = ((Math.floor(r / 7) % 2) === 0) ? [0.24, 0.92, 0.96] : [0.98, 0.48, 0.78];
+                if (isEntry) {
+                    // Twin Art Deco Gate Pillars flanking the beach access opening
+                    emitSolidBox3D(wallX, wy - 22, 1, 0, 0, 0, 9.5, 9.5, 2.0, 2.24, [0.97, 0.95, 0.92], 5);
+                    emitSolidBox3D(wallX, wy - 22, 1, 0, 0, 0, 10.5, 10.5, 2.24, 2.29, capCol, 6);
+                    emitSolidBox3D(wallX, wy + 22, 1, 0, 0, 0, 9.5, 9.5, 2.0, 2.24, [0.97, 0.95, 0.92], 5);
+                    emitSolidBox3D(wallX, wy + 22, 1, 0, 0, 0, 10.5, 10.5, 2.24, 2.29, capCol, 6);
+                } else {
+                    const waveOff = Math.sin(r * 0.65) * 2.2;
+                    emitSolidBox3D(wallX + waveOff, wy, 1, 0, 0, 0, 6.8, 64.0, 2.0, 2.13, [0.96, 0.94, 0.90], 5);
+                    emitSolidBox3D(wallX + waveOff, wy, 1, 0, 0, 0, 7.8, 64.0, 2.13, 2.165, capCol, 6);
+                }
+            }
+
+            // 20C. ESPAÑOLA WAY & LITTLE HAVANA 3D OVERHEAD FESTOON STRING LIGHTS (Warm Miami Night Ambiance)
+            const festoonSpans = [
+                // Española Way Pedestrian Plaza & Cafe Terrace (c = 434..441, r = 160..174)
+                { x1: 434.2 * TILE_SIZE, x2: 441.8 * TILE_SIZE, rStart: 160, rEnd: 174, step: 2 },
+                // Little Havana / Calle Ocho Domino & Latin District (c = 280..288, r = 242..254)
+                { x1: 280.2 * TILE_SIZE, x2: 287.8 * TILE_SIZE, rStart: 242, rEnd: 254, step: 2 }
+            ];
+            for (const fs of festoonSpans) {
+                for (let r = fs.rStart; r <= fs.rEnd; r += fs.step) {
+                    const fy = (r + 0.5) * TILE_SIZE;
+                    const bulbs = 7;
+                    for (let bi = 0; bi <= bulbs; bi++) {
+                        const t = bi / bulbs;
+                        const bx = fs.x1 + (fs.x2 - fs.x1) * t;
+                        const sag = Math.sin(t * Math.PI) * 0.08;
+                        const bz = 2.58 - sag;
+                        const isPinkBulb = ((bi + r) % 3) === 0;
+                        const bulbCol = isPinkBulb ? [1.0, 0.52, 0.82] : [1.0, 0.90, 0.52];
+                        emitSolidBox3D(bx, fy, 1, 0, 0, 0, 3.6, 3.6, bz, bz + 0.04, bulbCol, 6);
+                    }
+                }
             }
         }
 

@@ -500,13 +500,23 @@ class LeonidaGame {
 
         const parked = [
 
-            // --- A. Ocean Drive & Hotel Dixon Spawn: Curb-parked Hero Tulip & Motorcycles along the Curbside Edge (x=218.18, clear of sidewalks & road lanes 214..217!) ---
+            // --- A. Ocean Drive & Hotel Dixon Spawn: Curb-parked Hero Tulip, Exotics & Motorcycles along the Curbside Edge (x=218.18, clear of sidewalks & road lanes 214..217!) ---
+
+            { spec: "STINGER_CABRIO", c: 218.18, r: 136.5, a: -Math.PI * 0.5, z: 2.0 },
+
+            { spec: "TURISMO_CABRIO", c: 218.18, r: 139.8, a: -Math.PI * 0.5, z: 2.0 },
 
             { spec: "TULIP_MUSCLE", c: 218.18, r: 143.5, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
 
             { spec: "SUPERBIKE", c: 218.18, r: 146.2, a: -Math.PI * 0.5, z: 2.0 },
 
             { spec: "HARLEY_BIKE", c: 218.18, r: 148.8, a: -Math.PI * 0.5, z: 2.0 },
+
+            { spec: "BANSHEE_GT", c: 218.18, r: 151.8, a: -Math.PI * 0.5, z: 2.0 },
+
+            { spec: "CHALLENGER_RT", c: 218.18, r: 155.2, a: -Math.PI * 0.5, z: 2.0 },
+
+            { spec: "PORKA_TURBO", c: 218.18, r: 158.5, a: -Math.PI * 0.5, z: 2.0 },
 
             // Active moving traffic on Ocean Drive & Collins Ave (never parked stationary in the road!)
 
@@ -710,6 +720,14 @@ class LeonidaGame {
 
             { c: 219.5, r: 158.2, a: Math.PI * 0.5, type: "surfer_guy", missionTag: "BEACH" },
 
+            // Lummus Park Oceanfront Boardwalk Rollerbladers (c = 451.5 raw512, gliding along the beach seawall!)
+            { c: 451.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   isRollerblader: true, missionTag: "BEACH" },
+            { c: 451.5, r: 228.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   isRollerblader: true, missionTag: "BEACH" },
+            { c: 451.5, r: 234.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_yellow", isRollerblader: true, missionTag: "BEACH" },
+            { c: 451.5, r: 240.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    isRollerblader: true, missionTag: "BEACH" },
+            { c: 451.5, r: 246.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_red",    isRollerblader: true, missionTag: "BEACH" },
+            { c: 451.5, r: 252.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_white",  isRollerblader: true, missionTag: "BEACH" },
+
 
 
             // Collins Ave Sidewalks (x = 203.5 West sidewalk & x = 208.5 East sidewalk — NEVER on road lanes x = 204..207!)
@@ -796,7 +814,7 @@ class LeonidaGame {
 
         starterPeds.forEach((sp, idx) => {
 
-            this.peds.push(new Pedestrian({
+            const pedObj = new Pedestrian({
 
                 id: `ped_init_${idx}`,
 
@@ -808,7 +826,7 @@ class LeonidaGame {
 
                 angle: sp.a,
 
-                speed: sp.dead ? 0 : 36,
+                speed: sp.dead ? 0 : (sp.isRollerblader ? 66 : 36),
 
                 kind: sp.kind || "CIVILIAN",
 
@@ -832,7 +850,9 @@ class LeonidaGame {
 
                 targetBy: null
 
-            }));
+            });
+            if (sp.isRollerblader) pedObj.isRollerblader = true;
+            this.peds.push(pedObj);
 
         });
 
