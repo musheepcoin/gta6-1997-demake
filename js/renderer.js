@@ -2588,7 +2588,11 @@ class RetroRenderer {
 
         // 2B. Build True 3D Volumetric Architectural Prefab Mesh (WorldObjectEngine)
         if (this.map && this.map.objectEngine) {
-            this.map.objectEngine.buildStatic3DMesh(gl, this);
+            try {
+                this.map.objectEngine.buildStatic3DMesh(gl, this);
+            } catch (err) {
+                console.error("WorldObjectEngine.buildStatic3DMesh error:", err);
+            }
         }
 
         // 3. Build 512x512 Ray-Marched 3D Building Solar Cast Shadow & Ambient Occlusion Lightmap (this.dayLightTex)

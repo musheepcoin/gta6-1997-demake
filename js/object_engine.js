@@ -3270,12 +3270,12 @@ class WorldObjectEngine {
                 emitTileBox3D(bb.x, bb.y, bCos, bSin, 0,  8, 76, 5, bz + 0.45, bz + 0.49, 250, 250, 45, [0.78, 0.82, 0.88]);
                 emitTileBox3D(bb.x, bb.y, bCos, bSin, 0, -8, 76, 5, bz + 0.45, bz + 0.49, 250, 250, 45, [0.78, 0.82, 0.88]);
                 for (let lx = -24; lx <= 24; lx += 24) {
-                    emitProcBox3D(bb.x, bb.y, bCos, bSin, lx,  9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], [0.95, 0.90, 0.72], 1);
-                    emitProcBox3D(bb.x, bb.y, bCos, bSin, lx, -9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], [0.95, 0.90, 0.72], 1);
+                    emitSolidBox3D(bb.x, bb.y, bCos, bSin, lx,  9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], 1);
+                    emitSolidBox3D(bb.x, bb.y, bCos, bSin, lx, -9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], 1);
                 }
                 // Structural Steel Backing Frame (L45) & Illuminated Neon Crown Header
-                emitProcBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 82, 7.5, bz + 0.46, bz + 0.90, [0.16, 0.20, 0.28], [0.12, 0.15, 0.22], 5);
-                emitProcBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 84, 9.0, bz + 0.90, bz + 0.94, nc, nc, 1);
+                emitSolidBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 82, 7.5, bz + 0.46, bz + 0.90, [0.16, 0.20, 0.28], 5);
+                emitSolidBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 84, 9.0, bz + 0.90, bz + 0.94, nc, 1);
                 // Double-Sided High-Resolution 128x64 Satirical GTA Advertising Panel (MODE D from gta1_sprites.png!)
                 emitBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 78, 9.2, bz + 0.48, bz + 0.88, bb.ad, bb.ad, [0.22, 0.26, 0.34]);
             }
@@ -3294,10 +3294,10 @@ class WorldObjectEngine {
                 emitAOShadow3D(sm.x, sm.y, sCos, sSin, 0, 0, 22, 18, bz, 0.34);
                 // Concrete Plinth & Enamel Vending Cabinet Body
                 emitTileBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 16, 12, bz, bz + 0.05, 177, 177, 71, [0.86, 0.88, 0.92]);
-                emitProcBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 14, 10, bz + 0.05, bz + 0.29, bodyCol, glowCol, 5);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 14, 10, bz + 0.05, bz + 0.29, bodyCol, 5);
                 // Illuminated Front/Back Branded Graphic Panel (ad_ecola / ad_sprunk) + Neon Top Canopy
                 emitBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 12.5, 10.6, bz + 0.08, bz + 0.26, sm.ad, sm.ad, glowCol);
-                emitProcBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 15, 11, bz + 0.29, bz + 0.32, glowCol, glowCol, 1);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 15, 11, bz + 0.29, bz + 0.32, glowCol, 1);
             }
         }
 
