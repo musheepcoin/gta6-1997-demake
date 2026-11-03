@@ -370,6 +370,12 @@ class RetroAudioEngine {
             case "HARLEY_BIKE":
                 return "HARLEY";
 
+            case "BMX_BIKE":
+                return "BICYCLE";
+
+            case "E_SCOOTER":
+                return "ESCOOTER";
+
             case "PANZER_TANK":
                 return "TANK";
 
@@ -798,9 +804,50 @@ class RetroAudioEngine {
             const vehClass = this.getVehicleAudioClass(specKey);
             const rawSpeed = state.vehicleSpeed || 0;
             const absSpeed = Math.abs(rawSpeed);
-            const maxSpd = Math.max(220, state.vehicleMaxSpeed || 410);
+            const maxSpd = Math.max(180, state.vehicleMaxSpeed || 410);
             const speedNorm = Math.min(1.0, absSpeed / maxSpd);
             const throttle = state.vehicleThrottle !== undefined ? state.vehicleThrottle : (absSpeed > this._prevAbsSpeed + 0.5 ? 1 : 0);
+
+            // BICYCLE & ELECTRIC SCOOTER: Zero combustion engine noise!
+            if (vehClass === "BICYCLE" || vehClass === "ESCOOTER") {
+                if (this._engineLayers.length > 0) {
+                    this._stopEngineLayers();
+                }
+                if (this.engineMasterGain) {
+                    this.engineMasterGain.gain.cancelScheduledValues(now);
+                    this.engineMasterGain.gain.setValueAtTime(0.0, now);
+                }
+                this._updateSkidLoop(now, false, 0);
+
+                if (vehClass === "BICYCLE" && absSpeed > 14) {
+                    // Authentic Beach Cruiser Bicycle sound: soft pedal chain swish when pedaling, crisp freewheel ratchet ticks when coasting!
+                    this._bikeTickTimer = (this._bikeTickTimer || 0) - dt;
+                    const tickInterval = throttle > 0
+                        ? Math.max(0.18, 0.42 - speedNorm * 0.22)
+                        : Math.max(0.055, 0.14 - speedNorm * 0.08);
+                    if (this._bikeTickTimer <= 0) {
+                        this._bikeTickTimer = tickInterval;
+                        if (throttle > 0) {
+                            // Subtle pedal chain cadence swish
+                            this.playBandNoise(0.032, 2600 + speedNorm * 800, 2.4, 0.011);
+                        } else if (absSpeed > 24) {
+                            // Crisp metallic freewheel hub ratchet click while coasting
+                            this.playBandNoise(0.012, 4400, 4.2, 0.009);
+                        }
+                    }
+                } else if (vehClass === "ESCOOTER" && absSpeed > 14) {
+                    // Subtle modern electric brushless hub motor hum (quiet high-tech sine pulse)
+                    this._scooterHumTimer = (this._scooterHumTimer || 0) - dt;
+                    if (this._scooterHumTimer <= 0) {
+                        this._scooterHumTimer = 0.075;
+                        const humFreq = 310 + speedNorm * 440 + (throttle > 0 ? 45 : 0);
+                        this.playBeep(humFreq, 0.085, "sine", 0.0085 * Math.min(1.0, speedNorm * 1.3));
+                    }
+                }
+
+                this._prevThrottle = throttle;
+                this._prevAbsSpeed = absSpeed;
+            } else {
 
             // 5-Speed Automatic Transmission Gear Selection with Hysteresis
             let targetGear = 1;
@@ -896,6 +943,7 @@ class RetroAudioEngine {
             this._updateSkidLoop(now, Boolean(state.vehicleDrifting), speedNorm);
             this._prevThrottle = throttle;
             this._prevAbsSpeed = absSpeed;
+            }
         } else {
             if (this._engineLayers.length > 0) {
                 this._stopEngineLayers();
@@ -1200,6 +1248,29 @@ class RetroAudioEngine {
         }
 
         const vehClass = this.getVehicleAudioClass(specKey);
+
+        // Authentic Bicycle Handlebar Bell ("DRING-DRING!") & Electric Scooter Piezo Beep!
+        if (vehClass === "BICYCLE" || specKey === "BMX_BIKE") {
+            this.playBeep(2420, 0.11, "sine", 0.065);
+            this.playBeep(3630, 0.08, "triangle", 0.032);
+            setTimeout(() => {
+                if (this.ctx && !this.muted) {
+                    this.playBeep(2680, 0.14, "sine", 0.070);
+                    this.playBeep(4020, 0.10, "triangle", 0.035);
+                }
+            }, 85);
+            return;
+        }
+        if (vehClass === "ESCOOTER" || specKey === "E_SCOOTER") {
+            this.playBeep(1580, 0.065, "triangle", 0.055);
+            setTimeout(() => {
+                if (this.ctx && !this.muted) {
+                    this.playBeep(1580, 0.075, "triangle", 0.055);
+                }
+            }, 80);
+            return;
+        }
+
         let hornKey = "horn_car";
         let rate = 0.97 + Math.random() * 0.06;
         let maxDur = 0.55;
@@ -1322,6 +1393,24 @@ class RetroAudioEngine {
     playCarEnter(isMotorcycle = false, specKey = null) {
         if (!this.initialized || this.muted || !this.ctx) return;
         const vehClass = this.getVehicleAudioClass(specKey);
+
+        if (vehClass === "BICYCLE" || specKey === "BMX_BIKE") {
+            // Hop onto bicycle saddle + crisp chain click (NO engine starter!)
+            this.playSample("step_soft", 0.075, 1.12, 0.14);
+            this.playBandNoise(0.025, 3800, 3.5, 0.018);
+            return;
+        }
+        if (vehClass === "ESCOOTER" || specKey === "E_SCOOTER") {
+            // Step onto electric scooter deck + modern Miami e-scooter unlock chime (NO combustion engine starter!)
+            this.playSample("step_soft", 0.065, 1.15, 0.12);
+            this.playBeep(987.77, 0.055, "sine", 0.042);
+            setTimeout(() => {
+                if (this.ctx && !this.muted) {
+                    this.playBeep(1318.51, 0.08, "sine", 0.048);
+                }
+            }, 65);
+            return;
+        }
 
         if (!isMotorcycle) {
             const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "gta_car_door_open";

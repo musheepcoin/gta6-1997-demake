@@ -912,7 +912,7 @@ class Vehicle {
             this.aiScanDist = 120;
         }
         this.aiAggressive = Boolean(
-            this.isMotorcycle ||
+            (this.isMotorcycle && specKey !== "BMX_BIKE" && specKey !== "E_SCOOTER") ||
             specKey === "TULIP_MUSCLE" ||
             specKey === "CHALLENGER_RT" ||
             specKey === "GATOR_4X4" ||
@@ -2393,10 +2393,14 @@ class Vehicle {
         this.drifting = (handbrake && Math.abs(forwardVel) > 130) || Math.abs(lateralVel) > 75;
         if (this.drifting && !map.isWaterAtPixel(this.x, this.y)) {
             const rearTire = this.getTirePosition(CAR_TIRE.REAR);
-            const lat = this.getTireLateral(CAR_TIRE.REAR);
-            game.addSkidmark(rearTire.x + lat.x * 8, rearTire.y + lat.y * 8);
-            game.addSkidmark(rearTire.x - lat.x * 8, rearTire.y - lat.y * 8);
-            if (this.driver === "PLAYER" && Math.random() < 0.25) {
+            if (this.isMotorcycle) {
+                game.addSkidmark(rearTire.x, rearTire.y);
+            } else {
+                const lat = this.getTireLateral(CAR_TIRE.REAR);
+                game.addSkidmark(rearTire.x + lat.x * 8, rearTire.y + lat.y * 8);
+                game.addSkidmark(rearTire.x - lat.x * 8, rearTire.y - lat.y * 8);
+            }
+            if (this.driver === "PLAYER" && this.specKey !== "BMX_BIKE" && this.specKey !== "E_SCOOTER" && Math.random() < 0.25) {
                 game.audio.playTireScreech();
             }
         }

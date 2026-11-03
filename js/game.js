@@ -11089,6 +11089,8 @@ class LeonidaGame {
 
             if (v === p.inVehicle || !v.driver) continue;
 
+            if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
+
             const vSpd = Math.abs(v.speed || 0);
 
             if (vSpd < 10) continue;
