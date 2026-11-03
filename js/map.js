@@ -1124,7 +1124,7 @@ class LeonidaMap {
             }
         }
 
-        // 2) Leonida Alligators ("gator_3d"): Swimming in Lake Leonida / Grassrivers / Kalaga + Basking on Banks & Port Gellhorn Gas Station!
+        // 2) Leonida Alligators ("gator_3d"): Swimming in Lake Leonida / Grassrivers / Kalaga + Basking on Natural Swamp Banks!
         this.leonidaGators = [];
         const rawGators = [
             // Lake Leonida & Gator Island swimming & basking gators
@@ -1137,11 +1137,10 @@ class LeonidaMap {
             { c: 140.5,       r: 136.5,       inWater: true, angle: -1.4 },
             { c: mx256(64.5), r: my256(64.5), inWater: false, angle: 0.2 }, // Basking on NW Lake Leonida bank
             { c: mx256(78.5), r: my256(74.5), inWater: false, angle: -0.5 }, // Gator Island basking
-            // South Lake Leonida Lagoon & Port Gellhorn Convenience Store / Gas Station Gator (Trailer 1 Easter Egg!)
+            // South Lake Leonida Lagoon
             { c: mx256(68.0), r: my256(101.5), inWater: true, angle: 1.5 },
             { c: 140.5,       r: 220.5,        inWater: true, angle: -0.6 },
             { c: mx256(63.5), r: my256(123.5), inWater: true, angle: -1.2 },
-            { c: mx256(61.2), r: my256(122.5), inWater: false, angle: 0.15 }, // Port Gellhorn urban gator on sidewalk!
             // Mount Kalaga National Park Mountain Lake
             { c: mx256(55.5), r: my256(15.5), inWater: true, angle: 0.6 },
             { c: mx256(58.5), r: my256(17.0), inWater: true, angle: -2.2 },
@@ -1151,9 +1150,7 @@ class LeonidaMap {
             { c: mx256(82.5),  r: my256(216.5), inWater: true, angle: -0.7 },
             { c: mx256(98.5),  r: my256(224.5), inWater: true, angle: 1.1 },
             { c: mx256(116.5), r: my256(219.5), inWater: true, angle: -1.9 },
-            { c: mx256(134.5), r: my256(225.5), inWater: true, angle: 0.8 },
-            // Golf Club Water Hazard Pond gator!
-            { c: mx256(147.5), r: my256(56.0), inWater: true, angle: 0.5 }
+            { c: mx256(134.5), r: my256(225.5), inWater: true, angle: 0.8 }
         ];
         for (let gi = 0; gi < rawGators.length; gi++) {
             const g = rawGators[gi];

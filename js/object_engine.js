@@ -380,14 +380,11 @@ class WorldObjectEngine {
             capsuleY: 35.0 * TILE_SIZE
         };
         // GTA 6 Trailer 1 & Screenshots "Instant Fun" Interactive Encounters:
-        // 1. Rogue Leonida Alligators (Convenience Stores, Mansion Pools & Sidewalks)
+        // 1. Leonida Swamp & Gator Island Alligators (strictly in Grassrivers Everglades & Lake Leonida Gator Island — no city sidewalks!)
         this.gatorEncounters = [
-            { id: "gator_ocean_liquor", name: "OCEAN DRIVE 24/7 LIQUOR GATOR", x: 442.5 * TILE_SIZE, y: 288.0 * TILE_SIZE, z: 2.0, ang: 0.35, active: true, cooldown: 0 },
-            { id: "gator_star_pool",    name: "STAR ISLAND POOL GATOR",        x: 351.2 * TILE_SIZE, y: 169.2 * TILE_SIZE, z: 2.0, ang: -0.60, active: true, cooldown: 0 },
-            { id: "gator_venetian",     name: "VENETIAN VILLA ROGUE GATOR",    x: 393.5 * TILE_SIZE, y: 121.8 * TILE_SIZE, z: 2.0, ang: 1.15, active: true, cooldown: 0 },
-            { id: "gator_gellhorn",     name: "PORT GELLHORN GAS STATION GATOR", x: 64.5 * TILE_SIZE, y: 182.5 * TILE_SIZE, z: 2.0, ang: -0.25, active: true, cooldown: 0 },
-            { id: "gator_little_haiti", name: "LITTLE HAITI MARKET GATOR",     x: 226.5 * TILE_SIZE, y: 111.5 * TILE_SIZE, z: 2.0, ang: 0.80, active: true, cooldown: 0 },
-            { id: "gator_grassrivers",  name: "GRASSRIVERS BULL GATOR",        x: 110.5 * TILE_SIZE, y: 390.5 * TILE_SIZE, z: 2.0, ang: -1.10, active: true, cooldown: 0 }
+            { id: "gator_grassrivers",  name: "GRASSRIVERS BULL GATOR",        x: 110.5 * TILE_SIZE, y: 390.5 * TILE_SIZE, z: 2.0, ang: -1.10, active: true, cooldown: 0 },
+            { id: "gator_everglades_w", name: "EVERGLADES BAYOU GATOR",        x: 96.5 * TILE_SIZE,  y: 420.5 * TILE_SIZE, z: 2.0, ang: 0.45,  active: true, cooldown: 0 },
+            { id: "gator_gator_island", name: "LAKE LEONIDA GATOR ISLAND BULL", x: 125.5 * TILE_SIZE, y: 108.5 * TILE_SIZE, z: 2.0, ang: -0.35, active: true, cooldown: 0 }
         ];
         // 2. VCPD High-Speed Radar Speed Traps & Nitrous Boost Portals (strictly on PAVE/FIELD sidewalks beside the road!)
         this.speedTraps = [

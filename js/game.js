@@ -9166,7 +9166,7 @@ class LeonidaGame {
 
             if (ped.kind === "GATOR") {
 
-                // Gator chases nearest human or Lucia if close
+                // Gator chases nearest human or Lucia if close, strictly bounded inside Grassrivers Everglades swamps
 
                 const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
 
@@ -9191,6 +9191,18 @@ class LeonidaGame {
                     ped.y += Math.sin(ped.angle) * 28 * dt;
 
                     if (Math.random() < 0.02) ped.angle += (Math.random() - 0.5) * 1.8;
+
+                }
+
+                const minGx = 55 * TILE_SIZE, maxGx = 180 * TILE_SIZE, minGy = 385 * TILE_SIZE, maxGy = 475 * TILE_SIZE;
+
+                if (ped.x < minGx || ped.x > maxGx || ped.y < minGy || ped.y > maxGy) {
+
+                    ped.x = Math.max(minGx, Math.min(maxGx, prevX));
+
+                    ped.y = Math.max(minGy, Math.min(maxGy, prevY));
+
+                    ped.angle += Math.PI;
 
                 }
 
