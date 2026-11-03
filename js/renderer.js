@@ -2144,6 +2144,74 @@ class RetroRenderer {
                     meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
                 }
 
+                // 6J2. Miami Neon Electric Scooter ("veh_escooter", 16x32, facing South +Y) & South Beach Cruiser Bicycle ("veh_bicycle", 16x34, facing South +Y)
+                {
+                    // 1) Electric Scooter ("veh_escooter", 16x32 at 1342, py3)
+                    const scx = 1342, scy = py3;
+                    ctx.save();
+                    // Rear wheel (top) & Front wheel (bottom)
+                    ctx.fillStyle = "#090d16";
+                    ctx.fillRect(scx + 6, scy + 1, 4, 6);
+                    ctx.fillRect(scx + 6, scy + 25, 4, 6);
+                    // Grip-tape standing deck with Neon Lime & Cyan side LED rails
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(scx + 4, scy + 6, 8, 19);
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillRect(scx + 4, scy + 7, 1.6, 17);
+                    ctx.fillRect(scx + 10.4, scy + 7, 1.6, 17);
+                    ctx.fillStyle = "#1e293b";
+                    ctx.fillRect(scx + 6, scy + 8, 4, 14);
+                    // Rear red brake LED & fender
+                    ctx.fillStyle = "#ef4444";
+                    ctx.fillRect(scx + 6, scy + 4, 4, 2.2);
+                    // Front steering stem, wide handlebars & cyan/lime handgrips (at bottom = front +Y)
+                    ctx.fillStyle = "#cbd5e1";
+                    ctx.fillRect(scx + 2, scy + 23, 12, 2.4);
+                    ctx.fillStyle = "#00f0ff";
+                    ctx.fillRect(scx + 1, scy + 22.5, 3, 3);
+                    ctx.fillRect(scx + 12, scy + 22.5, 3, 3);
+                    // Front LED headlight
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillRect(scx + 6.5, scy + 25, 3, 2);
+                    ctx.restore();
+                    meta.sprites.objects["veh_escooter"] = [scx, scy, 16, 32];
+
+                    // 2) South Beach Cruiser / BMX Bicycle ("veh_bicycle", 16x34 at 1364, py3)
+                    const bkx = 1364, bky = py3;
+                    ctx.save();
+                    // Rear & Front whitewall beach cruiser tires
+                    ctx.fillStyle = "#090d16";
+                    ctx.fillRect(bkx + 6, bky + 1, 4, 9);
+                    ctx.fillRect(bkx + 6, bky + 24, 4, 9);
+                    ctx.fillStyle = "#e2e8f0";
+                    ctx.fillRect(bkx + 7, bky + 2, 2, 7);
+                    ctx.fillRect(bkx + 7, bky + 25, 2, 7);
+                    // Turquoise & Flamingo Pink tubular cruiser frame
+                    ctx.fillStyle = "#00f0ff";
+                    ctx.fillRect(bkx + 6.5, bky + 8, 3, 17);
+                    ctx.fillStyle = "#ff2a85";
+                    ctx.fillRect(bkx + 5.5, bky + 14, 5, 3);
+                    // Left & Right pedals
+                    ctx.fillStyle = "#cbd5e1";
+                    ctx.fillRect(bkx + 3, bky + 15, 2.5, 2);
+                    ctx.fillRect(bkx + 10.5, bky + 17, 2.5, 2);
+                    // Tan leather beach cruiser saddle (over rear/mid frame)
+                    ctx.fillStyle = "#78350f";
+                    ctx.fillRect(bkx + 5, bky + 9, 6, 5);
+                    ctx.fillStyle = "#b45309";
+                    ctx.fillRect(bkx + 6, bky + 10, 4, 3.5);
+                    // Swept-back chrome cruiser handlebars & grips (front +Y) + woven beach basket
+                    ctx.fillStyle = "#f8fafc";
+                    ctx.fillRect(bkx + 1.5, bky + 21, 13, 2.4);
+                    ctx.fillStyle = "#ff2a85";
+                    ctx.fillRect(bkx + 1, bky + 19.5, 2.5, 3.5);
+                    ctx.fillRect(bkx + 12.5, bky + 19.5, 2.5, 3.5);
+                    ctx.fillStyle = "#fde68a";
+                    ctx.fillRect(bkx + 5, bky + 23.5, 6, 3.5);
+                    ctx.restore();
+                    meta.sprites.objects["veh_bicycle"] = [bkx, bky, 16, 34];
+                }
+
                 // =========================================================================
                 // 6K. GTA 6 LEONIDA DIVERSE FLORA & ARBORETUM SPRITES
                 // True 3ds Max / Raytraced 1999 DMA Design baked flora (y = 3480 in gta1_sprites.png)
@@ -4217,16 +4285,25 @@ class RetroRenderer {
                     }
                 }
 
-                // Side Beach Activity Props (Surfboard, Beach Ball, Sandcastle, Cooler)
+                // Side Beach Activity Props (Surfboard, Beach Ball, Sandcastle, Cooler) + Playful Beach Kids!
                 if (sb.propSpr) {
                     const px = sb.x + (sb.propDx !== undefined ? sb.propDx : 24);
                     const py = sb.y + (sb.propDy !== undefined ? sb.propDy : -8);
                     this.batchObjectSprite3D(sb.propSpr, px, py, bz + 0.026, sb.propAngle || 0.35, sb.propScale || 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    if (sb.propSpr === "sandcastle_prop") {
+                        const kidFr = 50 + (Math.floor(this.time * 4.5 + i) % 4);
+                        const kidType = (i % 2 === 0) ? "kid_beach" : "kid_girl_pink";
+                        this.batchPedSprite3D(kidType, kidFr, px + 11, py + 4, bz + 0.036, Math.PI, 0.78, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
                 if (sb.extraPropSpr) {
                     const ex = sb.x + (sb.extraPropDx !== undefined ? sb.extraPropDx : 22);
                     const ey = sb.y + (sb.extraPropDy !== undefined ? sb.extraPropDy : 18);
                     this.batchObjectSprite3D(sb.extraPropSpr, ex, ey, bz + 0.026, 0, 0.90, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    if (sb.extraPropSpr === "sandcastle_prop") {
+                        const kidFr = 50 + (Math.floor(this.time * 4.2 + i * 3) % 4);
+                        this.batchPedSprite3D("kid_boy_cap", kidFr, ex + 10, ey - 5, bz + 0.036, Math.PI * 0.75, 0.78, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
 
                 // 3D Striped Beach Umbrella (with solar ground shadow + 3D rising pole + elevated canopy at head corner of towel!)
@@ -5415,7 +5492,12 @@ class RetroRenderer {
             { key: "vc_sailor",       shirt: [248, 248, 252], shirt2: [32, 188, 224],  pants: [242, 62, 82],   sleeves: "short", legs: "shorts", hair: H.auburn,skin: SK.light, pattern: "stripes" },
             { key: "vc_cuban",        shirt: [246, 244, 232], shirt2: [52, 198, 168],  shirt3: [252, 204, 56], pants: [42, 48, 62],    sleeves: "short", legs: "pants",  hair: H.black, skin: SK.brown, pattern: "jacket" },
             { key: "vc_haitian",      shirt: [238, 48, 72],   shirt2: [38, 128, 236],  pants: JEANS,           sleeves: "short", legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "jacket" },
-            { key: "vc_bodybuilder",  shirt: [252, 214, 38],  shirt2: [255, 68, 148],  pants: [232, 48, 68],   sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.brown, pattern: "stripes" }
+            { key: "vc_bodybuilder",  shirt: [252, 214, 38],  shirt2: [255, 68, 148],  pants: [232, 48, 68],   sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.brown, pattern: "stripes" },
+            // --- Miami Kids & Teenagers (rendered at 0.74x child scale) ---
+            { key: "kid_boy_cap",     shirt: [254, 218, 42],  shirt2: [28, 212, 242],  pants: [48, 112, 224],  sleeves: "short", legs: "shorts", hairMode: "helmet", helmet: [242, 44, 64],  skin: SK.light, pattern: "stripes" },
+            { key: "kid_girl_pink",   shirt: [255, 78, 174],  shirt2: [250, 250, 252], pants: [44, 224, 218],  sleeves: "short", legs: "shorts", hair: H.blond,  skin: SK.light, pattern: "stripes" },
+            { key: "kid_skater",      shirt: [56, 238, 132],  shirt2: [168, 85, 247],  pants: KHAKI,           sleeves: "short", legs: "shorts", hairMode: "helmet", helmet: [24, 214, 242], skin: SK.tan,   pattern: "hawaiian", shirt3: [254, 224, 68] },
+            { key: "kid_beach",       shirt: [36, 218, 238],  shirt2: [255, 114, 62],  pants: [255, 92, 74],   sleeves: "tank",  legs: "shorts", hair: H.brown,  skin: SK.tan,   pattern: "stripes" }
         ];
         return this._g2Archs;
     }
@@ -5434,7 +5516,8 @@ class RetroRenderer {
             "g2_civ_darkgreen", "g2_civ_granny",
             "vc_tommy", "vc_crockett", "vc_hawaiian_red", "vc_tourist", "vc_jogger",
             "g2_civ_aqua", "g2_civ_pink", "g2_civ_redtee", "g2_civ_blueshorts",
-            "bikini_pink", "bikini_cyan", "bikini_yellow"
+            "bikini_pink", "bikini_cyan", "bikini_yellow",
+            "kid_boy_cap", "kid_girl_pink", "kid_skater", "kid_beach"
         ];
         const pool = isGang ? gangPool : civPool;
         const seed = Math.abs(Math.floor((ped.animSeed || 0) * 7919 + (ped.turnSeed || 0) * 131 + (ped.x || 0) * 0.37));
@@ -5710,6 +5793,9 @@ class RetroRenderer {
                 ? ped.getDrawOrder()
                 : SPRITE_DRAW_ORDER.PEDESTRIAN;
 
+            const isChildPed = Boolean(ped.isChild || (pedType && pedType.startsWith("kid_")));
+            const thisPedScale = isChildPed ? (pedScale * 0.74) : pedScale;
+
             let frameIdx;
             if ((ped.stunnedTimer || 0) > 0) {
                 // Authentic GTA 1 fall_long / stunned frames (38..41)
@@ -5733,7 +5819,8 @@ class RetroRenderer {
                 frameIdx = this.getPedFrameIndex("FIST", true, true, walkPhase);
             } else {
                 const isRunning = (ped.panicTimer || 0) > 0 || (ped.burnTimer || 0) > 0;
-                const walkPhase = this.time * (isRunning ? 2.4 : 1.5) + ped.animSeed;
+                const stepMult = isChildPed ? 1.35 : 1.0;
+                const walkPhase = this.time * (isRunning ? 2.4 : 1.5) * stepMult + ped.animSeed;
                 frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0, isRunning, walkPhase);
             }
 
@@ -5800,10 +5887,10 @@ class RetroRenderer {
                 this.pushSolidQuad3D(ped.x + skateSwayX + skSin * 3.2, ped.y + skateSwayY - skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
-            this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, pedScale, false, pedDrawOrder, pr, pg, pb);
+            this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, false, pedDrawOrder, pr, pg, pb);
 
-            // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm civilian pedestrians smoke a glowing cigarette ember after dusk!
-            if (nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
+            // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm adult civilian pedestrians smoke a glowing cigarette ember after dusk!
+            if (!isChildPed && nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
                 const cigX = ped.x + Math.cos(ped.angle + 0.55) * 5.6;
                 const cigY = ped.y + Math.sin(ped.angle + 0.55) * 5.6;
                 const dragGlow = 0.65 + 0.35 * Math.max(0, Math.sin(this.time * 2.2 + ped.animSeed * 30));
@@ -6190,10 +6277,17 @@ class RetroRenderer {
                 const occSeats = typeof v.getOccupiedSeats === "function" ? v.getOccupiedSeats(game) : [];
 
                 if (mapInfo.isMotorcycle) {
-                    const bikerTypes = ["gang", "gang", "civ0", "civ1", "civ2", "civ3"];
+                    const isScooter = v.specKey === "E_SCOOTER";
+                    const isBicycle = v.specKey === "BMX_BIKE";
+                    const bikerTypes = (isScooter || isBicycle)
+                        ? ["vc_jogger", "vc_tourist", "bikini_cyan", "g2_civ_pink", "vc_tommy", "kid_skater"]
+                        : ["vc_tommy", "vc_crockett", "vc_hawaiian_red", "g2_civ_aqua", "gang", "civ0"];
+                    const pedalFrame = (isBicycle && Math.abs(v.speed || 0) > 12)
+                        ? (Math.floor(this.time * 7.5 + idHash) % 8)
+                        : (isScooter ? 98 : 84);
                     const riderFrame = (v.doorOpenTimer || 0) > 0
                         ? (80 + Math.min(3, Math.floor((1.0 - v.doorOpenTimer / 0.48) * 4)))
-                        : 84; // Frame 84 = sitting_on_bike in ped_animations.json
+                        : pedalFrame;
 
                     if (occSeats.length > 0) {
                         for (const occ of occSeats) {
@@ -6216,14 +6310,15 @@ class RetroRenderer {
                         }
                     } else {
                         const aiPedType = v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length];
+                        const aiScale = aiPedType.startsWith("kid_") ? (vScale * 0.78) : (vScale * 1.02);
                         this.batchPedSprite3D(
                             aiPedType,
                             riderFrame,
-                            v.x + cosA * 1.5,
-                            v.y + sinA * 1.5,
+                            v.x + cosA * (isScooter ? 0.0 : 1.5),
+                            v.y + sinA * (isScooter ? 0.0 : 1.5),
                             vz + airZ + 0.014,
                             v.angle,
-                            vScale * 1.05,
+                            aiScale,
                             false,
                             riderDrawOrder
                         );

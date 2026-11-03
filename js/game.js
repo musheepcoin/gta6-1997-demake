@@ -510,7 +510,15 @@ class LeonidaGame {
 
             { spec: "SUPERBIKE", c: 218.18, r: 146.2, a: -Math.PI * 0.5, z: 2.0 },
 
+            { spec: "E_SCOOTER", c: 213.82, r: 147.6, a: Math.PI * 0.5, z: 2.0 },
+
+            { spec: "BMX_BIKE", c: 213.82, r: 150.8, a: -Math.PI * 0.5, z: 2.0 },
+
             { spec: "HARLEY_BIKE", c: 218.18, r: 148.8, a: -Math.PI * 0.5, z: 2.0 },
+
+            { spec: "E_SCOOTER", c: 218.18, r: 150.2, a: -Math.PI * 0.5, z: 2.0 },
+
+            { spec: "BMX_BIKE", c: 218.18, r: 153.4, a: -Math.PI * 0.5, z: 2.0 },
 
             { spec: "BANSHEE_GT", c: 218.18, r: 151.8, a: -Math.PI * 0.5, z: 2.0 },
 
@@ -518,7 +526,20 @@ class LeonidaGame {
 
             { spec: "PORKA_TURBO", c: 218.18, r: 158.5, a: -Math.PI * 0.5, z: 2.0 },
 
+            // Lummus Park Boardwalk Parked & Active E-Scooters and Beach Cruiser Bicycles
+            { spec: "E_SCOOTER", c: 450.8, r: 231.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
+            { spec: "BMX_BIKE", c: 450.8, r: 237.5, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "E_SCOOTER", c: 450.8, r: 244.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
+
             // Active moving traffic on Ocean Drive & Collins Ave (never parked stationary in the road!)
+
+            { spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+
+            { spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+
+            { spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+
+            { spec: "BMX_BIKE", c: 214.5, r: 139.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
             { spec: "SUPERBIKE", c: 216.5, r: 148.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
@@ -720,13 +741,25 @@ class LeonidaGame {
 
             { c: 219.5, r: 158.2, a: Math.PI * 0.5, type: "vc_tubbs" },
 
-            // Lummus Park Oceanfront Boardwalk Rollerbladers (c = 451.5 raw512, gliding along the beach promenade!)
+            // Lummus Park Oceanfront Boardwalk Rollerbladers & Kids (c = 451.5 raw512, gliding along the beach promenade!)
             { c: 451.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "vc_jogger",     isRollerblader: true },
+            { c: 451.5, r: 225.2, raw512: true, a: Math.PI * 0.5,  type: "kid_skater",    isRollerblader: true, isChild: true },
             { c: 451.5, r: 228.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   isRollerblader: true },
+            { c: 451.5, r: 231.5, raw512: true, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true },
             { c: 451.5, r: 234.0, raw512: true, a: Math.PI * 0.5,  type: "g2_civ_pink",   isRollerblader: true },
+            { c: 451.5, r: 237.2, raw512: true, a: Math.PI * 0.5,  type: "kid_boy_cap",   isChild: true },
             { c: 451.5, r: 240.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist",    isRollerblader: true },
+            { c: 451.5, r: 243.5, raw512: true, a: -Math.PI * 0.5, type: "kid_beach",     isChild: true },
             { c: 451.5, r: 246.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   isRollerblader: true },
             { c: 451.5, r: 252.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_aqua",   isRollerblader: true },
+
+            // Ocean Drive & Lummus Park Kids / Teenagers with families
+            { c: 213.5, r: 146.2, a: Math.PI * 0.5,  type: "kid_boy_cap",   isChild: true },
+            { c: 213.5, r: 150.1, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true },
+            { c: 219.5, r: 147.2, a: Math.PI * 0.5,  type: "kid_skater",    isRollerblader: true, isChild: true },
+            { c: 220.2, r: 151.0, a: -Math.PI * 0.5, type: "kid_beach",     isChild: true },
+            { c: 222.8, r: 145.8, a: Math.PI * 0.5,  type: "kid_beach",     isChild: true, missionTag: "BEACH" },
+            { c: 223.8, r: 150.8, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true, missionTag: "BEACH" },
 
 
 
@@ -852,6 +885,7 @@ class LeonidaGame {
 
             });
             if (sp.isRollerblader) pedObj.isRollerblader = true;
+            if (sp.isChild || (sp.type && sp.type.startsWith("kid_"))) pedObj.isChild = true;
             this.peds.push(pedObj);
 
         });
@@ -877,6 +911,10 @@ class LeonidaGame {
                 "HARLEY_BIKE",
 
                 "SUPERBIKE",
+
+                "E_SCOOTER",
+
+                "BMX_BIKE",
 
                 "VICE_CAB",
 

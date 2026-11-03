@@ -45,6 +45,46 @@ const VEHICLE_SPECS = {
         isConvertible: true,
         amphibious: false
     },
+    E_SCOOTER: {
+        name: "MIAMI NEON E-SCOOTER",
+        sprId: "veh_escooter",
+        w: 30,
+        h: 14,
+        maxSpeed: 285,
+        accel: 360,
+        turnSpeed: 5.25,
+        grip: 0.96,
+        driftGrip: 0.98,
+        maxHp: 110,
+        color: "#39ff14",
+        secondaryColor: "#0f172a",
+        stripeColor: "#00f0ff",
+        bodyStyle: "MOTORCYCLE",
+        isMotorcycle: true,
+        isConvertible: true,
+        useBaseOnly: true,
+        amphibious: false
+    },
+    BMX_BIKE: {
+        name: "SOUTH BEACH CRUISER BIKE",
+        sprId: "veh_bicycle",
+        w: 34,
+        h: 14,
+        maxSpeed: 265,
+        accel: 335,
+        turnSpeed: 4.95,
+        grip: 0.95,
+        driftGrip: 0.975,
+        maxHp: 115,
+        color: "#00f0ff",
+        secondaryColor: "#ff2a85",
+        stripeColor: "#fef08a",
+        bodyStyle: "MOTORCYCLE",
+        isMotorcycle: true,
+        isConvertible: true,
+        useBaseOnly: true,
+        amphibious: false
+    },
 
     // --- 2. HERO CONVERTIBLES, MUSCLE CARS & CLASSICS ---
     TULIP_MUSCLE: {
