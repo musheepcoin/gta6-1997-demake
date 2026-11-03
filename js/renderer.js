@@ -7154,6 +7154,24 @@ class RetroRenderer {
             }
         }
 
+        // 2B-2. Illuminated 3D eCola & Sprunk Sidewalk Vending Machine Neon Glow
+        if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.sodaMachines)) {
+            for (const sm of this.map.objectEngine.sodaMachines) {
+                if (Math.abs(sm.x - this.camX) > 840 || Math.abs(sm.y - this.camY) > 620) continue;
+                const sc = this.worldToScreen(sm.x, sm.y, (sm.z || 2.0) + 0.22);
+                if (sc.x < -100 || sc.x > W + 100 || sc.y < -100 || sc.y > H + 100) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                const isSprunk = sm.brand === "SPRUNK";
+                addLightPool(
+                    sc.x,
+                    sc.y,
+                    36 * pxScale,
+                    isSprunk ? "rgba(65, 255, 125, 0.64)" : "rgba(255, 65, 85, 0.64)",
+                    isSprunk ? "rgba(15, 175, 65, 0.22)" : "rgba(185, 20, 40, 0.22)"
+                );
+            }
+        }
+
         // 2C. GTA 2 Junction Traffic Lights: subtle local lens visibility in night darkness (NO streetlamp star flare or giant pool!)
         if (this.map && Array.isArray(this.map.trafficSignals)) {
             const ph = ((game ? game.trafficLightTimer : this.time) || 0) % 12.0;

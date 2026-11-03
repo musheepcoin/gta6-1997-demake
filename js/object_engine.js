@@ -357,16 +357,16 @@ class WorldObjectEngine {
             ]
         };
         // 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines + Ad Kiosks
-        // (Placed on open PAWEMENT sidewalks, clear of lid=69 planters, palm trees & café parasols)
+        // (Placed flush against building facades on verified PAWEMENT sidewalks — never on roads or intersections!)
         this.sodaMachines = [
-            { x: 443.35 * TILE_SIZE, y: 291.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 443.35 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 443.35 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 352.0 * TILE_SIZE,  y: 176.2 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 282.5 * TILE_SIZE,  y: 246.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 224.5 * TILE_SIZE,  y: 112.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 115.5 * TILE_SIZE,  y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 64.5 * TILE_SIZE,   y: 186.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
+            { x: 443.18 * TILE_SIZE, y: 291.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 443.18 * TILE_SIZE, y: 251.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 443.18 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 352.5 * TILE_SIZE,  y: 175.18 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 282.18 * TILE_SIZE, y: 246.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 224.5 * TILE_SIZE,  y: 112.18 * TILE_SIZE, z: 2.0, ang: 0,            brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 115.5 * TILE_SIZE,  y: 293.18 * TILE_SIZE, z: 2.0, ang: 0,            brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 64.18 * TILE_SIZE,  y: 186.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
         ];
         this.rocketLaunch = {
             state: "IDLE", // IDLE | COUNTDOWN | LIFTOFF | COOLDOWN
@@ -896,8 +896,56 @@ class WorldObjectEngine {
                 clearZones.push({ x: gw.x, y: gw.y, r: 56 });
             }
         }
-        if (Array.isArray(this.sodaMachines)) {
+        if (Array.isArray(this.sodaMachines) && map.surfaceGround) {
+            const isBldTile = (tc, tr) => {
+                if (tc < 1 || tc >= M - 1 || tr < 1 || tr >= MAP_ROWS - 1) return false;
+                if (map.surfaceGround[tr * M + tc] === GROUND_TYPE.BUILDING) return true;
+                if (map.voxelGrid && map.voxelGrid[(2 * MAP_ROWS + tr) * M + tc] > 0) return true;
+                return false;
+            };
             for (const sm of this.sodaMachines) {
+                const c0 = Math.floor(sm.x / TILE_SIZE);
+                const r0 = Math.floor(sm.y / TILE_SIZE);
+                let placed = false;
+                for (let rad = 0; rad <= 18 && !placed; rad++) {
+                    for (let dr = -rad; dr <= rad && !placed; dr++) {
+                        for (let dc = -rad; dc <= rad && !placed; dc++) {
+                            const nc = c0 + dc;
+                            const nr = r0 + dr;
+                            if (nc < 4 || nc >= M - 4 || nr < 4 || nr >= MAP_ROWS - 4) continue;
+                            if (map.surfaceGround[nr * M + nc] !== GROUND_TYPE.PAWEMENT) continue;
+                            const blk1 = map.getBlockInfo ? map.getBlockInfo(nc, nr, 1) : null;
+                            if (blk1 && blk1.lid === 69) continue;
+                            const cxPx = (nc + 0.5) * TILE_SIZE;
+                            const cyPx = (nr + 0.5) * TILE_SIZE;
+                            if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - cxPx, it.doorY - cyPx) < 48)) {
+                                continue;
+                            }
+                            // Snap flush against an adjacent solid 3D building wall so it NEVER sits in a road or middle of sidewalk!
+                            if (isBldTile(nc - 1, nr)) {
+                                sm.x = (nc + 0.17) * TILE_SIZE;
+                                sm.y = (nr + 0.50) * TILE_SIZE;
+                                sm.ang = -Math.PI * 0.5; // Front faces East (+X) onto sidewalk
+                                placed = true;
+                            } else if (isBldTile(nc + 1, nr)) {
+                                sm.x = (nc + 0.83) * TILE_SIZE;
+                                sm.y = (nr + 0.50) * TILE_SIZE;
+                                sm.ang = Math.PI * 0.5;  // Front faces West (-X) onto sidewalk
+                                placed = true;
+                            } else if (isBldTile(nc, nr - 1)) {
+                                sm.x = (nc + 0.50) * TILE_SIZE;
+                                sm.y = (nr + 0.17) * TILE_SIZE;
+                                sm.ang = 0;              // Front faces South (+Y) onto sidewalk
+                                placed = true;
+                            } else if (isBldTile(nc, nr + 1)) {
+                                sm.x = (nc + 0.50) * TILE_SIZE;
+                                sm.y = (nr + 0.83) * TILE_SIZE;
+                                sm.ang = Math.PI;        // Front faces North (-Y) onto sidewalk
+                                placed = true;
+                            }
+                        }
+                    }
+                }
                 clearZones.push({ x: sm.x, y: sm.y, r: 58 });
             }
         }
@@ -4650,23 +4698,71 @@ class WorldObjectEngine {
             }
         }
 
-        // 14. 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines + Ad Kiosks
+        // 14. 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines (Backed against Building Facades!)
         if (Array.isArray(this.sodaMachines)) {
             for (const sm of this.sodaMachines) {
                 const bz = sm.z || 2.0;
                 const sCos = Math.cos(sm.ang || 0);
                 const sSin = Math.sin(sm.ang || 0);
                 const isSprunk = sm.brand === "SPRUNK";
-                const bodyCol = isSprunk ? [0.12, 0.78, 0.32] : [0.86, 0.14, 0.18];
-                const glowCol = isSprunk ? [0.32, 0.98, 0.48] : [0.98, 0.28, 0.32];
+                const bodyCol = isSprunk ? [0.06, 0.78, 0.30] : [0.88, 0.12, 0.16];
+                const darkBodyCol = isSprunk ? [0.04, 0.48, 0.18] : [0.56, 0.06, 0.10];
+                const glowCol = isSprunk ? [0.32, 1.00, 0.48] : [1.00, 0.30, 0.36];
+                const accentCol = isSprunk ? [0.96, 0.98, 0.28] : [0.98, 0.96, 0.96];
 
-                emitAOShadow3D(sm.x, sm.y, sCos, sSin, 0, 0, 22, 18, bz, 0.34);
-                // Concrete Plinth & Enamel Vending Cabinet Body
-                emitTileBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 16, 12, bz, bz + 0.05, 177, 177, 71, [0.86, 0.88, 0.92]);
-                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 14, 10, bz + 0.05, bz + 0.29, bodyCol, 5);
-                // Illuminated Front/Back Branded Graphic Panel (ad_ecola / ad_sprunk) + Neon Top Canopy
-                emitBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 12.5, 10.6, bz + 0.08, bz + 0.26, sm.ad, sm.ad, glowCol);
-                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 15, 11, bz + 0.29, bz + 0.32, glowCol, 1);
+                emitAOShadow3D(sm.x, sm.y, sCos, sSin, 0, 1.0, 24, 16, bz, 0.40);
+
+                // 1. Dark Rubber Leveling Base & Brushed Chrome Lower Trim (MAT 9 = Glossy Lacquer/Chrome)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 21, 13, bz, bz + 0.04, [0.14, 0.18, 0.24], 9);
+
+                // 2. Main Glossy Enameled Vending Cabinet Chassis (20x12, height bz+0.04..0.44, MAT 9)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 20, 12, bz + 0.04, bz + 0.44, bodyCol, 9);
+
+                // 3. Brushed Silver-Chrome Left & Right Corner Pillars (offX = -9.4 & +9.4)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, -9.4, 0.4, 1.8, 12.4, bz + 0.04, bz + 0.44, [0.86, 0.90, 0.96], 9);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin,  9.4, 0.4, 1.8, 12.4, bz + 0.04, bz + 0.44, [0.86, 0.90, 0.96], 9);
+
+                // 4. Illuminated Front Branded Graphic Display & Backlit Can Shelves (offX = -2.2, offY = +5.6)
+                emitBox3D(sm.x, sm.y, sCos, sSin, -2.2, 0.3, 13.5, 12.2, bz + 0.14, bz + 0.41, sm.ad, sm.ad, darkBodyCol);
+                // Glowing backlit glass window frame (MAT 10 = Pure Emissive LED/Neon)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, -2.2, 5.9, 12.2, 1.0, bz + 0.16, bz + 0.34, glowCol, 10);
+                // 3 Horizontal Rows of Mini 3D Soda Cans inside the illuminated showcase
+                const canCols = [
+                    [0.12, 0.92, 0.38],
+                    [0.96, 0.22, 0.26],
+                    [0.98, 0.86, 0.18],
+                    [0.22, 0.78, 0.98]
+                ];
+                for (let row = 0; row < 3; row++) {
+                    const cyElev = bz + 0.175 + row * 0.055;
+                    // White shelf bar
+                    emitSolidBox3D(sm.x, sm.y, sCos, sSin, -2.2, 6.2, 11.4, 0.8, cyElev - 0.008, cyElev, [0.92, 0.95, 0.98], 9);
+                    for (let ci = 0; ci < 4; ci++) {
+                        const cxOff = -6.4 + ci * 2.8;
+                        const cCol = canCols[(row + ci) % canCols.length];
+                        emitSolidBox3D(sm.x, sm.y, sCos, sSin, cxOff, 6.25, 2.0, 0.9, cyElev, cyElev + 0.038, cCol, 10);
+                    }
+                }
+
+                // 5. Right-Side Chrome Coin/Bill Validator Column & Illuminated Selection Buttons (offX = +6.6, offY = +5.9)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 6.6, 5.9, 3.4, 1.1, bz + 0.14, bz + 0.40, [0.20, 0.24, 0.32], 9);
+                // Glowing digital credit LED & selection buttons
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 6.6, 6.3, 2.2, 0.8, bz + 0.34, bz + 0.37, [0.25, 1.00, 0.48], 10);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 6.6, 6.3, 1.8, 0.8, bz + 0.22, bz + 0.31, accentCol, 10);
+
+                // 6. Recessed Dark Bottom Can-Delivery Push Flap ("PUSH", offX = -2.2, offY = +5.9, bz + 0.05..0.12)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, -2.2, 5.9, 12.0, 1.2, bz + 0.05, bz + 0.12, [0.08, 0.10, 0.15], 9);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, -2.2, 6.3, 10.0, 0.8, bz + 0.10, bz + 0.118, [0.82, 0.88, 0.94], 9);
+
+                // 7. Top Roof Bezel, Rear Cooling Vents & Glowing Front Neon Marquee Crown (clearly visible from top-down camera!)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 0, 21.2, 13.2, bz + 0.44, bz + 0.465, [0.20, 0.24, 0.32], 9);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, -0.5, 18.6, 10.2, bz + 0.465, bz + 0.48, darkBodyCol, 9);
+                // Rear dark compressor louver vents on roof
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, -4.5, -3.2, 6.5, 3.0, bz + 0.48, bz + 0.49, [0.10, 0.13, 0.18], 9);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin,  4.5, -3.2, 6.5, 3.0, bz + 0.48, bz + 0.49, [0.10, 0.13, 0.18], 9);
+                // Glowing Front Neon Marquee Sign Bar along the front roof edge (MAT 10)
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 4.2, 18.8, 3.6, bz + 0.465, bz + 0.50, glowCol, 10);
+                emitSolidBox3D(sm.x, sm.y, sCos, sSin, 0, 4.4, 13.0, 1.8, bz + 0.50, bz + 0.51, accentCol, 10);
             }
         }
 
