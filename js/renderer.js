@@ -2050,14 +2050,35 @@ class RetroRenderer {
                 meta.sprites.objects["sawgrass_clump"] = meta.sprites.objects["sawgrass_clump"] || [638, 3470, 42, 42];
 
                 // =========================================================================
-                // 6L. GTA 6 LEONIDA 3D PRE-RENDERED RESIDENTIAL ESTATES & WATERFRONT MANSIONS
-                // Raytraced 3ds Max baked architectural models (y = 3474 in gta1_sprites.png)
+                // 6L. GTA 6 LEONIDA 3D MULTI-STORY RESIDENTIAL ESTATES & 3D FACADE WALLS
+                // Raytraced 3ds Max full-bleed roofs & 1:1 scale 3D vertical walls (y = 3580..4070 in gta1_sprites.png)
                 // =========================================================================
-                meta.sprites.objects["mansion_star_island"] = meta.sprites.objects["mansion_star_island"] || [10, 3580, 340, 240];
-                meta.sprites.objects["mansion_modern_luxury"] = meta.sprites.objects["mansion_modern_luxury"] || [366, 3580, 280, 200];
-                meta.sprites.objects["house_canal_villa"] = meta.sprites.objects["house_canal_villa"] || [662, 3580, 250, 180];
-                meta.sprites.objects["house_florida_bungalow"] = meta.sprites.objects["house_florida_bungalow"] || [928, 3580, 200, 160];
-                meta.sprites.objects["house_keys_stilt"] = meta.sprites.objects["house_keys_stilt"] || [1144, 3580, 200, 170];
+                meta.sprites.objects["mansion_star_island"]       = [10,   3580, 300, 184];
+                meta.sprites.objects["mansion_modern_luxury"]     = [326,  3580, 256, 168];
+                meta.sprites.objects["house_canal_villa"]         = [598,  3580, 240, 160];
+                meta.sprites.objects["house_florida_bungalow"]    = [854,  3580, 212, 148];
+                meta.sprites.objects["house_keys_stilt"]          = [1082, 3580, 204, 152];
+
+                meta.sprites.objects["mansion_star_island_top"]    = [10,  3780, 176, 118];
+                meta.sprites.objects["mansion_modern_luxury_top"]  = [202, 3780, 152, 104];
+                meta.sprites.objects["house_canal_villa_top"]      = [370, 3780, 132, 92];
+                meta.sprites.objects["house_florida_bungalow_top"] = [518, 3780, 124, 80];
+                meta.sprites.objects["house_keys_stilt_top"]       = [658, 3780, 112, 80];
+
+                meta.sprites.objects["wall_star_front"]           = [10,   3915, 280, 64];
+                meta.sprites.objects["wall_star_upper"]           = [300,  3915, 164, 56];
+                meta.sprites.objects["wall_modern_front"]         = [474,  3915, 240, 64];
+                meta.sprites.objects["wall_modern_upper"]         = [724,  3915, 140, 56];
+                meta.sprites.objects["wall_canal_front"]          = [874,  3915, 224, 60];
+                meta.sprites.objects["wall_bungalow_front"]       = [1108, 3915, 198, 56];
+                meta.sprites.objects["wall_keys_front"]           = [1316, 3915, 188, 72];
+
+                meta.sprites.objects["wall_star_side"]            = [10,   3995, 168, 64];
+                meta.sprites.objects["wall_modern_side"]          = [190,  3995, 152, 64];
+                meta.sprites.objects["wall_canal_side"]           = [354,  3995, 148, 60];
+                meta.sprites.objects["wall_canal_upper"]          = [514,  3995, 120, 52];
+                meta.sprites.objects["wall_bungalow_side"]        = [646,  3995, 136, 56];
+                meta.sprites.objects["wall_keys_side"]            = [794,  3995, 140, 72];
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
@@ -2360,7 +2381,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_56", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_57", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2375,7 +2396,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_56", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_57", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -4989,12 +5010,17 @@ class RetroRenderer {
         }
 
         // =========================================================================
-        // 16B) GTA 6 LEONIDA 3D PRE-RENDERED RESIDENTIAL ESTATES & WATERFRONT MANSIONS
-        // ("mansion_star_island", "mansion_modern_luxury", "house_canal_villa", "house_florida_bungalow", "house_keys_stilt")
+        // 16B) GTA 6 LEONIDA TRUE 3D MULTI-STORY RESIDENTIAL ESTATES & WATERFRONT MANSIONS
+        // True 3D vertical architectural facades (pushWallSprite3D) + multi-tier 3D roofs +
+        // 1:1 full-scale game vehicles, pools, loungers & sunbathers!
         // =========================================================================
         const resHouses = this.map.residentialHouses;
-        if (Array.isArray(resHouses) && resHouses.length > 0) {
-            const vehSpritesList = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.vehicles;
+        if (Array.isArray(resHouses) && resHouses.length > 0 && this.gta1Meta && this.gta1Meta.sprites) {
+            const objSprites = this.gta1Meta.sprites.objects;
+            const vehSpritesList = this.gta1Meta.sprites.vehicles;
+            const texW = this.spritesTexW || this.gta1SpritesImg.width || 2048;
+            const texH = this.spritesTexH || this.gta1SpritesImg.height || 4096;
+
             const getHouseCarRect = (idxOrSpr, remapIdx = 0) => {
                 if (!vehSpritesList) return null;
                 const ve = (this.vehicleBySprIdx && this.vehicleBySprIdx[String(idxOrSpr)]) || vehSpritesList[Number(idxOrSpr)] || vehSpritesList[0];
@@ -5006,52 +5032,154 @@ class RetroRenderer {
                 return ve.base || null;
             };
 
+            const emit3DWallBox = (frontKey, sideKey, cx, cy, zBot, zTop, wPx, dPx, ang) => {
+                const fRect = objSprites[frontKey];
+                const sRect = objSprites[sideKey || frontKey];
+                if (!fRect || !sRect) return;
+                const cs = Math.cos(ang);
+                const sn = Math.sin(ang);
+                const hw = wPx * 0.5;
+                const hd = dPx * 0.5;
+                const zMid = (zBot + zTop) * 0.5;
+                const halfZ = (zTop - zBot) * 0.5;
+                const walls = [
+                    { lx: 0,   ly: hd,  nx: -sn, ny: cs,  w: wPx, a: ang,                rect: fRect, sh: 1.00 },
+                    { lx: 0,   ly: -hd, nx: sn,  ny: -cs, w: wPx, a: ang + Math.PI,      rect: sRect, sh: 0.78 },
+                    { lx: hw,  ly: 0,   nx: cs,  ny: sn,  w: dPx, a: ang - Math.PI * 0.5, rect: sRect, sh: 0.86 },
+                    { lx: -hw, ly: 0,   nx: -cs, ny: -sn, w: dPx, a: ang + Math.PI * 0.5, rect: sRect, sh: 0.94 }
+                ];
+                for (let wIdx = 0; wIdx < 4; wIdx++) {
+                    const wl = walls[wIdx];
+                    const wx = cx + wl.lx * cs - wl.ly * sn;
+                    const wy = cy + wl.lx * sn + wl.ly * cs;
+                    if ((this.camX - wx) * wl.nx + (this.camY - wy) * wl.ny > -12.0) {
+                        const [sx, sy, sw, sh] = wl.rect;
+                        const u0 = (sx + 0.5) / texW;
+                        const v0 = (sy + 0.5) / texH;
+                        const u1 = (sx + sw - 0.5) / texW;
+                        const v1 = (sy + sh - 0.5) / texH;
+                        this.pushSpriteQuad3D(wx, wy, zMid, wl.w, 0.35, wl.a, u0, v0, u1, v1, wl.sh, wl.sh, wl.sh, 1.0, SPRITE_DRAW_ORDER.TREES, -halfZ);
+                    }
+                }
+            };
+
+            const HOUSE_SPECS = {
+                mansion_star_island: {
+                    w1: 286, d1: 170, h1: 0.64,
+                    w2: 164, d2: 106, h2: 0.50,
+                    front1: "wall_star_front", side1: "wall_star_side",
+                    upper: "wall_star_upper", topRoof: "mansion_star_island_top"
+                },
+                mansion_modern_luxury: {
+                    w1: 242, d1: 154, h1: 0.62,
+                    w2: 140, d2: 92,  h2: 0.48,
+                    front1: "wall_modern_front", side1: "wall_modern_side",
+                    upper: "wall_modern_upper", topRoof: "mansion_modern_luxury_top"
+                },
+                house_canal_villa: {
+                    w1: 226, d1: 146, h1: 0.58,
+                    w2: 120, d2: 82,  h2: 0.44,
+                    front1: "wall_canal_front", side1: "wall_canal_side",
+                    upper: "wall_canal_upper", topRoof: "house_canal_villa_top"
+                },
+                house_florida_bungalow: {
+                    w1: 198, d1: 136, h1: 0.54,
+                    w2: 0,   d2: 0,   h2: 0,
+                    front1: "wall_bungalow_front", side1: "wall_bungalow_side",
+                    topRoof: "house_florida_bungalow_top"
+                },
+                house_keys_stilt: {
+                    w1: 188, d1: 138, h1: 0.68,
+                    w2: 0,   d2: 0,   h2: 0,
+                    front1: "wall_keys_front", side1: "wall_keys_side",
+                    topRoof: "house_keys_stilt_top"
+                }
+            };
+
             for (let i = 0; i < resHouses.length; i++) {
                 const h = resHouses[i];
-                if (h.x < minX - 250 || h.x > maxX + 250 || h.y < minY - 250 || h.y > maxY + 250) continue;
+                if (h.x < minX - 320 || h.x > maxX + 320 || h.y < minY - 320 || h.y > maxY + 320) continue;
                 const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
                     ? this.map.getHeightAtPixel(h.x, h.y, 4.0)
                     : (h.z || 2.0);
                 const sc = h.scale || 1.0;
                 const cosA = Math.cos(h.ang);
                 const sinA = Math.sin(h.ang);
+                const spec = HOUSE_SPECS[h.kind] || HOUSE_SPECS.house_canal_villa;
 
-                // 1. Ambient Contact Occlusion & Directional Sun Silhouette Shadow
-                this.batchObjectSprite3D(h.kind, h.x + sunCos * 7, h.y + sunSin * 7, bz + 0.015, h.ang, sc * 1.04, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
+                // 1. Directional Solar Cast Shadow at Ground Level
+                this.batchObjectSprite3D(h.kind, h.x + sunCos * 12, h.y + sunSin * 12, bz + 0.015, h.ang, sc * 1.03, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.38);
 
-                // 2. Main 3D Pre-Rendered Architectural Structure (High Draw Order above pedestrians/ground)
-                this.batchObjectSprite3D(h.kind, h.x, h.y, bz + 0.165, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
+                // 2. 1st-Floor True 3D Vertical Facade Walls + Overhanging 1st-Floor Roof & Stepped Hip Ridge
+                const z1 = bz + spec.h1 * sc;
+                emit3DWallBox(spec.front1, spec.side1, h.x, h.y, bz, z1, spec.w1 * sc, spec.d1 * sc, h.ang);
+                this.batchObjectSprite3D(h.kind, h.x, h.y, z1, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
+                this.batchObjectSprite3D(h.kind, h.x, h.y, z1 + 0.06 * sc, h.ang, sc * 0.86, SPRITE_DRAW_ORDER.TREES);
 
-                // 3. Driveway Parked Vehicle (Luxury sports cars, convertibles, sedans, pickups)
-                if (h.drivewayCar) {
-                    const dc = h.drivewayCar;
+                // 3. 2nd-Floor True 3D Tower / Penthouse Walls + Overhanging 2nd-Floor Roof (or Raised Clerestory Cupola)
+                if (spec.w2 > 0 && spec.upper && spec.topRoof) {
+                    const z2 = z1 + spec.h2 * sc;
+                    emit3DWallBox(spec.upper, spec.upper, h.x, h.y, z1 + 0.06 * sc, z2, spec.w2 * sc, spec.d2 * sc, h.ang);
+                    this.batchObjectSprite3D(spec.topRoof, h.x, h.y, z2, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
+                    this.batchObjectSprite3D(spec.topRoof, h.x, h.y, z2 + 0.06 * sc, h.ang, sc * 0.80, SPRITE_DRAW_ORDER.TREES);
+                } else if (spec.topRoof) {
+                    this.batchObjectSprite3D(spec.topRoof, h.x, h.y, z1 + 0.12 * sc, h.ang, sc, SPRITE_DRAW_ORDER.TREES);
+                }
+
+                // 4. Private Swimming Pool & 1:1 Pedestrian-Scale Sun Loungers, Bikini Sunbathers & Parasol
+                if (h.pool) {
+                    const pl = h.pool;
+                    const px = h.x + cosA * pl.dx - sinA * pl.dy;
+                    const py = h.y + sinA * pl.dx + cosA * pl.dy;
+                    const pAng = h.ang + (pl.ang || 0);
+                    const pSc = pl.scale || 0.90;
+                    const csP = Math.cos(pAng);
+                    const snP = Math.sin(pAng);
+                    this.batchObjectSprite3D("vercetti_pool", px, py, bz + 0.018, pAng, pSc, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // 2 Full-scale poolside sun loungers + sunbathers + umbrella
+                    for (let li = -1; li <= 1; li += 2) {
+                        const lx = px + csP * (-58 * pSc) - snP * (li * 18 * pSc);
+                        const ly = py + snP * (-58 * pSc) + csP * (li * 18 * pSc);
+                        this.batchObjectSprite3D("beach_lounger", lx, ly, bz + 0.024, pAng, 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.batchPedSprite3D(li < 0 ? "bikini_pink" : "bikini_cyan", 42, lx, ly, bz + 0.032, pAng, 1.24, false, SPRITE_DRAW_ORDER.CORPSE);
+                    }
+                    const ux = px + csP * (-58 * pSc);
+                    const uy = py + snP * (-58 * pSc);
+                    this.batchObjectSprite3D("beach_umbrella_pink", ux + sunCos * 4, uy + sunSin * 4, bz + 0.020, 0, 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
+                    this.batchObjectSprite3D("beach_umbrella_pink", ux, uy, bz + 0.14, this.time * 0.2 + i, 1.05, SPRITE_DRAW_ORDER.TREES);
+                }
+
+                // 5. Real Full-Scale Driveway Parked Vehicles (100% 1:1 scale = 58x28 px, matching road cars!)
+                const cars = Array.isArray(h.drivewayCars) ? h.drivewayCars : (h.drivewayCar ? [h.drivewayCar] : []);
+                for (let ci = 0; ci < cars.length; ci++) {
+                    const dc = cars[ci];
                     const carX = h.x + cosA * dc.dx - sinA * dc.dy;
                     const carY = h.y + sinA * dc.dx + cosA * dc.dy;
                     const carAng = h.ang + (dc.ang || 0);
-                    const vRect = getHouseCarRect(dc.sprIdx, i);
+                    const vRect = getHouseCarRect(dc.sprIdx, i + ci * 2);
                     if (vRect) {
-                        this.pushSolidQuad3D(carX + sunCos * 3, carY + sunSin * 3, bz + 0.018, 32, 16, carAng, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.048, carAng - Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                        this.pushAtlasSprite3D(vRect, carX + sunCos * 4.2, carY + sunSin * 4.2, bz + 0.018, carAng - Math.PI * 0.5, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.35);
+                        this.pushAtlasSprite3D(vRect, carX, carY, bz + 0.052, carAng - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
                     }
                 }
 
-                // 4. Private Waterfront Canal / Jetty Moored Watercraft (Speedboats, WaveRunners)
+                // 6. Private Waterfront Canal / Jetty Moored Watercraft (Speedboats, WaveRunners)
                 if (h.dockBoat) {
                     const db = h.dockBoat;
                     const boatX = h.x + cosA * db.dx - sinA * db.dy;
                     const boatY = h.y + sinA * db.dx + cosA * db.dy;
                     const boatAng = h.ang + (db.ang || 0);
                     const bob = Math.sin(this.time * 2.2 + i * 1.3) * 0.008;
-                    this.batchObjectSprite3D(db.spr, boatX + sunCos * 3, boatY + sunSin * 3, bz + 0.015, boatAng, 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.28);
-                    this.batchObjectSprite3D(db.spr, boatX, boatY, bz + 0.045 + bob, boatAng, 1.0, SPRITE_DRAW_ORDER.CAR);
+                    this.batchObjectSprite3D(db.spr, boatX + sunCos * 3.5, boatY + sunSin * 3.5, 2.015, boatAng, 1.12, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.28);
+                    this.batchObjectSprite3D(db.spr, boatX, boatY, 2.045 + bob, boatAng, 1.12, SPRITE_DRAW_ORDER.CAR);
                 }
 
-                // 5. Night Mode Cozy Golden Window Glow
+                // 7. Night Mode Warm Interior Window Glow
                 if (this.nightFactor > 0.15) {
                     const nightGlow = Math.min(1.0, (this.nightFactor - 0.15) / 0.70);
                     const flicker = 0.94 + Math.sin(this.time * 3.5 + i * 2.1) * 0.06;
                     const winPulse = nightGlow * flicker;
-                    this.pushSolidQuad3D(h.x, h.y, bz + 0.18, 22 * sc, 16 * sc, h.ang, 0.98, 0.75, 0.28, 0.42 * winPulse, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    this.pushSolidQuad3D(h.x, h.y + sinA * 20, bz + 0.22, 48 * sc, 24 * sc, h.ang, 0.98, 0.76, 0.30, 0.45 * winPulse, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                 }
             }
         }

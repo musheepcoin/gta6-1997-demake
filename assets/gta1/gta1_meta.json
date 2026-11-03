@@ -23542,32 +23542,140 @@
       "mansion_star_island": [
         10,
         3580,
-        340,
-        240
+        300,
+        184
       ],
       "mansion_modern_luxury": [
-        366,
+        326,
         3580,
-        280,
-        200
+        256,
+        168
       ],
       "house_canal_villa": [
-        662,
+        598,
         3580,
-        250,
-        180
-      ],
-      "house_florida_bungalow": [
-        928,
-        3580,
-        200,
+        240,
         160
       ],
-      "house_keys_stilt": [
-        1144,
+      "house_florida_bungalow": [
+        854,
         3580,
-        200,
-        170
+        212,
+        148
+      ],
+      "house_keys_stilt": [
+        1082,
+        3580,
+        204,
+        152
+      ],
+      "mansion_star_island_top": [
+        10,
+        3780,
+        176,
+        118
+      ],
+      "mansion_modern_luxury_top": [
+        202,
+        3780,
+        152,
+        104
+      ],
+      "house_canal_villa_top": [
+        370,
+        3780,
+        132,
+        92
+      ],
+      "house_florida_bungalow_top": [
+        518,
+        3780,
+        124,
+        80
+      ],
+      "house_keys_stilt_top": [
+        658,
+        3780,
+        112,
+        80
+      ],
+      "wall_star_front": [
+        10,
+        3915,
+        280,
+        64
+      ],
+      "wall_star_upper": [
+        300,
+        3915,
+        164,
+        56
+      ],
+      "wall_modern_front": [
+        474,
+        3915,
+        240,
+        64
+      ],
+      "wall_modern_upper": [
+        724,
+        3915,
+        140,
+        56
+      ],
+      "wall_canal_front": [
+        874,
+        3915,
+        224,
+        60
+      ],
+      "wall_bungalow_front": [
+        1108,
+        3915,
+        198,
+        56
+      ],
+      "wall_keys_front": [
+        1316,
+        3915,
+        188,
+        72
+      ],
+      "wall_star_side": [
+        10,
+        3995,
+        168,
+        64
+      ],
+      "wall_modern_side": [
+        190,
+        3995,
+        152,
+        64
+      ],
+      "wall_canal_side": [
+        354,
+        3995,
+        148,
+        60
+      ],
+      "wall_canal_upper": [
+        514,
+        3995,
+        120,
+        52
+      ],
+      "wall_bungalow_side": [
+        646,
+        3995,
+        136,
+        56
+      ],
+      "wall_keys_side": [
+        794,
+        3995,
+        140,
+        72
       ]
     },
     "fonts": {
