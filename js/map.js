@@ -2402,8 +2402,44 @@ class LeonidaMap {
                         if (dx * dx + dy * dy < 42 * 42) return false;
                     }
                 }
+                if (this.interiors) {
+                    for (let i = 0; i < this.interiors.length; i++) {
+                        const intr = this.interiors[i];
+                        const dx = pm.x - intr.doorX, dy = pm.y - intr.doorY;
+                        if (dx * dx + dy * dy < 48 * 48) return false;
+                    }
+                }
+                const payphoneSpots = [
+                    [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
+                    [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
+                    [448.5 * TILE_SIZE, 293.5 * TILE_SIZE],
+                    [448.5 * TILE_SIZE, 292.5 * TILE_SIZE],
+                    [344.5 * TILE_SIZE, 171.5 * TILE_SIZE],
+                    [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
+                ];
+                for (let i = 0; i < payphoneSpots.length; i++) {
+                    const dx = pm.x - payphoneSpots[i][0], dy = pm.y - payphoneSpots[i][1];
+                    if (dx * dx + dy * dy < 58 * 58) return false;
+                }
                 return true;
             });
+
+            if (Array.isArray(this.trees) && this.trees.length > 0) {
+                const payphoneSpots = [
+                    [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
+                    [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
+                    [448.5 * TILE_SIZE, 293.5 * TILE_SIZE],
+                    [448.5 * TILE_SIZE, 292.5 * TILE_SIZE],
+                    [344.5 * TILE_SIZE, 171.5 * TILE_SIZE],
+                    [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
+                ];
+                this.trees = this.trees.filter(tr => {
+                    for (let i = 0; i < payphoneSpots.length; i++) {
+                        if (Math.hypot(tr.x - payphoneSpots[i][0], tr.y - payphoneSpots[i][1]) < 58) return false;
+                    }
+                    return true;
+                });
+            }
 
             // Rebuild O(1) Spatial Hash Grid for Leonida Flora & Tree Trunks
             this.floraGrid = new Map();

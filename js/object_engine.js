@@ -346,15 +346,16 @@ class WorldObjectEngine {
             ]
         };
         // 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines + Ad Kiosks
+        // (Placed on open PAWEMENT sidewalks, clear of lid=69 planters, palm trees & café parasols)
         this.sodaMachines = [
-            { x: 442.5 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 442.5 * TILE_SIZE, y: 256.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 443.4 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 352.0 * TILE_SIZE, y: 176.2 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 282.5 * TILE_SIZE, y: 246.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 224.5 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
-            { x: 115.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 64.5 * TILE_SIZE,  y: 186.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
+            { x: 443.35 * TILE_SIZE, y: 291.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 443.35 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 443.35 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 352.0 * TILE_SIZE,  y: 176.2 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 282.5 * TILE_SIZE,  y: 246.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 224.5 * TILE_SIZE,  y: 112.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "SPRUNK", ad: "ad_sprunk" },
+            { x: 115.5 * TILE_SIZE,  y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             brand: "eCOLA",  ad: "ad_ecola"  },
+            { x: 64.5 * TILE_SIZE,   y: 186.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
         ];
         this.rocketLaunch = {
             state: "IDLE", // IDLE | COUNTDOWN | LIFTOFF | COOLDOWN
@@ -693,6 +694,31 @@ class WorldObjectEngine {
                     clearZones.push({ x: gc.x, y: gc.y, r: 110 });
                 }
             }
+            if (Array.isArray(this.landmarks3D.gtaBillboards)) {
+                for (const bb of this.landmarks3D.gtaBillboards) {
+                    clearZones.push({ x: bb.x, y: bb.y, r: 58 });
+                }
+            }
+            if (Array.isArray(this.landmarks3D.speedTraps)) {
+                for (const st of this.landmarks3D.speedTraps) {
+                    clearZones.push({ x: st.x, y: st.y, r: 52 });
+                }
+            }
+        }
+        if (Array.isArray(this.sodaMachines)) {
+            for (const sm of this.sodaMachines) {
+                clearZones.push({ x: sm.x, y: sm.y, r: 58 });
+            }
+        }
+        for (const [px, py] of [
+            [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
+            [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 293.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 292.5 * TILE_SIZE],
+            [344.5 * TILE_SIZE, 171.5 * TILE_SIZE],
+            [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
+        ]) {
+            clearZones.push({ x: px, y: py, r: 58 });
         }
         const notInClearZone = (obj) => !clearZones.some(z => Math.hypot(obj.x - z.x, obj.y - z.y) < z.r);
         if (Array.isArray(map.vicePalms)) map.vicePalms = map.vicePalms.filter(notInClearZone);
@@ -1616,6 +1642,10 @@ class WorldObjectEngine {
                 if (this.streetProps.length >= 210) break;
                 const idx = r * M + c;
                 if (g[idx] !== GROUND_TYPE.PAWEMENT) continue;
+                // Never place sidewalk booths or street furniture on lid 69 tree planter tiles
+                const blk1 = map.getBlockInfo ? map.getBlockInfo(c, r, 1) : null;
+                if (blk1 && blk1.lid === 69) continue;
+
                 // Check which neighbor is a ROAD tile so we place the prop near the curb facing the street
                 let curbDx = 0, curbDy = 0, armAng = 0, hasRoad = false;
                 if (g[r * M + (c + 1)] === GROUND_TYPE.ROAD) {
@@ -1632,8 +1662,28 @@ class WorldObjectEngine {
                 const px = (c + 0.5) * TILE_SIZE + curbDx;
                 const py = (r + 0.5) * TILE_SIZE + curbDy;
 
-                // Ensure not blocking any interior door
+                // Ensure not blocking any interior door, tree/palm canopy, café parasol, soda machine, or mission payphone
                 if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - px, it.doorY - py) < 52)) {
+                    continue;
+                }
+                if (Array.isArray(map.vicePalms) && map.vicePalms.some(pm => Math.hypot(pm.x - px, pm.y - py) < 56)) {
+                    continue;
+                }
+                if (Array.isArray(map.trees) && map.trees.some(tr => Math.hypot(tr.x - px, tr.y - py) < 56)) {
+                    continue;
+                }
+                if (Array.isArray(map.viceStreetDetails) && map.viceStreetDetails.some(vd => Math.hypot(vd.x - px, vd.y - py) < 44)) {
+                    continue;
+                }
+                if (Array.isArray(this.sodaMachines) && this.sodaMachines.some(sm => Math.hypot(sm.x - px, sm.y - py) < 56)) {
+                    continue;
+                }
+                if (
+                    Math.hypot(443.5 * TILE_SIZE - px, 285.5 * TILE_SIZE - py) < 56 ||
+                    Math.hypot(448.5 * TILE_SIZE - px, 293.5 * TILE_SIZE - py) < 56 ||
+                    Math.hypot(344.5 * TILE_SIZE - px, 171.5 * TILE_SIZE - py) < 56 ||
+                    Math.hypot(68.5 * TILE_SIZE - px, 187.5 * TILE_SIZE - py) < 56
+                ) {
                     continue;
                 }
 
@@ -1657,6 +1707,23 @@ class WorldObjectEngine {
                     geyserTimer: 0,
                     neonPink: (kIdx % 2 === 0)
                 });
+            }
+        }
+
+        // Rebuild map.floraGrid after all WorldObjectEngine flora & booth clearance passes
+        if (Array.isArray(map.vicePalms)) {
+            map.floraGrid = new Map();
+            for (let pi = 0; pi < map.vicePalms.length; pi++) {
+                const pm = map.vicePalms[pi];
+                const fbx = Math.floor(pm.x / TILE_SIZE);
+                const fby = Math.floor(pm.y / TILE_SIZE);
+                const fkey = (fby << 16) | (fbx & 0xffff);
+                let cell = map.floraGrid.get(fkey);
+                if (!cell) {
+                    cell = [];
+                    map.floraGrid.set(fkey, cell);
+                }
+                cell.push(pm);
             }
         }
     }

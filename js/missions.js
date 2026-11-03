@@ -9,6 +9,7 @@ class MissionManager {
         this.game = game;
 
         // Static sidewalk payphone booth locations + Smartphone Mission Contracts
+        // (All 4 coordinates verified on clean PAWEMENT sidewalk tiles, off lid=69 planters, roads & palm canopies)
         this.payphones = [
             {
                 id: "phone_motel",
@@ -18,8 +19,8 @@ class MissionManager {
                 rewardCash: 25000,
                 name: "SOUTH BEACH LIQUOR HOLD-UP",
                 briefing: "MISSION 1 (TRUST?): Hold up South Beach Liquor on Ocean Drive with Jason, then lose VCPD at Vice Customs!",
-                x: mx256(213.5) * TILE_SIZE,
-                y: my256(143.5) * TILE_SIZE,
+                x: 443.5 * TILE_SIZE,
+                y: 285.5 * TILE_SIZE,
                 completed: false
             },
             {
@@ -30,8 +31,8 @@ class MissionManager {
                 rewardCash: 45000,
                 name: "VICE BEACH PIER CONTRABAND",
                 briefing: "MISSION 2 (CONTRABAND): Collect 3 contraband crates on Vice Beach & Ocean Pier, then deliver to Hotel Dixon!",
-                x: mx256(218.5) * TILE_SIZE,
-                y: my256(151.5) * TILE_SIZE,
+                x: 448.5 * TILE_SIZE,
+                y: 293.5 * TILE_SIZE,
                 completed: false
             },
             {
@@ -42,8 +43,8 @@ class MissionManager {
                 rewardCash: 75000,
                 name: "STAR ISLAND CHEETAH BOOST",
                 briefing: "MISSION 3 (CHEETAH BOOST): Steal the VIP Grotti Cheetah on Star Island and deliver it to Vice Port Crane!",
-                x: mx256(173.0) * TILE_SIZE,
-                y: my256(104.5) * TILE_SIZE,
+                x: 344.5 * TILE_SIZE,
+                y: 171.5 * TILE_SIZE,
                 completed: false
             },
             {
@@ -54,8 +55,8 @@ class MissionManager {
                 rewardCash: 150000,
                 name: "DOC ANKLE MONITOR OVERRIDE",
                 briefing: "MISSION 4 (THE BIG SCORE): Ambush the Armored Van in Port Gellhorn, then hack the DOC Relay at VCIA Airport!",
-                x: mx256(47.0) * TILE_SIZE,
-                y: my256(114.5) * TILE_SIZE,
+                x: 68.5 * TILE_SIZE,
+                y: 187.5 * TILE_SIZE,
                 completed: false
             }
         ];
