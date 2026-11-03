@@ -6700,11 +6700,11 @@ class RetroRenderer {
                 this.pushSolidQuad3D(midX, midY, sz + 0.53, armLen, 2.8, sl.armAngle, pr, pg, pb, 0.98, SPRITE_DRAW_ORDER.TREES);
 
                 // 5. Luminaire Cobra/Deco Hood & Warm Golden-Yellow Lamp Bulb at (headX, headY, sz + 0.55)
-                this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.54, 7.8, 5.2, sl.armAngle, pr * 0.85, pg * 0.85, pb * 0.85, 0.98, SPRITE_DRAW_ORDER.TREES);
+                this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.54, 7.2, 4.8, sl.armAngle, pr * 0.85, pg * 0.85, pb * 0.85, 0.98, SPRITE_DRAW_ORDER.TREES);
                 if (lightsOn) {
-                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.56, 5.5, 4.2, sl.armAngle, 1.0, 0.88, 0.38, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.555, 3.6, 2.8, sl.armAngle, 1.0, 0.90, 0.48, 0.92, SPRITE_DRAW_ORDER.TREES);
                 } else {
-                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.55, 4.5, 3.4, sl.armAngle, 0.95, 0.90, 0.72, 0.92, SPRITE_DRAW_ORDER.TREES);
+                    this.pushSolidQuad3D(sl.headX, sl.headY, sz + 0.55, 3.6, 2.8, sl.armAngle, 0.95, 0.90, 0.72, 0.90, SPRITE_DRAW_ORDER.TREES);
                 }
             }
         }
@@ -7036,15 +7036,35 @@ class RetroRenderer {
                 if (gSc.x < -160 || gSc.x > W + 160 || gSc.y < -160 || gSc.y > H + 160) continue;
                 const pxScale = (gSc.scale * H) / 128.0;
 
-                // Elevated 3D lamp head position for the GTA 2 warm golden-yellow 4-point star corona flare
+                // Elevated 3D lamp head position for the warm, progressively diffuse golden-yellow radial halo
                 const hSc = this.worldToScreen(sl.headX, sl.headY, sz + 0.56);
 
                 if (sl.colorType === "SODIUM") {
-                    addLightPool(gSc.x, gSc.y, 74 * pxScale, "rgba(255, 190, 75, 0.88)", "rgba(225, 130, 25, 0.36)");
-                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 9.5 * pxScale, col: "rgba(255, 205, 95, 0.84)", isStar: true });
+                    addLightPool(gSc.x, gSc.y, 96 * pxScale, "rgba(255, 198, 82, 0.90)", "rgba(230, 140, 30, 0.38)");
+                    addLightPool(hSc.x, hSc.y, 38 * pxScale, "rgba(255, 215, 105, 0.75)", "rgba(235, 155, 40, 0.25)");
+                    highResFlares.push({
+                        x: hSc.x,
+                        y: hSc.y,
+                        r: 36 * pxScale,
+                        gx: gSc.x,
+                        gy: gSc.y,
+                        gr: 58 * pxScale,
+                        isLampHalo: true,
+                        warmSodium: true
+                    });
                 } else {
-                    addLightPool(gSc.x, gSc.y, 76 * pxScale, "rgba(255, 212, 92, 0.90)", "rgba(235, 160, 40, 0.38)");
-                    highResFlares.push({ x: hSc.x, y: hSc.y, r: 10.0 * pxScale, col: "rgba(255, 225, 118, 0.85)", isStar: true });
+                    addLightPool(gSc.x, gSc.y, 98 * pxScale, "rgba(255, 216, 98, 0.92)", "rgba(240, 168, 45, 0.40)");
+                    addLightPool(hSc.x, hSc.y, 40 * pxScale, "rgba(255, 228, 120, 0.78)", "rgba(240, 175, 50, 0.26)");
+                    highResFlares.push({
+                        x: hSc.x,
+                        y: hSc.y,
+                        r: 38 * pxScale,
+                        gx: gSc.x,
+                        gy: gSc.y,
+                        gr: 60 * pxScale,
+                        isLampHalo: true,
+                        warmSodium: false
+                    });
                 }
             }
         }
@@ -7058,8 +7078,8 @@ class RetroRenderer {
                 if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
                 const pxScale = (sc.scale * H) / 128.0;
                 if (vd.kind === "BISTRO_STRING") {
-                    addLightPool(sc.x, sc.y, 64 * pxScale, "rgba(255, 195, 120, 0.82)", "rgba(235, 110, 150, 0.32)");
-                    highResFlares.push({ x: sc.x, y: sc.y, r: 9 * pxScale, col: "rgba(255, 215, 145, 0.78)", isStar: true });
+                    addLightPool(sc.x, sc.y, 68 * pxScale, "rgba(255, 205, 120, 0.84)", "rgba(235, 145, 55, 0.32)");
+                    highResFlares.push({ x: sc.x, y: sc.y, r: 28 * pxScale, isLampHalo: true, warmSodium: false });
                 } else if (vd.kind === "SERPENTINE_WALL") {
                     const isPink = vd.theme === "PINK";
                     addLightPool(
@@ -7400,36 +7420,53 @@ class RetroRenderer {
 
             for (const f of highResFlares) {
                 const r = Math.max(2, f.r);
-                const g = ctx.createRadialGradient(f.x, f.y, r * 0.1, f.x, f.y, r);
-                g.addColorStop(0.0, "#ffffff");
-                g.addColorStop(0.35, f.col);
+                if (f.isLampHalo) {
+                    // 1. Soft diffuse golden-yellow ground scatter beneath the streetlamp
+                    if (f.gx !== undefined && f.gy !== undefined && f.gr > 2) {
+                        const gg = ctx.createRadialGradient(f.gx, f.gy, 0, f.gx, f.gy, f.gr);
+                        gg.addColorStop(0.0, f.warmSodium ? "rgba(255, 205, 85, 0.22)" : "rgba(255, 220, 105, 0.24)");
+                        gg.addColorStop(0.45, f.warmSodium ? "rgba(250, 180, 55, 0.10)" : "rgba(255, 200, 75, 0.11)");
+                        gg.addColorStop(0.80, "rgba(240, 160, 35, 0.03)");
+                        gg.addColorStop(1.0, "rgba(240, 160, 35, 0.0)");
+                        ctx.fillStyle = gg;
+                        ctx.beginPath();
+                        ctx.arc(f.gx, f.gy, f.gr, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // 2. Progressively diffuse multi-stop golden-yellow radial halo around the luminaire bulb (no star spikes!)
+                    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
+                    if (f.warmSodium) {
+                        g.addColorStop(0.00, "rgba(255, 246, 200, 0.90)");
+                        g.addColorStop(0.10, "rgba(255, 222, 118, 0.68)");
+                        g.addColorStop(0.24, "rgba(255, 198, 72, 0.38)");
+                        g.addColorStop(0.46, "rgba(248, 172, 42, 0.17)");
+                        g.addColorStop(0.72, "rgba(238, 148, 24, 0.06)");
+                        g.addColorStop(1.00, "rgba(238, 148, 24, 0.0)");
+                    } else {
+                        g.addColorStop(0.00, "rgba(255, 250, 215, 0.92)");
+                        g.addColorStop(0.10, "rgba(255, 232, 135, 0.70)");
+                        g.addColorStop(0.24, "rgba(255, 212, 85, 0.40)");
+                        g.addColorStop(0.46, "rgba(252, 188, 52, 0.18)");
+                        g.addColorStop(0.72, "rgba(245, 165, 32, 0.06)");
+                        g.addColorStop(1.00, "rgba(245, 165, 32, 0.0)");
+                    }
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    continue;
+                }
+
+                const g = ctx.createRadialGradient(f.x, f.y, r * 0.08, f.x, f.y, r);
+                g.addColorStop(0.0, "rgba(255, 252, 235, 0.92)");
+                g.addColorStop(0.32, f.col);
+                g.addColorStop(0.68, f.col.replace(/[\d.]+\)$/, "0.18)"));
                 g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
                 ctx.fillStyle = g;
                 ctx.beginPath();
                 ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
                 ctx.fill();
-
-                // GTA 2 Signature 4-Point Cross-Star Corona on elevated 3D Streetlamp Bulbs!
-                if (f.isStar) {
-                    const rayLen = r * 1.65;
-                    const rayW = Math.max(1.1, r * 0.16);
-                    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
-                    ctx.beginPath();
-                    ctx.moveTo(f.x - rayLen, f.y);
-                    ctx.lineTo(f.x, f.y - rayW);
-                    ctx.lineTo(f.x + rayLen, f.y);
-                    ctx.lineTo(f.x, f.y + rayW);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    ctx.beginPath();
-                    ctx.moveTo(f.x, f.y - rayLen);
-                    ctx.lineTo(f.x + rayW, f.y);
-                    ctx.lineTo(f.x, f.y + rayLen);
-                    ctx.lineTo(f.x - rayW, f.y);
-                    ctx.closePath();
-                    ctx.fill();
-                }
             }
         }
 
