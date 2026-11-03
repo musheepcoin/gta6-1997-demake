@@ -2053,11 +2053,11 @@ class RetroRenderer {
                 // 6L. GTA 6 LEONIDA 3D PRE-RENDERED RESIDENTIAL ESTATES & WATERFRONT MANSIONS
                 // Raytraced 3ds Max baked architectural models (y = 3474 in gta1_sprites.png)
                 // =========================================================================
-                meta.sprites.objects["mansion_star_island"] = meta.sprites.objects["mansion_star_island"] || [704, 3474, 116, 86];
-                meta.sprites.objects["mansion_modern_luxury"] = meta.sprites.objects["mansion_modern_luxury"] || [828, 3474, 96, 76];
-                meta.sprites.objects["house_canal_villa"] = meta.sprites.objects["house_canal_villa"] || [932, 3474, 90, 72];
-                meta.sprites.objects["house_florida_bungalow"] = meta.sprites.objects["house_florida_bungalow"] || [1030, 3474, 74, 58];
-                meta.sprites.objects["house_keys_stilt"] = meta.sprites.objects["house_keys_stilt"] || [1112, 3474, 70, 58];
+                meta.sprites.objects["mansion_star_island"] = meta.sprites.objects["mansion_star_island"] || [10, 3580, 340, 240];
+                meta.sprites.objects["mansion_modern_luxury"] = meta.sprites.objects["mansion_modern_luxury"] || [366, 3580, 280, 200];
+                meta.sprites.objects["house_canal_villa"] = meta.sprites.objects["house_canal_villa"] || [662, 3580, 250, 180];
+                meta.sprites.objects["house_florida_bungalow"] = meta.sprites.objects["house_florida_bungalow"] || [928, 3580, 200, 160];
+                meta.sprites.objects["house_keys_stilt"] = meta.sprites.objects["house_keys_stilt"] || [1144, 3580, 200, 170];
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < H)
                 // Ensures all custom planes, boats, helicopters & props have seamless 3D edge filtering without dark alpha halos
@@ -2360,7 +2360,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_55", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_56", () => {
             spritesLoaded = true;
             checkReady();
         });
@@ -2375,7 +2375,7 @@ class RetroRenderer {
             this.bakeRadarBackground();
         });
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_55", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_56", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();

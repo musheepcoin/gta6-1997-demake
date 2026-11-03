@@ -1551,8 +1551,7 @@ class LeonidaMap {
                 kind: "mansion_star_island",
                 c: 349.0, r: 164.0,
                 x: 349.0 * TILE_SIZE, y: 164.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.85, hw: 78, hh: 58,
-                drivewayCar: { sprIdx: 3, dx: 48, dy: 52, ang: 0 },
+                ang: 0, scale: 1.0, hw: 110, hh: 75,
                 dockBoat: { spr: "speedboat_v8", dx: -45, dy: -65, ang: -Math.PI * 0.5 }
             },
             {
@@ -1562,8 +1561,7 @@ class LeonidaMap {
                 kind: "mansion_modern_luxury",
                 c: 337.0, r: 163.5,
                 x: 337.0 * TILE_SIZE, y: 163.5 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.65, hw: 68, hh: 52,
-                drivewayCar: { sprIdx: 12, dx: 42, dy: 46, ang: 0 },
+                ang: 0, scale: 1.0, hw: 90, hh: 65,
                 dockBoat: { spr: "jetski_neon", dx: -45, dy: -48, ang: -Math.PI * 0.5 }
             },
             {
@@ -1573,13 +1571,12 @@ class LeonidaMap {
                 kind: "mansion_star_island",
                 c: 349.0, r: 183.5,
                 x: 349.0 * TILE_SIZE, y: 183.5 * TILE_SIZE, z: 2.0,
-                ang: Math.PI, scale: 1.70, hw: 72, hh: 54,
-                drivewayCar: { sprIdx: 7, dx: 42, dy: 48, ang: Math.PI },
+                ang: Math.PI, scale: 1.0, hw: 110, hh: 75,
                 dockBoat: { spr: "speedboat_v8", dx: -45, dy: 58, ang: Math.PI * 0.5 }
             },
 
             // =====================================================================
-            // 2. SOUTH BEACH RESIDENTIAL GARDEN DISTRICT (Placed in pure open grass lots, ZERO on roads!)
+            // 2. SOUTH BEACH RESIDENTIAL GARDEN DISTRICT (Placed in pure open grass lots)
             // =====================================================================
             {
                 id: "sobe_modern_oceanfront",
@@ -1588,8 +1585,7 @@ class LeonidaMap {
                 kind: "mansion_modern_luxury",
                 c: 441.0, r: 268.0,
                 x: 441.0 * TILE_SIZE, y: 268.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.65, hw: 68, hh: 52,
-                drivewayCar: { sprIdx: 3, dx: 44, dy: 46, ang: 0 }
+                ang: 0, scale: 1.0, hw: 90, hh: 65
             },
             {
                 id: "sobe_flamingo_bungalow",
@@ -1598,8 +1594,7 @@ class LeonidaMap {
                 kind: "house_florida_bungalow",
                 c: 431.0, r: 268.0,
                 x: 431.0 * TILE_SIZE, y: 268.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.60, hw: 54, hh: 42,
-                drivewayCar: { sprIdx: 2, dx: 32, dy: 38, ang: 0 }
+                ang: 0, scale: 1.0, hw: 65, hh: 50
             },
 
             // =====================================================================
@@ -1612,8 +1607,7 @@ class LeonidaMap {
                 kind: "house_canal_villa",
                 c: 154.0, r: 48.0,
                 x: 154.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.60, hw: 62, hh: 48,
-                drivewayCar: { sprIdx: 2, dx: 36, dy: 42, ang: 0 },
+                ang: 0, scale: 1.0, hw: 80, hh: 60,
                 dockBoat: { spr: "jetski_neon", dx: 45, dy: -42, ang: 0 }
             },
             {
@@ -1623,8 +1617,7 @@ class LeonidaMap {
                 kind: "house_canal_villa",
                 c: 164.0, r: 48.0,
                 x: 164.0 * TILE_SIZE, y: 48.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.55, hw: 60, hh: 46,
-                drivewayCar: { sprIdx: 7, dx: 36, dy: 42, ang: 0 },
+                ang: 0, scale: 1.0, hw: 80, hh: 60,
                 dockBoat: { spr: "speedboat_v8", dx: -45, dy: -48, ang: 0 }
             },
             {
@@ -1634,8 +1627,7 @@ class LeonidaMap {
                 kind: "mansion_modern_luxury",
                 c: 154.0, r: 58.0,
                 x: 154.0 * TILE_SIZE, y: 58.0 * TILE_SIZE, z: 2.0,
-                ang: Math.PI, scale: 1.55, hw: 64, hh: 48,
-                drivewayCar: { sprIdx: 12, dx: 38, dy: 42, ang: Math.PI }
+                ang: Math.PI, scale: 1.0, hw: 90, hh: 65
             },
 
             // =====================================================================
@@ -1648,7 +1640,7 @@ class LeonidaMap {
                 kind: "house_keys_stilt",
                 c: 368.0, r: 453.0,
                 x: 368.0 * TILE_SIZE, y: 453.0 * TILE_SIZE, z: 2.0,
-                ang: 0, scale: 1.80, hw: 58, hh: 48,
+                ang: 0, scale: 1.0, hw: 70, hh: 55,
                 dockBoat: { spr: "jetski_neon", dx: -44, dy: 28, ang: Math.PI * 0.5 }
             },
             {
@@ -1658,7 +1650,7 @@ class LeonidaMap {
                 kind: "house_keys_stilt",
                 c: 271.0, r: 475.0,
                 x: 271.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
-                ang: -Math.PI * 0.5, scale: 1.70, hw: 54, hh: 46,
+                ang: -Math.PI * 0.5, scale: 1.0, hw: 70, hh: 55,
                 dockBoat: { spr: "jetski_neon", dx: 38, dy: 26, ang: 0 }
             },
             {
@@ -1668,7 +1660,7 @@ class LeonidaMap {
                 kind: "house_keys_stilt",
                 c: 222.0, r: 475.0,
                 x: 222.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
-                ang: Math.PI * 0.5, scale: 1.70, hw: 54, hh: 46,
+                ang: Math.PI * 0.5, scale: 1.0, hw: 70, hh: 55,
                 dockBoat: { spr: "speedboat_v8", dx: -42, dy: -34, ang: 0 }
             }
         ];
