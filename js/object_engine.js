@@ -545,6 +545,7 @@ class WorldObjectEngine {
 
         this.registerEstateInteriors();
         this.generate3DStreetProps();
+        this.initVillaHeists();
     }
 
     /* ========================================================================
@@ -560,9 +561,11 @@ class WorldObjectEngine {
             const cosA = Math.cos(inst.ang);
             const sinA = Math.sin(inst.ang);
             const frontDist = (inst.spec.d1 * 0.5 + (inst.spec.porticoD || 26) + 18) * inst.scale;
+            const facing = Math.abs(inst.ang) > 2.0 ? "N" : (inst.ang < -0.8 ? "E" : "S");
             return {
                 doorX: inst.x - sinA * frontDist,
-                doorY: inst.y + cosA * frontDist
+                doorY: inst.y + cosA * frontDist,
+                facing
             };
         };
 
@@ -572,7 +575,7 @@ class WorldObjectEngine {
             const pt = computePorticoDoor(vercetti);
             starIntr.doorX = pt.doorX;
             starIntr.doorY = pt.doorY;
-            starIntr.facing = "S";
+            starIntr.facing = pt.facing;
         }
 
         const estateDoors = [
@@ -645,7 +648,7 @@ class WorldObjectEngine {
                 theme: ed.theme,
                 accent: ed.accent,
                 matRGB: ed.matRGB,
-                facing: "S",
+                facing: pt.facing,
                 doorX: pt.doorX,
                 doorY: pt.doorY,
                 w: 800,
@@ -653,6 +656,322 @@ class WorldObjectEngine {
                 npcs: tpl ? tpl.npcs.map(n => ({ ...n })) : (baseMansion ? baseMansion.npcs.map(n => ({ ...n })) : []),
                 stations: tpl ? tpl.stations() : (baseMansion ? baseMansion.stations.map(s => ({ ...s })) : [])
             });
+        }
+    }
+
+    /* ========================================================================
+       1D. GTA 6 CARTEL & VILLA HEISTS (HOME INVASION, 3D LASER GRIDS,
+           KEYPAD HACKING, 3D ARMORED VAULTS & MARINE SPEEDBOAT GETAWAYS)
+       ======================================================================== */
+    initVillaHeists() {
+        if (this.villaHeistsInitialized) return;
+        this.villaHeistsInitialized = true;
+        this.heistTargets = [];
+        this.activeHeist = null;
+
+        const specs = [
+            {
+                instId: "star_vercetti_palazzo",
+                interiorId: "STAR_ISLAND",
+                title: "OPÉRATION SCARFACE — PALAZZO DE LA ROSA",
+                lootCash: 25000,
+                bonusWeapon: "ROCKET_LAUNCHER",
+                bonusAmmo: 8
+            },
+            {
+                instId: "star_south_palazzo",
+                interiorId: "ESTATE_STAR_SOUTH",
+                title: "BRAQUAGE DU CARTEL — VILLA DI LEONIDA",
+                lootCash: 22000,
+                bonusWeapon: "UZI",
+                bonusAmmo: 120
+            },
+            {
+                instId: "venetian_south_palazzo",
+                interiorId: "ESTATE_VENETIAN_PALAZZO",
+                title: "HOME INVASION — CASA BELLA VENETIAN",
+                lootCash: 18500,
+                bonusWeapon: "SHOTGUN",
+                bonusAmmo: 30
+            },
+            {
+                instId: "sobe_artdeco_villa_1",
+                interiorId: "ESTATE_SOBE_ARTDECO",
+                title: "CASSE ART DÉCO — FLAMINGO COURT",
+                lootCash: 16500,
+                bonusWeapon: "UZI",
+                bonusAmmo: 90
+            },
+            {
+                instId: "shores_modern_villa",
+                interiorId: "ESTATE_SHORES_MODERN",
+                title: "RAID HAUTE SÉCURITÉ — PENTHOUSE GOLDEN GLADES",
+                lootCash: 20000,
+                bonusWeapon: "FLAMETHROWER",
+                bonusAmmo: 60
+            },
+            {
+                instId: "keys_stilt_islamorada",
+                interiorId: "ESTATE_KEYS_ISLAMORADA",
+                title: "RAID DES KEYS — PLANQUE D'ISLAMORADA",
+                lootCash: 15000,
+                bonusWeapon: "SHOTGUN",
+                bonusAmmo: 24
+            }
+        ];
+
+        for (let i = 0; i < specs.length; i++) {
+            const sp = specs[i];
+            const inst = this.instances.find(it => it.id === sp.instId);
+            if (!inst) continue;
+
+            const sc = inst.scale || 1.0;
+            const cosA = Math.cos(inst.ang);
+            const sinA = Math.sin(inst.ang);
+            const toWorld = (lx, ly) => ({
+                x: inst.x + cosA * (lx * sc) - sinA * (ly * sc),
+                y: inst.y + sinA * (lx * sc) + cosA * (ly * sc)
+            });
+
+            const pW = inst.spec.porticoW || 56;
+            const pD = inst.spec.porticoD || 26;
+            const frontY = inst.spec.d1 * 0.5 + pD + 8;
+
+            const kpPos = toWorld(pW * 0.5 + 16, frontY - 4);
+            const lsPos = toWorld(0, frontY);
+            const vtPos = toWorld(0, -inst.spec.d1 * 0.5 - 24);
+            const g1Pos = toWorld(-pW * 0.65 - 18, frontY + 14);
+            const g2Pos = toWorld(pW * 0.65 + 18, -inst.spec.d1 * 0.45);
+
+            this.heistTargets.push({
+                ...sp,
+                inst,
+                hacked: false,
+                alarmTripped: false,
+                looted: false,
+                cooldown: 0,
+                keypadX: kpPos.x,
+                keypadY: kpPos.y,
+                laserX: lsPos.x,
+                laserY: lsPos.y,
+                laserW: (pW + 14) * sc,
+                vaultX: vtPos.x,
+                vaultY: vtPos.y,
+                guards: [
+                    { baseX: g1Pos.x, baseY: g1Pos.y, x: g1Pos.x, y: g1Pos.y, ang: inst.ang + Math.PI * 0.5, phase: i * 1.1 },
+                    { baseX: g2Pos.x, baseY: g2Pos.y, x: g2Pos.x, y: g2Pos.y, ang: inst.ang - Math.PI * 0.5, phase: i * 1.1 + 3.14 }
+                ]
+            });
+        }
+    }
+
+    startHeistEscape(game, ht, sourceLabel) {
+        if (!game || !ht) return;
+        ht.looted = true;
+        ht.cooldown = 150.0;
+        const stealthBonus = (!ht.alarmTripped && ht.hacked) ? 5000 : 0;
+        const totalTake = ht.lootCash + stealthBonus;
+
+        if (typeof game.addScore === "function") game.addScore(totalTake);
+        if (game.player) {
+            game.player.armor = Math.max(game.player.armor || 0, 100);
+            if (ht.bonusWeapon && typeof game.player.giveWeapon === "function") {
+                game.player.giveWeapon(ht.bonusWeapon, ht.bonusAmmo || 30);
+            }
+        }
+        if (game.wantedSystem && typeof game.wantedSystem.addChaos === "function") {
+            game.wantedSystem.addChaos(ht.hacked ? 120 : 280, "VILLA_HEIST", game);
+            if (!ht.hacked && (game.wantedSystem.level || 0) < 3) {
+                game.wantedSystem.level = 3;
+            }
+        }
+        ht.alarmTripped = true;
+
+        this.activeHeist = {
+            target: ht,
+            title: ht.title,
+            bagCash: totalTake,
+            escapeRadius: 430,
+            timer: 0
+        };
+
+        if (game.audio) game.audio.playPickup("WEAPON");
+        if (Array.isArray(game.floatingTexts) && game.player) {
+            game.floatingTexts.push({
+                x: game.player.x,
+                y: game.player.y,
+                z: 2.65,
+                text: `💰 ${sourceLabel}: +$${totalTake.toLocaleString()}! ESCAPE THE ESTATE!`,
+                color: "#fde047",
+                life: 3.0
+            });
+        }
+    }
+
+    onInteriorVaultCracked(game, intr) {
+        if (!game || !intr || !this.heistTargets) return;
+        const ht = this.heistTargets.find(t => t.interiorId === intr.id);
+        if (!ht || ht.looted) return;
+        this.startHeistEscape(game, ht, "INTERIOR VAULT CRACKED");
+    }
+
+    tryTriggerHeistAction(game) {
+        if (!game || !game.player || game.player.inVehicle || game.activeInterior) return false;
+        if (!this.heistTargets || this.heistTargets.length === 0) return false;
+        const px = game.player.x;
+        const py = game.player.y;
+
+        for (let i = 0; i < this.heistTargets.length; i++) {
+            const ht = this.heistTargets[i];
+
+            // 1. Marine Speedboat / Jet-Ski Getaway on the 3D Waterfront Pier!
+            if (ht.inst.dockBoat) {
+                const db = ht.inst.dockBoat;
+                const dBoat = Math.hypot(px - db.worldX, py - db.worldY);
+                const dPier = Math.hypot(px - db.pierMidX, py - db.pierMidY);
+                if (dBoat < 64 || (this.activeHeist && this.activeHeist.target === ht && dPier < 75)) {
+                    const ux = Math.cos(db.pierAng);
+                    const uy = Math.sin(db.pierAng);
+                    game.player.x = db.worldX + ux * 42;
+                    game.player.y = db.worldY + uy * 42;
+                    if (this.activeHeist && this.activeHeist.target === ht) {
+                        if (typeof game.addScore === "function") game.addScore(7500);
+                        if (game.wantedSystem) game.wantedSystem.level = Math.max(0, (game.wantedSystem.level || 0) - 2);
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: game.player.x,
+                                y: game.player.y,
+                                z: 2.75,
+                                text: `🚤 MARINE SPEEDBOAT GETAWAY! +$7,500 CLEAN ESCAPE!`,
+                                color: "#2dd4bf",
+                                life: 3.2
+                            });
+                        }
+                        this.activeHeist = null;
+                    } else {
+                        if (typeof game.addScore === "function") game.addScore(500);
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: game.player.x,
+                                y: game.player.y,
+                                z: 2.55,
+                                text: `🚤 PIER SPEEDBOAT LAUNCH! +$500`,
+                                color: "#38bdf8",
+                                life: 1.8
+                            });
+                        }
+                    }
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    return true;
+                }
+            }
+
+            if (ht.looted) continue;
+
+            // 2. Hack 3D Security Laser Keypad Box
+            if (!ht.hacked && Math.hypot(px - ht.keypadX, py - ht.keypadY) < 48) {
+                ht.hacked = true;
+                ht.alarmTripped = false;
+                if (typeof game.addScore === "function") game.addScore(1500);
+                if (game.audio) game.audio.playPickup("SCORE");
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: ht.keypadX,
+                        y: ht.keypadY,
+                        z: 2.55,
+                        text: `🔓 LASER GRID HACKED! +$1,500 (STEALTH BONUS UNLOCKED)`,
+                        color: "#4ade80",
+                        life: 2.4
+                    });
+                }
+                return true;
+            }
+
+            // 3. Crack Exterior 3D Armored Cartel Vault on Terrace
+            if (Math.hypot(px - ht.vaultX, py - ht.vaultY) < 54) {
+                this.startHeistEscape(game, ht, "3D CARTEL VAULT LOOTED");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    updateHeists(game, dt) {
+        if (!game || !this.heistTargets) return;
+        const p = game.player;
+        const px = p ? (p.car ? p.car.x : p.x) : 0;
+        const py = p ? (p.car ? p.car.y : p.y) : 0;
+        const t = performance.now() * 0.001;
+
+        for (let i = 0; i < this.heistTargets.length; i++) {
+            const ht = this.heistTargets[i];
+            if (ht.looted) {
+                ht.cooldown = Math.max(0, ht.cooldown - dt);
+                if (ht.cooldown <= 0 && Math.hypot(px - ht.inst.x, py - ht.inst.y) > 650) {
+                    ht.looted = false;
+                    ht.hacked = false;
+                    ht.alarmTripped = false;
+                }
+            }
+
+            // Patrol Cartel Bodyguards around the villa perimeter
+            for (let gi = 0; gi < ht.guards.length; gi++) {
+                const g = ht.guards[gi];
+                const speed = ht.alarmTripped ? 2.8 : 1.1;
+                const rad = ht.alarmTripped ? 26.0 : 18.0;
+                const nx = g.baseX + Math.cos(t * speed + g.phase) * rad;
+                const ny = g.baseY + Math.sin(t * speed + g.phase) * rad;
+                g.ang = Math.atan2(ny - g.y, nx - g.x);
+                g.x = nx;
+                g.y = ny;
+            }
+
+            // Check if player walks through unhacked 3D Red Laser Security Grid
+            if (p && !p.inVehicle && !game.activeInterior && !ht.hacked && !ht.alarmTripped && !ht.looted) {
+                if (Math.hypot(p.x - ht.laserX, p.y - ht.laserY) < 28) {
+                    ht.alarmTripped = true;
+                    if (game.wantedSystem) {
+                        game.wantedSystem.addChaos(180, "VILLA_ALARM", game);
+                        if ((game.wantedSystem.level || 0) < 2) game.wantedSystem.level = 2;
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ht.laserX,
+                            y: ht.laserY,
+                            z: 2.65,
+                            text: `🚨 CARTEL LASER ALARM TRIPPED! GUARDS ALERTED!`,
+                            color: "#ef4444",
+                            life: 2.6
+                        });
+                    }
+                }
+            }
+        }
+
+        // Update Active Villa Heist Escape Phase
+        if (this.activeHeist && p && !game.activeInterior) {
+            this.activeHeist.timer += dt;
+            const ht = this.activeHeist.target;
+            const dist = Math.hypot(px - ht.inst.x, py - ht.inst.y);
+            if (dist > this.activeHeist.escapeRadius) {
+                const escapeBonus = (p.inVehicle && p.car && p.car.isEstateCar) ? 8000 : 5000;
+                const bonusText = (p.inVehicle && p.car && p.car.isEstateCar)
+                    ? `🏎️ SUPERCAR HEIST GETAWAY COMPLETE! +$${escapeBonus.toLocaleString()}!`
+                    : `🏆 VILLA HEIST ESCAPE COMPLETE! +$${escapeBonus.toLocaleString()}!`;
+                if (typeof game.addScore === "function") game.addScore(escapeBonus);
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: px,
+                        y: py,
+                        z: 2.75,
+                        text: bonusText,
+                        color: "#4ade80",
+                        life: 3.4
+                    });
+                }
+                this.activeHeist = null;
+            }
         }
     }
 
@@ -1667,6 +1986,47 @@ class WorldObjectEngine {
             }
         }
 
+        // 4. 3D Villa Heist Security Grids, Keypads, Armored Cartel Vaults & Roof Alarm Strobes
+        if (this.heistTargets && this.heistTargets.length > 0) {
+            for (let i = 0; i < this.heistTargets.length; i++) {
+                const ht = this.heistTargets[i];
+                const inst = ht.inst;
+                if (inst.x < minX - 240 || inst.x > maxX + 240 || inst.y < minY - 240 || inst.y > maxY + 240) continue;
+                const cosA = Math.cos(inst.ang);
+                const sinA = Math.sin(inst.ang);
+                const bz = inst.z || 2.0;
+
+                // 3D Security Keypad Box next to Portico
+                const ledCol = ht.hacked ? [0.18, 0.96, 0.42] : [0.98, 0.18, 0.22];
+                emitDynBox(ht.keypadX, ht.keypadY, cosA, sinA, 0, 0, 8, 6, bz, bz + 0.22, [0.22, 0.26, 0.32]);
+                emitDynBox(ht.keypadX, ht.keypadY, cosA, sinA, 0, 0, 6, 6.5, bz + 0.14, bz + 0.20, ledCol);
+
+                // 3D Red Laser Security Beams across the Villa Portico (when unhacked & unlooted)
+                if (!ht.hacked && !ht.looted) {
+                    const pulse = 0.72 + 0.25 * Math.sin(t * 9.0 + i);
+                    for (const hOff of [0.07, 0.15, 0.23]) {
+                        emitDynBox(ht.laserX, ht.laserY, cosA, sinA, 0, 0, ht.laserW, 2.2, bz + hOff, bz + hOff + 0.018, [1.0, 0.12, 0.18], pulse);
+                    }
+                }
+
+                // 3D Black & Gold Armored Cartel Vault on Rear/Poolside Terrace
+                if (ht.looted) {
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 22, 16, bz, bz + 0.14, [0.16, 0.18, 0.22]);
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 14, 10, bz + 0.14, bz + 0.19, [0.98, 0.82, 0.18]);
+                } else {
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 22, 16, bz, bz + 0.28, [0.14, 0.16, 0.20]);
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 24, 18, bz + 0.26, bz + 0.30, [0.96, 0.78, 0.16]);
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 10, 17, bz + 0.08, bz + 0.20, [0.98, 0.84, 0.22]);
+                }
+
+                // Pulsing 3D Red Roof Alarm Strobes when Alarm is Tripped
+                if (ht.alarmTripped && Math.sin(t * 14.0 + i) > 0) {
+                    const topY = bz + inst.totalHeightBlocks;
+                    emitDynBox(inst.x, inst.y, cosA, sinA, 0, 0, 18, 18, topY, topY + 0.14, [1.0, 0.12, 0.16], 0.92);
+                }
+            }
+        }
+
         if (dVerts.length === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -1689,6 +2049,7 @@ class WorldObjectEngine {
         }
         if (game) {
             this.updateAndCollideProps(game, 1 / 60);
+            this.updateHeists(game, 1 / 60);
         }
 
         for (let i = 0; i < this.instances.length; i++) {
@@ -1773,6 +2134,116 @@ class WorldObjectEngine {
                 }
             }
         }
+
+        // Render Cartel Villa Bodyguards & Interactive Heist Ground Rings
+        if (this.heistTargets && this.heistTargets.length > 0) {
+            const walkFrame = Math.floor(renderer.time * 6.5) % 8;
+            for (let i = 0; i < this.heistTargets.length; i++) {
+                const ht = this.heistTargets[i];
+                const inst = ht.inst;
+                if (inst.x < minX - 280 || inst.x > maxX + 280 || inst.y < minY - 280 || inst.y > maxY + 280) continue;
+                const bz = inst.z || 2.0;
+
+                for (let gi = 0; gi < ht.guards.length; gi++) {
+                    const g = ht.guards[gi];
+                    renderer.batchPedSprite3D(gi === 0 ? "g2_swat" : "gang", walkFrame, g.x, g.y, bz + 0.045, g.ang, 1.26, false, SPRITE_DRAW_ORDER.PED);
+                }
+
+                if (!ht.looted) {
+                    const ringSz = 26 + Math.sin(renderer.time * 4.5 + i) * 3.0;
+                    renderer.pushSolidQuad3D(ht.vaultX, ht.vaultY, bz + 0.032, ringSz, ringSz, renderer.time * 0.8, 0.98, 0.82, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (!ht.hacked) {
+                        renderer.pushSolidQuad3D(ht.keypadX, ht.keypadY, bz + 0.032, 18, 18, renderer.time * 1.2, 0.98, 0.22, 0.28, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+            }
+        }
+    }
+
+    /* ========================================================================
+       6B. RENDER 2D VILLA HEIST INTERACTION PROMPTS & ACTIVE GETAWAY BANNER
+       ======================================================================== */
+    renderHeistPrompts(ctx, renderer, game) {
+        if (!ctx || !renderer || !game || !game.player || game.activeInterior) return;
+        if (!this.heistTargets || this.heistTargets.length === 0) return;
+
+        const p = game.player;
+        const px = p.car ? p.car.x : p.x;
+        const py = p.car ? p.car.y : p.y;
+
+        ctx.save();
+        ctx.textAlign = "center";
+
+        // 1. On-Foot Proximity Prompts for Keypads, 3D Cartel Vaults, and Getaway Boats
+        if (!p.inVehicle) {
+            for (let i = 0; i < this.heistTargets.length; i++) {
+                const ht = this.heistTargets[i];
+
+                if (!ht.looted && !ht.hacked && Math.hypot(px - ht.keypadX, py - ht.keypadY) < 62) {
+                    const scr = renderer.worldToScreen(ht.keypadX, ht.keypadY - 18, (ht.inst.z || 2.0) + 0.28);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.88)";
+                    ctx.fillRect(scr.x - 135, scr.y - 22, 270, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 135, scr.y - 22, 270, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText("🔓 [E] HACK LASER SECURITY (+$1,500)", scr.x, scr.y - 7);
+                }
+
+                if (!ht.looted && Math.hypot(px - ht.vaultX, py - ht.vaultY) < 70) {
+                    const scr = renderer.worldToScreen(ht.vaultX, ht.vaultY - 18, (ht.inst.z || 2.0) + 0.34);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 150, scr.y - 22, 300, 22);
+                    ctx.strokeStyle = "#fde047";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 150, scr.y - 22, 300, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`💰 [E] CRACK CARTEL VAULT ($${ht.lootCash.toLocaleString()})`, scr.x, scr.y - 7);
+                }
+
+                if (ht.inst.dockBoat) {
+                    const db = ht.inst.dockBoat;
+                    if (Math.hypot(px - db.worldX, py - db.worldY) < 76 || Math.hypot(px - db.pierMidX, py - db.pierMidY) < 72) {
+                        const scr = renderer.worldToScreen(db.worldX, db.worldY - 14, 2.25);
+                        ctx.font = "900 11px monospace";
+                        ctx.fillStyle = "rgba(8,12,22,0.88)";
+                        ctx.fillRect(scr.x - 135, scr.y - 22, 270, 22);
+                        ctx.strokeStyle = "#2dd4bf";
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(scr.x - 135, scr.y - 22, 270, 22);
+                        ctx.fillStyle = "#2dd4bf";
+                        ctx.fillText("🚤 [E] LAUNCH PIER SPEEDBOAT GETAWAY", scr.x, scr.y - 7);
+                    }
+                }
+            }
+        }
+
+        // 2. Top-Center Active Villa Heist Escape HUD Banner
+        if (this.activeHeist) {
+            const ah = this.activeHeist;
+            const ht = ah.target;
+            const dist = Math.hypot(px - ht.inst.x, py - ht.inst.y);
+            const rem = Math.max(0, Math.ceil(ah.escapeRadius - dist));
+            const cx = ctx.canvas.width * 0.5;
+            const cy = 62;
+
+            ctx.fillStyle = "rgba(10, 14, 26, 0.90)";
+            ctx.fillRect(cx - 220, cy - 24, 440, 48);
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx - 220, cy - 24, 440, 48);
+
+            ctx.font = "900 12px monospace";
+            ctx.fillStyle = "#fde047";
+            ctx.fillText(`🚨 ${ah.title} — TAKE: $${ah.bagCash.toLocaleString()}`, cx, cy - 6);
+            ctx.font = "700 11px monospace";
+            ctx.fillStyle = "#38bdf8";
+            ctx.fillText(`ESCAPE ZONE: ${rem}m REMAINING (USE DRIVEWAY SUPERCAR OR PIER BOAT!)`, cx, cy + 14);
+        }
+
+        ctx.restore();
     }
 
     /* ========================================================================
