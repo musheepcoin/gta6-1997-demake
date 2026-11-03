@@ -1608,8 +1608,8 @@ class LeonidaMap {
                 ang: 0, scale: 1.0, hw: 142, hh: 84,
                 pool: { dx: 0, dy: -136, scale: 0.90 },
                 drivewayCars: [
-                    { sprIdx: 0, dx: -82, dy: 118, ang: 0 },
-                    { sprIdx: 6, dx: 82, dy: 118, ang: Math.PI }
+                    { sprIdx: 0, dx: -82, dy: 168, ang: 0 },
+                    { sprIdx: 6, dx: 82, dy: 168, ang: Math.PI }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: 180, dy: -180, ang: 0 }
             },
@@ -1623,8 +1623,8 @@ class LeonidaMap {
                 ang: Math.PI, scale: 1.0, hw: 142, hh: 84,
                 pool: { dx: 0, dy: -136, scale: 0.90 },
                 drivewayCars: [
-                    { sprIdx: 4, dx: -82, dy: 118, ang: 0 },
-                    { sprIdx: 1, dx: 82, dy: 118, ang: Math.PI }
+                    { sprIdx: 4, dx: -82, dy: 168, ang: 0 },
+                    { sprIdx: 1, dx: 82, dy: 168, ang: Math.PI }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: -160, dy: -220, ang: 0 }
             },
@@ -1638,7 +1638,7 @@ class LeonidaMap {
                 ang: Math.PI, scale: 0.94, hw: 116, hh: 74,
                 pool: { dx: 0, dy: -124, scale: 0.85 },
                 drivewayCars: [
-                    { sprIdx: 1, dx: -64, dy: 104, ang: 0 }
+                    { sprIdx: 1, dx: -64, dy: 154, ang: 0 }
                 ],
                 dockBoat: { spr: "jetski_neon", dx: 150, dy: -180, ang: 0 }
             },
@@ -1656,7 +1656,7 @@ class LeonidaMap {
                 ang: 0, scale: 0.95, hw: 108, hh: 70,
                 pool: { dx: 0, dy: -120, scale: 0.84 },
                 drivewayCars: [
-                    { sprIdx: 6, dx: -64, dy: 102, ang: 0 }
+                    { sprIdx: 6, dx: -64, dy: 150, ang: 0 }
                 ],
                 dockBoat: { spr: "jetski_neon", dx: 0, dy: -220, ang: 0 }
             },
@@ -1669,7 +1669,7 @@ class LeonidaMap {
                 x: 400.2 * TILE_SIZE, y: 126.8 * TILE_SIZE, z: 2.0,
                 ang: Math.PI, scale: 0.92, hw: 114, hh: 72,
                 drivewayCars: [
-                    { sprIdx: 0, dx: -64, dy: 102, ang: 0 }
+                    { sprIdx: 0, dx: -64, dy: 152, ang: 0 }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: -160, dy: -160, ang: 0 }
             },
@@ -1683,7 +1683,7 @@ class LeonidaMap {
                 ang: Math.PI, scale: 0.95, hw: 136, hh: 80,
                 pool: { dx: 0, dy: -128, scale: 0.86 },
                 drivewayCars: [
-                    { sprIdx: 0, dx: -76, dy: 112, ang: 0 }
+                    { sprIdx: 0, dx: -76, dy: 164, ang: 0 }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: 0, dy: -220, ang: 0 }
             },
@@ -1696,7 +1696,7 @@ class LeonidaMap {
                 x: 400.2 * TILE_SIZE, y: 206.8 * TILE_SIZE, z: 2.0,
                 ang: Math.PI, scale: 0.95, hw: 108, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 4, dx: -62, dy: 100, ang: 0 }
+                    { sprIdx: 4, dx: -62, dy: 150, ang: 0 }
                 ],
                 dockBoat: { spr: "jetski_neon", dx: -150, dy: -180, ang: 0 }
             },
@@ -1714,7 +1714,7 @@ class LeonidaMap {
                 ang: -Math.PI * 0.5, scale: 0.94, hw: 104, hh: 70,
                 pool: { dx: 0, dy: -118, scale: 0.84 },
                 drivewayCars: [
-                    { sprIdx: 6, dx: -62, dy: 96, ang: 0 }
+                    { sprIdx: 6, dx: 162, dy: 44, ang: Math.PI * 0.5 }
                 ]
             },
             {
@@ -1726,7 +1726,7 @@ class LeonidaMap {
                 x: 431.0 * TILE_SIZE, y: 265.5 * TILE_SIZE, z: 2.0,
                 ang: -Math.PI * 0.5, scale: 0.94, hw: 94, hh: 66,
                 drivewayCars: [
-                    { sprIdx: 13, dx: 0, dy: 92, ang: 0 }
+                    { sprIdx: 13, dx: 156, dy: 46, ang: Math.PI * 0.5 }
                 ]
             },
             {
@@ -1738,7 +1738,7 @@ class LeonidaMap {
                 x: 456.5 * TILE_SIZE, y: 213.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.94, hw: 104, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 1, dx: -58, dy: 96, ang: 0 }
+                    { sprIdx: 1, dx: -58, dy: 148, ang: 0 }
                 ]
             },
 
@@ -1755,7 +1755,7 @@ class LeonidaMap {
                 ang: 0, scale: 0.96, hw: 118, hh: 75,
                 pool: { dx: 0, dy: -124, scale: 0.85 },
                 drivewayCars: [
-                    { sprIdx: 0, dx: -66, dy: 104, ang: 0 }
+                    { sprIdx: 0, dx: -66, dy: 154, ang: 0 }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: -160, dy: -160, ang: 0 }
             },
@@ -1769,7 +1769,7 @@ class LeonidaMap {
                 ang: 0, scale: 0.96, hw: 110, hh: 72,
                 pool: { dx: 0, dy: -124, scale: 0.85 },
                 drivewayCars: [
-                    { sprIdx: 1, dx: -64, dy: 102, ang: 0 }
+                    { sprIdx: 1, dx: -64, dy: 150, ang: 0 }
                 ],
                 dockBoat: { spr: "jetski_neon", dx: 0, dy: -220, ang: 0 }
             },
@@ -1783,7 +1783,7 @@ class LeonidaMap {
                 ang: 0, scale: 0.96, hw: 110, hh: 72,
                 pool: { dx: 0, dy: -124, scale: 0.85 },
                 drivewayCars: [
-                    { sprIdx: 4, dx: -64, dy: 102, ang: 0 }
+                    { sprIdx: 4, dx: -64, dy: 150, ang: 0 }
                 ]
             },
 
@@ -1799,7 +1799,7 @@ class LeonidaMap {
                 x: 230.5 * TILE_SIZE, y: 83.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.94, hw: 94, hh: 66,
                 drivewayCars: [
-                    { sprIdx: 13, dx: -52, dy: 92, ang: 0 }
+                    { sprIdx: 13, dx: -156, dy: 44, ang: Math.PI * 0.5 }
                 ]
             },
             {
@@ -1811,7 +1811,7 @@ class LeonidaMap {
                 x: 230.5 * TILE_SIZE, y: 91.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.94, hw: 94, hh: 66,
                 drivewayCars: [
-                    { sprIdx: 4, dx: -52, dy: 92, ang: 0 }
+                    { sprIdx: 4, dx: -156, dy: 44, ang: Math.PI * 0.5 }
                 ]
             },
             {
@@ -1823,7 +1823,7 @@ class LeonidaMap {
                 x: 292.5 * TILE_SIZE, y: 183.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.94, hw: 94, hh: 66,
                 drivewayCars: [
-                    { sprIdx: 13, dx: -52, dy: 92, ang: 0 }
+                    { sprIdx: 13, dx: -156, dy: 44, ang: Math.PI * 0.5 }
                 ]
             },
             {
@@ -1835,7 +1835,7 @@ class LeonidaMap {
                 x: 297.5 * TILE_SIZE, y: 183.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.92, hw: 102, hh: 68,
                 drivewayCars: [
-                    { sprIdx: 1, dx: -56, dy: 94, ang: 0 }
+                    { sprIdx: 1, dx: 162, dy: 44, ang: Math.PI * 0.5 }
                 ]
             },
 
@@ -1851,7 +1851,7 @@ class LeonidaMap {
                 x: 94.0 * TILE_SIZE, y: 190.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.96, hw: 86, hh: 64,
                 drivewayCars: [
-                    { sprIdx: 25, dx: -50, dy: 92, ang: 0 }
+                    { sprIdx: 25, dx: -52, dy: 152, ang: 0 }
                 ],
                 dockBoat: { spr: "airboat_gator", dx: 180, dy: 0, ang: 0 }
             },
@@ -1864,7 +1864,7 @@ class LeonidaMap {
                 x: 109.5 * TILE_SIZE, y: 388.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 0.96, hw: 86, hh: 64,
                 drivewayCars: [
-                    { sprIdx: 25, dx: -50, dy: 92, ang: 0 }
+                    { sprIdx: 25, dx: -52, dy: 152, ang: 0 }
                 ],
                 dockBoat: { spr: "airboat_gator", dx: -160, dy: 120, ang: 0 }
             },
@@ -1881,7 +1881,7 @@ class LeonidaMap {
                 x: 368.5 * TILE_SIZE, y: 452.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 25, dx: -56, dy: 102, ang: 0 }
+                    { sprIdx: 25, dx: -56, dy: 156, ang: 0 }
                 ],
                 dockBoat: { spr: "jetski_neon", dx: 180, dy: -120, ang: Math.PI * 0.5 }
             },
@@ -1894,7 +1894,7 @@ class LeonidaMap {
                 x: 330.5 * TILE_SIZE, y: 473.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 1, dx: -56, dy: 102, ang: 0 }
+                    { sprIdx: 1, dx: -56, dy: 156, ang: 0 }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: 180, dy: -120, ang: Math.PI * 0.5 }
             },
@@ -1907,7 +1907,7 @@ class LeonidaMap {
                 x: 272.5 * TILE_SIZE, y: 474.5 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 13, dx: -56, dy: 102, ang: 0 }
+                    { sprIdx: 13, dx: -56, dy: 156, ang: 0 }
                 ],
                 dockBoat: { spr: "jetski_neon", dx: 180, dy: -120, ang: 0 }
             },
@@ -1920,7 +1920,7 @@ class LeonidaMap {
                 x: 222.0 * TILE_SIZE, y: 475.0 * TILE_SIZE, z: 2.0,
                 ang: 0, scale: 1.0, hw: 94, hh: 70,
                 drivewayCars: [
-                    { sprIdx: 25, dx: -56, dy: 102, ang: 0 }
+                    { sprIdx: 25, dx: -56, dy: 156, ang: 0 }
                 ],
                 dockBoat: { spr: "speedboat_v8", dx: 180, dy: -120, ang: Math.PI * 0.5 }
             }

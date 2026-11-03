@@ -1743,27 +1743,128 @@ class WorldObjectEngine {
             25: "GATOR_4X4"
         };
 
+        const g = this.map && this.map.surfaceGround ? this.map.surfaceGround : null;
+        const M = MAP_COLS;
+        const isDryLotPoint = (wx, wy, roadPad = 24) => {
+            if (!g) return true;
+            const checks = [
+                [0, 0],
+                [-roadPad, 0], [roadPad, 0],
+                [0, -roadPad], [0, roadPad],
+                [-roadPad * 0.7, -roadPad * 0.7], [roadPad * 0.7, -roadPad * 0.7],
+                [-roadPad * 0.7, roadPad * 0.7],  [roadPad * 0.7, roadPad * 0.7]
+            ];
+            for (let k = 0; k < checks.length; k++) {
+                const tc = Math.floor((wx + checks[k][0]) / TILE_SIZE);
+                const tr = Math.floor((wy + checks[k][1]) / TILE_SIZE);
+                if (tc < 2 || tc >= M - 2 || tr < 2 || tr >= MAP_ROWS - 2) return false;
+                const gt = g[tr * M + tc];
+                if (gt !== GROUND_TYPE.FIELD && gt !== GROUND_TYPE.PAWEMENT) return false;
+            }
+            return true;
+        };
+
         for (let i = 0; i < this.instances.length; i++) {
             const inst = this.instances[i];
             if (!inst.drivewayCars || inst.drivewayCars.length === 0) continue;
+            const spec = inst.spec;
+            const sc = inst.scale || 1.0;
             const cosA = Math.cos(inst.ang);
             const sinA = Math.sin(inst.ang);
             const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
                 ? this.map.getHeightAtPixel(inst.x, inst.y, 4.0)
                 : (inst.z || 2.0);
 
+            // True 3D architectural footprint including roof overhangs, front porches, portico columns & stilt stairs
+            const halfW = (spec.w1 * 0.5 + Math.max(spec.roofOverhang || 10, spec.deckPad || 0)) * sc;
+            const backD = (spec.d1 * 0.5 + Math.max(spec.roofOverhang || 10, spec.deckPad || 0)) * sc;
+            const frontExtra = spec.hasPortico ? (spec.porticoD || 26) * 1.08
+                             : spec.hasFrontPorch ? (spec.porchD || 26) * 1.08
+                             : spec.hasStiltDeck ? 42
+                             : (spec.roofOverhang || 10);
+            const frontD = (spec.d1 * 0.5 + frontExtra) * sc;
+            const minWallGap = 38; // Mandatory 38px open breathing room between house/porch edge and car body
+
             for (let ci = 0; ci < inst.drivewayCars.length; ci++) {
                 const dc = inst.drivewayCars[ci];
-                const vx = inst.x + cosA * dc.dx - sinA * dc.dy;
-                const vy = inst.y + sinA * dc.dx + cosA * dc.dy;
-                const vang = inst.ang + (dc.ang || 0);
+                const baseAng = dc.ang !== undefined ? dc.ang : 0;
+                const sideSign = (dc.dx || 0) >= 0 ? 1 : -1;
+
+                // Candidate local placements: requested spot first, then side driveways & deep front courtyard
+                const candidates = [
+                    { lx: dc.dx || 0, ly: dc.dy || (frontD + 56), relAng: baseAng },
+                    { lx: sideSign * (halfW + 56), ly: 44, relAng: Math.PI * 0.5 },
+                    { lx: -sideSign * (halfW + 56), ly: 44, relAng: Math.PI * 0.5 },
+                    { lx: (dc.dx || -60), ly: frontD + 56, relAng: 0 },
+                    { lx: sideSign * (halfW + 64), ly: 18, relAng: Math.PI * 0.5 },
+                    { lx: -sideSign * (halfW + 64), ly: 18, relAng: Math.PI * 0.5 },
+                    { lx: -(dc.dx || -60), ly: frontD + 58, relAng: 0 }
+                ];
+
+                let chosen = null;
+                for (let k = 0; k < candidates.length; k++) {
+                    let { lx, ly, relAng } = candidates[k];
+                    const carHalfX = Math.abs(Math.cos(relAng)) * 30 + Math.abs(Math.sin(relAng)) * 16;
+                    const carHalfY = Math.abs(Math.sin(relAng)) * 30 + Math.abs(Math.cos(relAng)) * 16;
+                    const safeX = halfW + carHalfX + minWallGap;
+                    const safeFrontY = frontD + carHalfY + minWallGap;
+                    const safeBackY = backD + carHalfY + minWallGap;
+
+                    // Enforce strict minimum clearance from house walls, porch, portico columns & roof overhang
+                    if (Math.abs(lx) < safeX && ly > -safeBackY && ly < safeFrontY) {
+                        if (Math.abs(lx) > halfW * 0.85) {
+                            lx = (lx >= 0 ? 1 : -1) * safeX;
+                        } else {
+                            ly = safeFrontY;
+                        }
+                    }
+
+                    // Ensure clear of backyard pool deck if present
+                    if (inst.pool) {
+                        const pSc = inst.pool.scale || 0.90;
+                        if (Math.abs(lx - inst.pool.dx) < 80 * pSc + carHalfX + 20 &&
+                            Math.abs(ly - inst.pool.dy) < 50 * pSc + carHalfY + 20) {
+                            continue;
+                        }
+                    }
+
+                    const vx = inst.x + cosA * lx - sinA * ly;
+                    const vy = inst.y + sinA * lx + cosA * ly;
+                    const vang = inst.ang + relAng;
+
+                    if (!isDryLotPoint(vx, vy, 26)) continue;
+                    if (game.vehicles.some(v => Math.hypot(v.x - vx, v.y - vy) < 46)) continue;
+
+                    chosen = { vx, vy, vang };
+                    break;
+                }
+
+                if (!chosen) continue;
+
+                // Clear any random decorative bush/tree/palm overlapping the parked driveway car
+                if (this.map && Array.isArray(this.map.trees)) {
+                    this.map.trees = this.map.trees.filter(t => Math.hypot(t.x - chosen.vx, t.y - chosen.vy) > 42);
+                }
+                if (this.map && Array.isArray(this.map.vicePalms)) {
+                    this.map.vicePalms = this.map.vicePalms.filter(p => Math.hypot(p.x - chosen.vx, p.y - chosen.vy) > 42);
+                }
+                if (this.map && this.map.floraGrid && typeof this.map.floraGrid.get === "function") {
+                    const fcx = Math.floor(chosen.vx / TILE_SIZE);
+                    const fcy = Math.floor(chosen.vy / TILE_SIZE);
+                    for (let fdy = -1; fdy <= 1; fdy++) {
+                        for (let fdx = -1; fdx <= 1; fdx++) {
+                            const fkey = ((fcy + fdy) << 16) | ((fcx + fdx) & 0xffff);
+                            const cell = this.map.floraGrid.get(fkey);
+                            if (Array.isArray(cell)) {
+                                this.map.floraGrid.set(fkey, cell.filter(pm => Math.hypot(pm.x - chosen.vx, pm.y - chosen.vy) > 42));
+                            }
+                        }
+                    }
+                }
+
                 const specKey = dc.spec || sprToSpec[dc.sprIdx] || "STINGER_CABRIO";
-
-                const exists = game.vehicles.some(v => Math.hypot(v.x - vx, v.y - vy) < 28);
-                if (exists) continue;
-
                 if (typeof Vehicle === "function") {
-                    const v = new Vehicle(`estate_${inst.id}_car_${ci}`, specKey, vx, vy, vang);
+                    const v = new Vehicle(`estate_${inst.id}_car_${ci}`, specKey, chosen.vx, chosen.vy, chosen.vang);
                     v.z = bz;
                     v.missionTag = "LANDMARK";
                     v.isEstateCar = true;
