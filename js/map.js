@@ -1282,7 +1282,7 @@ class LeonidaMap {
             // Helipads with Live Spinning-Rotor Helicopters
             { kind: "HELIPAD",  c: 122.5, r: 303.5, ang: 0.4,            scale: 1.25 },
             { kind: "HELIPAD",  c: 158.5, r: 291.5, ang: -0.6,           scale: 1.25 },
-            { kind: "HELIPAD",  c: 453.5, r: 35.5,  ang: 0.2,            scale: 1.25 },
+            { kind: "HELIPAD",  c: 460.0, r: 40.5,  ang: 0.2,            scale: 1.25 },
             { kind: "HELIPAD",  c: 338.5, r: 163.5, ang: -0.8,           scale: 1.25 },
             { kind: "HELIPAD",  c: 336.5, r: 318.5, ang: 0.5,            scale: 1.25 },
             { kind: "HELIPAD",  c: 63.5,  r: 96.5,  ang: 1.1,            scale: 1.20 }
@@ -1409,18 +1409,18 @@ class LeonidaMap {
         this.portTerminals = [
             // Deepwater Container Barges & Freighters (100% in clean open water gt=1)
             { kind: "BARGE",      c: 360.5, r: 302.5, ang: 0,              scale: 1.55 },
-            { kind: "BARGE",      c: 361.5, r: 318.8, ang: Math.PI,        scale: 1.50 },
-            { kind: "BARGE",      c: 362.5, r: 329.5, ang: 0,              scale: 1.60 },
+            { kind: "BARGE",      c: 362.5, r: 323.2, ang: Math.PI,        scale: 1.55 },
+            { kind: "BARGE",      c: 362.5, r: 335.2, ang: 0,              scale: 1.60 },
             { kind: "BARGE",      c: 24.0,  r: 186.5, ang: Math.PI,        scale: 1.50 },
             { kind: "BARGE",      c: 38.0,  r: 209.5, ang: 0,              scale: 1.55 },
             { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 1.55 },
             { kind: "BARGE",      c: 139.5, r: 100.5, ang: -Math.PI * 0.5, scale: 1.45 },
             { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 1.45 },
-            // Quayside Intermodal Container Stacks
-            { kind: "CONTAINERS", c: 334.5, r: 329.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.0, r: 329.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 334.5, r: 331.8, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.0, r: 331.8, ang: 0,              scale: 1.25 },
+            // Quayside Intermodal Container Stacks (aligned with 3D Gantry Cranes on the waterfront quay!)
+            { kind: "CONTAINERS", c: 355.5, r: 323.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 355.5, r: 335.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 334.5, r: 332.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.0, r: 332.8, ang: 0,              scale: 1.25 },
             { kind: "CONTAINERS", c: 58.5,  r: 204.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 58.5,  r: 212.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 58.5,  r: 244.5, ang: Math.PI * 0.5,  scale: 1.25 },
@@ -1494,7 +1494,7 @@ class LeonidaMap {
             { c: 376.5, r: 118.5, ang: -Math.PI * 0.5 },
             { c: 456.0, r: 396.5, ang: -Math.PI * 0.5 },
             { c: 396.0, r: 456.5, ang: 0 },
-            { c: 150.0, r: 490.0, ang: 0 }
+            { c: 190.0, r: 470.0, ang: 0 }
         ].map((sp, i) => ({
             x: sp.c * TILE_SIZE,
             y: sp.r * TILE_SIZE,
@@ -1508,7 +1508,7 @@ class LeonidaMap {
             { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza Center
             { c: 64.5,  r: 177.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn Speedway Open Pit Apron
             { c: 150.5, r: 123.5, carSpr: "4",  seed: 0.0 }, // Ambrosia Refinery Open Concrete Yard
-            { c: 452.5, r: 40.5,  carSpr: "6",  seed: 4.4 }  // SERA Spaceport Open Concrete Pad
+            { c: 336.5, r: 329.5, carSpr: "6",  seed: 4.4 }  // Vice Port Industrial Concrete Yard
         ].map((st) => ({
             x: st.c * TILE_SIZE,
             y: st.r * TILE_SIZE,
@@ -1899,6 +1899,16 @@ class LeonidaMap {
         this.objectEngine = typeof WorldObjectEngine !== "undefined" ? new WorldObjectEngine(this) : null;
         if (this.objectEngine) {
             this.objectEngine.validateAndPrepareLots();
+        }
+        try {
+            if (window.ShopInteriors && Array.isArray(this.interiors)) {
+                this.interiors = this.interiors.filter(intr => !intr.isShop || intr.id.startsWith("ESTATE_") || intr.id.startsWith("BIZ_"));
+                window.ShopInteriors.snapLandmarkDoors(this);
+                const shops = window.ShopInteriors.generate(this);
+                for (const s of shops) this.interiors.push(s);
+            }
+        } catch (e) {
+            console.warn("Post-CMP ShopInteriors generation failed:", e);
         }
 
         // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks & Outlaw Biker Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
@@ -2297,6 +2307,27 @@ class LeonidaMap {
                         const sd = this.viceStreetDetails[i];
                         const dx = pm.x - sd.x, dy = pm.y - sd.y;
                         if (dx * dx + dy * dy < 28 * 28) return false;
+                    }
+                }
+                if (this.airportProps) {
+                    for (let i = 0; i < this.airportProps.length; i++) {
+                        const ap = this.airportProps[i];
+                        const dx = pm.x - ap.x, dy = pm.y - ap.y;
+                        if (dx * dx + dy * dy < 68 * 68) return false;
+                    }
+                }
+                if (this.streetTakeovers) {
+                    for (let i = 0; i < this.streetTakeovers.length; i++) {
+                        const st = this.streetTakeovers[i];
+                        const dx = pm.x - st.x, dy = pm.y - st.y;
+                        if (dx * dx + dy * dy < 72 * 72) return false;
+                    }
+                }
+                if (this.tikiBars) {
+                    for (let i = 0; i < this.tikiBars.length; i++) {
+                        const tb = this.tikiBars[i];
+                        const dx = pm.x - tb.x, dy = pm.y - tb.y;
+                        if (dx * dx + dy * dy < 42 * 42) return false;
                     }
                 }
                 return true;
@@ -3000,16 +3031,16 @@ class LeonidaMap {
 
         // 10 High-Flying Unique Stunt Jump Ramps across Vice City & Leonida!
         this.stuntRamps = [
-            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: mx256(217.5) * TILE_SIZE, y: my256(151.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: mx256(217.5) * TILE_SIZE, y: my256(124.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: mx256(184.0) * TILE_SIZE, y: my256(156.5) * TILE_SIZE, angle: 0 },
-            { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: mx256(184.0) * TILE_SIZE, y: my256(109.5) * TILE_SIZE, angle: 0 },
-            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: mx256(184.0) * TILE_SIZE, y: my256(47.0) * TILE_SIZE, angle: 0 },
-            { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: mx256(141.5) * TILE_SIZE, y: my256(120.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: mx256(116.0) * TILE_SIZE, y: my256(114.5) * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: mx256(47.0) * TILE_SIZE, y: my256(120.5) * TILE_SIZE, angle: 0 },
-            { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: mx256(66.5) * TILE_SIZE, y: my256(156.0) * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: mx256(124.0) * TILE_SIZE, y: my256(241.5) * TILE_SIZE, angle: 0 }
+            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: 447.5 * TILE_SIZE, y: 292.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: 447.5 * TILE_SIZE, y: 265.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: 356.0 * TILE_SIZE, y: 297.5 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: 356.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 356.0 * TILE_SIZE, y: 75.0 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: 285.5 * TILE_SIZE, y: 261.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: 188.5 * TILE_SIZE, y: 188.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: 55.5 * TILE_SIZE, y: 177.5 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: 90.5 * TILE_SIZE, y: 297.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: 202.0 * TILE_SIZE, y: 480.5 * TILE_SIZE, angle: Math.PI }
         ];
         return landmarksList;
     }
@@ -3597,22 +3628,22 @@ class LeonidaMap {
         // 6 PAY 'N' SPRAY SHOPS ("VICE CUSTOMS") ON STATE OF LEONIDA ROADS
         // --------------------------------------------------------------------
         this.payNSprays = [
-            { id: "pns_oceandrive", name: "VICE CUSTOMS (COLLINS AVE / SOUTH BEACH)", x: mx256(203.0) * TILE_SIZE, y: my256(146.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_northbeach", name: "VICE CUSTOMS (NORTH BEACH / 919)", x: mx256(203.0) * TILE_SIZE, y: my256(48.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_downtown", name: "VICE CUSTOMS (BISCAYNE BLVD)", x: mx256(141.0) * TILE_SIZE, y: my256(112.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_wynwood", name: "WYNWOOD CUSTOMS (MAMBAS STADIUM)", x: mx256(115.0) * TILE_SIZE, y: my256(92.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_gellhorn", name: "GELLHORN SPEEDWAY CUSTOMS", x: mx256(38.0) * TILE_SIZE, y: my256(118.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_vcia", name: "VCIA AIRPORT CUSTOMS", x: mx256(89.0) * TILE_SIZE, y: my256(148.0) * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE }
+            { id: "pns_oceandrive", name: "VICE CUSTOMS (COLLINS AVE / SOUTH BEACH)", x: 434.5 * TILE_SIZE, y: 287.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_northbeach", name: "VICE CUSTOMS (NORTH BEACH / 919)", x: 434.5 * TILE_SIZE, y: 75.5 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_downtown", name: "VICE CUSTOMS (BISCAYNE BLVD)", x: 285.0 * TILE_SIZE, y: 179.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_wynwood", name: "WYNWOOD CUSTOMS (MAMBAS STADIUM)", x: 188.5 * TILE_SIZE, y: 159.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_gellhorn", name: "GELLHORN SPEEDWAY CUSTOMS", x: 62.0 * TILE_SIZE, y: 259.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_vcia", name: "VCIA AIRPORT CUSTOMS", x: 161.0 * TILE_SIZE, y: 295.5 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE }
         ];
 
         // --------------------------------------------------------------------
         // 4 BOMB SHOPS
         // --------------------------------------------------------------------
         this.bombShops = [
-            { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: mx256(75.5) * TILE_SIZE, y: my256(153.5) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_littlehaiti", name: "AMBROSIA BOMB SHOP (LAKE LEONIDA)", x: mx256(94.0) * TILE_SIZE, y: my256(80.0) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_sera", name: "SERA ROCKET ORDNANCE (CAPE LEONIDA)", x: mx256(215.0) * TILE_SIZE, y: my256(20.0) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: mx256(38.0) * TILE_SIZE, y: my256(140.0) * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
+            { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: 123.5 * TILE_SIZE, y: 295.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_littlehaiti", name: "AMBROSIA BOMB SHOP (LAKE LEONIDA)", x: 168.5 * TILE_SIZE, y: 110.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_sera", name: "SERA ROCKET ORDNANCE (CAPE LEONIDA)", x: 445.0 * TILE_SIZE, y: 28.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: 62.0 * TILE_SIZE, y: 281.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
         ];
 
         // --------------------------------------------------------------------
@@ -3755,7 +3786,7 @@ class LeonidaMap {
         this.crates = [];
 
         this.infoSigns = [
-            { x: mx256(213.5) * TILE_SIZE, y: my256(148.5) * TILE_SIZE, z: 2.0, text: "STATE OF LEONIDA (512x512 MEGA-MAP): VICE BEACH, MAMBAS STADIUM, SERA SPACEPORT, PENITENTIARY, SPEEDWAY & KEYS! PRESS [M] OR USE [C] TOUR!" },
+            { x: 443.5 * TILE_SIZE, y: 288.2 * TILE_SIZE, z: 2.0, text: "STATE OF LEONIDA (512x512 MEGA-MAP): VICE BEACH, MAMBAS STADIUM, SERA SPACEPORT, PENITENTIARY, SPEEDWAY & KEYS! PRESS [M] OR USE [C] TOUR!" },
             { x: mx256(218.5) * TILE_SIZE, y: my256(152.5) * TILE_SIZE, z: 2.0, text: "LUMMUS PARK & VICE BEACH: WIPE OUT ALL 7 MONKS FOR A GOURANGA! BONUS, OR CLICK ANY OF THE 16 LANDMARKS IN THE TOP-LEFT [C] WINDOW!" }
         ];
 

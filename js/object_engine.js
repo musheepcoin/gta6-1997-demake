@@ -271,22 +271,22 @@ class WorldObjectEngine {
         this.streetProps = [];
         this.landmarks3D = {
             launchpad: {
-                x: 461.8 * TILE_SIZE,
+                x: 464.5 * TILE_SIZE,
                 y: 35.5 * TILE_SIZE,
                 z: 2.0,
-                consoleX: 459.1 * TILE_SIZE,
+                consoleX: 461.0 * TILE_SIZE,
                 consoleY: 35.5 * TILE_SIZE
             },
             ferrisWheel: { x: 464.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
             lighthouses: [
-                { id: "key_west_lh", x: 215.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, seed: 0.0 },
+                { id: "key_west_lh", x: 199.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, seed: 0.0 },
                 { id: "cape_leonida_lh", x: 464.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, seed: 2.4 }
             ],
             gantryCranes: [
-                { x: 336.8 * TILE_SIZE, y: 328.0 * TILE_SIZE, z: 2.0, ang: 0 },
-                { x: 336.8 * TILE_SIZE, y: 333.0 * TILE_SIZE, z: 2.0, ang: 0 },
+                { x: 359.2 * TILE_SIZE, y: 323.2 * TILE_SIZE, z: 2.0, ang: 0 },
+                { x: 359.2 * TILE_SIZE, y: 335.2 * TILE_SIZE, z: 2.0, ang: 0 },
                 { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE, z: 2.0, ang: Math.PI },
-                { x: 57.2 * TILE_SIZE,  y: 240.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
+                { x: 57.2 * TILE_SIZE,  y: 243.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
             ]
         };
         this.rocketLaunch = {
@@ -555,6 +555,33 @@ class WorldObjectEngine {
                 }
             }
         }
+
+        const clearZones = [];
+        if (this.landmarks3D) {
+            if (this.landmarks3D.launchpad) {
+                clearZones.push({ x: this.landmarks3D.launchpad.x - 40, y: this.landmarks3D.launchpad.y, r: 340 });
+            }
+            if (this.landmarks3D.ferrisWheel) {
+                clearZones.push({ x: this.landmarks3D.ferrisWheel.x, y: this.landmarks3D.ferrisWheel.y, r: 165 });
+            }
+            if (Array.isArray(this.landmarks3D.lighthouses)) {
+                for (const lh of this.landmarks3D.lighthouses) {
+                    clearZones.push({ x: lh.x, y: lh.y, r: 96 });
+                }
+            }
+            if (Array.isArray(this.landmarks3D.gantryCranes)) {
+                for (const gc of this.landmarks3D.gantryCranes) {
+                    clearZones.push({ x: gc.x, y: gc.y, r: 110 });
+                }
+            }
+        }
+        const notInClearZone = (obj) => !clearZones.some(z => Math.hypot(obj.x - z.x, obj.y - z.y) < z.r);
+        if (Array.isArray(map.vicePalms)) map.vicePalms = map.vicePalms.filter(notInClearZone);
+        if (Array.isArray(map.trees)) map.trees = map.trees.filter(notInClearZone);
+        if (Array.isArray(map.beachSunbathers)) map.beachSunbathers = map.beachSunbathers.filter(notInClearZone);
+        if (Array.isArray(map.beachUmbrellas)) map.beachUmbrellas = map.beachUmbrellas.filter(notInClearZone);
+        if (Array.isArray(map.beachVolleyballCourts)) map.beachVolleyballCourts = map.beachVolleyballCourts.filter(notInClearZone);
+        if (Array.isArray(map.beachParties)) map.beachParties = map.beachParties.filter(notInClearZone);
 
         this.registerEstateInteriors();
         this.generate3DStreetProps();

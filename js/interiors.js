@@ -193,7 +193,7 @@
             { dc: 0, dr: 1, facing: "N", penalty: 6.0 }
         ];
         for (const intr of map.interiors) {
-            if (intr.isShop) continue;
+            if (intr.isShop || intr.id === "STAR_ISLAND") continue;
             intr.matRGB = hexToRgb(intr.accent);
             const cInit = Math.floor(intr.doorX / ts);
             const rInit = Math.floor(intr.doorY / ts);
@@ -279,7 +279,8 @@
                     if (len >= 2) {
                         const mid = c + (len >> 1);
                         // Door sidewalk tile needs walkable neighbours and must not be trapped in a 1-tile alley behind another building
-                        if ((isP(mid - 1, r + 1) || isP(mid + 1, r + 1)) && !isB(mid, r + 2)) {
+                        const isRestricted = typeof map.isRestrictedNoTrafficZone === "function" && map.isRestrictedNoTrafficZone(mid, r + 1);
+                        if (!isRestricted && (isP(mid - 1, r + 1) || isP(mid + 1, r + 1)) && !isB(mid, r + 2)) {
                             cands.push({ c: mid, r, len });
                         }
                     }
