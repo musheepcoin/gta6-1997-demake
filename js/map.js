@@ -263,6 +263,16 @@ class LeonidaMap {
             }
         }
 
+        // Pave SERA Space Center Launch Complex 39A security apron (x=458..471, y=29..40) with native GTA 1 stone/concrete pavers (lid 8)
+        for (let x = 458; x <= 471; x++) {
+            for (let y = 29; y <= 40; y++) {
+                for (let z = 0; z < MAP_LAYERS; z++) {
+                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] =
+                        this.voxelGrid[(z * MAP_ROWS + 41) * MAP_COLS + 462];
+                }
+            }
+        }
+
         // Seamless GTA 2 Road Continuity Pass: record original intersection stop-line blocks (lid 24)
         // in stopLineMask, then replace disruptive barcode crosswalk blocks with their adjacent continuous lane block (lid 1, 80, or 74)
         // so curbs, yellow edge lines & lane dividers run unbroken to every junction while Traffic AI still knows every stop line!
@@ -878,6 +888,7 @@ class LeonidaMap {
         const starLawnMinY = MAP_Y_256[111], starLawnMaxY = MAP_Y_256[115];
         const isCleanSandTile = (c, r, allowStarIsland = false) => {
             if (c < 2 || c >= MAP_COLS - 2 || r < 2 || r >= MAP_ROWS - 2) return false;
+            if (r <= 46 && c >= 455) return false; // Exclude SERA Spaceport security perimeter from beach sunbathers
             const idx = r * MAP_COLS + c;
             const isStarLawn = allowStarIsland && c >= starLawnMinX && c <= starLawnMaxX && r >= starLawnMinY && r <= starLawnMaxY && this.surfaceGround[idx] === GROUND_TYPE.FIELD;
             if (!this.coastalSandMask[idx] && !isStarLawn) return false;

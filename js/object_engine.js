@@ -271,11 +271,11 @@ class WorldObjectEngine {
         this.streetProps = [];
         this.landmarks3D = {
             launchpad: {
-                x: 464.5 * TILE_SIZE,
-                y: 35.5 * TILE_SIZE,
+                x: 465.0 * TILE_SIZE,
+                y: 35.0 * TILE_SIZE,
                 z: 2.0,
-                consoleX: 461.0 * TILE_SIZE,
-                consoleY: 35.5 * TILE_SIZE
+                consoleX: 460.8 * TILE_SIZE,
+                consoleY: 35.0 * TILE_SIZE
             },
             ferrisWheel: { x: 464.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
             lighthouses: [
@@ -1410,6 +1410,9 @@ class WorldObjectEngine {
             varying vec4 vColor;
             varying vec3 vWorldPos;
             uniform sampler2D uTex;
+            uniform sampler2D uTilesTex;
+            uniform sampler2D uDayLightTex;
+            uniform vec2 uSunDir;
             uniform float uNightTint;
             uniform float uSunsetTint;
 
@@ -1419,90 +1422,156 @@ class WorldObjectEngine {
                 return fract(p.x * p.y);
             }
 
+            // Sample authentic 64x64 3ds Max pixel-art tile from gta1_tiles_vice.png (16x51 atlas)
+            vec4 sampleViceTile(float col, float row, vec2 uv) {
+                vec2 localUV = clamp(uv, vec2(0.5 / 64.0), vec2(63.5 / 64.0));
+                return texture2D(uTilesTex, (vec2(col, row) + localUV) / vec2(16.0, 51.0));
+            }
+
             void main() {
                 vec4 c;
-                if (vUV.x < -0.5) {
+                bool isShadowSkirt = false;
+
+                // 64px-per-tile pixel-art texel grid quantization (matches GTA 1 / Vice City 26 1:1 texel density)
+                vec3 qWorld = floor(vWorldPos * 64.0 + 0.5) / 64.0;
+
+                if (vUV.x >= 1.5) {
+                    // MODE A: Face-Mapped 64x64 Tile directly from gta1_tiles_vice.png (uTilesTex)
+                    vec4 tex = texture2D(uTilesTex, vec2(vUV.x - 2.0, vUV.y));
+                    if (tex.a < 0.12) discard;
+                    c = vec4(tex.rgb * vColor.rgb, tex.a * vColor.a);
+                } else if (vUV.x < -19.5) {
+                    // MODE B: World-Tiled 1:1 64x64 Lid Tile from gta1_tiles_vice.png (matches sampleLidTile in cityFS!)
+                    float col = floor(-vUV.x - 20.0 + 0.5);
+                    float row = floor(vUV.y + 0.5);
+                    vec4 tex = sampleViceTile(col, row, fract(vWorldPos.xz));
+                    c = vec4(tex.rgb * vColor.rgb, vColor.a);
+                } else if (vUV.x < -0.5) {
+                    // MODE C: 64px-Quantized Pixel-Art + uTilesTex-Blended Materials (MAT 1..8)
                     float rawX = -vUV.x;
                     float matId = floor(rawX + 0.001);
                     vec2 puv = vec2(clamp((rawX - matId) / 0.85, 0.0, 1.0), clamp(vUV.y, 0.0, 1.0));
+                    vec2 qUV = floor(puv * 32.0 + 0.5) / 32.0;
                     c = vColor;
 
-                    // World-space micro-grain so no untextured surface ever looks flat plastic
-                    float grain = (hash21(floor(vWorldPos.xz * 24.0 + vWorldPos.y * 16.0)) - 0.5) * 0.055;
+                    // Quantized 64px texel grain & dark charcoal pixel-art contour color (#0f172a)
+                    float grain = (hash21(floor(vWorldPos.xz * 64.0 + vWorldPos.y * 32.0)) - 0.5) * 0.06;
+                    vec3 darkInk = vec3(0.09, 0.12, 0.18);
+                    float edgeX = min(puv.x, 1.0 - puv.x);
+                    float edgeY = min(puv.y, 1.0 - puv.y);
 
                     if (matId < 1.5) {
-                        // MAT 1: Architectural Stucco / Trim / Columns (beveled edges + vertical AO)
-                        float edgeX = min(puv.x, 1.0 - puv.x);
-                        float edgeY = min(puv.y, 1.0 - puv.y);
-                        float bevel = smoothstep(0.0, 0.08, min(edgeX, edgeY));
-                        float vAO = mix(0.88, 1.04, puv.y);
-                        c.rgb = c.rgb * vAO * (0.95 + 0.07 * bevel) + grain;
+                        // MAT 1: Architectural Stucco / Masonry / Trim (blends L8 stone tile grain + 1px dark contour)
+                        vec3 stoneTex = sampleViceTile(14.0, 24.0, fract(qWorld.xz + vec2(qWorld.y))).rgb;
+                        float stoneMod = 0.88 + dot(stoneTex, vec3(0.333)) * 0.18;
+                        float bevel = step(0.04, min(edgeX, edgeY));
+                        float vAO = mix(0.86, 1.04, qUV.y);
+                        c.rgb = c.rgb * stoneMod * vAO + grain;
+                        c.rgb = mix(darkInk, c.rgb, mix(0.55, 1.0, bevel));
                     } else if (matId < 2.5) {
-                        // MAT 2: Industrial Concrete Blast Pad & Tarmac (expansion slab grid + blast scorch + aggregate)
-                        vec2 slab = abs(fract(vWorldPos.xz * 1.25) - 0.5);
-                        float joint = smoothstep(0.46, 0.495, max(slab.x, slab.y));
-                        float rad = length(puv - vec2(0.5, 0.5)) * 2.0;
-                        float scorch = smoothstep(0.15, 0.78, rad);
-                        float curb = smoothstep(0.88, 0.96, max(abs(puv.x - 0.5), abs(puv.y - 0.5)) * 2.0);
-                        c.rgb = c.rgb * mix(0.76, 1.02, scorch) * (1.0 - joint * 0.16) + curb * 0.07 + grain * 1.3;
+                        // MAT 2: Industrial Concrete Blast Pad & Retaining Wall (samples L71 concrete grid & L8 pavers at 1:1 scale)
+                        vec3 concTex = sampleViceTile(13.0, 28.0, fract(vWorldPos.xz)).rgb;
+                        vec3 paverTex = sampleViceTile(14.0, 24.0, fract(vWorldPos.xz * 0.5)).rgb;
+                        vec3 baseTex = mix(concTex, paverTex, 0.42);
+                        float rad = length(qUV - vec2(0.5, 0.5)) * 2.0;
+                        float scorch = smoothstep(0.12, 0.78, rad);
+                        float outline = step(0.035, min(edgeX, edgeY));
+                        c.rgb = mix(baseTex * c.rgb * 1.32, c.rgb * (0.72 + baseTex * 0.42), 0.45) * mix(0.78, 1.02, scorch) + grain;
+                        c.rgb = mix(darkInk, c.rgb, mix(0.45, 1.0, outline));
                     } else if (matId < 3.5) {
-                        // MAT 3: Diagonal Yellow/Black Industrial Hazard Chevrons
-                        float stripe = sin((vWorldPos.x + vWorldPos.z + vWorldPos.y * 0.5) * 26.0);
-                        vec3 hazYellow = vec3(0.96, 0.76, 0.10);
-                        vec3 hazDark = vec3(0.14, 0.16, 0.20);
-                        c.rgb = mix(hazDark, hazYellow, smoothstep(-0.15, 0.15, stripe)) + grain;
+                        // MAT 3: 64px-Quantized Yellow/Black Hazard Chevrons over L33 Riveted Blast Steel
+                        vec3 steelTex = sampleViceTile(7.0, 26.0, fract(qWorld.xz * 2.0)).rgb;
+                        float stripe = step(0.0, sin((qWorld.x + qWorld.z + qWorld.y * 0.5) * 25.1327));
+                        vec3 hazYellow = vec3(0.92, 0.72, 0.14) * (0.85 + steelTex.r * 0.35);
+                        vec3 hazDark = steelTex * 0.85;
+                        float border = step(0.06, min(edgeX, edgeY));
+                        c.rgb = mix(hazDark, hazYellow, stripe) + grain;
+                        c.rgb = mix(darkInk, c.rgb, mix(0.40, 1.0, border));
                     } else if (matId < 4.5) {
-                        // MAT 4: Open-Lattice 3D Structural Steel Truss (Umbilical Tower, Gantry Cranes, Swing Arms)
-                        float frameX = min(puv.x, 1.0 - puv.x);
-                        float frameY = min(puv.y, 1.0 - puv.y);
-                        float d1 = abs(puv.x - puv.y);
-                        float d2 = abs(puv.x - (1.0 - puv.y));
-                        bool isOuter = (frameX < 0.16) || (frameY < 0.15);
-                        bool isCross = (d1 < 0.115) || (d2 < 0.115);
+                        // MAT 4: 24x24 Pixel-Art Open-Lattice Riveted Steel Truss (matches S246 & S363 in gta1_tiles_vice.png)
+                        vec2 tp = floor(puv * 24.0) / 24.0;
+                        float fx = min(tp.x, 1.0 - tp.x);
+                        float fy = min(tp.y, 1.0 - tp.y);
+                        float d1 = abs(tp.x - tp.y);
+                        float d2 = abs(tp.x - (1.0 - tp.y));
+                        bool isOuter = (fx < 0.17) || (fy < 0.17);
+                        bool isCross = (d1 < 0.125) || (d2 < 0.125);
                         if (!isOuter && !isCross) discard;
-                        float barHighlight = isOuter ? 1.04 : 0.88;
-                        c.rgb = c.rgb * barHighlight + grain * 0.8;
+                        // 1-texel dark charcoal pixel-art girder outline + corner gusset rivets + L45 steel grain
+                        bool isOutline = (fx < 0.045) || (fy < 0.045) ||
+                                         (!isOuter && d1 > 0.082 && d2 > 0.082) ||
+                                         (isOuter && fx > 0.125 && fy > 0.125 && !isCross);
+                        vec3 steelTex = sampleViceTile(3.0, 27.0, tp).rgb;
+                        float rivet = step(0.86, sin(tp.x * 75.398) * sin(tp.y * 75.398)) * (isOuter ? 0.12 : 0.0);
+                        c.rgb = c.rgb * (0.76 + steelTex * 0.38) * (isOuter ? 1.04 : 0.88) + rivet + grain;
+                        if (isOutline) c.rgb = mix(c.rgb, darkInk, 0.72);
                     } else if (matId < 5.5) {
-                        // MAT 5: Aerospace Fuselage / Cryogenic Tank / Cylindrical Monument (stringers + weld rings + sheen)
-                        float ring = smoothstep(0.43, 0.49, abs(fract(puv.y * 4.0) - 0.5));
-                        float stringer = smoothstep(0.42, 0.49, abs(fract(puv.x * 8.0) - 0.5));
-                        float sheen = pow(max(0.0, 1.0 - abs(puv.x - 0.38) * 2.1), 2.4) * 0.14;
-                        c.rgb = c.rgb * (1.0 - ring * 0.10 - stringer * 0.05) + sheen + grain * 0.5;
+                        // MAT 5: 3ds Max Pixel-Art Aerospace Fuselage / Cryo Sphere / Cylindrical Monument (samples L45 brushed steel)
+                        vec3 aeroTex = sampleViceTile(3.0, 27.0, qUV).rgb;
+                        float ring = step(0.42, abs(fract(qUV.y * 4.0) - 0.5));
+                        float stringer = step(0.42, abs(fract(qUV.x * 8.0) - 0.5));
+                        // Stepped 3ds Max metallic highlight band + dark charcoal panel weld seams
+                        float sheen = floor(pow(max(0.0, 1.0 - abs(qUV.x - 0.38) * 2.0), 2.0) * 5.0) / 5.0 * 0.14;
+                        c.rgb = c.rgb * (0.78 + aeroTex * 0.34) + sheen + grain;
+                        c.rgb = mix(c.rgb, darkInk, max(ring * 0.38, stringer * 0.22));
                     } else if (matId < 6.5) {
-                        // MAT 6: Corrugated Steel Shipping Container (deep ribs + frame border)
-                        float rib = sin(puv.x * 54.0) * 0.10;
-                        float border = (min(puv.x, 1.0 - puv.x) < 0.06 || min(puv.y, 1.0 - puv.y) < 0.08) ? 0.08 : 0.0;
-                        c.rgb = clamp(c.rgb + rib + border + grain, 0.0, 1.0);
+                        // MAT 6: 3ds Max Corrugated Steel Shipping Container (samples L63 corrugated metal + dark corner castings)
+                        vec3 corrTex = sampleViceTile(5.0, 28.0, qUV).rgb;
+                        float rib = floor(sin(qUV.x * 50.265) * 3.0) / 3.0 * 0.09;
+                        bool isFrame = (edgeX < 0.065) || (edgeY < 0.085);
+                        bool isDarkEdge = (edgeX < 0.03) || (edgeY < 0.04);
+                        c.rgb = c.rgb * (0.76 + dot(corrTex, vec3(0.333)) * 0.38) + rib + (isFrame ? 0.06 : 0.0) + grain;
+                        if (isDarkEdge) c.rgb = mix(c.rgb, darkInk, 0.70);
                     } else if (matId < 7.5) {
-                        // MAT 7: Architectural / Fresnel Lantern Glass (mullion grid + sky reflection)
-                        float mullionX = smoothstep(0.42, 0.48, abs(fract(puv.x * 4.0) - 0.5));
-                        float mullionY = smoothstep(0.42, 0.48, abs(fract(puv.y * 2.0) - 0.5));
+                        // MAT 7: Observation Bunker & Fresnel Lantern Glass (samples L31 blue glass skylight grid)
+                        vec3 glassTex = sampleViceTile(5.0, 26.0, qUV).rgb;
+                        float mullionX = step(0.40, abs(fract(qUV.x * 4.0) - 0.5));
+                        float mullionY = step(0.40, abs(fract(qUV.y * 2.0) - 0.5));
                         float mullion = max(mullionX, mullionY);
-                        float refl = smoothstep(0.1, 0.9, puv.x * 0.6 + puv.y * 0.4) * 0.18;
-                        c.rgb = mix(c.rgb + refl, vec3(0.16, 0.20, 0.26), mullion * 0.65);
+                        c.rgb = mix(mix(c.rgb, glassTex, 0.48), darkInk, mullion * 0.72);
                     } else if (matId < 8.5) {
                         // MAT 8: Soft Ground Ambient Occlusion Contact Shadow Skirt
+                        isShadowSkirt = true;
                         vec2 d = abs(puv - vec2(0.5, 0.5)) * 2.0;
                         float dist = max(d.x, d.y);
                         float falloff = 1.0 - smoothstep(0.45, 0.98, dist);
                         c = vec4(0.02, 0.03, 0.06, vColor.a * falloff);
                     }
                 } else {
+                    // MODE D: Sprite & Custom 3D House Facade Atlas (gta1_sprites.png)
                     c = texture2D(uTex, vUV) * vColor;
                     if (c.a < 0.12) discard;
                 }
-                if (uSunsetTint > 0.01 && vUV.x > -7.5) {
-                    vec3 sunsetRgb = c.rgb * vec3(1.12, 0.90, 0.78);
-                    c.rgb = mix(c.rgb, sunsetRgb, uSunsetTint * 0.52);
-                }
-                if (uNightTint > 0.01 && vUV.x > -7.5) {
-                    float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                    float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                    float isWindow = clamp((lum - 0.50) * 3.4 + (sat - 0.28) * 2.6, 0.0, 1.0);
-                    vec3 darkWall = c.rgb * vec3(0.46, 0.54, 0.78);
-                    vec3 warmGlow = min(vec3(1.0), mix(c.rgb * 1.38, vec3(1.0, 0.86, 0.52), 0.42));
-                    vec3 nightRgb = mix(darkWall, warmGlow, isWindow * 0.90);
-                    c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
+
+                // Apply exact cityFS (js/renderer.js) Daytime Solar Grading, Ray-Marched Lightmap (uDayLightTex) & Storey AO!
+                if (!isShadowSkirt) {
+                    float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
+                    if (dayAmt > 0.01) {
+                        vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
+                        float onGround = clamp(2.65 - vWorldPos.y, 0.0, 1.0);
+                        float bldAO = lm.g * onGround * 0.50;
+                        float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
+                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * 0.60;
+                        float totalShade = clamp(max(bldShadow, bldAO), 0.0, 1.0);
+                        vec3 sunlitTint = vec3(1.07, 1.03, 0.95);
+                        vec3 shadowTint = vec3(0.68, 0.75, 0.88);
+                        vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade);
+                        float baseAO = mix(0.86, 1.0, smoothstep(2.0, 2.45, vWorldPos.y));
+                        c.rgb = min(vec3(1.0), c.rgb * mix(vec3(1.0), dayGrading * baseAO, dayAmt));
+                    }
+                    if (uSunsetTint > 0.01) {
+                        vec3 sunsetRgb = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.04, 0.01, 0.02);
+                        c.rgb = mix(c.rgb, min(vec3(1.0), sunsetRgb), uSunsetTint * 0.60);
+                    }
+                    if (uNightTint > 0.01) {
+                        float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                        float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+                        float isWindow = clamp((lum - 0.50) * 3.4 + (sat - 0.28) * 2.6, 0.0, 1.0);
+                        vec3 darkWall = c.rgb * vec3(0.46, 0.54, 0.78);
+                        vec3 warmGlow = min(vec3(1.0), mix(c.rgb * 1.38, vec3(1.0, 0.86, 0.52), 0.42));
+                        vec3 nightRgb = mix(darkWall, warmGlow, isWindow * 0.90);
+                        c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
+                    }
                 }
                 gl_FragColor = c;
             }
@@ -1514,6 +1583,9 @@ class WorldObjectEngine {
             aColor: gl.getAttribLocation(this.meshProg, "aColor"),
             uViewProj: gl.getUniformLocation(this.meshProg, "uViewProj"),
             uTex: gl.getUniformLocation(this.meshProg, "uTex"),
+            uTilesTex: gl.getUniformLocation(this.meshProg, "uTilesTex"),
+            uDayLightTex: gl.getUniformLocation(this.meshProg, "uDayLightTex"),
+            uSunDir: gl.getUniformLocation(this.meshProg, "uSunDir"),
             uNightTint: gl.getUniformLocation(this.meshProg, "uNightTint"),
             uSunsetTint: gl.getUniformLocation(this.meshProg, "uSunsetTint")
         };
@@ -1536,6 +1608,28 @@ class WorldObjectEngine {
             -matId - Math.max(0.01, Math.min(0.99, u)) * 0.85,
             Math.max(0.01, Math.min(0.99, v))
         ];
+        // Direct 64x64 Tile Atlas UVs in gta1_tiles_vice.png (sideIdx 0..389, lidIdx 390 + lid)
+        const getTileAtlasUV = (tileIdx, u0 = 0.0, v0 = 0.0, u1 = 1.0, v1 = 1.0) => {
+            const col = tileIdx % 16;
+            const row = Math.floor(tileIdx / 16);
+            const pu0 = Math.max(0.5 / 64.0, Math.min(63.5 / 64.0, u0));
+            const pv0 = Math.max(0.5 / 64.0, Math.min(63.5 / 64.0, v0));
+            const pu1 = Math.max(0.5 / 64.0, Math.min(63.5 / 64.0, u1));
+            const pv1 = Math.max(0.5 / 64.0, Math.min(63.5 / 64.0, v1));
+            return [
+                2.0 + (col + pu0) / 16.0,
+                (row + pv0) / 51.0,
+                2.0 + (col + pu1) / 16.0,
+                (row + pv1) / 51.0
+            ];
+        };
+        // World-Tiled 1:1 64x64 Lid Tile UV encoding (tiles seamlessly across world-space fract(vWorldPos.xz))
+        const encodeLidWorldUV = (lidIdx) => {
+            const idx = 390 + lidIdx;
+            const col = idx % 16;
+            const row = Math.floor(idx / 16);
+            return [-20.0 - col, row];
+        };
         const pushQuad3D = (p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a = 1.0) => {
             pushV(p0[0], p0[1], p0[2], u0, v0, r, g, b, a);
             pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
@@ -1549,6 +1643,14 @@ class WorldObjectEngine {
             const [u0, v0] = encodeMatUV(matId, 0.02, 0.98);
             const [u1, v1] = encodeMatUV(matId, 0.98, 0.02);
             pushQuad3D(p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a);
+        };
+        const pushTileQuad3D = (p0, p1, p2, p3, tileIdx, r = 1.0, g = 1.0, b = 1.0, a = 1.0) => {
+            const [u0, v0, u1, v1] = getTileAtlasUV(tileIdx, 0.0, 0.0, 1.0, 1.0);
+            pushQuad3D(p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a);
+        };
+        const pushWorldLidQuad3D = (p0, p1, p2, p3, lidIdx, r = 1.0, g = 1.0, b = 1.0, a = 1.0) => {
+            const [wu, wv] = encodeLidWorldUV(lidIdx);
+            pushQuad3D(p0, p1, p2, p3, wu, wv, wu, wv, r, g, b, a);
         };
         const pushTri3D = (p0, p1, p2, uv0, uv1, uv2, r, g, b, a = 1.0) => {
             pushV(p0[0], p0[1], p0[2], uv0[0], uv0[1], r, g, b, a);
@@ -1597,6 +1699,36 @@ class WorldObjectEngine {
 
             if (topColor) {
                 pushMatQuad3D(tNW, tNE, tSW, tSE, 1, topColor[0], topColor[1], topColor[2], 1.0);
+            }
+        };
+
+        // 3D Box Textured Directly with Authentic 64x64 Tiles from gta1_tiles_vice.png (uTilesTex)
+        const emitTileBox3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, frontTileIdx, sideTileIdx, topLidIdx = null, col = [1.0, 1.0, 1.0], worldTileTop = false) => {
+            const hw = wPx * 0.5;
+            const hd = dPx * 0.5;
+            const [r, g, b] = col;
+            const tNW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY - hd, yTop);
+            const tNE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY - hd, yTop);
+            const tSW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY + hd, yTop);
+            const tSE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY + hd, yTop);
+            const bNW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY - hd, yBot);
+            const bNE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY - hd, yBot);
+            const bSW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY + hd, yBot);
+            const bSE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY + hd, yBot);
+
+            const sIdx = (sideTileIdx !== null && sideTileIdx !== undefined) ? sideTileIdx : frontTileIdx;
+            if (frontTileIdx !== null && frontTileIdx !== undefined) {
+                pushTileQuad3D(tSW, tSE, bSW, bSE, frontTileIdx, r * 1.02, g * 1.01, b * 0.99, 1.0);
+                pushTileQuad3D(tNE, tNW, bNE, bNW, sIdx, r * 0.78, g * 0.80, b * 0.85, 1.0);
+                pushTileQuad3D(tNW, tSW, bNW, bSW, sIdx, r * 0.92, g * 0.93, b * 0.95, 1.0);
+                pushTileQuad3D(tSE, tNE, bSE, bNE, sIdx, r * 0.85, g * 0.86, b * 0.90, 1.0);
+            }
+            if (topLidIdx !== null && topLidIdx !== undefined) {
+                if (worldTileTop) {
+                    pushWorldLidQuad3D(tNW, tNE, tSW, tSE, topLidIdx, r, g, b, 1.0);
+                } else {
+                    pushTileQuad3D(tNW, tNE, tSW, tSE, 390 + topLidIdx, r, g, b, 1.0);
+                }
             }
         };
 
@@ -1721,8 +1853,8 @@ class WorldObjectEngine {
             }
         };
 
-        // True 8-Sided Chamfered Concrete Pad with Sloped Blast Apron Walls
-        const emitOctagonPad3D = (cxPx, cyPx, offX, offY, rxBot, ryBot, rxTop, ryTop, bevelRatio, yBot, yTop, sideCol, topCol, matId = 2) => {
+        // True 8-Sided Chamfered Concrete Pad with Authentic gta1_tiles_vice.png Sloped Retaining Walls & World-Tiled Lid Deck
+        const emitOctagonPad3D = (cxPx, cyPx, offX, offY, rxBot, ryBot, rxTop, ryTop, bevelRatio, yBot, yTop, sideCol, topCol, matId = 2, sideTileIdx = 177, topLidIdx = 71) => {
             const makeOctPts = (rx, ry, yE) => {
                 const bx = rx * (1.0 - bevelRatio);
                 const by = ry * (1.0 - bevelRatio);
@@ -1740,19 +1872,28 @@ class WorldObjectEngine {
             const botPts = makeOctPts(rxBot, ryBot, yBot);
             const topPts = makeOctPts(rxTop, ryTop, yTop);
             const centerTop = toWorld(cxPx, cyPx, 1, 0, offX, offY, yTop);
-            const uvCenter = encodeMatUV(matId, 0.5, 0.5);
+            const worldLidUV = (topLidIdx !== null && topLidIdx !== undefined) ? encodeLidWorldUV(topLidIdx) : null;
+            const uvCenter = worldLidUV || encodeMatUV(matId, 0.5, 0.5);
             for (let i = 0; i < 8; i++) {
                 const ni = (i + 1) % 8;
-                const shade = 0.82 + 0.16 * Math.sin((i / 8.0) * Math.PI * 2.0);
-                pushMatQuad3D(
-                    topPts[i], topPts[ni], botPts[i], botPts[ni],
-                    matId,
-                    sideCol[0] * shade, sideCol[1] * shade, sideCol[2] * shade, 1.0
-                );
+                const shade = 0.84 + 0.16 * Math.sin((i / 8.0) * Math.PI * 2.0);
+                if (sideTileIdx !== null && sideTileIdx !== undefined) {
+                    pushTileQuad3D(
+                        topPts[i], topPts[ni], botPts[i], botPts[ni],
+                        sideTileIdx,
+                        sideCol[0] * shade, sideCol[1] * shade, sideCol[2] * shade, 1.0
+                    );
+                } else {
+                    pushMatQuad3D(
+                        topPts[i], topPts[ni], botPts[i], botPts[ni],
+                        matId,
+                        sideCol[0] * shade, sideCol[1] * shade, sideCol[2] * shade, 1.0
+                    );
+                }
                 const a0 = (i / 8.0) * Math.PI * 2.0;
                 const a1 = (ni / 8.0) * Math.PI * 2.0;
-                const uv0 = encodeMatUV(matId, 0.5 + 0.46 * Math.cos(a0), 0.5 + 0.46 * Math.sin(a0));
-                const uv1 = encodeMatUV(matId, 0.5 + 0.46 * Math.cos(a1), 0.5 + 0.46 * Math.sin(a1));
+                const uv0 = worldLidUV || encodeMatUV(matId, 0.5 + 0.46 * Math.cos(a0), 0.5 + 0.46 * Math.sin(a0));
+                const uv1 = worldLidUV || encodeMatUV(matId, 0.5 + 0.46 * Math.cos(a1), 0.5 + 0.46 * Math.sin(a1));
                 pushTri3D(centerTop, topPts[i], topPts[ni], uvCenter, uv0, uv1, topCol[0], topCol[1], topCol[2], 1.0);
             }
         };
@@ -2007,28 +2148,30 @@ class WorldObjectEngine {
 
         // ====================================================================
         // E. COMPILE 3D AIRPORT CHECKPOINT GUARDHOUSES (airportCompound.gates)
+        //    (Textured with real 64x64 GTA 1 tiles: S177 concrete, S199 glass booth, L86 HVAC roof)
         // ====================================================================
         if (this.map && this.map.airportCompound && Array.isArray(this.map.airportCompound.gates)) {
             for (const gt of this.map.airportCompound.gates) {
                 const bx = gt.boothX, by = gt.boothY, bz = 2.0;
                 emitAOShadow3D(bx, by, 1, 0, 0, 0, 42, 34, bz, 0.38);
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 28, 22, bz, bz + 0.18, [0.86, 0.89, 0.94], 2);
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 24, 18, bz + 0.18, bz + 0.38, [0.32, 0.62, 0.84], 7);
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.38, bz + 0.43, [0.22, 0.26, 0.34], 1);
-                emitSolidBox3D(bx, by, 1, 0, 0, 0, 18, 5, bz + 0.43, bz + 0.47, [0.98, 0.78, 0.12], 3);
+                emitTileBox3D(bx, by, 1, 0, 0, 0, 28, 22, bz, bz + 0.18, 177, 177, 46, [0.94, 0.96, 0.99], true);
+                emitTileBox3D(bx, by, 1, 0, 0, 0, 24, 18, bz + 0.18, bz + 0.38, 199, 199, 31, [0.96, 0.98, 1.00], false);
+                emitTileBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.38, bz + 0.44, 173, 173, 86, [0.92, 0.94, 0.98], false);
+                emitSolidBox3D(bx, by, 1, 0, 0, 0, 18, 5, bz + 0.44, bz + 0.48, [0.94, 0.74, 0.14], 3);
             }
         }
 
         // ====================================================================
         // F. COMPILE 3D CORRUGATED SHIPPING CONTAINERS & SEE-THROUGH PORT GANTRY CRANES
+        //    (Uses real alpha-cutout 3ds Max steel truss tiles S246, S250, S363 + MAT 6 containers)
         // ====================================================================
         if (this.map && Array.isArray(this.map.portTerminals)) {
             const containerPalette = [
-                [0.84, 0.22, 0.18], // Hapag Crimson
-                [0.14, 0.54, 0.78], // Maersk Cyan-Blue
-                [0.16, 0.62, 0.36], // Evergreen
-                [0.92, 0.52, 0.12], // Hazard Orange
-                [0.24, 0.36, 0.68]  // Cosco Navy
+                [0.80, 0.24, 0.20], // Hapag Weathered Crimson
+                [0.18, 0.52, 0.74], // Maersk Weathered Cyan-Blue
+                [0.20, 0.58, 0.36], // Evergreen Weathered Green
+                [0.86, 0.48, 0.16], // Hazard Rust-Orange
+                [0.26, 0.38, 0.64]  // Cosco Industrial Navy
             ];
             for (let i = 0; i < this.map.portTerminals.length; i++) {
                 const pt = this.map.portTerminals[i];
@@ -2040,7 +2183,7 @@ class WorldObjectEngine {
                 const cw = 54 * sc;
                 const cd = 22 * sc;
                 emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, cw + 18, cd * 2.4 + 16, bz, 0.44);
-                // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers (MAT 6)
+                // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers (MAT 6 blends L63 steel ribs)
                 for (let row = -1; row <= 1; row += 2) {
                     const oy = row * (cd * 0.55);
                     const c1 = containerPalette[(i + (row > 0 ? 1 : 0)) % containerPalette.length];
@@ -2060,122 +2203,135 @@ class WorldObjectEngine {
                 const cosA = Math.cos(gc.ang || 0);
                 const sinA = Math.sin(gc.ang || 0);
                 const bz = gc.z || 2.0;
-                const red = [0.88, 0.18, 0.16];
-                const white = [0.95, 0.96, 0.98];
-                const steel = [0.26, 0.30, 0.36];
+                const red = [0.92, 0.36, 0.32];
+                const white = [0.96, 0.97, 0.99];
+                const steel = [0.28, 0.32, 0.38];
                 emitAOShadow3D(gc.x, gc.y, cosA, sinA, 0, 0, 96, 96, bz, 0.38);
-                // 4 Mega-Port Panamax Portal Legs with MAT 4 Steel Truss Bracing
+                // 4 Mega-Port Panamax Portal Legs with real 3ds Max S246 & S363 alpha-cutout steel truss tiles!
                 for (const lx of [-34, 34]) {
                     for (const ly of [-36, 36]) {
-                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 10, 10, bz, bz + 0.95, red, 1);
-                        emitSolidBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 9,  9,  bz + 0.95, bz + 1.65, white, 4);
+                        emitTileBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 11, 11, bz, bz + 0.95, 246, 246, 64, red, false);
+                        emitTileBox3D(gc.x, gc.y, cosA, sinA, lx, ly, 10, 10, bz + 0.95, bz + 1.65, 363, 363, 64, white, false);
                     }
                 }
-                // Cross-Portal Beam + Operator Glass Cab (MAT 7) + 210px Open-Lattice Hammerhead Boom (MAT 4)
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 84, 86, bz + 0.90, bz + 1.02, red, 4);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 18, 0, 26, 22, bz + 1.42, bz + 1.64, [0.36, 0.68, 0.88], 7);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 54, 0, 214, 18, bz + 1.64, bz + 1.82, red, 4);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 24, 24, bz + 1.82, bz + 2.15, white, 4);
+                // Cross-Portal Truss Beam (S250) + Operator Glass Cab (S199 / L86) + 214px Open-Lattice Hammerhead Boom (S250 / L64)
+                emitTileBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 84, 86, bz + 0.90, bz + 1.04, 250, 250, 64, red, false);
+                emitTileBox3D(gc.x, gc.y, cosA, sinA, 18, 0, 26, 22, bz + 1.42, bz + 1.64, 199, 86, 86, [0.95, 0.97, 1.00], false);
+                emitTileBox3D(gc.x, gc.y, cosA, sinA, 54, 0, 214, 18, bz + 1.64, bz + 1.82, 250, 363, 64, red, false);
+                emitTileBox3D(gc.x, gc.y, cosA, sinA, 0, 0, 24, 24, bz + 1.82, bz + 2.15, 363, 363, 64, white, false);
                 // Spreader steel cables + suspended 3D Maersk/Hapag corrugated container (MAT 6)
                 emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, -8, 2.5, 2.5, bz + 0.78, bz + 1.64, steel, 1);
                 emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108,  8, 2.5, 2.5, bz + 0.78, bz + 1.64, steel, 1);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 28, 16, bz + 0.70, bz + 0.78, [0.96, 0.76, 0.12], 3);
-                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 24, 56, bz + 0.44, bz + 0.70, [0.14, 0.54, 0.78], 6);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 28, 16, bz + 0.70, bz + 0.78, [0.94, 0.74, 0.14], 3);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 24, 56, bz + 0.44, bz + 0.70, [0.18, 0.52, 0.74], 6);
             }
         }
 
         // ====================================================================
         // G. COMPILE SERA SPACE CENTER LAUNCH COMPLEX 39A (KENNEDY / CAPE CANAVERAL)
-        //    (Chamfered Octagonal Concrete Blast Pad, Recessed Scorched Flame Trench,
-        //     True 3D Geodesic Spherical LOX/LH2 Cryo Tanks, Open-Lattice Steel LUT
-        //     Umbilical Tower, Tapered Cylindrical Lightning Masts & Control Bunker)
+        //    100% Textured with Authentic 64x64 GTA 1 Tiles from gta1_tiles_vice.png:
+        //    - S86 / S199 / L86 / L31: NASA/SERA Launch Control Bunker (matches SERA building across road!)
+        //    - S177 / L71 & S503(L113) / L144: Stepped Chamfered Octagonal Concrete Blast Pad
+        //    - L33 / L22: Scorched Riveted Steel Flame Deflector Trench & Exhaust Turbine Shafts
+        //    - S172 / S173 / L109: Mobile Launcher Platform (MLP) with Helipad/Target Ring Deck
+        //    - S191 / L67: Cryogenic LOX/LH2 Pipeline Manifolds & Geodesic Storage Spheres
+        //    - S363 / S246 / S249 / L64: 7-Tier Alpha-Cutout Open-Lattice Steel Umbilical Tower (LUT)
         // ====================================================================
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             const bz = lp.z || 2.0;
 
-            // 0. Soft Ground Ambient Occlusion Contact Shadow Skirt (blends complex into coast!)
-            emitAOShadow3D(lp.x, lp.y, 1, 0, -16, 0, 328, 296, bz, 0.48);
+            // 0. Soft Ground Ambient Occlusion Contact Shadow Skirt on the Paved Spaceport Compound (lid 8)
+            emitAOShadow3D(lp.x, lp.y, 1, 0, -14, 0, 316, 288, bz, 0.44);
 
-            // 1. West Crawlerway Access Roadway & Launch Control Console Bunker (at lp.consoleX)
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -136, 0, 116, 92, bz, bz + 0.06, [0.34, 0.37, 0.42], 2);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -136, -18, 108, 10, bz + 0.06, bz + 0.09, [0.52, 0.55, 0.60], 2);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -136,  18, 108, 10, bz + 0.06, bz + 0.09, [0.52, 0.55, 0.60], 2);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -136, -42, 112, 6, bz + 0.06, bz + 0.11, [0.96, 0.76, 0.12], 3);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -136,  42, 112, 6, bz + 0.06, bz + 0.11, [0.96, 0.76, 0.12], 3);
+            // 1. West Crawlerway Steel Track Roadway (L33 / L87) connecting Control Bunker (460.8) to Pad (465.0)
+            //    Stays strictly east of c=458 so it NEVER overlaps the asphalt road at c=456..457!
+            emitTileBox3D(lp.x, lp.y, 1, 0, -92, 0, 88, 76, bz, bz + 0.06, 177, 177, 87, [0.92, 0.94, 0.98], true);
+            emitTileBox3D(lp.x, lp.y, 1, 0, -92, -18, 84, 12, bz + 0.06, bz + 0.095, 173, 173, 33, [0.90, 0.92, 0.96], false);
+            emitTileBox3D(lp.x, lp.y, 1, 0, -92,  18, 84, 12, bz + 0.06, bz + 0.095, 173, 173, 33, [0.90, 0.92, 0.96], false);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -92, -35, 84, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, -92,  35, 84, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
 
-            // Reinforced Concrete Launch Control Bunker with Reflective Observation Glass & Telemetry Dish
-            emitAOShadow3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 72, 54, bz, 0.42);
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 52, 34, bz, bz + 0.20, [0.76, 0.79, 0.84], 2);
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 46, 28, bz + 0.20, bz + 0.36, [0.28, 0.58, 0.82], 7);
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, -48, 54, 38, bz + 0.36, bz + 0.42, [0.24, 0.28, 0.36], 2);
-            emitCylinder3D(lp.consoleX, lp.consoleY, -14, -48, 2.5, 2.5, bz + 0.42, bz + 0.58, 10, [0.82, 0.86, 0.90], 5, true);
-            emitCone3D(lp.consoleX, lp.consoleY, -14, -48, 10.0, bz + 0.64, bz + 0.54, 14, [0.94, 0.96, 0.99], 5);
-            // Armored Ignition Pedestal at (lp.consoleX, lp.consoleY)
-            emitSolidBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 18, 14, bz + 0.06, bz + 0.28, [0.22, 0.26, 0.32], 3);
-            emitCylinder3D(lp.consoleX, lp.consoleY, 0, 0, 5.5, 5.5, bz + 0.28, bz + 0.35, 12, [0.98, 0.16, 0.16], 5, true);
+            // 1B. SERA Launch Control Bunker (at lp.consoleX = 460.8, north of crawlerway)
+            //     Uses exact S86 & S199 blue/white facade tiles from the SERA Space Center building across the street!
+            emitAOShadow3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 74, 54, bz, 0.42);
+            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 56, 36, bz, bz + 0.22, 177, 86, 46, [0.96, 0.98, 1.00], true);
+            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 52, 32, bz + 0.22, bz + 0.42, 199, 86, 86, [0.98, 0.99, 1.00], false);
+            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 24, 20, bz + 0.42, bz + 0.47, 172, 172, 31, [0.94, 0.96, 1.00], false);
+            // Rooftop Telemetry Radar Dish on Control Bunker
+            emitCylinder3D(lp.consoleX, lp.consoleY, -6, -54, 2.5, 2.5, bz + 0.42, bz + 0.58, 10, [0.82, 0.86, 0.90], 5, true);
+            emitCone3D(lp.consoleX, lp.consoleY, -6, -54, 10.0, bz + 0.64, bz + 0.54, 14, [0.94, 0.96, 0.99], 5);
+            // Interactive Launch Ignition Pedestal (S172 telemetry console + glowing red trigger dome)
+            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 18, 14, bz + 0.06, bz + 0.28, 172, 173, 86, [0.92, 0.95, 0.99], false);
+            emitCylinder3D(lp.consoleX, lp.consoleY, 0, 0, 5.2, 5.2, bz + 0.28, bz + 0.35, 12, [0.94, 0.20, 0.18], 5, true);
 
             // 2. Stepped Chamfered Octagonal Concrete Blast Pad (LC-39A)
-            //    Tier 1: Dark Asphalt/Tarmac Security Compound Apron (rx=138, ry=130)
-            emitOctagonPad3D(lp.x, lp.y, 0, 0, 138, 130, 132, 124, 0.24, bz, bz + 0.09, [0.42, 0.45, 0.50], [0.36, 0.39, 0.44], 2);
-            //    Tier 2: Sloped Reinforced Concrete Blast Deck (rx=108, ry=102)
-            emitOctagonPad3D(lp.x, lp.y, 0, 0, 108, 102, 96, 90, 0.26, bz + 0.09, bz + 0.24, [0.62, 0.65, 0.70], [0.56, 0.59, 0.64], 2);
+            //    Tier 1: Reinforced Concrete Security Perimeter Pad (S177 concrete walls + L71 1:1 world-tiled concrete grid)
+            emitOctagonPad3D(lp.x, lp.y, 0, 0, 134, 126, 128, 120, 0.24, bz, bz + 0.09, [0.90, 0.92, 0.96], [0.84, 0.86, 0.90], 2, 177, 71);
+            //    Tier 2: Sloped Riveted Blast Apron (L113 sloped riveted apron walls + L87 reinforced steel/concrete deck)
+            emitOctagonPad3D(lp.x, lp.y, 0, 0, 104, 98, 92, 86, 0.26, bz + 0.09, bz + 0.24, [0.94, 0.96, 0.99], [0.88, 0.90, 0.94], 2, 390 + 113, 87);
 
-            // Deep East-West Scorched Flame Deflector Trench + Hazard Blast Deflector Walls + Steel MLP Platform
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, 0, 156, 48, bz + 0.24, bz + 0.265, [0.14, 0.16, 0.20], 2);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, -27, 156, 6, bz + 0.24, bz + 0.34, [0.96, 0.74, 0.12], 3);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 14,  27, 156, 6, bz + 0.24, bz + 0.34, [0.96, 0.74, 0.12], 3);
-            // Mobile Launcher Platform (MLP) Steel Deck straddling the Flame Trench under the Rocket
-            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, 0, 68, 66, bz + 0.24, bz + 0.32, [0.44, 0.48, 0.54], 2);
+            // 2B. Deep East-West Scorched Flame Deflector Trench (L33 dark riveted blast steel + L22 exhaust turbine shafts)
+            emitTileBox3D(lp.x, lp.y, 1, 0, 14, 0, 148, 46, bz + 0.24, bz + 0.265, 173, 173, 33, [0.82, 0.84, 0.88], true);
+            emitTileBox3D(lp.x, lp.y, 1, 0, -32, 0, 34, 34, bz + 0.265, bz + 0.275, 173, 173, 22, [0.92, 0.94, 0.98], false);
+            emitTileBox3D(lp.x, lp.y, 1, 0,  62, 0, 34, 34, bz + 0.265, bz + 0.275, 173, 173, 22, [0.92, 0.94, 0.98], false);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 14, -25, 148, 5.5, bz + 0.24, bz + 0.33, [0.94, 0.74, 0.14], 3);
+            emitSolidBox3D(lp.x, lp.y, 1, 0, 14,  25, 148, 5.5, bz + 0.24, bz + 0.33, [0.94, 0.74, 0.14], 3);
+
+            // 2C. Mobile Launcher Platform (MLP) Steel Pedestal straddling the Flame Trench under the Rocket
+            //     Textured with S172/S173 cryogenic instrumentation fins on sides & L109 circular target ring on top!
+            emitTileBox3D(lp.x, lp.y, 1, 0, 14, 0, 66, 64, bz + 0.24, bz + 0.33, 172, 173, 109, [0.94, 0.96, 1.00], false);
             for (const [hx, hy] of [[-6, -20], [34, -20], [-6, 20], [34, 20]]) {
-                emitCylinder3D(lp.x, lp.y, hx, hy, 3.5, 2.8, bz + 0.32, bz + 0.42, 10, [0.30, 0.34, 0.40], 5, true);
+                emitCylinder3D(lp.x, lp.y, hx, hy, 3.5, 2.8, bz + 0.33, bz + 0.43, 10, [0.32, 0.36, 0.42], 5, true);
             }
 
-            // 3. Twin True 3D Geodesic Spherical Cryogenic LOX / LH2 Propellant Storage Tanks
-            for (const sy of [-70, 70]) {
-                const tx = 74;
-                // Concrete tank circular pad & 6 cylindrical support legs
-                emitCylinder3D(lp.x, lp.y, tx, sy, 24, 23, bz + 0.09, bz + 0.16, 16, [0.48, 0.52, 0.58], 2, true);
+            // 3. Twin True 3D Geodesic Spherical Cryogenic LOX / LH2 Propellant Storage Tanks + S191 Pipeline Racks
+            for (const sy of [-68, 68]) {
+                const tx = 70;
+                // Octagonal/Circular concrete pad & 6 cylindrical support legs
+                emitCylinder3D(lp.x, lp.y, tx, sy, 23, 22, bz + 0.09, bz + 0.16, 16, [0.62, 0.66, 0.72], 2, true);
                 for (let li = 0; li < 6; li++) {
                     const la = (li * Math.PI * 2.0) / 6;
-                    emitCylinder3D(lp.x, lp.y, tx + Math.cos(la) * 17.5, sy + Math.sin(la) * 17.5, 2.2, 2.2, bz + 0.16, bz + 0.46, 8, [0.34, 0.38, 0.44], 5, false);
+                    emitCylinder3D(lp.x, lp.y, tx + Math.cos(la) * 16.5, sy + Math.sin(la) * 16.5, 2.2, 2.2, bz + 0.16, bz + 0.46, 8, [0.36, 0.40, 0.46], 5, false);
                 }
-                // Equatorial structural steel ring + Gleaming 3D Geodesic Cryo Sphere (10x18 segments!)
-                emitCylinder3D(lp.x, lp.y, tx, sy, 22.5, 22.5, bz + 0.42, bz + 0.48, 18, [0.88, 0.22, 0.18], 5, false);
-                emitSphere3D(lp.x, lp.y, tx, sy, 21.5, bz + 0.46, 0.30, 9, 18, [0.95, 0.97, 1.00], 5);
-                // Insulated aluminum cryogenic feed pipeline connecting sphere to MLP
-                emitSolidBox3D(lp.x, lp.y, 1, 0, 44, sy * 0.52, 6, 36, bz + 0.24, bz + 0.31, [0.82, 0.86, 0.92], 5);
+                // Equatorial structural steel ring + 3D Geodesic Cryo Sphere (MAT 5 blends L45 aerospace plating + pixel-art outlines)
+                emitCylinder3D(lp.x, lp.y, tx, sy, 21.5, 21.5, bz + 0.42, bz + 0.48, 18, [0.84, 0.26, 0.20], 5, false);
+                emitSphere3D(lp.x, lp.y, tx, sy, 20.5, bz + 0.46, 0.30, 9, 18, [0.92, 0.95, 0.99], 5);
+                // Authentic S191 Dual Cryogenic Feed Pipeline Manifold connecting sphere to MLP
+                emitTileBox3D(lp.x, lp.y, 1, 0, 42, sy * 0.52, 12, 34, bz + 0.24, bz + 0.32, 191, 191, 67, [0.92, 0.95, 0.99], false);
             }
 
             // 4. Four Sleek Tapered Cylindrical Perimeter Lightning Arrestor Masts (at Outer Octagon Corners)
-            for (const [mx, my] of [[-110, -104], [110, -104], [-110, 104], [110, 104]]) {
-                // Steel lattice truss pedestal base (MAT 4) + Tapered 12-sided cylindrical mast + Red aviation beacon
-                emitSolidBox3D(lp.x, lp.y, 1, 0, mx, my, 14, 14, bz + 0.09, bz + 0.46, [0.76, 0.80, 0.86], 4);
-                emitCylinder3D(lp.x, lp.y, mx, my, 4.2, 1.5, bz + 0.46, bz + 1.52, 12, [0.88, 0.91, 0.96], 5, true);
-                emitCone3D(lp.x, lp.y, mx, my, 2.5, bz + 1.52, bz + 1.66, 10, [0.98, 0.16, 0.16], 5);
+            for (const [mx, my] of [[-104, -98], [104, -98], [-104, 98], [104, 98]]) {
+                // Authentic 3ds Max S363 alpha-cutout steel lattice pedestal base + Tapered 12-sided cylindrical mast
+                emitTileBox3D(lp.x, lp.y, 1, 0, mx, my, 15, 15, bz + 0.09, bz + 0.46, 363, 363, 64, [0.88, 0.91, 0.96], false);
+                emitCylinder3D(lp.x, lp.y, mx, my, 4.0, 1.4, bz + 0.46, bz + 1.50, 12, [0.86, 0.89, 0.94], 5, true);
+                emitCone3D(lp.x, lp.y, mx, my, 2.4, bz + 1.50, bz + 1.64, 10, [0.92, 0.22, 0.18], 5);
             }
 
             // 5. True Open-Lattice 3D Steel Umbilical Launch Tower (LUT) at North-West Pad Deck (offX=-44, offY=-32)
-            //    Uses MAT 4 (See-Through X-Brace Truss) + 4 Corner Columns + Floor Grating Decks so it NEVER looks like a solid brick!
+            //    Uses authentic 3ds Max alpha-cutout riveted steel truss tiles (S363 & S246), L64 steel grating floors,
+            //    and S249 alpha-cutout vertical steel service ladders so it is 100% cohesive with GTA 1 bridges & cranes!
             const lutX = -44;
             const lutY = -32;
             for (let lv = 0; lv < 7; lv++) {
                 const y0 = bz + 0.24 + lv * 0.28;
                 const y1 = y0 + 0.28;
                 const isRed = (lv % 2 === 0);
-                const trussCol = isRed ? [0.86, 0.22, 0.18] : [0.92, 0.95, 0.98];
-                // Open see-through X-brace steel truss walls (MAT 4 discards cutout windows!)
-                emitSolidBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 38, 38, y0, y1, trussCol, 4);
-                // Thin horizontal steel walk-grating floor deck at each level
-                emitSolidBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 40, 40, y1 - 0.025, y1, [0.32, 0.36, 0.42], 2);
+                const trussCol = isRed ? [0.90, 0.34, 0.28] : [0.94, 0.96, 0.99];
+                const trussTile = isRed ? 246 : 363;
+                // Alpha-cutout 3ds Max riveted steel truss bay + L64 X-braced steel walk-grating deck
+                emitTileBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 38, 38, y0, y1, trussTile, trussTile, 64, trussCol, false);
+                // S173 / L64 Structural steel floor deck rim at each level
+                emitTileBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 40, 40, y1 - 0.028, y1, 173, 173, 64, [0.76, 0.80, 0.86], false);
             }
-            // 4 Solid Steel Corner I-Beam Columns & Central Dark Elevator Core inside the open lattice
+            // 4 Solid Steel Corner I-Beam Columns & Central Dark Elevator Core + S249 Alpha-Cutout Ladder
             for (const [cxOff, cyOff] of [[-18, -18], [18, -18], [-18, 18], [18, 18]]) {
-                emitCylinder3D(lp.x, lp.y, lutX + cxOff, lutY + cyOff, 2.4, 2.2, bz + 0.24, bz + 2.20, 8, [0.84, 0.20, 0.16], 5, true);
+                emitCylinder3D(lp.x, lp.y, lutX + cxOff, lutY + cyOff, 2.4, 2.2, bz + 0.24, bz + 2.20, 8, [0.80, 0.24, 0.20], 5, true);
             }
-            emitSolidBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 13, 13, bz + 0.24, bz + 2.22, [0.22, 0.26, 0.32], 5);
-            // Top Open-Lattice Hammerhead Crane Boom on Umbilical Tower (MAT 4)
-            emitSolidBox3D(lp.x, lp.y, 1, 0, lutX + 16, lutY, 68, 18, bz + 2.20, bz + 2.34, [0.95, 0.97, 1.00], 4);
+            emitTileBox3D(lp.x, lp.y, 1, 0, lutX, lutY, 14, 14, bz + 0.24, bz + 2.22, 249, 172, 86, [0.84, 0.88, 0.94], false);
+            // Top Open-Lattice Hammerhead Crane Boom on Umbilical Tower (S250 / S363 alpha-cutout truss)
+            emitTileBox3D(lp.x, lp.y, 1, 0, lutX + 16, lutY, 68, 18, bz + 2.20, bz + 2.35, 250, 363, 64, [0.94, 0.96, 0.99], false);
         }
 
         // ====================================================================
@@ -2188,20 +2344,20 @@ class WorldObjectEngine {
                 // Keeper's Coral-Roofed Villa
                 emitBox3D(lh.x, lh.y, 1, 0, -44, 16, 70, 50, bz, bz + 0.54, "wall_keys_front", "wall_keys_side", [0.96, 0.96, 0.98]);
                 emitHippedRoof3D(lh.x, lh.y, 1, 0, -44, 16, 80, 60, bz + 0.54, 0.22, "mansion_star_island_top", [0.92, 0.92, 0.94], [0.84, 0.32, 0.20]);
-                // Octagonal Masonry Foundation Base
-                emitCylinder3D(lh.x, lh.y, 0, 0, 26, 24, bz, bz + 0.22, 12, [0.68, 0.70, 0.74], 2, true);
+                // Octagonal Masonry Foundation Base (Textured with S177 / L8 pavers)
+                emitOctagonPad3D(lh.x, lh.y, 0, 0, 28, 28, 25, 25, 0.28, bz, bz + 0.22, [0.90, 0.92, 0.95], [0.82, 0.85, 0.90], 2, 177, 8);
                 // 7-Tier Smooth 20-Sided Tapered Cylindrical Red & White Lighthouse Tower (rising to bz + 2.18)
                 for (let lv = 0; lv < 7; lv++) {
                     const r0 = 23.0 - lv * 1.25;
                     const r1 = 23.0 - (lv + 1) * 1.25;
                     const y0 = bz + 0.22 + lv * 0.26;
-                    const col = (lv % 2 === 1) ? [0.88, 0.18, 0.18] : [0.97, 0.97, 0.99];
+                    const col = (lv % 2 === 1) ? [0.84, 0.22, 0.20] : [0.95, 0.96, 0.98];
                     emitCylinder3D(lh.x, lh.y, 0, 0, r0, r1, y0, y0 + 0.26, 20, col, 5, lv === 6);
                 }
                 // Circular Black Iron Watch Gallery Deck + Glowing Cylindrical Fresnel Glass Lantern Room + Conical Copper Dome
-                emitCylinder3D(lh.x, lh.y, 0, 0, 17.5, 17.5, bz + 2.04, bz + 2.11, 20, [0.16, 0.18, 0.22], 5, true);
-                emitCylinder3D(lh.x, lh.y, 0, 0, 12.5, 12.5, bz + 2.11, bz + 2.38, 16, [1.00, 0.94, 0.62], 7, true);
-                emitCone3D(lh.x, lh.y, 0, 0, 16.0, bz + 2.38, bz + 2.64, 20, [0.82, 0.18, 0.18], 5);
+                emitCylinder3D(lh.x, lh.y, 0, 0, 17.5, 17.5, bz + 2.04, bz + 2.11, 20, [0.18, 0.20, 0.26], 5, true);
+                emitCylinder3D(lh.x, lh.y, 0, 0, 12.5, 12.5, bz + 2.11, bz + 2.38, 16, [1.00, 0.92, 0.58], 7, true);
+                emitCone3D(lh.x, lh.y, 0, 0, 16.0, bz + 2.38, bz + 2.64, 20, [0.80, 0.20, 0.18], 5);
             }
         }
 
@@ -2209,14 +2365,14 @@ class WorldObjectEngine {
             const fw = this.landmarks3D.ferrisWheel;
             const bz = fw.z || 2.0;
             emitAOShadow3D(fw.x, fw.y, 1, 0, 0, 0, 210, 98, bz, 0.42);
-            // Giant Wooden Boardwalk Deck + Twin Open-Truss A-Frame Steel Support Towers (MAT 4) + Central Neon Axle Hub
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 196, 84, bz, bz + 0.10, [0.64, 0.42, 0.24], 1);
+            // Giant Wooden Boardwalk Deck (L77 boardwalk planks) + Twin S363 Alpha-Cutout Steel Support Towers
+            emitTileBox3D(fw.x, fw.y, 1, 0, 0, 0, 196, 84, bz, bz + 0.10, 177, 177, 77, [0.94, 0.90, 0.84], true);
             for (const sideY of [-26, 26]) {
-                emitSolidBox3D(fw.x, fw.y, 1, 0, -34, sideY, 10, 10, bz + 0.10, bz + 1.38, [0.94, 0.96, 0.99], 4);
-                emitSolidBox3D(fw.x, fw.y, 1, 0,  34, sideY, 10, 10, bz + 0.10, bz + 1.38, [0.94, 0.96, 0.99], 4);
-                emitSolidBox3D(fw.x, fw.y, 1, 0,   0, sideY, 22, 14, bz + 1.32, bz + 1.48, [0.98, 0.24, 0.68], 5);
+                emitTileBox3D(fw.x, fw.y, 1, 0, -34, sideY, 11, 11, bz + 0.10, bz + 1.38, 363, 363, 64, [0.94, 0.96, 0.99], false);
+                emitTileBox3D(fw.x, fw.y, 1, 0,  34, sideY, 11, 11, bz + 0.10, bz + 1.38, 363, 363, 64, [0.94, 0.96, 0.99], false);
+                emitTileBox3D(fw.x, fw.y, 1, 0,   0, sideY, 22, 14, bz + 1.32, bz + 1.48, 199, 172, 86, [0.98, 0.42, 0.78], false);
             }
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 14, 62, bz + 1.36, bz + 1.46, [0.18, 0.88, 0.98], 5);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 14, 62, bz + 1.36, bz + 1.46, [0.22, 0.86, 0.96], 5);
         }
 
         if (this.meshVbo) {
@@ -2238,10 +2394,30 @@ class WorldObjectEngine {
         gl.uniformMatrix4fv(this.meshLocs.uViewProj, false, viewProj);
         gl.uniform1f(this.meshLocs.uNightTint, nf);
         gl.uniform1f(this.meshLocs.uSunsetTint, sf);
+        if (this.meshLocs.uSunDir) {
+            gl.uniform2f(this.meshLocs.uSunDir, 0.55, 0.83);
+        }
 
+        // Unit 0: gta1_sprites.png (mansions, roof tiles, signage)
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, renderer.spritesTex);
         gl.uniform1i(this.meshLocs.uTex, 0);
+
+        // Unit 1: gta1_tiles_vice.png (authentic 1997 64x64 3ds Max world tile atlas!)
+        const viceTilesTex = renderer.tilesTexVice || renderer.tilesTex || renderer.spritesTex;
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, viceTilesTex);
+        if (this.meshLocs.uTilesTex) {
+            gl.uniform1i(this.meshLocs.uTilesTex, 1);
+        }
+
+        // Unit 2: 512x512 ray-marched city lightmap (uDayLightTex)
+        const lightMapTex = renderer.dayLightTex || viceTilesTex;
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, lightMapTex);
+        if (this.meshLocs.uDayLightTex) {
+            gl.uniform1i(this.meshLocs.uDayLightTex, 2);
+        }
 
         const stride = 9 * 4;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVbo);
@@ -2264,6 +2440,9 @@ class WorldObjectEngine {
         // Pass 2: Dynamic 3D Animated Landmarks (Vertically-Rotating 3D Ferris Wheel,
         //         3D Windmill Sails, Cylindrical Artemis VI Rocket) & 3D Street Furniture!
         this.renderDynamic3DMeshes(gl, renderer, stride);
+
+        // Restore active texture unit 0 for subsequent 2D/3D passes in renderer.js
+        gl.activeTexture(gl.TEXTURE0);
     }
 
     renderDynamic3DMeshes(gl, renderer, stride) {
@@ -2393,24 +2572,25 @@ class WorldObjectEngine {
                     const gx = fw.x + Math.cos(theta) * radPx;
                     const gyElev = hubElev + Math.sin(theta) * radElev;
                     const isPink = (gi % 2 === 0);
-                    const gCol = isPink ? [0.98, 0.28, 0.72] : [0.18, 0.90, 0.98];
+                    const gCol = isPink ? [0.92, 0.30, 0.68] : [0.22, 0.82, 0.92];
                     // 3D Cylindrical Passenger Gondola Cabin + Radial Spoke
                     emitDynCylinder(gx, fw.y, 0, 0, 10.5, 11.5, gyElev - 0.12, gyElev + 0.05, 10, gCol, 5, true);
                     const mx = fw.x + Math.cos(theta) * (radPx * 0.52);
                     const myElev = hubElev + Math.sin(theta) * (radElev * 0.52);
-                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 7, 32, myElev - 0.035, myElev + 0.035, [0.98, 0.94, 0.52], 1.0, 4);
+                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 7, 32, myElev - 0.035, myElev + 0.035, [0.94, 0.88, 0.48], 1.0, 4);
                 }
             }
         }
 
         // 1B. TRUE 3D CYLINDRICAL & CONICAL SERA ARTEMIS VI HEAVY-LIFT ROCKET + SEE-THROUGH TRUSS SWING ARMS + LIFTOFF PLUME
+        //     (Shaded by MAT 5 & MAT 6 which blend L45 & L63 steel tiles from gta1_tiles_vice.png + dark charcoal pixel-art outlines!)
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             if (lp.x >= minX - 360 && lp.x <= maxX + 360 && lp.y >= minY - 360 && lp.y <= maxY + 360) {
                 const bz = lp.z || 2.0;
                 const rl = this.rocketLaunch || { state: "IDLE", timer: 0, liftZ: 0, armSwing: 0 };
 
-                // A. 3 Open-Lattice Steel Umbilical Swing Arms (MAT 4) pivoting from LUT at (lp.x - 44, lp.y - 32) toward Rocket at (lp.x + 14, lp.y)
+                // A. 3 Open-Lattice Steel Umbilical Swing Arms (MAT 4 blends S363 riveted truss) pivoting from LUT toward Rocket
                 const baseAng = 0.50; // Points from (-44, -32) to (+14, 0)
                 const armAng = baseAng - (rl.armSwing || 0);
                 const armCos = Math.cos(armAng);
@@ -2418,53 +2598,53 @@ class WorldObjectEngine {
                 const pivotX = lp.x - 32;
                 const pivotY = lp.y - 24;
                 for (const armZ of [bz + 0.85, bz + 1.40, bz + 1.95]) {
-                    emitDynBox(pivotX, pivotY, armCos, armSin, 24, 0, 52, 9, armZ, armZ + 0.10, [0.88, 0.22, 0.18], 1.0, 4);
+                    emitDynBox(pivotX, pivotY, armCos, armSin, 24, 0, 52, 9, armZ, armZ + 0.10, [0.84, 0.26, 0.20], 1.0, 4);
                 }
 
                 // B. True 20-Sided Cylindrical & Conical SERA Artemis VI Heavy-Lift Rocket (unless in COOLDOWN)
                 if (rl.state !== "COOLDOWN") {
                     const rx = lp.x + 14;
                     const ry = lp.y;
-                    const rBase = bz + 0.32 + (rl.liftZ || 0);
+                    const rBase = bz + 0.33 + (rl.liftZ || 0);
 
                     // 1. 4 Clustered Conical RS-25 Liquid Hydrogen Main Engine Nozzles (Gunmetal Steel)
                     for (const [nx, ny] of [[-7.5, -7.5], [7.5, -7.5], [-7.5, 7.5], [7.5, 7.5]]) {
-                        emitDynCylinder(rx, ry, nx, ny, 5.8, 3.2, rBase - 0.04, rBase + 0.10, 12, [0.22, 0.25, 0.32], 5, false);
+                        emitDynCylinder(rx, ry, nx, ny, 5.8, 3.2, rBase - 0.04, rBase + 0.10, 12, [0.24, 0.27, 0.34], 5, false);
                     }
 
                     // 2. Twin 16-Sided Cylindrical Solid Rocket Boosters (SRBs) on North & South Flanks (offY = -26 and +26)
                     for (const srbY of [-26, 26]) {
                         // Flared aft booster skirt + nozzle
-                        emitDynCylinder(rx, ry, 0, srbY, 9.8, 8.2, rBase - 0.02, rBase + 0.12, 16, [0.26, 0.29, 0.35], 5, false);
-                        // White segmented SRB cylindrical casing (MAT 5)
-                        emitDynCylinder(rx, ry, 0, srbY, 8.2, 8.2, rBase + 0.12, rBase + 1.42, 16, [0.96, 0.97, 1.00], 5, false);
-                        // NASA Red separation ring & black telemetry band
-                        emitDynCylinder(rx, ry, 0, srbY, 8.4, 8.4, rBase + 1.02, rBase + 1.12, 16, [0.88, 0.18, 0.16], 5, false);
-                        emitDynCylinder(rx, ry, 0, srbY, 8.3, 8.3, rBase + 1.36, rBase + 1.43, 16, [0.16, 0.18, 0.22], 5, false);
-                        // Smooth 16-Sided Aerodynamic Conical SRB Nose Cone + Red Tip!
-                        emitDynCone(rx, ry, 0, srbY, 8.2, rBase + 1.42, rBase + 1.76, 16, [0.97, 0.98, 1.00], 5);
-                        emitDynCone(rx, ry, 0, srbY, 3.2, rBase + 1.66, rBase + 1.80, 12, [0.90, 0.18, 0.16], 5);
+                        emitDynCylinder(rx, ry, 0, srbY, 9.8, 8.2, rBase - 0.02, rBase + 0.12, 16, [0.28, 0.31, 0.38], 5, false);
+                        // Weathered Aerospace White segmented SRB cylindrical casing (MAT 5 blends L45 steel plate + pixel-art outlines)
+                        emitDynCylinder(rx, ry, 0, srbY, 8.2, 8.2, rBase + 0.12, rBase + 1.42, 16, [0.91, 0.93, 0.96], 5, false);
+                        // Weathered NASA Crimson separation ring & dark charcoal telemetry band
+                        emitDynCylinder(rx, ry, 0, srbY, 8.4, 8.4, rBase + 1.02, rBase + 1.12, 16, [0.80, 0.22, 0.18], 5, false);
+                        emitDynCylinder(rx, ry, 0, srbY, 8.3, 8.3, rBase + 1.36, rBase + 1.43, 16, [0.16, 0.19, 0.24], 5, false);
+                        // Smooth 16-Sided Aerodynamic Conical SRB Nose Cone + Crimson Tip!
+                        emitDynCone(rx, ry, 0, srbY, 8.2, rBase + 1.42, rBase + 1.76, 16, [0.92, 0.94, 0.97], 5);
+                        emitDynCone(rx, ry, 0, srbY, 3.2, rBase + 1.66, rBase + 1.80, 12, [0.82, 0.22, 0.18], 5);
                         // Structural attach struts between SRB and Core Stage
                         emitDynBox(rx, ry, 1, 0, 0, srbY * 0.65, 6, 10, rBase + 0.28, rBase + 0.34, [0.36, 0.40, 0.46], 1.0, 5);
                         emitDynBox(rx, ry, 1, 0, 0, srbY * 0.65, 6, 10, rBase + 1.24, rBase + 1.30, [0.36, 0.40, 0.46], 1.0, 5);
                     }
 
-                    // 3. Colossal 20-Sided Cylindrical Cryogenic Core Stage (NASA SLS Orange, r = 17.0px)
-                    emitDynCylinder(rx, ry, 0, 0, 17.0, 17.0, rBase + 0.08, rBase + 0.18, 20, [0.94, 0.96, 0.99], 5, false);
-                    emitDynCylinder(rx, ry, 0, 0, 17.0, 17.0, rBase + 0.18, rBase + 1.44, 20, [0.92, 0.45, 0.14], 5, false);
-                    // Ribbed Dark Cryogenic Intertank Band & External LOX Feedline Tunnel
-                    emitDynCylinder(rx, ry, 0, 0, 17.4, 17.4, rBase + 0.98, rBase + 1.14, 20, [0.22, 0.25, 0.32], 6, false);
-                    emitDynCylinder(rx, ry, 16.2, 0, 2.2, 2.2, rBase + 0.14, rBase + 1.38, 8, [0.84, 0.87, 0.92], 5, true);
+                    // 3. Colossal 20-Sided Cylindrical Cryogenic Core Stage (Weathered NASA SLS Rust-Orange, r = 17.0px)
+                    emitDynCylinder(rx, ry, 0, 0, 17.0, 17.0, rBase + 0.08, rBase + 0.18, 20, [0.90, 0.92, 0.96], 5, false);
+                    emitDynCylinder(rx, ry, 0, 0, 17.0, 17.0, rBase + 0.18, rBase + 1.44, 20, [0.82, 0.43, 0.18], 5, false);
+                    // Ribbed Dark Cryogenic Intertank Band (MAT 6 blends L63 corrugated ribs) & External LOX Feedline Tunnel
+                    emitDynCylinder(rx, ry, 0, 0, 17.4, 17.4, rBase + 0.98, rBase + 1.14, 20, [0.24, 0.27, 0.34], 6, false);
+                    emitDynCylinder(rx, ry, 16.2, 0, 2.2, 2.2, rBase + 0.14, rBase + 1.38, 8, [0.80, 0.84, 0.90], 5, true);
 
                     // 4. Saturn V / Artemis Black-and-White Checker Roll-Pattern Ring + Tapered Upper Stage Adapter
-                    emitDynCylinder(rx, ry, 0, 0, 17.1, 17.1, rBase + 1.44, rBase + 1.58, 20, [0.96, 0.98, 1.00], 5, false, 1.0, true);
-                    emitDynCylinder(rx, ry, 0, 0, 17.0, 11.8, rBase + 1.58, rBase + 1.82, 20, [0.96, 0.97, 1.00], 5, false);
+                    emitDynCylinder(rx, ry, 0, 0, 17.1, 17.1, rBase + 1.44, rBase + 1.58, 20, [0.92, 0.94, 0.97], 5, false, 1.0, true);
+                    emitDynCylinder(rx, ry, 0, 0, 17.0, 11.8, rBase + 1.58, rBase + 1.82, 20, [0.91, 0.93, 0.96], 5, false);
 
                     // 5. Cylindrical Orion Service Module + Smooth Conical Crew Capsule + Launch Abort System (LAS) Escape Tower!
-                    emitDynCylinder(rx, ry, 0, 0, 11.8, 11.8, rBase + 1.82, rBase + 2.04, 20, [0.97, 0.98, 1.00], 5, false);
-                    emitDynCylinder(rx, ry, 0, 0, 12.0, 12.0, rBase + 1.90, rBase + 1.96, 20, [0.88, 0.18, 0.16], 5, false);
-                    emitDynCone(rx, ry, 0, 0, 11.8, rBase + 2.04, rBase + 2.34, 20, [0.98, 0.98, 1.00], 5);
-                    emitDynCylinder(rx, ry, 0, 0, 2.2, 1.1, rBase + 2.30, rBase + 2.58, 12, [0.94, 0.20, 0.18], 5, true);
+                    emitDynCylinder(rx, ry, 0, 0, 11.8, 11.8, rBase + 1.82, rBase + 2.04, 20, [0.92, 0.94, 0.97], 5, false);
+                    emitDynCylinder(rx, ry, 0, 0, 12.0, 12.0, rBase + 1.90, rBase + 1.96, 20, [0.80, 0.22, 0.18], 5, false);
+                    emitDynCone(rx, ry, 0, 0, 11.8, rBase + 2.04, rBase + 2.34, 20, [0.94, 0.96, 0.99], 5);
+                    emitDynCylinder(rx, ry, 0, 0, 2.2, 1.1, rBase + 2.30, rBase + 2.58, 12, [0.84, 0.22, 0.18], 5, true);
 
                     // C. Cylindrical & Conical 3D Main Engine Supersonic Exhaust Plume & Flame Trench Steam Billows
                     if (rl.state === "COUNTDOWN" || rl.state === "LIFTOFF") {
