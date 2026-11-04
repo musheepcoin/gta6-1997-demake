@@ -4165,48 +4165,10 @@ class LeonidaGame {
 
         this.player.nickname = chosenNick;
 
-        this.player.weapon = "PISTOL"; // same starting weapon for every character
+        this.player.weapon = "PISTOL"; // Everyone starts with the exact same loadout & stats
 
-        if (chosenCharId === "JASON") {
-
-            this.player.armor = 100;
-
-            if (this.jason) this.jason.pedType = "lucia";
-
-        } else {
-
-            if (this.jason) this.jason.pedType = "jason";
-
-            if (chosenCharId === "TREVOR") {
-
-                this.player.armor = 100;
-
-                this.multiplier = Math.max(this.multiplier, 2);
-
-            } else if (chosenCharId === "NIKO") {
-
-                this.player.armor = 100;
-
-            } else if (chosenCharId === "CLAUDE") {
-
-                this.jailFreeCards = Math.max(this.jailFreeCards, 2);
-
-            } else if (chosenCharId === "BIGSMOKE") {
-
-                this.player.armor = 100;
-
-                this.multiplier = Math.max(this.multiplier, 2);
-
-            } else if (chosenCharId === "DETECTIVE" || chosenCharId === "CROCKETT") {
-
-                this.jailFreeCards = Math.max(this.jailFreeCards, 3);
-
-            } else if (chosenCharId === "GOURANGA") {
-
-                this.multiplier = Math.max(this.multiplier, 2);
-
-            }
-
+        if (this.jason) {
+            this.jason.pedType = chosenCharId === "JASON" ? "lucia" : "jason";
         }
 
 
