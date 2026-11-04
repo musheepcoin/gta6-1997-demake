@@ -2176,8 +2176,8 @@ class Vehicle {
             let bestDist = 1400;
             for (const v of game.vehicles) {
                 if (v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) continue;
-                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 8.0;
-                const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 26.0 : 14.0);
+                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 4.5;
+                const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 22.0 : 11.0);
                 if (!isWreck && !isAbandoned) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
@@ -2194,7 +2194,7 @@ class Vehicle {
         }
 
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        if (dist < 62) {
+        if (dist < 68) {
             // Hook up the vehicle / wreck to the tow winch!
             this.towingVehicle = target;
             this.towTarget = null;
@@ -2213,6 +2213,17 @@ class Vehicle {
             return this.computeTrafficControls(dt, map, game);
         }
 
+        // Final approach within 165px: steer directly to the wreck even if it rests on a curb/sidewalk
+        if (dist < 165) {
+            const desiredAng = Math.atan2(target.y - this.y, target.x - this.x);
+            const diff = Math.atan2(Math.sin(desiredAng - this.angle), Math.cos(desiredAng - this.angle));
+            return {
+                throttle: 0.72,
+                steer: Math.max(-1, Math.min(1, diff * 2.2)),
+                handbrake: false
+            };
+        }
+
         return this.computeRoadInterceptControls(
             dt,
             map,
@@ -2221,7 +2232,7 @@ class Vehicle {
             target.y,
             0,
             0,
-            0.82,
+            0.90,
             false
         );
     }
@@ -3060,10 +3071,11 @@ class TrafficManager {
                 game.vehicles.splice(i, 1);
                 continue;
             }
+            const isApproachingTowTruck = v.driver === "AI_TOW" && Boolean(v.towTarget) && !v.towingVehicle;
             if (game.vehicles.length <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW") continue;
-            // Burned wrecks and abandoned cars stay in the neighborhood until a Tow Truck physically tows them;
-            // only garbage-collect them on their own if the player has driven far away into another district (> 28 blocks / ~1800px)!
-            const checkRects = isAbandonedOrWreck ? farWreckRects : outerRects;
+            // Burned wrecks, abandoned cars, and Tow Trucks actively approaching a target stay in the neighborhood;
+            // only garbage-collect them if the player has driven far away into another district (> 28 blocks / ~1800px)!
+            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck) ? farWreckRects : outerRects;
             const nearAnyPlayer = checkRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
                 if (v.towingVehicle) {

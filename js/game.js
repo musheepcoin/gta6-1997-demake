@@ -8114,9 +8114,9 @@ class LeonidaGame {
 
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 10.0;
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 4.5;
 
-            const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 28.0 : 15.0);
+            const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 22.0 : 11.0);
 
             if (!isWreck && !isAbandoned) continue;
 
@@ -8124,7 +8124,7 @@ class LeonidaGame {
 
             const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
 
-            if (dPlayer < 75 || dPlayer >= bestDist) continue;
+            if ((!isWreck && dPlayer < 42) || dPlayer >= bestDist) continue;
 
 
 
@@ -8132,13 +8132,31 @@ class LeonidaGame {
 
             const by = Math.floor(v.y / TILE_SIZE);
 
-            const navBlk = typeof this.map.getNavigationBlock === "function"
+            let nearRoad = false;
 
-                ? this.map.getNavigationBlock(bx, by, v.z || 2.0)
+            if (typeof this.map.getNavigationBlock === "function") {
 
-                : null;
+                for (let dy = -1; dy <= 1 && !nearRoad; dy++) {
 
-            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
+                    for (let dx = -1; dx <= 1; dx++) {
+
+                        const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z || 2.0);
+
+                        if (nb && nb.groundType === GROUND_TYPE.ROAD) {
+
+                            nearRoad = true;
+
+                            break;
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            if (!nearRoad) continue;
 
 
 
@@ -8146,7 +8164,7 @@ class LeonidaGame {
 
             const alreadyTargeted = this.vehicles.some(
 
-                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (tv.towTarget === v || Math.hypot(tv.x - v.x, tv.y - v.y) < 380)
+                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (tv.towTarget === v || (!tv.towingVehicle && Math.hypot(tv.x - v.x, tv.y - v.y) < 340))
 
             );
 
@@ -8174,9 +8192,9 @@ class LeonidaGame {
 
         this.towDispatchTimer = (this.towDispatchTimer || 0) + dt;
 
-        if (this.towDispatchTimer < 8.5) return;
+        if (this.towDispatchTimer < 3.5) return;
 
-        this.towDispatchTimer = 4.5; // retry ~4s later if no road spawn block found
+        this.towDispatchTimer = 1.8; // retry ~1.7s later if no road spawn block found
 
 
 
@@ -8188,11 +8206,11 @@ class LeonidaGame {
 
 
 
-        for (let attempt = 0; attempt < 26; attempt++) {
+        for (let attempt = 0; attempt < 32; attempt++) {
 
             const ang = Math.random() * Math.PI * 2;
 
-            const distB = 8.0 + Math.random() * 5.0;
+            const distB = 5.0 + Math.random() * 3.2;
 
             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
 
@@ -8214,7 +8232,7 @@ class LeonidaGame {
 
             const sy = (by + 0.5) * TILE_SIZE;
 
-            if (Math.hypot(sx - p.x, sy - p.y) < 380) continue;
+            if (Math.hypot(sx - p.x, sy - p.y) < 260) continue;
 
 
 
