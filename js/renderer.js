@@ -11606,22 +11606,22 @@ class RetroRenderer {
             }
         }
 
-        // Player Directional Arrow
+        // Player Pulsing Round Radar Blip
         const pp = worldToMini(p.x, p.y);
-        const ang = (p.inVehicle ? p.inVehicle.angle : p.angle) || 0;
+        const beepPhase = (this.time * 1.35) % 1.0;
+        const beepRad = 4.5 + beepPhase * 9.5;
         ctx.save();
-        ctx.translate(pp.x, pp.y);
-        ctx.rotate(ang);
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#ff2a85";
-        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(6.5, 0);
-        ctx.lineTo(-4.5, -4.5);
-        ctx.lineTo(-2, 0);
-        ctx.lineTo(-4.5, 4.5);
-        ctx.closePath();
+        ctx.arc(pp.x, pp.y, beepRad, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 240, 255, ${(1.0 - beepPhase) * 0.78})`;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pp.x, pp.y, 4.4 + Math.sin(this.time * 6.5) * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
+        ctx.strokeStyle = "#ff2a85";
+        ctx.lineWidth = 2.0;
         ctx.stroke();
         ctx.restore();
 
@@ -12333,31 +12333,36 @@ class RetroRenderer {
             }
         }
 
-        // 9. Lucia / Player Directional Arrow & Vision Cone
+        // 9. Player Pulsing Round Radar Blip & Vision Cone
         const pp = worldToMini(p.x, p.y);
         const ang = (p.inVehicle ? p.inVehicle.angle : p.angle) || 0;
         ctx.save();
         ctx.translate(pp.x, pp.y);
         ctx.rotate(ang);
         // Subtle heading cone
-        ctx.fillStyle = "rgba(0, 240, 255, 0.16)";
+        ctx.fillStyle = "rgba(0, 240, 255, 0.14)";
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(26, -13);
-        ctx.lineTo(26, 13);
+        ctx.lineTo(24, -12);
+        ctx.lineTo(24, 12);
         ctx.closePath();
         ctx.fill();
-        // Crisp directional player arrow
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#ff2a85";
-        ctx.lineWidth = 1.6;
+        ctx.restore();
+
+        const beepPhase = (this.time * 1.35) % 1.0;
+        const beepRad = 5.0 + beepPhase * 10.5;
+        ctx.save();
         ctx.beginPath();
-        ctx.moveTo(7, 0);
-        ctx.lineTo(-5, -5);
-        ctx.lineTo(-2.5, 0);
-        ctx.lineTo(-5, 5);
-        ctx.closePath();
+        ctx.arc(pp.x, pp.y, beepRad, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 240, 255, ${(1.0 - beepPhase) * 0.80})`;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pp.x, pp.y, 4.8 + Math.sin(this.time * 6.5) * 0.65, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
+        ctx.strokeStyle = "#ff2a85";
+        ctx.lineWidth = 2.2;
         ctx.stroke();
         ctx.restore();
 
@@ -12616,12 +12621,30 @@ class RetroRenderer {
         }
 
         const lx = Math.round(game.player.x * sx);
-        const ly = Math.round(game.player.y * sx);
+        const ly = Math.round(game.player.y * sy);
+        const beepPhase = (this.time * 1.35) % 1.0;
+        const beepRad = 6.0 + beepPhase * 13.0;
+        fctx.save();
+        // Expanding radar ping ring ("bip léger")
+        fctx.beginPath();
+        fctx.arc(lx, ly, beepRad, 0, Math.PI * 2);
+        fctx.strokeStyle = `rgba(0, 240, 255, ${(1.0 - beepPhase) * 0.85})`;
+        fctx.lineWidth = 2.2;
+        fctx.stroke();
+        // High-contrast outer dark halo + round pulsing player core
+        const coreRad = 5.6 + Math.sin(this.time * 6.5) * 0.8;
+        fctx.beginPath();
+        fctx.arc(lx, ly, coreRad + 1.8, 0, Math.PI * 2);
+        fctx.fillStyle = "rgba(5, 8, 17, 0.88)";
+        fctx.fill();
+        fctx.beginPath();
+        fctx.arc(lx, ly, coreRad, 0, Math.PI * 2);
         fctx.fillStyle = "#ffffff";
-        fctx.fillRect(lx - 5, ly - 5, 10, 10);
+        fctx.fill();
         fctx.strokeStyle = "#ff2a85";
-        fctx.lineWidth = 2.5;
-        fctx.strokeRect(lx - 5, ly - 5, 10, 10);
+        fctx.lineWidth = 2.6;
+        fctx.stroke();
+        fctx.restore();
     }
 }
 

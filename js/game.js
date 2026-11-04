@@ -13899,6 +13899,12 @@ class LeonidaGame {
 
             this.renderer.render(this, dt);
 
+            if (this.fullMapOpen && this.renderer) {
+
+                this.renderer.renderFullMap(this);
+
+            }
+
             if (
 
                 this.killFrenzy ||
