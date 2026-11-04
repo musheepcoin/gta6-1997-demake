@@ -11022,7 +11022,7 @@ class LeonidaGame {
 
             } else if (ped.kind === "MEDIC") {
 
-                // On-Foot Paramedic AI: Runs from parked ambulance across sidewalks/beaches/parks to revive casualties, then boards ambulance!
+                // On-Foot Paramedic AI: Runs from parked ambulance across sidewalks/beaches/parks to revive civilians or evacuate criminal corpses into the ambulance!
 
                 ped.medicOutTimer = (ped.medicOutTimer || 0) + dt;
 
@@ -11031,6 +11031,7 @@ class LeonidaGame {
                 if (!amb || amb.destroyed || amb.driver !== "AI_EMERGENCY") {
 
                     if (amb) amb.deployedMedic = null;
+                    if (ped.carryingCorpse) ped.carryingCorpse = null;
 
                     ped.kind = "CIVILIAN";
 
@@ -11038,48 +11039,56 @@ class LeonidaGame {
 
                 }
 
-
+                // Keep carried criminal corpse moving with the paramedic on the stretcher back to the ambulance
+                if (ped.carryingCorpse) {
+                    if (!this.peds.includes(ped.carryingCorpse)) {
+                        ped.carryingCorpse = null;
+                    } else {
+                        ped.carryingCorpse.x = ped.x - Math.cos(ped.angle) * 10;
+                        ped.carryingCorpse.y = ped.y - Math.sin(ped.angle) * 10;
+                        ped.carryingCorpse.z = ped.z || 2.0;
+                        ped.carryingCorpse.angle = ped.angle;
+                    }
+                }
 
                 let targetCorpse = null;
 
                 let bestDist = 760;
 
-                for (const other of this.peds) {
+                if (!ped.carryingCorpse) {
+                    for (const other of this.peds) {
 
-                    if (
+                        if (
 
-                        !other.dead ||
+                            !other.dead ||
 
-                        other.kind === "CRIMINAL" ||
+                            other.revived ||
 
-                        other.kind === "HOSTILE" ||
+                            other.unreachableForMedic ||
 
-                        other.revived ||
+                            other.deathKind === "DROWNED"
 
-                        other.unreachableForMedic ||
+                        ) {
 
-                        other.deathKind === "DROWNED"
+                            continue;
 
-                    ) {
+                        }
 
-                        continue;
+                        if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(other.x, other.y)) continue;
+
+                        if (Math.hypot(other.x - amb.x, other.y - amb.y) > 760) continue;
+
+                        const d = Math.hypot(other.x - ped.x, other.y - ped.y);
+
+                        if (d < bestDist) {
+
+                            bestDist = d;
+
+                            targetCorpse = other;
+
+                        }
 
                     }
-
-                    if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(other.x, other.y)) continue;
-
-                    if (Math.hypot(other.x - amb.x, other.y - amb.y) > 760) continue;
-
-                    const d = Math.hypot(other.x - ped.x, other.y - ped.y);
-
-                    if (d < bestDist) {
-
-                        bestDist = d;
-
-                        targetCorpse = other;
-
-                    }
-
                 }
 
 
@@ -11094,45 +11103,59 @@ class LeonidaGame {
 
                         ped.medicStuckTimer = 0;
 
-                        if (ped.healTimer >= 1.8) {
+                        const isCriminalOrBurnt = (
+                            targetCorpse.kind === "CRIMINAL" ||
+                            targetCorpse.kind === "HOSTILE" ||
+                            targetCorpse.isCriminalNPC ||
+                            targetCorpse.deathKind === "BURNT"
+                        );
+
+                        if (ped.healTimer >= (isCriminalOrBurnt ? 1.4 : 1.8)) {
 
                             ped.healTimer = 0;
 
-                            targetCorpse.dead = false;
+                            if (isCriminalOrBurnt) {
+                                // Evacuate dead criminal / hostile body back to the ambulance instead of reviving them on the street!
+                                targetCorpse.revived = true;
+                                ped.carryingCorpse = targetCorpse;
+                                this.addFloatingText(targetCorpse.x, targetCorpse.y - 22, "🚑 EVACUATING CRIMINAL BODY!", "#38bdf8");
+                            } else {
+                                targetCorpse.dead = false;
 
-                            targetCorpse.deadTimer = 0;
+                                targetCorpse.deadTimer = 0;
 
-                            targetCorpse.revived = true;
+                                targetCorpse.revived = true;
 
-                            targetCorpse.hp = 35;
+                                targetCorpse.hp = 35;
 
-                            targetCorpse.speed = 36;
+                                targetCorpse.speed = 36;
 
-                            targetCorpse.stunnedTimer = 0;
+                                targetCorpse.stunnedTimer = 0;
 
-                            targetCorpse.burnTimer = 0;
+                                targetCorpse.burnTimer = 0;
 
-                            targetCorpse.electroTimer = 0;
+                                targetCorpse.electroTimer = 0;
 
-                            targetCorpse.drownTimer = 0;
+                                targetCorpse.drownTimer = 0;
 
-                            targetCorpse.panicTimer = 4.0;
+                                targetCorpse.panicTimer = 4.0;
 
-                            for (let k = 0; k < 5; k++) {
+                                for (let k = 0; k < 5; k++) {
 
-                                this.spawnParticle(
+                                    this.spawnParticle(
 
-                                    targetCorpse.x + (Math.random() - 0.5) * 14,
+                                        targetCorpse.x + (Math.random() - 0.5) * 14,
 
-                                    targetCorpse.y + (Math.random() - 0.5) * 14,
+                                        targetCorpse.y + (Math.random() - 0.5) * 14,
 
-                                    "SPARK"
+                                        "SPARK"
 
-                                );
+                                    );
 
+                                }
+
+                                this.addFloatingText(targetCorpse.x, targetCorpse.y - 22, "🚑 MEDIC REVIVED!", "#38bdf8");
                             }
-
-                            this.addFloatingText(targetCorpse.x, targetCorpse.y - 22, "🚑 MEDIC REVIVED!", "#38bdf8");
 
                         }
 
@@ -11208,7 +11231,7 @@ class LeonidaGame {
 
                 } else {
 
-                    // All nearby casualties revived (or timed out) — jog back to the ambulance and climb in!
+                    // Jog back to the ambulance (carrying a criminal corpse if any) and load / climb in!
 
                     ped._boardingVeh = amb;
 
@@ -11218,7 +11241,30 @@ class LeonidaGame {
 
                     if (dAmb < ambBoardDist || ped.medicOutTimer > 34.0) {
 
-                        amb.doorOpenTimer = 0.40;
+                        amb.doorOpenTimer = 0.45;
+
+                        if (ped.carryingCorpse) {
+                            ped.carryingCorpse._boardedVehicle = true;
+                            ped.carryingCorpse = null;
+                            this.addFloatingText(amb.x, amb.y - 24, "🚑 BODY LOADED IN AMBULANCE!", "#38bdf8");
+                        }
+
+                        // Check if more casualties remain nearby before climbing back into the cab
+                        const hasMoreCasualties = ped.medicOutTimer < 28.0 && this.peds.some((other) => (
+                            other.dead &&
+                            !other.revived &&
+                            !other._boardedVehicle &&
+                            !other.unreachableForMedic &&
+                            other.deathKind !== "DROWNED" &&
+                            !(this.map.isWaterAtPixel && this.map.isWaterAtPixel(other.x, other.y)) &&
+                            Math.hypot(other.x - amb.x, other.y - amb.y) <= 760
+                        ));
+
+                        if (hasMoreCasualties) {
+                            ped._boardingVeh = null;
+                            ped.medicOutTimer = Math.min(ped.medicOutTimer, 10.0);
+                            continue;
+                        }
 
                         amb.deployedMedic = null;
 
@@ -11945,7 +11991,7 @@ class LeonidaGame {
 
             for (const ped of this.peds) {
 
-                if (!ped.dead || ped.kind === "CRIMINAL" || ped.kind === "HOSTILE" || ped.revived || ped.unreachableForMedic || ped.deathKind === "DROWNED") continue;
+                if (!ped.dead || ped.revived || ped._boardedVehicle || ped.unreachableForMedic || ped.deathKind === "DROWNED") continue;
 
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) continue;
 
@@ -11995,9 +12041,9 @@ class LeonidaGame {
 
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + dt;
 
-                    if (this.medicDispatchTimer > 9.0) {
+                    if (this.medicDispatchTimer > 5.5) {
 
-                        this.medicDispatchTimer = 6.0; // if no road spawn point is found, retry ~3s later
+                        this.medicDispatchTimer = 3.5; // if no road spawn point is found, retry ~2s later
 
                         const baseBx = Math.floor(casualtyNearPlayer.x / TILE_SIZE);
 

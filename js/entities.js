@@ -2063,12 +2063,10 @@ class Vehicle {
             for (const ped of game.peds) {
                 if (
                     !ped.dead ||
-                    ped.kind === "CRIMINAL" ||
-                    ped.kind === "HOSTILE" ||
                     ped.revived ||
                     ped.unreachableForMedic ||
                     ped.deathKind === "DROWNED" ||
-                    (ped.deadTimer || 0) < 4.0
+                    (ped.deadTimer || 0) < 2.5
                 ) {
                     continue;
                 }
