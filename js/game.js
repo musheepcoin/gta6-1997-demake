@@ -6521,7 +6521,7 @@ class LeonidaGame {
 
         });
 
-        if (this.skidmarks.length > 1400) {
+        if (this.skidmarks.length > 2800) {
 
             this.skidmarks.shift();
 

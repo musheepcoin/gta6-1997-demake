@@ -2625,7 +2625,7 @@ class Vehicle {
                 g: 0.42,
                 b: 0.23,
                 alpha: 0.56,
-                maxLife: 9.5
+                maxLife: 19.0
             };
         }
         if (tile === TILE.SWAMP_MUD) {
@@ -2635,7 +2635,7 @@ class Vehicle {
                 g: 0.14,
                 b: 0.08,
                 alpha: 0.64,
-                maxLife: 10.5
+                maxLife: 21.0
             };
         }
         if (tile === TILE.GRASS || gt === GROUND_TYPE.FIELD) {
@@ -2645,7 +2645,7 @@ class Vehicle {
                 g: 0.25,
                 b: 0.10,
                 alpha: 0.56,
-                maxLife: 9.0
+                maxLife: 18.0
             };
         }
         if (isDrifting) {
