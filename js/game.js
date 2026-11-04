@@ -6234,7 +6234,7 @@ class LeonidaGame {
 
 
 
-        if (effectiveGlobalWanted > 0 && p && !p.dead && (this.wantedLevel > 0 || !anyRemoteWanted)) {
+        if (this.wantedLevel > 0 && p && !p.dead) {
 
             const v = p.inVehicle;
 
@@ -6260,7 +6260,7 @@ class LeonidaGame {
 
                 isCriminalNPC: false,
 
-                wantedLevel: this.wantedLevel || effectiveGlobalWanted
+                wantedLevel: this.wantedLevel
 
             });
 
@@ -6391,9 +6391,68 @@ class LeonidaGame {
 
 
 
+    clearAllPlayerPursuit(despawnNearPoint = false) {
+        this.wantedLevel = 0;
+        this.wantedDecayTimer = 0;
+        this.copSpawnTimer = 0;
+        this.crimeHeat = 0;
+        this.policeHeli = null;
+
+        // Disown any in-flight player projectiles so delayed hits after WASTED/BUSTED never trigger new wanted stars
+        if (Array.isArray(this.projectiles)) {
+            for (const pr of this.projectiles) {
+                if (pr.fromPlayer) pr.fromPlayer = false;
+            }
+        }
+
+        // Clear player hit attribution on vehicles (prevents delayed car explosions from adding wanted stars after death/arrest)
+        // and calm down pursuing AI_COP cruisers
+        if (Array.isArray(this.vehicles)) {
+            for (let i = this.vehicles.length - 1; i >= 0; i--) {
+                const v = this.vehicles[i];
+                v.lastHitByPlayer = false;
+                if (v.driver === "AI_COP") {
+                    v.sirenActive = false;
+                    if (despawnNearPoint && this.player && Math.hypot(v.x - this.player.x, v.y - this.player.y) < 380) {
+                        this.vehicles.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // Reset all NPC aggro / pursuit flags toward the player
+        if (Array.isArray(this.peds)) {
+            for (let i = this.peds.length - 1; i >= 0; i--) {
+                const ped = this.peds[i];
+                if (ped.dead) continue;
+                ped.carjackedCop = false;
+                ped.attackedByPlayer = false;
+                ped.provokedByPlayer = false;
+                ped.inCombat = false;
+                ped._boardingVeh = null;
+                if (ped.kind === "HOSTILE") {
+                    ped.kind = "CIVILIAN";
+                    ped.panicTimer = 0;
+                } else if (ped.kind === "COP") {
+                    ped.bustedGraceTimer = 5.0;
+                    if (despawnNearPoint && this.player && Math.hypot(ped.x - this.player.x, ped.y - this.player.y) < 380) {
+                        this.peds.splice(i, 1);
+                    }
+                } else if (ped.kind === "CRIMINAL" && despawnNearPoint && this.player && Math.hypot(ped.x - this.player.x, ped.y - this.player.y) < 380) {
+                    this.peds.splice(i, 1);
+                }
+            }
+        }
+    }
+
     setWantedLevel(level) {
 
         const clamped = Math.max(0, Math.min(6, Math.floor(level)));
+
+        // Never allow wanted stars to increase while the player is dead/busted or during respawn grace
+        if (clamped > 0 && this.player && (this.player.dead || (this.player.respawnGraceUntil || 0) > performance.now())) {
+            return;
+        }
 
         if (this.wantedLevel === 0 && clamped > 0) {
 
@@ -6401,9 +6460,7 @@ class LeonidaGame {
 
         } else if (clamped === 0) {
 
-            this.copSpawnTimer = 0;
-
-            this.crimeHeat = 0;
+            this.clearAllPlayerPursuit(false);
 
         }
 
@@ -6907,7 +6964,8 @@ class LeonidaGame {
 
             this.recordFrenzyKill();
 
-            if (!isCriminalCar) {
+            const isPlayerInGraceOrDead = Boolean(this.player && (this.player.dead || (this.player.respawnGraceUntil || 0) > performance.now()));
+            if (!isCriminalCar && !isPlayerInGraceOrDead) {
 
                 this.wantedDecayTimer = 0;
 
@@ -7007,9 +7065,9 @@ class LeonidaGame {
 
 
 
-        // If an AI traffic or AI police car ran over this pedestrian, do NOT blame or reward the player!
+        // If an AI traffic or AI police car ran over this pedestrian, or the player is dead/respawning, do NOT blame or reward the player!
 
-        if (!byPlayer) return;
+        if (!byPlayer || (this.player && (this.player.dead || (this.player.respawnGraceUntil || 0) > performance.now()))) return;
 
 
 
@@ -7163,6 +7221,8 @@ class LeonidaGame {
 
         const p = this.player;
 
+        if (!p || p.dead) return;
+
         if (targetType === "POLICE") {
 
             const maxHp = p.maxHp || 100;
@@ -7176,6 +7236,7 @@ class LeonidaGame {
         }
 
         p.dead = true;
+        p.respawnGraceUntil = performance.now() + 4500;
 
         if (p.inVehicle) {
 
@@ -7368,6 +7429,12 @@ class LeonidaGame {
             p.vy = 0;
 
             p.isMoving = false;
+
+            p.respawnGraceUntil = performance.now() + 2000;
+
+            this.clearAllPlayerPursuit(true);
+
+            this.setWantedLevel(0);
 
             if (this.audio && typeof this.audio.resetLoops === "function") {
 
