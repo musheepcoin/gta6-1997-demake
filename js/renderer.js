@@ -215,8 +215,10 @@ class RetroRenderer {
                 float surfWave = pow(max(0.0, sin(vWorldPos.x * 3.2 + uTime * 2.6 + sin(vWorldPos.z * 0.8) * 1.4)), 6.0) * shallowFactor;
                 vec3 crestFoam = vec3(0.90, 0.98, 1.00);
                 rgb = mix(rgb, crestFoam, clamp((caust * 0.18 + surfWave * 0.52) * (1.0 - uNightTint * 0.60), 0.0, 0.85));
-                float sunGlint = pow(caust, 3.0) * dayAmt;
-                rgb = min(vec3(1.0), rgb + vec3(0.36, 0.34, 0.24) * sunGlint);
+                float sunGlint = pow(caust, 2.5) * dayAmt;
+                float sparkleWave = max(0.0, sin(vWorldPos.x * 11.4 + uTime * 3.6 + swell) * cos(vWorldPos.z * 11.8 - uTime * 3.2));
+                float sunSparkle = pow(sparkleWave, 7.0) * dayAmt;
+                rgb = min(vec3(1.0), rgb + vec3(0.46, 0.41, 0.26) * sunGlint + vec3(0.95, 0.92, 0.76) * sunSparkle * 0.65);
                 return vec4(rgb, 0.78);
             }
 
@@ -556,20 +558,19 @@ class RetroRenderer {
                         float sandMask = clamp(isSand + step(0.82, min(c.r, min(c.g, c.b))), 0.0, 1.0);
                         float bldAO = lm.g * onGround * (1.0 - sandMask * 0.88);
                         float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
-                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.88);
-                        float totalShade = clamp(max(bldShadow * 0.94, bldAO * 0.72), 0.0, 1.0);
+                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.85);
+                        float totalShade = clamp(max(bldShadow * 0.96, bldAO * 0.74), 0.0, 1.0);
                         if (isRoad) {
-                            // The 2-texel-per-tile lightmap paints blurry light/dark squares on wide asphalt
-                            // (bright junction box vs. shaded lanes): keep only a faint, neutral hint of it on roads.
-                            bldAO *= 0.12;
-                            totalShade *= 0.30;
+                            // True 3D building cast shadows project cleanly across asphalt streets while keeping curb AO subtle
+                            bldAO *= 0.22;
+                            totalShade = clamp(bldShadow * 0.82 + bldAO * 0.25, 0.0, 1.0);
                         }
 
-                        vec3 sunlitTint = mix(vec3(1.13, 1.06, 0.92), vec3(1.03, 1.01, 0.97), sandMask);
-                        vec3 shadowTint = mix(vec3(0.56, 0.65, 0.84), vec3(0.92, 0.88, 0.80), sandMask);
+                        vec3 sunlitTint = mix(vec3(1.19, 1.10, 0.90), vec3(1.06, 1.03, 0.96), sandMask);
+                        vec3 shadowTint = mix(vec3(0.50, 0.62, 0.85), vec3(0.88, 0.85, 0.78), sandMask);
                         if (isRoad) {
-                            sunlitTint = vec3(1.06, 1.05, 1.02);
-                            shadowTint = vec3(0.72, 0.76, 0.86);
+                            sunlitTint = vec3(1.11, 1.07, 0.98);
+                            shadowTint = vec3(0.58, 0.67, 0.85);
                         }
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
                         float isElevatedRoof = step(2.85, vWorldPos.y);
@@ -596,13 +597,15 @@ class RetroRenderer {
                                 float paverBevel  = smoothstep(0.052, 0.085, subD) - smoothstep(0.085, 0.12, subD);
                                 float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.042;
                                 float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.024;
-                                c.rgb = (cleanRoof + fineGrain + medGrain + paverBevel * 0.022)
+                                // Directional solar rim highlight along sun-facing roof edges
+                                float sunEdgeRim = (1.0 - smoothstep(0.0, 0.14, rf.y)) * 0.045;
+                                c.rgb = (cleanRoof + fineGrain + medGrain + paverBevel * 0.025 + sunEdgeRim)
                                     * mix(0.84, 1.0, outerGutter)
                                     * mix(0.89, 1.0, paverJoint);
                             }
                         }
-                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.018, 0.0, 0.045) * (1.0 - sandMask * 0.85);
-                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
+                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.024, 0.0, 0.065) * (1.0 - sandMask * 0.85);
+                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.14 * (1.0 - totalShade) * (1.0 - sandMask * 0.65)) + 0.5, 0.0, 1.0);
                         sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
                         c.rgb = mix(c.rgb, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
                     }
@@ -657,7 +660,7 @@ class RetroRenderer {
 
                     float sunDot = dot(wallNormal, uSunDir);
                     float wallSunFactor = clamp(sunDot * 0.5 + 0.5, 0.0, 1.0);
-                    vec3 wallDayTint = mix(vec3(0.76, 0.82, 0.92), vec3(1.10, 1.05, 0.96), wallSunFactor);
+                    vec3 wallDayTint = mix(vec3(0.68, 0.77, 0.91), vec3(1.18, 1.10, 0.93), wallSunFactor);
                     vec3 wallShade = mix(vec3(1.0 + sunDot * 0.06), wallDayTint, dayAmt);
 
                     // Eliminate any synthwave purple / magenta / hot-pink / neon-cyan hue on vertical building walls
@@ -690,8 +693,9 @@ class RetroRenderer {
                     vec3 blindCol = mix(vec3(0.76, 0.73, 0.67), vec3(0.54, 0.64, 0.72), step(0.68, rSeed)) * slatWave;
                     c.rgb = mix(c.rgb + stuccoGrain, blindCol, isGlass * inBlind * 0.30 * dayAmt);
 
-                    vec3 skyGlint = vec3(0.09, 0.14, 0.20) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.30, 0.0, 1.0) * (0.38 + 0.62 * wallSunFactor);
-                    c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO * pilaster * corniceLight + skyGlint);
+                    vec3 skyGlint = vec3(0.11, 0.17, 0.24) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.32, 0.0, 1.0) * (0.35 + 0.65 * wallSunFactor);
+                    vec3 sunGlassSpec = vec3(0.24, 0.20, 0.12) * isGlass * dayAmt * pow(wallSunFactor, 3.0);
+                    c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO * pilaster * corniceLight + skyGlint + sunGlassSpec);
                 }
 
                 if (uSunsetTint > 0.01) {
@@ -4846,11 +4850,12 @@ class RetroRenderer {
         for (let r = 0; r < M; r++) {
             for (let c = 0; c < M; c++) {
                 let topY = 2.0;
-                for (let z = 5; z >= 0; z--) {
+                for (let z = 5; z >= 2; z--) {
                     const bIdx = this.map.getBlockIndex(c, r, z);
                     if (bIdx === 0) continue;
                     const b = this.map.getBlockInfo(bIdx);
-                    if (b && (b.faces[4] !== 0 || b.faces[0] !== 0 || b.faces[1] !== 0 || b.faces[2] !== 0 || b.faces[3] !== 0)) {
+                    if (!b || b.groundType !== GROUND_TYPE.BUILDING || b.slopeType !== 0) continue;
+                    if (b.faces[4] !== 0 || b.faces[0] !== 0 || b.faces[1] !== 0 || b.faces[2] !== 0 || b.faces[3] !== 0) {
                         topY = z + 1.0;
                         break;
                     }
@@ -4898,20 +4903,20 @@ class RetroRenderer {
                 }
                 rawAO[idx] = Math.min(1.0, aoSum / 3.0);
 
-                // Ray-march 3D solar cast shadows (7 steps up to ~2.8 blocks from 3D buildings)
+                // Ray-march 3D solar cast shadows (9 steps up to ~3.6 blocks from 3D buildings so shadows reach across streets!)
                 let shE = 0.0;
                 let shW = 0.0;
-                for (let s = 1; s <= 7; s++) {
+                for (let s = 1; s <= 9; s++) {
                     const dist = s * 0.40;
-                    const reqH = dist * 0.78;
-                    const falloff = Math.max(0.28, 1.0 - dist * 0.13);
+                    const reqH = dist * 0.68;
+                    const falloff = Math.max(0.26, 1.0 - dist * 0.11);
 
                     // Caster to the North-East (+X, -Y) -> casts shadow South-West
                     const ex = Math.min(M - 1, Math.max(0, Math.floor(wx + 0.35 * s)));
                     const ey = Math.min(M - 1, Math.max(0, Math.floor(wy - 0.32 * s)));
                     const diffE = colTopElev[ey * M + ex] - baseElev;
                     if (diffE > reqH) {
-                        shE = Math.max(shE, Math.min(1.0, falloff * Math.min(1.0, diffE * 0.52)));
+                        shE = Math.max(shE, Math.min(1.0, falloff * Math.min(1.0, diffE * 0.56)));
                     }
 
                     // Caster to the North-West (-X, -Y) -> casts shadow South-East (matching palm & ped shadows!)
@@ -4919,7 +4924,7 @@ class RetroRenderer {
                     const wyCaster = Math.min(M - 1, Math.max(0, Math.floor(wy - 0.32 * s)));
                     const diffW = colTopElev[wyCaster * M + wxCaster] - baseElev;
                     if (diffW > reqH) {
-                        shW = Math.max(shW, Math.min(1.0, falloff * Math.min(1.0, diffW * 0.52)));
+                        shW = Math.max(shW, Math.min(1.0, falloff * Math.min(1.0, diffW * 0.56)));
                     }
                 }
                 rawShadE[idx] = shE;
@@ -6122,20 +6127,24 @@ class RetroRenderer {
         const leanX = Math.cos(leanAng) * 3.0 * sc * hm + Math.cos(this.time * 1.65 + y * 0.02) * 0.9 * hm;
         const leanY = Math.sin(leanAng) * 3.0 * sc * hm + Math.sin(this.time * 1.65 + x * 0.02) * 0.9 * hm;
 
-        // 1. Soft Dappled Feathery Ground Shadow on Sidewalk / Lawn / Beach Sand (taller palms cast longer shadows)
+        // 1. Solar-Tracked Dappled Feathery Ground Shadow on Sidewalk / Lawn / Beach Sand (taller palms cast longer shadows)
         const nf = Math.max(0.0, Math.min(1.0, this.nightFactor || 0.0));
-        const shadowAlpha = 0.27 * (1.0 - nf * 0.55);
+        const daySun = Math.max(0.0, 1.0 - nf * 1.15);
+        const shadowAlpha = 0.33 * (1.0 - nf * 0.55);
+        const shCos = this._curSunCos !== undefined ? this._curSunCos : 0.72;
+        const shSin = this._curSunSin !== undefined ? this._curSunSin : 0.69;
+        const shDist = (12.5 + daySun * 3.5) * sc * hm;
         this.pushAtlasSprite3D(
             palmRect,
-            x + 9.5 * sc * hm,
-            y + 7.5 * sc * hm,
+            x + shCos * shDist,
+            y + shSin * shDist,
             baseZ + 0.018,
             baseAngle + breeze * 0.5,
-            sc * 0.92,
+            sc * 0.96,
             SPRITE_DRAW_ORDER.TIRE_MARKS,
-            0.0,
-            0.0,
-            0.0,
+            0.02,
+            0.05,
+            0.14,
             shadowAlpha
         );
 
@@ -6172,13 +6181,13 @@ class RetroRenderer {
             baseAngle + 0.45 - breeze * 0.6,
             sc * 0.94,
             SPRITE_DRAW_ORDER.TREES,
+            0.62,
+            0.82,
             0.68,
-            0.84,
-            0.70,
             0.95
         );
 
-        // 4. Upper Sunlit Feathery Palm Crown + Central Coconut Cluster
+        // 4. Upper Sunlit Feathery Palm Crown + Central Coconut Cluster (warm golden-lime Florida sun highlight by day!)
         this.pushAtlasSprite3D(
             palmRect,
             x + leanX,
@@ -6187,9 +6196,9 @@ class RetroRenderer {
             baseAngle + breeze,
             sc * 1.04,
             SPRITE_DRAW_ORDER.TREES,
-            1.0,
-            1.0,
-            1.0,
+            1.0 + 0.08 * daySun,
+            1.0 + 0.05 * daySun,
+            1.0 - 0.06 * daySun,
             1.0
         );
     }
@@ -8361,16 +8370,27 @@ class RetroRenderer {
 
             // Car body sprite with GTA 2 live rotation-aware solar clearcoat specular sheen + 3D building cast shadow response!
             const vehShade = (1.0 - nfGlobal) * this.getDayShadeAtPixel(v.x, v.y);
-            const carSunSpec = v.destroyed ? 1.0 : (1.0 + 0.08 * Math.cos(v.angle - sunShadowAngle) * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.7));
-            const vTintR = carSunSpec * (1.0 - vehShade * 0.16);
-            const vTintG = carSunSpec * (1.0 - vehShade * 0.11);
-            const vTintB = carSunSpec * (1.0 - vehShade * 0.03);
+            const sunAlign = Math.cos(v.angle - sunShadowAngle);
+            const carSunSpec = v.destroyed ? 1.0 : (1.0 + 0.12 * sunAlign * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.75));
+            const vTintR = carSunSpec * (1.04 - vehShade * 0.22);
+            const vTintG = carSunSpec * (1.01 - vehShade * 0.15);
+            const vTintB = carSunSpec * (0.97 - vehShade * 0.04);
             this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             if (dmgRect) {
                 this.pushAtlasSprite3D(dmgRect, v.x, v.y, vz + airZ + 0.0015, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             }
             if (doorRect) {
                 this.pushAtlasSprite3D(doorRect, v.x, v.y, vz + airZ + 0.0025, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
+            }
+            // Solar clearcoat / windshield sun-glint on sunlit cars by day
+            if (!v.destroyed && !mapInfo.isMotorcycle && !isMicroTwoWheeler && nfGlobal < 0.45 && vehShade < 0.35) {
+                const glintPulse = 0.55 + 0.45 * Math.max(0, Math.sin(v.angle * 2.0 - sunShadowAngle + 0.8));
+                const glintAlpha = 0.22 * glintPulse * (1.0 - nfGlobal * 2.0) * (1.0 - vehShade * 2.2);
+                if (glintAlpha > 0.02) {
+                    const gx = v.x + cosA * 3.5 - sunCos * 2.2;
+                    const gy = v.y + sinA * 3.5 - sunSin * 2.2;
+                    this.pushSolidQuad3D(gx, gy, vz + airZ + 0.011, 6.5, (v.h || 22) * 0.52, v.angle, 1.0, 0.97, 0.84, glintAlpha, SPRITE_DRAW_ORDER.CAR_ROOF);
+                }
             }
 
             // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp):
@@ -8884,50 +8904,57 @@ class RetroRenderer {
         const clockHr = (game && typeof game.worldMinutes === "number")
             ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
             : 12.0;
-        // Sun positioned above top-left / top-center horizon (matching South-East cast shadows of buildings, palms & peds!)
+        // Sun positioned above top-left / top-right horizon depending on time of day (06:00 East -> 12:00 South -> 18:00 West)
         const dayProgress = Math.max(0, Math.min(1, (clockHr - 6.0) / 12.0));
-        const sunX = W * (0.18 + dayProgress * 0.16);
-        const sunY = -H * 0.16;
+        const sunX = W * (0.82 - dayProgress * 0.64);
+        const sunY = -H * 0.10;
         const maxDim = Math.hypot(W, H);
 
         ctx.save();
 
-        // 1. Warm Golden-Ivory Florida Solar Radiance Field (lifts flat textures with natural sun warmth)
+        // 1. Directional Soft-Light Solar Grading (boosts golden warmth in sunlit areas & cool tropical azure in shadows without greying out dark asphalt!)
+        ctx.globalCompositeOperation = "soft-light";
+        const toneGrad = ctx.createLinearGradient(sunX, 0, W - sunX, H);
+        toneGrad.addColorStop(0.0, `rgba(255, 224, 132, ${(0.22 * dayInt).toFixed(3)})`);
+        toneGrad.addColorStop(0.55, `rgba(255, 236, 178, ${(0.10 * dayInt).toFixed(3)})`);
+        toneGrad.addColorStop(1.0, `rgba(56, 148, 225, ${(0.08 * dayInt).toFixed(3)})`);
+        ctx.fillStyle = toneGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 2. Crisp Golden Florida Solar Corona & Corner Rim Glow (tighter radius near the sun horizon so roads in the center stay deep & contrasty)
         ctx.globalCompositeOperation = "screen";
-        const sunGrad = ctx.createRadialGradient(sunX, sunY, maxDim * 0.04, sunX, sunY, maxDim * 1.05);
-        // (kept faint: a strong full-screen "screen" lift washed dark asphalt into milky grey blotches)
-        sunGrad.addColorStop(0.0, `rgba(255, 238, 184, ${(0.08 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(0.42, `rgba(255, 218, 148, ${(0.04 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(0.78, `rgba(255, 200, 128, ${(0.015 * dayInt).toFixed(3)})`);
+        const sunGrad = ctx.createRadialGradient(sunX, sunY, maxDim * 0.02, sunX, sunY, maxDim * 0.68);
+        sunGrad.addColorStop(0.0, `rgba(255, 246, 200, ${(0.20 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(0.28, `rgba(255, 222, 142, ${(0.09 * dayInt).toFixed(3)})`);
+        sunGrad.addColorStop(0.62, `rgba(255, 198, 112, ${(0.025 * dayInt).toFixed(3)})`);
         sunGrad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
         ctx.fillStyle = sunGrad;
         ctx.fillRect(0, 0, W, H);
 
-        // 2. Feathered Elliptical Volumetric Sunbeams (100% radial-gradient feathered edges — zero hard polygon lines!)
+        // 3. Feathered Elliptical Volumetric Sunbeams (100% radial-gradient feathered edges — zero hard polygon lines!)
         ctx.globalCompositeOperation = "lighter";
-        const baseRayAngle = Math.atan2(H * 0.85, W * 0.58 - sunX);
+        const baseRayAngle = Math.atan2(H * 0.85, W * 0.50 - sunX);
         const camPhase = (this.camX * 0.0020 + this.camY * 0.0015);
         for (let i = 0; i < 4; i++) {
             const rayWave = 0.72 + 0.28 * Math.sin(this.time * 0.80 + camPhase + i * 1.57);
             const ang = baseRayAngle + (i - 1.5) * 0.14;
-            const lenR = maxDim * 0.68;
-            const widR = W * (0.09 + (i % 2) * 0.025);
+            const lenR = maxDim * 0.62;
+            const widR = W * (0.08 + (i % 2) * 0.022);
 
             ctx.save();
             ctx.translate(sunX, sunY);
             ctx.rotate(ang);
             ctx.scale(lenR, widR);
 
-            const rg = ctx.createRadialGradient(0.55, 0.0, 0.02, 0.55, 0.0, 0.65);
-            // Very faint: brighter beams read as moving light smudges/squares on the top-down asphalt
-            const a0 = (0.010 * dayInt * rayWave).toFixed(4);
-            const a1 = (0.004 * dayInt * rayWave).toFixed(4);
+            const rg = ctx.createRadialGradient(0.48, 0.0, 0.02, 0.48, 0.0, 0.62);
+            const a0 = (0.016 * dayInt * rayWave).toFixed(4);
+            const a1 = (0.006 * dayInt * rayWave).toFixed(4);
             rg.addColorStop(0.0, `rgba(255, 244, 198, ${a0})`);
             rg.addColorStop(0.50, `rgba(255, 224, 154, ${a1})`);
             rg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
             ctx.fillStyle = rg;
             ctx.beginPath();
-            ctx.arc(0.55, 0.0, 0.65, 0, Math.PI * 2);
+            ctx.arc(0.48, 0.0, 0.62, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         }

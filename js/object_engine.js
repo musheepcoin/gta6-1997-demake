@@ -3608,14 +3608,14 @@ class WorldObjectEngine {
                         if (dayAmt > 0.01) {
                             vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                             float onGround = clamp(2.65 - vWorldPos.y, 0.0, 1.0);
-                            float bldAO = lm.g * onGround * 0.50;
+                            float bldAO = lm.g * onGround * 0.55;
                             float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
-                            float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * 0.60;
+                            float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * 0.68;
                             float totalShade = clamp(max(bldShadow, bldAO), 0.0, 1.0);
-                            vec3 sunlitTint = vec3(1.07, 1.03, 0.95);
-                            vec3 shadowTint = vec3(0.68, 0.75, 0.88);
+                            vec3 sunlitTint = vec3(1.13, 1.07, 0.93);
+                            vec3 shadowTint = vec3(0.58, 0.68, 0.87);
                             vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade);
-                            float baseAO = mix(0.86, 1.0, smoothstep(2.0, 2.45, vWorldPos.y));
+                            float baseAO = mix(0.85, 1.03, smoothstep(2.0, 2.55, vWorldPos.y));
                             c.rgb = min(vec3(1.0), c.rgb * mix(vec3(1.0), dayGrading * baseAO, dayAmt));
                         }
                         if (uSunsetTint > 0.01) {
@@ -6595,7 +6595,12 @@ class WorldObjectEngine {
         gl.uniform1f(this.meshLocs.uNightTint, nf);
         gl.uniform1f(this.meshLocs.uSunsetTint, sf);
         if (this.meshLocs.uSunDir) {
-            gl.uniform2f(this.meshLocs.uSunDir, 0.55, 0.83);
+            const gameRef = renderer.lastGameRef;
+            const clockHr = (gameRef && typeof gameRef.worldMinutes === "number")
+                ? (((gameRef.worldMinutes % 1440) + 1440) % 1440) / 60.0
+                : 12.0;
+            const sunAz = ((clockHr - 6.0) / 12.0) * Math.PI;
+            gl.uniform2f(this.meshLocs.uSunDir, Math.cos(sunAz), Math.max(0.25, Math.sin(sunAz)));
         }
 
         // Unit 0: gta1_sprites.png (mansions, roof tiles, signage)
