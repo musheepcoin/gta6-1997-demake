@@ -9706,6 +9706,51 @@ class LeonidaGame {
 
                 }
 
+                // Allow cars, trucks, vans, buses & tanks (NOT motorcycles, bicycles, or e-scooters) to smash sidewalk payphone booths!
+                const isTwoWheeler = Boolean(
+                    isNonLethalWheeler ||
+                    v.isMotorcycle ||
+                    v.specKey === "STREET_BIKE" ||
+                    v.specKey === "HARLEY_BIKE"
+                );
+                if (!isTwoWheeler && vSpeed > 32 && this.missions && Array.isArray(this.missions.payphones)) {
+                    const bOff = (v.w || 48) * 0.32;
+                    const noseX = v.x + Math.cos(v.angle || 0) * bOff;
+                    const noseY = v.y + Math.sin(v.angle || 0) * bOff;
+                    for (const ph of this.missions.payphones) {
+                        if ((ph.wipeoutTimer || 0) > 0) continue;
+                        const dPh = Math.min(Math.hypot(ph.x - v.x, ph.y - v.y), Math.hypot(ph.x - noseX, ph.y - noseY));
+                        if (dPh < 26) {
+                            ph.wipeoutTimer = 45.0;
+                            ph.knockAng = Math.atan2(ph.y - v.y, ph.x - v.x);
+                            if (this.audio) {
+                                if (typeof this.audio.playCrateSmash === "function") this.audio.playCrateSmash();
+                                if (typeof this.audio.playCarCrash === "function") this.audio.playCarCrash(0.75);
+                            }
+                            const shardColors = ["#38bdf8", "#e0f2fe", "#94a3b8", "#facc15"];
+                            for (let si = 0; si < 16; si++) {
+                                const ang = ph.knockAng + (Math.random() - 0.5) * 1.8;
+                                const spd = 50 + Math.random() * 125;
+                                this.particles.push({
+                                    x: ph.x + (Math.random() - 0.5) * 8,
+                                    y: ph.y + (Math.random() - 0.5) * 8,
+                                    vx: Math.cos(ang) * spd,
+                                    vy: Math.sin(ang) * spd,
+                                    size: 3.5 + Math.random() * 4.0,
+                                    color: shardColors[si % shardColors.length],
+                                    life: 0.52,
+                                    maxLife: 0.52
+                                });
+                            }
+                            if (v.driver === "PLAYER") {
+                                this.score += 85 * this.multiplier;
+                                this.updateHud();
+                                this.addFloatingText(ph.x, ph.y - 20, "☎️ PAYPHONE SMASHED! +$85", "#38bdf8");
+                            }
+                        }
+                    }
+                }
+
                 // Allow vehicles to plow through open-air street/beach animations, sunbathers, and parasols (non-lethal wheelers knock out instead of killing)!
                 this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true, isNonLethalWheeler);
 
@@ -13139,6 +13184,9 @@ class LeonidaGame {
         tickArray(this.map.beachSunbathers);
         tickArray(this.map.beachUmbrellas);
         tickArray(this.map.viceStreetDetails);
+        if (this.missions && Array.isArray(this.missions.payphones)) {
+            tickArray(this.missions.payphones);
+        }
         tickArray(this.map.beachVolleyballCourts);
         tickArray(this.map.beachParties);
         tickArray(this.map.muscleBeachGyms);

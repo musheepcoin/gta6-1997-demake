@@ -3004,13 +3004,21 @@ class WorldObjectEngine {
         const cx = pCar ? pCar.x : (player ? player.x : 0);
         const cy = pCar ? pCar.y : (player ? player.y : 0);
         const isMicroVeh = pCar && (pCar.specKey === "BMX_BIKE" || pCar.specKey === "E_SCOOTER");
+        const isTwoWheeler = Boolean(
+            pCar && (
+                isMicroVeh ||
+                pCar.isMotorcycle ||
+                pCar.specKey === "STREET_BIKE" ||
+                pCar.specKey === "HARLEY_BIKE"
+            )
+        );
         const heavySpecs = [
             "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "TOUR_COACH", "TANKER_RIG",
             "FLATBED_TRUCK", "BRINKS_TRUCK", "SWAT_ENFORCER", "BOXVILLE_VAN",
             "HOTDOG_VAN", "MEDIC_AMBULANCE", "MONSTER_BUGGY", "GATOR_4X4",
             "PICKUP_TRUCK", "CAMPER_PICKUP"
         ];
-        const isHeavyVeh = Boolean(pCar && !isMicroVeh && (pCar.crushesCars || heavySpecs.includes(pCar.specKey)));
+        const isHeavyVeh = Boolean(pCar && !isTwoWheeler && (pCar.crushesCars || heavySpecs.includes(pCar.specKey)));
 
         if (this.streetProps && this.streetProps.length > 0) {
             for (let i = 0; i < this.streetProps.length; i++) {
@@ -3052,10 +3060,14 @@ class WorldObjectEngine {
                     continue;
                 }
 
-                if (pCar && !isMicroVeh && Math.abs(pCar.x - sp.x) < 30 && Math.abs(pCar.y - sp.y) < 30) {
+                const blockedByTwoWheeler = (sp.kind === "PAYPHONE_BOOTH") ? isTwoWheeler : isMicroVeh;
+                if (pCar && !blockedByTwoWheeler && Math.abs(pCar.x - sp.x) < 42 && Math.abs(pCar.y - sp.y) < 42) {
                     const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                    const dist = Math.hypot(pCar.x - sp.x, pCar.y - sp.y);
-                    if (dist < 24 && spd > 42 && (sp.hitCooldown || 0) <= 0) {
+                    const bOff = (pCar.w || 48) * 0.32;
+                    const noseX = pCar.x + Math.cos(pCar.angle || 0) * bOff;
+                    const noseY = pCar.y + Math.sin(pCar.angle || 0) * bOff;
+                    const dist = Math.min(Math.hypot(pCar.x - sp.x, pCar.y - sp.y), Math.hypot(noseX - sp.x, noseY - sp.y));
+                    if (dist < 25 && spd > 34 && (sp.hitCooldown || 0) <= 0) {
                         const dx = sp.x - pCar.x;
                         const dy = sp.y - pCar.y;
                         const d = Math.hypot(dx, dy) || 1.0;
@@ -3122,6 +3134,16 @@ class WorldObjectEngine {
                             if (typeof game.addScore === "function") game.addScore(100);
                             if (Array.isArray(game.floatingTexts)) {
                                 game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "💥 STREETLAMP SMASHED! +$100", color: "#f472b6", life: 1.2 });
+                            }
+                        } else if (sp.kind === "PAYPHONE_BOOTH") {
+                            if (typeof game.spawnParticle === "function") {
+                                for (let k = 0; k < 8; k++) {
+                                    game.spawnParticle(sp.x + (Math.random() - 0.5) * 12, sp.y + (Math.random() - 0.5) * 12, "SPARK");
+                                }
+                            }
+                            if (typeof game.addScore === "function") game.addScore(85);
+                            if (Array.isArray(game.floatingTexts)) {
+                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "☎️ PAYPHONE SMASHED! +$85", color: "#38bdf8", life: 1.2 });
                             }
                         } else {
                             if (typeof game.addScore === "function") game.addScore(75);

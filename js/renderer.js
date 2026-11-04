@@ -7385,8 +7385,32 @@ class RetroRenderer {
 
         for (const ph of game.missions.payphones) {
             if (ph.x < minX || ph.x > maxX || ph.y < minY || ph.y > maxY) continue;
-            // Static silent payphone booth prop (never rings; missions are launched via Smartphone!)
-            this.batchObjectSprite3D("274", ph.x, ph.y, this.getEntityZ(ph, 0.06), 0, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            // Static silent payphone booth prop (or toppled/smashed flat on the sidewalk!)
+            const pz = this.getEntityZ(ph, 0.06);
+            if ((ph.wipeoutTimer || 0) > 0) {
+                const ka = ph.knockAng || 0;
+                const ca = Math.cos(ka);
+                const sa = Math.sin(ka);
+                // Torn metal pedestal base & shattered blue glass fragments on the sidewalk
+                this.pushSolidQuad3D(ph.x, ph.y, pz - 0.042, 7.0, 7.0, 0, 0.34, 0.38, 0.44, 0.94, SPRITE_DRAW_ORDER.GROUND_DECALS);
+                this.pushSolidQuad3D(ph.x + ca * 7, ph.y + sa * 7, pz - 0.040, 14.0, 4.5, ka + 0.25, 0.22, 0.64, 0.88, 0.78, SPRITE_DRAW_ORDER.GROUND_DECALS);
+                const phRect = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects && this.gta1Meta.sprites.objects["274"];
+                if (phRect) {
+                    this.pushAtlasSprite3D(
+                        phRect,
+                        ph.x + ca * 13,
+                        ph.y + sa * 13,
+                        pz - 0.036,
+                        ka + 0.38,
+                        0.96,
+                        SPRITE_DRAW_ORDER.GROUND_DECALS,
+                        0.68, 0.72, 0.78,
+                        0.94
+                    );
+                }
+            } else {
+                this.batchObjectSprite3D("274", ph.x, ph.y, pz, 0, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            }
         }
 
         const m = game.missions.activeMission;
