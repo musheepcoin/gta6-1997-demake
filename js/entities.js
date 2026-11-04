@@ -2147,8 +2147,132 @@ class Vehicle {
         return this.computeTrafficControls(dt, map, game);
     }
 
+    computeTowControls(dt, map, game) {
+        this.aiState = "TOW_TRUCK";
+        this.sirenActive = true;
+
+        // If already towing a vehicle/wreck, drive it away along the road network until off-screen
+        if (this.towingVehicle) {
+            if (!game.vehicles.includes(this.towingVehicle) || this.towingVehicle.driver === "PLAYER") {
+                this.towingVehicle.towedByTruck = null;
+                this.towingVehicle = null;
+            } else {
+                return this.computeTrafficControls(dt, map, game);
+            }
+        }
+
+        // Validate or acquire target abandoned / wrecked vehicle on road
+        let target = this.towTarget;
+        if (
+            !target ||
+            !game.vehicles.includes(target) ||
+            (target.driver !== null && !target.destroyed) ||
+            (target.towedByTruck && target.towedByTruck !== this) ||
+            target.isStaticParked ||
+            target.missionTag
+        ) {
+            target = null;
+            this.towTarget = null;
+            let bestDist = 1400;
+            for (const v of game.vehicles) {
+                if (v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) continue;
+                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 8.0;
+                const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 26.0 : 14.0);
+                if (!isWreck && !isAbandoned) continue;
+                const d = Math.hypot(v.x - this.x, v.y - this.y);
+                if (d < bestDist) {
+                    bestDist = d;
+                    target = v;
+                }
+            }
+            this.towTarget = target;
+        }
+
+        if (!target) {
+            this.sirenActive = false;
+            return this.computeTrafficControls(dt, map, game);
+        }
+
+        const dist = Math.hypot(target.x - this.x, target.y - this.y);
+        if (dist < 62) {
+            // Hook up the vehicle / wreck to the tow winch!
+            this.towingVehicle = target;
+            this.towTarget = null;
+            target.towedByTruck = this;
+            target.driver = null;
+            target.sirenActive = false;
+            target.vx = 0;
+            target.vy = 0;
+            target.speed = 0;
+            if (game.audio && typeof game.audio.playBeep === "function") {
+                game.audio.playBeep(580, 0.08, "square", 0.06);
+            }
+            if (typeof game.addFloatingText === "function") {
+                game.addFloatingText(target.x, target.y - 24, "🪝 VCPD FOURRIÈRE — REMORQUAGE!", "#f59e0b");
+            }
+            return this.computeTrafficControls(dt, map, game);
+        }
+
+        return this.computeRoadInterceptControls(
+            dt,
+            map,
+            game,
+            target.x,
+            target.y,
+            0,
+            0,
+            0.82,
+            false
+        );
+    }
+
     update(dt, input, map, game) {
-        if (this.destroyed) return;
+        // If this vehicle or wreck is hooked to a Tow Truck, follow behind its rear hitch!
+        if (this.towedByTruck) {
+            const truck = this.towedByTruck;
+            if (
+                !truck ||
+                truck.destroyed ||
+                truck.towingVehicle !== this ||
+                this.driver === "PLAYER" ||
+                (game && !game.vehicles.includes(truck))
+            ) {
+                if (truck && truck.towingVehicle === this) truck.towingVehicle = null;
+                this.towedByTruck = null;
+            } else {
+                const hitchDist = ((truck.w || 56) + (this.w || 46)) * 0.52 + 8;
+                const targetX = truck.x - Math.cos(truck.angle) * hitchDist;
+                const targetY = truck.y - Math.sin(truck.angle) * hitchDist;
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const pullAng = Math.atan2(truck.y - this.y, truck.x - this.x);
+                const angDiff = Math.atan2(Math.sin(pullAng - this.angle), Math.cos(pullAng - this.angle));
+                this.angle += angDiff * Math.min(1.0, dt * 10.0);
+                this.x += dx * Math.min(1.0, dt * 14.0);
+                this.y += dy * Math.min(1.0, dt * 14.0);
+                this.z = truck.z;
+                this.vx = truck.vx;
+                this.vy = truck.vy;
+                this.speed = truck.speed;
+                return;
+            }
+        }
+
+        if (this.destroyed) {
+            this.abandonedTimer = (this.abandonedTimer || 0) + dt;
+            return;
+        }
+
+        if (this.driver === "PLAYER") {
+            this.lastPlayerDriven = true;
+            this.isStaticParked = false;
+            this.abandonedTimer = 0;
+        } else if (this.driver !== null) {
+            this.isStaticParked = false;
+            this.abandonedTimer = 0;
+        } else {
+            this.abandonedTimer = (this.abandonedTimer || 0) + dt;
+        }
 
         this.sirenPhase += dt * 10;
         if (this.doorOpenTimer > 0) {
@@ -2357,6 +2481,11 @@ class Vehicle {
                 throttle = crimCtrl.throttle;
                 steer = crimCtrl.steer;
                 handbrake = crimCtrl.handbrake;
+            } else if (this.driver === "AI_TOW") {
+                const towCtrl = this.computeTowControls(dt, map, game);
+                throttle = towCtrl.throttle;
+                steer = towCtrl.steer;
+                handbrake = towCtrl.handbrake;
             }
 
             this.updateSteer(dt, steer);
@@ -2900,24 +3029,46 @@ class TrafficManager {
 
         for (let i = game.vehicles.length - 1; i >= 0; i--) {
             const v = game.vehicles[i];
+            if (!v || v.towedByTruck) continue;
             const anyWanted = game.wantedLevel > 0 || (game.net && typeof game.net.getMaxWantedLevel === "function" && game.net.getMaxWantedLevel() > 0);
+            const isAbandonedOrWreck =
+                !v.isStaticParked &&
+                !v.isEstateCar &&
+                ((v.destroyed && (v.abandonedTimer || 0) > 12.0) ||
+                 (v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 32.0 : 12.0)));
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
                 v.driver === "AI_EMERGENCY" ||
                 v.driver === "AI_CRIMINAL" ||
-                (!anyWanted && v.driver === "AI_COP");
+                v.driver === "AI_TOW" ||
+                (!anyWanted && v.driver === "AI_COP") ||
+                isAbandonedOrWreck;
             if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE") continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
             // Immediately remove any civilian/emergency traffic car that ever wanders or spawns inside a restricted compound (VCIA Airport / Penitentiary)
             if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(bx, by)) {
+                if (v.towingVehicle) {
+                    const tIdx = game.vehicles.indexOf(v.towingVehicle);
+                    if (tIdx >= 0) {
+                        game.vehicles.splice(tIdx, 1);
+                        if (tIdx < i) i--;
+                    }
+                }
                 game.vehicles.splice(i, 1);
                 continue;
             }
-            if (game.vehicles.length <= minKeep) continue;
+            if (game.vehicles.length <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW") continue;
             const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
+                if (v.towingVehicle) {
+                    const tIdx = game.vehicles.indexOf(v.towingVehicle);
+                    if (tIdx >= 0) {
+                        game.vehicles.splice(tIdx, 1);
+                        if (tIdx < i) i--;
+                    }
+                }
                 game.vehicles.splice(i, 1);
             }
         }

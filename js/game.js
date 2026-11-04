@@ -669,6 +669,10 @@ class LeonidaGame {
 
                 v.driver = p.driver;
 
+            } else {
+
+                v.isStaticParked = true;
+
             }
 
             if (p.missionTag) {
@@ -7838,7 +7842,7 @@ class LeonidaGame {
 
             copCar.z = z;
 
-            copCar.driver = "AI_COP";
+            copCar.driver = null;
 
             copCar.sirenActive = true;
 
@@ -8061,6 +8065,228 @@ class LeonidaGame {
                 ped.panicTimer = 6.0;
 
             }
+
+        }
+
+    }
+
+
+
+    updateRoadClearanceAndTowing(dt) {
+
+        const p = this.player;
+
+        if (!p || p.dead || this.activeInterior) return;
+
+
+
+        // Scan for a wrecked or abandoned vehicle blocking a road near the player (75px < dist < 760px)
+
+        let targetBlockedCar = null;
+
+        let bestDist = 760;
+
+        let activeTowTrucks = 0;
+
+        let farTowTruck = null;
+
+
+
+        for (const v of this.vehicles) {
+
+            if (!v.destroyed && v.driver === "AI_TOW") {
+
+                activeTowTrucks++;
+
+                if (!v.towingVehicle && Math.hypot(v.x - p.x, v.y - p.y) > 980) {
+
+                    farTowTruck = v;
+
+                }
+
+            }
+
+        }
+
+
+
+        for (const v of this.vehicles) {
+
+            if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
+
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 10.0;
+
+            const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 28.0 : 15.0);
+
+            if (!isWreck && !isAbandoned) continue;
+
+
+
+            const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
+
+            if (dPlayer < 75 || dPlayer >= bestDist) continue;
+
+
+
+            const bx = Math.floor(v.x / TILE_SIZE);
+
+            const by = Math.floor(v.y / TILE_SIZE);
+
+            const navBlk = typeof this.map.getNavigationBlock === "function"
+
+                ? this.map.getNavigationBlock(bx, by, v.z || 2.0)
+
+                : null;
+
+            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
+
+
+
+            // Check if a tow truck is already assigned or close to this vehicle
+
+            const alreadyTargeted = this.vehicles.some(
+
+                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (tv.towTarget === v || Math.hypot(tv.x - v.x, tv.y - v.y) < 380)
+
+            );
+
+            if (alreadyTargeted) continue;
+
+
+
+            bestDist = dPlayer;
+
+            targetBlockedCar = v;
+
+        }
+
+
+
+        if (!targetBlockedCar) {
+
+            this.towDispatchTimer = 0;
+
+            return;
+
+        }
+
+
+
+        this.towDispatchTimer = (this.towDispatchTimer || 0) + dt;
+
+        if (this.towDispatchTimer < 8.5) return;
+
+        this.towDispatchTimer = 4.5; // retry ~4s later if no road spawn block found
+
+
+
+        const baseBx = Math.floor(targetBlockedCar.x / TILE_SIZE);
+
+        const baseBy = Math.floor(targetBlockedCar.y / TILE_SIZE);
+
+        const pz = targetBlockedCar.z || 2.0;
+
+
+
+        for (let attempt = 0; attempt < 26; attempt++) {
+
+            const ang = Math.random() * Math.PI * 2;
+
+            const distB = 8.0 + Math.random() * 5.0;
+
+            const bx = Math.floor(baseBx + Math.cos(ang) * distB);
+
+            const by = Math.floor(baseBy + Math.sin(ang) * distB);
+
+            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
+
+            const navBlk = typeof this.map.getNavigationBlock === "function"
+
+                ? this.map.getNavigationBlock(bx, by, pz)
+
+                : null;
+
+            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
+
+
+
+            const sx = (bx + 0.5) * TILE_SIZE;
+
+            const sy = (by + 0.5) * TILE_SIZE;
+
+            if (Math.hypot(sx - p.x, sy - p.y) < 380) continue;
+
+
+
+            const toCarAng = Math.atan2(targetBlockedCar.y - sy, targetBlockedCar.x - sx);
+
+            const roadAng = typeof this.map.getAlignedRoadAngle === "function"
+
+                ? this.map.getAlignedRoadAngle(bx, by, toCarAng, pz)
+
+                : toCarAng;
+
+            const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
+
+
+
+            if (farTowTruck) {
+
+                farTowTruck.x = sx;
+
+                farTowTruck.y = sy;
+
+                farTowTruck.z = sz;
+
+                farTowTruck.angle = roadAng;
+
+                farTowTruck.towTarget = targetBlockedCar;
+
+                farTowTruck.towingVehicle = null;
+
+                farTowTruck.sirenActive = true;
+
+                farTowTruck.speed = 95;
+
+                farTowTruck.vx = Math.cos(roadAng) * 95;
+
+                farTowTruck.vy = Math.sin(roadAng) * 95;
+
+                farTowTruck.aiStuckTimer = 0;
+
+                farTowTruck.aiChosenDir = null;
+
+                farTowTruck.approachBestDist = undefined;
+
+                farTowTruck.approachNoProgress = 0;
+
+            } else if (activeTowTrucks < 2) {
+
+                const towTruck = new Vehicle(`tow_${Date.now()}_${attempt}`, "FLATBED_TRUCK", sx, sy, roadAng);
+
+                towTruck.z = sz;
+
+                towTruck.driver = "AI_TOW";
+
+                towTruck.isEmergency = true;
+
+                towTruck.sirenActive = true;
+
+                towTruck.towTarget = targetBlockedCar;
+
+                towTruck.speed = 95;
+
+                towTruck.vx = Math.cos(roadAng) * 95;
+
+                towTruck.vy = Math.sin(roadAng) * 95;
+
+                this.vehicles.push(towTruck);
+
+            }
+
+            this.towDispatchTimer = 0;
+
+            break;
 
         }
 
@@ -9276,6 +9502,8 @@ class LeonidaGame {
 
                 const b = this.vehicles[j];
 
+                if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
+
                 if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.85) continue;
 
                 if (Math.abs(b.x - a.x) > 68 || Math.abs(b.y - a.y) > 68) continue;
@@ -10298,13 +10526,46 @@ class LeonidaGame {
 
                 } else {
 
-                    // Routine VCPD foot patrol when no wanted player or active criminal is nearby
+                    // Post-shootout scene cleanup: if an unoccupied police cruiser or bandit getaway car is nearby,
+                    // VCPD officers walk back to it, climb in, and drive it away on patrol!
+                    let returnCar = null;
+                    let bestCarDist = 420;
+                    if (ped.missionTag !== "PRISON_GUARD") {
+                        for (const v of this.vehicles) {
+                            if (
+                                !v.destroyed &&
+                                v.driver === null &&
+                                !v.towedByTruck &&
+                                (v.isPolice || v.wasCriminalCar)
+                            ) {
+                                const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                                if (d < bestCarDist) {
+                                    bestCarDist = d;
+                                    returnCar = v;
+                                }
+                            }
+                        }
+                    }
 
-                    ped.x += Math.cos(ped.angle) * 42 * dt;
-
-                    ped.y += Math.sin(ped.angle) * 42 * dt;
-
-                    if (Math.random() < 0.015) ped.angle += (Math.random() - 0.5) * 1.2;
+                    if (returnCar) {
+                        if (bestCarDist < 36) {
+                            returnCar.driver = "AI_COP";
+                            returnCar.wasCriminalCar = false;
+                            returnCar.sirenActive = false;
+                            returnCar.doorOpenTimer = 0.44;
+                            const idx = this.peds.indexOf(ped);
+                            if (idx >= 0) this.peds.splice(idx, 1);
+                            continue;
+                        }
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, returnCar.x, returnCar.y);
+                        ped.x += Math.cos(ped.angle) * 76 * dt;
+                        ped.y += Math.sin(ped.angle) * 76 * dt;
+                    } else {
+                        // Routine VCPD foot patrol when no wanted player or active criminal is nearby
+                        ped.x += Math.cos(ped.angle) * 42 * dt;
+                        ped.y += Math.sin(ped.angle) * 42 * dt;
+                        if (Math.random() < 0.015) ped.angle += (Math.random() - 0.5) * 1.2;
+                    }
 
                 }
 
@@ -10444,13 +10705,36 @@ class LeonidaGame {
 
                 } else {
 
-                    // All pursuing cops neutralized — bandits sprint away down the street with the loot!
+                    // All pursuing cops neutralized — bandits hop into the nearest unoccupied getaway car (or sprint away)!
+                    let getawayCar = null;
+                    let bestCarDist = 380;
+                    for (const v of this.vehicles) {
+                        if (!v.destroyed && v.driver === null && !v.towedByTruck && !v.missionTag && !v.isEstateCar) {
+                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                            if (d < bestCarDist) {
+                                bestCarDist = d;
+                                getawayCar = v;
+                            }
+                        }
+                    }
 
-                    ped.x += Math.cos(ped.angle) * 96 * dt;
-
-                    ped.y += Math.sin(ped.angle) * 96 * dt;
-
-                    if (Math.random() < 0.025) ped.angle += (Math.random() - 0.5) * 1.1;
+                    if (getawayCar) {
+                        if (bestCarDist < 36) {
+                            getawayCar.driver = "AI_CRIMINAL";
+                            getawayCar.wasCriminalCar = true;
+                            getawayCar.doorOpenTimer = 0.44;
+                            const idx = this.peds.indexOf(ped);
+                            if (idx >= 0) this.peds.splice(idx, 1);
+                            continue;
+                        }
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, getawayCar.x, getawayCar.y);
+                        ped.x += Math.cos(ped.angle) * 96 * dt;
+                        ped.y += Math.sin(ped.angle) * 96 * dt;
+                    } else {
+                        ped.x += Math.cos(ped.angle) * 96 * dt;
+                        ped.y += Math.sin(ped.angle) * 96 * dt;
+                        if (Math.random() < 0.025) ped.angle += (Math.random() - 0.5) * 1.1;
+                    }
 
                 }
 
@@ -10729,6 +11013,54 @@ class LeonidaGame {
                 // (AiCharacterController.cpp lines 250-365): Pedestrians stay strictly on PAWEMENT / FIELD blocks!
 
                 if (ped.panicTimer > 0) ped.panicTimer = Math.max(0, ped.panicTimer - dt);
+
+
+
+                // Opportunistic Vice City street thief: gang members / muggers walking near an abandoned unlocked road car steal it and drive off!
+                const isStreetThiefType =
+                    ped.g24Type === "g2_mugger" ||
+                    ped.g24Type === "gang" ||
+                    ped.g24Type === "vc_haitian" ||
+                    ped.g24Type === "vc_cuban";
+                if (isStreetThiefType && (ped.burnTimer || 0) <= 0 && !ped.isLivingProp) {
+                    let stealTarget = null;
+                    let bestStealDist = 115;
+                    for (const v of this.vehicles) {
+                        if (
+                            !v.destroyed &&
+                            v.driver === null &&
+                            !v.towedByTruck &&
+                            !v.isStaticParked &&
+                            !v.isEstateCar &&
+                            !v.missionTag &&
+                            !v.isPolice &&
+                            !v.isEmergency &&
+                            (v.abandonedTimer || 0) > 18.0 &&
+                            Math.hypot(v.x - p.x, v.y - p.y) > 95
+                        ) {
+                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                            if (d < bestStealDist) {
+                                bestStealDist = d;
+                                stealTarget = v;
+                            }
+                        }
+                    }
+                    if (stealTarget) {
+                        if (bestStealDist < 32) {
+                            stealTarget.driver = "AI_TRAFFIC";
+                            stealTarget.aiPanicTimer = 6.0;
+                            stealTarget.doorOpenTimer = 0.44;
+                            this.addFloatingText(stealTarget.x, stealTarget.y - 22, "🚗 VOITURE ABANDONNÉE VOLÉE!", "#facc15");
+                            const idx = this.peds.indexOf(ped);
+                            if (idx >= 0) this.peds.splice(idx, 1);
+                            continue;
+                        }
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, stealTarget.x, stealTarget.y);
+                        ped.x += Math.cos(ped.angle) * 84 * dt;
+                        ped.y += Math.sin(ped.angle) * 84 * dt;
+                        continue;
+                    }
+                }
 
 
 
@@ -11436,6 +11768,9 @@ class LeonidaGame {
 
             // 7c. Ambient Random Street Crime & Police Intervention Events (Independent of Player)
             this.updateAmbientCrimeEvents(dt);
+
+            // 7d. Municipal Tow Truck (Fourrière) & Abandoned Road Vehicle Clearance
+            this.updateRoadClearanceAndTowing(dt);
 
         }
 

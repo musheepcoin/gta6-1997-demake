@@ -7269,11 +7269,53 @@ class RetroRenderer {
                 }
             }
 
-            // Siren Overlays (eSpriteDrawOrder_CarRoof) — only when driven & siren active
-            if (!v.destroyed && v.driver && v.isEmergency && v.sirenActive && sirens.length > 0) {
+            // Siren Overlays (eSpriteDrawOrder_CarRoof) — when driven or parked at an active scene with siren active
+            if (!v.destroyed && (v.driver || v.sirenActive) && v.isEmergency && v.sirenActive && sirens.length > 0) {
                 const sIdx = Math.floor(this.time * 10) % sirens.length;
                 const sRect = sirens[sIdx];
                 if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF, 1, 1, 1, 1, totalPitchZ);
+            }
+
+            // Tow Truck Flashing Amber Roof Beacon & 3D Steel Tow Bar / Winch Cable
+            if (!v.destroyed && v.driver === "AI_TOW" && this.solidWhiteRect) {
+                const cosA = Math.cos(v.angle);
+                const sinA = Math.sin(v.angle);
+                if (v.sirenActive) {
+                    const amberSide = (Math.floor(this.time * 9) % 2 === 0) ? -4.5 : 4.5;
+                    const bx = v.x + cosA * 10 - sinA * amberSide;
+                    const by = v.y + sinA * 10 + cosA * amberSide;
+                    this.pushAtlasQuad3D(
+                        this.solidWhiteRect,
+                        bx - 3, by - 3, vz + airZ + 0.022,
+                        bx + 3, by - 3, vz + airZ + 0.022,
+                        bx + 3, by + 3, vz + airZ + 0.022,
+                        bx - 3, by + 3, vz + airZ + 0.022,
+                        1.0, 0.72, 0.08, 0.92,
+                        SPRITE_DRAW_ORDER.CAR_ROOF
+                    );
+                }
+                if (v.towingVehicle) {
+                    const tv = v.towingVehicle;
+                    const hitchX = v.x - cosA * ((v.w || 56) * 0.44);
+                    const hitchY = v.y - sinA * ((v.w || 56) * 0.44);
+                    const noseX = tv.x + Math.cos(tv.angle) * ((tv.w || 46) * 0.42);
+                    const noseY = tv.y + Math.sin(tv.angle) * ((tv.w || 46) * 0.42);
+                    const bdx = noseX - hitchX;
+                    const bdy = noseY - hitchY;
+                    const bLen = Math.hypot(bdx, bdy) || 1;
+                    const nx = (-bdy / bLen) * 2.2;
+                    const ny = (bdx / bLen) * 2.2;
+                    const barZ = vz + 0.008;
+                    this.pushAtlasQuad3D(
+                        this.solidWhiteRect,
+                        hitchX - nx, hitchY - ny, barZ,
+                        hitchX + nx, hitchY + ny, barZ,
+                        noseX + nx, noseY + ny, barZ,
+                        noseX - nx, noseY - ny, barZ,
+                        0.96, 0.68, 0.12, 0.95,
+                        SPRITE_DRAW_ORDER.CARS
+                    );
+                }
             }
 
             // Tank Turret & Barrel (Sprite 267 — eSpriteDrawOrder_CarRoof)
