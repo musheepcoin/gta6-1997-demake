@@ -2782,6 +2782,12 @@ class WorldObjectEngine {
                 stampTower(tw.x, tw.y, 0, 2.85);
             }
         }
+        if (Array.isArray(this.rooftopSuperstructures)) {
+            for (let i = 0; i < this.rooftopSuperstructures.length; i++) {
+                const rs = this.rooftopSuperstructures[i];
+                stampTower(rs.x, rs.y, rs.radTiles || 0, rs.topElev);
+            }
+        }
     }
 
     /* ========================================================================
@@ -5437,6 +5443,536 @@ class WorldObjectEngine {
                 emitAOShadow3D(ps.x, ps.y, 1, 0, 0, 0, 32, 32, bz, 0.32);
                 emitCylinder3D(ps.x, ps.y, 0, 0, 11.0, 9.5, bz, bz + 0.07, 12, [0.88, 0.90, 0.94], 2, true);
                 emitCylinder3D(ps.x, ps.y, 0, 0, 3.0, 2.2, bz + 0.07, bz + 0.26, 8, [0.24, 0.28, 0.34], 5, true);
+            }
+        }
+
+        // 29. CITY-WIDE GTA 6 3D BUILDING ARCHITECTURE & ROOFTOP SUPERSTRUCTURE UPGRADE
+        //     Transforms every voxel building across Vice Beach, Ocean Drive, Downtown, Brickell,
+        //     Wynwood, Little Havana, Little Haiti, Port Gellhorn, Ambrosia & Vice Port with:
+        //     - Merged 3D Perimeter Parapet Walls, Stepped Art Deco Ziggurat Crowns & Neon Skyline Bands
+        //     - 3D Horizontal Window "Eyebrow" Sun-Ledges, Cantilevered Glass Balconies, Storefront Awnings & Vertical Neon Blade Signs
+        //     - District-Authentic 3D Rooftop Superstructures (Glass Penthouses, VIP Helipads, Rooftop Infinity Plunge Pools & Pergolas,
+        //       Wooden Water Tanks on Steel Truss Legs, HVAC Chiller Plants, Ventilation Ducts, Solar Arrays & Cellular Relay Masts)
+        this.rooftopSuperstructures = [];
+        if (this.map && typeof this.map.getBlockInfo === "function") {
+            const M = MAP_COLS;
+            const bTopZ = new Uint8Array(MAP_ROWS * M);
+            const bTopLid = new Uint16Array(MAP_ROWS * M);
+            const surfGtGrid = this.map.surfaceGround;
+
+            // Mark custom 3D prefab footprints so we only enhance voxel city buildings
+            const customMask = new Uint8Array(MAP_ROWS * M);
+            if (Array.isArray(this.instances)) {
+                for (let i = 0; i < this.instances.length; i++) {
+                    const inst = this.instances[i];
+                    const c0 = Math.max(0, Math.floor((inst.x - (inst.extX || 96)) / TILE_SIZE));
+                    const c1 = Math.min(M - 1, Math.ceil((inst.x + (inst.extX || 96)) / TILE_SIZE));
+                    const r0 = Math.max(0, Math.floor((inst.y - (inst.extY || 96)) / TILE_SIZE));
+                    const r1 = Math.min(MAP_ROWS - 1, Math.ceil((inst.y + (inst.extY || 96)) / TILE_SIZE));
+                    for (let rr = r0; rr <= r1; rr++) {
+                        for (let cc = c0; cc <= c1; cc++) {
+                            customMask[rr * M + cc] = 1;
+                        }
+                    }
+                }
+            }
+
+            for (let r = 4; r < MAP_ROWS - 4; r++) {
+                const rOff = r * M;
+                for (let c = 4; c < M - 4; c++) {
+                    if (customMask[rOff + c]) continue;
+                    for (let z = MAP_LAYERS - 1; z >= 2; z--) {
+                        const blk = this.map.getBlockInfo(c, r, z);
+                        if (blk && blk.groundType === GROUND_TYPE.BUILDING && blk.lid > 0 && !blk.slopeType) {
+                            bTopZ[rOff + c] = z + 1; // Top elevation in block units (3..6)
+                            bTopLid[rOff + c] = blk.lid;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            const artDecoPal = [
+                [0.98, 0.36, 0.78], // Flamingo Pink
+                [0.14, 0.94, 0.98], // South Beach Cyan
+                [0.32, 0.98, 0.76], // Tropical Mint
+                [1.00, 0.82, 0.24], // Sunset Gold
+                [0.78, 0.44, 0.98]  // Ocean Drive Violet
+            ];
+            const downtownLedPal = [
+                [0.18, 0.90, 1.00], // Brickell Sky Cyan
+                [0.98, 0.84, 0.28], // Financial Gold
+                [0.96, 0.30, 0.76], // Vice Bay Magenta
+                [0.88, 0.96, 1.00]  // Crisp Ice White
+            ];
+            const awningPal = [
+                [0.92, 0.26, 0.34], // Coral Crimson
+                [0.12, 0.72, 0.68], // Caribbean Teal
+                [0.96, 0.68, 0.16], // Havana Marigold
+                [0.20, 0.52, 0.88], // Royal Azure
+                [0.88, 0.34, 0.70]  // South Beach Rose
+            ];
+            const bladeAdKeys = [
+                "ad_vice26", "ad_hotel_dixon", "ad_vice_neon", "ad_ocean_drive",
+                "ad_mambos_latin", "ad_sprunk", "ad_ecola", "ad_pisswasser",
+                "ad_burgershot", "ad_ammunation", "ad_call_morgan", "ad_angstipan"
+            ];
+            const interiorsList = Array.isArray(this.map.interiors) ? this.map.interiors : [];
+            const isNearDoor = (wx, wy) => {
+                for (let i = 0; i < interiorsList.length; i++) {
+                    const intr = interiorsList[i];
+                    if (Math.abs(intr.doorX - wx) < 88 && Math.abs(intr.doorY - wy) < 88) return true;
+                }
+                return false;
+            };
+
+            // Helper to emit a merged 3D parapet wall + district crown + street-facing facade architecture
+            // dirX, dirY is the outward normal of the building edge: N=(0,-1), S=(0,1), W=(-1,0), E=(1,0)
+            const emitBuildingEdgeSpan = (cStart, cEnd, rStart, rEnd, topY, dirX, dirY, adjGroundIsSidewalk) => {
+                const spanTiles = Math.max(cEnd - cStart + 1, rEnd - rStart + 1);
+                const midC = (cStart + cEnd + 1) * 0.5;
+                const midR = (rStart + rEnd + 1) * 0.5;
+                const hash = (((cStart * 73856093) ^ (rStart * 19349663) ^ (spanTiles * 83492791)) >>> 0);
+
+                const isBeachArtDeco = (midC >= 365);
+                const isDowntown = (midC >= 235 && midC < 365 && midR >= 145 && midR <= 315);
+                const isLatinOrUrban = (midC >= 170 && midC < 285 && midR >= 70 && midR < 315);
+
+                // Edge center in pixels (inset 3.2px onto the roof so parapet sits flush along the outer wall)
+                const isHorizontal = (dirY !== 0);
+                const edgeX = isHorizontal
+                    ? midC * TILE_SIZE
+                    : (dirX < 0 ? cStart * TILE_SIZE + 3.2 : (cEnd + 1) * TILE_SIZE - 3.2);
+                const edgeY = isHorizontal
+                    ? (dirY < 0 ? rStart * TILE_SIZE + 3.2 : (rEnd + 1) * TILE_SIZE - 3.2)
+                    : midR * TILE_SIZE;
+                const spanPx = spanTiles * TILE_SIZE;
+                const wPx = isHorizontal ? spanPx : 6.4;
+                const dPx = isHorizontal ? 6.4 : spanPx;
+
+                // 1) 3D Perimeter Parapet Wall & Coping Ledge + Inner Roof Deck AO Shadow Skirt
+                const parapetH = isDowntown ? 0.105 : (isBeachArtDeco ? 0.095 : 0.082);
+                const baseCol = isBeachArtDeco
+                    ? [0.97, 0.95, 0.92]
+                    : (isDowntown ? [0.82, 0.88, 0.95] : (isLatinOrUrban ? [0.90, 0.80, 0.70] : [0.78, 0.80, 0.84]));
+                const baseMat = isDowntown ? 9 : 1;
+
+                emitAOShadow3D(
+                    edgeX - dirX * 5.0,
+                    edgeY - dirY * 5.0,
+                    1, 0, 0, 0,
+                    isHorizontal ? spanPx : 14.0,
+                    isHorizontal ? 14.0 : spanPx,
+                    topY,
+                    0.28
+                );
+                emitSolidBox3D(edgeX, edgeY, 1, 0, 0, 0, wPx, dPx, topY, topY + parapetH, baseCol, baseMat);
+
+                // Top coping cap / neon skyline band
+                if (isBeachArtDeco) {
+                    const neonCol = artDecoPal[hash % artDecoPal.length];
+                    const altNeon = artDecoPal[(hash + 2) % artDecoPal.length];
+                    emitSolidBox3D(
+                        edgeX, edgeY, 1, 0, 0, 0,
+                        isHorizontal ? spanPx + 1.5 : 7.6,
+                        isHorizontal ? 7.6 : spanPx + 1.5,
+                        topY + parapetH, topY + parapetH + 0.032,
+                        neonCol, 10
+                    );
+                    // Stepped Art Deco Ziggurat central crown & vertical neon fin on spans >= 2 tiles
+                    if (spanTiles >= 2) {
+                        const crownW = Math.min(spanPx * 0.56, 136.0);
+                        const crownW2 = Math.min(spanPx * 0.32, 78.0);
+                        emitSolidBox3D(
+                            edgeX, edgeY, 1, 0, 0, 0,
+                            isHorizontal ? crownW : 8.2,
+                            isHorizontal ? 8.2 : crownW,
+                            topY + parapetH + 0.03, topY + parapetH + 0.16,
+                            [0.98, 0.96, 0.94], 9
+                        );
+                        emitSolidBox3D(
+                            edgeX, edgeY, 1, 0, 0, 0,
+                            isHorizontal ? crownW2 : 9.0,
+                            isHorizontal ? 9.0 : crownW2,
+                            topY + parapetH + 0.16, topY + parapetH + 0.27,
+                            neonCol, 10
+                        );
+                        if (spanTiles >= 3 && (hash % 2 === 0)) {
+                            emitSolidBox3D(
+                                edgeX + dirX * 2.5, edgeY + dirY * 2.5, 1, 0, 0, 0,
+                                isHorizontal ? 6.5 : 12.0,
+                                isHorizontal ? 12.0 : 6.5,
+                                topY + 0.05, topY + parapetH + 0.44,
+                                altNeon, 10
+                            );
+                        }
+                    }
+                } else if (isDowntown && topY >= 4.0) {
+                    const ledCol = downtownLedPal[hash % downtownLedPal.length];
+                    emitSolidBox3D(
+                        edgeX, edgeY, 1, 0, 0, 0,
+                        isHorizontal ? spanPx + 1.6 : 7.8,
+                        isHorizontal ? 7.8 : spanPx + 1.6,
+                        topY + parapetH, topY + parapetH + 0.038,
+                        ledCol, 10
+                    );
+                    if (spanTiles >= 3 && (hash % 2 === 0)) {
+                        const finSpan = Math.min(spanPx * 0.50, 128.0);
+                        emitSolidBox3D(
+                            edgeX, edgeY, 1, 0, 0, 0,
+                            isHorizontal ? finSpan : 8.4,
+                            isHorizontal ? 8.4 : finSpan,
+                            topY + parapetH + 0.038, topY + parapetH + 0.20,
+                            [0.20, 0.78, 0.96], 7
+                        );
+                        emitSolidBox3D(
+                            edgeX, edgeY, 1, 0, 0, 0,
+                            isHorizontal ? finSpan + 2.0 : 9.0,
+                            isHorizontal ? 9.0 : finSpan + 2.0,
+                            topY + parapetH + 0.20, topY + parapetH + 0.24,
+                            ledCol, 10
+                        );
+                    }
+                } else {
+                    // Warm terracotta / limestone / industrial steel coping cap
+                    const capCol = isLatinOrUrban ? [0.84, 0.44, 0.30] : [0.58, 0.62, 0.68];
+                    emitSolidBox3D(
+                        edgeX, edgeY, 1, 0, 0, 0,
+                        isHorizontal ? spanPx + 1.4 : 7.6,
+                        isHorizontal ? 7.6 : spanPx + 1.4,
+                        topY + parapetH, topY + parapetH + 0.028,
+                        capCol, isLatinOrUrban ? 1 : 6
+                    );
+                    if (isLatinOrUrban && spanTiles >= 3 && (hash % 2 === 0)) {
+                        const pedW = Math.min(spanPx * 0.42, 96.0);
+                        emitSolidBox3D(
+                            edgeX, edgeY, 1, 0, 0, 0,
+                            isHorizontal ? pedW : 7.8,
+                            isHorizontal ? 7.8 : pedW,
+                            topY + parapetH + 0.028, topY + parapetH + 0.15,
+                            [0.94, 0.84, 0.72], 1
+                        );
+                    }
+                }
+
+                // 2) Street-Facing 3D Architectural Facade Details (Eyebrow Ledges, Glass Balconies, Storefront Awnings & Neon Blade Signs)
+                if (!adjGroundIsSidewalk || spanTiles < 2) return;
+
+                const wallFaceX = edgeX + dirX * 3.2;
+                const wallFaceY = edgeY + dirY * 3.2;
+
+                // 2A) Upper-Storey Horizontal Window "Eyebrow" Sun-Ledges & Cantilevered Glass Balconies
+                if (topY >= 4.0 && (isBeachArtDeco || isDowntown)) {
+                    const ledgeCol = isBeachArtDeco
+                        ? artDecoPal[(hash + 1) % artDecoPal.length]
+                        : [0.84, 0.90, 0.96];
+                    const ledgeSpan = Math.max(48.0, spanPx - 16.0);
+                    for (let zFl = 3.0; zFl <= topY - 0.8; zFl += 1.0) {
+                        emitSolidBox3D(
+                            wallFaceX + dirX * 2.4,
+                            wallFaceY + dirY * 2.4,
+                            1, 0, 0, 0,
+                            isHorizontal ? ledgeSpan : 4.8,
+                            isHorizontal ? 4.8 : ledgeSpan,
+                            zFl - 0.06, zFl - 0.01,
+                            ledgeCol,
+                            isBeachArtDeco ? 9 : 5
+                        );
+                    }
+                    // 3D Cantilevered Glass Resort / Condo Balconies on spans >= 3 tiles
+                    if (spanTiles >= 3 && (hash % 3 !== 0)) {
+                        const balcCount = Math.min(3, Math.floor(spanTiles / 2));
+                        for (let bi = 0; bi < balcCount; bi++) {
+                            const frac = (bi + 1) / (balcCount + 1) - 0.5;
+                            const bx = wallFaceX + (isHorizontal ? frac * (spanPx - 48.0) : dirX * 5.2);
+                            const by = wallFaceY + (isHorizontal ? dirY * 5.2 : frac * (spanPx - 48.0));
+                            const bw = isHorizontal ? 44.0 : 10.4;
+                            const bd = isHorizontal ? 10.4 : 44.0;
+                            const bzFloor = (topY >= 5.0 && (bi % 2 === 1)) ? 3.92 : 2.92;
+                            // Concrete balcony deck slab + glowing cyan glass balustrade
+                            emitSolidBox3D(bx, by, 1, 0, 0, 0, bw, bd, bzFloor, bzFloor + 0.045, [0.94, 0.95, 0.98], 9);
+                            emitSolidBox3D(
+                                bx + dirX * 3.8, by + dirY * 3.8, 1, 0, 0, 0,
+                                isHorizontal ? bw : 2.2,
+                                isHorizontal ? 2.2 : bd,
+                                bzFloor + 0.045, bzFloor + 0.135,
+                                [0.22, 0.90, 0.98], 7
+                            );
+                        }
+                    }
+                }
+
+                // 2B) Street-Level Cantilevered Storefront Canopy / Striped Cafe Awning (at z = 2.38..2.48, clear of interior doors)
+                if ((hash % 3 !== 2) && !isNearDoor(wallFaceX, wallFaceY)) {
+                    const awnSpan = Math.min(spanPx - 20.0, 116.0);
+                    if (awnSpan >= 44.0) {
+                        const awnCol = isBeachArtDeco
+                            ? artDecoPal[hash % artDecoPal.length]
+                            : (isDowntown ? [0.18, 0.24, 0.34] : awningPal[hash % awningPal.length]);
+                        const trimCol = isDowntown
+                            ? downtownLedPal[hash % downtownLedPal.length]
+                            : [0.98, 0.98, 1.00];
+                        const ax = wallFaceX + dirX * 8.0;
+                        const ay = wallFaceY + dirY * 8.0;
+                        emitSolidBox3D(
+                            ax, ay, 1, 0, 0, 0,
+                            isHorizontal ? awnSpan : 16.0,
+                            isHorizontal ? 16.0 : awnSpan,
+                            2.39, 2.47,
+                            awnCol,
+                            isDowntown ? 9 : 5
+                        );
+                        emitSolidBox3D(
+                            wallFaceX + dirX * 15.8,
+                            wallFaceY + dirY * 15.8,
+                            1, 0, 0, 0,
+                            isHorizontal ? awnSpan + 1.0 : 2.4,
+                            isHorizontal ? 2.4 : awnSpan + 1.0,
+                            2.36, 2.41,
+                            trimCol,
+                            isDowntown || isBeachArtDeco ? 10 : 9
+                        );
+                    }
+                }
+
+                // 2C) Vertical 3D Illuminated Neon Blade Sign projecting from multi-storey facades (at z = 2.64..3.94)
+                if (topY >= 4.0 && spanTiles >= 3 && (hash % 3 === 0)) {
+                    const adKey = bladeAdKeys[hash % bladeAdKeys.length];
+                    const neonCol = isBeachArtDeco
+                        ? artDecoPal[hash % artDecoPal.length]
+                        : downtownLedPal[hash % downtownLedPal.length];
+                    const signX = wallFaceX + dirX * 9.5;
+                    const signY = wallFaceY + dirY * 9.5;
+                    const sCos = isHorizontal ? 0 : 1;
+                    const sSin = isHorizontal ? 1 : 0;
+                    // Steel wall mounting brackets
+                    emitSolidBox3D(wallFaceX + dirX * 4.5, wallFaceY + dirY * 4.5, sCos, sSin, 0, 0, 9.0, 2.8, 2.74, 2.80, [0.24, 0.28, 0.34], 5);
+                    emitSolidBox3D(wallFaceX + dirX * 4.5, wallFaceY + dirY * 4.5, sCos, sSin, 0, 0, 9.0, 2.8, 3.78, 3.84, [0.24, 0.28, 0.34], 5);
+                    // Double-sided 3D illuminated sign box + outer neon tube fin
+                    emitBox3D(signX, signY, sCos, sSin, 0, 0, 10.5, 4.6, 2.64, 3.92, adKey, adKey, [1.0, 1.0, 1.0]);
+                    emitSolidBox3D(
+                        wallFaceX + dirX * 15.4,
+                        wallFaceY + dirY * 15.4,
+                        sCos, sSin, 0, 0, 2.2, 5.2, 2.60, 3.96, neonCol, 10
+                    );
+                }
+            };
+
+            // Pass 29A: Scan & merge contiguous North and South building roof edges along each row r
+            for (let r = 5; r < MAP_ROWS - 5; r++) {
+                const rOff = r * M;
+                // North edges (dirY = -1) & South edges (dirY = +1)
+                for (const dirY of [-1, 1]) {
+                    const nRowOff = (r + dirY) * M;
+                    let c = 5;
+                    while (c < M - 5) {
+                        const z = bTopZ[rOff + c];
+                        const nz = bTopZ[nRowOff + c];
+                        if (z >= 3 && nz < z) {
+                            let cEnd = c;
+                            while (
+                                cEnd + 1 < M - 5 &&
+                                bTopZ[rOff + cEnd + 1] === z &&
+                                bTopZ[nRowOff + cEnd + 1] < z &&
+                                (cEnd + 1 - c) < 8
+                            ) {
+                                cEnd++;
+                            }
+                            const midC = (c + cEnd) >> 1;
+                            const adjSidewalk = (nz === 0) && surfGtGrid && (surfGtGrid[nRowOff + midC] === GROUND_TYPE.PAWEMENT);
+                            emitBuildingEdgeSpan(c, cEnd, r, r, z, 0, dirY, adjSidewalk);
+                            c = cEnd + 1;
+                        } else {
+                            c++;
+                        }
+                    }
+                }
+            }
+
+            // Pass 29B: Scan & merge contiguous West and East building roof edges along each column c
+            for (let c = 5; c < M - 5; c++) {
+                for (const dirX of [-1, 1]) {
+                    // Skip East face of c=442 where Section 20A already builds custom Ocean Drive details
+                    if (c === 442 && dirX === 1) continue;
+                    let r = 5;
+                    while (r < MAP_ROWS - 5) {
+                        const z = bTopZ[r * M + c];
+                        const nz = bTopZ[r * M + (c + dirX)];
+                        if (z >= 3 && nz < z) {
+                            let rEnd = r;
+                            while (
+                                rEnd + 1 < MAP_ROWS - 5 &&
+                                bTopZ[(rEnd + 1) * M + c] === z &&
+                                bTopZ[(rEnd + 1) * M + (c + dirX)] < z &&
+                                (rEnd + 1 - r) < 8
+                            ) {
+                                rEnd++;
+                            }
+                            const midR = (r + rEnd) >> 1;
+                            const adjSidewalk = (nz === 0) && surfGtGrid && (surfGtGrid[midR * M + (c + dirX)] === GROUND_TYPE.PAWEMENT);
+                            emitBuildingEdgeSpan(c, c, r, rEnd, z, dirX, 0, adjSidewalk);
+                            r = rEnd + 1;
+                        } else {
+                            r++;
+                        }
+                    }
+                }
+            }
+
+            // Pass 29C: Scan 2x2 Flat Building Rooftop Plateaus & Emit District-Authentic 3D Rooftop Superstructures
+            const roofUsed = new Uint8Array(MAP_ROWS * M);
+            // Mark existing rooftop pool party tiles so we never overlap them
+            if (Array.isArray(this.map.rooftopParties)) {
+                for (let i = 0; i < this.map.rooftopParties.length; i++) {
+                    const rp = this.map.rooftopParties[i];
+                    const rc = Math.floor(rp.x / TILE_SIZE);
+                    const rr = Math.floor(rp.y / TILE_SIZE);
+                    for (let dr = -2; dr <= 2; dr++) {
+                        for (let dc = -2; dc <= 2; dc++) {
+                            const cc = rc + dc, rrr = rr + dr;
+                            if (cc >= 0 && cc < M && rrr >= 0 && rrr < MAP_ROWS) {
+                                roofUsed[rrr * M + cc] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (let r = 6; r < MAP_ROWS - 6; r += 2) {
+                for (let c = 6; c < M - 6; c += 2) {
+                    const idx00 = r * M + c;
+                    if (roofUsed[idx00]) continue;
+                    const z = bTopZ[idx00];
+                    if (z < 3) continue;
+                    // Require a flat 2x2 building roof plateau with no pool tile (lid 35)
+                    if (
+                        bTopZ[r * M + (c + 1)] !== z ||
+                        bTopZ[(r + 1) * M + c] !== z ||
+                        bTopZ[(r + 1) * M + (c + 1)] !== z
+                    ) {
+                        continue;
+                    }
+                    if (
+                        bTopLid[idx00] === 35 ||
+                        bTopLid[r * M + (c + 1)] === 35 ||
+                        bTopLid[(r + 1) * M + c] === 35 ||
+                        bTopLid[(r + 1) * M + (c + 1)] === 35
+                    ) {
+                        continue;
+                    }
+
+                    // Mark a 6x6 neighborhood as used so each building block gets well-spaced 3D rooftop superstructures
+                    for (let dr = -2; dr <= 3; dr++) {
+                        for (let dc = -2; dc <= 3; dc++) {
+                            const cc = c + dc, rr = r + dr;
+                            if (cc >= 0 && cc < M && rr >= 0 && rr < MAP_ROWS) {
+                                roofUsed[rr * M + cc] = 1;
+                            }
+                        }
+                    }
+
+                    const cxPx = (c + 1.0) * TILE_SIZE;
+                    const cyPx = (r + 1.0) * TILE_SIZE;
+                    const topY = z;
+                    const rHash = (((c * 92837111) ^ (r * 689287499)) >>> 0);
+
+                    const isBeachArtDeco = (c >= 365);
+                    const isDowntown = (c >= 235 && c < 365 && r >= 145 && r <= 315);
+                    const isUrbanBrick = (c >= 170 && c < 285 && r >= 70 && r < 315);
+
+                    if ((isDowntown && topY >= 4.0) || topY >= 5.0) {
+                        if (rHash % 3 === 0) {
+                            // ARCHETYPE 1A: 3D Skyscraper Octagonal VIP Helipad + Glowing Perimeter Deck Lights & 'H' Marking
+                            emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 96, topY, 0.40);
+                            emitOctagonPad3D(cxPx, cyPx, 0, 0, 42, 42, 39, 39, 0.28, topY, topY + 0.08, [0.88, 0.90, 0.94], [0.76, 0.80, 0.86], 2, 177, 71);
+                            // Yellow/Black Hazard Helipad Safety Rim + 3D White 'H' Landing Bars
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, -34, 42, 3.5, topY + 0.08, topY + 0.105, [0.98, 0.82, 0.16], 3);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0,  34, 42, 3.5, topY + 0.08, topY + 0.105, [0.98, 0.82, 0.16], 3);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -11, 0, 4.5, 28, topY + 0.082, topY + 0.098, [0.98, 0.98, 1.00], 9);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0,  11, 0, 4.5, 28, topY + 0.082, topY + 0.098, [0.98, 0.98, 1.00], 9);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0,   0, 0, 22, 4.5, topY + 0.082, topY + 0.098, [0.98, 0.98, 1.00], 9);
+                            // 4 Glowing Emerald-Green Helipad Perimeter Beacon Lights
+                            for (const [lx, ly] of [[-28, -28], [28, -28], [-28, 28], [28, 28]]) {
+                                emitSolidBox3D(cxPx, cyPx, 1, 0, lx, ly, 4.5, 4.5, topY + 0.08, topY + 0.13, [0.20, 0.98, 0.52], 10);
+                            }
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.20 });
+                        } else {
+                            // ARCHETYPE 1B: 2-Tier Modern Miami Glass Curtain-Wall Penthouse + Twin Cylindrical HVAC Cooling Towers
+                            const ledCol = downtownLedPal[rHash % downtownLedPal.length];
+                            emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 98, 86, topY, 0.42);
+                            emitTileBox3D(cxPx, cyPx, 1, 0, -6, 0, 72, 62, topY, topY + 0.44, 199, 199, 86, [0.92, 0.96, 1.00], false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -6, 0, 76, 66, topY + 0.44, topY + 0.49, ledCol, 10);
+                            emitTileBox3D(cxPx, cyPx, 1, 0, -10, 0, 44, 38, topY + 0.49, topY + 0.78, 199, 86, 86, [0.94, 0.98, 1.00], false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -10, 0, 48, 42, topY + 0.78, topY + 0.83, ledCol, 10);
+                            // Twin Cylindrical Chiller Cooling Towers on East Mechanical Deck
+                            emitCylinder3D(cxPx, cyPx, 36, -14, 9.5, 9.0, topY, topY + 0.36, 12, [0.84, 0.88, 0.94], 5, true);
+                            emitCylinder3D(cxPx, cyPx, 36,  14, 9.5, 9.0, topY, topY + 0.36, 12, [0.84, 0.88, 0.94], 5, true);
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.85 });
+                        }
+                    } else if (isBeachArtDeco) {
+                        const neonCol = artDecoPal[rHash % artDecoPal.length];
+                        const altCol = artDecoPal[(rHash + 1) % artDecoPal.length];
+                        if (rHash % 2 === 0) {
+                            // ARCHETYPE 2A: South Beach Rooftop Infinity Plunge Pool, Travertine Sundeck & Pastel Cabana Pergola
+                            emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 84, topY, 0.38);
+                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 84, 72, topY, topY + 0.07, 177, 177, 8, [0.98, 0.96, 0.92], false);
+                            // Glowing Turquoise Rooftop Plunge Pool Basin (at offX = -14)
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 44, 52, topY + 0.07, topY + 0.13, [0.98, 0.98, 1.00], 9);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 38, 46, topY + 0.08, topY + 0.145, [0.16, 0.92, 0.98], 10);
+                            // Pastel Art Deco Rooftop Bar & Louvered Pergola Canopy (at offX = +22)
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 20, 48, topY + 0.07, topY + 0.38, [0.98, 0.94, 0.92], 9);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 24, 54, topY + 0.38, topY + 0.44, neonCol, 10);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 14, 32, topY + 0.44, topY + 0.58, altCol, 9);
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.58 });
+                        } else {
+                            // ARCHETYPE 2B: Art Deco Stepped Ziggurat Elevator Cupola & Skylight Atrium
+                            emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 88, 88, topY, 0.40);
+                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 68, 68, topY, topY + 0.32, 86, 199, 31, [0.98, 0.95, 0.92], false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 72, 72, topY + 0.32, topY + 0.37, neonCol, 10);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 44, 44, topY + 0.37, topY + 0.56, [0.98, 0.96, 0.94], 9);
+                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.56, topY + 0.74, 12, altCol, 10, true);
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.74 });
+                        }
+                    } else if (isUrbanBrick && (rHash % 2 === 0)) {
+                        // ARCHETYPE 3: Classic Urban Wooden Rooftop Water Tank on Steel Truss Legs + Brick Stair Bulkhead
+                        emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 92, 78, topY, 0.40);
+                        // Brick/Stucco Staircase Bulkhead Door (at offX = -20)
+                        emitTileBox3D(cxPx, cyPx, 1, 0, -20, 0, 32, 42, topY, topY + 0.42, 172, 177, 86, [0.90, 0.82, 0.74], false);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, -20, 0, 35, 45, topY + 0.42, topY + 0.46, [0.78, 0.38, 0.26], 1);
+                        // 4 Open-Lattice S363 Steel Truss Legs + Cylindrical Cedar Water Barrel & Conical Roof (at offX = +18)
+                        for (const lx of [10, 26]) {
+                            for (const ly of [-8, 8]) {
+                                emitTileBox3D(cxPx, cyPx, 1, 0, lx, ly, 6, 6, topY, topY + 0.32, 363, 363, 64, [0.76, 0.80, 0.86], false);
+                            }
+                        }
+                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.5, 14.0, topY + 0.30, topY + 0.64, 14, [0.68, 0.46, 0.28], 11, true);
+                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.8, 14.8, topY + 0.42, topY + 0.46, 14, [0.24, 0.28, 0.34], 5, false);
+                        emitCone3D(cxPx, cyPx, 18, 0, 15.5, topY + 0.64, topY + 0.82, 14, [0.46, 0.30, 0.18], 5);
+                        this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.82 });
+                    } else if (rHash % 3 === 0) {
+                        // ARCHETYPE 4: Raised 3D Multi-Pane Glass Skylight Atrium & Mechanical Bulkhead
+                        emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 92, 76, topY, 0.38);
+                        emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 76, 60, topY, topY + 0.22, 199, 86, 31, [0.90, 0.95, 1.00], false);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 52, 36, topY + 0.22, topY + 0.36, [0.24, 0.82, 0.98], 7);
+                        this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.38 });
+                    } else {
+                        // ARCHETYPE 5: Commercial HVAC Chiller Plant, Galvanized Ventilation Ducts, Solar Array & Cellular Relay Mast
+                        emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 94, 82, topY, 0.38);
+                        emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 82, 68, topY, topY + 0.06, 177, 177, 71, [0.86, 0.88, 0.92], false);
+                        // Twin Ribbed Steel HVAC Chiller Units + Dark Exhaust Fan Shrouds (at offX = -18)
+                        for (const hy of [-14, 14]) {
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -18, hy, 28, 20, topY + 0.06, topY + 0.28, [0.76, 0.80, 0.86], 6);
+                            emitCylinder3D(cxPx, cyPx, -18, hy, 7.2, 7.2, topY + 0.28, topY + 0.32, 10, [0.18, 0.22, 0.28], 5, true);
+                        }
+                        // Horizontal Galvanized Steel HVAC Ductwork & Blue Photovoltaic Solar Panel Array (at offX = +16)
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 12, -16, 32, 10, topY + 0.08, topY + 0.20, [0.84, 0.88, 0.94], 5);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 18,  12, 28, 24, topY + 0.08, topY + 0.22, [0.18, 0.58, 0.92], 7);
+                        // Open-Lattice S363 Cellular / Radio Relay Mast + Red Aviation Beacon (at offX = +26, offY = -18)
+                        emitTileBox3D(cxPx, cyPx, 1, 0, 26, -18, 8, 8, topY + 0.06, topY + 0.68, 363, 363, 64, [0.88, 0.92, 0.96], false);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 26, -18, 4.0, 4.0, topY + 0.68, topY + 0.74, [1.00, 0.18, 0.22], 10);
+                        this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.52 });
+                    }
+                }
             }
         }
 

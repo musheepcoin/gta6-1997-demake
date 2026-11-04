@@ -572,10 +572,22 @@ class RetroRenderer {
                             shadowTint = vec3(0.72, 0.76, 0.86);
                         }
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
-                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.035, 0.0, 0.10);
-                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
+                        float isElevatedRoof = step(2.85, vWorldPos.y);
+                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.024, 0.0, 0.06) * (1.0 - sandMask * 0.85);
+                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.11 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
                         sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
-                        c.rgb = mix(c.rgb, sunlitRgb, dayAmt);
+                        if (isElevatedRoof > 0.5 && waterCoverage < 0.05) {
+                            // GTA 6 Architectural Rooftop Deck Relief: prevent cream/yellow highlight blow-out,
+                            // add 32px paver/membrane expansion seams, perimeter drainage channel & micro-gravel texture
+                            vec2 rf = fract(vWorldPos.xz);
+                            vec2 subRf = fract(vWorldPos.xz * 2.0);
+                            float outerDrain = smoothstep(0.03, 0.075, min(min(rf.x, 1.0 - rf.x), min(rf.y, 1.0 - rf.y)));
+                            float expJoint = smoothstep(0.025, 0.055, min(min(subRf.x, 1.0 - subRf.x), min(subRf.y, 1.0 - subRf.y)));
+                            float roofGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.035;
+                            float hiComp = smoothstep(0.76, 0.98, max(sunlitRgb.r, sunlitRgb.g)) * 0.09;
+                            sunlitRgb = (sunlitRgb - hiComp + roofGrain) * mix(0.88, 1.0, outerDrain) * mix(0.93, 1.0, expJoint);
+                        }
+                        c.rgb = mix(c.rgb, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
                     }
 
                     // For shoreline tiles (lid 99..101), composite the beach sand & white surf directly over the animated ocean water on the SAME quad!
@@ -618,7 +630,7 @@ class RetroRenderer {
                     }
                 }
 
-                // 2. 3D Cardinal Wall Normals, Solar Directional Shading & Ground-Contact Ambient Occlusion (world_mesh.cpp)
+                // 2. 3D Cardinal Wall Normals, GTA 6 Architectural Facade Relief, Parallax Window Depth & Ground-Contact AO
                 if (vAnim < -0.5) {
                     vec2 wallNormal = vec2(0.0, 1.0);
                     if (vAnim > -1.5) wallNormal = vec2(-1.0, 0.0);      // West wall (-1.0)
@@ -628,17 +640,28 @@ class RetroRenderer {
 
                     float sunDot = dot(wallNormal, uSunDir);
                     float wallSunFactor = clamp(sunDot * 0.5 + 0.5, 0.0, 1.0);
-                    vec3 wallDayTint = mix(vec3(0.75, 0.83, 0.96), vec3(1.14, 1.06, 0.94), wallSunFactor);
+                    vec3 wallDayTint = mix(vec3(0.74, 0.82, 0.96), vec3(1.14, 1.06, 0.94), wallSunFactor);
                     vec3 wallShade = mix(vec3(1.0 + sunDot * 0.06), wallDayTint, dayAmt);
 
-                    // Subtle Ground-Contact Ambient Occlusion at each storey ledge + street-level facade base
+                    // Storey Cornice Ledge Highlight, Under-Eyebrow Shadow, Vertical Pilaster Fluting & Street-Level Plinth AO
                     float storeyY = fract(vWorldPos.y);
-                    float baseAO = mix(0.84, 1.0, smoothstep(0.0, 0.32, storeyY)) * mix(0.82, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
+                    float wallHoriz = fract(vWorldPos.x + vWorldPos.z);
+                    float pilaster = mix(0.91, 1.02, smoothstep(0.04, 0.12, min(wallHoriz, 1.0 - wallHoriz)));
+                    float corniceLight = 1.0 + 0.08 * smoothstep(0.91, 0.97, storeyY) - 0.10 * (smoothstep(0.80, 0.86, storeyY) - smoothstep(0.86, 0.92, storeyY));
+                    float baseAO = mix(0.82, 1.0, smoothstep(0.0, 0.30, storeyY)) * mix(0.80, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
 
-                    // Daytime solar sky-reflection glint on upper-floor glass windows
-                    float isGlass = clamp((c.b - c.r - 0.06) * 3.2, 0.0, 1.0) * dayAmt;
-                    vec3 skyGlint = vec3(0.10, 0.15, 0.20) * isGlass * clamp((vWorldPos.y - 2.0) * 0.30, 0.0, 1.0) * (0.4 + 0.6 * wallSunFactor);
-                    c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO + skyGlint);
+                    // Daytime GTA 6 Parallax-Style Window Interior Depth (Venetian blinds/curtains) & Miami Sky Fresnel Glint
+                    float isGlass = clamp((c.b - c.r - 0.04) * 3.4, 0.0, 1.0);
+                    vec3 roomId = floor(vWorldPos * vec3(2.0, 1.0, 2.0));
+                    float rSeed = fract(sin(dot(roomId, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+                    float blindLevel = 0.45 + 0.40 * rSeed;
+                    float inBlind = step(blindLevel, fract(storeyY * 2.0)) * step(0.35, rSeed);
+                    float slatWave = 0.88 + 0.12 * sin(storeyY * 96.0);
+                    vec3 blindCol = mix(vec3(0.82, 0.78, 0.70), vec3(0.58, 0.76, 0.88), step(0.68, rSeed)) * slatWave;
+                    c.rgb = mix(c.rgb, blindCol, isGlass * inBlind * 0.34 * dayAmt);
+
+                    vec3 skyGlint = vec3(0.11, 0.17, 0.24) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.32, 0.0, 1.0) * (0.38 + 0.62 * wallSunFactor);
+                    c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO * pilaster * corniceLight + skyGlint);
                 }
 
                 if (uSunsetTint > 0.01) {
@@ -649,25 +672,29 @@ class RetroRenderer {
                 if (uNightTint > 0.01) {
                     vec3 nightRgb = c.rgb;
                     if (vAnim < -0.5) {
-                        // Inspired by gta2-rtx-remix SubUSDs/*_emissive.e.rtex.dds & lamp_emissives.py:
-                        // Vertical 3D building facade (face < 4) with per-room emissive window masks & Vice neon trim!
+                        // Inspired by gta2-rtx-remix SubUSDs/*_emissive.e.rtex.dds & GTA 6 Night Skyline:
+                        // Vertical 3D building facade (face < 4) with per-room interior depth, Venetian blinds & street-level neon wash!
                         float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
                         float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                        float isGlassOrNeon = clamp((lum - 0.50) * 3.8 + (sat - 0.34) * 2.8, 0.0, 1.0);
+                        float isGlassOrNeon = clamp((lum - 0.48) * 3.8 + (sat - 0.32) * 2.8, 0.0, 1.0);
 
-                        // Deterministic 3D room cell hash so ~62% of hotel/office rooms are lit and ~38% are dark
+                        // Deterministic 3D room cell hash so ~64% of hotel/office rooms are lit and ~36% are dark
                         vec3 roomCell = floor(vWorldPos * vec3(2.0, 2.0, 2.0));
                         float roomHash = fract(sin(dot(roomCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-                        float roomLit = step(0.36, roomHash);
+                        float roomLit = step(0.35, roomHash);
 
                         vec3 roomTint = vec3(1.0, 0.86, 0.52); // Warm tungsten hotel/apartment window light
                         if (uViceStyle > 0.5) {
-                            if (roomHash > 0.82) roomTint = vec3(0.28, 0.95, 1.0);      // Ocean Drive Neon Cyan
-                            else if (roomHash > 0.66) roomTint = vec3(1.0, 0.36, 0.76); // Art Deco Flamingo Pink
+                            if (roomHash > 0.84) roomTint = vec3(0.24, 0.95, 1.0);      // Ocean Drive Neon Cyan
+                            else if (roomHash > 0.70) roomTint = vec3(1.0, 0.34, 0.76); // Art Deco Flamingo Pink
+                            else if (roomHash > 0.58) roomTint = vec3(0.72, 0.86, 1.0); // Cool Office / TV Screen Glow
                         }
 
-                        vec3 wallDark = c.rgb * vec3(0.46, 0.54, 0.78);
-                        vec3 windowGlow = min(vec3(1.0), mix(c.rgb * 1.38, roomTint, 0.42) + vec3(0.08, 0.05, 0.10));
+                        // Subtle horizontal interior blind / ceiling gradient inside lit windows
+                        float winGrad = 0.84 + 0.24 * fract(vWorldPos.y * 2.0);
+                        vec3 streetNeonWash = vec3(0.06, 0.03, 0.08) * clamp(1.0 - (vWorldPos.y - 2.0) * 0.55, 0.0, 1.0);
+                        vec3 wallDark = c.rgb * vec3(0.45, 0.53, 0.78) + streetNeonWash;
+                        vec3 windowGlow = min(vec3(1.0), mix(c.rgb * 1.40, roomTint * winGrad, 0.46) + vec3(0.08, 0.05, 0.10));
                         nightRgb = mix(wallDark, windowGlow, isGlassOrNeon * (0.28 + 0.72 * roomLit));
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal navy
@@ -3659,6 +3686,50 @@ class RetroRenderer {
                 }
 
                 ctx.putImageData(tileImg, x0, y0);
+            }
+
+            // 3. GTA 6 Building Rooftop Deck Remaster (lid 46, 48, 51, 86 across both remap banks 390+lid and 544+lid):
+            //    Replaces washed-out 1997 pastel-yellow 2x2 checkerboards with crisp architectural roof-deck pavers,
+            //    recessed perimeter drainage gutters, 16px expansion joints, and subtle gravel/terrazzo micro-relief!
+            const roofLids = [46, 48, 51, 86];
+            for (const lid of roofLids) {
+                for (const base of [390, 544]) {
+                    const idx = base + lid;
+                    const col = idx % 16;
+                    const row = Math.floor(idx / 16);
+                    const x0 = col * 64;
+                    const y0 = row * 64;
+                    if (y0 + 64 > h) continue;
+
+                    const tileImg = ctx.getImageData(x0, y0, 64, 64);
+                    const td = tileImg.data;
+                    for (let ty = 0; ty < 64; ty++) {
+                        for (let tx = 0; tx < 64; tx++) {
+                            const p = (ty * 64 + tx) * 4;
+                            let r = td[p], g = td[p + 1], b = td[p + 2];
+                            // Compress overly bright yellow/cream pixels toward warm Miami architectural limestone/travertine
+                            if (r > 215 && g > 195) {
+                                r = Math.round(206 + (r - 215) * 0.42);
+                                g = Math.round(192 + (g - 195) * 0.42);
+                                b = Math.round(Math.max(b, 168) + (210 - Math.max(b, 168)) * 0.25);
+                            }
+                            const edgeDist = Math.min(tx, 63 - tx, ty, 63 - ty);
+                            const isGutter = (edgeDist === 1 || edgeDist === 2);
+                            const isSubSeam = ((tx & 15) === 0 || (ty & 15) === 0) && edgeDist > 2;
+                            const isHighlight = ((tx & 15) === 1 || (ty & 15) === 1) && edgeDist > 2;
+                            const hash = (((tx * 73856093) ^ (ty * 19349663) ^ (lid * 83492791)) >>> 0) % 13 - 6;
+                            let mul = 1.0;
+                            if (edgeDist === 0) mul = 0.82;
+                            else if (isGutter) mul = 0.89;
+                            else if (isSubSeam) mul = 0.90;
+                            else if (isHighlight) mul = 1.04;
+                            td[p]     = Math.max(0, Math.min(255, Math.round(r * mul + hash)));
+                            td[p + 1] = Math.max(0, Math.min(255, Math.round(g * mul + hash)));
+                            td[p + 2] = Math.max(0, Math.min(255, Math.round(b * mul + hash)));
+                        }
+                    }
+                    ctx.putImageData(tileImg, x0, y0);
+                }
             }
 
             return cvs;
