@@ -3718,50 +3718,67 @@ class RetroRenderer {
                 ctx.putImageData(tileImg, x0, y0);
             }
 
-            // 3. GTA 6 Building Rooftop Deck Remaster (all building roof lids across both remap banks 390+lid and 544+lid):
-            //    Replaces blurry 1997 2x2 diamond-checkerboards & purple/yellow hue-shifted roofs with crisp architectural
-            //    concrete/travertine roof-deck slabs, recessed perimeter drainage gutters, 16px expansion joints, and aggregate grain!
-            const roofLids = [31, 45, 46, 48, 51, 64, 71, 86, 87];
+            // 3. GTA 6 Building Rooftop Deck Remaster (all building roof lids across 390+lid, 544+lid, and remap_lids 735..748):
+            //    Completely replaces 1997 blotchy/cyan/diamond roof textures with crisp procedural GTA 6 architectural
+            //    precast concrete & warm travertine roof-deck slabs, recessed perimeter drainage gutters, 16px expansion joints, and aggregate grain!
+            const roofLids = [
+                14, 15, 16, 17, 18,
+                29, 30, 31, 32, 33, 34,
+                36, 37, 38, 39, 40,
+                42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68,
+                70, 71, 72, 73, 76, 78, 79,
+                83, 84, 85, 86, 87
+            ];
+            const roofAtlasIndices = [];
             for (const lid of roofLids) {
-                for (const base of [390, 544]) {
-                    const idx = base + lid;
-                    const col = idx % 16;
-                    const row = Math.floor(idx / 16);
-                    const x0 = col * 64;
-                    const y0 = row * 64;
-                    if (y0 + 64 > h) continue;
+                roofAtlasIndices.push({ idx: 390 + lid, seed: lid });
+                roofAtlasIndices.push({ idx: 544 + lid, seed: lid + 100 });
+            }
+            // Include all remapped building roof lid slots in gta1_meta.json (735..748, excluding 738 which is pool water 35_2)
+            for (const rIdx of [735, 736, 737, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748]) {
+                roofAtlasIndices.push({ idx: rIdx, seed: rIdx });
+            }
 
-                    const tileImg = ctx.getImageData(x0, y0, 64, 64);
-                    const td = tileImg.data;
-                    const isWarmRoof = (lid === 46 || lid === 48 || lid === 51);
-                    const baseR = isWarmRoof ? 194 : 172;
-                    const baseG = isWarmRoof ? 188 : 176;
-                    const baseB = isWarmRoof ? 176 : 182;
-                    for (let ty = 0; ty < 64; ty++) {
-                        for (let tx = 0; tx < 64; tx++) {
-                            const p = (ty * 64 + tx) * 4;
-                            const origLum = (td[p] * 0.299 + td[p + 1] * 0.587 + td[p + 2] * 0.114) - 128.0;
-                            // Eliminate the blurry 1997 2x2 diamond gradient & any pink/purple/yellow tint
-                            let r = baseR + origLum * 0.14;
-                            let g = baseG + origLum * 0.14;
-                            let b = baseB + origLum * 0.14;
-                            const edgeDist = Math.min(tx, 63 - tx, ty, 63 - ty);
-                            const isGutter = (edgeDist === 1 || edgeDist === 2);
-                            const isSubSeam = ((tx & 15) === 0 || (ty & 15) === 0) && edgeDist > 2;
-                            const isHighlight = ((tx & 15) === 1 || (ty & 15) === 1) && edgeDist > 2;
-                            const hash = (((tx * 73856093) ^ (ty * 19349663) ^ (lid * 83492791)) >>> 0) % 13 - 6;
-                            let mul = 1.0;
-                            if (edgeDist === 0) mul = 0.80;
-                            else if (isGutter) mul = 0.88;
-                            else if (isSubSeam) mul = 0.89;
-                            else if (isHighlight) mul = 1.03;
-                            td[p]     = Math.max(0, Math.min(255, Math.round(r * mul + hash)));
-                            td[p + 1] = Math.max(0, Math.min(255, Math.round(g * mul + hash)));
-                            td[p + 2] = Math.max(0, Math.min(255, Math.round(b * mul + hash)));
-                        }
+            for (const { idx, seed } of roofAtlasIndices) {
+                const col = idx % 16;
+                const row = Math.floor(idx / 16);
+                const x0 = col * 64;
+                const y0 = row * 64;
+                if (y0 + 64 > h) continue;
+
+                const tileImg = ctx.getImageData(x0, y0, 64, 64);
+                const td = tileImg.data;
+                const roofStyle = seed % 3;
+                // 0: Cool architectural precast concrete, 1: Warm Miami limestone/travertine deck, 2: Weathered slate-grey membrane
+                const baseR = roofStyle === 1 ? 194 : (roofStyle === 2 ? 156 : 176);
+                const baseG = roofStyle === 1 ? 188 : (roofStyle === 2 ? 160 : 179);
+                const baseB = roofStyle === 1 ? 176 : (roofStyle === 2 ? 166 : 183);
+                for (let ty = 0; ty < 64; ty++) {
+                    for (let tx = 0; tx < 64; tx++) {
+                        const p = (ty * 64 + tx) * 4;
+                        const sx = tx >> 4;
+                        const sy = ty >> 4;
+                        const slabTone = (((sx * 19 + sy * 37 + seed * 13) & 7) - 3.5) * 1.6;
+                        const r = baseR + slabTone;
+                        const g = baseG + slabTone;
+                        const b = baseB + slabTone;
+                        const edgeDist = Math.min(tx, 63 - tx, ty, 63 - ty);
+                        const isGutter = (edgeDist === 1 || edgeDist === 2);
+                        const isSubSeam = ((tx & 15) === 0 || (ty & 15) === 0) && edgeDist > 2;
+                        const isHighlight = ((tx & 15) === 1 || (ty & 15) === 1) && edgeDist > 2;
+                        const hash = (((tx * 73856093) ^ (ty * 19349663) ^ (seed * 83492791)) >>> 0) % 11 - 5;
+                        let mul = 1.0;
+                        if (edgeDist === 0) mul = 0.80;
+                        else if (isGutter) mul = 0.88;
+                        else if (isSubSeam) mul = 0.89;
+                        else if (isHighlight) mul = 1.03;
+                        td[p]     = Math.max(0, Math.min(255, Math.round(r * mul + hash)));
+                        td[p + 1] = Math.max(0, Math.min(255, Math.round(g * mul + hash)));
+                        td[p + 2] = Math.max(0, Math.min(255, Math.round(b * mul + hash)));
+                        td[p + 3] = 255;
                     }
-                    ctx.putImageData(tileImg, x0, y0);
                 }
+                ctx.putImageData(tileImg, x0, y0);
             }
 
             // 4. GTA 6 3D Building Facade Wall Tile Remaster (side tiles 0..389 in rows 0..24):
@@ -4730,6 +4747,22 @@ class RetroRenderer {
                         }
                         animType = 30.0 + surType * 256.0 + bits;
                     }
+                }
+            }
+
+            // Guarantee all BUILDING roof lids (except pools 35/22) use a remastered GTA 6 roof deck tile
+            if (b.groundType === 4 && effTileIdx !== 35 && effTileIdx !== 22) {
+                const isKnownCleanRoof = (
+                    (effTileIdx >= 14 && effTileIdx <= 18) ||
+                    (effTileIdx >= 29 && effTileIdx <= 34) ||
+                    (effTileIdx >= 36 && effTileIdx <= 40) ||
+                    (effTileIdx >= 42 && effTileIdx <= 68) ||
+                    (effTileIdx >= 70 && effTileIdx <= 73) ||
+                    effTileIdx === 76 || effTileIdx === 78 || effTileIdx === 79 ||
+                    (effTileIdx >= 83 && effTileIdx <= 87)
+                );
+                if (!isKnownCleanRoof) {
+                    effTileIdx = ((x + z_south) % 2 === 0) ? 46 : 48;
                 }
             }
 
