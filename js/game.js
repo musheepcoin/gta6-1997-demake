@@ -1863,9 +1863,9 @@ class LeonidaGame {
 
     getMonkTrackPosition(s) {
 
-        const xA = mx256(218.2) * TILE_SIZE;
+        const xA = mx256(218.62) * TILE_SIZE;
 
-        const xB = mx256(219.6) * TILE_SIZE;
+        const xB = mx256(219.62) * TILE_SIZE;
 
         const yTop = my256(143.5) * TILE_SIZE;
 
@@ -10453,6 +10453,8 @@ class LeonidaGame {
 
                     ped.y += Math.sin(ped.angle) * 75 * dt;
 
+                    this.resolveCircleVehicleCollision(ped, ped.radius || 9, null);
+
                     ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
 
                     continue;
@@ -10461,9 +10463,11 @@ class LeonidaGame {
 
 
 
-                // Lead monk advances the parade forward along the circuit
+                // First active monk in the loop advances the parade forward along the circuit
 
-                if (ped.monkIndex === 0) {
+                const firstAliveMonk = this.monkChain && this.monkChain.find((m) => m && !m.dead && (m.panicTimer || 0) <= 0 && (m.stunnedTimer || 0) <= 0);
+
+                if (!firstAliveMonk || firstAliveMonk === ped) {
 
                     this.monkLeadS = (this.monkLeadS || 0) + 38 * dt;
 
@@ -10477,7 +10481,9 @@ class LeonidaGame {
 
                 if (dTarget > 4) {
 
-                    ped.angle = Math.atan2(targetPos.y - ped.y, targetPos.x - ped.x);
+                    const rawAngle = Math.atan2(targetPos.y - ped.y, targetPos.x - ped.x);
+
+                    ped.angle = this.steerPedWithObstacleFeelers(ped.x, ped.y, rawAngle, 26, null);
 
                     const catchSpeed = Math.min(62, Math.max(34, dTarget * 3.5));
 
@@ -10494,6 +10500,8 @@ class LeonidaGame {
                     ped.angle = targetPos.angle;
 
                 }
+
+                this.resolveCircleVehicleCollision(ped, ped.radius || 9, null);
 
                 ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
 
