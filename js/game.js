@@ -5354,95 +5354,63 @@ class LeonidaGame {
 
 
         if (reason === "CRIMINAL_DEPLOY") {
-
-            const gangPool = ["vc_haitian", "vc_cuban", "g2_zaibatsu", "g2_russian", "g2_mugger"];
-
-            const gType1 = gangPool[Math.floor(Math.random() * gangPool.length)];
-
-            const gType2 = gangPool[Math.floor(Math.random() * gangPool.length)];
-
-            this.peds.push(new Pedestrian({
-
-                x: doorX,
-
-                y: doorY,
-
-                z: vz,
-
-                angle: vehicle.angle + Math.PI,
-
-                speed: 98,
-
-                kind: "CRIMINAL",
-
-                g24Type: gType1,
-
-                g2Remapped: true,
-
-                shirtColor: "#ef4444",
-
-                hp: 95,
-
-                maxHp: 95,
-
-                copWeapon: "UZI",
-
-                shootCooldown: 0.25,
-
-                dead: false,
-
-                panicTimer: 0,
-
-                exitAnimTimer: 0.32
-
-            }));
-
-            const doorX2 = vehicle.x + Math.sin(vehicle.angle) * 28;
-
-            const doorY2 = vehicle.y - Math.cos(vehicle.angle) * 28;
-
-            this.peds.push(new Pedestrian({
-
-                x: doorX2,
-
-                y: doorY2,
-
-                z: vz,
-
-                angle: vehicle.angle + Math.PI,
-
-                speed: 96,
-
-                kind: "CRIMINAL",
-
-                g24Type: gType2,
-
-                g2Remapped: true,
-
-                shirtColor: "#f97316",
-
-                hp: 85,
-
-                maxHp: 85,
-
-                copWeapon: Math.random() < 0.45 ? "SHOTGUN" : "PISTOL",
-
-                shootCooldown: 0.35,
-
-                dead: false,
-
-                panicTimer: 0,
-
-                exitAnimTimer: 0.32
-
-            }));
-
+            if (vehicle.criminalDeployDone) return;
+            vehicle.criminalDeployDone = true;
+            vehicle.criminalBailedOut = true;
             vehicle.wasCriminalCar = true;
 
+            // Cap active ambient CRIMINAL peds so shootouts never flood the street
+            let activeCrimCount = 0;
+            for (let i = 0; i < this.peds.length; i++) {
+                if (!this.peds[i].dead && this.peds[i].kind === "CRIMINAL") activeCrimCount++;
+            }
+            if (activeCrimCount >= 6) return;
+
+            const gangPool = ["vc_haitian", "vc_cuban", "g2_zaibatsu", "g2_russian", "g2_mugger"];
+            const gType1 = gangPool[Math.floor(Math.random() * gangPool.length)];
+            const gType2 = gangPool[Math.floor(Math.random() * gangPool.length)];
+            this.peds.push(new Pedestrian({
+                x: doorX,
+                y: doorY,
+                z: vz,
+                angle: vehicle.angle + Math.PI,
+                speed: 98,
+                kind: "CRIMINAL",
+                g24Type: gType1,
+                g2Remapped: true,
+                shirtColor: "#ef4444",
+                hp: 95,
+                maxHp: 95,
+                copWeapon: "UZI",
+                shootCooldown: 0.25,
+                noBoardTimer: 10.0,
+                dead: false,
+                panicTimer: 0,
+                exitAnimTimer: 0.32
+            }));
+            const doorX2 = vehicle.x + Math.sin(vehicle.angle) * 28;
+            const doorY2 = vehicle.y - Math.cos(vehicle.angle) * 28;
+            this.peds.push(new Pedestrian({
+                x: doorX2,
+                y: doorY2,
+                z: vz,
+                angle: vehicle.angle + Math.PI,
+                speed: 96,
+                kind: "CRIMINAL",
+                g24Type: gType2,
+                g2Remapped: true,
+                shirtColor: "#f97316",
+                hp: 85,
+                maxHp: 85,
+                copWeapon: Math.random() < 0.45 ? "SHOTGUN" : "PISTOL",
+                shootCooldown: 0.35,
+                noBoardTimer: 10.0,
+                dead: false,
+                panicTimer: 0,
+                exitAnimTimer: 0.32
+            }));
             this.addFloatingText(doorX, doorY - 22, "🔫 GANGSTERS BAILED OUT — SHOOTOUT!", "#f97316");
-
             return;
-
         }
 
 
@@ -11021,16 +10989,31 @@ class LeonidaGame {
                     }
 
                 } else {
-
-                    // All pursuing cops neutralized — bandits hop into the nearest unoccupied getaway car (or sprint away)!
+                    // All pursuing cops neutralized — bandits hop into a fresh undamaged unoccupied getaway car (never re-boarding a bailed-out or damaged car)!
+                    if ((ped.noBoardTimer || 0) > 0) {
+                        ped.noBoardTimer = Math.max(0, ped.noBoardTimer - dt);
+                    }
                     let getawayCar = null;
                     let bestCarDist = 380;
-                    for (const v of this.vehicles) {
-                        if (!v.destroyed && v.driver === null && !v.towedByTruck && !v.missionTag && !v.isEstateCar) {
-                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
-                            if (d < bestCarDist) {
-                                bestCarDist = d;
-                                getawayCar = v;
+                    if ((ped.noBoardTimer || 0) <= 0) {
+                        for (const v of this.vehicles) {
+                            if (
+                                !v.destroyed &&
+                                v.driver === null &&
+                                !v.criminalBailedOut &&
+                                !v.criminalDeployDone &&
+                                !v.wasCriminalCar &&
+                                !v.isPolice &&
+                                v.hp > v.maxHp * 0.65 &&
+                                !v.towedByTruck &&
+                                !v.missionTag &&
+                                !v.isEstateCar
+                            ) {
+                                const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                                if (d < bestCarDist) {
+                                    bestCarDist = d;
+                                    getawayCar = v;
+                                }
                             }
                         }
                     }
@@ -11054,7 +11037,6 @@ class LeonidaGame {
                         ped.y += Math.sin(ped.angle) * 96 * dt;
                         if (Math.random() < 0.025) ped.angle += (Math.random() - 0.5) * 1.1;
                     }
-
                 }
 
             } else if (ped.kind === "HOSTILE") {

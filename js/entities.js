@@ -1899,13 +1899,17 @@ class Vehicle {
        out on foot for a street shootout when boxed in or heavily damaged!
        ======================================================================== */
     computeCriminalControls(dt, map, game) {
+        if (this.criminalBailedOut || this.destroyed) {
+            this.driver = null;
+            return { throttle: 0, steer: 0, handbrake: true };
+        }
         this.aiPanicTimer = Math.max(this.aiPanicTimer || 0, 8.0);
         const ctrl = this.computeTrafficControls(dt, map, game);
         ctrl.throttle = Math.max(ctrl.throttle, 0.86);
 
         if (game) {
             let nearestCop = null;
-            let bestCopDist = 340;
+            let bestCopDist = 380;
             for (const v of game.vehicles) {
                 if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
                     const d = Math.hypot(v.x - this.x, v.y - this.y);
@@ -1935,13 +1939,14 @@ class Vehicle {
                 }
             }
 
-            // Bail out on foot for a street gunfight if boxed in by police or vehicle is heavily damaged!
+            // Bail out on foot for a street gunfight ONLY once if boxed in by police or heavily damaged near police!
             const boxedByCop = nearestCop && bestCopDist < 145 && Math.abs(this.speed || 0) < 34;
-            const heavilyDamaged = this.hp < this.maxHp * 0.44;
-            if (boxedByCop || heavilyDamaged) {
+            const heavilyDamaged = nearestCop && bestCopDist < 320 && this.hp < this.maxHp * 0.44;
+            if ((boxedByCop || heavilyDamaged) && !this.criminalBailedOut) {
                 this.aiBailTimer = (this.aiBailTimer || 0) + dt;
                 if ((this.aiBailTimer > 0.75 || heavilyDamaged) && typeof game.ejectVehicleDriver === "function") {
                     this.aiBailTimer = 0;
+                    this.criminalBailedOut = true;
                     game.ejectVehicleDriver(this, "CRIMINAL_DEPLOY");
                     return { throttle: 0, steer: 0, handbrake: true };
                 }
