@@ -279,8 +279,8 @@ class WorldObjectEngine {
                 splashX: 490.6 * TILE_SIZE,
                 splashY: 35.0 * TILE_SIZE
             },
-            ferrisWheel: { x: 464.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
-            pierArch: { x: 456.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0 },
+            ferrisWheel: { x: 466.0 * TILE_SIZE, y: 195.0 * TILE_SIZE, z: 2.0 },
+            pierArch: { x: 455.2 * TILE_SIZE, y: 195.0 * TILE_SIZE, z: 2.0 },
             atcTower: { x: 106.5 * TILE_SIZE, y: 307.5 * TILE_SIZE, z: 2.0 },
             waterTower: { x: 148.5 * TILE_SIZE, y: 118.5 * TILE_SIZE, z: 2.0 },
             // GTA 6 Leonida Regional 3D World-Building Monuments:
@@ -4504,34 +4504,184 @@ class WorldObjectEngine {
             }
         }
 
+        // H1. 3D VICE BEACH PLEASURE PIER ROADWAY, TIMBER PILINGS, GUARDRAILS, PROMENADE LAMPS & GIANT FERRIS WHEEL BASE
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
             const bz = fw.z || 2.0;
-            emitAOShadow3D(fw.x, fw.y, 1, 0, 0, 0, 210, 98, bz, 0.42);
-            // Giant Wooden Boardwalk Deck (L77 boardwalk planks) + Twin S363 Alpha-Cutout Steel Support Towers
-            emitTileBox3D(fw.x, fw.y, 1, 0, 0, 0, 196, 84, bz, bz + 0.10, 177, 177, 77, [0.94, 0.90, 0.84], true);
-            for (const sideY of [-26, 26]) {
-                emitTileBox3D(fw.x, fw.y, 1, 0, -34, sideY, 11, 11, bz + 0.10, bz + 1.38, 363, 363, 64, [0.94, 0.96, 0.99], false);
-                emitTileBox3D(fw.x, fw.y, 1, 0,  34, sideY, 11, 11, bz + 0.10, bz + 1.38, 363, 363, 64, [0.94, 0.96, 0.99], false);
-                emitTileBox3D(fw.x, fw.y, 1, 0,   0, sideY, 22, 14, bz + 1.32, bz + 1.48, 199, 172, 86, [0.98, 0.42, 0.78], false);
+            const pierStartX = 454.0 * TILE_SIZE;
+            const pierEndX   = 477.0 * TILE_SIZE;
+            const pierMidX   = (pierStartX + pierEndX) * 0.5;
+            const pierLen    = pierEndX - pierStartX;
+            const pierY      = 195.0 * TILE_SIZE;
+
+            // 1. West Entrance Coral-to-Timber Threshold Apron (at x=454.0, seamlessly joining the c=453 Lummus Park Boardwalk!)
+            emitTileBox3D(pierStartX + 6, pierY, 1, 0, 0, 0, 16, 252, bz, bz + 0.016, 177, 177, 9, [0.98, 0.94, 0.90], true);
+            for (const sideY of [-122, 122]) {
+                emitSolidBox3D(pierStartX + 10, pierY, 1, 0, 0, sideY, 24, 8, bz + 0.016, bz + 0.14, [0.98, 0.96, 0.94], 9);
+                emitSolidBox3D(pierStartX + 10, pierY, 1, 0, 0, sideY, 26, 6, bz + 0.14, bz + 0.19, [0.18, 0.92, 0.96], 10);
             }
-            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 14, 62, bz + 1.36, bz + 1.46, [0.22, 0.86, 0.96], 5);
+
+            // 2. Continuous 3D North & South Pier Edge Timber Fascia, White Coastal Guardrails & Deep Ocean Pilings (c=454..477)
+            for (const sideDir of [-1, 1]) {
+                const edgeY = sideDir * 124;
+                // Outer edge ambient occlusion shadow on beach sand & surf
+                emitAOShadow3D(pierMidX, pierY, 1, 0, 0, sideDir * 128, pierLen + 16, 18, bz, 0.38);
+                // Heavy weathered mahogany pier deck edge beam (L77) + white coastal curb coping (MAT 9)
+                emitTileBox3D(pierMidX, pierY, 1, 0, 0, edgeY, pierLen, 8, bz - 0.14, bz + 0.05, 177, 177, 77, [0.68, 0.50, 0.34], false);
+                emitSolidBox3D(pierMidX, pierY, 1, 0, 0, edgeY, pierLen, 6.5, bz + 0.05, bz + 0.10, [0.96, 0.97, 0.99], 9);
+                // Continuous 3D double-rail white timber safety handrail + top neon promenade tube
+                emitSolidBox3D(pierMidX, pierY, 1, 0, 0, edgeY, pierLen - 8, 3.2, bz + 0.15, bz + 0.18, [0.94, 0.96, 0.99], 9);
+                emitSolidBox3D(pierMidX, pierY, 1, 0, 0, edgeY, pierLen - 8, 4.2, bz + 0.23, bz + 0.265, [0.98, 0.98, 1.00], 9);
+                const railNeon = (sideDir < 0) ? [0.16, 0.92, 0.98] : [0.98, 0.36, 0.78];
+                emitSolidBox3D(pierMidX, pierY, 1, 0, 0, edgeY, pierLen - 12, 2.4, bz + 0.265, bz + 0.285, railNeon, 10);
+            }
+
+            // 2B. 24 Pairs of 3D Cylindrical Creosote Timber Under-Deck Pilings, White Bollards & Art Deco Pier Lamp Posts
+            const numPierBays = 23;
+            for (let pi = 0; pi <= numPierBays; pi++) {
+                const px = pierStartX + 14 + (pi / numPierBays) * (pierLen - 28);
+                const isLampBay = (pi > 1 && pi < numPierBays && (pi % 3 === 1));
+                for (const sideDir of [-1, 1]) {
+                    const pyOff = sideDir * 124;
+                    // Deep cylindrical timber piling descending into sand/ocean water
+                    emitCylinder3D(px, pierY, 0, pyOff, 4.4, 4.0, bz - 0.38, bz + 0.05, 8, [0.46, 0.32, 0.20], 2, false);
+                    // White-painted pier guardrail bollard post + brass cap
+                    emitSolidBox3D(px, pierY, 1, 0, 0, pyOff, 6.5, 6.5, bz + 0.05, bz + 0.30, [0.96, 0.97, 0.99], 9);
+                    emitSolidBox3D(px, pierY, 1, 0, 0, pyOff, 7.5, 7.5, bz + 0.30, bz + 0.33, [0.98, 0.80, 0.22], 9);
+                    if (isLampBay) {
+                        const globeCol = ((pi + (sideDir > 0 ? 1 : 0)) % 2 === 0) ? [0.18, 0.94, 0.98] : [1.00, 0.42, 0.80];
+                        emitCylinder3D(px, pierY, 0, pyOff, 2.0, 1.6, bz + 0.33, bz + 0.66, 8, [0.88, 0.92, 0.96], 5, false);
+                        emitCylinder3D(px, pierY, 0, pyOff, 4.8, 4.8, bz + 0.66, bz + 0.76, 10, globeCol, 10, true);
+                    }
+                }
+            }
+
+            // 2C. East Oceanfront Observation Overlook Parapet & Twin Corner Beacon Turrets (at c=477 over the Atlantic surf!)
+            emitTileBox3D(pierEndX - 4, pierY, 1, 0, 0, 0, 10, 254, bz - 0.14, bz + 0.06, 177, 177, 77, [0.68, 0.50, 0.34], false);
+            emitSolidBox3D(pierEndX - 3, pierY, 1, 0, 0, 0, 6.5, 248, bz + 0.06, bz + 0.26, [0.96, 0.97, 0.99], 9);
+            emitSolidBox3D(pierEndX - 3, pierY, 1, 0, 0, 0, 3.0, 246, bz + 0.26, bz + 0.29, [0.98, 0.82, 0.22], 10);
+            for (const cSide of [-120, 120]) {
+                emitCylinder3D(pierEndX - 4, pierY, 0, cSide, 7.5, 6.5, bz + 0.05, bz + 0.42, 10, [0.96, 0.97, 0.99], 9, true);
+                emitCylinder3D(pierEndX - 4, pierY, 0, cSide, 5.2, 5.2, bz + 0.42, bz + 0.56, 10, [0.18, 0.94, 0.98], 10, true);
+                emitCone3D(pierEndX - 4, pierY, 0, cSide, 6.8, bz + 0.56, bz + 0.68, 10, [0.98, 0.36, 0.78], 9);
+            }
+
+            // 2D. Flush Painted Pier Boulevard Center Median Strip & Cat's-Eye Markers (c=455.8..463.8, 100% smooth for cars!)
+            for (let dm = 0; dm < 9; dm++) {
+                const mx = (456.2 + dm * 0.88) * TILE_SIZE;
+                const dCol = (dm % 2 === 0) ? [0.98, 0.96, 0.92] : [0.22, 0.92, 0.96];
+                emitSolidBox3D(mx, pierY, 1, 0, 0, 0, 26, 3.5, bz + 0.005, bz + 0.014, dCol, 9);
+            }
+
+            // 3. GIANT 3D FERRIS WHEEL BOARDING PLAZA, ART DECO TICKET BOOTH & SLANTED A-FRAME STEEL TOWERS (at c=466.0, r=195.0)
+            emitAOShadow3D(fw.x, fw.y, 1, 0, 0, 0, 218, 106, bz, 0.44);
+            // Stepped Terrazzo & Hardwood Boarding Platform (w=204, d=92, leaving 82px open road corridors on North & South!)
+            emitTileBox3D(fw.x, fw.y, 1, 0, 0, 0, 204, 92, bz, bz + 0.06, 177, 177, 8, [0.96, 0.94, 0.90], true);
+            emitTileBox3D(fw.x, fw.y, 1, 0, 0, 0, 192, 82, bz + 0.06, bz + 0.12, 177, 177, 77, [0.94, 0.88, 0.78], true);
+            // West & East Boarding Steps + North/South White Safety Perimeter Railings on Platform
+            for (const endDir of [-1, 1]) {
+                emitSolidBox3D(fw.x, fw.y, 1, 0, endDir * 100, 0, 8, 56, bz, bz + 0.04, [0.96, 0.94, 0.90], 9);
+                emitSolidBox3D(fw.x, fw.y, 1, 0, endDir * 96, 0, 8, 56, bz + 0.04, bz + 0.08, [0.98, 0.44, 0.78], 9);
+            }
+            for (const railY of [-42, 42]) {
+                emitSolidBox3D(fw.x, fw.y, 1, 0, 10, railY, 162, 3.0, bz + 0.12, bz + 0.25, [0.96, 0.98, 1.00], 9);
+                emitSolidBox3D(fw.x, fw.y, 1, 0, 10, railY, 162, 2.2, bz + 0.25, bz + 0.275, [0.18, 0.92, 0.98], 10);
+            }
+            // Art Deco Ride Control & Ticket Kiosk at West End of Boarding Deck (offX=-78, offY=-24)
+            emitBox3D(fw.x, fw.y, 1, 0, -78, -24, 26, 22, bz + 0.12, bz + 0.44, "wall_artdeco_front", "wall_artdeco_side", [0.98, 0.95, 0.92]);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, -78, -24, 28, 24, bz + 0.26, bz + 0.35, [0.22, 0.90, 0.96], 7);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, -78, -24, 30, 26, bz + 0.44, bz + 0.50, [0.98, 0.38, 0.78], 9);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, -78, -24, 24, 18, bz + 0.50, bz + 0.56, [0.18, 0.94, 0.98], 10);
+
+            // 4 True 3D Slanted A-Frame Steel Support Legs converging from offX = ±46 (bz+0.12) to offX = 0 at Hub (bz+1.54)
+            for (const sideY of [-26, 26]) {
+                // Reinforced concrete & steel foot pedestals at offX = -46 and +46
+                for (const footSign of [-1, 1]) {
+                    emitTileBox3D(fw.x, fw.y, 1, 0, footSign * 46, sideY, 14, 12, bz + 0.12, bz + 0.24, 177, 177, 71, [0.90, 0.92, 0.96], false);
+                    // 7 stepped diagonal A-frame leg segments converging smoothly toward the central hub (offX = 0)
+                    const steps = 7;
+                    for (let st = 0; st < steps; st++) {
+                        const f0 = st / steps;
+                        const f1 = (st + 1) / steps;
+                        const fMid = (f0 + f1) * 0.5;
+                        const lx = footSign * 46.0 * (1.0 - fMid);
+                        const z0 = bz + 0.22 + f0 * 1.28;
+                        const z1 = bz + 0.22 + f1 * 1.28 + 0.03;
+                        emitTileBox3D(fw.x, fw.y, 1, 0, lx, sideY, 10.5 - fMid * 2.0, 8.5, z0, z1, 363, 246, 64, [0.94, 0.97, 1.00], false);
+                        // Glowing diagonal neon strip along each A-frame leg
+                        const legNeon = (footSign < 0) ? [0.98, 0.32, 0.78] : [0.16, 0.92, 0.98];
+                        emitSolidBox3D(fw.x, fw.y, 1, 0, lx, sideY + (sideY > 0 ? 4.5 : -4.5), 4.2, 1.8, z0 + 0.02, z1 - 0.01, legNeon, 10);
+                    }
+                }
+                // Horizontal A-Frame Steel Cross-Braces at Mid-Height (bz+0.68 & bz+1.08)
+                emitTileBox3D(fw.x, fw.y, 1, 0, 0, sideY, 56, 6.5, bz + 0.66, bz + 0.74, 250, 363, 64, [0.92, 0.95, 0.99], false);
+                emitTileBox3D(fw.x, fw.y, 1, 0, 0, sideY, 30, 6.5, bz + 1.06, bz + 1.14, 250, 363, 64, [0.92, 0.95, 0.99], false);
+                // High-Altitude Central Axle Bearing Housing & Glowing Neon Hub Medallion (at bz+1.46..1.64)
+                emitTileBox3D(fw.x, fw.y, 1, 0, 0, sideY, 22, 14, bz + 1.44, bz + 1.62, 199, 172, 86, [0.98, 0.40, 0.78], false);
+                emitCylinder3D(fw.x, fw.y, 0, sideY + (sideY > 0 ? 8 : -8), 9.5, 9.5, bz + 1.48, bz + 1.60, 12, [0.18, 0.94, 0.98], 10, true);
+            }
+            // Horizontal 3D Steel Central Drive Axle Shaft spanning North-South between the Twin A-Frame Towers (bz+1.50..1.58)
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 11, 64, bz + 1.50, bz + 1.58, [0.88, 0.92, 0.96], 5);
+            emitSolidBox3D(fw.x, fw.y, 1, 0, 0, 0, 15, 36, bz + 1.48, bz + 1.60, [0.98, 0.82, 0.22], 10);
         }
 
-        // H2. 3D VICE BEACH PIER NEON ENTRANCE ARCHWAY (at c=456.5, r=194.5 welcoming traffic & peds onto the L77 Boardwalk!)
+        // H2. 3D VICE BEACH PIER GRAND ART DECO ENTRANCE PORTAL & TICKET GATEHOUSES ("SA PORTE" at c=455.2, r=195.0)
+        //     Spans the full 4-tile pier width (py = -102..+102) with a wide 164px clear central roadway (py = -82..+82)!
         if (this.landmarks3D && this.landmarks3D.pierArch) {
             const pa = this.landmarks3D.pierArch;
             const bz = pa.z || 2.0;
-            emitAOShadow3D(pa.x, pa.y, 1, 0, 0, 0, 48, 132, bz, 0.36);
-            for (const py of [-48, 48]) {
-                // Concrete masonry base (S177 / L8) + S363 Alpha-Cutout Steel Truss Pylon + Neon Crown
-                emitTileBox3D(pa.x, pa.y, 1, 0, 0, py, 20, 20, bz, bz + 0.24, 177, 177, 8, [0.94, 0.96, 0.99], false);
-                emitTileBox3D(pa.x, pa.y, 1, 0, 0, py, 14, 14, bz + 0.24, bz + 1.18, 363, 246, 64, [0.96, 0.44, 0.78], false);
-                emitCone3D(pa.x, pa.y, 0, py, 8.5, bz + 1.34, bz + 1.52, 10, [0.22, 0.88, 0.98], 5);
+            emitAOShadow3D(pa.x, pa.y, 1, 0, 0, 0, 68, 252, bz, 0.42);
+
+            // 1. Twin Stepped Art Deco Gatehouse Ticket-Booth Pylons on North (py = -102) & South (py = +102) Pier Curbs
+            for (const sideSign of [-1, 1]) {
+                const py = sideSign * 102;
+                const innerY = sideSign * 84;
+                // Chamfered Octagonal Terrazzo & Coral Plinth Base
+                emitOctagonPad3D(pa.x, pa.y, 0, py, 24, 21, 22, 19, 0.26, bz, bz + 0.12, [0.96, 0.94, 0.90], [0.88, 0.84, 0.80], 2, 177, 8);
+                // Lower Gatehouse Ticket Booth (Pastel Cream & Flamingo Pink Art Deco facade + Wrap-Around Turquoise Glass Windows)
+                emitBox3D(pa.x, pa.y, 1, 0, 0, py, 38, 32, bz + 0.12, bz + 0.66, "wall_artdeco_front", "wall_artdeco_side", [0.98, 0.95, 0.92]);
+                emitSolidBox3D(pa.x, pa.y, 1, 0, 0, py, 40, 34, bz + 0.30, bz + 0.44, [0.20, 0.90, 0.96], 7);
+                // Cantilevered Art Deco White & Flamingo-Pink "Eyebrow" Sun Ledges
+                emitSolidBox3D(pa.x, pa.y, 1, 0, 0, py, 44, 38, bz + 0.44, bz + 0.49, [0.98, 0.98, 1.00], 9);
+                emitSolidBox3D(pa.x, pa.y, 1, 0, 0, py, 42, 36, bz + 0.66, bz + 0.72, [0.98, 0.40, 0.78], 9);
+                // Upper Stepped Art Deco Tower Shaft (bz+0.72..1.20)
+                emitBox3D(pa.x, pa.y, 1, 0, 0, py, 28, 24, bz + 0.72, bz + 1.20, "wall_artdeco_side", "wall_artdeco_side", [0.96, 0.50, 0.78]);
+                // Twin Vertical Fluted Neon Fin Columns on West & East Faces of each Pylon
+                for (const fx of [-16, 16]) {
+                    const finCol = (fx < 0) ? [0.16, 0.94, 0.98] : [0.98, 0.32, 0.78];
+                    emitCylinder3D(pa.x, pa.y, fx, py, 3.2, 2.8, bz + 0.12, bz + 1.46, 10, finCol, 10, true);
+                }
+                // Inner Structural Arch Buttress Column (at py = ±84) + Stepped Vaulted Arch Haunches curving over the roadway!
+                emitTileBox3D(pa.x, pa.y, 1, 0, 0, innerY, 22, 10, bz, bz + 1.18, 177, 199, 86, [0.96, 0.97, 1.00], false);
+                emitSolidBox3D(pa.x, pa.y, 1, 0, 0, innerY - sideSign * 6, 18, 10, bz + 0.92, bz + 1.18, [0.98, 0.42, 0.78], 9);
+                emitSolidBox3D(pa.x, pa.y, 1, 0, 0, innerY - sideSign * 16, 16, 14, bz + 1.05, bz + 1.18, [0.18, 0.92, 0.98], 9);
+                // Pylon Top Turret Drum & Conical Neon Finial Spire (at py = ±102, rising to bz+1.72)
+                emitCylinder3D(pa.x, pa.y, 0, py, 10.5, 9.5, bz + 1.44, bz + 1.56, 12, [0.98, 0.98, 1.00], 9, true);
+                emitCone3D(pa.x, pa.y, 0, py, 9.5, bz + 1.56, bz + 1.76, 12, [0.16, 0.94, 0.98], 10);
             }
-            // Overhead Art Deco Spanning Arch Beam (S199 / S250 / L86) high enough (bz+1.10) for cars & trucks to drive right underneath!
-            emitTileBox3D(pa.x, pa.y, 1, 0, 0, 0, 24, 114, bz + 1.12, bz + 1.34, 199, 250, 86, [0.96, 0.98, 1.00], false);
-            emitTileBox3D(pa.x, pa.y, 1, 0, 0, 0, 16, 76, bz + 1.34, bz + 1.48, 86, 199, 31, [0.98, 0.42, 0.78], false);
+
+            // 2. Monumental Multi-Tiered Overhead Art Deco Portal Bridge (bz+1.16..1.90, spanning 238px across entire pier!)
+            //    Tier 1: Main Structural Box Girder & Glowing Under-Arch Soffit (bz+1.16..1.34)
+            emitTileBox3D(pa.x, pa.y, 1, 0, 0, 0, 34, 238, bz + 1.16, bz + 1.34, 199, 86, 86, [0.98, 0.97, 1.00], false);
+            emitSolidBox3D(pa.x, pa.y, 1, 0, 0, 0, 38, 242, bz + 1.15, bz + 1.19, [0.16, 0.94, 0.98], 10);
+            emitSolidBox3D(pa.x, pa.y, 1, 0, 0, 0, 38, 242, bz + 1.32, bz + 1.36, [0.98, 0.36, 0.78], 9);
+            //    6 Under-Arch Warm-Gold Drive-Through Downlights illuminating the roadway
+            for (const ly of [-62, -38, -14, 14, 38, 62]) {
+                emitSolidBox3D(pa.x, pa.y, 1, 0, 0, ly, 14, 8, bz + 1.13, bz + 1.16, [1.00, 0.86, 0.32], 10);
+            }
+
+            //    Tier 2: Double-Sided "VICE CITY 26" Illuminated Neon Marquee Gallery (bz+1.36..1.62, span d=186px)
+            emitBox3D(pa.x, pa.y, 1, 0, 0, 0, 26, 186, bz + 1.36, bz + 1.62, "wall_artdeco_front", "wall_artdeco_side", [0.98, 0.44, 0.78]);
+            //    West-Facing (Entrance) & East-Facing (Exit) 3D Illuminated Marquee Signboards ("ad_vice26")
+            emitBox3D(pa.x, pa.y, 0, 1, 0, -14, 144, 6, bz + 1.38, bz + 1.60, "ad_vice26", "ad_vice26", [1.00, 1.00, 1.00]);
+            emitBox3D(pa.x, pa.y, 0, -1, 0, -14, 144, 6, bz + 1.38, bz + 1.60, "ad_vice26", "ad_vice26", [1.00, 1.00, 1.00]);
+            emitSolidBox3D(pa.x, pa.y, 1, 0, 0, 0, 30, 192, bz + 1.60, bz + 1.65, [0.98, 0.84, 0.24], 10);
+
+            //    Tier 3: Central Stepped Art Deco Ziggurat Crown & Glass Lantern Cupola (bz+1.65..1.96)
+            emitSolidBox3D(pa.x, pa.y, 1, 0, 0, 0, 22, 118, bz + 1.65, bz + 1.75, [0.98, 0.98, 1.00], 9);
+            emitSolidBox3D(pa.x, pa.y, 1, 0, 0, 0, 18, 72, bz + 1.75, bz + 1.84, [0.98, 0.36, 0.78], 9);
+            emitCylinder3D(pa.x, pa.y, 0, 0, 11.0, 9.5, bz + 1.84, bz + 1.96, 12, [0.20, 0.94, 0.98], 7, true);
+            emitCone3D(pa.x, pa.y, 0, 0, 10.0, bz + 1.96, bz + 2.14, 12, [1.00, 0.84, 0.24], 10);
         }
 
         // H3. 3D VCIA AIRPORT AIR TRAFFIC CONTROL (ATC) TOWER + RADAR PLATFORM (at c=106.5, r=307.5)
@@ -5474,25 +5624,97 @@ class WorldObjectEngine {
             }
         };
 
-        // 1. Live Vertically-Rotating Supersized 3D Neon Ferris Wheel at Vice Beach Pier
+        // 1. Live Vertically-Rotating Dual-Rim 3D Neon Ferris Wheel & Pier Archway Marquee at Vice Beach Pier
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
-            if (fw.x >= minX - 240 && fw.x <= maxX + 240 && fw.y >= minY - 240 && fw.y <= maxY + 240) {
-                const hubElev = (fw.z || 2.0) + 1.40;
-                const radPx = 78.0;
-                const radElev = 1.15;
+            if (fw.x >= minX - 280 && fw.x <= maxX + 280 && fw.y >= minY - 280 && fw.y <= maxY + 280) {
+                const hubElev = (fw.z || 2.0) + 1.54;
+                const radPx = 82.0;
+                const radElev = 1.24;
+                const wheelRot = t * 0.58;
+
+                // A. Twin Parallel 24-Segment 3D Circular Steel & Neon Wheel Rims (North Rim offY=-16, South Rim offY=+16)
+                const rimSegs = 24;
+                for (let rs = 0; rs < rimSegs; rs++) {
+                    const a0 = wheelRot + (rs * Math.PI * 2.0) / rimSegs;
+                    const a1 = wheelRot + ((rs + 1) * Math.PI * 2.0) / rimSegs;
+                    const aMid = (a0 + a1) * 0.5;
+                    const mx = fw.x + Math.cos(aMid) * radPx;
+                    const mzElev = hubElev + Math.sin(aMid) * radElev;
+                    const imx = fw.x + Math.cos(aMid) * (radPx * 0.72);
+                    const imzElev = hubElev + Math.sin(aMid) * (radElev * 0.72);
+                    const neonCol = ((rs + Math.floor(t * 6.0)) % 2 === 0) ? [1.00, 0.30, 0.78] : [0.16, 0.94, 1.00];
+                    const innerCol = ((rs + Math.floor(t * 6.0)) % 2 === 0) ? [1.00, 0.84, 0.24] : [0.98, 0.36, 0.80];
+
+                    for (const rimY of [-16, 16]) {
+                        // Outer structural steel rim chord + glowing neon rim tube
+                        emitDynBox(mx, fw.y, 1, 0, 0, rimY, 9.2, 2.8, mzElev - 0.024, mzElev + 0.024, [0.94, 0.97, 1.00], 1.0, 5);
+                        emitDynBox(mx, fw.y, 1, 0, 0, rimY + (rimY > 0 ? 1.8 : -1.8), 8.4, 1.8, mzElev - 0.018, mzElev + 0.018, neonCol, 1.0, 10);
+                        // Inner concentric neon star-ring chord at 72% radius
+                        emitDynBox(imx, fw.y, 1, 0, 0, rimY, 6.8, 2.0, imzElev - 0.016, imzElev + 0.016, innerCol, 1.0, 10);
+                    }
+                }
+
+                // B. 12 Twin-Plane Radial Steel Spokes & 12 Crisp 3D Suspended Passenger Gondola Cabins
                 const numGondolas = 12;
+                const cabinPalette = [
+                    [0.98, 0.32, 0.74], // Flamingo Pink
+                    [0.18, 0.88, 0.96], // South Beach Cyan
+                    [1.00, 0.80, 0.22], // Sunset Gold
+                    [0.32, 0.96, 0.76]  // Tropical Mint
+                ];
                 for (let gi = 0; gi < numGondolas; gi++) {
-                    const theta = t * 0.65 + (gi * Math.PI * 2.0) / numGondolas;
-                    const gx = fw.x + Math.cos(theta) * radPx;
-                    const gyElev = hubElev + Math.sin(theta) * radElev;
-                    const isPink = (gi % 2 === 0);
-                    const gCol = isPink ? [0.92, 0.30, 0.68] : [0.22, 0.82, 0.92];
-                    // 3D Cylindrical Passenger Gondola Cabin + Radial Spoke
-                    emitDynCylinder(gx, fw.y, 0, 0, 10.5, 11.5, gyElev - 0.12, gyElev + 0.05, 10, gCol, 5, true);
-                    const mx = fw.x + Math.cos(theta) * (radPx * 0.52);
-                    const myElev = hubElev + Math.sin(theta) * (radElev * 0.52);
-                    emitDynBox(mx, fw.y, 1, 0, 0, 0, 7, 32, myElev - 0.035, myElev + 0.035, [0.94, 0.88, 0.48], 1.0, 4);
+                    const theta = wheelRot + (gi * Math.PI * 2.0) / numGondolas;
+                    const cosT = Math.cos(theta);
+                    const sinT = Math.sin(theta);
+
+                    // 1) Slender 3-Step Radial Spokes on BOTH North (offY=-16) & South (offY=+16) Wheel Rims
+                    const spokeNeon = ((gi + Math.floor(t * 4.0)) % 2 === 0) ? [0.18, 0.94, 0.98] : [1.00, 0.36, 0.80];
+                    for (const frac of [0.24, 0.48, 0.72, 0.90]) {
+                        const sx = fw.x + cosT * (radPx * frac);
+                        const szElev = hubElev + sinT * (radElev * frac);
+                        for (const rimY of [-16, 16]) {
+                            emitDynBox(sx, fw.y, 1, 0, 0, rimY, 5.2, 2.2, szElev - 0.020, szElev + 0.020, [0.92, 0.95, 0.99], 1.0, 5);
+                            emitDynBox(sx, fw.y, 1, 0, 0, rimY + (rimY > 0 ? 1.4 : -1.4), 4.4, 1.4, szElev - 0.014, szElev + 0.014, spokeNeon, 1.0, 10);
+                        }
+                    }
+
+                    // 2) 3D Suspended Passenger Gondola Carriage (hanging plumb below its horizontal rim axle pin!)
+                    const gx = fw.x + cosT * radPx;
+                    const gyElev = hubElev + sinT * radElev;
+                    const cCol = cabinPalette[gi % cabinPalette.length];
+                    // Horizontal steel suspension crossbar bridging North (offY=-16) & South (offY=+16) rims
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 2.8, 34, gyElev - 0.012, gyElev + 0.012, [0.88, 0.92, 0.96], 1.0, 5);
+                    // Cantilevered white Art Deco cabin sun-canopy roof + neon roof trim
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 12.6, 22, gyElev - 0.038, gyElev - 0.012, [0.98, 0.98, 1.00], 1.0, 9);
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 13.0, 22.6, gyElev - 0.044, gyElev - 0.036, cCol, 1.0, 10);
+                    // Panoramic observation glass window cabin upper section (MAT 7)
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 10.4, 19, gyElev - 0.098, gyElev - 0.044, [0.22, 0.90, 0.98], 1.0, 7);
+                    // Glossy pastel gondola carriage body (MAT 9) + dark steel undercarriage floor
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 11.6, 21, gyElev - 0.165, gyElev - 0.098, cCol, 1.0, 9);
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 10.8, 19.5, gyElev - 0.182, gyElev - 0.165, [0.18, 0.20, 0.26], 1.0, 5);
+                }
+            }
+        }
+
+        // 1A-2. Live Animated Neon Marquee Chase & Rotating Rooftop Star on Vice Beach Pier Entrance Portal ("SA PORTE")
+        if (this.landmarks3D && this.landmarks3D.pierArch) {
+            const pa = this.landmarks3D.pierArch;
+            if (pa.x >= minX - 240 && pa.x <= maxX + 240 && pa.y >= minY - 240 && pa.y <= maxY + 240) {
+                const bz = pa.z || 2.0;
+                const rotStar = t * 1.8;
+                const cs = Math.cos(rotStar);
+                const sn = Math.sin(rotStar);
+                // Rotating 3D Neon Star/Crown atop the Central Portal Cupola (bz+2.14..2.28)
+                emitDynBox(pa.x, pa.y, cs, sn, 0, 0, 16, 5, bz + 2.12, bz + 2.24, [1.00, 0.34, 0.80], 1.0, 10);
+                emitDynBox(pa.x, pa.y, -sn, cs, 0, 0, 16, 5, bz + 2.12, bz + 2.24, [0.16, 0.94, 0.98], 1.0, 10);
+                // Animated Marquee Chase Bulbs along the West & East Portal Arch Fascia
+                for (let bi = -4; bi <= 4; bi++) {
+                    const by = bi * 22;
+                    const bulbOn = ((bi + 4 + Math.floor(t * 7.0)) % 3 === 0);
+                    const bCol = bulbOn ? [1.00, 0.90, 0.32] : [0.98, 0.32, 0.78];
+                    emitDynBox(pa.x, pa.y, 1, 0, -18, by, 3.5, 8, bz + 1.33, bz + 1.37, bCol, 1.0, 10);
+                    emitDynBox(pa.x, pa.y, 1, 0,  18, by, 3.5, 8, bz + 1.33, bz + 1.37, bCol, 1.0, 10);
                 }
             }
         }

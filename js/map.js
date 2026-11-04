@@ -281,7 +281,7 @@ class LeonidaMap {
                 }
             }
         }
-        for (let x = 455; x <= 467; x++) {
+        for (let x = 454; x <= 476; x++) {
             for (let y = 193; y <= 196; y++) {
                 for (let z = 0; z < MAP_LAYERS; z++) {
                     this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] =
@@ -943,7 +943,7 @@ class LeonidaMap {
             if (c < 2 || c >= MAP_COLS - 2 || r < 2 || r >= MAP_ROWS - 2) return false;
             if (r <= 46 && c >= 455) return false; // Exclude SERA Spaceport security perimeter
             if (r >= 131 && r <= 137 && c >= 456 && c <= 467) return false; // Exclude Cape Leonida Lighthouse Plaza
-            if (r >= 192 && r <= 197 && c >= 454 && c <= 468) return false; // Exclude Vice Beach Pier Boardwalk
+            if (r >= 192 && r <= 197 && c >= 453 && c <= 478) return false; // Exclude Vice Beach Pier Boardwalk
             if (r >= 474 && r <= 479 && c >= 196 && c <= 202) return false; // Exclude Key West Lighthouse Plaza
             const idx = r * MAP_COLS + c;
             const isStarLawn = allowStarIsland && c >= starLawnMinX && c <= starLawnMaxX && r >= starLawnMinY && r <= starLawnMaxY && this.surfaceGround[idx] === GROUND_TYPE.FIELD;
@@ -2104,10 +2104,13 @@ class LeonidaMap {
         pushPropOBB(106.5 * TILE_SIZE, 307.5 * TILE_SIZE, 38, 38, 0);             // VCIA 3D Air Traffic Control Tower
         pushPropOBB(148.5 * TILE_SIZE, 118.5 * TILE_SIZE, 32, 32, 0);             // Kelly County 3D Water Tower
         pushPropOBB(148.5 * TILE_SIZE + 54, 118.5 * TILE_SIZE, 14, 14, 0);        // Kelly County 3D Radio Mast
-        pushPropOBB(456.5 * TILE_SIZE, 194.5 * TILE_SIZE - 42, 16, 16, 0);        // Vice Beach Pier Arch North Pylon (road stays open!)
-        pushPropOBB(456.5 * TILE_SIZE, 194.5 * TILE_SIZE + 42, 16, 16, 0);        // Vice Beach Pier Arch South Pylon (road stays open!)
-        pushPropOBB(464.5 * TILE_SIZE, 194.5 * TILE_SIZE - 20, 42, 8, 0);         // Vice Beach Ferris Wheel North A-Frame Base
-        pushPropOBB(464.5 * TILE_SIZE, 194.5 * TILE_SIZE + 20, 42, 8, 0);         // Vice Beach Ferris Wheel South A-Frame Base
+        pushPropOBB(455.2 * TILE_SIZE, 195.0 * TILE_SIZE - 102, 24, 20, 0);        // Vice Beach Pier Arch North Gatehouse Pylon (road stays open!)
+        pushPropOBB(455.2 * TILE_SIZE, 195.0 * TILE_SIZE + 102, 24, 20, 0);        // Vice Beach Pier Arch South Gatehouse Pylon (road stays open!)
+        pushPropOBB(466.0 * TILE_SIZE, 195.0 * TILE_SIZE - 26, 48, 8, 0);          // Vice Beach Ferris Wheel North A-Frame Base
+        pushPropOBB(466.0 * TILE_SIZE, 195.0 * TILE_SIZE + 26, 48, 8, 0);          // Vice Beach Ferris Wheel South A-Frame Base
+        pushPropOBB(465.5 * TILE_SIZE, 193.0 * TILE_SIZE + 4, 710, 5, 0);          // Vice Beach Pier North Timber Guardrail
+        pushPropOBB(465.5 * TILE_SIZE, 197.0 * TILE_SIZE - 4, 710, 5, 0);          // Vice Beach Pier South Timber Guardrail
+        pushPropOBB(476.85 * TILE_SIZE, 195.0 * TILE_SIZE, 5, 122, 0);             // Vice Beach Pier East Ocean Overlook Rail
         pushPropOBB(199.5 * TILE_SIZE, 476.5 * TILE_SIZE, 24, 24, 0);             // Key West Lighthouse
         pushPropOBB(464.5 * TILE_SIZE, 134.5 * TILE_SIZE, 24, 24, 0);             // Cape Leonida Lighthouse
         pushPropOBB(118.5 * TILE_SIZE, 293.5 * TILE_SIZE, 82, 22, 0);             // VCIA Colossal 3D "VICE" Welcome Sign
