@@ -626,9 +626,9 @@ const VEHICLE_SPECS = {
         grip: 0.90,
         driftGrip: 0.96,
         maxHp: 440,
-        color: "#1e293b",
+        color: "#0b3d2c",
         secondaryColor: "#f8fafc",
-        stripeColor: "#f8fafc",
+        stripeColor: "#eab308",
         bodyStyle: "CRUISER",
         isPolice: true,
         useBaseOnly: true,
@@ -1155,7 +1155,7 @@ class Vehicle {
             }
         }
 
-        const shouldDent = isExplosive || amount >= 14 || this.hp < this.maxHp * 0.82;
+        const shouldDent = isExplosive || amount >= 9 || this.hp < this.maxHp * 0.88;
         if (shouldDent) {
             if (hitX !== undefined && hitY !== undefined) {
                 const dx = hitX - this.x;
@@ -1185,7 +1185,7 @@ class Vehicle {
             }
         }
 
-        if (this.hp < this.maxHp * 0.48) {
+        if (this.hp < this.maxHp * 0.56) {
             this.heavyDented = true;
             this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.WS);
         }
@@ -2407,12 +2407,14 @@ class Vehicle {
                     this.aiReverseTimer = 0.85;
                     this.aiReverseSteer = Math.random() < 0.5 ? 0.9 : -0.9;
                 }
-                if (this.driver === "PLAYER" && impact > 155 && (this.crashCooldown || 0) <= 0) {
+                if (impact > 155 && (this.crashCooldown || 0) <= 0) {
                     this.crashCooldown = 0.52;
-                    this.receiveImpactDamage((impact - 140) * 0.085, hitX, hitY);
-                    game.spawnParticle(hitX, hitY, "SPARK");
-                    if (game && game.audio) {
-                        game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145));
+                    this.receiveImpactDamage((impact - 140) * (this.driver === "PLAYER" ? 0.085 : 0.065), hitX, hitY);
+                    if (this.driver === "PLAYER") {
+                        game.spawnParticle(hitX, hitY, "SPARK");
+                        if (game && game.audio) {
+                            game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145));
+                        }
                     }
                 }
             }

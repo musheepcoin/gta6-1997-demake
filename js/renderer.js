@@ -2439,6 +2439,606 @@ class RetroRenderer {
                 }
 
                 // =========================================================================
+                // 6J3. MIAMI-DADE / VICE CITY POLICE DODGE CHARGER PURSUIT (spr_idx = 73, 52x64)
+                //      & ALL MULTI-STATE SPRITE OVERLAYS:
+                //      - Intact Factory Cruiser (base + remaps[0..4]):
+                //        Dark Miami-Dade Emerald/Forest Green Hood & Trunk, Crisp White Roof & Doors,
+                //        Gold VCPD Shield Crest & "911 / 1126A" Decals, Black Steel Wheels w/ Chrome Caps,
+                //        Black Front PIT Push-Bar Bullbar, Charger Racetrack LED Taillight, Low-Profile Red/Blue LED Lightbar
+                //      -Sirens (sirens[0..1]): Alternating Red/Blue Roof Lightbar + PIT Bullbar & Rear Deck Strobes
+                //      -Doors (doors[0..3]): 4 Progressive Door-Swing States (White/Green Door + Gold Shield + Dark Cabin)
+                //      -Damage (damage.front, damage.rear, damage.heavy): Buckled Green Hood/Trunk, Twisted Bullbar,
+                //        Exposed Engine/Trunk Bay, Spiderweb-Cracked Windshields, Dented White Doors & Crooked Lightbar
+                //      -Destroyed Wreck (veh_vcpd_wreck at [1604, 130, 52, 64]): Burnt/Scorched VCPD Charger Hulk
+                // =========================================================================
+                {
+                    const buildVcpdChargerState = (mode) => {
+                        const cw = 52, ch = 64;
+                        const id = ctx.createImageData(cw, ch);
+                        const px = id.data;
+                        const setPx = (x, y, r, g, b, a = 255) => {
+                            if (x < 0 || x >= cw || y < 0 || y >= ch) return;
+                            const idx = (y * cw + x) * 4;
+                            px[idx] = Math.max(0, Math.min(255, r | 0));
+                            px[idx + 1] = Math.max(0, Math.min(255, g | 0));
+                            px[idx + 2] = Math.max(0, Math.min(255, b | 0));
+                            px[idx + 3] = Math.max(0, Math.min(255, a | 0));
+                        };
+
+                        const isWreck = mode === "WRECK";
+                        const isSiren0 = mode === "SIREN_0";
+                        const isSiren1 = mode === "SIREN_1";
+                        const isDoor = mode.startsWith("DOOR_");
+                        const isDmgFront = mode === "DMG_FRONT" || mode === "DMG_HEAVY";
+                        const isDmgRear = mode === "DMG_REAR" || mode === "DMG_HEAVY";
+                        const isDmgHeavy = mode === "DMG_HEAVY";
+
+                        // 1) Pure Siren Delta Overlays (sirens[0] & sirens[1])
+                        if (isSiren0 || isSiren1) {
+                            // Roof Lightbar Active Flash (y = 24..30, x = 13..38)
+                            for (let y = 24; y <= 30; y++) {
+                                for (let x = 13; x <= 38; x++) {
+                                    const inBar = y >= 25 && y <= 29 && x >= 14 && x <= 37;
+                                    const leftSide = x <= 23;
+                                    const rightSide = x >= 28;
+                                    if (inBar) {
+                                        if (x >= 24 && x <= 27) {
+                                            // Center white/silver takedown strobe flash
+                                            setPx(x, y, 248, 250, 252, 255);
+                                        } else if (leftSide) {
+                                            if (isSiren0) {
+                                                const core = (y === 27 && x >= 17 && x <= 22);
+                                                setPx(x, y, 255, core ? 215 : 38, core ? 225 : 68, 255);
+                                            } else {
+                                                setPx(x, y, 135, 18, 32, 255);
+                                            }
+                                        } else if (rightSide) {
+                                            if (isSiren1) {
+                                                const core = (y === 27 && x >= 29 && x <= 34);
+                                                setPx(x, y, core ? 215 : 37, core ? 240 : 118, 255, 255);
+                                            } else {
+                                                setPx(x, y, 22, 52, 148, 255);
+                                            }
+                                        }
+                                    } else {
+                                        // Soft emissive halo spilled onto the white roof around the active side
+                                        if (isSiren0 && x >= 13 && x <= 24) {
+                                            setPx(x, y, 255, 64, 88, 165);
+                                        } else if (isSiren1 && x >= 27 && x <= 38) {
+                                            setPx(x, y, 56, 165, 255, 165);
+                                        }
+                                    }
+                                }
+                            }
+                            // Front PIT Bullbar Strobe LEDs (y = 60..62) & Rear Charger Deck Strobes (y = 3..4)
+                            if (isSiren0) {
+                                for (let y = 60; y <= 62; y++) {
+                                    for (let x = 21; x <= 24; x++) setPx(x, y, 255, 60, 80, 255);
+                                }
+                                for (let y = 3; y <= 4; y++) {
+                                    for (let x = 31; x <= 35; x++) setPx(x, y, 56, 175, 255, 255);
+                                }
+                            } else {
+                                for (let y = 60; y <= 62; y++) {
+                                    for (let x = 27; x <= 30; x++) setPx(x, y, 56, 175, 255, 255);
+                                }
+                                for (let y = 3; y <= 4; y++) {
+                                    for (let x = 16; x <= 20; x++) setPx(x, y, 255, 60, 80, 255);
+                                }
+                            }
+                            return id;
+                        }
+
+                        // 2) Progressive Door-Swing Delta Overlays (doors[0..3])
+                        if (isDoor) {
+                            const stage = Number(mode.split("_")[1]) || 0; // 0..3
+                            const swingOut = stage + 2; // 2..5 px outward swing from front hinge (y = 39)
+                            // Dark open cabin recess on driver side (x = 10..14, y = 28..39)
+                            for (let y = 28; y <= 39; y++) {
+                                const t = (39 - y) / 11.0; // 0 at front hinge (y=39), 1 at rear latch (y=28)
+                                const shift = Math.round(1 + t * swingOut);
+                                // Dark exposed police cruiser interior & tactical seat
+                                for (let x = 10; x <= 13; x++) {
+                                    const isSeat = y >= 30 && y <= 36 && x >= 11;
+                                    setPx(x, y, isSeat ? 28 : 12, isSeat ? 36 : 16, isSeat ? 52 : 26, 255);
+                                }
+                                // Swinging White & Miami-Dade Green VCPD Door Leaf + Gold Shield Badge
+                                const doorOuterX = Math.max(3, 10 - shift);
+                                const doorInnerX = doorOuterX + 2;
+                                for (let dx = doorOuterX; dx <= doorInnerX; dx++) {
+                                    if (dx === doorOuterX) {
+                                        // Crisp dark outer edge of the open door
+                                        setPx(dx, y, 15, 23, 42, 255);
+                                    } else if (y >= 33 && y <= 36 && dx === doorOuterX + 1) {
+                                        // Gold VCPD Shield Badge on the swinging white front door!
+                                        setPx(dx, y, 234, 179, 8, 255);
+                                    } else if (y === 29 || y === 30) {
+                                        // Miami-Dade Dark Forest Green stripe accent on door
+                                        setPx(dx, y, 11, 61, 44, 255);
+                                    } else {
+                                        // Crisp Miami-Dade White door skin
+                                        setPx(dx, y, 241, 245, 249, 255);
+                                    }
+                                }
+                            }
+                            return id;
+                        }
+
+                        // 3) Localized Crash Damage Delta Overlays (DMG_FRONT, DMG_REAR, DMG_HEAVY)
+                        if (mode === "DMG_FRONT" || mode === "DMG_REAR" || mode === "DMG_HEAVY") {
+                            if (isDmgFront) {
+                                // Crumpled Miami-Dade Dark Forest Green Hood, Exposed V8 Engine Bay & Twisted PIT Bullbar (y = 36..63)
+                                for (let y = 36; y <= 62; y++) {
+                                    for (let x = 10; x <= 41; x++) {
+                                        // Spiderweb-cracked front windshield (y = 36..42, x = 14..37)
+                                        if (y >= 36 && y <= 42 && x >= 14 && x <= 37) {
+                                            const d1 = Math.hypot(x - 21, y - 39);
+                                            const isRing = Math.abs(d1 - 2.2) < 0.65 || Math.abs(d1 - 4.6) < 0.65;
+                                            const isRay = Math.abs((x - 21) - (y - 39)) <= 0.6 || Math.abs((x - 21) + (y - 39)) <= 0.6 || x === 21 || y === 39;
+                                            if ((isRing || isRay) && d1 <= 6.2) {
+                                                setPx(x, y, 226, 238, 248, 245);
+                                            }
+                                            continue;
+                                        }
+                                        // Crumpled Green Hood (y = 43..58)
+                                        if (y >= 43 && y <= 58) {
+                                            // Jagged inward crumple notches on front corners
+                                            if (y >= 54 && (x <= 12 || x >= 39)) {
+                                                setPx(x, y, 8, 12, 18, 220);
+                                                continue;
+                                            }
+                                            // Torn hood gap exposing dark V8 engine block & silver radiator pipes
+                                            const inEngineGap = (y >= 48 && y <= 55 && x >= 19 && x <= 32 && ((x + y) % 3 !== 0));
+                                            if (inEngineGap) {
+                                                const isPipe = (x === 22 || x === 28) && y >= 50 && y <= 54;
+                                                setPx(x, y, isPipe ? 148 : 22, isPipe ? 163 : 27, isPipe ? 184 : 36, 255);
+                                            } else {
+                                                // Buckled dark forest-green hood creases
+                                                const crease = ((x * 3 + y * 5) % 7 === 0) || y === 46 || y === 52;
+                                                setPx(x, y, crease ? 5 : 14, crease ? 28 : 68, crease ? 20 : 49, 255);
+                                            }
+                                        }
+                                        // Shattered Right Headlight & Bent/Twisted Front PIT Bullbar (y = 58..62)
+                                        if (y >= 58 && y <= 62) {
+                                            if (x >= 32 && x <= 39 && y <= 59) {
+                                                // Broken dark headlight cavity with amber shards
+                                                setPx(x, y, x === 38 ? 217 : 15, x === 38 ? 119 : 20, x === 38 ? 6 : 28, 255);
+                                            } else if (x >= 17 && x <= 34) {
+                                                // Twisted/askew black steel PIT push-bar bullbar
+                                                const skewY = x < 26 ? 60 : 59;
+                                                if (Math.abs(y - skewY) <= 1 || ((x === 20 || x === 31) && y >= 58 && y <= 61)) {
+                                                    setPx(x, y, 24, 32, 46, 255);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (isDmgRear) {
+                                // Crumpled Miami-Dade Dark Forest Green Trunk, Smashed Racetrack LED Taillight & Cracked Backlight (y = 1..17)
+                                for (let y = 1; y <= 17; y++) {
+                                    for (let x = 10; x <= 41; x++) {
+                                        // Spiderweb-cracked rear backlight window (y = 11..16, x = 15..36)
+                                        if (y >= 11 && y <= 16 && x >= 15 && x <= 36) {
+                                            const d2 = Math.hypot(x - 29, y - 13.5);
+                                            const isCrack = Math.abs(d2 - 2.5) < 0.65 || Math.abs((x - 29) - (y - 13)) <= 0.6 || x === 29;
+                                            if (isCrack && d2 <= 5.5) {
+                                                setPx(x, y, 226, 238, 248, 240);
+                                            }
+                                            continue;
+                                        }
+                                        // Crushed Rear Bumper & Half-Smashed Charger Racetrack LED Taillight (y = 1..4)
+                                        if (y >= 1 && y <= 4 && x >= 12 && x <= 39) {
+                                            if (x < 26) {
+                                                // Smashed-out left taillight housing
+                                                setPx(x, y, (x + y) % 2 === 0 ? 18 : 65, 16, 22, 255);
+                                            } else if (y >= 2 && y <= 3) {
+                                                // flickering surviving right LED bar
+                                                setPx(x, y, 220, 38, 38, 255);
+                                            }
+                                            continue;
+                                        }
+                                        // Buckled Dark Forest Green Trunk Deck & Exposed Trunk Well (y = 4..10)
+                                        if (y >= 4 && y <= 10) {
+                                            const inTrunkGap = (y >= 5 && y <= 8 && x >= 20 && x <= 31 && ((x + y) % 2 === 0));
+                                            if (inTrunkGap) {
+                                                setPx(x, y, 18, 24, 34, 255);
+                                            } else {
+                                                const crease = ((x * 5 + y * 3) % 6 === 0) || y === 6;
+                                                setPx(x, y, crease ? 5 : 13, crease ? 28 : 66, crease ? 20 : 47, 255);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (isDmgHeavy) {
+                                // Heavy Side-Impact Dents on White Doors, Scuffed Gold Badge & Crooked/Cracked Roof Lightbar (y = 18..39)
+                                for (let y = 18; y <= 39; y++) {
+                                    // Left & Right White Door Scrapes & Crumple Creases
+                                    for (const sideX of [10, 11, 12, 39, 40, 41]) {
+                                        if ((y + sideX) % 4 === 0 || (y >= 26 && y <= 31 && (sideX === 11 || sideX === 40))) {
+                                            setPx(sideX, y, 51, 65, 85, 245);
+                                        } else if (y >= 22 && y <= 35 && (sideX === 12 || sideX === 39)) {
+                                            setPx(sideX, y, 185, 195, 208, 240);
+                                        }
+                                    }
+                                }
+                                // Cracked / Askew Roof LED Lightbar (y = 25..29, x = 15..36)
+                                for (let y = 25; y <= 29; y++) {
+                                    for (let x = 15; x <= 36; x++) {
+                                        if ((x + y) % 3 === 0) {
+                                            setPx(x, y, 22, 28, 38, 250);
+                                        }
+                                    }
+                                }
+                            }
+                            return id;
+                        }
+
+                        // 4) Base Intact Miami-Dade / Vice City Dodge Charger Pursuit (mode === "BASE")
+                        //    OR Burnt-Out Destroyed VCPD Charger Hulk (mode === "WRECK")
+                        for (let y = 1; y <= 62; y++) {
+                            // Charger Coke-Bottle Muscular Body Half-Width Profile
+                            let halfW = 15; // default x = 11..40 (width 30)
+                            if (y <= 2) halfW = 13;        // tapered rear bumper (x = 13..38)
+                            else if (y <= 5) halfW = 14;   // rear corner taper (x = 12..39)
+                            else if (y >= 7 && y <= 17) halfW = 16; // muscular rear fender flare (x = 10..41)
+                            else if (y >= 18 && y <= 41) halfW = 15; // center cabin & doors (x = 11..40)
+                            else if (y >= 42 && y <= 55) halfW = 16; // muscular front Charger fender flare (x = 10..41)
+                            else if (y >= 56 && y <= 58) halfW = 15; // front nose & headlights (x = 11..40)
+                            else if (y === 59) halfW = 13; // front lower valence (x = 13..38)
+                            else if (y >= 60) halfW = 8;   // protruding front steel PIT push-bar bullbar (x = 18..33)
+
+                            const minX = Math.round(25.5 - halfW);
+                            const maxX = Math.round(25.5 + halfW);
+
+                            // Black Steel Interceptor Tire Protrusions at Rear Axle (y = 8..16) & Front Axle (y = 45..53)
+                            const inRearWheel = (y >= 8 && y <= 16);
+                            const inFrontWheel = (y >= 45 && y <= 53);
+                            if (inRearWheel || inFrontWheel) {
+                                const isHub = (y === 12 || y === 49);
+                                for (const wx of [minX - 1, minX, maxX, maxX + 1]) {
+                                    if (isWreck) {
+                                        setPx(wx, y, 18, 20, 24, 255);
+                                    } else if (isHub && (wx === minX || wx === maxX)) {
+                                        // Gleaming chrome center hubcap on black police steelie wheel!
+                                        setPx(wx, y, 226, 232, 240, 255);
+                                    } else {
+                                        setPx(wx, y, 15, 23, 38, 255);
+                                    }
+                                }
+                            }
+
+                            // Black Pursuit Side Mirrors with LED Spot-Lamps (y = 38..40)
+                            if (y >= 38 && y <= 40 && !isWreck) {
+                                const isSpot = (y === 39);
+                                setPx(minX - 2, y, isSpot ? 226 : 15, isSpot ? 232 : 23, isSpot ? 240 : 38, 255);
+                                setPx(minX - 1, y, 15, 23, 38, 255);
+                                setPx(maxX + 1, y, 15, 23, 38, 255);
+                                setPx(maxX + 2, y, isSpot ? 226 : 15, isSpot ? 232 : 23, isSpot ? 240 : 38, 255);
+                            }
+
+                            for (let x = minX; x <= maxX; x++) {
+                                const nx = (x - 25.5) / 16.0; // -1..+1 lateral normalized coordinate
+                                const absNx = Math.abs(nx);
+                                const dome = Math.max(0, 1.0 - absNx * absNx * 0.92);
+                                const isOuterEdge = (x === minX || x === maxX);
+
+                                // A) Protruding Front Black Steel PIT Push-Bar / Bullbar (y = 59..62, x = 18..33)
+                                if (y >= 59 && x >= 18 && x <= 33) {
+                                    const isUpright = (x >= 19 && x <= 21) || (x >= 30 && x <= 32);
+                                    const isCrossbar = (y === 60 || y === 61);
+                                    if (!isUpright && !isCrossbar) continue;
+                                    if (isWreck) {
+                                        setPx(x, y, 24, 26, 30, 255);
+                                    } else if (y === 61 && (x === 22 || x === 23)) {
+                                        // Embedded Left Red PIT-Bar Strobe LED
+                                        setPx(x, y, 239, 68, 68, 255);
+                                    } else if (y === 61 && (x === 28 || x === 29)) {
+                                        // Embedded Right Blue PIT-Bar Strobe LED
+                                        setPx(x, y, 59, 130, 246, 255);
+                                    } else if (isUpright && y === 59) {
+                                        // Metallic steel top bevel on bullbar uprights
+                                        setPx(x, y, 100, 116, 139, 255);
+                                    } else {
+                                        setPx(x, y, 17, 24, 39, 255);
+                                    }
+                                    continue;
+                                }
+                                if (y >= 60) continue;
+
+                                // B) Rear Bumper & Full-Width Dodge Charger LED Racetrack Tail-Light Bar (y = 1..3)
+                                if (y <= 3) {
+                                    if (y === 1) {
+                                        const isExhaust = (x === 15 || x === 16 || x === 35 || x === 36);
+                                        setPx(x, y, isExhaust ? 148 : 12, isExhaust ? 163 : 18, isExhaust ? 184 : 24, 255);
+                                    } else if (isWreck) {
+                                        setPx(x, y, (x + y) % 2 === 0 ? 28 : 45, 20, 22, 255);
+                                    } else {
+                                        // Glowing Ruby-Red Dodge Charger Racetrack LED Tail-Light Bar!
+                                        const isCenterBadge = (x >= 24 && x <= 27 && y === 2);
+                                        const isBrightRing = (y === 2 || x <= 15 || x >= 36);
+                                        if (isCenterBadge) {
+                                            setPx(x, y, 30, 41, 59, 255);
+                                        } else if (isBrightRing) {
+                                            setPx(x, y, 248, 62, 62, 255);
+                                        } else {
+                                            setPx(x, y, 185, 24, 32, 255);
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // C) Slanted Dark-Tinted Rear Backlight Window (y = 11..16)
+                                const rearWinHalfW = 10.5 + (y - 11) * 0.25;
+                                if (y >= 11 && y <= 16 && Math.abs(x - 25.5) <= rearWinHalfW) {
+                                    if (isWreck) {
+                                        // Blown-out hollow charred rear window
+                                        setPx(x, y, 12, 14, 18, 255);
+                                    } else {
+                                        const isSeal = (y === 11 || y === 16 || Math.abs(Math.abs(x - 25.5) - rearWinHalfW) < 0.9);
+                                        const isSpec = Math.abs((x - 22) - (y - 11) * 1.4) < 1.1;
+                                        if (isSeal) setPx(x, y, 10, 15, 26, 255);
+                                        else if (isSpec) setPx(x, y, 71, 85, 105, 255);
+                                        else setPx(x, y, 17, 26, 44, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // D) Wrap-Around Tinted Front Windshield (y = 35..42)
+                                const frontWinHalfW = 10.5 + (y - 35) * 0.28;
+                                if (y >= 35 && y <= 42 && Math.abs(x - 25.5) <= frontWinHalfW) {
+                                    if (isWreck) {
+                                        // Blown-out hollow charred front windshield
+                                        setPx(x, y, 11, 13, 17, 255);
+                                    } else {
+                                        const isSeal = (y === 35 || y === 42 || Math.abs(Math.abs(x - 25.5) - frontWinHalfW) < 0.9);
+                                        const isSpec = Math.abs((x - 20) - (y - 35) * 1.3) < 1.25 || Math.abs((x - 31) - (y - 35) * 1.3) < 0.85;
+                                        const isMdtGlow = (y === 40 && (x === 25 || x === 26));
+                                        if (isSeal) setPx(x, y, 10, 15, 26, 255);
+                                        else if (isMdtGlow) setPx(x, y, 16, 185, 129, 255);
+                                        else if (isSpec) setPx(x, y, 82, 100, 124, 255);
+                                        else setPx(x, y, 16, 25, 42, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // E) Tinted Side Windows & Black B-Pillar (y = 18..34, x = 13..15 & x = 36..38)
+                                if (y >= 18 && y <= 34 && ((x >= 13 && x <= 15) || (x >= 36 && x <= 38))) {
+                                    if (isWreck) {
+                                        setPx(x, y, 14, 16, 20, 255);
+                                    } else if (y === 26 || y === 27) {
+                                        // Black B-pillar between front & rear side windows
+                                        setPx(x, y, 15, 23, 38, 255);
+                                    } else {
+                                        setPx(x, y, x === 14 || x === 37 ? 30 : 17, x === 14 || x === 37 ? 41 : 25, x === 14 || x === 37 ? 59 : 42, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // F) Low-Profile Modern Aerodynamic Red/Blue LED Roof Lightbar (y = 25..29, x = 14..37)
+                                if (y >= 25 && y <= 29 && x >= 14 && x <= 37) {
+                                    if (isWreck) {
+                                        // Melted/shattered roof lightbar frame
+                                        if (y >= 26 && y <= 28 && (x + y) % 2 === 0) {
+                                            setPx(x, y, 38, 42, 50, 255);
+                                        } else {
+                                            setPx(x, y, 22, 25, 30, 255);
+                                        }
+                                        continue;
+                                    }
+                                    const isMount = (x <= 15 || x >= 36);
+                                    const isFrame = (y === 25 || y === 29);
+                                    const isCenterPod = (x >= 24 && x <= 27);
+                                    const isRedSide = (x >= 16 && x <= 23);
+                                    if (isMount || isFrame) {
+                                        setPx(x, y, 15, 23, 42, 255);
+                                    } else if (isCenterPod) {
+                                        setPx(x, y, y === 27 ? 248 : 203, y === 27 ? 250 : 213, y === 27 ? 252 : 225, 255);
+                                    } else if (isRedSide) {
+                                        const isCore = (y === 27 && x >= 17 && x <= 22);
+                                        setPx(x, y, isCore ? 255 : 220, isCore ? 115 : 30, isCore ? 128 : 48, 255);
+                                    } else {
+                                        const isCore = (y === 27 && x >= 29 && x <= 34);
+                                        setPx(x, y, isCore ? 115 : 30, isCore ? 185 : 92, 255, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // G) Front Dodge Charger Angry Scowl Grille & Xenon LED Headlights (y = 57..59)
+                                if (y >= 57 && y <= 59) {
+                                    if (isWreck) {
+                                        setPx(x, y, 16, 18, 22, 255);
+                                        continue;
+                                    }
+                                    if (x >= 19 && x <= 32) {
+                                        // Black recessed Charger crosshair grille + upright bullbar mounts
+                                        const isUpright = (x >= 19 && x <= 21) || (x >= 30 && x <= 32);
+                                        setPx(x, y, isUpright ? 30 : 11, isUpright ? 41 : 16, isUpright ? 59 : 25, 255);
+                                    } else if ((x >= 12 && x <= 18) || (x >= 33 && x <= 39)) {
+                                        // Bright Xenon-White LED Headlight DRLs
+                                        const isCore = (y === 58);
+                                        setPx(x, y, isCore ? 255 : 218, isCore ? 255 : 238, 255, 255);
+                                    } else {
+                                        // Amber corner marker reflectors
+                                        setPx(x, y, 245, 158, 11, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // H) Determine Two-Tone Livery Zone:
+                                //    - WHITE CENTER CABIN & DOORS: y = 17..41 (with angled Miami-Dade door cutlines at y=16 & y=42)
+                                //    - MIAMI-DADE DEEP FOREST GREEN FRONT HOOD (y = 42..56) & REAR TRUNK (y = 4..16)
+                                const inWhiteCabin =
+                                    (y >= 17 && y <= 40) ||
+                                    (y === 16 && absNx < 0.72) ||
+                                    (y === 41 && absNx > 0.58);
+
+                                if (inWhiteCabin) {
+                                    if (isOuterEdge) {
+                                        setPx(x, y, 18, 26, 36, 255);
+                                        continue;
+                                    }
+                                    if (isWreck) {
+                                        // Soot-stained ash-grey burned doors & roof with faded bronze badge remnant
+                                        const soot = ((x * 7 + y * 11) % 9 === 0) ? 0.65 : 1.0;
+                                        const isFadedBadge = (y >= 32 && y <= 35 && (x === 11 || x === 12 || x === 39 || x === 40));
+                                        if (isFadedBadge) {
+                                            setPx(x, y, 120, 92, 34, 255);
+                                        } else {
+                                            const gVal = Math.round((52 + 28 * dome) * soot);
+                                            setPx(x, y, gVal, gVal + 2, gVal + 5, 255);
+                                        }
+                                        continue;
+                                    }
+
+                                    // 1. Gold Miami-Dade / VCPD Shield Badge on Front White Doors (y = 32..36, x = 11..12 & x = 39..40)
+                                    const onDoorSkin = (x === 11 || x === 12 || x === 39 || x === 40);
+                                    if (onDoorSkin && y >= 32 && y <= 36) {
+                                        const isStarCenter = (y === 34 && (x === 12 || x === 39));
+                                        const isCrown = (y === 32);
+                                        if (isStarCenter) {
+                                            // Dark forest green star inside gold shield
+                                            setPx(x, y, 11, 61, 44, 255);
+                                        } else if (isCrown) {
+                                            setPx(x, y, 254, 240, 138, 255);
+                                        } else {
+                                            setPx(x, y, 234, 179, 8, 255);
+                                        }
+                                        continue;
+                                    }
+
+                                    // 2. Miami-Dade Dark Forest Green "VCPD / POLICE" Door Lettering Band (y = 20..26 on door flanks)
+                                    if (onDoorSkin && y >= 20 && y <= 26) {
+                                        if (y % 2 === 0) {
+                                            setPx(x, y, 11, 61, 44, 255);
+                                        } else {
+                                            setPx(x, y, 234, 179, 8, 255);
+                                        }
+                                        continue;
+                                    }
+
+                                    // 3. Aerial Helicopter Unit Number "26" on White Rear Roof (y = 19..23, x = 22..29)
+                                    if (y >= 19 && y <= 23 && x >= 22 && x <= 29) {
+                                        const ry = y - 19; // 0..4
+                                        // Digit '2' at x = 22..24, Digit '6' at x = 27..29
+                                        const d2 = (x >= 22 && x <= 24) && (
+                                            ry === 0 || ry === 2 || ry === 4 ||
+                                            (ry === 1 && x === 24) || (ry === 3 && x === 22)
+                                        );
+                                        const d6 = (x >= 27 && x <= 29) && (
+                                            ry === 0 || ry === 2 || ry === 4 ||
+                                            (ry === 1 && x === 27) || (ry === 3 && (x === 27 || x === 29))
+                                        );
+                                        if (d2 || d6) {
+                                            setPx(x, y, 11, 61, 44, 255);
+                                            continue;
+                                        }
+                                    }
+
+                                    // 4. Door Shutlines (y = 17, y = 27, y = 40) & 3D Glossy White Roof/Door Clearcoat
+                                    const isShutline = (y === 17 || y === 40 || (y === 27 && onDoorSkin));
+                                    if (isShutline) {
+                                        setPx(x, y, 186, 198, 212, 255);
+                                    } else {
+                                        const wR = Math.round(224 + 31 * dome);
+                                        const wG = Math.round(230 + 25 * dome);
+                                        const wB = Math.round(238 + 17 * dome);
+                                        setPx(x, y, wR, wG, wB, 255);
+                                    }
+                                } else {
+                                    // MIAMI-DADE DEEP EMERALD / FOREST GREEN FRONT HOOD & REAR TRUNK
+                                    if (isOuterEdge) {
+                                        setPx(x, y, 5, 24, 17, 255);
+                                        continue;
+                                    }
+                                    if (isWreck) {
+                                        // Charred dark forest-green & blackened steel hood/trunk
+                                        const charNoise = ((x * 5 + y * 9) % 7 === 0) ? 0.55 : 1.0;
+                                        setPx(
+                                            x,
+                                            y,
+                                            Math.round((12 + 10 * dome) * charNoise),
+                                            Math.round((24 + 18 * dome) * charNoise),
+                                            Math.round((19 + 14 * dome) * charNoise),
+                                            255
+                                        );
+                                        continue;
+                                    }
+
+                                    // 1. Black Trunk-Mounted ALPR / Police Radio Antenna Pod (y = 5..7, x = 17..20, matching photo!)
+                                    if (y >= 5 && y <= 7 && x >= 17 && x <= 20) {
+                                        const isPodTop = (y === 6 && (x === 18 || x === 19));
+                                        setPx(x, y, isPodTop ? 51 : 15, isPodTop ? 65 : 23, isPodTop ? 85 : 38, 255);
+                                        continue;
+                                    }
+
+                                    // 2. Gold "EMERGENCY 911" Rear Quarter Decal (y = 6..9) & Gold "1126A" Front Fender Unit Number (y = 43..46)
+                                    const onFlankDecal = (x === 11 || x === 12 || x === 39 || x === 40);
+                                    if (onFlankDecal && ((y >= 6 && y <= 9 && y % 2 === 0) || (y >= 43 && y <= 46 && (y + x) % 2 === 0))) {
+                                        setPx(x, y, 250, 204, 21, 255);
+                                        continue;
+                                    }
+
+                                    // 3.Amber Front Fender Side-Marker Light (y = 55..56)
+                                    if ((y === 55 || y === 56) && (x === 11 || x === 40)) {
+                                        setPx(x, y, 245, 158, 11, 255);
+                                        continue;
+                                    }
+
+                                    // 4. Sculpted Dodge Charger Scat-Pack Hood Power-Bulge Ribs & Recessed Central Air Vent (y = 45..55)
+                                    const isHoodVent = (y >= 47 && y <= 50 && x >= 23 && x <= 28);
+                                    const isHoodRib = (y >= 44 && y <= 55 && (x === 19 || x === 20 || x === 31 || x === 32));
+                                    if (isHoodVent) {
+                                        setPx(x, y, 6, 30, 22, 255);
+                                    } else if (isHoodRib) {
+                                        // Bright emerald metallic specular ridge along the Charger hood bulge
+                                        setPx(x, y, 28, 118, 86, 255);
+                                    } else {
+                                        // Rich Miami-Dade Emerald Forest Green metallic clearcoat (#0b3d2c -> #196b4e)
+                                        const gR = Math.round(9 + 16 * dome);
+                                        const gG = Math.round(52 + 54 * dome);
+                                        const gB = Math.round(37 + 39 * dome);
+                                        setPx(x, y, gR, gG, gB, 255);
+                                    }
+                                }
+                            }
+                        }
+                        return id;
+                    };
+
+                    // Paint Base & Remaps[0..4] + Wrecked VCPD Charger at Remaps[5] ([1604, 130, 52, 64])
+                    const baseImg = buildVcpdChargerState("BASE");
+                    ctx.putImageData(baseImg, 1280, 130);
+                    for (const rx of [1334, 1388, 1442, 1496, 1550]) {
+                        ctx.putImageData(baseImg, rx, 130);
+                    }
+                    const wreckImg = buildVcpdChargerState("WRECK");
+                    ctx.putImageData(wreckImg, 1604, 130);
+                    meta.sprites.objects["veh_vcpd_wreck"] = [1604, 130, 52, 64];
+                    if (meta.sprites.wrecked) {
+                        meta.sprites.wrecked["veh_vcpd_wreck"] = [1604, 130, 52, 64];
+                    }
+
+                    // Paint Alternating Siren States (sirens[0..1])
+                    ctx.putImageData(buildVcpdChargerState("SIREN_0"), 1658, 130);
+                    ctx.putImageData(buildVcpdChargerState("SIREN_1"), 1712, 130);
+
+                    // Paint 4 Progressive Door-Swing States (doors[0..3])
+                    ctx.putImageData(buildVcpdChargerState("DOOR_0"), 1766, 130);
+                    ctx.putImageData(buildVcpdChargerState("DOOR_1"), 1820, 130);
+                    ctx.putImageData(buildVcpdChargerState("DOOR_2"), 1874, 130);
+                    ctx.putImageData(buildVcpdChargerState("DOOR_3"), 1928, 130);
+
+                    // Paint 3 Localized Crash Damage States (front, rear, heavy)
+                    ctx.putImageData(buildVcpdChargerState("DMG_FRONT"), 1982, 130);
+                    ctx.putImageData(buildVcpdChargerState("DMG_REAR"), 2, 196);
+                    ctx.putImageData(buildVcpdChargerState("DMG_HEAVY"), 56, 196);
+                }
+
+                // =========================================================================
                 // 6K. GTA 6 LEONIDA DIVERSE FLORA & ARBORETUM SPRITES
                 // True 3ds Max / Raytraced 1999 DMA Design baked flora (y = 3480 in gta1_sprites.png)
                 // (10 distinct plant/tree species: palm_tree, fan_palm, swamp_cypress,
@@ -6296,6 +6896,10 @@ class RetroRenderer {
                     rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_escooter_wreck"]) ||
                         this.gta1Meta.sprites.objects["veh_escooter_wreck"] ||
                         this.gta1Meta.sprites.objects["veh_escooter"];
+                } else if (v.specKey === "VCPD_CRUISER" || mapInfo.sprId === "73") {
+                    rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_vcpd_wreck"]) ||
+                        this.gta1Meta.sprites.objects["veh_vcpd_wreck"] ||
+                        this.gta1Meta.sprites.wrecked["979"];
                 } else {
                     let wId = "979";
                     if (mapInfo.isTank) {
@@ -6493,27 +7097,58 @@ class RetroRenderer {
                 );
                 const isReversing = isDriven && (v.speed || 0) < -10;
 
+                const isVcpdCharger = (v.specKey === "VCPD_CRUISER" || mapInfo.sprId === "73");
+
                 for (const lat of lampOffsets) {
                     // 1) Front Headlight Lenses (bright xenon-white when driven at dusk/night, crisp silver-blue glass housing by day)
-                    const fx = v.x + cosA * frontDist - sinA * lat;
-                    const fy = v.y + sinA * frontDist + cosA * lat;
-                    if (isDriven && nfGlobal > 0.15) {
-                        this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 3.0, 2.5, v.angle, 1.0, 0.98, 0.88, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
-                    } else {
-                        this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 2.4, 2.1, v.angle, 0.82, 0.91, 0.98, 0.82, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    //    If front-dented on VCPD Charger, right headlight (lat > 0) is shattered out!
+                    const rightLampBroken = isVcpdCharger && (v.frontDented || v.heavyDented) && lat > 0;
+                    if (!rightLampBroken) {
+                        const fx = v.x + cosA * frontDist - sinA * lat;
+                        const fy = v.y + sinA * frontDist + cosA * lat;
+                        if (isDriven && nfGlobal > 0.15) {
+                            this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 3.0, 2.5, v.angle, 1.0, 0.98, 0.88, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        } else {
+                            this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 2.4, 2.1, v.angle, 0.82, 0.91, 0.98, 0.82, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        }
                     }
 
                     // 2) Rear Taillight / Brake / Reverse Lenses
-                    const rx = v.x + cosA * rearDist - sinA * lat;
-                    const ry = v.y + sinA * rearDist + cosA * lat;
-                    if (isReversing) {
-                        this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 3.2, 2.4, v.angle, 0.95, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
-                    } else if (isBraking || (isDriven && nfGlobal > 0.15)) {
-                        this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 3.4, 2.6, v.angle, 1.0, 0.08, 0.14, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
-                    } else {
-                        // Unlit dark ruby taillight housing by day / when parked
-                        this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 2.5, 2.1, v.angle, 0.58, 0.07, 0.11, 0.85, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    const leftTailBroken = isVcpdCharger && (v.rearDented || v.heavyDented) && lat < 0;
+                    if (!leftTailBroken) {
+                        const rx = v.x + cosA * rearDist - sinA * lat;
+                        const ry = v.y + sinA * rearDist + cosA * lat;
+                        if (isReversing) {
+                            this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 3.2, 2.4, v.angle, 0.95, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        } else if (isBraking || (isDriven && nfGlobal > 0.15)) {
+                            this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 3.4, 2.6, v.angle, 1.0, 0.08, 0.14, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        } else {
+                            // Unlit dark ruby taillight housing by day / when parked
+                            this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 2.5, 2.1, v.angle, 0.58, 0.07, 0.11, 0.85, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        }
                     }
+                }
+
+                // 3) Full-Width Dodge Charger LED Racetrack Tail-Light Bar on VCPD Cruiser!
+                if (isVcpdCharger && (isBraking || (isDriven && nfGlobal > 0.12))) {
+                    const rearBroken = Boolean(v.rearDented || v.heavyDented);
+                    const barLatOff = rearBroken ? (latSpread * 0.45) : 0;
+                    const barSpan = rearBroken ? (latSpread * 1.05) : (latSpread * 2.10);
+                    const bx = v.x + cosA * (rearDist - 0.6) - sinA * barLatOff;
+                    const by = v.y + sinA * (rearDist - 0.6) + cosA * barLatOff;
+                    this.pushSolidQuad3D(
+                        bx,
+                        by,
+                        vz + airZ - totalPitchZ + 0.013,
+                        isBraking ? 2.4 : 1.8,
+                        barSpan,
+                        v.angle,
+                        1.0,
+                        isBraking ? 0.16 : 0.08,
+                        0.18,
+                        isBraking ? 0.96 : 0.86,
+                        SPRITE_DRAW_ORDER.CAR_ROOF
+                    );
                 }
             }
 
