@@ -5262,6 +5262,171 @@ class WorldObjectEngine {
             }
         }
 
+        // 19B. VICE CITY MONUMENTAL 3D BRIDGES NORTH OF STAR ISLAND:
+        //      (1) Star Island North Channel Through-Truss & Art Deco Bascule Bridge (c=345..346, r=147..157)
+        //      (2) North Prawn Island Channel Steel Truss Bridge (c=345..346, r=77..83)
+        //      (3) Grand Vice City North Bridge / Links & Julia Tuttle Cable-Stayed Suspension Causeway (r=72..75, c=298..418)
+        //      (4) Star Island / Venetian Causeway West & East Portal Bridges (r=172..175, c=308..323 & c=367..417)
+        {
+            const bz = 2.0;
+            const concCol = [0.84, 0.86, 0.90];
+            const steelCol = [0.74, 0.80, 0.88];
+            const darkSteel = [0.46, 0.52, 0.60];
+            const cableCol = [0.90, 0.93, 0.98];
+            const neonCyan = [0.12, 0.92, 0.98];
+            const neonPink = [0.98, 0.24, 0.68];
+            const decoCream = [0.94, 0.90, 0.82];
+            const decoTeal = [0.22, 0.78, 0.74];
+
+            // --- (1) STAR ISLAND NORTH CHANNEL 3D THROUGH-TRUSS & ART DECO BASCULE BRIDGE (c=346.0, r=147.2..156.8) ---
+            const snX = 346.0 * TILE_SIZE;
+            const snY = 152.0 * TILE_SIZE;
+            const snLen = 9.4 * TILE_SIZE; // 601.6px overwater span (r=147.3..156.7)
+            for (const sideX of [-74, 74]) {
+                // 5 Marine Cylindrical Concrete Pilings + Pier Caps in Biscayne Bay along each outer edge
+                for (let pyOff = -240; pyOff <= 240; pyOff += 120) {
+                    emitCylinder3D(snX, snY, sideX, pyOff, 6.5, 5.8, bz - 0.08, bz + 0.10, 10, concCol, 2, false);
+                    emitTileBox3D(snX, snY, 1, 0, sideX, pyOff, 14, 18, bz + 0.06, bz + 0.18, 177, 177, 71, concCol, false);
+                }
+                // Continuous Raised Concrete Jersey Barrier + Open-Lattice S363 Steel Through-Truss Side Girders
+                emitTileBox3D(snX, snY, 1, 0, sideX, 0, 10, snLen, bz, bz + 0.18, 177, 177, 71, concCol, false);
+                emitTileBox3D(snX, snY, 1, 0, sideX, 0, 9, snLen - 16, bz + 0.18, bz + 1.16, 363, 363, 64, steelCol, false);
+                emitTileBox3D(snX, snY, 1, 0, sideX, 0, 12, snLen, bz + 1.16, bz + 1.28, 250, 250, 64, concCol, false);
+            }
+            // 3 Overhead Steel Lattice Portal Cross-Beams (bz+1.16..1.32 — 100% clear for all trucks & buses!) + Neon Vice City Bridge Tubes
+            for (const pyOff of [-210, 0, 210]) {
+                emitTileBox3D(snX, snY, 1, 0, 0, pyOff, 160, 16, bz + 1.16, bz + 1.32, 250, 363, 64, steelCol, false);
+                emitSolidBox3D(snX, snY, 1, 0, 0, pyOff - 8.5, 136, 2.5, bz + 1.21, bz + 1.27, pyOff === 0 ? neonPink : neonCyan, 7);
+                emitSolidBox3D(snX, snY, 1, 0, 0, pyOff + 8.5, 136, 2.5, bz + 1.21, bz + 1.27, pyOff === 0 ? neonPink : neonCyan, 7);
+            }
+            // Twin Art Deco Bascule Bridge-Tender Control Towers at the Star Island North Gate (r=156.2) & Prawn South Gate (r=147.8)
+            for (const endY of [-256, 256]) {
+                for (const sideX of [-88, 88]) {
+                    emitTileBox3D(snX, snY, 1, 0, sideX, endY, 22, 22, bz, bz + 0.92, 177, 177, 71, decoCream, false);
+                    emitSolidBox3D(snX, snY, 1, 0, sideX, endY, 24, 24, bz + 0.92, bz + 1.00, decoTeal, 1);
+                    emitTileBox3D(snX, snY, 1, 0, sideX, endY, 20, 20, bz + 1.00, bz + 1.34, 199, 199, 71, [0.95, 0.97, 1.00], false);
+                    emitHippedRoof3D(snX, snY, 1, 0, sideX, endY, 26, 26, bz + 1.34, 0.20, "roof_terracotta", decoTeal, [0.16, 0.58, 0.56]);
+                    emitSolidBox3D(snX, snY, 1, 0, sideX, endY, 4, 4, bz + 1.54, bz + 1.64, neonPink, 7);
+                }
+            }
+
+            // --- (2) NORTH PRAWN ISLAND CHANNEL 3D STEEL TRUSS BRIDGE (c=346.0, r=77.2..82.8) ---
+            const pnY = 80.0 * TILE_SIZE;
+            const pnLen = 5.4 * TILE_SIZE; // 345.6px overwater span
+            for (const sideX of [-74, 74]) {
+                for (const pyOff of [-110, 0, 110]) {
+                    emitCylinder3D(snX, pnY, sideX, pyOff, 6.0, 5.4, bz - 0.08, bz + 0.10, 10, concCol, 2, false);
+                }
+                emitTileBox3D(snX, pnY, 1, 0, sideX, 0, 10, pnLen, bz, bz + 0.18, 177, 177, 71, concCol, false);
+                emitTileBox3D(snX, pnY, 1, 0, sideX, 0, 8, pnLen - 12, bz + 0.18, bz + 1.12, 363, 363, 64, steelCol, false);
+                emitTileBox3D(snX, pnY, 1, 0, sideX, 0, 11, pnLen, bz + 1.12, bz + 1.24, 250, 250, 64, concCol, false);
+            }
+            for (const pyOff of [-115, 115]) {
+                emitTileBox3D(snX, pnY, 1, 0, 0, pyOff, 158, 14, bz + 1.12, bz + 1.28, 250, 363, 64, steelCol, false);
+                emitSolidBox3D(snX, pnY, 1, 0, 0, pyOff, 134, 3.0, bz + 1.28, bz + 1.33, neonCyan, 7);
+            }
+
+            // --- (3) GRAND VICE CITY NORTH BRIDGE (LINKS / JULIA TUTTLE 3D CABLE-STAYED SUSPENSION CAUSEWAY, r=72..75, c=298..418) ---
+            const nbY = 74.0 * TILE_SIZE;
+            const nbSpans = [
+                { c0: 298.5, c1: 342.5 }, // West Biscayne Bay Span (2,816px)
+                { c0: 349.5, c1: 417.5 }  // East Biscayne Bay Span (4,352px)
+            ];
+            for (const sp of nbSpans) {
+                const x0 = sp.c0 * TILE_SIZE;
+                const x1 = sp.c1 * TILE_SIZE;
+                const spanW = x1 - x0;
+                const midX = (x0 + x1) * 0.5;
+                for (const sideY of [-136, 136]) {
+                    // Continuous Concrete Jersey Barrier + Open-Lattice S250 Steel Side Guardrail Girder
+                    emitTileBox3D(midX, nbY, 1, 0, 0, sideY, spanW, 10, bz, bz + 0.16, 177, 177, 71, concCol, false);
+                    emitTileBox3D(midX, nbY, 1, 0, 0, sideY, spanW, 8, bz + 0.16, bz + 0.34, 250, 250, 64, steelCol, false);
+                    // Marine Cylindrical Concrete Bridge Piers every 4 tiles (256px)
+                    for (let px = x0 + 64; px <= x1 - 64; px += 256) {
+                        emitCylinder3D(px, nbY, 0, sideY, 6.5, 5.8, bz - 0.08, bz + 0.10, 10, concCol, 2, false);
+                    }
+                }
+            }
+
+            // 3 Monumental Twin-Tower Cable-Stayed H-Pylons on the Grand North Bridge (c=320.5 West, c=368.0 Mid-East, c=398.0 Far-East)
+            const northBridgePylons = [320.5 * TILE_SIZE, 368.0 * TILE_SIZE, 398.0 * TILE_SIZE];
+            for (let pi = 0; pi < northBridgePylons.length; pi++) {
+                const px = northBridgePylons[pi];
+                const isCenterTower = (pi === 1);
+                const towerTopZ = isCenterTower ? (bz + 2.55) : (bz + 2.35);
+
+                for (const sideY of [-146, 146]) {
+                    // Marine Concrete Caisson Pier Base in Biscayne Bay
+                    emitOctagonPad3D(px, nbY, 0, sideY, 22, 20, 19, 17, 0.28, bz - 0.06, bz + 0.24, concCol, darkSteel, 2, 177, 71);
+                    // Lower & Upper Monumental Stepped Concrete/Steel Pylon Legs
+                    emitTileBox3D(px, nbY, 1, 0, 0, sideY, 24, 22, bz + 0.24, bz + 1.35, 177, 177, 71, concCol, false);
+                    emitTileBox3D(px, nbY, 1, 0, 0, sideY, 18, 18, bz + 1.35, towerTopZ, 363, 177, 71, [0.92, 0.94, 0.98], false);
+                    // Vertical Neon Accent Strip on Each Pylon Face + Red Aviation Spire Beacon
+                    emitSolidBox3D(px, nbY, 1, 0, 0, sideY + (sideY < 0 ? 11.5 : -11.5), 4.5, 2.5, bz + 0.45, towerTopZ - 0.12, (pi % 2 === 0) ? neonCyan : neonPink, 7);
+                    emitCylinder3D(px, nbY, 0, sideY, 3.2, 1.8, towerTopZ, towerTopZ + 0.24, 8, darkSteel, 3, false);
+                    emitSolidBox3D(px, nbY, 1, 0, 0, sideY, 5.5, 5.5, towerTopZ + 0.24, towerTopZ + 0.32, [1.0, 0.16, 0.22], 7);
+
+                    // Symmetrical 3D Diagonal Steel Stay-Cable Fans radiating West & East from the Pylon down to the Bridge Deck!
+                    for (const dirX of [-1, 1]) {
+                        for (let ci = 1; ci <= 4; ci++) {
+                            const reach = ci * 64; // 64px, 128px, 192px, 256px
+                            const anchorZ = towerTopZ - 0.14 - (4 - ci) * 0.16;
+                            const deckZ = bz + 0.34;
+                            const segs = 5;
+                            for (let s = 0; s < segs; s++) {
+                                const t0 = s / segs;
+                                const t1 = (s + 1) / segs;
+                                const tm = (t0 + t1) * 0.5;
+                                const segX = dirX * (10 + reach * tm);
+                                const segW = (reach / segs) + 3.0;
+                                const zLow = anchorZ + (deckZ - anchorZ) * t1;
+                                const zHigh = anchorZ + (deckZ - anchorZ) * t0 + 0.035;
+                                emitSolidBox3D(px, nbY, 1, 0, segX, sideY * 0.94, segW, 2.6, zLow, zHigh, cableCol, 3);
+                            }
+                        }
+                    }
+                }
+
+                // Lower & Upper Overhead Cross-Portal Struts spanning across the 4-lane highway (bz+1.26..1.42 & towerTopZ-0.28..towerTopZ-0.12)
+                emitTileBox3D(px, nbY, 1, 0, 0, 0, 22, 308, bz + 1.26, bz + 1.42, 250, 363, 64, steelCol, false);
+                emitTileBox3D(px, nbY, 1, 0, 0, 0, 16, 304, towerTopZ - 0.28, towerTopZ - 0.12, 177, 177, 71, concCol, false);
+                // Neon Vice City Horizontal Portal Light Bars + Emerald FDOT Highway Sign Panels
+                emitSolidBox3D(px, nbY, 1, 0, -12, 0, 2.5, 268, towerTopZ - 0.23, towerTopZ - 0.17, neonCyan, 7);
+                emitSolidBox3D(px, nbY, 1, 0,  12, 0, 2.5, 268, towerTopZ - 0.23, towerTopZ - 0.17, neonPink, 7);
+                for (const signY of [-56, 56]) {
+                    emitSolidBox3D(px, nbY, 1, 0, 0, signY, 9, 76, bz + 1.18, bz + 1.50, [0.96, 0.98, 1.00], 1);
+                    emitSolidBox3D(px, nbY, 1, 0, 0, signY, 10.5, 70, bz + 1.21, bz + 1.47, [0.04, 0.48, 0.34], 1);
+                }
+            }
+
+            // --- (4) STAR ISLAND / VENETIAN CAUSEWAY WEST & EAST PORTAL BRIDGES (r=172..175, c=308..323 & c=367..417) ---
+            const vcY = 174.0 * TILE_SIZE;
+            const vcSpans = [
+                { c0: 308.0, c1: 323.5, towerC: 315.5 }, // West Star Island Causeway Channel
+                { c0: 367.0, c1: 417.5, towerC: 392.0 }  // East Star Island Causeway Channel
+            ];
+            for (const vs of vcSpans) {
+                const x0 = vs.c0 * TILE_SIZE;
+                const x1 = vs.c1 * TILE_SIZE;
+                const spanW = x1 - x0;
+                const midX = (x0 + x1) * 0.5;
+                const tx = vs.towerC * TILE_SIZE;
+                for (const sideY of [-136, 136]) {
+                    emitTileBox3D(midX, vcY, 1, 0, 0, sideY, spanW, 10, bz, bz + 0.16, 177, 177, 71, decoCream, false);
+                    emitTileBox3D(midX, vcY, 1, 0, 0, sideY, spanW, 8, bz + 0.16, bz + 0.32, 250, 250, 64, steelCol, false);
+                    for (let px = x0 + 64; px <= x1 - 64; px += 256) {
+                        emitCylinder3D(px, vcY, 0, sideY, 6.0, 5.5, bz - 0.08, bz + 0.10, 10, concCol, 2, false);
+                    }
+                    // Art Deco Venetian Causeway Portal Pylon Towers
+                    emitTileBox3D(tx, vcY, 1, 0, 0, sideY, 22, 20, bz, bz + 1.58, 177, 177, 71, decoCream, false);
+                    emitSolidBox3D(tx, vcY, 1, 0, 0, sideY, 24, 22, bz + 1.58, bz + 1.68, decoTeal, 1);
+                    emitSolidBox3D(tx, vcY, 1, 0, 0, sideY, 5, 5, bz + 1.68, bz + 1.78, neonPink, 7);
+                }
+                emitTileBox3D(tx, vcY, 1, 0, 0, 0, 18, 292, bz + 1.24, bz + 1.40, 250, 363, 64, steelCol, false);
+                emitSolidBox3D(tx, vcY, 1, 0, 0, 0, 20, 268, bz + 1.38, bz + 1.44, neonCyan, 7);
+            }
+        }
+
         // 20A. OCEAN DRIVE 3D ART DECO HOTEL FACADE ENHANCEMENTS (Architectural Limestone Eyebrows, Stepped Stone Crowns, Blade Signs & Canvas Awnings)
         if (this.map && typeof this.map.getBlockInfo === "function") {
             const stoneTrimPal = [
