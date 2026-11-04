@@ -500,23 +500,23 @@ class LeonidaGame {
 
         const parked = [
 
-            // --- A. Ocean Drive & Hotel Dixon Spawn: Curb-parked Hero Tulip, Exotics & Motorcycles along the Curbside Edge (x=218.18, clear of sidewalks & road lanes 214..217!) ---
+            // --- A. Ocean Drive & Collins Ave: Keep sidewalks 100% clear for pedestrians & monks; exotics & bikes cruise in live road traffic, while the Hero Tulip is parked in the dedicated off-sidewalk Beachfront Bay (col 452.65)! ---
 
-            { spec: "STINGER_CABRIO", c: 218.18, r: 136.5, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "STINGER_CABRIO", c: 217.5, r: 136.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "TURISMO_CABRIO", c: 218.18, r: 139.8, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "TURISMO_CABRIO", c: 214.5, r: 138.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "TULIP_MUSCLE", c: 218.18, r: 143.5, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
+            { spec: "TULIP_MUSCLE", c: 452.65, r: 282.5, raw512: true, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
 
-            { spec: "SUPERBIKE", c: 218.18, r: 146.2, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "SUPERBIKE", c: 216.5, r: 141.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "HARLEY_BIKE", c: 218.18, r: 148.8, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "HARLEY_BIKE", c: 215.5, r: 148.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "BANSHEE_GT", c: 218.18, r: 151.8, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "BANSHEE_GT", c: 217.5, r: 158.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "CHALLENGER_RT", c: 218.18, r: 155.2, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "CHALLENGER_RT", c: 206.5, r: 143.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "PORKA_TURBO", c: 218.18, r: 158.5, a: -Math.PI * 0.5, z: 2.0 },
+            { spec: "PORKA_TURBO", c: 207.5, r: 150.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
             // Active moving traffic on Ocean Drive & Collins Ave (never parked stationary in the road!)
 
@@ -638,18 +638,18 @@ class LeonidaGame {
 
             { spec: "MONSTER_BUGGY", c: 468.5, r: 274.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            // --- M. Ocean Drive & Lummus Park Boardwalk E-Scooters & BMX Cruisers (appended at end to preserve legacy parked_N IDs) ---
-            { id: "micromob_0", spec: "E_SCOOTER", c: 213.82, r: 147.6, a: Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_1", spec: "BMX_BIKE", c: 213.82, r: 150.8, a: -Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_2", spec: "E_SCOOTER", c: 218.18, r: 150.2, a: -Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_3", spec: "BMX_BIKE", c: 218.18, r: 153.4, a: -Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_4", spec: "E_SCOOTER", c: 450.8, r: 231.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_5", spec: "BMX_BIKE", c: 450.8, r: 238.5, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_6", spec: "E_SCOOTER", c: 450.8, r: 244.0, raw512: true, a: Math.PI * 0.5, z: 2.0 },
+            // --- M. Ocean Drive & Lummus Park E-Scooters & BMX Cruisers (cruising in traffic + 2 parked in off-sidewalk Beachfront Bay at col 452.65) ---
+            { id: "micromob_0", spec: "E_SCOOTER", c: 214.5, r: 145.8, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_1", spec: "BMX_BIKE", c: 215.5, r: 151.8, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_2", spec: "E_SCOOTER", c: 217.5, r: 143.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_3", spec: "BMX_BIKE", c: 216.5, r: 152.4, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_4", spec: "E_SCOOTER", c: 452.65, r: 280.2, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_5", spec: "BMX_BIKE", c: 452.65, r: 284.8, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_6", spec: "E_SCOOTER", c: 207.5, r: 146.0, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_7", spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_8", spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_9", spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-            { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 139.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" }
+            { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 135.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" }
 
         ];
 
@@ -724,25 +724,25 @@ class LeonidaGame {
 
             { c: 213.5, r: 158.6, a: Math.PI * 0.5, type: "civ2" },
 
-            { c: 219.5, r: 140.5, a: Math.PI * 0.5, type: "vc_tommy" },
+            { c: 218.5, r: 140.5, a: Math.PI * 0.5, type: "vc_tommy" },
 
-            { c: 220.2, r: 144.8, a: -Math.PI * 0.5, type: "bikini_pink" },
+            { c: 221.5, r: 144.8, a: -Math.PI * 0.5, type: "bikini_pink" },
 
-            { c: 219.5, r: 148.6, a: Math.PI * 0.5, type: "vc_crockett" },
+            { c: 218.5, r: 148.6, a: Math.PI * 0.5, type: "vc_crockett" },
 
-            { c: 220.2, r: 152.4, a: -Math.PI * 0.5, type: "vc_hawaiian_red" },
+            { c: 221.5, r: 152.4, a: -Math.PI * 0.5, type: "vc_hawaiian_red" },
 
-            { c: 219.5, r: 156.8, a: Math.PI * 0.5, type: "vc_jogger" },
+            { c: 218.5, r: 156.8, a: Math.PI * 0.5, type: "vc_jogger" },
 
-            { c: 219.5, r: 142.5, a: Math.PI * 0.5, type: "g2_civ_aqua" },
+            { c: 221.5, r: 142.5, a: Math.PI * 0.5, type: "g2_civ_aqua" },
 
-            { c: 219.5, r: 145.5, a: Math.PI * 0.5, type: "bikini_cyan" },
+            { c: 218.5, r: 145.5, a: Math.PI * 0.5, type: "bikini_cyan" },
 
-            { c: 219.5, r: 150.2, a: -Math.PI * 0.5, type: "vc_tourist" },
+            { c: 221.5, r: 150.2, a: -Math.PI * 0.5, type: "vc_tourist" },
 
-            { c: 219.5, r: 154.5, a: -Math.PI * 0.5, type: "g2_civ_pink" },
+            { c: 218.5, r: 154.5, a: -Math.PI * 0.5, type: "g2_civ_pink" },
 
-            { c: 219.5, r: 158.2, a: Math.PI * 0.5, type: "vc_tubbs" },
+            { c: 221.5, r: 158.2, a: Math.PI * 0.5, type: "vc_tubbs" },
 
             // Lummus Park Oceanfront Boardwalk Rollerbladers & Kids (c = 451.5 raw512, gliding along the beach promenade!)
             { c: 451.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "vc_jogger",     isRollerblader: true },
@@ -759,8 +759,8 @@ class LeonidaGame {
             // Ocean Drive & Lummus Park Kids / Teenagers with families
             { c: 213.5, r: 146.2, a: Math.PI * 0.5,  type: "kid_boy_cap",   isChild: true },
             { c: 213.5, r: 150.1, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true },
-            { c: 219.5, r: 147.2, a: Math.PI * 0.5,  type: "kid_skater",    isRollerblader: true, isChild: true },
-            { c: 220.2, r: 151.0, a: -Math.PI * 0.5, type: "kid_beach",     isChild: true },
+            { c: 218.5, r: 147.2, a: Math.PI * 0.5,  type: "kid_skater",    isRollerblader: true, isChild: true },
+            { c: 221.5, r: 151.0, a: -Math.PI * 0.5, type: "kid_beach",     isChild: true },
             { c: 222.8, r: 145.8, a: Math.PI * 0.5,  type: "kid_beach",     isChild: true, missionTag: "BEACH" },
             { c: 223.8, r: 150.8, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true, missionTag: "BEACH" },
 
@@ -1141,9 +1141,16 @@ class LeonidaGame {
                     czList.some(cz => Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54)) ||
                     beachStructs.some(bs => Math.hypot(bs.x - px, bs.y - py) < 76);
 
-                if ((nav && nav.groundType === GROUND_TYPE.ROAD) || hitsClearZone(v.x, v.y)) {
+                if (nav && nav.groundType === GROUND_TYPE.ROAD) {
+                    // Never snap a road vehicle onto a pedestrian sidewalk: convert it to live moving traffic!
+                    v.driver = "AI_TRAFFIC";
+                    v.isStaticParked = false;
+                    v.x = (bx + 0.5) * TILE_SIZE;
+                    v.y = (by + 0.5) * TILE_SIZE;
+                    v.angle = this.map.getAlignedRoadAngle(bx, by, v.angle, v.z);
+                } else if (hitsClearZone(v.x, v.y)) {
 
-                    // Never leave a driverless parked car blocking an active road lane or underneath a 3D billboard/landmark!
+                    // Never leave a driverless parked car underneath a 3D billboard/landmark or overlapping another parked vehicle!
 
                     for (let r = 1; r <= 4; r++) {
 
@@ -1153,13 +1160,18 @@ class LeonidaGame {
 
                             for (let dx = -r; dx <= r && !foundCurb; dx++) {
 
-                                const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z);
+                                const cbx = bx + dx;
+                                const cby = by + dy;
+                                // Never shift parked cars onto narrow Ocean Drive sidewalks (col 443, 448, 451)
+                                if (cbx === 443 || cbx === 448 || cbx === 451) continue;
+
+                                const nb = this.map.getNavigationBlock(cbx, cby, v.z);
 
                                 if (nb && (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)) {
 
-                                    const candX = (bx + dx + 0.5) * TILE_SIZE;
+                                    const candX = (cbx + 0.5) * TILE_SIZE;
 
-                                    const candY = (by + dy + 0.5) * TILE_SIZE;
+                                    const candY = (cby + 0.5) * TILE_SIZE;
 
                                     if (typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(candX, candY, 24)) {
 
@@ -1172,6 +1184,9 @@ class LeonidaGame {
                                         continue;
 
                                     }
+
+                                    const hitsOtherVeh = this.vehicles.some(other => other !== v && Math.hypot(other.x - candX, other.y - candY) < 56);
+                                    if (hitsOtherVeh) continue;
 
                                     v.x = candX;
 
@@ -1863,13 +1878,16 @@ class LeonidaGame {
 
     getMonkTrackPosition(s) {
 
-        const xA = mx256(218.62) * TILE_SIZE;
+        // Walk strictly along paved Lummus Park walkways:
+        // xA = col 448.5 (East Curbside Coral Promenade), xB = col 451.5 (Oceanfront Boardwalk Promenade),
+        // yTop = row 280.6 & yBottom = row 294.6 (paved Lummus Park crosswalks where y % 14 < 2, completely off the green grass!)
+        const xA = 448.5 * TILE_SIZE;
 
-        const xB = mx256(219.62) * TILE_SIZE;
+        const xB = 451.5 * TILE_SIZE;
 
-        const yTop = my256(143.5) * TILE_SIZE;
+        const yTop = 280.6 * TILE_SIZE;
 
-        const yBottom = my256(155.0) * TILE_SIZE;
+        const yBottom = 294.6 * TILE_SIZE;
 
         const segTop = xB - xA;
 
@@ -5794,6 +5812,24 @@ class LeonidaGame {
             } else if (this.resolveCircleVehicleCollision(p2x, p2y, 8, pz, ignoreVeh).hit) {
 
                 score -= 24;
+
+            }
+
+            if (this.map.resolveCircleFloraCollision && this.map.resolveCircleFloraCollision(p1x, p1y, 8).hit) {
+
+                score -= 42;
+
+            }
+
+            if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && this.map.getNavigationBlock) {
+
+                const fNav = this.map.getNavigationBlock(Math.floor(p1x / TILE_SIZE), Math.floor(p1y / TILE_SIZE), pz);
+
+                if (fNav && fNav.groundType === GROUND_TYPE.ROAD) {
+
+                    score -= 48;
+
+                }
 
             }
 
@@ -10453,7 +10489,11 @@ class LeonidaGame {
 
                     ped.y += Math.sin(ped.angle) * 75 * dt;
 
-                    this.resolveCircleVehicleCollision(ped, ped.radius || 9, null);
+                    const vColPanic = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0, null);
+                    if (vColPanic.hit) {
+                        ped.x = vColPanic.x;
+                        ped.y = vColPanic.y;
+                    }
 
                     ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
 
@@ -10481,9 +10521,7 @@ class LeonidaGame {
 
                 if (dTarget > 4) {
 
-                    const rawAngle = Math.atan2(targetPos.y - ped.y, targetPos.x - ped.x);
-
-                    ped.angle = this.steerPedWithObstacleFeelers(ped.x, ped.y, rawAngle, 26, null);
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, targetPos.x, targetPos.y, null);
 
                     const catchSpeed = Math.min(62, Math.max(34, dTarget * 3.5));
 
@@ -10501,7 +10539,11 @@ class LeonidaGame {
 
                 }
 
-                this.resolveCircleVehicleCollision(ped, ped.radius || 9, null);
+                const vColMonk = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0, null);
+                if (vColMonk.hit) {
+                    ped.x = vColMonk.x;
+                    ped.y = vColMonk.y;
+                }
 
                 ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
 
@@ -11299,7 +11341,7 @@ class LeonidaGame {
 
                     const ty = (ped.targetBy + 0.5) * TILE_SIZE;
 
-                    ped.angle = Math.atan2(ty - ped.y, tx - ped.x);
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
 
                 }
 
@@ -11453,7 +11495,10 @@ class LeonidaGame {
                     ped.x = vCol.x;
                     ped.y = vCol.y;
                     if (ped.kind === "CIVILIAN" && !ped._boardingVeh) {
-                        ped.angle += (Math.random() < 0.5 ? 1 : -1) * Math.PI * 0.35;
+                        ped.angle += Math.PI + (Math.random() - 0.5) * 0.9;
+                        ped.targetBx = null;
+                        ped.targetBy = null;
+                        ped.turnSeed = (ped.turnSeed || 1) + 3;
                     }
                 }
             }

@@ -457,15 +457,15 @@ class ViceNetworkManager {
             setTimeout(() => {
                 if (!this.remotePlayers.has(bot.id)) return;
                 const lower = cleaned.toLowerCase();
-                let reply = "On se retrouve sur Ocean Drive devant le Hotel Dixon ! 🌴🔥";
+                let reply = "Meet up on Ocean Drive in front of Hotel Dixon! 🌴🔥";
                 if (lower.includes("race") || lower.includes("course")) {
-                    reply = "Vas-y ! Départ Ocean Drive jusqu'au Pier, le dernier paie sa tournée au Club Nine1Nine ! 🏎️💨";
+                    reply = "Let's go! Ocean Drive to South Pier, last one there buys a round at Club Nine1Nine! 🏎️💨";
                 } else if (lower.includes("yo") || lower.includes("salut") || lower.includes("hello") || lower.includes("slt") || lower.includes("cc")) {
-                    reply = `Yo ${this.playerName} ! Bienvenue dans Vice City 26 ! 👋🌴`;
+                    reply = `Yo ${this.playerName}! Welcome to Vice City 26! 👋🌴`;
                 } else if (lower.includes("gg") || lower.includes("bien joué")) {
-                    reply = "GG ! Ce moteur tourne comme une horloge ! 🔥";
+                    reply = "GG! This engine runs like clockwork! 🔥";
                 } else if (lower.includes("gps") || lower.includes("rejoins") || lower.includes("me")) {
-                    reply = "J'arrive plein gaz sur ta position GPS ! 📍🚓";
+                    reply = "On my way full throttle to your GPS ping! 📍🚓";
                 }
                 bot.chatText = reply;
                 bot.chatTimer = 6.5;

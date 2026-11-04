@@ -1112,7 +1112,7 @@ class WorldObjectEngine {
             {
                 instId: "star_vercetti_palazzo",
                 interiorId: "STAR_ISLAND",
-                title: "OPÉRATION SCARFACE — PALAZZO DE LA ROSA",
+                title: "OPERATION SCARFACE — PALAZZO DE LA ROSA",
                 lootCash: 25000,
                 bonusWeapon: "ROCKET_LAUNCHER",
                 bonusAmmo: 8
@@ -1120,7 +1120,7 @@ class WorldObjectEngine {
             {
                 instId: "star_south_palazzo",
                 interiorId: "ESTATE_STAR_SOUTH",
-                title: "BRAQUAGE DU CARTEL — VILLA DI LEONIDA",
+                title: "CARTEL HEIST — VILLA DI LEONIDA",
                 lootCash: 22000,
                 bonusWeapon: "UZI",
                 bonusAmmo: 120
@@ -1136,7 +1136,7 @@ class WorldObjectEngine {
             {
                 instId: "sobe_artdeco_villa_1",
                 interiorId: "ESTATE_SOBE_ARTDECO",
-                title: "CASSE ART DÉCO — FLAMINGO COURT",
+                title: "ART DECO HEIST — FLAMINGO COURT",
                 lootCash: 16500,
                 bonusWeapon: "UZI",
                 bonusAmmo: 90
@@ -1144,7 +1144,7 @@ class WorldObjectEngine {
             {
                 instId: "shores_modern_villa",
                 interiorId: "ESTATE_SHORES_MODERN",
-                title: "RAID HAUTE SÉCURITÉ — PENTHOUSE GOLDEN GLADES",
+                title: "HIGH-SECURITY RAID — GOLDEN GLADES PENTHOUSE",
                 lootCash: 20000,
                 bonusWeapon: "FLAMETHROWER",
                 bonusAmmo: 60
@@ -1152,7 +1152,7 @@ class WorldObjectEngine {
             {
                 instId: "keys_stilt_islamorada",
                 interiorId: "ESTATE_KEYS_ISLAMORADA",
-                title: "RAID DES KEYS — PLANQUE D'ISLAMORADA",
+                title: "KEYS RAID — ISLAMORADA SAFEHOUSE",
                 lootCash: 15000,
                 bonusWeapon: "SHOTGUN",
                 bonusAmmo: 24
@@ -3082,7 +3082,7 @@ class WorldObjectEngine {
                             if (!wasDamaged) {
                                 if (typeof game.addScore === "function") game.addScore(40);
                                 if (Array.isArray(game.floatingTexts)) {
-                                    game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ LAMPADAIRE ABÎMÉ! +$40", color: "#fde047", life: 1.15 });
+                                    game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ STREETLAMP BENT! +$40", color: "#fde047", life: 1.15 });
                                 }
                             }
                             continue;
@@ -3114,7 +3114,7 @@ class WorldObjectEngine {
                             }
                             if (typeof game.addScore === "function") game.addScore(100);
                             if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "💥 LAMPADAIRE DÉFONCÉ! +$100", color: "#f472b6", life: 1.2 });
+                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "💥 STREETLAMP SMASHED! +$100", color: "#f472b6", life: 1.2 });
                             }
                         } else {
                             if (typeof game.addScore === "function") game.addScore(75);
@@ -3203,7 +3203,7 @@ class WorldObjectEngine {
                                     x: sl.baseX,
                                     y: sl.baseY,
                                     z: 2.42,
-                                    text: "💥 LAMPADAIRE DÉFONCÉ! +$100",
+                                    text: "💥 STREETLAMP SMASHED! +$100",
                                     color: "#fb923c",
                                     life: 1.25
                                 });
@@ -3243,7 +3243,7 @@ class WorldObjectEngine {
                                         x: sl.baseX,
                                         y: sl.baseY,
                                         z: 2.38,
-                                        text: "⚡ LAMPADAIRE ABÎMÉ! +$40",
+                                        text: "⚡ STREETLAMP BENT! +$40",
                                         color: "#fde047",
                                         life: 1.15
                                     });
@@ -3331,7 +3331,7 @@ class WorldObjectEngine {
                                     x: ts.baseX,
                                     y: ts.baseY,
                                     z: 2.45,
-                                    text: "💥 FEU ROUGE DÉFONCÉ! +$125",
+                                    text: "💥 TRAFFIC LIGHT SMASHED! +$125",
                                     color: "#ef4444",
                                     life: 1.3
                                 });
@@ -3371,7 +3371,7 @@ class WorldObjectEngine {
                                         x: ts.baseX,
                                         y: ts.baseY,
                                         z: 2.42,
-                                        text: "⚡ FEU ROUGE ABÎMÉ! +$50",
+                                        text: "⚡ TRAFFIC LIGHT BENT! +$50",
                                         color: "#fde047",
                                         life: 1.2
                                     });
