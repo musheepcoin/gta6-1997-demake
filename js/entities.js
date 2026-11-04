@@ -2208,7 +2208,7 @@ class Vehicle {
                 game.audio.playBeep(580, 0.08, "square", 0.06);
             }
             if (typeof game.addFloatingText === "function") {
-                game.addFloatingText(target.x, target.y - 24, "🪝 VCPD FOURRIÈRE — REMORQUAGE!", "#f59e0b");
+                game.addFloatingText(target.x, target.y - 24, "🪝 VCPD IMPOUND — TOWING!", "#f59e0b");
             }
             return this.computeTrafficControls(dt, map, game);
         }

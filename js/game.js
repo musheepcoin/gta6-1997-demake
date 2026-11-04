@@ -11050,7 +11050,7 @@ class LeonidaGame {
                             stealTarget.driver = "AI_TRAFFIC";
                             stealTarget.aiPanicTimer = 6.0;
                             stealTarget.doorOpenTimer = 0.44;
-                            this.addFloatingText(stealTarget.x, stealTarget.y - 22, "🚗 VOITURE ABANDONNÉE VOLÉE!", "#facc15");
+                            this.addFloatingText(stealTarget.x, stealTarget.y - 22, "🚗 ABANDONED CAR STOLEN!", "#facc15");
                             const idx = this.peds.indexOf(ped);
                             if (idx >= 0) this.peds.splice(idx, 1);
                             continue;
