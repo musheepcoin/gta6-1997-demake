@@ -10692,20 +10692,20 @@ class RetroRenderer {
         ctx.fillStyle = intr.accent || "#38bdf8";
         ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 31);
 
-        // 3. 3D-Projected Interactive Station Glow Halos & Glassmorphic Pill Badges
+        // 3. 3D-Projected Interactive Station Glow Halos & Glassmorphic Pill Badges (confirm with [E] when standing on the zone!)
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
                 const stFloor = this.worldToScreen(st.x, st.y, 2.04);
                 const stTop = this.worldToScreen(st.x, st.y, 2.28);
                 const ready = (st.cooldown || 0) <= 0;
                 const distToPlayer = Math.hypot(px - st.x, py - st.y);
-                const isNear = distToPlayer < 82;
+                const isNear = distToPlayer < 42;
                 const stCol = ready ? (st.color || "#39ff14") : "#64748b";
                 const pulseR = (isNear ? 30 : 22) + Math.sin(this.time * 6) * 3.0;
 
                 // Soft radial 3D floor glow
                 const pGrad = ctx.createRadialGradient(stFloor.x, stFloor.y, 4, stFloor.x, stFloor.y, pulseR + 10);
-                pGrad.addColorStop(0, ready ? "rgba(56, 189, 248, 0.25)" : "rgba(100, 116, 139, 0.12)");
+                pGrad.addColorStop(0, ready ? (isNear ? "rgba(57, 255, 20, 0.36)" : "rgba(56, 189, 248, 0.22)") : "rgba(100, 116, 139, 0.12)");
                 pGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
                 ctx.fillStyle = pGrad;
                 ctx.beginPath();
@@ -10713,36 +10713,26 @@ class RetroRenderer {
                 ctx.fill();
 
                 // Compact Glassmorphic Pill Badge projected above the 3D station pedestal
-                const bw = isNear ? 186 : 162;
-                const bh = isNear ? 32 : 28;
+                const cleanSub = String(st.sub || "").replace(/^\[E\]\s*/i, "");
+                const bw = isNear ? 204 : 162;
+                const bh = isNear ? 34 : 28;
                 const bx = Math.round(stTop.x - bw * 0.5);
                 const by = Math.round(stTop.y - bh - (isNear ? 10 : 6));
 
-                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.92)" : "rgba(9, 14, 28, 0.80)";
+                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.94)" : "rgba(9, 14, 28, 0.80)";
                 ctx.fillRect(bx, by, bw, bh);
                 ctx.fillStyle = stCol;
                 ctx.fillRect(bx, by, 3.5, bh);
-                ctx.strokeStyle = stCol;
-                ctx.lineWidth = isNear ? 1.8 : 1.1;
+                ctx.strokeStyle = isNear && ready ? "#fde047" : stCol;
+                ctx.lineWidth = isNear ? 2.0 : 1.1;
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
                 ctx.font = isNear ? "bold 10.5px Consolas, 'Courier New', monospace" : "bold 9.5px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = ready ? "#ffffff" : "#94a3b8";
                 ctx.fillText(st.label, stTop.x + 2, by + 10);
                 ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
-                ctx.fillStyle = stCol;
-                ctx.fillText(ready ? (isNear ? `[E] ${st.sub}` : st.sub) : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 21.5);
-
-                if (ready) {
-                    this.cheatButtons.push({
-                        id: "TRIGGER_STATION",
-                        x: bx,
-                        y: by,
-                        w: bw,
-                        h: bh + 44,
-                        station: st
-                    });
-                }
+                ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
+                ctx.fillText(ready ? (isNear ? `[E] CONFIRM • ${cleanSub}` : cleanSub) : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 22);
             }
         }
 

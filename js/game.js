@@ -2127,9 +2127,9 @@ class LeonidaGame {
 
 
 
-            // Enter / Exit / Carjack Vehicle (F or Enter or E)
+            // Enter / Exit / Carjack Vehicle or Confirm Station Purchase (F or Enter or E — single press only, never auto-repeat!)
 
-            if (code === "KeyF" || code === "Enter" || code === "KeyE") {
+            if (!e.repeat && (code === "KeyF" || code === "Enter" || code === "KeyE")) {
 
                 this.toggleVehicleEntry();
 
@@ -4794,7 +4794,7 @@ class LeonidaGame {
 
 
 
-        // If inside a building interior, [E] / [F] / [Enter] activates a touched station or exits when on the door mat!
+        // If inside a building interior, [E] / [F] / [Enter] confirms the station the player is standing on or exits at the door mat!
 
         if (this.activeInterior) {
 
@@ -4802,15 +4802,29 @@ class LeonidaGame {
 
             if (Array.isArray(intr.stations)) {
 
+                let bestSt = null;
+
+                let bestDist = 42;
+
                 for (const st of intr.stations) {
 
-                    if (Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 32 && (st.cooldown || 0) <= 0) {
+                    const d = Math.hypot(this.interiorX - st.x, this.interiorY - st.y);
 
-                        this.triggerInteriorStation(st);
+                    if (d < bestDist && (st.cooldown || 0) <= 0) {
 
-                        return;
+                        bestDist = d;
+
+                        bestSt = st;
 
                     }
+
+                }
+
+                if (bestSt) {
+
+                    this.triggerInteriorStation(bestSt);
+
+                    return;
 
                 }
 
@@ -4823,6 +4837,58 @@ class LeonidaGame {
             }
 
             return;
+
+        }
+
+        // If inside a vehicle on a Bomb Shop pad, [E] confirms buying/rigging the Car Bomb instead of exiting!
+
+        if (p.inVehicle && Array.isArray(this.map.bombShops)) {
+
+            const v = p.inVehicle;
+
+            for (const bs of this.map.bombShops) {
+
+                if (!v.hasBomb && (bs.cooldown || 0) <= 0 && v.x > bs.x && v.x < bs.x + bs.w && v.y > bs.y && v.y < bs.y + bs.h) {
+
+                    const cost = bs.cost || 1000;
+
+                    if (this.cash < cost) {
+
+                        this.audio.playBeep(180, 0.16, "sawtooth", 0.06);
+
+                        this.addFloatingText(v.x, v.y - 24, `NOT ENOUGH CASH ($${cost.toLocaleString("en-US")})`, "#ef4444");
+
+                        return;
+
+                    }
+
+                    bs.cooldown = 5.0;
+
+                    this.cash -= cost;
+
+                    v.hasBomb = true;
+
+                    this.audio.playCashSound();
+
+                    this.showBigBanner(
+
+                        "CAR BOMB RIGGED!",
+
+                        "PRESS [K] ANYTIME TO ARM THE 5-SECOND DETONATOR, THEN [F] TO BAIL OUT!",
+
+                        "#ff9900",
+
+                        2.6
+
+                    );
+
+                    this.updateHud();
+
+                    return;
+
+                }
+
+            }
 
         }
 
@@ -8848,25 +8914,7 @@ class LeonidaGame {
 
 
 
-        // Step directly onto any interactive station pad inside the venue to trigger its perk/heist/minigame!
-
-        if (Array.isArray(intr.stations)) {
-
-            for (const st of intr.stations) {
-
-                if (!st.effect && (st.cooldown || 0) <= 0 && Math.hypot(this.interiorX - st.x, this.interiorY - st.y) < 22) {
-
-                    this.triggerInteriorStation(st);
-
-                    break;
-
-                }
-
-            }
-
-        }
-
-
+        // Stations inside venues NEVER auto-buy/auto-trigger on walk-over — player must press [E] while on the zone!
 
         // Step directly onto the bottom EXIT DOOR mat (near center bottom) to return to the street!
 
@@ -10241,7 +10289,7 @@ class LeonidaGame {
 
 
 
-        // 4B. Classic GTA 1 Car Bomb Shop Check
+        // 4B. Classic GTA 1 Car Bomb Shop Check (never auto-buy on drive-over — must confirm with [E]!)
 
         if (this.map.bombShops) {
 
@@ -10249,33 +10297,23 @@ class LeonidaGame {
 
                 if (bs.cooldown > 0) bs.cooldown -= dt;
 
-                if (p.inVehicle && bs.cooldown <= 0) {
+                if (p.inVehicle && (bs.cooldown || 0) <= 0) {
 
                     const v = p.inVehicle;
 
-                    if (!v.hasBomb && v.x > bs.x && v.x < bs.x + bs.w && v.y > bs.y && v.y < bs.y + bs.h) {
+                    const inside = !v.hasBomb && v.x > bs.x && v.x < bs.x + bs.w && v.y > bs.y && v.y < bs.y + bs.h;
 
-                        bs.cooldown = 5.0;
+                    if (inside && !bs._promptShown) {
 
-                        if (this.cash >= bs.cost) this.cash -= bs.cost;
+                        bs._promptShown = true;
 
-                        v.hasBomb = true;
+                        const cost = bs.cost || 1000;
 
-                        this.audio.playCashSound();
+                        this.addFloatingText(v.x, v.y - 26, `💣 [E] CONFIRM CAR BOMB ($${cost.toLocaleString("en-US")})`, "#ff9900");
 
-                        this.showBigBanner(
+                    } else if (!inside) {
 
-                            "CAR BOMB RIGGED!",
-
-                            "PRESS [K] ANYTIME TO ARM THE 5-SECOND DETONATOR, THEN [F] TO BAIL OUT!",
-
-                            "#ff9900",
-
-                            2.6
-
-                        );
-
-                        this.updateHud();
+                        bs._promptShown = false;
 
                     }
 
