@@ -7469,7 +7469,7 @@ class LeonidaGame {
 
 
 
-            // Also allow bare-handed punches to hit nearby wooden crates!
+            // Also allow bare-handed punches to hit nearby wooden crates, parasols, and sunbathers!
 
             if (this.map && Array.isArray(this.map.crates)) {
 
@@ -7486,6 +7486,12 @@ class LeonidaGame {
                     }
 
                 }
+
+            }
+
+            if (this.checkAndWipeoutLivingEvents(hitX, hitY, 22, true, false, true)) {
+
+                hitAnyone = true;
 
             }
 
@@ -9700,10 +9706,8 @@ class LeonidaGame {
 
                 }
 
-                // Allow cars/trucks (not non-lethal e-scooters/bikes) to plow through open-air street/beach animations!
-                if (!isNonLethalWheeler) {
-                    this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true);
-                }
+                // Allow vehicles to plow through open-air street/beach animations, sunbathers, and parasols (non-lethal wheelers knock out instead of killing)!
+                this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true, isNonLethalWheeler);
 
             }
 
@@ -13121,13 +13125,20 @@ class LeonidaGame {
             if (!Array.isArray(arr)) return;
             for (let i = 0; i < arr.length; i++) {
                 const it = arr[i];
-                if ((it.wipeoutTimer || 0) > 0 && Math.hypot(it.x - px, it.y - py) > 360) {
+                const distOut = Math.hypot(it.x - px, it.y - py) > 360;
+                if ((it.wipeoutTimer || 0) > 0 && distOut) {
                     it.wipeoutTimer = Math.max(0, it.wipeoutTimer - dt);
+                }
+                if ((it.umbWipeoutTimer || 0) > 0 && distOut) {
+                    it.umbWipeoutTimer = Math.max(0, it.umbWipeoutTimer - dt);
                 }
             }
         };
         tickArray(this.map.streetEvents);
         tickArray(this.map.streetTakeovers);
+        tickArray(this.map.beachSunbathers);
+        tickArray(this.map.beachUmbrellas);
+        tickArray(this.map.viceStreetDetails);
         tickArray(this.map.beachVolleyballCourts);
         tickArray(this.map.beachParties);
         tickArray(this.map.muscleBeachGyms);
@@ -13138,22 +13149,51 @@ class LeonidaGame {
         }
     }
 
-    checkAndWipeoutLivingEvents(hitX, hitY, hitRad = 28, byPlayer = true, isVehicleImpact = false) {
+    checkAndWipeoutLivingEvents(hitX, hitY, hitRad = 28, byPlayer = true, isVehicleImpact = false, isNonLethal = false) {
         if (!this.map) return false;
         let triggeredAny = false;
 
-        const spawnScenePeds = (scene, members, labelText) => {
+        const smashParasolFX = (ux, uy, knockAng) => {
+            triggeredAny = true;
+            if (this.audio && typeof this.audio.playCrateSmash === "function") {
+                this.audio.playCrateSmash();
+            }
+            const colors = ["#ff2a85", "#38bdf8", "#facc15", "#f8fafc", "#cbd5e1"];
+            for (let pi = 0; pi < 14; pi++) {
+                const spread = (Math.random() - 0.5) * 1.9;
+                const ang = (knockAng !== undefined ? knockAng : Math.random() * Math.PI * 2) + spread;
+                const spd = 45 + Math.random() * 115;
+                this.particles.push({
+                    x: ux + (Math.random() - 0.5) * 6,
+                    y: uy + (Math.random() - 0.5) * 6,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd,
+                    size: 3.5 + Math.random() * 4.0,
+                    color: colors[pi % colors.length],
+                    life: 0.48,
+                    maxLife: 0.48
+                });
+            }
+            if (byPlayer) {
+                this.score += 25 * this.multiplier;
+                this.updateHud();
+                this.addFloatingText(ux, uy - 18, "⛱️ PARASOL SMASHED!", "#38bdf8");
+            }
+        };
+
+        const spawnScenePeds = (scene, members, labelText, requireDirectHit = false) => {
             scene.wipeoutTimer = 40.0;
             triggeredAny = true;
             const bz = scene.z || this.map.getHeightAtPixel(scene.x, scene.y, 4.0);
             let killedCount = 0;
             for (let i = 0; i < members.length; i++) {
                 const m = members[i];
+                const awayAng = Math.atan2(m.y - hitY, m.x - hitX);
                 const ped = new Pedestrian({
                     x: m.x,
                     y: m.y,
                     z: bz,
-                    angle: Math.atan2(m.y - hitY, m.x - hitX),
+                    angle: awayAng,
                     speed: 52,
                     kind: "CIVILIAN",
                     g24Type: m.ped || "vc_tourist",
@@ -13166,18 +13206,100 @@ class LeonidaGame {
                 });
                 this.peds.push(ped);
                 const d = Math.hypot(m.x - hitX, m.y - hitY);
-                if (d <= hitRad + 16 || (i === 0 && killedCount === 0)) {
-                    this.killPed(ped, byPlayer);
+                if (d <= hitRad + 18 || (!requireDirectHit && i === 0 && killedCount === 0)) {
+                    if (isNonLethal) {
+                        ped.stunnedTimer = 1.65;
+                        ped.panicTimer = 6.5;
+                        ped.x += Math.cos(awayAng) * 14;
+                        ped.y += Math.sin(awayAng) * 14;
+                    } else {
+                        this.killPed(ped, byPlayer);
+                    }
                     killedCount++;
                 }
             }
-            if (byPlayer && labelText) {
-                this.addFloatingText(scene.x, scene.y - 22, labelText, "#ff2a85");
-                if (isVehicleImpact && this.audio && typeof this.audio.playPedDeath === "function") {
-                    this.audio.playPedDeath(null, true);
+            if (byPlayer && labelText && killedCount > 0) {
+                this.addFloatingText(
+                    scene.x,
+                    scene.y - 22,
+                    isNonLethal ? "💫 SUNBATHER KNOCKOUT!" : labelText,
+                    isNonLethal ? "#38bdf8" : "#ff2a85"
+                );
+                if (isVehicleImpact && this.audio) {
+                    if (isNonLethal && typeof this.audio.playPedScream === "function") {
+                        this.audio.playPedScream();
+                    } else if (!isNonLethal && typeof this.audio.playPedDeath === "function") {
+                        this.audio.playPedDeath(null, true);
+                    }
                 }
             }
         };
+
+        // 0. Lying Beach Sunbathers & Parasols (this.map.beachSunbathers, this.map.beachUmbrellas, sidewalk café parasols)
+        if (Array.isArray(this.map.beachSunbathers)) {
+            for (let i = 0; i < this.map.beachSunbathers.length; i++) {
+                const sb = this.map.beachSunbathers[i];
+                let umbJustSmashed = false;
+                if (sb.umbSpr && (sb.umbWipeoutTimer || 0) <= 0) {
+                    const ux = sb.x + (sb.umbDx !== undefined ? sb.umbDx : -22);
+                    const uy = sb.y + (sb.umbDy !== undefined ? sb.umbDy : -14);
+                    if (Math.hypot(ux - hitX, uy - hitY) < hitRad + 16) {
+                        sb.umbWipeoutTimer = 45.0;
+                        sb.umbKnockAng = Math.atan2(uy - hitY, ux - hitX);
+                        smashParasolFX(ux, uy, sb.umbKnockAng);
+                        umbJustSmashed = true;
+                    }
+                }
+                if ((sb.wipeoutTimer || 0) <= 0) {
+                    const ang = sb.angle || 0;
+                    const fx = sb.x - Math.sin(ang) * 25;
+                    const fy = sb.y + Math.cos(ang) * 25;
+                    const dMain = Math.hypot(sb.x - hitX, sb.y - hitY);
+                    const dFriend = sb.friendPedType ? Math.hypot(fx - hitX, fy - hitY) : 9999;
+                    if (dMain < hitRad + 18 || dFriend < hitRad + 18 || (umbJustSmashed && Math.min(dMain, dFriend) < hitRad + 34)) {
+                        const members = [
+                            { ped: sb.pedType || "bikini_pink", x: sb.x, y: sb.y }
+                        ];
+                        if (sb.friendPedType) {
+                            members.push({ ped: sb.friendPedType, x: fx, y: fy });
+                        }
+                        if (sb.propSpr === "sandcastle_prop") {
+                            const px = sb.x + (sb.propDx !== undefined ? sb.propDx : 24) + 11;
+                            const py = sb.y + (sb.propDy !== undefined ? sb.propDy : -8) + 4;
+                            members.push({ ped: (i % 2 === 0) ? "kid_beach" : "kid_girl_pink", x: px, y: py });
+                        }
+                        if (sb.extraPropSpr === "sandcastle_prop") {
+                            const ex = sb.x + (sb.extraPropDx !== undefined ? sb.extraPropDx : 22) + 10;
+                            const ey = sb.y + (sb.extraPropDy !== undefined ? sb.extraPropDy : 18) - 5;
+                            members.push({ ped: "kid_boy_cap", x: ex, y: ey });
+                        }
+                        spawnScenePeds(sb, members, "🏖️ SUNBATHER FLATTENED!", true);
+                    }
+                }
+            }
+        }
+        if (Array.isArray(this.map.beachUmbrellas)) {
+            for (let i = 0; i < this.map.beachUmbrellas.length; i++) {
+                const umb = this.map.beachUmbrellas[i];
+                if ((umb.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(umb.x - hitX, umb.y - hitY) < hitRad + 16) {
+                    umb.wipeoutTimer = 45.0;
+                    umb.knockAng = Math.atan2(umb.y - hitY, umb.x - hitX);
+                    smashParasolFX(umb.x, umb.y, umb.knockAng);
+                }
+            }
+        }
+        if (Array.isArray(this.map.viceStreetDetails)) {
+            for (let i = 0; i < this.map.viceStreetDetails.length; i++) {
+                const vd = this.map.viceStreetDetails[i];
+                if (vd.kind !== "CAFE_TABLE" || (vd.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(vd.x - hitX, vd.y - hitY) < hitRad + 16) {
+                    vd.wipeoutTimer = 45.0;
+                    vd.knockAng = Math.atan2(vd.y - hitY, vd.x - hitX);
+                    smashParasolFX(vd.x, vd.y, vd.knockAng);
+                }
+            }
+        }
 
         // 1. Street Events (Wynwood Breakdance Cyphers & Ocean Drive Livestreamers)
         if (Array.isArray(this.map.streetEvents)) {

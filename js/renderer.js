@@ -5964,6 +5964,33 @@ class RetroRenderer {
         }
     }
 
+    renderSmashedParasol3D(umbSpr, ux, uy, bz, knockAng = 0, scale = 0.95) {
+        const objs = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects;
+        const umbRect = objs && (objs[umbSpr] || objs["umbrella_pink"]);
+        const ca = Math.cos(knockAng);
+        const sa = Math.sin(knockAng);
+        // Snapped base stub & bent aluminum pole lying flat on the sand/pavement
+        this.pushSolidQuad3D(ux, uy, bz + 0.016, 3.2, 3.2, 0, 0.45, 0.47, 0.50, 0.92, SPRITE_DRAW_ORDER.GROUND_DECALS);
+        this.pushSolidQuad3D(ux + ca * 8, uy + sa * 8, bz + 0.018, 16, 2.2, knockAng, 0.78, 0.80, 0.84, 0.95, SPRITE_DRAW_ORDER.GROUND_DECALS);
+        // Toppled, crumpled parasol canopy knocked forward on the ground
+        if (umbRect) {
+            this.pushAtlasSprite3D(
+                umbRect,
+                ux + ca * 15,
+                uy + sa * 15,
+                bz + 0.020,
+                knockAng + 0.45,
+                scale * 0.82,
+                SPRITE_DRAW_ORDER.GROUND_DECALS,
+                0.76, 0.74, 0.72,
+                0.92
+            );
+        }
+        // Bent wireframe spoke ribs protruding from torn canopy
+        this.pushSolidQuad3D(ux + ca * 18, uy + sa * 18, bz + 0.022, 12, 1.3, knockAng + 0.38, 0.88, 0.90, 0.94, 0.88, SPRITE_DRAW_ORDER.GROUND_DECALS);
+        this.pushSolidQuad3D(ux + ca * 16, uy + sa * 16, bz + 0.022, 11, 1.3, knockAng - 0.42, 0.88, 0.90, 0.94, 0.88, SPRITE_DRAW_ORDER.GROUND_DECALS);
+    }
+
     renderViceBeachActivities3D(game, minX, minY, maxX, maxY, sunCos, sunSin, sunShadowAngle, sunShadowAlpha, nfGlobal) {
         if (!this.gta1Ready || !this.map) return;
         const objs = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects;
@@ -5976,17 +6003,20 @@ class RetroRenderer {
                 if (sb.x < minX - 48 || sb.x > maxX + 48 || sb.y < minY - 48 || sb.y > maxY + 48) continue;
                 const bz = sb.z || 2.0;
                 const ang = sb.angle || 0;
+                const isWipedOut = (sb.wipeoutTimer || 0) > 0;
 
-                // Main Beach Towel or White Sun Lounger flat on the sand (GROUND_DECALS = 1 so sunbathers always render on top!)
+                // Main Beach Towel or White Sun Lounger flat on the sand (GROUND_DECALS = 1 so sunbathers/corpses always render on top!)
                 this.batchObjectSprite3D(sb.towelSpr || "beach_towel_pink", sb.x, sb.y, bz + 0.015, ang, 1.15, SPRITE_DRAW_ORDER.GROUND_DECALS);
 
-                // Sunbathing Bikini Woman lying lengthwise on the towel (frame 42 = custom top-down lying sunbather with sunglasses & two-piece bikini!)
+                // Sunbathing Bikini Woman lying lengthwise on the towel (when wiped out, spawned as a real Pedestrian corpse/runner!)
                 const tanSway = Math.sin(this.time * 1.5 + i * 1.3) * 0.04;
-                if (sb.pose === "WAVE") {
-                    const waveFr = 50 + (Math.floor(this.time * 4.2 + i) % 4);
-                    this.batchPedSprite3D(sb.pedType || "bikini_pink", waveFr, sb.x, sb.y, bz + 0.038, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                } else {
-                    this.batchPedSprite3D(sb.pedType || "bikini_pink", 42, sb.x, sb.y, bz + 0.035, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                if (!isWipedOut) {
+                    if (sb.pose === "WAVE") {
+                        const waveFr = 50 + (Math.floor(this.time * 4.2 + i) % 4);
+                        this.batchPedSprite3D(sb.pedType || "bikini_pink", waveFr, sb.x, sb.y, bz + 0.038, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    } else {
+                        this.batchPedSprite3D(sb.pedType || "bikini_pink", 42, sb.x, sb.y, bz + 0.035, ang + tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
 
                 // Optional Companion Bikini Friend on adjacent towel (chatting or sunbathing in pairs!)
@@ -5996,11 +6026,13 @@ class RetroRenderer {
                     const fx = sb.x + perpX;
                     const fy = sb.y + perpY;
                     this.batchObjectSprite3D(sb.friendTowelSpr || "beach_towel_yellow", fx, fy, bz + 0.015, ang, 1.15, SPRITE_DRAW_ORDER.GROUND_DECALS);
-                    if ((i % 2) === 0) {
-                        this.batchPedSprite3D(sb.friendPedType, 42, fx, fy, bz + 0.035, ang - tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    } else {
-                        const chatFr = 50 + (Math.floor(this.time * 3.8 + i * 2) % 4);
-                        this.batchPedSprite3D(sb.friendPedType, chatFr, fx, fy, bz + 0.038, ang - Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (!isWipedOut) {
+                        if ((i % 2) === 0) {
+                            this.batchPedSprite3D(sb.friendPedType, 42, fx, fy, bz + 0.035, ang - tanSway, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        } else {
+                            const chatFr = 50 + (Math.floor(this.time * 3.8 + i * 2) % 4);
+                            this.batchPedSprite3D(sb.friendPedType, chatFr, fx, fy, bz + 0.038, ang - Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        }
                     }
                 }
 
@@ -6009,7 +6041,7 @@ class RetroRenderer {
                     const px = sb.x + (sb.propDx !== undefined ? sb.propDx : 24);
                     const py = sb.y + (sb.propDy !== undefined ? sb.propDy : -8);
                     this.batchObjectSprite3D(sb.propSpr, px, py, bz + 0.026, sb.propAngle || 0.35, sb.propScale || 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    if (sb.propSpr === "sandcastle_prop") {
+                    if (sb.propSpr === "sandcastle_prop" && !isWipedOut) {
                         const kidFr = 50 + (Math.floor(this.time * 4.5 + i) % 4);
                         const kidType = (i % 2 === 0) ? "kid_beach" : "kid_girl_pink";
                         this.batchPedSprite3D(kidType, kidFr, px + 11, py + 4, bz + 0.036, Math.PI, 0.78, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
@@ -6019,34 +6051,38 @@ class RetroRenderer {
                     const ex = sb.x + (sb.extraPropDx !== undefined ? sb.extraPropDx : 22);
                     const ey = sb.y + (sb.extraPropDy !== undefined ? sb.extraPropDy : 18);
                     this.batchObjectSprite3D(sb.extraPropSpr, ex, ey, bz + 0.026, 0, 0.90, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    if (sb.extraPropSpr === "sandcastle_prop") {
+                    if (sb.extraPropSpr === "sandcastle_prop" && !isWipedOut) {
                         const kidFr = 50 + (Math.floor(this.time * 4.2 + i * 3) % 4);
                         this.batchPedSprite3D("kid_boy_cap", kidFr, ex + 10, ey - 5, bz + 0.036, Math.PI * 0.75, 0.78, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 }
 
-                // 3D Striped Beach Umbrella (with solar ground shadow + 3D rising pole + elevated canopy at head corner of towel!)
+                // 3D Striped Beach Umbrella (with solar ground shadow + 3D rising pole + elevated canopy, or smashed flat on sand!)
                 if (sb.umbSpr) {
                     const ux = sb.x + (sb.umbDx !== undefined ? sb.umbDx : -22);
                     const uy = sb.y + (sb.umbDy !== undefined ? sb.umbDy : -14);
-                    const umbRect = objs[sb.umbSpr] || objs["umbrella_pink"];
-                    const umbRot = (i * 0.85) + Math.sin(this.time * 1.3 + i) * 0.04;
-                    if (umbRect) {
-                        this.pushAtlasSprite3D(
-                            umbRect,
-                            ux + sunCos * 10,
-                            uy + sunSin * 10,
-                            bz + 0.014,
-                            umbRot,
-                            0.92,
-                            SPRITE_DRAW_ORDER.GROUND_DECALS,
-                            0.0, 0.0, 0.0,
-                            0.26 * (1.0 - nfGlobal * 0.6)
-                        );
+                    if ((sb.umbWipeoutTimer || 0) > 0) {
+                        this.renderSmashedParasol3D(sb.umbSpr, ux, uy, bz, sb.umbKnockAng || 0, 0.95);
+                    } else {
+                        const umbRect = objs[sb.umbSpr] || objs["umbrella_pink"];
+                        const umbRot = (i * 0.85) + Math.sin(this.time * 1.3 + i) * 0.04;
+                        if (umbRect) {
+                            this.pushAtlasSprite3D(
+                                umbRect,
+                                ux + sunCos * 10,
+                                uy + sunSin * 10,
+                                bz + 0.014,
+                                umbRot,
+                                0.92,
+                                SPRITE_DRAW_ORDER.GROUND_DECALS,
+                                0.0, 0.0, 0.0,
+                                0.26 * (1.0 - nfGlobal * 0.6)
+                            );
+                        }
+                        this.pushSolidQuad3D(ux, uy, bz + 0.05, 2.8, 2.8, 0, 0.92, 0.90, 0.84, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                        this.pushSolidQuad3D(ux, uy, bz + 0.11, 2.4, 2.4, 0, 0.96, 0.94, 0.88, 0.98, SPRITE_DRAW_ORDER.TREES);
+                        this.batchObjectSprite3D(sb.umbSpr, ux, uy, bz + 0.16, umbRot, 0.95, SPRITE_DRAW_ORDER.TREES);
                     }
-                    this.pushSolidQuad3D(ux, uy, bz + 0.05, 2.8, 2.8, 0, 0.92, 0.90, 0.84, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    this.pushSolidQuad3D(ux, uy, bz + 0.11, 2.4, 2.4, 0, 0.96, 0.94, 0.88, 0.98, SPRITE_DRAW_ORDER.TREES);
-                    this.batchObjectSprite3D(sb.umbSpr, ux, uy, bz + 0.16, umbRot, 0.95, SPRITE_DRAW_ORDER.TREES);
                 }
             }
         }
@@ -8312,7 +8348,11 @@ class RetroRenderer {
                 for (const umb of this.map.beachUmbrellas) {
                     if (umb.x < minX || umb.x > maxX || umb.y < minY || umb.y > maxY) continue;
                     const uz = this.getEntityZ(umb, 0.04);
-                    this.batchObjectSprite3D(umb.spr || "umbrella_pink", umb.x, umb.y, uz + 0.08, umb.angle || 0, 0.92, SPRITE_DRAW_ORDER.TREES);
+                    if ((umb.wipeoutTimer || 0) > 0) {
+                        this.renderSmashedParasol3D(umb.spr || "umbrella_pink", umb.x, umb.y, uz, umb.knockAng || 0, 0.92);
+                    } else {
+                        this.batchObjectSprite3D(umb.spr || "umbrella_pink", umb.x, umb.y, uz + 0.08, umb.angle || 0, 0.92, SPRITE_DRAW_ORDER.TREES);
+                    }
                 }
             }
             this.renderViceBeachActivities3D(game, minX, minY, maxX, maxY, sunCos, sunSin, sunShadowAngle, sunShadowAlpha, nfGlobal);
@@ -8331,7 +8371,11 @@ class RetroRenderer {
                     const vz = (vd.z !== undefined ? vd.z : 2.0);
                     if (vd.kind === "CAFE_TABLE") {
                         const umbSpr = vd.theme === "PINK" ? "umbrella_pink" : "umbrella_cyan";
-                        this.batchObjectSprite3D(umbSpr, vd.x, vd.y, vz + 0.08, (vd.y * 0.03) % 6.28, 0.78, SPRITE_DRAW_ORDER.TREES);
+                        if ((vd.wipeoutTimer || 0) > 0) {
+                            this.renderSmashedParasol3D(umbSpr, vd.x, vd.y, vz, vd.knockAng || 0, 0.78);
+                        } else {
+                            this.batchObjectSprite3D(umbSpr, vd.x, vd.y, vz + 0.08, (vd.y * 0.03) % 6.28, 0.78, SPRITE_DRAW_ORDER.TREES);
+                        }
                     } else if (vd.kind === "BISTRO_STRING") {
                         // Española Way overhead Mediterranean festive light cable & glowing bulbs
                         this.pushSolidQuad3D(vd.x, vd.y, vz + 0.50, 58, 1.8, 0, 0.18, 0.22, 0.28, 0.85, SPRITE_DRAW_ORDER.TREES);
