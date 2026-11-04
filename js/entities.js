@@ -3026,6 +3026,7 @@ class TrafficManager {
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
         const minKeep = 24 + (vps.length - 1) * 10;
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
+        const farWreckRects = vps.map((vp) => this.expandRect(vp.area, 28));
 
         for (let i = game.vehicles.length - 1; i >= 0; i--) {
             const v = game.vehicles[i];
@@ -3034,8 +3035,8 @@ class TrafficManager {
             const isAbandonedOrWreck =
                 !v.isStaticParked &&
                 !v.isEstateCar &&
-                ((v.destroyed && (v.abandonedTimer || 0) > 12.0) ||
-                 (v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 32.0 : 12.0)));
+                ((v.destroyed && (v.abandonedTimer || 0) > 120.0) ||
+                 (!v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 120.0 : 85.0)));
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
                 v.driver === "AI_EMERGENCY" ||
@@ -3060,7 +3061,10 @@ class TrafficManager {
                 continue;
             }
             if (game.vehicles.length <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW") continue;
-            const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
+            // Burned wrecks and abandoned cars stay in the neighborhood until a Tow Truck physically tows them;
+            // only garbage-collect them on their own if the player has driven far away into another district (> 28 blocks / ~1800px)!
+            const checkRects = isAbandonedOrWreck ? farWreckRects : outerRects;
+            const nearAnyPlayer = checkRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
                 if (v.towingVehicle) {
                     const tIdx = game.vehicles.indexOf(v.towingVehicle);
