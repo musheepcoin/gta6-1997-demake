@@ -3801,15 +3801,327 @@ class RetroRenderer {
                 meta.sprites.objects["wall_artdeco_side"]         = [946,  3995, 156, 64];
                 meta.sprites.objects["wall_shack_side"]           = [1114, 3995, 148, 64];
 
-                // 6M. Satirical GTA 6 & GTA Universe Advertising Billboards (baked at y = 3780, x = 800..1920 in gta1_sprites.png)
-                meta.sprites.objects["ad_pisswasser"]             = [800,  3780, 128, 64];
-                meta.sprites.objects["ad_ecola"]                  = [940,  3780, 128, 64];
-                meta.sprites.objects["ad_sprunk"]                 = [1080, 3780, 128, 64];
-                meta.sprites.objects["ad_angstipan"]              = [1220, 3780, 128, 64];
-                meta.sprites.objects["ad_patriot_beer"]           = [1360, 3780, 128, 64];
-                meta.sprites.objects["ad_burgershot"]             = [1500, 3780, 128, 64];
-                meta.sprites.objects["ad_ammunation"]             = [1640, 3780, 128, 64];
-                meta.sprites.objects["ad_call_morgan"]            = [1780, 3780, 128, 64];
+                // 6M. Satirical GTA 6 & GTA Universe High-Resolution 128x64 Advertising Billboards
+                //     Procedurally painted with crisp studio vector typography, brand emblems & spotlight gradients
+                //     at y = 3780 (row 1) and y = 3846 (row 2), x = 800..1920 in gta1_sprites.png
+                {
+                    const adSpecs = [
+                        {
+                            key: "ad_pisswasser", x: 800, y: 3780,
+                            bg0: "#0c2340", bg1: "#1d4ed8", accent: "#facc15", trim: "#fef08a",
+                            tag: "BAVARIAN EXPORT LAGER • 11% ALC",
+                            title: "PISSWASSER",
+                            sub: "THIS IS BEER! DRIVE DRUNK",
+                            cta: "OFFICIAL SPONSOR OF BAD DECISIONS",
+                            icon: "BEER"
+                        },
+                        {
+                            key: "ad_ecola", x: 940, y: 3780,
+                            bg0: "#7f1d1d", bg1: "#dc2626", accent: "#ffffff", trim: "#fecaca",
+                            tag: "ICE COLD • 200MG CAFFEINE",
+                            title: "eCola",
+                            sub: "DELICIOUSLY INFECTIOUS!",
+                            cta: "SWALLOW THE RED WAVE TODAY",
+                            icon: "CAN_RED"
+                        },
+                        {
+                            key: "ad_sprunk", x: 1080, y: 3780,
+                            bg0: "#064e3b", bg1: "#16a34a", accent: "#fde047", trim: "#bbf7d0",
+                            tag: "EXTREME LEMON-LIME BLAST",
+                            title: "SPRUNK",
+                            sub: "THE ESSENCE OF LIFE!",
+                            cta: "OBEY YOUR ADRENALINE GLAND",
+                            icon: "CAN_GREEN"
+                        },
+                        {
+                            key: "ad_angstipan", x: 1220, y: 3780,
+                            bg0: "#0f172a", bg1: "#0284c7", accent: "#38bdf8", trim: "#e0f2fe",
+                            tag: "BETTA PHARMACEUTICALS Rx",
+                            title: "ANGSTIPAN",
+                            sub: "CURE EXISTENTIAL DREAD",
+                            cta: "SIDE EFFECTS MAY INCLUDE RAMPAGES",
+                            icon: "PILL"
+                        },
+                        {
+                            key: "ad_patriot_beer", x: 1360, y: 3780,
+                            bg0: "#172554", bg1: "#b91c1c", accent: "#facc15", trim: "#f8fafc",
+                            tag: "PROUDLY BREWED IN LEONIDA",
+                            title: "PATRIOT BEER",
+                            sub: "REAL AMERICAN FREEDOM",
+                            cta: "TASTES LIKE VICTORY & FIREWORKS",
+                            icon: "STAR"
+                        },
+                        {
+                            key: "ad_burgershot", x: 1500, y: 3780,
+                            bg0: "#7c2d12", bg1: "#ea580c", accent: "#facc15", trim: "#fed7aa",
+                            tag: "HOME OF THE 6LB HEART STOPPER",
+                            title: "BURGER SHOT",
+                            sub: "DIE WITH A SMILE! $1.99",
+                            cta: "NOW WITH 40% REAL BEEF PRODUCT",
+                            icon: "BURGER"
+                        },
+                        {
+                            key: "ad_ammunation", x: 1640, y: 3780,
+                            bg0: "#18181b", bg1: "#991b1b", accent: "#facc15", trim: "#fca5a5",
+                            tag: "2ND AMENDMENT SUPERSTORE",
+                            title: "AMMU-NATION",
+                            sub: "PROTECT YOUR FAMILY!",
+                            cta: "NO BACKGROUND CHECK • FREE GRENADE",
+                            icon: "TARGET"
+                        },
+                        {
+                            key: "ad_call_morgan", x: 1780, y: 3780,
+                            bg0: "#0f172a", bg1: "#1e3a8a", accent: "#facc15", trim: "#fde047",
+                            tag: "HIT BY A SPEEDING SUPERCAR?",
+                            title: "CALL MORGAN!",
+                            sub: "1-800-LAW-VICE • WE SUE ALL",
+                            cta: "NO RECOVERY? WE ROB THEM FOR YOU!",
+                            icon: "GAVEL"
+                        },
+                        {
+                            key: "ad_vice26", x: 800, y: 3846,
+                            bg0: "#3b0764", bg1: "#db2777", accent: "#22d3ee", trim: "#f472b6",
+                            tag: "WELCOME TO THE SUNSHINE STATE",
+                            title: "VICE CITY 26",
+                            sub: "LEONIDA TOURISM BOARD",
+                            cta: "SUNSET BEACHES • NEON NIGHTS",
+                            icon: "PALM"
+                        },
+                        {
+                            key: "ad_hotel_dixon", x: 940, y: 3846,
+                            bg0: "#0f3d3e", bg1: "#0d9488", accent: "#f472b6", trim: "#99f6e4",
+                            tag: "OCEAN DRIVE HISTORIC ART DECO",
+                            title: "HOTEL DIXON",
+                            sub: "LUXURY ROOFTOP SUITES",
+                            cta: "COCKTAILS • POOL PARTY • VALET",
+                            icon: "PALM"
+                        },
+                        {
+                            key: "ad_vice_neon", x: 1080, y: 3846,
+                            bg0: "#1e1b4b", bg1: "#701a75", accent: "#38bdf8", trim: "#f0abfc",
+                            tag: "VICE BEACH NIGHTLIFE VIP",
+                            title: "CLUB MALIBU",
+                            sub: "LIVE DJS • OPEN ALL NIGHT",
+                            cta: "WASHINGTON AVE • DRESS TO IMPRESS",
+                            icon: "STAR"
+                        },
+                        {
+                            key: "ad_ocean_drive", x: 1220, y: 3846,
+                            bg0: "#155e75", bg1: "#0891b2", accent: "#fde047", trim: "#fed7aa",
+                            tag: "SOUTH BEACH PARADISE STRIP",
+                            title: "OCEAN DRIVE",
+                            sub: "LUMMUS PARK & PIER",
+                            cta: "CRUISE THE NEON STRIP TONIGHT",
+                            icon: "PALM"
+                        },
+                        {
+                            key: "ad_mambos_latin", x: 1360, y: 3846,
+                            bg0: "#042f2e", bg1: "#0f766e", accent: "#f97316", trim: "#fde047",
+                            tag: "VICE CITY STADIUM PRO FOOTBALL",
+                            title: "VC MAMBAS",
+                            sub: "SEASON TICKETS ON SALE",
+                            cta: "FEEL THE VENOM IN DOWNTOWN VICE",
+                            icon: "STAR"
+                        },
+                        {
+                            key: "ad_pi_beer", x: 1500, y: 3846,
+                            bg0: "#1e293b", bg1: "#ca8a04", accent: "#fef08a", trim: "#facc15",
+                            tag: "IMPORTED PILSNER • ICE COLD",
+                            title: "PISSWASSER GOLD",
+                            sub: "KING OF HAPPY HOUR",
+                            cta: "AVAILABLE AT UNCLE JACK'S LIQUOR",
+                            icon: "BEER"
+                        }
+                    ];
+
+                    ctx.save();
+                    for (const ad of adSpecs) {
+                        const ax = ad.x;
+                        const ay = ad.y;
+                        const aw = 128;
+                        const ah = 64;
+
+                        // 1. Rich angled studio background gradient
+                        const bgGrad = ctx.createLinearGradient(ax, ay, ax + aw, ay + ah);
+                        bgGrad.addColorStop(0.0, ad.bg0);
+                        bgGrad.addColorStop(0.65, ad.bg1);
+                        bgGrad.addColorStop(1.0, ad.bg0);
+                        ctx.fillStyle = bgGrad;
+                        ctx.fillRect(ax, ay, aw, ah);
+
+                        // Subtle diagonal graphic speed-stripe accent on right side
+                        ctx.fillStyle = "rgba(255,255,255,0.08)";
+                        ctx.beginPath();
+                        ctx.moveTo(ax + 78, ay);
+                        ctx.lineTo(ax + 104, ay);
+                        ctx.lineTo(ax + 84, ay + ah);
+                        ctx.lineTo(ax + 58, ay + ah);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // 2. Bottom dark high-contrast CTA banner strip
+                        ctx.fillStyle = "rgba(6, 10, 18, 0.86)";
+                        ctx.fillRect(ax + 2, ay + ah - 13, aw - 4, 11);
+                        ctx.fillStyle = ad.accent;
+                        ctx.fillRect(ax + 2, ay + ah - 14, aw - 4, 1.5);
+
+                        // 3. Left-side illustrative brand icon emblem (cx = ax + 21, cy = ay + 26)
+                        const icx = ax + 20;
+                        const icy = ay + 26;
+                        // Glowing circular emblem badge
+                        ctx.fillStyle = "rgba(10, 14, 24, 0.55)";
+                        ctx.beginPath();
+                        ctx.arc(icx, icy, 15.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = ad.accent;
+                        ctx.lineWidth = 1.6;
+                        ctx.beginPath();
+                        ctx.arc(icx, icy, 14.5, 0, Math.PI * 2);
+                        ctx.stroke();
+
+                        if (ad.icon === "BEER") {
+                            // Golden foaming beer mug + bottle
+                            ctx.fillStyle = "#f59e0b";
+                            ctx.fillRect(icx - 7, icy - 4, 12, 13);
+                            ctx.strokeStyle = "#fef08a";
+                            ctx.lineWidth = 2.0;
+                            ctx.strokeRect(icx + 4, icy - 2, 4, 8);
+                            ctx.fillStyle = "#ffffff";
+                            ctx.beginPath();
+                            ctx.arc(icx - 4, icy - 5, 4.2, 0, Math.PI * 2);
+                            ctx.arc(icx + 1, icy - 6, 4.8, 0, Math.PI * 2);
+                            ctx.arc(icx + 4, icy - 4, 3.6, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else if (ad.icon === "CAN_RED" || ad.icon === "CAN_GREEN") {
+                            // Frosted soda can with metallic lids & dynamic ribbon
+                            ctx.fillStyle = ad.icon === "CAN_RED" ? "#ef4444" : "#22c55e";
+                            ctx.fillRect(icx - 6, icy - 9, 12, 18);
+                            ctx.fillStyle = "#e2e8f0";
+                            ctx.fillRect(icx - 5, icy - 10, 10, 2);
+                            ctx.fillRect(icx - 5, icy + 8, 10, 2);
+                            ctx.strokeStyle = "#ffffff";
+                            ctx.lineWidth = 2.2;
+                            ctx.beginPath();
+                            ctx.moveTo(icx - 6, icy + 3);
+                            ctx.quadraticCurveTo(icx, icy - 5, icx + 6, icy - 2);
+                            ctx.stroke();
+                        } else if (ad.icon === "PILL") {
+                            // Red & white pharmaceutical capsule
+                            ctx.save();
+                            ctx.translate(icx, icy);
+                            ctx.rotate(-0.55);
+                            ctx.fillStyle = "#ef4444";
+                            ctx.fillRect(-9, -4.5, 9, 9);
+                            ctx.fillStyle = "#f8fafc";
+                            ctx.fillRect(0, -4.5, 9, 9);
+                            ctx.restore();
+                        } else if (ad.icon === "BURGER") {
+                            // Triple-decker cheeseburger
+                            ctx.fillStyle = "#f59e0b";
+                            ctx.beginPath();
+                            ctx.arc(icx, icy - 3, 9.5, Math.PI, 0);
+                            ctx.fill();
+                            ctx.fillStyle = "#22c55e";
+                            ctx.fillRect(icx - 10, icy - 3, 20, 2.5);
+                            ctx.fillStyle = "#facc15";
+                            ctx.fillRect(icx - 9, icy - 0.5, 18, 2.5);
+                            ctx.fillStyle = "#78350f";
+                            ctx.fillRect(icx - 9.5, icy + 1.5, 19, 4);
+                            ctx.fillStyle = "#f59e0b";
+                            ctx.fillRect(icx - 9, icy + 5.5, 18, 3.5);
+                        } else if (ad.icon === "TARGET") {
+                            // Tactical red/gold crosshair reticle
+                            ctx.strokeStyle = "#ef4444";
+                            ctx.lineWidth = 2.0;
+                            ctx.beginPath();
+                            ctx.arc(icx, icy, 9.5, 0, Math.PI * 2);
+                            ctx.stroke();
+                            ctx.fillStyle = "#facc15";
+                            ctx.fillRect(icx - 12, icy - 1, 24, 2);
+                            ctx.fillRect(icx - 1, icy - 12, 2, 24);
+                        } else if (ad.icon === "GAVEL") {
+                            // Golden lawyer scales / gavel emblem
+                            ctx.fillStyle = "#facc15";
+                            ctx.fillRect(icx - 8, icy - 7, 16, 6);
+                            ctx.fillRect(icx - 1.5, icy - 1, 3, 11);
+                            ctx.fillStyle = "#fef08a";
+                            ctx.fillRect(icx - 9, icy - 8, 2, 8);
+                            ctx.fillRect(icx + 7, icy - 8, 2, 8);
+                        } else if (ad.icon === "PALM") {
+                            // Neon sunset disc + palm silhouette
+                            ctx.fillStyle = "#fbbf24";
+                            ctx.beginPath();
+                            ctx.arc(icx, icy + 1, 9.5, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.strokeStyle = "#0f172a";
+                            ctx.lineWidth = 2.2;
+                            ctx.beginPath();
+                            ctx.moveTo(icx - 2, icy + 10);
+                            ctx.quadraticCurveTo(icx + 1, icy, icx + 3, icy - 6);
+                            ctx.stroke();
+                            for (const fa of [-2.4, -1.7, -0.8, -0.2, 0.5]) {
+                                ctx.beginPath();
+                                ctx.moveTo(icx + 3, icy - 6);
+                                ctx.lineTo(icx + 3 + Math.cos(fa) * 9, icy - 6 + Math.sin(fa) * 7);
+                                ctx.stroke();
+                            }
+                        } else {
+                            // Golden 5-point star crest
+                            ctx.fillStyle = "#facc15";
+                            ctx.beginPath();
+                            for (let si = 0; si < 10; si++) {
+                                const r = (si % 2 === 0) ? 10.5 : 4.5;
+                                const a = -Math.PI * 0.5 + (si * Math.PI) / 5;
+                                const sx = icx + Math.cos(a) * r;
+                                const sy = icy + Math.sin(a) * r;
+                                if (si === 0) ctx.moveTo(sx, sy);
+                                else ctx.lineTo(sx, sy);
+                            }
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+
+                        // 4. Crisp Studio Typography (Top Tagline, Giant Brand Headline, Sub-Headline, Bottom CTA)
+                        ctx.textAlign = "left";
+                        ctx.textBaseline = "middle";
+
+                        // Top small pill tag
+                        ctx.font = "bold 6.5px Impact, 'Arial Black', sans-serif";
+                        ctx.fillStyle = ad.trim;
+                        ctx.fillText(ad.tag, ax + 39, ay + 9.5, 84);
+
+                        // Giant Brand Title with heavy 3D drop shadow
+                        ctx.font = "900 15.5px Impact, 'Arial Black', sans-serif";
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+                        ctx.fillText(ad.title, ax + 40.5, ay + 24.5, 84);
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillText(ad.title, ax + 39, ay + 23, 84);
+
+                        // Sub-headline in bright brand accent color
+                        ctx.font = "bold 8.5px Impact, 'Arial Black', sans-serif";
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.80)";
+                        ctx.fillText(ad.sub, ax + 40, ay + 39, 84);
+                        ctx.fillStyle = ad.accent;
+                        ctx.fillText(ad.sub, ax + 39, ay + 38, 84);
+
+                        // Bottom centered CTA ribbon text
+                        ctx.textAlign = "center";
+                        ctx.font = "bold 6.8px 'Arial Black', Impact, sans-serif";
+                        ctx.fillStyle = "#f8fafc";
+                        ctx.fillText(ad.cta, ax + aw * 0.5, ay + ah - 7, aw - 10);
+
+                        // 5. Outer Metallic Billboard Bezel Frame & Inner Pinstripe
+                        ctx.strokeStyle = "#1e293b";
+                        ctx.lineWidth = 2.5;
+                        ctx.strokeRect(ax + 1.25, ay + 1.25, aw - 2.5, ah - 2.5);
+                        ctx.strokeStyle = ad.accent;
+                        ctx.lineWidth = 1.0;
+                        ctx.strokeRect(ax + 3.0, ay + 3.0, aw - 6.0, ah - 6.0);
+
+                        meta.sprites.objects[ad.key] = [ax, ay, aw, ah];
+                    }
+                    ctx.restore();
+                }
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 240)
                 // Ensures all custom props & procedural vehicles have seamless 3D edge filtering without dark alpha halos

@@ -335,26 +335,9 @@ class WorldObjectEngine {
                 { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE, z: 2.0, ang: Math.PI },
                 { x: 57.2 * TILE_SIZE,  y: 243.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
             ],
-            // 16 Satirical GTA 6 & GTA Universe 3D Illuminated Roadside Advertising Billboards
-            // (Placed on highway verges, causeways & commercial strips — NEVER on Ocean Drive beachfront sidewalks or parked cars!)
-            gtaBillboards: [
-                { x: 398.0 * TILE_SIZE, y: 299.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_pisswasser",   neon: [0.98, 0.82, 0.18] }, // MacArthur Causeway East Approach
-                { x: 432.5 * TILE_SIZE, y: 242.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ecola",        neon: [0.98, 0.22, 0.28] }, // Collins Ave Mid Strip
-                { x: 398.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Venetian Causeway East Approach
-                { x: 432.5 * TILE_SIZE, y: 165.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_angstipan",    neon: [0.22, 0.92, 0.96] }, // North Beach Collins Strip
-                { x: 352.0 * TILE_SIZE, y: 299.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_patriot_beer", neon: [0.96, 0.28, 0.32] }, // MacArthur Causeway West
-                { x: 352.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_burgershot",   neon: [0.98, 0.62, 0.16] }, // Venetian Causeway West
-                { x: 282.5 * TILE_SIZE, y: 248.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_call_morgan",  neon: [0.98, 0.84, 0.18] }, // Downtown South
-                { x: 282.5 * TILE_SIZE, y: 215.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ammunation",   neon: [0.96, 0.24, 0.24] }, // Downtown North
-                { x: 224.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_sprunk",       neon: [0.22, 0.96, 0.42] }, // Little Haiti
-                { x: 214.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_ecola",        neon: [0.98, 0.22, 0.28] }, // Wynwood
-                { x: 112.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_angstipan",    neon: [0.22, 0.92, 0.96] }, // VCIA West
-                { x: 142.5 * TILE_SIZE, y: 293.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_call_morgan",  neon: [0.98, 0.84, 0.18] }, // VCIA East
-                { x: 64.5 * TILE_SIZE,  y: 192.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_patriot_beer", neon: [0.96, 0.28, 0.32] }, // Port Gellhorn Strip
-                { x: 86.5 * TILE_SIZE,  y: 235.0 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_ammunation",   neon: [0.96, 0.24, 0.24] }, // Port Gellhorn South
-                { x: 152.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_pisswasser",   neon: [0.98, 0.82, 0.18] }, // Ambrosia Refinery
-                { x: 260.0 * TILE_SIZE, y: 478.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_burgershot",   neon: [0.98, 0.62, 0.16] }  // Leonida Keys Highway
-            ]
+            // Satirical GTA 6 & GTA Universe 3D Illuminated Mega-Billboards
+            // (Populated procedurally on verified flat commercial rooftops & wide highway verges in buildStatic3DMesh)
+            gtaBillboards: []
         };
         // 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines + Ad Kiosks
         // (Placed flush against building facades on verified PAWEMENT sidewalks — never on roads or intersections!)
@@ -400,15 +383,8 @@ class WorldObjectEngine {
         this.cashDrops = [];
         this.viralCooldown = 0;
         this.viralDriftTimer = 0;
-        // 4. Wynwood Walls & Leonida Street-Art 3D Graffiti Tagging Challenge (6 Mural Monoliths)
-        this.graffitiWalls = [
-            { id: "tag_wynwood_main",  name: "WYNWOOD GALLERY MAIN WALL",     x: 189.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, ang: 0,             tagged: false, neon: [0.98, 0.24, 0.78], ad: "ad_vice26"     },
-            { id: "tag_wynwood_east",  name: "WYNWOOD ARTS DISTRICT ALLEY",   x: 212.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, ang: 0,             tagged: false, neon: [0.18, 0.94, 0.98], ad: "ad_sprunk"     },
-            { id: "tag_little_haiti",  name: "LITTLE HAITI CARIBBEAN MURAL",  x: 224.5 * TILE_SIZE, y: 110.5 * TILE_SIZE, z: 2.0, ang: 0,             tagged: false, neon: [0.98, 0.82, 0.16], ad: "ad_call_morgan"},
-            { id: "tag_ocean_alley",   name: "OCEAN DRIVE ART DECO MURAL",    x: 442.5 * TILE_SIZE, y: 264.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, tagged: false, neon: [0.98, 0.30, 0.68], ad: "ad_vice26"     },
-            { id: "tag_downtown_arts", name: "DOWNTOWN METROMOVER PLAZA WALL",x: 282.5 * TILE_SIZE, y: 228.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, tagged: false, neon: [0.24, 0.96, 0.48], ad: "ad_ecola"      },
-            { id: "tag_gellhorn_yard", name: "PORT GELLHORN RAILYARD MURAL",  x: 64.5 * TILE_SIZE,  y: 198.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, tagged: false, neon: [0.98, 0.52, 0.16], ad: "ad_ammunation" }
-        ];
+        // 4. Sidewalk mural monoliths removed (replaced by monumental rooftop & highway mega-billboards)
+        this.graffitiWalls = [];
         // 5. Lake Leonida, Grassrivers & Leonida Keys 3D Floating Smuggler Contraband Airdrop Crates
         this.smugglerDrops = [
             { id: "drop_lake_nw",      name: "LAKE LEONIDA NORTHWEST DROP",   x: 112.5 * TILE_SIZE, y: 95.5 * TILE_SIZE,  z: 2.0, active: true, cooldown: 0, seed: 0.4 },
@@ -454,15 +430,8 @@ class WorldObjectEngine {
         this.takeoverCooldown = 0;
         this.gymCooldown = 0;
         this.tikiCooldown = 0;
-        // 8. GTA 6 Trailer 1 & 2 Iconic Bandana Stick-Up Robbery Stores (Uncle Jack's Liquor, Pawn & Gun, Hank's Waffles, etc.)
-        this.stickUpStores = [
-            { id: "rob_uncle_jacks",  name: "UNCLE JACK'S LIQUOR (TRAILER 1)",   x: 442.5 * TILE_SIZE, y: 282.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, robbedOnce: false, neon: [0.98, 0.28, 0.68], ad: "ad_pisswasser"   },
-            { id: "rob_pawn_and_gun", name: "PORT GELLHORN PAWN & GUN",          x: 64.5 * TILE_SIZE,  y: 179.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0, robbedOnce: false, neon: [0.98, 0.82, 0.16], ad: "ad_ammunation"   },
-            { id: "rob_hanks_waffle", name: "HANK'S WAFFLES DINER (GELLHORN)",   x: 68.5 * TILE_SIZE,  y: 191.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.22, 0.92, 0.98], ad: "ad_burgershot"   },
-            { id: "rob_haiti_mercad", name: "LITTLE HAITI CARIBBEAN MERCADO",    x: 224.5 * TILE_SIZE, y: 116.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.24, 0.96, 0.46], ad: "ad_sprunk"       },
-            { id: "rob_rusty_anchor", name: "THE RUSTY ANCHOR BIKER BAR",        x: 152.5 * TILE_SIZE, y: 126.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.98, 0.52, 0.16], ad: "ad_patriot_beer" },
-            { id: "rob_keys_tackle",  name: "ISLAMORADA BAIT & LIQUOR",          x: 258.5 * TILE_SIZE, y: 478.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0, robbedOnce: false, neon: [0.18, 0.94, 0.86], ad: "ad_ecola"        }
-        ];
+        // 8. Outdoor sidewalk stick-up boxes removed (robberies happen inside the enterable 3D interiors)
+        this.stickUpStores = [];
         // 9. GTA 6 70+ Official Screenshots: Leonida Snapmatic / Social-Media Photo Safari Viewpoints
         this.photoSafariSpots = [
             { id: "snap_ocean_drive", name: "OCEAN DRIVE ART DECO NEON STRIP",   x: 443.5 * TILE_SIZE, y: 272.5 * TILE_SIZE, z: 2.0, snapped: false },
@@ -5019,37 +4988,7 @@ class WorldObjectEngine {
             emitCylinder3D(sb.x, sb.y, 0, 0, 10.5,  7.5, bz + 0.78, bz + 0.94, 18, [0.14, 0.16, 0.20], 5, true);
         }
 
-        // 13. 16 Satirical GTA 6 & GTA Universe 3D Illuminated Roadside Advertising Billboards
-        //     (Pißwasser, eCola, Sprunk, Angstipan Rx, Patriot Beer, Burger Shot, Phil's Ammu-Nation, Call Morgan!)
-        if (this.landmarks3D && Array.isArray(this.landmarks3D.gtaBillboards)) {
-            for (const bb of this.landmarks3D.gtaBillboards) {
-                const bz = bb.z || 2.0;
-                const bCos = Math.cos(bb.ang || 0);
-                const bSin = Math.sin(bb.ang || 0);
-                const nc = bb.neon || [0.98, 0.82, 0.18];
-
-                emitAOShadow3D(bb.x, bb.y, bCos, bSin, 0, 0, 86, 26, bz, 0.36);
-                // Twin Reinforced Concrete Footings (S177)
-                emitTileBox3D(bb.x, bb.y, bCos, bSin, -26, 0, 10, 10, bz, bz + 0.12, 177, 177, 71, [0.88, 0.90, 0.94]);
-                emitTileBox3D(bb.x, bb.y, bCos, bSin,  26, 0, 10, 10, bz, bz + 0.12, 177, 177, 71, [0.88, 0.90, 0.94]);
-                // Twin Alpha-Cutout Open Steel Truss Columns (S363) + Maintenance Ladder (S249)
-                emitTileBox3D(bb.x, bb.y, bCos, bSin, -26, 0, 6.5, 6.5, bz + 0.12, bz + 0.48, 363, 363, 45, [0.76, 0.80, 0.86]);
-                emitTileBox3D(bb.x, bb.y, bCos, bSin,  26, 0, 6.5, 6.5, bz + 0.12, bz + 0.48, 363, 363, 45, [0.76, 0.80, 0.86]);
-                emitTileBox3D(bb.x, bb.y, bCos, bSin, -30, 0, 2.5, 3.5, bz + 0.12, bz + 0.50, 249, 249, 45, [0.92, 0.84, 0.32]);
-                // Front & Back Maintenance Catwalk Grilles (S250) + Upward Halogen Floodlight Bars
-                emitTileBox3D(bb.x, bb.y, bCos, bSin, 0,  8, 76, 5, bz + 0.45, bz + 0.49, 250, 250, 45, [0.78, 0.82, 0.88]);
-                emitTileBox3D(bb.x, bb.y, bCos, bSin, 0, -8, 76, 5, bz + 0.45, bz + 0.49, 250, 250, 45, [0.78, 0.82, 0.88]);
-                for (let lx = -24; lx <= 24; lx += 24) {
-                    emitSolidBox3D(bb.x, bb.y, bCos, bSin, lx,  9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], 1);
-                    emitSolidBox3D(bb.x, bb.y, bCos, bSin, lx, -9.5, 6, 3, bz + 0.49, bz + 0.52, [0.99, 0.96, 0.80], 1);
-                }
-                // Structural Steel Backing Frame (L45) & Illuminated Neon Crown Header
-                emitSolidBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 82, 7.5, bz + 0.46, bz + 0.90, [0.16, 0.20, 0.28], 5);
-                emitSolidBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 84, 9.0, bz + 0.90, bz + 0.94, nc, 1);
-                // Double-Sided High-Resolution 128x64 Satirical GTA Advertising Panel (MODE D from gta1_sprites.png!)
-                emitBox3D(bb.x, bb.y, bCos, bSin, 0, 0, 78, 9.2, bz + 0.48, bz + 0.88, bb.ad, bb.ad, [0.22, 0.26, 0.34]);
-            }
-        }
+        // 13. (Roadside & Rooftop 3D Mega-Billboards are emitted in Section 29 with full voxel-map placement verification)
 
         // 14. 8 Interactive 3D Illuminated eCola & Sprunk Sidewalk Soda Vending Machines (Backed against Building Facades!)
         if (Array.isArray(this.sodaMachines)) {
@@ -5208,21 +5147,6 @@ class WorldObjectEngine {
                 emitTileBox3D(ww.x, ww.y, 1, 0, wx, -18, 10, 10, bz + 0.08, bz + 1.06, 363, 363, 64, [0.96, 0.32, 0.76], false);
             }
             emitTileBox3D(ww.x, ww.y, 1, 0, 0, -18, 104, 12, bz + 0.96, bz + 1.08, 250, 363, 64, [0.20, 0.92, 0.98], false);
-        }
-        if (Array.isArray(this.graffitiWalls)) {
-            for (const gw of this.graffitiWalls) {
-                const bz = gw.z || 2.0;
-                const gCos = Math.cos(gw.ang || 0);
-                const gSin = Math.sin(gw.ang || 0);
-                const nc = gw.neon || [0.98, 0.24, 0.78];
-                emitAOShadow3D(gw.x, gw.y, gCos, gSin, 0, 0, 68, 24, bz, 0.36);
-                // Brutalist Concrete Mural Plinth & Wall Monolith (S177 + S86)
-                emitTileBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 58, 14, bz, bz + 0.08, 177, 177, 71, [0.88, 0.90, 0.94], false);
-                emitTileBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 54, 10, bz + 0.08, bz + 0.56, 86, 86, 46, [0.82, 0.84, 0.88], false);
-                // Street-Art Mural Canvas Panel + Neon Crown Frame
-                emitBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 48, 11.2, bz + 0.12, bz + 0.52, gw.ad, gw.ad, nc);
-                emitSolidBox3D(gw.x, gw.y, gCos, gSin, 0, 0, 56, 12, bz + 0.56, bz + 0.61, nc, 7);
-            }
         }
 
         // 18. LAKE LEONIDA GATOR ISLAND 3D SMUGGLER RADAR OUTPOST & AIRBOAT DOCK (c=125.5, r=103.0)
@@ -5491,16 +5415,7 @@ class WorldObjectEngine {
                     emitSolidBox3D(facadeX + 1.0, rowY, 1, 0, 0, 0, 11.0, 5.5, topZ + 0.08, topZ + 0.44, trimCol, 1);
                 }
 
-                // 3) Vertical 3D Illuminated Hotel Blade Sign projecting over Ocean Drive West Sidewalk
-                if (r % 8 === 4) {
-                    const bladeTex = bladeTextures[oceanBldgGroup % bladeTextures.length];
-                    emitSolidBox3D(facadeX + 5.0, rowY, 1, 0, 0, 0, 10.0, 3.0, 2.75, 2.82, [0.24, 0.28, 0.34], 5);
-                    emitSolidBox3D(facadeX + 5.0, rowY, 1, 0, 0, 0, 10.0, 3.0, 3.82, 3.89, [0.24, 0.28, 0.34], 5);
-                    emitBox3D(facadeX + 11.0, rowY, 1, 0, 0, 0, 11.0, 4.8, 2.62, 3.98, bladeTex, bladeTex, [1.0, 1.0, 1.0]);
-                    emitSolidBox3D(facadeX + 17.0, rowY, 1, 0, 0, 0, 2.2, 5.4, 2.58, 4.02, capCol, 5);
-                }
-
-                // 4) Grounded Architectural Canvas Storefront Awning over West Sidewalk (skipping building entrance doors!)
+                // 3) Grounded Architectural Canvas Storefront Awning over West Sidewalk (skipping building entrance doors!)
                 if (r % 3 === 1) {
                     const nearDoor = interiorsList.some(intr => Math.abs(intr.doorX - facadeX) < 96 && Math.abs(intr.doorY - rowY) < 42);
                     if (!nearDoor) {
@@ -5657,26 +5572,6 @@ class WorldObjectEngine {
             for (let lv = 0; lv < 3; lv++) {
                 const y0 = bz + 0.08 + lv * 0.32;
                 emitTileBox3D(ch.x, ch.y, 1, 0, 16, -8, 10 - lv * 1.5, 10 - lv * 1.5, y0, y0 + 0.32, 363, 246, 64, [0.90, 0.92, 0.96], false);
-            }
-        }
-
-        // 27. GTA 6 TRAILER 1 & 2: 6 ICONIC BANDANA STICK-UP STOREFRONT CANOPIES & CASH REGISTERS (this.stickUpStores)
-        if (Array.isArray(this.stickUpStores)) {
-            for (const su of this.stickUpStores) {
-                const bz = su.z || 2.0;
-                const sCos = Math.cos(su.ang || 0);
-                const sSin = Math.sin(su.ang || 0);
-                const nc = su.neon || [0.98, 0.28, 0.68];
-                emitAOShadow3D(su.x, su.y, sCos, sSin, 0, 0, 52, 32, bz, 0.36);
-                // Sidewalk Storefront Entrance Mat + Armored Cash Register Pedestal + Overhead Neon Awning & Ad Sign
-                emitTileBox3D(su.x, su.y, sCos, sSin, 0, 0, 44, 24, bz, bz + 0.05, 177, 177, 8, [0.90, 0.92, 0.96], false);
-                emitSolidBox3D(su.x, su.y, sCos, sSin, 0, 0, 18, 12, bz + 0.05, bz + 0.24, [0.20, 0.24, 0.32], 5);
-                emitSolidBox3D(su.x, su.y, sCos, sSin, 0, 0, 14, 10, bz + 0.24, bz + 0.32, [0.98, 0.82, 0.16], 7);
-                for (const pxOff of [-18, 18]) {
-                    emitTileBox3D(su.x, su.y, sCos, sSin, pxOff, -8, 4.5, 4.5, bz + 0.05, bz + 0.48, 363, 363, 45, [0.88, 0.90, 0.94], false);
-                }
-                emitSolidBox3D(su.x, su.y, sCos, sSin, 0, -2, 46, 22, bz + 0.46, bz + 0.52, nc, 7);
-                emitBox3D(su.x, su.y, sCos, sSin, 0, -2, 40, 8, bz + 0.52, bz + 0.72, su.ad, su.ad, nc);
             }
         }
 
@@ -5988,23 +5883,6 @@ class WorldObjectEngine {
                     }
                 }
 
-                // 2C) Vertical 3D Illuminated Blade Sign projecting from multi-storey facades (at z = 2.64..3.94)
-                if (topY >= 4.0 && spanTiles >= 3 && (hash % 4 === 0)) {
-                    const adKey = bladeAdKeys[hash % bladeAdKeys.length];
-                    const signX = wallFaceX + dirX * 9.5;
-                    const signY = wallFaceY + dirY * 9.5;
-                    const sCos = isHorizontal ? 0 : 1;
-                    const sSin = isHorizontal ? 1 : 0;
-                    // Dark anodized steel wall mounting brackets & outer frame
-                    emitSolidBox3D(wallFaceX + dirX * 4.5, wallFaceY + dirY * 4.5, sCos, sSin, 0, 0, 9.0, 2.8, 2.74, 2.80, [0.24, 0.28, 0.34], 5);
-                    emitSolidBox3D(wallFaceX + dirX * 4.5, wallFaceY + dirY * 4.5, sCos, sSin, 0, 0, 9.0, 2.8, 3.78, 3.84, [0.24, 0.28, 0.34], 5);
-                    emitBox3D(signX, signY, sCos, sSin, 0, 0, 10.5, 4.6, 2.64, 3.92, adKey, adKey, [1.0, 1.0, 1.0]);
-                    emitSolidBox3D(
-                        wallFaceX + dirX * 15.4,
-                        wallFaceY + dirY * 15.4,
-                        sCos, sSin, 0, 0, 2.2, 5.2, 2.60, 3.96, capCol, 5
-                    );
-                }
             };
 
             // Pass 29A: Scan & merge contiguous North and South building roof edges along each row r
@@ -6068,7 +5946,7 @@ class WorldObjectEngine {
                 }
             }
 
-            // Pass 29C: Scan 2x2 Flat Building Rooftop Plateaus & Emit District-Authentic 3D Rooftop Superstructures
+            // Pass 29C: Scan Flat Building Rooftop Plateaus & Highway Verges for Monumental 3D Mega-Billboards & Superstructures
             const roofUsed = new Uint8Array(MAP_ROWS * M);
             // Mark existing rooftop pool party tiles so we never overlap them
             if (Array.isArray(this.map.rooftopParties)) {
@@ -6082,6 +5960,269 @@ class WorldObjectEngine {
                             if (cc >= 0 && cc < M && rrr >= 0 && rrr < MAP_ROWS) {
                                 roofUsed[rrr * M + cc] = 1;
                             }
+                        }
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // Pass 29C-0: MONUMENTAL 3D GTA 6 / VICE CITY MEGA-BILLBOARDS
+            // - Pitched 30° 3D display face (160px wide x 0.68 Z-height) so the full 128x64 artwork is
+            //   large, un-foreshortened, and crystal-clear from the 2.5D top-down camera
+            // - Heavy open-lattice steel A-frame raker trusses on flat commercial building rooftops
+            //   overlooking major East-West avenues & street intersections
+            // - Towering cylindrical gunmetal steel monopoles & V-trusses on wide open highway grass verges
+            // -----------------------------------------------------------------
+            const megaBillboardPalette = [
+                { ad: "ad_vice26",       accent: [0.16, 0.88, 0.98] },
+                { ad: "ad_pisswasser",   accent: [0.98, 0.82, 0.18] },
+                { ad: "ad_ecola",        accent: [0.98, 0.22, 0.28] },
+                { ad: "ad_sprunk",       accent: [0.22, 0.96, 0.42] },
+                { ad: "ad_burgershot",   accent: [0.98, 0.62, 0.16] },
+                { ad: "ad_ammunation",   accent: [0.96, 0.28, 0.26] },
+                { ad: "ad_call_morgan",  accent: [0.98, 0.84, 0.18] },
+                { ad: "ad_angstipan",    accent: [0.24, 0.86, 0.98] },
+                { ad: "ad_patriot_beer", accent: [0.96, 0.30, 0.34] },
+                { ad: "ad_hotel_dixon",  accent: [0.96, 0.44, 0.76] },
+                { ad: "ad_vice_neon",    accent: [0.24, 0.88, 0.98] },
+                { ad: "ad_ocean_drive",  accent: [0.98, 0.86, 0.28] },
+                { ad: "ad_mambos_latin", accent: [0.98, 0.56, 0.16] },
+                { ad: "ad_pi_beer",      accent: [0.98, 0.82, 0.18] }
+            ];
+
+            const emitMegaBillboard3D = (cxPx, cyPx, cosA, sinA, zBase, adKey, accentCol, isRooftop) => {
+                const hw = 76.0;       // 152px wide artwork canvas
+                const hwFrame = 81.0;  // 162px wide outer steel bezel
+                const lyBot = 14.0;    // South/front bottom edge of tilted panel
+                const lyTop = -14.0;   // North/back top edge of tilted panel (28px backward pitch toward camera!)
+                const yBot = zBase + (isRooftop ? 0.22 : 0.44);
+                const yTop = yBot + 0.68;
+                const frameCol = [0.15, 0.18, 0.24];
+                const darkSteel = [0.20, 0.24, 0.30];
+                const silverTrim = [0.86, 0.90, 0.96];
+
+                emitAOShadow3D(cxPx, cyPx, cosA, sinA, 0, 0, 176, 56, zBase, 0.42);
+
+                if (isRooftop) {
+                    // 1A. Rooftop Heavy Steel A-Frame Lattice Truss & 3 Precast Concrete Ballast Pads
+                    for (const lx of [-62, 0, 62]) {
+                        emitTileBox3D(cxPx, cyPx, cosA, sinA, lx, -2, 16, 42, zBase, zBase + 0.055, 177, 177, 71, [0.84, 0.86, 0.90], false);
+                        // Front vertical S363 open-lattice column supporting bottom of billboard
+                        emitTileBox3D(cxPx, cyPx, cosA, sinA, lx, 11, 7.0, 7.0, zBase + 0.055, yBot + 0.02, 363, 363, 64, [0.78, 0.82, 0.88], false);
+                        // Tall rear S363 open-lattice A-frame column bracing top of tilted billboard
+                        emitTileBox3D(cxPx, cyPx, cosA, sinA, lx, -15, 7.5, 7.5, zBase + 0.055, yTop - 0.04, 363, 363, 64, [0.74, 0.78, 0.84], false);
+                        // Horizontal steel tie-strut connecting front and rear truss legs
+                        emitSolidBox3D(cxPx, cyPx, cosA, sinA, lx, -2, 4.5, 28, zBase + 0.16, zBase + 0.21, darkSteel, 5);
+                    }
+                    // Rear horizontal S250 lattice wind-bracing cross-girder across all 3 towers
+                    emitTileBox3D(cxPx, cyPx, cosA, sinA, 0, -15, 136, 6.0, yBot + 0.24, yBot + 0.31, 250, 363, 64, [0.76, 0.80, 0.86], false);
+                } else {
+                    // 1B. Highway Verge Heavy Steel Monopole Column, Octagonal Concrete Pier & V-Truss Outriggers
+                    emitOctagonPad3D(cxPx, cyPx, 0, 0, 22, 22, 19, 19, 0.26, zBase, zBase + 0.10, [0.88, 0.90, 0.94], [0.80, 0.82, 0.86], 2, 177, 71);
+                    emitCylinder3D(cxPx, cyPx, 0, 0, 10.5, 9.5, zBase + 0.10, zBase + 0.16, 12, frameCol, 5, true);
+                    emitCylinder3D(cxPx, cyPx, 0, 0, 8.2, 7.0, zBase + 0.16, yBot + 0.14, 14, darkSteel, 5, true);
+                    // Vertical steel maintenance ladder (S249) on side of monopole
+                    emitTileBox3D(cxPx, cyPx, cosA, sinA, -9.5, 0, 2.5, 4.5, zBase + 0.12, yBot + 0.04, 249, 249, 45, [0.90, 0.84, 0.32], false);
+                    // Lower & upper horizontal steel spreader box-girders + twin S363 V-truss outrigger columns
+                    emitSolidBox3D(cxPx, cyPx, cosA, sinA, 0, 0, 116, 9.0, zBase + 0.22, zBase + 0.28, darkSteel, 5);
+                    for (const vx of [-52, 52]) {
+                        emitTileBox3D(cxPx, cyPx, cosA, sinA, vx, 0, 8.0, 8.0, zBase + 0.24, yBot + 0.04, 363, 363, 64, [0.78, 0.82, 0.88], false);
+                    }
+                    emitSolidBox3D(cxPx, cyPx, cosA, sinA, 0, 6, 148, 12.0, yBot - 0.05, yBot + 0.02, frameCol, 5);
+                }
+
+                // 2. Tilted 3D Dark Gunmetal Backing Cabinet & Outer Architectural Frame Bezel
+                const backOffY = -4.5;
+                const tNW_f = toWorld(cxPx, cyPx, cosA, sinA, -hwFrame, lyTop, yTop + 0.03);
+                const tNE_f = toWorld(cxPx, cyPx, cosA, sinA,  hwFrame, lyTop, yTop + 0.03);
+                const bSW_f = toWorld(cxPx, cyPx, cosA, sinA, -hwFrame, lyBot, yBot - 0.03);
+                const bSE_f = toWorld(cxPx, cyPx, cosA, sinA,  hwFrame, lyBot, yBot - 0.03);
+
+                const tNW_b = toWorld(cxPx, cyPx, cosA, sinA, -hwFrame, lyTop + backOffY, yTop + 0.03);
+                const tNE_b = toWorld(cxPx, cyPx, cosA, sinA,  hwFrame, lyTop + backOffY, yTop + 0.03);
+                const bSW_b = toWorld(cxPx, cyPx, cosA, sinA, -hwFrame, lyBot + backOffY, yBot - 0.03);
+                const bSE_b = toWorld(cxPx, cyPx, cosA, sinA,  hwFrame, lyBot + backOffY, yBot - 0.03);
+
+                // Dark anodized charcoal frame front face (behind the inset artwork) + rear corrugated steel backing + side/top caps
+                pushMatQuad3D(tNW_f, tNE_f, bSW_f, bSE_f, 9, frameCol[0], frameCol[1], frameCol[2], 1.0);
+                pushMatQuad3D(tNE_b, tNW_b, bSE_b, bSW_b, 6, 0.12, 0.15, 0.20, 1.0);
+                pushMatQuad3D(tNW_b, tNW_f, bSW_b, bSW_f, 5, 0.18, 0.22, 0.28, 1.0);
+                pushMatQuad3D(tNE_f, tNE_b, bSE_f, bSE_b, 5, 0.14, 0.17, 0.22, 1.0);
+                pushMatQuad3D(tNW_b, tNE_b, tNW_f, tNE_f, 9, 0.22, 0.26, 0.33, 1.0);
+
+                // Brushed silver-aluminum inner bezel border (1.8px rim around the artwork)
+                const hwRim = hw + 1.8;
+                const tNW_r = toWorld(cxPx, cyPx, cosA, sinA, -hwRim, lyTop + 0.6, yTop + 0.008);
+                const tNE_r = toWorld(cxPx, cyPx, cosA, sinA,  hwRim, lyTop + 0.6, yTop + 0.008);
+                const bSW_r = toWorld(cxPx, cyPx, cosA, sinA, -hwRim, lyBot + 0.6, yBot - 0.008);
+                const bSE_r = toWorld(cxPx, cyPx, cosA, sinA,  hwRim, lyBot + 0.6, yBot - 0.008);
+                pushMatQuad3D(tNW_r, tNE_r, bSW_r, bSE_r, 9, silverTrim[0], silverTrim[1], silverTrim[2], 1.0);
+
+                // 3. Pitched High-Resolution 128x64 Billboard Artwork Quad (tilted 30° toward camera!)
+                const [fu0, fv0, fu1, fv1] = getUV(adKey);
+                const tNW_a = toWorld(cxPx, cyPx, cosA, sinA, -hw, lyTop + 1.1, yTop);
+                const tNE_a = toWorld(cxPx, cyPx, cosA, sinA,  hw, lyTop + 1.1, yTop);
+                const bSW_a = toWorld(cxPx, cyPx, cosA, sinA, -hw, lyBot + 1.1, yBot);
+                const bSE_a = toWorld(cxPx, cyPx, cosA, sinA,  hw, lyBot + 1.1, yBot);
+                pushQuad3D(tNW_a, tNE_a, bSW_a, bSE_a, fu0, fv0, fu1, fv1, 1.03, 1.02, 1.00, 1.0);
+
+                // Top center brand crown header badge & subtle accent trim bar
+                emitSolidBox3D(cxPx, cyPx, cosA, sinA, 0, lyTop - 1.2, 54, 5.5, yTop + 0.03, yTop + 0.075, frameCol, 9);
+                emitSolidBox3D(cxPx, cyPx, cosA, sinA, 0, lyTop - 0.5, 46, 3.5, yTop + 0.075, yTop + 0.098, accentCol, 10);
+
+                // 4. Full-Width Front See-Through Steel Maintenance Catwalk (S250 / L64) & 4 Upward Halogen Floodlights
+                emitTileBox3D(cxPx, cyPx, cosA, sinA, 0, lyBot + 5.5, 164, 8.5, yBot - 0.045, yBot - 0.005, 250, 250, 64, [0.80, 0.84, 0.90], false);
+                emitSolidBox3D(cxPx, cyPx, cosA, sinA, 0, lyBot + 9.4, 164, 1.8, yBot - 0.005, yBot + 0.055, darkSteel, 5);
+                for (const lx of [-54, -18, 18, 54]) {
+                    // Cantilevered floodlight boom arm + dark reflector hood + warm-white halogen lens
+                    emitSolidBox3D(cxPx, cyPx, cosA, sinA, lx, lyBot + 11.5, 2.2, 6.0, yBot - 0.02, yBot + 0.01, darkSteel, 5);
+                    emitSolidBox3D(cxPx, cyPx, cosA, sinA, lx, lyBot + 14.2, 9.5, 4.2, yBot - 0.01, yBot + 0.035, frameCol, 9);
+                    emitSolidBox3D(cxPx, cyPx, cosA, sinA, lx, lyBot + 13.4, 8.0, 2.8, yBot + 0.035, yBot + 0.052, [1.00, 0.96, 0.82], 10);
+                }
+            };
+
+            const placedBillboards = [];
+            const isTooCloseToBillboard = (wx, wy, minDistPx) => {
+                for (let i = 0; i < placedBillboards.length; i++) {
+                    const pb = placedBillboards[i];
+                    if (Math.hypot(pb.x - wx, pb.y - wy) < minDistPx) return true;
+                }
+                return false;
+            };
+
+            // Pass 29C-0A: Place Monumental Rooftop Mega-Billboards on flat 3x2 commercial roofs overlooking major streets/intersections
+            let bbPaletteIdx = 0;
+            for (let r = 14; r < MAP_ROWS - 14; r++) {
+                for (let c = 14; c < M - 14; c++) {
+                    const z = bTopZ[r * M + c];
+                    if (z < 3 || z > 5) continue;
+
+                    // Verify a 3-tile-wide (c..c+2) x 2-tile-deep (r-1..r) flat commercial roof plateau
+                    let roofFlatOk = true;
+                    for (let dr = -1; dr <= 0 && roofFlatOk; dr++) {
+                        const rrOff = (r + dr) * M;
+                        for (let dc = 0; dc <= 2; dc++) {
+                            const idx = rrOff + (c + dc);
+                            if (bTopZ[idx] !== z || bTopLid[idx] === 35 || roofUsed[idx] || customMask[idx]) {
+                                roofFlatOk = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!roofFlatOk) continue;
+
+                    // Row r+1 must drop down to ground level (South edge of the building)
+                    const s1Off = (r + 1) * M;
+                    if (bTopZ[s1Off + c] !== 0 || bTopZ[s1Off + c + 1] !== 0 || bTopZ[s1Off + c + 2] !== 0) {
+                        continue;
+                    }
+
+                    // Must directly overlook an East-West street/avenue (at r+1, r+2, or r+3) OR stand on a corner lot beside a North-South avenue
+                    const hasEWStreet = surfGtGrid && (
+                        (surfGtGrid[(r + 1) * M + (c + 1)] === GROUND_TYPE.ROAD) ||
+                        (surfGtGrid[(r + 2) * M + (c + 1)] === GROUND_TYPE.ROAD) ||
+                        (surfGtGrid[(r + 3) * M + (c + 1)] === GROUND_TYPE.ROAD)
+                    );
+                    const hasWestAve = surfGtGrid && (
+                        bTopZ[r * M + (c - 1)] === 0 &&
+                        (surfGtGrid[r * M + (c - 2)] === GROUND_TYPE.ROAD || surfGtGrid[r * M + (c - 1)] === GROUND_TYPE.ROAD)
+                    );
+                    const hasEastAve = surfGtGrid && (
+                        bTopZ[r * M + (c + 3)] === 0 &&
+                        (surfGtGrid[r * M + (c + 3)] === GROUND_TYPE.ROAD || surfGtGrid[r * M + (c + 4)] === GROUND_TYPE.ROAD)
+                    );
+                    if (!hasEWStreet && !hasWestAve && !hasEastAve) continue;
+
+                    const cxPx = (c + 1.5) * TILE_SIZE;
+                    const cyPx = (r + 0.30) * TILE_SIZE;
+                    if (isTooCloseToBillboard(cxPx, cyPx, 13.0 * TILE_SIZE)) continue;
+
+                    // Angle slightly toward corner intersections while facing South toward the camera
+                    let ang = 0.0;
+                    if (!hasEWStreet && hasWestAve) ang = -0.22;
+                    else if (!hasEWStreet && hasEastAve) ang = 0.22;
+                    else if (hasWestAve && !hasEastAve) ang = -0.12;
+                    else if (hasEastAve && !hasWestAve) ang = 0.12;
+
+                    const spec = megaBillboardPalette[bbPaletteIdx % megaBillboardPalette.length];
+                    bbPaletteIdx++;
+                    emitMegaBillboard3D(cxPx, cyPx, Math.cos(ang), Math.sin(ang), z, spec.ad, spec.accent, true);
+                    placedBillboards.push({ x: cxPx, y: cyPx, z, ang, ad: spec.ad, isRooftop: true });
+                    this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 2, topElev: z + 0.95 });
+
+                    // Reserve the roof neighborhood so no helipad/penthouse/HVAC overlaps this Mega-Billboard
+                    for (let dr = -3; dr <= 2; dr++) {
+                        for (let dc = -2; dc <= 4; dc++) {
+                            const cc = c + dc, rr = r + dr;
+                            if (cc >= 0 && cc < M && rr >= 0 && rr < MAP_ROWS) {
+                                roofUsed[rr * M + cc] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Pass 29C-0B: Place Towering Highway & Causeway Verge Monopole Mega-Billboards
+            // Verified 5x2 open grass verges (GROUND_TYPE.FIELD, bTopZ === 0) immediately North of major East-West highways
+            if (surfGtGrid) {
+                for (let r = 20; r < MAP_ROWS - 20; r++) {
+                    for (let c = 20; c < M - 20; c++) {
+                        const isInsideRestricted = (c >= 52 && c <= 72 && r >= 72 && r <= 150) || (c >= 60 && c <= 170 && r >= 294 && r <= 372);
+                        if (isInsideRestricted) continue;
+
+                        // Require a 5x2 open grass verge (GROUND_TYPE.FIELD) with zero buildings and zero custom prefabs
+                        let vergeOk = true;
+                        for (let dr = -1; dr <= 0 && vergeOk; dr++) {
+                            const rrOff = (r + dr) * M;
+                            for (let dc = -1; dc <= 3; dc++) {
+                                const idx = rrOff + (c + dc);
+                                if (bTopZ[idx] !== 0 || customMask[idx] || surfGtGrid[idx] !== GROUND_TYPE.FIELD) {
+                                    vergeOk = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!vergeOk) continue;
+
+                        // Must border a continuous East-West highway lane (GROUND_TYPE.ROAD) immediately South at r+1 or r+2
+                        const roadAtR1 = (
+                            surfGtGrid[(r + 1) * M + c] === GROUND_TYPE.ROAD &&
+                            surfGtGrid[(r + 1) * M + c + 1] === GROUND_TYPE.ROAD &&
+                            surfGtGrid[(r + 1) * M + c + 2] === GROUND_TYPE.ROAD
+                        );
+                        const roadAtR2 = (
+                            surfGtGrid[(r + 1) * M + c + 1] !== GROUND_TYPE.BUILDING &&
+                            surfGtGrid[(r + 2) * M + c] === GROUND_TYPE.ROAD &&
+                            surfGtGrid[(r + 2) * M + c + 1] === GROUND_TYPE.ROAD &&
+                            surfGtGrid[(r + 2) * M + c + 2] === GROUND_TYPE.ROAD
+                        );
+                        if (!roadAtR1 && !roadAtR2) continue;
+
+                        // Ensure no building blocks the view within 3 tiles South
+                        let southClear = true;
+                        for (let dr = 1; dr <= 3 && southClear; dr++) {
+                            for (let dc = -1; dc <= 3; dc++) {
+                                if (bTopZ[(r + dr) * M + (c + dc)] > 0) {
+                                    southClear = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!southClear) continue;
+
+                        const cxPx = (c + 1.5) * TILE_SIZE;
+                        const cyPx = (r - 0.15) * TILE_SIZE;
+                        if (isTooCloseToBillboard(cxPx, cyPx, 16.0 * TILE_SIZE)) continue;
+
+                        const spec = megaBillboardPalette[bbPaletteIdx % megaBillboardPalette.length];
+                        bbPaletteIdx++;
+                        emitMegaBillboard3D(cxPx, cyPx, 1.0, 0.0, 2.0, spec.ad, spec.accent, false);
+                        placedBillboards.push({ x: cxPx, y: cyPx, z: 2.0, ang: 0, ad: spec.ad, isRooftop: false });
+                        if (this.landmarks3D && Array.isArray(this.landmarks3D.gtaBillboards)) {
+                            this.landmarks3D.gtaBillboards.push({ x: cxPx, y: cyPx, z: 2.0, ang: 0, ad: spec.ad, neon: spec.accent });
+                        }
+                        if (Array.isArray(this.clearZones)) {
+                            this.clearZones.push({ x: cxPx, y: cyPx, r: 96 });
                         }
                     }
                 }
