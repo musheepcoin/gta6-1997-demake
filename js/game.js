@@ -12500,7 +12500,7 @@ class LeonidaGame {
 
             const d = Math.hypot(dx, dy);
 
-            if (v.sirenActive && d < nearestSirenDist) {
+            if (v.sirenActive && v.driver !== "AI_TOW" && d < nearestSirenDist) {
 
                 nearestSirenDist = d;
 

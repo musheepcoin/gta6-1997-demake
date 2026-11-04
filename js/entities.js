@@ -2224,7 +2224,7 @@ class Vehicle {
             };
         }
 
-        return this.computeRoadInterceptControls(
+        return this.computeTargetRoadOrFeelerControls(
             dt,
             map,
             game,
