@@ -6400,11 +6400,41 @@ class LeonidaGame {
 
 
 
-    addSkidmark(x, y) {
+    addSkidmark(x, y, opts = {}) {
 
-        this.skidmarks.push({ x, y });
+        const maxLife = typeof opts.maxLife === "number" ? opts.maxLife : 8.5;
 
-        if (this.skidmarks.length > 420) {
+        this.skidmarks.push({
+
+            x,
+
+            y,
+
+            z: typeof opts.z === "number" ? opts.z : 2.0,
+
+            angle: typeof opts.angle === "number" ? opts.angle : 0,
+
+            w: typeof opts.w === "number" ? opts.w : 5.5,
+
+            h: typeof opts.h === "number" ? opts.h : 2.8,
+
+            r: typeof opts.r === "number" ? opts.r : 0.08,
+
+            g: typeof opts.g === "number" ? opts.g : 0.08,
+
+            b: typeof opts.b === "number" ? opts.b : 0.10,
+
+            alpha: typeof opts.alpha === "number" ? opts.alpha : 0.46,
+
+            life: typeof opts.life === "number" ? opts.life : maxLife,
+
+            maxLife,
+
+            surface: opts.surface || "ROAD"
+
+        });
+
+        if (this.skidmarks.length > 1400) {
 
             this.skidmarks.shift();
 
@@ -11676,6 +11706,28 @@ class LeonidaGame {
             ft.life -= dt;
 
             if (ft.life <= 0) this.floatingTexts.splice(i, 1);
+
+        }
+
+
+
+        // Progressive fade-out & cleanup of tire/surface tracks (grass, sand, mud, road)
+
+        for (let i = this.skidmarks.length - 1; i >= 0; i--) {
+
+            const sk = this.skidmarks[i];
+
+            if (typeof sk.life === "number") {
+
+                sk.life -= dt;
+
+                if (sk.life <= 0) {
+
+                    this.skidmarks.splice(i, 1);
+
+                }
+
+            }
 
         }
 

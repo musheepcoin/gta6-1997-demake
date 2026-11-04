@@ -2314,13 +2314,12 @@ class Vehicle {
             this.speed = curSpd;
             this.vx = Math.cos(this.angle) * curSpd;
             this.vy = Math.sin(this.angle) * curSpd;
-            if ((Math.abs(diff) > 0.45 || input.handbrake) && curSpd > 110 && !map.isWaterAtPixel(this.x, this.y)) {
-                game.addSkidmark(this.x, this.y, this.angle, this.w, this.h);
-            }
+            this.drifting = (Math.abs(diff) > 0.45 || Boolean(input.handbrake)) && curSpd > 110;
         } else if (this.driver === "PLAYER" && input && input.joyWasUsed && !input.up && !input.down && !input.left && !input.right) {
             // Mobile stick released: smooth immediate stop like pedestrian movement
             this.aiState = "PLAYER";
             this.steerAngleRad = 0;
+            this.drifting = false;
             this.vx *= Math.pow(0.025, dt);
             this.vy *= Math.pow(0.025, dt);
             if (Math.hypot(this.vx, this.vy) < 6) {
@@ -2421,6 +2420,198 @@ class Vehicle {
         if (typeof map.getHeightAtPixel === "function") {
             this.z = map.getHeightAtPixel(this.x, this.y, curZ);
         }
+        this.emitWheelTracks(map, game);
+    }
+
+    getSurfaceTrackStyle(x, y, map, isDrifting) {
+        if (!map || map.isWaterAtPixel(x, y)) return null;
+        const tile = map.getTileAtPixel(x, y);
+        const gt = typeof map.getGroundTypeAt === "function" ? map.getGroundTypeAt(x, y) : 0;
+        if (tile === TILE.SAND) {
+            return {
+                surface: "SAND",
+                r: 0.54,
+                g: 0.42,
+                b: 0.23,
+                alpha: 0.56,
+                maxLife: 9.5
+            };
+        }
+        if (tile === TILE.SWAMP_MUD) {
+            return {
+                surface: "MUD",
+                r: 0.19,
+                g: 0.14,
+                b: 0.08,
+                alpha: 0.64,
+                maxLife: 10.5
+            };
+        }
+        if (tile === TILE.GRASS || gt === GROUND_TYPE.FIELD) {
+            return {
+                surface: "GRASS",
+                r: 0.13,
+                g: 0.25,
+                b: 0.10,
+                alpha: 0.56,
+                maxLife: 9.0
+            };
+        }
+        if (isDrifting) {
+            return {
+                surface: "ROAD",
+                r: 0.07,
+                g: 0.07,
+                b: 0.09,
+                alpha: 0.48,
+                maxLife: 8.0
+            };
+        }
+        return null;
+    }
+
+    emitWheelTracks(map, game) {
+        if (!map || !game || typeof game.addSkidmark !== "function") return;
+        if (this.specKey === "AIRBOAT" || (this.stuntAirTimer || 0) > 0) return;
+        if (map.isWaterAtPixel(this.x, this.y)) return;
+
+        const curSpeed = Math.hypot(this.vx, this.vy);
+        if (curSpeed < 10) return;
+
+        const style = this.getSurfaceTrackStyle(this.x, this.y, map, Boolean(this.drifting));
+        if (!style) return;
+
+        // Distance-gate track segments so marks form smooth continuous ribbons regardless of framerate
+        const stepDist = 5.2;
+        const moved = this._lastTrackX === undefined
+            ? 999
+            : Math.hypot(this.x - this._lastTrackX, this.y - this._lastTrackY);
+        if (moved < stepDist) return;
+        this._lastTrackX = this.x;
+        this._lastTrackY = this.y;
+
+        const fx = Math.cos(this.angle);
+        const fy = Math.sin(this.angle);
+        const rx = -fy;
+        const ry = fx;
+        const frontAng = this.angle + (this.steerAngleRad || 0) * 0.68;
+        const rearAng = this.angle;
+        const vz = this.z !== undefined ? this.z : 2.0;
+        const isOffroad = style.surface !== "ROAD";
+
+        const pushWheelMark = (wx, wy, ang, segLen, tireWidth, alphaMult = 1.0) => {
+            const wStyle = this.getSurfaceTrackStyle(wx, wy, map, Boolean(this.drifting)) || style;
+            if (!wStyle) return;
+            game.addSkidmark(wx, wy, {
+                z: vz,
+                angle: ang,
+                w: segLen,
+                h: tireWidth,
+                r: wStyle.r,
+                g: wStyle.g,
+                b: wStyle.b,
+                alpha: Math.min(0.82, wStyle.alpha * alphaMult),
+                life: wStyle.maxLife,
+                maxLife: wStyle.maxLife,
+                surface: wStyle.surface
+            });
+        };
+
+        // 1) 2-Wheelers (Motorcycles, Scooters, BMX): 2 inline wheels (front steered + rear drive)
+        if (this.isMotorcycle) {
+            const tireW = (this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") ? 1.8 : 2.4;
+            const rearX = this.x + fx * this.rearTireOffset;
+            const rearY = this.y + fy * this.rearTireOffset;
+            pushWheelMark(rearX, rearY, rearAng, 6.8, tireW, 1.0);
+            if (isOffroad) {
+                const frontX = this.x + fx * this.frontTireOffset;
+                const frontY = this.y + fy * this.frontTireOffset;
+                pushWheelMark(frontX, frontY, frontAng, 6.4, tireW * 0.92, 0.88);
+            }
+            return;
+        }
+
+        // 2) Tracked Armored Tank: 2 wide heavy caterpillar treads
+        if (this.isTank || this.specKey === "PANZER_TANK") {
+            const latOff = Math.max(9.5, (this.h || 28) * 0.38);
+            for (const side of [-1, 1]) {
+                const tx = this.x + rx * (latOff * side);
+                const ty = this.y + ry * (latOff * side);
+                pushWheelMark(tx, ty, rearAng, 8.2, 5.4, 1.2);
+            }
+            return;
+        }
+
+        // 3) 6-Wheel / Multi-Axle Heavy Trucks, Buses, Armored Vans & Stretch Limos (3 axles / dual rear tires)
+        const isSixWheeler = Boolean(
+            this.isHeavyVehicle ||
+            this.specKey === "FLATBED_TRUCK" ||
+            this.specKey === "TANKER_RIG" ||
+            this.specKey === "CITY_BUS" ||
+            this.specKey === "TOUR_COACH" ||
+            this.specKey === "SWAT_ENFORCER" ||
+            this.specKey === "BRINKS_TRUCK" ||
+            this.specKey === "FIRE_TRUCK" ||
+            this.specKey === "STRETCH_LIMO"
+        );
+        const latOff = Math.max(6.8, (this.h || 22) * 0.38);
+
+        if (isSixWheeler) {
+            const frontOff = this.frontTireOffset;
+            const midRearOff = this.rearTireOffset * 0.56;
+            const backRearOff = this.rearTireOffset * 1.04;
+            for (const side of [-1, 1]) {
+                // Rear dual-wheel tandem axle 1 (outer dual)
+                pushWheelMark(
+                    this.x + fx * backRearOff + rx * ((latOff + 0.9) * side),
+                    this.y + fy * backRearOff + ry * ((latOff + 0.9) * side),
+                    rearAng,
+                    7.2,
+                    3.8,
+                    1.08
+                );
+                // Rear dual-wheel tandem axle 2 (inner/mid offset)
+                pushWheelMark(
+                    this.x + fx * midRearOff + rx * ((latOff - 1.1) * side),
+                    this.y + fy * midRearOff + ry * ((latOff - 1.1) * side),
+                    rearAng,
+                    7.0,
+                    3.4,
+                    0.96
+                );
+                // Steered front axle (2 front wheels)
+                if (isOffroad) {
+                    pushWheelMark(
+                        this.x + fx * frontOff + rx * (latOff * side),
+                        this.y + fy * frontOff + ry * (latOff * side),
+                        frontAng,
+                        6.8,
+                        3.0,
+                        0.92
+                    );
+                }
+            }
+            return;
+        }
+
+        // 4) Standard 4-Wheel Cars, Muscle Cars, Sports Cars, SUVs & 4x4s (2 front steered wheels + 2 rear drive wheels)
+        const isOffroad4x4 = Boolean(
+            this.specKey === "GATOR_4X4" ||
+            this.specKey === "MONSTER_BUGGY" ||
+            this.specKey === "PICKUP_TRUCK" ||
+            this.specKey === "CAMPER_PICKUP"
+        );
+        const tireW = isOffroad4x4 ? 3.5 : 2.8;
+        for (const side of [-1, 1]) {
+            const rearX = this.x + fx * this.rearTireOffset + rx * (latOff * side);
+            const rearY = this.y + fy * this.rearTireOffset + ry * (latOff * side);
+            pushWheelMark(rearX, rearY, rearAng, 7.0, tireW, 1.0);
+            if (isOffroad) {
+                const frontX = this.x + fx * this.frontTireOffset + rx * (latOff * side);
+                const frontY = this.y + fy * this.frontTireOffset + ry * (latOff * side);
+                pushWheelMark(frontX, frontY, frontAng, 6.6, tireW * 0.94, 0.90);
+            }
+        }
     }
 
     computeSurfaceMultiplier(map) {
@@ -2510,15 +2701,10 @@ class Vehicle {
 
         this.drifting = (handbrake && Math.abs(forwardVel) > 130) || Math.abs(lateralVel) > 75;
         if (this.drifting && !map.isWaterAtPixel(this.x, this.y)) {
-            const rearTire = this.getTirePosition(CAR_TIRE.REAR);
-            if (this.isMotorcycle) {
-                game.addSkidmark(rearTire.x, rearTire.y);
-            } else {
-                const lat = this.getTireLateral(CAR_TIRE.REAR);
-                game.addSkidmark(rearTire.x + lat.x * 8, rearTire.y + lat.y * 8);
-                game.addSkidmark(rearTire.x - lat.x * 8, rearTire.y - lat.y * 8);
-            }
-            if (this.driver === "PLAYER" && this.specKey !== "BMX_BIKE" && this.specKey !== "E_SCOOTER" && Math.random() < 0.25) {
+            const tile = map.getTileAtPixel(this.x, this.y);
+            const gt = typeof map.getGroundTypeAt === "function" ? map.getGroundTypeAt(this.x, this.y) : 0;
+            const isSoftSurface = tile === TILE.SAND || tile === TILE.SWAMP_MUD || tile === TILE.GRASS || gt === GROUND_TYPE.FIELD;
+            if (!isSoftSurface && this.driver === "PLAYER" && this.specKey !== "BMX_BIKE" && this.specKey !== "E_SCOOTER" && Math.random() < 0.25) {
                 game.audio.playTireScreech();
             }
         }

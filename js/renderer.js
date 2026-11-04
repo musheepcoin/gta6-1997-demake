@@ -5794,11 +5794,24 @@ class RetroRenderer {
     }
 
     batchWorldSprites3D(game, minX, minY, maxX, maxY) {
-        // 1. Tire Skidmarks on Road Surface (eSpriteDrawOrder_TireMarks)
+        // 1. Tire Skidmarks & Off-Road Surface Wheel Ruts (Grass, Sand, Mud, Road) with Progressive Fade-Out (eSpriteDrawOrder_TireMarks)
         for (const s of game.skidmarks) {
             if (s.x < minX || s.x > maxX || s.y < minY || s.y > maxY) continue;
+            const lifeRatio = (typeof s.life === "number" && typeof s.maxLife === "number" && s.maxLife > 0)
+                ? Math.max(0, Math.min(1, s.life / s.maxLife))
+                : 1.0;
+            if (lifeRatio <= 0.01) continue;
+            // Smooth ease-out fade so tracks remain crisp initially and dissolve naturally into the terrain
+            const fade = Math.pow(lifeRatio, 0.85);
+            const alpha = (typeof s.alpha === "number" ? s.alpha : 0.45) * fade;
             const sz = this.getEntityZ(s, 0.015);
-            this.pushSolidQuad3D(s.x, s.y, sz, 3, 3, 0, 0.08, 0.08, 0.10, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            const sw = typeof s.w === "number" ? s.w : 3.5;
+            const sh = typeof s.h === "number" ? s.h : 2.8;
+            const sang = typeof s.angle === "number" ? s.angle : 0;
+            const sr = typeof s.r === "number" ? s.r : 0.08;
+            const sg = typeof s.g === "number" ? s.g : 0.08;
+            const sb = typeof s.b === "number" ? s.b : 0.10;
+            this.pushSolidQuad3D(s.x, s.y, sz, sw, sh, sang, sr, sg, sb, alpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
         }
 
         // 2. Crates, Kill Frenzies, Info Signs, Powerups & Ringing Payphones (eSpriteDrawOrder_MapObject)
