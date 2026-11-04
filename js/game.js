@@ -8114,9 +8114,9 @@ class LeonidaGame {
 
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 4.5;
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 25.0;
 
-            const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 22.0 : 11.0);
+            const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
 
             if (!isWreck && !isAbandoned) continue;
 
@@ -8192,9 +8192,9 @@ class LeonidaGame {
 
         this.towDispatchTimer = (this.towDispatchTimer || 0) + dt;
 
-        if (this.towDispatchTimer < 3.5) return;
+        if (this.towDispatchTimer < 6.0) return;
 
-        this.towDispatchTimer = 1.8; // retry ~1.7s later if no road spawn block found
+        this.towDispatchTimer = 3.0; // retry ~3s later if no road spawn block found
 
 
 

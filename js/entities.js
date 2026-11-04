@@ -2176,8 +2176,8 @@ class Vehicle {
             let bestDist = 1400;
             for (const v of game.vehicles) {
                 if (v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) continue;
-                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 4.5;
-                const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 22.0 : 11.0);
+                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 25.0;
+                const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
                 if (!isWreck && !isAbandoned) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
