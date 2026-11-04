@@ -7578,6 +7578,8 @@ class LeonidaGame {
 
         const baseHeading = p.inVehicle ? p.inVehicle.angle : p.angle;
 
+        const pz = p.z || 2.0;
+
         let chosenPos = null;
 
         for (let attempt = 0; attempt < 22; attempt++) {
@@ -7592,9 +7594,15 @@ class LeonidaGame {
 
             const ty = Math.floor((p.y + Math.sin(ang) * dist) / TILE_SIZE);
 
-            const blk = this.map.getBlockAt(tx, ty, 0);
+            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(tx, ty)) continue;
 
-            if (!blk || blk.groundType !== GROUND_TYPE.ROAD) continue;
+            const navBlk = typeof this.map.getNavigationBlock === "function"
+
+                ? this.map.getNavigationBlock(tx, ty, pz)
+
+                : null;
+
+            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
 
             const wx = (tx + 0.5) * TILE_SIZE;
 
@@ -7602,7 +7610,7 @@ class LeonidaGame {
 
             if (Math.hypot(wx - p.x, wy - p.y) < 210) continue;
 
-            const bCol = this.map.resolveCircleBuildingCollision(wx, wy, 24, 2.0);
+            const bCol = this.map.resolveCircleBuildingCollision(wx, wy, 24, pz);
 
             if (bCol && bCol.hit) continue;
 
@@ -7618,7 +7626,13 @@ class LeonidaGame {
 
             else roadAng = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5][Math.floor(Math.random() * 4)];
 
-            chosenPos = { x: wx, y: wy, z: this.map.getHeightAtPixel(wx, wy, 2.0), roadAng };
+            if (typeof this.map.getAlignedRoadAngle === "function") {
+
+                roadAng = this.map.getAlignedRoadAngle(tx, ty, roadAng, pz);
+
+            }
+
+            chosenPos = { x: wx, y: wy, z: this.map.getHeightAtPixel(wx, wy, pz), roadAng };
 
             break;
 
@@ -7650,9 +7664,13 @@ class LeonidaGame {
 
 
 
-        const getawayPool = ["CRIMSON_STINGER", "NEON_BANSHEE", "SABRE_TURBO", "MUSCLE_97", "CHEETAH_GT"];
+        const getawayPool = ["VICE_CHEETAH", "BANSHEE_GT", "CHALLENGER_RT", "TULIP_MUSCLE", "PENETRATOR_GT"];
 
         const getawayKey = getawayPool[Math.floor(Math.random() * getawayPool.length)];
+
+        const gangTypes = ["vc_haitian", "vc_cuban", "g2_zaibatsu", "g2_russian", "g2_mugger"];
+
+        const nowId = Date.now();
 
         const roll = Math.random();
 
@@ -7662,9 +7680,9 @@ class LeonidaGame {
 
             // 1. HIGH_SPEED_CHASE: Getaway sports car fleeing at high speed with 1-2 VCPD / SWAT units in hot pursuit!
 
-            const crimCar = new Vehicle(x + fwdX * 26, y + fwdY * 26, getawayKey, z);
+            const crimCar = new Vehicle(`amb_crim_${nowId}`, getawayKey, x + fwdX * 26, y + fwdY * 26, roadAng);
 
-            crimCar.angle = roadAng;
+            crimCar.z = z;
 
             crimCar.driver = "AI_CRIMINAL";
 
@@ -7688,11 +7706,23 @@ class LeonidaGame {
 
                 const latOff = (i === 0 ? 1 : -1) * 10;
 
-                const copSpec = (i === 1 && Math.random() < 0.4) ? "SWAT_ENFORCER" : "POLICE_CRUISER";
+                const copSpec = (i === 1 && Math.random() < 0.4) ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
-                const copCar = new Vehicle(x - fwdX * backDist + sideX * latOff, y - fwdY * backDist + sideY * latOff, copSpec, z);
+                const copCar = new Vehicle(
 
-                copCar.angle = roadAng;
+                    `amb_cop_${nowId}_${i}`,
+
+                    copSpec,
+
+                    x - fwdX * backDist + sideX * latOff,
+
+                    y - fwdY * backDist + sideY * latOff,
+
+                    roadAng
+
+                );
+
+                copCar.z = z;
 
                 copCar.driver = "AI_COP";
 
@@ -7714,9 +7744,9 @@ class LeonidaGame {
 
             // 2. GANG_HEIST_SHOOTOUT: Armed heist crew exchanging heavy gunfire with VCPD & SWAT officers in the street!
 
-            const crimCar = new Vehicle(x + fwdX * 20 + sideX * 12, y + fwdY * 20 + sideY * 12, getawayKey, z);
+            const crimCar = new Vehicle(`amb_heist_${nowId}`, getawayKey, x + fwdX * 20 + sideX * 12, y + fwdY * 20 + sideY * 12, roadAng + 0.25);
 
-            crimCar.angle = roadAng + 0.25;
+            crimCar.z = z;
 
             crimCar.driver = null;
 
@@ -7736,7 +7766,11 @@ class LeonidaGame {
 
                 const by = y + fwdY * (12 + i * 16) + sideY * ((i % 2 === 0 ? 1 : -1) * 20);
 
+                const gType = gangTypes[(i + Math.floor(Math.random() * gangTypes.length)) % gangTypes.length];
+
                 this.peds.push(new Pedestrian({
+
+                    id: `amb_bandit_${nowId}_${i}`,
 
                     x: bx,
 
@@ -7746,11 +7780,25 @@ class LeonidaGame {
 
                     kind: "CRIMINAL",
 
+                    g24Type: gType,
+
+                    g2Remapped: true,
+
+                    shirtColor: "#ef4444",
+
                     hp: 95,
+
+                    maxHp: 95,
 
                     copWeapon: i === 0 ? "SHOTGUN" : "UZI",
 
-                    angle: roadAng + Math.PI
+                    angle: roadAng + Math.PI,
+
+                    speed: 96,
+
+                    dead: false,
+
+                    panicTimer: 0
 
                 }));
 
@@ -7758,11 +7806,11 @@ class LeonidaGame {
 
 
 
-            const copSpec = Math.random() < 0.38 ? "SWAT_ENFORCER" : "POLICE_CRUISER";
+            const copSpec = Math.random() < 0.38 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
-            const copCar = new Vehicle(x - fwdX * 62 - sideX * 10, y - fwdY * 62 - sideY * 10, copSpec, z);
+            const copCar = new Vehicle(`amb_heist_copcar_${nowId}`, copSpec, x - fwdX * 62 - sideX * 10, y - fwdY * 62 - sideY * 10, roadAng - 0.22);
 
-            copCar.angle = roadAng - 0.22;
+            copCar.z = z;
 
             copCar.driver = "AI_COP";
 
@@ -7784,6 +7832,8 @@ class LeonidaGame {
 
                 this.peds.push(new Pedestrian({
 
+                    id: `amb_heist_cop_${nowId}_${i}`,
+
                     x: cx,
 
                     y: cy,
@@ -7792,13 +7842,25 @@ class LeonidaGame {
 
                     kind: "COP",
 
+                    g24Type: isSwat ? "g2_swat" : "police",
+
                     isSwat,
+
+                    shirtColor: isSwat ? "#1e293b" : "#1e3a8a",
 
                     hp: isSwat ? 140 : 105,
 
+                    maxHp: isSwat ? 140 : 105,
+
                     copWeapon: isSwat ? "SHOTGUN" : (i === 0 ? "UZI" : "PISTOL"),
 
-                    angle: roadAng
+                    angle: roadAng,
+
+                    speed: 98,
+
+                    dead: false,
+
+                    panicTimer: 0
 
                 }));
 
@@ -7810,9 +7872,9 @@ class LeonidaGame {
 
             // 3. STREET_CARJACK_INTERVENTION: Bandits carjacking a sports car while VCPD intervenes!
 
-            const jackedCar = new Vehicle(x, y, getawayKey, z);
+            const jackedCar = new Vehicle(`amb_jack_${nowId}`, getawayKey, x, y, roadAng);
 
-            jackedCar.angle = roadAng;
+            jackedCar.z = z;
 
             jackedCar.driver = "AI_CRIMINAL";
 
@@ -7834,6 +7896,8 @@ class LeonidaGame {
 
             const victim = new Pedestrian({
 
+                id: `amb_victim_${nowId}`,
+
                 x: x + sideX * 24,
 
                 y: y + sideY * 24,
@@ -7842,11 +7906,23 @@ class LeonidaGame {
 
                 kind: "CIVILIAN",
 
-                angle: roadAng + Math.PI * 0.5
+                g24Type: "civ0",
+
+                shirtColor: "#38bdf8",
+
+                hp: 40,
+
+                maxHp: 40,
+
+                speed: 88,
+
+                angle: roadAng + Math.PI * 0.5,
+
+                dead: false,
+
+                panicTimer: 7.0
 
             });
-
-            victim.panicTimer = 7.0;
 
             this.peds.push(victim);
 
@@ -7854,7 +7930,11 @@ class LeonidaGame {
 
             // Accomplice bandit providing cover fire on foot
 
+            const gType = gangTypes[Math.floor(Math.random() * gangTypes.length)];
+
             this.peds.push(new Pedestrian({
+
+                id: `amb_jack_bandit_${nowId}`,
 
                 x: x - fwdX * 16 - sideX * 18,
 
@@ -7864,11 +7944,25 @@ class LeonidaGame {
 
                 kind: "CRIMINAL",
 
+                g24Type: gType,
+
+                g2Remapped: true,
+
+                shirtColor: "#ef4444",
+
                 hp: 90,
+
+                maxHp: 90,
 
                 copWeapon: "UZI",
 
-                angle: roadAng + Math.PI
+                angle: roadAng + Math.PI,
+
+                speed: 96,
+
+                dead: false,
+
+                panicTimer: 0
 
             }));
 
@@ -7876,9 +7970,9 @@ class LeonidaGame {
 
             // Responding VCPD cruiser + officer
 
-            const copCar = new Vehicle(x - fwdX * 72, y - fwdY * 72, "POLICE_CRUISER", z);
+            const copCar = new Vehicle(`amb_jack_copcar_${nowId}`, "VCPD_CRUISER", x - fwdX * 72, y - fwdY * 72, roadAng);
 
-            copCar.angle = roadAng;
+            copCar.z = z;
 
             copCar.driver = "AI_COP";
 
@@ -7896,6 +7990,8 @@ class LeonidaGame {
 
             this.peds.push(new Pedestrian({
 
+                id: `amb_jack_cop_${nowId}`,
+
                 x: x - fwdX * 50 + sideX * 22,
 
                 y: y - fwdY * 50 + sideY * 22,
@@ -7904,11 +8000,23 @@ class LeonidaGame {
 
                 kind: "COP",
 
+                g24Type: "police",
+
+                shirtColor: "#1e3a8a",
+
                 hp: 105,
+
+                maxHp: 105,
 
                 copWeapon: "PISTOL",
 
-                angle: roadAng
+                angle: roadAng,
+
+                speed: 98,
+
+                dead: false,
+
+                panicTimer: 0
 
             }));
 
