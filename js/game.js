@@ -500,13 +500,13 @@ class LeonidaGame {
 
         const parked = [
 
-            // --- A. Ocean Drive & Collins Ave: Keep sidewalks 100% clear for pedestrians & monks; exotics & bikes cruise in live road traffic, while the Hero Tulip is parked in the dedicated off-sidewalk Beachfront Bay (col 452.65)! ---
+            // --- A. Ocean Drive & Collins Ave: Keep sidewalks & boardwalks 100% clear of parked vehicles; all exotics, muscle cars & bikes cruise in live road traffic! ---
 
             { spec: "STINGER_CABRIO", c: 217.5, r: 136.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
             { spec: "TURISMO_CABRIO", c: 214.5, r: 138.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "TULIP_MUSCLE", c: 452.65, r: 282.5, raw512: true, a: -Math.PI * 0.5, z: 2.0, isScurveHero: true },
+            { spec: "TULIP_MUSCLE", c: 216.5, r: 143.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC", isScurveHero: true },
 
             { spec: "SUPERBIKE", c: 216.5, r: 141.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
@@ -638,13 +638,13 @@ class LeonidaGame {
 
             { spec: "MONSTER_BUGGY", c: 468.5, r: 274.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            // --- M. Ocean Drive & Lummus Park E-Scooters & BMX Cruisers (cruising in traffic + 2 parked in off-sidewalk Beachfront Bay at col 452.65) ---
+            // --- M. Ocean Drive & Collins Ave E-Scooters & BMX Cruisers (100% cruising in road traffic — zero parked on sidewalks or boardwalks!) ---
             { id: "micromob_0", spec: "E_SCOOTER", c: 214.5, r: 145.8, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_1", spec: "BMX_BIKE", c: 215.5, r: 151.8, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_2", spec: "E_SCOOTER", c: 217.5, r: 143.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_3", spec: "BMX_BIKE", c: 216.5, r: 152.4, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-            { id: "micromob_4", spec: "E_SCOOTER", c: 452.65, r: 280.2, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
-            { id: "micromob_5", spec: "BMX_BIKE", c: 452.65, r: 284.8, raw512: true, a: -Math.PI * 0.5, z: 2.0 },
+            { id: "micromob_4", spec: "E_SCOOTER", c: 215.5, r: 138.0, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { id: "micromob_5", spec: "BMX_BIKE", c: 216.5, r: 158.0, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_6", spec: "E_SCOOTER", c: 207.5, r: 146.0, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_7", spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_8", spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
@@ -5761,9 +5761,11 @@ class LeonidaGame {
 
         const directAngle = Math.atan2(targetY - ped.y, targetX - ped.x);
 
-        const offsets = [0, 0.35, -0.35, 0.72, -0.72, 1.15, -1.15, 1.60, -1.60];
+        const offsets = [0, 0.30, -0.30, 0.62, -0.62, 0.98, -0.98, 1.38, -1.38, 1.85, -1.85, 2.35, -2.35];
 
         const pz = ped.z !== undefined ? ped.z : 2.0;
+
+        const curHeading = typeof ped.angle === "number" ? ped.angle : directAngle;
 
         let bestAngle = directAngle;
 
@@ -5779,55 +5781,74 @@ class LeonidaGame {
 
             const cSin = Math.sin(cand);
 
-            let score = -Math.abs(off) * 1.6;
+            const turnFromCur = Math.abs(Math.atan2(Math.sin(cand - curHeading), Math.cos(cand - curHeading)));
 
-            const p1x = ped.x + cCos * 20;
+            // Hysteresis term (-turnFromCur * 0.45) keeps the pedestrian committed to one side of an obstacle without fluttering
+            let score = -Math.abs(off) * 1.35 - turnFromCur * 0.45;
 
-            const p1y = ped.y + cSin * 20;
+            const p1x = ped.x + cCos * 16;
 
-            const p2x = ped.x + cCos * 42;
+            const p1y = ped.y + cSin * 16;
 
-            const p2y = ped.y + cSin * 42;
+            const p2x = ped.x + cCos * 34;
+
+            const p2y = ped.y + cSin * 34;
 
             if (this.map.isWaterAtPixel && (this.map.isWaterAtPixel(p1x, p1y) || this.map.isWaterAtPixel(p2x, p2y))) {
 
-                score -= 80;
+                score -= 90;
 
             }
 
             if (this.map.resolveCircleBuildingCollision(p1x, p1y, 9, pz).hit) {
 
-                score -= 70;
+                score -= 75;
 
             } else if (this.map.resolveCircleBuildingCollision(p2x, p2y, 9, pz).hit) {
 
-                score -= 35;
+                score -= 36;
 
             }
 
-            if (this.resolveCircleVehicleCollision(p1x, p1y, 8, pz, ignoreVeh).hit) {
+            if (this.resolveCircleVehicleCollision(p1x, p1y, 9, pz, ignoreVeh).hit) {
 
-                score -= 52;
+                score -= 68;
 
-            } else if (this.resolveCircleVehicleCollision(p2x, p2y, 8, pz, ignoreVeh).hit) {
+            } else if (this.resolveCircleVehicleCollision(p2x, p2y, 9, pz, ignoreVeh).hit) {
 
-                score -= 24;
-
-            }
-
-            if (this.map.resolveCircleFloraCollision && this.map.resolveCircleFloraCollision(p1x, p1y, 8).hit) {
-
-                score -= 42;
+                score -= 32;
 
             }
 
-            if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && this.map.getNavigationBlock) {
+            if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0) {
 
-                const fNav = this.map.getNavigationBlock(Math.floor(p1x / TILE_SIZE), Math.floor(p1y / TILE_SIZE), pz);
+                if (typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(p1x, p1y, 6)) {
 
-                if (fNav && fNav.groundType === GROUND_TYPE.ROAD) {
+                    score -= 40;
 
-                    score -= 48;
+                }
+
+                if (this.map.getNavigationBlock) {
+
+                    const fbx = Math.floor(p1x / TILE_SIZE);
+
+                    const fby = Math.floor(p1y / TILE_SIZE);
+
+                    const fNav = this.map.getNavigationBlock(fbx, fby, pz);
+
+                    if (fNav && fNav.groundType === GROUND_TYPE.ROAD) {
+
+                        score -= 55;
+
+                    }
+
+                    const flid = this.map.getBlockInfo ? (this.map.getBlockInfo(fbx, fby, 1)?.lid || 0) : 0;
+
+                    if (fbx >= 449 && fbx <= 450 && fby >= 42 && fby <= 362 && flid === 10) {
+
+                        score -= 42;
+
+                    }
 
                 }
 
@@ -11289,26 +11310,43 @@ class LeonidaGame {
 
 
 
+                ped.waypointTimer = (ped.waypointTimer || 0) + dt;
+
+                const curTx = ped.targetBx !== null && ped.targetBx !== undefined
+                    ? (ped.targetBx + 0.5) * TILE_SIZE + (ped.targetOffX || 0)
+                    : ped.x;
+                const curTy = ped.targetBy !== null && ped.targetBy !== undefined
+                    ? (ped.targetBy + 0.5) * TILE_SIZE + (ped.targetOffY || 0)
+                    : ped.y;
+
                 const needTarget =
 
                     ped.targetBx === null ||
 
                     ped.targetBx === undefined ||
 
-                    Math.hypot((ped.targetBx + 0.5) * TILE_SIZE - ped.x, (ped.targetBy + 0.5) * TILE_SIZE - ped.y) < 10;
+                    ped.waypointTimer > 2.2 ||
+
+                    Math.hypot(curTx - ped.x, curTy - ped.y) < 18;
 
 
 
                 if (needTarget) {
 
-                    const baseX = ped.targetBx !== null && ped.targetBx !== undefined ? ped.targetBx : bx;
+                    const reachedTarget = ped.targetBx !== null && ped.targetBx !== undefined && Math.hypot(curTx - ped.x, curTy - ped.y) < 18;
 
-                    const baseY = ped.targetBy !== null && ped.targetBy !== undefined ? ped.targetBy : by;
+                    const baseX = reachedTarget ? ped.targetBx : bx;
+
+                    const baseY = reachedTarget ? ped.targetBy : by;
+
+                    if (reachedTarget) {
+                        ped._avoidBx = -1;
+                        ped._avoidBy = -1;
+                    }
 
                     ped.turnSeed = (ped.turnSeed || 1) + 1;
 
-                    // Never step onto ROAD blocks (isPanic = false keeps pedestrians strictly on sidewalks/beaches)
-
+                    // Choose next sidewalk block while avoiding 3D structures, Lummus Park grass, and stopped vehicles
                     const nextStep = this.map.chooseNextSidewalkBlock(
 
                         baseX,
@@ -11321,7 +11359,13 @@ class LeonidaGame {
 
                         ped.turnSeed,
 
-                        false
+                        (ped.panicTimer || 0) > 0,
+
+                        this.vehicles,
+
+                        ped._avoidBx ?? -1,
+
+                        ped._avoidBy ?? -1
 
                     );
 
@@ -11331,15 +11375,50 @@ class LeonidaGame {
 
                     ped.angle = nextStep.angle;
 
+                    ped.waypointTimer = 0;
+
+                    ped.targetOffX = 0;
+
+                    ped.targetOffY = 0;
+
+                    // If a stopped vehicle or structure partially overlaps the center of (targetBx, targetBy),
+                    // shift the waypoint laterally (±18..24px) inside the corridor so the pedestrian bypasses it cleanly!
+                    const centerTx = (ped.targetBx + 0.5) * TILE_SIZE;
+                    const centerTy = (ped.targetBy + 0.5) * TILE_SIZE;
+                    if (
+                        this.resolveCircleVehicleCollision(centerTx, centerTy, 11, pz, null).hit ||
+                        this.map.resolveCircleBuildingCollision(centerTx, centerTy, 11, pz).hit
+                    ) {
+                        const perpX = -Math.sin(nextStep.angle);
+                        const perpY = Math.cos(nextStep.angle);
+                        for (const lat of [18, -18, 25, -25]) {
+                            const candX = centerTx + perpX * lat;
+                            const candY = centerTy + perpY * lat;
+                            const cbx = Math.floor(candX / TILE_SIZE);
+                            const cby = Math.floor(candY / TILE_SIZE);
+                            const cNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(cbx, cby, pz) : null;
+                            if (cNav && cNav.groundType !== GROUND_TYPE.ROAD && cNav.groundType !== GROUND_TYPE.WATER && cNav.groundType !== GROUND_TYPE.BUILDING) {
+                                if (
+                                    !this.resolveCircleVehicleCollision(candX, candY, 9, pz, null).hit &&
+                                    !this.map.resolveCircleBuildingCollision(candX, candY, 9, pz).hit
+                                ) {
+                                    ped.targetOffX = perpX * lat;
+                                    ped.targetOffY = perpY * lat;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                 }
 
 
 
                 if (ped.targetBx !== null && ped.targetBx !== undefined) {
 
-                    const tx = (ped.targetBx + 0.5) * TILE_SIZE;
+                    const tx = (ped.targetBx + 0.5) * TILE_SIZE + (ped.targetOffX || 0);
 
-                    const ty = (ped.targetBy + 0.5) * TILE_SIZE;
+                    const ty = (ped.targetBy + 0.5) * TILE_SIZE + (ped.targetOffY || 0);
 
                     ped.angle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
 
@@ -11456,35 +11535,22 @@ class LeonidaGame {
 
                 ped.y = pCol.y;
 
-                ped.angle += Math.PI * 0.5;
+                if (ped.kind === "CIVILIAN") {
+                    ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
+                        ? ped.targetBx
+                        : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
+                    ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
+                        ? ped.targetBy
+                        : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
+                }
+
+                ped.angle += Math.PI + (Math.random() - 0.5) * 0.8;
 
                 ped.targetBx = null;
 
                 ped.targetBy = null;
 
-            }
-
-
-
-            // Physical collision against Leonida Tree Trunks and Sabal Palms
-
-            if (this.map.resolveCircleFloraCollision) {
-
-                const fCol = this.map.resolveCircleFloraCollision(ped.x, ped.y, 8);
-
-                if (fCol.hit) {
-
-                    ped.x = fCol.x;
-
-                    ped.y = fCol.y;
-
-                    ped.angle += Math.PI * 0.5;
-
-                    ped.targetBx = null;
-
-                    ped.targetBy = null;
-
-                }
+                ped.turnSeed = (ped.turnSeed || 1) + 2;
 
             }
 
@@ -11495,9 +11561,47 @@ class LeonidaGame {
                     ped.x = vCol.x;
                     ped.y = vCol.y;
                     if (ped.kind === "CIVILIAN" && !ped._boardingVeh) {
-                        ped.angle += Math.PI + (Math.random() - 0.5) * 0.9;
+                        ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
+                            ? ped.targetBx
+                            : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
+                        ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
+                            ? ped.targetBy
+                            : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
+                        ped.angle += Math.PI + (Math.random() - 0.5) * 0.8;
                         ped.targetBx = null;
                         ped.targetBy = null;
+                        ped.turnSeed = (ped.turnSeed || 1) + 3;
+                    }
+                }
+            }
+
+            // Real-displacement anti-stuck watchdog: if any walking pedestrian moved < 7px over 0.50s,
+            // mark the tile ahead as blocked, nudge toward the center of the current walkable tile, and pick a clear direction!
+            if (!ped.dead && !ped.isLivingProp && ped.kind !== "GATOR" && (ped.healTimer || 0) <= 0 && (ped.slideCarTimer || 0) <= 0) {
+                ped._stuckCheckTimer = (ped._stuckCheckTimer || 0) + dt;
+                if (ped._lastCheckX === undefined) {
+                    ped._lastCheckX = ped.x;
+                    ped._lastCheckY = ped.y;
+                } else if (ped._stuckCheckTimer >= 0.50) {
+                    const movedDist = Math.hypot(ped.x - ped._lastCheckX, ped.y - ped._lastCheckY);
+                    ped._lastCheckX = ped.x;
+                    ped._lastCheckY = ped.y;
+                    ped._stuckCheckTimer = 0;
+                    if (movedDist < 7.0) {
+                        const cbx = Math.floor(ped.x / TILE_SIZE);
+                        const cby = Math.floor(ped.y / TILE_SIZE);
+                        ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
+                            ? ped.targetBx
+                            : Math.floor((ped.x + Math.cos(ped.angle) * 22) / TILE_SIZE);
+                        ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
+                            ? ped.targetBy
+                            : Math.floor((ped.y + Math.sin(ped.angle) * 22) / TILE_SIZE);
+                        ped.x += ((cbx + 0.5) * TILE_SIZE - ped.x) * 0.18;
+                        ped.y += ((cby + 0.5) * TILE_SIZE - ped.y) * 0.18;
+                        ped.angle += Math.PI * 0.8 + (Math.random() - 0.5) * 0.7;
+                        ped.targetBx = null;
+                        ped.targetBy = null;
+                        ped.waypointTimer = 0;
                         ped.turnSeed = (ped.turnSeed || 1) + 3;
                     }
                 }

@@ -3545,11 +3545,43 @@ class LeonidaMap {
         return pool[Math.min(pool.length - 1, 1 + Math.floor((normSeed - 0.82) * 5.5 * (pool.length - 1)))];
     }
 
+    // Checks whether a candidate tile (nx, ny) is obstructed by a 3D structure/prop OBB, living event zone, or stopped vehicle
+    isTileBlockedForPed(nx, ny, zBlocks = 2.0, vehicles = null) {
+        const cx = (nx + 0.5) * TILE_SIZE;
+        const cy = (ny + 0.5) * TILE_SIZE;
+        if (this.resolveCircleBuildingCollision(cx, cy, 15, zBlocks).hit) {
+            return true;
+        }
+        if (typeof this.isInsideLivingEventZone === "function" && this.isInsideLivingEventZone(cx, cy, 8)) {
+            return true;
+        }
+        if (Array.isArray(vehicles)) {
+            for (let i = 0; i < vehicles.length; i++) {
+                const v = vehicles[i];
+                if (!v || Math.abs(v.speed || 0) > 28) continue;
+                const dx = cx - v.x;
+                const dy = cy - v.y;
+                if (dx * dx + dy * dy > 52 * 52) continue;
+                const cosA = Math.cos(v.angle || 0);
+                const sinA = Math.sin(v.angle || 0);
+                const lx = Math.abs(dx * cosA + dy * sinA);
+                const ly = Math.abs(-dx * sinA + dy * cosA);
+                const hw = (v.w || 54) * 0.5 + 12;
+                const hh = (v.h || 26) * 0.5 + 12;
+                if (lx < hw && ly < hh) return true;
+            }
+        }
+        return false;
+    }
+
     // Exact port of AiCharacterController::ChooseWalkWaypoint (AiCharacterController.cpp lines 287-345)
-    chooseNextSidewalkBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, isPanic = false) {
+    // Enhanced with 3D structure OBB, Lummus Park lawn, and stopped-vehicle avoidance
+    chooseNextSidewalkBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, isPanic = false, vehicles = null, avoidBx = -1, avoidBy = -1) {
         const normSeed = turnSeed > 1.0 ? (((turnSeed * 0.6180339887) % 1.0) + 1.0) % 1.0 : (((turnSeed % 1.0) + 1.0) % 1.0);
         const curBlk = this.getNavigationBlock(bx, by, zBlocks);
         const onRoadNow = curBlk && curBlk.groundType === GROUND_TYPE.ROAD;
+        const curLid1 = this.getBlockInfo(bx, by, 1)?.lid || 0;
+        const onLummusGrassNow = (bx >= 449 && bx <= 450 && by >= 42 && by <= 362 && curLid1 === 10);
 
         const cardinals = [
             { key: "U", dx: 0, dy: -1, angle: -Math.PI * 0.5 },
@@ -3569,8 +3601,26 @@ class LeonidaMap {
             if (!nb || nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) {
                 continue;
             }
+            const nextLid1 = this.getBlockInfo(nx, ny, 1)?.lid || 0;
+            const isLummusGrass = (nx >= 449 && nx <= 450 && ny >= 42 && ny <= 362 && nextLid1 === 10);
+            // Keep promenade/boardwalk pedestrians on paved walkways (col 448, col 451, and crosswalks), off the decorative grass strip!
+            if (isLummusGrass && !onLummusGrassNow && !isPanic) {
+                continue;
+            }
             const absDiff = Math.abs(this.normalizeAngleDiff(c.angle, currentAngle));
-            const entry = { ...c, bx: nx, by: ny, absDiff, isUturn: absDiff > 2.4, groundType: nb.groundType };
+            const blocked = this.isTileBlockedForPed(nx, ny, zBlocks, vehicles);
+            const isAvoided = (nx === avoidBx && ny === avoidBy);
+            const entry = {
+                ...c,
+                bx: nx,
+                by: ny,
+                absDiff,
+                isUturn: absDiff > 2.4,
+                groundType: nb.groundType,
+                isLummusGrass,
+                blocked,
+                isAvoided
+            };
             if (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD) {
                 sidewalkDirs.push(entry);
             } else if (nb.groundType === GROUND_TYPE.ROAD) {
@@ -3578,12 +3628,23 @@ class LeonidaMap {
             }
         }
 
+        // If a pedestrian somehow started on the Lummus Park grass strip (col 449..450), step immediately onto paved promenade (448 or 451)!
+        if (onLummusGrassNow && sidewalkDirs.length > 0) {
+            const pavedExit = sidewalkDirs.filter((d) => !d.isLummusGrass && !d.blocked);
+            if (pavedExit.length > 0) {
+                pavedExit.sort((a, b) => a.absDiff - b.absDiff);
+                return pavedExit[0];
+            }
+        }
+
         // 1. If a pedestrian ever ends up on a ROAD block (e.g. ejected driver on a 4-lane road),
         //    scan up to 4 blocks in each cardinal direction to walk shortest-path onto the nearest PAWEMENT/FIELD sidewalk!
         if (onRoadNow) {
             if (sidewalkDirs.length > 0) {
-                sidewalkDirs.sort((a, b) => a.absDiff - b.absDiff);
-                return sidewalkDirs[0];
+                const clearSw = sidewalkDirs.filter((d) => !d.blocked);
+                const swPool = clearSw.length > 0 ? clearSw : sidewalkDirs;
+                swPool.sort((a, b) => a.absDiff - b.absDiff);
+                return swPool[0];
             }
             let bestExit = null;
             let bestSteps = 99;
@@ -3616,8 +3677,17 @@ class LeonidaMap {
         }
 
         // 2. AiCharacterController::ChooseWalkWaypoint:
-        //    Pedestrians NEVER step from a sidewalk (PAWEMENT/FIELD) onto a ROAD block!
+        //    Pedestrians NEVER step from a sidewalk (PAWEMENT/FIELD) onto a ROAD block,
+        //    and always prefer unblocked tiles clear of 3D structures & stopped vehicles!
         let pool = sidewalkDirs;
+        const clearPool = pool.filter((d) => !d.blocked && !d.isAvoided);
+        if (clearPool.length > 0) {
+            pool = clearPool;
+        } else {
+            const nonBlockedPool = pool.filter((d) => !d.blocked);
+            if (nonBlockedPool.length > 0) pool = nonBlockedPool;
+        }
+
         if (pool.length === 0) {
             // Reached dead-end or corner of sidewalk: U-turn back along sidewalk, NEVER step onto road!
             const revAngle = this.normalizeAngleDiff(currentAngle + Math.PI, 0);
@@ -4303,8 +4373,8 @@ class LeonidaMap {
             }
         }
 
-        // Physical collision against Solid Tree & Palm Trunks (this.vicePalms + this.trees in this.floraGrid)
-        if (currentZBlocks === null || currentZBlocks < 2.8) {
+        // Physical collision against Solid Tree & Palm Trunks (for vehicles radius >= 11; pedestrians walk freely under canopies/bushes!)
+        if (radius >= 11 && (currentZBlocks === null || currentZBlocks < 2.8)) {
             const floraCol = this.resolveCircleFloraCollision(nx, ny, radius);
             if (floraCol.hit) {
                 nx = floraCol.x;
@@ -4334,8 +4404,17 @@ class LeonidaMap {
                 if (!cell) continue;
                 for (let i = 0; i < cell.length; i++) {
                     const pm = cell[i];
+                    // Soft bushes/shrubs/sawgrass allow smooth pass-through without snagging
+                    if (
+                        pm.kind === "bougainvillea_bush" ||
+                        pm.kind === "sawgrass_clump" ||
+                        pm.kind === "tropical_shrub" ||
+                        pm.kind === "sea_grape"
+                    ) {
+                        continue;
+                    }
                     // Solid trunk collision: Royal Palm, Coconut Palm, Palmetto, Bald Cypress, Live Oak & Banyan
-                    const trunkR = Math.max(10, Math.min(16, 13 * (pm.scale || 1.0)));
+                    const trunkR = Math.max(9, Math.min(14, 11 * (pm.scale || 1.0)));
                     const ex = nx - pm.x;
                     const ey = ny - pm.y;
                     const dist2 = ex * ex + ey * ey;
