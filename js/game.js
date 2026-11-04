@@ -7526,27 +7526,53 @@ class LeonidaGame {
 
         if (!p || p.dead || this.activeInterior) return;
 
+        if ((this.wantedLevel || 0) >= 2) return;
+
+        if (this.missionMgr && this.missionMgr.activeMission) return;
 
 
-        if (this.ambientCrimeCooldown === undefined) {
 
-            this.ambientCrimeCooldown = 16.0;
+        if (this.ambientCrimeQuietTimer === undefined) {
+
+            // Randomized initial grace window (45..110s) so nothing ever triggers at a predictable startup second
+
+            this.ambientCrimeQuietTimer = 45.0 + Math.random() * 65.0;
+
+            this.ambientCrimeRollTimer = 6.0;
 
         }
 
-        this.ambientCrimeCooldown -= dt;
+        if (this.ambientCrimeQuietTimer > 0) {
 
-        if (this.ambientCrimeCooldown > 0) return;
+            this.ambientCrimeQuietTimer -= dt;
+
+            return;
+
+        }
 
 
 
-        // Check if an ambient crime event is already unfolding nearby
+        // Evaluate a low-probability stochastic roll (4.5% chance) only once every 6 seconds
+
+        // -> Truly un-timed Poisson process (~1 event every 2.5 to 4.5 minutes on average, never clockwork)
+
+        this.ambientCrimeRollTimer = (this.ambientCrimeRollTimer || 6.0) - dt;
+
+        if (this.ambientCrimeRollTimer > 0) return;
+
+        this.ambientCrimeRollTimer = 5.5 + Math.random() * 2.5;
+
+        if (Math.random() >= 0.045) return;
+
+
+
+        // Check if an ambient crime event is already unfolding anywhere near the player
 
         let activeNearby = 0;
 
         for (const v of this.vehicles) {
 
-            if (!v.destroyed && v.driver === "AI_CRIMINAL" && Math.hypot(v.x - p.x, v.y - p.y) < 880) {
+            if (!v.destroyed && v.driver === "AI_CRIMINAL" && Math.hypot(v.x - p.x, v.y - p.y) < 1500) {
 
                 activeNearby++;
 
@@ -7556,7 +7582,7 @@ class LeonidaGame {
 
         for (const ped of this.peds) {
 
-            if (!ped.dead && ped.kind === "CRIMINAL" && Math.hypot(ped.x - p.x, ped.y - p.y) < 880) {
+            if (!ped.dead && ped.kind === "CRIMINAL" && Math.hypot(ped.x - p.x, ped.y - p.y) < 1500) {
 
                 activeNearby++;
 
@@ -7566,7 +7592,7 @@ class LeonidaGame {
 
         if (activeNearby > 0) {
 
-            this.ambientCrimeCooldown = 12.0;
+            this.ambientCrimeQuietTimer = 35.0 + Math.random() * 30.0;
 
             return;
 
@@ -7642,15 +7668,15 @@ class LeonidaGame {
 
         if (!chosenPos) {
 
-            this.ambientCrimeCooldown = 6.0;
-
             return;
 
         }
 
 
 
-        this.ambientCrimeCooldown = 32.0 + Math.random() * 18.0;
+        // Minimum quiet refractory period after an event before stochastic rolls even resume (110..210s)
+
+        this.ambientCrimeQuietTimer = 110.0 + Math.random() * 100.0;
 
         const { x, y, z, roadAng } = chosenPos;
 
