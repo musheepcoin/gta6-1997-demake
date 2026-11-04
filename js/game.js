@@ -10538,6 +10538,10 @@ class LeonidaGame {
 
                         !other.dead ||
 
+                        other.kind === "CRIMINAL" ||
+
+                        other.kind === "HOSTILE" ||
+
                         other.revived ||
 
                         other.unreachableForMedic ||
@@ -11270,7 +11274,7 @@ class LeonidaGame {
 
             for (const ped of this.peds) {
 
-                if (!ped.dead || ped.revived || ped.unreachableForMedic || ped.deathKind === "DROWNED") continue;
+                if (!ped.dead || ped.kind === "CRIMINAL" || ped.kind === "HOSTILE" || ped.revived || ped.unreachableForMedic || ped.deathKind === "DROWNED") continue;
 
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) continue;
 
