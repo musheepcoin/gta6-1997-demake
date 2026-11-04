@@ -1362,14 +1362,15 @@ class LeonidaMap {
             { kind: "HELIPAD",  c: 460.0, r: 40.5,  ang: 0.2,            scale: 1.25 },
             { kind: "HELIPAD",  c: 338.5, r: 163.5, ang: -0.8,           scale: 1.25 },
             { kind: "HELIPAD",  c: 336.5, r: 318.5, ang: 0.5,            scale: 1.25 },
-            { kind: "HELIPAD",  c: 63.5,  r: 96.5,  ang: 1.1,            scale: 1.20 }
+            { kind: "HELIPAD",  c: 62.0,  r: 90.5,  z: 5.08, ang: 1.1,   scale: 1.20, isRooftop: true }
         ].map((p, i) => ({
             kind: p.kind,
             x: p.c * TILE_SIZE,
             y: p.r * TILE_SIZE,
-            z: 2.0,
+            z: p.z !== undefined ? p.z : 2.0,
             ang: p.ang,
             scale: p.scale,
+            isRooftop: Boolean(p.isRooftop),
             seed: i * 1.7
         }));
 
@@ -2044,7 +2045,7 @@ class LeonidaMap {
             } else if (ap.kind === "LEARJET") {
                 pushPropOBB(ap.x, ap.y, 27 * sc, 6.5 * sc, ap.ang);
                 pushPropOBB(ap.x - cs * 3 * sc, ap.y - sn * 3 * sc, 8 * sc, 24 * sc, ap.ang);
-            } else if (ap.kind === "HELIPAD") {
+            } else if (ap.kind === "HELIPAD" && !ap.isRooftop) {
                 pushPropOBB(ap.x, ap.y, 26 * sc, 10 * sc, ap.ang);
             }
         }

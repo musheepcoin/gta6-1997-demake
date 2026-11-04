@@ -6266,8 +6266,9 @@ class WorldObjectEngine {
                         }
                     }
 
-                    const cxPx = (c + 1.0) * TILE_SIZE;
-                    const cyPx = (r + 1.0) * TILE_SIZE;
+                    const isPrisonRoofPad = (c === 60 && r === 90);
+                    const cxPx = (isPrisonRoofPad ? 62.0 : (c + 1.0)) * TILE_SIZE;
+                    const cyPx = (isPrisonRoofPad ? 90.5 : (r + 1.0)) * TILE_SIZE;
                     const topY = z;
                     const rHash = (((c * 92837111) ^ (r * 689287499)) >>> 0);
 
@@ -6276,7 +6277,7 @@ class WorldObjectEngine {
                     const isUrbanBrick = (c >= 170 && c < 285 && r >= 70 && r < 315);
 
                     if ((isDowntown && topY >= 4.0) || topY >= 5.0) {
-                        if (rHash % 3 === 0) {
+                        if (isPrisonRoofPad || rHash % 3 === 0) {
                             // ARCHETYPE 1A: 3D Skyscraper Octagonal VIP Helipad + Glowing Perimeter Deck Lights & 'H' Marking
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 96, topY, 0.40);
                             emitOctagonPad3D(cxPx, cyPx, 0, 0, 42, 42, 39, 39, 0.28, topY, topY + 0.08, [0.88, 0.90, 0.94], [0.76, 0.80, 0.86], 2, 177, 71);

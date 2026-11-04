@@ -6938,7 +6938,9 @@ class RetroRenderer {
                     this.batchObjectSprite3D("private_learjet", ap.x, ap.y, bz + 0.065, ap.ang, ap.scale, SPRITE_DRAW_ORDER.CAR);
                     this.batchPedSprite3D("g2_zaibatsu", 0, ap.x + cs * 38 + sn * 24, ap.y + sn * 38 - cs * 24, bz + 0.038, ap.ang - 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 } else if (ap.kind === "HELIPAD") {
-                    this.batchObjectSprite3D("helipad_mark", ap.x, ap.y, bz + 0.016, 0, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (!ap.isRooftop) {
+                        this.batchObjectSprite3D("helipad_mark", ap.x, ap.y, bz + 0.016, 0, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
                     this.batchObjectSprite3D("heli_vice", ap.x + sunCos * 5, ap.y + sunSin * 5, bz + 0.022, ap.ang, ap.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.35);
                     this.batchObjectSprite3D("heli_vice", ap.x, ap.y, bz + 0.065, ap.ang, ap.scale, SPRITE_DRAW_ORDER.CAR);
                     // Authentic 1997 GTA 1 3ds Max 8-frame motion-blurred spinning main rotor (#540..#547)
