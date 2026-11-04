@@ -4263,7 +4263,7 @@ class LeonidaGame {
 
         const fnv = ({ S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] })[intr.facing] || [0, 1];
 
-        if (!intr.facing) {
+        if (!intr.facing || intr.isEstatePortico) {
 
             return { x: intr.doorX, y: intr.doorY, fnv };
 
@@ -4273,13 +4273,12 @@ class LeonidaGame {
 
         const tcy = Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
 
-        // Building wall is at tcx - fnv * 32; black doormat step is at tcx - fnv * 24.
-        // With player collision radius = 10px, physical contact with the door occurs at tcx - fnv * 22.
+        // Building wall is at tcx - fnv * 32; glowing sidewalk welcome mat is centered at tcx - fnv * 18.
         return {
 
-            x: tcx - fnv[0] * 22,
+            x: tcx - fnv[0] * 18,
 
-            y: tcy - fnv[1] * 22,
+            y: tcy - fnv[1] * 18,
 
             fnv
 
@@ -4295,9 +4294,9 @@ class LeonidaGame {
 
         const { x, y, fnv } = this.getDoorThresholdPos(intr);
 
-        if (!intr.facing) {
+        if (!intr.facing || intr.isEstatePortico) {
 
-            return Math.hypot(px - x, py - y) <= 13;
+            return Math.hypot(px - x, py - y) <= 18;
 
         }
 
@@ -4305,7 +4304,7 @@ class LeonidaGame {
 
         const lateralDist = Math.abs((px - x) * fnv[1] - (py - y) * fnv[0]);
 
-        return normalDist <= 6.5 && lateralDist <= 15.0;
+        return normalDist <= 13.0 && lateralDist <= 20.0;
 
     }
 
@@ -4839,13 +4838,15 @@ class LeonidaGame {
 
 
 
-        // If on foot in direct physical contact with a building entrance door, [E] / [F] / [Enter] enters the interior!
+        // If on foot near a building entrance door, [E] / [F] / [Enter] enters the interior!
 
         if (!p.inVehicle && Array.isArray(this.map.interiors)) {
 
             for (const intr of this.map.interiors) {
 
-                if (this.isTouchingInteriorDoor(intr, p.x, p.y)) {
+                const thresh = this.getDoorThresholdPos(intr);
+
+                if (this.isTouchingInteriorDoor(intr, p.x, p.y) || Math.hypot(p.x - thresh.x, p.y - thresh.y) <= 36) {
 
                     this.enterInterior(intr);
 

@@ -193,7 +193,7 @@
             { dc: 0, dr: 1, facing: "N", penalty: 6.0 }
         ];
         for (const intr of map.interiors) {
-            if (intr.isShop || intr.id === "STAR_ISLAND") continue;
+            if (intr.isShop || intr.isEstatePortico || intr.id === "STAR_ISLAND" || (intr.id && intr.id.startsWith("ESTATE_"))) continue;
             intr.matRGB = hexToRgb(intr.accent);
             const cInit = Math.floor(intr.doorX / ts);
             const rInit = Math.floor(intr.doorY / ts);
@@ -226,9 +226,11 @@
         }
     }
 
-    function buildInterior(type, index, c, r, tileSize) {
+    function buildInterior(type, index, c, r, tileSize, facing = "S") {
         const tpl = SHOP_TEMPLATES[type];
         const nm = tpl.names[hash2(c, r) % tpl.names.length];
+        const doorC = facing === "E" ? (c + 1.5) : (facing === "W" ? (c - 0.5) : (c + 0.5));
+        const doorR = facing === "S" ? (r + 1.5) : (facing === "N" ? (r - 0.5) : (r + 0.5));
         return {
             id: `SHOP_${type}_${c}_${r}`,
             shopType: type,
@@ -238,9 +240,9 @@
             theme: tpl.theme,
             accent: tpl.accent,
             matRGB: tpl.mat,
-            facing: "S",
-            doorX: (c + 0.5) * tileSize,
-            doorY: (r + 1.5) * tileSize,
+            facing,
+            doorX: doorC * tileSize,
+            doorY: doorR * tileSize,
             w: ROOM_W,
             h: ROOM_H,
             npcs: tpl.npcs.map((n) => ({ ...n })),
@@ -249,13 +251,13 @@
     }
 
     /**
-     * Scan the map for south-facing storefronts (BUILDING tile whose southern
-     * neighbour is sidewalk) and create shop interiors on a spaced-out subset.
-     * Deterministic: same map => same shops.
+     * Scan the map for south-facing, east-facing (Ocean Drive / Collins Ave) and
+     * west-facing storefronts (BUILDING tile whose neighbour is sidewalk) and create
+     * shop interiors on a spaced-out subset. Deterministic: same map => same shops.
      */
     function generate(map, opts = {}) {
-        const maxShops = opts.maxShops || 72;
-        const minSpacing = opts.minSpacing || 9;
+        const maxShops = opts.maxShops || 110;
+        const minSpacing = opts.minSpacing || 7;
         const cols = MAP_COLS;
         const rows = MAP_ROWS;
         const ts = TILE_SIZE;
@@ -267,7 +269,7 @@
 
         const existing = (map.interiors || []).map((it) => ({ c: it.doorX / ts, r: it.doorY / ts }));
 
-        // 1. Collect storefront runs (>= 2 tiles wide) on south-facing facades
+        // 1A. Collect storefront runs (>= 2 tiles wide) on south-facing facades
         const cands = [];
         for (let r = 4; r < rows - 4; r++) {
             let c = 1;
@@ -281,12 +283,44 @@
                         // Door sidewalk tile needs walkable neighbours and must not be trapped in a 1-tile alley behind another building
                         const isRestricted = typeof map.isRestrictedNoTrafficZone === "function" && map.isRestrictedNoTrafficZone(mid, r + 1);
                         if (!isRestricted && (isP(mid - 1, r + 1) || isP(mid + 1, r + 1)) && !isB(mid, r + 2)) {
-                            cands.push({ c: mid, r, len });
+                            cands.push({ c: mid, r, len, facing: "S", doorC: mid, doorR: r + 1 });
                         }
                     }
                     c = c1 + 1;
                 } else {
                     c++;
+                }
+            }
+        }
+
+        // 1B. Collect storefront runs (>= 3 tiles tall) on East-facing & West-facing facades (Ocean Drive, Collins Ave, Washington Ave, Downtown)
+        for (let c = 4; c < cols - 4; c++) {
+            for (const [dc, facing] of [[1, "E"], [-1, "W"]]) {
+                let r = 4;
+                while (r < rows - 4) {
+                    if (isB(c, r) && isP(c + dc, r)) {
+                        let r1 = r;
+                        while (r1 + 1 < rows - 4 && isB(c, r1 + 1) && isP(c + dc, r1 + 1)) r1++;
+                        const len = r1 - r + 1;
+                        if (len >= 3) {
+                            // For long Ocean Drive blocks, sample every ~10 tiles so multiple hotels/bars/cafes along the block have doors!
+                            const step = len >= 14 ? 9 : len;
+                            for (let segStart = r; segStart + 2 <= r1; segStart += step) {
+                                const segEnd = Math.min(r1, segStart + step - 1);
+                                const midR = (segStart + segEnd) >> 1;
+                                const swC = c + dc;
+                                const isRestricted = typeof map.isRestrictedNoTrafficZone === "function" && map.isRestrictedNoTrafficZone(swC, midR);
+                                if (!isRestricted && (isP(swC, midR - 1) || isP(swC, midR + 1)) && !isB(c + dc * 2, midR)) {
+                                    // Give Ocean Drive (c=442, facing="E") a priority boost so its Art Deco hotels & cafes are always populated
+                                    const priorityBoost = (c === 442 && facing === "E") ? 1 : 0;
+                                    cands.push({ c, r: midR, len, facing, doorC: swC, doorR: midR, priorityBoost });
+                                }
+                            }
+                        }
+                        r = r1 + 1;
+                    } else {
+                        r++;
+                    }
                 }
             }
         }
@@ -313,19 +347,19 @@
         };
         const good = cands.filter((cd) => clusterSize(cd.c, cd.r, 8) >= 6);
 
-        // 3. Deterministic shuffle (bigger storefronts first within each hash bucket)
-        good.sort((a, b) => (hash2(a.c, a.r) - hash2(b.c, b.r)) || (b.len - a.len));
+        // 3. Deterministic shuffle (priority Ocean Drive storefronts first, then deterministic hash)
+        good.sort((a, b) => ((b.priorityBoost || 0) - (a.priorityBoost || 0)) || (hash2(a.c, a.r) - hash2(b.c, b.r)) || (b.len - a.len));
 
         // 4. Greedy spaced selection
         const chosen = [];
-        const tooClose = (cd, list) => list.some((o) => Math.hypot(o.c - cd.c, o.r - cd.r) < minSpacing);
+        const tooClose = (cd, list) => list.some((o) => Math.hypot((o.doorC ?? o.c) - cd.doorC, (o.doorR ?? o.r) - cd.doorR) < minSpacing);
         for (const cd of good) {
             if (chosen.length >= maxShops) break;
             if (tooClose(cd, existing) || tooClose(cd, chosen)) continue;
             chosen.push(cd);
         }
 
-        const out = chosen.map((cd, i) => buildInterior(TYPE_ORDER[i % TYPE_ORDER.length], i, cd.c, cd.r, ts));
+        const out = chosen.map((cd, i) => buildInterior(TYPE_ORDER[i % TYPE_ORDER.length], i, cd.c, cd.r, ts, cd.facing));
         return out;
     }
 

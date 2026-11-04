@@ -7752,20 +7752,27 @@ class RetroRenderer {
                 if (intr.facing) {
                     // Real door: vertical quads standing against the facade the door belongs to (any of 4 sides)
                     const fnv = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[intr.facing] || [0, 1];
-                    const tcx = Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
-                    const tcy = Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5;
-                    const wx0 = tcx - fnv[0] * TILE_SIZE * 0.5 + fnv[0] * 1.6;
-                    const wy0 = tcy - fnv[1] * TILE_SIZE * 0.5 + fnv[1] * 1.6;
+                    const tcx = intr.isEstatePortico ? intr.doorX : (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5);
+                    const tcy = intr.isEstatePortico ? intr.doorY : (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5);
                     const dAng = fnv[0] !== 0 ? Math.PI * 0.5 : 0;
-                    const gz = dz - 0.03;
-                    const vq = (w, zc, halfH, rr, gg, bb, aa, off = 0) =>
-                        this.pushSpriteQuad3D(wx0 + fnv[0] * off, wy0 + fnv[1] * off, gz + zc, w, 0.4, dAng, -1, -1, -1, -1, rr, gg, bb, aa, SPRITE_DRAW_ORDER.MAP_OBJECT, halfH);
-                    vq(48, 1.02, 0.11, mrgb[0], mrgb[1], mrgb[2], 1.0, 0.00); // sign band
-                    vq(38, 0.48, 0.50, 0.20, 0.15, 0.12, 1.0, 0.02);           // door frame
-                    vq(31, 0.46, 0.46, 0.0, 0.0, 0.0, 1.0, 0.05);              // black doorway
-                    vq(3, 0.42, 0.04, 0.95, 0.80, 0.25, 1.0, 0.08);           // brass handle
-                    // Threshold step on the sidewalk
-                    this.pushSolidQuad3D(tcx - fnv[0] * 24, tcy - fnv[1] * 24, dz, 36, 8, dAng, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    if (!intr.isEstatePortico) {
+                        const wx0 = tcx - fnv[0] * TILE_SIZE * 0.5 + fnv[0] * 1.6;
+                        const wy0 = tcy - fnv[1] * TILE_SIZE * 0.5 + fnv[1] * 1.6;
+                        const gz = dz - 0.03;
+                        const vq = (w, zc, halfH, rr, gg, bb, aa, off = 0) =>
+                            this.pushSpriteQuad3D(wx0 + fnv[0] * off, wy0 + fnv[1] * off, gz + zc, w, 0.4, dAng, -1, -1, -1, -1, rr, gg, bb, aa, SPRITE_DRAW_ORDER.MAP_OBJECT, halfH);
+                        vq(48, 1.02, 0.11, mrgb[0], mrgb[1], mrgb[2], 1.0, 0.00); // sign band
+                        vq(38, 0.48, 0.50, 0.20, 0.15, 0.12, 1.0, 0.02);           // door frame
+                        vq(31, 0.46, 0.46, 0.0, 0.0, 0.0, 1.0, 0.05);              // black doorway
+                        vq(3, 0.42, 0.04, 0.95, 0.80, 0.25, 1.0, 0.08);           // brass handle
+                        // Threshold step on the sidewalk
+                        this.pushSolidQuad3D(tcx - fnv[0] * 24, tcy - fnv[1] * 24, dz, 36, 8, dAng, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    }
+                    // Glowing sidewalk welcome mat positioned outside the 3D canopy overhang so it is ALWAYS visible from above!
+                    const matX = intr.isEstatePortico ? intr.doorX : (tcx - fnv[0] * 12);
+                    const matY = intr.isEstatePortico ? intr.doorY : (tcy - fnv[1] * 12);
+                    this.pushSolidQuad3D(matX, matY, dz + 0.004, 30, 14, dAng, mrgb[0], mrgb[1], mrgb[2], pulse * 0.85, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(matX, matY, dz + 0.009, 20, 8, dAng, 0.15, 0.95, 1.0, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     continue;
                 }
                 this.pushSolidQuad3D(intr.doorX, intr.doorY, dz, 26, 26, this.time * 1.2, mrgb[0], mrgb[1], mrgb[2], pulse, SPRITE_DRAW_ORDER.MAP_OBJECT);
@@ -9531,23 +9538,24 @@ class RetroRenderer {
         if (Array.isArray(this.map.interiors)) {
             for (const intr of this.map.interiors) {
                 const fnv = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[intr.facing] || [0, 1];
-                const tcx = intr.facing ? (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorX;
-                const tcy = intr.facing ? (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorY;
-                const threshX = intr.facing ? (tcx - fnv[0] * 22) : intr.doorX;
-                const threshY = intr.facing ? (tcy - fnv[1] * 22) : intr.doorY;
+                const isPortico = !!intr.isEstatePortico;
+                const tcx = (intr.facing && !isPortico) ? (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorX;
+                const tcy = (intr.facing && !isPortico) ? (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorY;
+                const threshX = (intr.facing && !isPortico) ? (tcx - fnv[0] * 18) : intr.doorX;
+                const threshY = (intr.facing && !isPortico) ? (tcy - fnv[1] * 18) : intr.doorY;
 
                 const dist = Math.hypot(p.x - threshX, p.y - threshY);
-                if (dist > 165) continue;
+                if (dist > 340) continue;
                 // Never draw a South-facing door badge when the player is on the North/back side of the 3D building
-                if ((!intr.facing || intr.facing === "S") && p.y < tcy - TILE_SIZE * 0.52) continue;
-                if (dist > 48 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, intr.doorX, intr.doorY, 2.0).hit) continue;
+                if (!isPortico && (!intr.facing || intr.facing === "S") && p.y < tcy - TILE_SIZE * 0.52) continue;
+                if (!isPortico && dist > 64 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, threshX, threshY, 2.0).hit) continue;
 
-                const labelX = intr.facing ? (tcx - fnv[0] * 14) : intr.doorX;
-                const labelY = intr.facing ? (tcy - fnv[1] * 14) : intr.doorY;
+                const labelX = (intr.facing && !isPortico) ? (tcx - fnv[0] * 12) : intr.doorX;
+                const labelY = (intr.facing && !isPortico) ? (tcy - fnv[1] * 12) : intr.doorY;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.04;
                 const sc = this.worldToScreen(labelX, labelY, dz);
-                const isClose = dist < 24;
-                const label = `🚪 ${intr.name}`;
+                const isClose = dist < 38;
+                const label = isClose ? `🚪 [E] ${intr.name}` : `🚪 ${intr.name}`;
                 const bw = Math.max(130, ctx.measureText(label).width + 18);
                 const bh = 22;
                 const bx = Math.round(sc.x - bw * 0.5);
@@ -12560,6 +12568,19 @@ class RetroRenderer {
             fctx.strokeStyle = "#39ff14";
             fctx.lineWidth = 1.5;
             fctx.strokeRect(px - 5, py - 5, 10, 10);
+        }
+
+        // Enterable Shops, Bars, Hotels, Ammu-Nation & 3D Luxury Villa Interiors on the [M] Full Map
+        if (Array.isArray(this.map.interiors)) {
+            for (const intr of this.map.interiors) {
+                const ix = Math.round(intr.doorX * sx);
+                const iy = Math.round(intr.doorY * sy);
+                fctx.fillStyle = intr.accent || "#f472b6";
+                fctx.fillRect(ix - 2, iy - 2, 4, 4);
+                fctx.strokeStyle = "#090d16";
+                fctx.lineWidth = 1;
+                fctx.strokeRect(ix - 2.5, iy - 2.5, 5, 5);
+            }
         }
 
         // Official Vice City Landmarks ("Lieux Officiels") on the [M] Full Map

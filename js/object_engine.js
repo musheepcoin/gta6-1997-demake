@@ -984,6 +984,7 @@ class WorldObjectEngine {
             starIntr.doorX = pt.doorX;
             starIntr.doorY = pt.doorY;
             starIntr.facing = pt.facing;
+            starIntr.isEstatePortico = true;
         }
 
         const estateDoors = [
@@ -1057,6 +1058,7 @@ class WorldObjectEngine {
                 accent: ed.accent,
                 matRGB: ed.matRGB,
                 facing: pt.facing,
+                isEstatePortico: true,
                 doorX: pt.doorX,
                 doorY: pt.doorY,
                 w: 800,

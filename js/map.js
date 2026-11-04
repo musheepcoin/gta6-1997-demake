@@ -2030,11 +2030,7 @@ class LeonidaMap {
             }
         ];
 
-        // 16C) Initialize Unified 3D Volumetric World Object & Prefab Engine (validates road clearance, 1:1 scale & lot flora)
-        this.objectEngine = typeof WorldObjectEngine !== "undefined" ? new WorldObjectEngine(this) : null;
-        if (this.objectEngine) {
-            this.objectEngine.validateAndPrepareLots();
-        }
+        // 16C) Snap landmark doors & generate storefront shop interiors FIRST so WorldObjectEngine knows all door clearances!
         try {
             if (window.ShopInteriors && Array.isArray(this.interiors)) {
                 this.interiors = this.interiors.filter(intr => !intr.isShop || intr.id.startsWith("ESTATE_") || intr.id.startsWith("BIZ_"));
@@ -2044,6 +2040,12 @@ class LeonidaMap {
             }
         } catch (e) {
             console.warn("Post-CMP ShopInteriors generation failed:", e);
+        }
+
+        // Initialize Unified 3D Volumetric World Object & Prefab Engine (validates road clearance, 1:1 scale, lot flora & registers 3D estate portico doors)
+        this.objectEngine = typeof WorldObjectEngine !== "undefined" ? new WorldObjectEngine(this) : null;
+        if (this.objectEngine) {
+            this.objectEngine.validateAndPrepareLots();
         }
 
         // 17) Ambrosia "Allied Crystal" 3D Refinery Smokestacks & Outlaw Biker Rally, Port Gellhorn Mini-Golf & Mount Kalaga Kayakers
@@ -3152,8 +3154,8 @@ class LeonidaMap {
                 theme: "PRISON_BLOCK",
                 accent: "#f87171",
                 facing: "S",
-                doorX: mx256(35.5) * TILE_SIZE,
-                doorY: my256(76.5) * TILE_SIZE,
+                doorX: 62.5 * TILE_SIZE,
+                doorY: 93.5 * TILE_SIZE,
                 w: 800,
                 h: 530,
                 npcs: [
