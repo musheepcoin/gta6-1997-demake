@@ -5958,6 +5958,21 @@ class WorldObjectEngine {
 
             // Pass 29C: Scan Flat Building Rooftop Plateaus & Highway Verges for Monumental 3D Mega-Billboards & Superstructures
             const roofUsed = new Uint8Array(MAP_ROWS * M);
+            // Pre-reserve all rooftop ventilation fans (lid 22), rooftop swimming pools (lid 35), and glass skylights (lid 31)
+            // with a 3x3 safety margin so no 3D helipad, penthouse, billboard, or HVAC unit ever sits on top of a roof vent or pool!
+            for (let r = 2; r < MAP_ROWS - 2; r++) {
+                const rOff = r * M;
+                for (let c = 2; c < M - 2; c++) {
+                    const lid = bTopLid[rOff + c];
+                    if (lid === 22 || lid === 35 || lid === 31) {
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                roofUsed[(r + dr) * M + (c + dc)] = 1;
+                            }
+                        }
+                    }
+                }
+            }
             // Mark existing rooftop pool party tiles so we never overlap them
             if (Array.isArray(this.map.rooftopParties)) {
                 for (let i = 0; i < this.map.rooftopParties.length; i++) {
@@ -6235,28 +6250,70 @@ class WorldObjectEngine {
                 }
             }
 
+            // Dedicated Leonida State Penitentiary Rooftop Helipad at (62.0, 90.5, z = 5.0)
+            {
+                const pHx = 62.0 * TILE_SIZE;
+                const pHy = 90.5 * TILE_SIZE;
+                const pTopY = 5.0;
+                emitAOShadow3D(pHx, pHy, 1, 0, 0, 0, 96, 96, pTopY, 0.40);
+                emitOctagonPad3D(pHx, pHy, 0, 0, 42, 42, 39, 39, 0.28, pTopY, pTopY + 0.08, [0.88, 0.90, 0.94], [0.76, 0.80, 0.86], 2, 177, 71);
+                emitSolidBox3D(pHx, pHy, 1, 0, 0, -34, 42, 3.5, pTopY + 0.08, pTopY + 0.105, [0.98, 0.82, 0.16], 3);
+                emitSolidBox3D(pHx, pHy, 1, 0, 0,  34, 42, 3.5, pTopY + 0.08, pTopY + 0.105, [0.98, 0.82, 0.16], 3);
+                emitSolidBox3D(pHx, pHy, 1, 0, -11, 0, 4.5, 28, pTopY + 0.082, pTopY + 0.098, [0.98, 0.98, 1.00], 9);
+                emitSolidBox3D(pHx, pHy, 1, 0,  11, 0, 4.5, 28, pTopY + 0.082, pTopY + 0.098, [0.98, 0.98, 1.00], 9);
+                emitSolidBox3D(pHx, pHy, 1, 0,   0, 0, 22, 4.5, pTopY + 0.082, pTopY + 0.098, [0.98, 0.98, 1.00], 9);
+                for (const [lx, ly] of [[-28, -28], [28, -28], [-28, 28], [28, 28]]) {
+                    emitSolidBox3D(pHx, pHy, 1, 0, lx, ly, 4.5, 4.5, pTopY + 0.08, pTopY + 0.13, [0.20, 0.98, 0.52], 10);
+                }
+                this.rooftopSuperstructures.push({ x: pHx, y: pHy, radTiles: 1, topElev: pTopY + 0.20 });
+                for (let rr = 88; rr <= 93; rr++) {
+                    for (let cc = 59; cc <= 64; cc++) {
+                        roofUsed[rr * M + cc] = 1;
+                    }
+                }
+            }
+
+            const isSpecialRoofLid = (lid) => (lid === 22 || lid === 35 || lid === 31);
+
             for (let r = 6; r < MAP_ROWS - 6; r += 3) {
                 for (let c = 6; c < M - 6; c += 3) {
                     const idx00 = r * M + c;
-                    if (roofUsed[idx00]) continue;
+                    const idx10 = r * M + (c + 1);
+                    const idx01 = (r + 1) * M + c;
+                    const idx11 = (r + 1) * M + (c + 1);
+                    if (roofUsed[idx00] || roofUsed[idx10] || roofUsed[idx01] || roofUsed[idx11]) continue;
+                    if (customMask[idx00] || customMask[idx10] || customMask[idx01] || customMask[idx11]) continue;
                     const z = bTopZ[idx00];
                     if (z < 3) continue;
-                    // Require a flat 2x2 building roof plateau with no pool tile (lid 35)
-                    if (
-                        bTopZ[r * M + (c + 1)] !== z ||
-                        bTopZ[(r + 1) * M + c] !== z ||
-                        bTopZ[(r + 1) * M + (c + 1)] !== z
-                    ) {
+                    // Require a flat 2x2 building roof plateau with zero ventilation fans (lid 22), pools (lid 35), or skylights (lid 31)
+                    if (bTopZ[idx10] !== z || bTopZ[idx01] !== z || bTopZ[idx11] !== z) {
                         continue;
                     }
-                    if (
-                        bTopLid[idx00] === 35 ||
-                        bTopLid[r * M + (c + 1)] === 35 ||
-                        bTopLid[(r + 1) * M + c] === 35 ||
-                        bTopLid[(r + 1) * M + (c + 1)] === 35
-                    ) {
-                        continue;
+                    let hasVentOrPoolNear = false;
+                    for (let dr = -1; dr <= 2 && !hasVentOrPoolNear; dr++) {
+                        const rrOff = (r + dr) * M;
+                        for (let dc = -1; dc <= 2; dc++) {
+                            if (isSpecialRoofLid(bTopLid[rrOff + (c + dc)])) {
+                                hasVentOrPoolNear = true;
+                                break;
+                            }
+                        }
                     }
+                    if (hasVentOrPoolNear) continue;
+
+                    // If this 2x2 sits at the top-left of a clean 3x3 roof crown, center the superstructure on the 3x3 plateau!
+                    const is3x3Crown = (
+                        bTopZ[r * M + (c + 2)] === z &&
+                        bTopZ[(r + 1) * M + (c + 2)] === z &&
+                        bTopZ[(r + 2) * M + c] === z &&
+                        bTopZ[(r + 2) * M + (c + 1)] === z &&
+                        bTopZ[(r + 2) * M + (c + 2)] === z &&
+                        !roofUsed[r * M + (c + 2)] &&
+                        !roofUsed[(r + 2) * M + c] &&
+                        !roofUsed[(r + 2) * M + (c + 2)] &&
+                        bTopZ[r * M + (c - 1)] < z &&
+                        bTopZ[(r - 1) * M + c] < z
+                    );
 
                     // Mark a 6x6 neighborhood as used so each building block gets well-spaced 3D rooftop superstructures
                     for (let dr = -2; dr <= 3; dr++) {
@@ -6268,9 +6325,8 @@ class WorldObjectEngine {
                         }
                     }
 
-                    const isPrisonRoofPad = (c === 60 && r === 90);
-                    const cxPx = (isPrisonRoofPad ? 62.0 : (c + 1.0)) * TILE_SIZE;
-                    const cyPx = (isPrisonRoofPad ? 90.5 : (r + 1.0)) * TILE_SIZE;
+                    const cxPx = (c + (is3x3Crown ? 1.5 : 1.0)) * TILE_SIZE;
+                    const cyPx = (r + (is3x3Crown ? 1.5 : 1.0)) * TILE_SIZE;
                     const topY = z;
                     const rHash = (((c * 92837111) ^ (r * 689287499)) >>> 0);
 
@@ -6279,7 +6335,7 @@ class WorldObjectEngine {
                     const isUrbanBrick = (c >= 170 && c < 285 && r >= 70 && r < 315);
 
                     if ((isDowntown && topY >= 4.0) || topY >= 5.0) {
-                        if (isPrisonRoofPad || rHash % 3 === 0) {
+                        if (rHash % 3 === 0) {
                             // ARCHETYPE 1A: 3D Skyscraper Octagonal VIP Helipad + Glowing Perimeter Deck Lights & 'H' Marking
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 96, topY, 0.40);
                             emitOctagonPad3D(cxPx, cyPx, 0, 0, 42, 42, 39, 39, 0.28, topY, topY + 0.08, [0.88, 0.90, 0.94], [0.76, 0.80, 0.86], 2, 177, 71);
@@ -6428,12 +6484,12 @@ class WorldObjectEngine {
             for (let r = 6; r < MAP_ROWS - 6; r += 3) {
                 for (let c = 6; c < M - 6; c += 3) {
                     const idx = r * M + c;
-                    if (roofUsed[idx]) continue;
+                    if (roofUsed[idx] || customMask[idx]) continue;
                     const z = bTopZ[idx];
-                    if (z < 3 || bTopLid[idx] === 35) continue;
+                    if (z < 3 || isSpecialRoofLid(bTopLid[idx])) continue;
 
-                    const hasRight = (bTopZ[r * M + (c + 1)] === z && !roofUsed[r * M + (c + 1)] && bTopLid[r * M + (c + 1)] !== 35);
-                    const hasDown  = (bTopZ[(r + 1) * M + c] === z && !roofUsed[(r + 1) * M + c] && bTopLid[(r + 1) * M + c] !== 35);
+                    const hasRight = (bTopZ[r * M + (c + 1)] === z && !roofUsed[r * M + (c + 1)] && !customMask[r * M + (c + 1)] && !isSpecialRoofLid(bTopLid[r * M + (c + 1)]));
+                    const hasDown  = (bTopZ[(r + 1) * M + c] === z && !roofUsed[(r + 1) * M + c] && !customMask[(r + 1) * M + c] && !isSpecialRoofLid(bTopLid[(r + 1) * M + c]));
                     if (!hasRight && !hasDown) continue;
 
                     // Mark 4x4 neighborhood so narrow wings get 1 clean superstructure per wing

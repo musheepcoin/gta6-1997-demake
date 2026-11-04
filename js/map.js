@@ -447,9 +447,11 @@ class LeonidaMap {
                     const sBlk = this.blocksData[this.voxelGrid[(zOff + tiley + 1) * MAP_COLS + tilex]];
                     const wBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex - 1)]];
                     const eBlk = this.blocksData[this.voxelGrid[(zOff + tiley) * MAP_COLS + (tilex + 1)]];
-                    const hasNSRoof = nBlk && nBlk.lid > 0 && sBlk && sBlk.lid > 0;
-                    const hasEWRoof = wBlk && wBlk.lid > 0 && eBlk && eBlk.lid > 0;
+                    const hasNSRoof = nBlk && nBlk.lid > 0 && nBlk.lid !== 22 && sBlk && sBlk.lid > 0 && sBlk.lid !== 22;
+                    const hasEWRoof = wBlk && wBlk.lid > 0 && wBlk.lid !== 22 && eBlk && eBlk.lid > 0 && eBlk.lid !== 22;
                     if (!hasNSRoof || !hasEWRoof) continue;
+                    // Keep Leonida Penitentiary rooftop helipad deck (c=60..64, r=88..93) clear of pools/skylights
+                    if (tilex >= 60 && tilex <= 64 && tiley >= 88 && tiley <= 93) continue;
 
                     const isHotelDixonCenter = (tiley === dixonY0 && tilex === dixonX0);
                     const isOceanDrivePenthouse = (tilex >= oceanPentMinX && tilex <= oceanPentMaxX && tilez >= 4);
