@@ -657,9 +657,16 @@ class LeonidaGame {
 
         parked.forEach((p, idx) => {
 
-            const vx = (p.raw512 ? p.c : mx256(p.c)) * TILE_SIZE;
+            let vx = (p.raw512 ? p.c : mx256(p.c)) * TILE_SIZE;
 
-            const vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
+            let vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
+
+            // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed parked vehicle
+            for (let shiftTry = 0; shiftTry < 4; shiftTry++) {
+                const overlap = this.vehicles.some((other) => Math.hypot(other.x - vx, other.y - vy) < 36);
+                if (!overlap) break;
+                vy += 42;
+            }
 
             const v = new Vehicle(p.id || `parked_${idx}`, p.spec, vx, vy, p.a);
 
@@ -8072,6 +8079,62 @@ class LeonidaGame {
 
 
 
+    resolveCircleVehicleCollision(x, y, radius = 8.5, z = 2.0, ignoreVeh = null) {
+        let hit = false;
+        let curX = x;
+        let curY = y;
+        for (let i = 0; i < this.vehicles.length; i++) {
+            const v = this.vehicles[i];
+            if (!v || v === ignoreVeh) continue;
+            if (v.z !== undefined && z !== undefined && Math.abs(v.z - z) > 0.85) continue;
+            const dx = curX - v.x;
+            const dy = curY - v.y;
+            if (Math.abs(dx) > 54 || Math.abs(dy) > 54) continue;
+
+            // Only solid-block against stationary / slow / parked / wrecked vehicles
+            // (fast-moving vehicles are handled by the run-over / knockback logic)
+            const vSpd = Math.hypot(v.vx || 0, v.vy || 0);
+            if (!v.destroyed && v.driver !== null && vSpd > 58) continue;
+
+            const cosA = Math.cos(v.angle);
+            const sinA = Math.sin(v.angle);
+            const localX = dx * cosA + dy * sinA;
+            const localY = -dx * sinA + dy * cosA;
+
+            const halfL = (v.w || 46) * 0.44;
+            const halfW = (v.h || 22) * 0.42;
+
+            const clampedX = Math.max(-halfL, Math.min(halfL, localX));
+            const clampedY = Math.max(-halfW, Math.min(halfW, localY));
+            const ox = localX - clampedX;
+            const oy = localY - clampedY;
+            const distSq = ox * ox + oy * oy;
+
+            if (distSq < radius * radius) {
+                hit = true;
+                let newLocalX = localX;
+                let newLocalY = localY;
+                if (distSq > 0.0001) {
+                    const dist = Math.sqrt(distSq);
+                    newLocalX = clampedX + (ox / dist) * radius;
+                    newLocalY = clampedY + (oy / dist) * radius;
+                } else {
+                    // Center is inside the OBB: push out along the nearest face
+                    const penL = halfL - Math.abs(localX);
+                    const penW = halfW - Math.abs(localY);
+                    if (penW <= penL) {
+                        newLocalY = (localY >= 0 ? 1 : -1) * (halfW + radius);
+                    } else {
+                        newLocalX = (localX >= 0 ? 1 : -1) * (halfL + radius);
+                    }
+                }
+                curX = v.x + newLocalX * cosA - newLocalY * sinA;
+                curY = v.y + newLocalX * sinA + newLocalY * cosA;
+            }
+        }
+        return { hit, x: curX, y: curY };
+    }
+
     updateRoadClearanceAndTowing(dt) {
 
         const p = this.player;
@@ -9221,6 +9284,16 @@ class LeonidaGame {
                     p.x = fcol.x;
 
                     p.y = fcol.y;
+
+                }
+
+                if ((p.jumpTimer || 0) <= 0 && (p.slideCarTimer || 0) <= 0 && (p.exitAnimTimer || 0) <= 0) {
+
+                    const vcol = this.resolveCircleVehicleCollision(p.x, p.y, 8.5, p.z || 2.0);
+
+                    p.x = vcol.x;
+
+                    p.y = vcol.y;
 
                 }
 
@@ -11290,6 +11363,18 @@ class LeonidaGame {
 
                 }
 
+            }
+
+            // Physical collision against parked / stationary vehicles and wrecks
+            if ((ped.slideCarTimer || 0) <= 0 && (ped.exitAnimTimer || 0) <= 0) {
+                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0);
+                if (vCol.hit) {
+                    ped.x = vCol.x;
+                    ped.y = vCol.y;
+                    if (ped.kind === "CIVILIAN") {
+                        ped.angle += (Math.random() < 0.5 ? 1 : -1) * Math.PI * 0.35;
+                    }
+                }
             }
 
             ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
