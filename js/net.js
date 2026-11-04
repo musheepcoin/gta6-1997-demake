@@ -1561,9 +1561,18 @@ class ViceNetworkManager {
                     p.hitByCarCooldown = 0.85;
                     p.x += ((rp.vx || 0) / Math.max(1, rSpeed)) * 20;
                     p.y += ((rp.vy || 0) / Math.max(1, rSpeed)) * 20;
-                    this.game.lastAttackerId = rp.id;
-                    this.game.lastAttackerName = rp.name;
-                    this.game.damagePlayer(Math.min(34, rSpeed * 0.10));
+                    const isRemoteScooterOrBike = rp.veh && (rp.veh.specKey === "E_SCOOTER" || rp.veh.specKey === "BMX_BIKE");
+                    if (isRemoteScooterOrBike) {
+                        p.slideCarTimer = 0.42;
+                        if (p.hp > 1) {
+                            this.game.damagePlayer(Math.min(p.hp - 1, 6));
+                        }
+                        this.game.addFloatingText(p.x, p.y - 22, "💫 KNOCKOUT!", "#38bdf8");
+                    } else {
+                        this.game.lastAttackerId = rp.id;
+                        this.game.lastAttackerName = rp.name;
+                        this.game.damagePlayer(Math.min(34, rSpeed * 0.10));
+                    }
                     this.game.spawnParticle(p.x, p.y, "SPARK");
                 }
             } else if (p.inVehicle) {

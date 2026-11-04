@@ -6894,7 +6894,14 @@ class LeonidaGame {
 
             this.player.y = v.y - (isBicycle || isScooter ? 18 : 32);
 
-            this.damagePlayer(isBicycle ? 8 : (isScooter ? 18 : 45));
+            if (isBicycle || isScooter) {
+                this.player.slideCarTimer = 0.42;
+                if (this.player.hp > 1) {
+                    this.damagePlayer(Math.min(this.player.hp - 1, 8));
+                }
+            } else {
+                this.damagePlayer(45);
+            }
 
         }
 
@@ -6904,29 +6911,26 @@ class LeonidaGame {
 
         }
 
-        if (isBicycle) {
-            // A pedal bicycle crumples mechanically without any fireball or explosion!
+        if (isBicycle || isScooter) {
+            // A bicycle or e-scooter crumples / short-circuits with sparks & smoke without a lethal fireball!
             if (this.audio && typeof this.audio.playCarCrash === "function") {
                 this.audio.playCarCrash(0.55);
             }
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 10; i++) {
                 this.spawnParticle(
-                    v.x + (Math.random() - 0.5) * 14,
-                    v.y + (Math.random() - 0.5) * 14,
+                    v.x + (Math.random() - 0.5) * 16,
+                    v.y + (Math.random() - 0.5) * 16,
                     i % 2 === 0 ? "SPARK" : "WHITE_SMOKE"
                 );
             }
-            if (playerResponsible) {
-                this.addCash(50, `${v.name} TRASHED!`);
+            for (const ped of this.peds) {
+                if (!ped.dead && Math.hypot(ped.x - v.x, ped.y - v.y) < 38) {
+                    ped.stunnedTimer = Math.max(ped.stunnedTimer || 0, 1.45);
+                    ped.panicTimer = 4.5;
+                }
             }
-            return;
-        }
-
-        if (isScooter) {
-            // Small electric battery pop rather than a massive V8 car explosion
-            this.explodeAt(v.x, v.y, 44, 48, playerResponsible);
             if (playerResponsible) {
-                this.addCash(150, `${v.name} WRECKED!`);
+                this.addCash(isScooter ? 150 : 50, `${v.name} WRECKED!`);
             }
             return;
         }
@@ -9623,10 +9627,12 @@ class LeonidaGame {
 
 
             // Check player vehicle OR high-speed panicked/cop vehicle hitting pedestrians:
-
-            // Low-speed bumps (30 < vSpeed <= 68) knock pedestrians down (stunnedTimer); high-speed (> 68) runs them over!
+            // E-Scooters & Bicycles NEVER kill pedestrians — they only knock them out (stunnedTimer)!
+            // For cars/motorcycles: low-speed bumps (30 < vSpeed <= 68) knock pedestrians down; high-speed (> 68) runs them over!
 
             const vSpeed = Math.hypot(v.vx, v.vy);
+
+            const isNonLethalWheeler = (v.specKey === "E_SCOOTER" || v.specKey === "BMX_BIKE");
 
             const isActiveThreatCar =
 
@@ -9634,7 +9640,7 @@ class LeonidaGame {
 
                 (v.driver === "PLAYER" || v.driver === "AI_COP" || v.aiPanicTimer > 0);
 
-            if (isActiveThreatCar && vSpeed > 30) {
+            if (isActiveThreatCar && vSpeed > 28) {
 
                 for (const ped of this.peds) {
 
@@ -9644,7 +9650,39 @@ class LeonidaGame {
 
                     if (Math.hypot(ped.x - v.x, ped.y - v.y) < 25) {
 
-                        if (ped.kind === "COP" && !v.crushesCars) {
+                        if (isNonLethalWheeler) {
+
+                            if ((ped.stunnedTimer || 0) <= 0) {
+
+                                ped.stunnedTimer = 1.55;
+
+                                ped.panicTimer = 4.5;
+
+                                ped.x += (v.vx / Math.max(1, vSpeed)) * 18;
+
+                                ped.y += (v.vy / Math.max(1, vSpeed)) * 18;
+
+                                v.vx *= 0.84;
+
+                                v.vy *= 0.84;
+
+                                v.speed *= 0.84;
+
+                                if (v.driver === "PLAYER") {
+
+                                    if (this.audio && typeof this.audio.playPedScream === "function") {
+
+                                        this.audio.playPedScream();
+
+                                    }
+
+                                    this.addFloatingText(ped.x, ped.y - 22, "💫 KNOCKOUT!", "#38bdf8");
+
+                                }
+
+                            }
+
+                        } else if (ped.kind === "COP" && !v.crushesCars) {
 
                             if ((ped.stunnedTimer || 0) <= 0) {
 
@@ -9700,9 +9738,10 @@ class LeonidaGame {
 
                 }
 
-                // Allow vehicles to plow through open-air street/beach animations (Influencer Livestreamers, Breakdance Cyphers, Street Takeovers, Volleyball, Aerobics, Biker Rallies, etc.)!
-
-                this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true);
+                // Allow cars/trucks (not non-lethal e-scooters/bikes) to plow through open-air street/beach animations!
+                if (!isNonLethalWheeler) {
+                    this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true);
+                }
 
             }
 
@@ -9738,7 +9777,14 @@ class LeonidaGame {
 
                     p.y += (v.vy / vSpeed) * 18;
 
-                    this.damagePlayer(Math.min(26, vSpeed * 0.08));
+                    if (isNonLethalWheeler) {
+                        p.slideCarTimer = 0.42;
+                        if (p.hp > 1) {
+                            this.damagePlayer(Math.min(p.hp - 1, 6));
+                        }
+                    } else {
+                        this.damagePlayer(Math.min(26, vSpeed * 0.08));
+                    }
 
                     this.spawnParticle(p.x, p.y, "SPARK");
 
