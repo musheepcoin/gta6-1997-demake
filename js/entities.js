@@ -1330,7 +1330,6 @@ class Vehicle {
 
         const curZ = this.z !== undefined ? this.z : 2.0;
         this.aiReverseTimer = 0;
-        this.aiLaneShiftTimer = 0;
 
         const bx = Math.floor(this.x / TILE_SIZE);
         const by = Math.floor(this.y / TILE_SIZE);
@@ -1347,7 +1346,7 @@ class Vehicle {
 
         // 1. Commit to a valid outgoing NYC.CMP arrow direction upon entering each road block.
         // Pass the previously committed cardinal angle (refAngle) so a car mid-turn doesn't think its new lane is a 2nd turn!
-        const movedOutOfLane = (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
+        const movedOutOfLane = this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
         if (movedOutOfLane) {
             const refAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number"
                 ? this.aiChosenDir.angle
@@ -1400,14 +1399,16 @@ class Vehicle {
         this.steerAngleRad = 0;
         steer = 0;
 
-        // Always center vehicle smoothly onto the active lane centerline (including when pivoting into a 90-deg turn)
+        // Always center vehicle smoothly onto the active lane centerline (including when pivoting into a 90-deg turn or lane change)
         const maxLatStep = (this.aiChosenDir.isTurn ? 82 : 98) * dt;
+        const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
+        const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
         if (this.aiChosenDir.dx !== 0) {
-            const centerY = (by + 0.5) * TILE_SIZE;
+            const centerY = (laneBlockY + 0.5) * TILE_SIZE;
             const dyErr = centerY - this.y;
             this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 10.5)));
         } else if (this.aiChosenDir.dy !== 0) {
-            const centerX = (bx + 0.5) * TILE_SIZE;
+            const centerX = (laneBlockX + 0.5) * TILE_SIZE;
             const dxErr = centerX - this.x;
             this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 10.5)));
         }
@@ -1502,7 +1503,7 @@ class Vehicle {
 
         if (game && Array.isArray(game.vehicles)) {
             for (const other of game.vehicles) {
-                if (other === this) continue;
+                if (other === this || other === this.towingVehicle || other === this.towTarget) continue;
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
@@ -1520,11 +1521,12 @@ class Vehicle {
                     }
                 }
 
-                // B. Same-Direction Vehicle Ahead in Same Lane (cosDiff > 0.45):
+                // B. Same-Direction Vehicle OR Stationary Wreck/Abandoned Car Ahead in Same Lane:
                 // Strictly maintain true bumper-to-bumper gap (half of our length + half of lead car's length)
+                const isStationaryObstacle = Boolean(other.destroyed || other.driver === null);
                 const halfWidthSum = (this.h + (other.h || 24)) * 0.46 + 4;
                 const halfLengthSum = ((this.w || 48) + (other.w || 48)) * 0.50;
-                if (cosDiff > 0.45 && forwardDist > 4 && lateralDist < halfWidthSum) {
+                if ((cosDiff > 0.45 || isStationaryObstacle) && forwardDist > 4 && lateralDist < halfWidthSum) {
                     const bumperGap = Math.max(0, forwardDist - halfLengthSum);
                     if (bumperGap < closestBumperGap) {
                         closestBumperGap = bumperGap;
@@ -1600,6 +1602,10 @@ class Vehicle {
             this.vy *= brakeMult;
             this.speed *= brakeMult;
         } else if (closestEntity && closestBumperGap < 110) {
+            const isStationaryCar = Boolean(closestEntity.destroyed || closestEntity.driver === null);
+            if (isStationaryCar && closestBumperGap < 98 && !this.towingVehicle && this.aiLaneChangeCooldown <= 0) {
+                this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+            }
             const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
             this.aiState = "FOLLOWING";
             if (closestBumperGap <= minStopGap) {
@@ -1753,7 +1759,7 @@ class Vehicle {
         const ry = fx;
         if (game && Array.isArray(game.vehicles) && this.aiLaneChangeCooldown <= 0) {
             for (const other of game.vehicles) {
-                if (other === this || other.driver === "PLAYER") continue;
+                if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
                 const fDist = dx * fx + dy * fy;
@@ -1997,7 +2003,7 @@ class Vehicle {
             // Penalize feelers that collide with civilian/wrecked vehicles so police weave around traffic!
             if (game && Array.isArray(game.vehicles)) {
                 for (const other of game.vehicles) {
-                    if (other === this || other.driver === "PLAYER") continue;
+                    if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
                     const d1 = Math.hypot(other.x - p1x, other.y - p1y);
                     const d2 = Math.hypot(other.x - p2x, other.y - p2y);
                     if (d1 < 26) score -= 24;
@@ -2219,7 +2225,9 @@ class Vehicle {
         }
 
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        if (dist < 64) {
+        const noProgress = this.updateApproachProgress(dt, dist);
+        const hookDist = Math.max(76, ((this.w || 62) + (target.w || 48)) * 0.54 + 14);
+        if (dist < hookDist || (dist < 115 && noProgress > 2.4)) {
             // Stop for 1.8s to attach the tow winch before pulling away!
             this.towHookTimer = (this.towHookTimer || 0) + dt;
             if (this.towHookTimer < 1.8) {
@@ -2230,6 +2238,8 @@ class Vehicle {
                 };
             }
             this.towHookTimer = 0;
+            this.approachBestDist = undefined;
+            this.approachNoProgress = 0;
             this.towingVehicle = target;
             this.towTarget = null;
             target.towedByTruck = this;
@@ -2248,17 +2258,7 @@ class Vehicle {
         }
         this.towHookTimer = 0;
 
-        // Final approach within 165px: slow down gently (~50 px/s) and align with the wreck
-        if (dist < 165) {
-            const desiredAng = Math.atan2(target.y - this.y, target.x - this.x);
-            const diff = Math.atan2(Math.sin(desiredAng - this.angle), Math.cos(desiredAng - this.angle));
-            return {
-                throttle: this.speed > 52 ? -0.35 : 0.24,
-                steer: Math.max(-1, Math.min(1, diff * 2.0)),
-                handbrake: false
-            };
-        }
-
+        const closeApproach = dist < 175;
         const roadCtrl = this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -2267,11 +2267,13 @@ class Vehicle {
             target.y,
             0,
             0,
-            0.38,
-            false
+            closeApproach ? 0.24 : 0.38,
+            false,
+            closeApproach
         );
-        if (this.speed > 86) {
-            roadCtrl.throttle = -0.20;
+        const maxTowSpd = closeApproach ? 52 : 86;
+        if (this.speed > maxTowSpd) {
+            roadCtrl.throttle = -0.25;
         }
         return roadCtrl;
     }
@@ -3240,7 +3242,7 @@ class TrafficManager {
 
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
-            if (ped.missionTag) continue;
+            if (ped.missionTag || ped.kind === "MEDIC") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
             if (ped.kind === "CIVILIAN") {
@@ -3327,6 +3329,9 @@ class TrafficManager {
             if (tooClose) continue;
 
             const pedZ = map.getHeightAtPixel(pedX, pedY, 4.0);
+            if (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(pedX, pedY, 10, pedZ).hit) {
+                continue;
+            }
             const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];
             const pedStep = map.chooseNextSidewalkBlock ? map.chooseNextSidewalkBlock(pick.bx, pick.by, rawAngle, camZ, Math.random(), false) : null;
             const pedAngle = pedStep ? pedStep.angle : rawAngle;

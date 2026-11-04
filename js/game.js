@@ -4889,11 +4889,31 @@ class LeonidaGame {
 
             const sideSign = (mySeat % 2 === 1) ? 1 : -1;
 
-            let exitX = v.x + sideSign * Math.sin(v.angle) * 26;
+            const exitDist = Math.max(26, ((v.h || 24) * 0.44) + 12);
 
-            let exitY = v.y - sideSign * Math.cos(v.angle) * 26;
+            let exitX = v.x + sideSign * Math.sin(v.angle) * exitDist;
 
-            const resolvedExit = this.map.resolveCircleBuildingCollision(exitX, exitY, 10, p.z || 2.0, false);
+            let exitY = v.y - sideSign * Math.cos(v.angle) * exitDist;
+
+            let resolvedExit = this.map.resolveCircleBuildingCollision(exitX, exitY, 10, p.z || 2.0, false);
+
+            const vehBlocked = this.resolveCircleVehicleCollision(resolvedExit.x, resolvedExit.y, 8.5, p.z || 2.0, v).hit;
+
+            if (resolvedExit.hit || vehBlocked) {
+
+                const altX = v.x - sideSign * Math.sin(v.angle) * exitDist;
+
+                const altY = v.y + sideSign * Math.cos(v.angle) * exitDist;
+
+                const altResolved = this.map.resolveCircleBuildingCollision(altX, altY, 10, p.z || 2.0, false);
+
+                if (!altResolved.hit && !this.resolveCircleVehicleCollision(altResolved.x, altResolved.y, 8.5, p.z || 2.0, v).hit) {
+
+                    resolvedExit = altResolved;
+
+                }
+
+            }
 
             exitX = resolvedExit.x;
 
@@ -5101,9 +5121,27 @@ class LeonidaGame {
 
                 closest.driver === "AI_COP" ||
 
-                closest.driver === "AI_EMERGENCY"
+                closest.driver === "AI_EMERGENCY" ||
+
+                closest.driver === "AI_TOW" ||
+
+                closest.driver === "AI_CRIMINAL"
 
             );
+
+
+
+        if (closest.towedByTruck) {
+
+            if (closest.towedByTruck.towingVehicle === closest) {
+
+                closest.towedByTruck.towingVehicle = null;
+
+            }
+
+            closest.towedByTruck = null;
+
+        }
 
 
 
@@ -5140,6 +5178,10 @@ class LeonidaGame {
         if (freeSeat === 0) {
 
             closest.driver = "PLAYER";
+
+            closest.towTarget = null;
+
+            closest.towHookTimer = 0;
 
         }
 
@@ -5697,7 +5739,7 @@ class LeonidaGame {
 
 
 
-    steerPedWithObstacleFeelers(ped, targetX, targetY) {
+    steerPedWithObstacleFeelers(ped, targetX, targetY, ignoreVeh = null) {
 
         const directAngle = Math.atan2(targetY - ped.y, targetX - ped.x);
 
@@ -5742,6 +5784,16 @@ class LeonidaGame {
             } else if (this.map.resolveCircleBuildingCollision(p2x, p2y, 9, pz).hit) {
 
                 score -= 35;
+
+            }
+
+            if (this.resolveCircleVehicleCollision(p1x, p1y, 8, pz, ignoreVeh).hit) {
+
+                score -= 52;
+
+            } else if (this.resolveCircleVehicleCollision(p2x, p2y, 8, pz, ignoreVeh).hit) {
+
+                score -= 24;
 
             }
 
@@ -9135,7 +9187,9 @@ class LeonidaGame {
 
                     const distDoor = Math.hypot(doorX - p.x, doorY - p.y);
 
-                    if (distDoor < 24) {
+                    const distCarCenter = Math.hypot(ev.x - p.x, ev.y - p.y);
+
+                    if (distDoor < 26 || distCarCenter < 38) {
 
                         this.completeVehicleEntry(ev);
 
@@ -9289,7 +9343,7 @@ class LeonidaGame {
 
                 if ((p.jumpTimer || 0) <= 0 && (p.slideCarTimer || 0) <= 0 && (p.exitAnimTimer || 0) <= 0) {
 
-                    const vcol = this.resolveCircleVehicleCollision(p.x, p.y, 8.5, p.z || 2.0);
+                    const vcol = this.resolveCircleVehicleCollision(p.x, p.y, 8.5, p.z || 2.0, p.enteringVehicle);
 
                     p.x = vcol.x;
 
@@ -10453,6 +10507,8 @@ class LeonidaGame {
 
             const prevY = ped.y;
 
+            ped._boardingVeh = null;
+
 
 
             if (ped.kind === "GATOR") {
@@ -10639,16 +10695,18 @@ class LeonidaGame {
                     }
 
                     if (returnCar) {
-                        if (bestCarDist < 36) {
+                        ped._boardingVeh = returnCar;
+                        const boardDist = Math.max(40, (returnCar.w || 48) * 0.52 + 10);
+                        if (bestCarDist < boardDist) {
                             returnCar.driver = "AI_COP";
                             returnCar.wasCriminalCar = false;
                             returnCar.sirenActive = false;
                             returnCar.doorOpenTimer = 0.44;
-                            const idx = this.peds.indexOf(ped);
-                            if (idx >= 0) this.peds.splice(idx, 1);
+                            ped._boardedVehicle = true;
+                            ped.dead = true;
                             continue;
                         }
-                        ped.angle = this.steerPedWithObstacleFeelers(ped, returnCar.x, returnCar.y);
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, returnCar.x, returnCar.y, returnCar);
                         ped.x += Math.cos(ped.angle) * 76 * dt;
                         ped.y += Math.sin(ped.angle) * 76 * dt;
                     } else {
@@ -10810,15 +10868,17 @@ class LeonidaGame {
                     }
 
                     if (getawayCar) {
-                        if (bestCarDist < 36) {
+                        ped._boardingVeh = getawayCar;
+                        const boardDist = Math.max(40, (getawayCar.w || 48) * 0.52 + 10);
+                        if (bestCarDist < boardDist) {
                             getawayCar.driver = "AI_CRIMINAL";
                             getawayCar.wasCriminalCar = true;
                             getawayCar.doorOpenTimer = 0.44;
-                            const idx = this.peds.indexOf(ped);
-                            if (idx >= 0) this.peds.splice(idx, 1);
+                            ped._boardedVehicle = true;
+                            ped.dead = true;
                             continue;
                         }
-                        ped.angle = this.steerPedWithObstacleFeelers(ped, getawayCar.x, getawayCar.y);
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, getawayCar.x, getawayCar.y, getawayCar);
                         ped.x += Math.cos(ped.angle) * 96 * dt;
                         ped.y += Math.sin(ped.angle) * 96 * dt;
                     } else {
@@ -10837,9 +10897,13 @@ class LeonidaGame {
 
                 if (dPlayer < 290 && !p.dead) {
 
-                    if (dPlayer > 24) {
+                    const reachDist = p.inVehicle ? Math.max(38, (p.inVehicle.w || 48) * 0.50 + 10) : 24;
 
-                        ped.angle = this.steerPedWithObstacleFeelers(ped, p.x, p.y);
+                    if (p.inVehicle) ped._boardingVeh = p.inVehicle;
+
+                    if (dPlayer > reachDist) {
+
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, p.x, p.y, p.inVehicle || null);
 
                         ped.x += Math.cos(ped.angle) * 90 * dt;
 
@@ -10862,6 +10926,8 @@ class LeonidaGame {
                         stolenBack.driver = "AI_TRAFFIC";
 
                         stolenBack.doorOpenTimer = 0.48;
+
+                        ped._boardedVehicle = true;
 
                         ped.dead = true; // Driver is now back inside the vehicle
 
@@ -11073,23 +11139,27 @@ class LeonidaGame {
 
                     // All nearby casualties revived (or timed out) — jog back to the ambulance and climb in!
 
+                    ped._boardingVeh = amb;
+
                     const dAmb = Math.hypot(amb.x - ped.x, amb.y - ped.y);
 
-                    if (dAmb < 38 || ped.medicOutTimer > 34.0) {
+                    const ambBoardDist = Math.max(42, (amb.w || 62) * 0.52 + 10);
+
+                    if (dAmb < ambBoardDist || ped.medicOutTimer > 34.0) {
 
                         amb.doorOpenTimer = 0.40;
 
                         amb.deployedMedic = null;
 
-                        const idx = this.peds.indexOf(ped);
+                        ped._boardedVehicle = true;
 
-                        if (idx >= 0) this.peds.splice(idx, 1);
+                        ped.dead = true;
 
                         continue;
 
                     }
 
-                    ped.angle = this.steerPedWithObstacleFeelers(ped, amb.x, amb.y);
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, amb.x, amb.y, amb);
 
                     ped.x += Math.cos(ped.angle) * 98 * dt;
 
@@ -11113,6 +11183,7 @@ class LeonidaGame {
                     ped.g24Type === "gang" ||
                     ped.g24Type === "vc_haitian" ||
                     ped.g24Type === "vc_cuban";
+                let pursuingStealCar = false;
                 if (isStreetThiefType && (ped.burnTimer || 0) <= 0 && !ped.isLivingProp) {
                     let stealTarget = null;
                     let bestStealDist = 115;
@@ -11137,24 +11208,25 @@ class LeonidaGame {
                         }
                     }
                     if (stealTarget) {
-                        if (bestStealDist < 32) {
+                        ped._boardingVeh = stealTarget;
+                        const stealBoardDist = Math.max(38, (stealTarget.w || 48) * 0.52 + 10);
+                        if (bestStealDist < stealBoardDist) {
                             stealTarget.driver = "AI_TRAFFIC";
                             stealTarget.aiPanicTimer = 6.0;
                             stealTarget.doorOpenTimer = 0.44;
                             this.addFloatingText(stealTarget.x, stealTarget.y - 22, "🚗 ABANDONED CAR STOLEN!", "#facc15");
-                            const idx = this.peds.indexOf(ped);
-                            if (idx >= 0) this.peds.splice(idx, 1);
+                            ped._boardedVehicle = true;
+                            ped.dead = true;
                             continue;
                         }
-                        ped.angle = this.steerPedWithObstacleFeelers(ped, stealTarget.x, stealTarget.y);
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, stealTarget.x, stealTarget.y, stealTarget);
                         ped.x += Math.cos(ped.angle) * 84 * dt;
                         ped.y += Math.sin(ped.angle) * 84 * dt;
-                        continue;
+                        pursuingStealCar = true;
                     }
                 }
 
-
-
+                if (!pursuingStealCar) {
                 const baseWalkSpd = ped.kind === "COP" ? 38 : (ped.speed || 36);
 
                 const spd = (ped.burnTimer || 0) > 0 ? 105 : (ped.panicTimer > 0 ? 82 : baseWalkSpd);
@@ -11304,6 +11376,7 @@ class LeonidaGame {
                     ped.targetBy = null;
 
                 }
+                }
 
             }
 
@@ -11367,11 +11440,11 @@ class LeonidaGame {
 
             // Physical collision against parked / stationary vehicles and wrecks
             if ((ped.slideCarTimer || 0) <= 0 && (ped.exitAnimTimer || 0) <= 0) {
-                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0);
+                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0, ped._boardingVeh || null);
                 if (vCol.hit) {
                     ped.x = vCol.x;
                     ped.y = vCol.y;
-                    if (ped.kind === "CIVILIAN") {
+                    if (ped.kind === "CIVILIAN" && !ped._boardingVeh) {
                         ped.angle += (Math.random() < 0.5 ? 1 : -1) * Math.PI * 0.35;
                     }
                 }
@@ -11379,6 +11452,12 @@ class LeonidaGame {
 
             ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
 
+        }
+
+        for (let i = this.peds.length - 1; i >= 0; i--) {
+            if (this.peds[i]._boardedVehicle) {
+                this.peds.splice(i, 1);
+            }
         }
 
 
