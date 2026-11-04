@@ -3658,10 +3658,9 @@ class WorldObjectEngine {
         const texW = renderer.spritesTexW || renderer.gta1SpritesImg.width || 2048;
         const texH = renderer.spritesTexH || renderer.gta1SpritesImg.height || 4096;
 
-        const verts = [];
-        const pushV = (x, yElev, z, u, v, r, g, b, a = 1.0) => {
-            verts.push(x, yElev, z, u, v, r, g, b, a);
-        };
+        // 16x16 spatial chunk buckets (each chunk covers 32x32 world tiles = 2048x2048 px)
+        // Eliminates monolithic array allocation stall at startup and enables per-frame frustum culling!
+        const chunkBuckets = Array.from({ length: 256 }, () => []);
         const encodeMatUV = (matId, u, v) => [
             -matId - Math.max(0.01, Math.min(0.99, u)) * 0.85,
             Math.max(0.01, Math.min(0.99, v))
@@ -3689,13 +3688,17 @@ class WorldObjectEngine {
             return [-20.0 - col, row];
         };
         const pushQuad3D = (p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a = 1.0) => {
-            pushV(p0[0], p0[1], p0[2], u0, v0, r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], u1, v0, r, g, b, a);
-
-            pushV(p1[0], p1[1], p1[2], u1, v0, r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
-            pushV(p3[0], p3[1], p3[2], u1, v1, r, g, b, a);
+            const cx = Math.max(0, Math.min(15, p0[0] >> 5));
+            const cz = Math.max(0, Math.min(15, p0[2] >> 5));
+            const bkt = chunkBuckets[(cz << 4) | cx];
+            bkt.push(
+                p0[0], p0[1], p0[2], u0, v0, r, g, b, a,
+                p2[0], p2[1], p2[2], u0, v1, r, g, b, a,
+                p1[0], p1[1], p1[2], u1, v0, r, g, b, a,
+                p1[0], p1[1], p1[2], u1, v0, r, g, b, a,
+                p2[0], p2[1], p2[2], u0, v1, r, g, b, a,
+                p3[0], p3[1], p3[2], u1, v1, r, g, b, a
+            );
         };
         const pushMatQuad3D = (p0, p1, p2, p3, matId, r, g, b, a = 1.0) => {
             const [u0, v0] = encodeMatUV(matId, 0.02, 0.98);
@@ -3711,9 +3714,14 @@ class WorldObjectEngine {
             pushQuad3D(p0, p1, p2, p3, wu, wv, wu, wv, r, g, b, a);
         };
         const pushTri3D = (p0, p1, p2, uv0, uv1, uv2, r, g, b, a = 1.0) => {
-            pushV(p0[0], p0[1], p0[2], uv0[0], uv0[1], r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], uv1[0], uv1[1], r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], uv2[0], uv2[1], r, g, b, a);
+            const cx = Math.max(0, Math.min(15, p0[0] >> 5));
+            const cz = Math.max(0, Math.min(15, p0[2] >> 5));
+            const bkt = chunkBuckets[(cz << 4) | cx];
+            bkt.push(
+                p0[0], p0[1], p0[2], uv0[0], uv0[1], r, g, b, a,
+                p1[0], p1[1], p1[2], uv1[0], uv1[1], r, g, b, a,
+                p2[0], p2[1], p2[2], uv2[0], uv2[1], r, g, b, a
+            );
         };
 
         const getUV = (key) => {
@@ -6085,15 +6093,15 @@ class WorldObjectEngine {
             const isTooCloseToBillboard = (wx, wy, minDistPx) => {
                 for (let i = 0; i < placedBillboards.length; i++) {
                     const pb = placedBillboards[i];
-                    if (Math.hypot(pb.x - wx, pb.y - wy) < minDistPx) return true;
+                    if (Math.abs(pb.x - wx) < minDistPx && Math.abs(pb.y - wy) < minDistPx && Math.hypot(pb.x - wx, pb.y - wy) < minDistPx) return true;
                 }
                 return false;
             };
 
             // Pass 29C-0A: Place Monumental Rooftop Mega-Billboards on flat 3x2 commercial roofs overlooking major streets/intersections
             let bbPaletteIdx = 0;
-            for (let r = 14; r < MAP_ROWS - 14; r++) {
-                for (let c = 14; c < M - 14; c++) {
+            for (let r = 14; r < MAP_ROWS - 14; r += 2) {
+                for (let c = 14; c < M - 14; c += 2) {
                     const z = bTopZ[r * M + c];
                     if (z < 3 || z > 5) continue;
 
@@ -6135,7 +6143,7 @@ class WorldObjectEngine {
 
                     const cxPx = (c + 1.5) * TILE_SIZE;
                     const cyPx = (r + 0.30) * TILE_SIZE;
-                    if (isTooCloseToBillboard(cxPx, cyPx, 13.0 * TILE_SIZE)) continue;
+                    if (isTooCloseToBillboard(cxPx, cyPx, 21.0 * TILE_SIZE)) continue;
 
                     // Angle slightly toward corner intersections while facing South toward the camera
                     let ang = 0.0;
@@ -6165,8 +6173,8 @@ class WorldObjectEngine {
             // Pass 29C-0B: Place Towering Highway & Causeway Verge Monopole Mega-Billboards
             // Verified 5x2 open grass verges (GROUND_TYPE.FIELD, bTopZ === 0) immediately North of major East-West highways
             if (surfGtGrid) {
-                for (let r = 20; r < MAP_ROWS - 20; r++) {
-                    for (let c = 20; c < M - 20; c++) {
+                for (let r = 20; r < MAP_ROWS - 20; r += 2) {
+                    for (let c = 20; c < M - 20; c += 2) {
                         const isInsideRestricted = (c >= 52 && c <= 72 && r >= 72 && r <= 150) || (c >= 60 && c <= 170 && r >= 294 && r <= 372);
                         if (isInsideRestricted) continue;
 
@@ -6212,7 +6220,7 @@ class WorldObjectEngine {
 
                         const cxPx = (c + 1.5) * TILE_SIZE;
                         const cyPx = (r - 0.15) * TILE_SIZE;
-                        if (isTooCloseToBillboard(cxPx, cyPx, 16.0 * TILE_SIZE)) continue;
+                        if (isTooCloseToBillboard(cxPx, cyPx, 26.0 * TILE_SIZE)) continue;
 
                         const spec = megaBillboardPalette[bbPaletteIdx % megaBillboardPalette.length];
                         bbPaletteIdx++;
@@ -6221,15 +6229,12 @@ class WorldObjectEngine {
                         if (this.landmarks3D && Array.isArray(this.landmarks3D.gtaBillboards)) {
                             this.landmarks3D.gtaBillboards.push({ x: cxPx, y: cyPx, z: 2.0, ang: 0, ad: spec.ad, neon: spec.accent });
                         }
-                        if (Array.isArray(this.clearZones)) {
-                            this.clearZones.push({ x: cxPx, y: cyPx, r: 96 });
-                        }
                     }
                 }
             }
 
-            for (let r = 6; r < MAP_ROWS - 6; r += 2) {
-                for (let c = 6; c < M - 6; c += 2) {
+            for (let r = 6; r < MAP_ROWS - 6; r += 3) {
+                for (let c = 6; c < M - 6; c += 3) {
                     const idx00 = r * M + c;
                     if (roofUsed[idx00]) continue;
                     const z = bTopZ[idx00];
@@ -6295,8 +6300,8 @@ class WorldObjectEngine {
                             emitTileBox3D(cxPx, cyPx, 1, 0, -10, 0, 44, 38, topY + 0.49, topY + 0.78, 199, 86, 86, [0.86, 0.90, 0.94], false);
                             emitSolidBox3D(cxPx, cyPx, 1, 0, -10, 0, 48, 42, topY + 0.78, topY + 0.83, capCol, 5);
                             // Twin Cylindrical Chiller Cooling Towers on East Mechanical Deck
-                            emitCylinder3D(cxPx, cyPx, 36, -14, 9.5, 9.0, topY, topY + 0.36, 12, [0.76, 0.80, 0.86], 5, true);
-                            emitCylinder3D(cxPx, cyPx, 36,  14, 9.5, 9.0, topY, topY + 0.36, 12, [0.76, 0.80, 0.86], 5, true);
+                            emitCylinder3D(cxPx, cyPx, 36, -14, 9.5, 9.0, topY, topY + 0.36, 8, [0.76, 0.80, 0.86], 5, true);
+                            emitCylinder3D(cxPx, cyPx, 36,  14, 9.5, 9.0, topY, topY + 0.36, 8, [0.76, 0.80, 0.86], 5, true);
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.85 });
                         }
                     } else if (isBeachArtDeco) {
@@ -6321,7 +6326,7 @@ class WorldObjectEngine {
                             emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 68, 68, topY, topY + 0.32, 86, 199, 31, wallCol, false);
                             emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 72, 72, topY + 0.32, topY + 0.37, capCol, 2);
                             emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 44, 44, topY + 0.37, topY + 0.56, wallCol, 1);
-                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.56, topY + 0.72, 12, capCol, 5, true);
+                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.56, topY + 0.72, 8, capCol, 5, true);
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.72 });
                         }
                     } else if (isUrbanBrick && (rHash % 2 === 0)) {
@@ -6336,9 +6341,9 @@ class WorldObjectEngine {
                                 emitTileBox3D(cxPx, cyPx, 1, 0, lx, ly, 6, 6, topY, topY + 0.32, 363, 363, 64, [0.74, 0.78, 0.84], false);
                             }
                         }
-                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.5, 14.0, topY + 0.30, topY + 0.64, 14, [0.66, 0.44, 0.28], 11, true);
-                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.8, 14.8, topY + 0.42, topY + 0.46, 14, [0.24, 0.28, 0.34], 5, false);
-                        emitCone3D(cxPx, cyPx, 18, 0, 15.5, topY + 0.64, topY + 0.82, 14, [0.44, 0.28, 0.18], 5);
+                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.5, 14.0, topY + 0.30, topY + 0.64, 10, [0.66, 0.44, 0.28], 11, true);
+                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.8, 14.8, topY + 0.42, topY + 0.46, 10, [0.24, 0.28, 0.34], 5, false);
+                        emitCone3D(cxPx, cyPx, 18, 0, 15.5, topY + 0.64, topY + 0.82, 10, [0.44, 0.28, 0.18], 5);
                         this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.82 });
                     } else if (rHash % 3 === 0) {
                         // ARCHETYPE 4: Raised 3D Multi-Pane Glass Skylight Atrium & Mechanical Bulkhead
@@ -6353,7 +6358,7 @@ class WorldObjectEngine {
                         // Twin Ribbed Steel HVAC Chiller Units + Dark Exhaust Fan Shrouds (at offX = -18)
                         for (const hy of [-14, 14]) {
                             emitSolidBox3D(cxPx, cyPx, 1, 0, -18, hy, 28, 20, topY + 0.06, topY + 0.28, [0.72, 0.76, 0.82], 6);
-                            emitCylinder3D(cxPx, cyPx, -18, hy, 7.2, 7.2, topY + 0.28, topY + 0.32, 10, [0.18, 0.22, 0.28], 5, true);
+                            emitCylinder3D(cxPx, cyPx, -18, hy, 7.2, 7.2, topY + 0.28, topY + 0.32, 8, [0.18, 0.22, 0.28], 5, true);
                         }
                         // Horizontal Galvanized Steel HVAC Ductwork & Photovoltaic Solar Panel Array (at offX = +16)
                         emitSolidBox3D(cxPx, cyPx, 1, 0, 12, -16, 32, 10, topY + 0.08, topY + 0.20, [0.78, 0.82, 0.88], 5);
@@ -6374,8 +6379,8 @@ class WorldObjectEngine {
                     const z = bTopZ[rOff + c];
                     if (z < 3) continue;
                     const bId = bldgIdGrid[rOff + c] || 1;
-                    // Only decorate ~40% of building blocks, consistently per building
-                    if ((bId % 5) > 1) continue;
+                    // Decorate ~25% of landmark building blocks consistently per building
+                    if ((bId & 3) !== 0) continue;
 
                     const isBeachArtDeco = (c >= 365);
                     const isDowntown = (c >= 235 && c < 365 && r >= 145 && r <= 315);
@@ -6394,11 +6399,11 @@ class WorldObjectEngine {
 
                             if (isBeachArtDeco) {
                                 // Iconic South Beach Rounded Art Deco Limestone Corner Column & Stone Turret Finial
-                                emitCylinder3D(corX, corY, 0, 0, 7.0, 7.0, baseZ + 0.06, z + 0.14, 10, wallCol, 1, true);
-                                emitCylinder3D(corX, corY, 0, 0, 7.6, 7.6, z - 0.03, z + 0.04, 10, capCol, 2, false);
+                                emitCylinder3D(corX, corY, 0, 0, 7.0, 7.0, baseZ + 0.06, z + 0.14, 6, wallCol, 1, true);
+                                emitCylinder3D(corX, corY, 0, 0, 7.6, 7.6, z - 0.03, z + 0.04, 6, capCol, 2, false);
                                 if (z >= 4 && (bId % 2 === 0)) {
-                                    emitCylinder3D(corX, corY, 0, 0, 5.2, 4.6, z + 0.14, z + 0.28, 10, wallCol, 1, true);
-                                    emitCone3D(corX, corY, 0, 0, 4.6, z + 0.28, z + 0.44, 10, capCol, 2);
+                                    emitCylinder3D(corX, corY, 0, 0, 5.2, 4.6, z + 0.14, z + 0.28, 6, wallCol, 1, true);
+                                    emitCone3D(corX, corY, 0, 0, 4.6, z + 0.28, z + 0.44, 6, capCol, 2);
                                 }
                             } else if (isDowntown && z >= 4) {
                                 // Modern Skyscraper Brushed-Steel Corner Mullion Pylon & Coping Cap
@@ -6417,8 +6422,8 @@ class WorldObjectEngine {
             // Pass 29E: Narrow-Wing (1x2 / 2x1) & Stepped-Setback 3D Rooftop Superstructures:
             //           3D Rooftop Steel-Truss Advertising Billboards, Setback Glass Solariums,
             //           Elevator Bulkheads, Twin Exhaust Turbines & Rooftop Satellite Dishes!
-            for (let r = 6; r < MAP_ROWS - 6; r += 2) {
-                for (let c = 6; c < M - 6; c += 2) {
+            for (let r = 6; r < MAP_ROWS - 6; r += 3) {
+                for (let c = 6; c < M - 6; c += 3) {
                     const idx = r * M + c;
                     if (roofUsed[idx]) continue;
                     const z = bTopZ[idx];
@@ -6489,12 +6494,12 @@ class WorldObjectEngine {
                         const v1y = cyPx + wSin * 14 + wCos * (-8);
                         const v2x = cxPx + wCos * 14 - wSin * 8;
                         const v2y = cyPx + wSin * 14 + wCos * 8;
-                        emitCylinder3D(v1x, v1y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 10, [0.78, 0.82, 0.88], 5, true);
-                        emitCylinder3D(v2x, v2y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 10, [0.78, 0.82, 0.88], 5, true);
+                        emitCylinder3D(v1x, v1y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 8, [0.78, 0.82, 0.88], 5, true);
+                        emitCylinder3D(v2x, v2y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 8, [0.78, 0.82, 0.88], 5, true);
                         const satX = cxPx + wCos * 26;
                         const satY = cyPx + wSin * 26;
-                        emitCylinder3D(satX, satY, 0, 0, 2.2, 1.8, topY, topY + 0.16, 8, [0.64, 0.68, 0.74], 5, false);
-                        emitCylinder3D(satX, satY, 0, 0, 4.0, 9.5, topY + 0.16, topY + 0.26, 12, [0.88, 0.90, 0.94], 2, true);
+                        emitCylinder3D(satX, satY, 0, 0, 2.2, 1.8, topY, topY + 0.16, 6, [0.64, 0.68, 0.74], 5, false);
+                        emitCylinder3D(satX, satY, 0, 0, 4.0, 9.5, topY + 0.16, topY + 0.26, 8, [0.88, 0.90, 0.94], 2, true);
                     }
                 }
             }
@@ -6541,19 +6546,46 @@ class WorldObjectEngine {
 
         if (this.meshVbo) {
             gl.deleteBuffer(this.meshVbo);
+            this.meshVbo = null;
         }
-        this.meshVertexCount = verts.length / 9;
-        this.meshVbo = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-        verts.length = 0;
+        if (Array.isArray(this.staticChunks)) {
+            for (let i = 0; i < this.staticChunks.length; i++) {
+                if (this.staticChunks[i].vbo) {
+                    gl.deleteBuffer(this.staticChunks[i].vbo);
+                }
+            }
+        }
+        this.staticChunks = [];
+        this.meshVertexCount = 0;
+        for (let cz = 0; cz < 16; cz++) {
+            for (let cx = 0; cx < 16; cx++) {
+                const bkt = chunkBuckets[(cz << 4) | cx];
+                if (!bkt || bkt.length === 0) continue;
+                const count = bkt.length / 9;
+                const vbo = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bkt), gl.STATIC_DRAW);
+                bkt.length = 0;
+                this.meshVertexCount += count;
+                this.staticChunks.push({
+                    cx,
+                    cz,
+                    minX: cx * 32 - 5,
+                    maxX: (cx + 1) * 32 + 5,
+                    minZ: cz * 32 - 5,
+                    maxZ: (cz + 1) * 32 + 5,
+                    vbo,
+                    count
+                });
+            }
+        }
     }
 
     /* ========================================================================
        5. RENDER HARDWARE-DEPTH-BUFFERED 3D STATIC + DYNAMIC ANIMATED MESHES
        ======================================================================== */
     renderStatic3DMesh(gl, renderer, viewProj, nf = 0.0, sf = 0.0) {
-        if (!gl || !this.meshVbo || this.meshVertexCount === 0 || !this.meshProg || !renderer.spritesTex) return;
+        if (!gl || !this.staticChunks || this.staticChunks.length === 0 || !this.meshProg || !renderer.spritesTex) return;
 
         gl.useProgram(this.meshProg);
         gl.uniformMatrix4fv(this.meshLocs.uViewProj, false, viewProj);
@@ -6585,13 +6617,9 @@ class WorldObjectEngine {
         }
 
         const stride = 9 * 4;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVbo);
         gl.enableVertexAttribArray(this.meshLocs.aPos);
-        gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
         gl.enableVertexAttribArray(this.meshLocs.aUV);
-        gl.vertexAttribPointer(this.meshLocs.aUV, 2, gl.FLOAT, false, stride, 12);
         gl.enableVertexAttribArray(this.meshLocs.aColor);
-        gl.vertexAttribPointer(this.meshLocs.aColor, 4, gl.FLOAT, false, stride, 20);
 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
@@ -6599,8 +6627,23 @@ class WorldObjectEngine {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        // Pass 1: Static 3D Estates & Landmarks
-        gl.drawArrays(gl.TRIANGLES, 0, this.meshVertexCount);
+        // Pass 1: Frustum-Culled 32x32-Tile Static 3D Chunks (Estates, Bridges, Parapets, Mega-Billboards & Landmarks)
+        const camX = renderer.camX || 0;
+        const camY = renderer.camY || 0;
+        const minTileX = (camX - 1180) / TILE_SIZE;
+        const maxTileX = (camX + 1180) / TILE_SIZE;
+        const minTileZ = (camY - 920) / TILE_SIZE;
+        const maxTileZ = (camY + 920) / TILE_SIZE;
+
+        for (let i = 0; i < this.staticChunks.length; i++) {
+            const ch = this.staticChunks[i];
+            if (ch.maxX < minTileX || ch.minX > maxTileX || ch.maxZ < minTileZ || ch.minZ > maxTileZ) continue;
+            gl.bindBuffer(gl.ARRAY_BUFFER, ch.vbo);
+            gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
+            gl.vertexAttribPointer(this.meshLocs.aUV, 2, gl.FLOAT, false, stride, 12);
+            gl.vertexAttribPointer(this.meshLocs.aColor, 4, gl.FLOAT, false, stride, 20);
+            gl.drawArrays(gl.TRIANGLES, 0, ch.count);
+        }
 
         // Pass 2: Dynamic 3D Animated Landmarks (Vertically-Rotating 3D Ferris Wheel,
         //         3D Windmill Sails, Cylindrical Artemis VI Rocket) & 3D Street Furniture!
@@ -6619,13 +6662,31 @@ class WorldObjectEngine {
         const maxY = camY + 720;
         const t = renderer.time || 0;
 
-        const dVerts = [];
+        if (!this.dynFloatBuf) {
+            this.dynFloatBuf = new Float32Array(65536);
+        }
+        let dBuf = this.dynFloatBuf;
+        let dLen = 0;
         const encUV = (matId, u, v) => [
             -matId - Math.max(0.01, Math.min(0.99, u)) * 0.85,
             Math.max(0.01, Math.min(0.99, v))
         ];
         const pushV = (x, yElev, z, u, v, r, g, b, a = 1.0) => {
-            dVerts.push(x, yElev, z, u, v, r, g, b, a);
+            if (dLen + 9 > dBuf.length) {
+                const nextBuf = new Float32Array(dBuf.length * 2);
+                nextBuf.set(dBuf);
+                this.dynFloatBuf = dBuf = nextBuf;
+            }
+            dBuf[dLen]     = x;
+            dBuf[dLen + 1] = yElev;
+            dBuf[dLen + 2] = z;
+            dBuf[dLen + 3] = u;
+            dBuf[dLen + 4] = v;
+            dBuf[dLen + 5] = r;
+            dBuf[dLen + 6] = g;
+            dBuf[dLen + 7] = b;
+            dBuf[dLen + 8] = a;
+            dLen += 9;
         };
         const pushQ = (p0, p1, p2, p3, matId, r, g, b, a = 1.0) => {
             const [u0, v0] = encUV(matId, 0.02, 0.98);
@@ -7572,20 +7633,16 @@ class WorldObjectEngine {
             }
         }
 
-        if (dVerts.length === 0) return;
+        if (dLen === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
         }
-        if (!this.dynFloatBuf || this.dynFloatBuf.length < dVerts.length) {
-            this.dynFloatBuf = new Float32Array(Math.max(16384, dVerts.length * 2));
-        }
-        this.dynFloatBuf.set(dVerts, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.dynVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, this.dynFloatBuf.subarray(0, dVerts.length), gl.STREAM_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, this.dynFloatBuf.subarray(0, dLen), gl.STREAM_DRAW);
         gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
         gl.vertexAttribPointer(this.meshLocs.aUV, 2, gl.FLOAT, false, stride, 12);
         gl.vertexAttribPointer(this.meshLocs.aColor, 4, gl.FLOAT, false, stride, 20);
-        gl.drawArrays(gl.TRIANGLES, 0, dVerts.length / 9);
+        gl.drawArrays(gl.TRIANGLES, 0, dLen / 9);
     }
 
     /* ========================================================================

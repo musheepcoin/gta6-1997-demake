@@ -1855,7 +1855,8 @@ class RetroRenderer {
             // 1-pass RGB color dilation into alpha=0 border texels (keeping alpha=0) to prevent dark fringe bleeding
             // (Skipped on mobile to avoid an 8.4M-pixel synchronous main-thread stall during startup)
             if (!this.isMobileInit) {
-                for (let y = 1; y < H - 1; y++) {
+                const maxBleedY = Math.min(H - 1, origH);
+                for (let y = 1; y < maxBleedY; y++) {
                     const rowOff = y * W;
                     for (let x = 1; x < W - 1; x++) {
                         const p = (rowOff + x) * 4;
@@ -4321,20 +4322,15 @@ class RetroRenderer {
                 roofAtlasIndices.push({ idx: rIdx, seed: rIdx });
             }
 
-            for (const { idx, seed } of roofAtlasIndices) {
-                const col = idx % 16;
-                const row = Math.floor(idx / 16);
-                const x0 = col * 64;
-                const y0 = row * 64;
-                if (y0 + 64 > h) continue;
-
-                const tileImg = ctx.getImageData(x0, y0, 64, 64);
+            // Pre-synthesize the 3 procedural 64x64 rooftop deck styles once in CPU memory (zero GPU readbacks!)
+            const roofStyleTiles = [0, 1, 2].map((roofStyle) => {
+                const tileImg = ctx.createImageData(64, 64);
                 const td = tileImg.data;
-                const roofStyle = seed % 3;
                 // 0: Cool architectural precast concrete, 1: Warm Miami limestone/travertine deck, 2: Weathered slate-grey membrane
                 const baseR = roofStyle === 1 ? 194 : (roofStyle === 2 ? 156 : 176);
                 const baseG = roofStyle === 1 ? 188 : (roofStyle === 2 ? 160 : 179);
                 const baseB = roofStyle === 1 ? 176 : (roofStyle === 2 ? 166 : 183);
+                const seed = roofStyle + 17;
                 for (let ty = 0; ty < 64; ty++) {
                     for (let tx = 0; tx < 64; tx++) {
                         const p = (ty * 64 + tx) * 4;
@@ -4360,7 +4356,16 @@ class RetroRenderer {
                         td[p + 3] = 255;
                     }
                 }
-                ctx.putImageData(tileImg, x0, y0);
+                return tileImg;
+            });
+
+            for (const { idx, seed } of roofAtlasIndices) {
+                const col = idx % 16;
+                const row = Math.floor(idx / 16);
+                const x0 = col * 64;
+                const y0 = row * 64;
+                if (y0 + 64 > h) continue;
+                ctx.putImageData(roofStyleTiles[seed % 3], x0, y0);
             }
 
             // 4. GTA 6 3D Building Facade Wall Tile Remaster (side tiles 0..389 in rows 0..24):
