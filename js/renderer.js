@@ -3732,6 +3732,95 @@ class RetroRenderer {
                 }
             }
 
+            // 4. GTA 6 3D Building Facade Wall Tile Remaster (side tiles 0..389 in rows 0..24):
+            //    Adds 3D recessed window frame top/left shadows, projecting sunlit bottom window sills,
+            //    diagonal Miami sky-reflection glass sheen, and crisp masonry/stucco course micro-relief
+            //    (automatically skips alpha-cutout truss/fence/ladder tiles so cutouts stay razor-sharp).
+            const sideBandH = Math.min(h, 25 * 64);
+            const sideImg = ctx.getImageData(0, 0, w, sideBandH);
+            const sd = sideImg.data;
+            const glassMask = new Uint8Array(64 * 64);
+
+            for (let idx = 0; idx < 390; idx++) {
+                const col = idx % 16;
+                const row = Math.floor(idx / 16);
+                const x0 = col * 64;
+                const y0 = row * 64;
+                if (y0 + 64 > sideBandH) continue;
+
+                // Skip any alpha-cutout tile (fences, ladders, steel trusses, railings)
+                let hasAlphaCutout = false;
+                for (let ty = 0; ty < 64 && !hasAlphaCutout; ty += 2) {
+                    const rowBase = ((y0 + ty) * w + x0) * 4;
+                    for (let tx = 0; tx < 64; tx += 2) {
+                        if (sd[rowBase + tx * 4 + 3] < 245) {
+                            hasAlphaCutout = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasAlphaCutout) continue;
+
+                for (let ty = 0; ty < 64; ty++) {
+                    const rowBase = ((y0 + ty) * w + x0) * 4;
+                    for (let tx = 0; tx < 64; tx++) {
+                        const p = rowBase + tx * 4;
+                        const r = sd[p], g = sd[p + 1], b = sd[p + 2];
+                        glassMask[ty * 64 + tx] = (b > r + 15 && b > 78 && g > r * 0.82) ? 1 : 0;
+                    }
+                }
+
+                for (let ty = 0; ty < 64; ty++) {
+                    const rowBase = ((y0 + ty) * w + x0) * 4;
+                    for (let tx = 0; tx < 64; tx++) {
+                        const p = rowBase + tx * 4;
+                        let r = sd[p], g = sd[p + 1], b = sd[p + 2];
+                        const isG = glassMask[ty * 64 + tx] === 1;
+
+                        if (isG) {
+                            const topFrame  = (ty > 0  && glassMask[(ty - 1) * 64 + tx] === 0);
+                            const leftFrame = (tx > 0  && glassMask[ty * 64 + (tx - 1)] === 0);
+                            const botSill   = (ty < 63 && glassMask[(ty + 1) * 64 + tx] === 0);
+                            if (topFrame || leftFrame) {
+                                // Deep 3D recessed window casing shadow
+                                r = Math.round(r * 0.68);
+                                g = Math.round(g * 0.72);
+                                b = Math.round(b * 0.78);
+                            } else if (botSill) {
+                                // Sunlit bottom window sill reflection
+                                r = Math.min(255, r + 22);
+                                g = Math.min(255, g + 26);
+                                b = Math.min(255, b + 30);
+                            } else {
+                                // Diagonal Miami sky-reflection glint & vertical sky gradient
+                                const diagStreak = (((tx + ty) & 15) === 3 || ((tx + ty) & 15) === 4) ? 12 : 0;
+                                const skyBoost = Math.round((1.0 - (ty & 15) / 15.0) * 10) + diagStreak;
+                                r = Math.min(255, Math.max(0, r + Math.round(skyBoost * 0.55)));
+                                g = Math.min(255, Math.max(0, g + Math.round(skyBoost * 0.85)));
+                                b = Math.min(255, Math.max(0, b + skyBoost));
+                            }
+                        } else {
+                            // Masonry / Stucco / Terracotta wall pixel: add 3D window-sill under-shadow & course relief
+                            const aboveIsGlass = (ty > 0 && glassMask[(ty - 1) * 64 + tx] === 1);
+                            const courseLine = ((ty & 7) === 0);
+                            let mul = 1.0;
+                            if (aboveIsGlass) mul = 1.09; // Bright projecting window sill cap below glass
+                            else if (ty === 0) mul = 0.85;
+                            else if (ty === 63) mul = 0.88;
+                            else if (courseLine) mul = 0.94;
+                            r = Math.min(255, Math.max(0, Math.round(r * mul)));
+                            g = Math.min(255, Math.max(0, Math.round(g * mul)));
+                            b = Math.min(255, Math.max(0, Math.round(b * mul)));
+                        }
+
+                        sd[p]     = r;
+                        sd[p + 1] = g;
+                        sd[p + 2] = b;
+                    }
+                }
+            }
+            ctx.putImageData(sideImg, 0, 0);
+
             return cvs;
         } catch (err) {
             console.warn("processViceTilesRtx fallback:", err);
