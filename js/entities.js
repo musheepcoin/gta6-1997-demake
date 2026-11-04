@@ -1847,15 +1847,15 @@ class Vehicle {
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
         // GTA 1 Tactical Officer Bail-Out:
-        // 1) Close to a wanted player on foot (< 130px) or a boxed-in slow car (< 92px), OR
-        // 2) Cruiser can't get any closer (blocked by water/buildings/plaza walls) for 2s while within 650px
-        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 130;
-        const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 35 && distToPlayer < 92;
-        const blockedNear = !wantedTarget.inVehicle && distToPlayer < 650 && noProgress > 2.0;
+        // 1) Close to a wanted player on foot (< 210px) or a boxed-in slow car (< 130px), OR
+        // 2) Cruiser can't get any closer (blocked by water/buildings/plaza walls) for 1.6s while within 650px
+        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 210;
+        const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
+        const blockedNear = !wantedTarget.inVehicle && distToPlayer < 650 && noProgress > 1.6;
 
         if (playerOnFootNear || playerBoxedNear || blockedNear) {
             this.aiBailTimer += dt;
-            const bailDelay = playerBoxedNear ? 0.95 : 0.40;
+            const bailDelay = playerBoxedNear ? 0.70 : 0.25;
             if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
                 this.approachNoProgress = 0;
@@ -1869,8 +1869,11 @@ class Vehicle {
         // Wanted player or ambient criminal off-road nearby (beach, plaza, park): cruiser leaves the asphalt and drives straight at them
         const forceDirect = !targetOnRoad && distToPlayer < 720;
 
-        // When pursuing an ambient AI_CRIMINAL getaway vehicle, the police passenger fires bursts at the fleeing car!
-        if (wantedTarget.isCriminalNPC && wantedTarget.inVehicle && distToPlayer < 260 && game && typeof game.fireWeapon === "function") {
+        // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger fires bursts!
+        const canDriveByShoot =
+            (wantedTarget.isCriminalNPC && wantedTarget.inVehicle) ||
+            (!wantedTarget.isCriminalNPC && (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2);
+        if (canDriveByShoot && distToPlayer < 275 && game && typeof game.fireWeapon === "function") {
             this.copDriveByTimer = (this.copDriveByTimer || 0) - dt;
             if (this.copDriveByTimer <= 0) {
                 this.copDriveByTimer = 0.65 + Math.random() * 0.45;

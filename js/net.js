@@ -1001,6 +1001,7 @@ class ViceNetworkManager {
             if (d === "AI_COP") return 2;
             if (d === "AI_EMERGENCY") return 3;
             if (d === "PLAYER" || d === "REMOTE") return 4;
+            if (d === "AI_CRIMINAL") return 5;
             return 0;
         };
 
@@ -1037,6 +1038,8 @@ class ViceNetworkManager {
             if (k === "MONK") return 2;
             if (k === "HOSTILE") return 3;
             if (k === "GATOR") return 4;
+            if (k === "CRIMINAL") return 5;
+            if (k === "PARAMEDIC") return 6;
             return 0;
         };
 
@@ -1050,7 +1053,9 @@ class ViceNetworkManager {
                 ((pd.burnTimer || 0) > 0 ? 8 : 0) |
                 ((pd.electroTimer || 0) > 0 ? 16 : 0) |
                 ((pd.drownTimer || 0) > 0 ? 32 : 0) |
-                ((pd.exitAnimTimer || 0) > 0 ? 64 : 0);
+                ((pd.exitAnimTimer || 0) > 0 ? 64 : 0) |
+                ((pd.muzzleTimer || 0) > 0 ? 128 : 0) |
+                (pd.inCombat ? 256 : 0);
             peds.push([
                 pd.id,
                 kindToCode(pd.kind),
@@ -1062,7 +1067,8 @@ class ViceNetworkManager {
                 Math.round(pd.speed || 0),
                 Math.round(pd.hp || 0),
                 flags,
-                pd.missionTag || 0
+                pd.missionTag || 0,
+                pd.copWeapon || 0
             ]);
         }
 
@@ -1100,6 +1106,7 @@ class ViceNetworkManager {
             if (c === 2) return "AI_COP";
             if (c === 3) return "AI_EMERGENCY";
             if (c === 4) return "REMOTE";
+            if (c === 5) return "AI_CRIMINAL";
             return null;
         };
 
@@ -1187,6 +1194,8 @@ class ViceNetworkManager {
             if (c === 2) return "MONK";
             if (c === 3) return "HOSTILE";
             if (c === 4) return "GATOR";
+            if (c === 5) return "CRIMINAL";
+            if (c === 6) return "PARAMEDIC";
             return "CIVILIAN";
         };
 
@@ -1199,7 +1208,7 @@ class ViceNetworkManager {
 
             for (const row of pkt.peds) {
                 if (!Array.isArray(row) || row.length < 10) continue;
-                const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag] = row;
+                const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag, copWeapon] = row;
                 seenPedIds.add(id);
                 let pd = existingPeds.get(id);
                 const kindStr = codeToKind(kindCode);
@@ -1214,6 +1223,7 @@ class ViceNetworkManager {
                         kind: kindStr,
                         g24Type: g24Type || "civ0",
                         missionTag: missionTag || null,
+                        copWeapon: copWeapon || null,
                         hp,
                         dead: Boolean(flags & 1)
                     });
@@ -1230,6 +1240,7 @@ class ViceNetworkManager {
                     pd.speed = spd;
                     pd.kind = kindStr;
                     pd.g24Type = g24Type || pd.g24Type;
+                    if (copWeapon) pd.copWeapon = copWeapon;
                     // The host only learns about our hits through PED_KILL, so its snapshot hp is always
                     // >= ours: keep the lower value or multi-hit kills would be healed back every 100 ms.
                     pd.hp = Number.isFinite(pd.hp) ? Math.min(pd.hp, hp) : hp;
@@ -1247,6 +1258,8 @@ class ViceNetworkManager {
                     pd.electroTimer = (flags & 16) ? Math.max(pd.electroTimer || 0, 0.4) : 0;
                     pd.drownTimer = (flags & 32) ? Math.max(pd.drownTimer || 0, 0.4) : 0;
                     if ((flags & 64) && (pd.exitAnimTimer || 0) <= 0) pd.exitAnimTimer = 0.28;
+                    if (flags & 128) pd.muzzleTimer = Math.max(pd.muzzleTimer || 0, 0.09);
+                    pd.inCombat = Boolean(flags & 256);
                 }
             }
 

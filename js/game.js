@@ -6396,17 +6396,26 @@ class LeonidaGame {
 
         let best = candidates[0];
 
-        let bestDist = Math.hypot(best.x - fromX, best.y - fromY);
+        const scoreCandidate = (c) => {
+            const rawDist = Math.hypot(c.x - fromX, c.y - fromY);
+            // Prioritize wanted human players over ambient NPC criminals when a player is wanted nearby
+            if (c.isCriminalNPC && effectiveGlobalWanted > 0) {
+                return rawDist + 320;
+            }
+            return rawDist;
+        };
+
+        let bestScore = scoreCandidate(best);
 
         for (let i = 1; i < candidates.length; i++) {
 
             const c = candidates[i];
 
-            const d = Math.hypot(c.x - fromX, c.y - fromY);
+            const sc = scoreCandidate(c);
 
-            if (d < bestDist) {
+            if (sc < bestScore) {
 
-                bestDist = d;
+                bestScore = sc;
 
                 best = c;
 
@@ -7573,6 +7582,8 @@ class LeonidaGame {
                 damage: spec.damage,
 
                 rangeLeft: spec.range,
+
+                maxRange: spec.range,
 
                 isFlame: Boolean(spec.isFlame),
 
@@ -10431,28 +10442,38 @@ class LeonidaGame {
 
                 }
 
-                // Check close-range COP arrest / damage on local player even in client sync mode
-
-                if (ped.kind === "COP" && this.wantedLevel > 0 && !p.dead) {
-
-                    const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
-
+                // Check close-range COP arrest / damage AND ranged weapon fire on local player even in client sync mode
+                if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop) && !p.dead) {
+                    ped.inCombat = true;
+                    const targetEnt = p.inVehicle || p;
+                    const dPlayer = Math.hypot(targetEnt.x - ped.x, targetEnt.y - ped.y);
                     if (dPlayer <= 28 && !p.inVehicle) {
-
                         const maxHp = p.maxHp || 100;
-
                         if (p.hp < maxHp * 0.25) {
-
                             this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
-
                         } else {
-
                             this.damagePlayer(18 * dt);
-
                         }
-
                     }
-
+                    ped.shootCooldown = (ped.shootCooldown || 0) - dt;
+                    if (dPlayer < 325 && ped.shootCooldown <= 0 && (ped.stunnedTimer || 0) <= 0) {
+                        const blocked = this.map.traceSegment2D
+                            ? this.map.traceSegment2D(ped.x, ped.y, targetEnt.x, targetEnt.y, ped.z || 2.0).hit
+                            : false;
+                        if (!blocked) {
+                            const effWanted = Math.max(1, this.wantedLevel || 1);
+                            const wep = ped.copWeapon || (effWanted >= 4 ? "SHOTGUN" : (effWanted >= 3 ? "UZI" : "PISTOL"));
+                            ped.shootCooldown = wep === "UZI" ? 0.34 : (wep === "SHOTGUN" ? 1.15 : 0.85);
+                            const leadX = targetEnt.x + (targetEnt.vx || 0) * 0.12;
+                            const leadY = targetEnt.y + (targetEnt.vy || 0) * 0.12;
+                            const aimAng = Math.atan2(leadY - ped.y, leadX - ped.x);
+                            ped.angle = aimAng;
+                            ped.muzzleTimer = 0.09;
+                            this.fireWeapon(ped.x, ped.y, aimAng, wep, false, false, "COP");
+                        } else {
+                            ped.shootCooldown = 0.35;
+                        }
+                    }
                 }
 
                 continue;
@@ -11669,7 +11690,9 @@ class LeonidaGame {
                         : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
                 }
 
-                ped.angle += Math.PI + (Math.random() - 0.5) * 0.8;
+                if (!ped.inCombat) {
+                    ped.angle += Math.PI + (Math.random() - 0.5) * 0.8;
+                }
 
                 ped.targetBx = null;
 
@@ -11702,7 +11725,7 @@ class LeonidaGame {
 
             // Real-displacement anti-stuck watchdog: if any walking pedestrian moved < 7px over 0.50s,
             // mark the tile ahead as blocked, nudge toward the center of the current walkable tile, and pick a clear direction!
-            if (!ped.dead && !ped.isLivingProp && ped.kind !== "GATOR" && (ped.healTimer || 0) <= 0 && (ped.slideCarTimer || 0) <= 0) {
+            if (!ped.dead && !ped.isLivingProp && !ped.inCombat && ped.kind !== "GATOR" && (ped.healTimer || 0) <= 0 && (ped.slideCarTimer || 0) <= 0) {
                 ped._stuckCheckTimer = (ped._stuckCheckTimer || 0) + dt;
                 if (ped._lastCheckX === undefined) {
                     ped._lastCheckX = ped.x;
@@ -12330,6 +12353,8 @@ class LeonidaGame {
 
             if (!hitSomething) {
 
+                const distTraveled = (pr.maxRange || 320) - (pr.rangeLeft || 0);
+
                 for (const v of this.vehicles) {
 
                     if (pr.fromPlayer && p.inVehicle === v) continue;
@@ -12339,6 +12364,10 @@ class LeonidaGame {
                     if (!pr.fromPlayer && pr.npcFaction === "CRIMINAL" && v.driver === "AI_CRIMINAL") continue;
 
                     if (!pr.fromPlayer && !pr.npcFaction && v.isPolice && p.inVehicle !== v) continue;
+
+                    // Do not let a vehicle immediately next to an NPC shooter swallow their bullet on spawn,
+                    // nor swallow a bullet that is hitting the on-foot player right next to the car
+                    if (!pr.fromPlayer && p.inVehicle !== v && (distTraveled < 44 || (!p.inVehicle && Math.hypot(p.x - pr.x, p.y - pr.y) < 16))) continue;
 
                     if (Math.hypot(v.x - pr.x, v.y - pr.y) < 24) {
 
@@ -12552,11 +12581,13 @@ class LeonidaGame {
 
                     Boolean(pr.fromRemoteId) ||
 
-                    (pr.npcFaction === "COP" && this.wantedLevel > 0) ||
+                    (pr.npcFaction === "COP" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && pd.carjackedCop))) ||
+
+                    (pr.npcFaction === "CRIMINAL" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && pd.kind === "CRIMINAL" && (pd.provokedByPlayer || pd.missionTag === "MISSION_ENEMY")))) ||
 
                     (!pr.npcFaction && this.wantedLevel > 0);
 
-                if (canHitPlayer && Math.hypot(p.x - pr.x, p.y - pr.y) < 13) {
+                if (canHitPlayer && Math.hypot(p.x - pr.x, p.y - pr.y) < 15) {
 
                     if (pr.fromRemoteId) {
 
