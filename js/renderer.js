@@ -3038,6 +3038,386 @@ class RetroRenderer {
                     ctx.putImageData(buildVcpdChargerState("DMG_HEAVY"), 56, 196);
                 }
 
+                // 6J4. VCPD IMPOUND HEAVY WRECKER / TOW TRUCK (spr_idx = "veh_tow_truck" — 11 Multi-State 52x64 Sprites at y = 3470, x = 700..1312)
+                //      Authentic American Heavy-Duty Recovery Wrecker (facing South +Y):
+                //      - Rear Wheel-Lift Stinger Crossbar (y = 0..2) + Yellow/Black Hazard Chevron Rear Bumper (y = 3..5)
+                //      - Open Gunmetal Diamond-Plate Wrecker Bed (y = 6..31) with Twin Dual Rear Tires & Safety-Amber Side Toolboxes
+                //      - Heavy Hydraulic Winch Drum (y = 26..30) + Twin Angled Yellow/Steel A-Frame Crane Boom Arms converging to Rear Pulley Hook!
+                //      - Steel Headache Rack + Full-Width Alternating Amber/White LED Strobe Lightbar (y = 32..35)
+                //      - Two-Tone Safety-Amber & White Heavy Truck Cab (y = 35..45), Sapphire Windshield (y = 45..49), Long Power-Dome Hood (y = 49..59) & Chrome Push Bumper (y = 59..62)
+                {
+                    const buildTowTruckState = (mode) => {
+                        const sw = 52, sh = 64;
+                        const id = ctx.createImageData(sw, sh);
+                        const b = id.data;
+                        const isWreck = mode === "WRECK";
+                        const dmgFront = mode === "DMG_FRONT" || mode === "DMG_HEAVY" || isWreck;
+                        const dmgRear = mode === "DMG_REAR" || mode === "DMG_HEAVY" || isWreck;
+                        const doorStage = mode.startsWith("DOOR_") ? parseInt(mode.slice(5), 10) : -1;
+
+                        const setPx = (x, y, r, g, bl, a = 255) => {
+                            if (x < 0 || x >= sw || y < 0 || y >= sh) return;
+                            const i = (y * sw + x) * 4;
+                            b[i] = r; b[i + 1] = g; b[i + 2] = bl; b[i + 3] = a;
+                        };
+
+                        for (let y = 0; y < sh; y++) {
+                            let xL = 10, xR = 41;
+                            if (y <= 2) {
+                                // Protruding rear steel wheel-lift stinger crossbar & tow forks
+                                xL = 16; xR = 35;
+                            } else if (y <= 5) {
+                                // Wide rear hazard chevron bumper
+                                xL = 9; xR = 42;
+                            } else if (y <= 31) {
+                                // Open flatbed recovery deck + side utility toolboxes
+                                xL = 10; xR = 41;
+                            } else if (y <= 45) {
+                                // Heavy truck cab
+                                xL = 11; xR = 40;
+                            } else if (y <= 59) {
+                                // Tapered American heavy truck hood & front fenders
+                                xL = 11; xR = 40;
+                            } else if (y <= 62) {
+                                // Heavy chrome front push bumper
+                                xL = 12; xR = 39;
+                            } else {
+                                continue;
+                            }
+
+                            if (dmgFront && y >= 55) {
+                                const crush = Math.round(((xL + y * 5) % 3) - 0.5);
+                                if (y >= 61 && (xL + y) % 2 === 0) continue;
+                                xL += Math.max(0, crush);
+                                xR -= Math.max(0, (y * 3) % 2);
+                            }
+                            if (dmgRear && y <= 6) {
+                                if (y <= 1 && (y + xL) % 2 === 0) continue;
+                                xL += (y % 2);
+                                xR -= ((y + 1) % 2);
+                            }
+
+                            // Dual Rear Dually Tires (y = 11..23) & Steerable Front Tires (y = 48..57)
+                            const inRearTire = (y >= 11 && y <= 23);
+                            const inFrontTire = (y >= 48 && y <= 57);
+                            if (inRearTire || inFrontTire) {
+                                const tOutL = inRearTire ? 7 : 8;
+                                const tOutR = inRearTire ? 44 : 43;
+                                for (let tx = tOutL; tx <= xL; tx++) {
+                                    const tread = (y % 2 === 0) ? 16 : 30;
+                                    setPx(tx, y, tread, tread + 2, tread + 5, 255);
+                                }
+                                for (let tx = xR; tx <= tOutR; tx++) {
+                                    const tread = (y % 2 === 0) ? 16 : 30;
+                                    setPx(tx, y, tread, tread + 2, tread + 5, 255);
+                                }
+                            }
+
+                            // Chrome West-Coast Cab Side Mirrors (y = 44..46)
+                            if (!isWreck && y >= 44 && y <= 46) {
+                                setPx(8, y, 226, 232, 240, 255);
+                                setPx(9, y, 148, 163, 184, 255);
+                                setPx(42, y, 148, 163, 184, 255);
+                                setPx(43, y, 226, 232, 240, 255);
+                            }
+
+                            for (let x = xL; x <= xR; x++) {
+                                const nx = (x - 25.5) / 15.5;
+                                const dome = Math.max(0.0, 1.0 - nx * nx * 0.72);
+                                const isEdge = (x === xL || x === xR);
+
+                                if (isEdge) {
+                                    setPx(x, y, 15, 20, 28, 255);
+                                    continue;
+                                }
+
+                                // 1. Rear Protruding Steel Wheel-Lift Stinger Crossbar & Twin Tire Forks (y = 0..2)
+                                if (y <= 2) {
+                                    const isFork = (x >= 17 && x <= 20) || (x >= 31 && x <= 34) || y === 1;
+                                    if (!isFork) continue;
+                                    if (isWreck) {
+                                        setPx(x, y, 45, 42, 40, 255);
+                                    } else {
+                                        const isTip = (y === 0 && ((x >= 17 && x <= 20) || (x >= 31 && x <= 34)));
+                                        setPx(x, y, isTip ? 245 : 148, isTip ? 158 : 163, isTip ? 11 : 184, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // 2. Rear Hazard Chevron Bumper & Brake/Reverse Tail Lamps (y = 3..5)
+                                if (y >= 3 && y <= 5) {
+                                    if (!isWreck && y === 4 && (x >= 11 && x <= 14 || x >= 37 && x <= 40)) {
+                                        // Ruby red brake lights
+                                        setPx(x, y, 239, 36, 44, 255);
+                                    } else if (!isWreck && y === 4 && (x === 15 || x === 36)) {
+                                        // White reverse lamps
+                                        setPx(x, y, 248, 250, 252, 255);
+                                    } else {
+                                        // Yellow & black diagonal hazard chevrons
+                                        const chev = ((x + y * 2) % 6) < 3;
+                                        if (isWreck) {
+                                            setPx(x, y, chev ? 78 : 24, chev ? 56 : 22, 18, 255);
+                                        } else {
+                                            setPx(x, y, chev ? 250 : 20, chev ? 204 : 24, chev ? 21 : 32, 255);
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // 3. Open Wrecker Recovery Bed, Side Utility Toolboxes & Twin A-Frame Crane Boom (y = 6..31)
+                                if (y >= 6 && y <= 31) {
+                                    const onSideBox = (x <= 13 || x >= 38);
+                                    // Twin angled A-frame crane boom arms converging from (x=17, y=28) & (x=34, y=28) to pulley head (x=24..27, y=5..9)
+                                    const tBoom = Math.max(0, Math.min(1, (29 - y) / 22.0));
+                                    const leftArmX = 17.5 + tBoom * 7.0;
+                                    const rightArmX = 33.5 - tBoom * 7.0;
+                                    const onBoomArm = (y >= 6 && y <= 29) && (Math.abs(x - leftArmX) <= 1.35 || Math.abs(x - rightArmX) <= 1.35);
+                                    const onPulleyHead = (y >= 5 && y <= 9 && x >= 23 && x <= 28);
+                                    const onCenterCable = (y >= 9 && y <= 26 && (x === 25 || x === 26));
+                                    const onWinchDrum = (y >= 26 && y <= 30 && x >= 20 && x <= 31);
+                                    const onCrossStrut = (y === 18 && x >= Math.round(leftArmX) && x <= Math.round(rightArmX));
+
+                                    if (onPulleyHead) {
+                                        // Heavy steel crane pulley sheave & bright yellow hook block
+                                        const isHook = (y <= 6 && (x === 25 || x === 26));
+                                        setPx(x, y, isWreck ? 60 : (isHook ? 250 : 203), isWreck ? 55 : (isHook ? 204 : 213), isWreck ? 52 : (isHook ? 21 : 225), 255);
+                                    } else if (onBoomArm || onCrossStrut) {
+                                        // Safety-Caterpillar Yellow & Chrome hydraulic A-frame crane boom
+                                        const isBoomEdge = Math.abs(x - leftArmX) > 0.85 || Math.abs(x - rightArmX) > 0.85;
+                                        if (isWreck) {
+                                            setPx(x, y, 68, 52, 28, 255);
+                                        } else if (isBoomEdge) {
+                                            setPx(x, y, 180, 83, 9, 255);
+                                        } else {
+                                            setPx(x, y, 250, 204, 21, 255);
+                                        }
+                                    } else if (onWinchDrum) {
+                                        // Coiled steel cable winch drum behind headache rack
+                                        const coil = (x % 2 === 0) ? 168 : 112;
+                                        setPx(x, y, coil, coil + 6, coil + 14, 255);
+                                    } else if (onCenterCable) {
+                                        // High-tensile braided steel winch cable down center of bed
+                                        const braid = (y % 2 === 0) ? 210 : 148;
+                                        setPx(x, y, braid, braid + 8, braid + 16, 255);
+                                    } else if (onSideBox) {
+                                        // Safety-Amber side utility toolboxes with chrome latches & white hazard stripe
+                                        const isLatch = (!isWreck && (y === 11 || y === 19 || y === 26) && (x === 12 || x === 39));
+                                        const isBoxDiv = (y === 15 || y === 23);
+                                        if (isLatch) {
+                                            setPx(x, y, 241, 245, 249, 255);
+                                        } else if (isBoxDiv) {
+                                            setPx(x, y, 28, 34, 44, 255);
+                                        } else if (isWreck) {
+                                            setPx(x, y, 58, 42, 24, 255);
+                                        } else {
+                                            setPx(x, y, Math.round(217 + 32 * dome), Math.round(119 + 36 * dome), Math.round(6 + 14 * dome), 255);
+                                        }
+                                    } else {
+                                        // Dark gunmetal diamond-plate steel flatbed deck with recessed tie-down rails
+                                        const isTieRail = (x === 16 || x === 35);
+                                        const tread = ((x + y) % 3 === 0) ? 14 : 0;
+                                        if (isTieRail) {
+                                            setPx(x, y, 24, 30, 40, 255);
+                                        } else {
+                                            const baseDeck = isWreck ? 26 : 44;
+                                            setPx(x, y, baseDeck + tread, baseDeck + 4 + tread, baseDeck + 11 + tread, 255);
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // 4. Heavy Steel Headache Rack & Full-Width Amber Strobe Lightbar (y = 32..35)
+                                if (y >= 32 && y <= 35) {
+                                    if (x >= 12 && x <= 39 && y >= 33 && y <= 35) {
+                                        const isLeftPod = x >= 13 && x <= 23;
+                                        const isRightPod = x >= 28 && x <= 38;
+                                        if (isWreck) {
+                                            setPx(x, y, 42, 38, 36, 255);
+                                        } else if (isLeftPod) {
+                                            if (mode === "SIREN_0") {
+                                                // Intense golden-white strobe flash on left side
+                                                setPx(x, y, 255, 248, 196, 255);
+                                            } else {
+                                                setPx(x, y, 245, 158, 11, 255);
+                                            }
+                                        } else if (isRightPod) {
+                                            if (mode === "SIREN_1") {
+                                                // Intense golden-white strobe flash on right side
+                                                setPx(x, y, 255, 248, 196, 255);
+                                            } else {
+                                                setPx(x, y, 234, 88, 12, 255);
+                                            }
+                                        } else {
+                                            // Chrome center speaker housing
+                                            setPx(x, y, 226, 232, 240, 255);
+                                        }
+                                    } else {
+                                        setPx(x, y, 30, 41, 59, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // 5. Heavy Truck Cab Roof (y = 36..44) with White Center Stripe & Dual Chrome Air Horns
+                                if (y >= 36 && y <= 44) {
+                                    const onAirHorn = (!isWreck && y >= 38 && y <= 43 && (x === 14 || x === 37));
+                                    const onWhiteCabStripe = (!isWreck && x >= 21 && x <= 30 && y >= 37 && y <= 43);
+                                    if (onAirHorn) {
+                                        setPx(x, y, 226, 232, 240, 255);
+                                    } else if (onWhiteCabStripe) {
+                                        const wShade = Math.round(232 + 22 * dome);
+                                        setPx(x, y, wShade, wShade, Math.min(255, wShade + 4), 255);
+                                    } else if (isWreck) {
+                                        setPx(x, y, 52, 38, 22, 255);
+                                    } else {
+                                        setPx(x, y, Math.round(234 + 20 * dome), Math.round(138 + 38 * dome), Math.round(12 + 16 * dome), 255);
+                                    }
+                                    continue;
+                                }
+
+                                // 6. Sapphire-Tinted Wrap-Around Truck Windshield (y = 45..49)
+                                if (y >= 45 && y <= 49 && x >= 13 && x <= 38) {
+                                    if (isWreck) {
+                                        setPx(x, y, 18, 20, 24, 255);
+                                    } else if (dmgFront && ((x * 5 + y * 3) % 7 === 0)) {
+                                        setPx(x, y, 203, 213, 225, 255);
+                                    } else {
+                                        const glare = (x + y === 69 || x + y === 70);
+                                        setPx(x, y, glare ? 148 : 30, glare ? 212 : 58, glare ? 248 : 96, 255);
+                                    }
+                                    continue;
+                                }
+
+                                // 7. Long Sculpted American Wrecker Hood (y = 50..59) with Raised Power Dome & White Rally Stripe
+                                if (y >= 50 && y <= 59) {
+                                    if (dmgFront && y >= 54 && ((x * 7 + y * 11) % 5 === 0)) {
+                                        setPx(x, y, 28, 32, 38, 255);
+                                        continue;
+                                    }
+                                    const onHoodBlower = (!isWreck && y >= 51 && y <= 54 && x >= 23 && x <= 28);
+                                    const onHoodStripe = (!isWreck && x >= 21 && x <= 30);
+                                    const onFenderMarker = (!isWreck && (y === 56 || y === 57) && (x === 12 || x === 39));
+                                    if (onHoodBlower) {
+                                        // Chrome engine air intake scoop on hood
+                                        setPx(x, y, 203, 213, 225, 255);
+                                    } else if (onFenderMarker) {
+                                        setPx(x, y, 254, 240, 138, 255);
+                                    } else if (onHoodStripe) {
+                                        const wShade = Math.round(228 + 24 * dome);
+                                        setPx(x, y, wShade, wShade, Math.min(255, wShade + 4), 255);
+                                    } else if (isWreck) {
+                                        setPx(x, y, 48, 34, 20, 255);
+                                    } else {
+                                        setPx(x, y, Math.round(228 + 26 * dome), Math.round(128 + 42 * dome), Math.round(10 + 16 * dome), 255);
+                                    }
+                                    continue;
+                                }
+
+                                // 8. Heavy Chrome Grille & Front Push Bumper (y = 60..62)
+                                if (y >= 60 && y <= 62) {
+                                    const isHeadlamp = (!isWreck && y === 60 && ((x >= 13 && x <= 17) || (x >= 34 && x <= 38)));
+                                    const isPushGuard = (x === 19 || x === 20 || x === 31 || x === 32);
+                                    if (isHeadlamp) {
+                                        setPx(x, y, 254, 249, 195, 255);
+                                    } else if (isPushGuard) {
+                                        setPx(x, y, 15, 23, 42, 255);
+                                    } else {
+                                        const ch = isWreck ? 64 : ((x % 2 === 0) ? 226 : 168);
+                                        setPx(x, y, ch, ch + 4, ch + 10, 255);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Siren Bloom Halo in SIREN_0 / SIREN_1
+                        if (mode === "SIREN_0" || mode === "SIREN_1") {
+                            const cx = mode === "SIREN_0" ? 18 : 33;
+                            const cy = 34;
+                            for (let py = cy - 4; py <= cy + 4; py++) {
+                                for (let px = cx - 6; px <= cx + 6; px++) {
+                                    const d2 = (px - cx) * (px - cx) * 0.6 + (py - cy) * (py - cy);
+                                    if (d2 <= 14) {
+                                        setPx(px, py, 255, 215, 40, 255);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Open Driver Door Swing (DOOR_0..3) at Cab (y = 37..47, left side x = 3..11)
+                        if (doorStage >= 0) {
+                            const reach = 3 + doorStage * 2;
+                            for (let dy = 0; dy <= 9; dy++) {
+                                const py = 46 - dy;
+                                const px = Math.round(11 - (dy / 9) * reach);
+                                setPx(px, py, 245, 158, 11, 255);
+                                setPx(px + 1, py, 217, 119, 6, 255);
+                                setPx(px - 1, py, 15, 23, 42, 255);
+                            }
+                        }
+
+                        return id;
+                    };
+
+                    const towY = 3470;
+                    const baseTowImg = buildTowTruckState("BASE");
+                    const toDeltaAgainstBase = (stateImg, isDoor = false) => {
+                        const sb = stateImg.data;
+                        const bb = baseTowImg.data;
+                        for (let i = 0; i < sb.length; i += 4) {
+                            if (sb[i] === bb[i] && sb[i + 1] === bb[i + 1] && sb[i + 2] === bb[i + 2] && sb[i + 3] === bb[i + 3]) {
+                                sb[i] = 0; sb[i + 1] = 0; sb[i + 2] = 0; sb[i + 3] = 0;
+                            } else if (sb[i + 3] < 16 && bb[i + 3] >= 16 && !isDoor) {
+                                sb[i] = 14; sb[i + 1] = 16; sb[i + 2] = 22; sb[i + 3] = 220;
+                            }
+                        }
+                        return stateImg;
+                    };
+
+                    ctx.putImageData(baseTowImg, 700, towY);
+                    const wreckTowImg = buildTowTruckState("WRECK");
+                    ctx.putImageData(wreckTowImg, 756, towY);
+                    ctx.putImageData(buildTowTruckState("SIREN_0"), 812, towY);
+                    ctx.putImageData(buildTowTruckState("SIREN_1"), 868, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DOOR_0"), true), 924, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DOOR_1"), true), 980, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DOOR_2"), true), 1036, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DOOR_3"), true), 1092, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DMG_FRONT"), false), 1148, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DMG_REAR"), false), 1204, towY);
+                    ctx.putImageData(toDeltaAgainstBase(buildTowTruckState("DMG_HEAVY"), false), 1260, towY);
+
+                    const towBaseRect = [700, towY, 52, 64];
+                    const towWreckRect = [756, towY, 52, 64];
+                    meta.sprites.objects["veh_tow_truck"] = towBaseRect;
+                    meta.sprites.objects["veh_tow_truck_wreck"] = towWreckRect;
+                    if (meta.sprites.wrecked) {
+                        meta.sprites.wrecked["veh_tow_truck_wreck"] = towWreckRect;
+                    }
+                    const towVehEntry = {
+                        spr_idx: "veh_tow_truck",
+                        base: towBaseRect,
+                        remaps: [towBaseRect],
+                        sirens: [[812, towY, 52, 64], [868, towY, 52, 64]],
+                        doors: [
+                            [924, towY, 52, 64],
+                            [980, towY, 52, 64],
+                            [1036, towY, 52, 64],
+                            [1092, towY, 52, 64]
+                        ],
+                        damage: {
+                            front: [1148, towY, 52, 64],
+                            rear: [1204, towY, 52, 64],
+                            heavy: [1260, towY, 52, 64]
+                        },
+                        convertible: false
+                    };
+                    if (Array.isArray(meta.sprites.vehicles)) {
+                        meta.sprites.vehicles.push(towVehEntry);
+                    }
+                    if (this.vehicleBySprIdx) {
+                        this.vehicleBySprIdx["veh_tow_truck"] = towVehEntry;
+                    }
+                }
+
                 // =========================================================================
                 // 6K. GTA 6 LEONIDA DIVERSE FLORA & ARBORETUM SPRITES
                 // True 3ds Max / Raytraced 1999 DMA Design baked flora (y = 3480 in gta1_sprites.png)
@@ -3104,10 +3484,10 @@ class RetroRenderer {
                 meta.sprites.objects["ad_ammunation"]             = [1640, 3780, 128, 64];
                 meta.sprites.objects["ad_call_morgan"]            = [1780, 3780, 128, 64];
 
-                // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 165)
-                // Ensures all custom props have seamless 3D edge filtering without dark alpha halos
+                // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 240)
+                // Ensures all custom props & procedural vehicles have seamless 3D edge filtering without dark alpha halos
                 {
-                    const customBandH = Math.min(165, H - origH);
+                    const customBandH = Math.min(240, H - origH);
                     const postData = ctx.getImageData(0, origH, W, customBandH);
                     const pd = postData.data;
                     const pW = W;
@@ -6900,6 +7280,10 @@ class RetroRenderer {
                     rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_vcpd_wreck"]) ||
                         this.gta1Meta.sprites.objects["veh_vcpd_wreck"] ||
                         this.gta1Meta.sprites.wrecked["979"];
+                } else if (v.specKey === "TOW_TRUCK" || mapInfo.sprId === "veh_tow_truck") {
+                    rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_tow_truck_wreck"]) ||
+                        this.gta1Meta.sprites.objects["veh_tow_truck_wreck"] ||
+                        this.gta1Meta.sprites.wrecked["979"];
                 } else {
                     let wId = "979";
                     if (mapInfo.isTank) {
@@ -7276,44 +7660,49 @@ class RetroRenderer {
                 if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF, 1, 1, 1, 1, totalPitchZ);
             }
 
-            // Tow Truck Flashing Amber Roof Beacon & 3D Steel Tow Bar / Winch Cable
-            if (!v.destroyed && v.driver === "AI_TOW" && this.solidWhiteRect) {
+            // Tow Truck 3D Hydraulic Wheel-Lift Stinger Cradle, Twin Safety Chains & Taut Braided Winch Cable
+            if (!v.destroyed && (v.driver === "AI_TOW" || v.specKey === "TOW_TRUCK")) {
                 const cosA = Math.cos(v.angle);
                 const sinA = Math.sin(v.angle);
-                if (v.sirenActive) {
-                    const amberSide = (Math.floor(this.time * 9) % 2 === 0) ? -4.5 : 4.5;
-                    const bx = v.x + cosA * 10 - sinA * amberSide;
-                    const by = v.y + sinA * 10 + cosA * amberSide;
-                    this.pushAtlasQuad3D(
-                        this.solidWhiteRect,
-                        bx - 3, by - 3, vz + airZ + 0.022,
-                        bx + 3, by - 3, vz + airZ + 0.022,
-                        bx + 3, by + 3, vz + airZ + 0.022,
-                        bx - 3, by + 3, vz + airZ + 0.022,
-                        1.0, 0.72, 0.08, 0.92,
-                        SPRITE_DRAW_ORDER.CAR_ROOF
-                    );
-                }
                 if (v.towingVehicle) {
                     const tv = v.towingVehicle;
-                    const hitchX = v.x - cosA * ((v.w || 56) * 0.44);
-                    const hitchY = v.y - sinA * ((v.w || 56) * 0.44);
-                    const noseX = tv.x + Math.cos(tv.angle) * ((tv.w || 46) * 0.42);
-                    const noseY = tv.y + Math.sin(tv.angle) * ((tv.w || 46) * 0.42);
+                    const hitchX = v.x - cosA * ((v.w || 62) * 0.45);
+                    const hitchY = v.y - sinA * ((v.w || 62) * 0.45);
+                    const noseX = tv.x + Math.cos(tv.angle) * ((tv.w || 46) * 0.40);
+                    const noseY = tv.y + Math.sin(tv.angle) * ((tv.w || 46) * 0.40);
                     const bdx = noseX - hitchX;
                     const bdy = noseY - hitchY;
                     const bLen = Math.hypot(bdx, bdy) || 1;
-                    const nx = (-bdy / bLen) * 2.2;
-                    const ny = (bdx / bLen) * 2.2;
-                    const barZ = vz + 0.008;
-                    this.pushAtlasQuad3D(
-                        this.solidWhiteRect,
-                        hitchX - nx, hitchY - ny, barZ,
-                        hitchX + nx, hitchY + ny, barZ,
-                        noseX + nx, noseY + ny, barZ,
-                        noseX - nx, noseY - ny, barZ,
-                        0.96, 0.68, 0.12, 0.95,
-                        SPRITE_DRAW_ORDER.CARS
+                    const bAng = Math.atan2(bdy, bdx);
+                    const midX = (hitchX + noseX) * 0.5;
+                    const midY = (hitchY + noseY) * 0.5;
+
+                    // 1) Heavy Hydraulic Steel Wheel-Lift Stinger Arm under the towed car's front axle
+                    this.pushSolidQuad3D(midX, midY, vz + 0.006, bLen + 6.0, 4.2, bAng, 0.22, 0.26, 0.34, 0.96, SPRITE_DRAW_ORDER.CAR);
+                    this.pushSolidQuad3D(midX, midY, vz + 0.008, bLen + 4.0, 2.2, bAng, 0.96, 0.68, 0.10, 0.98, SPRITE_DRAW_ORDER.CAR);
+
+                    // 2) Transverse Steel Tire-Cradle Crossbar gripping the towed vehicle's front wheels
+                    this.pushSolidQuad3D(noseX, noseY, vz + 0.007, 4.0, 18.0, tv.angle, 0.96, 0.68, 0.10, 0.96, SPRITE_DRAW_ORDER.CAR);
+
+                    // 3) Elevated Taut Braided Steel Crane Boom Cable from Wrecker Pulley Head to Towed Bumper
+                    const boomTipX = v.x - cosA * ((v.w || 62) * 0.34);
+                    const boomTipY = v.y - sinA * ((v.w || 62) * 0.34);
+                    const cDx = noseX - boomTipX;
+                    const cDy = noseY - boomTipY;
+                    const cLen = Math.hypot(cDx, cDy) || 1;
+                    const cAng = Math.atan2(cDy, cDx);
+                    this.pushSolidQuad3D(
+                        (boomTipX + noseX) * 0.5,
+                        (boomTipY + noseY) * 0.5,
+                        vz + 0.018,
+                        cLen,
+                        1.6,
+                        cAng,
+                        0.78,
+                        0.84,
+                        0.92,
+                        0.95,
+                        SPRITE_DRAW_ORDER.CAR_ROOF
                     );
                 }
             }
@@ -8010,7 +8399,12 @@ class RetroRenderer {
                 const lSc = this.worldToScreen(lx, ly, vz + 0.04);
                 const rScSiren = this.worldToScreen(rx, ry, vz + 0.04);
 
-                if (redOn) {
+                const isTowWrecker = (v.specKey === "TOW_TRUCK" || v.driver === "AI_TOW");
+                if (isTowWrecker) {
+                    const activeSc = redOn ? lSc : rScSiren;
+                    addLightPool(activeSc.x, activeSc.y, 118 * pxScale, "rgba(255, 190, 35, 0.94)", "rgba(235, 120, 10, 0.40)");
+                    highResFlares.push({ x: activeSc.x, y: activeSc.y, r: 21 * pxScale, col: "rgba(255, 210, 50, 0.88)" });
+                } else if (redOn) {
                     addLightPool(lSc.x, lSc.y, 128 * pxScale, "rgba(255, 35, 75, 0.96)", "rgba(220, 15, 50, 0.42)");
                     highResFlares.push({ x: lSc.x, y: lSc.y, r: 22 * pxScale, col: "rgba(255, 40, 80, 0.85)" });
                 } else {
@@ -10476,6 +10870,9 @@ class RetroRenderer {
 
         if (v.specKey === "VCPD_CRUISER" || sprId === "73") {
             return { sprId: "73", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
+        }
+        if (v.specKey === "TOW_TRUCK" || sprId === "veh_tow_truck") {
+            return { sprId: "veh_tow_truck", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
         }
         if (v.specKey === "SWAT_ENFORCER" || (v.isPolice && sprId === "76")) {
             return { sprId: "76", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };

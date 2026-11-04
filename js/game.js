@@ -8343,7 +8343,7 @@ class LeonidaGame {
 
             } else if (activeTowTrucks < 2) {
 
-                const towTruck = new Vehicle(`tow_${Date.now()}_${attempt}`, "FLATBED_TRUCK", sx, sy, roadAng);
+                const towTruck = new Vehicle(`tow_${Date.now()}_${attempt}`, "TOW_TRUCK", sx, sy, roadAng);
 
                 towTruck.z = sz;
 

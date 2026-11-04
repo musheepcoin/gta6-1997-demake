@@ -560,6 +560,25 @@ const VEHICLE_SPECS = {
         bodyStyle: "TRUCK",
         amphibious: false
     },
+    TOW_TRUCK: {
+        name: "VCPD IMPOUND WRECKER",
+        sprId: "veh_tow_truck",
+        w: 62,
+        h: 28,
+        maxSpeed: 295,
+        accel: 220,
+        turnSpeed: 2.45,
+        grip: 0.94,
+        driftGrip: 0.94,
+        maxHp: 580,
+        color: "#f59e0b",
+        secondaryColor: "#0f172a",
+        stripeColor: "#fde047",
+        bodyStyle: "TRUCK",
+        isEmergency: true,
+        useBaseOnly: true,
+        amphibious: false
+    },
     TOUR_COACH: {
         name: "LEONIDA SCHOOL BUS",
         sprId: "53",
