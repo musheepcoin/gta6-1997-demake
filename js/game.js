@@ -6684,9 +6684,25 @@ class LeonidaGame {
 
         v.burnTimer = 0;
 
+        v.chainExplodeTimer = 0;
+
+        v.bombArmed = false;
+
+        v.sirenActive = false;
+
+        v.drifting = false;
+
+        v.speed = 0;
+
         v.vx = 0;
 
         v.vy = 0;
+
+        if (this.player.inVehicle !== v) {
+
+            v.driver = null;
+
+        }
 
         const isBicycle = (v.specKey === "BMX_BIKE");
         const isScooter = (v.specKey === "E_SCOOTER");
@@ -9204,21 +9220,21 @@ class LeonidaGame {
 
                         b.driver === "PLAYER" ||
 
-                        a.driver === "AI_CRIMINAL" ||
+                        (!a.destroyed && a.driver === "AI_CRIMINAL") ||
 
-                        b.driver === "AI_CRIMINAL" ||
+                        (!b.destroyed && b.driver === "AI_CRIMINAL") ||
 
-                        ((a.driver === "AI_COP" || b.driver === "AI_COP") && (this.wantedLevel > 0 || a.sirenActive || b.sirenActive));
+                        (((!a.destroyed && a.driver === "AI_COP") || (!b.destroyed && b.driver === "AI_COP")) && (this.wantedLevel > 0 || a.sirenActive || b.sirenActive));
 
 
 
-                    if (!involvesPlayerOrActiveCop) {
+                    if (!involvesPlayerOrActiveCop || (a.destroyed && b.destroyed)) {
 
                         // AI-vs-AI traffic: only enforce longitudinal spacing between same-direction vehicles;
 
                         // never push AI cars laterally out of their lane or wedge crossing AI cars inside an intersection!
 
-                        if (Math.cos(a.angle - b.angle) > 0.65) {
+                        if (!a.destroyed && !b.destroyed && Math.cos(a.angle - b.angle) > 0.65) {
 
                             const proj = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
 
@@ -9256,15 +9272,31 @@ class LeonidaGame {
 
 
 
-                    const push = bestOverlap * 0.5;
+                    const push = bestOverlap * 0.66;
 
-                    a.x -= bestNx * push;
+                    if (a.destroyed && !b.destroyed) {
 
-                    a.y -= bestNy * push;
+                        b.x += bestNx * bestOverlap * 1.05;
 
-                    b.x += bestNx * push;
+                        b.y += bestNy * bestOverlap * 1.05;
 
-                    b.y += bestNy * push;
+                    } else if (b.destroyed && !a.destroyed) {
+
+                        a.x -= bestNx * bestOverlap * 1.05;
+
+                        a.y -= bestNy * bestOverlap * 1.05;
+
+                    } else {
+
+                        a.x -= bestNx * push;
+
+                        a.y -= bestNy * push;
+
+                        b.x += bestNx * push;
+
+                        b.y += bestNy * push;
+
+                    }
 
 
 
@@ -9278,15 +9310,23 @@ class LeonidaGame {
 
                     if (normalVel < 0) {
 
-                        const impulse = -0.64 * normalVel;
+                        const impulse = -0.68 * normalVel;
 
-                        a.vx -= bestNx * impulse;
+                        if (!a.destroyed) {
 
-                        a.vy -= bestNy * impulse;
+                            a.vx -= bestNx * impulse;
 
-                        b.vx += bestNx * impulse;
+                            a.vy -= bestNy * impulse;
 
-                        b.vy += bestNy * impulse;
+                        }
+
+                        if (!b.destroyed) {
+
+                            b.vx += bestNx * impulse;
+
+                            b.vy += bestNy * impulse;
+
+                        }
 
 
 
@@ -9296,27 +9336,35 @@ class LeonidaGame {
 
                         const bCross = bCos * bestNy - bSin * bestNx;
 
-                        a.angle -= hitALever * aCross * Math.min(0.22, impulse * 0.0014);
+                        if (!a.destroyed) a.angle -= hitALever * aCross * Math.min(0.22, impulse * 0.0014);
 
-                        b.angle += hitBLever * bCross * Math.min(0.22, impulse * 0.0014);
+                        if (!b.destroyed) b.angle += hitBLever * bCross * Math.min(0.22, impulse * 0.0014);
 
                     }
 
 
 
-                    const relSpeed = Math.hypot(rvx, rvy);
+                    // Only trigger crash damage, sparks, horns & crash SFX on a true inward collision impulse (never when grinding/sliding in a loop!)
 
-                    if (relSpeed > 95) {
+                    const inwardImpact = -normalVel;
+
+                    const canTriggerCrashSfx = (a.crashCooldown || 0) <= 0 && (b.crashCooldown || 0) <= 0;
+
+                    if (inwardImpact > 68 && canTriggerCrashSfx) {
 
                         if (typeof a.triggerPanic === "function") a.triggerPanic(8.5);
 
                         if (typeof b.triggerPanic === "function") b.triggerPanic(8.5);
 
-                        if ((a.driver === "PLAYER" || b.driver === "PLAYER") && Math.random() < 0.5) {
+                        if ((a.driver === "PLAYER" || b.driver === "PLAYER") && Math.random() < 0.38) {
 
                             const honker = a.driver === "PLAYER" ? b : a;
 
-                            this.audio.playHorn(Boolean(honker.isEmergency), honker.specKey);
+                            if (!honker.destroyed && honker.driver) {
+
+                                this.audio.playHorn(Boolean(honker.isEmergency), honker.specKey);
+
+                            }
 
                         }
 
@@ -9324,7 +9372,7 @@ class LeonidaGame {
 
                         const aiVictim = (a.driver === "PLAYER" && b.driver === "AI_TRAFFIC") ? b : ((b.driver === "PLAYER" && a.driver === "AI_TRAFFIC") ? a : null);
 
-                        if (aiVictim && aiVictim.aiAggressive && relSpeed > 135 && Math.hypot(aiVictim.vx, aiVictim.vy) < 85 && Math.random() < 0.35) {
+                        if (aiVictim && aiVictim.aiAggressive && inwardImpact > 115 && Math.hypot(aiVictim.vx, aiVictim.vy) < 85 && Math.random() < 0.35) {
 
                             this.ejectVehicleDriver(aiVictim, "ROAD_RAGE");
 
@@ -9332,27 +9380,39 @@ class LeonidaGame {
 
                     }
 
-                    if (relSpeed > 125) {
+                    if (inwardImpact > 88 && canTriggerCrashSfx) {
 
-                        const dmg = relSpeed * 0.042;
+                        a.crashCooldown = 0.52;
+
+                        b.crashCooldown = 0.52;
+
+                        const dmg = inwardImpact * 0.042;
 
                         if (b.driver === "PLAYER") a.damagedByPlayer = true;
 
                         if (a.driver === "PLAYER") b.damagedByPlayer = true;
 
-                        if (typeof a.receiveImpactDamage === "function") a.receiveImpactDamage(dmg, b.x, b.y);
+                        if (!a.destroyed) {
 
-                        else a.hp -= dmg;
+                            if (typeof a.receiveImpactDamage === "function") a.receiveImpactDamage(dmg, b.x, b.y);
 
-                        if (typeof b.receiveImpactDamage === "function") b.receiveImpactDamage(dmg, a.x, a.y);
+                            else a.hp -= dmg;
 
-                        else b.hp -= dmg;
+                        }
+
+                        if (!b.destroyed) {
+
+                            if (typeof b.receiveImpactDamage === "function") b.receiveImpactDamage(dmg, a.x, a.y);
+
+                            else b.hp -= dmg;
+
+                        }
 
                         this.spawnParticle((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, "SPARK");
 
-                        if (Math.hypot(a.x - p.x, a.y - p.y) < 520) {
+                        if (Math.hypot(a.x - p.x, a.y - p.y) < 480) {
 
-                            this.audio.playCarCrash(Math.min(1.5, dmg / 16));
+                            this.audio.playCarCrash(Math.min(1.5, dmg / 14));
 
                         }
 

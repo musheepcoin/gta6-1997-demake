@@ -3070,6 +3070,7 @@ class WorldObjectEngine {
                             if (typeof pCar.receiveImpactDamage === "function") {
                                 pCar.receiveImpactDamage(10, sp.x, sp.y);
                             }
+                            pCar.crashCooldown = 0.45;
                             if (game.audio && typeof game.audio.playCarCrash === "function") {
                                 game.audio.playCarCrash(0.85);
                             }
@@ -3094,11 +3095,9 @@ class WorldObjectEngine {
                         sp.vy = (dy / d) * launchSpd;
                         sp.vz = 0.55;
                         sp.vang = (Math.random() - 0.5) * 16.0;
+                        pCar.crashCooldown = 0.45;
                         if (game.audio && typeof game.audio.playCarCrash === "function") {
-                            game.audio.playCarCrash(1.1);
-                        }
-                        if (game.audio && typeof game.audio.playCrateSmash === "function") {
-                            game.audio.playCrateSmash();
+                            game.audio.playCarCrash(1.05);
                         }
 
                         if (sp.kind === "HYDRANT") {
@@ -3185,11 +3184,9 @@ class WorldObjectEngine {
 
                             pCar.vx *= 0.90;
                             pCar.vy *= 0.90;
+                            pCar.crashCooldown = 0.45;
                             if (game.audio && typeof game.audio.playCarCrash === "function") {
                                 game.audio.playCarCrash(1.15);
-                            }
-                            if (game.audio && typeof game.audio.playCrateSmash === "function") {
-                                game.audio.playCrateSmash();
                             }
                             if (typeof game.spawnParticle === "function") {
                                 for (let k = 0; k < 10; k++) {
@@ -3226,6 +3223,7 @@ class WorldObjectEngine {
                             if (typeof pCar.receiveImpactDamage === "function") {
                                 pCar.receiveImpactDamage(11, sl.baseX, sl.baseY);
                             }
+                            pCar.crashCooldown = 0.45;
                             if (game.audio && typeof game.audio.playCarCrash === "function") {
                                 game.audio.playCarCrash(0.85);
                             }
@@ -3314,11 +3312,9 @@ class WorldObjectEngine {
 
                             pCar.vx *= 0.90;
                             pCar.vy *= 0.90;
+                            pCar.crashCooldown = 0.45;
                             if (game.audio && typeof game.audio.playCarCrash === "function") {
                                 game.audio.playCarCrash(1.15);
-                            }
-                            if (game.audio && typeof game.audio.playCrateSmash === "function") {
-                                game.audio.playCrateSmash();
                             }
                             if (typeof game.spawnParticle === "function") {
                                 for (let k = 0; k < 12; k++) {
@@ -3355,6 +3351,7 @@ class WorldObjectEngine {
                             if (typeof pCar.receiveImpactDamage === "function") {
                                 pCar.receiveImpactDamage(12, ts.baseX, ts.baseY);
                             }
+                            pCar.crashCooldown = 0.45;
                             if (game.audio && typeof game.audio.playCarCrash === "function") {
                                 game.audio.playCarCrash(0.85);
                             }

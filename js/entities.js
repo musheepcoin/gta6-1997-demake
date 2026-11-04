@@ -2152,6 +2152,9 @@ class Vehicle {
         if (this.doorOpenTimer > 0) {
             this.doorOpenTimer = Math.max(0, this.doorOpenTimer - dt);
         }
+        if (this.crashCooldown > 0) {
+            this.crashCooldown = Math.max(0, this.crashCooldown - dt);
+        }
 
         // Remote player driven vehicle: pose is updated directly at 60 FPS from remote player state in net.js
         if (this.driver === "REMOTE") {
@@ -2257,6 +2260,19 @@ class Vehicle {
                 game.explodeVehicle(this);
                 return;
             }
+        } else if (this.hp <= 0 && !this.destroyed) {
+            // Vehicle destroyed while in water: disable cleanly so it doesn't stay alive at negative HP
+            this.destroyed = true;
+            this.burnTimer = 0;
+            this.sirenActive = false;
+            this.drifting = false;
+            this.speed = 0;
+            this.vx = 0;
+            this.vy = 0;
+            if (game && game.player && game.player.inVehicle !== this) {
+                this.driver = null;
+            }
+            return;
         } else if (this.hp < this.maxHp * 0.55 && Math.random() < 0.25 && !map.isWaterAtPixel(this.x, this.y)) {
             game.spawnParticle(
                 this.x + Math.cos(this.angle) * 18,
@@ -2392,7 +2408,8 @@ class Vehicle {
                     this.aiReverseTimer = 0.85;
                     this.aiReverseSteer = Math.random() < 0.5 ? 0.9 : -0.9;
                 }
-                if (this.driver === "PLAYER" && impact > 155) {
+                if (this.driver === "PLAYER" && impact > 155 && (this.crashCooldown || 0) <= 0) {
+                    this.crashCooldown = 0.52;
                     this.receiveImpactDamage((impact - 140) * 0.085, hitX, hitY);
                     game.spawnParticle(hitX, hitY, "SPARK");
                     if (game && game.audio) {
