@@ -1057,6 +1057,193 @@ class RetroRenderer {
                 }
             };
 
+            // Helper: Procedural GTA 6 / GTA 2 3D Scorched & Crumpled Vehicle Wreck Reconstructor
+            // Builds a model-exact destroyed hulk at `dstRect` ([wx, wy, bw, bh]) from `srcRect` (ve.damage.heavy || ve.base)
+            const buildProceduralVehicleWreck = (srcRect, dstRect, vtype = 4, hasHeavyDmg = true) => {
+                if (!Array.isArray(srcRect) || srcRect.length < 4 || !Array.isArray(dstRect) || dstRect.length < 4) return;
+                const [sx, sy, bw, bh] = srcRect;
+                const [wx, wy, dw, dh] = dstRect;
+                if (bw !== dw || bh !== dh || bw <= 4 || bh <= 4) return;
+
+                // Copy source pixels into a temporary buffer so in-place (srcRect === dstRect) or bent-fork sampling is 100% safe
+                const tmp = new Uint8Array(bw * bh * 4);
+                for (let ly = 0; ly < bh; ly++) {
+                    for (let lx = 0; lx < bw; lx++) {
+                        const sp = ((sy + ly) * W + (sx + lx)) * 4;
+                        const tp = (ly * bw + lx) * 4;
+                        tmp[tp] = d[sp];
+                        tmp[tp + 1] = d[sp + 1];
+                        tmp[tp + 2] = d[sp + 2];
+                        tmp[tp + 3] = d[sp + 3];
+                    }
+                }
+
+                const isMoto = (vtype === 3 || bw <= 20);
+                const isLongRig = (bh >= 95);
+                const engCenterY = isMoto ? 0.50 : 0.77;
+                const engHalfY = isMoto ? 0.14 : 0.10;
+                const engHalfX = isMoto ? 0.44 : 0.42;
+
+                const sampleSrc = (lx, ly) => {
+                    let qx = lx;
+                    let qy = ly;
+                    if (isMoto) {
+                        // Bent front forks & crooked rear wheel on wrecked motorcycles
+                        if (ly >= bh * 0.66) {
+                            qx = lx - Math.round((ly - bh * 0.66) * 0.18);
+                        } else if (ly <= bh * 0.24) {
+                            qx = lx + Math.round((bh * 0.24 - ly) * 0.14);
+                        }
+                    } else if (!hasHeavyDmg) {
+                        // Procedural front/rear impact crumple warp for vehicles without a dedicated .G24 heavy-damage frame
+                        if (ly >= bh - 7) {
+                            qy = Math.min(bh - 1, ly + (((lx * 3 + ly) % 3) === 0 ? 1 : 0));
+                        } else if (ly <= 6) {
+                            qy = Math.max(0, ly - (((lx * 5 + ly) % 3) === 0 ? 1 : 0));
+                        }
+                    }
+                    if (qx < 0 || qx >= bw || qy < 0 || qy >= bh) return -1;
+                    return (qy * bw + qx) * 4;
+                };
+
+                for (let ly = 0; ly < bh; ly++) {
+                    const fy = (ly + 0.5) / bh;
+                    const ny = fy * 2.0 - 1.0;
+                    for (let lx = 0; lx < bw; lx++) {
+                        const dp = ((wy + ly) * W + (wx + lx)) * 4;
+                        const fx = (lx + 0.5) / bw;
+                        const nx = fx * 2.0 - 1.0;
+                        const absNx = Math.abs(nx);
+
+                        const tp = sampleSrc(lx, ly);
+                        if (tp < 0 || tmp[tp + 3] < 16) {
+                            d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
+                            continue;
+                        }
+
+                        // Jagged inward blast-crumple notches on extreme front/rear bumper corners
+                        if (!isMoto && (ly <= 1 || ly >= bh - 2) && absNx > 0.52 && ((lx * 7 + ly * 11) % 4 === 0)) {
+                            d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
+                            continue;
+                        }
+
+                        const sr = tmp[tp];
+                        const sg = tmp[tp + 1];
+                        const sb = tmp[tp + 2];
+                        const lum = (sr * 0.299 + sg * 0.587 + sb * 0.114);
+                        const maxC = Math.max(sr, sg, sb);
+                        const minC = Math.min(sr, sg, sb);
+                        const sat = maxC - minC;
+
+                        // Check 1px outer silhouette perimeter
+                        const tL = sampleSrc(lx - 1, ly);
+                        const tR = sampleSrc(lx + 1, ly);
+                        const tU = sampleSrc(lx, ly - 1);
+                        const tD = sampleSrc(lx, ly + 1);
+                        const isPerim =
+                            (tL < 0 || tmp[tL + 3] < 16) ||
+                            (tR < 0 || tmp[tR + 3] < 16) ||
+                            (tU < 0 || tmp[tU + 3] < 16) ||
+                            (tD < 0 || tmp[tD + 3] < 16);
+
+                        if (isPerim) {
+                            // Crisp dark charred steel silhouette border + shredded tire wheel-arch treads
+                            const inAxle = (fy >= 0.13 && fy <= 0.34) || (fy >= 0.65 && fy <= 0.86);
+                            if (inAxle && absNx > 0.68 && ((ly + lx) % 3 === 0)) {
+                                // Exposed bent steel wheel rim glint on blown tire
+                                d[dp] = 68; d[dp + 1] = 74; d[dp + 2] = 84; d[dp + 3] = 255;
+                            } else {
+                                d[dp] = 12; d[dp + 1] = 14; d[dp + 2] = 19; d[dp + 3] = 255;
+                            }
+                            continue;
+                        }
+
+                        // 1. Ruptured Smoldering Engine Bay Cavity (Front Hood / Mid-Bike / Secondary Long-Rig Blast Vent)
+                        const eDist1 = Math.hypot(nx / engHalfX, (fy - engCenterY) / engHalfY);
+                        const eDist2 = isLongRig ? Math.hypot(nx / 0.38, (fy - 0.36) / 0.08) : 9.0;
+                        const eDist = Math.min(eDist1, eDist2);
+                        if (eDist < 0.96 && ((lx * 5 + ly * 9) % 7 !== 0)) {
+                            if (eDist > 0.72) {
+                                // Jagged peeled dark hood lip around the blast crater
+                                d[dp] = 18; d[dp + 1] = 20; d[dp + 2] = 26; d[dp + 3] = 255;
+                            } else if ((lx === Math.floor(bw * 0.42) || lx === Math.floor(bw * 0.58)) && (ly % 2 === 0)) {
+                                // Exposed metallic scorched V8 cylinder block & radiator manifold pipes
+                                d[dp] = 94; d[dp + 1] = 102; d[dp + 2] = 116; d[dp + 3] = 255;
+                            } else if (eDist < 0.58 && ((lx * 3 + ly * 7) % 5 === 0)) {
+                                // Smoldering hot orange-amber ember coals deep inside the ruptured engine bay
+                                const isHotCore = ((lx + ly) % 2 === 0);
+                                d[dp] = isHotCore ? 245 : 218;
+                                d[dp + 1] = isHotCore ? 142 : 68;
+                                d[dp + 2] = isHotCore ? 22 : 14;
+                                d[dp + 3] = 255;
+                            } else {
+                                // Oil-blackened hollow engine bay cavity
+                                d[dp] = 14; d[dp + 1] = 16; d[dp + 2] = 21; d[dp + 3] = 255;
+                            }
+                            continue;
+                        }
+
+                        // 2. Blown-Out Hollow Windshields, Side Windows & Open Cockpit with Shattered Safety-Glass Rim
+                        const inCabinBand = !isMoto && (fy >= 0.16 && fy <= 0.76) && (absNx <= 0.82);
+                        const isGlassOrCockpit = inCabinBand && (
+                            (lum < 76 && sat < 42) ||
+                            (sb >= sr + 6 && lum < 125)
+                        );
+                        if (isGlassOrCockpit) {
+                            const nL = tL >= 0 ? (tmp[tL] * 0.299 + tmp[tL + 1] * 0.587 + tmp[tL + 2] * 0.114) : 0;
+                            const nR = tR >= 0 ? (tmp[tR] * 0.299 + tmp[tR + 1] * 0.587 + tmp[tR + 2] * 0.114) : 0;
+                            const nU = tU >= 0 ? (tmp[tU] * 0.299 + tmp[tU + 1] * 0.587 + tmp[tU + 2] * 0.114) : 0;
+                            const nD = tD >= 0 ? (tmp[tD] * 0.299 + tmp[tD + 1] * 0.587 + tmp[tD + 2] * 0.114) : 0;
+                            const onWindowEdge = (nL > 88 || nR > 88 || nU > 88 || nD > 88);
+                            if (onWindowEdge && ((lx * 7 + ly * 13) % 3 === 0)) {
+                                // Jagged frosted tempered-glass shards clinging to the window frame
+                                d[dp] = 128; d[dp + 1] = 140; d[dp + 2] = 158; d[dp + 3] = 255;
+                            } else if (((lx * 5 + ly * 3) % 11 === 0) && absNx < 0.55) {
+                                // Charred interior headrest / steering wheel frame silhouette
+                                d[dp] = 26; d[dp + 1] = 24; d[dp + 2] = 28; d[dp + 3] = 255;
+                            } else {
+                                // Deep blown-out hollow soot-blackened cabin cavity
+                                d[dp] = 11; d[dp + 1] = 13; d[dp + 2] = 18; d[dp + 3] = 255;
+                            }
+                            continue;
+                        }
+
+                        // 3. 3D Volumetric Scorched Body Metal, Oxidized Heat-Rust Patina & Recognizable Charred Livery
+                        const dome = Math.max(0.0, 1.0 - nx * nx * 0.82);
+                        const lumNorm = lum / 255.0;
+                        const isCrease = ((lx * 3 + ly * 5) % 11 === 0) || ((lx * 7 - ly * 3 + 128) % 14 === 0);
+                        const isRust = ((lx * 11 + ly * 17) % 9 < 3);
+                        const isAsh = (dome > 0.62) && ((lx * 5 + ly * 7) % 8 === 0);
+
+                        // Base charcoal gunmetal + 24% original model livery/paint contrast so the vehicle remains 100% recognizable
+                        let wr = Math.round(24 + 26 * dome + lumNorm * 26 + sr * 0.24);
+                        let wg = Math.round(25 + 26 * dome + lumNorm * 25 + sg * 0.21);
+                        let wb = Math.round(29 + 28 * dome + lumNorm * 26 + sb * 0.19);
+
+                        if (isRust) {
+                            wr += 20;
+                            wg += 7;
+                            wb -= 4;
+                        }
+                        if (isAsh) {
+                            wr += 18;
+                            wg += 18;
+                            wb += 20;
+                        }
+                        if (isCrease) {
+                            wr = Math.round(wr * 0.54);
+                            wg = Math.round(wg * 0.54);
+                            wb = Math.round(wb * 0.58);
+                        }
+
+                        d[dp] = Math.max(10, Math.min(255, wr));
+                        d[dp + 1] = Math.max(10, Math.min(255, wg));
+                        d[dp + 2] = Math.max(12, Math.min(255, wb));
+                        d[dp + 3] = 255;
+                    }
+                }
+            };
+
             if (Array.isArray(meta.sprites.vehicles)) {
                 for (const ve of meta.sprites.vehicles) {
                     if (ve.base) closeBoxHoles(ve.base, true, false);
@@ -1073,6 +1260,27 @@ class RetroRenderer {
                         if (ve.damage.front) closeBoxHoles(ve.damage.front, true, false);
                         if (ve.damage.rear) closeBoxHoles(ve.damage.rear, true, false);
                         if (ve.damage.heavy) closeBoxHoles(ve.damage.heavy, true, false);
+                    }
+
+                    // Synthesize a bespoke, model-exact procedural destroyed wreck sprite (`ve.wreck`) for EVERY vehicle
+                    // into its 6th remap slot (`ve.remaps[5]`) BEFORE `toNeutralDeltaOverlay` converts `ve.damage.heavy` into a sparse delta!
+                    if (ve.base && ve.base.length >= 4 && Array.isArray(ve.remaps) && ve.remaps.length >= 6) {
+                        const [bx, by, bw, bh] = ve.base;
+                        const wreckRect = ve.remaps[5];
+                        const hasHeavy = Boolean(
+                            ve.damage &&
+                            Array.isArray(ve.damage.heavy) &&
+                            ve.damage.heavy.length >= 4 &&
+                            ve.damage.heavy[2] === bw &&
+                            ve.damage.heavy[3] === bh
+                        );
+                        const srcWreckRect = hasHeavy ? ve.damage.heavy : ve.base;
+                        buildProceduralVehicleWreck(srcWreckRect, wreckRect, ve.vtype, hasHeavy);
+                        ve.wreck = wreckRect;
+                        const wKey = `veh_${ve.spr_idx}_wreck`;
+                        if (meta.sprites.objects) meta.sprites.objects[wKey] = wreckRect;
+                        if (meta.sprites.wrecked) meta.sprites.wrecked[wKey] = wreckRect;
+                        ve.remaps = ve.remaps.slice(0, 5);
                     }
 
                     // Convert .G24 damage & door sprites (which are baked only in `ve.base` color in the atlas)
@@ -1150,21 +1358,81 @@ class RetroRenderer {
                 }
             }
             if (meta.sprites.wrecked) {
-                for (const k of Object.keys(meta.sprites.wrecked)) {
-                    closeBoxHoles(meta.sprites.wrecked[k], false, false);
+                for (const k of ["979", "980", "981", "982", "983", "984"]) {
+                    const wr = meta.sprites.wrecked[k];
+                    if (Array.isArray(wr) && wr.length >= 4) {
+                        closeBoxHoles(wr, false, false);
+                        buildProceduralVehicleWreck(wr, wr, k === "984" ? 3 : 4, false);
+                    }
                 }
             }
             // Note: closeBoxHoles on meta.sprites.peds runs AFTER 2B (beachArchetypes) and 2C (g2Archs)
             // so that 2B and 2C read the clean, un-highlighted source pixels of `lucia` and `civ0`!
 
-            // 2. ConvertEffectToAlpha (dll/src/texture_store.cpp & tools/triage_textures.py):
-            // Convert 8-bit cutout fire (234..241), explosions (242..249), smoke (200..210) & sparks (219..223)
-            // so dark outer edges become smoothly translucent proportional to luminance instead of having a black 1-bit cutout rim!
+            // 2. ConvertEffectToAlpha (dll/src/texture_store.cpp & tools/triage_textures.py) +
+            //    Procedural 8-Frame Volumetric Fire Plume Reconstruction (234..241):
+            //    Rebuilds the 1997 8-bit black-bordered fire sprites into clean multi-tongued translucent flames
+            //    with zero dark charcoal/brown rectangular halo!
             if (meta.sprites.objects) {
+                // 2A. Procedural 8-Frame Animated Fire Plumes (234..241)
+                for (let fi = 0; fi < 8; fi++) {
+                    const idStr = String(234 + fi);
+                    const rect = meta.sprites.objects[idStr];
+                    if (!Array.isArray(rect) || rect.length < 4) continue;
+                    const [sx, sy, sw, sh] = rect;
+                    const phase = (fi / 8.0) * Math.PI * 2.0;
+                    for (let ly = 0; ly < sh; ly++) {
+                        const ny = (ly - sh * 0.5) / (sh * 0.44);
+                        for (let lx = 0; lx < sw; lx++) {
+                            const nx = (lx - sw * 0.5) / (sw * 0.44);
+                            const p = ((sy + ly) * W + (sx + lx)) * 4;
+                            const ang = Math.atan2(ny, nx);
+                            const rad = Math.hypot(nx, ny * 0.90);
+                            const wave1 = Math.sin(ang * 3.0 + phase) * 0.13;
+                            const wave2 = Math.cos(ang * 5.0 - phase * 2.0) * 0.08;
+                            const wave3 = Math.sin((nx + ny) * 4.2 + phase) * 0.06;
+                            const effR = rad + wave1 + wave2 + wave3;
+                            if (effR >= 0.88) {
+                                d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 0;
+                                continue;
+                            }
+                            const heat = Math.max(0.0, Math.min(1.0, 1.0 - effR / 0.88));
+                            let fr, fg, fb, fa;
+                            if (heat > 0.70) {
+                                // White-hot / lemon-gold roaring flame core
+                                const t = (heat - 0.70) / 0.30;
+                                fr = 255;
+                                fg = Math.round(232 + 22 * t);
+                                fb = Math.round(96 + 135 * t);
+                                fa = Math.round(235 + 20 * t);
+                            } else if (heat > 0.38) {
+                                // Vibrant golden-amber to fiery orange flame tongue
+                                const t = (heat - 0.38) / 0.32;
+                                fr = 255;
+                                fg = Math.round(118 + 114 * t);
+                                fb = Math.round(18 + 78 * t);
+                                fa = Math.round(170 + 65 * t);
+                            } else {
+                                // Glowing crimson-orange outer ember tongue (zero dark brown/black pixels!)
+                                const t = heat / 0.38;
+                                fr = Math.round(220 + 35 * t);
+                                fg = Math.round(42 + 76 * t);
+                                fb = 14;
+                                fa = Math.round(t * t * 170);
+                            }
+                            if (fa < 24) {
+                                d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 0;
+                            } else {
+                                d[p] = fr; d[p + 1] = fg; d[p + 2] = fb; d[p + 3] = fa;
+                            }
+                        }
+                    }
+                }
+
+                // 2B. Smoke puffs (200..210), Sparks (219..223) & Explosion fireballs (242..249)
                 const effectRanges = [
                     [200, 210, false], // Smoke puffs
                     [219, 223, true],  // Sparks & ricochets
-                    [234, 241, true],  // Fire flames
                     [242, 249, true]   // Explosion fireballs
                 ];
                 for (const [idStart, idEnd, isEmissiveFire] of effectRanges) {
@@ -1181,13 +1449,14 @@ class RetroRenderer {
                                 const b = d[p + 2];
                                 const peak = Math.max(r, g, b);
                                 if (isEmissiveFire) {
-                                    // Smooth luminance-to-alpha ramp eliminating dark 8-bit charcoal fringe
-                                    const softA = Math.min(255, Math.max(0, Math.round((peak - 14) * 2.15)));
-                                    d[p + 3] = softA;
-                                    if (softA > 0) {
-                                        // Un-premultiply / lift warm flame colors on semi-transparent edges
-                                        d[p] = Math.min(255, Math.round(r * 1.18 + 18));
-                                        d[p + 1] = Math.min(255, Math.round(g * 1.10 + 6));
+                                    // Strip dark 8-bit brown/charcoal border pixels around explosion fireballs
+                                    const softA = Math.min(255, Math.max(0, Math.round((peak - 72) * 1.65)));
+                                    if (softA < 24) {
+                                        d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 0;
+                                    } else {
+                                        d[p + 3] = softA;
+                                        d[p] = Math.min(255, Math.round(r * 1.22 + 24));
+                                        d[p + 1] = Math.min(255, Math.round(g * 1.14 + 10));
                                     }
                                 } else {
                                     // Smoke puff soft edge alpha
@@ -3452,6 +3721,7 @@ class RetroRenderer {
                     const towVehEntry = {
                         spr_idx: "veh_tow_truck",
                         base: towBaseRect,
+                        wreck: towWreckRect,
                         remaps: [towBaseRect],
                         sirens: [[812, towY, 52, 64], [868, towY, 52, 64]],
                         doors: [
@@ -7510,7 +7780,9 @@ class RetroRenderer {
             let doorRect = null;
             let sirens = [];
 
+            const vehEntry = this.vehicleBySprIdx ? this.vehicleBySprIdx[mapInfo.sprId] : null;
             if (v.destroyed) {
+                const wreckKey = `veh_${mapInfo.sprId}_wreck`;
                 if (v.specKey === "BMX_BIKE") {
                     rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_bicycle_wreck"]) ||
                         this.gta1Meta.sprites.objects["veh_bicycle_wreck"] ||
@@ -7522,23 +7794,27 @@ class RetroRenderer {
                 } else if (v.specKey === "VCPD_CRUISER" || mapInfo.sprId === "73") {
                     rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_vcpd_wreck"]) ||
                         this.gta1Meta.sprites.objects["veh_vcpd_wreck"] ||
-                        this.gta1Meta.sprites.wrecked["979"];
+                        (vehEntry && vehEntry.wreck);
                 } else if (v.specKey === "TOW_TRUCK" || mapInfo.sprId === "veh_tow_truck") {
                     rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked["veh_tow_truck_wreck"]) ||
                         this.gta1Meta.sprites.objects["veh_tow_truck_wreck"] ||
-                        this.gta1Meta.sprites.wrecked["979"];
+                        (vehEntry && vehEntry.wreck);
+                } else if (vehEntry && vehEntry.wreck) {
+                    rect = vehEntry.wreck;
+                } else if (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked[wreckKey]) {
+                    rect = this.gta1Meta.sprites.wrecked[wreckKey];
+                } else if (this.gta1Meta.sprites.objects && this.gta1Meta.sprites.objects[wreckKey]) {
+                    rect = this.gta1Meta.sprites.objects[wreckKey];
                 } else {
                     let wId = "979";
-                    if (mapInfo.isTank) {
-                        wId = "983";
-                    } else {
-                        const wreckIds = ["979", "980"];
-                        wId = wreckIds[Math.abs((v.id || "0").charCodeAt((v.id || "0").length - 1)) % wreckIds.length];
-                    }
-                    rect = this.gta1Meta.sprites.wrecked[wId] || this.gta1Meta.sprites.wrecked["979"];
+                    if (mapInfo.isTank) wId = "983";
+                    else if (mapInfo.isMotorcycle) wId = "984";
+                    else if (v.specKey === "MICRO_KART") wId = "981";
+                    else if ((v.w || 48) >= 75) wId = "982";
+                    rect = (this.gta1Meta.sprites.wrecked && this.gta1Meta.sprites.wrecked[wId]) ||
+                        (vehEntry && vehEntry.base);
                 }
             } else {
-                const vehEntry = this.vehicleBySprIdx ? this.vehicleBySprIdx[mapInfo.sprId] : null;
                 if (vehEntry) {
                     sirens = vehEntry.sirens || [];
                 }
@@ -7951,17 +8227,54 @@ class RetroRenderer {
             }
 
             // Tank Turret & Barrel (Sprite 267 — eSpriteDrawOrder_CarRoof)
-            if (mapInfo.isTank && !v.destroyed) {
+            if (mapInfo.isTank) {
                 const turretRect = this.gta1Meta.sprites.objects["267"];
                 if (turretRect) {
-                    const tRot = (v.turretAngle || v.angle) - Math.PI * 0.5;
-                    this.pushAtlasSprite3D(turretRect, v.x, v.y, vz + 0.02, tRot, carScale, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    const tRot = (v.turretAngle || v.angle) - Math.PI * 0.5 + (v.destroyed ? 0.28 : 0);
+                    const tTint = v.destroyed ? 0.42 : 1.0;
+                    this.pushAtlasSprite3D(
+                        turretRect,
+                        v.x,
+                        v.y,
+                        vz + 0.02,
+                        tRot,
+                        carScale,
+                        SPRITE_DRAW_ORDER.CAR_ROOF,
+                        tTint,
+                        tTint * 0.94,
+                        tTint * 0.88,
+                        1
+                    );
                 }
             }
 
             if (v.destroyed && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
                 const frameId = 234 + (Math.floor(this.time * 11 + Math.abs(v.x * 0.1)) % 8);
-                this.batchObjectSprite3D(String(frameId), v.x, v.y, vz + 0.03, 0, 1.0, SPRITE_DRAW_ORDER.EXPLOSION);
+                const isMotoOrKart = Boolean(mapInfo.isMotorcycle || v.specKey === "MICRO_KART");
+                const isHeavyLong = (v.w || 48) >= 75;
+                const engOff = isMotoOrKart ? 0 : ((v.w || 48) * 0.22);
+                const fireScale = isMotoOrKart ? 0.46 : (isHeavyLong ? 0.72 : 0.60);
+                this.batchObjectSprite3D(
+                    String(frameId),
+                    v.x + cosA * engOff,
+                    v.y + sinA * engOff,
+                    vz + 0.03,
+                    0,
+                    fireScale,
+                    SPRITE_DRAW_ORDER.EXPLOSION
+                );
+                if (isHeavyLong) {
+                    const rearFrameId = 234 + (Math.floor(this.time * 9 + Math.abs(v.y * 0.1) + 3) % 8);
+                    this.batchObjectSprite3D(
+                        String(rearFrameId),
+                        v.x - cosA * ((v.w || 88) * 0.18),
+                        v.y - sinA * ((v.w || 88) * 0.18),
+                        vz + 0.028,
+                        0,
+                        0.54,
+                        SPRITE_DRAW_ORDER.EXPLOSION
+                    );
+                }
             }
         }
 

@@ -854,10 +854,10 @@ class Vehicle {
         for (let i = 0; i < idStr.length; i++) {
             idHash = (idHash * 31 + idStr.charCodeAt(i)) | 0;
         }
-        const paletteSlot = Math.abs(idHash) % 7;
+        const paletteSlot = Math.abs(idHash) % 6;
         this.remapIdx = (this.useBaseOnly || this.isPolice || this.isEmergency || this.isTank || this.amphibious)
             ? -1
-            : (paletteSlot === 6 ? -1 : paletteSlot);
+            : (paletteSlot === 5 ? -1 : paletteSlot);
 
         this.x = x;
         this.y = y;
