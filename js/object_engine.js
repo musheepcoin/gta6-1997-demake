@@ -5240,23 +5240,46 @@ class WorldObjectEngine {
             }
         }
 
-        // 20A. OCEAN DRIVE 3D ART DECO HOTEL FACADE ENHANCEMENTS (Eyebrows, Rooftop Neon Crowns, Vertical Blade Signs & Pastel Awnings)
+        // 20A. OCEAN DRIVE 3D ART DECO HOTEL FACADE ENHANCEMENTS (Architectural Limestone Eyebrows, Stepped Stone Crowns, Blade Signs & Canvas Awnings)
         if (this.map && typeof this.map.getBlockInfo === "function") {
-            const neonTrimPal = [
-                [0.98, 0.36, 0.78], // Hot Flamingo Pink
-                [0.14, 0.94, 0.98], // South Beach Cyan
-                [0.34, 0.98, 0.76], // Mint Pastel
-                [1.00, 0.82, 0.24], // Warm Neon Gold
-                [0.78, 0.42, 0.98]  // Ultra-Violet Purple
+            const stoneTrimPal = [
+                [0.91, 0.88, 0.82], // Warm Ivory Limestone
+                [0.86, 0.81, 0.74], // Travertine Sand
+                [0.80, 0.81, 0.83], // Precast Architectural Concrete
+                [0.84, 0.76, 0.68], // Warm Coral Stone
+                [0.75, 0.77, 0.80]  // Slate Limestone
+            ];
+            const copingMetalPal = [
+                [0.28, 0.31, 0.36], // Dark Anodized Bronze
+                [0.36, 0.40, 0.45], // Brushed Architectural Steel
+                [0.64, 0.60, 0.54], // Weathered Travertine Cap
+                [0.58, 0.36, 0.28], // Terracotta Stone Cap
+                [0.22, 0.25, 0.30]  // Charcoal Metal Coping
+            ];
+            const canvasAwningPal = [
+                [0.16, 0.28, 0.42], // Deep Navy Canvas
+                [0.52, 0.20, 0.22], // Classic Burgundy Canvas
+                [0.18, 0.36, 0.28], // Forest Green Canvas
+                [0.24, 0.27, 0.32], // Charcoal Slate Canvas
+                [0.64, 0.34, 0.24]  // Warm Terracotta Canvas
             ];
             const bladeTextures = ["ad_hotel_dixon", "ad_vice_neon", "ad_ocean_drive", "ad_mambos_latin", "ad_pi_beer"];
             const interiorsList = Array.isArray(this.map.interiors) ? this.map.interiors : [];
 
+            let oceanBldgGroup = 0;
+            let prevHadBldg = false;
             for (let r = 44; r <= 358; r++) {
                 // Check if c=442 has a tall Art Deco hotel building block (z=2..3+)
                 const b2 = this.map.getBlockInfo(442, r, 2);
                 const b3 = this.map.getBlockInfo(442, r, 3);
-                if (!b2 || !b2.lid || !b3 || !b3.lid) continue;
+                if (!b2 || !b2.lid || !b3 || !b3.lid) {
+                    prevHadBldg = false;
+                    continue;
+                }
+                if (!prevHadBldg) {
+                    oceanBldgGroup++;
+                    prevHadBldg = true;
+                }
                 let topZ = 4.0;
                 for (let zTest = 4; zTest <= 5; zTest++) {
                     const bt = this.map.getBlockInfo(442, r, zTest);
@@ -5264,37 +5287,38 @@ class WorldObjectEngine {
                 }
                 const facadeX = 443.0 * TILE_SIZE;
                 const rowY = (r + 0.5) * TILE_SIZE;
-                const trimCol = neonTrimPal[Math.floor(r / 4) % neonTrimPal.length];
-                const altCol  = neonTrimPal[(Math.floor(r / 4) + 1) % neonTrimPal.length];
+                const trimCol = stoneTrimPal[oceanBldgGroup % stoneTrimPal.length];
+                const capCol  = copingMetalPal[oceanBldgGroup % copingMetalPal.length];
+                const awnCol  = canvasAwningPal[oceanBldgGroup % canvasAwningPal.length];
 
-                // 1) Pastel Art Deco Horizontal "Eyebrow" Window Sun-Ledges along the East hotel face
-                emitSolidBox3D(facadeX + 2.5, rowY, 1, 0, 0, 0, 5.0, 56.0, 2.94, 3.00, trimCol, 6);
+                // 1) Architectural Limestone Horizontal "Eyebrow" Window Sun-Ledges along the East hotel face
+                emitSolidBox3D(facadeX + 2.5, rowY, 1, 0, 0, 0, 5.0, 56.0, 2.94, 3.00, trimCol, 1);
                 if (topZ >= 4.0) {
-                    emitSolidBox3D(facadeX + 2.2, rowY, 1, 0, 0, 0, 4.4, 56.0, 3.88, 3.94, altCol, 6);
+                    emitSolidBox3D(facadeX + 2.2, rowY, 1, 0, 0, 0, 4.4, 56.0, 3.88, 3.94, trimCol, 1);
                 }
 
-                // 2) Stepped Art Deco Rooftop Neon Crown & Central Vertical Fin Spire (every 5 building rows)
+                // 2) Stepped Art Deco Limestone Rooftop Crown & Vertical Stone Fin (every 5 building rows)
                 if (r % 5 === 2) {
-                    emitSolidBox3D(facadeX - 4.0, rowY, 1, 0, 0, 0, 10.0, 52.0, topZ, topZ + 0.16, [0.96, 0.94, 0.98], 5);
-                    emitSolidBox3D(facadeX - 2.5, rowY, 1, 0, 0, 0, 8.0, 34.0, topZ + 0.16, topZ + 0.30, trimCol, 6);
-                    emitSolidBox3D(facadeX + 1.0, rowY, 1, 0, 0, 0, 12.0, 6.0, topZ + 0.10, topZ + 0.52, altCol, 6);
+                    emitSolidBox3D(facadeX - 4.0, rowY, 1, 0, 0, 0, 10.0, 52.0, topZ, topZ + 0.16, trimCol, 1);
+                    emitSolidBox3D(facadeX - 2.5, rowY, 1, 0, 0, 0, 8.0, 34.0, topZ + 0.16, topZ + 0.28, capCol, 2);
+                    emitSolidBox3D(facadeX + 1.0, rowY, 1, 0, 0, 0, 11.0, 5.5, topZ + 0.08, topZ + 0.44, trimCol, 1);
                 }
 
                 // 3) Vertical 3D Illuminated Hotel Blade Sign projecting over Ocean Drive West Sidewalk
                 if (r % 8 === 4) {
-                    const bladeTex = bladeTextures[Math.floor(r / 8) % bladeTextures.length];
+                    const bladeTex = bladeTextures[oceanBldgGroup % bladeTextures.length];
                     emitSolidBox3D(facadeX + 5.0, rowY, 1, 0, 0, 0, 10.0, 3.0, 2.75, 2.82, [0.24, 0.28, 0.34], 5);
                     emitSolidBox3D(facadeX + 5.0, rowY, 1, 0, 0, 0, 10.0, 3.0, 3.82, 3.89, [0.24, 0.28, 0.34], 5);
                     emitBox3D(facadeX + 11.0, rowY, 1, 0, 0, 0, 11.0, 4.8, 2.62, 3.98, bladeTex, bladeTex, [1.0, 1.0, 1.0]);
-                    emitSolidBox3D(facadeX + 17.0, rowY, 1, 0, 0, 0, 2.2, 5.6, 2.58, 4.02, trimCol, 6);
+                    emitSolidBox3D(facadeX + 17.0, rowY, 1, 0, 0, 0, 2.2, 5.4, 2.58, 4.02, capCol, 5);
                 }
 
-                // 4) Pastel Striped Storefront Cafe Awning over West Sidewalk (skipping building entrance doors!)
+                // 4) Grounded Architectural Canvas Storefront Awning over West Sidewalk (skipping building entrance doors!)
                 if (r % 3 === 1) {
                     const nearDoor = interiorsList.some(intr => Math.abs(intr.doorX - facadeX) < 96 && Math.abs(intr.doorY - rowY) < 42);
                     if (!nearDoor) {
-                        emitSolidBox3D(facadeX + 9.0, rowY, 1, 0, 0, 0, 18.0, 48.0, 2.38, 2.48, trimCol, 5);
-                        emitSolidBox3D(facadeX + 17.5, rowY, 1, 0, 0, 0, 2.5, 48.0, 2.34, 2.40, [0.98, 0.98, 1.00], 6);
+                        emitSolidBox3D(facadeX + 9.0, rowY, 1, 0, 0, 0, 18.0, 48.0, 2.38, 2.48, awnCol, 1);
+                        emitSolidBox3D(facadeX + 17.5, rowY, 1, 0, 0, 0, 2.5, 48.0, 2.34, 2.40, [0.92, 0.90, 0.86], 1);
                     }
                 }
             }
@@ -5525,25 +5549,54 @@ class WorldObjectEngine {
                 }
             }
 
-            const artDecoPal = [
-                [0.98, 0.36, 0.78], // Flamingo Pink
-                [0.14, 0.94, 0.98], // South Beach Cyan
-                [0.32, 0.98, 0.76], // Tropical Mint
-                [1.00, 0.82, 0.24], // Sunset Gold
-                [0.78, 0.44, 0.98]  // Ocean Drive Violet
+            // Assign a single unified Building ID (connected component) to every contiguous building footprint
+            // so all 4 walls and all roof tiers of a building share one coherent architectural material palette!
+            const bldgIdGrid = new Int32Array(MAP_ROWS * M);
+            const bfsQueue = new Int32Array(MAP_ROWS * M);
+            let nextBldgId = 1;
+            for (let r = 4; r < MAP_ROWS - 4; r++) {
+                const rOff = r * M;
+                for (let c = 4; c < M - 4; c++) {
+                    const startIdx = rOff + c;
+                    if (bTopZ[startIdx] < 3 || bldgIdGrid[startIdx] !== 0) continue;
+                    const curId = nextBldgId++;
+                    bldgIdGrid[startIdx] = curId;
+                    let qHead = 0, qTail = 0;
+                    bfsQueue[qTail++] = startIdx;
+                    while (qHead < qTail) {
+                        const cur = bfsQueue[qHead++];
+                        const cr = (cur / M) | 0;
+                        const cc = cur - cr * M;
+                        const n0 = cur - 1, n1 = cur + 1, n2 = cur - M, n3 = cur + M;
+                        if (cc > 4 && bTopZ[n0] >= 3 && bldgIdGrid[n0] === 0) { bldgIdGrid[n0] = curId; bfsQueue[qTail++] = n0; }
+                        if (cc < M - 5 && bTopZ[n1] >= 3 && bldgIdGrid[n1] === 0) { bldgIdGrid[n1] = curId; bfsQueue[qTail++] = n1; }
+                        if (cr > 4 && bTopZ[n2] >= 3 && bldgIdGrid[n2] === 0) { bldgIdGrid[n2] = curId; bfsQueue[qTail++] = n2; }
+                        if (cr < MAP_ROWS - 5 && bTopZ[n3] >= 3 && bldgIdGrid[n3] === 0) { bldgIdGrid[n3] = curId; bfsQueue[qTail++] = n3; }
+                    }
+                }
+            }
+
+            // Realistic GTA 6 Architectural Material Palettes (Limestone, Travertine, Precast Concrete, Dark Bronze & Canvas)
+            const stoneWallPal = [
+                [0.90, 0.87, 0.81], // Warm Ivory Limestone
+                [0.85, 0.80, 0.73], // Travertine Sand
+                [0.78, 0.79, 0.81], // Precast Architectural Concrete
+                [0.82, 0.74, 0.66], // Warm Coral Stone
+                [0.72, 0.75, 0.79]  // Slate-Gray Concrete
             ];
-            const downtownLedPal = [
-                [0.18, 0.90, 1.00], // Brickell Sky Cyan
-                [0.98, 0.84, 0.28], // Financial Gold
-                [0.96, 0.30, 0.76], // Vice Bay Magenta
-                [0.88, 0.96, 1.00]  // Crisp Ice White
+            const copingCapPal = [
+                [0.28, 0.31, 0.36], // Dark Anodized Bronze Coping
+                [0.38, 0.41, 0.46], // Brushed Architectural Steel
+                [0.66, 0.62, 0.56], // Weathered Travertine Cap
+                [0.58, 0.36, 0.28], // Terracotta Stone Coping
+                [0.22, 0.25, 0.30]  // Charcoal Metal Coping
             ];
             const awningPal = [
-                [0.92, 0.26, 0.34], // Coral Crimson
-                [0.12, 0.72, 0.68], // Caribbean Teal
-                [0.96, 0.68, 0.16], // Havana Marigold
-                [0.20, 0.52, 0.88], // Royal Azure
-                [0.88, 0.34, 0.70]  // South Beach Rose
+                [0.16, 0.28, 0.42], // Deep Navy Canvas
+                [0.52, 0.20, 0.22], // Classic Burgundy Canvas
+                [0.18, 0.36, 0.28], // Forest Green Canvas
+                [0.24, 0.27, 0.32], // Charcoal Slate Canvas
+                [0.64, 0.34, 0.24]  // Warm Terracotta Canvas
             ];
             const bladeAdKeys = [
                 "ad_vice26", "ad_hotel_dixon", "ad_vice_neon", "ad_ocean_drive",
@@ -5565,7 +5618,8 @@ class WorldObjectEngine {
                 const spanTiles = Math.max(cEnd - cStart + 1, rEnd - rStart + 1);
                 const midC = (cStart + cEnd + 1) * 0.5;
                 const midR = (rStart + rEnd + 1) * 0.5;
-                const hash = (((cStart * 73856093) ^ (rStart * 19349663) ^ (spanTiles * 83492791)) >>> 0);
+                const bldgId = bldgIdGrid[rStart * M + cStart] || 1;
+                const hash = (((bldgId * 2654435761) ^ 0x9E3779B9) >>> 0);
 
                 const isBeachArtDeco = (midC >= 365);
                 const isDowntown = (midC >= 235 && midC < 365 && midR >= 145 && midR <= 315);
@@ -5583,12 +5637,11 @@ class WorldObjectEngine {
                 const wPx = isHorizontal ? spanPx : 6.4;
                 const dPx = isHorizontal ? 6.4 : spanPx;
 
-                // 1) 3D Perimeter Parapet Wall & Coping Ledge + Inner Roof Deck AO Shadow Skirt
+                // 1) Unified 3D Perimeter Parapet Wall & Architectural Coping Ledge + Inner Roof Deck AO Shadow Skirt
                 const parapetH = isDowntown ? 0.105 : (isBeachArtDeco ? 0.095 : 0.082);
-                const baseCol = isBeachArtDeco
-                    ? [0.97, 0.95, 0.92]
-                    : (isDowntown ? [0.82, 0.88, 0.95] : (isLatinOrUrban ? [0.90, 0.80, 0.70] : [0.78, 0.80, 0.84]));
-                const baseMat = isDowntown ? 9 : 1;
+                const wallCol = stoneWallPal[hash % stoneWallPal.length];
+                const capCol  = copingCapPal[hash % copingCapPal.length];
+                const baseMat = isDowntown ? 2 : 1;
 
                 emitAOShadow3D(
                     edgeX - dirX * 5.0,
@@ -5599,82 +5652,69 @@ class WorldObjectEngine {
                     topY,
                     0.28
                 );
-                emitSolidBox3D(edgeX, edgeY, 1, 0, 0, 0, wPx, dPx, topY, topY + parapetH, baseCol, baseMat);
+                emitSolidBox3D(edgeX, edgeY, 1, 0, 0, 0, wPx, dPx, topY, topY + parapetH, wallCol, baseMat);
 
-                // Top coping cap / neon skyline band
+                // Top architectural stone/bronze coping cap & stepped limestone ziggurat crown
                 if (isBeachArtDeco) {
-                    const neonCol = artDecoPal[hash % artDecoPal.length];
-                    const altNeon = artDecoPal[(hash + 2) % artDecoPal.length];
                     emitSolidBox3D(
                         edgeX, edgeY, 1, 0, 0, 0,
                         isHorizontal ? spanPx + 1.5 : 7.6,
                         isHorizontal ? 7.6 : spanPx + 1.5,
                         topY + parapetH, topY + parapetH + 0.032,
-                        neonCol, 10
+                        capCol, 2
                     );
-                    // Stepped Art Deco Ziggurat central crown & vertical neon fin on spans >= 2 tiles
+                    // Stepped Art Deco Limestone Ziggurat central pediment on spans >= 2 tiles
                     if (spanTiles >= 2) {
-                        const crownW = Math.min(spanPx * 0.56, 136.0);
-                        const crownW2 = Math.min(spanPx * 0.32, 78.0);
+                        const crownW = Math.min(spanPx * 0.54, 132.0);
+                        const crownW2 = Math.min(spanPx * 0.30, 74.0);
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
                             isHorizontal ? crownW : 8.2,
                             isHorizontal ? 8.2 : crownW,
-                            topY + parapetH + 0.03, topY + parapetH + 0.16,
-                            [0.98, 0.96, 0.94], 9
+                            topY + parapetH + 0.03, topY + parapetH + 0.15,
+                            wallCol, 1
                         );
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
-                            isHorizontal ? crownW2 : 9.0,
-                            isHorizontal ? 9.0 : crownW2,
-                            topY + parapetH + 0.16, topY + parapetH + 0.27,
-                            neonCol, 10
+                            isHorizontal ? crownW2 : 8.8,
+                            isHorizontal ? 8.8 : crownW2,
+                            topY + parapetH + 0.15, topY + parapetH + 0.24,
+                            capCol, 2
                         );
-                        if (spanTiles >= 3 && (hash % 2 === 0)) {
-                            emitSolidBox3D(
-                                edgeX + dirX * 2.5, edgeY + dirY * 2.5, 1, 0, 0, 0,
-                                isHorizontal ? 6.5 : 12.0,
-                                isHorizontal ? 12.0 : 6.5,
-                                topY + 0.05, topY + parapetH + 0.44,
-                                altNeon, 10
-                            );
-                        }
                     }
                 } else if (isDowntown && topY >= 4.0) {
-                    const ledCol = downtownLedPal[hash % downtownLedPal.length];
                     emitSolidBox3D(
                         edgeX, edgeY, 1, 0, 0, 0,
                         isHorizontal ? spanPx + 1.6 : 7.8,
                         isHorizontal ? 7.8 : spanPx + 1.6,
-                        topY + parapetH, topY + parapetH + 0.038,
-                        ledCol, 10
+                        topY + parapetH, topY + parapetH + 0.036,
+                        capCol, 5
                     );
                     if (spanTiles >= 3 && (hash % 2 === 0)) {
-                        const finSpan = Math.min(spanPx * 0.50, 128.0);
+                        const finSpan = Math.min(spanPx * 0.48, 124.0);
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
                             isHorizontal ? finSpan : 8.4,
                             isHorizontal ? 8.4 : finSpan,
-                            topY + parapetH + 0.038, topY + parapetH + 0.20,
-                            [0.20, 0.78, 0.96], 7
+                            topY + parapetH + 0.036, topY + parapetH + 0.18,
+                            [0.22, 0.30, 0.38], 7
                         );
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
                             isHorizontal ? finSpan + 2.0 : 9.0,
                             isHorizontal ? 9.0 : finSpan + 2.0,
-                            topY + parapetH + 0.20, topY + parapetH + 0.24,
-                            ledCol, 10
+                            topY + parapetH + 0.18, topY + parapetH + 0.22,
+                            capCol, 5
                         );
                     }
                 } else {
-                    // Warm terracotta / limestone / industrial steel coping cap
-                    const capCol = isLatinOrUrban ? [0.84, 0.44, 0.30] : [0.58, 0.62, 0.68];
+                    const urbanCap = isLatinOrUrban ? [0.64, 0.38, 0.28] : capCol;
                     emitSolidBox3D(
                         edgeX, edgeY, 1, 0, 0, 0,
                         isHorizontal ? spanPx + 1.4 : 7.6,
                         isHorizontal ? 7.6 : spanPx + 1.4,
                         topY + parapetH, topY + parapetH + 0.028,
-                        capCol, isLatinOrUrban ? 1 : 6
+                        urbanCap, isLatinOrUrban ? 1 : 2
                     );
                     if (isLatinOrUrban && spanTiles >= 3 && (hash % 2 === 0)) {
                         const pedW = Math.min(spanPx * 0.42, 96.0);
@@ -5682,23 +5722,20 @@ class WorldObjectEngine {
                             edgeX, edgeY, 1, 0, 0, 0,
                             isHorizontal ? pedW : 7.8,
                             isHorizontal ? 7.8 : pedW,
-                            topY + parapetH + 0.028, topY + parapetH + 0.15,
-                            [0.94, 0.84, 0.72], 1
+                            topY + parapetH + 0.028, topY + parapetH + 0.14,
+                            wallCol, 1
                         );
                     }
                 }
 
-                // 2) Street-Facing 3D Architectural Facade Details (Eyebrow Ledges, Glass Balconies, Storefront Awnings & Neon Blade Signs)
+                // 2) Street-Facing 3D Architectural Facade Details (Limestone Eyebrow Ledges, Smoked Glass Balconies, Canvas Awnings & Blade Signs)
                 if (!adjGroundIsSidewalk || spanTiles < 2) return;
 
                 const wallFaceX = edgeX + dirX * 3.2;
                 const wallFaceY = edgeY + dirY * 3.2;
 
-                // 2A) Upper-Storey Horizontal Window "Eyebrow" Sun-Ledges & Cantilevered Glass Balconies
+                // 2A) Upper-Storey Horizontal Limestone/Concrete Window "Eyebrow" Sun-Ledges & Cantilevered Balconies
                 if (topY >= 4.0 && (isBeachArtDeco || isDowntown)) {
-                    const ledgeCol = isBeachArtDeco
-                        ? artDecoPal[(hash + 1) % artDecoPal.length]
-                        : [0.84, 0.90, 0.96];
                     const ledgeSpan = Math.max(48.0, spanPx - 16.0);
                     for (let zFl = 3.0; zFl <= topY - 0.8; zFl += 1.0) {
                         emitSolidBox3D(
@@ -5708,11 +5745,11 @@ class WorldObjectEngine {
                             isHorizontal ? ledgeSpan : 4.8,
                             isHorizontal ? 4.8 : ledgeSpan,
                             zFl - 0.06, zFl - 0.01,
-                            ledgeCol,
-                            isBeachArtDeco ? 9 : 5
+                            wallCol,
+                            isDowntown ? 2 : 1
                         );
                     }
-                    // 3D Cantilevered Glass Resort / Condo Balconies on spans >= 3 tiles
+                    // 3D Cantilevered Smoked-Glass Resort / Condo Balconies on spans >= 3 tiles
                     if (spanTiles >= 3 && (hash % 3 !== 0)) {
                         const balcCount = Math.min(3, Math.floor(spanTiles / 2));
                         for (let bi = 0; bi < balcCount; bi++) {
@@ -5722,29 +5759,25 @@ class WorldObjectEngine {
                             const bw = isHorizontal ? 44.0 : 10.4;
                             const bd = isHorizontal ? 10.4 : 44.0;
                             const bzFloor = (topY >= 5.0 && (bi % 2 === 1)) ? 3.92 : 2.92;
-                            // Concrete balcony deck slab + glowing cyan glass balustrade
-                            emitSolidBox3D(bx, by, 1, 0, 0, 0, bw, bd, bzFloor, bzFloor + 0.045, [0.94, 0.95, 0.98], 9);
+                            // Concrete balcony deck slab + dark smoked architectural glass balustrade
+                            emitSolidBox3D(bx, by, 1, 0, 0, 0, bw, bd, bzFloor, bzFloor + 0.045, wallCol, 2);
                             emitSolidBox3D(
                                 bx + dirX * 3.8, by + dirY * 3.8, 1, 0, 0, 0,
                                 isHorizontal ? bw : 2.2,
                                 isHorizontal ? 2.2 : bd,
                                 bzFloor + 0.045, bzFloor + 0.135,
-                                [0.22, 0.90, 0.98], 7
+                                [0.22, 0.32, 0.40], 7
                             );
                         }
                     }
                 }
 
-                // 2B) Street-Level Cantilevered Storefront Canopy / Striped Cafe Awning (at z = 2.38..2.48, clear of interior doors)
+                // 2B) Street-Level Cantilevered Storefront Canopy / Architectural Canvas Awning (at z = 2.38..2.48, clear of interior doors)
                 if ((hash % 3 !== 2) && !isNearDoor(wallFaceX, wallFaceY)) {
                     const awnSpan = Math.min(spanPx - 20.0, 116.0);
                     if (awnSpan >= 44.0) {
-                        const awnCol = isBeachArtDeco
-                            ? artDecoPal[hash % artDecoPal.length]
-                            : (isDowntown ? [0.18, 0.24, 0.34] : awningPal[hash % awningPal.length]);
-                        const trimCol = isDowntown
-                            ? downtownLedPal[hash % downtownLedPal.length]
-                            : [0.98, 0.98, 1.00];
+                        const awnCol = awningPal[hash % awningPal.length];
+                        const trimCol = [0.90, 0.88, 0.84];
                         const ax = wallFaceX + dirX * 8.0;
                         const ay = wallFaceY + dirY * 8.0;
                         emitSolidBox3D(
@@ -5753,7 +5786,7 @@ class WorldObjectEngine {
                             isHorizontal ? 16.0 : awnSpan,
                             2.39, 2.47,
                             awnCol,
-                            isDowntown ? 9 : 5
+                            1
                         );
                         emitSolidBox3D(
                             wallFaceX + dirX * 15.8,
@@ -5763,30 +5796,26 @@ class WorldObjectEngine {
                             isHorizontal ? 2.4 : awnSpan + 1.0,
                             2.36, 2.41,
                             trimCol,
-                            isDowntown || isBeachArtDeco ? 10 : 9
+                            1
                         );
                     }
                 }
 
-                // 2C) Vertical 3D Illuminated Neon Blade Sign projecting from multi-storey facades (at z = 2.64..3.94)
-                if (topY >= 4.0 && spanTiles >= 3 && (hash % 3 === 0)) {
+                // 2C) Vertical 3D Illuminated Blade Sign projecting from multi-storey facades (at z = 2.64..3.94)
+                if (topY >= 4.0 && spanTiles >= 3 && (hash % 4 === 0)) {
                     const adKey = bladeAdKeys[hash % bladeAdKeys.length];
-                    const neonCol = isBeachArtDeco
-                        ? artDecoPal[hash % artDecoPal.length]
-                        : downtownLedPal[hash % downtownLedPal.length];
                     const signX = wallFaceX + dirX * 9.5;
                     const signY = wallFaceY + dirY * 9.5;
                     const sCos = isHorizontal ? 0 : 1;
                     const sSin = isHorizontal ? 1 : 0;
-                    // Steel wall mounting brackets
+                    // Dark anodized steel wall mounting brackets & outer frame
                     emitSolidBox3D(wallFaceX + dirX * 4.5, wallFaceY + dirY * 4.5, sCos, sSin, 0, 0, 9.0, 2.8, 2.74, 2.80, [0.24, 0.28, 0.34], 5);
                     emitSolidBox3D(wallFaceX + dirX * 4.5, wallFaceY + dirY * 4.5, sCos, sSin, 0, 0, 9.0, 2.8, 3.78, 3.84, [0.24, 0.28, 0.34], 5);
-                    // Double-sided 3D illuminated sign box + outer neon tube fin
                     emitBox3D(signX, signY, sCos, sSin, 0, 0, 10.5, 4.6, 2.64, 3.92, adKey, adKey, [1.0, 1.0, 1.0]);
                     emitSolidBox3D(
                         wallFaceX + dirX * 15.4,
                         wallFaceY + dirY * 15.4,
-                        sCos, sSin, 0, 0, 2.2, 5.2, 2.60, 3.96, neonCol, 10
+                        sCos, sSin, 0, 0, 2.2, 5.2, 2.60, 3.96, capCol, 5
                     );
                 }
             };
@@ -5931,96 +5960,99 @@ class WorldObjectEngine {
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.20 });
                         } else {
                             // ARCHETYPE 1B: 2-Tier Modern Miami Glass Curtain-Wall Penthouse + Twin Cylindrical HVAC Cooling Towers
-                            const ledCol = downtownLedPal[rHash % downtownLedPal.length];
+                            const capCol = copingCapPal[rHash % copingCapPal.length];
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 98, 86, topY, 0.42);
-                            emitTileBox3D(cxPx, cyPx, 1, 0, -6, 0, 72, 62, topY, topY + 0.44, 199, 199, 86, [0.92, 0.96, 1.00], false);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, -6, 0, 76, 66, topY + 0.44, topY + 0.49, ledCol, 10);
-                            emitTileBox3D(cxPx, cyPx, 1, 0, -10, 0, 44, 38, topY + 0.49, topY + 0.78, 199, 86, 86, [0.94, 0.98, 1.00], false);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, -10, 0, 48, 42, topY + 0.78, topY + 0.83, ledCol, 10);
+                            emitTileBox3D(cxPx, cyPx, 1, 0, -6, 0, 72, 62, topY, topY + 0.44, 199, 199, 86, [0.84, 0.88, 0.92], false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -6, 0, 76, 66, topY + 0.44, topY + 0.49, capCol, 5);
+                            emitTileBox3D(cxPx, cyPx, 1, 0, -10, 0, 44, 38, topY + 0.49, topY + 0.78, 199, 86, 86, [0.86, 0.90, 0.94], false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -10, 0, 48, 42, topY + 0.78, topY + 0.83, capCol, 5);
                             // Twin Cylindrical Chiller Cooling Towers on East Mechanical Deck
-                            emitCylinder3D(cxPx, cyPx, 36, -14, 9.5, 9.0, topY, topY + 0.36, 12, [0.84, 0.88, 0.94], 5, true);
-                            emitCylinder3D(cxPx, cyPx, 36,  14, 9.5, 9.0, topY, topY + 0.36, 12, [0.84, 0.88, 0.94], 5, true);
+                            emitCylinder3D(cxPx, cyPx, 36, -14, 9.5, 9.0, topY, topY + 0.36, 12, [0.76, 0.80, 0.86], 5, true);
+                            emitCylinder3D(cxPx, cyPx, 36,  14, 9.5, 9.0, topY, topY + 0.36, 12, [0.76, 0.80, 0.86], 5, true);
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.85 });
                         }
                     } else if (isBeachArtDeco) {
-                        const neonCol = artDecoPal[rHash % artDecoPal.length];
-                        const altCol = artDecoPal[(rHash + 1) % artDecoPal.length];
+                        const bId = bldgIdGrid[idx00] || 1;
+                        const wallCol = stoneWallPal[bId % stoneWallPal.length];
+                        const capCol = copingCapPal[bId % copingCapPal.length];
                         if (rHash % 2 === 0) {
-                            // ARCHETYPE 2A: South Beach Rooftop Infinity Plunge Pool, Travertine Sundeck & Pastel Cabana Pergola
+                            // ARCHETYPE 2A: South Beach Rooftop Infinity Plunge Pool, Travertine Sundeck & Teak Cabana Pergola
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 84, topY, 0.38);
-                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 84, 72, topY, topY + 0.07, 177, 177, 8, [0.98, 0.96, 0.92], false);
-                            // Glowing Turquoise Rooftop Plunge Pool Basin (at offX = -14)
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 44, 52, topY + 0.07, topY + 0.13, [0.98, 0.98, 1.00], 9);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 38, 46, topY + 0.08, topY + 0.145, [0.16, 0.92, 0.98], 10);
-                            // Pastel Art Deco Rooftop Bar & Louvered Pergola Canopy (at offX = +22)
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 20, 48, topY + 0.07, topY + 0.38, [0.98, 0.94, 0.92], 9);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 24, 54, topY + 0.38, topY + 0.44, neonCol, 10);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 14, 32, topY + 0.44, topY + 0.58, altCol, 9);
-                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.58 });
+                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 84, 72, topY, topY + 0.07, 177, 177, 8, [0.90, 0.86, 0.80], false);
+                            // Deep Turquoise Rooftop Plunge Pool Basin (at offX = -14)
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 44, 52, topY + 0.07, topY + 0.13, [0.90, 0.88, 0.84], 1);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 38, 46, topY + 0.08, topY + 0.145, [0.16, 0.64, 0.78], 7);
+                            // Architectural Limestone Rooftop Lounge & Teak Wood Louvered Pergola (at offX = +22)
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 20, 48, topY + 0.07, topY + 0.38, wallCol, 1);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 24, 54, topY + 0.38, topY + 0.44, [0.62, 0.42, 0.26], 11);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 14, 32, topY + 0.44, topY + 0.56, capCol, 2);
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.56 });
                         } else {
-                            // ARCHETYPE 2B: Art Deco Stepped Ziggurat Elevator Cupola & Skylight Atrium
+                            // ARCHETYPE 2B: Art Deco Stepped Limestone Elevator Cupola & Skylight Atrium
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 88, 88, topY, 0.40);
-                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 68, 68, topY, topY + 0.32, 86, 199, 31, [0.98, 0.95, 0.92], false);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 72, 72, topY + 0.32, topY + 0.37, neonCol, 10);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 44, 44, topY + 0.37, topY + 0.56, [0.98, 0.96, 0.94], 9);
-                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.56, topY + 0.74, 12, altCol, 10, true);
-                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.74 });
+                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 68, 68, topY, topY + 0.32, 86, 199, 31, wallCol, false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 72, 72, topY + 0.32, topY + 0.37, capCol, 2);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 44, 44, topY + 0.37, topY + 0.56, wallCol, 1);
+                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.56, topY + 0.72, 12, capCol, 5, true);
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.72 });
                         }
                     } else if (isUrbanBrick && (rHash % 2 === 0)) {
                         // ARCHETYPE 3: Classic Urban Wooden Rooftop Water Tank on Steel Truss Legs + Brick Stair Bulkhead
                         emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 92, 78, topY, 0.40);
                         // Brick/Stucco Staircase Bulkhead Door (at offX = -20)
-                        emitTileBox3D(cxPx, cyPx, 1, 0, -20, 0, 32, 42, topY, topY + 0.42, 172, 177, 86, [0.90, 0.82, 0.74], false);
-                        emitSolidBox3D(cxPx, cyPx, 1, 0, -20, 0, 35, 45, topY + 0.42, topY + 0.46, [0.78, 0.38, 0.26], 1);
+                        emitTileBox3D(cxPx, cyPx, 1, 0, -20, 0, 32, 42, topY, topY + 0.42, 172, 177, 86, [0.88, 0.80, 0.72], false);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, -20, 0, 35, 45, topY + 0.42, topY + 0.46, [0.64, 0.36, 0.26], 1);
                         // 4 Open-Lattice S363 Steel Truss Legs + Cylindrical Cedar Water Barrel & Conical Roof (at offX = +18)
                         for (const lx of [10, 26]) {
                             for (const ly of [-8, 8]) {
-                                emitTileBox3D(cxPx, cyPx, 1, 0, lx, ly, 6, 6, topY, topY + 0.32, 363, 363, 64, [0.76, 0.80, 0.86], false);
+                                emitTileBox3D(cxPx, cyPx, 1, 0, lx, ly, 6, 6, topY, topY + 0.32, 363, 363, 64, [0.74, 0.78, 0.84], false);
                             }
                         }
-                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.5, 14.0, topY + 0.30, topY + 0.64, 14, [0.68, 0.46, 0.28], 11, true);
+                        emitCylinder3D(cxPx, cyPx, 18, 0, 14.5, 14.0, topY + 0.30, topY + 0.64, 14, [0.66, 0.44, 0.28], 11, true);
                         emitCylinder3D(cxPx, cyPx, 18, 0, 14.8, 14.8, topY + 0.42, topY + 0.46, 14, [0.24, 0.28, 0.34], 5, false);
-                        emitCone3D(cxPx, cyPx, 18, 0, 15.5, topY + 0.64, topY + 0.82, 14, [0.46, 0.30, 0.18], 5);
+                        emitCone3D(cxPx, cyPx, 18, 0, 15.5, topY + 0.64, topY + 0.82, 14, [0.44, 0.28, 0.18], 5);
                         this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.82 });
                     } else if (rHash % 3 === 0) {
                         // ARCHETYPE 4: Raised 3D Multi-Pane Glass Skylight Atrium & Mechanical Bulkhead
                         emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 92, 76, topY, 0.38);
-                        emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 76, 60, topY, topY + 0.22, 199, 86, 31, [0.90, 0.95, 1.00], false);
-                        emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 52, 36, topY + 0.22, topY + 0.36, [0.24, 0.82, 0.98], 7);
+                        emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 76, 60, topY, topY + 0.22, 199, 86, 31, [0.84, 0.86, 0.90], false);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 52, 36, topY + 0.22, topY + 0.36, [0.20, 0.32, 0.42], 7);
                         this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.38 });
                     } else {
                         // ARCHETYPE 5: Commercial HVAC Chiller Plant, Galvanized Ventilation Ducts, Solar Array & Cellular Relay Mast
                         emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 94, 82, topY, 0.38);
-                        emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 82, 68, topY, topY + 0.06, 177, 177, 71, [0.86, 0.88, 0.92], false);
+                        emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 82, 68, topY, topY + 0.06, 177, 177, 71, [0.80, 0.82, 0.86], false);
                         // Twin Ribbed Steel HVAC Chiller Units + Dark Exhaust Fan Shrouds (at offX = -18)
                         for (const hy of [-14, 14]) {
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, -18, hy, 28, 20, topY + 0.06, topY + 0.28, [0.76, 0.80, 0.86], 6);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -18, hy, 28, 20, topY + 0.06, topY + 0.28, [0.72, 0.76, 0.82], 6);
                             emitCylinder3D(cxPx, cyPx, -18, hy, 7.2, 7.2, topY + 0.28, topY + 0.32, 10, [0.18, 0.22, 0.28], 5, true);
                         }
-                        // Horizontal Galvanized Steel HVAC Ductwork & Blue Photovoltaic Solar Panel Array (at offX = +16)
-                        emitSolidBox3D(cxPx, cyPx, 1, 0, 12, -16, 32, 10, topY + 0.08, topY + 0.20, [0.84, 0.88, 0.94], 5);
-                        emitSolidBox3D(cxPx, cyPx, 1, 0, 18,  12, 28, 24, topY + 0.08, topY + 0.22, [0.18, 0.58, 0.92], 7);
+                        // Horizontal Galvanized Steel HVAC Ductwork & Photovoltaic Solar Panel Array (at offX = +16)
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 12, -16, 32, 10, topY + 0.08, topY + 0.20, [0.78, 0.82, 0.88], 5);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 18,  12, 28, 24, topY + 0.08, topY + 0.22, [0.16, 0.28, 0.44], 7);
                         // Open-Lattice S363 Cellular / Radio Relay Mast + Red Aviation Beacon (at offX = +26, offY = -18)
-                        emitTileBox3D(cxPx, cyPx, 1, 0, 26, -18, 8, 8, topY + 0.06, topY + 0.68, 363, 363, 64, [0.88, 0.92, 0.96], false);
-                        emitSolidBox3D(cxPx, cyPx, 1, 0, 26, -18, 4.0, 4.0, topY + 0.68, topY + 0.74, [1.00, 0.18, 0.22], 10);
+                        emitTileBox3D(cxPx, cyPx, 1, 0, 26, -18, 8, 8, topY + 0.06, topY + 0.68, 363, 363, 64, [0.84, 0.88, 0.92], false);
+                        emitSolidBox3D(cxPx, cyPx, 1, 0, 26, -18, 4.0, 4.0, topY + 0.68, topY + 0.74, [0.92, 0.18, 0.20], 7);
                         this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.52 });
                     }
                 }
             }
 
-            // Pass 29D: 3D Building Outer Corner Architecture (Art Deco Rounded Corner Turrets,
-            //           Downtown Skyscraper Chrome Corner Pylons & Urban Masonry Corner Finials)
+            // Pass 29D: 3D Building Outer Corner Architecture (Art Deco Rounded Limestone Corner Turrets,
+            //           Downtown Skyscraper Brushed-Steel Corner Pylons & Urban Masonry Corner Finials)
             for (let r = 6; r < MAP_ROWS - 6; r++) {
                 const rOff = r * M;
                 for (let c = 6; c < M - 6; c++) {
                     const z = bTopZ[rOff + c];
                     if (z < 3) continue;
-                    const cHash = (((c * 2654435761) ^ (r * 2246822519)) >>> 0);
-                    // Only decorate ~45% of building blocks to keep silhouettes varied and crisp
-                    if ((cHash % 9) > 3) continue;
+                    const bId = bldgIdGrid[rOff + c] || 1;
+                    // Only decorate ~40% of building blocks, consistently per building
+                    if ((bId % 5) > 1) continue;
 
                     const isBeachArtDeco = (c >= 365);
                     const isDowntown = (c >= 235 && c < 365 && r >= 145 && r <= 315);
+                    const wallCol = stoneWallPal[bId % stoneWallPal.length];
+                    const capCol  = copingCapPal[bId % copingCapPal.length];
 
                     for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
                         const nzX = bTopZ[rOff + (c + dx)];
@@ -6033,23 +6065,21 @@ class WorldObjectEngine {
                             const baseZ = Math.max(2.0, Math.max(nzX, nzY));
 
                             if (isBeachArtDeco) {
-                                // Iconic South Beach Rounded Art Deco Corner Column, Drum Turret & Neon Ring Finial (Colony / Beacon style!)
-                                const neonCol = artDecoPal[(c + r) % artDecoPal.length];
-                                emitCylinder3D(corX, corY, 0, 0, 7.2, 7.2, baseZ + 0.06, z + 0.14, 10, [0.98, 0.96, 0.94], 9, true);
-                                emitCylinder3D(corX, corY, 0, 0, 7.8, 7.8, z - 0.04, z + 0.04, 10, neonCol, 10, false);
-                                if (z >= 4 && ((c + r) % 2 === 0)) {
-                                    emitCylinder3D(corX, corY, 0, 0, 5.5, 4.8, z + 0.14, z + 0.30, 10, neonCol, 10, true);
-                                    emitCone3D(corX, corY, 0, 0, 4.8, z + 0.30, z + 0.48, 10, [0.98, 0.98, 1.00], 9);
+                                // Iconic South Beach Rounded Art Deco Limestone Corner Column & Stone Turret Finial
+                                emitCylinder3D(corX, corY, 0, 0, 7.0, 7.0, baseZ + 0.06, z + 0.14, 10, wallCol, 1, true);
+                                emitCylinder3D(corX, corY, 0, 0, 7.6, 7.6, z - 0.03, z + 0.04, 10, capCol, 2, false);
+                                if (z >= 4 && (bId % 2 === 0)) {
+                                    emitCylinder3D(corX, corY, 0, 0, 5.2, 4.6, z + 0.14, z + 0.28, 10, wallCol, 1, true);
+                                    emitCone3D(corX, corY, 0, 0, 4.6, z + 0.28, z + 0.44, 10, capCol, 2);
                                 }
                             } else if (isDowntown && z >= 4) {
-                                // Modern Skyscraper Brushed-Chrome Corner Mullion Pylon & Rooftop LED Beacon
-                                const ledCol = downtownLedPal[(c + r) % downtownLedPal.length];
-                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 8.8, 8.8, baseZ + 0.06, z + 0.18, [0.84, 0.90, 0.96], 9);
-                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 9.6, 9.6, z + 0.18, z + 0.25, ledCol, 10);
+                                // Modern Skyscraper Brushed-Steel Corner Mullion Pylon & Coping Cap
+                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 8.6, 8.6, baseZ + 0.06, z + 0.18, wallCol, 2);
+                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 9.4, 9.4, z + 0.18, z + 0.24, capCol, 5);
                             } else if (z >= 4) {
-                                // Urban Masonry / Limestone Corner Quoin Pedestal & Rooftop Finial Cap
-                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 8.4, 8.4, z, z + 0.16, [0.92, 0.84, 0.74], 1);
-                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 9.4, 9.4, z + 0.16, z + 0.20, [0.80, 0.40, 0.28], 1);
+                                // Urban Masonry / Limestone Corner Quoin Pedestal & Finial Cap
+                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 8.4, 8.4, z, z + 0.16, wallCol, 1);
+                                emitSolidBox3D(corX, corY, 1, 0, 0, 0, 9.4, 9.4, z + 0.16, z + 0.20, capCol, 2);
                             }
                         }
                     }
@@ -6101,42 +6131,42 @@ class WorldObjectEngine {
                     }
 
                     if (bordersStreet && (nHash % 3 === 0)) {
-                        // ARCHETYPE 6: 3D Rooftop Open-Lattice Steel Truss Advertising Billboard & Neon Sky-Sign
+                        // ARCHETYPE 6: 3D Rooftop Open-Lattice Steel Truss Advertising Billboard & Sky-Sign
                         const adKey = bladeAdKeys[nHash % bladeAdKeys.length];
-                        const neonCol = artDecoPal[nHash % artDecoPal.length];
+                        const capCol = copingCapPal[nHash % copingCapPal.length];
                         emitAOShadow3D(cxPx, cyPx, wCos, wSin, 0, 0, 74, 28, topY, 0.36);
                         for (const sx of [-22, 22]) {
-                            emitTileBox3D(cxPx, cyPx, wCos, wSin, sx, 0, 8, 8, topY, topY + 0.10, 177, 177, 71, [0.88, 0.90, 0.94], false);
-                            emitTileBox3D(cxPx, cyPx, wCos, wSin, sx, 0, 6, 6, topY + 0.10, topY + 0.42, 363, 363, 64, [0.82, 0.86, 0.92], false);
+                            emitTileBox3D(cxPx, cyPx, wCos, wSin, sx, 0, 8, 8, topY, topY + 0.10, 177, 177, 71, [0.80, 0.82, 0.86], false);
+                            emitTileBox3D(cxPx, cyPx, wCos, wSin, sx, 0, 6, 6, topY + 0.10, topY + 0.42, 363, 363, 64, [0.76, 0.80, 0.86], false);
                         }
-                        emitTileBox3D(cxPx, cyPx, wCos, wSin, 0, 6, 64, 5, topY + 0.38, topY + 0.42, 250, 250, 45, [0.82, 0.86, 0.92], false);
+                        emitTileBox3D(cxPx, cyPx, wCos, wSin, 0, 6, 64, 5, topY + 0.38, topY + 0.42, 250, 250, 45, [0.76, 0.80, 0.86], false);
                         emitSolidBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 68, 7.0, topY + 0.40, topY + 0.78, [0.16, 0.20, 0.28], 5);
                         emitBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 64, 8.4, topY + 0.42, topY + 0.76, adKey, adKey, [1.0, 1.0, 1.0]);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 70, 8.6, topY + 0.78, topY + 0.82, neonCol, 10);
+                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 70, 8.6, topY + 0.78, topY + 0.82, capCol, 5);
                         this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 0, topElev: topY + 0.82 });
                     } else if (bordersHigherTier) {
                         // ARCHETYPE 7: Stepped Building Setback Glass Solarium Conservatory & Split-AC Condenser Bank
                         emitAOShadow3D(cxPx, cyPx, wCos, wSin, 0, 0, 76, 44, topY, 0.36);
-                        emitTileBox3D(cxPx, cyPx, wCos, wSin, -12, 0, 44, 34, topY, topY + 0.28, 199, 199, 31, [0.92, 0.97, 1.00], false);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, -12, 0, 46, 36, topY + 0.28, topY + 0.32, [0.22, 0.88, 0.98], 7);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin,  22, -7, 16, 11, topY, topY + 0.18, [0.78, 0.82, 0.88], 6);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin,  22,  7, 16, 11, topY, topY + 0.18, [0.78, 0.82, 0.88], 6);
+                        emitTileBox3D(cxPx, cyPx, wCos, wSin, -12, 0, 44, 34, topY, topY + 0.28, 199, 199, 31, [0.86, 0.90, 0.94], false);
+                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, -12, 0, 46, 36, topY + 0.28, topY + 0.32, [0.20, 0.32, 0.42], 7);
+                        emitSolidBox3D(cxPx, cyPx, wCos, wSin,  22, -7, 16, 11, topY, topY + 0.18, [0.74, 0.78, 0.84], 6);
+                        emitSolidBox3D(cxPx, cyPx, wCos, wSin,  22,  7, 16, 11, topY, topY + 0.18, [0.74, 0.78, 0.84], 6);
                     } else {
                         // ARCHETYPE 8: Rooftop Elevator Stair Bulkhead, Twin Spinning-Style Exhaust Turbines & Satellite Dish
                         emitAOShadow3D(cxPx, cyPx, wCos, wSin, 0, 0, 72, 42, topY, 0.34);
-                        emitTileBox3D(cxPx, cyPx, wCos, wSin, -14, 0, 30, 28, topY, topY + 0.34, 172, 177, 86, [0.88, 0.86, 0.82], false);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, -14, 0, 32, 30, topY + 0.34, topY + 0.38, [0.28, 0.32, 0.40], 5);
+                        emitTileBox3D(cxPx, cyPx, wCos, wSin, -14, 0, 30, 28, topY, topY + 0.34, 172, 177, 86, [0.84, 0.82, 0.78], false);
+                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, -14, 0, 32, 30, topY + 0.34, topY + 0.38, [0.28, 0.32, 0.38], 5);
                         // Twin Cylindrical Metal Roof Ventilator Turbines + Parabolic Satellite Dish
                         const v1x = cxPx + wCos * 14 - wSin * (-8);
                         const v1y = cyPx + wSin * 14 + wCos * (-8);
                         const v2x = cxPx + wCos * 14 - wSin * 8;
                         const v2y = cyPx + wSin * 14 + wCos * 8;
-                        emitCylinder3D(v1x, v1y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 10, [0.84, 0.88, 0.94], 5, true);
-                        emitCylinder3D(v2x, v2y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 10, [0.84, 0.88, 0.94], 5, true);
+                        emitCylinder3D(v1x, v1y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 10, [0.78, 0.82, 0.88], 5, true);
+                        emitCylinder3D(v2x, v2y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 10, [0.78, 0.82, 0.88], 5, true);
                         const satX = cxPx + wCos * 26;
                         const satY = cyPx + wSin * 26;
-                        emitCylinder3D(satX, satY, 0, 0, 2.2, 1.8, topY, topY + 0.16, 8, [0.68, 0.72, 0.78], 5, false);
-                        emitCylinder3D(satX, satY, 0, 0, 4.0, 9.5, topY + 0.16, topY + 0.26, 12, [0.94, 0.96, 0.99], 9, true);
+                        emitCylinder3D(satX, satY, 0, 0, 2.2, 1.8, topY, topY + 0.16, 8, [0.64, 0.68, 0.74], 5, false);
+                        emitCylinder3D(satX, satY, 0, 0, 4.0, 9.5, topY + 0.16, topY + 0.26, 12, [0.88, 0.90, 0.94], 2, true);
                     }
                 }
             }
@@ -6170,14 +6200,14 @@ class WorldObjectEngine {
                 const wallY = (dr + 0.5 - bDirY * 0.44) * TILE_SIZE;
                 const canX = wallX + bDirX * 11.0;
                 const canY = wallY + bDirY * 11.0;
-                const neonCol = artDecoPal[i % artDecoPal.length];
+                const capCol = copingCapPal[i % copingCapPal.length];
                 const adKey = bladeAdKeys[i % bladeAdKeys.length];
 
-                // Overhead 3D Illuminated Entrance Marquee Canopy (z = 2.42..2.52) + Signboard Header (z = 2.52..2.84)
-                emitSolidBox3D(canX, canY, pCos, pSin, 0, 0, 54, 22, 2.42, 2.49, [0.16, 0.20, 0.28], 9);
-                emitSolidBox3D(canX, canY, pCos, pSin, 0, 0, 56, 24, 2.49, 2.53, neonCol, 10);
+                // Overhead 3D Architectural Entrance Marquee Canopy (z = 2.42..2.52) + Signboard Header (z = 2.52..2.84)
+                emitSolidBox3D(canX, canY, pCos, pSin, 0, 0, 54, 22, 2.42, 2.49, [0.18, 0.22, 0.28], 5);
+                emitSolidBox3D(canX, canY, pCos, pSin, 0, 0, 56, 24, 2.49, 2.53, capCol, 2);
                 emitBox3D(wallX + bDirX * 6.0, wallY + bDirY * 6.0, pCos, pSin, 0, 0, 48, 8.5, 2.53, 2.84, adKey, adKey, [1.0, 1.0, 1.0]);
-                emitSolidBox3D(wallX + bDirX * 6.0, wallY + bDirY * 6.0, pCos, pSin, 0, 0, 50, 9.5, 2.84, 2.88, [1.00, 0.84, 0.24], 10);
+                emitSolidBox3D(wallX + bDirX * 6.0, wallY + bDirY * 6.0, pCos, pSin, 0, 0, 50, 9.5, 2.84, 2.88, capCol, 5);
             }
         }
 

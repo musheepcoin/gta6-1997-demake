@@ -573,20 +573,37 @@ class RetroRenderer {
                         }
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
                         float isElevatedRoof = step(2.85, vWorldPos.y);
-                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.024, 0.0, 0.06) * (1.0 - sandMask * 0.85);
-                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.11 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
-                        sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
                         if (isElevatedRoof > 0.5 && waterCoverage < 0.05) {
-                            // GTA 6 Architectural Rooftop Deck Relief: prevent cream/yellow highlight blow-out,
-                            // add 32px paver/membrane expansion seams, perimeter drainage channel & micro-gravel texture
-                            vec2 rf = fract(vWorldPos.xz);
-                            vec2 subRf = fract(vWorldPos.xz * 2.0);
-                            float outerDrain = smoothstep(0.03, 0.075, min(min(rf.x, 1.0 - rf.x), min(rf.y, 1.0 - rf.y)));
-                            float expJoint = smoothstep(0.025, 0.055, min(min(subRf.x, 1.0 - subRf.x), min(subRf.y, 1.0 - subRf.y)));
-                            float roofGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.035;
-                            float hiComp = smoothstep(0.76, 0.98, max(sunlitRgb.r, sunlitRgb.g)) * 0.09;
-                            sunlitRgb = (sunlitRgb - hiComp + roofGrain) * mix(0.88, 1.0, outerDrain) * mix(0.93, 1.0, expJoint);
+                            // Preserve turquoise rooftop swimming pools (lid 35), but replace all blurry 1997
+                            // diamond-checkerboard / purple / yellow roof tiles with a crisp procedural GTA 6 architectural roof deck!
+                            float isPoolRoof = step(0.18, c.b - c.r) * step(0.12, c.g - c.r);
+                            if (isPoolRoof < 0.5) {
+                                float roofLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                                float tierSeed = fract(floor(vWorldPos.y + 0.1) * 0.37);
+                                vec3 archDeckBase = mix(
+                                    vec3(0.76, 0.74, 0.69), // Warm architectural travertine/concrete slab
+                                    vec3(0.64, 0.66, 0.69), // Weathered precast slate-concrete membrane
+                                    tierSeed
+                                );
+                                // Keep only 14% of underlying tile luminance so the blurry 1997 2x2 diamonds & pink/yellow tints vanish
+                                vec3 cleanRoof = archDeckBase * (0.90 + 0.14 * (roofLum - 0.5));
+                                vec2 rf = fract(vWorldPos.xz);
+                                vec2 subRf = fract(vWorldPos.xz * 2.0);
+                                float edgeD = min(min(rf.x, 1.0 - rf.x), min(rf.y, 1.0 - rf.y));
+                                float subD  = min(min(subRf.x, 1.0 - subRf.x), min(subRf.y, 1.0 - subRf.y));
+                                float outerGutter = smoothstep(0.025, 0.075, edgeD);
+                                float paverJoint  = smoothstep(0.020, 0.052, subD);
+                                float paverBevel  = smoothstep(0.052, 0.085, subD) - smoothstep(0.085, 0.12, subD);
+                                float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.042;
+                                float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.024;
+                                c.rgb = (cleanRoof + fineGrain + medGrain + paverBevel * 0.022)
+                                    * mix(0.84, 1.0, outerGutter)
+                                    * mix(0.89, 1.0, paverJoint);
+                            }
                         }
+                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.018, 0.0, 0.045) * (1.0 - sandMask * 0.85);
+                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.10 * (1.0 - totalShade) * (1.0 - sandMask * 0.7)) + 0.5, 0.0, 1.0);
+                        sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
                         c.rgb = mix(c.rgb, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
                     }
 
@@ -640,27 +657,40 @@ class RetroRenderer {
 
                     float sunDot = dot(wallNormal, uSunDir);
                     float wallSunFactor = clamp(sunDot * 0.5 + 0.5, 0.0, 1.0);
-                    vec3 wallDayTint = mix(vec3(0.74, 0.82, 0.96), vec3(1.14, 1.06, 0.94), wallSunFactor);
+                    vec3 wallDayTint = mix(vec3(0.76, 0.82, 0.92), vec3(1.10, 1.05, 0.96), wallSunFactor);
                     vec3 wallShade = mix(vec3(1.0 + sunDot * 0.06), wallDayTint, dayAmt);
 
-                    // Storey Cornice Ledge Highlight, Under-Eyebrow Shadow, Vertical Pilaster Fluting & Street-Level Plinth AO
+                    // Eliminate any synthwave purple / magenta / hot-pink / neon-cyan hue on vertical building walls
+                    float wallLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                    float isGlass = clamp((c.b - c.r - 0.05) * 3.6, 0.0, 1.0);
+                    float purpleTint = clamp((min(c.r, c.b) - c.g + 0.02) * 4.5, 0.0, 1.0) * (1.0 - isGlass);
+                    vec3 stoneNeutral = vec3(wallLum * 1.04, wallLum * 0.99, wallLum * 0.92);
+                    c.rgb = mix(c.rgb, stoneNeutral, purpleTint);
+                    // Compress excessive masonry saturation so brick/stucco stays grounded and architectural
+                    vec3 masonryClean = mix(stoneNeutral, c.rgb, 0.62);
+                    c.rgb = mix(masonryClean, c.rgb, isGlass);
+                    // Deepen window glass into realistic dark architectural tinted glass
+                    vec3 archGlass = vec3(0.18, 0.27, 0.36) + vec3(0.18, 0.24, 0.30) * clamp(wallLum, 0.0, 0.85);
+                    c.rgb = mix(c.rgb, archGlass, isGlass * 0.72);
+
+                    // Storey Cornice Ledge Highlight, Under-Eyebrow Shadow, Vertical Pilaster Fluting, Micro-Stucco Grain & Plinth AO
                     float storeyY = fract(vWorldPos.y);
                     float wallHoriz = fract(vWorldPos.x + vWorldPos.z);
                     float pilaster = mix(0.91, 1.02, smoothstep(0.04, 0.12, min(wallHoriz, 1.0 - wallHoriz)));
                     float corniceLight = 1.0 + 0.08 * smoothstep(0.91, 0.97, storeyY) - 0.10 * (smoothstep(0.80, 0.86, storeyY) - smoothstep(0.86, 0.92, storeyY));
                     float baseAO = mix(0.82, 1.0, smoothstep(0.0, 0.30, storeyY)) * mix(0.80, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
+                    float stuccoGrain = (fract(sin(dot(floor(vec2(wallHoriz, storeyY) * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.032 * (1.0 - isGlass);
 
                     // Daytime GTA 6 Parallax-Style Window Interior Depth (Venetian blinds/curtains) & Miami Sky Fresnel Glint
-                    float isGlass = clamp((c.b - c.r - 0.04) * 3.4, 0.0, 1.0);
                     vec3 roomId = floor(vWorldPos * vec3(2.0, 1.0, 2.0));
                     float rSeed = fract(sin(dot(roomId, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
                     float blindLevel = 0.45 + 0.40 * rSeed;
                     float inBlind = step(blindLevel, fract(storeyY * 2.0)) * step(0.35, rSeed);
                     float slatWave = 0.88 + 0.12 * sin(storeyY * 96.0);
-                    vec3 blindCol = mix(vec3(0.82, 0.78, 0.70), vec3(0.58, 0.76, 0.88), step(0.68, rSeed)) * slatWave;
-                    c.rgb = mix(c.rgb, blindCol, isGlass * inBlind * 0.34 * dayAmt);
+                    vec3 blindCol = mix(vec3(0.76, 0.73, 0.67), vec3(0.54, 0.64, 0.72), step(0.68, rSeed)) * slatWave;
+                    c.rgb = mix(c.rgb + stuccoGrain, blindCol, isGlass * inBlind * 0.30 * dayAmt);
 
-                    vec3 skyGlint = vec3(0.11, 0.17, 0.24) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.32, 0.0, 1.0) * (0.38 + 0.62 * wallSunFactor);
+                    vec3 skyGlint = vec3(0.09, 0.14, 0.20) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.30, 0.0, 1.0) * (0.38 + 0.62 * wallSunFactor);
                     c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO * pilaster * corniceLight + skyGlint);
                 }
 
@@ -3688,10 +3718,10 @@ class RetroRenderer {
                 ctx.putImageData(tileImg, x0, y0);
             }
 
-            // 3. GTA 6 Building Rooftop Deck Remaster (lid 46, 48, 51, 86 across both remap banks 390+lid and 544+lid):
-            //    Replaces washed-out 1997 pastel-yellow 2x2 checkerboards with crisp architectural roof-deck pavers,
-            //    recessed perimeter drainage gutters, 16px expansion joints, and subtle gravel/terrazzo micro-relief!
-            const roofLids = [46, 48, 51, 86];
+            // 3. GTA 6 Building Rooftop Deck Remaster (all building roof lids across both remap banks 390+lid and 544+lid):
+            //    Replaces blurry 1997 2x2 diamond-checkerboards & purple/yellow hue-shifted roofs with crisp architectural
+            //    concrete/travertine roof-deck slabs, recessed perimeter drainage gutters, 16px expansion joints, and aggregate grain!
+            const roofLids = [31, 45, 46, 48, 51, 64, 71, 86, 87];
             for (const lid of roofLids) {
                 for (const base of [390, 544]) {
                     const idx = base + lid;
@@ -3703,26 +3733,28 @@ class RetroRenderer {
 
                     const tileImg = ctx.getImageData(x0, y0, 64, 64);
                     const td = tileImg.data;
+                    const isWarmRoof = (lid === 46 || lid === 48 || lid === 51);
+                    const baseR = isWarmRoof ? 194 : 172;
+                    const baseG = isWarmRoof ? 188 : 176;
+                    const baseB = isWarmRoof ? 176 : 182;
                     for (let ty = 0; ty < 64; ty++) {
                         for (let tx = 0; tx < 64; tx++) {
                             const p = (ty * 64 + tx) * 4;
-                            let r = td[p], g = td[p + 1], b = td[p + 2];
-                            // Compress overly bright yellow/cream pixels toward warm Miami architectural limestone/travertine
-                            if (r > 215 && g > 195) {
-                                r = Math.round(206 + (r - 215) * 0.42);
-                                g = Math.round(192 + (g - 195) * 0.42);
-                                b = Math.round(Math.max(b, 168) + (210 - Math.max(b, 168)) * 0.25);
-                            }
+                            const origLum = (td[p] * 0.299 + td[p + 1] * 0.587 + td[p + 2] * 0.114) - 128.0;
+                            // Eliminate the blurry 1997 2x2 diamond gradient & any pink/purple/yellow tint
+                            let r = baseR + origLum * 0.14;
+                            let g = baseG + origLum * 0.14;
+                            let b = baseB + origLum * 0.14;
                             const edgeDist = Math.min(tx, 63 - tx, ty, 63 - ty);
                             const isGutter = (edgeDist === 1 || edgeDist === 2);
                             const isSubSeam = ((tx & 15) === 0 || (ty & 15) === 0) && edgeDist > 2;
                             const isHighlight = ((tx & 15) === 1 || (ty & 15) === 1) && edgeDist > 2;
                             const hash = (((tx * 73856093) ^ (ty * 19349663) ^ (lid * 83492791)) >>> 0) % 13 - 6;
                             let mul = 1.0;
-                            if (edgeDist === 0) mul = 0.82;
-                            else if (isGutter) mul = 0.89;
-                            else if (isSubSeam) mul = 0.90;
-                            else if (isHighlight) mul = 1.04;
+                            if (edgeDist === 0) mul = 0.80;
+                            else if (isGutter) mul = 0.88;
+                            else if (isSubSeam) mul = 0.89;
+                            else if (isHighlight) mul = 1.03;
                             td[p]     = Math.max(0, Math.min(255, Math.round(r * mul + hash)));
                             td[p + 1] = Math.max(0, Math.min(255, Math.round(g * mul + hash)));
                             td[p + 2] = Math.max(0, Math.min(255, Math.round(b * mul + hash)));
@@ -3733,9 +3765,9 @@ class RetroRenderer {
             }
 
             // 4. GTA 6 3D Building Facade Wall Tile Remaster (side tiles 0..389 in rows 0..24):
-            //    Adds 3D recessed window frame top/left shadows, projecting sunlit bottom window sills,
-            //    diagonal Miami sky-reflection glass sheen, and crisp masonry/stucco course micro-relief
-            //    (automatically skips alpha-cutout truss/fence/ladder tiles so cutouts stay razor-sharp).
+            //    Eliminates synthwave purple/magenta/pink/cyan "Polly Pocket" hues on building walls,
+            //    converts windows into realistic dark architectural tinted glass with 3D recessed frames,
+            //    and adds crisp limestone/travertine/brick masonry course relief!
             const sideBandH = Math.min(h, 25 * 64);
             const sideImg = ctx.getImageData(0, 0, w, sideBandH);
             const sd = sideImg.data;
@@ -3766,7 +3798,7 @@ class RetroRenderer {
                     for (let tx = 0; tx < 64; tx++) {
                         const p = rowBase + tx * 4;
                         const r = sd[p], g = sd[p + 1], b = sd[p + 2];
-                        glassMask[ty * 64 + tx] = (b > r + 15 && b > 78 && g > r * 0.82) ? 1 : 0;
+                        glassMask[ty * 64 + tx] = (b > r + 14 && b > 70) ? 1 : 0;
                     }
                 }
 
@@ -3775,42 +3807,60 @@ class RetroRenderer {
                     for (let tx = 0; tx < 64; tx++) {
                         const p = rowBase + tx * 4;
                         let r = sd[p], g = sd[p + 1], b = sd[p + 2];
+                        const lum = r * 0.299 + g * 0.587 + b * 0.114;
                         const isG = glassMask[ty * 64 + tx] === 1;
 
                         if (isG) {
+                            // Remap bright cyan / purple 1997 window pixels to deep GTA 6 architectural tinted glass
+                            const gLum = Math.min(180, Math.max(36, lum * 0.65));
+                            r = Math.round(36 + gLum * 0.26);
+                            g = Math.round(54 + gLum * 0.38);
+                            b = Math.round(74 + gLum * 0.48);
+
                             const topFrame  = (ty > 0  && glassMask[(ty - 1) * 64 + tx] === 0);
                             const leftFrame = (tx > 0  && glassMask[ty * 64 + (tx - 1)] === 0);
                             const botSill   = (ty < 63 && glassMask[(ty + 1) * 64 + tx] === 0);
                             if (topFrame || leftFrame) {
                                 // Deep 3D recessed window casing shadow
                                 r = Math.round(r * 0.68);
-                                g = Math.round(g * 0.72);
-                                b = Math.round(b * 0.78);
+                                g = Math.round(g * 0.70);
+                                b = Math.round(b * 0.74);
                             } else if (botSill) {
                                 // Sunlit bottom window sill reflection
-                                r = Math.min(255, r + 22);
+                                r = Math.min(255, r + 24);
                                 g = Math.min(255, g + 26);
-                                b = Math.min(255, b + 30);
+                                b = Math.min(255, b + 28);
                             } else {
-                                // Diagonal Miami sky-reflection glint & vertical sky gradient
-                                const diagStreak = (((tx + ty) & 15) === 3 || ((tx + ty) & 15) === 4) ? 12 : 0;
-                                const skyBoost = Math.round((1.0 - (ty & 15) / 15.0) * 10) + diagStreak;
-                                r = Math.min(255, Math.max(0, r + Math.round(skyBoost * 0.55)));
-                                g = Math.min(255, Math.max(0, g + Math.round(skyBoost * 0.85)));
-                                b = Math.min(255, Math.max(0, b + skyBoost));
+                                // Subtle diagonal architectural glass reflection
+                                const diagStreak = (((tx + ty) & 15) === 3 || ((tx + ty) & 15) === 4) ? 10 : 0;
+                                const skyBoost = Math.round((1.0 - (ty & 15) / 15.0) * 8) + diagStreak;
+                                r = Math.min(255, r + Math.round(skyBoost * 0.60));
+                                g = Math.min(255, g + Math.round(skyBoost * 0.82));
+                                b = Math.min(255, b + skyBoost);
                             }
                         } else {
-                            // Masonry / Stucco / Terracotta wall pixel: add 3D window-sill under-shadow & course relief
+                            // Neutralize purple / magenta / pink / violet hue shifts into natural warm limestone & concrete
+                            if (b > g + 6 || (r > g + 20 && b > g - 6)) {
+                                r = Math.round(lum * 1.05);
+                                g = Math.round(lum * 1.00);
+                                b = Math.round(lum * 0.92);
+                            } else {
+                                // Desaturate overly bright orange/yellow masonry toward grounded architectural sandstone/brick
+                                r = Math.round(lum * 0.42 + r * 0.58);
+                                g = Math.round(lum * 0.42 + g * 0.58);
+                                b = Math.round(lum * 0.42 + b * 0.58);
+                            }
                             const aboveIsGlass = (ty > 0 && glassMask[(ty - 1) * 64 + tx] === 1);
                             const courseLine = ((ty & 7) === 0);
+                            const grain = (((tx * 73856093) ^ (ty * 19349663) ^ (idx * 83492791)) >>> 0) % 9 - 4;
                             let mul = 1.0;
-                            if (aboveIsGlass) mul = 1.09; // Bright projecting window sill cap below glass
-                            else if (ty === 0) mul = 0.85;
-                            else if (ty === 63) mul = 0.88;
-                            else if (courseLine) mul = 0.94;
-                            r = Math.min(255, Math.max(0, Math.round(r * mul)));
-                            g = Math.min(255, Math.max(0, Math.round(g * mul)));
-                            b = Math.min(255, Math.max(0, Math.round(b * mul)));
+                            if (aboveIsGlass) mul = 1.08; // Projecting stone window sill cap below glass
+                            else if (ty === 0) mul = 0.86;
+                            else if (ty === 63) mul = 0.89;
+                            else if (courseLine) mul = 0.95;
+                            r = Math.min(255, Math.max(0, Math.round(r * mul + grain)));
+                            g = Math.min(255, Math.max(0, Math.round(g * mul + grain)));
+                            b = Math.min(255, Math.max(0, Math.round(b * mul + grain)));
                         }
 
                         sd[p]     = r;
