@@ -8022,19 +8022,38 @@ class RetroRenderer {
         lctx.globalCompositeOperation = "lighter";
         lctx.globalAlpha = lightInt;
 
+        if (!this._lightStampCache) {
+            this._lightStampCache = new Map();
+        }
+        const getLightStamp = (key, stops) => {
+            let stamp = this._lightStampCache.get(key);
+            if (!stamp) {
+                stamp = document.createElement("canvas");
+                stamp.width = 64;
+                stamp.height = 64;
+                const sctx = stamp.getContext("2d");
+                const g = sctx.createRadialGradient(32, 32, stops[0][0] * 32, 32, 32, 32);
+                for (let i = 0; i < stops.length; i++) {
+                    g.addColorStop(stops[i][1], stops[i][2]);
+                }
+                sctx.fillStyle = g;
+                sctx.fillRect(0, 0, 64, 64);
+                this._lightStampCache.set(key, stamp);
+            }
+            return stamp;
+        };
+
         const addLightPool = (sx, sy, radPx, innerCol, midCol) => {
             const x = sx * scale;
             const y = sy * scale;
             const r = Math.max(4, radPx * scale);
             if (x + r < 0 || x - r > lw || y + r < 0 || y - r > lh) return;
-            const g = lctx.createRadialGradient(x, y, r * 0.05, x, y, r);
-            g.addColorStop(0.0, innerCol);
-            g.addColorStop(0.48, midCol);
-            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-            lctx.fillStyle = g;
-            lctx.beginPath();
-            lctx.arc(x, y, r, 0, Math.PI * 2);
-            lctx.fill();
+            const stamp = getLightStamp(`pool|${innerCol}|${midCol}`, [
+                [0.05, 0.0, innerCol],
+                [0.05, 0.48, midCol],
+                [0.05, 1.0, "rgba(0, 0, 0, 0)"]
+            ]);
+            lctx.drawImage(stamp, x - r, y - r, r * 2, r * 2);
         };
 
         const addHeadlightCone = (sx, sy, angle, lenPx, spreadRad, baseHalfWPx, innerCol, midCol) => {
@@ -8226,11 +8245,12 @@ class RetroRenderer {
         }
 
         // 3B. Ocean Drive Art Deco Hotel Blade Neon Reflections, Royal Palm Uplighting & Española Way Festoons!
-        if (this.map && Array.isArray(this.map.vicePalms)) {
+        if (this.map && Array.isArray(this.map.vicePalms) && Math.abs(this.camX - 447.0 * 64) < 1200) {
             for (let pi = 0; pi < this.map.vicePalms.length; pi++) {
                 const pm = this.map.vicePalms[pi];
                 // Uplight Royal Palms along Ocean Drive & Lummus Park promenade (c = 442.5..451.8)
                 if (pm.x < 442.5 * 64 || pm.x > 451.8 * 64) continue;
+                if (Math.abs(pm.y - this.camY) > 680) continue;
                 const sc = this.worldToScreen(pm.x, pm.y, 2.08);
                 if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
                 const pxScale = (sc.scale * H) / 128.0;
@@ -8245,20 +8265,23 @@ class RetroRenderer {
             }
         }
         // Ocean Drive Hotel Neon Blade Reflections across the West Curb & Asphalt (every 8 rows, r = 44..356)
-        for (let r = 44; r <= 356; r += 8) {
-            const bx = 443.6 * 64;
-            const by = (r + 0.5) * 64;
-            const sc = this.worldToScreen(bx, by, 2.02);
-            if (sc.x < -160 || sc.x > W + 160 || sc.y < -160 || sc.y > H + 160) continue;
-            const pxScale = (sc.scale * H) / 128.0;
-            const isCyan = ((r / 8) % 2) === 0;
-            addLightPool(
-                sc.x,
-                sc.y,
-                92 * pxScale,
-                isCyan ? "rgba(30, 240, 255, 0.82)" : "rgba(255, 65, 195, 0.82)",
-                isCyan ? "rgba(0, 175, 235, 0.32)" : "rgba(210, 20, 145, 0.32)"
-            );
+        if (Math.abs(this.camX - 443.6 * 64) < 1050) {
+            for (let r = 44; r <= 356; r += 8) {
+                const by = (r + 0.5) * 64;
+                if (Math.abs(by - this.camY) > 700) continue;
+                const bx = 443.6 * 64;
+                const sc = this.worldToScreen(bx, by, 2.02);
+                if (sc.x < -160 || sc.x > W + 160 || sc.y < -160 || sc.y > H + 160) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                const isCyan = ((r / 8) % 2) === 0;
+                addLightPool(
+                    sc.x,
+                    sc.y,
+                    92 * pxScale,
+                    isCyan ? "rgba(30, 240, 255, 0.82)" : "rgba(255, 65, 195, 0.82)",
+                    isCyan ? "rgba(0, 175, 235, 0.32)" : "rgba(210, 20, 145, 0.32)"
+                );
+            }
         }
 
         // 4. Lucia & Jason Subtle Visibility Halo (plus Muzzle Flash light when firing!)
@@ -8511,38 +8534,32 @@ class RetroRenderer {
             for (const f of highResFlares) {
                 const r = Math.max(2, f.r);
                 if (f.isLampHalo) {
-                    // Progressive, warm golden-yellow radial halo around the 3D luminaire bulb
-                    // (keeps alpha balanced so the 3D WebGL pole, gusset bracket & cobra-head hood remain crisp!)
-                    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
-                    if (f.warmSodium) {
-                        g.addColorStop(0.00, "rgba(255, 238, 155, 0.44)");
-                        g.addColorStop(0.20, "rgba(255, 208, 86, 0.25)");
-                        g.addColorStop(0.46, "rgba(248, 176, 46, 0.11)");
-                        g.addColorStop(0.75, "rgba(238, 148, 26, 0.04)");
-                        g.addColorStop(1.00, "rgba(238, 148, 26, 0.0)");
-                    } else {
-                        g.addColorStop(0.00, "rgba(255, 245, 175, 0.46)");
-                        g.addColorStop(0.20, "rgba(255, 218, 96, 0.26)");
-                        g.addColorStop(0.46, "rgba(252, 188, 54, 0.12)");
-                        g.addColorStop(0.75, "rgba(245, 162, 30, 0.04)");
-                        g.addColorStop(1.00, "rgba(245, 162, 30, 0.0)");
-                    }
-                    ctx.fillStyle = g;
-                    ctx.beginPath();
-                    ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-                    ctx.fill();
+                    const stamp = f.warmSodium
+                        ? getLightStamp("halo|sodium", [
+                            [0.0, 0.00, "rgba(255, 238, 155, 0.44)"],
+                            [0.0, 0.20, "rgba(255, 208, 86, 0.25)"],
+                            [0.0, 0.46, "rgba(248, 176, 46, 0.11)"],
+                            [0.0, 0.75, "rgba(238, 148, 26, 0.04)"],
+                            [0.0, 1.00, "rgba(238, 148, 26, 0.0)"]
+                        ])
+                        : getLightStamp("halo|mercury", [
+                            [0.0, 0.00, "rgba(255, 245, 175, 0.46)"],
+                            [0.0, 0.20, "rgba(255, 218, 96, 0.26)"],
+                            [0.0, 0.46, "rgba(252, 188, 54, 0.12)"],
+                            [0.0, 0.75, "rgba(245, 162, 30, 0.04)"],
+                            [0.0, 1.00, "rgba(245, 162, 30, 0.0)"]
+                        ]);
+                    ctx.drawImage(stamp, f.x - r, f.y - r, r * 2, r * 2);
                     continue;
                 }
 
-                const g = ctx.createRadialGradient(f.x, f.y, r * 0.08, f.x, f.y, r);
-                g.addColorStop(0.0, "rgba(255, 252, 235, 0.92)");
-                g.addColorStop(0.32, f.col);
-                g.addColorStop(0.68, f.col.replace(/[\d.]+\)$/, "0.18)"));
-                g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-                ctx.fillStyle = g;
-                ctx.beginPath();
-                ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-                ctx.fill();
+                const stamp = getLightStamp(`flare|${f.col}`, [
+                    [0.08, 0.0, "rgba(255, 252, 235, 0.92)"],
+                    [0.08, 0.32, f.col],
+                    [0.08, 0.68, f.col.replace(/[\d.]+\)$/, "0.18)")],
+                    [0.08, 1.0, "rgba(0, 0, 0, 0)"]
+                ]);
+                ctx.drawImage(stamp, f.x - r, f.y - r, r * 2, r * 2);
             }
         }
 

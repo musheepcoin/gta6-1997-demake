@@ -5761,6 +5761,18 @@ class LeonidaGame {
 
         const directAngle = Math.atan2(targetY - ped.y, targetX - ped.x);
 
+        // Reuse cached clear steering on alternate frames for distant/unobstructed pedestrians to save CPU raycasts
+        if (ped._lastFeelerClear && ped._cachedSteerAngle !== undefined) {
+            ped._feelerTick = ((ped._feelerTick || 0) + 1) & 1;
+            const isFarFromPlayer = this.player && (Math.abs(ped.x - this.player.x) > 420 || Math.abs(ped.y - this.player.y) > 320);
+            if (ped._feelerTick === 1 || (isFarFromPlayer && ((ped._feelerFarTick = ((ped._feelerFarTick || 0) + 1) & 3) !== 0))) {
+                const diffDirect = Math.abs(Math.atan2(Math.sin(directAngle - ped._cachedDirectAngle), Math.cos(directAngle - ped._cachedDirectAngle)));
+                if (diffDirect < 0.18) {
+                    return directAngle;
+                }
+            }
+        }
+
         const offsets = [0, 0.30, -0.30, 0.62, -0.62, 0.98, -0.98, 1.38, -1.38, 1.85, -1.85, 2.35, -2.35];
 
         const pz = ped.z !== undefined ? ped.z : 2.0;
@@ -5770,6 +5782,8 @@ class LeonidaGame {
         let bestAngle = directAngle;
 
         let bestScore = -9999;
+
+        let zeroOffsetClear = false;
 
 
 
@@ -5784,7 +5798,8 @@ class LeonidaGame {
             const turnFromCur = Math.abs(Math.atan2(Math.sin(cand - curHeading), Math.cos(cand - curHeading)));
 
             // Hysteresis term (-turnFromCur * 0.45) keeps the pedestrian committed to one side of an obstacle without fluttering
-            let score = -Math.abs(off) * 1.35 - turnFromCur * 0.45;
+            const baseScore = -Math.abs(off) * 1.35 - turnFromCur * 0.45;
+            let score = baseScore;
 
             const p1x = ped.x + cCos * 16;
 
@@ -5862,7 +5877,20 @@ class LeonidaGame {
 
             }
 
+            // Early exit: if straight ahead (off === 0) hit zero obstacles and requires minimal turning,
+            // no deflected feeler (|off| >= 0.30, max possible score <= -0.405) can mathematically beat it!
+            if (off === 0 && score === baseScore) {
+                zeroOffsetClear = true;
+                if (turnFromCur < 0.85) {
+                    break;
+                }
+            }
+
         }
+
+        ped._lastFeelerClear = zeroOffsetClear && bestAngle === directAngle;
+        ped._cachedSteerAngle = bestAngle;
+        ped._cachedDirectAngle = directAngle;
 
         return bestAngle;
 
@@ -8192,6 +8220,55 @@ class LeonidaGame {
         let hit = false;
         let curX = x;
         let curY = y;
+        const rSq = radius * radius;
+        const cache = this._stoppedVehCache;
+        if (cache) {
+            for (let i = 0; i < cache.length; i++) {
+                const vc = cache[i];
+                if (vc.v === ignoreVeh) continue;
+                const dx = curX - vc.x;
+                if (dx > 54 || dx < -54) continue;
+                const dy = curY - vc.y;
+                if (dy > 54 || dy < -54) continue;
+                if (vc.z !== undefined && z !== undefined && Math.abs(vc.z - z) > 0.85) continue;
+
+                const cosA = vc.cosA;
+                const sinA = vc.sinA;
+                const localX = dx * cosA + dy * sinA;
+                const localY = -dx * sinA + dy * cosA;
+                const halfL = vc.halfL;
+                const halfW = vc.halfW;
+
+                const clampedX = Math.max(-halfL, Math.min(halfL, localX));
+                const clampedY = Math.max(-halfW, Math.min(halfW, localY));
+                const ox = localX - clampedX;
+                const oy = localY - clampedY;
+                const distSq = ox * ox + oy * oy;
+
+                if (distSq < rSq) {
+                    hit = true;
+                    let newLocalX = localX;
+                    let newLocalY = localY;
+                    if (distSq > 0.0001) {
+                        const dist = Math.sqrt(distSq);
+                        newLocalX = clampedX + (ox / dist) * radius;
+                        newLocalY = clampedY + (oy / dist) * radius;
+                    } else {
+                        const penL = halfL - Math.abs(localX);
+                        const penW = halfW - Math.abs(localY);
+                        if (penW <= penL) {
+                            newLocalY = (localY >= 0 ? 1 : -1) * (halfW + radius);
+                        } else {
+                            newLocalX = (localX >= 0 ? 1 : -1) * (halfL + radius);
+                        }
+                    }
+                    curX = vc.x + newLocalX * cosA - newLocalY * sinA;
+                    curY = vc.y + newLocalX * sinA + newLocalY * cosA;
+                }
+            }
+            return { hit, x: curX, y: curY };
+        }
+
         for (let i = 0; i < this.vehicles.length; i++) {
             const v = this.vehicles[i];
             if (!v || v === ignoreVeh) continue;
@@ -8219,7 +8296,7 @@ class LeonidaGame {
             const oy = localY - clampedY;
             const distSq = ox * ox + oy * oy;
 
-            if (distSq < radius * radius) {
+            if (distSq < rSq) {
                 hit = true;
                 let newLocalX = localX;
                 let newLocalY = localY;
@@ -10271,6 +10348,26 @@ class LeonidaGame {
 
 
         // 6. Pedestrians, GOURANGA Monk Chain, Alligators, Hostile Carjackers & VCPD Foot Officers Update
+        // Pre-cache stationary / slow / parked vehicle OBB transforms once per frame to eliminate thousands of trig/hypot calls in pedestrian feelers
+        if (!this._stoppedVehCache) this._stoppedVehCache = [];
+        this._stoppedVehCache.length = 0;
+        for (let i = 0; i < this.vehicles.length; i++) {
+            const v = this.vehicles[i];
+            if (!v) continue;
+            const vx = v.vx || 0;
+            const vy = v.vy || 0;
+            if (!v.destroyed && v.driver !== null && (vx * vx + vy * vy) > 3364) continue; // 58^2 = 3364
+            this._stoppedVehCache.push({
+                v,
+                x: v.x,
+                y: v.y,
+                z: v.z,
+                cosA: Math.cos(v.angle),
+                sinA: Math.sin(v.angle),
+                halfL: (v.w || 46) * 0.44,
+                halfW: (v.h || 22) * 0.42
+            });
+        }
 
         const isClientWorldSync = Boolean(
 

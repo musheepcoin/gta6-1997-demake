@@ -4228,6 +4228,68 @@ class LeonidaMap {
     }
 
     /* ========================================================================
+       SPATIAL HASH GRIDS FOR SECURITY BARRIER BOXES & FENCE SPANS (128px CELLS)
+       Eliminates ~800+ full-array iterations per collision call!
+       ======================================================================== */
+    ensureBarrierSpatialGrids() {
+        const boxList = this.securityBarrierBoxes;
+        if (boxList && boxList.length > 0 && (this._barrierGridCount !== boxList.length || !this.barrierBoxGrid)) {
+            const grid = new Map();
+            const pad = 28;
+            for (let i = 0; i < boxList.length; i++) {
+                const bb = boxList[i];
+                const gx0 = Math.floor((bb.minX - pad) / 128);
+                const gx1 = Math.floor((bb.maxX + pad) / 128);
+                const gy0 = Math.floor((bb.minY - pad) / 128);
+                const gy1 = Math.floor((bb.maxY + pad) / 128);
+                for (let gy = gy0; gy <= gy1; gy++) {
+                    for (let gx = gx0; gx <= gx1; gx++) {
+                        const key = (gx << 16) | (gy & 0xffff);
+                        let cell = grid.get(key);
+                        if (!cell) {
+                            cell = [];
+                            grid.set(key, cell);
+                        }
+                        cell.push(bb);
+                    }
+                }
+            }
+            this.barrierBoxGrid = grid;
+            this._barrierGridCount = boxList.length;
+        }
+
+        const spanList = this.securityFenceSpans;
+        if (spanList && spanList.length > 0 && (this._fenceGridCount !== spanList.length || !this.fenceSpanGrid)) {
+            const grid = new Map();
+            const pad = 34;
+            for (let i = 0; i < spanList.length; i++) {
+                const sp = spanList[i];
+                const minX = Math.min(sp.xA, sp.xB);
+                const maxX = Math.max(sp.xA, sp.xB);
+                const minY = Math.min(sp.yA, sp.yB);
+                const maxY = Math.max(sp.yA, sp.yB);
+                const gx0 = Math.floor((minX - pad) / 128);
+                const gx1 = Math.floor((maxX + pad) / 128);
+                const gy0 = Math.floor((minY - pad) / 128);
+                const gy1 = Math.floor((maxY + pad) / 128);
+                for (let gy = gy0; gy <= gy1; gy++) {
+                    for (let gx = gx0; gx <= gx1; gx++) {
+                        const key = (gx << 16) | (gy & 0xffff);
+                        let cell = grid.get(key);
+                        if (!cell) {
+                            cell = [];
+                            grid.set(key, cell);
+                        }
+                        cell.push(sp);
+                    }
+                }
+            }
+            this.fenceSpanGrid = grid;
+            this._fenceGridCount = spanList.length;
+        }
+    }
+
+    /* ========================================================================
        3D VOXEL BUILDING & SEAWALL / BRIDGE GUARDRAIL COLLISION SOLVER
        Checks solid building blocks AND blocks non-amphibious entities from
        crossing from roads, bridges, or sidewalks into WATER tiles.
@@ -4279,110 +4341,116 @@ class LeonidaMap {
             }
         }
 
-        // Physical collision against Solid Security Barrier Boxes (Leonida State Penitentiary Double-Fence Perimeter & Gatehouses)
-        if (this.securityBarrierBoxes && this.securityBarrierBoxes.length > 0 && (currentZBlocks === null || currentZBlocks < 2.8)) {
-            for (let pass = 0; pass < 2; pass++) {
-                for (let i = 0; i < this.securityBarrierBoxes.length; i++) {
-                    const bb = this.securityBarrierBoxes[i];
-                    if (bb.vehiclesOnly && radius < 11.5) continue;
-                    if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
+        if (currentZBlocks === null || currentZBlocks < 2.8) {
+            this.ensureBarrierSpatialGrids();
+            const cellKey = (Math.floor(nx / 128) << 16) | (Math.floor(ny / 128) & 0xffff);
 
-                    if (bb.cx !== undefined) {
-                        const relX = nx - bb.cx;
-                        const relY = ny - bb.cy;
-                        const lx = relX * bb.cosA + relY * bb.sinA;
-                        const ly = -relX * bb.sinA + relY * bb.cosA;
-                        const clX = Math.max(-bb.hw, Math.min(lx, bb.hw));
-                        const clY = Math.max(-bb.hh, Math.min(ly, bb.hh));
-                        const dlx = lx - clX;
-                        const dly = ly - clY;
-                        const distSq = dlx * dlx + dly * dly;
-                        if (distSq < radius * radius) {
-                            hit = true;
-                            let pushLX = 0;
-                            let pushLY = 0;
-                            if (distSq > 0.0001) {
-                                const dist = Math.sqrt(distSq);
-                                const overlap = radius - dist;
-                                pushLX = (dlx / dist) * overlap;
-                                pushLY = (dly / dist) * overlap;
-                            } else {
-                                const dLeft = lx + bb.hw;
-                                const dRight = bb.hw - lx;
-                                const dTop = ly + bb.hh;
-                                const dBot = bb.hh - ly;
-                                const m = Math.min(dLeft, dRight, dTop, dBot);
-                                if (m === dLeft) pushLX = -(dLeft + radius);
-                                else if (m === dRight) pushLX = dRight + radius;
-                                else if (m === dTop) pushLY = -(dTop + radius);
-                                else pushLY = dBot + radius;
+            // Physical collision against Solid Security Barrier Boxes (O(1) spatial cell lookup!)
+            const cellBoxes = this.barrierBoxGrid ? this.barrierBoxGrid.get(cellKey) : null;
+            if (cellBoxes) {
+                for (let pass = 0; pass < 2; pass++) {
+                    for (let i = 0; i < cellBoxes.length; i++) {
+                        const bb = cellBoxes[i];
+                        if (bb.vehiclesOnly && radius < 11.5) continue;
+                        if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
+
+                        if (bb.cx !== undefined) {
+                            const relX = nx - bb.cx;
+                            const relY = ny - bb.cy;
+                            const lx = relX * bb.cosA + relY * bb.sinA;
+                            const ly = -relX * bb.sinA + relY * bb.cosA;
+                            const clX = Math.max(-bb.hw, Math.min(lx, bb.hw));
+                            const clY = Math.max(-bb.hh, Math.min(ly, bb.hh));
+                            const dlx = lx - clX;
+                            const dly = ly - clY;
+                            const distSq = dlx * dlx + dly * dly;
+                            if (distSq < radius * radius) {
+                                hit = true;
+                                let pushLX = 0;
+                                let pushLY = 0;
+                                if (distSq > 0.0001) {
+                                    const dist = Math.sqrt(distSq);
+                                    const overlap = radius - dist;
+                                    pushLX = (dlx / dist) * overlap;
+                                    pushLY = (dly / dist) * overlap;
+                                } else {
+                                    const dLeft = lx + bb.hw;
+                                    const dRight = bb.hw - lx;
+                                    const dTop = ly + bb.hh;
+                                    const dBot = bb.hh - ly;
+                                    const m = Math.min(dLeft, dRight, dTop, dBot);
+                                    if (m === dLeft) pushLX = -(dLeft + radius);
+                                    else if (m === dRight) pushLX = dRight + radius;
+                                    else if (m === dTop) pushLY = -(dTop + radius);
+                                    else pushLY = dBot + radius;
+                                }
+                                nx += pushLX * bb.cosA - pushLY * bb.sinA;
+                                ny += pushLX * bb.sinA + pushLY * bb.cosA;
                             }
-                            nx += pushLX * bb.cosA - pushLY * bb.sinA;
-                            ny += pushLX * bb.sinA + pushLY * bb.cosA;
-                        }
-                    } else {
-                        const clX = Math.max(bb.minX, Math.min(nx, bb.maxX));
-                        const clY = Math.max(bb.minY, Math.min(ny, bb.maxY));
-                        const ddx = nx - clX;
-                        const ddy = ny - clY;
-                        const distSq = ddx * ddx + ddy * ddy;
+                        } else {
+                            const clX = Math.max(bb.minX, Math.min(nx, bb.maxX));
+                            const clY = Math.max(bb.minY, Math.min(ny, bb.maxY));
+                            const ddx = nx - clX;
+                            const ddy = ny - clY;
+                            const distSq = ddx * ddx + ddy * ddy;
 
-                        if (distSq < radius * radius) {
-                            hit = true;
-                            if (distSq > 0.0001) {
-                                const dist = Math.sqrt(distSq);
-                                const overlap = radius - dist;
-                                nx += (ddx / dist) * overlap;
-                                ny += (ddy / dist) * overlap;
-                            } else {
-                                // Center is inside the box: push out along nearest face
-                                const dLeft = nx - bb.minX;
-                                const dRight = bb.maxX - nx;
-                                const dTop = ny - bb.minY;
-                                const dBot = bb.maxY - ny;
-                                const m = Math.min(dLeft, dRight, dTop, dBot);
-                                if (m === dLeft) nx = bb.minX - radius;
-                                else if (m === dRight) nx = bb.maxX + radius;
-                                else if (m === dTop) ny = bb.minY - radius;
-                                else ny = bb.maxY + radius;
+                            if (distSq < radius * radius) {
+                                hit = true;
+                                if (distSq > 0.0001) {
+                                    const dist = Math.sqrt(distSq);
+                                    const overlap = radius - dist;
+                                    nx += (ddx / dist) * overlap;
+                                    ny += (ddy / dist) * overlap;
+                                } else {
+                                    const dLeft = nx - bb.minX;
+                                    const dRight = bb.maxX - nx;
+                                    const dTop = ny - bb.minY;
+                                    const dBot = bb.maxY - ny;
+                                    const m = Math.min(dLeft, dRight, dTop, dBot);
+                                    if (m === dLeft) nx = bb.minX - radius;
+                                    else if (m === dRight) nx = bb.maxX + radius;
+                                    else if (m === dTop) ny = bb.minY - radius;
+                                    else ny = bb.maxY + radius;
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Physical collision against 3D Perimeter Security Fences (VCIA Airport & Leonida State Penitentiary)
-        if (this.securityFenceSpans && this.securityFenceSpans.length > 0 && (currentZBlocks === null || currentZBlocks < 2.8)) {
-            const fenceRadius = radius + 6.5;
-            const fenceRadSq = fenceRadius * fenceRadius;
-            for (let pass = 0; pass < 2; pass++) {
-                for (let i = 0; i < this.securityFenceSpans.length; i++) {
-                    const sp = this.securityFenceSpans[i];
-                    const minX = Math.min(sp.xA, sp.xB) - fenceRadius;
-                    const maxX = Math.max(sp.xA, sp.xB) + fenceRadius;
-                    const minY = Math.min(sp.yA, sp.yB) - fenceRadius;
-                    const maxY = Math.max(sp.yA, sp.yB) + fenceRadius;
-                    if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
+            // Physical collision against 3D Perimeter Security Fences (O(1) spatial cell lookup!)
+            const cellSpans = this.fenceSpanGrid ? this.fenceSpanGrid.get(cellKey) : null;
+            if (cellSpans) {
+                const fenceRadius = radius + 6.5;
+                const fenceRadSq = fenceRadius * fenceRadius;
+                for (let pass = 0; pass < 2; pass++) {
+                    for (let i = 0; i < cellSpans.length; i++) {
+                        const sp = cellSpans[i];
+                        const minX = Math.min(sp.xA, sp.xB) - fenceRadius;
+                        const maxX = Math.max(sp.xA, sp.xB) + fenceRadius;
+                        const minY = Math.min(sp.yA, sp.yB) - fenceRadius;
+                        const maxY = Math.max(sp.yA, sp.yB) + fenceRadius;
+                        if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
 
-                    const vx = sp.xB - sp.xA;
-                    const vy = sp.yB - sp.yA;
-                    const lenSq = vx * vx + vy * vy;
-                    const t = lenSq > 0.001 ? Math.max(0.0, Math.min(1.0, ((nx - sp.xA) * vx + (ny - sp.yA) * vy) / lenSq)) : 0.0;
-                    const cx = sp.xA + t * vx;
-                    const cy = sp.yA + t * vy;
-                    const ddx = nx - cx;
-                    const ddy = ny - cy;
-                    const distSq = ddx * ddx + ddy * ddy;
-                    if (distSq < fenceRadSq) {
-                        hit = true;
-                        const dist = Math.sqrt(distSq) || 0.001;
-                        const overlap = fenceRadius - dist;
-                        if (dist > 0.01) {
-                            nx += (ddx / dist) * overlap;
-                            ny += (ddy / dist) * overlap;
-                        } else {
-                            nx += fenceRadius;
+                        const vx = sp.xB - sp.xA;
+                        const vy = sp.yB - sp.yA;
+                        const lenSq = vx * vx + vy * vy;
+                        const t = lenSq > 0.001 ? Math.max(0.0, Math.min(1.0, ((nx - sp.xA) * vx + (ny - sp.yA) * vy) / lenSq)) : 0.0;
+                        const cx = sp.xA + t * vx;
+                        const cy = sp.yA + t * vy;
+                        const ddx = nx - cx;
+                        const ddy = ny - cy;
+                        const distSq = ddx * ddx + ddy * ddy;
+                        if (distSq < fenceRadSq) {
+                            hit = true;
+                            const dist = Math.sqrt(distSq) || 0.001;
+                            const overlap = fenceRadius - dist;
+                            if (dist > 0.01) {
+                                nx += (ddx / dist) * overlap;
+                                ny += (ddy / dist) * overlap;
+                            } else {
+                                nx += fenceRadius;
+                            }
                         }
                     }
                 }
