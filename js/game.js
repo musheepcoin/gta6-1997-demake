@@ -8264,11 +8264,11 @@ class LeonidaGame {
 
                 farTowTruck.sirenActive = true;
 
-                farTowTruck.speed = 95;
+                farTowTruck.speed = 68;
 
-                farTowTruck.vx = Math.cos(roadAng) * 95;
+                farTowTruck.vx = Math.cos(roadAng) * 68;
 
-                farTowTruck.vy = Math.sin(roadAng) * 95;
+                farTowTruck.vy = Math.sin(roadAng) * 68;
 
                 farTowTruck.aiStuckTimer = 0;
 
@@ -8292,11 +8292,11 @@ class LeonidaGame {
 
                 towTruck.towTarget = targetBlockedCar;
 
-                towTruck.speed = 95;
+                towTruck.speed = 68;
 
-                towTruck.vx = Math.cos(roadAng) * 95;
+                towTruck.vx = Math.cos(roadAng) * 68;
 
-                towTruck.vy = Math.sin(roadAng) * 95;
+                towTruck.vy = Math.sin(roadAng) * 68;
 
                 this.vehicles.push(towTruck);
 

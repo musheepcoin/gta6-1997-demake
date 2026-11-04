@@ -2151,13 +2151,19 @@ class Vehicle {
         this.aiState = "TOW_TRUCK";
         this.sirenActive = true;
 
-        // If already towing a vehicle/wreck, drive it away along the road network until off-screen
+        // If already towing a vehicle/wreck, haul it slowly & heavily along the road network (~62 px/s max)
         if (this.towingVehicle) {
             if (!game.vehicles.includes(this.towingVehicle) || this.towingVehicle.driver === "PLAYER") {
                 this.towingVehicle.towedByTruck = null;
                 this.towingVehicle = null;
             } else {
-                return this.computeTrafficControls(dt, map, game);
+                const tCtrl = this.computeTrafficControls(dt, map, game);
+                if (this.speed > 64) {
+                    tCtrl.throttle = -0.25;
+                } else {
+                    tCtrl.throttle = Math.min(tCtrl.throttle, 0.26);
+                }
+                return tCtrl;
             }
         }
 
@@ -2194,8 +2200,17 @@ class Vehicle {
         }
 
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        if (dist < 68) {
-            // Hook up the vehicle / wreck to the tow winch!
+        if (dist < 64) {
+            // Stop for 1.8s to attach the tow winch before pulling away!
+            this.towHookTimer = (this.towHookTimer || 0) + dt;
+            if (this.towHookTimer < 1.8) {
+                return {
+                    throttle: this.speed > 6 ? -0.75 : 0,
+                    steer: 0,
+                    handbrake: true
+                };
+            }
+            this.towHookTimer = 0;
             this.towingVehicle = target;
             this.towTarget = null;
             target.towedByTruck = this;
@@ -2210,21 +2225,22 @@ class Vehicle {
             if (typeof game.addFloatingText === "function") {
                 game.addFloatingText(target.x, target.y - 24, "🪝 VCPD IMPOUND — TOWING!", "#f59e0b");
             }
-            return this.computeTrafficControls(dt, map, game);
+            return { throttle: 0.22, steer: 0, handbrake: false };
         }
+        this.towHookTimer = 0;
 
-        // Final approach within 165px: steer directly to the wreck even if it rests on a curb/sidewalk
+        // Final approach within 165px: slow down gently (~50 px/s) and align with the wreck
         if (dist < 165) {
             const desiredAng = Math.atan2(target.y - this.y, target.x - this.x);
             const diff = Math.atan2(Math.sin(desiredAng - this.angle), Math.cos(desiredAng - this.angle));
             return {
-                throttle: 0.72,
-                steer: Math.max(-1, Math.min(1, diff * 2.2)),
+                throttle: this.speed > 52 ? -0.35 : 0.24,
+                steer: Math.max(-1, Math.min(1, diff * 2.0)),
                 handbrake: false
             };
         }
 
-        return this.computeTargetRoadOrFeelerControls(
+        const roadCtrl = this.computeTargetRoadOrFeelerControls(
             dt,
             map,
             game,
@@ -2232,9 +2248,13 @@ class Vehicle {
             target.y,
             0,
             0,
-            0.90,
+            0.38,
             false
         );
+        if (this.speed > 86) {
+            roadCtrl.throttle = -0.20;
+        }
+        return roadCtrl;
     }
 
     update(dt, input, map, game) {
@@ -2258,9 +2278,9 @@ class Vehicle {
                 const dy = targetY - this.y;
                 const pullAng = Math.atan2(truck.y - this.y, truck.x - this.x);
                 const angDiff = Math.atan2(Math.sin(pullAng - this.angle), Math.cos(pullAng - this.angle));
-                this.angle += angDiff * Math.min(1.0, dt * 10.0);
-                this.x += dx * Math.min(1.0, dt * 14.0);
-                this.y += dy * Math.min(1.0, dt * 14.0);
+                this.angle += angDiff * Math.min(1.0, dt * 4.5);
+                this.x += dx * Math.min(1.0, dt * 5.2);
+                this.y += dy * Math.min(1.0, dt * 5.2);
                 this.z = truck.z;
                 this.vx = truck.vx;
                 this.vy = truck.vy;
