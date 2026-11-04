@@ -653,10 +653,20 @@ class LeonidaMap {
             }
         }
 
-        // Build O(1) Spatial Hash Grid for Leonida Flora & Tree Trunks (eliminates pedestrian/player tree-clipping)
+        // Build O(1) Spatial Hash Grid for Solid-Trunk Leonida Trees Only (Ferns/Bushes/Shrubs allow 100% pass-through!)
         this.floraGrid = new Map();
         for (let pi = 0; pi < this.vicePalms.length; pi++) {
             const pm = this.vicePalms[pi];
+            if (
+                pm.kind === "fan_palm" ||
+                pm.kind === "mangrove" ||
+                pm.kind === "bougainvillea_bush" ||
+                pm.kind === "sawgrass_clump" ||
+                pm.kind === "tropical_shrub" ||
+                pm.kind === "sea_grape"
+            ) {
+                continue;
+            }
             const fbx = Math.floor(pm.x / TILE_SIZE);
             const fby = Math.floor(pm.y / TILE_SIZE);
             const fkey = (fby << 16) | (fbx & 0xffff);
@@ -2476,9 +2486,17 @@ class LeonidaMap {
                 });
             }
 
-            // Rebuild O(1) Spatial Hash Grid for Leonida Flora (Palms & Trees)
+            // Rebuild O(1) Spatial Hash Grid for Solid-Trunk Leonida Trees Only (Ferns/Bushes/Shrubs allow 100% pass-through!)
             this.floraGrid = new Map();
+            const isSolidTrunkTree = (kind) => (
+                kind === "palm_tree" ||
+                kind === "banyan_tree" ||
+                kind === "live_oak" ||
+                kind === "swamp_cypress" ||
+                kind === "slash_pine"
+            );
             const addFloraToGrid = (item) => {
+                if (!item || !isSolidTrunkTree(item.kind)) return;
                 const fbx = Math.floor(item.x / TILE_SIZE);
                 const fby = Math.floor(item.y / TILE_SIZE);
                 const fkey = (fby << 16) | (fbx & 0xffff);
@@ -2491,11 +2509,6 @@ class LeonidaMap {
             };
             for (let pi = 0; pi < this.vicePalms.length; pi++) {
                 addFloraToGrid(this.vicePalms[pi]);
-            }
-            if (Array.isArray(this.trees)) {
-                for (let ti = 0; ti < this.trees.length; ti++) {
-                    addFloraToGrid(this.trees[ti]);
-                }
             }
         }
 
@@ -4407,8 +4420,11 @@ class LeonidaMap {
                 if (!cell) continue;
                 for (let i = 0; i < cell.length; i++) {
                     const pm = cell[i];
-                    // Soft bushes/shrubs/sawgrass allow smooth pass-through without snagging
+                    // Soft ferns (fan_palm), bushes, shrubs, mangroves & sawgrass allow smooth 100% pass-through without snagging
                     if (
+                        !pm.kind ||
+                        pm.kind === "fan_palm" ||
+                        pm.kind === "mangrove" ||
                         pm.kind === "bougainvillea_bush" ||
                         pm.kind === "sawgrass_clump" ||
                         pm.kind === "tropical_shrub" ||
@@ -4416,7 +4432,7 @@ class LeonidaMap {
                     ) {
                         continue;
                     }
-                    // Solid trunk collision: Royal Palm, Coconut Palm, Palmetto, Bald Cypress, Live Oak & Banyan
+                    // Solid trunk collision: Royal Palm, Bald Cypress, Slash Pine, Live Oak & Banyan
                     const trunkR = Math.max(9, Math.min(14, 11 * (pm.scale || 1.0)));
                     const ex = nx - pm.x;
                     const ey = ny - pm.y;

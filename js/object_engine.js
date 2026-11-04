@@ -2690,10 +2690,18 @@ class WorldObjectEngine {
             }
         }
 
-        // Rebuild map.floraGrid after all WorldObjectEngine flora & booth clearance passes (includes both vicePalms and trees!)
-        if (Array.isArray(map.vicePalms) || Array.isArray(map.trees)) {
+        // Rebuild map.floraGrid after all WorldObjectEngine flora & booth clearance passes (solid-trunk trees only; ferns/bushes allow 100% pass-through!)
+        if (Array.isArray(map.vicePalms)) {
             map.floraGrid = new Map();
+            const isSolidTrunkTree = (kind) => (
+                kind === "palm_tree" ||
+                kind === "banyan_tree" ||
+                kind === "live_oak" ||
+                kind === "swamp_cypress" ||
+                kind === "slash_pine"
+            );
             const addFlora = (item) => {
+                if (!item || !isSolidTrunkTree(item.kind)) return;
                 const fbx = Math.floor(item.x / TILE_SIZE);
                 const fby = Math.floor(item.y / TILE_SIZE);
                 const fkey = (fby << 16) | (fbx & 0xffff);
@@ -2704,15 +2712,8 @@ class WorldObjectEngine {
                 }
                 cell.push(item);
             };
-            if (Array.isArray(map.vicePalms)) {
-                for (let pi = 0; pi < map.vicePalms.length; pi++) {
-                    addFlora(map.vicePalms[pi]);
-                }
-            }
-            if (Array.isArray(map.trees)) {
-                for (let ti = 0; ti < map.trees.length; ti++) {
-                    addFlora(map.trees[ti]);
-                }
+            for (let pi = 0; pi < map.vicePalms.length; pi++) {
+                addFlora(map.vicePalms[pi]);
             }
         }
     }
