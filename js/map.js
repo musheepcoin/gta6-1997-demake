@@ -3924,6 +3924,9 @@ class LeonidaMap {
             const nx = bx + c.dx;
             const ny = by + c.dy;
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
+            // Never allow sidewalk/beach pedestrians to walk into Port Gellhorn Super-Speedway or VCIA Airport tarmac
+            if (nx >= 26 && nx <= 87 && ny >= 149 && ny <= 200) continue;
+            if (nx >= 64 && nx <= 165 && ny >= 299 && ny <= 368) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
             if (!nb || nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) {
                 continue;

@@ -3251,6 +3251,11 @@ class TrafficManager {
             if (ped.missionTag || ped.kind === "MEDIC") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
+            // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway
+            if ((ped.kind === "CIVILIAN" || ped.kind === "CRIMINAL") && bx >= 26 && bx <= 87 && by >= 149 && by <= 200) {
+                game.peds.splice(i, 1);
+                continue;
+            }
             if (ped.kind === "CIVILIAN") {
                 const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
                 if (!nearAnyPlayer) {
@@ -3292,8 +3297,11 @@ class TrafficManager {
 
         for (let by = outerRect.minY; by <= outerRect.maxY; by++) {
             for (let bx = outerRect.minX; bx <= outerRect.maxX; bx++) {
-                // Never spawn street pedestrians on VCIA Airport active runways/tarmac or on prison double-fence perimeter strips
+                // Never spawn street pedestrians on VCIA Airport active runways/tarmac, Port Gellhorn Super-Speedway, SERA Space Center, Stadium pitch, or prison double-fence perimeter strips
                 if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
+                if (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) continue;
+                if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) continue;
+                if (bx >= 179 && bx <= 197 && by >= 164 && by <= 180) continue;
                 if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
 
                 const inScreen = this.isPointInRect(bx, by, onScreenArea);
