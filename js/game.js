@@ -10471,10 +10471,19 @@ class LeonidaGame {
 
 
 
-                    // Wrecks are physical: a moving car shoves a burned-out hulk, and sliding hulks knock into each other
+                    // Wrecks are dead weight: only a real ram by the player (or a hulk already sliding from a blast) moves them.
+                    // AI traffic simply stops/steers around them and never bulldozes a carcass.
                     const aSpdW = Math.hypot(a.vx || 0, a.vy || 0);
                     const bSpdW = Math.hypot(b.vx || 0, b.vy || 0);
-                    const wreckShove = (a.destroyed !== b.destroyed) && ((a.destroyed ? bSpdW : aSpdW) > 25);
+                    const liveCar = a.destroyed && !b.destroyed ? b : (b.destroyed && !a.destroyed ? a : null);
+                    const wreckCar = liveCar ? (liveCar === a ? b : a) : null;
+                    const wreckMovable = Boolean(
+                        liveCar && (
+                            (liveCar.driver === "PLAYER" && (liveCar === a ? aSpdW : bSpdW) > 60) ||
+                            Math.hypot(wreckCar.vx || 0, wreckCar.vy || 0) > 15
+                        )
+                    );
+                    const wreckShove = wreckMovable;
                     const slidingWrecks = a.destroyed && b.destroyed && (aSpdW > 15 || bSpdW > 15);
 
                     if ((!involvesPlayerOrActiveCop && !wreckShove && !slidingWrecks) || (a.destroyed && b.destroyed && !slidingWrecks)) {
@@ -10525,24 +10534,28 @@ class LeonidaGame {
 
                     if (a.destroyed && !b.destroyed) {
 
-                        // Heavy hulk gives way a little, the live car takes most of the separation
-                        a.x -= bestNx * bestOverlap * 0.35;
+                        // Heavy hulk gives way a little only on a real ram, otherwise the live car takes all the separation
+                        const wk = wreckMovable ? 0.35 : 0;
 
-                        a.y -= bestNy * bestOverlap * 0.35;
+                        a.x -= bestNx * bestOverlap * wk;
 
-                        b.x += bestNx * bestOverlap * 0.70;
+                        a.y -= bestNy * bestOverlap * wk;
 
-                        b.y += bestNy * bestOverlap * 0.70;
+                        b.x += bestNx * bestOverlap * (wreckMovable ? 0.70 : 1.05);
+
+                        b.y += bestNy * bestOverlap * (wreckMovable ? 0.70 : 1.05);
 
                     } else if (b.destroyed && !a.destroyed) {
 
-                        b.x += bestNx * bestOverlap * 0.35;
+                        const wk = wreckMovable ? 0.35 : 0;
 
-                        b.y += bestNy * bestOverlap * 0.35;
+                        b.x += bestNx * bestOverlap * wk;
 
-                        a.x -= bestNx * bestOverlap * 0.70;
+                        b.y += bestNy * bestOverlap * wk;
 
-                        a.y -= bestNy * bestOverlap * 0.70;
+                        a.x -= bestNx * bestOverlap * (wreckMovable ? 0.70 : 1.05);
+
+                        a.y -= bestNy * bestOverlap * (wreckMovable ? 0.70 : 1.05);
 
                     } else {
 
@@ -10571,9 +10584,9 @@ class LeonidaGame {
 
                         const impulse = -0.68 * normalVel;
 
-                        const aShare = a.destroyed ? 0.55 : 1.0;
+                        const aShare = a.destroyed ? ((wreckMovable || slidingWrecks) ? 0.55 : 0) : 1.0;
 
-                        const bShare = b.destroyed ? 0.55 : 1.0;
+                        const bShare = b.destroyed ? ((wreckMovable || slidingWrecks) ? 0.55 : 0) : 1.0;
 
                         a.vx -= bestNx * impulse * aShare;
 
@@ -10592,10 +10605,10 @@ class LeonidaGame {
                         const bCross = bCos * bestNy - bSin * bestNx;
 
                         if (!a.destroyed) a.angle -= hitALever * aCross * Math.min(0.22, impulse * 0.0014);
-                        else a.angularVelocity = (a.angularVelocity || 0) - hitALever * aCross * Math.min(3.0, impulse * 0.018);
+                        else if (aShare > 0) a.angularVelocity = (a.angularVelocity || 0) - hitALever * aCross * Math.min(3.0, impulse * 0.018);
 
                         if (!b.destroyed) b.angle += hitBLever * bCross * Math.min(0.22, impulse * 0.0014);
-                        else b.angularVelocity = (b.angularVelocity || 0) + hitBLever * bCross * Math.min(3.0, impulse * 0.018);
+                        else if (bShare > 0) b.angularVelocity = (b.angularVelocity || 0) + hitBLever * bCross * Math.min(3.0, impulse * 0.018);
 
                     }
 
