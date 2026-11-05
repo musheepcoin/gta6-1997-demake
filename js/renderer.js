@@ -2541,10 +2541,10 @@ class RetroRenderer {
                     meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
                 }
 
-                // 6J2. Crisp Pixel-Art 1997 GTA 1 / GTA 2 Electric Scooter ("veh_escooter", 16x34) & Beach Cruiser Bicycle ("veh_bicycle", 16x38)
+                // 6J2. Crisp Pixel-Art 1997 GTA 1 / GTA 2 Electric Scooter ("veh_escooter", 18x34) & South Beach Cruiser Bicycle ("veh_bicycle", 20x42)
                 // Drawn with exact integer pixel matrices (alpha = 255 / 0, zero Canvas2D sub-pixel blur) facing South (+Y = bottom = front wheel)
                 {
-                    ctx.clearRect(1340, py3, 92, 42);
+                    ctx.clearRect(1340, py3, 108, 44);
 
                     const drawPixelMatrix = (ox, oy, rows, pal) => {
                         const h = rows.length;
@@ -2578,198 +2578,213 @@ class RetroRenderer {
                         T: [22, 28, 40],    // Dark vulcanized tire rubber
                         t: [51, 65, 85],    // Tire tread highlight
                         W: [203, 213, 225], // Silver wheel rim & spokes
-                        w: [248, 250, 252], // Gleaming chrome highlight
-                        C: [148, 163, 184], // Brushed chrome / aluminum
+                        w: [248, 250, 252], // Gleaming chrome & whitewall tire sidewall
+                        C: [148, 163, 184], // Brushed chrome / aluminum rack & fork
                         F: [2, 132, 199],   // Frame paint shadow bevel (Miami Ocean Blue/Cyan)
                         f: [6, 182, 212],   // Frame paint mid-tone
                         H: [103, 232, 249], // Frame 3D cylinder top specular
                         S: [69, 26, 3],     // Dark espresso leather saddle border
                         s: [146, 64, 14],   // Warm saddle leather cushion
-                        L: [217, 119, 6],   // Saddle crown highlight
+                        L: [217, 119, 6],   // Saddle crown / golden rattan basket highlight
+                        B: [120, 72, 24],   // Woven wicker front beach basket shadow
+                        b: [180, 118, 48],  // Woven wicker front beach basket mid-tone
+                        P: [244, 114, 182], // Rolled pink South Beach towel inside front basket
                         G: [30, 41, 59],    // Ribbed dark rubber handgrip / pedal
                         A: [245, 158, 11],  // Amber pedal reflector / brass bell
                         R: [239, 68, 68],   // Ruby red rear brake/fender LED
                         r: [252, 165, 165], // Bright red LED core
                         E: [5, 150, 105],   // Emerald scooter anodized rail shadow
-                        e: [52, 211, 153],  // Neon mint-emerald scooter rail highlight
+                        e: [57, 255, 20],   // Neon lime-emerald scooter LED rail highlight
                         D: [15, 23, 42],    // Dark charcoal grip-tape standing deck
                         d: [30, 41, 59],    // Grip-tape anti-slip groove
+                        Q: [34, 211, 238],  // Cyan digital QR/speedometer screen on scooter stem
                         Y: [254, 240, 138]  // Front Xenon LED headlight
                     };
 
-                    // 1) Modern Miami Electric Kick-Scooter ("veh_escooter", 16x34 at 1342, py3, facing South +Y)
+                    // 1) Modern Miami Neon Electric Kick-Scooter ("veh_escooter", 18x34 at 1342, py3, facing South +Y)
+                    // Compact standing deck w/ glowing lime LED side-strips, rear foot-brake LED & digital QR stem display
                     const scx = 1342, scy = py3;
                     const scooterRows = [
-                        "......KKKK......",
-                        ".....KTTTTK.....",
-                        ".....KTttTK.....",
-                        ".....KTRrTK.....",
-                        "....KKERRRKK....",
-                        "...KEedddddeEK..",
-                        "...KEdDDDDdEK...",
-                        "...KEdDDDDdEK...",
-                        "...KEddddddeK...",
-                        "...KEdDDDDdEK...",
-                        "...KEdDDDDdEK...",
-                        "...KEddddddeK...",
-                        "...KEdDDDDdEK...",
-                        "...KEdDDDDdEK...",
-                        "...KEddddddeK...",
-                        "...KEdDDDDdEK...",
-                        "...KEdDDDDdEK...",
-                        "...KEddddddeK...",
-                        "...KEdDDDDdEK...",
-                        "...KEedddddeEK..",
-                        "....KKEwwwEKK...",
-                        ".....KCwwwCK....",
-                        ".....KCfHfCK....",
-                        ".KKKKKKKKKKKKKK.",
-                        "KeGGCCCCCCCCGGeK",
-                        "KeGGCCCwwCCCGGeK",
-                        ".KKKKKCYYCKKKKK.",
-                        ".....KTTTTK.....",
-                        ".....KTWWtK.....",
-                        ".....KTWWtK.....",
-                        ".....KTttTK.....",
-                        ".....KTTTTK.....",
-                        "......KKKK......",
-                        "................"
+                        ".......KKKK.......",
+                        "......KTTTTK......",
+                        "......KTttTK......",
+                        ".....KKTRrTKK.....",
+                        "....KEeRRRRrEK....",
+                        "...KEeedddddeEK...",
+                        "..KEedDDDDDDdeEK..",
+                        "..KEeDDDDDDDDeeK..",
+                        "..KEedddCCddddeK..",
+                        "..KEeDDDeeDDDeeK..",
+                        "..KEedDDDDDDdeEK..",
+                        "..KEeDDDDDDDDeeK..",
+                        "..KEedddCCddddeK..",
+                        "..KEeDDDeeDDDeeK..",
+                        "..KEedDDDDDDdeEK..",
+                        "..KEeDDDDDDDDeeK..",
+                        "..KEedddCCddddeK..",
+                        "..KEeDDDeeDDDeeK..",
+                        "..KEedDDDDDDdeEK..",
+                        "...KEeedddddeEK...",
+                        "....KKEewwweEKK...",
+                        "......KCwwwCK.....",
+                        "......KCeQeCK.....",
+                        "..KKKKKKKKKKKKKK..",
+                        ".KeGGGCCCCCCGGGeK.",
+                        ".KeGGGCCQQCCGGGeK.",
+                        "..KKKKKCYYCKKKKK..",
+                        "......KTTTTK......",
+                        "......KTWWtK......",
+                        "......KTWWtK......",
+                        "......KTttTK......",
+                        "......KTTTTK......",
+                        ".......KKKK.......",
+                        ".................."
                     ];
                     drawPixelMatrix(scx, scy, scooterRows, bikePal);
-                    meta.sprites.objects["veh_escooter"] = [scx, scy, 16, 34];
+                    meta.sprites.objects["veh_escooter"] = [scx, scy, 18, 34];
 
-                    // 2) South Beach Cruiser / BMX Bicycle ("veh_bicycle", 16x38 at 1364, py3, facing South +Y)
+                    // 2) Authentic South Beach Cruiser Bicycle ("veh_bicycle", 20x42 at 1364, py3, facing South +Y)
+                    // Features whitewall balloon tires, rear chrome pannier rack, wide quilted leather springer saddle,
+                    // twin asymmetric pedals, swept-back "moon" cruiser handlebars w/ brass bell, and a woven wicker front beach basket!
                     const bkx = 1364, bky = py3;
                     const bicycleRows = [
-                        "......KKKK......",
-                        ".....KTTTTK.....",
-                        ".....KTttTK.....",
-                        ".....KTWWTK.....",
-                        ".....KTWWTK.....",
-                        "....KKTWWTKK....",
-                        "....KFTWWTFK....",
-                        "....KFKTWTFK....",
-                        ".....KFTWTFK....",
-                        "....KSSSSSSK....",
-                        "...KSssssssSK...",
-                        "...KSsLLLLsSK...",
-                        "...KSssssssSK...",
-                        "....KSSssSSK....",
-                        ".....KSssSK.....",
-                        "..KKK.KffK......",
-                        ".KGAKKKfHfK.....",
-                        "..KKK.KfHfK.....",
-                        "......KfHfKKK...",
-                        "......KfHfKGAK..",
-                        "......KffK.KKK..",
-                        "......KfHfK.....",
-                        "......KfHfK.....",
-                        ".KKK..KfHfK..KKK",
-                        "KGGK..KfHfK..KGG",
-                        "KGGCK.KfHfK.KCGG",
-                        ".KCCwKKfHfKKACCK",
-                        "..KKCwwwwwwwCKK.",
-                        "....KKFwwwFKK...",
-                        "....KFTWWTFK....",
-                        "....KFTWWTFK....",
-                        "....KKTWWTKK....",
-                        ".....KTWWTK.....",
-                        ".....KTWWTK.....",
-                        ".....KTttTK.....",
-                        ".....KTTTTK.....",
-                        "......KKKK......",
-                        "................"
+                        "........KKKK........",
+                        ".......KTTTTK.......",
+                        "......KTwwwwTK......",
+                        "......KTWwwWTK......",
+                        "......KFRrrRFK......",
+                        ".....KKFfHHfFKK.....",
+                        ".....KFCwwwwCFK.....",
+                        ".....KFCwWWwCFK.....",
+                        ".....KFCwwwwCFK.....",
+                        "......KFfHHfFK......",
+                        ".....KSSSSSSSSK.....",
+                        "....KSssssssssSK....",
+                        "...KSssLLLLLLssSK...",
+                        "...KSssLLLLLLssSK...",
+                        "....KSssssssssSK....",
+                        ".....KSSSssSSSK.....",
+                        "......KSSssSSK......",
+                        "...KKK.KFfHfK.......",
+                        "..KGAKKKFfHfK.......",
+                        "...KKK.KFfHfK.......",
+                        "......KFfHHfFK......",
+                        ".......KFfHfKKK.....",
+                        ".......KFfHfKGAK....",
+                        ".......KFfHfKKKK....",
+                        ".KKKK..KFfHfK..KKKK.",
+                        "KGGGKK.KFfHfK.KKGGGK",
+                        "KGGCCKKKFfHfKKKCCGGK",
+                        ".KKCCwwKFfHfKwwCCKK.",
+                        "...KKCCwwHHwwCCKK...",
+                        "....KBBBBBBBBBBK....",
+                        "...KBbbLLLLLLbbBK...",
+                        "...KBbLPPPPLLbLBK...",
+                        "...KBbbLLLLLLbbBK...",
+                        "....KBBBBBBBBBBK....",
+                        ".....KKFfHHfFKK.....",
+                        "......KTwwwwTK......",
+                        "......KTWwwWTK......",
+                        "......KTwwwwTK......",
+                        ".......KTttTK.......",
+                        ".......KTTTTK.......",
+                        "........KKKK........",
+                        "...................."
                     ];
                     drawPixelMatrix(bkx, bky, bicycleRows, bikePal);
-                    meta.sprites.objects["veh_bicycle"] = [bkx, bky, 16, 38];
+                    meta.sprites.objects["veh_bicycle"] = [bkx, bky, 20, 42];
 
-                    // 3) Wrecked / Broken E-Scooter ("veh_escooter_wreck", 16x34 at 1386, py3)
-                    const scwx = 1386, scwy = py3;
+                    // 3) Wrecked / Broken E-Scooter ("veh_escooter_wreck", 18x34 at 1388, py3)
+                    const scwx = 1388, scwy = py3;
                     const scooterWreckRows = [
-                        "....KKKK........",
-                        "...KTTTTK.......",
-                        "...KTttTK.......",
-                        "....KTRrTK......",
-                        "....KKERRKK.....",
-                        "...KEeddddeEK...",
-                        "..KEdDDDDdEK....",
-                        "..KEdDDdDdEK....",
-                        "...KEdddddeK....",
-                        "...KEdDDdDdEK...",
-                        "....KEdDDdEK....",
-                        "...KEddddddeK...",
-                        "..KEdDDDDdEK....",
-                        "..KEdDDdDdEK....",
-                        "...KEdddddeK....",
-                        "...KEdDDDDdEK...",
-                        "....KEdDDdEK....",
-                        "...KEddddddeK...",
-                        "...KEdDDDDdEK...",
-                        "....KEeddddeEK..",
-                        ".....KKEwwEKK...",
-                        "......KCwwCK....",
-                        "...KKKKCfHCK....",
-                        "..KeGGCCCCCCKKK.",
-                        "..KeGGCCwwCCGGeK",
-                        "...KKKKCddCKGGeK",
-                        "......KTTTTKKKK.",
-                        ".....KTWWtK.....",
-                        ".....KTWWtK.....",
-                        "......KTttTK....",
-                        "......KTTTTK....",
-                        ".......KKKK.....",
-                        "................",
-                        "................"
+                        ".....KKKK.........",
+                        "....KTTTTK........",
+                        "....KTttTK........",
+                        "....KKTRrTKK......",
+                        "....KEeRRRKK......",
+                        "...KEeeddddeEK....",
+                        "..KEedDDDDdEK.....",
+                        "..KEedDDdDdEK.....",
+                        "...KEedddddeK.....",
+                        "...KEedDDdDdEK....",
+                        "....KEedDDdEK.....",
+                        "...KEeddddddeK....",
+                        "..KEedDDDDdEK.....",
+                        "..KEedDDdDdEK.....",
+                        "...KEedddddeK.....",
+                        "...KEedDDDDdEK....",
+                        "....KEedDDdEK.....",
+                        "...KEeddddddeK....",
+                        "...KEedDDDDdEK....",
+                        "....KEeeddddeEK...",
+                        ".....KKEewwEKK....",
+                        "......KCwwCK......",
+                        "...KKKKCeHCK......",
+                        "..KeGGGCCCCCCKKK..",
+                        "..KeGGGCCwwCCGGGeK",
+                        "...KKKKKCddCKGGGeK",
+                        ".......KTTTTKKKKK.",
+                        "......KTWWtK......",
+                        "......KTWWtK......",
+                        ".......KTttTK.....",
+                        ".......KTTTTK.....",
+                        "........KKKK......",
+                        "..................",
+                        ".................."
                     ];
                     drawPixelMatrix(scwx, scwy, scooterWreckRows, bikePal);
-                    meta.sprites.objects["veh_escooter_wreck"] = [scwx, scwy, 16, 34];
-                    if (meta.sprites.wrecked) meta.sprites.wrecked["veh_escooter_wreck"] = [scwx, scwy, 16, 34];
+                    meta.sprites.objects["veh_escooter_wreck"] = [scwx, scwy, 18, 34];
+                    if (meta.sprites.wrecked) meta.sprites.wrecked["veh_escooter_wreck"] = [scwx, scwy, 18, 34];
 
-                    // 4) Bent / Crumpled Beach Cruiser Bicycle ("veh_bicycle_wreck", 16x38 at 1408, py3 — bent wheel & handlebars, zero fire!)
-                    const bkwx = 1408, bkwy = py3;
+                    // 4) Bent / Crumpled Beach Cruiser Bicycle ("veh_bicycle_wreck", 20x42 at 1410, py3 — bent wheel, handlebars & basket, zero fire!)
+                    const bkwx = 1410, bkwy = py3;
                     const bicycleWreckRows = [
-                        "....KKKK........",
-                        "...KTTTTK.......",
-                        "...KTttTK.......",
-                        "....KTWWTK......",
-                        "....KTWWTK......",
-                        "....KKTWWTKK....",
-                        ".....KFTWWTFK...",
-                        ".....KFKTWTFK...",
-                        ".....KFTWTFK....",
-                        "....KSSSSSSK....",
-                        "...KSssssssSK...",
-                        "...KSsLLLLsSK...",
-                        "....KSsssssSK...",
-                        ".....KSSssSSK...",
-                        "......KSssSK....",
-                        "..KKK..KffK.....",
-                        ".KGAKKKfHfK.....",
-                        "..KKK.KfHfK.....",
-                        ".....KfHfKKK....",
-                        ".....KfHfKGAK...",
-                        "......KffK.KKK..",
-                        "......KfHfK.....",
-                        ".....KfHfK......",
-                        ".KKK.KfHfK......",
-                        "KGGKKKfHfK..KKK.",
-                        "KGGCK.KfHfKKCGGK",
-                        ".KCCwKKfHfKACCK.",
-                        "..KKCwwwwwwCKK..",
-                        "....KKFwwwFKK...",
-                        ".....KFTWWTFK...",
-                        "......KFTWWTFK..",
-                        ".....KKTWWTKK...",
-                        "....KTWWTK......",
-                        "....KTWWTK......",
-                        ".....KTttTK.....",
-                        ".....KTTTTK.....",
-                        "......KKKK......",
-                        "................"
+                        "......KKKK..........",
+                        ".....KTTTTK.........",
+                        ".....KTwwwwTK.......",
+                        "......KTWwwWTK......",
+                        "......KFRrrRFK......",
+                        ".....KKFfHHfFKK.....",
+                        "......KFCwwwCFK.....",
+                        "......KFCwWWCFK.....",
+                        ".....KFCwwwwCFK.....",
+                        "......KFfHHfFK......",
+                        ".....KSSSSSSSSK.....",
+                        "....KSssssssssSK....",
+                        "...KSssLLLLLLssSK...",
+                        "....KSssLLLLssSK....",
+                        ".....KSssssssSK.....",
+                        "......KSSssSSK......",
+                        ".......KSssSK.......",
+                        "...KKK..KFfK........",
+                        "..KGAKKKFfHfK.......",
+                        "...KKK.KFfHfK.......",
+                        "......KFfHfKKK......",
+                        "......KFfHfKGAK.....",
+                        ".......KFfK.KKK.....",
+                        ".......KFfHfK.......",
+                        "..KKKK.KFfHfK.......",
+                        ".KGGGKKKFfHfK..KKKK.",
+                        ".KGGCCK.KFfHfKKCCGGK",
+                        "..KCCwwKKFfHfKACCGGK",
+                        "...KKCCwwwwwwCCKKK..",
+                        ".....KBBBBBBBBK.....",
+                        "....KBbbLLLLbbBK....",
+                        ".....KBbLPPLbBK.....",
+                        ".....KBBBBBBBBK.....",
+                        "......KKFwwwFKK.....",
+                        ".......KTwwwwTK.....",
+                        "........KTWwwWTK....",
+                        ".......KTwwwwTK.....",
+                        "......KTWWTK........",
+                        ".......KTttTK.......",
+                        ".......KTTTTK.......",
+                        "........KKKK........",
+                        "...................."
                     ];
                     drawPixelMatrix(bkwx, bkwy, bicycleWreckRows, bikePal);
-                    meta.sprites.objects["veh_bicycle_wreck"] = [bkwx, bkwy, 16, 38];
-                    if (meta.sprites.wrecked) meta.sprites.wrecked["veh_bicycle_wreck"] = [bkwx, bkwy, 16, 38];
+                    meta.sprites.objects["veh_bicycle_wreck"] = [bkwx, bkwy, 20, 42];
+                    if (meta.sprites.wrecked) meta.sprites.wrecked["veh_bicycle_wreck"] = [bkwx, bkwy, 20, 42];
                 }
 
                 // =========================================================================
@@ -8332,13 +8347,14 @@ class RetroRenderer {
                 );
             }
 
-            // A2. Miami / Vice City Custom Neon Underglow for Sports Cars, Convertibles & Muscle Cars!
+            // A2. Miami / Vice City Custom Neon Underglow for Sports Cars, Convertibles, Muscle Cars & Neon E-Scooters!
             if (!v.destroyed && airZ < 0.08) {
                 const sk = v.specKey || "";
                 const hasUnderglow = (
                     sk === "BANSHEE_GT" || sk === "STINGER_CABRIO" || sk === "TURISMO_CABRIO" ||
                     sk === "PENETRATOR_GT" || sk === "CHALLENGER_RT" || sk === "TULIP_MUSCLE" ||
-                    sk === "VICE_CHEETAH" || sk === "PORKA_TURBO" || sk === "SUPERBIKE"
+                    sk === "VICE_CHEETAH" || sk === "PORKA_TURBO" || sk === "SUPERBIKE" ||
+                    sk === "E_SCOOTER"
                 );
                 if (hasUnderglow) {
                     const ugAlpha = Math.max(0.18, Math.min(0.68, 0.22 + nfGlobal * 0.46));
@@ -8347,11 +8363,11 @@ class RetroRenderer {
                         ugR = 1.00; ugG = 0.18; ugB = 0.76; // Flamingo Magenta
                     } else if (sk === "CHALLENGER_RT" || sk === "PENETRATOR_GT") {
                         ugR = 0.68; ugG = 0.24; ugB = 1.00; // Ultra-Violet Purple
-                    } else if (sk === "TURISMO_CABRIO" || sk === "SUPERBIKE") {
-                        ugR = 0.22; ugG = 1.00; ugB = 0.64; // Neon Mint Lime
+                    } else if (sk === "TURISMO_CABRIO" || sk === "SUPERBIKE" || sk === "E_SCOOTER") {
+                        ugR = 0.22; ugG = 1.00; ugB = 0.56; // Neon Mint-Lime
                     }
-                    const ugW = (v.w || 46) * (mapInfo.isMotorcycle ? 0.68 : 0.92);
-                    const ugH = (v.h || 22) * (mapInfo.isMotorcycle ? 0.62 : 0.96);
+                    const ugW = (v.w || 46) * (sk === "E_SCOOTER" ? 0.58 : (mapInfo.isMotorcycle ? 0.68 : 0.92));
+                    const ugH = (v.h || 22) * (sk === "E_SCOOTER" ? 0.56 : (mapInfo.isMotorcycle ? 0.62 : 0.96));
                     this.pushSolidQuad3D(v.x, v.y, vz - 0.020, ugW * 1.16, ugH * 1.24, v.angle, ugR, ugG, ugB, ugAlpha * 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.pushSolidQuad3D(v.x, v.y, vz - 0.019, ugW * 0.88, ugH * 0.92, v.angle, ugR, ugG, ugB, ugAlpha * 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
@@ -8485,15 +8501,40 @@ class RetroRenderer {
                     const bikerTypes = (isScooter || isBicycle)
                         ? ["vc_jogger", "vc_tourist", "bikini_cyan", "g2_civ_pink", "vc_tommy", "kid_skater"]
                         : ["vc_tommy", "vc_crockett", "vc_hawaiian_red", "g2_civ_aqua", "gang", "civ0"];
-                    // Always use frame 84 (sitting_on_bike: hands forward gripping handlebars, legs straddling frame)
-                    // so the rider's hands align with the bicycle/scooter handlebars and never obscure the front wheel!
+
+                    // Animated 3D Pedaling Feet on South Beach Cruiser Bike vs. Planted Deck Stance + Stem Display on E-Scooter!
+                    const absSpd = Math.abs(v.speed || 0);
+                    if (isBicycle) {
+                        const pedalPhase = (absSpd > 6 ? (this.time * (7.5 + absSpd * 0.032)) : 0) + idHash;
+                        for (const side of [-1, 1]) {
+                            const pLong = -1.5 + Math.sin(pedalPhase + (side > 0 ? Math.PI : 0)) * (absSpd > 6 ? 3.4 : 1.8);
+                            const pLat = side * 5.2;
+                            const pxW = v.x + cosA * pLong - sinA * pLat;
+                            const pyW = v.y + sinA * pLong + cosA * pLat;
+                            // Dark pedal + amber reflector + rider sneaker pumping on each crank arm
+                            this.pushSolidQuad3D(pxW, pyW, vz + airZ + 0.008, 3.6, 2.4, v.angle, 0.14, 0.18, 0.26, 0.96, vDrawOrder);
+                            this.pushSolidQuad3D(pxW, pyW, vz + airZ + 0.011, 2.8, 1.8, v.angle, 0.96, 0.96, 0.98, 0.95, vDrawOrder);
+                        }
+                    } else if (isScooter) {
+                        //Glowing cyan-green digital speedometer display on the handlebar stem + bright red rear fender brake LED
+                        const stemX = v.x + cosA * 7.2;
+                        const stemY = v.y + sinA * 7.2;
+                        this.pushSolidQuad3D(stemX, stemY, vz + airZ + 0.016, 2.2, 3.0, v.angle, 0.14, 0.96, 0.88, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        const fenderX = v.x - cosA * 11.2;
+                        const fenderY = v.y - sinA * 11.2;
+                        this.pushSolidQuad3D(fenderX, fenderY, vz + airZ + 0.012, 2.2, 3.2, v.angle, 1.0, 0.16, 0.22, 0.94, vDrawOrder);
+                    }
+
+                    // For E-Scooter, use frame 97 (compact standing/upright rider without wide straddling knees);
+                    // For Bicycle & Motorcycles, use frame 84 (sitting_on_bike straddling saddle & gripping wide cruiser handlebars)!
                     const riderFrame = (v.doorOpenTimer || 0) > 0
                         ? (80 + Math.min(3, Math.floor((1.0 - v.doorOpenTimer / 0.48) * 4)))
-                        : 84;
-                    const pedalSway = (isBicycle && Math.abs(v.speed || 0) > 12)
-                        ? Math.sin(this.time * 11.5 + idHash) * 0.065
+                        : (isScooter ? 97 : 84);
+                    const pedalSway = (isBicycle && absSpd > 10)
+                        ? Math.sin(this.time * 11.5 + idHash) * 0.075
                         : 0;
-                    const seatLongOff = isBicycle ? -4.2 : (isScooter ? -3.8 : 1.5);
+                    // Keep bicycle rider seated on the leather saddle (-5.2) so the swept cruiser handlebars & front wicker basket stay 100% visible!
+                    const seatLongOff = isBicycle ? -5.2 : (isScooter ? -1.8 : 1.5);
 
                     if (occSeats.length > 0) {
                         for (const occ of occSeats) {
@@ -8504,7 +8545,7 @@ class RetroRenderer {
                                     : { x: v.x + cosA * (occ.seat === 0 ? 1.5 : -7.5), y: v.y + sinA * (occ.seat === 0 ? 1.5 : -7.5) });
                             const isCustom24 = !((occ.pedType || "").startsWith("civ") || occ.pedType === "gang" || occ.pedType === "police" || occ.pedType === "monk");
                             const baseRScale = carScale * (1.0 + airZ * 0.22) * (isCustom24 ? 0.94 : 1.04);
-                            const rScale = (isBicycle || isScooter) ? (baseRScale * 0.82) : baseRScale;
+                            const rScale = isScooter ? (baseRScale * 0.78) : (isBicycle ? (baseRScale * 0.80) : baseRScale);
                             this.batchPedSprite3D(
                                 occ.pedType || "gang",
                                 occ.seat === 0 ? riderFrame : 84,
@@ -8520,8 +8561,8 @@ class RetroRenderer {
                     } else {
                         const aiPedType = v.driver === "AI_COP" ? "police" : bikerTypes[idHash % bikerTypes.length];
                         const aiScale = aiPedType.startsWith("kid_")
-                            ? (carScale * 0.72)
-                            : (carScale * ((isBicycle || isScooter) ? 0.82 : 1.02));
+                            ? (carScale * 0.70)
+                            : (carScale * (isScooter ? 0.78 : (isBicycle ? 0.80 : 1.02)));
                         this.batchPedSprite3D(
                             aiPedType,
                             riderFrame,
@@ -9314,18 +9355,24 @@ class RetroRenderer {
             // Headlights are rigidly mounted to the front bumper: always aligned straight with the vehicle chassis (v.angle)
             const beamAng = v.angle;
 
-            // Warm ambient glow around the vehicle chassis
-            addLightPool(sc.x, sc.y, 38 * pxScale, "rgba(200, 215, 255, 0.42)", "rgba(100, 130, 190, 0.15)");
+            // Warm ambient glow around the vehicle chassis (or neon mint-green deck glow for E_SCOOTER!)
+            if (v.specKey === "E_SCOOTER") {
+                addLightPool(sc.x, sc.y, 34 * pxScale, "rgba(80, 255, 160, 0.56)", "rgba(34, 211, 238, 0.18)");
+            } else {
+                addLightPool(sc.x, sc.y, (v.specKey === "BMX_BIKE" ? 28 : 38) * pxScale, "rgba(200, 215, 255, 0.42)", "rgba(100, 130, 190, 0.15)");
+            }
 
             // Front Bumper Center in Screen Space
             const fxWorld = v.x + cosA * frontDist;
             const fyWorld = v.y + sinA * frontDist;
             const fSc = this.worldToScreen(fxWorld, fyWorld, vz);
 
-            // Long Wide-Base Headlight Beam (starts across the full width of both headlights for cars/trucks, narrow single bulb for motorcycles!)
-            const beamLen = (v.isMotorcycle ? 140 : (v.driver === "PLAYER" ? 185 : 158)) * pxScale;
-            const coneSpread = v.isMotorcycle ? 0.22 : 0.32;
-            const baseHalfWPx = v.isMotorcycle ? (2.2 * pxScale) : ((latSpread + 3.2) * pxScale);
+            // Long Wide-Base Headlight Beam (cars/trucks = wide dual beam, motorcycles = 140px single bulb, E_SCOOTER = 86px LED beam, BMX_BIKE = 52px warm dynamo lamp)
+            const isBike = v.specKey === "BMX_BIKE";
+            const isScoot = v.specKey === "E_SCOOTER";
+            const beamLen = (isBike ? 52 : (isScoot ? 86 : (v.isMotorcycle ? 140 : (v.driver === "PLAYER" ? 185 : 158)))) * pxScale;
+            const coneSpread = isBike ? 0.28 : (isScoot ? 0.20 : (v.isMotorcycle ? 0.22 : 0.32));
+            const baseHalfWPx = v.isMotorcycle ? (2.0 * pxScale) : ((latSpread + 3.2) * pxScale);
 
             addHeadlightCone(
                 fSc.x,
@@ -9334,8 +9381,8 @@ class RetroRenderer {
                 beamLen,
                 coneSpread,
                 baseHalfWPx,
-                "rgba(255, 250, 225, 0.98)",
-                "rgba(215, 232, 255, 0.52)"
+                isScoot ? "rgba(220, 255, 245, 0.96)" : "rgba(255, 250, 225, 0.98)",
+                isScoot ? "rgba(110, 240, 220, 0.48)" : "rgba(215, 232, 255, 0.52)"
             );
             highResCones.push({
                 x: fSc.x,
@@ -9344,7 +9391,7 @@ class RetroRenderer {
                 len: beamLen * 0.92,
                 spread: coneSpread * 0.88,
                 baseHalfW: baseHalfWPx,
-                col0: "rgba(255, 250, 220, 0.22)",
+                col0: isScoot ? "rgba(180, 255, 240, 0.20)" : "rgba(255, 250, 220, 0.22)",
                 col1: "rgba(180, 220, 255, 0.07)"
             });
 
