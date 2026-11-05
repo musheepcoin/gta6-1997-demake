@@ -6895,7 +6895,8 @@ class LeonidaGame {
 
             if (d < radius) {
 
-                const dmg = damage * (1 - d / radius);
+                // Heavy armored Panzer Tank shrugs off blast waves from the cars it crushes
+                const dmg = damage * (1 - d / radius) * (v.crushesCars ? 0.1 : 1);
 
                 if (byPlayer) v.damagedByPlayer = true;
 
@@ -7021,7 +7022,10 @@ class LeonidaGame {
 
         if (dp < radius) {
 
-            this.damagePlayer(damage * 0.45 * (1 - dp / radius));
+            // The tank's armored hull shields its crew from the blast of cars it crushes
+            const tankShield = (this.player.inVehicle && this.player.inVehicle.crushesCars) ? 0.06 : 1;
+
+            this.damagePlayer(damage * 0.45 * (1 - dp / radius) * tankShield);
 
         }
 
