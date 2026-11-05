@@ -1576,6 +1576,7 @@ class Vehicle {
         if (game && Array.isArray(game.vehicles)) {
             for (const other of game.vehicles) {
                 if (other === this || other === this.towingVehicle || other === this.towTarget) continue;
+                if (this.ghostTimer > 0 && other.driver !== "PLAYER") continue;
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
@@ -2574,6 +2575,31 @@ class Vehicle {
         }
 
         this.sirenPhase += dt * 10;
+
+        // Gridlock breaker: an AI vehicle that has been frozen for ages (not at a red light / not parked on purpose)
+        // phases through other AI cars & wrecks for a few seconds so intersection pileups always resolve themselves!
+        if (this.ghostTimer > 0) {
+            this.ghostTimer = Math.max(0, this.ghostTimer - dt);
+        }
+        const isAiDriven = this.driver === "AI_TRAFFIC" || this.driver === "AI_TOW" || this.driver === "AI_EMERGENCY";
+        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && Math.abs(this.speed || 0) < 6) {
+            let counts = true;
+            if (this.driver === "AI_TOW") counts = (this.approachNoProgress || 0) > 3.0 && !this.towHookTimer;
+            else if (this.driver === "AI_EMERGENCY") counts = !this.deployedFireman && !this.deployedMedic && (this.approachNoProgress || 0) > 3.0;
+            if (counts) {
+                this.gridlockTimer = (this.gridlockTimer || 0) + dt;
+                if (this.gridlockTimer > 7.5 && !(this.ghostTimer > 0)) {
+                    this.ghostTimer = 6.0;
+                    this.gridlockTimer = 0;
+                    this.aiLaneChangeCooldown = 0;
+                    this.aiReverseTimer = 0;
+                }
+            } else {
+                this.gridlockTimer = Math.max(0, (this.gridlockTimer || 0) - dt * 2);
+            }
+        } else {
+            this.gridlockTimer = Math.max(0, (this.gridlockTimer || 0) - dt * 2);
+        }
         if (this.doorOpenTimer > 0) {
             this.doorOpenTimer = Math.max(0, this.doorOpenTimer - dt);
         }
