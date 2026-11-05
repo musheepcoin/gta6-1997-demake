@@ -2231,7 +2231,7 @@ class Vehicle {
                 if (v === this || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
-                const isBurningWreck = v.destroyed && !v.fireExtinguished;
+                const isBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 4.5;
                 if (!isLiveBurning && !isBurningWreck) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {

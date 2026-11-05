@@ -12530,7 +12530,7 @@ class LeonidaGame {
                 if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
-                const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 1.2;
+                const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 3.0;
                 if ((isLiveBurning || isFreshBurningWreck) && Math.hypot(v.x - p.x, v.y - p.y) < 780) {
                     burningVehNearPlayer = v;
                     break;
@@ -12553,14 +12553,14 @@ class LeonidaGame {
                 }
                 if (!fireTruckNearTarget) {
                     this.fireDispatchTimer = (this.fireDispatchTimer || 0) + dt;
-                    if (this.fireDispatchTimer > 5.5) {
-                        this.fireDispatchTimer = 3.5; // retry ~2s later if road candidate busy
+                    if (this.fireDispatchTimer > 12.0) {
+                        this.fireDispatchTimer = 8.0; // retry ~4s later if road candidate busy
                         const baseBx = Math.floor(burningVehNearPlayer.x / TILE_SIZE);
                         const baseBy = Math.floor(burningVehNearPlayer.y / TILE_SIZE);
                         const fz = burningVehNearPlayer.z || 2.0;
                         for (let attempt = 0; attempt < 30; attempt++) {
                             const ang = Math.random() * Math.PI * 2;
-                            const distB = 10.5 + Math.random() * 5.5;
+                            const distB = 12.0 + Math.random() * 6.0;
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                             const by = Math.floor(baseBy + Math.sin(ang) * distB);
                             if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
@@ -12568,7 +12568,7 @@ class LeonidaGame {
                             if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                                 const sx = (bx + 0.5) * TILE_SIZE;
                                 const sy = (by + 0.5) * TILE_SIZE;
-                                if (Math.hypot(sx - p.x, sy - p.y) < 600) continue;
+                                if (Math.hypot(sx - p.x, sy - p.y) < 650) continue;
                                 const toFireAng = Math.atan2(burningVehNearPlayer.y - sy, burningVehNearPlayer.x - sx);
                                 const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                                     ? this.map.getAlignedRoadAngle(bx, by, toFireAng, fz)
@@ -12588,7 +12588,7 @@ class LeonidaGame {
                                     farFireTruck.approachBestDist = undefined;
                                     farFireTruck.approachNoProgress = 0;
                                     this.fireDispatchTimer = 0;
-                                    this.fireDispatchCooldown = 18.0;
+                                    this.fireDispatchCooldown = 36.0;
                                 } else if (totalFireTrucks < 3) {
                                     const fireCar = new Vehicle(`vcfd_${Date.now()}_${attempt}`, "FIRE_TRUCK", sx, sy, roadAng);
                                     fireCar.z = sz;
@@ -12599,7 +12599,7 @@ class LeonidaGame {
                                     fireCar.vy = Math.sin(roadAng) * 95;
                                     this.vehicles.push(fireCar);
                                     this.fireDispatchTimer = 0;
-                                    this.fireDispatchCooldown = 18.0;
+                                    this.fireDispatchCooldown = 36.0;
                                 }
                                 break;
                             }
