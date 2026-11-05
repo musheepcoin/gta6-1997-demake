@@ -1668,13 +1668,24 @@ class Vehicle {
             this.speed *= brakeMult;
         } else if (closestEntity && closestBumperGap < 110) {
             const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
-            const isStationaryCar = Boolean(
+            const isDeadOrAbandonedObstacle = Boolean(
                 closestEntity.destroyed ||
-                closestEntity.driver === null ||
+                closestEntity.driver === null
+            );
+            const isStationaryCar = Boolean(
+                isDeadOrAbandonedObstacle ||
                 (obstacleSpeed < 10 && this.aiState !== "STOPPED_LIGHT")
             );
             if ((isStationaryCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 98 && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+            }
+            // Never wait forever behind a destroyed wreck or abandoned driverless car (or when hauling a wreck as AI_TOW):
+            // actively steer around the pileup using 9-feeler obstacle bypass!
+            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 58) {
+                const lookX = tx + (this.aiChosenDir ? (this.aiChosenDir.dx || 0) * TILE_SIZE * 0.95 : 0);
+                const lookY = ty + (this.aiChosenDir ? (this.aiChosenDir.dy || 0) * TILE_SIZE * 0.95 : 0);
+                const bypassAng = Math.atan2(lookY - this.y, lookX - this.x);
+                return this.steerTowardTargetWithFeelers(dt, map, curZ, bypassAng, this.driver === "AI_TOW" ? 0.36 : 0.48, game);
             }
             // If a Tow Truck hauling a vehicle (or a car clearing the way for a siren) is still blocked by a stopped car on a 2-lane street,
             // shift laterally around the stopped obstacle instead of waiting forever!
@@ -2265,20 +2276,20 @@ class Vehicle {
                 }
 
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
-                const shouldParkAndDeploy = bestDist < 165 || (bestDist < 700 && (this.approachNoProgress || 0) > 2.0) || Boolean(this.deployedFireman);
+                const shouldParkAndDeploy = bestDist < 215 || (bestDist < 700 && (this.approachNoProgress || 0) > 1.5) || Boolean(this.deployedFireman);
                 if (shouldParkAndDeploy) {
                     // Deploy an on-foot VCFD Firefighter in bunker gear & helmet with a handheld fire hose!
                     if (!this.deployedFireman) {
                         this.aiBailTimer = (this.aiBailTimer || 0) + dt;
-                        if (this.aiBailTimer > 0.42 && Math.abs(this.speed) < 34 && typeof game.deployFirefighterFromTruck === "function") {
+                        if (this.aiBailTimer > 0.38 && Math.abs(this.speed) < 36 && typeof game.deployFirefighterFromTruck === "function") {
                             this.aiBailTimer = 0;
                             this.approachNoProgress = 0;
                             game.deployFirefighterFromTruck(this, burningCar);
                         }
                     }
 
-                    // If within rooftop deck-gun range (< 155px), also fire the truck's rooftop water cannon!
-                    if (bestDist < 155) {
+                    // If within rooftop deck-gun range (< 235px), also fire the truck's rooftop water cannon over any obstacles!
+                    if (bestDist < 235) {
                         const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
                         for (let k = 0; k < 2; k++) {
                             if (Math.random() < 0.85) {
@@ -2376,7 +2387,20 @@ class Vehicle {
         }
 
         // Validate or acquire target abandoned / wrecked vehicle on road
-        // (Tow Truck CAN be dispatched and drive to a burning wreck, but MUST wait on standby until the fire is extinguished before hooking!)
+        // (Tow Truck prioritizes cooled wrecks first so it can peel a multi-car pileup while the Fire Truck extinguishes burning ones!)
+        const isVehBurning = (v) =>
+            (!v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50)) ||
+            (v.destroyed && !v.fireExtinguished && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER");
+
+        const isValidTowCandidate = (v) => {
+            if (!v || v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) return false;
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 12.0;
+            const isAbandoned = !v.destroyed &&
+                v.driver === null &&
+                (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
+            return isWreck || isAbandoned;
+        };
+
         let target = this.towTarget;
         if (
             !target ||
@@ -2388,21 +2412,34 @@ class Vehicle {
         ) {
             target = null;
             this.towTarget = null;
-            let bestDist = 1400;
+        }
+
+        // If we have no target, OR our current target is still burning while a cooled wreck is available nearby,
+        // OR we are blocked by an outer cooled wreck in a multi-car pileup, switch to the best cooled wreck!
+        if (!target || isVehBurning(target) || (this.approachNoProgress || 0) > 1.4) {
+            let bestCand = null;
+            let bestScore = 99999;
             for (const v of game.vehicles) {
-                if (v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) continue;
-                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 12.0;
-                const isAbandoned = !v.destroyed &&
-                    v.driver === null &&
-                    (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
-                if (!isWreck && !isAbandoned) continue;
+                if (!isValidTowCandidate(v)) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
-                if (d < bestDist) {
-                    bestDist = d;
-                    target = v;
+                if (d > 1400) continue;
+                const burning = isVehBurning(v);
+                const score = d + (burning ? 1200 : 0);
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestCand = v;
                 }
             }
-            this.towTarget = target;
+            if (bestCand && bestCand !== target) {
+                const curDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
+                const candDist = Math.hypot(bestCand.x - this.x, bestCand.y - this.y);
+                if (!target || (isVehBurning(target) && !isVehBurning(bestCand)) || (!isVehBurning(bestCand) && candDist < curDist - 16)) {
+                    target = bestCand;
+                    this.towTarget = target;
+                    this.approachBestDist = undefined;
+                    this.approachNoProgress = 0;
+                }
+            }
         }
 
         if (!target) {
@@ -2410,16 +2447,23 @@ class Vehicle {
             return this.computeTrafficControls(dt, map, game);
         }
 
-        const targetStillBurning =
-            (!target.destroyed && ((target.burnTimer || 0) > 0 || target.hp <= 50)) ||
-            (target.destroyed && !target.fireExtinguished && target.specKey !== "BMX_BIKE" && target.specKey !== "E_SCOOTER");
+        const targetStillBurning = isVehBurning(target);
 
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        // If the target vehicle/wreck is still on fire, the Tow Truck drives to the scene, parks at a safe standby distance (~170px),
-        // and waits with flashing beacons for the Fire Truck (FIRE_TRUCK) to extinguish the flames before hooking!
-        if (targetStillBurning && dist < 175) {
+        // If the target vehicle/wreck is still on fire, the Tow Truck parks at a safe standby distance (145..215px) pulled over to the side
+        // (and backs up slightly if closer than 135px so it never blocks the Fire Truck's access to the flames!)
+        if (targetStillBurning && dist < 215) {
             this.towHookTimer = 0;
             this.approachNoProgress = 0;
+            this.aiPullOverOffset = 24;
+            this.aiPullOverTimer = 1.5;
+            if (dist < 135) {
+                return {
+                    throttle: -0.55,
+                    steer: 0.35,
+                    handbrake: false
+                };
+            }
             return {
                 throttle: this.speed > 6 ? -0.75 : 0,
                 steer: 0,
@@ -2429,7 +2473,8 @@ class Vehicle {
 
         const noProgress = this.updateApproachProgress(dt, dist);
         const hookDist = Math.max(76, ((this.w || 62) + (target.w || 48)) * 0.54 + 14);
-        if (!targetStillBurning && (dist < hookDist || (dist < 115 && noProgress > 2.4))) {
+        // In a dense multi-car pileup, allow the Tow Truck's extendable steel winch cable to hook cooled wrecks up to 195px away when blocked!
+        if (!targetStillBurning && (dist < hookDist || (dist < 195 && noProgress > 1.7))) {
             // Stop for 1.8s to attach the tow winch before pulling away!
             this.towHookTimer = (this.towHookTimer || 0) + dt;
             if (this.towHookTimer < 1.8) {

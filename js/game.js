@@ -10238,6 +10238,14 @@ class LeonidaGame {
 
                         (!b.destroyed && b.driver === "AI_CRIMINAL") ||
 
+                        (!a.destroyed && a.driver === "AI_TOW") ||
+
+                        (!b.destroyed && b.driver === "AI_TOW") ||
+
+                        (!a.destroyed && a.driver === "AI_EMERGENCY" && a.sirenActive) ||
+
+                        (!b.destroyed && b.driver === "AI_EMERGENCY" && b.sirenActive) ||
+
                         (((!a.destroyed && a.driver === "AI_COP") || (!b.destroyed && b.driver === "AI_COP")) && (this.wantedLevel > 0 || a.sirenActive || b.sirenActive));
 
 
@@ -11817,7 +11825,7 @@ class LeonidaGame {
 
                 if (targetFire && ped.firemanOutTimer < 30.0) {
 
-                    if (bestDist < 84) {
+                    if (bestDist < 128) {
 
                         ped.angle = Math.atan2(targetFire.y - ped.y, targetFire.x - ped.x);
 
@@ -12355,7 +12363,8 @@ class LeonidaGame {
 
             // Physical collision against parked / stationary vehicles and wrecks
             if ((ped.slideCarTimer || 0) <= 0 && (ped.exitAnimTimer || 0) <= 0) {
-                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0, ped._boardingVeh || null);
+                const pedVehRadius = (ped.kind === "FIREMAN" || ped.kind === "MEDIC") ? 4.5 : 7.5;
+                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, pedVehRadius, ped.z || 2.0, ped._boardingVeh || ped.fireTarget || null);
                 if (vCol.hit) {
                     ped.x = vCol.x;
                     ped.y = vCol.y;
@@ -12376,7 +12385,7 @@ class LeonidaGame {
 
             // Real-displacement anti-stuck watchdog: if any walking pedestrian moved < 7px over 0.50s,
             // mark the tile ahead as blocked, nudge toward the center of the current walkable tile, and pick a clear direction!
-            if (!ped.dead && !ped.isLivingProp && !ped.inCombat && ped.kind !== "GATOR" && (ped.healTimer || 0) <= 0 && (ped.slideCarTimer || 0) <= 0) {
+            if (!ped.dead && !ped.isLivingProp && !ped.inCombat && ped.kind !== "GATOR" && (ped.healTimer || 0) <= 0 && !ped.sprayingHose && (ped.slideCarTimer || 0) <= 0) {
                 ped._stuckCheckTimer = (ped._stuckCheckTimer || 0) + dt;
                 if (ped._lastCheckX === undefined) {
                     ped._lastCheckX = ped.x;
