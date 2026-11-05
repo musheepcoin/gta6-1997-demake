@@ -193,8 +193,8 @@
             { dc: 0, dr: 1, facing: "N", penalty: 6.0 }
         ];
         for (const intr of map.interiors) {
-            if (intr.isShop || intr.isEstatePortico || intr.id === "STAR_ISLAND" || (intr.id && intr.id.startsWith("ESTATE_"))) continue;
             intr.matRGB = hexToRgb(intr.accent);
+            if (intr.isShop || intr.isEstatePortico || intr.id === "STAR_ISLAND" || intr.id === "SERA_SPACE" || (intr.id && intr.id.startsWith("ESTATE_"))) continue;
             const cInit = Math.floor(intr.doorX / ts);
             const rInit = Math.floor(intr.doorY / ts);
             if (intr.facing === "S" && walkable(cInit, rInit) && gt(cInit, rInit - 1) === GROUND_TYPE.BUILDING) {

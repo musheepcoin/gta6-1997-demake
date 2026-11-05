@@ -7237,6 +7237,66 @@ class RetroRenderer {
             }
         }
 
+        // 10C) SERA Space Center (Cape Canaveral) Fenced Federal Launch Complex, West Checkpoint Boom Barrier, Searchlights & Armed SWAT Sentries
+        const seraComp = this.map.seraCompound;
+        if (seraComp && seraComp.x1 >= minX - 140 && seraComp.x0 <= maxX + 140 && seraComp.y1 >= minY - 140 && seraComp.y0 <= maxY + 140) {
+            const bz = seraComp.z || 2.0;
+            if (Array.isArray(seraComp.spans)) {
+                for (let si = 0; si < seraComp.spans.length; si++) {
+                    const sp = seraComp.spans[si];
+                    drawSecurityFenceSpan(sp.xA, sp.yA, sp.xB, sp.yB, bz, Boolean(sp.isPrison));
+                }
+            }
+            if (Array.isArray(seraComp.gates)) {
+                for (let gi = 0; gi < seraComp.gates.length; gi++) {
+                    const gt = seraComp.gates[gi];
+                    if (gt.x < minX - 220 || gt.x > maxX + 220 || gt.y < minY - 220 || gt.y > maxY + 220) continue;
+                    const halfW = gt.w * 0.5;
+                    // Yellow & black hazard stop stripe across the West Security Checkpoint lane
+                    this.pushSolidQuad3D(gt.x, gt.y, bz + 0.016, 7.0, gt.w - 8, 0, 0.98, 0.80, 0.12, 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // North & South 3D Security Gate Pillars with flashing red/blue federal warning beacons & boom barrier arms
+                    for (const side of [-1, 1]) {
+                        const px = gt.x;
+                        const py = gt.y + side * (halfW - 4);
+                        this.pushSolidQuad3D(px + sunCos * 4, py + sunSin * 4, bz + 0.015, 11, 11, 0, 0.02, 0.03, 0.05, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(px, py, bz + 0.10, 9.5, 9.5, 0, 0.22, 0.26, 0.32, 0.98, SPRITE_DRAW_ORDER.CAR);
+                        this.pushSolidQuad3D(px, py, bz + 0.22, 7.5, 7.5, 0, 0.16, 0.52, 0.94, 0.98, SPRITE_DRAW_ORDER.TREES);
+                        const beaconOn = Math.sin(this.time * 7.0 + gi * 1.7 + side) > 0.0;
+                        if (beaconOn) {
+                            this.pushSolidQuad3D(px, py, bz + 0.26, 5.8, 5.8, 0, side < 0 ? 1.0 : 0.18, side < 0 ? 0.20 : 0.65, side < 0 ? 0.16 : 1.0, 0.94, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                        }
+                        const armLen = halfW * 0.44;
+                        const armCy = py - side * (armLen * 0.5 + 3);
+                        this.pushSolidQuad3D(px, armCy, bz + 0.14, 3.6, armLen, 0, 0.95, 0.18, 0.18, 0.96, SPRITE_DRAW_ORDER.TREES);
+                        this.pushSolidQuad3D(px, armCy, bz + 0.145, 3.6, armLen * 0.45, 0, 0.98, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.TREES);
+                    }
+                }
+            }
+            if (Array.isArray(seraComp.towers)) {
+                for (let ti = 0; ti < seraComp.towers.length; ti++) {
+                    const tw = seraComp.towers[ti];
+                    if (tw.x < minX - 180 || tw.x > maxX + 180 || tw.y < minY - 180 || tw.y > maxY + 180) continue;
+                    const sAng = tw.baseAng + Math.sin(this.time * 0.85 + ti * 1.6) * 0.65;
+                    const beamX = tw.x + Math.cos(sAng) * 58;
+                    const beamY = tw.y + Math.sin(sAng) * 58;
+                    this.pushSolidQuad3D(beamX, beamY, bz + 0.022, 42, 42, sAng, 0.72, 0.92, 1.0, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(beamX, beamY, bz + 0.025, 20, 20, sAng, 0.88, 0.97, 1.0, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+            if (Array.isArray(seraComp.patrolGuards)) {
+                for (let pi = 0; pi < seraComp.patrolGuards.length; pi++) {
+                    const pg = seraComp.patrolGuards[pi];
+                    const osc = Math.sin(this.time * 1.15 + pg.seed);
+                    const gx = pg.x + pg.dx * osc;
+                    const gy = pg.y + pg.dy * osc;
+                    if (gx < minX - 80 || gx > maxX + 80 || gy < minY - 80 || gy > maxY + 80) continue;
+                    const gAng = Math.atan2(pg.dy * Math.cos(this.time * 1.15 + pg.seed), pg.dx * Math.cos(this.time * 1.15 + pg.seed) || 0.01);
+                    const fr = Math.floor(this.time * 5.0 + pi * 2) % 8;
+                    this.batchPedSprite3D(pi % 2 === 0 ? "g2_swat" : "police", fr, gx, gy, bz + 0.038, gAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
+
         // 11) Vice Port, Port Gellhorn, Ambrosia Docks & Island Marinas (Cargo Barges, Container Stacks & Boats)
         const portTerms = this.map.portTerminals;
         if (portTerms && portTerms.length > 0) {

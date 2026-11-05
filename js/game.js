@@ -560,9 +560,13 @@ class LeonidaGame {
 
 
 
-            // --- D. SERA Space Center Restricted Military Launch Pad 39A (off-road concrete pad at x=230.5, y=22.5) ---
+            // --- D. SERA Space Center Restricted Federal Launch Complex 39A (Cape Canaveral compound c=458..480, r=22..44) ---
 
-            { spec: "PANZER_TANK", c: 459.5, r: 32.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "PANZER_TANK", c: 468.5, r: 27.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+
+            { spec: "VCPD_CRUISER", c: 460.5, r: 31.2, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+
+            { spec: "BOXVILLE_VAN", c: 460.5, r: 38.8, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
 
 
@@ -13058,6 +13062,33 @@ class LeonidaGame {
 
             }
 
+        }
+
+        if (!p.dead && this.map.seraCompound) {
+            const sc = this.map.seraCompound;
+            const inSeraCompound = (p.x > sc.x0 + 28 && p.x < sc.x1 - 28 && p.y > sc.y0 + 28 && p.y < sc.y1 - 28);
+            if (inSeraCompound) {
+                const isAuthorizedVehicle = Boolean(p.inVehicle && (p.inVehicle.isPolice || p.inVehicle.isEmergency));
+                const isCopOutfit = (p.charId === "DETECTIVE" || p.charId === "CROCKETT");
+                if (!isAuthorizedVehicle && !isCopOutfit) {
+                    if (!this._inRestrictedSera) {
+                        this._inRestrictedSera = true;
+                        if (this.wantedLevel < 3) {
+                            this.setWantedLevel(3);
+                            this.wantedDecayTimer = 0;
+                        }
+                        this.addFloatingText(p.x, p.y - 30, "🚨 RESTRICTED AREA: SERA SPACE CENTER — 3★ WANTED!", "#ef4444");
+                        this.sendPager(
+                            "SERA FEDERAL SECURITY",
+                            "ALERT! Unauthorized breach of SERA Launch Complex 39A security checkpoint! SWAT & Federal Units dispatched!",
+                            true
+                        );
+                    }
+                    this.wantedDecayTimer = 0;
+                }
+            } else {
+                this._inRestrictedSera = false;
+            }
         }
 
 

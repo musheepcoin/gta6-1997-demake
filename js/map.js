@@ -286,11 +286,20 @@ class LeonidaMap {
             }
         }
 
-        // Pave SERA Space Center Launch Complex 39A security apron (x=458..471, y=29..40),
+        // Clear stray cubic 5-story voxel blocks on the Cape Leonida shoreline (x=481..482, y=21..44) to golden beach sand (lid 98),
+        // then pave the entire SERA Space Center high-security complex tarmac (x=458..480, y=22..44),
         // Cape Leonida Lighthouse headland plaza (x=457..466, y=132..136), and Key West Lighthouse plaza (x=197..201, y=475..478)
         // with native GTA 1 stone/concrete pavers (lid 8), and Vice Beach Pier boardwalk (x=455..467, y=193..196) with wooden planks (lid 77)!
+        for (let x = 481; x <= 482; x++) {
+            for (let y = 21; y <= 44; y++) {
+                for (let z = 0; z < MAP_LAYERS; z++) {
+                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] =
+                        this.voxelGrid[(z * MAP_ROWS + 26) * MAP_COLS + 460];
+                }
+            }
+        }
         const stonePaverBoxes = [
-            [458, 471, 29, 40],
+            [458, 480, 22, 44],
             [457, 466, 132, 136],
             [197, 201, 475, 478]
         ];
@@ -535,7 +544,7 @@ class LeonidaMap {
                 this.surfaceGround[r * MAP_COLS + c] = surfGt;
 
                 // Open ground tiles store their visible lid at z = 1 and their navigation groundType at z = 2 (with lid = 0)
-                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180);
+                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45);
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
                 if (blkZ1 && blkZ1.lid === 69) {
@@ -585,8 +594,8 @@ class LeonidaMap {
                     this.coastalSandMask[idx] = 1;
                 }
 
-                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, or Vice City Mambas Stadium bowl/pitch
-                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180)) {
+                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, Vice City Mambas Stadium, or SERA Space Center compound
+                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45)) {
                     continue;
                 }
 
@@ -1442,7 +1451,7 @@ class LeonidaMap {
             // Helipads with Live Spinning-Rotor Helicopters
             { kind: "HELIPAD",  c: 122.5, r: 303.5, ang: 0.4,            scale: 1.25 },
             { kind: "HELIPAD",  c: 158.5, r: 291.5, ang: -0.6,           scale: 1.25 },
-            { kind: "HELIPAD",  c: 460.0, r: 40.5,  ang: 0.2,            scale: 1.25 },
+            { kind: "HELIPAD",  c: 463.5, r: 42.2,  ang: 0.2,            scale: 1.25 },
             { kind: "HELIPAD",  c: 338.5, r: 163.5, ang: -0.8,           scale: 1.25 },
             { kind: "HELIPAD",  c: 336.5, r: 318.5, ang: 0.5,            scale: 1.25 },
             { kind: "HELIPAD",  c: 62.0,  r: 90.5,  z: 5.08, ang: 1.1,   scale: 1.20, isRooftop: true }
@@ -1558,12 +1567,79 @@ class LeonidaMap {
                 { x: 131.2 * TILE_SIZE, y: 367.4 * TILE_SIZE, dx: 26, dy: 0,  seed: 5.3 }
             ]
         };
+        // 10C) SERA Space Center (Cape Canaveral / Cape Leonida) Restricted Federal Launch Complex ("seraCompound")
+        const seraX0 = 458.25 * TILE_SIZE, seraY0 = 22.25 * TILE_SIZE, seraX1 = 480.75 * TILE_SIZE, seraY1 = 44.75 * TILE_SIZE;
+        const seraInX0 = 458.95 * TILE_SIZE, seraInY0 = 22.95 * TILE_SIZE, seraInX1 = 480.05 * TILE_SIZE, seraInY1 = 44.05 * TILE_SIZE;
+        this.seraCompound = {
+            x0: seraX0,
+            y0: seraY0,
+            x1: seraX1,
+            y1: seraY1,
+            inX0: seraInX0,
+            inY0: seraInY0,
+            inX1: seraInX1,
+            inY1: seraInY1,
+            z: 2.0,
+            spans: [
+                // Outer High-Security Double-Fence with Razor Wire (West Main Checkpoint Opening at y=33.8..36.2)
+                { xA: seraX0, yA: seraY0,             xB: seraX1, yB: seraY0,             isPrison: true },
+                { xA: seraX1, yA: seraY0,             xB: seraX1, yB: seraY1,             isPrison: true },
+                { xA: seraX0, yA: seraY1,             xB: seraX1, yB: seraY1,             isPrison: true },
+                { xA: seraX0, yA: seraY0,             xB: seraX0, yB: 33.8 * TILE_SIZE,   isPrison: true },
+                { xA: seraX0, yA: 36.2 * TILE_SIZE,   xB: seraX0, yB: seraY1,             isPrison: true },
+                // Inner Razor-Wire Security Perimeter Fence
+                { xA: seraInX0, yA: seraInY0,           xB: seraInX1, yB: seraInY0,           isPrison: true },
+                { xA: seraInX1, yA: seraInY0,           xB: seraInX1, yB: seraInY1,           isPrison: true },
+                { xA: seraInX0, yA: seraInY1,           xB: seraInX1, yB: seraInY1,           isPrison: true },
+                { xA: seraInX0, yA: seraInY0,           xB: seraInX0, yB: 33.8 * TILE_SIZE,   isPrison: true },
+                { xA: seraInX0, yA: 36.2 * TILE_SIZE,   xB: seraInX0, yB: seraInY1,           isPrison: true }
+            ],
+            // Solid thick AABB barrier boxes around all 4 sides — entry ONLY via West Security Checkpoint (y = 33.8..36.2)!
+            barrierBoxes: [
+                // North Double-Fence Blast Wall
+                { minX: 458.15 * TILE_SIZE, maxX: 480.85 * TILE_SIZE, minY: 22.15 * TILE_SIZE, maxY: 23.02 * TILE_SIZE },
+                // South Double-Fence Blast Wall
+                { minX: 458.15 * TILE_SIZE, maxX: 480.85 * TILE_SIZE, minY: 43.98 * TILE_SIZE, maxY: 44.85 * TILE_SIZE },
+                // East Atlantic Shoreline Double-Fence Blast Wall
+                { minX: 479.98 * TILE_SIZE, maxX: 480.85 * TILE_SIZE, minY: 22.15 * TILE_SIZE, maxY: 44.85 * TILE_SIZE },
+                // West-North Double-Fence Blast Wall (north of Main Security Gatehouse)
+                { minX: 458.15 * TILE_SIZE, maxX: 459.02 * TILE_SIZE, minY: 22.15 * TILE_SIZE, maxY: 33.75 * TILE_SIZE },
+                // West-South Double-Fence Blast Wall (south of Main Security Gatehouse)
+                { minX: 458.15 * TILE_SIZE, maxX: 459.02 * TILE_SIZE, minY: 36.25 * TILE_SIZE, maxY: 44.85 * TILE_SIZE }
+            ],
+            gates: [
+                {
+                    x: 458.6 * TILE_SIZE,
+                    y: 35.0 * TILE_SIZE,
+                    w: 2.4 * TILE_SIZE,
+                    boothX: 459.45 * TILE_SIZE,
+                    boothY: 33.15 * TILE_SIZE,
+                    guardAng: Math.PI,
+                    isVerticalGate: true,
+                    name: "SERA MAIN SECURITY CHECKPOINT"
+                }
+            ],
+            towers: [
+                { x: 458.65 * TILE_SIZE, y: 22.65 * TILE_SIZE, baseAng: 0.75 },
+                { x: 480.35 * TILE_SIZE, y: 22.65 * TILE_SIZE, baseAng: 2.35 },
+                { x: 458.65 * TILE_SIZE, y: 44.35 * TILE_SIZE, baseAng: -0.75 },
+                { x: 480.35 * TILE_SIZE, y: 44.35 * TILE_SIZE, baseAng: -2.35 }
+            ],
+            patrolGuards: [
+                { x: 460.1 * TILE_SIZE, y: 33.6 * TILE_SIZE, dx: 0,  dy: 22, seed: 0.8 },
+                { x: 460.1 * TILE_SIZE, y: 36.4 * TILE_SIZE, dx: 0,  dy: -22, seed: 2.1 },
+                { x: 463.5 * TILE_SIZE, y: 29.8 * TILE_SIZE, dx: 34, dy: 0,  seed: 3.4 },
+                { x: 469.2 * TILE_SIZE, y: 35.0 * TILE_SIZE, dx: 0,  dy: 36, seed: 4.7 }
+            ]
+        };
         this.securityFenceSpans = [
             ...this.prisonCompound.spans,
-            ...this.airportCompound.spans
+            ...this.airportCompound.spans,
+            ...this.seraCompound.spans
         ];
         this.securityBarrierBoxes = [
-            ...this.prisonCompound.barrierBoxes
+            ...this.prisonCompound.barrierBoxes,
+            ...this.seraCompound.barrierBoxes
         ];
 
         // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
@@ -2135,7 +2211,7 @@ class LeonidaMap {
             }
         }
 
-        // 18B. Airport & Penitentiary Security Guardhouse Booths & Watchtowers
+        // 18B. Airport, Penitentiary & SERA Space Center Security Guardhouse Booths & Watchtowers
         for (const gt of this.airportCompound.gates) {
             if (gt.boothX && gt.boothY) pushPropOBB(gt.boothX, gt.boothY, 13, 10, 0);
         }
@@ -2143,6 +2219,12 @@ class LeonidaMap {
             if (gt.boothX && gt.boothY) pushPropOBB(gt.boothX, gt.boothY, 17, 13, 0);
         }
         for (const tw of this.prisonCompound.towers) {
+            pushPropOBB(tw.x, tw.y, 17, 17, 0);
+        }
+        for (const gt of this.seraCompound.gates) {
+            if (gt.boothX && gt.boothY) pushPropOBB(gt.boothX, gt.boothY, 16, 13, 0);
+        }
+        for (const tw of this.seraCompound.towers) {
             pushPropOBB(tw.x, tw.y, 17, 17, 0);
         }
 
@@ -2194,9 +2276,12 @@ class LeonidaMap {
         // intentionally have ZERO solid collision boxes in securityBarrierBoxes so the player can drive through and
         // physically run over / scatter the participants! Vehicle spawners use this.isInsideLivingEventZone(x, y) instead.
 
-        // 18D-2. 3D Landmarks & Monuments Solid OBB Collision Hulls (Launchpad, ATC Tower, Water Tower, Pier Arch Pylons, Ferris Wheel & Gantry Legs)
-        pushPropOBB(465.0 * TILE_SIZE, 35.0 * TILE_SIZE, 78, 78, 0);              // SERA Launchpad MLP & Umbilical Tower
-        pushPropOBB(460.8 * TILE_SIZE, 35.0 * TILE_SIZE, 28, 36, 0);              // SERA Launch Control Bunker
+        // 18D-2. 3D Landmarks & Monuments Solid OBB Collision Hulls (SERA Space Center VAB/Launchpad, ATC Tower, Water Tower, Pier Arch Pylons, Ferris Wheel & Gantry Legs)
+        pushPropOBB(463.5 * TILE_SIZE, 26.2 * TILE_SIZE, 146, 114, 0);             // SERA 3D Vehicle Assembly Building (VAB) & High-Bay Hangar
+        pushPropOBB(466.5 * TILE_SIZE, 32.0 * TILE_SIZE, 44, 28, 0);               // SERA 3D Launch Control Center Bunker
+        pushPropOBB(463.5 * TILE_SIZE, 38.8 * TILE_SIZE, 92, 42, 0);               // SERA 3D Payload, Fairing & Booster Recovery Bay
+        pushPropOBB(473.0 * TILE_SIZE, 35.0 * TILE_SIZE, 86, 86, 0);               // SERA 3D Launch Complex 39A MLP & Umbilical Gantry
+        pushPropOBB(473.0 * TILE_SIZE - 68, 35.0 * TILE_SIZE + 54, 18, 18, 0);     // SERA 3D Water Deluge Suppression Tower
         pushPropOBB(106.5 * TILE_SIZE, 307.5 * TILE_SIZE, 38, 38, 0);             // VCIA 3D Air Traffic Control Tower
         pushPropOBB(148.5 * TILE_SIZE, 118.5 * TILE_SIZE, 32, 32, 0);             // Kelly County 3D Water Tower
         pushPropOBB(148.5 * TILE_SIZE + 54, 118.5 * TILE_SIZE, 14, 14, 0);        // Kelly County 3D Radio Mast
@@ -2561,7 +2646,7 @@ class LeonidaMap {
                     const dx = pm.x - payphoneSpots[i][0], dy = pm.y - payphoneSpots[i][1];
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
-                if (c >= 179 && c <= 197 && r >= 164 && r <= 180) return false;
+                if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45)) return false;
                 return true;
             });
 
@@ -2577,7 +2662,7 @@ class LeonidaMap {
                 this.trees = this.trees.filter(tr => {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
-                    if (c >= 179 && c <= 197 && r >= 164 && r <= 180) return false;
+                    if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45)) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
                         const gt = this.surfaceGround[r * MAP_COLS + c];
                         if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
@@ -2731,13 +2816,13 @@ class LeonidaMap {
                 id: "SERA_SPACE",
                 short: "SERA SPACE",
                 shortName: "SERA SPACE CENTER",
-                name: "🚀 SERA SPACE CENTER & LAUNCH PADS 39A/39B",
-                sub: "CAPE LEONIDA VAB, BANANA RIVER LAGOON & 2 3D ROCKET GANTRY TOWERS — ROCKET & ARMOR!",
+                name: "🚀 SERA SPACE CENTER & LAUNCH COMPLEX 39A",
+                sub: "FENCED FEDERAL SPACEPORT, 3D VAB HANGAR, PAYLOAD BAY & ARTEMIS ROCKET — 3★ RESTRICTED ZONE!",
                 district: "CAPE LEONIDA — SERA SPACEPORT",
-                bx: mx256(224.5),
-                by: my256(20.5),
-                x: mx256(224.5) * TILE_SIZE,
-                y: my256(20.5) * TILE_SIZE,
+                bx: 456.5,
+                by: 35.0,
+                x: 456.5 * TILE_SIZE,
+                y: 35.0 * TILE_SIZE,
                 color: "#38bdf8",
                 perk: "ESTATE",
                 visited: false
@@ -3151,8 +3236,8 @@ class LeonidaMap {
                 theme: "SPACE_BUNKER",
                 accent: "#38bdf8",
                 facing: "S",
-                doorX: mx256(230.5) * TILE_SIZE,
-                doorY: my256(17.5) * TILE_SIZE,
+                doorX: 463.5 * TILE_SIZE,
+                doorY: 28.55 * TILE_SIZE,
                 w: 820,
                 h: 540,
                 npcs: [
@@ -3357,6 +3442,8 @@ class LeonidaMap {
         if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) return true;
         // Leonida State Penitentiary Fenced Compound (c = 56..68, r = 76..146)
         if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146) return true;
+        // SERA Space Center Fenced Federal Launch Complex (c = 458..481, r = 21..45)
+        if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) return true;
         return false;
     }
 

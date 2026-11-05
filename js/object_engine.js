@@ -271,12 +271,18 @@ class WorldObjectEngine {
         this.streetProps = [];
         this.landmarks3D = {
             launchpad: {
-                x: 465.0 * TILE_SIZE,
+                x: 473.0 * TILE_SIZE,
                 y: 35.0 * TILE_SIZE,
                 z: 2.0,
-                consoleX: 460.8 * TILE_SIZE,
-                consoleY: 35.0 * TILE_SIZE,
-                splashX: 490.6 * TILE_SIZE,
+                consoleX: 466.5 * TILE_SIZE,
+                consoleY: 34.0 * TILE_SIZE,
+                vabX: 463.5 * TILE_SIZE,
+                vabY: 26.2 * TILE_SIZE,
+                payloadX: 463.5 * TILE_SIZE,
+                payloadY: 38.8 * TILE_SIZE,
+                gateX: 458.6 * TILE_SIZE,
+                gateY: 35.0 * TILE_SIZE,
+                splashX: 491.5 * TILE_SIZE,
                 splashY: 35.0 * TILE_SIZE
             },
             ferrisWheel: { x: 466.0 * TILE_SIZE, y: 195.0 * TILE_SIZE, z: 2.0 },
@@ -705,7 +711,7 @@ class WorldObjectEngine {
         const clearZones = [];
         if (this.landmarks3D) {
             if (this.landmarks3D.launchpad) {
-                clearZones.push({ x: this.landmarks3D.launchpad.x - 40, y: this.landmarks3D.launchpad.y, r: 340 });
+                clearZones.push({ x: 469.0 * TILE_SIZE, y: 33.5 * TILE_SIZE, r: 780 });
             }
             if (this.landmarks3D.ferrisWheel) {
                 clearZones.push({ x: this.landmarks3D.ferrisWheel.x, y: this.landmarks3D.ferrisWheel.y, r: 165 });
@@ -2739,7 +2745,12 @@ class WorldObjectEngine {
             }
         };
         if (this.landmarks3D) {
-            if (this.landmarks3D.launchpad) stampTower(this.landmarks3D.launchpad.x, this.landmarks3D.launchpad.y, 1, 4.1);
+            if (this.landmarks3D.launchpad) {
+                stampTower(this.landmarks3D.launchpad.x, this.landmarks3D.launchpad.y, 1, 4.3);
+                if (this.landmarks3D.launchpad.vabX) {
+                    stampTower(this.landmarks3D.launchpad.vabX, this.landmarks3D.launchpad.vabY, 2, 4.4);
+                }
+            }
             if (this.landmarks3D.atcTower) stampTower(this.landmarks3D.atcTower.x, this.landmarks3D.atcTower.y, 1, 4.2);
             if (this.landmarks3D.waterTower) stampTower(this.landmarks3D.waterTower.x, this.landmarks3D.waterTower.y, 1, 4.0);
             if (this.landmarks3D.viceSign) stampTower(this.landmarks3D.viceSign.x, this.landmarks3D.viceSign.y, 1, 3.6);
@@ -2753,6 +2764,11 @@ class WorldObjectEngine {
         if (this.map && this.map.prisonCompound && Array.isArray(this.map.prisonCompound.towers)) {
             for (const tw of this.map.prisonCompound.towers) {
                 stampTower(tw.x, tw.y, 0, 2.85);
+            }
+        }
+        if (this.map && this.map.seraCompound && Array.isArray(this.map.seraCompound.towers)) {
+            for (const tw of this.map.seraCompound.towers) {
+                stampTower(tw.x, tw.y, 0, 2.95);
             }
         }
         // Inject 3D Octagonal Vice City Mambas Stadium Bowl & 4 Corner Spires into solar shadow map
@@ -4360,6 +4376,46 @@ class WorldObjectEngine {
             }
         }
 
+        // E.3: SERA Space Center (Cape Canaveral) West Security Checkpoint Gatehouse, Overhead Portal & 4 Radar Watchtowers
+        if (this.map && this.map.seraCompound) {
+            const sc = this.map.seraCompound;
+            if (Array.isArray(sc.gates)) {
+                for (const gt of sc.gates) {
+                    const bz = 2.0;
+                    if (gt.boothX && gt.boothY) {
+                        const bx = gt.boothX, by = gt.boothY;
+                        emitAOShadow3D(bx, by, 1, 0, 0, 0, 48, 38, bz, 0.44);
+                        // Aerospace Security Bunker Base (S177 bevelled stone + S86 NASA blue/white cladding + L46 concrete deck)
+                        emitTileBox3D(bx, by, 1, 0, 0, 0, 34, 28, bz, bz + 0.22, 177, 86, 46, [0.92, 0.95, 0.99], true);
+                        // 360° Armored Observation Window Tier (S199 glass + L31 skylight)
+                        emitTileBox3D(bx, by, 1, 0, 0, 0, 30, 24, bz + 0.22, bz + 0.42, 199, 199, 31, [0.94, 0.98, 1.00], false);
+                        // Overhanging Roof Slab & Telemetry Radome (S172 + L86)
+                        emitTileBox3D(bx, by, 1, 0, 0, 0, 36, 30, bz + 0.42, bz + 0.50, 172, 173, 86, [0.90, 0.94, 0.99], false);
+                        emitSphere3D(bx, by, 0, 0, 7.5, bz + 0.50, 0.12, 6, 12, [0.96, 0.98, 1.00], 5);
+                    }
+                    // Heavy 3D Overhead Federal Spaceport Security Portal spanning the West Main Checkpoint (North-South gate opening)
+                    const gw = (gt.w || 154) + 12;
+                    emitTileBox3D(gt.x, gt.y, 1, 0, 0, -gw * 0.48, 14, 12, bz, bz + 0.52, 86, 86, 46, [0.92, 0.95, 0.99], true);
+                    emitTileBox3D(gt.x, gt.y, 1, 0, 0,  gw * 0.48, 14, 12, bz, bz + 0.52, 86, 86, 46, [0.92, 0.95, 0.99], true);
+                    emitTileBox3D(gt.x, gt.y, 1, 0, 0, 0, 16, gw + 10, bz + 0.40, bz + 0.52, 250, 363, 45, [0.92, 0.95, 0.99], false);
+                    emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 10, gw * 0.84, bz + 0.52, bz + 0.58, [0.16, 0.52, 0.92], 3);
+                }
+            }
+            if (Array.isArray(sc.towers)) {
+                for (const tw of sc.towers) {
+                    const tx = tw.x, ty = tw.y, bz = 2.0;
+                    emitAOShadow3D(tx, ty, 1, 0, 0, 0, 52, 52, bz, 0.46);
+                    emitOctagonPad3D(tx, ty, 0, 0, 42, 42, 38, 38, 0.25, bz, bz + 0.14, [0.90, 0.92, 0.96], [0.84, 0.86, 0.90], 2, 177, 71);
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 26, 26, bz + 0.14, bz + 0.54, 86, 86, 46, [0.92, 0.95, 0.99], false);
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 40, 40, bz + 0.54, bz + 0.60, 363, 363, 45, [0.88, 0.92, 0.96], false);
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 32, 32, bz + 0.60, bz + 0.80, 199, 199, 31, [0.94, 0.98, 1.00], false);
+                    emitTileBox3D(tx, ty, 1, 0, 0, 0, 38, 38, bz + 0.80, bz + 0.87, 172, 172, 86, [0.90, 0.94, 0.98], false);
+                    // Geodesic White Radar Tracking Dome on top of each SERA Corner Watchtower
+                    emitSphere3D(tx, ty, 0, 0, 11.5, bz + 0.87, 0.18, 7, 14, [0.96, 0.98, 1.00], 5);
+                }
+            }
+        }
+
         // ====================================================================
         // F. COMPILE 3D CORRUGATED SHIPPING CONTAINERS & SEE-THROUGH PORT GANTRY CRANES
         //    (Uses real alpha-cutout 3ds Max steel truss tiles S246, S250, S363 + MAT 6 containers)
@@ -4427,48 +4483,132 @@ class WorldObjectEngine {
         }
 
         // ====================================================================
-        // G. COMPILE SERA SPACE CENTER LAUNCH COMPLEX 39A (KENNEDY / CAPE CANAVERAL)
-        //    100% Textured with Authentic 64x64 GTA 1 Tiles from gta1_tiles_vice.png:
-        //    - S86 / S199 / L86 / L31: NASA/SERA Launch Control Bunker (matches SERA building across road!)
-        //    - S177 / L71 & S503(L113) / L87: Stepped Chamfered Octagonal Concrete Blast Pad
-        //    - L33 / L22: Scorched Riveted Steel Flame Deflector Trench & Exhaust Turbine Shafts
-        //    - S172 / S173 / L109: Mobile Launcher Platform (MLP) with Helipad/Target Ring Deck
-        //    - S191 / L67: Cryogenic LOX/LH2 Pipeline Manifolds & Geodesic Storage Spheres
-        //    - S363 / S246 / S249 / L64: 7-Tier Alpha-Cutout Open-Lattice Steel Umbilical Tower (LUT)
+        // G. COMPILE SERA SPACE CENTER & LAUNCH COMPLEX 39A (CAPE CANAVERAL / CAPE LEONIDA)
+        //    Coherent Fenced Federal Spaceport (c = 458..480, r = 22..44) built 100% with the 3D Engine:
+        //    - G.1: Colossal 3D Vehicle Assembly Building (VAB) & Mission Control Complex (463.5, 26.2)
+        //    - G.2: Heavy Twin Steel Crawlerway Roadways linking West Gate, VAB, Payload Bay & LC-39A
+        //    - G.3: 3D Launch Control Center (LCC) Bunker & Ignition Console Pedestal (466.5, 34.0)
+        //    - G.4: 3D SERA Payload, Fairing & Booster Recovery Inspection Hangar (463.5, 38.8 — GTA 6 SERA leaks!)
+        //    - G.5: Stepped Octagonal Concrete Blast Pad 39A, Flame Trench, MLP, Water Deluge Tower, Cryo Spheres & 7-Tier LUT (473.0, 35.0)
         // ====================================================================
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             const bz = lp.z || 2.0;
+            const vabX = lp.vabX || (463.5 * TILE_SIZE);
+            const vabY = lp.vabY || (26.2 * TILE_SIZE);
+            const payX = lp.payloadX || (463.5 * TILE_SIZE);
+            const payY = lp.payloadY || (38.8 * TILE_SIZE);
 
-            // 0. Soft Ground Ambient Occlusion Contact Shadow Skirt on the Paved Spaceport Compound (lid 8)
-            emitAOShadow3D(lp.x, lp.y, 1, 0, -14, 0, 316, 288, bz, 0.44);
+            // ----------------------------------------------------------------
+            // G.1: COLOSSAL 3D VEHICLE ASSEMBLY BUILDING (VAB) & MISSION CONTROL
+            // ----------------------------------------------------------------
+            emitAOShadow3D(vabX, vabY, 1, 0, 0, 6, 326, 256, bz, 0.48);
+            // 1. Reinforced Concrete Seismic Plinth (294 x 226)
+            emitTileBox3D(vabX, vabY, 1, 0, 0, 0, 294, 226, bz, bz + 0.14, 177, 177, 71, [0.88, 0.90, 0.94], true);
+            // 2. Lower Transfer Aisle & Mission Control Wings (284 x 216, S86 NASA blue/white vertical steel + S199 glass)
+            emitTileBox3D(vabX, vabY, 1, 0, 0, 0, 284, 216, bz + 0.14, bz + 0.96, 86, 199, 86, [0.94, 0.97, 1.00], false);
+            // 3. Towering Central High-Bay Rocket Assembly Cube (224 x 182, rising to bz + 2.26!)
+            emitTileBox3D(vabX, vabY, 1, 0, 0, -4, 224, 182, bz + 0.96, bz + 2.26, 86, 86, 46, [0.96, 0.98, 1.00], false);
+            // 4. Giant Vertical High-Bay Slotted Rocket Hangar Doors on East (Crawlerway) & South Facades (S173 / L33 dark ribbed steel)
+            emitTileBox3D(vabX, vabY, 1, 0, 113, -36, 8, 46, bz + 0.14, bz + 2.12, 173, 173, 33, [0.42, 0.46, 0.54], false);
+            emitTileBox3D(vabX, vabY, 1, 0, 113,  28, 8, 46, bz + 0.14, bz + 2.12, 173, 173, 33, [0.42, 0.46, 0.54], false);
+            emitTileBox3D(vabX, vabY, 1, 0, -56, 88, 44, 8, bz + 0.96, bz + 2.10, 173, 173, 33, [0.42, 0.46, 0.54], false);
+            emitTileBox3D(vabX, vabY, 1, 0,  56, 88, 44, 8, bz + 0.96, bz + 2.10, 173, 173, 33, [0.42, 0.46, 0.54], false);
+            // 5. SERA Royal Blue & NASA Crimson Livery Stripes across High-Bay Facade
+            emitSolidBox3D(vabX, vabY, 1, 0, 0, -4, 228, 186, bz + 1.56, bz + 1.68, [0.14, 0.44, 0.88], 5);
+            emitSolidBox3D(vabX, vabY, 1, 0, 0, -4, 229, 187, bz + 1.68, bz + 1.73, [0.86, 0.22, 0.18], 5);
+            // 6. VAB Rooftop Penthouse Mechanical Deck, Twin Geodesic Telemetry Radomes & Deep-Space Dish
+            emitTileBox3D(vabX, vabY, 1, 0, 0, -4, 168, 128, bz + 2.26, bz + 2.38, 172, 173, 86, [0.90, 0.94, 0.99], false);
+            emitSphere3D(vabX, vabY, -48, -28, 18.0, bz + 2.38, 0.28, 8, 16, [0.96, 0.98, 1.00], 5);
+            emitSphere3D(vabX, vabY,  48, -28, 14.0, bz + 2.38, 0.22, 8, 16, [0.96, 0.98, 1.00], 5);
+            emitCylinder3D(vabX, vabY, 0, 24, 3.2, 2.2, bz + 2.38, bz + 2.72, 10, [0.84, 0.88, 0.94], 5, true);
+            emitCone3D(vabX, vabY, 0, 24, 15.0, bz + 2.82, bz + 2.66, 16, [0.96, 0.98, 1.00], 5);
+            // 7. South Mission Control Entrance Portico over the enterable SERA_SPACE Bunker Door (463.5, 28.55)
+            emitTileBox3D(vabX, vabY, 1, 0, 0, 118, 76, 26, bz, bz + 0.42, 199, 86, 86, [0.94, 0.98, 1.00], true);
+            emitSolidBox3D(vabX, vabY, 1, 0, 0, 126, 82, 14, bz + 0.42, bz + 0.48, [0.16, 0.68, 0.98], 3);
 
-            // 1. West Crawlerway Steel Track Roadway (L33 / L87) connecting Control Bunker (460.8) to Pad (465.0)
-            //    Stays strictly east of c=458 so it NEVER overlaps the asphalt road at c=456..457!
-            emitTileBox3D(lp.x, lp.y, 1, 0, -92, 0, 88, 76, bz, bz + 0.06, 177, 177, 87, [0.92, 0.94, 0.98], true);
-            emitTileBox3D(lp.x, lp.y, 1, 0, -92, -18, 84, 12, bz + 0.06, bz + 0.095, 173, 173, 33, [0.90, 0.92, 0.96], false);
-            emitTileBox3D(lp.x, lp.y, 1, 0, -92,  18, 84, 12, bz + 0.06, bz + 0.095, 173, 173, 33, [0.90, 0.92, 0.96], false);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -92, -35, 84, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
-            emitSolidBox3D(lp.x, lp.y, 1, 0, -92,  35, 84, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
+            // ----------------------------------------------------------------
+            // G.2: HEAVY TWIN STEEL CRAWLERWAY TRACKS & ENTRY ROADWAY
+            // ----------------------------------------------------------------
+            // West Checkpoint Entry Roadway (c = 458.8 .. 463.5 at r = 35.0)
+            const entryMidX = 461.1 * TILE_SIZE;
+            emitTileBox3D(entryMidX, lp.y, 1, 0, 0, 0, 310, 82, bz, bz + 0.045, 177, 177, 87, [0.90, 0.92, 0.96], true);
+            emitSolidBox3D(entryMidX, lp.y, 1, 0, 0, -38, 306, 4.5, bz + 0.045, bz + 0.085, [0.94, 0.74, 0.14], 3);
+            emitSolidBox3D(entryMidX, lp.y, 1, 0, 0,  38, 306, 4.5, bz + 0.045, bz + 0.085, [0.94, 0.74, 0.14], 3);
+            // Main East-West Crawlerway Track Bed from VAB Junction (463.5) to Launch Pad 39A (473.0) at r = 35.0
+            const cwMidX = 467.4 * TILE_SIZE;
+            emitTileBox3D(cwMidX, lp.y, 1, 0, 0, 0, 516, 78, bz, bz + 0.06, 177, 177, 87, [0.92, 0.94, 0.98], true);
+            emitTileBox3D(cwMidX, lp.y, 1, 0, 0, -18, 508, 13, bz + 0.06, bz + 0.095, 173, 173, 33, [0.88, 0.90, 0.94], false);
+            emitTileBox3D(cwMidX, lp.y, 1, 0, 0,  18, 508, 13, bz + 0.06, bz + 0.095, 173, 173, 33, [0.88, 0.90, 0.94], false);
+            emitSolidBox3D(cwMidX, lp.y, 1, 0, 0, -36, 508, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
+            emitSolidBox3D(cwMidX, lp.y, 1, 0, 0,  36, 508, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
+            // North-South Crawlerway Spur connecting VAB East High-Bay Rollout Apron to Main Crawlerway
+            emitTileBox3D(vabX, 31.8 * TILE_SIZE, 1, 0, 0, 0, 78, 340, bz, bz + 0.055, 177, 177, 87, [0.92, 0.94, 0.98], true);
+            emitTileBox3D(vabX, 31.8 * TILE_SIZE, 1, 0, -18, 0, 12, 332, bz + 0.055, bz + 0.09, 173, 173, 33, [0.88, 0.90, 0.94], false);
+            emitTileBox3D(vabX, 31.8 * TILE_SIZE, 1, 0,  18, 0, 12, 332, bz + 0.055, bz + 0.09, 173, 173, 33, [0.88, 0.90, 0.94], false);
 
-            // 1B. SERA Launch Control Bunker (at lp.consoleX = 460.8, north of crawlerway)
-            //     Uses exact S86 & S199 blue/white facade tiles from the SERA Space Center building across the street!
-            emitAOShadow3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 74, 54, bz, 0.42);
-            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 56, 36, bz, bz + 0.22, 177, 86, 46, [0.96, 0.98, 1.00], true);
-            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 52, 32, bz + 0.22, bz + 0.42, 199, 86, 86, [0.98, 0.99, 1.00], false);
-            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 8, -54, 24, 20, bz + 0.42, bz + 0.47, 172, 172, 31, [0.94, 0.96, 1.00], false);
-            // Rooftop Telemetry Radar Dish on Control Bunker
-            emitCylinder3D(lp.consoleX, lp.consoleY, -6, -54, 2.5, 2.5, bz + 0.42, bz + 0.58, 10, [0.82, 0.86, 0.90], 5, true);
-            emitCone3D(lp.consoleX, lp.consoleY, -6, -54, 10.0, bz + 0.64, bz + 0.54, 14, [0.94, 0.96, 0.99], 5);
-            // Interactive Launch Ignition Pedestal (S172 telemetry console + glowing red trigger dome)
-            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 18, 14, bz + 0.06, bz + 0.28, 172, 173, 86, [0.92, 0.95, 0.99], false);
-            emitCylinder3D(lp.consoleX, lp.consoleY, 0, 0, 5.2, 5.2, bz + 0.28, bz + 0.35, 12, [0.94, 0.20, 0.18], 5, true);
+            // ----------------------------------------------------------------
+            // G.3: 3D LAUNCH CONTROL CENTER (LCC) BUNKER & IGNITION CONSOLE
+            // ----------------------------------------------------------------
+            const lccX = lp.consoleX;
+            const lccY = 32.0 * TILE_SIZE;
+            emitAOShadow3D(lccX, lccY, 1, 0, 0, 0, 108, 72, bz, 0.44);
+            emitTileBox3D(lccX, lccY, 1, 0, 0, 0, 86, 52, bz, bz + 0.26, 177, 86, 46, [0.96, 0.98, 1.00], true);
+            emitTileBox3D(lccX, lccY, 1, 0, 0, 0, 80, 46, bz + 0.26, bz + 0.50, 199, 86, 86, [0.98, 0.99, 1.00], false);
+            emitTileBox3D(lccX, lccY, 1, 0, 0, 0, 42, 26, bz + 0.50, bz + 0.58, 172, 172, 31, [0.94, 0.96, 1.00], false);
+            emitCylinder3D(lccX, lccY, -16, 0, 2.8, 2.8, bz + 0.58, bz + 0.76, 10, [0.82, 0.86, 0.90], 5, true);
+            emitCone3D(lccX, lccY, -16, 0, 11.5, bz + 0.84, bz + 0.72, 14, [0.94, 0.96, 0.99], 5);
+            // Interactive Launch Ignition Pedestal at (lp.consoleX, lp.consoleY = 34.0 * TILE_SIZE)
+            emitTileBox3D(lp.consoleX, lp.consoleY, 1, 0, 0, 0, 22, 16, bz + 0.06, bz + 0.30, 172, 173, 86, [0.92, 0.95, 0.99], false);
+            emitCylinder3D(lp.consoleX, lp.consoleY, 0, 0, 5.8, 5.8, bz + 0.30, bz + 0.38, 12, [0.94, 0.20, 0.18], 5, true);
+
+            // ----------------------------------------------------------------
+            // G.4: 3D SERA PAYLOAD, FAIRING & BOOSTER RECOVERY INSPECTION BAY
+            //      (Honoring the GTA 6 SERA props: sera_rocket, sera_fairing, sera_engine, sera_capsule!)
+            // ----------------------------------------------------------------
+            emitAOShadow3D(payX, payY, 1, 0, 0, 0, 206, 104, bz, 0.44);
+            // Concrete Assembly Apron & Open-Sided Steel Truss Canopy
+            emitTileBox3D(payX, payY, 1, 0, 0, 0, 184, 84, bz, bz + 0.10, 177, 177, 71, [0.90, 0.92, 0.96], true);
+            for (const pxOff of [-82, 0, 82]) {
+                for (const pyOff of [-34, 34]) {
+                    emitTileBox3D(payX, payY, 1, 0, pxOff, pyOff, 10, 10, bz + 0.10, bz + 0.82, 363, 363, 64, [0.92, 0.95, 0.99], false);
+                }
+            }
+            emitTileBox3D(payX, payY, 1, 0, 0, 0, 188, 88, bz + 0.82, bz + 0.94, 250, 86, 86, [0.94, 0.97, 1.00], false);
+            // 1. Twin Conical Payload Fairing Halves ("sera_fairing") on Rotary Yellow Inspection Stands (West Bay)
+            for (const fxOff of [-58, -24]) {
+                emitCylinder3D(payX, payY, fxOff, 0, 13.5, 13.5, bz + 0.10, bz + 0.18, 14, [0.94, 0.74, 0.14], 5, true);
+                emitCylinder3D(payX, payY, fxOff, 0, 11.5, 11.5, bz + 0.18, bz + 0.48, 16, [0.94, 0.96, 0.99], 5, false);
+                emitCone3D(payX, payY, fxOff, 0, 11.5, bz + 0.48, bz + 0.76, 16, [0.94, 0.96, 0.99], 5);
+            }
+            // 2. Orion Cleanroom Crew Capsule Prototype ("sera_capsule") on Telemetry Rig (Center Bay)
+            emitCylinder3D(payX, payY, 18, 0, 15.0, 15.0, bz + 0.10, bz + 0.18, 16, [0.94, 0.46, 0.14], 5, true);
+            emitCone3D(payX, payY, 18, 0, 13.5, bz + 0.18, bz + 0.52, 18, [0.90, 0.93, 0.98], 5);
+            emitCylinder3D(payX, payY, 18, 0, 4.5, 4.5, bz + 0.48, bz + 0.58, 12, [0.22, 0.26, 0.34], 5, true);
+            // 3. Clustered RS-25 Cryogenic Rocket Engine Test Stand ("sera_engine") (East Bay)
+            emitTileBox3D(payX, payY, 1, 0, 58, 0, 32, 32, bz + 0.10, bz + 0.42, 172, 173, 64, [0.86, 0.90, 0.96], false);
+            for (const [nx, ny] of [[51, -7], [65, -7], [51, 7], [65, 7]]) {
+                emitCylinder3D(payX, payY, nx, ny, 5.2, 3.0, bz + 0.42, bz + 0.62, 12, [0.26, 0.30, 0.38], 5, true);
+            }
+
+            // ----------------------------------------------------------------
+            // G.5: LAUNCH COMPLEX 39A (OCTAGONAL BLAST PAD, WATER DELUGE TOWER, CRYO TANKS & LUT)
+            // ----------------------------------------------------------------
+            emitAOShadow3D(lp.x, lp.y, 1, 0, 0, 0, 296, 288, bz, 0.46);
 
             // 2. Stepped Chamfered Octagonal Concrete Blast Pad (LC-39A)
             //    Tier 1: Reinforced Concrete Security Perimeter Pad (S177 concrete walls + L71 1:1 world-tiled concrete grid)
             emitOctagonPad3D(lp.x, lp.y, 0, 0, 134, 126, 128, 120, 0.24, bz, bz + 0.09, [0.90, 0.92, 0.96], [0.84, 0.86, 0.90], 2, 177, 71);
             //    Tier 2: Sloped Riveted Blast Apron (L113 sloped riveted apron walls + L87 reinforced steel/concrete deck)
             emitOctagonPad3D(lp.x, lp.y, 0, 0, 104, 98, 92, 86, 0.26, bz + 0.09, bz + 0.24, [0.94, 0.96, 0.99], [0.88, 0.90, 0.94], 2, 390 + 113, 87);
+
+            // 2A. 3D Water Deluge Sound Suppression Tower at South-West Pad Corner (offX = -68, offY = 54)
+            const wtX = -68, wtY = 54;
+            emitTileBox3D(lp.x, lp.y, 1, 0, wtX, wtY, 26, 26, bz + 0.09, bz + 0.96, 363, 363, 64, [0.90, 0.93, 0.98], false);
+            emitCylinder3D(lp.x, lp.y, wtX, wtY, 17.5, 17.5, bz + 0.96, bz + 1.44, 16, [0.94, 0.97, 1.00], 5, true);
+            emitCone3D(lp.x, lp.y, wtX, wtY, 18.0, bz + 1.44, bz + 1.60, 16, [0.16, 0.48, 0.90], 5);
+            // High-volume water feed main into the Flame Trench
+            emitTileBox3D(lp.x, lp.y, 1, 0, wtX + 24, wtY * 0.5, 10, 38, bz + 0.24, bz + 0.34, 191, 191, 67, [0.88, 0.92, 0.98], false);
 
             // 2B. Deep East-West Scorched Flame Deflector Trench (L33 dark riveted blast steel + L22 exhaust turbine shafts)
             emitTileBox3D(lp.x, lp.y, 1, 0, 14, 0, 148, 46, bz + 0.24, bz + 0.265, 173, 173, 33, [0.82, 0.84, 0.88], true);
@@ -8603,7 +8743,7 @@ class WorldObjectEngine {
         // Paved Landmark Plazas & Boardwalk Compounds on GPS / Overview Map
         ctx.fillStyle = "#e6dcc5";
         const pavedStonePlazas = [
-            [458, 471, 29, 40],   // SERA Cape Canaveral Spaceport Compound
+            [458, 480, 22, 44],   // SERA Cape Canaveral Spaceport Compound
             [457, 466, 132, 136], // Cape Leonida Lighthouse Plaza
             [197, 201, 475, 478]  // Key West Lighthouse Plaza
         ];
@@ -8617,6 +8757,12 @@ class WorldObjectEngine {
         // Major 3D Landmarks on GPS / Overview Map
         const lm = this.landmarks3D || {};
         if (lm.launchpad) {
+            if (lm.launchpad.vabX && lm.launchpad.vabY) {
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fillRect((lm.launchpad.vabX - 144) * sx, (lm.launchpad.vabY - 110) * sy, 288 * sx, 220 * sy);
+                ctx.fillStyle = "#2563eb";
+                ctx.fillRect((lm.launchpad.vabX - 110) * sx, (lm.launchpad.vabY - 88) * sy, 220 * sx, 176 * sy);
+            }
             ctx.fillStyle = "#94a3b8";
             ctx.fillRect((lm.launchpad.x - 104) * sx, (lm.launchpad.y - 104) * sy, 208 * sx, 208 * sy);
             ctx.fillStyle = "#ea580c";
