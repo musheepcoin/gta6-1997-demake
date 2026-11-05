@@ -7100,6 +7100,16 @@ class LeonidaGame {
 
             if (d < radius) {
 
+                // Blast wave shoves nearby vehicles & wrecks outward and sets them spinning (the tank barely moves)
+                if (!v.towedByTruck && !v.crushesCars && v.driver !== "REMOTE") {
+                    const bAng = d > 2 ? Math.atan2(v.y - y, v.x - x) : Math.random() * Math.PI * 2;
+                    const heavy = (v.w || 48) >= 75 ? 0.45 : 1.0;
+                    const kick = d < 4 ? 75 * heavy : (60 + 230 * (1 - d / radius)) * heavy;
+                    v.vx = (v.vx || 0) + Math.cos(bAng) * kick;
+                    v.vy = (v.vy || 0) + Math.sin(bAng) * kick;
+                    v.angularVelocity = (v.angularVelocity || 0) + (Math.random() - 0.5) * 6.0 * (1 - d / radius) * heavy;
+                }
+
                 // Heavy armored Panzer Tank shrugs off blast waves from the cars it crushes
                 const dmg = damage * (1 - d / radius) * (v.crushesCars ? 0.1 : 1);
 
@@ -10461,7 +10471,13 @@ class LeonidaGame {
 
 
 
-                    if (!involvesPlayerOrActiveCop || (a.destroyed && b.destroyed)) {
+                    // Wrecks are physical: a moving car shoves a burned-out hulk, and sliding hulks knock into each other
+                    const aSpdW = Math.hypot(a.vx || 0, a.vy || 0);
+                    const bSpdW = Math.hypot(b.vx || 0, b.vy || 0);
+                    const wreckShove = (a.destroyed !== b.destroyed) && ((a.destroyed ? bSpdW : aSpdW) > 25);
+                    const slidingWrecks = a.destroyed && b.destroyed && (aSpdW > 15 || bSpdW > 15);
+
+                    if ((!involvesPlayerOrActiveCop && !wreckShove && !slidingWrecks) || (a.destroyed && b.destroyed && !slidingWrecks)) {
 
                         // AI-vs-AI traffic: only enforce longitudinal spacing between same-direction vehicles;
 
@@ -10509,15 +10525,24 @@ class LeonidaGame {
 
                     if (a.destroyed && !b.destroyed) {
 
-                        b.x += bestNx * bestOverlap * 1.05;
+                        // Heavy hulk gives way a little, the live car takes most of the separation
+                        a.x -= bestNx * bestOverlap * 0.35;
 
-                        b.y += bestNy * bestOverlap * 1.05;
+                        a.y -= bestNy * bestOverlap * 0.35;
+
+                        b.x += bestNx * bestOverlap * 0.70;
+
+                        b.y += bestNy * bestOverlap * 0.70;
 
                     } else if (b.destroyed && !a.destroyed) {
 
-                        a.x -= bestNx * bestOverlap * 1.05;
+                        b.x += bestNx * bestOverlap * 0.35;
 
-                        a.y -= bestNy * bestOverlap * 1.05;
+                        b.y += bestNy * bestOverlap * 0.35;
+
+                        a.x -= bestNx * bestOverlap * 0.70;
+
+                        a.y -= bestNy * bestOverlap * 0.70;
 
                     } else {
 
@@ -10534,6 +10559,7 @@ class LeonidaGame {
 
 
                     // Realistic 2D impulse momentum transfer + PIT maneuver angular spin when Player or Active Cop is involved!
+                    // (Wrecks receive a reduced share: no engine, locked/burst wheels, dead weight)
 
                     const rvx = b.vx - a.vx;
 
@@ -10545,21 +10571,17 @@ class LeonidaGame {
 
                         const impulse = -0.68 * normalVel;
 
-                        if (!a.destroyed) {
+                        const aShare = a.destroyed ? 0.55 : 1.0;
 
-                            a.vx -= bestNx * impulse;
+                        const bShare = b.destroyed ? 0.55 : 1.0;
 
-                            a.vy -= bestNy * impulse;
+                        a.vx -= bestNx * impulse * aShare;
 
-                        }
+                        a.vy -= bestNy * impulse * aShare;
 
-                        if (!b.destroyed) {
+                        b.vx += bestNx * impulse * bShare;
 
-                            b.vx += bestNx * impulse;
-
-                            b.vy += bestNy * impulse;
-
-                        }
+                        b.vy += bestNy * impulse * bShare;
 
 
 
@@ -10570,8 +10592,10 @@ class LeonidaGame {
                         const bCross = bCos * bestNy - bSin * bestNx;
 
                         if (!a.destroyed) a.angle -= hitALever * aCross * Math.min(0.22, impulse * 0.0014);
+                        else a.angularVelocity = (a.angularVelocity || 0) - hitALever * aCross * Math.min(3.0, impulse * 0.018);
 
                         if (!b.destroyed) b.angle += hitBLever * bCross * Math.min(0.22, impulse * 0.0014);
+                        else b.angularVelocity = (b.angularVelocity || 0) + hitBLever * bCross * Math.min(3.0, impulse * 0.018);
 
                     }
 

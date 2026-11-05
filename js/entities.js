@@ -2657,6 +2657,44 @@ class Vehicle {
 
         if (this.destroyed) {
             this.abandonedTimer = (this.abandonedTimer || 0) + dt;
+            // Burned-out wrecks are heavy dead hulks: they still slide & spin when blasted or rammed,
+            // grinding to a halt with strong scrape friction (no engine, locked wheels) and bouncing off walls.
+            const wSpd = Math.hypot(this.vx || 0, this.vy || 0);
+            const wSpin = Math.abs(this.angularVelocity || 0);
+            if (wSpd > 0.5 || wSpin > 0.01) {
+                const fr = Math.pow(0.12, dt);
+                this.vx *= fr;
+                this.vy *= fr;
+                this.angle += (this.angularVelocity || 0) * dt;
+                this.angularVelocity = (this.angularVelocity || 0) * Math.pow(0.06, dt);
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                if (map && typeof map.resolveCircleBuildingCollision === "function") {
+                    const wz = this.z !== undefined ? this.z : 2.0;
+                    const wRad = Math.min(18, Math.max(11, (this.h || 24) * 0.45));
+                    const wCol = map.resolveCircleBuildingCollision(this.x, this.y, wRad, wz, false);
+                    if (wCol.hit) {
+                        this.x = wCol.x;
+                        this.y = wCol.y;
+                        this.vx *= -0.3;
+                        this.vy *= -0.3;
+                        this.angularVelocity = (this.angularVelocity || 0) * 0.5;
+                    }
+                }
+                if (map && typeof map.getHeightAtPixel === "function") {
+                    this.z = map.getHeightAtPixel(this.x, this.y, this.z !== undefined ? this.z : 2.0);
+                }
+                // Scraping metal sparks while the hulk slides fast
+                if (wSpd > 70 && game && typeof game.spawnParticle === "function" && Math.random() < 0.35) {
+                    game.spawnParticle(this.x + (Math.random() - 0.5) * 18, this.y + (Math.random() - 0.5) * 18, "SPARK");
+                }
+                if (Math.hypot(this.vx, this.vy) < 3) {
+                    this.vx = 0;
+                    this.vy = 0;
+                }
+                if (Math.abs(this.angularVelocity || 0) < 0.02) this.angularVelocity = 0;
+            }
+            this.speed = 0;
             return;
         }
 
