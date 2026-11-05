@@ -2074,7 +2074,7 @@ class Vehicle {
                     ped.revived ||
                     ped.unreachableForMedic ||
                     ped.deathKind === "DROWNED" ||
-                    (ped.deadTimer || 0) < 2.5
+                    (ped.deadTimer || 0) < 6.0
                 ) {
                     continue;
                 }
