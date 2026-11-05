@@ -2342,16 +2342,11 @@ class Vehicle {
             }
         }
 
-        // Validate or acquire target abandoned / extinguished wrecked vehicle on road
-        // (Burning cars & unextinguished burning wrecks MUST be extinguished by a Fire Truck first before towing!)
+        // Validate or acquire target abandoned / wrecked vehicle on road
+        // (Tow Truck CAN be dispatched and drive to a burning wreck, but MUST wait on standby until the fire is extinguished before hooking!)
         let target = this.towTarget;
-        const targetStillBurning = target && (
-            (!target.destroyed && ((target.burnTimer || 0) > 0 || target.hp <= 50)) ||
-            (target.destroyed && !target.fireExtinguished && target.specKey !== "BMX_BIKE" && target.specKey !== "E_SCOOTER")
-        );
         if (
             !target ||
-            targetStillBurning ||
             !game.vehicles.includes(target) ||
             (target.driver !== null && !target.destroyed) ||
             (target.towedByTruck && target.towedByTruck !== this) ||
@@ -2363,15 +2358,11 @@ class Vehicle {
             let bestDist = 1400;
             for (const v of game.vehicles) {
                 if (v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) continue;
-                const isExtinguishedWreck = v.destroyed &&
-                    Boolean(v.fireExtinguished || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") &&
-                    (v.abandonedTimer || 0) > 8.0;
+                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 12.0;
                 const isAbandoned = !v.destroyed &&
                     v.driver === null &&
-                    (v.burnTimer || 0) <= 0 &&
-                    v.hp > 50 &&
                     (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
-                if (!isExtinguishedWreck && !isAbandoned) continue;
+                if (!isWreck && !isAbandoned) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
                     bestDist = d;
@@ -2386,10 +2377,26 @@ class Vehicle {
             return this.computeTrafficControls(dt, map, game);
         }
 
+        const targetStillBurning =
+            (!target.destroyed && ((target.burnTimer || 0) > 0 || target.hp <= 50)) ||
+            (target.destroyed && !target.fireExtinguished && target.specKey !== "BMX_BIKE" && target.specKey !== "E_SCOOTER");
+
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
+        // If the target vehicle/wreck is still on fire, the Tow Truck drives to the scene, parks at a safe standby distance (~170px),
+        // and waits with flashing beacons for the Fire Truck (FIRE_TRUCK) to extinguish the flames before hooking!
+        if (targetStillBurning && dist < 175) {
+            this.towHookTimer = 0;
+            this.approachNoProgress = 0;
+            return {
+                throttle: this.speed > 6 ? -0.75 : 0,
+                steer: 0,
+                handbrake: true
+            };
+        }
+
         const noProgress = this.updateApproachProgress(dt, dist);
         const hookDist = Math.max(76, ((this.w || 62) + (target.w || 48)) * 0.54 + 14);
-        if (dist < hookDist || (dist < 115 && noProgress > 2.4)) {
+        if (!targetStillBurning && (dist < hookDist || (dist < 115 && noProgress > 2.4))) {
             // Stop for 1.8s to attach the tow winch before pulling away!
             this.towHookTimer = (this.towHookTimer || 0) + dt;
             if (this.towHookTimer < 1.8) {
