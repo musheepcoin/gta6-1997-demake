@@ -8464,9 +8464,15 @@ class LeonidaGame {
 
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 25.0;
+            const isWreck = v.destroyed &&
+                Boolean(v.fireExtinguished || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") &&
+                (v.abandonedTimer || 0) > 8.0;
 
-            const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
+            const isAbandoned = !v.destroyed &&
+                v.driver === null &&
+                (v.burnTimer || 0) <= 0 &&
+                v.hp > 50 &&
+                (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
 
             if (!isWreck && !isAbandoned) continue;
 
@@ -12528,7 +12534,7 @@ class LeonidaGame {
                 if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
-                const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 1.2 && (v.abandonedTimer || 0) < 75.0;
+                const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 1.2;
                 if ((isLiveBurning || isFreshBurningWreck) && Math.hypot(v.x - p.x, v.y - p.y) < 780) {
                     burningVehNearPlayer = v;
                     break;

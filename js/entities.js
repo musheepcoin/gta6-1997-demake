@@ -2231,7 +2231,7 @@ class Vehicle {
                 if (v === this || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
-                const isBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) < 90.0;
+                const isBurningWreck = v.destroyed && !v.fireExtinguished;
                 if (!isLiveBurning && !isBurningWreck) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
@@ -2325,8 +2325,11 @@ class Vehicle {
 
         // If already towing a vehicle/wreck, haul it slowly & heavily along the road network (~62 px/s max)
         if (this.towingVehicle) {
-            if (!game.vehicles.includes(this.towingVehicle) || this.towingVehicle.driver === "PLAYER") {
-                this.towingVehicle.towedByTruck = null;
+            const tv = this.towingVehicle;
+            const tvBurning = (!tv.destroyed && ((tv.burnTimer || 0) > 0 || tv.hp <= 50)) ||
+                (tv.destroyed && !tv.fireExtinguished && tv.specKey !== "BMX_BIKE" && tv.specKey !== "E_SCOOTER");
+            if (!game.vehicles.includes(tv) || tv.driver === "PLAYER" || tvBurning) {
+                tv.towedByTruck = null;
                 this.towingVehicle = null;
             } else {
                 const tCtrl = this.computeTrafficControls(dt, map, game);
@@ -2339,10 +2342,16 @@ class Vehicle {
             }
         }
 
-        // Validate or acquire target abandoned / wrecked vehicle on road
+        // Validate or acquire target abandoned / extinguished wrecked vehicle on road
+        // (Burning cars & unextinguished burning wrecks MUST be extinguished by a Fire Truck first before towing!)
         let target = this.towTarget;
+        const targetStillBurning = target && (
+            (!target.destroyed && ((target.burnTimer || 0) > 0 || target.hp <= 50)) ||
+            (target.destroyed && !target.fireExtinguished && target.specKey !== "BMX_BIKE" && target.specKey !== "E_SCOOTER")
+        );
         if (
             !target ||
+            targetStillBurning ||
             !game.vehicles.includes(target) ||
             (target.driver !== null && !target.destroyed) ||
             (target.towedByTruck && target.towedByTruck !== this) ||
@@ -2354,9 +2363,15 @@ class Vehicle {
             let bestDist = 1400;
             for (const v of game.vehicles) {
                 if (v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) continue;
-                const isWreck = v.destroyed && (v.abandonedTimer || 0) > 25.0;
-                const isAbandoned = !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
-                if (!isWreck && !isAbandoned) continue;
+                const isExtinguishedWreck = v.destroyed &&
+                    Boolean(v.fireExtinguished || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") &&
+                    (v.abandonedTimer || 0) > 8.0;
+                const isAbandoned = !v.destroyed &&
+                    v.driver === null &&
+                    (v.burnTimer || 0) <= 0 &&
+                    v.hp > 50 &&
+                    (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
+                if (!isExtinguishedWreck && !isAbandoned) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
                     bestDist = d;
