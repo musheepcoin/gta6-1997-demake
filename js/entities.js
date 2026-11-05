@@ -2223,12 +2223,16 @@ class Vehicle {
             this.medicTargetPed = null;
         }
 
-        // B. FIRE ENGINE: Responds to burning vehicles within 640px and sprays water cannon!
+        // B. FIRE ENGINE: Responds to burning vehicles & burning wrecks within 1500px and sprays high-pressure water cannon!
         if (this.specKey === "FIRE_TRUCK" && Array.isArray(game.vehicles)) {
             let burningCar = null;
-            let bestDist = 640;
+            let bestDist = 1500;
             for (const v of game.vehicles) {
-                if (v === this || v.destroyed || v.hp > 50) continue;
+                if (v === this || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
+                if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) continue;
+                const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
+                const isBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) < 90.0;
+                if (!isLiveBurning && !isBurningWreck) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
                     bestDist = d;
@@ -2239,25 +2243,63 @@ class Vehicle {
             if (burningCar) {
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_FIRE";
+                if (this.fireTargetCar !== burningCar) {
+                    this.fireTargetCar = burningCar;
+                    this.approachBestDist = bestDist;
+                    this.approachNoProgress = 0;
+                } else if (bestDist < (this.approachBestDist ?? 9999) - 6) {
+                    this.approachBestDist = bestDist;
+                    this.approachNoProgress = 0;
+                } else {
+                    this.approachNoProgress = (this.approachNoProgress || 0) + dt;
+                }
+
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
-                if (bestDist < 110) {
-                    // Spray water stream particles & extinguish vehicle fire!
-                    if (Math.random() < 0.65) {
-                        game.particles.push({
-                            x: this.x + Math.cos(ang) * 24,
-                            y: this.y + Math.sin(ang) * 24,
-                            vx: Math.cos(ang + (Math.random() - 0.5) * 0.18) * 210,
-                            vy: Math.sin(ang + (Math.random() - 0.5) * 0.18) * 210,
-                            size: 4,
-                            color: "#38bdf8",
-                            life: 0.35,
-                            maxLife: 0.35
-                        });
+                const inSprayRange = bestDist < 138 || (bestDist < 290 && (this.approachNoProgress || 0) > 2.2);
+                if (inSprayRange) {
+                    // High-pressure rooftop water cannon stream toward the burning vehicle/wreck!
+                    const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
+                    for (let k = 0; k < 2; k++) {
+                        if (Math.random() < 0.85) {
+                            const spread = (Math.random() - 0.5) * 0.16;
+                            game.particles.push({
+                                x: this.x + Math.cos(ang) * 26,
+                                y: this.y + Math.sin(ang) * 26,
+                                vx: Math.cos(ang + spread) * jetSpeed,
+                                vy: Math.sin(ang + spread) * jetSpeed,
+                                size: 3.5 + Math.random() * 2.0,
+                                color: Math.random() < 0.35 ? "#bae6fd" : "#38bdf8",
+                                life: 0.42,
+                                maxLife: 0.42
+                            });
+                        }
                     }
-                    burningCar.hp = Math.min(burningCar.maxHp, burningCar.hp + 38 * dt);
-                    burningCar.burnTimer = 0;
+                    if (Math.random() < 0.45 && typeof game.spawnParticle === "function") {
+                        game.spawnParticle(
+                            burningCar.x + (Math.random() - 0.5) * 22,
+                            burningCar.y + (Math.random() - 0.5) * 22,
+                            "WHITE_SMOKE"
+                        );
+                    }
+                    burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt;
+                    if (!burningCar.destroyed) {
+                        burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 45 * dt, 58));
+                        burningCar.burnTimer = 0;
+                        burningCar.chainExplodeTimer = 0;
+                        if (burningCar.extinguishProgress >= 1.6 && !burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
+                            burningCar._vcfdSavedMsg = true;
+                            game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                        }
+                    } else if (burningCar.extinguishProgress >= 2.8) {
+                        burningCar.fireExtinguished = true;
+                        burningCar.burnTimer = 0;
+                        if (typeof game.addFloatingText === "function") {
+                            game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                        }
+                    }
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
+                const forceDirect = bestDist < 260 || (this.approachNoProgress || 0) > 1.6;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -2266,10 +2308,11 @@ class Vehicle {
                     burningCar.y,
                     burningCar.vx || 0,
                     burningCar.vy || 0,
-                    0.90,
-                    false
+                    0.94,
+                    forceDirect
                 );
             }
+            this.fireTargetCar = null;
         }
 
         this.sirenActive = false;
@@ -3217,10 +3260,11 @@ class TrafficManager {
                 continue;
             }
             const isApproachingTowTruck = v.driver === "AI_TOW" && Boolean(v.towTarget) && !v.towingVehicle;
-            if (game.vehicles.length <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW") continue;
-            // Burned wrecks, abandoned cars, and Tow Trucks actively approaching a target stay in the neighborhood;
+            const isRespondingFireTruck = v.specKey === "FIRE_TRUCK" && (v.aiState === "EMERGENCY_FIRE" || Boolean(v.sirenActive));
+            if (game.vehicles.length <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isRespondingFireTruck) continue;
+            // Burned wrecks, abandoned cars, Tow Trucks, and responding Fire Trucks stay in the neighborhood;
             // only garbage-collect them if the player has driven far away into another district (> 28 blocks / ~1800px)!
-            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck) ? farWreckRects : outerRects;
+            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isRespondingFireTruck) ? farWreckRects : outerRects;
             const nearAnyPlayer = checkRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
                 if (v.towingVehicle) {
@@ -3304,7 +3348,8 @@ class TrafficManager {
             "CITY_BUS",
             "TOUR_COACH",
             "FLATBED_TRUCK",
-            "TANKER_RIG"
+            "TANKER_RIG",
+            "FIRE_TRUCK"
         ];
 
         for (let attempt = 0; attempt < 8 && candidates.length > 0; attempt++) {
@@ -3326,10 +3371,14 @@ class TrafficManager {
 
             const vz = map.getHeightAtPixel(vx, vy, 4.0);
             const roadAngle = dirs[Math.floor(Math.random() * dirs.length)].angle;
-            const spec = specPool[Math.floor(Math.random() * specPool.length)];
+            let spec = specPool[Math.floor(Math.random() * specPool.length)];
+            if (spec === "FIRE_TRUCK") {
+                const activeFireTrucks = game.vehicles.filter((ov) => !ov.destroyed && ov.specKey === "FIRE_TRUCK").length;
+                if (activeFireTrucks >= 3) spec = "FLATBED_TRUCK";
+            }
             const newCar = new Vehicle(`trf_${++this._trafficSeq}`, spec, vx, vy, roadAngle);
             newCar.z = vz;
-            newCar.driver = "AI_TRAFFIC";
+            newCar.driver = (spec === "FIRE_TRUCK" || spec === "MEDIC_AMBULANCE") ? "AI_EMERGENCY" : "AI_TRAFFIC";
             newCar.speed = 85;
             newCar.vx = Math.cos(roadAngle) * 85;
             newCar.vy = Math.sin(roadAngle) * 85;

@@ -8779,7 +8779,7 @@ class RetroRenderer {
                 }
             }
 
-            if (v.destroyed && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
+            if (v.destroyed && !v.fireExtinguished && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
                 const frameId = 234 + (Math.floor(this.time * 11 + Math.abs(v.x * 0.1)) % 8);
                 const isMotoOrKart = Boolean(mapInfo.isMotorcycle || v.specKey === "MICRO_KART");
                 const isHeavyLong = (v.w || 48) >= 75;
@@ -9416,7 +9416,7 @@ class RetroRenderer {
             if (sc.x < -260 || sc.x > W + 260 || sc.y < -260 || sc.y > H + 260) continue;
             const pxScale = (sc.scale * H) / 128.0;
 
-            if (v.destroyed || (v.burnTimer || 0) > 0) {
+            if ((v.destroyed && !v.fireExtinguished) || (v.burnTimer || 0) > 0) {
                 if (v.specKey === "BMX_BIKE" || (v.specKey === "E_SCOOTER" && v.destroyed)) continue;
                 const flick = 0.88 + Math.sin(this.time * 22 + v.x) * 0.12;
                 addLightPool(sc.x, sc.y, 110 * pxScale * flick, "rgba(255, 165, 50, 0.95)", "rgba(235, 65, 15, 0.45)");

@@ -610,7 +610,11 @@ class LeonidaGame {
 
             { spec: "BANSHEE_GT", c: 58.8, r: 176.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
+            { spec: "FIRE_TRUCK", c: 63.2, r: 176.2, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+
             { spec: "FIRE_TRUCK", c: 38.5, r: 136.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
+
+            { spec: "FIRE_TRUCK", c: 286.5, r: 230.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY", raw512: true },
 
 
 
@@ -9624,6 +9628,77 @@ class LeonidaGame {
 
                 const mySeat = p.seatIndex || 0;
 
+                if (v && v.specKey === "FIRE_TRUCK" && mySeat === 0) {
+                    // Rooftop High-Pressure Water Cannon when driving a Fire Truck!
+                    p.shootCooldown = 0.045;
+                    const cannonAng = shotAngle;
+                    const nozX = v.x + Math.cos(cannonAng) * 26;
+                    const nozY = v.y + Math.sin(cannonAng) * 26;
+                    for (let k = 0; k < 3; k++) {
+                        const spread = (Math.random() - 0.5) * 0.16;
+                        const spd = 250 + Math.random() * 75;
+                        this.particles.push({
+                            x: nozX,
+                            y: nozY,
+                            vx: Math.cos(cannonAng + spread) * spd,
+                            vy: Math.sin(cannonAng + spread) * spd,
+                            size: 3.8 + Math.random() * 2.2,
+                            color: Math.random() < 0.38 ? "#bae6fd" : "#38bdf8",
+                            life: 0.44,
+                            maxLife: 0.44
+                        });
+                    }
+                    // Extinguish burning vehicles / wrecks & knock back pedestrians in the water stream cone
+                    for (const ov of this.vehicles) {
+                        if (ov === v) continue;
+                        const dx = ov.x - v.x;
+                        const dy = ov.y - v.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist > 195) continue;
+                        const aDiff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - cannonAng), Math.cos(Math.atan2(dy, dx) - cannonAng)));
+                        if (aDiff > 0.36) continue;
+                        const wasBurning = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
+                        if (wasBurning) {
+                            ov.extinguishProgress = (ov.extinguishProgress || 0) + 0.09;
+                            if (Math.random() < 0.55) {
+                                this.spawnParticle(ov.x + (Math.random() - 0.5) * 20, ov.y + (Math.random() - 0.5) * 20, "WHITE_SMOKE");
+                            }
+                            if (!ov.destroyed) {
+                                ov.hp = Math.min(ov.maxHp, Math.max(ov.hp + 6.5, 60));
+                                ov.burnTimer = 0;
+                                ov.chainExplodeTimer = 0;
+                                if (ov.extinguishProgress >= 1.1 && !ov._playerFireReward) {
+                                    ov._playerFireReward = true;
+                                    this.score += 150;
+                                    this.addFloatingText(ov.x, ov.y - 24, "🚒 VCFD +$150 — FIRE EXTINGUISHED!", "#38bdf8");
+                                    this.updateHud();
+                                }
+                            } else if (ov.extinguishProgress >= 1.5 && !ov.fireExtinguished) {
+                                ov.fireExtinguished = true;
+                                ov.burnTimer = 0;
+                                this.score += 150;
+                                this.addFloatingText(ov.x, ov.y - 24, "🚒 VCFD +$150 — WRECK EXTINGUISHED!", "#38bdf8");
+                                this.updateHud();
+                            }
+                        }
+                    }
+                    for (const ped of this.peds) {
+                        if (ped.dead) continue;
+                        const dx = ped.x - v.x;
+                        const dy = ped.y - v.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist > 175) continue;
+                        const aDiff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - cannonAng), Math.cos(Math.atan2(dy, dx) - cannonAng)));
+                        if (aDiff <= 0.30) {
+                            ped.burnTimer = 0;
+                            ped.stunnedTimer = Math.max(ped.stunnedTimer || 0, 0.75);
+                            ped.panicTimer = 4.0;
+                            ped.x += Math.cos(cannonAng) * 5.5;
+                            ped.y += Math.sin(cannonAng) * 5.5;
+                        }
+                    }
+                } else {
+
                 const occList = (v && typeof v.getOccupiedSeats === "function") ? v.getOccupiedSeats(this) : [];
 
                 const hasRemoteGunner = occList.some((o) => !o.isLocal && o.seat === 1);
@@ -9695,6 +9770,8 @@ class LeonidaGame {
                     p.weapon = "FIST";
 
                     this.updateHud();
+
+                }
 
                 }
 
@@ -12442,6 +12519,95 @@ class LeonidaGame {
 
                 this.medicDispatchTimer = 0;
 
+            }
+
+            // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK) for Burning Cars & Unextinguished Burning Wrecks
+            this.fireDispatchCooldown = Math.max(0, (this.fireDispatchCooldown || 0) - dt);
+            let burningVehNearPlayer = null;
+            for (const v of this.vehicles) {
+                if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
+                if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
+                const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
+                const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 1.2 && (v.abandonedTimer || 0) < 75.0;
+                if ((isLiveBurning || isFreshBurningWreck) && Math.hypot(v.x - p.x, v.y - p.y) < 780) {
+                    burningVehNearPlayer = v;
+                    break;
+                }
+            }
+            if (burningVehNearPlayer && this.fireDispatchCooldown <= 0) {
+                let fireTruckNearTarget = false;
+                let farFireTruck = null;
+                let totalFireTrucks = 0;
+                for (const v of this.vehicles) {
+                    if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
+                        totalFireTrucks++;
+                        const dFire = Math.hypot(v.x - burningVehNearPlayer.x, v.y - burningVehNearPlayer.y);
+                        if (dFire < 980) {
+                            fireTruckNearTarget = true;
+                        } else if (Math.hypot(v.x - p.x, v.y - p.y) > 820) {
+                            farFireTruck = v;
+                        }
+                    }
+                }
+                if (!fireTruckNearTarget) {
+                    this.fireDispatchTimer = (this.fireDispatchTimer || 0) + dt;
+                    if (this.fireDispatchTimer > 5.5) {
+                        this.fireDispatchTimer = 3.5; // retry ~2s later if road candidate busy
+                        const baseBx = Math.floor(burningVehNearPlayer.x / TILE_SIZE);
+                        const baseBy = Math.floor(burningVehNearPlayer.y / TILE_SIZE);
+                        const fz = burningVehNearPlayer.z || 2.0;
+                        for (let attempt = 0; attempt < 30; attempt++) {
+                            const ang = Math.random() * Math.PI * 2;
+                            const distB = 10.5 + Math.random() * 5.5;
+                            const bx = Math.floor(baseBx + Math.cos(ang) * distB);
+                            const by = Math.floor(baseBy + Math.sin(ang) * distB);
+                            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
+                            const navBlk = this.map.getNavigationBlock(bx, by, fz);
+                            if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
+                                const sx = (bx + 0.5) * TILE_SIZE;
+                                const sy = (by + 0.5) * TILE_SIZE;
+                                if (Math.hypot(sx - p.x, sy - p.y) < 600) continue;
+                                const toFireAng = Math.atan2(burningVehNearPlayer.y - sy, burningVehNearPlayer.x - sx);
+                                const roadAng = typeof this.map.getAlignedRoadAngle === "function"
+                                    ? this.map.getAlignedRoadAngle(bx, by, toFireAng, fz)
+                                    : toFireAng;
+                                const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
+                                if (farFireTruck) {
+                                    farFireTruck.x = sx;
+                                    farFireTruck.y = sy;
+                                    farFireTruck.z = sz;
+                                    farFireTruck.angle = roadAng;
+                                    farFireTruck.speed = 95;
+                                    farFireTruck.vx = Math.cos(roadAng) * 95;
+                                    farFireTruck.vy = Math.sin(roadAng) * 95;
+                                    farFireTruck.sirenActive = true;
+                                    farFireTruck.aiStuckTimer = 0;
+                                    farFireTruck.aiChosenDir = null;
+                                    farFireTruck.approachBestDist = undefined;
+                                    farFireTruck.approachNoProgress = 0;
+                                    this.fireDispatchTimer = 0;
+                                    this.fireDispatchCooldown = 18.0;
+                                } else if (totalFireTrucks < 3) {
+                                    const fireCar = new Vehicle(`vcfd_${Date.now()}_${attempt}`, "FIRE_TRUCK", sx, sy, roadAng);
+                                    fireCar.z = sz;
+                                    fireCar.driver = "AI_EMERGENCY";
+                                    fireCar.sirenActive = true;
+                                    fireCar.speed = 95;
+                                    fireCar.vx = Math.cos(roadAng) * 95;
+                                    fireCar.vy = Math.sin(roadAng) * 95;
+                                    this.vehicles.push(fireCar);
+                                    this.fireDispatchTimer = 0;
+                                    this.fireDispatchCooldown = 18.0;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    this.fireDispatchTimer = 0;
+                }
+            } else {
+                this.fireDispatchTimer = 0;
             }
 
             // 7c. Ambient Random Street Crime & Police Intervention Events (Independent of Player)
