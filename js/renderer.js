@@ -12151,8 +12151,14 @@ class RetroRenderer {
         const isTank = Boolean(v.isTank || specObj.isTank || sprId === "940");
         // The sprite atlas metadata (original GTA1 car info) is the source of truth for open-top cars:
         // a driver/passenger may only be drawn if the sprite really has an open cockpit.
+        // Visually verified whitelist: only sprite 62 (open jeep) and 70 (cabrio with visible seats) are truly open.
+        // Sprites 74 & 75 are flagged "convertible" in GTA1 metadata but are drawn as closed hardtops,
+        // so drawing a driver on them puts a person on top of the roof.
+        const OPEN_TOP_SPRITES = { "62": true, "70": true };
         const spriteMeta = this.vehicleBySprIdx && this.vehicleBySprIdx[sprId];
-        const isConvertible = spriteMeta ? Boolean(spriteMeta.convertible) : Boolean(v.isConvertible || specObj.isConvertible);
+        const isConvertible = spriteMeta
+            ? Boolean(spriteMeta.convertible && OPEN_TOP_SPRITES[sprId])
+            : Boolean(v.isConvertible || specObj.isConvertible);
         const isMotorcycle = Boolean(v.isMotorcycle || specObj.isMotorcycle);
 
         if (v.specKey === "VCPD_CRUISER" || sprId === "73") {
