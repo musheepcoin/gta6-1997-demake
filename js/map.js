@@ -261,6 +261,19 @@ class LeonidaMap {
                     }
                 }
             }
+            // Clear old beach-sand tiles in Port Gellhorn International Raceway (x = 56..87, y = 163..188)
+            // so the 3D banked asphalt oval, red/white FIA curbs, SAFER walls, grandstands & pit lane sit over
+            // a clean stone paddock concourse (lid 8) and emerald turf infield (lid 10)!
+            for (let y = 163; y <= 188; y++) {
+                for (let x = 56; x <= 87; x++) {
+                    const nd = Math.hypot((x + 0.5 - 72.0) / 8.6, (y + 0.5 - 176.0) / 5.4);
+                    const isPitApron = (x >= 68 && x <= 76 && y >= 172 && y <= 176);
+                    const srcCol = (nd <= 1.0 && !isPitApron) ? turfVoxels : tunnelVoxels;
+                    for (let z = 0; z < MAP_LAYERS; z++) {
+                        this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] = srcCol[z];
+                    }
+                }
+            }
         }
 
         // Convert generic 1997 brick office blocks on Star Island & Venetian Isles into lush emerald waterfront estate lawns:
@@ -544,7 +557,7 @@ class LeonidaMap {
                 this.surfaceGround[r * MAP_COLS + c] = surfGt;
 
                 // Open ground tiles store their visible lid at z = 1 and their navigation groundType at z = 2 (with lid = 0)
-                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45);
+                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 56 && c <= 87 && r >= 163 && r <= 188);
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
                 if (blkZ1 && blkZ1.lid === 69) {
@@ -594,8 +607,8 @@ class LeonidaMap {
                     this.coastalSandMask[idx] = 1;
                 }
 
-                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, Vice City Mambas Stadium, or SERA Space Center compound
-                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45)) {
+                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, Vice City Mambas Stadium, SERA Space Center, or Port Gellhorn Speedway
+                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 56 && c <= 87 && r >= 163 && r <= 188)) {
                     continue;
                 }
 
@@ -1743,7 +1756,7 @@ class LeonidaMap {
         // 14) GTA 6 Street Takeovers / Sideshow Drift Donuts ("streetTakeovers" — ONLY in wide-open off-road plazas with zero buildings/doors/cars!)
         this.streetTakeovers = [
             { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza Center
-            { c: 64.5,  r: 177.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn Speedway Open Pit Apron
+            { c: 68.5,  r: 205.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn South Industrial Plaza
             { c: 150.5, r: 123.5, carSpr: "4",  seed: 0.0 }, // Ambrosia Refinery Open Concrete Yard
             { c: 336.5, r: 329.5, carSpr: "6",  seed: 4.4 }  // Vice Port Industrial Concrete Yard
         ].map((st) => ({
@@ -1754,14 +1767,14 @@ class LeonidaMap {
             seed: st.seed
         }));
 
-        // 15) Port Gellhorn Oval Dirt Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders ("trackRacers")
+        // 15) Port Gellhorn Oval Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders ("trackRacers")
         this.trackRacers = {
             speedway: {
-                cx: 75.0 * TILE_SIZE,
-                cy: 177.0 * TILE_SIZE,
-                rx: 9.1 * TILE_SIZE,
-                ry: 7.3 * TILE_SIZE,
-                z: 2.0,
+                cx: 72.0 * TILE_SIZE,
+                cy: 176.0 * TILE_SIZE,
+                rx: 10.6 * TILE_SIZE,
+                ry: 7.4 * TILE_SIZE,
+                z: 2.04,
                 cars: ["0", "1", "4", "6"]
             },
             mudPark: {
@@ -2315,6 +2328,33 @@ class LeonidaMap {
                 pushPropOBB(stX + sx * 476, stY + sy * 412, 32, 32, 0);                        // Corner Spiral Ramp Rotundas
             }
         }
+        // Port Gellhorn International Raceway 3D SAFER Concrete Walls, Grandstands & Infield Pit Garage OBB Hulls
+        // (West & East Entry Gates at i === 15, 16, 31, 0 stay 100% open for driving in!)
+        {
+            const gsX = 72.0 * TILE_SIZE;
+            const gsY = 176.0 * TILE_SIZE;
+            const rx = 10.6 * TILE_SIZE;
+            const ry = 7.4 * TILE_SIZE;
+            const trackW = 196;
+            const N = 32;
+            for (let i = 0; i < N; i++) {
+                if (i === 15 || i === 16 || i === 31 || i === 0) continue; // West & East Entry Gates
+                const midTh = ((i + 0.5) / N) * Math.PI * 2;
+                const px = gsX + Math.cos(midTh) * rx;
+                const py = gsY + Math.sin(midTh) * ry;
+                const tx = -Math.sin(midTh) * rx;
+                const ty =  Math.cos(midTh) * ry;
+                const segLen = (Math.PI * 2 / N) * Math.hypot(tx, ty) * 0.96;
+                const tAng = Math.atan2(ty, tx);
+                const nx =  Math.sin(tAng);
+                const ny = -Math.cos(tAng);
+                const wallDist = trackW * 0.5 + 10;
+                pushPropOBB(px + nx * wallDist, py + ny * wallDist, segLen * 0.5, 9, tAng);
+            }
+            pushPropOBB(gsX, gsY - 654, 214, 34, 0);        // North Main Covered Grandstand
+            pushPropOBB(gsX, gsY + 654, 184, 34, 0);        // South VIP Grandstand & Race Control Tower
+            pushPropOBB(gsX, 173.0 * TILE_SIZE, 78, 26, 0); // Infield 3-Bay Pit Crew Garage
+        }
         const gantryLocs = [
             { x: 359.4 * TILE_SIZE, y: 322.8 * TILE_SIZE },
             { x: 359.4 * TILE_SIZE, y: 335.4 * TILE_SIZE },
@@ -2646,7 +2686,7 @@ class LeonidaMap {
                     const dx = pm.x - payphoneSpots[i][0], dy = pm.y - payphoneSpots[i][1];
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
-                if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45)) return false;
+                if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 56 && c <= 87 && r >= 163 && r <= 188)) return false;
                 return true;
             });
 
@@ -2662,7 +2702,7 @@ class LeonidaMap {
                 this.trees = this.trees.filter(tr => {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
-                    if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45)) return false;
+                    if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 56 && c <= 87 && r >= 163 && r <= 188)) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
                         const gt = this.surfaceGround[r * MAP_COLS + c];
                         if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
@@ -2951,13 +2991,13 @@ class LeonidaMap {
                 id: "PORT_GELLHORN",
                 short: "PT GELLHORN",
                 shortName: "GELLHORN & SPEEDWAY",
-                name: "🏁 PORT GELLHORN OVAL SPEEDWAY & HANK'S",
-                sub: "DRIVEABLE DIRT OVAL RACE TRACK, HANK'S WAFFLES, UNCLE JACK'S & DOCKS — REPAIR & 0 WANTED!",
-                district: "PORT GELLHORN DIRT SPEEDWAY",
-                bx: mx256(47.0),
-                by: my256(113.5),
-                x: mx256(47.0) * TILE_SIZE,
-                y: my256(113.5) * TILE_SIZE,
+                name: "🏁 PORT GELLHORN INTERNATIONAL RACEWAY & HANK'S",
+                sub: "3D BANKED ASPHALT SPEEDWAY, FIA CURBS, GRANDSTANDS, PIT GARAGE & HANK'S — REPAIR & 0 WANTED!",
+                district: "PORT GELLHORN RACEWAY",
+                bx: 58.0,
+                by: 176.0,
+                x: 58.0 * TILE_SIZE,
+                y: 176.0 * TILE_SIZE,
                 color: "#fb923c",
                 perk: "REPAIR_CLEAR",
                 visited: false
@@ -3389,7 +3429,7 @@ class LeonidaMap {
             { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 356.0 * TILE_SIZE, y: 75.0 * TILE_SIZE, angle: 0 },
             { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: 285.5 * TILE_SIZE, y: 261.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: 188.5 * TILE_SIZE, y: 188.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: 55.5 * TILE_SIZE, y: 177.5 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SPEEDWAY RAMP", x: 56.2 * TILE_SIZE, y: 176.0 * TILE_SIZE, angle: 0 },
             { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: 90.5 * TILE_SIZE, y: 297.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: 202.0 * TILE_SIZE, y: 480.5 * TILE_SIZE, angle: Math.PI }
         ];
@@ -3444,6 +3484,8 @@ class LeonidaMap {
         if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146) return true;
         // SERA Space Center Fenced Federal Launch Complex (c = 458..481, r = 21..45)
         if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) return true;
+        // Port Gellhorn International Raceway Complex (c = 56..87, r = 163..188)
+        if (bx >= 56 && bx <= 87 && by >= 163 && by <= 188) return true;
         return false;
     }
 
