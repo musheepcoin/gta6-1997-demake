@@ -10429,19 +10429,61 @@ class LeonidaGame {
 
                 if (bestOverlap > 0) {
 
-                    // Panzer Tank crushes other vehicles on contact!
+                    // Panzer Tank rams: the 50-ton hull shoves the other vehicle aside and dents it according to
+                    // ramming speed. A slow nudge only pushes & dents; a full-speed ram sets the car on fire.
+                    // (The car only blows up after several rams or a very fast hit, never on a simple contact.)
+                    if ((a.crushesCars && !b.crushesCars) || (b.crushesCars && !a.crushesCars)) {
 
-                    if (a.crushesCars && !b.crushesCars && !b.destroyed && Math.hypot(a.vx, a.vy) > 35) {
+                        const tank = a.crushesCars ? a : b;
 
-                        this.explodeVehicle(b, a.driver === "PLAYER");
+                        const victim = tank === a ? b : a;
 
-                        continue;
+                        const sgn = tank === a ? 1 : -1; // bestN points from a to b
 
-                    }
+                        // The tank doesn't budge: the victim takes the whole separation
+                        victim.x += bestNx * bestOverlap * 1.05 * sgn;
 
-                    if (b.crushesCars && !a.crushesCars && !a.destroyed && Math.hypot(b.vx, b.vy) > 35) {
+                        victim.y += bestNy * bestOverlap * 1.05 * sgn;
 
-                        this.explodeVehicle(a, b.driver === "PLAYER");
+                        const tankSpd = Math.hypot(tank.vx || 0, tank.vy || 0);
+
+                        const closing = ((tank.vx || 0) - (victim.vx || 0)) * bestNx * sgn + ((tank.vy || 0) - (victim.vy || 0)) * bestNy * sgn;
+
+                        if (closing > 0) {
+
+                            const kickMul = victim.destroyed ? 0.6 : 0.85;
+
+                            victim.vx = (victim.vx || 0) + bestNx * sgn * closing * kickMul;
+
+                            victim.vy = (victim.vy || 0) + bestNy * sgn * closing * kickMul;
+
+                            if (victim.destroyed) victim.angularVelocity = (victim.angularVelocity || 0) + (Math.random() - 0.5) * 2.5;
+
+                        }
+
+                        if (!victim.destroyed && tankSpd > 35 && closing > 20 && (victim.crashCooldown || 0) <= 0) {
+
+                            victim.crashCooldown = 0.45;
+
+                            if (tank.driver === "PLAYER") victim.damagedByPlayer = true;
+
+                            const ramDmg = Math.max(0, closing - 20) * 0.9;
+
+                            if (typeof victim.receiveImpactDamage === "function") victim.receiveImpactDamage(ramDmg, tank.x, tank.y);
+
+                            else victim.hp -= ramDmg;
+
+                            if (typeof victim.triggerPanic === "function") victim.triggerPanic(8.0);
+
+                            this.spawnParticle((tank.x + victim.x) * 0.5, (tank.y + victim.y) * 0.5, "SPARK");
+
+                            if (this.audio && Math.hypot(victim.x - p.x, victim.y - p.y) < 480) {
+
+                                this.audio.playCarCrash(Math.min(1.5, ramDmg / 60));
+
+                            }
+
+                        }
 
                         continue;
 
