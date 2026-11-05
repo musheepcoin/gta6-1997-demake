@@ -352,7 +352,7 @@ const VEHICLE_SPECS = {
     },
     MUNDANO_WAGON: {
         name: "MUNDANO STATION WAGON",
-        sprId: "68",
+        sprId: "81",
         w: 52,
         h: 24,
         maxSpeed: 360,
@@ -508,7 +508,7 @@ const VEHICLE_SPECS = {
     },
     HOTDOG_VAN: {
         name: "BEACH HOT-DOG / ICE-CREAM VAN",
-        sprId: "81",
+        sprId: "68",
         w: 56,
         h: 28,
         maxSpeed: 330,
@@ -545,8 +545,8 @@ const VEHICLE_SPECS = {
     },
     FLATBED_TRUCK: {
         name: "INDUSTRIAL CARGO RIG",
-        sprId: "79",
-        w: 64,
+        sprId: "55",
+        w: 90,
         h: 28,
         maxSpeed: 325,
         accel: 225,
@@ -858,6 +858,8 @@ class Vehicle {
         this.remapIdx = (this.useBaseOnly || this.isPolice || this.isEmergency || this.isTank || this.amphibious)
             ? -1
             : (paletteSlot === 5 ? -1 : paletteSlot);
+        // The armored cash van shares sprite 76 with the SWAT van: never show the blue/white police base livery on it
+        if (specKey === "BRINKS_TRUCK") this.remapIdx = 1;
 
         this.x = x;
         this.y = y;
