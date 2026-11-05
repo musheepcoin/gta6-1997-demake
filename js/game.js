@@ -6131,6 +6131,7 @@ class LeonidaGame {
                 vx: Math.cos(ang + spread) * (70 + Math.random() * 50),
                 vy: Math.sin(ang + spread) * (70 + Math.random() * 50),
                 size: 2.2 + Math.random() * 2.0,
+                kind: "SPRAY",
                 color: tg.hex,
                 life: 0.28,
                 maxLife: 0.28

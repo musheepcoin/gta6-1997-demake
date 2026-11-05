@@ -9154,6 +9154,10 @@ class RetroRenderer {
             } else if (pt.color === "#38bdf8") {
                 // Fire truck water cannon droplets
                 this.pushSolidQuad3D(pt.x, pt.y, pz, 3, 3, 0, 0.22, 0.74, 0.97, 1.0 - prog * 0.5, SPRITE_DRAW_ORDER.PROJECTILES);
+            } else if (pt.kind === "SPRAY") {
+                // Black spray-paint aerosol mist from the graffiti can (expands & fades)
+                const sz = (pt.size || 3) * (1.0 + prog * 1.4);
+                this.pushSolidQuad3D(pt.x, pt.y, pz, sz, sz, 0, 0.04, 0.04, 0.05, 0.85 * (1.0 - prog), SPRITE_DRAW_ORDER.PROJECTILES);
             } else {
                 // Authentic .G24 Spark frames (219..223)
                 const frameId = 219 + Math.min(4, Math.floor(prog * 5));
