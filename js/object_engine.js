@@ -8910,9 +8910,29 @@ class WorldObjectEngine {
         for (const [x0, x1, y0, y1] of pavedStonePlazas) {
             ctx.fillRect(x0 * TILE_SIZE * sx, y0 * TILE_SIZE * sy, (x1 - x0 + 1) * TILE_SIZE * sx, (y1 - y0 + 1) * TILE_SIZE * sy);
         }
-        // Vice Beach Pier Wooden Boardwalk (c = 455..467, r = 193..196)
+        // Vice Beach Pier Wooden Boardwalk (c = 454..476, r = 193..196)
         ctx.fillStyle = "#b88655";
-        ctx.fillRect(455 * TILE_SIZE * sx, 193 * TILE_SIZE * sy, 13 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
+        ctx.fillRect(454 * TILE_SIZE * sx, 193 * TILE_SIZE * sy, 23 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
+
+        // Vice City Mambas 3D Octagonal Football Stadium (c = 179..197, r = 164..180)
+        if (this.mambasStadium) {
+            const mcx = this.mambasStadium.x * sx;
+            const mcy = this.mambasStadium.y * sy;
+            // Coral concourse plaza
+            ctx.fillStyle = "#d8c0ba";
+            ctx.fillRect(179 * TILE_SIZE * sx, 164 * TILE_SIZE * sy, 19 * TILE_SIZE * sx, 17 * TILE_SIZE * sy);
+            // Outer 3D stadium bowl & teal canopy ring
+            ctx.fillStyle = "#0d9488";
+            ctx.fillRect(mcx - 540 * sx, mcy - 440 * sy, 1080 * sx, 880 * sy);
+            ctx.fillStyle = "#f1f5f9";
+            ctx.fillRect(mcx - 496 * sx, mcy - 396 * sy, 992 * sx, 792 * sy);
+            // Emerald football turf pitch & endzones
+            ctx.fillStyle = "#16a34a";
+            ctx.fillRect(mcx - 384 * sx, mcy - 284 * sy, 768 * sx, 568 * sy);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+            ctx.lineWidth = Math.max(1, 24 * sx);
+            ctx.strokeRect(mcx - 350 * sx, mcy - 256 * sy, 700 * sx, 512 * sy);
+        }
 
         // Major 3D Landmarks on GPS / Overview Map
         const lm = this.landmarks3D || {};
@@ -8927,6 +8947,12 @@ class WorldObjectEngine {
             ctx.fillRect((lm.launchpad.x - 104) * sx, (lm.launchpad.y - 104) * sy, 208 * sx, 208 * sy);
             ctx.fillStyle = "#ea580c";
             ctx.fillRect((lm.launchpad.x - 24) * sx, (lm.launchpad.y - 24) * sy, 48 * sx, 48 * sy);
+        }
+        if (lm.airportTerminal) {
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect((lm.airportTerminal.x - 360) * sx, (lm.airportTerminal.y - 68) * sy, 720 * sx, 136 * sy);
+            ctx.fillStyle = "#0ea5e9";
+            ctx.fillRect((lm.airportTerminal.x - 310) * sx, (lm.airportTerminal.y - 46) * sy, 620 * sx, 92 * sy);
         }
         if (lm.atcTower) {
             ctx.fillStyle = "#cbd5e1";
@@ -8963,20 +8989,51 @@ class WorldObjectEngine {
             ctx.fillRect((lm.thrillbillyArena.x - 78) * sx, (lm.thrillbillyArena.y - 48) * sy, 156 * sx, 96 * sy);
         }
         if (lm.gellhornSpeedway) {
+            // West Coast Golden Sand Beach (c = 22..25, r = 149..200, preserving wooden pier at r = 179..181)
+            ctx.fillStyle = "#ecd28e";
+            ctx.fillRect(22 * TILE_SIZE * sx, 149 * TILE_SIZE * sy, 4 * TILE_SIZE * sx, 30 * TILE_SIZE * sy);
+            ctx.fillRect(22 * TILE_SIZE * sx, 182 * TILE_SIZE * sy, 4 * TILE_SIZE * sx, 19 * TILE_SIZE * sy);
+            // Perimeter Highways around Super-Speedway (North y=147..148, East x=88..89, South y=201..202)
+            ctx.fillStyle = "#4b4f56";
+            ctx.fillRect(52 * TILE_SIZE * sx, 147 * TILE_SIZE * sy, 38 * TILE_SIZE * sx, 2 * TILE_SIZE * sy);
+            ctx.fillRect(88 * TILE_SIZE * sx, 147 * TILE_SIZE * sy, 2 * TILE_SIZE * sx, 56 * TILE_SIZE * sy);
+            ctx.fillRect(52 * TILE_SIZE * sx, 201 * TILE_SIZE * sy, 38 * TILE_SIZE * sx, 2 * TILE_SIZE * sy);
+            // Paved Super-Speedway Paddock Concourse (c = 26..87, r = 149..200)
+            ctx.fillStyle = "#d3cabd";
+            ctx.fillRect(26 * TILE_SIZE * sx, 149 * TILE_SIZE * sy, 62 * TILE_SIZE * sx, 52 * TILE_SIZE * sy);
             const gcx = (lm.gellhornSpeedway.centerX || (57.0 * TILE_SIZE)) * sx;
             const gcy = (lm.gellhornSpeedway.centerY || (174.5 * TILE_SIZE)) * sy;
             const grx = (lm.gellhornSpeedway.rx || (24.5 * TILE_SIZE)) * sx;
             const gry = (lm.gellhornSpeedway.ry || (17.5 * TILE_SIZE)) * sy;
-            ctx.strokeStyle = "#475569";
-            ctx.lineWidth = Math.max(4, 248 * sx);
+            // Emerald Turf Infield + Paved Pit Lane Apron
+            ctx.fillStyle = "#2f9541";
+            ctx.beginPath();
+            ctx.ellipse(gcx, gcy, grx * 0.88, gry * 0.85, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect(44 * TILE_SIZE * sx, 169 * TILE_SIZE * sy, 27 * TILE_SIZE * sx, 14 * TILE_SIZE * sy);
+            // Outer FIA Red/White Curbs & 248px Banked Asphalt Super-Oval
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = Math.max(4.5, 292 * sx);
             ctx.beginPath();
             ctx.ellipse(gcx, gcy, grx, gry, 0, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.strokeStyle = "#334155";
+            ctx.lineWidth = Math.max(3.5, 248 * sx);
+            ctx.beginPath();
+            ctx.ellipse(gcx, gcy, grx, gry, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            // North & South Covered Mega-Grandstands + 6-Bay Infield Pit Crew Garage
             ctx.fillStyle = "#ef4444";
-            ctx.fillRect(gcx - 440 * sx, gcy - 1330 * sy, 880 * sx, 68 * sy);
-            ctx.fillRect(gcx - 380 * sx, gcy + 1262 * sy, 760 * sx, 68 * sy);
-            ctx.fillStyle = "#cbd5e1";
-            ctx.fillRect(gcx - 190 * sx, gcy - 96 * sy, 380 * sx, 64 * sy);
+            ctx.fillRect(gcx - 440 * sx, gcy - 1330 * sy, 880 * sx, 76 * sy);
+            ctx.fillRect(gcx - 380 * sx, gcy + 1262 * sy, 760 * sx, 76 * sy);
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(gcx - 190 * sx, gcy - 96 * sy, 380 * sx, 68 * sy);
+            // Hank's Waffles & Uncle Jack's Pawn / Liquor Commercial Block (c = 66..75, r = 206..210)
+            ctx.fillStyle = "#ea580c";
+            ctx.fillRect(66 * TILE_SIZE * sx, 206 * TILE_SIZE * sy, 10 * TILE_SIZE * sx, 5 * TILE_SIZE * sy);
+            ctx.fillStyle = "#fde047";
+            ctx.fillRect(67 * TILE_SIZE * sx, 207 * TILE_SIZE * sy, 8 * TILE_SIZE * sx, 3 * TILE_SIZE * sy);
         }
         if (lm.wynwoodWalls) {
             ctx.fillStyle = "#ec4899";

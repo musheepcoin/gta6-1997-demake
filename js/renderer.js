@@ -4654,7 +4654,7 @@ class RetroRenderer {
             checkReady();
         });
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=99_41", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=100_71", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         });
@@ -11666,6 +11666,19 @@ class RetroRenderer {
             }
         }
 
+        // Enterable Venue Doors (Hank's Waffles, Clubs, Hotels, Shops, Mansions) when zoomed in
+        if (Array.isArray(this.map.interiors) && zoomMode < 2) {
+            for (const intr of this.map.interiors) {
+                const pt = worldToMini(intr.doorX, intr.doorY);
+                if (pt.x < mx - 4 || pt.x > mx + mw + 4 || pt.y < my - 4 || pt.y > my + mh + 4) continue;
+                ctx.fillStyle = intr.accent || "#f472b6";
+                ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+                ctx.strokeStyle = "#090d16";
+                ctx.lineWidth = 0.8;
+                ctx.strokeRect(pt.x - 2, pt.y - 2, 4, 4);
+            }
+        }
+
         // Nearby Vehicles, Cops & Ambient Crime Shootouts
         if (Array.isArray(game.vehicles) && zoomMode < 2) {
             const copFlash = Math.floor(this.time * 8) % 2 === 0;
@@ -12669,22 +12682,30 @@ class RetroRenderer {
         const rawImg = useVice ? this.viceOverviewImg : (this.nycOverviewReady ? this.nycOverviewImg : null);
         if (!rawImg) return;
         let srcImg = rawImg;
-        this.liveOverviewCanvas = null;
+        if (useVice && this.map && this.map.objectEngine) {
+            if (!this.liveOverviewCanvas) {
+                this.liveOverviewCanvas = document.createElement("canvas");
+                this.liveOverviewCanvas.width = 1024;
+                this.liveOverviewCanvas.height = 1024;
+            }
+            const octx = this.liveOverviewCanvas.getContext("2d");
+            octx.imageSmoothingEnabled = false;
+            octx.clearRect(0, 0, 1024, 1024);
+            octx.drawImage(rawImg, 0, 0, 1024, 1024);
+            this.map.objectEngine.paintOnOverviewCanvas(octx, 1024, 1024);
+            srcImg = this.liveOverviewCanvas;
+        } else {
+            this.liveOverviewCanvas = null;
+        }
         if (this.fullMapBgCanvas) {
             const fctx = this.fullMapBgCanvas.getContext("2d");
             fctx.imageSmoothingEnabled = false;
             fctx.drawImage(srcImg, 0, 0, this.fullMapBgCanvas.width, this.fullMapBgCanvas.height);
-            if (useVice && this.map && this.map.objectEngine) {
-                this.map.objectEngine.paintOnOverviewCanvas(fctx, this.fullMapBgCanvas.width, this.fullMapBgCanvas.height);
-            }
         }
         if (this.radarBgCanvas) {
             const rctx = this.radarBgCanvas.getContext("2d");
             rctx.imageSmoothingEnabled = false;
             rctx.drawImage(srcImg, 0, 0, this.radarBgCanvas.width, this.radarBgCanvas.height);
-            if (useVice && this.map && this.map.objectEngine) {
-                this.map.objectEngine.paintOnOverviewCanvas(rctx, this.radarBgCanvas.width, this.radarBgCanvas.height);
-            }
         }
     }
 
