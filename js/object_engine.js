@@ -410,10 +410,10 @@ class WorldObjectEngine {
                 { name: "START/FINISH GANTRY", x: 72.0 * TILE_SIZE, y: 178.0 * TILE_SIZE }
             ]
         };
-        // 7. Vice City Mambas Stadium 3D Arena, Mount Kalaga Skunk Ape Cryptid, Muscle Beach & Street Takeovers
+        // 7. Vice City Mambas Stadium 3D Arena (13x11 emerald pitch centered at c=188.5, r=172.5), Mount Kalaga Skunk Ape Cryptid, Muscle Beach & Street Takeovers
         this.mambasStadium = {
-            x: 188.0 * TILE_SIZE,
-            y: 172.0 * TILE_SIZE,
+            x: 188.5 * TILE_SIZE,
+            y: 172.5 * TILE_SIZE,
             z: 2.0,
             cooldown: 0,
             fireworkTimer: 0
@@ -1514,7 +1514,9 @@ class WorldObjectEngine {
         // 0K. Vice City Mambas Stadium Field-Goal / Touchdown Show ([E]!)
         if (this.mambasStadium && (this.mambasStadium.cooldown || 0) <= 0) {
             const ms = this.mambasStadium;
-            if (Math.hypot(px - ms.x, py - ms.y) < 135) {
+            if (Math.hypot(px - ms.x, py - ms.y) < 160 ||
+                Math.hypot(px - ms.x, py - (ms.y - 308)) < 110 ||
+                Math.hypot(px - ms.x, py - (ms.y + 308)) < 110) {
                 ms.cooldown = 18.0;
                 ms.fireworkTimer = 8.0;
                 if (typeof game.addScore === "function") game.addScore(10000);
@@ -2436,7 +2438,7 @@ class WorldObjectEngine {
             if ((ms.cooldown || 0) > 0) ms.cooldown = Math.max(0, ms.cooldown - dt);
             if ((ms.fireworkTimer || 0) > 0) ms.fireworkTimer = Math.max(0, ms.fireworkTimer - dt);
             if (pVeh && (ms.cooldown || 0) <= 0 &&
-                (Math.hypot(pVeh.x - ms.x, pVeh.y - (ms.y - 96)) < 54 || Math.hypot(pVeh.x - ms.x, pVeh.y - (ms.y + 96)) < 54)) {
+                (Math.hypot(pVeh.x - ms.x, pVeh.y - (ms.y - 308)) < 68 || Math.hypot(pVeh.x - ms.x, pVeh.y - (ms.y + 308)) < 68)) {
                 const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
                 if (spd > 65) {
                     ms.cooldown = 18.0;
@@ -5500,29 +5502,54 @@ class WorldObjectEngine {
             }
         }
 
-        // 23. VICE CITY MAMBAS STADIUM 3D GOALPOSTS, 4 FLOODLIGHT PYLONS & JUMBOTRON SCOREBOARD (c=188.0, r=172.0)
+        // 23. VICE CITY MAMBAS STADIUM 3D PITCH MARKINGS, GOALPOSTS, 4 CORNER FLOODLIGHT PYLONS & TWIN JUMBOTRON SCOREBOARDS (c=188.5, r=172.5)
         if (this.mambasStadium) {
             const ms = this.mambasStadium;
             const bz = ms.z || 2.0;
             const gold = [0.98, 0.84, 0.16];
-            // A. North & South Endzone 3D Tubular Golden Football Goalposts (offY = -96 & +96)
-            for (const gy of [-96, 96]) {
-                emitCylinder3D(ms.x, ms.y, 0, gy, 2.5, 2.5, bz, bz + 0.34, 8, gold, 5, true);
-                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, gy, 38, 3.5, bz + 0.32, bz + 0.36, gold, 7);
-                emitCylinder3D(ms.x, ms.y, -17, gy, 1.8, 1.8, bz + 0.34, bz + 0.88, 8, gold, 7, true);
-                emitCylinder3D(ms.x, ms.y,  17, gy, 1.8, 1.8, bz + 0.34, bz + 0.88, 8, gold, 7, true);
+            const chalk = [0.96, 0.98, 0.96];
+            const mambasAqua = [0.06, 0.72, 0.68];
+            const mambasOrange = [0.98, 0.45, 0.12];
+
+            // A0. Crisp 3D White Football Pitch Sidelines, Endzones, Yard-Lines & Central VC Mambas Emblem (13x11 turf bowl)
+            emitSolidBox3D(ms.x, ms.y, 1, 0, -356,    0,   4, 584, bz + 0.005, bz + 0.012, chalk, 9);
+            emitSolidBox3D(ms.x, ms.y, 1, 0,  356,    0,   4, 584, bz + 0.005, bz + 0.012, chalk, 9);
+            for (const yl of [-290, -242, -145, 0, 145, 242, 290]) {
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, yl, 712, (yl === 0 || Math.abs(yl) === 290) ? 4.5 : 3.0, bz + 0.005, bz + 0.012, chalk, 9);
             }
-            // B. 4 Towering Open-Lattice S363 Stadium Floodlight Pylons at Pitch Corners
-            for (const [fx, fy] of [[-86, -108], [86, -108], [-86, 108], [86, 108]]) {
-                emitTileBox3D(ms.x, ms.y, 1, 0, fx, fy, 12, 12, bz, bz + 1.48, 363, 363, 64, [0.88, 0.92, 0.96], false);
-                emitSolidBox3D(ms.x, ms.y, 1, 0, fx, fy, 26, 8, bz + 1.48, bz + 1.68, [0.98, 0.98, 0.90], 7);
+            // North & South Aqua/Orange VC Mambas Endzone Apron Stripes
+            for (const ezY of [-266, 266]) {
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, ezY, 704, 42, bz + 0.004, bz + 0.009, mambasAqua, 7);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, ezY, 696,  8, bz + 0.006, bz + 0.011, mambasOrange, 9);
             }
-            // C. North Endzone 3D Mambas Jumbotron Scoreboard Gantry (offY = -124)
-            for (const jx of [-38, 38]) {
-                emitTileBox3D(ms.x, ms.y, 1, 0, jx, -124, 10, 10, bz, bz + 0.96, 363, 246, 64, [0.86, 0.90, 0.96], false);
+            // Midfield 50-Yard VC Mambas Aqua/Orange Medallion
+            emitCylinder3D(ms.x, ms.y, 0, 0, 38, 38, bz + 0.005, bz + 0.011, 12, mambasOrange, 9, true);
+            emitCylinder3D(ms.x, ms.y, 0, 0, 32, 32, bz + 0.007, bz + 0.013, 12, mambasAqua, 7, true);
+
+            // A. North & South Endzone 3D Tubular Golden Football Goalposts (offY = -308 & +308, right behind the endzones)
+            for (const gy of [-308, 308]) {
+                emitCylinder3D(ms.x, ms.y, 0, gy, 2.8, 2.8, bz, bz + 0.36, 8, gold, 5, true);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, gy, 44, 3.8, bz + 0.34, bz + 0.39, gold, 7);
+                emitCylinder3D(ms.x, ms.y, -20, gy, 2.0, 2.0, bz + 0.36, bz + 0.96, 8, gold, 7, true);
+                emitCylinder3D(ms.x, ms.y,  20, gy, 2.0, 2.0, bz + 0.36, bz + 0.96, 8, gold, 7, true);
             }
-            emitSolidBox3D(ms.x, ms.y, 1, 0, 0, -124, 96, 10, bz + 0.56, bz + 1.12, [0.14, 0.18, 0.26], 5);
-            emitBox3D(ms.x, ms.y, 1, 0, 0, -124, 88, 11.5, bz + 0.60, bz + 1.06, "ad_vice26", "ad_sprunk", [0.22, 0.94, 0.98]);
+
+            // B. 4 Towering Open-Lattice S363 Stadium Floodlight Pylons atop the 4 Inner Grandstand Corner Bastions (c=181.5/195.5, r=166.5/178.5, z=4.0)
+            const tierZ = 4.0;
+            for (const [fx, fy] of [[-448, -384], [448, -384], [-448, 384], [448, 384]]) {
+                emitTileBox3D(ms.x, ms.y, 1, 0, fx, fy, 14, 14, tierZ, tierZ + 1.48, 363, 363, 64, [0.88, 0.92, 0.96], false);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, fx, fy, 32, 10, tierZ + 1.48, tierZ + 1.72, [0.98, 0.98, 0.90], 10);
+            }
+
+            // C. Twin North & South Endzone 3D "VC MAMBAS" Jumbotron Scoreboard Gantries (atop North/South Grandstands at r=166.5 & r=178.5, z=4.0)
+            for (const jy of [-384, 384]) {
+                for (const jx of [-46, 46]) {
+                    emitTileBox3D(ms.x, ms.y, 1, 0, jx, jy, 10, 10, tierZ, tierZ + 0.96, 363, 246, 64, [0.86, 0.90, 0.96], false);
+                }
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, jy, 118, 11, tierZ + 0.52, tierZ + 1.18, [0.10, 0.16, 0.22], 5);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, jy, 122, 12, tierZ + 1.18, tierZ + 1.24, mambasOrange, 9);
+                emitBox3D(ms.x, ms.y, 1, 0, 0, jy, 110, 12.5, tierZ + 0.56, tierZ + 1.14, "ad_mambos_latin", "ad_mambos_latin", [1.0, 1.0, 1.0]);
+            }
         }
 
         // 24. GTA 6 TRAILER 2: BRIAN HEDER'S LEONIDA KEYS BOATYARD, DRY-DOCK HOIST GANTRY & JASON'S LADDER (c=216.5, r=476.5)
@@ -5609,8 +5636,13 @@ class WorldObjectEngine {
             const bTopLid = new Uint16Array(MAP_ROWS * M);
             const surfGtGrid = this.map.surfaceGround;
 
-            // Mark custom 3D prefab footprints so we only enhance voxel city buildings
+            // Mark custom 3D prefab footprints & Vice City Mambas Stadium bowl (c=179..197, r=164..180) so we only enhance voxel city buildings
             const customMask = new Uint8Array(MAP_ROWS * M);
+            for (let rr = 164; rr <= 180; rr++) {
+                for (let cc = 179; cc <= 197; cc++) {
+                    customMask[rr * M + cc] = 1;
+                }
+            }
             if (Array.isArray(this.instances)) {
                 for (let i = 0; i < this.instances.length; i++) {
                     const inst = this.instances[i];
@@ -8205,8 +8237,11 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (this.mambasStadium && (this.mambasStadium.cooldown || 0) <= 0 && Math.hypot(px - this.mambasStadium.x, py - this.mambasStadium.y) < 165) {
-            const scr = renderer.worldToScreen(this.mambasStadium.x, this.mambasStadium.y - 24, 2.65);
+        if (this.mambasStadium && (this.mambasStadium.cooldown || 0) <= 0 &&
+            (Math.hypot(px - this.mambasStadium.x, py - this.mambasStadium.y) < 175 ||
+             Math.hypot(px - this.mambasStadium.x, py - (this.mambasStadium.y - 308)) < 120 ||
+             Math.hypot(px - this.mambasStadium.x, py - (this.mambasStadium.y + 308)) < 120)) {
+            const scr = renderer.worldToScreen(px, py - 24, 2.65);
             ctx.font = "900 11px monospace";
             ctx.fillStyle = "rgba(8,12,22,0.92)";
             ctx.fillRect(scr.x - 190, scr.y - 22, 380, 22);

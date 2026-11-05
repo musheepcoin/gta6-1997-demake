@@ -240,6 +240,14 @@ class LeonidaMap {
             }
         }
 
+        // Restore seamless emerald turf at the center of Vice City Mambas Stadium pitch (x = 188, y = 171..173 had concrete lid 8)
+        for (let y = 171; y <= 173; y++) {
+            for (let z = 0; z < MAP_LAYERS; z++) {
+                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 188] =
+                    this.voxelGrid[(z * MAP_ROWS + 172) * MAP_COLS + 187];
+            }
+        }
+
         // Convert generic 1997 brick office blocks on Star Island & Venetian Isles into lush emerald waterfront estate lawns:
         // - East Star Island (x=347..355, y=164..170 & y=178..185)
         // - Southwest Star Island (x=335..342, y=178..183)
@@ -450,8 +458,9 @@ class LeonidaMap {
                     const hasNSRoof = nBlk && nBlk.lid > 0 && nBlk.lid !== 22 && sBlk && sBlk.lid > 0 && sBlk.lid !== 22;
                     const hasEWRoof = wBlk && wBlk.lid > 0 && wBlk.lid !== 22 && eBlk && eBlk.lid > 0 && eBlk.lid !== 22;
                     if (!hasNSRoof || !hasEWRoof) continue;
-                    // Keep Leonida Penitentiary rooftop helipad deck (c=60..64, r=88..93) clear of pools/skylights
+                    // Keep Leonida Penitentiary rooftop helipad deck (c=60..64, r=88..93) and Vice City Mambas Stadium grandstands (c=179..197, r=164..180) clear of pools/skylights
                     if (tilex >= 60 && tilex <= 64 && tiley >= 88 && tiley <= 93) continue;
+                    if (tilex >= 179 && tilex <= 197 && tiley >= 164 && tiley <= 180) continue;
 
                     const isHotelDixonCenter = (tiley === dixonY0 && tilex === dixonX0);
                     const isOceanDrivePenthouse = (tilex >= oceanPentMinX && tilex <= oceanPentMaxX && tilez >= 4);
@@ -1394,10 +1403,10 @@ class LeonidaMap {
             }
         }
 
-        // 8) Mambas Stadium Live Football Pitch Scrimmage ("stadiumScrimmage" inside the emerald turf bowl)
+        // 8) Mambas Stadium Live Football Pitch Scrimmage ("stadiumScrimmage" inside the 13x11 emerald turf bowl at c=182..194, r=167..177)
         this.stadiumScrimmage = {
-            x: mx256(115.5) * TILE_SIZE,
-            y: my256(102.5) * TILE_SIZE,
+            x: 188.5 * TILE_SIZE,
+            y: 172.5 * TILE_SIZE,
             z: 2.0
         };
 
@@ -3998,8 +4007,8 @@ class LeonidaMap {
             {
                 id: "kf_stadium",
                 title: "MAMBAS STADIUM BOWL RAMPAGE!",
-                x: mx256(116.0) * TILE_SIZE,
-                y: my256(102.0) * TILE_SIZE,
+                x: 188.5 * TILE_SIZE,
+                y: 172.5 * TILE_SIZE,
                 weapon: "SHOTGUN",
                 targetKills: 6,
                 timeLimit: 40,
