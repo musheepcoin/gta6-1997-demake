@@ -5654,11 +5654,19 @@ class LeonidaGame {
 
 
 
-        // CARJACK: Civilian driver is yanked out onto the asphalt (plays GTA 1 fall/stunned frames 38..41, then flees or fights back if aggressive!)
+        // CARJACK: Civilian or Emergency driver is yanked out onto the asphalt (plays GTA 1 fall/stunned frames 38..41, then flees or fights back if aggressive!)
 
         const fleeAngle = Math.atan2(doorY - this.player.y, doorX - this.player.x);
 
-        const fightsBack = Boolean(vehicle.aiAggressive && Math.random() < 0.45);
+        const isFiremanDriver = vehicle.specKey === "FIRE_TRUCK";
+
+        const isMedicDriver = vehicle.specKey === "MEDIC_AMBULANCE";
+
+        const fightsBack = Boolean(!isFiremanDriver && !isMedicDriver && vehicle.aiAggressive && Math.random() < 0.45);
+
+        const driverSpriteType = isFiremanDriver
+            ? "g2_fireman"
+            : (isMedicDriver ? "g2_medic" : (fightsBack ? "gang" : "civ1"));
 
         this.peds.push(new Pedestrian({
 
@@ -5674,11 +5682,13 @@ class LeonidaGame {
 
             kind: fightsBack ? "HOSTILE" : "CIVILIAN",
 
-            g24Type: fightsBack ? "gang" : "civ1",
+            g24Type: driverSpriteType,
 
-            shirtColor: "#f43f5e",
+            g2Remapped: isFiremanDriver || isMedicDriver,
 
-            hp: 45,
+            shirtColor: isFiremanDriver ? "#eab308" : (isMedicDriver ? "#38bdf8" : "#f43f5e"),
+
+            hp: isFiremanDriver ? 75 : 45,
 
             dead: false,
 
@@ -5689,6 +5699,12 @@ class LeonidaGame {
             turnSeed: Math.floor(Math.random() * 16) + 1
 
         }));
+
+        if (isFiremanDriver) {
+            this.addFloatingText(doorX, doorY - 22, "🚒 VCFD FIREFIGHTER YANKED OUT!", "#f97316");
+        } else if (isMedicDriver) {
+            this.addFloatingText(doorX, doorY - 22, "🚑 PARAMEDIC YANKED OUT!", "#38bdf8");
+        }
 
     }
 
@@ -5736,7 +5752,9 @@ class LeonidaGame {
 
             kind: "MEDIC",
 
-            g24Type: "civ0",
+            g24Type: "g2_medic",
+
+            g2Remapped: true,
 
             shirtColor: "#38bdf8",
 
@@ -5765,6 +5783,84 @@ class LeonidaGame {
         this.peds.push(medic);
 
         this.addFloatingText(doorX, doorY - 22, "🚑 PARAMEDIC ON FOOT!", "#38bdf8");
+
+    }
+
+
+
+    deployFirefighterFromTruck(fireTruck, targetCar) {
+
+        if (!fireTruck || fireTruck.deployedFireman) return;
+
+        fireTruck.doorOpenTimer = 0.48;
+
+        const toFireX = targetCar ? (targetCar.x - fireTruck.x) : 0;
+
+        const toFireY = targetCar ? (targetCar.y - fireTruck.y) : 0;
+
+        const rightX = -Math.sin(fireTruck.angle);
+
+        const rightY = Math.cos(fireTruck.angle);
+
+        const sideSign = (toFireX * rightX + toFireY * rightY) >= 0 ? 1 : -1;
+
+        const doorX = fireTruck.x + rightX * sideSign * 26;
+
+        const doorY = fireTruck.y + rightY * sideSign * 26;
+
+        const vz = fireTruck.z !== undefined ? fireTruck.z : 2.0;
+
+
+
+        const fireman = new Pedestrian({
+
+            id: `fireman_ped_${Date.now()}`,
+
+            x: doorX,
+
+            y: doorY,
+
+            z: vz,
+
+            angle: targetCar ? Math.atan2(targetCar.y - doorY, targetCar.x - doorX) : fireTruck.angle,
+
+            speed: 98,
+
+            kind: "FIREMAN",
+
+            g24Type: "g2_fireman",
+
+            g2Remapped: true,
+
+            shirtColor: "#eab308",
+
+            hp: 85,
+
+            maxHp: 85,
+
+            dead: false,
+
+            panicTimer: 0,
+
+            exitAnimTimer: 0.30
+
+        });
+
+        fireman.homeFireTruck = fireTruck;
+
+        fireman.firemanOutTimer = 0;
+
+        fireman.firemanStuckTimer = 0;
+
+        fireman.sprayingHose = false;
+
+        fireman.lastBestDist = 9999;
+
+        fireTruck.deployedFireman = fireman;
+
+        this.peds.push(fireman);
+
+        this.addFloatingText(doorX, doorY - 22, "🚒 VCFD FIREFIGHTER ON FOOT!", "#f97316");
 
     }
 
@@ -10741,6 +10837,9 @@ class LeonidaGame {
 
 
             // 1997 GTA 1 Pedestrian::SetBurnEffectActive (Flamethrower burning pedestrians!)
+            if ((ped.burnTimer || 0) > 0 && (ped.kind === "FIREMAN" || ped.g24Type === "g2_fireman")) {
+                ped.burnTimer = 0; // Fireproof VCFD Nomex bunker suit!
+            }
 
             if ((ped.burnTimer || 0) > 0) {
 
@@ -11635,6 +11734,278 @@ class LeonidaGame {
                     }
 
                     ped.angle = this.steerPedWithObstacleFeelers(ped, amb.x, amb.y, amb);
+
+                    ped.x += Math.cos(ped.angle) * 98 * dt;
+
+                    ped.y += Math.sin(ped.angle) * 98 * dt;
+
+                }
+
+            } else if (ped.kind === "FIREMAN") {
+
+                // On-Foot VCFD Firefighter AI: Advances from parked Fire Engine with high-pressure hose nozzle to extinguish burning vehicles, wrecks & burning peds!
+
+                ped.firemanOutTimer = (ped.firemanOutTimer || 0) + dt;
+
+                const ft = ped.homeFireTruck;
+
+                if (!ft || ft.destroyed || ft.driver !== "AI_EMERGENCY") {
+
+                    if (ft) ft.deployedFireman = null;
+
+                    ped.sprayingHose = false;
+
+                    ped.kind = "CIVILIAN";
+
+                    continue;
+
+                }
+
+                let targetFire = null;
+
+                let isPedTarget = false;
+
+                let bestDist = 760;
+
+                for (const v of this.vehicles) {
+
+                    if (v === ft || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
+
+                    if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
+
+                    const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
+
+                    const isBurningWreck = v.destroyed && !v.fireExtinguished;
+
+                    if (!isLiveBurning && !isBurningWreck) continue;
+
+                    if (Math.hypot(v.x - ft.x, v.y - ft.y) > 760) continue;
+
+                    const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+
+                    if (d < bestDist) {
+
+                        bestDist = d;
+
+                        targetFire = v;
+
+                        isPedTarget = false;
+
+                    }
+
+                }
+
+                for (const other of this.peds) {
+
+                    if (other === ped || other.dead || (other.burnTimer || 0) <= 0) continue;
+
+                    if (Math.hypot(other.x - ft.x, other.y - ft.y) > 620) continue;
+
+                    const d = Math.hypot(other.x - ped.x, other.y - ped.y);
+
+                    if (d < bestDist) {
+
+                        bestDist = d;
+
+                        targetFire = other;
+
+                        isPedTarget = true;
+
+                    }
+
+                }
+
+                if (targetFire && ped.firemanOutTimer < 30.0) {
+
+                    if (bestDist < 84) {
+
+                        ped.angle = Math.atan2(targetFire.y - ped.y, targetFire.x - ped.x);
+
+                        ped.speed = 0;
+
+                        ped.sprayingHose = true;
+
+                        ped.firemanStuckTimer = 0;
+
+                        const nozX = ped.x + Math.cos(ped.angle) * 11;
+
+                        const nozY = ped.y + Math.sin(ped.angle) * 11;
+
+                        const jetSpeed = Math.max(150, Math.min(255, bestDist * 2.5));
+
+                        for (let k = 0; k < 2; k++) {
+
+                            if (Math.random() < 0.88) {
+
+                                const spread = (Math.random() - 0.5) * 0.18;
+
+                                this.particles.push({
+
+                                    x: nozX,
+
+                                    y: nozY,
+
+                                    vx: Math.cos(ped.angle + spread) * jetSpeed,
+
+                                    vy: Math.sin(ped.angle + spread) * jetSpeed,
+
+                                    size: 3.2 + Math.random() * 1.8,
+
+                                    color: Math.random() < 0.40 ? "#bae6fd" : "#38bdf8",
+
+                                    life: 0.34,
+
+                                    maxLife: 0.34
+
+                                });
+
+                            }
+
+                        }
+
+                        if (Math.random() < 0.45) {
+
+                            this.spawnParticle(
+
+                                targetFire.x + (Math.random() - 0.5) * 20,
+
+                                targetFire.y + (Math.random() - 0.5) * 20,
+
+                                "WHITE_SMOKE"
+
+                            );
+
+                        }
+
+                        if (isPedTarget) {
+
+                            targetFire.burnTimer = 0;
+
+                            targetFire.hp = Math.max(targetFire.hp || 35, 45);
+
+                            this.addFloatingText(targetFire.x, targetFire.y - 22, "🚒 CITIZEN EXTINGUISHED!", "#38bdf8");
+
+                        } else {
+
+                            targetFire.extinguishProgress = (targetFire.extinguishProgress || 0) + dt * 1.15;
+
+                            if (!targetFire.destroyed) {
+
+                                targetFire.hp = Math.min(targetFire.maxHp, Math.max(targetFire.hp + 48 * dt, 58));
+
+                                targetFire.burnTimer = 0;
+
+                                targetFire.chainExplodeTimer = 0;
+
+                                if (targetFire.extinguishProgress >= 1.5 && !targetFire._vcfdSavedMsg) {
+
+                                    targetFire._vcfdSavedMsg = true;
+
+                                    this.addFloatingText(targetFire.x, targetFire.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+
+                                }
+
+                            } else if (targetFire.extinguishProgress >= 2.4 && !targetFire.fireExtinguished) {
+
+                                targetFire.fireExtinguished = true;
+
+                                targetFire.burnTimer = 0;
+
+                                this.addFloatingText(targetFire.x, targetFire.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+
+                            }
+
+                        }
+
+                    } else {
+
+                        ped.sprayingHose = false;
+
+                        ped.speed = 98;
+
+                        if (ped.fireTarget !== targetFire) {
+
+                            ped.fireTarget = targetFire;
+
+                            ped.lastBestDist = 9999;
+
+                            ped.firemanStuckTimer = 0;
+
+                            ped.detourTimer = 0;
+
+                        }
+
+                        if ((ped.detourTimer || 0) > 0) {
+
+                            ped.detourTimer -= dt;
+
+                            ped.angle = ped.detourAngle;
+
+                        } else {
+
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, targetFire.x, targetFire.y, isPedTarget ? null : targetFire);
+
+                        }
+
+                        ped.x += Math.cos(ped.angle) * 98 * dt;
+
+                        ped.y += Math.sin(ped.angle) * 98 * dt;
+
+                        if (bestDist < (ped.lastBestDist || 9999) - 2) {
+
+                            ped.lastBestDist = bestDist;
+
+                            ped.firemanStuckTimer = 0;
+
+                        } else {
+
+                            ped.firemanStuckTimer = (ped.firemanStuckTimer || 0) + dt;
+
+                            if (ped.firemanStuckTimer > 1.5 && (ped.detourTimer || 0) <= 0) {
+
+                                const direct = Math.atan2(targetFire.y - ped.y, targetFire.x - ped.x);
+
+                                ped.detourSign = -(ped.detourSign || 1);
+
+                                ped.detourAngle = direct + ped.detourSign * Math.PI * 0.5;
+
+                                ped.detourTimer = 1.25;
+
+                            }
+
+                        }
+
+                    }
+
+                } else {
+
+                    // All fires extinguished — reel in the hose and climb back into the VCFD Fire Engine!
+
+                    ped.sprayingHose = false;
+
+                    ped.speed = 98;
+
+                    ped._boardingVeh = ft;
+
+                    const dFt = Math.hypot(ft.x - ped.x, ft.y - ped.y);
+
+                    const ftBoardDist = Math.max(44, (ft.w || 66) * 0.52 + 12);
+
+                    if (dFt < ftBoardDist || ped.firemanOutTimer > 34.0) {
+
+                        ft.doorOpenTimer = 0.45;
+
+                        ft.deployedFireman = null;
+
+                        ped._boardedVehicle = true;
+
+                        ped.dead = true;
+
+                        continue;
+
+                    }
+
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, ft.x, ft.y, ft);
 
                     ped.x += Math.cos(ped.angle) * 98 * dt;
 

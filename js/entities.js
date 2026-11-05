@@ -2223,8 +2223,18 @@ class Vehicle {
             this.medicTargetPed = null;
         }
 
-        // B. FIRE ENGINE: Responds to burning vehicles & burning wrecks within 1500px and sprays high-pressure water cannon!
+        // B. FIRE ENGINE: Responds to burning vehicles & burning wrecks within 1500px, deploys an on-foot VCFD Firefighter, and sprays high-pressure water cannon!
         if (this.specKey === "FIRE_TRUCK" && Array.isArray(game.vehicles)) {
+            if (this.deployedFireman) {
+                if (
+                    this.deployedFireman.dead ||
+                    (this.deployedFireman.firemanOutTimer || 0) > 36.0 ||
+                    !game.peds.includes(this.deployedFireman)
+                ) {
+                    this.deployedFireman = null;
+                }
+            }
+
             let burningCar = null;
             let bestDist = 1500;
             for (const v of game.vehicles) {
@@ -2255,50 +2265,63 @@ class Vehicle {
                 }
 
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
-                const inSprayRange = bestDist < 138 || (bestDist < 290 && (this.approachNoProgress || 0) > 2.2);
-                if (inSprayRange) {
-                    // High-pressure rooftop water cannon stream toward the burning vehicle/wreck!
-                    const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
-                    for (let k = 0; k < 2; k++) {
-                        if (Math.random() < 0.85) {
-                            const spread = (Math.random() - 0.5) * 0.16;
-                            game.particles.push({
-                                x: this.x + Math.cos(ang) * 26,
-                                y: this.y + Math.sin(ang) * 26,
-                                vx: Math.cos(ang + spread) * jetSpeed,
-                                vy: Math.sin(ang + spread) * jetSpeed,
-                                size: 3.5 + Math.random() * 2.0,
-                                color: Math.random() < 0.35 ? "#bae6fd" : "#38bdf8",
-                                life: 0.42,
-                                maxLife: 0.42
-                            });
+                const shouldParkAndDeploy = bestDist < 165 || (bestDist < 700 && (this.approachNoProgress || 0) > 2.0) || Boolean(this.deployedFireman);
+                if (shouldParkAndDeploy) {
+                    // Deploy an on-foot VCFD Firefighter in bunker gear & helmet with a handheld fire hose!
+                    if (!this.deployedFireman) {
+                        this.aiBailTimer = (this.aiBailTimer || 0) + dt;
+                        if (this.aiBailTimer > 0.42 && Math.abs(this.speed) < 34 && typeof game.deployFirefighterFromTruck === "function") {
+                            this.aiBailTimer = 0;
+                            this.approachNoProgress = 0;
+                            game.deployFirefighterFromTruck(this, burningCar);
                         }
                     }
-                    if (Math.random() < 0.45 && typeof game.spawnParticle === "function") {
-                        game.spawnParticle(
-                            burningCar.x + (Math.random() - 0.5) * 22,
-                            burningCar.y + (Math.random() - 0.5) * 22,
-                            "WHITE_SMOKE"
-                        );
-                    }
-                    burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt;
-                    if (!burningCar.destroyed) {
-                        burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 45 * dt, 58));
-                        burningCar.burnTimer = 0;
-                        burningCar.chainExplodeTimer = 0;
-                        if (burningCar.extinguishProgress >= 1.6 && !burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
-                            burningCar._vcfdSavedMsg = true;
-                            game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+
+                    // If within rooftop deck-gun range (< 155px), also fire the truck's rooftop water cannon!
+                    if (bestDist < 155) {
+                        const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
+                        for (let k = 0; k < 2; k++) {
+                            if (Math.random() < 0.85) {
+                                const spread = (Math.random() - 0.5) * 0.16;
+                                game.particles.push({
+                                    x: this.x + Math.cos(ang) * 26,
+                                    y: this.y + Math.sin(ang) * 26,
+                                    vx: Math.cos(ang + spread) * jetSpeed,
+                                    vy: Math.sin(ang + spread) * jetSpeed,
+                                    size: 3.5 + Math.random() * 2.0,
+                                    color: Math.random() < 0.35 ? "#bae6fd" : "#38bdf8",
+                                    life: 0.42,
+                                    maxLife: 0.42
+                                });
+                            }
                         }
-                    } else if (burningCar.extinguishProgress >= 2.8) {
-                        burningCar.fireExtinguished = true;
-                        burningCar.burnTimer = 0;
-                        if (typeof game.addFloatingText === "function") {
-                            game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                        if (Math.random() < 0.45 && typeof game.spawnParticle === "function") {
+                            game.spawnParticle(
+                                burningCar.x + (Math.random() - 0.5) * 22,
+                                burningCar.y + (Math.random() - 0.5) * 22,
+                                "WHITE_SMOKE"
+                            );
+                        }
+                        burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt * 0.65;
+                        if (!burningCar.destroyed) {
+                            burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 35 * dt, 58));
+                            burningCar.burnTimer = 0;
+                            burningCar.chainExplodeTimer = 0;
+                            if (burningCar.extinguishProgress >= 1.6 && !burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
+                                burningCar._vcfdSavedMsg = true;
+                                game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                            }
+                        } else if (burningCar.extinguishProgress >= 2.8 && !burningCar.fireExtinguished) {
+                            burningCar.fireExtinguished = true;
+                            burningCar.burnTimer = 0;
+                            if (typeof game.addFloatingText === "function") {
+                                game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                            }
                         }
                     }
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
+                this.aiBailTimer = 0;
                 const forceDirect = bestDist < 260 || (this.approachNoProgress || 0) > 1.6;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
@@ -2313,6 +2336,11 @@ class Vehicle {
                 );
             }
             this.fireTargetCar = null;
+            if (this.deployedFireman) {
+                this.sirenActive = true;
+                this.aiState = "EMERGENCY_FIRE";
+                return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
+            }
         }
 
         this.sirenActive = false;
@@ -3417,7 +3445,7 @@ class TrafficManager {
 
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
-            if (ped.missionTag || ped.kind === "MEDIC") continue;
+            if (ped.missionTag || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
             // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway

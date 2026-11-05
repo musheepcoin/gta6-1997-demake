@@ -1691,7 +1691,19 @@ class RetroRenderer {
                                 ly >= 1 && ly < sh - 1 &&
                                 swatHelmetDist <= 3.15
                             );
-                            if (a < 16 && !inSwatHelmetDome) {
+                            const fireHelmetDist = Math.hypot(dx * 0.92, (dy < 0 ? (dy + 0.18) * 0.80 : (dy - 0.10) * 0.95));
+                            const inFireHelmetDome = (
+                                !isXray &&
+                                arch &&
+                                arch.key === "g2_fireman" &&
+                                hCnt >= 3 &&
+                                ent.fk !== "42" &&
+                                ent.fk !== "53" &&
+                                lx >= 1 && lx < sw - 1 &&
+                                ly >= 1 && ly < sh - 1 &&
+                                fireHelmetDist <= 3.30
+                            );
+                            if (a < 16 && !inSwatHelmetDome && !inFireHelmetDome) {
                                 d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
                                 continue;
                             }
@@ -1752,6 +1764,40 @@ class RetroRenderer {
                                 continue;
                             }
 
+                            if (inFireHelmetDome) {
+                                // Traditional American VCFD Firefighter Helmet (red/gold Cairns dome, rear beavertail brim, front gold shield crest & SCBA visor)
+                                const isOuterRim = fireHelmetDist > 2.68;
+                                const isFrontShield = (dy >= 0.85 && dy <= 2.15 && Math.abs(dx) <= 1.05);
+                                const isVisorBand = (!isFrontShield && dy >= 1.15 && dy <= 2.55 && Math.abs(dx) <= 2.05);
+                                const isCenterComb = (Math.abs(dx) <= 0.45 && dy >= -2.3 && dy <= 0.85);
+                                if (isFrontShield) {
+                                    // Gleaming brass/gold VCFD front leather shield badge
+                                    d[dp] = 250; d[dp + 1] = 204; d[dp + 2] = 21; d[dp + 3] = 255;
+                                } else if (isVisorBand) {
+                                    // SCBA polycarbonate facepiece visor with cyan/white specular glint
+                                    if (dx < 0) {
+                                        d[dp] = 186; d[dp + 1] = 230; d[dp + 2] = 253; d[dp + 3] = 255;
+                                    } else {
+                                        d[dp] = 56; d[dp + 1] = 189; d[dp + 2] = 248; d[dp + 3] = 255;
+                                    }
+                                } else if (isOuterRim) {
+                                    // Dark crimson brim edge with yellow reflective trim
+                                    if (dy < -1.2 && Math.abs(dx) <= 1.65) {
+                                        d[dp] = 250; d[dp + 1] = 204; d[dp + 2] = 21; d[dp + 3] = 255;
+                                    } else {
+                                        d[dp] = 127; d[dp + 1] = 29; d[dp + 2] = 29; d[dp + 3] = 255;
+                                    }
+                                } else {
+                                    const domeSpec = Math.max(0, 1.0 - Math.hypot((dx + 0.40) * 0.42, (dy + 0.45) * 0.42));
+                                    const combBoost = isCenterComb ? 34 : 0;
+                                    d[dp] = clamp8(195 + domeSpec * 55 + combBoost);
+                                    d[dp + 1] = clamp8(28 + domeSpec * 44 + (isCenterComb ? 110 : 0));
+                                    d[dp + 2] = clamp8(24 + domeSpec * 26);
+                                    d[dp + 3] = 255;
+                                }
+                                continue;
+                            }
+
                             let col = null;
                             let shade = 1.0;
                             if (isShirt) {
@@ -1776,6 +1822,22 @@ class RetroRenderer {
                                     } else {
                                         col = [42, 58, 86]; // Navy-slate tactical uniform sleeves
                                     }
+                                } else if (arch.key === "g2_fireman") {
+                                    // Heavy charcoal-tan Nomex turnout coat + bright yellow SCBA oxygen cylinder on back + neon lime-silver triple reflective stripes!
+                                    if (ax <= 1.25 && dy >= -3.2 && dy <= -0.5) {
+                                        if (dy >= -1.1) {
+                                            col = [226, 232, 240]; // Chrome SCBA regulator valve neck
+                                            shade = 1.10;
+                                        } else {
+                                            col = [250, 204, 21]; // High-vis yellow SCBA oxygen tank cylinder
+                                            shade = 1.06;
+                                        }
+                                    } else if ((ly + 1) % 4 === 0 || (ax >= 3.2 && ax <= 4.4)) {
+                                        col = [234, 255, 56]; // Glowing lime-yellow NFPA triple-trim reflective band
+                                        shade = 1.12;
+                                    } else {
+                                        col = [44, 40, 38]; // Charcoal/bunker Nomex turnout coat
+                                    }
                                 } else {
                                     col = arch.shirt;
                                     if (arch.pattern === "hawaiian") {
@@ -1796,6 +1858,13 @@ class RetroRenderer {
                                 if (arch.legs === "shorts" && dist > 5.8) {
                                     col = arch.skin;
                                     shade = Math.max(0.70, Math.min(1.15, shade));
+                                } else if (arch.key === "g2_fireman") {
+                                    if (dist > 5.2 && dist < 6.7) {
+                                        col = [234, 255, 56]; // High-vis reflective cuff band on bunker pants
+                                        shade = 1.10;
+                                    } else {
+                                        col = [52, 46, 42]; // Heavy bunker turnout trousers
+                                    }
                                 } else {
                                     col = arch.pants;
                                 }
@@ -1818,6 +1887,10 @@ class RetroRenderer {
                                     // Tactical black-charcoal gloves on hands & balaclava on neck
                                     col = [28, 36, 48];
                                     shade = 0.95;
+                                } else if (arch.key === "g2_fireman") {
+                                    // Fireproof golden-tan Kevlar firefighter gauntlets & Nomex hood
+                                    col = [217, 166, 46];
+                                    shade = 0.98;
                                 } else {
                                     shade = Math.max(0.6, Math.min(1.2, r / 175));
                                     col = arch.skin;
@@ -7974,10 +8047,16 @@ class RetroRenderer {
                 (this.map && this.map.coastalSandMask && this.map.coastalSandMask[pby * MAP_COLS + pbx] === 1) ||
                 (pbx >= MAP_X_256[182] && pbx <= MAP_X_256[195] && pby >= MAP_Y_256[98] && pby <= MAP_Y_256[128]);
 
-            if (isPrisonZone && ped.kind !== "COP") {
+            if (isPrisonZone && ped.kind !== "COP" && ped.kind !== "FIREMAN" && ped.kind !== "MEDIC") {
                 pedType = "g2_prisoner";
                 ped.g24Type = "g2_prisoner";
                 ped.g2Remapped = true;
+            } else if (ped.kind === "FIREMAN") {
+                pedType = "g2_fireman";
+                ped.g24Type = "g2_fireman";
+            } else if (ped.kind === "MEDIC") {
+                pedType = "g2_medic";
+                ped.g24Type = "g2_medic";
             } else if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
                 const beachPool = [
                     "bikini_pink", "bikini_cyan", "bikini_yellow",
@@ -8000,6 +8079,8 @@ class RetroRenderer {
             if (!pedType) {
                 if (ped.kind === "MONK") pedType = "monk";
                 else if (ped.kind === "COP") pedType = "police";
+                else if (ped.kind === "FIREMAN") pedType = "g2_fireman";
+                else if (ped.kind === "MEDIC") pedType = "g2_medic";
                 else if (ped.kind === "HOSTILE" || ped.kind === "CRIMINAL" || ped.archetype === "PAULY" || ped.archetype === "DELL") pedType = "gang";
                 else {
                     const civTypes = ["gang", "civ0", "civ1", "civ2", "civ3"];
@@ -8041,6 +8122,10 @@ class RetroRenderer {
                 const copActive = (game.wantedLevel || 0) > 0 || Boolean(ped.inCombat);
                 const copWeapon = copActive ? (ped.copWeapon || "PISTOL") : "FIST";
                 frameIdx = this.getPedFrameIndex(copWeapon, ped.speed > 0, copActive, walkPhase);
+            } else if (ped.kind === "FIREMAN") {
+                const walkPhase = this.time * 1.9 + ped.animSeed;
+                const spraying = Boolean(ped.sprayingHose);
+                frameIdx = this.getPedFrameIndex(spraying ? "FLAMETHROWER" : "FIST", ped.speed > 0 && !spraying, spraying, walkPhase);
             } else if (ped.kind === "CRIMINAL") {
                 const walkPhase = this.time * 2.1 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex(ped.copWeapon || "UZI", ped.speed > 0, true, walkPhase);
@@ -8118,6 +8203,25 @@ class RetroRenderer {
             }
 
             this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
+
+            // VCFD On-Foot Firefighter brass hose nozzle + coupled yellow canvas supply line to his Fire Engine!
+            if (ped.kind === "FIREMAN") {
+                const ft = ped.homeFireTruck;
+                if (ft && !ft.destroyed) {
+                    const dFt = Math.hypot(ft.x - ped.x, ft.y - ped.y);
+                    if (dFt > 18 && dFt < 240) {
+                        const midX = (ped.x + ft.x) * 0.5;
+                        const midY = (ped.y + ft.y) * 0.5;
+                        const hAng = Math.atan2(ped.y - ft.y, ped.x - ft.x);
+                        this.pushSolidQuad3D(midX, midY, pz - 0.015, dFt, 2.4, hAng, 0.92, 0.78, 0.16, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+                if (ped.sprayingHose) {
+                    const nozX = ped.x + Math.cos(ped.angle) * 9.5;
+                    const nozY = ped.y + Math.sin(ped.angle) * 9.5;
+                    this.pushSolidQuad3D(nozX, nozY, pz + 0.018, 5.5, 2.6, ped.angle, 0.96, 0.80, 0.18, 0.98, pedDrawOrder);
+                }
+            }
 
             // GTA 2 kSynthCigarette (synthetic_lights.cpp): ~25% of calm adult civilian pedestrians smoke a glowing cigarette ember after dusk!
             if (!isChildPed && nfGlobal > 0.32 && (ped.panicTimer || 0) <= 0 && (Math.abs(Math.floor(ped.animSeed * 1000)) % 4 === 0)) {
