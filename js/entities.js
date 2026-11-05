@@ -1331,10 +1331,42 @@ class Vehicle {
         const curZ = this.z !== undefined ? this.z : 2.0;
         this.aiReverseTimer = 0;
 
-        // Backing out of a gridlock: reverse straight back along the lane, then re-pick a route
+        // Backing out of a gridlock: reverse straight back along the lane until we reach the previous intersection
+        // (or the road behind us is blocked), then re-pick a route that avoids the jammed direction.
         if (this.gridlockReverseTimer > 0) {
-            this.aiState = "REVERSING";
-            return { throttle: -0.8, steer: 0, handbrake: false };
+            const rbx = Math.floor(this.x / TILE_SIZE);
+            const rby = Math.floor(this.y / TILE_SIZE);
+            const rLid = map.getBlockInfo ? map.getBlockInfo(rbx, rby, 1).lid : 0;
+            const rCos = Math.cos(this.angle), rSin = Math.sin(this.angle);
+            let rearBlocked = false;
+            const rearX = this.x - rCos * ((this.w || 48) * 0.5 + 12);
+            const rearY = this.y - rSin * ((this.w || 48) * 0.5 + 12);
+            if (map.resolveCircleBuildingCollision && map.resolveCircleBuildingCollision(rearX, rearY, 12, curZ).hit) rearBlocked = true;
+            if (!rearBlocked && game && Array.isArray(game.vehicles)) {
+                for (const o of game.vehicles) {
+                    if (o === this || o === this.towingVehicle) continue;
+                    if (o.z !== undefined && Math.abs(o.z - curZ) > 0.85) continue;
+                    const ox = o.x - this.x, oy = o.y - this.y;
+                    const along = ox * rCos + oy * rSin;
+                    const lat = Math.abs(-ox * rSin + oy * rCos);
+                    const need = ((this.w || 48) + (o.w || 48)) * 0.5 + 6;
+                    if (along < 0 && along > -need && lat < ((this.h || 24) + (o.h || 24)) * 0.5) {
+                        rearBlocked = true;
+                        break;
+                    }
+                }
+            }
+            const reachedBox = rLid === 25 && !this.gridlockStartedInBox;
+            const leftBox = rLid !== 25 && this.gridlockStartedInBox;
+            if (rearBlocked || reachedBox || leftBox) {
+                this.gridlockReverseTimer = 0;
+                this.aiBlockX = -1;
+                this.aiBlockY = -1;
+                this.aiChosenDir = null;
+            } else {
+                this.aiState = "REVERSING";
+                return { throttle: -0.8, steer: 0, handbrake: false };
+            }
         }
 
         const bx = Math.floor(this.x / TILE_SIZE);
@@ -1373,6 +1405,18 @@ class Vehicle {
                     Boolean(this.aiTurnedInIntersection),
                     entryAngle
                 );
+                // Alternative route after backing out of a gridlock: try other exits than the jammed direction
+                if (this.gridlockAvoidTimer > 0 && typeof this.gridlockAvoidAngle === "number") {
+                    const isJammedDir = (dir) => dir && Math.abs(this.normalizeAngle(dir.angle - this.gridlockAvoidAngle)) < 0.3;
+                    for (let k = 1; k <= 7 && isJammedDir(this.aiChosenDir); k++) {
+                        const altSeed = (this.aiTurnSeed + k * 0.137) % 1.0;
+                        const alt = map.chooseNextRoadBlock(bx, by, refAngle, curZ, altSeed, false, entryAngle);
+                        if (alt && !isJammedDir(alt)) {
+                            this.aiChosenDir = alt;
+                            this.gridlockAvoidTimer = 0;
+                        }
+                    }
+                }
             } else {
                 const snapAngle = Math.round(refAngle / (Math.PI * 0.5)) * (Math.PI * 0.5);
                 this.aiChosenDir = { dx: Math.round(Math.cos(snapAngle)), dy: Math.round(Math.sin(snapAngle)), angle: snapAngle, isTurn: false };
@@ -2587,6 +2631,9 @@ class Vehicle {
         if (this.gridlockReverseTimer > 0) {
             this.gridlockReverseTimer = Math.max(0, this.gridlockReverseTimer - dt);
         }
+        if (this.gridlockAvoidTimer > 0) {
+            this.gridlockAvoidTimer = Math.max(0, this.gridlockAvoidTimer - dt);
+        }
         const isAiDriven = this.driver === "AI_TRAFFIC" || this.driver === "AI_TOW" || this.driver === "AI_EMERGENCY";
         if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0)) {
             let counts = true;
@@ -2616,7 +2663,10 @@ class Vehicle {
                         }
                     }
                     if (rearClear) {
-                        this.gridlockReverseTimer = 1.5;
+                        this.gridlockReverseTimer = 4.0;
+                        this.gridlockStartedInBox = inBox;
+                        this.gridlockAvoidAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number" ? this.aiChosenDir.angle : this.angle;
+                        this.gridlockAvoidTimer = 14.0;
                         this.gridlockTimer = 0;
                         this.aiLaneChangeCooldown = 0;
                         this.aiBlockX = -1;
