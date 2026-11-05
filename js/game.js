@@ -11879,33 +11879,55 @@ class LeonidaGame {
 
                         if (isPedTarget) {
 
-                            targetFire.burnTimer = 0;
+                            targetFire.extinguishProgress = (targetFire.extinguishProgress || 0) + dt;
 
-                            targetFire.hp = Math.max(targetFire.hp || 35, 45);
+                            targetFire.burnTimer = Math.max(targetFire.burnTimer || 0.8, 0.8);
 
-                            this.addFloatingText(targetFire.x, targetFire.y - 22, "🚒 CITIZEN EXTINGUISHED!", "#38bdf8");
+                            targetFire.hp = Math.max(targetFire.hp || 35, 35);
 
-                        } else {
-
-                            targetFire.extinguishProgress = (targetFire.extinguishProgress || 0) + dt * 1.15;
-
-                            if (!targetFire.destroyed) {
-
-                                targetFire.hp = Math.min(targetFire.maxHp, Math.max(targetFire.hp + 48 * dt, 58));
+                            if (targetFire.extinguishProgress >= 1.8) {
 
                                 targetFire.burnTimer = 0;
 
+                                targetFire.extinguishProgress = 0;
+
+                                targetFire.hp = Math.max(targetFire.hp || 45, 45);
+
+                                this.addFloatingText(targetFire.x, targetFire.y - 22, "🚒 CITIZEN EXTINGUISHED!", "#38bdf8");
+
+                            }
+
+                        } else {
+
+                            targetFire.extinguishProgress = (targetFire.extinguishProgress || 0) + dt * 0.55;
+
+                            if (!targetFire.destroyed) {
+
                                 targetFire.chainExplodeTimer = 0;
 
-                                if (targetFire.extinguishProgress >= 1.5 && !targetFire._vcfdSavedMsg) {
+                                if ((targetFire.burnTimer || 0) > 0) {
 
-                                    targetFire._vcfdSavedMsg = true;
-
-                                    this.addFloatingText(targetFire.x, targetFire.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                                    targetFire.burnTimer = Math.max(targetFire.burnTimer, 1.5);
 
                                 }
 
-                            } else if (targetFire.extinguishProgress >= 2.4 && !targetFire.fireExtinguished) {
+                                if (targetFire.extinguishProgress >= 3.2) {
+
+                                    targetFire.hp = Math.min(targetFire.maxHp, Math.max(targetFire.hp + 48 * dt, 58));
+
+                                    targetFire.burnTimer = 0;
+
+                                    if (!targetFire._vcfdSavedMsg) {
+
+                                        targetFire._vcfdSavedMsg = true;
+
+                                        this.addFloatingText(targetFire.x, targetFire.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+
+                                    }
+
+                                }
+
+                            } else if (targetFire.extinguishProgress >= 5.2 && !targetFire.fireExtinguished) {
 
                                 targetFire.fireExtinguished = true;
 

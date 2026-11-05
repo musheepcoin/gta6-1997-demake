@@ -2302,16 +2302,21 @@ class Vehicle {
                                 "WHITE_SMOKE"
                             );
                         }
-                        burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt * 0.65;
+                        burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt * 0.35;
                         if (!burningCar.destroyed) {
-                            burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 35 * dt, 58));
-                            burningCar.burnTimer = 0;
                             burningCar.chainExplodeTimer = 0;
-                            if (burningCar.extinguishProgress >= 1.6 && !burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
-                                burningCar._vcfdSavedMsg = true;
-                                game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                            if ((burningCar.burnTimer || 0) > 0) {
+                                burningCar.burnTimer = Math.max(burningCar.burnTimer, 1.5);
                             }
-                        } else if (burningCar.extinguishProgress >= 2.8 && !burningCar.fireExtinguished) {
+                            if (burningCar.extinguishProgress >= 3.2) {
+                                burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 35 * dt, 58));
+                                burningCar.burnTimer = 0;
+                                if (!burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
+                                    burningCar._vcfdSavedMsg = true;
+                                    game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                                }
+                            }
+                        } else if (burningCar.extinguishProgress >= 5.2 && !burningCar.fireExtinguished) {
                             burningCar.fireExtinguished = true;
                             burningCar.burnTimer = 0;
                             if (typeof game.addFloatingText === "function") {
