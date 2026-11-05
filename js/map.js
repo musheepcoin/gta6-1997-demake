@@ -520,7 +520,7 @@ class LeonidaMap {
                 this.surfaceGround[r * MAP_COLS + c] = surfGt;
 
                 // Open ground tiles store their visible lid at z = 1 and their navigation groundType at z = 2 (with lid = 0)
-                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369);
+                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180);
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
                 if (blkZ1 && blkZ1.lid === 69) {
@@ -570,8 +570,8 @@ class LeonidaMap {
                     this.coastalSandMask[idx] = 1;
                 }
 
-                // Never plant flora inside Leonida State Penitentiary or VCIA Airport active runways/tarmac
-                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369)) {
+                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, or Vice City Mambas Stadium bowl/pitch
+                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180)) {
                     continue;
                 }
 
@@ -2531,6 +2531,7 @@ class LeonidaMap {
                     const dx = pm.x - payphoneSpots[i][0], dy = pm.y - payphoneSpots[i][1];
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
+                if (c >= 179 && c <= 197 && r >= 164 && r <= 180) return false;
                 return true;
             });
 
@@ -2546,6 +2547,7 @@ class LeonidaMap {
                 this.trees = this.trees.filter(tr => {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
+                    if (c >= 179 && c <= 197 && r >= 164 && r <= 180) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
                         const gt = this.surfaceGround[r * MAP_COLS + c];
                         if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
