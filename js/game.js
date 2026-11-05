@@ -564,9 +564,9 @@ class LeonidaGame {
 
             { spec: "PANZER_TANK", c: 468.5, r: 27.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "VCPD_CRUISER", c: 460.5, r: 31.2, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "VCPD_CRUISER", c: 461.2, r: 31.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "BOXVILLE_VAN", c: 460.5, r: 38.8, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "BOXVILLE_VAN", c: 461.2, r: 38.8, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
 
 
@@ -1152,7 +1152,7 @@ class LeonidaGame {
                     v.x = (bx + 0.5) * TILE_SIZE;
                     v.y = (by + 0.5) * TILE_SIZE;
                     v.angle = this.map.getAlignedRoadAngle(bx, by, v.angle, v.z);
-                } else if (hitsClearZone(v.x, v.y)) {
+                } else if (v.missionTag !== "LANDMARK" && hitsClearZone(v.x, v.y)) {
 
                     // Never leave a driverless parked car underneath a 3D billboard/landmark or overlapping another parked vehicle!
 
@@ -1166,8 +1166,8 @@ class LeonidaGame {
 
                                 const cbx = bx + dx;
                                 const cby = by + dy;
-                                // Never shift parked cars onto narrow Ocean Drive sidewalks (col 443, 448, 451)
-                                if (cbx === 443 || cbx === 448 || cbx === 451) continue;
+                                // Never shift parked cars onto narrow Ocean Drive sidewalks (col 443, 448, 451) or restricted compounds
+                                if (cbx === 443 || cbx === 448 || cbx === 451 || (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(cbx, cby))) continue;
 
                                 const nb = this.map.getNavigationBlock(cbx, cby, v.z);
 
