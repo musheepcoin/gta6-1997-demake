@@ -1920,13 +1920,22 @@ class RetroRenderer {
                 meta.sprites.peds["g2_xray"] = { ...g2SrcFrames, ...xrayFrames };
             }
 
-            // Apply GTA 2 3D spherical head/shoulder shading & 1px dark contour to all ped sprites after synthesis
+            // Apply GTA 2 3D spherical head/shoulder shading & 1px dark contour to all ped sprites after synthesis.
+            // Many synthesized archetypes share the SAME atlas rects with their source (e.g. beach peds reuse Lucia's
+            // weapon frames, GTA 2 remaps reuse civ0's), so shade each unique atlas rect only ONCE — shading the same
+            // pixels repeatedly over-darkens/discolors them (Lucia changing color while shooting).
             if (meta.sprites.peds) {
+                const shadedRects = new Set();
                 for (const roleKey of Object.keys(meta.sprites.peds)) {
                     const roleFrames = meta.sprites.peds[roleKey];
                     if (!roleFrames) continue;
                     for (const frameKey of Object.keys(roleFrames)) {
-                        closeBoxHoles(roleFrames[frameKey], false, true);
+                        const rc = roleFrames[frameKey];
+                        if (!Array.isArray(rc) || rc.length < 4) continue;
+                        const rk = rc[0] + "," + rc[1] + "," + rc[2] + "," + rc[3];
+                        if (shadedRects.has(rk)) continue;
+                        shadedRects.add(rk);
+                        closeBoxHoles(rc, false, true);
                     }
                 }
             }
