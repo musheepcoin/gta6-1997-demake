@@ -7843,6 +7843,58 @@ class RetroRenderer {
             this.pushSolidQuad3D(s.x, s.y, sz, sw, sh, sang, sr, sg, sb, alpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
         }
 
+        // 1B. Persistent spray-paint graffiti tags on walls (press [P] on foot next to a building)
+        if (Array.isArray(game.graffitiTags)) {
+            const glyphs = [
+                ["X.X.XXX", "X.X.X..", "X.X.X..", ".X..X..", ".X..XXX"],
+                ["X.X.X", "XXXXX", "XXXXX", "XXXXX", "....."],
+                ["X...X", ".X.X.", "..X..", ".X.X.", "X...X"],
+                [".XXX.", "X.X.X", "X...X", ".X.X.", ".XXX."],
+                ["..X..", "...X.", "XXXXX", "...X.", "..X.."],
+                [".X.X.", "XXXXX", "XXXXX", ".XXX.", "..X.."],
+                ["..XX.", ".XX..", "XXXXX", "..XX.", ".XX.."]
+            ];
+            const drawTag = (tg, progress) => {
+                const rows = glyphs[(tg.style || 0) % glyphs.length];
+                const cell = 2.0;
+                const gw = rows[0].length * cell;
+                const gh = rows.length * cell;
+                const ca = Math.cos(tg.angle || 0), sa = Math.sin(tg.angle || 0);
+                const tz = this.getEntityZ(tg, 0.02);
+                // Dark backing shadow for readability
+                this.pushSolidQuad3D(tg.x, tg.y, tz, gw + 2.4, gh + 2.4, tg.angle || 0, 0.02, 0.02, 0.04, 0.30 * progress, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const maxRow = Math.max(1, Math.ceil(rows.length * progress));
+                for (let ry = 0; ry < Math.min(rows.length, maxRow); ry++) {
+                    for (let rx = 0; rx < rows[ry].length; rx++) {
+                        if (rows[ry][rx] !== "X") continue;
+                        const lx = (rx - (rows[ry].length - 1) * 0.5) * cell;
+                        const ly = (ry - (rows.length - 1) * 0.5) * cell;
+                        const wx = tg.x + lx * ca - ly * sa;
+                        const wy = tg.y + lx * sa + ly * ca;
+                        this.pushSolidQuad3D(wx, wy, tz + 0.001, cell * 0.92, cell * 0.92, tg.angle || 0, tg.r, tg.g, tg.b, 0.92 * progress, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+                // Paint drips running down under the tag
+                if (progress >= 1) {
+                    for (let dc = 0; dc < rows[0].length; dc++) {
+                        if (((tg.seed || 0) + dc * 7) % 4 !== 0) continue;
+                        const lx = (dc - (rows[0].length - 1) * 0.5) * cell;
+                        const ly = gh * 0.5 + cell * 0.9;
+                        this.pushSolidQuad3D(tg.x + lx * ca - ly * sa, tg.y + lx * sa + ly * ca, tz + 0.001, cell * 0.5, cell * 1.6, tg.angle || 0, tg.r, tg.g, tg.b, 0.7, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+            };
+            let drawn = 0;
+            for (const tg of game.graffitiTags) {
+                if (tg.x < minX || tg.x > maxX || tg.y < minY || tg.y > maxY) continue;
+                if (++drawn > 30) break;
+                drawTag(tg, 1);
+            }
+            if (game.tagSprayTarget && game.tagSprayTimer > 0) {
+                drawTag(game.tagSprayTarget, Math.max(0.05, Math.min(1, 1 - game.tagSprayTimer / 1.25)));
+            }
+        }
+
         // 2. Crates, Kill Frenzies, Info Signs, Powerups & Ringing Payphones (eSpriteDrawOrder_MapObject)
         if (this.map.crates) {
             for (const cr of this.map.crates) {

@@ -239,6 +239,10 @@ class LeonidaGame {
         this.floatingTexts = [];
 
         this.skidmarks = [];
+        this.graffitiTags = this.loadGraffitiTags();
+        this.tagSprayTimer = 0;
+        this.tagCooldown = 0;
+        this.tagSprayTarget = null;
 
         this.craters = [];
 
@@ -2168,6 +2172,13 @@ class LeonidaGame {
             if (code === "KeyK") {
 
                 this.armOrRigCarBomb();
+
+            }
+
+            // Graffiti tagging with a spray can [P]
+            if (code === "KeyP" && !e.repeat) {
+
+                this.startGraffitiTag();
 
             }
 
@@ -6006,6 +6017,151 @@ class LeonidaGame {
     }
 
 
+
+    // GTA San Andreas-style graffiti tagging [P]: spray a persistent tag on the wall in front of you
+    loadGraffitiTags() {
+        try {
+            const raw = window.localStorage ? window.localStorage.getItem("vc26_graffiti_tags_v1") : null;
+            const arr = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(arr)) {
+                return arr.filter((t) => t && typeof t.x === "number" && typeof t.y === "number").slice(-120);
+            }
+        } catch (err) { /* ignore */ }
+        return [];
+    }
+
+    saveGraffitiTags() {
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem("vc26_graffiti_tags_v1", JSON.stringify(this.graffitiTags.slice(-120)));
+            }
+        } catch (err) { /* ignore */ }
+    }
+
+    startGraffitiTag() {
+        const p = this.player;
+        if (!p || p.dead || !this.started) return;
+        if (p.inVehicle) {
+            this.addFloatingText(p.x, p.y - 26, "🎨 GET OUT OF THE CAR TO TAG!", "#ff2a85");
+            return;
+        }
+        if ((this.tagSprayTimer || 0) > 0 || (this.tagCooldown || 0) > 0) return;
+
+        // Look for a building wall within ~34px, preferring the direction Lucia is facing
+        const pz = p.z || 2.0;
+        let best = null;
+        let bestScore = -999;
+        for (let k = 0; k < 16; k++) {
+            const ang = (k / 16) * Math.PI * 2;
+            const cx = Math.cos(ang), cy = Math.sin(ang);
+            let hitDist = -1;
+            for (let s = 8; s <= 36; s += 4) {
+                if (this.map.resolveCircleBuildingCollision(p.x + cx * s, p.y + cy * s, 6, pz).hit) {
+                    hitDist = s;
+                    break;
+                }
+            }
+            if (hitDist < 0) continue;
+            const facing = Math.cos(this.normalizeAngleSafe(ang - (p.angle || 0)));
+            const score = facing * 10 - hitDist * 0.12;
+            if (score > bestScore) {
+                bestScore = score;
+                best = { ang, hitDist };
+            }
+        }
+        if (!best) {
+            this.addFloatingText(p.x, p.y - 26, "🎨 FIND A WALL TO TAG!", "#ffd13b");
+            return;
+        }
+
+        const wx = p.x + Math.cos(best.ang) * (best.hitDist - 5);
+        const wy = p.y + Math.sin(best.ang) * (best.hitDist - 5);
+        for (const t of this.graffitiTags) {
+            if (Math.hypot(t.x - wx, t.y - wy) < 20) {
+                this.addFloatingText(p.x, p.y - 26, "🎨 ALREADY TAGGED!", "#94a3b8");
+                return;
+            }
+        }
+
+        const palette = [
+            ["#ff2a85", 1.0, 0.16, 0.52], ["#00f0ff", 0.0, 0.94, 1.0], ["#39ff14", 0.22, 1.0, 0.08],
+            ["#ffd13b", 1.0, 0.82, 0.23], ["#f97316", 0.98, 0.45, 0.09], ["#a855f7", 0.66, 0.33, 0.97], ["#f8fafc", 0.97, 0.98, 0.99]
+        ];
+        const col = palette[Math.floor(Math.random() * palette.length)];
+        p.angle = best.ang;
+        this.tagSprayTarget = {
+            x: wx,
+            y: wy,
+            z: this.map.getHeightAtPixel(wx, wy, pz),
+            angle: best.ang + Math.PI * 0.5,
+            style: Math.floor(Math.random() * 7),
+            hex: col[0],
+            r: col[1],
+            g: col[2],
+            b: col[3],
+            seed: Math.floor(Math.random() * 1000)
+        };
+        this.tagSprayTimer = 1.25;
+        this.tagSprayStartX = p.x;
+        this.tagSprayStartY = p.y;
+        if (this.audio && typeof this.audio.playBeep === "function") {
+            this.audio.playBeep(1500, 0.05, "sawtooth", 0.04);
+        }
+    }
+
+    updateGraffitiTagging(dt) {
+        const p = this.player;
+        if ((this.tagCooldown || 0) > 0) this.tagCooldown = Math.max(0, this.tagCooldown - dt);
+        if (!(this.tagSprayTimer > 0)) return;
+        const moved = Math.hypot(p.x - this.tagSprayStartX, p.y - this.tagSprayStartY) > 6;
+        if (p.dead || p.inVehicle || moved || (p.jumpTimer || 0) > 0) {
+            this.tagSprayTimer = 0;
+            this.tagSprayTarget = null;
+            if (!p.dead) this.addFloatingText(p.x, p.y - 26, "🎨 TAG INTERRUPTED!", "#ef4444");
+            return;
+        }
+        const tg = this.tagSprayTarget;
+        this.tagSprayTimer -= dt;
+        // Aerosol mist spraying toward the wall
+        const ang = Math.atan2(tg.y - p.y, tg.x - p.x);
+        for (let i = 0; i < 2; i++) {
+            const spread = (Math.random() - 0.5) * 0.5;
+            this.particles.push({
+                x: p.x + Math.cos(ang) * 8,
+                y: p.y + Math.sin(ang) * 8,
+                vx: Math.cos(ang + spread) * (70 + Math.random() * 50),
+                vy: Math.sin(ang + spread) * (70 + Math.random() * 50),
+                size: 2.2 + Math.random() * 2.0,
+                color: tg.hex,
+                life: 0.28,
+                maxLife: 0.28
+            });
+        }
+        if (this.tagSprayTimer <= 0) {
+            this.tagSprayTimer = 0;
+            this.tagCooldown = 1.2;
+            tg.t = Date.now();
+            this.graffitiTags.push(tg);
+            if (this.graffitiTags.length > 120) this.graffitiTags.shift();
+            this.saveGraffitiTags();
+            this.tagSprayTarget = null;
+            this.addCash(75, `🎨 TAG #${this.graffitiTags.length} SPRAYED!`);
+            // Cops that see vandalism get angry
+            const copWitness =
+                this.peds.some((ped) => !ped.dead && ped.kind === "COP" && Math.hypot(ped.x - p.x, ped.y - p.y) < 260) ||
+                this.vehicles.some((v) => v.isPolice && !v.destroyed && Math.hypot(v.x - p.x, v.y - p.y) < 300);
+            if (copWitness && Math.random() < 0.7) {
+                this.setWantedLevel(Math.max(this.wantedLevel, 1));
+                this.addFloatingText(p.x, p.y - 44, "🚓 VANDALISM SPOTTED!", "#38bdf8");
+            }
+        }
+    }
+
+    normalizeAngleSafe(a) {
+        while (a > Math.PI) a -= Math.PI * 2;
+        while (a < -Math.PI) a += Math.PI * 2;
+        return a;
+    }
 
     // Classic 1997 GTA 1 Horn / Siren (in vehicle) OR Famous Burp & Fart (on foot!) [G or V]
 
@@ -9884,6 +10040,8 @@ class LeonidaGame {
 
 
         // 2. Partner AI removed (solo & multiplayer only)
+
+        this.updateGraffitiTagging(dt);
 
 
 
