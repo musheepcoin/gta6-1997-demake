@@ -2755,6 +2755,20 @@ class WorldObjectEngine {
                 stampTower(tw.x, tw.y, 0, 2.85);
             }
         }
+        // Inject 3D Octagonal Vice City Mambas Stadium Bowl & 4 Corner Spires into solar shadow map
+        for (let r = 164; r <= 180; r++) {
+            for (let c = 179; c <= 197; c++) {
+                const dx = Math.abs(c - 188);
+                const dy = Math.abs(r - 172);
+                if (dx <= 6 && dy <= 5) continue; // Open emerald pitch
+                if (dx + dy >= 16) continue;      // Chamfered outer octagonal corners
+                const idx = r * M + c;
+                if (3.62 > colTopElev[idx]) colTopElev[idx] = 3.62;
+            }
+        }
+        for (const [sc, sr] of [[180, 165], [196, 165], [180, 179], [196, 179]]) {
+            stampTower((sc + 0.5) * TILE_SIZE, (sr + 0.5) * TILE_SIZE, 0, 4.65);
+        }
         if (Array.isArray(this.rooftopSuperstructures)) {
             for (let i = 0; i < this.rooftopSuperstructures.length; i++) {
                 const rs = this.rooftopSuperstructures[i];
@@ -5502,31 +5516,54 @@ class WorldObjectEngine {
             }
         }
 
-        // 23. VICE CITY MAMBAS STADIUM 3D PITCH MARKINGS, GOALPOSTS, 4 CORNER FLOODLIGHT PYLONS & TWIN JUMBOTRON SCOREBOARDS (c=188.5, r=172.5)
+        // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
+        //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
+        //     West & East Drive-Through Vehicle Tunnels, Cantilevered White Canopy Roof, 4 Cylindrical Spiral Ramps,
+        //     4 Towering Cable-Stay Floodlight Spires, Twin "VC MAMBAS" Jumbotrons & Full 3D Football Pitch!
         if (this.mambasStadium) {
             const ms = this.mambasStadium;
             const bz = ms.z || 2.0;
             const gold = [0.98, 0.84, 0.16];
             const chalk = [0.96, 0.98, 0.96];
             const mambasAqua = [0.06, 0.72, 0.68];
+            const mambasTeal = [0.05, 0.56, 0.54];
             const mambasOrange = [0.98, 0.45, 0.12];
+            const stadiumWhite = [0.94, 0.95, 0.97];
+            const stadiumStone = [0.84, 0.86, 0.90];
+            const darkGlass = [0.14, 0.22, 0.32];
+            const aisleYellow = [0.96, 0.80, 0.18];
 
-            // A0. Crisp 3D White Football Pitch Sidelines, Endzones, Yard-Lines & Central VC Mambas Emblem (13x11 turf bowl)
+            // A0. Crisp 3D White Football Pitch Sidelines, Endzones, 10-Yard Lines, Hash Marks & Central VC Mambas Emblem
             emitSolidBox3D(ms.x, ms.y, 1, 0, -356,    0,   4, 584, bz + 0.005, bz + 0.012, chalk, 9);
             emitSolidBox3D(ms.x, ms.y, 1, 0,  356,    0,   4, 584, bz + 0.005, bz + 0.012, chalk, 9);
-            for (const yl of [-290, -242, -145, 0, 145, 242, 290]) {
-                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, yl, 712, (yl === 0 || Math.abs(yl) === 290) ? 4.5 : 3.0, bz + 0.005, bz + 0.012, chalk, 9);
+            for (const yl of [-290, -242, -182, -121, -60, 0, 60, 121, 182, 242, 290]) {
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, yl, 712, (yl === 0 || Math.abs(yl) === 290) ? 4.5 : 2.6, bz + 0.005, bz + 0.012, chalk, 9);
             }
-            // North & South Aqua/Orange VC Mambas Endzone Apron Stripes
+            // Infield NFL/College Hash Marks along +/-92px from center
+            for (let hy = -212; hy <= 212; hy += 30) {
+                if (Math.abs(hy) < 8) continue;
+                emitSolidBox3D(ms.x, ms.y, 1, 0, -88, hy, 12, 2.2, bz + 0.005, bz + 0.011, chalk, 9);
+                emitSolidBox3D(ms.x, ms.y, 1, 0,  88, hy, 12, 2.2, bz + 0.005, bz + 0.011, chalk, 9);
+            }
+            // North & South Aqua/Orange VC Mambas Endzone Aprons
             for (const ezY of [-266, 266]) {
                 emitSolidBox3D(ms.x, ms.y, 1, 0, 0, ezY, 704, 42, bz + 0.004, bz + 0.009, mambasAqua, 7);
                 emitSolidBox3D(ms.x, ms.y, 1, 0, 0, ezY, 696,  8, bz + 0.006, bz + 0.011, mambasOrange, 9);
             }
             // Midfield 50-Yard VC Mambas Aqua/Orange Medallion
-            emitCylinder3D(ms.x, ms.y, 0, 0, 38, 38, bz + 0.005, bz + 0.011, 12, mambasOrange, 9, true);
-            emitCylinder3D(ms.x, ms.y, 0, 0, 32, 32, bz + 0.007, bz + 0.013, 12, mambasAqua, 7, true);
+            emitCylinder3D(ms.x, ms.y, 0, 0, 40, 40, bz + 0.005, bz + 0.011, 12, mambasOrange, 9, true);
+            emitCylinder3D(ms.x, ms.y, 0, 0, 33, 33, bz + 0.007, bz + 0.013, 12, mambasAqua, 7, true);
+            emitCylinder3D(ms.x, ms.y, 0, 0, 12, 12, bz + 0.009, bz + 0.015, 10, chalk, 9, true);
 
-            // A. North & South Endzone 3D Tubular Golden Football Goalposts (offY = -308 & +308, right behind the endzones)
+            // West & East Sideline Team Benches & Aqua Hydration Shelters (outside chalk sidelines at offX = +/-372)
+            for (const bxSide of [-372, 372]) {
+                for (const byOff of [-82, 82]) {
+                    emitSolidBox3D(ms.x, ms.y, 1, 0, bxSide, byOff, 8, 52, bz, bz + 0.14, mambasAqua, 7);
+                    emitSolidBox3D(ms.x, ms.y, 1, 0, bxSide, byOff, 10, 54, bz + 0.14, bz + 0.18, stadiumWhite, 2);
+                }
+            }
+
+            // A1. North & South Endzone 3D Tubular Golden Football Goalposts (offY = -308 & +308)
             for (const gy of [-308, 308]) {
                 emitCylinder3D(ms.x, ms.y, 0, gy, 2.8, 2.8, bz, bz + 0.36, 8, gold, 5, true);
                 emitSolidBox3D(ms.x, ms.y, 1, 0, 0, gy, 44, 3.8, bz + 0.34, bz + 0.39, gold, 7);
@@ -5534,21 +5571,126 @@ class WorldObjectEngine {
                 emitCylinder3D(ms.x, ms.y,  20, gy, 2.0, 2.0, bz + 0.36, bz + 0.96, 8, gold, 7, true);
             }
 
-            // B. 4 Towering Open-Lattice S363 Stadium Floodlight Pylons atop the 4 Inner Grandstand Corner Bastions (c=181.5/195.5, r=166.5/178.5, z=4.0)
-            const tierZ = 4.0;
-            for (const [fx, fy] of [[-448, -384], [448, -384], [-448, 384], [448, 384]]) {
-                emitTileBox3D(ms.x, ms.y, 1, 0, fx, fy, 14, 14, tierZ, tierZ + 1.48, 363, 363, 64, [0.88, 0.92, 0.96], false);
-                emitSolidBox3D(ms.x, ms.y, 1, 0, fx, fy, 32, 10, tierZ + 1.48, tierZ + 1.72, [0.98, 0.98, 0.90], 10);
+            // A2. Helper: Build a 5-Tier Stepped Stadium Grandstand Section + Cantilevered White Canopy Roof
+            //     Local +Y (+cSin, +cCos) points INWARD toward the emerald football pitch; Local -Y points OUTWARD toward the street.
+            const emitStadiumStand = (sx, sy, cCos, cSin, spanW, numAisles = 3) => {
+                emitAOShadow3D(sx, sy, cCos, cSin, 0, 0, spanW + 18, 114, bz, 0.38);
+
+                // 1) Outer Architectural Limestone Concourse Wall & VIP Glass Ribbon (local Y = -48..+44)
+                emitTileBox3D(sx, sy, cCos, cSin, 0, -24, spanW, 48, bz, bz + 0.76, 86, 199, 8, stadiumStone, false);
+                emitSolidBox3D(sx, sy, cCos, cSin, 0, -30, spanW + 2, 36, bz + 0.76, bz + 1.06, darkGlass, 7);
+                emitTileBox3D(sx, sy, cCos, cSin, 0, -34, spanW, 28, bz + 1.06, bz + 1.48, 86, 86, 46, stadiumWhite, false);
+
+                // Exterior vertical white structural colonnade fins along the outer facade (local Y = -46)
+                const finStep = Math.max(56, Math.floor(spanW / Math.max(2, numAisles + 1)));
+                for (let fx = -spanW * 0.46; fx <= spanW * 0.46 + 1; fx += finStep) {
+                    emitSolidBox3D(sx, sy, cCos, cSin, fx, -46, 7.5, 10, bz, bz + 1.54, stadiumWhite, 2);
+                }
+
+                // 2) Field-Side Padded Perimeter Wall & Glowing VC Mambas Aqua/Orange LED Fascia Ribbon (local Y = +46)
+                emitSolidBox3D(sx, sy, cCos, cSin, 0, 44, spanW, 8, bz, bz + 0.24, [0.14, 0.20, 0.28], 5);
+                emitSolidBox3D(sx, sy, cCos, cSin, 0, 47.5, spanW, 2.5, bz + 0.14, bz + 0.22, mambasAqua, 10);
+                emitSolidBox3D(sx, sy, cCos, cSin, 0, 48.2, spanW * 0.65, 2.8, bz + 0.15, bz + 0.21, mambasOrange, 9);
+
+                // 3) 5 Progressive Stepped Seating Bleacher Tiers descending toward the pitch (+Y = front, -Y = top back)
+                const tierSpecs = [
+                    { yOff:  34, d: 18, z0: 0.00, z1: 0.30, col: mambasAqua,   mat: 7 }, // Lower Bowl Row 1 (Aqua)
+                    { yOff:  18, d: 18, z0: 0.26, z1: 0.56, col: mambasTeal,   mat: 7 }, // Lower Bowl Row 2 (Deep Teal)
+                    { yOff:   2, d: 18, z0: 0.52, z1: 0.82, col: mambasAqua,   mat: 7 }, // Lower Bowl Row 3 (Aqua)
+                    { yOff: -14, d: 18, z0: 0.78, z1: 1.12, col: stadiumWhite, mat: 2 }, // Mid-Level VIP Club Fascia
+                    { yOff: -30, d: 20, z0: 1.08, z1: 1.44, col: mambasOrange, mat: 9 }  // Upper Deck Bleachers (Coral Orange)
+                ];
+                for (let ti = 0; ti < tierSpecs.length; ti++) {
+                    const ts = tierSpecs[ti];
+                    emitSolidBox3D(sx, sy, cCos, cSin, 0, ts.yOff, spanW - 2, ts.d, bz + ts.z0, bz + ts.z1, ts.col, ts.mat);
+                    // Concrete riser lip at the back of each seating tier
+                    emitSolidBox3D(sx, sy, cCos, cSin, 0, ts.yOff - ts.d * 0.35, spanW, 3.2, bz + ts.z1, bz + ts.z1 + 0.04, stadiumStone, 1);
+                }
+
+                // 4) Stepped Yellow Radial Concrete Stair Aisles climbing the 5 bleacher tiers
+                for (let ai = 0; ai < numAisles; ai++) {
+                    const ax = numAisles === 1 ? 0 : (-spanW * 0.34 + (ai / (numAisles - 1)) * (spanW * 0.68));
+                    for (let ti = 0; ti < tierSpecs.length; ti++) {
+                        const ts = tierSpecs[ti];
+                        emitSolidBox3D(sx, sy, cCos, cSin, ax, ts.yOff, 11, ts.d + 1, bz + ts.z0 + 0.01, bz + ts.z1 + 0.025, aisleYellow, 3);
+                    }
+                }
+
+                // 5) Hard Rock Stadium Cantilevered White Open-Air Canopy Roof (shades the upper & mid decks, leaves field open!)
+                emitSolidBox3D(sx, sy, cCos, cSin, 0, -14, spanW + 8, 72, bz + 1.50, bz + 1.60, stadiumWhite, 2);
+                emitSolidBox3D(sx, sy, cCos, cSin, 0,  21, spanW + 10, 4.5, bz + 1.49, bz + 1.62, mambasAqua, 7);
+                // Overhead white steel roof truss ribs atop the canopy
+                for (let tx = -spanW * 0.42; tx <= spanW * 0.42 + 1; tx += finStep) {
+                    emitSolidBox3D(sx, sy, cCos, cSin, tx, -16, 4.5, 68, bz + 1.60, bz + 1.67, stadiumStone, 5);
+                }
+            };
+
+            // A3. Emit North & South Main Grandstands (facing South +Y and North -Y)
+            emitStadiumStand(ms.x, ms.y - 404,  1,  0, 536, 4); // North Stand
+            emitStadiumStand(ms.x, ms.y + 404, -1,  0, 536, 4); // South Stand
+
+            // A4. Emit West & East Sideline Grandstand Wings (flanking the central 112px Drive-In Vehicle Tunnels!)
+            emitStadiumStand(ms.x - 448, ms.y - 168, 0, -1, 224, 2); // West-North Wing (faces East +X)
+            emitStadiumStand(ms.x - 448, ms.y + 168, 0, -1, 224, 2); // West-South Wing (faces East +X)
+            emitStadiumStand(ms.x + 448, ms.y - 168, 0,  1, 224, 2); // East-North Wing (faces West -X)
+            emitStadiumStand(ms.x + 448, ms.y + 168, 0,  1, 224, 2); // East-South Wing (faces West -X)
+
+            // A5. West & East Central Drive-In Vehicle Tunnel Overpasses (112px wide clear tunnel at bz..bz+0.88, Upper Deck & Canopy bridge overhead!)
+            for (const [txOff, tCos, tSin] of [[-448, 0, -1], [448, 0, 1]]) {
+                const tx = ms.x + txOff;
+                const ty = ms.y;
+                // Tunnel Portal Side Pillars & Illuminated Aqua/Orange "VC MAMBAS" Archway Header (bz + 0.88..1.14)
+                for (const pyOff of [-54, 54]) {
+                    emitSolidBox3D(tx, ty, tCos, tSin, pyOff, 0, 10, 96, bz, bz + 1.50, stadiumWhite, 2);
+                }
+                emitSolidBox3D(tx, ty, tCos, tSin, 0, 0, 116, 96, bz + 0.88, bz + 1.12, [0.12, 0.18, 0.26], 5);
+                emitSolidBox3D(tx, ty, tCos, tSin, 0, 46, 114, 4, bz + 0.92, bz + 1.08, mambasAqua, 10);
+                emitSolidBox3D(tx, ty, tCos, tSin, 0, -46, 114, 4, bz + 0.92, bz + 1.08, mambasOrange, 9);
+                // Continuous Upper Deck Orange Seating Tier & White Canopy Roof bridging over the tunnel
+                emitSolidBox3D(tx, ty, tCos, tSin, 0, -28, 114, 24, bz + 1.12, bz + 1.46, mambasOrange, 9);
+                emitSolidBox3D(tx, ty, tCos, tSin, 0, -14, 118, 72, bz + 1.50, bz + 1.60, stadiumWhite, 2);
+                emitSolidBox3D(tx, ty, tCos, tSin, 0,  21, 120, 4.5, bz + 1.49, bz + 1.62, mambasAqua, 7);
             }
 
-            // C. Twin North & South Endzone 3D "VC MAMBAS" Jumbotron Scoreboard Gantries (atop North/South Grandstands at r=166.5 & r=178.5, z=4.0)
-            for (const jy of [-384, 384]) {
-                for (const jx of [-46, 46]) {
-                    emitTileBox3D(ms.x, ms.y, 1, 0, jx, jy, 10, 10, tierZ, tierZ + 0.96, 363, 246, 64, [0.86, 0.90, 0.96], false);
+            // A6. Emit 4 Chamfered 45-Degree Diagonal Corner Grandstand Wedges (closes the 8-sided octagonal bowl!)
+            const d45 = Math.SQRT1_2;
+            emitStadiumStand(ms.x - 364, ms.y - 336,  d45, -d45, 196, 2); // North-West 45-deg Corner (faces SE)
+            emitStadiumStand(ms.x + 364, ms.y - 336,  d45,  d45, 196, 2); // North-East 45-deg Corner (faces SW)
+            emitStadiumStand(ms.x - 364, ms.y + 336, -d45, -d45, 196, 2); // South-West 45-deg Corner (faces NE)
+            emitStadiumStand(ms.x + 364, ms.y + 336, -d45,  d45, 196, 2); // South-East 45-deg Corner (faces NW)
+
+            // B. 4 Iconic Hard Rock Stadium Cylindrical Pedestrian Spiral Ramps & Towering White Cable-Stay Spires
+            for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+                const rx = ms.x + sx * 476;
+                const ry = ms.y + sy * 412;
+                // 3-Tier Cylindrical Concrete Pedestrian Helix Ramp Rotunda (r = 34px)
+                emitAOShadow3D(rx, ry, 1, 0, 0, 0, 82, 82, bz, 0.38);
+                emitCylinder3D(rx, ry, 0, 0, 32, 32, bz, bz + 1.54, 12, stadiumStone, 1, true);
+                for (const hz of [0.38, 0.78, 1.18, 1.50]) {
+                    emitCylinder3D(rx, ry, 0, 0, 35.5, 35.5, bz + hz, bz + hz + 0.07, 12, stadiumWhite, 2, false);
+                    emitCylinder3D(rx, ry, 0, 0, 36.2, 36.2, bz + hz + 0.02, bz + hz + 0.05, 12, mambasAqua, 7, false);
                 }
-                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, jy, 118, 11, tierZ + 0.52, tierZ + 1.18, [0.10, 0.16, 0.22], 5);
-                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, jy, 122, 12, tierZ + 1.18, tierZ + 1.24, mambasOrange, 9);
-                emitBox3D(ms.x, ms.y, 1, 0, 0, jy, 110, 12.5, tierZ + 0.56, tierZ + 1.14, "ad_mambos_latin", "ad_mambos_latin", [1.0, 1.0, 1.0]);
+                // Towering White Steel Cable-Stay Spire & High-Wattage Stadium Floodlight Bank (rising to z = 5.48)
+                const spX = ms.x + sx * 428;
+                const spY = ms.y + sy * 372;
+                emitSolidBox3D(spX, spY, 1, 0, 0, 0, 18, 18, bz + 1.50, bz + 2.85, stadiumWhite, 2);
+                emitSolidBox3D(spX, spY, 1, 0, 0, 0, 11, 11, bz + 2.85, bz + 3.48, stadiumWhite, 2);
+                emitSolidBox3D(spX, spY, d45, sx * sy * d45, 0, 0, 38, 10, bz + 3.10, bz + 3.38, [0.98, 0.98, 0.90], 10);
+                emitSolidBox3D(spX, spY, 1, 0, 0, 0, 5.5, 5.5, bz + 3.48, bz + 3.56, mambasOrange, 10);
+                // Diagonal White Suspension Cable Struts from Spire to Canopy Roof
+                emitSolidBox3D(spX - sx * 36, spY, 1, 0, 0, 0, 64, 3.2, bz + 1.62, bz + 2.45, stadiumWhite, 2);
+                emitSolidBox3D(spX, spY - sy * 36, 1, 0, 0, 0, 3.2, 64, bz + 1.62, bz + 2.45, stadiumWhite, 2);
+            }
+
+            // C. Twin North & South Endzone 3D "VC MAMBAS" Jumbotron HD Scoreboards (mounted atop the Canopy Roof at offY = +/-376)
+            const roofZ = bz + 1.60;
+            for (const jy of [-376, 376]) {
+                for (const jx of [-52, 52]) {
+                    emitTileBox3D(ms.x, ms.y, 1, 0, jx, jy, 10, 10, roofZ, roofZ + 0.86, 363, 246, 64, [0.86, 0.90, 0.96], false);
+                }
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, jy, 136, 12, roofZ + 0.24, roofZ + 0.96, [0.10, 0.16, 0.22], 5);
+                emitSolidBox3D(ms.x, ms.y, 1, 0, 0, jy, 140, 13.5, roofZ + 0.96, roofZ + 1.03, mambasOrange, 9);
+                emitBox3D(ms.x, ms.y, 1, 0, 0, jy, 128, 13.5, roofZ + 0.28, roofZ + 0.92, "ad_mambos_latin", "ad_mambos_latin", [1.0, 1.0, 1.0]);
             }
         }
 

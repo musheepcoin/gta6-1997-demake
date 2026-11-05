@@ -240,11 +240,26 @@ class LeonidaMap {
             }
         }
 
-        // Restore seamless emerald turf at the center of Vice City Mambas Stadium pitch (x = 188, y = 171..173 had concrete lid 8)
-        for (let y = 171; y <= 173; y++) {
+        // Clear old cubic GTA 1 voxel stadium walls (x = 179..197, y = 164..180) so the entire Vice City Mambas Stadium
+        // is built 100% in 3D octagonal geometry by WorldObjectEngine over a seamless 13x11 emerald turf pitch & coral concourse plaza!
+        {
+            const turfVoxels = [];
+            const plazaVoxels = [];
+            const tunnelVoxels = [];
             for (let z = 0; z < MAP_LAYERS; z++) {
-                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + 188] =
-                    this.voxelGrid[(z * MAP_ROWS + 172) * MAP_COLS + 187];
+                turfVoxels[z]   = this.voxelGrid[(z * MAP_ROWS + 172) * MAP_COLS + 187]; // lid 10 emerald turf
+                plazaVoxels[z]  = this.voxelGrid[(z * MAP_ROWS + 163) * MAP_COLS + 180]; // lid 9 coral plaza paver
+                tunnelVoxels[z] = this.voxelGrid[(z * MAP_ROWS + 170) * MAP_COLS + 178]; // lid 8 stone tunnel paver
+            }
+            for (let y = 164; y <= 180; y++) {
+                for (let x = 179; x <= 197; x++) {
+                    const isPitch = (x >= 182 && x <= 194 && y >= 167 && y <= 177);
+                    const isTunnel = (!isPitch && y >= 171 && y <= 173 && (x <= 181 || x >= 195));
+                    const srcCol = isPitch ? turfVoxels : (isTunnel ? tunnelVoxels : plazaVoxels);
+                    for (let z = 0; z < MAP_LAYERS; z++) {
+                        this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] = srcCol[z];
+                    }
+                }
             }
         }
 
@@ -2200,6 +2215,21 @@ class LeonidaMap {
         pushPropOBB(160.5 * TILE_SIZE, 109.0 * TILE_SIZE, 68, 26, 0);             // Ambrosia "Allied Crystal" 3D Sugar Silos
         pushPropOBB(116.5 * TILE_SIZE - 36, 398.5 * TILE_SIZE - 12, 26, 13, 0);   // Grassrivers Giant 3D Roadside Gator Statue
         pushPropOBB(204.2 * TILE_SIZE, 476.5 * TILE_SIZE, 16, 16, 0);             // Key West Southernmost Point 3D Buoy Monument
+        // Vice City Mambas 3D Octagonal Stadium Bowl OBB Collision Hulls (West & East Vehicle Tunnels at r=172.5 stay 100% open!)
+        {
+            const stX = 188.5 * TILE_SIZE;
+            const stY = 172.5 * TILE_SIZE;
+            pushPropOBB(stX,       stY - 404, 270, 52, 0);                        // North Grandstand
+            pushPropOBB(stX,       stY + 404, 270, 52, 0);                        // South Grandstand
+            pushPropOBB(stX - 448, stY - 168,  52, 112, 0);                       // West-North Sideline Stand
+            pushPropOBB(stX - 448, stY + 168,  52, 112, 0);                       // West-South Sideline Stand
+            pushPropOBB(stX + 448, stY - 168,  52, 112, 0);                       // East-North Sideline Stand
+            pushPropOBB(stX + 448, stY + 168,  52, 112, 0);                       // East-South Sideline Stand
+            for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+                pushPropOBB(stX + sx * 364, stY + sy * 336, 94, 48, sx * sy * Math.PI * 0.25); // 45-deg Chamfered Corner Stands
+                pushPropOBB(stX + sx * 476, stY + sy * 412, 32, 32, 0);                        // Corner Spiral Ramp Rotundas
+            }
+        }
         const gantryLocs = [
             { x: 359.4 * TILE_SIZE, y: 322.8 * TILE_SIZE },
             { x: 359.4 * TILE_SIZE, y: 335.4 * TILE_SIZE },
