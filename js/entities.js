@@ -2437,7 +2437,7 @@ class Vehicle {
                 }
                 this.aiBailTimer = 0;
                 const forceDirect = bestDist < 260 || (this.approachNoProgress || 0) > 1.6;
-                return this.computeTargetRoadOrFeelerControls(
+                const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
                     game,
@@ -2445,9 +2445,18 @@ class Vehicle {
                     burningCar.y,
                     burningCar.vx || 0,
                     burningCar.vy || 0,
-                    0.94,
+                    0.55,
                     forceDirect
                 );
+                // A heavy fire engine drives to the scene at a measured emergency pace (not race speed),
+                // and slows right down on the final approach so it can stop & deploy the crew
+                const fireMaxSpd = bestDist < 320 ? 70 : 125;
+                if (this.speed > fireMaxSpd) {
+                    fireCtrl.throttle = -0.35;
+                } else if (fireCtrl.throttle > 0) {
+                    fireCtrl.throttle = Math.min(fireCtrl.throttle, this.speed > fireMaxSpd - 15 ? 0.12 : 0.45);
+                }
+                return fireCtrl;
             }
             this.fireTargetCar = null;
             if (this.deployedFireman) {
