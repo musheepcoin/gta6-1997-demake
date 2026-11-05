@@ -8512,7 +8512,8 @@ class RetroRenderer {
             }
 
             if (!rect) continue;
-            const rot = v.angle - Math.PI * 0.5;
+            // Boat sprites (jet-ski, speedboat) are drawn bow-east (horizontal) instead of the GTA1 south-facing car layout
+            const rot = mapInfo.horizontalSprite ? v.angle : (v.angle - Math.PI * 0.5);
             const airZ = v.stuntZOffset || 0;
             const isMicroTwoWheeler = (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER");
             const baseVehScale = isMicroTwoWheeler ? (carScale * 1.12) : carScale;
@@ -8596,6 +8597,17 @@ class RetroRenderer {
             }
 
             // A2. Miami / Vice City Custom Neon Underglow for Sports Cars, Convertibles, Muscle Cars & Neon E-Scooters!
+            // A1b. White V-shaped foam wake behind boats moving on water (jet-ski, speedboat, airboat)
+            if (!v.destroyed && (v.waterOnly || v.specKey === "AIRBOAT") && Math.abs(v.speed || Math.hypot(v.vx || 0, v.vy || 0)) > 35 &&
+                this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) {
+                const wSpd = Math.min(1, Math.hypot(v.vx || 0, v.vy || 0) / 380);
+                const halfL = (v.w || 40) * 0.5;
+                for (let wk = 1; wk <= 4; wk++) {
+                    const wx = v.x - cosA * (halfL + wk * 7);
+                    const wy = v.y - sinA * (halfL + wk * 7);
+                    this.pushSolidQuad3D(wx, wy, vz - 0.018, 8 + wk * 3, (v.h || 16) * 0.6 + wk * 4 * wSpd, v.angle, 0.92, 0.98, 1.0, (0.55 - wk * 0.11) * (0.4 + wSpd * 0.6), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
             if (!v.destroyed && airZ < 0.08) {
                 const sk = v.specKey || "";
                 const hasUnderglow = (
@@ -8660,7 +8672,7 @@ class RetroRenderer {
             // C. GTA 2 OwnCarLamps & kSynthBrake (live_geometry.cpp / synthetic_lights.cpp):
             // Physical Front Headlight Glass Lenses + Day/Night Rear Taillights, Brake Lamps & Reverse Lamps!
             // (Skipped on bicycles & e-scooters so car headlight/taillight quads don't cover thin bicycle wheels!)
-            if (!v.destroyed && !mapInfo.isTank && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
+            if (!v.destroyed && !mapInfo.isTank && !v.waterOnly && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER") {
                 const frontDist = (v.w || 48) * 0.45;
                 const rearDist = -(v.w || 48) * 0.45;
                 const latSpread = mapInfo.isMotorcycle ? 0 : ((v.h || 24) * 0.29);
@@ -8826,7 +8838,8 @@ class RetroRenderer {
                 } else if (
                     mapInfo.isConvertible ||
                     v.specKey === "MICRO_KART" ||
-                    v.specKey === "AIRBOAT"
+                    v.specKey === "AIRBOAT" ||
+                    v.waterOnly
                 ) {
                     const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
                     if (occSeats.length > 0) {
@@ -8850,7 +8863,7 @@ class RetroRenderer {
                         }
                     } else {
                         const aiPedType = v.driver === "AI_COP" ? "police" : civTypes[idHash % civTypes.length];
-                        const isCenterSeat = v.specKey === "MICRO_KART" || v.specKey === "AIRBOAT";
+                        const isCenterSeat = v.specKey === "MICRO_KART" || v.specKey === "AIRBOAT" || v.specKey === "JETSKI";
                         const latOff = isCenterSeat ? 0 : -4.5;
                         const longOff = -2.0;
                         const dx = v.x + cosA * longOff - sinA * latOff;
@@ -12191,7 +12204,8 @@ class RetroRenderer {
             remapIdx: hasRemap ? v.remapIdx : 0,
             isConvertible,
             isMotorcycle,
-            isTank
+            isTank,
+            horizontalSprite: Boolean(specObj.horizontalSprite)
         };
     }
 

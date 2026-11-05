@@ -663,7 +663,19 @@ class LeonidaGame {
             { id: "micromob_7", spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_8", spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_9", spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
-            { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 135.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" }
+            { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 135.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+
+            // --- N. Drivable water craft moored at the harbors (speedboats) & jet-skis beside them ---
+            { id: "boat_speed_0", spec: "SPEEDBOAT", c: 325.0, r: 312.0, a: Math.PI * 0.5, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_1", spec: "SPEEDBOAT", c: 105.5, r: 100.2, a: Math.PI, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_2", spec: "SPEEDBOAT", c: 373.5, r: 121.2, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_3", spec: "SPEEDBOAT", c: 379.5, r: 220.0, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_4", spec: "SPEEDBOAT", c: 424.0, r: 426.0, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_5", spec: "SPEEDBOAT", c: 329.0, r: 496.5, a: Math.PI * 0.5, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_0", spec: "JETSKI", c: 327.5, r: 314.5, a: Math.PI * 0.5, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_1", spec: "JETSKI", c: 376.0, r: 123.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_2", spec: "JETSKI", c: 382.0, r: 222.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_3", spec: "JETSKI", c: 426.5, r: 428.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true }
 
         ];
 
@@ -917,7 +929,44 @@ class LeonidaGame {
 
 
 
+    // Water-only craft (jet-skis, speedboats) must float: move each one that is not on open water
+    // to the nearest open-water spot (spiral search up to ~8 tiles). Called after spawning and once the real map is loaded.
+    snapWaterCraftToWater() {
+        if (!this.map || typeof this.map.isWaterAtPixel !== "function" || !Array.isArray(this.vehicles)) return;
+        const isOpenWater = (x, y) => {
+            for (const [ox, oy] of [[0, 0], [24, 0], [-24, 0], [0, 18], [0, -18]]) {
+                if (!this.map.isWaterAtPixel(x + ox, y + oy)) return false;
+            }
+            return true;
+        };
+        for (const v of this.vehicles) {
+            if (!v.waterOnly || v.driver || v.destroyed) continue;
+            if (isOpenWater(v.x, v.y)) continue;
+            let found = null;
+            for (let rad = 12; rad <= TILE_SIZE * 8 && !found; rad += 12) {
+                for (let k = 0; k < 16; k++) {
+                    const ang = (k / 16) * Math.PI * 2;
+                    const tx = v.x + Math.cos(ang) * rad;
+                    const ty = v.y + Math.sin(ang) * rad;
+                    if (isOpenWater(tx, ty) && !this.vehicles.some((o) => o !== v && Math.hypot(o.x - tx, o.y - ty) < 40)) {
+                        found = { x: tx, y: ty };
+                        break;
+                    }
+                }
+            }
+            if (found) {
+                v.x = found.x;
+                v.y = found.y;
+                v.vx = 0;
+                v.vy = 0;
+                v.speed = 0;
+            }
+        }
+    }
+
     onCmpLoaded(meta) {
+
+        this.snapWaterCraftToWater();
 
         // 1. Spawn authentic startup_cars from the binary map on single-direction straight lanes!
 

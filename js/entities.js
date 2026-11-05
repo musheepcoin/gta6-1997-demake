@@ -690,6 +690,51 @@ const VEHICLE_SPECS = {
         useBaseOnly: true,
         amphibious: true
     },
+    // --- Water-only craft: can only move on water, stop dead against beaches, docks & quays ---
+    JETSKI: {
+        name: "NEON VICE WAVERUNNER",
+        sprId: "jetski_neon",
+        w: 32,
+        h: 14,
+        maxSpeed: 430,
+        accel: 390,
+        turnSpeed: 3.9,
+        grip: 0.80,
+        driftGrip: 0.98,
+        maxHp: 160,
+        maxSeats: 2,
+        color: "#ff2a85",
+        secondaryColor: "#0f172a",
+        stripeColor: "#00f0ff",
+        bodyStyle: "AIRBOAT",
+        useBaseOnly: true,
+        isConvertible: true,
+        horizontalSprite: true,
+        waterOnly: true,
+        amphibious: true
+    },
+    SPEEDBOAT: {
+        name: "VICE V8 CIGARETTE SPEEDBOAT",
+        sprId: "speedboat_v8",
+        w: 58,
+        h: 30,
+        maxSpeed: 470,
+        accel: 320,
+        turnSpeed: 2.8,
+        grip: 0.78,
+        driftGrip: 0.98,
+        maxHp: 340,
+        maxSeats: 4,
+        color: "#f8fafc",
+        secondaryColor: "#1e3a8a",
+        stripeColor: "#ff2a85",
+        bodyStyle: "AIRBOAT",
+        useBaseOnly: true,
+        isConvertible: true,
+        horizontalSprite: true,
+        waterOnly: true,
+        amphibious: true
+    },
     MEDIC_AMBULANCE: {
         name: "LEONIDA MEDIC AMBULANCE",
         sprId: "58",
@@ -847,6 +892,7 @@ class Vehicle {
         this.hasTurret = Boolean(spec.hasTurret);
         this.turretAngle = angle;
         this.amphibious = Boolean(spec.amphibious);
+        this.waterOnly = Boolean(spec.waterOnly);
 
         // Authentic .G24 Vehicle Color Remap index (-1 = base palette, 0..5 = 6 factory paintjob remaps)
         let idHash = 0;
@@ -2915,8 +2961,33 @@ class Vehicle {
             this.vy = nfy * forwardVel + nry * lateralVel;
         }
 
+        const preMoveX = this.x;
+        const preMoveY = this.y;
         this.x += this.vx * dt;
         this.y += this.vy * dt;
+
+        // Water-only craft (jet-ski, speedboat): the hull runs aground on beaches, docks & quays
+        if (this.waterOnly && map.isWaterAtPixel) {
+            const dirSign = (this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle)) >= 0 ? 1 : -1;
+            const bowX = this.x + Math.cos(this.angle) * (this.w || 40) * 0.42 * dirSign;
+            const bowY = this.y + Math.sin(this.angle) * (this.w || 40) * 0.42 * dirSign;
+            if (!map.isWaterAtPixel(this.x, this.y) || !map.isWaterAtPixel(bowX, bowY)) {
+                const impact = Math.hypot(this.vx, this.vy);
+                this.x = preMoveX;
+                this.y = preMoveY;
+                this.vx *= -0.18;
+                this.vy *= -0.18;
+                this.speed = (this.speed || 0) * -0.18;
+                this.angularVelocity = 0;
+                if (impact > 160 && (this.crashCooldown || 0) <= 0) {
+                    this.crashCooldown = 0.6;
+                    this.receiveImpactDamage((impact - 150) * 0.05, bowX, bowY);
+                    if (this.driver === "PLAYER" && game && game.audio && typeof game.audio.playCarCrash === "function") {
+                        game.audio.playCarCrash(Math.min(1.2, (impact - 140) / 160));
+                    }
+                }
+            }
+        }
 
         // Building & Seawall/Bridge Guardrail collision check (uses lateral half-width so long buses/limos don't clip adjacent lane walls)
         const curZ = this.z !== undefined ? this.z : 2.0;
@@ -3018,7 +3089,7 @@ class Vehicle {
 
     emitWheelTracks(map, game) {
         if (!map || !game || typeof game.addSkidmark !== "function") return;
-        if (this.specKey === "AIRBOAT" || (this.stuntAirTimer || 0) > 0) return;
+        if (this.specKey === "AIRBOAT" || this.waterOnly || (this.stuntAirTimer || 0) > 0) return;
         if (map.isWaterAtPixel(this.x, this.y)) return;
 
         const curSpeed = Math.hypot(this.vx, this.vy);

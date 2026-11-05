@@ -1756,19 +1756,13 @@ class LeonidaMap {
             { kind: "CONTAINERS", c: 79.5,  r: 242.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 151.5, r: 107.5, ang: Math.PI * 0.5,  scale: 1.20 },
             { kind: "CONTAINERS", c: 152.5, r: 114.5, ang: Math.PI * 0.5,  scale: 1.20 },
-            // Moored Harbor Yachts & Speedboats in clean water beside piers
+            // Moored Harbor Yachts beside piers (the speedboats moored next to them are now drivable SPEEDBOAT vehicles spawned in game.js)
             { kind: "YACHT",      c: 325.0, r: 305.0, ang: -Math.PI * 0.5, scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 325.0, r: 312.0, ang: Math.PI * 0.5,  scale: 1.20 },
-            { kind: "SPEEDBOAT",  c: 105.5, r: 100.2, ang: Math.PI,        scale: 1.20 },
             { kind: "YACHT",      c: 105.5, r: 105.2, ang: Math.PI,        scale: 1.25 },
             { kind: "YACHT",      c: 373.5, r: 116.0, ang: 0,              scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 373.5, r: 121.2, ang: 0,              scale: 1.20 },
             { kind: "YACHT",      c: 379.5, r: 208.0, ang: 0,              scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 379.5, r: 220.0, ang: 0,              scale: 1.20 },
             { kind: "YACHT",      c: 454.0, r: 394.0, ang: 0,              scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 424.0, r: 426.0, ang: 0,              scale: 1.20 },
             { kind: "YACHT",      c: 396.0, r: 452.0, ang: 0,              scale: 1.30 },
-            { kind: "SPEEDBOAT",  c: 329.0, r: 496.5, ang: Math.PI * 0.5,  scale: 1.20 },
             { kind: "YACHT",      c: 269.0, r: 496.5, ang: Math.PI * 0.5,  scale: 1.25 }
         ].map((p, i) => ({
             kind: p.kind,
