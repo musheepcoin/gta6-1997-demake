@@ -7436,28 +7436,31 @@ class RetroRenderer {
             }
         }
 
-        // 15) Port Gellhorn Oval Dirt Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders
+        // 15) Port Gellhorn Super-Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders
         const tr = this.map.trackRacers;
         if (tr && vehSprites) {
             const sp = tr.speedway;
-            if (sp && sp.cx >= minX - 800 && sp.cx <= maxX + 800 && sp.cy >= minY - 680 && sp.cy <= maxY + 680) {
-                const bz = sp.z || 2.0;
-                for (let ci = 0; ci < sp.cars.length; ci++) {
-                    const t = -this.time * (1.28 + (ci % 2) * 0.06) - ci * (Math.PI * 0.5);
-                    const laneR = (ci % 2 === 0) ? 0.94 : 1.05;
+            const cullRx = (sp && sp.rx ? sp.rx : 1600) + 280;
+            const cullRy = (sp && sp.ry ? sp.ry : 1150) + 280;
+            if (sp && sp.cx >= minX - cullRx && sp.cx <= maxX + cullRx && sp.cy >= minY - cullRy && sp.cy <= maxY + cullRy) {
+                const bz = sp.z || 2.04;
+                const nCars = sp.cars.length;
+                for (let ci = 0; ci < nCars; ci++) {
+                    const t = -this.time * (0.68 + (ci % 2) * 0.04) - ci * (Math.PI * 2 / nCars);
+                    const laneR = 1.0 + ((ci % 3) - 1) * 0.038;
                     const cx = sp.cx + Math.cos(t) * (sp.rx * laneR);
                     const cy = sp.cy + Math.sin(t) * (sp.ry * laneR);
                     const vx = -Math.sin(t) * sp.rx;
                     const vy = Math.cos(t) * sp.ry;
-                    const cAng = Math.atan2(vy, vx) - 0.18;
+                    const cAng = Math.atan2(vy, vx) - 0.12;
                     const vRect = getVehRect(sp.cars[ci], ci + 1);
                     if (vRect) {
                         this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.018, 36, 18, cAng, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
                         this.pushAtlasSprite3D(vRect, cx, cy, bz + 0.048, cAng - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
                     }
-                    // Dirt rooster-tail dust puff behind stock car
+                    // Tire smoke puff behind stock car
                     const dustSpr = String(200 + ((Math.floor(this.time * 12) + ci) % 6));
-                    this.batchObjectSprite3D(dustSpr, cx - Math.cos(cAng) * 20, cy - Math.sin(cAng) * 20, bz + 0.045, this.time * 3, 0.68, SPRITE_DRAW_ORDER.EXPLOSION);
+                    this.batchObjectSprite3D(dustSpr, cx - Math.cos(cAng) * 20, cy - Math.sin(cAng) * 20, bz + 0.045, this.time * 3, 0.58, SPRITE_DRAW_ORDER.EXPLOSION);
                 }
             }
             const mp = tr.mudPark;

@@ -298,17 +298,19 @@ class WorldObjectEngine {
             // GTA 6 Deepsearch Geographical Landmarks (Thrillbilly Mud Club, Gellhorn Speedway, Wynwood Walls, Gator Island, Seven Mile Bridge):
             thrillbillyArena: { x: 82.0 * TILE_SIZE, y: 455.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
             gellhornSpeedway: {
-                x: 72.0 * TILE_SIZE,
-                y: 183.4 * TILE_SIZE,
-                centerX: 72.0 * TILE_SIZE,
-                centerY: 176.0 * TILE_SIZE,
-                rx: 10.6 * TILE_SIZE,
-                ry: 7.4 * TILE_SIZE,
+                x: 57.0 * TILE_SIZE,
+                y: 192.0 * TILE_SIZE,
+                centerX: 57.0 * TILE_SIZE,
+                centerY: 174.5 * TILE_SIZE,
+                rx: 24.5 * TILE_SIZE,
+                ry: 17.5 * TILE_SIZE,
                 z: 2.0,
-                pitX: 72.0 * TILE_SIZE,
-                pitY: 175.0 * TILE_SIZE,
-                westGateX: 61.4 * TILE_SIZE,
-                westGateY: 176.0 * TILE_SIZE
+                pitX: 57.0 * TILE_SIZE,
+                pitY: 179.5 * TILE_SIZE,
+                westGateX: 32.5 * TILE_SIZE,
+                westGateY: 174.5 * TILE_SIZE,
+                eastGateX: 81.5 * TILE_SIZE,
+                eastGateY: 174.5 * TILE_SIZE
             },
             wynwoodWalls: { x: 189.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0 },
             lakeLeonidaOutpost: { x: 125.5 * TILE_SIZE, y: 103.0 * TILE_SIZE, z: 2.0 },
@@ -367,7 +369,7 @@ class WorldObjectEngine {
             { x: 282.18 * TILE_SIZE, y: 246.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "eCOLA",  ad: "ad_ecola"  },
             { x: 224.5 * TILE_SIZE,  y: 112.18 * TILE_SIZE, z: 2.0, ang: 0,            brand: "SPRUNK", ad: "ad_sprunk" },
             { x: 115.5 * TILE_SIZE,  y: 293.18 * TILE_SIZE, z: 2.0, ang: 0,            brand: "eCOLA",  ad: "ad_ecola"  },
-            { x: 64.18 * TILE_SIZE,  y: 186.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
+            { x: 56.18 * TILE_SIZE,  y: 205.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, brand: "SPRUNK", ad: "ad_sprunk" }
         ];
         this.rocketLaunch = {
             state: "IDLE", // IDLE | COUNTDOWN | LIFTOFF | COOLDOWN
@@ -414,18 +416,18 @@ class WorldObjectEngine {
             { id: "drop_biscayne_bay", name: "BISCAYNE BAY SMUGGLER DROP",    x: 362.5 * TILE_SIZE, y: 235.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 1.1 },
             { id: "drop_keys_channel", name: "SEVEN MILE CHANNEL DROP",       x: 202.0 * TILE_SIZE, y: 484.5 * TILE_SIZE, z: 2.0, active: true, cooldown: 0, seed: 2.2 }
         ];
-        // 6. Port Gellhorn International Raceway 3D Hot-Lap Time Trial Circuit State
+        // 6. Port Gellhorn International Super-Speedway 3D Hot-Lap Time Trial Circuit State
         this.speedwayRace = {
             active: false,
             timer: 0,
-            bestTime: 38.5,
+            bestTime: 46.0,
             checkpointIdx: 0,
             pitCooldown: 0,
             checkpoints: [
-                { name: "EAST BANKING TURN 1", x: 82.6 * TILE_SIZE, y: 176.0 * TILE_SIZE },
-                { name: "NORTH BACKSTRETCH",   x: 72.0 * TILE_SIZE, y: 168.6 * TILE_SIZE },
-                { name: "WEST HAIRPIN TURN 3", x: 61.4 * TILE_SIZE, y: 176.0 * TILE_SIZE },
-                { name: "START/FINISH GANTRY", x: 72.0 * TILE_SIZE, y: 183.4 * TILE_SIZE }
+                { name: "EAST BANKING TURN 1", x: 81.5 * TILE_SIZE, y: 174.5 * TILE_SIZE },
+                { name: "NORTH BACKSTRETCH",   x: 57.0 * TILE_SIZE, y: 157.0 * TILE_SIZE },
+                { name: "WEST HAIRPIN TURN 3", x: 32.5 * TILE_SIZE, y: 174.5 * TILE_SIZE },
+                { name: "START/FINISH GANTRY", x: 57.0 * TILE_SIZE, y: 192.0 * TILE_SIZE }
             ]
         };
         // 7. Vice City Mambas Stadium 3D Arena (13x11 emerald pitch centered at c=188.5, r=172.5), Mount Kalaga Skunk Ape Cryptid, Muscle Beach & Street Takeovers
@@ -756,7 +758,7 @@ class WorldObjectEngine {
                 clearZones.push({ x: this.landmarks3D.thrillbillyArena.x, y: this.landmarks3D.thrillbillyArena.y, r: 195 });
             }
             if (this.landmarks3D.gellhornSpeedway) {
-                clearZones.push({ x: 72.0 * TILE_SIZE, y: 176.0 * TILE_SIZE, r: 920 });
+                clearZones.push({ x: 57.0 * TILE_SIZE, y: 174.5 * TILE_SIZE, r: 1750 });
             }
             if (this.landmarks3D.wynwoodWalls) {
                 const ww = this.landmarks3D.wynwoodWalls;
@@ -5293,112 +5295,136 @@ class WorldObjectEngine {
             emitTileBox3D(tb.x, tb.y, 1, 0, 0, 0, 12, 82, bz + 0.88, bz + 1.00, 250, 363, 64, [0.96, 0.48, 0.16], false);
         }
 
-        // 16. PORT GELLHORN INTERNATIONAL RACEWAY — 100% 3D BANKED ASPHALT OVAL, FIA CURBS, SAFER WALLS,
-        //     COVERED GRANDSTANDS, RACE CONTROL TOWER, START/FINISH GANTRY & 3-BAY PIT GARAGE (c=72.0, r=176.0)
+        // 16. PORT GELLHORN INTERNATIONAL SUPER-SPEEDWAY — COLOSSAL 2.4X 100% 3D BANKED ASPHALT SUPER-OVAL,
+        //     FIA CURBS, SAFER WALLS, MEGA-GRANDSTANDS, RACE CONTROL TOWER, 4 FLOODLIGHT MASTS, START/FINISH GANTRY & 6-BAY PIT GARAGE (c=57.0, r=174.5)
         if (this.landmarks3D && this.landmarks3D.gellhornSpeedway) {
             const gs = this.landmarks3D.gellhornSpeedway;
             const bz = gs.z || 2.0;
-            const cx = gs.centerX || (72.0 * TILE_SIZE);
-            const cy = gs.centerY || (176.0 * TILE_SIZE);
-            const rx = gs.rx || (10.6 * TILE_SIZE);
-            const ry = gs.ry || (7.4 * TILE_SIZE);
-            const trackW = 196;
-            const N = 32;
+            const cx = gs.centerX || (57.0 * TILE_SIZE);
+            const cy = gs.centerY || (174.5 * TILE_SIZE);
+            const rx = gs.rx || (24.5 * TILE_SIZE);
+            const ry = gs.ry || (17.5 * TILE_SIZE);
+            const trackW = 248;
+            const N = 48;
 
-            // A. 32-Segment 3D Banked Asphalt Oval Race Track, Red/White FIA Curbs & Outer SAFER Concrete + Catch-Fence Wall
+            // A. 48-Segment 3D Banked Asphalt Super-Oval Race Track, Red/White FIA Curbs & Outer SAFER Concrete + Catch-Fence Wall
             for (let i = 0; i < N; i++) {
                 const midTh = ((i + 0.5) / N) * Math.PI * 2;
                 const px = cx + Math.cos(midTh) * rx;
                 const py = cy + Math.sin(midTh) * ry;
                 const tx = -Math.sin(midTh) * rx;
                 const ty =  Math.cos(midTh) * ry;
-                const segLen = (Math.PI * 2 / N) * Math.hypot(tx, ty) * 1.08;
+                const segLen = (Math.PI * 2 / N) * Math.hypot(tx, ty) * 1.06;
                 const tAng = Math.atan2(ty, tx);
                 const cosT = Math.cos(tAng);
                 const sinT = Math.sin(tAng);
 
-                // 1. Dark Racing Asphalt Track Surface Ribbon (L33 dark tarmac + white dashed center line + yellow inner / white outer apron lines)
+                // 1. Dark Racing Asphalt Track Surface Ribbon (L33 dark tarmac + white dashed lane dividers + yellow inner / white outer apron lines)
                 emitTileBox3D(px, py, cosT, sinT, 0, 0, segLen, trackW, bz, bz + 0.024, 173, 173, 33, [0.36, 0.39, 0.45], false);
-                emitSolidBox3D(px, py, cosT, sinT, 0, 0, segLen * 0.52, 3.6, bz + 0.024, bz + 0.029, [0.94, 0.96, 0.99], 1);
-                emitSolidBox3D(px, py, cosT, sinT, 0,  trackW * 0.5 - 16, segLen, 3.0, bz + 0.024, bz + 0.028, [0.98, 0.82, 0.16], 1);
-                emitSolidBox3D(px, py, cosT, sinT, 0, -trackW * 0.5 + 12, segLen, 2.5, bz + 0.024, bz + 0.028, [0.98, 0.98, 1.00], 1);
+                emitSolidBox3D(px, py, cosT, sinT, 0, -40, segLen * 0.50, 3.2, bz + 0.024, bz + 0.029, [0.94, 0.96, 0.99], 1);
+                emitSolidBox3D(px, py, cosT, sinT, 0,  40, segLen * 0.50, 3.2, bz + 0.024, bz + 0.029, [0.94, 0.96, 0.99], 1);
+                emitSolidBox3D(px, py, cosT, sinT, 0,  trackW * 0.5 - 18, segLen, 3.5, bz + 0.024, bz + 0.028, [0.98, 0.82, 0.16], 1);
+                emitSolidBox3D(px, py, cosT, sinT, 0, -trackW * 0.5 + 14, segLen, 3.0, bz + 0.024, bz + 0.028, [0.98, 0.98, 1.00], 1);
 
                 // 2. Inner 3D Red-and-White FIA Racing Curbs (Vibreurs) along the inside edge of the oval (+ly points inward!)
-                const curbY = trackW * 0.5 - 7;
-                emitSolidBox3D(px, py, cosT, sinT, -segLen * 0.24, curbY, segLen * 0.50, 13, bz + 0.024, bz + 0.052, [0.92, 0.18, 0.18], 5);
-                emitSolidBox3D(px, py, cosT, sinT,  segLen * 0.24, curbY, segLen * 0.50, 13, bz + 0.024, bz + 0.052, [0.96, 0.98, 1.00], 5);
+                const curbY = trackW * 0.5 - 8;
+                emitSolidBox3D(px, py, cosT, sinT, -segLen * 0.24, curbY, segLen * 0.50, 15, bz + 0.024, bz + 0.054, [0.92, 0.18, 0.18], 5);
+                emitSolidBox3D(px, py, cosT, sinT,  segLen * 0.24, curbY, segLen * 0.50, 15, bz + 0.024, bz + 0.054, [0.96, 0.98, 1.00], 5);
 
                 // 3. Outer 3D Concrete SAFER Barrier Wall & Alpha-Cutout Steel Mesh Catch-Fence (with West & East Entry Gates open!)
-                const isEntryGate = (i === 15 || i === 16 || i === 31 || i === 0);
-                const wallY = -trackW * 0.5 - 8; // Since normal (-sinT, cosT) points INWARD toward center, outward is negative offY!
+                const isEntryGate = (i === 23 || i === 24 || i === 47 || i === 0);
+                const wallY = -trackW * 0.5 - 9; // Outward is negative offY
                 if (!isEntryGate) {
                     const wallCol = (i % 2 === 0) ? [0.94, 0.96, 0.99] : [0.90, 0.24, 0.20];
-                    emitTileBox3D(px, py, cosT, sinT, 0, wallY, segLen * 1.02, 16, bz, bz + 0.26, 177, 177, 71, wallCol, false);
-                    emitTileBox3D(px, py, cosT, sinT, 0, wallY - 3, segLen * 1.00, 6, bz + 0.26, bz + 0.58, 363, 246, 64, [0.86, 0.90, 0.96], false);
+                    emitTileBox3D(px, py, cosT, sinT, 0, wallY, segLen * 1.02, 18, bz, bz + 0.28, 177, 177, 71, wallCol, false);
+                    emitTileBox3D(px, py, cosT, sinT, 0, wallY - 3, segLen * 1.00, 6, bz + 0.28, bz + 0.64, 363, 246, 64, [0.86, 0.90, 0.96], false);
                 } else {
                     // Entry Gate Pylon Marker at Gate Threshold
-                    emitTileBox3D(px, py, cosT, sinT, (i === 15 || i === 31) ? -segLen * 0.42 : segLen * 0.42, wallY, 18, 18, bz, bz + 0.56, 86, 86, 46, [0.98, 0.82, 0.16], false);
+                    emitTileBox3D(px, py, cosT, sinT, (i === 23 || i === 47) ? -segLen * 0.42 : segLen * 0.42, wallY, 20, 20, bz, bz + 0.62, 86, 86, 46, [0.98, 0.82, 0.16], false);
                 }
             }
 
             // B. Checkered Start/Finish Line & Twin-Pylon Overhead Steel Race Gantry at South Straightaway (gs.x, gs.y)
-            for (let sq = 0; sq < 12; sq++) {
-                const sqY = -trackW * 0.46 + (sq + 0.5) * (trackW * 0.92 / 12);
-                emitSolidBox3D(gs.x, gs.y, 1, 0, -4, sqY, 7, 14, bz + 0.024, bz + 0.032, (sq % 2 === 0) ? [0.98, 0.98, 1.00] : [0.12, 0.14, 0.18], 1);
-                emitSolidBox3D(gs.x, gs.y, 1, 0,  4, sqY, 7, 14, bz + 0.024, bz + 0.032, (sq % 2 === 1) ? [0.98, 0.98, 1.00] : [0.12, 0.14, 0.18], 1);
+            for (let sq = 0; sq < 16; sq++) {
+                const sqY = -trackW * 0.46 + (sq + 0.5) * (trackW * 0.92 / 16);
+                emitSolidBox3D(gs.x, gs.y, 1, 0, -5, sqY, 9, 14, bz + 0.024, bz + 0.033, (sq % 2 === 0) ? [0.98, 0.98, 1.00] : [0.12, 0.14, 0.18], 1);
+                emitSolidBox3D(gs.x, gs.y, 1, 0,  5, sqY, 9, 14, bz + 0.024, bz + 0.033, (sq % 2 === 1) ? [0.98, 0.98, 1.00] : [0.12, 0.14, 0.18], 1);
             }
-            for (const sy of [-114, 114]) {
-                emitAOShadow3D(gs.x, gs.y, 1, 0, 0, sy, 28, 28, bz, 0.38);
-                emitTileBox3D(gs.x, gs.y, 1, 0, 0, sy, 18, 18, bz, bz + 0.18, 177, 177, 71, [0.92, 0.94, 0.98], false);
-                emitSolidBox3D(gs.x, gs.y, 1, 0, 0, sy, 16, 16, bz + 0.18, bz + 0.28, [0.98, 0.82, 0.16], 3);
-                emitTileBox3D(gs.x, gs.y, 1, 0, 0, sy, 12, 12, bz + 0.28, bz + 1.28, 363, 246, 64, [0.94, 0.96, 0.99], false);
+            for (const sy of [-144, 144]) {
+                emitAOShadow3D(gs.x, gs.y, 1, 0, 0, sy, 32, 32, bz, 0.38);
+                emitTileBox3D(gs.x, gs.y, 1, 0, 0, sy, 20, 20, bz, bz + 0.20, 177, 177, 71, [0.92, 0.94, 0.98], false);
+                emitSolidBox3D(gs.x, gs.y, 1, 0, 0, sy, 18, 18, bz + 0.20, bz + 0.30, [0.98, 0.82, 0.16], 3);
+                emitTileBox3D(gs.x, gs.y, 1, 0, 0, sy, 14, 14, bz + 0.30, bz + 1.36, 363, 246, 64, [0.94, 0.96, 0.99], false);
             }
-            emitTileBox3D(gs.x, gs.y, 1, 0, 0, 0, 18, 244, bz + 1.14, bz + 1.28, 250, 363, 64, [0.94, 0.96, 0.99], false);
-            emitBox3D(gs.x, gs.y, 0, 1, -54, 0, 82, 10, bz + 1.28, bz + 1.58, "ad_vice26", "ad_vice26", [0.98, 0.30, 0.72]);
-            emitBox3D(gs.x, gs.y, 0, 1,  54, 0, 82, 10, bz + 1.28, bz + 1.58, "ad_sprunk", "ad_sprunk", [0.22, 0.96, 0.42]);
+            emitTileBox3D(gs.x, gs.y, 1, 0, 0, 0, 20, 304, bz + 1.20, bz + 1.36, 250, 363, 64, [0.94, 0.96, 0.99], false);
+            emitBox3D(gs.x, gs.y, 0, 1, -72, 0, 108, 12, bz + 1.36, bz + 1.68, "ad_vice26", "ad_vice26", [0.98, 0.30, 0.72]);
+            emitBox3D(gs.x, gs.y, 0, 1,  72, 0, 108, 12, bz + 1.36, bz + 1.68, "ad_sprunk", "ad_sprunk", [0.22, 0.96, 0.42]);
 
-            // C. Colossal 3D North Covered Spectator Grandstand (at cy - 654) & South VIP Grandstand + Race Control Tower (at cy + 654)
+            // C. Colossal 3D North Covered Mega-Grandstand (at cy - 1296) & South VIP Grandstand + Race Control Tower (at cy + 1296)
             const tierColors = [
                 [0.90, 0.22, 0.20],
                 [0.96, 0.78, 0.16],
                 [0.18, 0.56, 0.92],
-                [0.94, 0.96, 0.99]
+                [0.94, 0.96, 0.99],
+                [0.90, 0.22, 0.20]
             ];
             for (const dirY of [-1, 1]) {
-                const standY = cy + dirY * 654;
-                const standW = dirY < 0 ? 424 : 364;
-                emitAOShadow3D(cx, standY, 1, 0, 0, 0, standW + 28, 84, bz, 0.45);
+                const standY = cy + dirY * 1296;
+                const standW = dirY < 0 ? 880 : 760;
+                emitAOShadow3D(cx, standY, 1, 0, 0, 0, standW + 36, 98, bz, 0.45);
                 // Concrete Under-Stand Concourse Structure
-                emitTileBox3D(cx, standY, 1, 0, 0, dirY * 10, standW, 56, bz, bz + 0.32, 177, 86, 71, [0.88, 0.90, 0.94], true);
-                // 4 Stepped Spectator Bleacher Tiers sloping toward the track
-                for (let t = 0; t < 4; t++) {
-                    const tyOff = dirY * (-14 + t * 11);
+                emitTileBox3D(cx, standY, 1, 0, 0, dirY * 12, standW, 68, bz, bz + 0.36, 177, 86, 71, [0.88, 0.90, 0.94], true);
+                // 5 Stepped Spectator Bleacher Tiers sloping toward the track
+                for (let t = 0; t < 5; t++) {
+                    const tyOff = dirY * (-18 + t * 11);
                     const z0 = bz + 0.18 + t * 0.18;
-                    emitSolidBox3D(cx, standY, 1, 0, 0, tyOff, standW - 8, 12, z0, z0 + 0.18, tierColors[t], 5);
+                    emitSolidBox3D(cx, standY, 1, 0, 0, tyOff, standW - 12, 12, z0, z0 + 0.18, tierColors[t], 5);
                 }
                 // Rear Structural Steel Columns & Cantilevered Stadium Roof Canopy
-                for (const colX of [-standW * 0.42, -standW * 0.14, standW * 0.14, standW * 0.42]) {
-                    emitTileBox3D(cx, standY, 1, 0, colX, dirY * 26, 10, 10, bz + 0.32, bz + 1.18, 363, 363, 64, [0.90, 0.93, 0.98], false);
+                for (const frac of [-0.44, -0.26, -0.09, 0.09, 0.26, 0.44]) {
+                    emitTileBox3D(cx, standY, 1, 0, standW * frac, dirY * 32, 12, 12, bz + 0.36, bz + 1.32, 363, 363, 64, [0.90, 0.93, 0.98], false);
                 }
-                emitTileBox3D(cx, standY, 1, 0, 0, dirY * 4, standW + 12, 68, bz + 1.18, bz + 1.28, 250, 86, 86, [0.94, 0.97, 1.00], false);
+                emitTileBox3D(cx, standY, 1, 0, 0, dirY * 4, standW + 18, 82, bz + 1.32, bz + 1.44, 250, 86, 86, [0.94, 0.97, 1.00], false);
+                // Twin Tall 3D Lattice Stadium Floodlight Masts flanking each Mega-Grandstand
+                for (const mSide of [-1, 1]) {
+                    const mx = cx + mSide * (standW * 0.5 + 56);
+                    emitTileBox3D(mx, standY, 1, 0, 0, 0, 18, 18, bz, bz + 0.24, 177, 177, 71, [0.86, 0.88, 0.92], false);
+                    emitTileBox3D(mx, standY, 1, 0, 0, 0, 12, 12, bz + 0.24, bz + 1.84, 363, 246, 64, [0.90, 0.93, 0.98], false);
+                    emitSolidBox3D(mx, standY, 1, 0, 0, -dirY * 6, 42, 10, bz + 1.84, bz + 1.98, [0.98, 0.98, 0.92], 7);
+                }
             }
-            // Elevated 3D Glass Race Control & Timing Tower atop the South VIP Grandstand
-            emitTileBox3D(cx, cy + 668, 1, 0, 0, 0, 96, 38, bz + 1.28, bz + 1.72, 199, 86, 86, [0.94, 0.98, 1.00], false);
-            emitSolidBox3D(cx, cy + 668, 1, 0, 0, 0, 104, 44, bz + 1.72, bz + 1.80, [0.16, 0.52, 0.94], 5);
+            // Elevated 3D Glass Race Control, Timing & Broadcast Tower atop the South VIP Grandstand
+            emitTileBox3D(cx, cy + 1314, 1, 0, 0, 0, 184, 46, bz + 1.44, bz + 1.96, 199, 86, 86, [0.94, 0.98, 1.00], false);
+            emitSolidBox3D(cx, cy + 1314, 1, 0, 0, 0, 196, 52, bz + 1.96, bz + 2.06, [0.16, 0.52, 0.94], 5);
+            emitBox3D(cx, cy + 1314, 1, 0, 0, -24, 124, 10, bz + 2.06, bz + 2.38, "ad_ecola", "ad_ecola", [0.96, 0.20, 0.20]);
 
-            // D. Infield Paved Pit Lane Apron, Pit Wall & 3-Bay Pit Crew Repair Garage (at cx, 173.0 * TILE_SIZE)
-            const garY = 173.0 * TILE_SIZE;
-            emitAOShadow3D(cx, garY, 1, 0, 0, 12, 224, 128, bz, 0.42);
-            // Paved Pit Lane Apron & Red/White Pit Crew Box Markings
-            emitTileBox3D(cx, gs.pitY, 1, 0, 0, 0, 260, 72, bz, bz + 0.022, 177, 177, 87, [0.84, 0.86, 0.90], false);
-            emitSolidBox3D(cx, gs.pitY, 1, 0, 0, 32, 240, 6, bz + 0.022, bz + 0.16, [0.94, 0.74, 0.14], 3);
-            // 3-Bay Pit Crew Garage Building
-            emitTileBox3D(cx, garY, 1, 0, 0, 0, 152, 48, bz, bz + 0.52, 86, 199, 86, [0.94, 0.96, 1.00], true);
-            for (const bxOff of [-46, 0, 46]) {
-                emitTileBox3D(cx, garY, 1, 0, bxOff, 24.5, 32, 4, bz + 0.02, bz + 0.38, 173, 173, 33, [0.32, 0.36, 0.42], false);
+            // D. Massive Infield Paved Pit Lane Apron, Pit Wall, 6-Bay Pit Crew Garage, Victory Lane Podium & VIP Helipad
+            const garY = 173.5 * TILE_SIZE;
+            emitAOShadow3D(cx, garY, 1, 0, 0, 14, 420, 142, bz, 0.42);
+            // Paved Pit Lane Apron & 6 Red/Yellow Pit Crew Box Markings at gs.pitY (179.5 * TILE_SIZE)
+            emitTileBox3D(cx, gs.pitY, 1, 0, 0, 0, 620, 96, bz, bz + 0.022, 177, 177, 87, [0.84, 0.86, 0.90], false);
+            emitSolidBox3D(cx, gs.pitY, 1, 0, 0, 44, 580, 8, bz + 0.022, bz + 0.20, [0.94, 0.74, 0.14], 3);
+            for (let pb = -2.5; pb <= 2.5; pb += 1.0) {
+                emitSolidBox3D(cx, gs.pitY, 1, 0, pb * 92, 0, 68, 44, bz + 0.023, bz + 0.028, [0.90, 0.22, 0.20], 1);
             }
-            emitSolidBox3D(cx, garY, 1, 0, 0, 0, 158, 54, bz + 0.52, bz + 0.60, [0.92, 0.24, 0.20], 5);
-            emitBox3D(cx, garY, 1, 0, 0, 0, 92, 10, bz + 0.60, bz + 0.88, "ad_pisswasser", "ad_pisswasser", [0.98, 0.82, 0.18]);
+            // 6-Bay Pit Crew Garage Building (380px wide x 64px deep)
+            emitTileBox3D(cx, garY, 1, 0, 0, 0, 380, 64, bz, bz + 0.58, 86, 199, 86, [0.94, 0.96, 1.00], true);
+            for (const bxOff of [-150, -90, -30, 30, 90, 150]) {
+                emitTileBox3D(cx, garY, 1, 0, bxOff, 32.5, 42, 4, bz + 0.02, bz + 0.42, 173, 173, 33, [0.32, 0.36, 0.42], false);
+            }
+            emitSolidBox3D(cx, garY, 1, 0, 0, 0, 392, 72, bz + 0.58, bz + 0.68, [0.92, 0.24, 0.20], 5);
+            emitBox3D(cx, garY, 1, 0, -92, 0, 128, 12, bz + 0.68, bz + 1.04, "ad_pisswasser", "ad_pisswasser", [0.98, 0.82, 0.18]);
+            emitBox3D(cx, garY, 1, 0,  92, 0, 128, 12, bz + 0.68, bz + 1.04, "ad_vice26",     "ad_vice26",     [0.98, 0.30, 0.72]);
+
+            // E. Infield 3D Victory Lane Checkered Podium (at cx - 280) & VIP Helicopter Pad (at cx + 280)
+            emitTileBox3D(cx - 280, garY, 1, 0, 0, 0, 76, 48, bz, bz + 0.14, 177, 177, 46, [0.96, 0.98, 1.00], false);
+            emitSolidBox3D(cx - 280, garY, 1, 0,   0, -6, 24, 24, bz + 0.14, bz + 0.36, [0.98, 0.82, 0.16], 5); // 1st Place Gold Step
+            emitSolidBox3D(cx - 280, garY, 1, 0, -24, -6, 22, 22, bz + 0.14, bz + 0.28, [0.84, 0.88, 0.94], 5); // 2nd Place Silver Step
+            emitSolidBox3D(cx - 280, garY, 1, 0,  24, -6, 22, 22, bz + 0.14, bz + 0.22, [0.82, 0.52, 0.28], 5); // 3rd Place Bronze Step
+            emitOctagonPad3D(cx + 280, garY, 0, 0, 44, 44, 40, 40, 0.26, bz, bz + 0.04, [0.36, 0.40, 0.46], [0.98, 0.82, 0.16], 1, 173, 33);
+            emitSolidBox3D(cx + 280, garY, 1, 0, -12, 0,  5, 28, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
+            emitSolidBox3D(cx + 280, garY, 1, 0,  12, 0,  5, 28, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
+            emitSolidBox3D(cx + 280, garY, 1, 0,   0, 0, 24,  5, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
         }
 
         // 17. WYNWOOD WALLS 3D OPEN-AIR GRAFFITI GALLERY & 6 LEONIDA STREET-ART MURAL MONOLITHS
@@ -8910,18 +8936,20 @@ class WorldObjectEngine {
             ctx.fillRect((lm.thrillbillyArena.x - 78) * sx, (lm.thrillbillyArena.y - 48) * sy, 156 * sx, 96 * sy);
         }
         if (lm.gellhornSpeedway) {
-            const gcx = (lm.gellhornSpeedway.centerX || (72.0 * TILE_SIZE)) * sx;
-            const gcy = (lm.gellhornSpeedway.centerY || (176.0 * TILE_SIZE)) * sy;
-            const grx = (lm.gellhornSpeedway.rx || (10.6 * TILE_SIZE)) * sx;
-            const gry = (lm.gellhornSpeedway.ry || (7.4 * TILE_SIZE)) * sy;
+            const gcx = (lm.gellhornSpeedway.centerX || (57.0 * TILE_SIZE)) * sx;
+            const gcy = (lm.gellhornSpeedway.centerY || (174.5 * TILE_SIZE)) * sy;
+            const grx = (lm.gellhornSpeedway.rx || (24.5 * TILE_SIZE)) * sx;
+            const gry = (lm.gellhornSpeedway.ry || (17.5 * TILE_SIZE)) * sy;
             ctx.strokeStyle = "#475569";
-            ctx.lineWidth = Math.max(3, 196 * sx);
+            ctx.lineWidth = Math.max(4, 248 * sx);
             ctx.beginPath();
             ctx.ellipse(gcx, gcy, grx, gry, 0, 0, Math.PI * 2);
             ctx.stroke();
             ctx.fillStyle = "#ef4444";
-            ctx.fillRect(gcx - 210 * sx, gcy - 680 * sy, 420 * sx, 56 * sy);
-            ctx.fillRect(gcx - 180 * sx, gcy + 624 * sy, 360 * sx, 56 * sy);
+            ctx.fillRect(gcx - 440 * sx, gcy - 1330 * sy, 880 * sx, 68 * sy);
+            ctx.fillRect(gcx - 380 * sx, gcy + 1262 * sy, 760 * sx, 68 * sy);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect(gcx - 190 * sx, gcy - 96 * sy, 380 * sx, 64 * sy);
         }
         if (lm.wynwoodWalls) {
             ctx.fillStyle = "#ec4899";

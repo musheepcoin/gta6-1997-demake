@@ -600,13 +600,15 @@ class LeonidaGame {
 
 
 
-            // --- H. Leonida State Penitentiary Yard & Port Gellhorn International Raceway Oval ---
+            // --- H. Leonida State Penitentiary Yard & Port Gellhorn International Super-Speedway Oval ---
 
             { spec: "VCPD_CRUISER", c: 59.5, r: 76.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "CHALLENGER_RT", c: 58.2, r: 173.8, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "CHALLENGER_RT", c: 84.5, r: 173.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "FJORD_FASTBACK", c: 75.5, r: 175.0, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "FJORD_FASTBACK", c: 55.2, r: 176.2, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+
+            { spec: "BANSHEE_GT", c: 58.8, r: 176.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "FIRE_TRUCK", c: 38.5, r: 136.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
 
