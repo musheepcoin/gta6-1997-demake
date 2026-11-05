@@ -1834,7 +1834,7 @@ class LeonidaMap {
         // 14) GTA 6 Street Takeovers / Sideshow Drift Donuts ("streetTakeovers" — ONLY in wide-open off-road plazas with zero buildings/doors/cars!)
         this.streetTakeovers = [
             { c: 224.5, r: 111.5, carSpr: "13", seed: 1.5 }, // Little Haiti Cultural Plaza Center
-            { c: 68.5,  r: 205.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn South Industrial Plaza
+            { c: 82.5,  r: 214.5, carSpr: "1",  seed: 3.1 }, // Port Gellhorn South Industrial Plaza (East of Hank's Waffles)
             { c: 150.5, r: 123.5, carSpr: "4",  seed: 0.0 }, // Ambrosia Refinery Open Concrete Yard
             { c: 336.5, r: 329.5, carSpr: "6",  seed: 4.4 }  // Vice Port Industrial Concrete Yard
         ].map((st) => ({
@@ -3447,8 +3447,8 @@ class LeonidaMap {
                 theme: "DINER_PAWN",
                 accent: "#fb923c",
                 facing: "S",
-                doorX: mx256(36.5) * TILE_SIZE,
-                doorY: my256(140.5) * TILE_SIZE,
+                doorX: 70.5 * TILE_SIZE,
+                doorY: 211.5 * TILE_SIZE,
                 w: 760,
                 h: 520,
                 npcs: [
@@ -4179,7 +4179,7 @@ class LeonidaMap {
             { id: "pns_northbeach", name: "VICE CUSTOMS (NORTH BEACH / 919)", x: 434.5 * TILE_SIZE, y: 75.5 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "pns_downtown", name: "VICE CUSTOMS (BISCAYNE BLVD)", x: 285.0 * TILE_SIZE, y: 179.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "pns_wynwood", name: "WYNWOOD CUSTOMS (MAMBAS STADIUM)", x: 188.5 * TILE_SIZE, y: 159.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "pns_gellhorn", name: "GELLHORN SPEEDWAY CUSTOMS", x: 62.0 * TILE_SIZE, y: 259.0 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
+            { id: "pns_gellhorn", name: "GELLHORN SPEEDWAY CUSTOMS", x: 66.5 * TILE_SIZE, y: 213.5 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "pns_vcia", name: "VCIA AIRPORT CUSTOMS", x: 161.0 * TILE_SIZE, y: 295.5 * TILE_SIZE, w: 2 * TILE_SIZE, h: 1.5 * TILE_SIZE }
         ];
 
@@ -4190,7 +4190,7 @@ class LeonidaMap {
             { id: "bomb_vcia", name: "8-BALL'S ORDNANCE (VCIA CARGO)", x: 123.5 * TILE_SIZE, y: 295.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "bomb_littlehaiti", name: "AMBROSIA BOMB SHOP (LAKE LEONIDA)", x: 168.5 * TILE_SIZE, y: 110.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
             { id: "bomb_sera", name: "SERA ROCKET ORDNANCE (CAPE LEONIDA)", x: 445.0 * TILE_SIZE, y: 28.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE },
-            { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: 62.0 * TILE_SIZE, y: 281.0 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
+            { id: "bomb_gellhorn", name: "PAWN & GUN ORDNANCE (PORT GELLHORN)", x: 74.5 * TILE_SIZE, y: 213.5 * TILE_SIZE, w: 1.5 * TILE_SIZE, h: 1.5 * TILE_SIZE }
         ];
 
         // --------------------------------------------------------------------
@@ -4339,7 +4339,7 @@ class LeonidaMap {
 
         // Atmospheric street fires in Port Gellhorn & Thrillbilly Mud Park
         this.streetFires = [
-            { x: mx256(35.8) * TILE_SIZE, y: my256(142.2) * TILE_SIZE, z: 2.05, size: 0.85 },
+            { x: 64.8 * TILE_SIZE, y: 211.2 * TILE_SIZE, z: 2.05, size: 0.85 },
             { x: mx256(54.0) * TILE_SIZE, y: my256(216.0) * TILE_SIZE, z: 2.05, size: 0.85 }
         ];
     }

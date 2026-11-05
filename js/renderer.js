@@ -3954,6 +3954,24 @@ class RetroRenderer {
                             sub: "KING OF HAPPY HOUR",
                             cta: "AVAILABLE AT UNCLE JACK'S LIQUOR",
                             icon: "BEER"
+                        },
+                        {
+                            key: "ad_hanks_waffles", x: 1640, y: 3846,
+                            bg0: "#7c2d12", bg1: "#ea580c", accent: "#fde047", trim: "#fef08a",
+                            tag: "PORT GELLHORN ROADSIDE DINER",
+                            title: "HANK'S WAFFLES",
+                            sub: "OPEN 24 HOURS • HOT COFFEE",
+                            cta: "WAFFLES • BACON • HOLDUP CASH!",
+                            icon: "BURGER"
+                        },
+                        {
+                            key: "ad_uncle_jacks", x: 1780, y: 3846,
+                            bg0: "#450a0a", bg1: "#991b1b", accent: "#39ff14", trim: "#facc15",
+                            tag: "PORT GELLHORN PAWN & ORDNANCE",
+                            title: "UNCLE JACK'S",
+                            sub: "PAWN • LIQUOR • AMMO",
+                            cta: "WE BUY GOLD • NO QUESTIONS ASKED",
+                            icon: "TARGET"
                         }
                     ];
 

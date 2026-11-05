@@ -5425,6 +5425,33 @@ class WorldObjectEngine {
             emitSolidBox3D(cx + 280, garY, 1, 0, -12, 0,  5, 28, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
             emitSolidBox3D(cx + 280, garY, 1, 0,  12, 0,  5, 28, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
             emitSolidBox3D(cx + 280, garY, 1, 0,   0, 0, 24,  5, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
+
+            // F. HANK'S WAFFLES DINER & UNCLE JACK'S PAWN / LIQUOR (c = 66..75, r = 206..210, Door at 70.5, 211.5)
+            //    Directly across the South Speedway Highway (r = 201..202):
+            //    1) South Storefront Orange/Yellow Diner Awning & Dual Marquee Signboards over the entrance at (70.5, 211.0)
+            const hwDoorX = 70.5 * TILE_SIZE;
+            const hwSouthWallY = 211.0 * TILE_SIZE;
+            const hwNorthWallY = 206.0 * TILE_SIZE;
+            emitSolidBox3D(hwDoorX, hwSouthWallY + 12, 1, 0,    0, 0, 240, 26, 2.44, 2.54, [0.94, 0.38, 0.08], 5);
+            emitSolidBox3D(hwDoorX, hwSouthWallY + 12, 1, 0,    0, 0, 246, 28, 2.54, 2.60, [0.98, 0.82, 0.16], 5);
+            emitBox3D(hwDoorX, hwSouthWallY + 6, 1, 0, -58, 0, 108, 10, 2.60, 3.04, "ad_hanks_waffles", "ad_hanks_waffles", [1.0, 1.0, 1.0]);
+            emitBox3D(hwDoorX, hwSouthWallY + 6, 1, 0,  58, 0, 108, 10, 2.60, 3.04, "ad_uncle_jacks",   "ad_uncle_jacks",   [1.0, 1.0, 1.0]);
+            //    2) Rooftop Giant Illuminated Billboards on Both South (r = 210.5, z = 4.0) & North (r = 206.5, z = 4.0) Roof Edges
+            for (const ryBillboard of [hwSouthWallY - 18, hwNorthWallY + 18]) {
+                emitSolidBox3D(hwDoorX, ryBillboard, 1, 0, -68, 0, 8, 8, 4.00, 4.22, [0.28, 0.32, 0.38], 3);
+                emitSolidBox3D(hwDoorX, ryBillboard, 1, 0,  68, 0, 8, 8, 4.00, 4.22, [0.28, 0.32, 0.38], 3);
+                emitBox3D(hwDoorX, ryBillboard, 1, 0, -68, 0, 124, 12, 4.22, 4.78, "ad_hanks_waffles", "ad_hanks_waffles", [1.0, 1.0, 1.0]);
+                emitBox3D(hwDoorX, ryBillboard, 1, 0,  68, 0, 124, 12, 4.22, 4.78, "ad_uncle_jacks",   "ad_uncle_jacks",   [1.0, 1.0, 1.0]);
+                emitSolidBox3D(hwDoorX, ryBillboard, 1, 0, -68, 0, 130, 16, 4.78, 4.86, [0.98, 0.82, 0.16], 5);
+                emitSolidBox3D(hwDoorX, ryBillboard, 1, 0,  68, 0, 130, 16, 4.78, 4.86, [0.22, 0.96, 0.32], 5);
+            }
+            //    3) Tall 3D Roadside Diner Pylon Sign at the Corner of Speedway South Hwy & Gellhorn Ave (64.8, 204.2)
+            const pylX = 64.8 * TILE_SIZE;
+            const pylY = 204.2 * TILE_SIZE;
+            emitTileBox3D(pylX, pylY, 1, 0, 0, 0, 22, 22, 2.00, 2.22, 177, 177, 71, [0.88, 0.90, 0.94], true);
+            emitSolidBox3D(pylX, pylY, 1, 0, 0, 0, 10, 10, 2.22, 3.10, [0.94, 0.38, 0.08], 3);
+            emitBox3D(pylX, pylY, 1, 0, 0, 0, 92, 14, 3.10, 3.60, "ad_hanks_waffles", "ad_hanks_waffles", [1.0, 1.0, 1.0]);
+            emitSolidBox3D(pylX, pylY, 1, 0, 0, 0, 98, 18, 3.60, 3.68, [0.98, 0.82, 0.16], 5);
         }
 
         // 17. WYNWOOD WALLS 3D OPEN-AIR GRAFFITI GALLERY & 6 LEONIDA STREET-ART MURAL MONOLITHS
