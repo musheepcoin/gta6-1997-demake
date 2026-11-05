@@ -10130,9 +10130,6 @@ class LeonidaGame {
 
                 if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
 
-                // Gridlock breaker: AI vehicles flagged as deadlocked ghost through other AI cars & wrecks (never through the player)
-                if (((a.ghostTimer || 0) > 0 && b.driver !== "PLAYER") || ((b.ghostTimer || 0) > 0 && a.driver !== "PLAYER")) continue;
-
                 if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.85) continue;
 
                 if (Math.abs(b.x - a.x) > 68 || Math.abs(b.y - a.y) > 68) continue;

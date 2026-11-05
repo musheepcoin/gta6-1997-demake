@@ -1331,6 +1331,12 @@ class Vehicle {
         const curZ = this.z !== undefined ? this.z : 2.0;
         this.aiReverseTimer = 0;
 
+        // Backing out of a gridlock: reverse straight back along the lane, then re-pick a route
+        if (this.gridlockReverseTimer > 0) {
+            this.aiState = "REVERSING";
+            return { throttle: -0.8, steer: 0, handbrake: false };
+        }
+
         const bx = Math.floor(this.x / TILE_SIZE);
         const by = Math.floor(this.y / TILE_SIZE);
         const curBlk = map.getNavigationBlock ? map.getNavigationBlock(bx, by, curZ) : null;
@@ -1576,7 +1582,6 @@ class Vehicle {
         if (game && Array.isArray(game.vehicles)) {
             for (const other of game.vehicles) {
                 if (other === this || other === this.towingVehicle || other === this.towTarget) continue;
-                if (this.ghostTimer > 0 && other.driver !== "PLAYER") continue;
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
@@ -2576,28 +2581,59 @@ class Vehicle {
 
         this.sirenPhase += dt * 10;
 
-        // Gridlock breaker: an AI vehicle that has been frozen for ages (not at a red light / not parked on purpose)
-        // phases through other AI cars & wrecks for a few seconds so intersection pileups always resolve themselves!
-        if (this.ghostTimer > 0) {
-            this.ghostTimer = Math.max(0, this.ghostTimer - dt);
+        // Gridlock resolution (no cheating, everything stays solid): an AI vehicle frozen for a long time
+        // (not at a red light / not parked on purpose) BACKS UP out of the jam like a real driver and re-picks its route,
+        // which frees the intersection box for the cross traffic. Drivers back up one after another (staggered by id).
+        if (this.gridlockReverseTimer > 0) {
+            this.gridlockReverseTimer = Math.max(0, this.gridlockReverseTimer - dt);
         }
         const isAiDriven = this.driver === "AI_TRAFFIC" || this.driver === "AI_TOW" || this.driver === "AI_EMERGENCY";
-        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && Math.abs(this.speed || 0) < 6) {
+        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0)) {
             let counts = true;
             if (this.driver === "AI_TOW") counts = (this.approachNoProgress || 0) > 3.0 && !this.towHookTimer;
             else if (this.driver === "AI_EMERGENCY") counts = !this.deployedFireman && !this.deployedMedic && (this.approachNoProgress || 0) > 3.0;
             if (counts) {
                 this.gridlockTimer = (this.gridlockTimer || 0) + dt;
-                if (this.gridlockTimer > 7.5 && !(this.ghostTimer > 0)) {
-                    this.ghostTimer = 6.0;
-                    this.gridlockTimer = 0;
-                    this.aiLaneChangeCooldown = 0;
-                    this.aiReverseTimer = 0;
+                const idNum = parseInt(String(this.id).replace(/\D/g, ""), 10) || 0;
+                const inBox = Boolean(map && map.getBlockInfo && map.getBlockInfo(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE), 1).lid === 25);
+                const threshold = (inBox ? 3.5 : 6.0) + (idNum % 5) * 1.3;
+                if (this.gridlockTimer > threshold) {
+                    // Only back up if there is free road behind us
+                    const bCos = Math.cos(this.angle), bSin = Math.sin(this.angle);
+                    let rearClear = true;
+                    if (game && Array.isArray(game.vehicles)) {
+                        for (const o of game.vehicles) {
+                            if (o === this || o === this.towingVehicle) continue;
+                            if (o.z !== undefined && Math.abs(o.z - (this.z !== undefined ? this.z : 2.0)) > 0.85) continue;
+                            const ox = o.x - this.x, oy = o.y - this.y;
+                            const along = ox * bCos + oy * bSin;
+                            const lat = Math.abs(-ox * bSin + oy * bCos);
+                            const need = ((this.w || 48) + (o.w || 48)) * 0.5 + 10;
+                            if (along < 0 && along > -(need + 26) && lat < ((this.h || 24) + (o.h || 24)) * 0.5 + 4) {
+                                rearClear = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (rearClear) {
+                        this.gridlockReverseTimer = 1.5;
+                        this.gridlockTimer = 0;
+                        this.aiLaneChangeCooldown = 0;
+                        this.aiBlockX = -1;
+                        this.aiBlockY = -1;
+                        this.aiChosenDir = null;
+                        if (this.driver !== "AI_TRAFFIC") {
+                            this.aiReverseTimer = 1.2;
+                            this.aiReverseSteer = Math.random() < 0.5 ? 0.8 : -0.8;
+                        }
+                    } else {
+                        this.gridlockTimer = threshold * 0.5; // check again shortly
+                    }
                 }
             } else {
                 this.gridlockTimer = Math.max(0, (this.gridlockTimer || 0) - dt * 2);
             }
-        } else {
+        } else if (!(this.gridlockReverseTimer > 0)) {
             this.gridlockTimer = Math.max(0, (this.gridlockTimer || 0) - dt * 2);
         }
         if (this.doorOpenTimer > 0) {
