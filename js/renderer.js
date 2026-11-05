@@ -7861,8 +7861,8 @@ class RetroRenderer {
                 const gh = rows.length * cell;
                 const ca = Math.cos(tg.angle || 0), sa = Math.sin(tg.angle || 0);
                 const tz = this.getEntityZ(tg, 0.02);
-                // Dark backing shadow for readability
-                this.pushSolidQuad3D(tg.x, tg.y, tz, gw + 2.4, gh + 2.4, tg.angle || 0, 0.02, 0.02, 0.04, 0.30 * progress, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Pale chalky backing halo so the black paint stays readable on dark asphalt / night scenes
+                this.pushSolidQuad3D(tg.x, tg.y, tz, gw + 2.6, gh + 2.6, tg.angle || 0, 0.78, 0.80, 0.84, 0.30 * progress, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 const maxRow = Math.max(1, Math.ceil(rows.length * progress));
                 for (let ry = 0; ry < Math.min(rows.length, maxRow); ry++) {
                     for (let rx = 0; rx < rows[ry].length; rx++) {

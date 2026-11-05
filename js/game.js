@@ -6084,8 +6084,7 @@ class LeonidaGame {
         }
 
         const palette = [
-            ["#ff2a85", 1.0, 0.16, 0.52], ["#00f0ff", 0.0, 0.94, 1.0], ["#39ff14", 0.22, 1.0, 0.08],
-            ["#ffd13b", 1.0, 0.82, 0.23], ["#f97316", 0.98, 0.45, 0.09], ["#a855f7", 0.66, 0.33, 0.97], ["#f8fafc", 0.97, 0.98, 0.99]
+            ["#111111", 0.03, 0.03, 0.04]
         ];
         const col = palette[Math.floor(Math.random() * palette.length)];
         p.angle = best.ang;
