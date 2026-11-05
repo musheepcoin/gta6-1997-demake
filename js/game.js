@@ -10572,86 +10572,53 @@ class LeonidaGame {
 
 
 
-                    const push = bestOverlap * 0.66;
+                    // Mass-based collision response: an e-scooter or bicycle can't shove a car, a car can't shove a bus,
+                    // and a stationary wreck only gives way on a real ram / blast (otherwise it's an immovable hulk).
+                    const massOf = (veh) => {
+                        if (veh.crushesCars) return 12.0;
+                        if (veh.specKey === "E_SCOOTER") return 0.10;
+                        if (veh.specKey === "BMX_BIKE") return 0.14;
+                        if (veh.isMotorcycle || veh.specKey === "JETSKI") return 0.30;
+                        if (veh.specKey === "MICRO_KART") return 0.45;
+                        const vw = veh.w || 48;
+                        let m = vw >= 85 ? 3.0 : (vw >= 58 ? 1.8 : 1.0);
+                        if (veh.destroyed) m *= 1.3;
+                        return m;
+                    };
+                    const wreckFree = wreckMovable || slidingWrecks;
+                    const invA = (a.destroyed && !wreckFree) ? 0 : 1 / massOf(a);
+                    const invB = (b.destroyed && !wreckFree) ? 0 : 1 / massOf(b);
+                    const invSum = invA + invB;
 
-                    if (a.destroyed && !b.destroyed) {
-
-                        // Heavy hulk gives way a little only on a real ram, otherwise the live car takes all the separation
-                        const wk = wreckMovable ? 0.35 : 0;
-
-                        a.x -= bestNx * bestOverlap * wk;
-
-                        a.y -= bestNy * bestOverlap * wk;
-
-                        b.x += bestNx * bestOverlap * (wreckMovable ? 0.70 : 1.05);
-
-                        b.y += bestNy * bestOverlap * (wreckMovable ? 0.70 : 1.05);
-
-                    } else if (b.destroyed && !a.destroyed) {
-
-                        const wk = wreckMovable ? 0.35 : 0;
-
-                        b.x += bestNx * bestOverlap * wk;
-
-                        b.y += bestNy * bestOverlap * wk;
-
-                        a.x -= bestNx * bestOverlap * (wreckMovable ? 0.70 : 1.05);
-
-                        a.y -= bestNy * bestOverlap * (wreckMovable ? 0.70 : 1.05);
-
-                    } else {
-
-                        a.x -= bestNx * push;
-
-                        a.y -= bestNy * push;
-
-                        b.x += bestNx * push;
-
-                        b.y += bestNy * push;
-
+                    if (invSum > 0) {
+                        const sepTotal = bestOverlap * 1.32;
+                        a.x -= bestNx * sepTotal * (invA / invSum);
+                        a.y -= bestNy * sepTotal * (invA / invSum);
+                        b.x += bestNx * sepTotal * (invB / invSum);
+                        b.y += bestNy * sepTotal * (invB / invSum);
                     }
 
-
-
-                    // Realistic 2D impulse momentum transfer + PIT maneuver angular spin when Player or Active Cop is involved!
-                    // (Wrecks receive a reduced share: no engine, locked/burst wheels, dead weight)
-
+                    // Realistic 2D impulse momentum transfer (restitution 0.36) + PIT maneuver angular spin
                     const rvx = b.vx - a.vx;
-
                     const rvy = b.vy - a.vy;
-
                     const normalVel = rvx * bestNx + rvy * bestNy;
 
-                    if (normalVel < 0) {
+                    if (normalVel < 0 && invSum > 0) {
+                        const jImp = (1.36 * -normalVel) / invSum;
+                        const dvA = jImp * invA;
+                        const dvB = jImp * invB;
+                        a.vx -= bestNx * dvA;
+                        a.vy -= bestNy * dvA;
+                        b.vx += bestNx * dvB;
+                        b.vy += bestNy * dvB;
 
-                        const impulse = -0.68 * normalVel;
-
-                        const aShare = a.destroyed ? ((wreckMovable || slidingWrecks) ? 0.55 : 0) : 1.0;
-
-                        const bShare = b.destroyed ? ((wreckMovable || slidingWrecks) ? 0.55 : 0) : 1.0;
-
-                        a.vx -= bestNx * impulse * aShare;
-
-                        a.vy -= bestNy * impulse * aShare;
-
-                        b.vx += bestNx * impulse * bShare;
-
-                        b.vy += bestNy * impulse * bShare;
-
-
-
-                        // Rotational torque on front/rear bumper impact (PIT maneuver spin!)
-
+                        // Rotational torque on front/rear bumper impact (PIT maneuver spin!) — scaled by how hard each side was hit
                         const aCross = aCos * bestNy - aSin * bestNx;
-
                         const bCross = bCos * bestNy - bSin * bestNx;
-
-                        if (!a.destroyed) a.angle -= hitALever * aCross * Math.min(0.22, impulse * 0.0014);
-                        else if (aShare > 0) a.angularVelocity = (a.angularVelocity || 0) - hitALever * aCross * Math.min(3.0, impulse * 0.018);
-
-                        if (!b.destroyed) b.angle += hitBLever * bCross * Math.min(0.22, impulse * 0.0014);
-                        else if (bShare > 0) b.angularVelocity = (b.angularVelocity || 0) + hitBLever * bCross * Math.min(3.0, impulse * 0.018);
-
+                        if (!a.destroyed) a.angle -= hitALever * aCross * Math.min(0.22, dvA * 0.0014);
+                        else if (invA > 0) a.angularVelocity = (a.angularVelocity || 0) - hitALever * aCross * Math.min(3.0, dvA * 0.018);
+                        if (!b.destroyed) b.angle += hitBLever * bCross * Math.min(0.22, dvB * 0.0014);
+                        else if (invB > 0) b.angularVelocity = (b.angularVelocity || 0) + hitBLever * bCross * Math.min(3.0, dvB * 0.018);
                     }
 
 
