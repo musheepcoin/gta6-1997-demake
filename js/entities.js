@@ -1381,6 +1381,82 @@ class Vehicle {
         const isPanicked = this.aiPanicTimer > 0 || Boolean(this.sirenActive);
         let desiredThrottle = isPanicked ? 0.78 : this.aiCruiseFactor;
         this.aiState = isPanicked ? "PANIC" : "CRUISE";
+        if (this.aiPullOverTimer > 0) {
+            this.aiPullOverTimer = Math.max(0, this.aiPullOverTimer - dt);
+        } else if (this.aiPullOverOffset) {
+            this.aiPullOverOffset *= Math.pow(0.06, dt);
+            if (Math.abs(this.aiPullOverOffset) < 0.4) this.aiPullOverOffset = 0;
+        }
+
+        // 1B. Emergency Corridor / Siren Detection (Ambulances, Tow Trucks, Fire Engines & Police)
+        //     When an emergency or tow vehicle approaches from behind, civilian cars pull over onto the
+        //     curb/shoulder (or change lanes) and advance past red lights to clear the lane!
+        const fx = Math.cos(this.angle);
+        const fy = Math.sin(this.angle);
+        const rx = -fy;
+        const ry = fx;
+        let sirenBehind = false;
+        let sirenYield = false;
+        if (!isPanicked && this.driver === "AI_TRAFFIC" && game && Array.isArray(game.vehicles)) {
+            for (const other of game.vehicles) {
+                if (other === this || other.destroyed) continue;
+                const isPriorityVeh = Boolean(
+                    other.sirenActive ||
+                    (other.driver === "AI_TOW" && (other.towTarget || other.towingVehicle))
+                );
+                if (!isPriorityVeh) continue;
+                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
+                const dx = other.x - this.x;
+                const dy = other.y - this.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 220) continue;
+
+                const forwardDist = dx * fx + dy * fy; // < 0 means emergency/tow vehicle is BEHIND us
+                const signedLat = dx * rx + dy * ry;
+                const lateralDist = Math.abs(signedLat);
+                const cosDiff = Math.cos(other.angle - this.angle);
+
+                const isRightSafe = (offPx) => {
+                    const pxTest = this.x + rx * offPx;
+                    const pyTest = this.y + ry * offPx;
+                    return (
+                        (!map.isWaterAtPixel || !map.isWaterAtPixel(pxTest, pyTest)) &&
+                        (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(pxTest, pyTest, 14, curZ).hit)
+                    );
+                };
+
+                if (cosDiff > 0.35 && forwardDist < 36 && forwardDist > -210 && lateralDist < 54) {
+                    // Priority vehicle approaching from behind in our direction: NEVER stop in front of it!
+                    sirenBehind = true;
+                    if (this.aiLaneChangeCooldown <= 0) {
+                        this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+                    }
+                    const prefSide = signedLat > 4 ? -1 : 1; // Pull away from the emergency vehicle's side (default right curb +1)
+                    if (isRightSafe(prefSide * 22)) {
+                        this.aiPullOverOffset = prefSide * 24;
+                        this.aiPullOverTimer = 1.6;
+                    } else if (isRightSafe(-prefSide * 22)) {
+                        this.aiPullOverOffset = -prefSide * 24;
+                        this.aiPullOverTimer = 1.6;
+                    }
+                } else if (
+                    (cosDiff < -0.35 && forwardDist > -10 && forwardDist < 150 && lateralDist < 54) ||
+                    (Math.abs(cosDiff) <= 0.45 && forwardDist > -8 && forwardDist < 115 && lateralDist < 48)
+                ) {
+                    // Priority vehicle oncoming or crossing intersection ahead: pull right and yield!
+                    sirenYield = true;
+                    if (isRightSafe(20)) {
+                        this.aiPullOverOffset = 22;
+                        this.aiPullOverTimer = 1.4;
+                    }
+                }
+            }
+        }
+        if (sirenBehind) {
+            sirenYield = false;
+            this.aiState = "PULL_OVER_SIREN";
+            desiredThrottle = Math.max(desiredThrottle, 0.64);
+        }
 
         // 2. Strict Cardinal Lane-Centered Steering & Clean 90-Degree Pivot Alignment
         const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
@@ -1399,16 +1475,17 @@ class Vehicle {
         this.steerAngleRad = 0;
         steer = 0;
 
-        // Always center vehicle smoothly onto the active lane centerline (including when pivoting into a 90-deg turn or lane change)
-        const maxLatStep = (this.aiChosenDir.isTurn ? 82 : 98) * dt;
+        // Always center vehicle smoothly onto the active lane centerline (plus any active curb pull-over offset!)
+        const maxLatStep = (this.aiChosenDir.isTurn ? 82 : (this.aiPullOverTimer > 0 ? 118 : 98)) * dt;
         const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
         const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
+        const pullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
         if (this.aiChosenDir.dx !== 0) {
-            const centerY = (laneBlockY + 0.5) * TILE_SIZE;
+            const centerY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
             const dyErr = centerY - this.y;
             this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 10.5)));
         } else if (this.aiChosenDir.dy !== 0) {
-            const centerX = (laneBlockX + 0.5) * TILE_SIZE;
+            const centerX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
             const dxErr = centerX - this.x;
             this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 10.5)));
         }
@@ -1432,6 +1509,7 @@ class Vehicle {
         // - Pre-slows 1 block before a red/amber light,
         // - Rolls smoothly up to the stop line (distToTargetCenter ~ 56px) on the approach block,
         // - Holds a strict 0-speed stop behind the intersection boundary until the light turns GREEN!
+        // - Exception: if an Ambulance / Tow Truck / Fire Engine is behind us (sirenBehind), advance & pull over to clear the lane!
         const nextLidZ1 = map.getBlockInfo ? map.getBlockInfo(this.aiTargetBlockX, this.aiTargetBlockY, 1).lid : 0;
         const stepDx = this.aiTargetBlockX - bx;
         const stepDy = this.aiTargetBlockY - by;
@@ -1443,7 +1521,7 @@ class Vehicle {
         const isPreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 === 25);
 
         const hasSignal = map && typeof map.hasTrafficSignalNear === "function" ? map.hasTrafficSignalNear(this.x, this.y, 380) : true;
-        if (!isPanicked && curBlk && (isStopBlock || isPreStopBlock) && hasSignal && game) {
+        if (!isPanicked && !sirenBehind && curBlk && (isStopBlock || isPreStopBlock) && hasSignal && game) {
             const isNSLane = stepDy !== 0 ? true : (Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right);
             const isEWLane = stepDx !== 0 ? true : (Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down);
             const nsRed = isNSLane && typeof game.isNSGreen === "function" && !game.isNSGreen();
@@ -1489,15 +1567,9 @@ class Vehicle {
         }
 
         // 4. Multi-Zone Forward Radar: True Bumper-to-Bumper Same-Lane Gap + Moving Cross-Traffic Check
-        const fx = Math.cos(this.angle);
-        const fy = Math.sin(this.angle);
-        const rx = -fy;
-        const ry = fx;
-
         let closestBumperGap = 999;
         let closestEntity = null;
         let isPlayerBlocking = false;
-        let sirenYield = false;
         let crossTrafficYield = false;
         const inIntersectionBox = (lidZ1 === 25);
 
@@ -1513,13 +1585,6 @@ class Vehicle {
                 const forwardDist = dx * fx + dy * fy;
                 const lateralDist = Math.abs(dx * rx + dy * ry);
                 const cosDiff = Math.cos(other.angle - this.angle);
-
-                // A. Yield to nearby active Police / Ambulance / Fire Engine sirens!
-                if (!isPanicked && this.driver === "AI_TRAFFIC" && other.sirenActive && !other.destroyed && dist < 140) {
-                    if (forwardDist > -20 && forwardDist < 105 && lateralDist < 42) {
-                        sirenYield = true;
-                    }
-                }
 
                 // B. Same-Direction Vehicle OR Stationary Wreck/Abandoned Car Ahead in Same Lane:
                 // Strictly maintain true bumper-to-bumper gap (half of our length + half of lead car's length)
@@ -1602,11 +1667,29 @@ class Vehicle {
             this.vy *= brakeMult;
             this.speed *= brakeMult;
         } else if (closestEntity && closestBumperGap < 110) {
-            const isStationaryCar = Boolean(closestEntity.destroyed || closestEntity.driver === null);
-            if (isStationaryCar && closestBumperGap < 98 && !this.towingVehicle && this.aiLaneChangeCooldown <= 0) {
+            const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
+            const isStationaryCar = Boolean(
+                closestEntity.destroyed ||
+                closestEntity.driver === null ||
+                (obstacleSpeed < 10 && this.aiState !== "STOPPED_LIGHT")
+            );
+            if ((isStationaryCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 98 && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
-            const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
+            // If a Tow Truck hauling a vehicle (or a car clearing the way for a siren) is still blocked by a stopped car on a 2-lane street,
+            // shift laterally around the stopped obstacle instead of waiting forever!
+            if (isStationaryCar && closestBumperGap < 56 && (this.driver === "AI_TOW" || sirenBehind)) {
+                const bypassSide = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? 1 : -1;
+                const testX = this.x + rx * bypassSide * 24;
+                const testY = this.y + ry * bypassSide * 24;
+                if (
+                    (!map.isWaterAtPixel || !map.isWaterAtPixel(testX, testY)) &&
+                    (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(testX, testY, 14, curZ).hit)
+                ) {
+                    this.aiPullOverOffset = bypassSide * 25;
+                    this.aiPullOverTimer = 1.5;
+                }
+            }
             this.aiState = "FOLLOWING";
             if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
@@ -1752,20 +1835,29 @@ class Vehicle {
             this.aiTargetBlockY = by + this.aiChosenDir.dy;
         }
 
-        // Overtake civilian traffic in the same lane while racing down the avenue
+        // Overtake civilian traffic in the same lane while racing down the avenue (or swerve around traffic jams via 9-feeler bypass!)
+        if (this.aiTrafficBypassTimer > 0) {
+            this.aiTrafficBypassTimer = Math.max(0, this.aiTrafficBypassTimer - dt);
+        }
         const fx = Math.cos(this.angle);
         const fy = Math.sin(this.angle);
         const rx = -fy;
         const ry = fx;
-        if (game && Array.isArray(game.vehicles) && this.aiLaneChangeCooldown <= 0) {
+        if (game && Array.isArray(game.vehicles)) {
             for (const other of game.vehicles) {
                 if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
+                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
                 const fDist = dx * fx + dy * fy;
                 const lDist = Math.abs(dx * rx + dy * ry);
-                if (fDist > 12 && fDist < 105 && lDist < 22) {
-                    this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+                if (fDist > 8 && fDist < 112 && lDist < 24) {
+                    const changed = this.aiLaneChangeCooldown <= 0
+                        ? this.tryAdjacentLaneChange(bx, by, curZ, map, game)
+                        : false;
+                    if (!changed && fDist < 88) {
+                        this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 1.35);
+                    }
                     break;
                 }
             }
@@ -1773,6 +1865,12 @@ class Vehicle {
 
         const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
         const ty = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
+        if (this.aiTrafficBypassTimer > 0) {
+            const lookAheadX = tx + (this.aiChosenDir ? (this.aiChosenDir.dx || 0) * TILE_SIZE * 0.85 : 0);
+            const lookAheadY = ty + (this.aiChosenDir ? (this.aiChosenDir.dy || 0) * TILE_SIZE * 0.85 : 0);
+            const bypassAngle = Math.atan2(lookAheadY - this.y, lookAheadX - this.x);
+            return this.steerTowardTargetWithFeelers(dt, map, curZ, bypassAngle, maxThrottle, game);
+        }
         const desiredAngle = Math.atan2(ty - this.y, tx - this.x);
         const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
         let steer = Math.max(-1, Math.min(1, angleDiff * 2.75));
@@ -2008,14 +2106,14 @@ class Vehicle {
                 score += 1.2;
             }
 
-            // Penalize feelers that collide with civilian/wrecked vehicles so police weave around traffic!
+            // Penalize feelers that collide with civilian/wrecked vehicles so police, ambulances & tow trucks weave around traffic!
             if (game && Array.isArray(game.vehicles)) {
                 for (const other of game.vehicles) {
                     if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
                     const d1 = Math.hypot(other.x - p1x, other.y - p1y);
                     const d2 = Math.hypot(other.x - p2x, other.y - p2y);
-                    if (d1 < 26) score -= 24;
-                    else if (d2 < 26) score -= 14;
+                    if (d1 < 30) score -= 32;
+                    else if (d2 < 30) score -= 18;
                 }
             }
 
