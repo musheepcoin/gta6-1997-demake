@@ -1625,7 +1625,15 @@ class Vehicle {
             const nsRed = isNSLane && typeof game.isNSGreen === "function" && !game.isNSGreen();
             const ewRed = isEWLane && typeof game.isEWGreen === "function" && !game.isEWGreen();
             if (nsRed || ewRed) {
-                if (isPreStopBlock) {
+                // The stop line is measured for the car's CENTER: a standard car (~48px) stops with its nose at the line,
+                // so longer vehicles (bus 88px, limo 90px, tanker 92px...) must stop proportionally further back
+                // (half of the extra length) instead of sticking far out into the junction.
+                const lenExtra = Math.max(0, (this.w || 48) * 0.5 - 24);
+                const stopDist = 56 + lenExtra;
+                // For long vehicles the stop point lies inside the previous (pre-stop) block: estimate the distance along the lane
+                const distToStopRef = isStopBlock ? distToTargetCenter : (distToTargetCenter + TILE_SIZE);
+                const longCarStopsInPreBlock = isPreStopBlock && lenExtra > 6 && distToStopRef <= stopDist + 70;
+                if (isPreStopBlock && !longCarStopsInPreBlock) {
                     if (this.speed > 92) {
                         desiredThrottle = 0;
                         const preMult = Math.pow(0.18, dt);
@@ -1635,10 +1643,10 @@ class Vehicle {
                     } else {
                         desiredThrottle = Math.min(desiredThrottle, 0.32);
                     }
-                } else if (isStopBlock) {
+                } else if (isStopBlock || longCarStopsInPreBlock) {
                     this.aiState = "STOPPED_LIGHT";
-                    if (distToTargetCenter > 60) {
-                        const rollSpd = Math.max(0, (distToTargetCenter - 54) * 2.0);
+                    if (distToStopRef > stopDist + 4) {
+                        const rollSpd = Math.max(0, (distToStopRef - (stopDist - 2)) * 2.0);
                         if (this.speed > rollSpd) {
                             desiredThrottle = 0;
                             const slowMult = Math.pow(0.04, dt);
@@ -1654,7 +1662,7 @@ class Vehicle {
                         this.vx *= brakeMult;
                         this.vy *= brakeMult;
                         this.speed *= brakeMult;
-                        if (Math.abs(this.speed) < 28 || distToTargetCenter <= 56) {
+                        if (Math.abs(this.speed) < 28 || distToStopRef <= stopDist) {
                             this.vx = 0;
                             this.vy = 0;
                             this.speed = 0;
