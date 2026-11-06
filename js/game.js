@@ -5484,10 +5484,10 @@ class LeonidaGame {
                 g24Type: gType1,
                 g2Remapped: true,
                 shirtColor: "#ef4444",
-                hp: 95,
-                maxHp: 95,
+                hp: 125,
+                maxHp: 125,
                 copWeapon: "UZI",
-                shootCooldown: 0.25,
+                shootCooldown: 1.6,
                 noBoardTimer: 10.0,
                 dead: false,
                 panicTimer: 0,
@@ -5505,10 +5505,10 @@ class LeonidaGame {
                 g24Type: gType2,
                 g2Remapped: true,
                 shirtColor: "#f97316",
-                hp: 85,
-                maxHp: 85,
+                hp: 115,
+                maxHp: 115,
                 copWeapon: Math.random() < 0.45 ? "SHOTGUN" : "PISTOL",
-                shootCooldown: 0.35,
+                shootCooldown: 1.9,
                 noBoardTimer: 10.0,
                 dead: false,
                 panicTimer: 0,
@@ -8164,21 +8164,35 @@ class LeonidaGame {
 
 
 
-        // Pick a road block 250..500px from the player (biased slightly ahead of player's heading)
-
+        // Pick a road block well OUTSIDE every human player's screen (never pops in view), biased ahead of the player's heading
         const baseHeading = p.inVehicle ? p.inVehicle.angle : p.angle;
 
         const pz = p.z || 2.0;
 
+        let viewports = null;
+        try {
+            viewports = (this.trafficManager && typeof this.trafficManager.getAllHumanPlayerViewports === "function")
+                ? this.trafficManager.getAllHumanPlayerViewports()
+                : null;
+        } catch (err) { viewports = null; }
+        const isVisibleToAnyPlayer = (wx, wy) => {
+            if (!viewports) return false;
+            const bx = Math.floor(wx / TILE_SIZE);
+            const by = Math.floor(wy / TILE_SIZE);
+            return viewports.some((vp) => vp.area &&
+                bx >= vp.area.minX - 4 && bx <= vp.area.maxX + 4 &&
+                by >= vp.area.minY - 4 && by <= vp.area.maxY + 4);
+        };
+
         let chosenPos = null;
 
-        for (let attempt = 0; attempt < 22; attempt++) {
+        for (let attempt = 0; attempt < 40; attempt++) {
 
-            const angOffset = attempt < 14 ? (Math.random() - 0.5) * 1.9 : (Math.random() - 0.5) * Math.PI * 2;
+            const angOffset = attempt < 24 ? (Math.random() - 0.5) * 1.9 : (Math.random() - 0.5) * Math.PI * 2;
 
             const ang = baseHeading + angOffset;
 
-            const dist = 255 + Math.random() * 235;
+            const dist = 520 + Math.random() * 330;
 
             const tx = Math.floor((p.x + Math.cos(ang) * dist) / TILE_SIZE);
 
@@ -8198,7 +8212,9 @@ class LeonidaGame {
 
             const wy = (ty + 0.5) * TILE_SIZE;
 
-            if (Math.hypot(wx - p.x, wy - p.y) < 210) continue;
+            if (Math.hypot(wx - p.x, wy - p.y) < 480) continue;
+
+            if (isVisibleToAnyPlayer(wx, wy)) continue;
 
             const bCol = this.map.resolveCircleBuildingCollision(wx, wy, 24, pz);
 
@@ -8292,7 +8308,7 @@ class LeonidaGame {
 
             for (let i = 0; i < copCount; i++) {
 
-                const backDist = 68 + i * 56;
+                const backDist = 130 + i * 70;
 
                 const latOff = (i === 0 ? 1 : -1) * 10;
 
@@ -8376,11 +8392,13 @@ class LeonidaGame {
 
                     shirtColor: "#ef4444",
 
-                    hp: 95,
+                    hp: 135,
 
-                    maxHp: 95,
+                    maxHp: 135,
 
                     copWeapon: i === 0 ? "SHOTGUN" : "UZI",
+
+                    shootCooldown: 3.5 + i * 0.8 + Math.random() * 1.5,
 
                     angle: roadAng + Math.PI,
 
@@ -8398,7 +8416,7 @@ class LeonidaGame {
 
             const copSpec = Math.random() < 0.38 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
-            const copCar = new Vehicle(`amb_heist_copcar_${nowId}`, copSpec, x - fwdX * 62 - sideX * 10, y - fwdY * 62 - sideY * 10, roadAng - 0.22);
+            const copCar = new Vehicle(`amb_heist_copcar_${nowId}`, copSpec, x - fwdX * 190 - sideX * 10, y - fwdY * 190 - sideY * 10, roadAng - 0.22);
 
             copCar.z = z;
 
@@ -8416,9 +8434,9 @@ class LeonidaGame {
 
             for (let i = 0; i < 2; i++) {
 
-                const cx = x - fwdX * (42 + i * 16) + sideX * ((i === 0 ? -1 : 1) * 22);
+                const cx = x - fwdX * (160 + i * 18) + sideX * ((i === 0 ? -1 : 1) * 22);
 
-                const cy = y - fwdY * (42 + i * 16) + sideY * ((i === 0 ? -1 : 1) * 22);
+                const cy = y - fwdY * (160 + i * 18) + sideY * ((i === 0 ? -1 : 1) * 22);
 
                 this.peds.push(new Pedestrian({
 
@@ -8443,6 +8461,8 @@ class LeonidaGame {
                     maxHp: isSwat ? 140 : 105,
 
                     copWeapon: isSwat ? "SHOTGUN" : (i === 0 ? "UZI" : "PISTOL"),
+
+                    shootCooldown: 3.0 + i * 0.8 + Math.random() * 1.5,
 
                     angle: roadAng,
 
@@ -8540,11 +8560,13 @@ class LeonidaGame {
 
                 shirtColor: "#ef4444",
 
-                hp: 90,
+                hp: 125,
 
-                maxHp: 90,
+                maxHp: 125,
 
                 copWeapon: "UZI",
+
+                shootCooldown: 3.5 + Math.random() * 1.5,
 
                 angle: roadAng + Math.PI,
 
@@ -13495,7 +13517,10 @@ class LeonidaGame {
 
                         }
 
-                        const pedDmg = pr.fromPlayer ? pr.damage : pr.damage * 0.62;
+                        // Cop-vs-bandit crossfire is deliberately less lethal so street shootouts last long enough to be watched
+                        const npcVsNpcMul = (pr.npcFaction === "COP" && ped.kind === "CRIMINAL") ? 0.36 : 0.62;
+
+                        const pedDmg = pr.fromPlayer ? pr.damage : pr.damage * npcVsNpcMul;
 
                         ped.hp -= pedDmg;
 
