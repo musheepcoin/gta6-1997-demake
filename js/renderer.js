@@ -1862,7 +1862,8 @@ class RetroRenderer {
                                     } else if (arch.pattern === "stripes") {
                                         if (ly % 2 === 0) col = arch.shirt2;
                                     } else if (arch.pattern === "jacket") {
-                                        if (ax <= 1.6) col = arch.shirt2;
+                                        // Front V-collar opening ONLY (dy >= 0.45 in front of head; back of jacket dy < 0.45 stays 100% solid suit color!)
+                                        if (dy >= 0.45 && ax <= 1.45) col = arch.shirt2;
                                     } else if (arch.pattern === "hivis") {
                                         if ((ly + 1) % 4 === 0) col = arch.shirt2;
                                     } else if (arch.pattern === "plaid") {
@@ -1871,7 +1872,19 @@ class RetroRenderer {
                                 }
                             } else if (isPants) {
                                 shade = Math.max(0.48, Math.min(1.35, b / 102));
-                                if (arch.legs === "shorts" && dist > 5.8) {
+                                const ax = Math.abs(dx);
+                                if (
+                                    arch.pattern === "jacket" &&
+                                    ent.fk !== "42" &&
+                                    ent.fk !== "53" &&
+                                    dy >= 0.45 &&
+                                    dy <= 2.35 &&
+                                    ax <= Math.max(0.55, 1.45 - (dy - 0.45) * 0.42)
+                                ) {
+                                    // Front chest V-lapel dress shirt opening in front of head (civ0 encodes front chest as blue)
+                                    col = arch.shirt2;
+                                    shade = Math.max(0.78, Math.min(1.18, shade * 1.05));
+                                } else if (arch.legs === "shorts" && dist > 5.8) {
                                     col = arch.skin;
                                     shade = Math.max(0.70, Math.min(1.15, shade));
                                 } else if (arch.key === "g2_fireman") {
@@ -7827,8 +7840,8 @@ class RetroRenderer {
             { key: "g2_swat",         shirt: [30, 41, 59],    pants: [24, 34, 50],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [62, 84, 116], skin: SK.light, pattern: "jacket", shirt2: [82, 106, 142] },
             { key: "g2_army",         shirt: [92, 104, 52],   pants: [80, 90, 46],    sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [70, 82, 40], skin: SK.tan, pattern: "plaid", shirt2: [66, 74, 36] },
             { key: "g2_scientist",    shirt: [240, 244, 246], pants: [112, 114, 124], sleeves: "long",  legs: "pants",  hair: H.grey, skin: SK.light, pattern: "jacket", shirt2: [120, 170, 200] },
-            { key: "g2_zaibatsu",     shirt: [30, 30, 36],    pants: [76, 78, 88],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [210, 210, 214] },
-            { key: "g2_yakuza",       shirt: [30, 44, 96],    pants: [24, 30, 64],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [236, 236, 236] },
+            { key: "g2_zaibatsu",     shirt: [26, 28, 34],    pants: [26, 28, 34],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [236, 238, 242] },
+            { key: "g2_yakuza",       shirt: [24, 34, 68],    pants: [22, 30, 60],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light, pattern: "jacket", shirt2: [240, 242, 246] },
             { key: "g2_loony",        shirt: [84, 206, 96],   pants: [238, 238, 230], sleeves: "short", legs: "pants",  hair: H.red, skin: SK.light },
             { key: "g2_russian",      shirt: [98, 62, 36],    pants: [44, 44, 52],    sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.light },
             { key: "g2_redneck_red",  shirt: [238, 236, 226], pants: JEANS,           sleeves: "tank",  legs: "pants",  hair: H.red, skin: SK.light },
