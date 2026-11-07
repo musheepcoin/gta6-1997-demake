@@ -10337,6 +10337,168 @@ class RetroRenderer {
         return tex;
     }
 
+    getOrBakeInteriorFloorTex(gl, intr) {
+        if (!gl || !intr) return null;
+        if (!this._interiorFloorTexCache) {
+            this._interiorFloorTexCache = {};
+        }
+        const rw = intr.w || 820;
+        const rh = intr.h || 560;
+        const t = intr.theme || "SHOP_CONVENIENCE";
+        const facing = intr.facing || "S";
+        const key = `${t}_${facing}_${rw}_${rh}`;
+        if (this._interiorFloorTexCache[key]) {
+            return this._interiorFloorTexCache[key];
+        }
+
+        const c = document.createElement("canvas");
+        c.width = 1024;
+        c.height = 1024;
+        const g = c.getContext("2d");
+        const tex = this.getInteriorTextures(g);
+
+        g.save();
+        g.scale(1024 / rw, 1024 / rh);
+
+        const trR = (x, y, w, h) => {
+            if (window.ShopInteriors && typeof window.ShopInteriors.transformRect === "function") {
+                return window.ShopInteriors.transformRect(x, y, w, h, intr);
+            }
+            return { x, y, w, h };
+        };
+        const fillR = (x, y, w, h, fill, stroke = null, lw = 1.5) => {
+            const r = trR(x, y, w, h);
+            g.fillStyle = fill;
+            g.fillRect(r.x, r.y, r.w, r.h);
+            if (stroke) {
+                g.strokeStyle = stroke;
+                g.lineWidth = lw;
+                g.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+            }
+        };
+
+        // 1. Primary multi-zone procedural pixel-art floor pattern across the entire room
+        let mainPat = tex.marble_dark;
+        if (t === "SHOP_GUN_SHOP" || t === "SPACE_BUNKER") mainPat = tex.gunmetal_plate;
+        else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") mainPat = tex.diner_checker;
+        else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL" || t === "MALIBU_CLUB") mainPat = tex.terrazzo_deco;
+        else if (t === "SHOP_CLOTHES" || t === "MANSION") mainPat = tex.marble_carrara;
+        else if (t === "SHOP_CONVENIENCE") mainPat = tex.linoleum_mart;
+        else if (t === "SHOP_BAR") mainPat = tex.wood_mahogany;
+        else if (t === "PRISON_BLOCK") mainPat = tex.concrete_prison;
+
+        g.fillStyle = mainPat;
+        g.fillRect(0, 0, rw, rh);
+
+        // 2. Oriented Multi-Room Architectural Sub-Zones, Carpets, Rugs & Floor Markings
+        if (t === "SHOP_GUN_SHOP") {
+            // West Gunsmith & Kevlar Vault concrete floor
+            fillR(18, 56, 206, 358, tex.concrete_prison, "#475569", 1.5);
+            // Center Showroom royal crimson tactical rug runner
+            fillR(266, 174, 224, 96, tex.carpet_royal, "#d97706", 2.0);
+            // East 4-Lane Live Firing Range concrete floor + yellow/black firing line + downrange distance stripes
+            fillR(532, 56, rw - 550, 358, "#18181b", "#facc15", 2.0);
+            fillR(540, 304, 250, 8, "#facc15");
+            for (let hx = 544; hx < 784; hx += 18) {
+                fillR(hx, 304, 9, 8, "#090d16");
+            }
+            // Downrange 10m and 25m range lines & spent brass casings
+            fillR(544, 218, 242, 2, "rgba(250, 204, 21, 0.35)");
+            fillR(544, 138, 242, 2, "rgba(250, 204, 21, 0.35)");
+            fillR(544, 62, 242, 24, "#451a03", "#78350f", 1.5); // Downrange sandtrap berm
+            for (let s = 0; s < 22; s++) {
+                const bx = 556 + ((s * 37) % 216);
+                const by = 336 + ((s * 19) % 34);
+                fillR(bx, by, 4, 2.5, "#fde047");
+            }
+            // South Security Vestibule diamond-plate floor & red welcome runner
+            fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#334155", 1.0);
+            fillR(330, 444, 160, 78, tex.carpet_royal, "#fbbf24", 1.5);
+        } else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") {
+            fillR(18, 56, rw - 36, 136, tex.kitchen_tile, "#64748b", 1.5);
+            if (t === "DINER_PAWN") {
+                fillR(500, 56, rw - 518, rh - 74, tex.wood_mahogany, "#f97316", 1.5);
+                fillR(536, 254, 196, 72, tex.carpet_royal, "#fde047", 1.5);
+            } else {
+                fillR(18, 208, 138, 216, tex.wood_oak, "#78350f", 1.5);
+                fillR(568, 208, rw - 586, 216, tex.wood_mahogany, "#fde047", 1.5);
+                fillR(354, 214, 112, 298, tex.carpet_royal, "#fbbf24", 1.5);
+            }
+        } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
+            fillR(18, 56, 230, rh - 74, tex.wood_oak, "#92400e", 1.5);
+            fillR(38, 86, 174, 176, tex.carpet_royal, "#fde047", 2.0);
+            fillR(38, 306, 174, 188, tex.carpet_royal, "#f472b6", 1.5);
+            fillR(356, 208, 108, rh - 228, tex.carpet_royal, "#fbbf24", 2.0);
+            fillR(564, 56, rw - 582, rh - 74, tex.marble_carrara, "#38bdf8", 1.5);
+        } else if (t === "SHOP_CLOTHES") {
+            fillR(18, 56, 224, rh - 74, tex.wood_oak, "#92400e", 1.5);
+            fillR(338, 168, 144, 252, tex.carpet_royal, "#fde047", 2.0);
+            fillR(578, 56, rw - 596, rh - 74, tex.wood_mahogany, "#f472b6", 1.5);
+        } else if (t === "SHOP_CONVENIENCE") {
+            fillR(18, 56, rw - 36, 130, tex.concrete_prison, "#475569", 1.5);
+            fillR(18, 202, 210, 110, tex.gunmetal_plate, "#38bdf8", 1.5);
+            fillR(624, 186, rw - 642, rh - 204, tex.kitchen_tile, "#22d3ee", 1.5);
+        } else if (t === "SHOP_BAR" || t === "NEON_CLUB" || t === "STRIP_CLUB" || t === "MALIBU_CLUB") {
+            fillR(18, 56, 230, rh - 74, tex.carpet_royal, "#f472b6", 1.5);
+            fillR(578, 56, rw - 596, rh - 74, tex.gunmetal_plate, "#fde047", 1.5);
+            if (t === "SHOP_BAR") {
+                fillR(18, 262, 230, rh - 280, "#064e3b", "#fbbf24", 2.0);
+            } else {
+                fillR(288, 198, 244, 196, tex.wood_oak, "#e879f9", 2.0);
+            }
+        } else if (t === "MANSION") {
+            fillR(18, 56, 240, rh - 74, tex.wood_mahogany, "#f97316", 1.5);
+            fillR(348, 148, 124, rh - 168, tex.carpet_royal, "#fde047", 2.5);
+            fillR(572, 56, rw - 590, rh - 74, tex.terrazzo_deco, "#22d3ee", 1.5);
+        } else if (t === "SPACE_BUNKER") {
+            fillR(18, 56, 234, rh - 74, tex.concrete_prison, "#38bdf8", 1.5);
+            fillR(580, 56, rw - 598, rh - 74, tex.kitchen_tile, "#39ff14", 1.5);
+            fillR(296, 168, 228, 236, "#0f172a", "#38bdf8", 2.0);
+        } else if (t === "PRISON_BLOCK") {
+            fillR(18, 56, 260, 152, tex.concrete_prison, "#f87171", 1.5);
+            fillR(294, 56, 222, 152, tex.wood_mahogany, "#fde047", 1.5);
+            fillR(532, 56, rw - 550, 152, tex.gunmetal_plate, "#38bdf8", 1.5);
+        }
+
+        // 3. Soft Perimeter Wall Ambient Occlusion Vignette on Floor
+        const nGrad = g.createLinearGradient(0, 56, 0, 92);
+        nGrad.addColorStop(0, "rgba(0, 0, 0, 0.55)");
+        nGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        g.fillStyle = nGrad;
+        g.fillRect(18, 56, rw - 36, 36);
+
+        const sGrad = g.createLinearGradient(0, rh - 18, 0, rh - 52);
+        sGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
+        sGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        g.fillStyle = sGrad;
+        g.fillRect(18, rh - 52, rw - 36, 34);
+
+        const wGrad = g.createLinearGradient(18, 0, 52, 0);
+        wGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
+        wGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        g.fillStyle = wGrad;
+        g.fillRect(18, 56, 34, rh - 74);
+
+        const eGrad = g.createLinearGradient(rw - 18, 0, rw - 52, 0);
+        eGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
+        eGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+        g.fillStyle = eGrad;
+        g.fillRect(rw - 52, 56, 34, rh - 74);
+
+        g.restore();
+
+        const glTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, glTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+
+        this._interiorFloorTexCache[key] = glTex;
+        return glTex;
+    }
+
     drawInteriorArchitectureAndDecor(ctx, intr, ox, oy, rw, rh) {
         const tex = this.getInteriorTextures(ctx);
         const acc = intr.accent || "#38bdf8";
@@ -11136,47 +11298,38 @@ class RetroRenderer {
         ctx.fillStyle = intr.accent || "#38bdf8";
         ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 31);
 
-        // 3. 3D-Projected Interactive Station Glow Halos & Glassmorphic Pill Badges (confirm with [E] when standing on the zone!)
+        // 3. 3D-Projected Interactive Station Badges (compact pill when far, expanded [E] card when near!)
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
-                const stFloor = this.worldToScreen(st.x, st.y, 2.04);
-                const stTop = this.worldToScreen(st.x, st.y, 2.28);
+                const stTop = this.worldToScreen(st.x, st.y, 2.26);
                 const ready = (st.cooldown || 0) <= 0;
                 const distToPlayer = Math.hypot(px - st.x, py - st.y);
-                const isNear = distToPlayer < 42;
+                const isNear = distToPlayer < 52;
                 const stCol = ready ? (st.color || "#39ff14") : "#64748b";
-                const pulseR = (isNear ? 30 : 22) + Math.sin(this.time * 6) * 3.0;
 
-                // Soft radial 3D floor glow
-                const pGrad = ctx.createRadialGradient(stFloor.x, stFloor.y, 4, stFloor.x, stFloor.y, pulseR + 10);
-                pGrad.addColorStop(0, ready ? (isNear ? "rgba(57, 255, 20, 0.36)" : "rgba(56, 189, 248, 0.22)") : "rgba(100, 116, 139, 0.12)");
-                pGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
-                ctx.fillStyle = pGrad;
-                ctx.beginPath();
-                ctx.arc(stFloor.x, stFloor.y, pulseR + 10, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Compact Glassmorphic Pill Badge projected above the 3D station pedestal
                 const cleanSub = String(st.sub || "").replace(/^\[E\]\s*/i, "");
-                const bw = isNear ? 204 : 162;
-                const bh = isNear ? 34 : 28;
+                ctx.font = isNear ? "bold 10px Consolas, 'Courier New', monospace" : "bold 9px Consolas, 'Courier New', monospace";
+                const lblW = ctx.measureText(st.label).width;
+                const bw = isNear ? Math.max(186, Math.round(lblW + 24)) : Math.max(128, Math.round(lblW + 18));
+                const bh = isNear ? 30 : 18;
                 const bx = Math.round(stTop.x - bw * 0.5);
-                const by = Math.round(stTop.y - bh - (isNear ? 10 : 6));
+                const by = Math.round(stTop.y - bh - (isNear ? 8 : 2));
 
-                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.94)" : "rgba(9, 14, 28, 0.80)";
+                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.94)" : "rgba(8, 12, 24, 0.78)";
                 ctx.fillRect(bx, by, bw, bh);
                 ctx.fillStyle = stCol;
-                ctx.fillRect(bx, by, 3.5, bh);
+                ctx.fillRect(bx, by, 3, bh);
                 ctx.strokeStyle = isNear && ready ? "#fde047" : stCol;
-                ctx.lineWidth = isNear ? 2.0 : 1.1;
+                ctx.lineWidth = isNear ? 1.8 : 1.0;
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
-                ctx.font = isNear ? "bold 10.5px Consolas, 'Courier New', monospace" : "bold 9.5px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = ready ? "#ffffff" : "#94a3b8";
-                ctx.fillText(st.label, stTop.x + 2, by + 10);
-                ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
-                ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
-                ctx.fillText(ready ? (isNear ? `[E] CONFIRM • ${cleanSub}` : cleanSub) : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 22);
+                ctx.fillText(st.label, stTop.x + 2, by + (isNear ? 9.5 : 9.0));
+                if (isNear || !ready) {
+                    ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
+                    ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
+                    ctx.fillText(ready ? `[E] CONFIRM • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 21);
+                }
             }
         }
 

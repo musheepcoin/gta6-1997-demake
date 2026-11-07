@@ -12,23 +12,23 @@
             matRGB: [0.98, 0.45, 0.12],
             w: 820,
             h: 560,
-            subtitle: "ARMORED VESTIBULE, L-SHAPED ORDNANCE COUNTER, GUNSMITH VAULT & 4-LANE FIRING RANGE",
+            subtitle: "ARMORED VESTIBULE, GLASS ORDNANCE SHOWCASE, GUNSMITH VAULT & 4-LANE FIRING RANGE",
             buildStations(id) {
                 return [
-                    { id: `${id}_PISTOL`, x: 145, y: 214, color: "#fbbf24", label: "🔫 9MM PISTOL CRATE ($250)", sub: "BUY PISTOL + 40 ROUNDS!", action: "BUY_PISTOL", cost: 250 },
-                    { id: `${id}_UZI`, x: 265, y: 214, color: "#f97316", label: "🔫 MICRO-UZI SUBMACHINE GUN ($650)", sub: "BUY UZI + 80 ROUNDS!", action: "BUY_UZI", cost: 650 },
-                    { id: `${id}_SHOTGUN`, x: 385, y: 214, color: "#ef4444", label: "💥 PUMP SHOTGUN ($900)", sub: "BUY SHOTGUN + 25 SHELLS!", action: "BUY_SHOTGUN", cost: 900 },
-                    { id: `${id}_ARMOR`, x: 115, y: 118, color: "#38bdf8", label: "🛡️ KEVLAR TACTICAL VEST ($500)", sub: "+100% BODY ARMOR!", action: "BUY_ARMOR", cost: 500 },
-                    { id: `${id}_ROCKET`, x: 655, y: 318, color: "#a855f7", label: "🚀 HEAVY ROCKET LAUNCHER ($2,500)", sub: "RANGE SPECIAL: ROCKET + 8 ROCKETS!", action: "BUY_ROCKET", cost: 2500 }
+                    { id: `${id}_PISTOL`, x: 304, y: 206, color: "#fbbf24", label: "🔫 9MM PISTOL CRATE ($250)", sub: "BUY PISTOL + 40 ROUNDS!", action: "BUY_PISTOL", cost: 250 },
+                    { id: `${id}_UZI`, x: 452, y: 206, color: "#f97316", label: "🔫 MICRO-UZI SUBMACHINE GUN ($650)", sub: "BUY UZI + 80 ROUNDS!", action: "BUY_UZI", cost: 650 },
+                    { id: `${id}_SHOTGUN`, x: 378, y: 362, color: "#ef4444", label: "💥 PUMP SHOTGUN ($900)", sub: "BUY SHOTGUN + 25 SHELLS!", action: "BUY_SHOTGUN", cost: 900 },
+                    { id: `${id}_ARMOR`, x: 118, y: 296, color: "#38bdf8", label: "🛡️ KEVLAR TACTICAL VEST ($500)", sub: "+100% BODY ARMOR!", action: "BUY_ARMOR", cost: 500 },
+                    { id: `${id}_ROCKET`, x: 666, y: 372, color: "#a855f7", label: "🚀 HEAVY ROCKET LAUNCHER ($2,500)", sub: "RANGE SPECIAL: ROCKET + 8 ROCKETS!", action: "BUY_ROCKET", cost: 2500 }
                 ];
             },
             buildNpcs() {
                 return [
-                    { x: 300, y: 108, angle: Math.PI * 0.5, type: "gang", label: "ARMS DEALER", dialog: "WELCOME TO AMMU-NATION! NO RECEIPTS, NO QUESTIONS!" },
-                    { x: 115, y: 84, angle: Math.PI * 0.5, type: "civ0", label: "GUNSMITH", dialog: "CUSTOM BARRELS AND KEVLAR VESTS IN THE BACK VAULT!" },
-                    { x: 410, y: 454, angle: Math.PI * 0.5, type: "police", label: "RANGE OFFICER", dialog: "KEEP YOUR PIECE HOLSTERED IN THE VESTIBULE!" },
-                    { x: 605, y: 392, angle: -Math.PI * 0.5, type: "civ1", label: "SHOOTER", dialog: "TESTING OUT THIS NEW 12-GAUGE ON LANE 2!" },
-                    { x: 715, y: 392, angle: -Math.PI * 0.5, type: "gang", label: "MARKSMAN", dialog: "CENTER MASS EVERY TIME, PAL." }
+                    { x: 378, y: 96, angle: Math.PI * 0.5, type: "gang", label: "ARMS DEALER", dialog: "WELCOME TO AMMU-NATION! NO RECEIPTS, NO QUESTIONS!" },
+                    { x: 118, y: 126, angle: Math.PI * 0.5, type: "civ0", label: "GUNSMITH", dialog: "CUSTOM BARRELS AND KEVLAR VESTS IN THE BACK VAULT!" },
+                    { x: 410, y: 458, angle: Math.PI * 0.5, type: "police", label: "RANGE OFFICER", dialog: "KEEP YOUR PIECE HOLSTERED IN THE VESTIBULE!" },
+                    { x: 588, y: 364, angle: -Math.PI * 0.5, type: "civ1", label: "SHOOTER", dialog: "TESTING OUT THIS NEW 12-GAUGE ON LANE 2!" },
+                    { x: 744, y: 364, angle: -Math.PI * 0.5, type: "gang", label: "MARKSMAN", dialog: "CENTER MASS EVERY TIME, PAL." }
                 ];
             }
         },
@@ -202,9 +202,10 @@
 
     // ============================================================================
     // 4-WAY CANONICAL TO ORIENTED ROOM COORDINATE TRANSFORMER
-    // Canonical space is authored for facing === "S" (door at South y = rh - 18,
-    // back wall at North y = 40, usable floor [0..rw] x [40..rh]).
-    // Transforms rectangles, points, and angles cleanly for "S", "N", "E", "W"!
+    // Canonical space is authored for facing === "S" inside the symmetric inner
+    // perimeter frame: x in [18 .. rw - 18], y in [56 .. rh - 18].
+    // Transforms rectangles, points, and angles cleanly for "S", "N", "E", "W"
+    // so walls connect flush to perimeter walls without gaps or overlaps!
     // ============================================================================
     function transformRect(x, y, w, h, intr) {
         const facing = (intr && intr.facing) || "S";
@@ -213,12 +214,19 @@
         }
         const rw = (intr && intr.w) || 820;
         const rh = (intr && intr.h) || 560;
-        const y0 = 40;
-        const uh = Math.max(1, rh - y0);
+        const ix0 = 18;
+        const iw = Math.max(1, rw - 36);
+        const iy0 = 56;
+        const ih = Math.max(1, rh - 74);
+
+        const u = (x - ix0) / iw;
+        const du = w / iw;
+        const v = (y - iy0) / ih;
+        const dv = h / ih;
 
         if (facing === "N") {
-            const nx = rw - (x + w);
-            const ny = y0 + uh - (y - y0 + h);
+            const nx = ix0 + (1.0 - (u + du)) * iw;
+            const ny = iy0 + (1.0 - (v + dv)) * ih;
             return {
                 x: Math.round(nx),
                 y: Math.round(ny),
@@ -227,22 +235,26 @@
             };
         }
 
-        const isThinVWall = (w <= 22 && h >= 36);
-        const isThinHWall = (h <= 22 && w >= 36);
-        const u = x / rw;
-        const du = w / rw;
-        const v = (y - y0) / uh;
-        const dv = h / uh;
+        const isThinVWall = (w <= 20 && h >= 36);
+        const isThinHWall = (h <= 20 && w >= 36);
 
         if (facing === "E") {
             // Canonical South (v = 1) -> East (u' = 1); Canonical North (v = 0) -> West (u' = 0)
             // Canonical West (u = 0) -> South (v' = 1); Canonical East (u = 1) -> North (v' = 0)
-            let nw = dv * rw;
-            let nh = du * uh;
-            let nx = v * rw;
-            let ny = y0 + (1.0 - (u + du)) * uh;
-            if (isThinHWall) nw = Math.max(16, Math.min(22, Math.round(nw)));
-            if (isThinVWall) nh = Math.max(16, Math.min(22, Math.round(nh)));
+            let nw = dv * iw;
+            let nh = du * ih;
+            let nx = ix0 + v * iw;
+            let ny = iy0 + (1.0 - (u + du)) * ih;
+            if (isThinHWall) {
+                const midX = nx + nw * 0.5;
+                nw = 16;
+                nx = midX - 8;
+            }
+            if (isThinVWall) {
+                const midY = ny + nh * 0.5;
+                nh = 16;
+                ny = midY - 8;
+            }
             return {
                 x: Math.round(nx),
                 y: Math.round(ny),
@@ -254,12 +266,20 @@
         if (facing === "W") {
             // Canonical South (v = 1) -> West (u' = 0); Canonical North (v = 0) -> East (u' = 1)
             // Canonical West (u = 0) -> North (v' = 0); Canonical East (u = 1) -> South (v' = 1)
-            let nw = dv * rw;
-            let nh = du * uh;
-            let nx = (1.0 - (v + dv)) * rw;
-            let ny = y0 + u * uh;
-            if (isThinHWall) nw = Math.max(16, Math.min(22, Math.round(nw)));
-            if (isThinVWall) nh = Math.max(16, Math.min(22, Math.round(nh)));
+            let nw = dv * iw;
+            let nh = du * ih;
+            let nx = ix0 + (1.0 - (v + dv)) * iw;
+            let ny = iy0 + u * ih;
+            if (isThinHWall) {
+                const midX = nx + nw * 0.5;
+                nw = 16;
+                nx = midX - 8;
+            }
+            if (isThinVWall) {
+                const midY = ny + nh * 0.5;
+                nh = 16;
+                ny = midY - 8;
+            }
             return {
                 x: Math.round(nx),
                 y: Math.round(ny),
@@ -279,29 +299,31 @@
         }
         const rw = (intr && intr.w) || 820;
         const rh = (intr && intr.h) || 560;
-        const y0 = 40;
-        const uh = Math.max(1, rh - y0);
-        const u = x / rw;
-        const v = (y - y0) / uh;
+        const ix0 = 18;
+        const iw = Math.max(1, rw - 36);
+        const iy0 = 56;
+        const ih = Math.max(1, rh - 74);
+        const u = (x - ix0) / iw;
+        const v = (y - iy0) / ih;
 
         if (facing === "N") {
             return {
-                x: Math.round(rw - x),
-                y: Math.round(y0 + uh - (y - y0)),
+                x: Math.round(ix0 + (1.0 - u) * iw),
+                y: Math.round(iy0 + (1.0 - v) * ih),
                 angle: ang + Math.PI
             };
         }
         if (facing === "E") {
             return {
-                x: Math.round(v * rw),
-                y: Math.round(y0 + (1.0 - u) * uh),
+                x: Math.round(ix0 + v * iw),
+                y: Math.round(iy0 + (1.0 - u) * ih),
                 angle: ang - Math.PI * 0.5
             };
         }
         if (facing === "W") {
             return {
-                x: Math.round((1.0 - v) * rw),
-                y: Math.round(y0 + u * uh),
+                x: Math.round(ix0 + (1.0 - v) * iw),
+                y: Math.round(iy0 + u * ih),
                 angle: ang + Math.PI * 0.5
             };
         }
@@ -621,21 +643,23 @@
         const add = (x, y, w, h, isWall = false) => obs.push({ x, y, w, h, isWall });
 
         if (t === "SHOP_GUN_SHOP") {
-            // 1. Entrance Security Vestibule Baffle Walls (y = 414, doorways at x=170..265 & x=555..650)
+            // 1. Entrance Security Vestibule Baffle Walls (y = 414, doorways at x=170..266 & x=554..650)
             add(18, 414, 152, 16, true);
-            add(265, 414, 290, 16, true);
+            add(266, 414, 288, 16, true);
             add(650, 414, rw - 668, 16, true);
-            // 2. North-West Gunsmith Vault Partition Wall (x = 224, doorway at y=162..242)
-            add(224, 54, 16, 108, true);
-            // 3. East 4-Lane Live Firing Range Wing Wall (x = 516, framed doorway at y=224..314)
-            add(516, 54, 16, 170, true);
-            add(516, 314, 16, 100, true);
-            // 4. Armored L-Counter, Tactical Racks & Firing Range Booth Dividers
-            add(44, 136, 176, 28);
-            add(244, 136, 210, 28);
-            add(108, 272, 128, 28);
-            add(296, 272, 128, 28);
-            add(542, 344, 236, 22);
+            // 2. West Tactical Gunsmith & Kevlar Vault Wing Wall (x = 224, framed vault doorway at y=176..266)
+            add(224, 56, 16, 120, true);
+            add(224, 266, 16, 148, true);
+            // 3. East 4-Lane Live Firing Range Wing Wall (x = 516, framed range doorway at y=216..306)
+            add(516, 56, 16, 160, true);
+            add(516, 306, 16, 108, true);
+            // 4. Gunsmith Workbench, Kevlar Rack, Glass Weapon Showcase, Surplus Crates & Firing Line Booths
+            add(36, 68, 164, 26);
+            add(36, 352, 164, 28);
+            add(262, 128, 232, 28);
+            add(266, 288, 96, 28);
+            add(394, 288, 96, 28);
+            add(548, 312, 236, 22);
         } else if (t === "SHOP_RESTAURANT") {
             // 1. Maitre D' Reception Foyer Partition Walls (y = 424, grand arch at x=346..474 & side passages)
             add(18, 424, 172, 16, true);
@@ -646,13 +670,13 @@
             add(18, 192, 230, 16, true);
             add(336, 192, 200, 16, true);
             add(622, 192, rw - 640, 16, true);
-            // 3. Kitchen Walk-In Cold Storage Divider (x = 576, y = 54..136)
-            add(576, 54, 16, 82, true);
+            // 3. Kitchen Walk-In Cold Storage Divider (x = 576, y = 56..136)
+            add(576, 56, 16, 80, true);
             // 4. East Private VIP Wine Cellar Wall (x = 552, framed doorway at y=288..376)
             add(552, 208, 16, 80, true);
             add(552, 376, 16, 48, true);
             // 5. Stainless Kitchen Line, Dining Booths, Central Tables & Wine Table
-            add(48, 62, 480, 28);
+            add(48, 64, 480, 28);
             add(220, 124, 180, 24);
             add(36, 238, 96, 42);
             add(36, 338, 96, 42);
@@ -665,13 +689,13 @@
             add(250, 424, 98, 16, true);
             add(472, 424, 92, 16, true);
             // 2. West Presidential Suite & Wardrobe Wing Wall (x = 248, doorway at y=236..326)
-            add(248, 54, 16, 182, true);
-            add(248, 326, 16, rh - 340, true);
+            add(248, 56, 16, 180, true);
+            add(248, 326, 16, rh - 344, true);
             // 3. Suite Bedroom / Walk-In Dressing Room Divider (y = 282, doorway at x=142..248)
             add(18, 282, 124, 16, true);
             // 4. East Cocktail Lounge & Sunken Jacuzzi Spa Wing Wall (x = 548, doorway at y=236..326)
-            add(548, 54, 16, 182, true);
-            add(548, 326, 16, rh - 340, true);
+            add(548, 56, 16, 180, true);
+            add(548, 326, 16, rh - 344, true);
             // 5. East Bar / Jacuzzi Courtyard Divider (y = 252, doorway at x=564..658)
             add(658, 252, rw - 676, 16, true);
             // 6. Concierge Desk, King Bed, Wardrobe Dresser, Bar Counter & Jacuzzi Pool
@@ -685,13 +709,13 @@
             add(244, 424, 100, 16, true);
             add(476, 424, 92, 16, true);
             // 2. West Tailor Atelier & Ready-To-Wear Wing Wall (x = 242, doorway at y=236..324)
-            add(242, 54, 16, 182, true);
-            add(242, 324, 16, rh - 338, true);
+            add(242, 56, 16, 180, true);
+            add(242, 324, 16, rh - 342, true);
             // 3. West Tailor / Streetwear Partition (y = 248, doorway at x=140..242)
             add(18, 248, 122, 16, true);
             // 4. East Cashier & Private Fitting Cabins Wing Wall (x = 562, doorway at y=236..324)
-            add(562, 54, 16, 182, true);
-            add(562, 324, 16, rh - 338, true);
+            add(562, 56, 16, 180, true);
+            add(562, 324, 16, rh - 342, true);
             // 5. East Fitting Cabin Cubicle Partition Walls (y = 278 & y = 398)
             add(682, 278, rw - 700, 16, true);
             add(682, 398, rw - 700, 16, true);
@@ -708,7 +732,7 @@
             add(228, 186, 16, 106, true);
             // 3. East Walk-In Refrigerated Cooler Wing Wall (x = 608, doorway at y=296..386)
             add(608, 186, 16, 110, true);
-            add(608, 386, 16, rh - 400, true);
+            add(608, 386, 16, rh - 404, true);
             // 4. Cashier Counter, 3 Supermarket Gondola Shelving Aisles & Stockroom Crates
             add(38, 232, 168, 28);
             add(286, 248, 42, 164);
@@ -721,13 +745,13 @@
             add(248, 428, 98, 16, true);
             add(474, 428, 92, 16, true);
             // 2. West Billiards / VIP Bottle Wing Wall (x = 248, doorway at y=236..326)
-            add(248, 54, 16, 182, true);
-            add(248, 326, 16, rh - 340, true);
+            add(248, 56, 16, 180, true);
+            add(248, 326, 16, rh - 344, true);
             // 3. West Backroom / Billiards Divider (y = 246, doorway at x=142..248)
             add(18, 246, 124, 16, true);
             // 4. East Manager Vault & Arcade Lounge Wing Wall (x = 562, doorway at y=236..326)
-            add(562, 54, 16, 182, true);
-            add(562, 326, 16, rh - 340, true);
+            add(562, 56, 16, 180, true);
+            add(562, 326, 16, rh - 344, true);
             // 5. North-East Armored Cash Vault Room Divider (y = 246, doorway at x=578..668)
             add(668, 246, rw - 686, 16, true);
             // 6. Center Bar/DJ/Stage & West Pool Table / Booths
@@ -746,12 +770,12 @@
             add(258, 228, 98, 16, true);
             add(464, 228, 98, 16, true);
             // 3. West Golden Armory & Cigar Trophy Wing Wall (x = 258, doorway at y=244..334)
-            add(258, 54, 16, 190, true);
-            add(258, 334, 16, rh - 348, true);
+            add(258, 56, 16, 188, true);
+            add(258, 334, 16, rh - 352, true);
             add(18, 258, 132, 16, true);
             // 4. East Roman Jacuzzi & Master Solarium Wing Wall (x = 556, doorway at y=244..334)
-            add(556, 54, 16, 190, true);
-            add(556, 334, 16, rh - 348, true);
+            add(556, 56, 16, 188, true);
+            add(556, 334, 16, rh - 352, true);
             add(658, 228, rw - 676, 16, true);
             // 5. Executive Desk, Rotunda Fountain, Armory Racks & Sunken Jacuzzi
             add(336, 104, 148, 32);
@@ -763,11 +787,11 @@
             add(252, 426, 102, 16, true);
             add(466, 426, 102, 16, true);
             // 2. West Orbital Munitions & Server Bay Bulkhead (x = 252, doorway at y=238..328)
-            add(252, 54, 16, 184, true);
-            add(252, 328, 16, rh - 342, true);
+            add(252, 56, 16, 182, true);
+            add(252, 328, 16, rh - 346, true);
             // 3. East Zero-G Bio-Med Cleanroom Bulkhead (x = 564, doorway at y=238..328)
-            add(564, 54, 16, 184, true);
-            add(564, 328, 16, rh - 342, true);
+            add(564, 56, 16, 182, true);
+            add(564, 328, 16, rh - 346, true);
             // 4. Flight Director Console, Telemetry Banks, Ordnance Racks & Medpod
             add(320, 118, 180, 28);
             add(290, 266, 96, 26);
@@ -778,17 +802,17 @@
             // 1. South Armored Sally-Port Checkpoint Wall (y = 426, gate x=354..466)
             add(246, 426, 108, 16, true);
             add(466, 426, 108, 16, true);
-            // 2. North Cellblock & Warden Office Partition Walls (x = 278 & x = 516, y = 54..220)
-            add(278, 54, 16, 166, true);
-            add(516, 54, 16, 166, true);
+            // 2. North Cellblock & Warden Office Partition Walls (x = 278 & x = 516, y = 56..208)
+            add(278, 56, 16, 152, true);
+            add(516, 56, 16, 152, true);
             // 3. Horizontal Barred Cellblock Wall (y = 208, 3 security gates at x=145..215, 365..435, 595..665)
             add(18, 208, 127, 16, true);
             add(215, 208, 150, 16, true);
             add(435, 208, 160, 16, true);
             add(665, 208, rw - 683, 16, true);
             // 4. South-West Interrogation Room & South-East Guard Locker Wing Walls
-            add(246, 298, 16, rh - 312, true);
-            add(554, 298, 16, rh - 312, true);
+            add(246, 298, 16, rh - 316, true);
+            add(554, 298, 16, rh - 316, true);
             // 5. Cell Bunk, Warden Desk, SWAT Armory Racks & Dayroom Mess Tables
             add(36, 82, 86, 44);
             add(332, 102, 136, 28);
@@ -796,8 +820,8 @@
             add(312, 336, 196, 36);
         } else if (t === "DINER_PAWN") {
             // 1. Diner / Uncle Jack's Pawn Dividing Brick Wall (x = 484, connecting breezeway at y=228..318)
-            add(484, 54, 16, 174, true);
-            add(484, 318, 16, rh - 332, true);
+            add(484, 56, 16, 172, true);
+            add(484, 318, 16, rh - 336, true);
             // 2. Diner Entrance Vestibule Partition (y = 426, x = 18..165 & x = 315..484)
             add(18, 426, 147, 16, true);
             add(315, 426, 169, 16, true);

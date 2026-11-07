@@ -3781,7 +3781,7 @@ class WorldObjectEngine {
                         wCol *= mix(0.84, 1.0, pilasterSeam);
                         float edge = step(0.025, edgeY);
                         c.rgb = mix(darkInk, wCol, mix(0.45, 1.0, edge));
-                    } else {
+                    } else if (matId < 13.5) {
                         // MAT 13: World-Tiled 32px Checkerboard / Marble / Parquet Interior Floor
                         vec2 tileCoord = vWorldPos.xz * 2.0;
                         vec2 fTile = fract(tileCoord);
@@ -3792,6 +3792,11 @@ class WorldObjectEngine {
                         float texMod = 0.90 + dot(stoneTex, vec3(0.333)) * 0.16;
                         vec3 altCol = c.rgb * (checker > 0.5 ? 1.04 : 0.84) * texMod + grain * 0.45;
                         c.rgb = mix(darkInk * 1.4, altCol, mix(0.55, 1.0, grout));
+                    } else {
+                        // MAT 14: High-Resolution 1024x1024 Baked Multi-Zone Procedural Pixel-Art Interior Floor (bound to uDayLightTex!)
+                        vec4 floorTex = texture2D(uDayLightTex, puv);
+                        c.rgb = floorTex.rgb * vColor.rgb + grain * 0.25;
+                        c.a = vColor.a;
                     }
                 } else {
                     // MODE D: Sprite & Custom 3D House Facade Atlas (gta1_sprites.png)
@@ -9491,7 +9496,7 @@ class WorldObjectEngine {
             rawAoR(tr.x, tr.y, tr.w, tr.h, yElev, pad, alpha);
         };
 
-        // 3D Architectural Wall Box (World-Tiled MAT 12 sides + Dark Cutaway Top Cap + Neon Crown Trim — zero texture stretching!)
+        // 3D Architectural Wall Box (World-Tiled MAT 12 sides + True Architectural Cutaway Top Section — no garish neon slabs!)
         const rawWallBoxR = (x, y, w, h, yBot, yTop, wallCol, crownCol) => {
             const x0 = x / TILE_SIZE;
             const x1 = (x + w) / TILE_SIZE;
@@ -9504,10 +9509,17 @@ class WorldObjectEngine {
             pushMatQuad(tNE, tNW, bNE, bNW, 12, r * 0.82, g * 0.84, b * 0.88, 1.0);
             pushMatQuad(tNW, tSW, bNW, bSW, 12, r * 0.92, g * 0.93, b * 0.96, 1.0);
             pushMatQuad(tSE, tNE, bSE, bNE, 12, r * 0.86, g * 0.88, b * 0.92, 1.0);
-            // Architectural cutaway top cap (dark charcoal slab)
-            pushMatQuad(tNW, tNE, tSW, tSE, 9, 0.11, 0.15, 0.23, 1.0);
-            if (crownCol) {
-                rawBoxR(x - 1, y - 1, w + 2, h + 2, yTop, yTop + 0.032, crownCol, 10);
+
+            // Outer beveled plaster/brass cornice molding rim
+            const cr = crownCol ? [
+                0.22 + crownCol[0] * 0.34,
+                0.26 + crownCol[1] * 0.34,
+                0.34 + crownCol[2] * 0.34
+            ] : [0.28, 0.34, 0.44];
+            rawBoxR(x - 1, y - 1, w + 2, h + 2, yTop, yTop + 0.012, cr, 9);
+            // Inset dark anthracite cutaway masonry/concrete structural core
+            if (w > 5 && h > 5) {
+                rawBoxR(x + 2, y + 2, w - 4, h - 4, yTop + 0.012, yTop + 0.020, [0.06, 0.08, 0.13], 9);
             }
         };
         const wallBoxR = (x, y, w, h, yBot, yTop, wallCol, crownCol) => {
@@ -9528,26 +9540,33 @@ class WorldObjectEngine {
             rawFloorMatR(tr.x, tr.y, tr.w, tr.h, yElev, col, matId, alpha);
         };
 
-        // 3D Poster / Billboard / Vending Front mounted on the North perimeter wall (skipping doorway if facing === "N")
+        // 3D Poster / Billboard / Sign mounted on the oriented Back Wall (transforms cleanly for S, N, E, W!)
         const posterBoxR = (x, y, w, h, yBot, yTop, sprKey, frameCol = [0.16, 0.20, 0.28]) => {
-            let px = x;
-            if (intr.facing === "N" && y < 76) {
-                const doorL = rw * 0.5 - 98;
-                const doorR = rw * 0.5 + 98;
-                if (px + w > doorL && px < doorR) {
-                    px = 52;
-                }
-            }
-            rawBoxR(px - 2, y - 1, w + 4, h + 2, yBot - 0.015, yTop + 0.015, frameCol, 9);
+            const tr = trRect(x, y, w, h);
+            rawBoxR(tr.x - 2, tr.y - 2, tr.w + 4, tr.h + 4, yBot - 0.015, yTop + 0.015, frameCol, 9);
             const uv = getSprUV(sprKey);
             if (!uv) {
-                rawBoxR(px, y, w, h, yBot, yTop, [0.95, 0.35, 0.65], 10);
+                rawBoxR(tr.x, tr.y, tr.w, tr.h, yBot, yTop, [0.95, 0.35, 0.65], 10);
                 return;
             }
-            const x0 = px / TILE_SIZE;
-            const x1 = (px + w) / TILE_SIZE;
-            const z1 = (y + h + 1.5) / TILE_SIZE;
-            pushQuad([x0, yTop, z1], [x1, yTop, z1], [x0, yBot, z1], [x1, yBot, z1], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
+            const x0 = tr.x / TILE_SIZE;
+            const x1 = (tr.x + tr.w) / TILE_SIZE;
+            const z0 = tr.y / TILE_SIZE;
+            const z1 = (tr.y + tr.h) / TILE_SIZE;
+            const facing = (intr && intr.facing) || "S";
+            if (facing === "S") {
+                const fz = z1 + 1.5 / TILE_SIZE;
+                pushQuad([x0, yTop, fz], [x1, yTop, fz], [x0, yBot, fz], [x1, yBot, fz], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
+            } else if (facing === "N") {
+                const fz = z0 - 1.5 / TILE_SIZE;
+                pushQuad([x1, yTop, fz], [x0, yTop, fz], [x1, yBot, fz], [x0, yBot, fz], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
+            } else if (facing === "E") {
+                const fx = x1 + 1.5 / TILE_SIZE;
+                pushQuad([fx, yTop, z1], [fx, yTop, z0], [fx, yBot, z1], [fx, yBot, z0], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
+            } else if (facing === "W") {
+                const fx = x0 - 1.5 / TILE_SIZE;
+                pushQuad([fx, yTop, z0], [fx, yTop, z1], [fx, yBot, z0], [fx, yBot, z1], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
+            }
         };
 
         // 3D Vertical Cylinder (Pillars, Barstools, Lamps, Turntables, Rocket Hologram, Prison Bars)
@@ -9619,21 +9638,18 @@ class WorldObjectEngine {
             mainFloorCol = [0.48, 0.52, 0.58]; wallTint = [0.52, 0.56, 0.62];
         }
 
-        // 2. PRIMARY 3D FLOOR SLAB (y = 2.00, Crisp 32px Checker/Tile Grid MAT 13)
-        rawFloorMatR(14, 60, rw - 28, rh - 72, 2.000, mainFloorCol, 13);
+        // 2. PRIMARY 3D FLOOR SLAB (y = 2.001, High-Res 1024x1024 Baked Multi-Zone Procedural Pixel-Art Floor MAT 14)
+        {
+            const fx0 = 14, fy0 = 50, fw = rw - 28, fh = rh - 62;
+            const x0 = fx0 / TILE_SIZE, x1 = (fx0 + fw) / TILE_SIZE;
+            const z0 = fy0 / TILE_SIZE, z1 = (fy0 + fh) / TILE_SIZE;
+            const [u0, v0] = encUV(14, fx0 / rw, fy0 / rh);
+            const [u1, v1] = encUV(14, (fx0 + fw) / rw, (fy0 + fh) / rh);
+            pushQuad([x0, 2.001, z0], [x1, 2.001, z0], [x0, 2.001, z1], [x1, 2.001, z1], u0, v0, u1, v1, 1.0, 1.0, 1.0, 1.0);
+        }
 
         // 3. THEME-SPECIFIC MULTI-ROOM 3D FLOOR ZONES, 3D FURNITURE, PROPS & ANIMATED 3D ELEMENTS
         if (theme === "SHOP_HOTEL" || theme === "ART_DECO_HOTEL") {
-            // West Suite & Wardrobe Wing Hardwood Floor (MAT 11) + Silk Rugs
-            floorMatR(18, 60, 230, rh - 74, 2.002, [0.76, 0.52, 0.34], 11);
-            boxR(42, 118, 168, 136, 2.003, 2.010, [0.64, 0.12, 0.24], 9);
-            boxR(46, 316, 168, 120, 2.003, 2.010, [0.48, 0.16, 0.54], 9);
-            // Center Colonnade Foyer & Reception Red Velvet Carpet Runner
-            boxR(356, 210, 108, rh - 230, 2.003, 2.010, [0.86, 0.68, 0.20], 9);
-            boxR(362, 214, 96, rh - 238, 2.005, 2.013, [0.68, 0.10, 0.22], 9);
-            // East Cocktail Lounge & Sunken Jacuzzi Spa White Marble Floor (MAT 13)
-            floorMatR(564, 60, rw - 582, rh - 74, 2.002, [0.92, 0.95, 0.98], 13);
-
             // Center Reception Hall: 3D Concierge Mahogany Desk (x=316..504, y=178..208)
             aoR(316, 178, 188, 30, 2.004, 10, 0.42);
             boxR(316, 178, 188, 30, 2.00, 2.22, [0.58, 0.30, 0.16], 11);
@@ -9692,53 +9708,94 @@ class WorldObjectEngine {
                 cyl(bx, by, 4.5, 4.5, bz, bz + 0.025, 8, [0.88, 0.98, 1.0], 10, true, 0.85);
             }
         } else if (theme === "SHOP_GUN_SHOP") {
-            // North-West Gunsmith Vault Floor, Center Showroom & East 4-Lane Live Firing Range Floor
-            floorMatR(18, 56, 206, 106, 2.002, [0.34, 0.38, 0.44], 13);
-            floorMatR(532, 60, rw - 550, rh - 74, 2.002, [0.32, 0.36, 0.42], 13);
-            // North Wall Illuminated Rifle Pegboard + Ammu-Nation 3D Billboard
-            boxR(34, 56, 178, 12, 2.18, 2.62, [0.16, 0.22, 0.32], 6);
-            posterBoxR(284, 56, 152, 14, 2.22, 2.62, "ad_ammunation", [0.88, 0.18, 0.18]);
-            // Gunsmith Vault Safe & Armored Sales Counters (x=44..220 & x=244..454, y=136..164)
-            boxR(32, 64, 64, 42, 2.00, 2.50, [0.18, 0.22, 0.28], 6);
-            aoR(44, 136, 176, 28, 2.004, 10, 0.44);
-            boxR(44, 136, 176, 28, 2.00, 2.22, [0.22, 0.26, 0.34], 9);
-            boxR(44, 136, 176, 28, 2.22, 2.26, [0.92, 0.72, 0.14], 3);
-            aoR(244, 136, 210, 28, 2.004, 10, 0.44);
-            boxR(244, 136, 210, 28, 2.00, 2.16, [0.22, 0.26, 0.34], 9);
-            boxR(244, 136, 210, 28, 2.16, 2.23, [0.38, 0.86, 0.98], 10, 0.88);
-            // Center Showroom Dual Tactical Weapon Racks (x=108..236 & x=296..424, y=272..300)
-            for (const rx of [108, 296]) {
-                aoR(rx, 272, 128, 28, 2.004, 8, 0.40);
-                boxR(rx, 272, 128, 28, 2.00, 2.36, [0.24, 0.34, 0.24], 6);
-                boxR(rx + 4, 276, 120, 20, 2.36, 2.40, [0.92, 0.72, 0.14], 3);
+            // 1. North Showroom Illuminated Rifle Pegboard + Ammu-Nation 3D Billboard (x=262..494, y=56..68)
+            boxR(264, 56, 228, 10, 2.16, 2.60, [0.12, 0.16, 0.24], 9);
+            for (let rIdx = 0; rIdx < 5; rIdx++) {
+                const rx = 274 + rIdx * 44;
+                boxR(rx, 60, 12, 6, 2.26, 2.34, [0.56, 0.30, 0.14], 11); // Wood rifle stock
+                boxR(rx + 12, 60, 22, 6, 2.27, 2.33, [0.68, 0.74, 0.82], 9); // Steel barrel/receiver
             }
-            // Entrance Security Vestibule Bulletproof Guard Window (x=350..470, y=412..432)
-            boxR(350, 412, 120, 20, 2.20, 2.52, [0.32, 0.88, 0.98], 10, 0.85);
-            // East 4-Lane Live Indoor Firing Range (Shooting booths at y=344..366 facing North toward targets at y=78!)
-            aoR(542, 344, 236, 22, 2.004, 8, 0.42);
-            boxR(542, 344, 236, 22, 2.00, 2.24, [0.92, 0.72, 0.14], 3);
+            posterBoxR(302, 56, 152, 12, 2.36, 2.64, "ad_ammunation", [0.88, 0.18, 0.18]);
+
+            // 2. West Tactical Gunsmith Vault: Workbench, Heavy Safe & Kevlar Body Armor Rack
+            aoR(36, 68, 164, 26, 2.004, 8, 0.44);
+            boxR(36, 68, 52, 32, 2.00, 2.48, [0.16, 0.20, 0.28], 6); // Vault steel combination safe
+            cyl(62, 100, 6, 6, 2.22, 2.26, 10, [0.96, 0.78, 0.20], 9, true);
+            boxR(92, 68, 108, 26, 2.00, 2.22, [0.22, 0.26, 0.34], 9); // Gunsmith workbench
+            boxR(90, 66, 112, 30, 2.22, 2.25, [0.58, 0.36, 0.18], 11); // Hardwood workbench top
+            boxR(112, 72, 28, 14, 2.25, 2.32, [0.42, 0.48, 0.56], 9); // Gunsmith steel vise
+
+            // South-West Kevlar Body Armor Rack (x=36..200, y=352..380)
+            aoR(36, 352, 164, 28, 2.004, 8, 0.42);
+            boxR(36, 352, 164, 28, 2.00, 2.18, [0.16, 0.20, 0.28], 9);
+            for (let v = 0; v < 3; v++) {
+                const vx = 48 + v * 52;
+                boxR(vx, 356, 36, 20, 2.18, 2.42, [0.08, 0.52, 0.84], 9); // Kevlar carrier vest
+                boxR(vx + 6, 358, 24, 16, 2.22, 2.38, [0.10, 0.14, 0.22], 9); // Ballistic trauma plate
+            }
+
+            // 3. Center Showroom Illuminated Glass Weapon Showcase Counter (x=262..494, y=128..156)
+            aoR(262, 128, 232, 28, 2.004, 10, 0.46);
+            boxR(262, 128, 232, 28, 2.00, 2.15, [0.14, 0.18, 0.26], 9);
+            // Red velvet weapon liner inside the showcase
+            boxR(266, 132, 224, 20, 2.15, 2.18, [0.64, 0.10, 0.18], 9);
+            // 3D Pistols, Micro-SMGs, and Shotguns resting inside the glass showcase
+            for (let b = 0; b < 3; b++) {
+                const bx = 274 + b * 72;
+                boxR(bx, 136, 24, 6, 2.18, 2.21, [0.82, 0.86, 0.92], 9);
+                boxR(bx + 30, 136, 28, 6, 2.18, 2.21, [0.58, 0.32, 0.16], 11);
+                boxR(bx + 8, 144, 36, 5, 2.18, 2.20, [0.96, 0.78, 0.18], 9);
+            }
+            // Translucent cyan illuminated glass showcase hood + Cash Register
+            boxR(260, 126, 236, 32, 2.18, 2.24, [0.38, 0.88, 0.98], 10, 0.42);
+            boxR(266, 130, 28, 18, 2.24, 2.34, [0.20, 0.24, 0.32], 9);
+
+            // 4. Center Showroom Military Surplus Crate Islands (x=266..362 & x=394..490, y=288..316)
+            for (const rx of [266, 394]) {
+                aoR(rx, 288, 96, 28, 2.004, 8, 0.42);
+                boxR(rx, 288, 96, 28, 2.00, 2.24, [0.26, 0.36, 0.18], 11); // Olive-drab wood slat crate
+                boxR(rx + 4, 292, 88, 20, 2.24, 2.28, [0.46, 0.32, 0.16], 11);
+                boxR(rx + 14, 295, 68, 14, 2.28, 2.33, [0.92, 0.44, 0.12], 9); // Ordnance warhead case
+            }
+
+            // 5. Entrance Security Vestibule Bulletproof Guard Window (x=350..470, y=412..432)
+            boxR(350, 412, 120, 20, 2.20, 2.52, [0.32, 0.88, 0.98], 10, 0.72);
+
+            // 6. East 4-Lane Live Indoor Firing Range (Shooting booths at y=312..334, lane dividers y=148..312, targets at y=78!)
+            aoR(548, 312, 236, 22, 2.004, 8, 0.44);
+            boxR(548, 312, 236, 22, 2.00, 2.20, [0.18, 0.22, 0.30], 9);
+            boxR(546, 310, 240, 26, 2.20, 2.24, [0.58, 0.36, 0.18], 11); // Shooting booth bench top
+            // Downrange Angled Sandtrap Berm (x=544..788, y=62..84)
+            boxR(544, 62, 244, 22, 2.00, 2.18, [0.44, 0.28, 0.14], 11);
             for (let lane = 0; lane < 4; lane++) {
-                const lx = 556 + lane * 56;
+                const lx = 550 + lane * 58;
+                // Red acoustic shooting earmuffs on each booth counter
+                cyl(lx + 26, 322, 5, 5, 2.24, 2.29, 8, [0.92, 0.16, 0.20], 9, true);
+                // Ballistic lane divider walls extending downrange from the front of the bench (y=148..312 — never crossing the bench!)
                 if (lane > 0) {
-                    boxR(lx - 4, 240, 6, 146, 2.00, 2.42, [0.32, 0.36, 0.44], 9);
+                    boxR(lx - 3, 148, 6, 164, 2.00, 2.26, [0.22, 0.26, 0.34], 9);
+                    boxR(lx - 2, 148, 4, 164, 2.26, 2.44, [0.38, 0.86, 0.98], 10, 0.50);
                 }
-                const targY = 86 + Math.sin(t * 2.2 + lane * 1.5) * 14;
-                boxR(lx + 10, targY, 28, 6, 2.08, 2.42, [0.96, 0.94, 0.88], 9);
-                boxR(lx + 16, targY + 2, 16, 6, 2.18, 2.34, [0.92, 0.18, 0.22], 10);
+                // Paper silhouette bullseye target hanging at the downrange sandtrap berm (y=86..94)
+                const targY = 86 + Math.sin(t * 2.0 + lane * 1.4) * 6;
+                boxR(lx + 12, targY, 30, 5, 2.10, 2.44, [0.96, 0.95, 0.90], 9);
+                boxR(lx + 19, targY - 1, 16, 7, 2.20, 2.36, [0.92, 0.16, 0.20], 10);
+                boxR(lx + 24, targY - 2, 6, 9, 2.25, 2.31, [0.98, 0.82, 0.16], 10);
             }
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
-            // North Commercial Kitchen Ceramic Floor (MAT 13) & Walk-In Cold Storage
-            floorMatR(18, 56, rw - 36, 136, 2.002, [0.84, 0.88, 0.92], 13);
             // North Stainless Cooking Line (x=48..528, y=62..90) + Prep Island (x=220..400, y=124..148)
             aoR(48, 62, 480, 28, 2.004, 8, 0.42);
             boxR(48, 62, 480, 28, 2.00, 2.22, [0.78, 0.82, 0.88], 9);
-            boxR(56, 66, 140, 20, 2.22, 2.25, [0.18, 0.20, 0.24], 9);
-            boxR(212, 66, 110, 20, 2.22, 2.26, [0.92, 0.68, 0.14], 10);
+            boxR(56, 66, 140, 20, 2.22, 2.25, [0.18, 0.20, 0.24], 9); // Sizzling flattop griddle
+            for (let p = 0; p < 4; p++) {
+                cyl(72 + p * 28, 76, 5, 5, 2.25, 2.28, 8, [0.52, 0.24, 0.10], 9, true); // Burger patties
+            }
+            boxR(212, 66, 110, 20, 2.22, 2.26, [0.92, 0.68, 0.14], 10); // Golden deep-fryer vats
             boxR(408, 66, 48, 20, 2.22, 2.38, [0.88, 0.18, 0.22], 9); // Espresso machine
-            boxR(46, 58, 484, 28, 2.48, 2.66, [0.82, 0.86, 0.92], 9); // Overhead stainless hood
+            boxR(46, 58, 484, 24, 2.48, 2.64, [0.82, 0.86, 0.92], 9); // Overhead stainless hood
             aoR(220, 124, 180, 24, 2.004, 8, 0.40);
             boxR(220, 124, 180, 24, 2.00, 2.22, [0.88, 0.92, 0.96], 9);
-            posterBoxR(260, 52, 136, 12, 2.26, 2.64, "ad_burgershot", [0.92, 0.38, 0.14]);
+            posterBoxR(260, 56, 136, 12, 2.26, 2.62, "ad_burgershot", [0.92, 0.38, 0.14]);
 
             if (theme === "DINER_PAWN") {
                 // Short-Order Diner Counter (x=56..432, y=132..158) + Red Chrome Stools
@@ -9753,7 +9810,6 @@ class WorldObjectEngine {
                     boxR(38, by, 118, 36, 2.00, 2.20, [0.84, 0.14, 0.20], 11);
                 }
                 // East Wing: Uncle Jack's Caged Pawn Vault & Showcase Counter
-                floorMatR(500, 60, rw - 518, rh - 74, 2.002, [0.64, 0.44, 0.30], 11);
                 aoR(536, 124, 210, 28, 2.004, 10, 0.44);
                 boxR(536, 124, 210, 28, 2.00, 2.22, [0.48, 0.26, 0.14], 11);
                 boxR(534, 122, 214, 32, 2.22, 2.26, [0.92, 0.74, 0.22], 9);
@@ -9771,20 +9827,17 @@ class WorldObjectEngine {
                         aoR(tx, ty, 64, 48, 2.004, 8, 0.38);
                         boxR(tx, ty, 64, 48, 2.00, 2.18, [0.48, 0.26, 0.14], 11);
                         boxR(tx - 2, ty - 2, 68, 52, 2.18, 2.22, [0.98, 0.96, 0.92], 9);
+                        cyl(tx + 18, ty + 24, 7, 7, 2.22, 2.24, 10, [1.0, 1.0, 1.0], 9, true);
+                        cyl(tx + 46, ty + 24, 7, 7, 2.22, 2.24, 10, [1.0, 1.0, 1.0], 9, true);
                     }
                 }
                 // East Private VIP Wine Cellar & Sommelier Tasting Room
-                floorMatR(568, 208, rw - 586, 216, 2.002, [0.58, 0.34, 0.22], 11);
                 boxR(748, 224, 28, 180, 2.00, 2.52, [0.42, 0.20, 0.12], 11); // Mahogany wine racks
                 cyl(656, 324, 26, 26, 2.00, 2.20, 14, [0.64, 0.14, 0.24], 9, true);
             }
         } else if (theme === "SHOP_CLOTHES") {
-            // West Tailor Atelier Hardwood + East Velvet Fitting Cabins Floor
-            floorMatR(18, 60, 224, rh - 74, 2.002, [0.82, 0.64, 0.46], 11);
-            floorMatR(578, 60, rw - 596, rh - 74, 2.002, [0.88, 0.68, 0.84], 13);
-            posterBoxR(340, 54, 144, 14, 2.22, 2.62, "ad_call_morgan", [0.96, 0.36, 0.76]);
-            // Center Velvet Catwalk Runway &Mannequin Rotunda Stage (x=358..462, y=266..338)
-            boxR(348, 180, 124, 240, 2.002, 2.009, [0.78, 0.14, 0.44], 9);
+            posterBoxR(340, 56, 144, 12, 2.22, 2.62, "ad_call_morgan", [0.96, 0.36, 0.76]);
+            // Center Velvet Catwalk Runway & Mannequin Rotunda Stage (x=358..462, y=266..338)
             aoR(358, 266, 104, 72, 2.004, 10, 0.42);
             cyl(410, 302, 52, 52, 2.00, 2.10, 18, [0.92, 0.74, 0.22], 9, true);
             cyl(410, 302, 46, 46, 2.10, 2.16, 18, [0.78, 0.14, 0.44], 9, true);
@@ -9798,18 +9851,15 @@ class WorldObjectEngine {
             // North-East Glass Jewelry & POS Counter (x=602..766, y=118..146)
             aoR(602, 118, 164, 28, 2.004, 10, 0.40);
             boxR(602, 118, 164, 28, 2.00, 2.16, [0.94, 0.88, 0.76], 9);
-            boxR(602, 118, 164, 28, 2.16, 2.23, [0.42, 0.90, 0.98], 10, 0.88);
+            boxR(602, 118, 164, 28, 2.16, 2.23, [0.42, 0.90, 0.98], 10, 0.65);
             // South-East 3 Partitioned Fitting Cabins with 3D Full-Length Mirrors & Ottomans
             for (const fy of [215, 315, 435]) {
                 boxR(768, fy, 12, 54, 2.04, 2.52, [0.56, 0.92, 1.0], 10);
                 cyl(720, fy + 26, 13, 13, 2.00, 2.14, 12, [0.88, 0.22, 0.58], 9, true);
             }
         } else if (theme === "SHOP_CONVENIENCE") {
-            // North Backroom Stockroom Concrete Floor + East Walk-In Cooler Tile Floor
-            floorMatR(18, 56, rw - 36, 130, 2.002, [0.52, 0.56, 0.60], 13);
-            floorMatR(624, 186, rw - 642, rh - 200, 2.002, [0.72, 0.90, 0.96], 13);
-            posterBoxR(220, 54, 64, 16, 2.04, 2.52, "ad_ecola", [0.92, 0.16, 0.20]);
-            posterBoxR(300, 54, 64, 16, 2.04, 2.52, "ad_sprunk", [0.16, 0.86, 0.36]);
+            posterBoxR(220, 56, 64, 14, 2.04, 2.52, "ad_ecola", [0.92, 0.16, 0.20]);
+            posterBoxR(300, 56, 64, 14, 2.04, 2.52, "ad_sprunk", [0.16, 0.86, 0.36]);
             // North Stockroom Pallets & Manager's Safe (x=54..194 & x=580..740, y=76..108)
             aoR(54, 76, 140, 32, 2.004, 8, 0.42);
             boxR(54, 76, 140, 32, 2.00, 2.34, [0.68, 0.48, 0.26], 11);
@@ -9820,7 +9870,7 @@ class WorldObjectEngine {
             aoR(38, 232, 168, 28, 2.004, 10, 0.42);
             boxR(38, 232, 168, 28, 2.00, 2.22, [0.18, 0.56, 0.48], 9);
             boxR(36, 230, 172, 32, 2.22, 2.25, [0.92, 0.96, 0.98], 9);
-            boxR(42, 234, 160, 6, 2.25, 2.50, [0.38, 0.88, 0.98], 10, 0.85);
+            boxR(42, 234, 160, 6, 2.25, 2.50, [0.38, 0.88, 0.98], 10, 0.65);
             // Center 3 Double-Sided 3D Supermarket Gondola Shelving Aisles (x=286, 398, 510, y=248..412)
             for (const gx of [286, 398, 510]) {
                 aoR(gx, 248, 42, 164, 2.004, 8, 0.42);
@@ -9829,20 +9879,17 @@ class WorldObjectEngine {
                 boxR(gx + 17, 248, 8, 164, 2.00, 2.40, [0.18, 0.24, 0.34], 9);
             }
             // East Walk-In Refrigerated Beverage Racks & Slushie Domes
-            boxR(756, 204, 22, 280, 2.00, 2.54, [0.22, 0.86, 0.98], 10, 0.90);
+            boxR(756, 204, 22, 280, 2.00, 2.54, [0.22, 0.86, 0.98], 10, 0.85);
             cyl(668, 228, 14, 14, 2.00, 2.38, 12, [0.98, 0.18, 0.32], 10, true);
             cyl(668, 262, 14, 14, 2.00, 2.38, 12, [0.18, 0.88, 0.98], 10, true);
         } else if (theme === "SHOP_BAR" || theme === "NEON_CLUB" || theme === "STRIP_CLUB" || theme === "MALIBU_CLUB") {
-            // West Billiards / VIP Wing Floor & East Vault / Arcade Wing Floor
-            floorMatR(18, 60, 230, rh - 74, 2.002, [0.34, 0.24, 0.38], 11);
-            floorMatR(578, 60, rw - 596, rh - 74, 2.002, [0.42, 0.46, 0.54], 13);
             // Center North Main Bar / DJ Turntable Stage (x=312..508, y=122..154)
             aoR(312, 122, 196, 32, 2.004, 12, 0.46);
             boxR(312, 122, 196, 32, 2.00, 2.24, [0.24, 0.14, 0.28], 11);
             boxR(308, 120, 204, 36, 2.24, 2.28, accentRgb, 10);
             cyl(372, 136, 12, 12, 2.28, 2.32, 12, [0.12, 0.14, 0.18], 9, true);
             cyl(448, 136, 12, 12, 2.28, 2.32, 12, [0.12, 0.14, 0.18], 9, true);
-            posterBoxR(344, 54, 132, 14, 2.28, 2.64, theme === "SHOP_BAR" ? "ad_pisswasser" : "ad_angstipan", accentRgb);
+            posterBoxR(344, 56, 132, 12, 2.28, 2.62, theme === "SHOP_BAR" ? "ad_pisswasser" : "ad_angstipan", accentRgb);
 
             if (theme === "STRIP_CLUB") {
                 // Center Illuminated Velvet Runway Stage (x=368..452, y=224..356) + Brass Dance Poles
@@ -9883,11 +9930,6 @@ class WorldObjectEngine {
                 boxR(732, ay + 6, 8, 32, 2.18, 2.40, ai === 1 ? [0.22, 0.92, 0.98] : [0.98, 0.24, 0.56], 10);
             }
         } else if (theme === "MANSION") {
-            // West Armory Hardwood, Center Carrara Marble Rotunda, East Indoor Jacuzzi Spa
-            floorMatR(18, 60, 240, rh - 74, 2.002, [0.76, 0.52, 0.34], 11);
-            floorMatR(572, 60, rw - 590, rh - 74, 2.002, [0.92, 0.90, 0.96], 13);
-            boxR(348, 236, 124, rh - 256, 2.003, 2.010, [0.92, 0.74, 0.20], 9);
-            boxR(354, 242, 112, rh - 268, 2.005, 2.013, [0.72, 0.10, 0.18], 9);
             // Centerpiece 3D "THE WORLD IS YOURS" Golden Globe Fountain at (410, 338)
             cyl(410, 338, 42, 44, 2.00, 2.14, 18, [0.94, 0.92, 0.86], 9, true);
             cyl(410, 338, 34, 34, 2.02, 2.16, 18, [0.18, 0.86, 0.98], 10, true);
@@ -9909,7 +9951,7 @@ class WorldObjectEngine {
             floorMatR(606, 338, 148, 110, 2.12, [0.22, 0.92, 1.0], 10);
         } else if (theme === "SPACE_BUNKER") {
             // North Giant Orbital Telemetry Screen Wall + Tiered Mission Control Consoles
-            boxR(276, 54, 268, 12, 2.16, 2.66, [0.16, 0.86, 0.98], 10);
+            boxR(276, 56, 268, 12, 2.16, 2.66, [0.16, 0.86, 0.98], 10);
             aoR(320, 118, 180, 28, 2.004, 10, 0.45);
             boxR(320, 118, 180, 28, 2.00, 2.24, [0.18, 0.24, 0.34], 9);
             boxR(324, 122, 172, 16, 2.24, 2.32, [0.98, 0.24, 0.28], 10);
@@ -9969,10 +10011,9 @@ class WorldObjectEngine {
                     if (gap >= 40 && gap <= 165) {
                         const wx = Math.round((ob.x + ob2.x) * 0.5);
                         const ww = Math.max(ob.w, ob2.w);
-                        rawBoxR(wx, topY, ww, gap, 2.42, 2.54, [0.16, 0.20, 0.30], 9);
-                        rawBoxR(wx - 1, topY, ww + 2, gap, 2.54, 2.572, wallCrownCol, 10);
-                        rawCyl(wx + ww * 0.5, topY + 2, 6, 6, 2.00, 2.42, 10, wallCrownCol, 9, true);
-                        rawCyl(wx + ww * 0.5, botY - 2, 6, 6, 2.00, 2.42, 10, wallCrownCol, 9, true);
+                        rawWallBoxR(wx, topY, ww, gap, 2.42, 2.54, wallTint, wallCrownCol);
+                        rawCyl(wx + ww * 0.5, topY + 2, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
+                        rawCyl(wx + ww * 0.5, botY - 2, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
                     }
                 } else if (ob.h <= 28 && ob2.h <= 28 && Math.abs(ob.y - ob2.y) <= 6) {
                     const leftX = Math.min(ob.x + ob.w, ob2.x + ob2.w);
@@ -9981,10 +10022,9 @@ class WorldObjectEngine {
                     if (gap >= 40 && gap <= 165) {
                         const wy = Math.round((ob.y + ob2.y) * 0.5);
                         const wh = Math.max(ob.h, ob2.h);
-                        rawBoxR(leftX, wy, gap, wh, 2.42, 2.54, [0.16, 0.20, 0.30], 9);
-                        rawBoxR(leftX, wy - 1, gap, wh + 2, 2.54, 2.572, wallCrownCol, 10);
-                        rawCyl(leftX + 2, wy + wh * 0.5, 6, 6, 2.00, 2.42, 10, wallCrownCol, 9, true);
-                        rawCyl(rightX - 2, wy + wh * 0.5, 6, 6, 2.00, 2.42, 10, wallCrownCol, 9, true);
+                        rawWallBoxR(leftX, wy, gap, wh, 2.42, 2.54, wallTint, wallCrownCol);
+                        rawCyl(leftX + 2, wy + wh * 0.5, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
+                        rawCyl(rightX - 2, wy + wh * 0.5, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
                     }
                 }
             }
@@ -10000,19 +10040,19 @@ class WorldObjectEngine {
         if (facing === "N") {
             const leftW = Math.max(40, rw * 0.5 - doorHalfW);
             const rightX = rw * 0.5 + doorHalfW;
-            rawWallBoxR(0, 40, leftW, 24, 2.00, 2.70, wallTint, wallCrownCol);
-            rawWallBoxR(rightX, 40, Math.max(40, rw - rightX), 24, 2.00, 2.70, wallTint, wallCrownCol);
+            rawWallBoxR(0, 40, leftW, 20, 2.00, 2.68, wallTint, wallCrownCol);
+            rawWallBoxR(rightX, 40, Math.max(40, rw - rightX), 20, 2.00, 2.68, wallTint, wallCrownCol);
             // North Entrance Welcome Threshold Rug & Twin 3D Brass Columns
-            rawBoxR(rw * 0.5 - 80, 44, 160, 26, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
-            rawBoxR(rw * 0.5 - 84, 42, 168, 30, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
-            rawCyl(rw * 0.5 - 84, 54, 9, 8, 2.00, 2.52, 12, [0.96, 0.80, 0.24], 9, true);
-            rawCyl(rw * 0.5 + 84, 54, 9, 8, 2.00, 2.52, 12, [0.96, 0.80, 0.24], 9, true);
+            rawBoxR(rw * 0.5 - 80, 42, 160, 26, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
+            rawBoxR(rw * 0.5 - 84, 40, 168, 30, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
+            rawCyl(rw * 0.5 - 84, 52, 9, 8, 2.00, 2.52, 12, [0.96, 0.80, 0.24], 9, true);
+            rawCyl(rw * 0.5 + 84, 52, 9, 8, 2.00, 2.52, 12, [0.96, 0.80, 0.24], 9, true);
         } else {
-            rawWallBoxR(0, 40, rw, 24, 2.00, 2.70, wallTint, wallCrownCol);
+            rawWallBoxR(0, 40, rw, 20, 2.00, 2.68, wallTint, wallCrownCol);
         }
 
         // West Perimeter Wall (Split with Entrance Archway if facing === "W")
-        rawAoR(0, 64, 18, rh - 76, 2.004, 12, 0.45);
+        rawAoR(0, 60, 18, rh - 72, 2.004, 12, 0.45);
         if (facing === "W") {
             const topH = Math.max(36, doorMidY - 74 - 40);
             const botY = doorMidY + 74;
@@ -10028,7 +10068,7 @@ class WorldObjectEngine {
         }
 
         // East Perimeter Wall (Split with Entrance Archway if facing === "E")
-        rawAoR(rw - 18, 64, 18, rh - 76, 2.004, 12, 0.45);
+        rawAoR(rw - 18, 60, 18, rh - 72, 2.004, 12, 0.45);
         if (facing === "E") {
             const topH = Math.max(36, doorMidY - 74 - 40);
             const botY = doorMidY + 74;
@@ -10048,28 +10088,24 @@ class WorldObjectEngine {
             const leftWallW = Math.max(40, rw * 0.5 - doorHalfW);
             const rightWallX = rw * 0.5 + doorHalfW;
             const rightWallW = Math.max(40, rw - rightWallX);
-            rawBoxR(0, rh - 14, leftWallW, 14, 2.00, 2.24, [0.16, 0.20, 0.30], 9);
-            rawBoxR(0, rh - 15, leftWallW, 16, 2.24, 2.275, wallCrownCol, 10);
-            rawBoxR(rightWallX, rh - 14, rightWallW, 14, 2.00, 2.24, [0.16, 0.20, 0.30], 9);
-            rawBoxR(rightWallX, rh - 15, rightWallW, 16, 2.24, 2.275, wallCrownCol, 10);
+            rawWallBoxR(0, rh - 18, leftWallW, 18, 2.00, 2.26, wallTint, wallCrownCol);
+            rawWallBoxR(rightWallX, rh - 18, rightWallW, 18, 2.00, 2.26, wallTint, wallCrownCol);
             // South Entrance Welcome Threshold Rug & Twin 3D Brass Columns
-            rawBoxR(rw * 0.5 - 80, rh - 26, 160, 22, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
-            rawBoxR(rw * 0.5 - 84, rh - 28, 168, 26, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
+            rawBoxR(rw * 0.5 - 80, rh - 28, 160, 24, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
+            rawBoxR(rw * 0.5 - 84, rh - 30, 168, 28, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
             rawCyl(rw * 0.5 - 84, rh - 12, 9, 8, 2.00, 2.48, 12, [0.96, 0.80, 0.24], 9, true);
             rawCyl(rw * 0.5 + 84, rh - 12, 9, 8, 2.00, 2.48, 12, [0.96, 0.80, 0.24], 9, true);
         } else {
-            rawBoxR(0, rh - 14, rw, 14, 2.00, 2.24, [0.16, 0.20, 0.30], 9);
-            rawBoxR(0, rh - 15, rw, 16, 2.24, 2.275, wallCrownCol, 10);
+            rawWallBoxR(0, rh - 18, rw, 18, 2.00, 2.26, wallTint, wallCrownCol);
         }
 
-        // 6. 3D INTERACTIVE STATION RINGS & PULSING HOLOGRAPHIC PEDESTALS (flush at z=2.002..2.020 so player & shadow never clip!)
+        // 6. COMPACT 3D INTERACTIVE STATION PEDESTAL RINGS (subtle 10px brass/neon floor marker under 3D floating icon)
         const stations = intr.stations || [];
         for (let i = 0; i < stations.length; i++) {
             const st = stations[i];
             const stCol = hexToRgb(st.color || intr.accent || "#38bdf8");
-            const pulseR = 19 + Math.sin(t * 5.0 + i * 1.4) * 3.0;
-            rawCyl(st.x, st.y, 16, 18, 2.002, 2.012, 14, [0.12, 0.16, 0.24], 9, true);
-            rawCyl(st.x, st.y, pulseR, pulseR - 2, 2.012, 2.020, 14, stCol, 10, true, 0.88);
+            rawCyl(st.x, st.y, 11, 12, 2.002, 2.010, 12, [0.10, 0.14, 0.22], 9, true);
+            rawCyl(st.x, st.y, 8, 9, 2.010, 2.016, 12, stCol, 10, true, 0.85);
         }
 
         if (iVerts.length === 0) return;
@@ -10093,9 +10129,9 @@ class WorldObjectEngine {
             gl.uniform1i(this.meshLocs.uTilesTex, 1);
         }
 
-        const lightMapTex = renderer.dayLightTex || viceTilesTex;
+        const floorMapTex = (renderer.getOrBakeInteriorFloorTex && renderer.getOrBakeInteriorFloorTex(gl, intr)) || renderer.dayLightTex || viceTilesTex;
         gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, lightMapTex);
+        gl.bindTexture(gl.TEXTURE_2D, floorMapTex);
         if (this.meshLocs.uDayLightTex) {
             gl.uniform1i(this.meshLocs.uDayLightTex, 2);
         }
