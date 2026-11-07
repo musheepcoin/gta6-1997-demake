@@ -3332,21 +3332,21 @@ class LeonidaMap {
                 subtitle: "ART DECO TERRAZZO LOBBY, COCKTAIL BAR, LUCIA & JASON'S SUITE STASH & WARDROBE",
                 theme: "ART_DECO_HOTEL",
                 accent: "#f472b6",
-                facing: "S",
+                facing: "E",
                 doorX: mx256(211.5) * TILE_SIZE,
                 doorY: my256(147.5) * TILE_SIZE,
-                w: 760,
-                h: 520,
+                w: 820,
+                h: 560,
                 npcs: [
-                    { x: 380, y: 84, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE" },
-                    { x: 185, y: 265, angle: 0, type: "civ1", label: "GUEST" },
-                    { x: 632, y: 76, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER" }
+                    { x: 410, y: 142, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE" },
+                    { x: 165, y: 245, angle: 0, type: "civ1", label: "GUEST" },
+                    { x: 665, y: 84, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER" }
                 ],
                 stations: [
                     {
                         id: "DIXON_STASH",
-                        x: 185,
-                        y: 160,
+                        x: 155,
+                        y: 168,
                         color: "#39ff14",
                         label: "🔫 SUITE WEAPON STASH",
                         sub: "+100% HP, +100 ARMOR, UZI & SHOTGUN!",
@@ -3354,8 +3354,8 @@ class LeonidaMap {
                     },
                     {
                         id: "DIXON_WARDROBE",
-                        x: 625,
-                        y: 195,
+                        x: 155,
+                        y: 385,
                         color: "#38bdf8",
                         label: "👗 SAFEHOUSE WARDROBE",
                         sub: "CLEAR WANTED LEVEL + TOGGLE BANDANA + $2,000!",
@@ -3363,8 +3363,8 @@ class LeonidaMap {
                     },
                     {
                         id: "DIXON_BAR",
-                        x: 585,
-                        y: 300,
+                        x: 665,
+                        y: 182,
                         color: "#f472b6",
                         label: "🍹 NEON MOJITO LOUNGE",
                         sub: "FULL HEALTH + SPEED BOOST + $1,500!",
@@ -3375,26 +3375,26 @@ class LeonidaMap {
             {
                 id: "CLUB_NINE1NINE",
                 name: "💃 CLUB NINE1NINE VIP NIGHTCLUB",
-                subtitle: "PULSING LED DANCEFLOOR, DJ TURNTABLE BOOTH, VIP BOTTLES & MANAGER VAULT",
+                subtitle: "BOUNCER FOYER, PULSING LED DANCEFLOOR, DJ BOOTH, VIP BOTTLE WING & MANAGER VAULT",
                 theme: "NEON_CLUB",
                 accent: "#fb923c",
-                facing: "S",
+                facing: "E",
                 doorX: mx256(211.5) * TILE_SIZE,
                 doorY: my256(51.5) * TILE_SIZE,
-                w: 800,
-                h: 540,
+                w: 820,
+                h: 560,
                 npcs: [
-                    { x: 402, y: 108, z: 2.34, angle: Math.PI * 0.5, type: "gang", label: "RESIDENT DJ" },
-                    { x: 340, y: 265, angle: 0.8, type: "civ2", label: "DANCER", dancing: true },
-                    { x: 455, y: 265, angle: -0.8, type: "civ1", label: "DANCER", dancing: true },
-                    { x: 395, y: 315, angle: -1.5, type: "civ3", label: "DANCER", dancing: true },
-                    { x: 645, y: 245, angle: Math.PI, type: "civ0", label: "VIP HOST" }
+                    { x: 410, y: 94, z: 2.34, angle: Math.PI * 0.5, type: "gang", label: "RESIDENT DJ" },
+                    { x: 355, y: 275, angle: 0.8, type: "civ2", label: "DANCER", dancing: true },
+                    { x: 465, y: 275, angle: -0.8, type: "civ1", label: "DANCER", dancing: true },
+                    { x: 410, y: 335, angle: -1.5, type: "civ3", label: "DANCER", dancing: true },
+                    { x: 645, y: 345, angle: Math.PI, type: "civ0", label: "VIP HOST" }
                 ],
                 stations: [
                     {
                         id: "NINE_DJ",
-                        x: 400,
-                        y: 172,
+                        x: 410,
+                        y: 185,
                         color: "#00f0ff",
                         label: "🎧 DJ TURNTABLE BOOTH",
                         sub: "DROP THE BASS! +1 MULTIPLIER & +$4,000!",
@@ -3402,8 +3402,8 @@ class LeonidaMap {
                     },
                     {
                         id: "NINE_VIP",
-                        x: 165,
-                        y: 215,
+                        x: 145,
+                        y: 178,
                         color: "#f472b6",
                         label: "🍾 VIP BOTTLE SERVICE",
                         sub: "+100% HP, +100 ARMOR & UZI AMMO!",
@@ -3411,8 +3411,8 @@ class LeonidaMap {
                     },
                     {
                         id: "NINE_SAFE",
-                        x: 660,
-                        y: 198,
+                        x: 655,
+                        y: 178,
                         color: "#fde047",
                         label: "💰 NIGHTCLUB OFFICE VAULT",
                         sub: "CRACK THE SAFE FOR +$10,000 CASH!",
@@ -3426,22 +3426,22 @@ class LeonidaMap {
                 subtitle: "NEON STAGE RUNWAY, VELVET VIP BOOTHS & BOOBIE IKE'S BACKROOM COUNTING VAULT",
                 theme: "STRIP_CLUB",
                 accent: "#e879f9",
-                facing: "S",
+                facing: "W",
                 doorX: mx256(111.5) * TILE_SIZE,
                 doorY: my256(81.5) * TILE_SIZE,
-                w: 800,
-                h: 540,
+                w: 820,
+                h: 560,
                 npcs: [
-                    { x: 402, y: 252, z: 2.22, angle: Math.PI * 0.5, type: "bikini_pink", label: "STAGE PERFORMER", dancing: true },
-                    { x: 268, y: 290, angle: 0, type: "gang", label: "BOOBIE IKE VIP" },
-                    { x: 522, y: 290, angle: Math.PI, type: "civ1", label: "PATRON" },
-                    { x: 645, y: 245, angle: Math.PI, type: "gang", label: "VAULT GUARD" }
+                    { x: 410, y: 262, z: 2.22, angle: Math.PI * 0.5, type: "bikini_pink", label: "STAGE PERFORMER", dancing: true },
+                    { x: 300, y: 295, angle: 0, type: "gang", label: "BOOBIE IKE VIP" },
+                    { x: 520, y: 295, angle: Math.PI, type: "civ1", label: "PATRON" },
+                    { x: 645, y: 345, angle: Math.PI, type: "gang", label: "VAULT GUARD" }
                 ],
                 stations: [
                     {
                         id: "JACK_STAGE",
-                        x: 400,
-                        y: 405,
+                        x: 410,
+                        y: 385,
                         color: "#e879f9",
                         label: "💃 MAIN NEON STAGE",
                         sub: "MAKE IT RAIN! +1 MULTIPLIER & 100% HP!",
@@ -3449,8 +3449,8 @@ class LeonidaMap {
                     },
                     {
                         id: "JACK_VAULT",
-                        x: 660,
-                        y: 198,
+                        x: 655,
+                        y: 178,
                         color: "#fde047",
                         label: "💼 BOOBIE IKE'S CASH VAULT",
                         sub: "+$12,000 CASH HEIST + SHOTGUN & UZI!",
@@ -3458,8 +3458,8 @@ class LeonidaMap {
                     },
                     {
                         id: "JACK_BAR",
-                        x: 165,
-                        y: 215,
+                        x: 155,
+                        y: 178,
                         color: "#38bdf8",
                         label: "🥃 VELVET VIP BAR",
                         sub: "+100 ARMOR & CLEAR WANTED LEVEL!",
@@ -3476,18 +3476,18 @@ class LeonidaMap {
                 facing: "S",
                 doorX: mx256(210.5) * TILE_SIZE,
                 doorY: my256(105.5) * TILE_SIZE,
-                w: 760,
-                h: 520,
+                w: 820,
+                h: 560,
                 npcs: [
-                    { x: 370, y: 255, angle: 0.5, type: "civ1", label: "SALSA DANCER", dancing: true },
-                    { x: 430, y: 255, angle: -2.5, type: "civ2", label: "SALSA DANCER", dancing: true },
-                    { x: 120, y: 92, angle: Math.PI * 0.5, type: "gang", label: "SMUGGLER" }
+                    { x: 375, y: 275, angle: 0.5, type: "civ1", label: "SALSA DANCER", dancing: true },
+                    { x: 445, y: 275, angle: -2.5, type: "civ2", label: "SALSA DANCER", dancing: true },
+                    { x: 125, y: 105, angle: Math.PI * 0.5, type: "gang", label: "SMUGGLER" }
                 ],
                 stations: [
                     {
                         id: "MALIBU_CRATE",
-                        x: 145,
-                        y: 195,
+                        x: 155,
+                        y: 178,
                         color: "#f97316",
                         label: "📦 SMUGGLER'S HEAVY CRATE",
                         sub: "FLAMETHROWER + ROCKET LAUNCHER + 100 ARMOR!",
@@ -3495,8 +3495,8 @@ class LeonidaMap {
                     },
                     {
                         id: "MALIBU_ARCADE",
-                        x: 645,
-                        y: 198,
+                        x: 655,
+                        y: 178,
                         color: "#39ff14",
                         label: "🕹️ 1997 GTA ARCADE CABINET",
                         sub: "+1 EXTRA LIFE & +$5,000 HIGH SCORE!",
@@ -3504,8 +3504,8 @@ class LeonidaMap {
                     },
                     {
                         id: "MALIBU_BAR",
-                        x: 645,
-                        y: 350,
+                        x: 655,
+                        y: 365,
                         color: "#fb7185",
                         label: "🍸 HAVANA MOJITO COUNTER",
                         sub: "100% HEALTH + SPEED BOOST + $2,000!",
@@ -3523,17 +3523,17 @@ class LeonidaMap {
                 doorX: mx256(176.5) * TILE_SIZE,
                 doorY: my256(104.5) * TILE_SIZE,
                 w: 820,
-                h: 550,
+                h: 560,
                 npcs: [
-                    { x: 410, y: 88, angle: Math.PI * 0.5, type: "gang", label: "CARTEL BOSS" },
-                    { x: 300, y: 235, angle: 0, type: "gang", label: "BODYGUARD" },
-                    { x: 520, y: 235, angle: Math.PI, type: "civ2", label: "VIP GUEST" }
+                    { x: 410, y: 84, angle: Math.PI * 0.5, type: "gang", label: "CARTEL BOSS" },
+                    { x: 315, y: 268, angle: 0, type: "gang", label: "BODYGUARD" },
+                    { x: 505, y: 268, angle: Math.PI, type: "civ2", label: "VIP GUEST" }
                 ],
                 stations: [
                     {
                         id: "MANSION_DESK",
                         x: 410,
-                        y: 185,
+                        y: 175,
                         color: "#fde047",
                         label: "🖥️ SCARFACE OFFICE & SAFE",
                         sub: "+$15,000 CARTEL PAYROLL & 0 WANTED!",
@@ -3542,7 +3542,7 @@ class LeonidaMap {
                     {
                         id: "MANSION_ARMORY",
                         x: 155,
-                        y: 220,
+                        y: 185,
                         color: "#f97316",
                         label: "🚀 GOLDEN HEAVY ARMORY",
                         sub: "ROCKET + FLAMETHROWER + UZI + SHOTGUN + 100 ARMOR!",
@@ -3551,7 +3551,7 @@ class LeonidaMap {
                     {
                         id: "MANSION_POOL",
                         x: 665,
-                        y: 235,
+                        y: 282,
                         color: "#22d3ee",
                         label: "🌊 INDOOR MARBLE JACUZZI",
                         sub: "100% HEALTH + +1 SCORE MULTIPLIER!",
@@ -3569,17 +3569,17 @@ class LeonidaMap {
                 doorX: 463.5 * TILE_SIZE,
                 doorY: 28.55 * TILE_SIZE,
                 w: 820,
-                h: 540,
+                h: 560,
                 npcs: [
-                    { x: 410, y: 102, angle: Math.PI * 0.5, type: "civ1", label: "FLIGHT DIRECTOR" },
-                    { x: 245, y: 255, angle: 0, type: "civ0", label: "ENGINEER" },
-                    { x: 575, y: 255, angle: Math.PI, type: "civ3", label: "ASTRONAUT" }
+                    { x: 410, y: 92, angle: Math.PI * 0.5, type: "civ1", label: "FLIGHT DIRECTOR" },
+                    { x: 315, y: 335, angle: 0, type: "civ0", label: "ENGINEER" },
+                    { x: 505, y: 335, angle: Math.PI, type: "civ3", label: "ASTRONAUT" }
                 ],
                 stations: [
                     {
                         id: "SERA_LAUNCH",
                         x: 410,
-                        y: 198,
+                        y: 192,
                         color: "#ef4444",
                         label: "🔴 [LAUNCH CAPE LEONIDA ROCKET!]",
                         sub: "IGNITE PAD 39A! +$20,000 & +2 MULTIPLIER!",
@@ -3587,8 +3587,8 @@ class LeonidaMap {
                     },
                     {
                         id: "SERA_ORDNANCE",
-                        x: 155,
-                        y: 250,
+                        x: 165,
+                        y: 265,
                         color: "#38bdf8",
                         label: "⚡ ORBITAL ORDNANCE LOCKER",
                         sub: "ROCKET LAUNCHER + FLAMETHROWER + 100 ARMOR!",
@@ -3596,8 +3596,8 @@ class LeonidaMap {
                     },
                     {
                         id: "SERA_MEDPOD",
-                        x: 665,
-                        y: 250,
+                        x: 655,
+                        y: 345,
                         color: "#39ff14",
                         label: "🧬 ZERO-G BIO-MEDPOD",
                         sub: "+1 EXTRA LIFE & 100% HEALTH!",
@@ -3614,18 +3614,18 @@ class LeonidaMap {
                 facing: "S",
                 doorX: 62.5 * TILE_SIZE,
                 doorY: 93.5 * TILE_SIZE,
-                w: 800,
-                h: 530,
+                w: 820,
+                h: 560,
                 npcs: [
-                    { x: 400, y: 96, angle: Math.PI * 0.5, type: "police", label: "WARDEN" },
-                    { x: 145, y: 195, angle: Math.PI * 0.5, type: "monk", label: "INMATE #09" },
-                    { x: 560, y: 260, angle: Math.PI, type: "police", label: "CORRECTIONS OFFICER" }
+                    { x: 400, y: 78, angle: Math.PI * 0.5, type: "police", label: "WARDEN" },
+                    { x: 165, y: 112, angle: Math.PI * 0.5, type: "monk", label: "INMATE #09" },
+                    { x: 505, y: 275, angle: Math.PI, type: "police", label: "CORRECTIONS OFFICER" }
                 ],
                 stations: [
                     {
                         id: "PRISON_PAROLE",
                         x: 400,
-                        y: 195,
+                        y: 168,
                         color: "#fde047",
                         label: "🗝️ WARDEN'S PAROLE SAFE",
                         sub: "+2 GET OUT OF JAIL FREE CARDS & 0 WANTED!",
@@ -3633,8 +3633,8 @@ class LeonidaMap {
                     },
                     {
                         id: "PRISON_ARMORY",
-                        x: 645,
-                        y: 220,
+                        x: 635,
+                        y: 168,
                         color: "#38bdf8",
                         label: "🛡️ SWAT RIOT ARMORY",
                         sub: "SHOTGUN + UZI + ROCKET + 100 SWAT ARMOR!",
@@ -3642,8 +3642,8 @@ class LeonidaMap {
                     },
                     {
                         id: "PRISON_CELL06",
-                        x: 195,
-                        y: 220,
+                        x: 180,
+                        y: 168,
                         color: "#f87171",
                         label: "🛏️ LUCIA'S CELL #06 STASH",
                         sub: "+$7,500 CONTRABAND STASH & 100% HP!",
@@ -3660,18 +3660,18 @@ class LeonidaMap {
                 facing: "S",
                 doorX: 70.5 * TILE_SIZE,
                 doorY: 211.5 * TILE_SIZE,
-                w: 760,
-                h: 520,
+                w: 820,
+                h: 560,
                 npcs: [
-                    { x: 355, y: 124, angle: Math.PI * 0.5, type: "civ0", label: "CASHIER" },
-                    { x: 205, y: 294, angle: Math.PI, type: "civ3", label: "DINER CUSTOMER" },
-                    { x: 620, y: 106, angle: Math.PI * 0.5, type: "gang", label: "PAWN BROKER" }
+                    { x: 345, y: 98, angle: Math.PI * 0.5, type: "civ0", label: "CASHIER" },
+                    { x: 220, y: 275, angle: Math.PI, type: "civ3", label: "DINER CUSTOMER" },
+                    { x: 635, y: 92, angle: Math.PI * 0.5, type: "gang", label: "PAWN BROKER" }
                 ],
                 stations: [
                     {
                         id: "DINER_REGISTER",
-                        x: 360,
-                        y: 208,
+                        x: 345,
+                        y: 192,
                         color: "#fde047",
                         label: "💵 ROB DINER REGISTER (TRAILER 1!)",
                         sub: "STICK UP THE REGISTER FOR +$8,500 CASH!",
@@ -3679,8 +3679,8 @@ class LeonidaMap {
                     },
                     {
                         id: "PAWN_GUNS",
-                        x: 615,
-                        y: 205,
+                        x: 625,
+                        y: 185,
                         color: "#f97316",
                         label: "🔫 UNCLE JACK'S GUN WALL",
                         sub: "SHOTGUN + UZI + FLAMETHROWER + 100 ARMOR!",
@@ -3688,8 +3688,8 @@ class LeonidaMap {
                     },
                     {
                         id: "HANK_WAFFLES",
-                        x: 205,
-                        y: 350,
+                        x: 225,
+                        y: 355,
                         color: "#39ff14",
                         label: "🧇 HANK'S WAFFLE BOOTH",
                         sub: "100% HEALTH + +1 MULTIPLIER!",

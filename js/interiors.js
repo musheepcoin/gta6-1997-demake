@@ -1,518 +1,847 @@
-/* ==========================================================================
-   SHOP INTERIORS — template system + automatic storefront door placement.
+// ============================================================================
+// VICE CITY '97 — HAND-CRAFTED MULTI-ROOM BUILDING INTERIORS & ORIENTATION ENGINE
+// Non-generative architectural layouts with 4-way building entrance matching
+// (facing: "S" | "N" | "E" | "W")
+// ============================================================================
 
-   Every template builds a walkable room (same format as the hand-made
-   landmark interiors in map.js) with PRICED stations: walk next to a pad and
-   press [E] (or click it) to buy. Doors are generated on real south-facing
-   building facades that sit on a sidewalk, so any commercial building can be
-   entered (teleport + fade, no seamless streaming needed).
-   ========================================================================== */
 (function () {
-    "use strict";
-
-    const ROOM_W = 760;
-    const ROOM_H = 520;
-
-    // Cooldown (seconds) before a purchase pad can be used again
-    const BUY_CD = 5.0;
-
-    const buy = (id, x, y, color, label, price, effect, extra = {}) => ({
-        id,
-        x,
-        y,
-        color,
-        label: `${label} — $${price.toLocaleString("en-US")}`,
-        sub: `[E] ${effect.desc}`,
-        price,
-        effect,
-        cooldownSec: BUY_CD,
-        ...extra
-    });
-
     const SHOP_TEMPLATES = {
-        GUN_SHOP: {
+        SHOP_GUN_SHOP: {
             theme: "SHOP_GUN_SHOP",
             accent: "#f97316",
-            mat: [0.98, 0.45, 0.08],
-            icon: "🔫",
-            names: ["AMMU-NATION LEONIDA", "GUNS & GLORY", "DEAD EYE ARMORY", "SUNSHINE FIREARMS", "BIG TONY'S GUN SHOP"],
-            subtitle: "ARMORED SHOWROOM, HEAVY ORDNANCE VAULT & INDOOR FIRING RANGE",
-            npcs: [
-                { x: 205, y: 96, angle: Math.PI * 0.5, type: "gang", label: "GUN DEALER" },
-                { x: 532, y: 265, angle: 0, type: "civ1", label: "RANGE SHOOTER" }
-            ],
-            stations: () => [
-                buy("GUN_PISTOL", 115, 195, "#fde047", "🔫 PISTOL +60", 150, { weapon: "PISTOL", ammo: 60, desc: "PISTOL + 60 AMMO" }),
-                buy("GUN_UZI", 245, 195, "#f97316", "🔫 SMG +150", 800, { weapon: "UZI", ammo: 150, desc: "FULL-AUTO SMG" }),
-                buy("GUN_SHOTGUN", 375, 195, "#ef4444", "🔫 SHOTGUN +30", 1200, { weapon: "SHOTGUN", ammo: 30, desc: "6-PELLET SPREAD" }),
-                buy("GUN_ARMOR", 150, 355, "#38bdf8", "🛡️ BODY ARMOR", 500, { armor: 100, desc: "+100 ARMOR" }),
-                buy("GUN_ROCKET", 395, 295, "#a855f7", "🚀 ROCKETS +8", 4000, { weapon: "ROCKET", ammo: 8, desc: "BIG BOOM" }),
-                buy("GUN_FLAME", 395, 425, "#fb923c", "🔥 FLAMETHROWER +150", 2500, { weapon: "FLAMETHROWER", ammo: 150, desc: "BURN EVERYTHING" })
-            ]
+            matRGB: [0.98, 0.45, 0.12],
+            w: 820,
+            h: 560,
+            subtitle: "ARMORED VESTIBULE, L-SHAPED ORDNANCE COUNTER, GUNSMITH VAULT & 4-LANE FIRING RANGE",
+            buildStations(id) {
+                return [
+                    { id: `${id}_PISTOL`, x: 145, y: 214, color: "#fbbf24", label: "🔫 9MM PISTOL CRATE ($250)", sub: "BUY PISTOL + 40 ROUNDS!", action: "BUY_PISTOL", cost: 250 },
+                    { id: `${id}_UZI`, x: 265, y: 214, color: "#f97316", label: "🔫 MICRO-UZI SUBMACHINE GUN ($650)", sub: "BUY UZI + 80 ROUNDS!", action: "BUY_UZI", cost: 650 },
+                    { id: `${id}_SHOTGUN`, x: 385, y: 214, color: "#ef4444", label: "💥 PUMP SHOTGUN ($900)", sub: "BUY SHOTGUN + 25 SHELLS!", action: "BUY_SHOTGUN", cost: 900 },
+                    { id: `${id}_ARMOR`, x: 115, y: 118, color: "#38bdf8", label: "🛡️ KEVLAR TACTICAL VEST ($500)", sub: "+100% BODY ARMOR!", action: "BUY_ARMOR", cost: 500 },
+                    { id: `${id}_ROCKET`, x: 655, y: 318, color: "#a855f7", label: "🚀 HEAVY ROCKET LAUNCHER ($2,500)", sub: "RANGE SPECIAL: ROCKET + 8 ROCKETS!", action: "BUY_ROCKET", cost: 2500 }
+                ];
+            },
+            buildNpcs() {
+                return [
+                    { x: 300, y: 108, angle: Math.PI * 0.5, type: "gang", label: "ARMS DEALER", dialog: "WELCOME TO AMMU-NATION! NO RECEIPTS, NO QUESTIONS!" },
+                    { x: 115, y: 84, angle: Math.PI * 0.5, type: "civ0", label: "GUNSMITH", dialog: "CUSTOM BARRELS AND KEVLAR VESTS IN THE BACK VAULT!" },
+                    { x: 410, y: 454, angle: Math.PI * 0.5, type: "police", label: "RANGE OFFICER", dialog: "KEEP YOUR PIECE HOLSTERED IN THE VESTIBULE!" },
+                    { x: 605, y: 392, angle: -Math.PI * 0.5, type: "civ1", label: "SHOOTER", dialog: "TESTING OUT THIS NEW 12-GAUGE ON LANE 2!" },
+                    { x: 715, y: 392, angle: -Math.PI * 0.5, type: "gang", label: "MARKSMAN", dialog: "CENTER MASS EVERY TIME, PAL." }
+                ];
+            }
         },
-        RESTAURANT: {
+
+        SHOP_RESTAURANT: {
             theme: "SHOP_RESTAURANT",
-            accent: "#facc15",
-            mat: [0.98, 0.82, 0.10],
-            icon: "🍔",
-            names: ["CAFE CUBANO", "OCEAN GRILL", "BURGER SHOT", "EL PESCADOR", "NEON DINER", "PALM BISTRO", "SUNSET TACOS"],
-            subtitle: "OPEN COMMERCIAL KITCHEN, CHROME DINER BOOTHS & WURLITZER JUKEBOX",
-            npcs: [
-                { x: 355, y: 126, angle: Math.PI * 0.5, type: "civ0", label: "HEAD CHEF" },
-                { x: 135, y: 126, angle: -Math.PI * 0.5, type: "civ1", label: "LINE COOK" },
-                { x: 205, y: 294, angle: Math.PI, type: "civ3", label: "DINER" },
-                { x: 642, y: 308, angle: Math.PI, type: "civ2", label: "DINER" }
-            ],
-            stations: () => [
-                buy("FOOD_BURGER", 135, 214, "#fb923c", "🍔 BURGER", 40, { hp: 40, desc: "+40 HEALTH" }),
-                buy("FOOD_MEAL", 360, 214, "#39ff14", "🍽️ CHEF'S SPECIAL", 120, { hp: 999, desc: "FULL HEALTH" }),
-                buy("FOOD_COFFEE", 625, 162, "#a16207", "☕ DOUBLE ESPRESSO", 25, { speed: 20, desc: "SPEED BOOST 20S" })
-            ]
+            accent: "#ef4444",
+            matRGB: [0.95, 0.25, 0.25],
+            w: 820,
+            h: 560,
+            subtitle: "MAITRE D' FOYER, CHANDELIER DINING HALL, VIP WINE CELLAR & COMMERCIAL KITCHEN",
+            buildStations(id) {
+                return [
+                    { id: `${id}_EXPRESS`, x: 185, y: 245, color: "#fbbf24", label: "🍕 HOT SLICE & ESPRESSO ($60)", sub: "+45 HP INSTANT HEAL!", action: "BUY_SNACK", cost: 60 },
+                    { id: `${id}_FEAST`, x: 410, y: 245, color: "#22c55e", label: "🥩 CHEF'S FULL PLATTER ($180)", sub: "100% FULL HEALTH + SPRINT BOOST!", action: "BUY_MEAL", cost: 180 },
+                    { id: `${id}_WINE`, x: 685, y: 350, color: "#e879f9", label: "🍷 VINTAGE RESERVE BOTTLE ($300)", sub: "100% HEALTH + +50 ARMOR!", action: "BUY_DRINK", cost: 300 },
+                    { id: `${id}_REG`, x: 685, y: 155, color: "#fde047", label: "💵 OFFICE SAFE STICK-UP", sub: "ROB THE MANAGER'S SAFE (+$3,500, +2★ WANTED)!", action: "ROB_REGISTER", reward: 3500 }
+                ];
+            },
+            buildNpcs() {
+                return [
+                    { x: 205, y: 108, angle: Math.PI * 0.5, type: "civ0", label: "HEAD CHEF", dialog: "ORDER UP! FRESH FROM THE WOOD-FIRED OVEN!" },
+                    { x: 425, y: 108, angle: Math.PI * 0.5, type: "civ2", label: "SOUS CHEF", dialog: "WATCH THE HOT SKILLETS IN THE PASS-THROUGH!" },
+                    { x: 410, y: 462, angle: Math.PI * 0.5, type: "civ1", label: "MAITRE D'", dialog: "BUONA SERA! TABLE FOR TWO OR PRIVATE WINE ROOM?" },
+                    { x: 112, y: 315, angle: 0, type: "civ3", label: "DINER", dialog: "THE SEAFOOD RISOTTO HERE IS UNBEATABLE." },
+                    { x: 685, y: 285, angle: Math.PI * 0.5, type: "gang", label: "SOMMELIER", dialog: "PRIVATE RESERVE CELLAR — ONLY THE FINEST VINTAGES." }
+                ];
+            }
         },
-        HOTEL: {
+
+        SHOP_HOTEL: {
             theme: "SHOP_HOTEL",
-            accent: "#f472b6",
-            mat: [0.96, 0.25, 0.65],
-            icon: "🏨",
-            names: ["HOTEL FLAMINGO", "PALMS MOTEL", "OCEAN VIEW SUITES", "THE GOLDEN IGUANA", "HOTEL TROPICANA"],
-            subtitle: "TERRAZZO CONCIERGE LOBBY, KING BEDROOM SUITE & VIP JACUZZI LOUNGE",
-            npcs: [
-                { x: 380, y: 84, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE" },
-                { x: 585, y: 275, angle: Math.PI, type: "civ1", label: "VIP GUEST" }
-            ],
-            stations: () => [
-                buy("HOTEL_ROOM", 325, 185, "#f472b6", "🛏️ PRIVATE ROOM", 500, { hp: 999, armor: 50, clearWanted: true, setMinutes: 480, desc: "HEAL, NO STARS, MORNING" }),
-                buy("HOTEL_MINIBAR", 630, 195, "#38bdf8", "🍸 MINIBAR", 60, { hp: 25, speed: 12, desc: "+25 HP + SPEED" }),
-                buy("HOTEL_LIFE", 445, 185, "#39ff14", "❤️ LIFE INSURANCE", 3000, { extraLife: 1, desc: "+1 EXTRA LIFE" }),
-                buy("HOTEL_SUITE", 185, 265, "#fde047", "👑 PENTHOUSE SUITE", 1500, { hp: 999, armor: 100, clearWanted: true, setMinutes: 1200, desc: "FULL HEAL, NO STARS, NIGHT" })
-            ]
+            accent: "#ec4899",
+            matRGB: [0.94, 0.28, 0.68],
+            w: 820,
+            h: 560,
+            subtitle: "COLONNADE FOYER, CONCIERGE HALL, KING BEDROOM SUITE, WARDROBE & INDOOR SPA POOL",
+            buildStations(id) {
+                return [
+                    { id: `${id}_SUITE`, x: 138, y: 162, color: "#ec4899", label: "🛏️ PRESIDENTIAL KING SUITE ($300)", sub: "REST & HEAL 100% HP + CLEAR 1★ WANTED!", action: "RENT_SUITE", cost: 300 },
+                    { id: `${id}_CLOSET`, x: 138, y: 395, color: "#38bdf8", label: "🕶️ WALK-IN SUITE WARDROBE ($400)", sub: "NEW DISGUISE — CLEAR ALL WANTED STARS!", action: "CHANGE_OUTFIT", cost: 400 },
+                    { id: `${id}_CONCIERGE`, x: 410, y: 256, color: "#fde047", label: "🛎️ CONCIERGE SAFE DEPOSIT", sub: "COLLECT VIP GUEST STASH (+$1,500)!", action: "HOTEL_PERK", reward: 1500 },
+                    { id: `${id}_BAR`, x: 665, y: 175, color: "#22d3ee", label: "🍹 POOLSIDE MOJITO BAR ($120)", sub: "FULL HEALTH + SPRINT SPEED BOOST!", action: "BUY_COCKTAIL", cost: 120 }
+                ];
+            },
+            buildNpcs() {
+                return [
+                    { x: 410, y: 145, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE", dialog: "WELCOME TO OUR ART DECO LANDMARK! YOUR SUITE IS READY." },
+                    { x: 335, y: 468, angle: 0, type: "civ0", label: "BELLHOP", dialog: "I'LL TAKE YOUR LUGGAGE UP TO THE PENTHOUSE, BOSS." },
+                    { x: 655, y: 92, angle: Math.PI * 0.5, type: "civ1", label: "BARTENDER", dialog: "FRESH MINT MOJITOS AND CHAMPAGNE ON ICE!" },
+                    { x: 675, y: 425, angle: -Math.PI * 0.5, type: "bikini_pink", label: "VIP GUEST", dialog: "THE HEATED INDOOR JACUZZI IS PURE VICE CITY LUXURY!" }
+                ];
+            }
         },
-        CLOTHES: {
+
+        SHOP_CLOTHES: {
             theme: "SHOP_CLOTHES",
-            accent: "#38bdf8",
-            mat: [0.22, 0.74, 0.98],
-            icon: "👗",
-            names: ["VICE THREADS", "BOARDWALK BOUTIQUE", "SUNNY STYLE", "MIAMI KICKS", "LUXE & LEO"],
-            subtitle: "CARRARA MARBLE SHOWROOM, DESIGNER PODIUM & PRIVATE FITTING SUITES",
-            npcs: [
-                { x: 145, y: 98, angle: Math.PI * 0.5, type: "civ2", label: "STYLIST" },
-                { x: 595, y: 260, angle: 0, type: "civ3", label: "SHOPPER" }
-            ],
-            stations: () => [
-                buy("CLOTHES_DISGUISE", 155, 195, "#38bdf8", "🕶️ NEW DISGUISE", 250, { bandanaToggle: true, clearWanted: true, desc: "NO STARS + NEW LOOK" }),
-                buy("CLOTHES_VEST", 365, 180, "#a3e635", "🧥 KEVLAR JACKET", 350, { armor: 70, desc: "+70 ARMOR" }),
-                buy("CLOTHES_VIP", 365, 395, "#facc15", "💎 DESIGNER LABEL", 4000, { multiplier: 1, desc: "SCORE MULTIPLIER +1" })
-            ]
+            accent: "#a855f7",
+            matRGB: [0.72, 0.32, 0.96],
+            w: 820,
+            h: 560,
+            subtitle: "VELVET DISPLAY GALLERY, CENTRAL CATWALK, TAILOR ATELIER & PRIVATE FITTING CABINS",
+            buildStations(id) {
+                return [
+                    { id: `${id}_STREET`, x: 135, y: 385, color: "#38bdf8", label: "👕 OCEAN DRIVE STREETWEAR ($200)", sub: "FRESH THREADS + CLEAR 2★ WANTED!", action: "BUY_OUTFIT_1", cost: 200 },
+                    { id: `${id}_TAILOR`, x: 135, y: 165, color: "#ec4899", label: "🧥 BESPOKE PASTEL LINEN SUIT ($550)", sub: "CLEAR ALL WANTED STARS + +50 ARMOR!", action: "BUY_OUTFIT_2", cost: 550 },
+                    { id: `${id}_VIP`, x: 675, y: 168, color: "#fde047", label: "💎 HIGH-ROLLER GOLD CHAIN & SILK ($900)", sub: "100% HP, 100 ARMOR, 0 WANTED & +1 MULTIPLIER!", action: "BUY_OUTFIT_VIP", cost: 900 },
+                    { id: `${id}_FIT`, x: 645, y: 385, color: "#34d399", label: "🪞 PRIVATE FITTING CABIN", sub: "QUICK CHANGE — DROP 1★ WANTED FREE!", action: "BUY_OUTFIT_1", cost: 0 }
+                ];
+            },
+            buildNpcs() {
+                return [
+                    { x: 675, y: 96, angle: Math.PI * 0.5, type: "civ2", label: "BOUTIQUE STYLIST", dialog: "DARLING, ITALIAN SILK AND PASTEL LINEN ARE IN SEASON!" },
+                    { x: 125, y: 96, angle: Math.PI * 0.5, type: "civ0", label: "MASTER TAILOR", dialog: "KEVLAR-LINED JACKETS CUSTOM FITTED IN MY ATELIER." },
+                    { x: 475, y: 300, angle: Math.PI, type: "civ1", label: "SHOPPER", dialog: "LOOKING FOR SOMETHING FLASHY FOR CLUB NINE1NINE TONIGHT." },
+                    { x: 335, y: 468, angle: Math.PI * 0.5, type: "civ3", label: "DOORMEN", dialog: "WELCOME TO VICE CITY COUTURE. BROWSE THE RUNWAY COLLECTION." }
+                ];
+            }
         },
-        CONVENIENCE: {
+
+        SHOP_CONVENIENCE: {
             theme: "SHOP_CONVENIENCE",
-            accent: "#39ff14",
-            mat: [0.22, 0.95, 0.12],
-            icon: "🏪",
-            names: ["24/7 QUICK STOP", "PALM MART", "SUNSHINE MINI MARKET", "LITTLE HAVANA CORNER STORE", "NIGHT OWL MART"],
-            subtitle: "WALK-IN COOLERS, SUPERMARKET AISLES, SLUSHIE BAR & CASHIER REGISTER",
-            npcs: [
-                { x: 106, y: 100, angle: Math.PI * 0.5, type: "civ0", label: "CASHIER" },
-                { x: 386, y: 274, angle: Math.PI, type: "civ1", label: "SHOPPER" }
-            ],
-            stations: () => [
-                buy("STORE_SNACK", 386, 120, "#fb923c", "🌮 SNACK PACK", 15, { hp: 20, desc: "+20 HEALTH" }),
-                buy("STORE_MEDKIT", 585, 290, "#ef4444", "🩹 FIRST AID KIT", 90, { hp: 999, desc: "FULL HEALTH" }),
-                buy("STORE_ENERGY", 605, 165, "#22d3ee", "⚡ ENERGY DRINK", 30, { speed: 25, desc: "SPEED BOOST 25S" }),
-                buy("STORE_JAIL", 155, 420, "#38bdf8", "🎟️ GET OUT OF JAIL FREE", 800, { jailCards: 1, desc: "+1 JAIL-FREE CARD" }),
-                {
-                    id: "STORE_ROB",
-                    x: 135,
-                    y: 200,
-                    color: "#fde047",
-                    label: "💵 ROB THE REGISTER",
-                    sub: "[E] +$1.5-4K BUT 3 STARS!",
-                    effect: { heist: [1500, 4000], wanted: 3, desc: "HOLD-UP" },
-                    cooldownSec: 120
-                }
-            ]
+            accent: "#22c55e",
+            matRGB: [0.18, 0.88, 0.45],
+            w: 820,
+            h: 560,
+            subtitle: "BULLETPROOF CASHIER CAGE, 3 SUPERMARKET AISLES, WALK-IN COOLER & BACKROOM STOCK SAFE",
+            buildStations(id) {
+                return [
+                    { id: `${id}_SLUSH`, x: 705, y: 265, color: "#38bdf8", label: "🥤 VICE BERRY SLUSHIE ($35)", sub: "+35 HP QUICK REFRESH!", action: "BUY_SNACK", cost: 35 },
+                    { id: `${id}_ENERGY`, x: 705, y: 435, color: "#22c55e", label: "⚡ 6-PACK ENERGY DRINK ($95)", sub: "100% FULL HEALTH + SPEED BOOST!", action: "BUY_ENERGY", cost: 95 },
+                    { id: `${id}_LOTTO`, x: 145, y: 315, color: "#fbbf24", label: "🎟️ LEONIDA SCRATCH-OFF ($100)", sub: "WIN UP TO $2,500 INSTANT CASH!", action: "PLAY_LOTTO", cost: 100 },
+                    { id: `${id}_ROB`, x: 485, y: 118, color: "#ef4444", label: "💰 CRACK BACKROOM STOCK SAFE", sub: "ROB +$3,200 CASH (+2★ WANTED LEVEL)!", action: "ROB_REGISTER", reward: 3200 }
+                ];
+            },
+            buildNpcs() {
+                return [
+                    { x: 125, y: 185, angle: Math.PI * 0.5, type: "civ0", label: "CAGED CLERK", dialog: "CASH ONLY AT THE WINDOW! WALK-IN COOLER IS ON THE RIGHT!" },
+                    { x: 245, y: 108, angle: Math.PI * 0.5, type: "civ1", label: "STOCK MANAGER", dialog: "INVENTORY DELIVERY JUST CAME IN THROUGH THE BACK STOCKROOM." },
+                    { x: 465, y: 345, angle: -Math.PI * 0.5, type: "civ3", label: "CUSTOMER", dialog: "GRABBING A LATE-NIGHT COFFEE AND A LOTTO TICKET." }
+                ];
+            }
         },
-        BAR: {
+
+        SHOP_BAR: {
             theme: "SHOP_BAR",
-            accent: "#c084fc",
-            mat: [0.75, 0.5, 0.98],
-            icon: "🍹",
-            names: ["THE RUSTY ANCHOR", "FLAMINGO LOUNGE", "PALM TREE TAVERN", "COCO LOCO BAR", "LAST CALL"],
-            subtitle: "MAHOGANY NEON TAVERN, TOURNAMENT POOL PARLOR & RETRO ARCADE",
-            npcs: [
-                { x: 176, y: 94, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER" },
-                { x: 238, y: 282, angle: 0, type: "gang", label: "REGULAR" },
-                { x: 614, y: 374, angle: -Math.PI * 0.5, type: "civ1", label: "POOL SHARK" }
-            ],
-            stations: () => [
-                buy("BAR_BEER", 135, 198, "#facc15", "🍺 ICE-COLD BEER", 20, { hp: 15, speed: 10, desc: "+15 HP, SPEED" }),
-                buy("BAR_COCKTAIL", 605, 195, "#f472b6", "🍹 MOJITO", 45, { hp: 40, speed: 18, desc: "+40 HP, SPEED 18S" }),
-                buy("BAR_SHOT", 275, 198, "#ef4444", "🥃 TEQUILA SHOT", 35, { armor: 30, speed: 15, desc: "+30 ARMOR, SPEED" }),
-                buy("BAR_BRIBE", 614, 420, "#facc15", "💰 PAY OFF A COP", 500, { bribe: 2, desc: "-2 WANTED STARS" })
-            ]
+            accent: "#06b6d4",
+            matRGB: [0.08, 0.82, 0.95],
+            w: 820,
+            h: 560,
+            subtitle: "BOUNCER VESTIBULE, NEON TAPROOM, BILLIARDS PARLOR, VIP LOUNGE & BACKROOM SAFE",
+            buildStations(id) {
+                return [
+                    { id: `${id}_BEER`, x: 410, y: 205, color: "#fbbf24", label: "🍺 ICE COLD VICE LAGER ($50)", sub: "+50 HP REFRESHMENT!", action: "BUY_SNACK", cost: 50 },
+                    { id: `${id}_SHOT`, x: 135, y: 165, color: "#06b6d4", label: "🥃 TOP-SHELF TEQUILA FLIGHT ($160)", sub: "100% HEALTH + +50 ARMOR!", action: "BUY_DRINK", cost: 160 },
+                    { id: `${id}_POOL`, x: 135, y: 395, color: "#22c55e", label: "🎱 HIGH-STAKES 8-BALL HUSTLE ($200)", sub: "BEAT THE HUSTLER FOR UP TO $3,000!", action: "PLAY_POOL", cost: 200 },
+                    { id: `${id}_SAFE`, x: 685, y: 145, color: "#fde047", label: "💼 BACKROOM BOOKIE STASH", sub: "CRACK THE BAR OFFICE SAFE (+$3,500, +2★ WANTED)!", action: "ROB_REGISTER", reward: 3500 }
+                ];
+            },
+            buildNpcs() {
+                return [
+                    { x: 410, y: 105, angle: Math.PI * 0.5, type: "civ1", label: "BARTENDER", dialog: "WHAT'LL IT BE? COLD DRAFT OR TOP-SHELF TEQUILA?" },
+                    { x: 410, y: 468, angle: Math.PI * 0.5, type: "gang", label: "BOUNCER", dialog: "NO TROUBLE IN THE TAPROOM. POOL TABLE'S IN THE WEST WING." },
+                    { x: 135, y: 318, angle: Math.PI * 0.5, type: "gang", label: "POOL SHARK", dialog: "RACK 'EM UP! $200 A GAME IF YOU THINK YOU CAN RUN THE TABLE." },
+                    { x: 675, y: 355, angle: Math.PI, type: "civ2", label: "REGULAR", dialog: "BEST JUKEBOX AND NEON VIBES ON THE STRIP!" }
+                ];
+            }
         }
     };
 
-    // Round-robin so every type is guaranteed to show up on the map
-    const TYPE_ORDER = [
-        "GUN_SHOP", "RESTAURANT", "CONVENIENCE", "HOTEL", "BAR", "CLOTHES",
-        "RESTAURANT", "CONVENIENCE", "BAR", "RESTAURANT"
+    // ============================================================================
+    // NON-GENERATIVE HAND-CRAFTED VICE CITY & LEONIDA ESTABLISHMENT CATALOG
+    // Every establishment has an exact city coordinate (c, r) and explicit building
+    // facade orientation (facing: "S" | "N" | "E" | "W") matching its street!
+    // ============================================================================
+    const HANDCRAFTED_ESTABLISHMENTS = [
+        // --- OCEAN DRIVE & SOUTH BEACH (West of Ocean Drive faces EAST toward beach!) ---
+        { id: "ESTAB_COLONY_HOTEL", tpl: "SHOP_HOTEL", name: "🏨 THE COLONY ART DECO HOTEL", district: "OCEAN DRIVE", c: 442, r: 299, facing: "E" },
+        { id: "ESTAB_CAFFE_ROMA", tpl: "SHOP_RESTAURANT", name: "🍝 CAFFÈ ROMA OCEAN TERRACE", district: "OCEAN DRIVE", c: 442, r: 274, facing: "E" },
+        { id: "ESTAB_GIANNI_COUTURE", tpl: "SHOP_CLOTHES", name: "👗 GIANNI'S COUTURE & SILK", district: "OCEAN DRIVE", c: 442, r: 262, facing: "E" },
+        { id: "ESTAB_CLEVELANDER_BAR", tpl: "SHOP_BAR", name: "🍹 THE CLEVELANDER POOL BAR", district: "OCEAN DRIVE", c: 442, r: 180, facing: "E" },
+        { id: "ESTAB_SOBE_BODEGA", tpl: "SHOP_CONVENIENCE", name: "🏪 SOUTH POINTE 24/7 BODEGA", district: "SOUTH BEACH", c: 394, r: 306, facing: "S" },
+        { id: "ESTAB_COLLINS_AMMU", tpl: "SHOP_GUN_SHOP", name: "🔫 COLLINS AVE AMMU-NATION", district: "SOUTH BEACH", c: 382, r: 280, facing: "W" },
+
+        // --- MID-BEACH, ESPAÑOLA WAY & WASHINGTON AVE ---
+        { id: "ESTAB_HAVANA_TAPAS", tpl: "SHOP_RESTAURANT", name: "🥘 HAVANA TAPAS & GRILL", district: "ESPAÑOLA WAY", c: 388, r: 162, facing: "S" },
+        { id: "ESTAB_FLAMINGO_LOUNGE", tpl: "SHOP_BAR", name: "🦩 FLAMINGO COCKTAIL LOUNGE", district: "MID-BEACH", c: 388, r: 175, facing: "N" },
+        { id: "ESTAB_WASH_SURPLUS", tpl: "SHOP_GUN_SHOP", name: "🔫 MID-BEACH TACTICAL SURPLUS", district: "WASHINGTON AVE", c: 382, r: 154, facing: "W" },
+        { id: "ESTAB_OCEAN_SUITES", tpl: "SHOP_HOTEL", name: "🏨 CARLYLE ART DECO SUITES", district: "MID-BEACH", c: 442, r: 152, facing: "E" },
+        { id: "ESTAB_MIDBEACH_MART", tpl: "SHOP_CONVENIENCE", name: "🏪 FLAMINGO PARK QUICK-STOP", district: "MID-BEACH", c: 392, r: 259, facing: "N" },
+
+        // --- NORTH BEACH & VICE POINT ---
+        { id: "ESTAB_VICEPOINT_SURF", tpl: "SHOP_CLOTHES", name: "👕 VICE POINT SURF & TAILOR", district: "VICE POINT", c: 442, r: 96, facing: "E" },
+        { id: "ESTAB_NORTH_AMMU", tpl: "SHOP_GUN_SHOP", name: "🔫 NORTH BEACH GUN & RANGE", district: "NORTH BEACH", c: 388, r: 66, facing: "S" },
+        { id: "ESTAB_STARLIGHT_HOTEL", tpl: "SHOP_HOTEL", name: "🏨 STARLIGHT OCEAN RESORT", district: "NORTH BEACH", c: 442, r: 58, facing: "E" },
+        { id: "ESTAB_NEON_PALM_BAR", tpl: "SHOP_BAR", name: "🍸 NEON PALM COCKTAIL CLUB", district: "NORTH BEACH", c: 382, r: 88, facing: "W" },
+        { id: "ESTAB_SHORES_OUTLET", tpl: "SHOP_CLOTHES", name: "🧥 VICE SHORES DESIGNER ATELIER", district: "NORTH VICE SHORES", c: 172, r: 54, facing: "N" },
+
+        // --- DOWNTOWN VICE CITY, LITTLE HAVANA, LITTLE HAITI & WYNWOOD ---
+        { id: "ESTAB_DOWNTOWN_ARMS", tpl: "SHOP_GUN_SHOP", name: "🔫 DOWNTOWN EXECUTIVE ARMS", district: "DOWNTOWN VC", c: 288, r: 172, facing: "E" },
+        { id: "ESTAB_BAYFRONT_BISTRO", tpl: "SHOP_RESTAURANT", name: "🥩 BAYFRONT GRAND BRASSERIE", district: "DOWNTOWN VC", c: 286, r: 262, facing: "S" },
+        { id: "ESTAB_CALLE_OCHO_CAFE", tpl: "SHOP_RESTAURANT", name: "☕ CALLE OCHO CAFÉ CUBANO", district: "LITTLE HAVANA", c: 230, r: 284, facing: "N" },
+        { id: "ESTAB_HAVANA_BODEGA", tpl: "SHOP_CONVENIENCE", name: "🏪 LITTLE HAVANA BODEGA & LOTTO", district: "LITTLE HAVANA", c: 226, r: 262, facing: "S" },
+        { id: "ESTAB_TOUSSAINT_RUM", tpl: "SHOP_BAR", name: "🥃 TOUSSAINT CREOLE RUM BAR", district: "LITTLE HAITI", c: 182, r: 162, facing: "W" },
+        { id: "ESTAB_WYNWOOD_THREADS", tpl: "SHOP_CLOTHES", name: "🕶️ WYNWOOD VINTAGE & COUTURE", district: "WYNWOOD", c: 228, r: 162, facing: "E" },
+
+        // --- PORT GELLHORN & INDUSTRIAL MAINLAND ---
+        { id: "ESTAB_TURNPIKE_DINER", tpl: "SHOP_RESTAURANT", name: "🍔 TURNPIKE TRUCKER SMOKEHOUSE", district: "PORT GELLHORN", c: 122, r: 262, facing: "S" },
+        { id: "ESTAB_KELLY_GUN_PAWN", tpl: "SHOP_GUN_SHOP", name: "🔫 KELLY COUNTY GUN & RANGE", district: "PORT GELLHORN", c: 76, r: 162, facing: "E" }
     ];
 
-    function hash2(a, b) {
-        let h = (Math.imul(a, 73856093) ^ Math.imul(b, 19349663)) >>> 0;
-        h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0;
-        return (h ^ (h >>> 15)) >>> 0;
+    // ============================================================================
+    // 4-WAY CANONICAL TO ORIENTED ROOM COORDINATE TRANSFORMER
+    // Canonical space is authored for facing === "S" (door at South y = rh - 18,
+    // back wall at North y = 40, usable floor [0..rw] x [40..rh]).
+    // Transforms rectangles, points, and angles cleanly for "S", "N", "E", "W"!
+    // ============================================================================
+    function transformRect(x, y, w, h, intr) {
+        const facing = (intr && intr.facing) || "S";
+        if (facing === "S" || y < 36) {
+            return { x, y, w, h };
+        }
+        const rw = (intr && intr.w) || 820;
+        const rh = (intr && intr.h) || 560;
+        const y0 = 40;
+        const uh = Math.max(1, rh - y0);
+
+        if (facing === "N") {
+            const nx = rw - (x + w);
+            const ny = y0 + uh - (y - y0 + h);
+            return {
+                x: Math.round(nx),
+                y: Math.round(ny),
+                w: Math.round(w),
+                h: Math.round(h)
+            };
+        }
+
+        const isThinVWall = (w <= 22 && h >= 36);
+        const isThinHWall = (h <= 22 && w >= 36);
+        const u = x / rw;
+        const du = w / rw;
+        const v = (y - y0) / uh;
+        const dv = h / uh;
+
+        if (facing === "E") {
+            // Canonical South (v = 1) -> East (u' = 1); Canonical North (v = 0) -> West (u' = 0)
+            // Canonical West (u = 0) -> South (v' = 1); Canonical East (u = 1) -> North (v' = 0)
+            let nw = dv * rw;
+            let nh = du * uh;
+            let nx = v * rw;
+            let ny = y0 + (1.0 - (u + du)) * uh;
+            if (isThinHWall) nw = Math.max(16, Math.min(22, Math.round(nw)));
+            if (isThinVWall) nh = Math.max(16, Math.min(22, Math.round(nh)));
+            return {
+                x: Math.round(nx),
+                y: Math.round(ny),
+                w: Math.max(4, Math.round(nw)),
+                h: Math.max(4, Math.round(nh))
+            };
+        }
+
+        if (facing === "W") {
+            // Canonical South (v = 1) -> West (u' = 0); Canonical North (v = 0) -> East (u' = 1)
+            // Canonical West (u = 0) -> North (v' = 0); Canonical East (u = 1) -> South (v' = 1)
+            let nw = dv * rw;
+            let nh = du * uh;
+            let nx = (1.0 - (v + dv)) * rw;
+            let ny = y0 + u * uh;
+            if (isThinHWall) nw = Math.max(16, Math.min(22, Math.round(nw)));
+            if (isThinVWall) nh = Math.max(16, Math.min(22, Math.round(nh)));
+            return {
+                x: Math.round(nx),
+                y: Math.round(ny),
+                w: Math.max(4, Math.round(nw)),
+                h: Math.max(4, Math.round(nh))
+            };
+        }
+
+        return { x, y, w, h };
     }
 
+    function transformPoint(x, y, angle, intr) {
+        const facing = (intr && intr.facing) || "S";
+        const ang = angle || 0;
+        if (facing === "S" || y < 36) {
+            return { x, y, angle: ang };
+        }
+        const rw = (intr && intr.w) || 820;
+        const rh = (intr && intr.h) || 560;
+        const y0 = 40;
+        const uh = Math.max(1, rh - y0);
+        const u = x / rw;
+        const v = (y - y0) / uh;
 
-    function hexToRgb(hex) {
-        const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
-        if (!m) return [0.96, 0.25, 0.65];
-        const n = parseInt(m[1], 16);
-        return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+        if (facing === "N") {
+            return {
+                x: Math.round(rw - x),
+                y: Math.round(y0 + uh - (y - y0)),
+                angle: ang + Math.PI
+            };
+        }
+        if (facing === "E") {
+            return {
+                x: Math.round(v * rw),
+                y: Math.round(y0 + (1.0 - u) * uh),
+                angle: ang - Math.PI * 0.5
+            };
+        }
+        if (facing === "W") {
+            return {
+                x: Math.round((1.0 - v) * rw),
+                y: Math.round(y0 + u * uh),
+                angle: ang + Math.PI * 0.5
+            };
+        }
+        return { x, y, angle: ang };
     }
 
-    /**
-     * Hand-made landmark interiors were authored with a free-floating door position. Snap each one to the
-     * nearest sidewalk/ground tile touching a building facade and record which wall (facing = wall normal).
-     * Landmarks with no building nearby keep their classic glowing mat.
-     */
-    function snapLandmarkDoors(map, maxDist = 5) {
-        const cols = MAP_COLS;
-        const rows = MAP_ROWS;
-        const ts = TILE_SIZE;
+    function getEntrancePose(intr) {
+        const rw = (intr && intr.w) || 820;
+        const rh = (intr && intr.h) || 560;
+        const y0 = 40;
+        const midY = Math.round(y0 + (rh - y0) * 0.5);
+        const facing = (intr && intr.facing) || "S";
+
+        if (facing === "N") {
+            return {
+                facing: "N",
+                spawnX: Math.round(rw * 0.5),
+                spawnY: y0 + 82,
+                spawnAngle: Math.PI * 0.5, // Enters from North wall facing South into building
+                partnerX: Math.round(rw * 0.5 + 62),
+                partnerY: y0 + 52,
+                partnerAngle: Math.PI * 0.62,
+                exitX: Math.round(rw * 0.5),
+                exitY: y0 + 18,
+                minX: 34,
+                maxX: rw - 34,
+                minY: y0 + 16,
+                maxY: rh - 30,
+                isAtExit(px, py) {
+                    return py <= y0 + 36 && Math.abs(px - rw * 0.5) < 68;
+                },
+                isNearExit(px, py) {
+                    return py <= y0 + 52 && Math.abs(px - rw * 0.5) < 76;
+                }
+            };
+        }
+        if (facing === "E") {
+            return {
+                facing: "E",
+                spawnX: rw - 96,
+                spawnY: midY,
+                spawnAngle: Math.PI, // Enters from East wall facing West into building
+                partnerX: rw - 56,
+                partnerY: midY + 52,
+                partnerAngle: -Math.PI * 0.82,
+                exitX: rw - 18,
+                exitY: midY,
+                minX: 34,
+                maxX: rw - 16,
+                minY: 74,
+                maxY: rh - 30,
+                isAtExit(px, py) {
+                    return px >= rw - 42 && Math.abs(py - midY) < 62;
+                },
+                isNearExit(px, py) {
+                    return px >= rw - 56 && Math.abs(py - midY) < 72;
+                }
+            };
+        }
+        if (facing === "W") {
+            return {
+                facing: "W",
+                spawnX: 96,
+                spawnY: midY,
+                spawnAngle: 0, // Enters from West wall facing East into building
+                partnerX: 56,
+                partnerY: midY - 52,
+                partnerAngle: Math.PI * 0.18,
+                exitX: 18,
+                exitY: midY,
+                minX: 16,
+                maxX: rw - 34,
+                minY: 74,
+                maxY: rh - 30,
+                isAtExit(px, py) {
+                    return px <= 42 && Math.abs(py - midY) < 62;
+                },
+                isNearExit(px, py) {
+                    return px <= 56 && Math.abs(py - midY) < 72;
+                }
+            };
+        }
+        // Default: facing === "S" (Door on South wall, player enters facing North)
+        return {
+            facing: "S",
+            spawnX: Math.round(rw * 0.5),
+            spawnY: rh - 92,
+            spawnAngle: -Math.PI * 0.5,
+            partnerX: Math.round(rw * 0.5 - 62),
+            partnerY: rh - 56,
+            partnerAngle: -Math.PI * 0.35,
+            exitX: Math.round(rw * 0.5),
+            exitY: rh - 18,
+            minX: 34,
+            maxX: rw - 34,
+            minY: 74,
+            maxY: rh - 16,
+            isAtExit(px, py) {
+                return py >= rh - 38 && Math.abs(px - rw * 0.5) < 68;
+            },
+            isNearExit(px, py) {
+                return py >= rh - 52 && Math.abs(px - rw * 0.5) < 76;
+            }
+        };
+    }
+
+    function orientInterior(intr) {
+        if (!intr) return intr;
+        if (!intr.w || intr.w < 800) intr.w = 820;
+        if (!intr.h || intr.h < 540) intr.h = 560;
+        if (!intr.facing) intr.facing = "S";
+
+        if (!intr._rawStations && Array.isArray(intr.stations)) {
+            intr._rawStations = intr.stations.map(st => ({ ...st }));
+        }
+        if (!intr._rawNpcs && Array.isArray(intr.npcs)) {
+            intr._rawNpcs = intr.npcs.map(npc => ({ ...npc }));
+        }
+
+        if (Array.isArray(intr._rawStations)) {
+            intr.stations = intr._rawStations.map(st => {
+                const pt = transformPoint(st.x, st.y, 0, intr);
+                return { ...st, x: pt.x, y: pt.y };
+            });
+        }
+        if (Array.isArray(intr._rawNpcs)) {
+            intr.npcs = intr._rawNpcs.map(npc => {
+                const pt = transformPoint(npc.x, npc.y, npc.angle !== undefined ? npc.angle : Math.PI * 0.5, intr);
+                return { ...npc, x: pt.x, y: pt.y, angle: pt.angle };
+            });
+        }
+        intr._orientedFacing = intr.facing;
+        return intr;
+    }
+
+    function hasTreeOnTile(map, c, r) {
+        const ts = 64;
+        const lists = [map.trees, map.vicePalms];
+        for (const list of lists) {
+            if (!Array.isArray(list)) continue;
+            for (let i = 0; i < list.length; i++) {
+                const t = list[i];
+                if (Math.floor(t.x / ts) === c && Math.floor(t.y / ts) === r) return true;
+            }
+        }
+        return false;
+    }
+
+    // Helper: compute exact sidewalk door coordinates for tile (c, r) and facade direction
+    function computeDoorPixelPos(c, r, facing, ts = 64) {
+        let doorX = (c + 0.5) * ts;
+        let doorY = (r + 0.5) * ts;
+        if (facing === "S") doorY = r * ts + 22;
+        else if (facing === "N") doorY = (r + 1) * ts - 22;
+        else if (facing === "E") doorX = c * ts + 22;
+        else if (facing === "W") doorX = (c + 1) * ts - 22;
+        return { doorX, doorY };
+    }
+
+    // Snap a target (c, r, preferredFacing) to the closest real sidewalk-against-building wall interface
+    function snapDoorToBuildingFacade(map, targetC, targetR, preferredFacing, maxRad = 18) {
+        const cols = 512;
+        const rows = 512;
         const ground = map.surfaceGround;
-        if (!ground || !map.interiors) return;
-        const gt = (c, r) => (c >= 0 && r >= 0 && c < cols && r < rows ? ground[r * cols + c] : -1);
-        const walkable = (c, r) => gt(c, r) === GROUND_TYPE.PAWEMENT || gt(c, r) === GROUND_TYPE.FIELD;
+        const topZ = map.topZ;
+        if (!ground || !topZ) return null;
+
+        const isBuilding = (c, r) => {
+            if (c < 2 || r < 2 || c >= cols - 2 || r >= rows - 2) return false;
+            const idx = r * cols + c;
+            return ground[idx] === 4 && (!topZ || topZ[idx] >= 3);
+        };
+        const isWalkableSidewalk = (c, r) => {
+            if (c < 2 || r < 2 || c >= cols - 2 || r >= rows - 2) return false;
+            const g = ground[r * cols + c];
+            return g === 5 || g === 3;
+        };
+
+        // Direction vectors from sidewalk tile (c, r) into adjacent building tile (c + dx, r + dy)
         const dirs = [
-            { dc: 0, dr: -1, facing: "S", penalty: 0.0 }, // building to the north -> door in a south-facing wall
-            { dc: -1, dr: 0, facing: "E", penalty: 1.5 },
-            { dc: 1, dr: 0, facing: "W", penalty: 1.5 },
-            { dc: 0, dr: 1, facing: "N", penalty: 6.0 }
+            { dx: 0, dy: -1, facing: "S" }, // Building is North of sidewalk -> South facade
+            { dx: -1, dy: 0, facing: "E" }, // Building is West of sidewalk -> East facade (e.g. Ocean Drive!)
+            { dx: 1, dy: 0, facing: "W" },  // Building is East of sidewalk -> West facade
+            { dx: 0, dy: 1, facing: "N" }   // Building is South of sidewalk -> North facade
         ];
+
+        let best = null;
+        let bestScore = 1e9;
+        for (let dr = -maxRad; dr <= maxRad; dr++) {
+            for (let dc = -maxRad; dc <= maxRad; dc++) {
+                const c = targetC + dc;
+                const r = targetR + dr;
+                if (!isWalkableSidewalk(c, r)) continue;
+                const treePen = hasTreeOnTile(map, c, r) ? 14.0 : 0.0;
+                const dist = Math.hypot(dc, dr);
+                for (const d of dirs) {
+                    if (!isBuilding(c + d.dx, r + d.dy)) continue;
+                    // Strongly prefer the authored building orientation so the door matches the intended facade!
+                    const facePen = (preferredFacing && d.facing !== preferredFacing) ? 9.5 : 0.0;
+                    const score = dist + facePen + treePen;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = { c, r, facing: d.facing };
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    // Snap existing landmark doors onto real building walls and orient their interior rooms
+    function snapLandmarkDoors(map) {
+        if (!map || !Array.isArray(map.interiors)) return;
+        const ts = 64;
+
+        // Explicit authentic building facade orientations for the 8 Vice City & Leonida landmarks:
+        // Ocean Drive landmarks (HOTEL_DIXON, CLUB_NINE1NINE) sit on the West side of Ocean Drive (c=441)
+        // and face EAST ("E") toward Lummus Park & the beach!
+        const preferredLandmarkFacings = {
+            HOTEL_DIXON: "E",
+            CLUB_NINE1NINE: "E",
+            ESPANOLA_WAY: "S",
+            JACK_OF_HEARTS: "W",
+            PENITENTIARY: "S",
+            PORT_GELLHORN: "S"
+        };
+
         for (const intr of map.interiors) {
-            intr.matRGB = hexToRgb(intr.accent);
-            if (intr.isShop || intr.isEstatePortico || intr.id === "STAR_ISLAND" || intr.id === "SERA_SPACE" || (intr.id && intr.id.startsWith("ESTATE_"))) continue;
-            const cInit = Math.floor(intr.doorX / ts);
-            const rInit = Math.floor(intr.doorY / ts);
-            if (intr.facing === "S" && walkable(cInit, rInit) && gt(cInit, rInit - 1) === GROUND_TYPE.BUILDING) {
-                intr.doorX = (cInit + 0.5) * ts;
-                intr.doorY = (rInit + 0.5) * ts;
+            if (!intr) continue;
+            // Ensure consistent room dimensions for multi-room floorplans
+            intr.w = 820;
+            intr.h = 560;
+
+            if (intr.isShop || intr.isEstatePortico || intr.id === "STAR_ISLAND" || intr.id === "SERA_SPACE" || (intr.id && intr.id.startsWith("ESTATE_"))) {
+                orientInterior(intr);
                 continue;
             }
-            const c0 = cInit;
-            const r0 = rInit;
-            let best = null;
-            for (let dr = -maxDist; dr <= maxDist; dr++) {
-                for (let dc = -maxDist; dc <= maxDist; dc++) {
-                    const c = c0 + dc;
-                    const r = r0 + dr;
-                    if (!walkable(c, r)) continue;
-                    for (const d of dirs) {
-                        if (gt(c + d.dc, r + d.dr) !== GROUND_TYPE.BUILDING) continue;
-                        if (d.facing === "S" && gt(c, r + 1) === GROUND_TYPE.BUILDING) continue;
-                        const dist = Math.hypot(dc, dr) + d.penalty;
-                        if (!best || dist < best.dist) best = { c, r, facing: d.facing, dist };
-                    }
-                }
+
+            const c0 = Math.floor(intr.doorX / ts);
+            const r0 = Math.floor(intr.doorY / ts);
+            const prefFacing = preferredLandmarkFacings[intr.id] || intr.facing || "S";
+            const snapped = snapDoorToBuildingFacade(map, c0, r0, prefFacing, 16);
+
+            if (snapped) {
+                const pos = computeDoorPixelPos(snapped.c, snapped.r, snapped.facing, ts);
+                intr.doorX = pos.doorX;
+                intr.doorY = pos.doorY;
+                intr.facing = snapped.facing;
             }
-            if (best) {
-                intr.facing = best.facing;
-                intr.doorX = (best.c + 0.5) * ts;
-                intr.doorY = (best.r + 0.5) * ts;
-            }
+            orientInterior(intr);
         }
     }
 
-    function buildInterior(type, index, c, r, tileSize, facing = "S") {
-        const tpl = SHOP_TEMPLATES[type];
-        const nm = tpl.names[hash2(c, r) % tpl.names.length];
-        const doorC = facing === "E" ? (c + 1.5) : (facing === "W" ? (c - 0.5) : (c + 0.5));
-        const doorR = facing === "S" ? (r + 1.5) : (facing === "N" ? (r - 0.5) : (r + 0.5));
-        return {
-            id: `SHOP_${type}_${c}_${r}`,
-            shopType: type,
-            isShop: true,
-            name: `${tpl.icon} ${nm}`,
-            subtitle: tpl.subtitle,
-            theme: tpl.theme,
-            accent: tpl.accent,
-            matRGB: tpl.mat,
-            facing,
-            doorX: doorC * tileSize,
-            doorY: doorR * tileSize,
-            w: ROOM_W,
-            h: ROOM_H,
-            npcs: tpl.npcs.map((n) => ({ ...n })),
-            stations: tpl.stations()
-        };
-    }
-
-    /**
-     * Scan the map for south-facing, east-facing (Ocean Drive / Collins Ave) and
-     * west-facing storefronts (BUILDING tile whose neighbour is sidewalk) and create
-     * shop interiors on a spaced-out subset. Deterministic: same map => same shops.
-     */
-    function generate(map, opts = {}) {
-        const maxShops = opts.maxShops || 110;
-        const minSpacing = opts.minSpacing || 7;
-        const cols = MAP_COLS;
-        const rows = MAP_ROWS;
-        const ts = TILE_SIZE;
-        const ground = map.surfaceGround;
-        if (!ground) return [];
-
-        const isB = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows && ground[r * cols + c] === GROUND_TYPE.BUILDING;
-        const isP = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows && ground[r * cols + c] === GROUND_TYPE.PAWEMENT;
+    // Build all 24 hand-crafted, non-generative Vice City establishments
+    function generate(map) {
+        const ts = 64;
+        if (!map || !map.surfaceGround) return [];
 
         const existing = (map.interiors || []).map((it) => ({ c: it.doorX / ts, r: it.doorY / ts }));
+        const placed = [];
 
-        // 1A. Collect storefront runs (>= 2 tiles wide) on south-facing facades
-        const cands = [];
-        for (let r = 4; r < rows - 4; r++) {
-            let c = 1;
-            while (c < cols - 1) {
-                if (isB(c, r) && isP(c, r + 1)) {
-                    let c1 = c;
-                    while (c1 + 1 < cols - 1 && isB(c1 + 1, r) && isP(c1 + 1, r + 1)) c1++;
-                    const len = c1 - c + 1;
-                    if (len >= 2) {
-                        const mid = c + (len >> 1);
-                        // Door sidewalk tile needs walkable neighbours and must not be trapped in a 1-tile alley behind another building
-                        const isRestricted = typeof map.isRestrictedNoTrafficZone === "function" && map.isRestrictedNoTrafficZone(mid, r + 1);
-                        if (!isRestricted && (isP(mid - 1, r + 1) || isP(mid + 1, r + 1)) && !isB(mid, r + 2)) {
-                            cands.push({ c: mid, r, len, facing: "S", doorC: mid, doorR: r + 1 });
-                        }
-                    }
-                    c = c1 + 1;
-                } else {
-                    c++;
+        for (let i = 0; i < HANDCRAFTED_ESTABLISHMENTS.length; i++) {
+            const spec = HANDCRAFTED_ESTABLISHMENTS[i];
+            const tpl = SHOP_TEMPLATES[spec.tpl];
+            if (!tpl) continue;
+
+            const snapped = snapDoorToBuildingFacade(map, spec.c, spec.r, spec.facing, 20);
+            const finalC = snapped ? snapped.c : spec.c;
+            const finalR = snapped ? snapped.r : spec.r;
+            const finalFacing = snapped ? snapped.facing : spec.facing;
+
+            // Avoid overlapping an existing door on the exact same tile
+            let tooClose = false;
+            for (const ex of existing) {
+                if (Math.hypot(ex.c - finalC, ex.r - finalR) < 2.2) {
+                    tooClose = true;
+                    break;
                 }
             }
+            if (tooClose) continue;
+
+            const pos = computeDoorPixelPos(finalC, finalR, finalFacing, ts);
+            const intr = {
+                id: spec.id,
+                name: spec.name,
+                subtitle: `${spec.district} — ${tpl.subtitle}`,
+                theme: tpl.theme,
+                accent: tpl.accent,
+                matRGB: tpl.matRGB,
+                facing: finalFacing,
+                doorX: pos.doorX,
+                doorY: pos.doorY,
+                w: tpl.w,
+                h: tpl.h,
+                isShop: true,
+                npcs: tpl.buildNpcs(),
+                stations: tpl.buildStations(spec.id)
+            };
+
+            orientInterior(intr);
+            placed.push(intr);
+            existing.push({ c: finalC, r: finalR });
         }
 
-        // 1B. Collect storefront runs (>= 3 tiles tall) on East-facing & West-facing facades (Ocean Drive, Collins Ave, Washington Ave, Downtown)
-        for (let c = 4; c < cols - 4; c++) {
-            for (const [dc, facing] of [[1, "E"], [-1, "W"]]) {
-                let r = 4;
-                while (r < rows - 4) {
-                    if (isB(c, r) && isP(c + dc, r)) {
-                        let r1 = r;
-                        while (r1 + 1 < rows - 4 && isB(c, r1 + 1) && isP(c + dc, r1 + 1)) r1++;
-                        const len = r1 - r + 1;
-                        if (len >= 3) {
-                            // For long Ocean Drive blocks, sample every ~10 tiles so multiple hotels/bars/cafes along the block have doors!
-                            const step = len >= 14 ? 9 : len;
-                            for (let segStart = r; segStart + 2 <= r1; segStart += step) {
-                                const segEnd = Math.min(r1, segStart + step - 1);
-                                const midR = (segStart + segEnd) >> 1;
-                                const swC = c + dc;
-                                const isRestricted = typeof map.isRestrictedNoTrafficZone === "function" && map.isRestrictedNoTrafficZone(swC, midR);
-                                if (!isRestricted && (isP(swC, midR - 1) || isP(swC, midR + 1)) && !isB(c + dc * 2, midR)) {
-                                    // Give Ocean Drive (c=442, facing="E") a priority boost so its Art Deco hotels & cafes are always populated
-                                    const priorityBoost = (c === 442 && facing === "E") ? 1 : 0;
-                                    cands.push({ c, r: midR, len, facing, doorC: swC, doorR: midR, priorityBoost });
-                                }
-                            }
-                        }
-                        r = r1 + 1;
-                    } else {
-                        r++;
-                    }
-                }
-            }
-        }
-
-        // 2. Reject tiny building clusters (fences, signs, wall stubs)
-        const clusterSize = (sc, sr, cap) => {
-            const seen = new Set([sr * cols + sc]);
-            const q = [sr * cols + sc];
-            while (q.length && seen.size < cap) {
-                const k = q.pop();
-                const kc = k % cols;
-                const kr = (k / cols) | 0;
-                for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                    if (isB(kc + dc, kr + dr)) {
-                        const nk = (kr + dr) * cols + (kc + dc);
-                        if (!seen.has(nk)) {
-                            seen.add(nk);
-                            q.push(nk);
-                        }
-                    }
-                }
-            }
-            return seen.size;
-        };
-        const good = cands.filter((cd) => clusterSize(cd.c, cd.r, 8) >= 6);
-
-        // 3. Deterministic shuffle (priority Ocean Drive storefronts first, then deterministic hash)
-        good.sort((a, b) => ((b.priorityBoost || 0) - (a.priorityBoost || 0)) || (hash2(a.c, a.r) - hash2(b.c, b.r)) || (b.len - a.len));
-
-        // 4. Greedy spaced selection
-        const chosen = [];
-        const tooClose = (cd, list) => list.some((o) => Math.hypot((o.doorC ?? o.c) - cd.doorC, (o.doorR ?? o.r) - cd.doorR) < minSpacing);
-        for (const cd of good) {
-            if (chosen.length >= maxShops) break;
-            if (tooClose(cd, existing) || tooClose(cd, chosen)) continue;
-            chosen.push(cd);
-        }
-
-        const out = chosen.map((cd, i) => buildInterior(TYPE_ORDER[i % TYPE_ORDER.length], i, cd.c, cd.r, ts, cd.facing));
-        return out;
+        return placed;
     }
 
-    /**
-     * Physical solid AABBs (partition walls, counters, pool tables, beds, gondola shelves)
-     * inside an interior room so the player collides realistically with the architecture
-     * while all doorways and station pads remain unobstructed.
-     */
+    // ============================================================================
+    // COMPLEX MULTI-ROOM NON-GENERATIVE ARCHITECTURAL FLOORPLANS (Canonical "S")
+    // Every layout defines 4-6 distinct interconnected rooms with horizontal &
+    // vertical partition walls (isWall: true), framed doorways, and 3D furniture!
+    // Automatically transformed to match intr.facing ("S", "N", "E", "W")!
+    // ============================================================================
+    function getRawObstacles(intr) {
+        if (!intr) return [];
+        const t = intr.theme || "";
+        const rw = intr.w || 820;
+        const rh = intr.h || 560;
+        const obs = [];
+        const add = (x, y, w, h, isWall = false) => obs.push({ x, y, w, h, isWall });
+
+        if (t === "SHOP_GUN_SHOP") {
+            // 1. Entrance Security Vestibule Baffle Walls (y = 414, doorways at x=170..265 & x=555..650)
+            add(18, 414, 152, 16, true);
+            add(265, 414, 290, 16, true);
+            add(650, 414, rw - 668, 16, true);
+            // 2. North-West Gunsmith Vault Partition Wall (x = 224, doorway at y=162..242)
+            add(224, 54, 16, 108, true);
+            // 3. East 4-Lane Live Firing Range Wing Wall (x = 516, framed doorway at y=224..314)
+            add(516, 54, 16, 170, true);
+            add(516, 314, 16, 100, true);
+            // 4. Armored L-Counter, Tactical Racks & Firing Range Booth Dividers
+            add(44, 136, 176, 28);
+            add(244, 136, 210, 28);
+            add(108, 272, 128, 28);
+            add(296, 272, 128, 28);
+            add(542, 344, 236, 22);
+        } else if (t === "SHOP_RESTAURANT") {
+            // 1. Maitre D' Reception Foyer Partition Walls (y = 424, grand arch at x=346..474 & side passages)
+            add(18, 424, 172, 16, true);
+            add(268, 424, 78, 16, true);
+            add(474, 424, 78, 16, true);
+            add(630, 424, rw - 648, 16, true);
+            // 2. North Commercial Kitchen Pass-Through Wall (y = 192, service doors at x=248..336 & x=536..622)
+            add(18, 192, 230, 16, true);
+            add(336, 192, 200, 16, true);
+            add(622, 192, rw - 640, 16, true);
+            // 3. Kitchen Walk-In Cold Storage Divider (x = 576, y = 54..136)
+            add(576, 54, 16, 82, true);
+            // 4. East Private VIP Wine Cellar Wall (x = 552, framed doorway at y=288..376)
+            add(552, 208, 16, 80, true);
+            add(552, 376, 16, 48, true);
+            // 5. Stainless Kitchen Line, Dining Booths, Central Tables & Wine Table
+            add(48, 62, 480, 28);
+            add(220, 124, 180, 24);
+            add(36, 238, 96, 42);
+            add(36, 338, 96, 42);
+            add(258, 278, 64, 52);
+            add(398, 278, 64, 52);
+            add(258, 356, 64, 48);
+            add(398, 356, 64, 48);
+        } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
+            // 1. Grand Colonnade Foyer Partition Screens (y = 424, center arch x=348..472)
+            add(250, 424, 98, 16, true);
+            add(472, 424, 92, 16, true);
+            // 2. West Presidential Suite & Wardrobe Wing Wall (x = 248, doorway at y=236..326)
+            add(248, 54, 16, 182, true);
+            add(248, 326, 16, rh - 340, true);
+            // 3. Suite Bedroom / Walk-In Dressing Room Divider (y = 282, doorway at x=142..248)
+            add(18, 282, 124, 16, true);
+            // 4. East Cocktail Lounge & Sunken Jacuzzi Spa Wing Wall (x = 548, doorway at y=236..326)
+            add(548, 54, 16, 182, true);
+            add(548, 326, 16, rh - 340, true);
+            // 5. East Bar / Jacuzzi Courtyard Divider (y = 252, doorway at x=564..658)
+            add(658, 252, rw - 676, 16, true);
+            // 6. Concierge Desk, King Bed, Wardrobe Dresser, Bar Counter & Jacuzzi Pool
+            add(316, 178, 188, 30);
+            add(28, 96, 118, 86);
+            add(28, 442, 112, 30);
+            add(584, 112, 176, 28);
+            add(588, 344, 176, 112);
+        } else if (t === "SHOP_CLOTHES") {
+            // 1. Velvet Display Gallery Foyer Wall (y = 424, central catwalk arch x=344..476)
+            add(244, 424, 100, 16, true);
+            add(476, 424, 92, 16, true);
+            // 2. West Tailor Atelier & Ready-To-Wear Wing Wall (x = 242, doorway at y=236..324)
+            add(242, 54, 16, 182, true);
+            add(242, 324, 16, rh - 338, true);
+            // 3. West Tailor / Streetwear Partition (y = 248, doorway at x=140..242)
+            add(18, 248, 122, 16, true);
+            // 4. East Cashier & Private Fitting Cabins Wing Wall (x = 562, doorway at y=236..324)
+            add(562, 54, 16, 182, true);
+            add(562, 324, 16, rh - 338, true);
+            // 5. East Fitting Cabin Cubicle Partition Walls (y = 278 & y = 398)
+            add(682, 278, rw - 700, 16, true);
+            add(682, 398, rw - 700, 16, true);
+            // 6. Central Mannequin Podium, Garment Racks, Tailor Table & Cashier Counter
+            add(358, 266, 104, 72);
+            add(42, 122, 124, 28);
+            add(42, 316, 124, 26);
+            add(602, 118, 164, 28);
+        } else if (t === "SHOP_CONVENIENCE") {
+            // 1. North Stockroom & Manager Vault Partition Wall (y = 186, doorway at x=336..436)
+            add(18, 186, 318, 16, true);
+            add(436, 186, rw - 454, 16, true);
+            // 2. West Bulletproof Cashier Cage Partition (x = 228, y = 186..292)
+            add(228, 186, 16, 106, true);
+            // 3. East Walk-In Refrigerated Cooler Wing Wall (x = 608, doorway at y=296..386)
+            add(608, 186, 16, 110, true);
+            add(608, 386, 16, rh - 400, true);
+            // 4. Cashier Counter, 3 Supermarket Gondola Shelving Aisles & Stockroom Crates
+            add(38, 232, 168, 28);
+            add(286, 248, 42, 164);
+            add(398, 248, 42, 164);
+            add(510, 248, 42, 164);
+            add(54, 76, 140, 32);
+            add(580, 76, 160, 32);
+        } else if (t === "SHOP_BAR" || t === "NEON_CLUB" || t === "STRIP_CLUB" || t === "MALIBU_CLUB") {
+            // 1. Bouncer Security & Coat-Check Vestibule Wall (y = 428, central arch x=346..474)
+            add(248, 428, 98, 16, true);
+            add(474, 428, 92, 16, true);
+            // 2. West Billiards / VIP Bottle Wing Wall (x = 248, doorway at y=236..326)
+            add(248, 54, 16, 182, true);
+            add(248, 326, 16, rh - 340, true);
+            // 3. West Backroom / Billiards Divider (y = 246, doorway at x=142..248)
+            add(18, 246, 124, 16, true);
+            // 4. East Manager Vault & Arcade Lounge Wing Wall (x = 562, doorway at y=236..326)
+            add(562, 54, 16, 182, true);
+            add(562, 326, 16, rh - 340, true);
+            // 5. North-East Armored Cash Vault Room Divider (y = 246, doorway at x=578..668)
+            add(668, 246, rw - 686, 16, true);
+            // 6. Center Bar/DJ/Stage & West Pool Table / Booths
+            add(312, 122, 196, 32);
+            if (t === "SHOP_BAR") {
+                add(56, 338, 124, 64);
+            } else if (t === "STRIP_CLUB") {
+                add(368, 224, 84, 132);
+            }
+            add(608, 108, 148, 28);
+        } else if (t === "MANSION") {
+            // 1. Grand Marble Foyer Colonnade Screens (y = 426, center rotunda arch x=346..474)
+            add(258, 426, 88, 16, true);
+            add(474, 426, 88, 16, true);
+            // 2. North Scarface Executive Office Partition Wall (y = 228, center double doorway x=356..464)
+            add(258, 228, 98, 16, true);
+            add(464, 228, 98, 16, true);
+            // 3. West Golden Armory & Cigar Trophy Wing Wall (x = 258, doorway at y=244..334)
+            add(258, 54, 16, 190, true);
+            add(258, 334, 16, rh - 348, true);
+            add(18, 258, 132, 16, true);
+            // 4. East Roman Jacuzzi & Master Solarium Wing Wall (x = 556, doorway at y=244..334)
+            add(556, 54, 16, 190, true);
+            add(556, 334, 16, rh - 348, true);
+            add(658, 228, rw - 676, 16, true);
+            // 5. Executive Desk, Rotunda Fountain, Armory Racks & Sunken Jacuzzi
+            add(336, 104, 148, 32);
+            add(374, 304, 72, 68);
+            add(42, 92, 176, 30);
+            add(594, 326, 172, 134);
+        } else if (t === "SPACE_BUNKER") {
+            // 1. South Airlock Decontamination Baffle Wall (y = 426, airlock door x=354..466)
+            add(252, 426, 102, 16, true);
+            add(466, 426, 102, 16, true);
+            // 2. West Orbital Munitions & Server Bay Bulkhead (x = 252, doorway at y=238..328)
+            add(252, 54, 16, 184, true);
+            add(252, 328, 16, rh - 342, true);
+            // 3. East Zero-G Bio-Med Cleanroom Bulkhead (x = 564, doorway at y=238..328)
+            add(564, 54, 16, 184, true);
+            add(564, 328, 16, rh - 342, true);
+            // 4. Flight Director Console, Telemetry Banks, Ordnance Racks & Medpod
+            add(320, 118, 180, 28);
+            add(290, 266, 96, 26);
+            add(434, 266, 96, 26);
+            add(44, 168, 74, 136);
+            add(692, 214, 68, 68);
+        } else if (t === "PRISON_BLOCK") {
+            // 1. South Armored Sally-Port Checkpoint Wall (y = 426, gate x=354..466)
+            add(246, 426, 108, 16, true);
+            add(466, 426, 108, 16, true);
+            // 2. North Cellblock & Warden Office Partition Walls (x = 278 & x = 516, y = 54..220)
+            add(278, 54, 16, 166, true);
+            add(516, 54, 16, 166, true);
+            // 3. Horizontal Barred Cellblock Wall (y = 208, 3 security gates at x=145..215, 365..435, 595..665)
+            add(18, 208, 127, 16, true);
+            add(215, 208, 150, 16, true);
+            add(435, 208, 160, 16, true);
+            add(665, 208, rw - 683, 16, true);
+            // 4. South-West Interrogation Room & South-East Guard Locker Wing Walls
+            add(246, 298, 16, rh - 312, true);
+            add(554, 298, 16, rh - 312, true);
+            // 5. Cell Bunk, Warden Desk, SWAT Armory Racks & Dayroom Mess Tables
+            add(36, 82, 86, 44);
+            add(332, 102, 136, 28);
+            add(566, 92, 196, 28);
+            add(312, 336, 196, 36);
+        } else if (t === "DINER_PAWN") {
+            // 1. Diner / Uncle Jack's Pawn Dividing Brick Wall (x = 484, connecting breezeway at y=228..318)
+            add(484, 54, 16, 174, true);
+            add(484, 318, 16, rh - 332, true);
+            // 2. Diner Entrance Vestibule Partition (y = 426, x = 18..165 & x = 315..484)
+            add(18, 426, 147, 16, true);
+            add(315, 426, 169, 16, true);
+            // 3. Uncle Jack's Caged Gun Vault Partition Wall (y = 228, security door at x=580..668)
+            add(500, 228, 80, 16, true);
+            add(668, 228, rw - 686, 16, true);
+            // 4. Short-Order Grill Counter, Diner Booths & Pawn Showcase Counter
+            add(56, 132, 376, 26);
+            add(38, 256, 118, 36);
+            add(38, 344, 118, 36);
+            add(536, 124, 210, 28);
+            add(546, 346, 196, 32);
+        }
+        return obs;
+    }
+
     function getObstacles(intr) {
         if (!intr) return [];
-        const t = intr.theme;
-        if (t === "SHOP_GUN_SHOP") {
-            return [
-                // North showroom armored glass weapon counter
-                { x: 42, y: 122, w: 404, h: 32 },
-                // Partition wall between showroom & East Firing Range (doorway at y=170..246)
-                { x: 490, y: 68, w: 16, h: 102, isWall: true },
-                { x: 490, y: 246, w: 16, h: 224, isWall: true },
-                // Firing range booth barrier & lane dividers
-                { x: 556, y: 84, w: 10, h: 372 },
-                // South-west tactical armor display racks
-                { x: 42, y: 284, w: 186, h: 34 }
-            ];
-        } else if (t === "SHOP_RESTAURANT") {
-            return [
-                // North commercial kitchen back line
-                { x: 36, y: 74, w: 420, h: 32 },
-                // Service pass-through counters (open gap at x=224..264 and x=456..548)
-                { x: 36, y: 148, w: 188, h: 30 },
-                { x: 264, y: 148, w: 192, h: 30 },
-                // East beverage & espresso counter
-                { x: 548, y: 84, w: 168, h: 36 },
-                // West & Center diner booths
-                { x: 36, y: 268, w: 136, h: 52 },
-                { x: 36, y: 368, w: 136, h: 52 },
-                { x: 286, y: 268, w: 136, h: 52 },
-                { x: 286, y: 368, w: 136, h: 52 }
-            ];
-        } else if (t === "SHOP_HOTEL") {
-            return [
-                // Central concierge mahogany desk
-                { x: 300, y: 108, w: 160, h: 30 },
-                // West bedroom suite partition wall (doorway at y=220..308)
-                { x: 246, y: 68, w: 16, h: 152, isWall: true },
-                { x: 246, y: 308, w: 16, h: 168, isWall: true },
-                // King bed inside west suite
-                { x: 28, y: 112, w: 120, h: 92 },
-                // East VIP Lounge & Spa partition wall (doorway at y=220..308)
-                { x: 504, y: 68, w: 16, h: 152, isWall: true },
-                { x: 504, y: 308, w: 16, h: 168, isWall: true },
-                // East cocktail bar counter
-                { x: 548, y: 92, w: 168, h: 30 },
-                // East sunken jacuzzi rim
-                { x: 554, y: 344, w: 172, h: 112 }
-            ];
-        } else if (t === "SHOP_CLOTHES") {
-            return [
-                // North-west glass checkout & jewelry counter
-                { x: 46, y: 126, w: 200, h: 32 },
-                // Central circular velvet mannequin podium
-                { x: 316, y: 232, w: 96, h: 96 },
-                // Left designer garment racks
-                { x: 56, y: 252, w: 140, h: 28 },
-                { x: 56, y: 364, w: 140, h: 28 },
-                // East Fitting Rooms partition wall (archway at y=212..300)
-                { x: 548, y: 68, w: 16, h: 144, isWall: true },
-                { x: 548, y: 300, w: 16, h: 176, isWall: true }
-            ];
-        } else if (t === "SHOP_CONVENIENCE") {
-            return [
-                // West L-shaped cashier counter
-                { x: 36, y: 132, w: 140, h: 32 },
-                { x: 36, y: 164, w: 36, h: 76 },
-                // Gondola supermarket shelving aisles
-                { x: 256, y: 144, w: 88, h: 100 },
-                { x: 436, y: 144, w: 88, h: 100 },
-                { x: 256, y: 312, w: 88, h: 100 },
-                { x: 436, y: 312, w: 88, h: 100 },
-                // East slushie & coffee counter
-                { x: 656, y: 136, w: 68, h: 230 }
-            ];
-        } else if (t === "SHOP_BAR") {
-            return [
-                // North-west mahogany dive bar counter
-                { x: 42, y: 122, w: 268, h: 34 },
-                // East Billiards & Arcade partition pillars (wide archway y=192..332)
-                { x: 482, y: 68, w: 16, h: 124, isWall: true },
-                { x: 482, y: 332, w: 16, h: 144, isWall: true },
-                // Tournament emerald-felt Pool Table in east wing
-                { x: 532, y: 252, w: 164, h: 92 },
-                // Center leather booths
-                { x: 276, y: 258, w: 132, h: 44 },
-                { x: 276, y: 368, w: 132, h: 44 }
-            ];
-        } else if (t === "ART_DECO_HOTEL") {
-            return [
-                { x: 300, y: 108, w: 160, h: 30 },
-                { x: 246, y: 68, w: 16, h: 152, isWall: true },
-                { x: 246, y: 308, w: 16, h: 168, isWall: true },
-                { x: 28, y: 112, w: 120, h: 92 },
-                { x: 504, y: 68, w: 16, h: 152, isWall: true },
-                { x: 504, y: 308, w: 16, h: 168, isWall: true },
-                { x: 548, y: 92, w: 168, h: 30 },
-                { x: 554, y: 344, w: 172, h: 112 }
-            ];
-        } else if (t === "NEON_CLUB" || t === "STRIP_CLUB" || t === "MALIBU_CLUB") {
-            return [
-                // West VIP bar counter
-                { x: 36, y: 118, w: 168, h: 36 },
-                // East Manager Vault Room partition wall (doorway at y=185..265)
-                { x: 556, y: 68, w: 16, h: 117, isWall: true },
-                { x: 556, y: 265, w: 16, h: 195, isWall: true }
-            ];
-        } else if (t === "MANSION") {
-            return [
-                // North executive desk
-                { x: 310, y: 114, w: 200, h: 38 },
-                // West Armory & East Jacuzzi wing walls
-                { x: 256, y: 68, w: 18, h: 115, isWall: true },
-                { x: 256, y: 275, w: 18, h: 185, isWall: true },
-                { x: 556, y: 68, w: 18, h: 115, isWall: true },
-                { x: 556, y: 275, w: 18, h: 185, isWall: true }
-            ];
-        } else if (t === "SPACE_BUNKER") {
-            return [
-                { x: 292, y: 128, w: 236, h: 36 },
-                { x: 292, y: 238, w: 236, h: 36 },
-                { x: 292, y: 348, w: 236, h: 36 }
-            ];
-        } else if (t === "PRISON_BLOCK") {
-            return [
-                // North cellblock dividers between Cell #06, Warden Office & SWAT Armory
-                { x: 268, y: 68, w: 16, h: 145, isWall: true },
-                { x: 526, y: 68, w: 16, h: 145, isWall: true },
-                // Warden's desk
-                { x: 310, y: 122, w: 180, h: 38 },
-                // South cellblock mess tables
-                { x: 64, y: 348, w: 136, h: 44 },
-                { x: 336, y: 348, w: 136, h: 44 }
-            ];
-        } else if (t === "DINER_PAWN") {
-            return [
-                // Partition wall between Hank's Waffles (west/center) and Uncle Jack's Pawn Shop (east)
-                { x: 484, y: 68, w: 16, h: 145, isWall: true },
-                { x: 484, y: 305, w: 16, h: 170, isWall: true },
-                // Hank's Diner counter & Uncle Jack's Pawn counter
-                { x: 36, y: 148, w: 188, h: 30 },
-                { x: 264, y: 148, w: 192, h: 30 },
-                { x: 532, y: 134, w: 196, h: 34 }
-            ];
-        }
-        return [];
+        const raw = getRawObstacles(intr);
+        return raw.map(ob => {
+            const tr = transformRect(ob.x, ob.y, ob.w, ob.h, intr);
+            return {
+                x: tr.x,
+                y: tr.y,
+                w: tr.w,
+                h: tr.h,
+                isWall: !!ob.isWall
+            };
+        });
     }
 
-    window.ShopInteriors = { generate, snapLandmarkDoors, getObstacles, TEMPLATES: SHOP_TEMPLATES, ROOM_W, ROOM_H };
+    window.ShopInteriors = {
+        SHOP_TEMPLATES,
+        HANDCRAFTED_ESTABLISHMENTS,
+        transformRect,
+        transformPoint,
+        getEntrancePose,
+        orientInterior,
+        snapLandmarkDoors,
+        generate,
+        getRawObstacles,
+        getObstacles
+    };
 })();

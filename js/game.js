@@ -4476,21 +4476,20 @@ class LeonidaGame {
 
 
 
+        if (window.ShopInteriors && typeof window.ShopInteriors.orientInterior === "function") {
+            window.ShopInteriors.orientInterior(intr);
+        }
+        const pose = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
+            ? window.ShopInteriors.getEntrancePose(intr)
+            : { spawnX: intr.w * 0.5, spawnY: intr.h - 120, spawnAngle: -Math.PI * 0.5, partnerX: intr.w * 0.5 + 38, partnerY: intr.h - 112, partnerAngle: -Math.PI * 0.5 };
         this.activeInterior = intr;
-
         this.interiorCooldown = 0.85;
-
-        this.interiorX = intr.w * 0.5;
-
-        this.interiorY = intr.h - 120;
-
-        this.interiorAngle = -Math.PI * 0.5;
-
-        this.interiorJasonX = intr.w * 0.5 + 38;
-
-        this.interiorJasonY = intr.h - 112;
-
-        this.interiorJasonAngle = -Math.PI * 0.5;
+        this.interiorX = pose.spawnX;
+        this.interiorY = pose.spawnY;
+        this.interiorAngle = pose.spawnAngle;
+        this.interiorJasonX = pose.partnerX;
+        this.interiorJasonY = pose.partnerY;
+        this.interiorJasonAngle = pose.partnerAngle;
 
 
 
@@ -4545,7 +4544,7 @@ class LeonidaGame {
         this.player.y = dty + dnx[1] * 18;
 
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
-
+        this.player.angle = Math.atan2(dnx[1], dnx[0]);
         this.player.vx = 0;
 
         this.player.vy = 0;
@@ -4920,10 +4919,11 @@ class LeonidaGame {
 
             }
 
-            if (this.interiorY >= intr.h - 44 && Math.abs(this.interiorX - intr.w * 0.5) < 56) {
-
+            const pose = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
+                ? window.ShopInteriors.getEntrancePose(intr)
+                : null;
+            if (pose ? pose.isNearExit(this.interiorX, this.interiorY) : (this.interiorY >= intr.h - 44 && Math.abs(this.interiorX - intr.w * 0.5) < 56)) {
                 this.exitInterior();
-
             }
 
             return;
@@ -9148,9 +9148,11 @@ class LeonidaGame {
 
         // Clamp Lucia inside the 2.5D perimeter interior walls
 
-        this.interiorX = Math.max(40, Math.min(intr.w - 40, this.interiorX));
-
-        this.interiorY = Math.max(82, Math.min(intr.h - 24, this.interiorY));
+        const poseBounds = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
+                ? window.ShopInteriors.getEntrancePose(intr)
+                : { minX: 34, maxX: intr.w - 34, minY: 72, maxY: intr.h - 24 };
+            this.interiorX = Math.max(poseBounds.minX, Math.min(poseBounds.maxX, this.interiorX));
+            this.interiorY = Math.max(poseBounds.minY, Math.min(poseBounds.maxY, this.interiorY));
 
 
 
@@ -9296,14 +9298,12 @@ class LeonidaGame {
 
         // Step directly onto the bottom EXIT DOOR mat (near center bottom) to return to the street!
 
+        const poseExit = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
+            ? window.ShopInteriors.getEntrancePose(intr)
+            : null;
         if (this.interiorCooldown <= 0 &&
-
-            this.interiorY >= intr.h - 38 &&
-
-            Math.abs(this.interiorX - intr.w * 0.5) < 52) {
-
+            (poseExit ? poseExit.isAtExit(this.interiorX, this.interiorY) : (this.interiorY >= intr.h - 38 && Math.abs(this.interiorX - intr.w * 0.5) < 52))) {
             this.exitInterior();
-
         }
 
     }

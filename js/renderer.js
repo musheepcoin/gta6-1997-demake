@@ -10017,8 +10017,8 @@ class RetroRenderer {
 
                 const dist = Math.hypot(p.x - threshX, p.y - threshY);
                 if (dist > 340) continue;
-                // Never draw a South-facing door badge when the player is on the North/back side of the 3D building
-                if (!isPortico && (!intr.facing || intr.facing === "S") && p.y < tcy - TILE_SIZE * 0.52) continue;
+                // Never draw a door badge when the player is on the opposite/back side of the 3D building facade
+                if (!isPortico && ((p.x - tcx) * fnv[0] + (p.y - tcy) * fnv[1]) < -TILE_SIZE * 0.52) continue;
                 if (!isPortico && dist > 64 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, threshX, threshY, 2.0).hit) continue;
 
                 const labelX = (intr.facing && !isPortico) ? (tcx - fnv[0] * 12) : intr.doorX;
@@ -11204,9 +11204,12 @@ class RetroRenderer {
         }
 
         // Companion Tag (Jason or Lucia standing watch near the entrance)
+        const pose = (window.ShopInteriors && window.ShopInteriors.getEntrancePose)
+            ? window.ShopInteriors.getEntrancePose(intr)
+            : { partnerX: rw * 0.5 - 64, partnerY: rh - 62, exitX: rw * 0.5, exitY: rh - 8 };
         const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
         const partnerName = isJasonPlayer ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
-        const jScr = this.worldToScreen(rw * 0.5 - 64, rh - 62, 2.22);
+        const jScr = this.worldToScreen(pose.partnerX, pose.partnerY, 2.22);
         ctx.font = "bold 9px Consolas, monospace";
         const jTw = ctx.measureText(partnerName).width + 10;
         ctx.fillStyle = "rgba(8, 12, 24, 0.84)";
@@ -11227,12 +11230,12 @@ class RetroRenderer {
         ctx.fillStyle = "#f472b6";
         ctx.fillText(pLabel, pTopScr.x, pTopScr.y - 11);
 
-        // 6. 3D-Projected South Threshold [🚪 EXIT TO STREET] Button
-        const exScr = this.worldToScreen(rw * 0.5, rh - 8, 2.08);
+        // 6. 3D-Projected Threshold [🚪 EXIT TO STREET] Button (anchored on actual building entrance wall)
+        const exScr = this.worldToScreen(pose.exitX, pose.exitY, 2.08);
         const exitW = 176;
         const exitH = 28;
-        const exitX = Math.round(exScr.x - exitW * 0.5);
-        const exitY = Math.min(H - 36, Math.round(exScr.y - exitH * 0.5));
+        const exitX = Math.max(12, Math.min(W - exitW - 12, Math.round(exScr.x - exitW * 0.5)));
+        const exitY = Math.max(48, Math.min(H - 36, Math.round(exScr.y - exitH * 0.5)));
 
         ctx.fillStyle = "rgba(131, 24, 67, 0.94)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
