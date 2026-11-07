@@ -5134,17 +5134,7 @@ class LeonidaGame {
 
 
 
-        // If on foot near a 3D Villa Heist Keypad, 3D Cartel Vault, or Pier Getaway Speedboat!
-
-        if (!p.inVehicle && this.map && this.map.objectEngine && typeof this.map.objectEngine.tryTriggerHeistAction === "function") {
-
-            if (this.map.objectEngine.tryTriggerHeistAction(this)) return;
-
-        }
-
-
-
-        // If on foot near a building entrance door, [E] / [F] / [Enter] enters the interior!
+        // If on foot directly at a building entrance door, [E] / [F] / [Enter] enters the interior first!
 
         if (!p.inVehicle && Array.isArray(this.map.interiors)) {
 
@@ -5161,6 +5151,16 @@ class LeonidaGame {
                 }
 
             }
+
+        }
+
+
+
+        // If on foot near a 3D Villa Heist Keypad, 3D Cartel Vault, Pier Getaway Speedboat, or Interactive World Prop!
+
+        if (!p.inVehicle && this.map && this.map.objectEngine && typeof this.map.objectEngine.tryTriggerHeistAction === "function") {
+
+            if (this.map.objectEngine.tryTriggerHeistAction(this)) return;
 
         }
 
@@ -7080,6 +7080,30 @@ class LeonidaGame {
 
         this.updateHud();
 
+    }
+
+    addMultiplier(n = 1) {
+        this.multiplier = Math.max(1, (this.multiplier || 1) + n);
+        this.updateHud();
+    }
+
+    get wantedSystem() {
+        const self = this;
+        return {
+            get level() {
+                return self.wantedLevel || 0;
+            },
+            set level(val) {
+                self.setWantedLevel(val);
+            },
+            addChaos(amt) {
+                const addStars = amt >= 200 ? 2 : 1;
+                self.setWantedLevel(Math.min(6, (self.wantedLevel || 0) + addStars));
+            },
+            clearWanted() {
+                self.setWantedLevel(0);
+            }
+        };
     }
 
 
@@ -9400,13 +9424,15 @@ class LeonidaGame {
         p.fireTimer = Math.max(0, (p.fireTimer || 0) - dt);
         if (this.input.shoot && p.fireTimer <= 0) {
             const wKey = p.weapon || "FIST";
-            const wDef = WEAPONS[wKey] || WEAPONS.FIST;
+            const wDef = (typeof WEAPON_SPECS !== "undefined" && (WEAPON_SPECS[wKey] || WEAPON_SPECS.FIST)) || { fireRate: 0.25 };
             if (wKey !== "FIST" && (p.ammo[wKey] || 0) <= 0) {
                 p.weapon = "FIST";
+                this.updateHud();
             } else {
-                p.fireTimer = wDef.cooldown || 0.22;
+                p.fireTimer = wDef.fireRate || 0.22;
                 if (wKey !== "FIST" && !this.infiniteAmmo) {
                     p.ammo[wKey] = Math.max(0, (p.ammo[wKey] || 0) - 1);
+                    this.updateHud();
                 }
                 const ang = this.interiorAngle !== undefined ? this.interiorAngle : (p.angle || -Math.PI * 0.5);
                 const maxRange = wKey === "FIST" ? 42 : 460;

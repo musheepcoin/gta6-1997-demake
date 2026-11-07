@@ -1072,13 +1072,13 @@ class WorldObjectEngine {
             if (!inst || map.interiors.some(it => it.id === ed.id)) continue;
             const pt = computePorticoDoor(inst);
             const tpl = (window.ShopInteriors && window.ShopInteriors.SHOP_TEMPLATES && window.ShopInteriors.SHOP_TEMPLATES[ed.theme]) || null;
-            const rawNpcs = tpl && typeof tpl.buildNpcs === "function"
-                ? tpl.buildNpcs()
+            const rawNpcs = tpl && Array.isArray(tpl.npcs)
+                ? tpl.npcs.map(n => ({ ...n }))
                 : (baseMansion && Array.isArray(baseMansion._rawNpcs || baseMansion.npcs)
                     ? (baseMansion._rawNpcs || baseMansion.npcs).map(n => ({ ...n }))
                     : []);
-            const rawStations = tpl && typeof tpl.buildStations === "function"
-                ? tpl.buildStations(ed.id)
+            const rawStations = tpl && Array.isArray(tpl.stations)
+                ? tpl.stations.map(s => ({ ...s, id: `${ed.id}_${s.id}` }))
                 : (baseMansion && Array.isArray(baseMansion._rawStations || baseMansion.stations)
                     ? (baseMansion._rawStations || baseMansion.stations).map(s => ({ ...s, id: `${ed.id}_${s.id}` }))
                     : []);
@@ -1121,7 +1121,7 @@ class WorldObjectEngine {
                 interiorId: "STAR_ISLAND",
                 title: "OPERATION SCARFACE — PALAZZO DE LA ROSA",
                 lootCash: 25000,
-                bonusWeapon: "ROCKET_LAUNCHER",
+                bonusWeapon: "ROCKET",
                 bonusAmmo: 8
             },
             {
@@ -1218,11 +1218,18 @@ class WorldObjectEngine {
         const stealthBonus = (!ht.alarmTripped && ht.hacked) ? 5000 : 0;
         const totalTake = ht.lootCash + stealthBonus;
 
-        if (typeof game.addScore === "function") game.addScore(totalTake);
+        if (typeof game.addCash === "function") game.addCash(totalTake, `💰 ${sourceLabel}`);
         if (game.player) {
             game.player.armor = Math.max(game.player.armor || 0, 100);
-            if (ht.bonusWeapon && typeof game.player.giveWeapon === "function") {
-                game.player.giveWeapon(ht.bonusWeapon, ht.bonusAmmo || 30);
+            if (ht.bonusWeapon) {
+                const wKey = ht.bonusWeapon === "ROCKET_LAUNCHER" ? "ROCKET" : ht.bonusWeapon;
+                if (Array.isArray(game.player.weaponsOwned) && !game.player.weaponsOwned.includes(wKey)) {
+                    game.player.weaponsOwned.push(wKey);
+                }
+                if (game.player.ammo) {
+                    game.player.ammo[wKey] = Math.min(999, (game.player.ammo[wKey] || 0) + (ht.bonusAmmo || 30));
+                }
+                game.player.weapon = wKey;
             }
         }
         if (game.wantedSystem && typeof game.wantedSystem.addChaos === "function") {
@@ -1270,7 +1277,7 @@ class WorldObjectEngine {
         this.rocketLaunch.armSwing = 0;
 
         if (game) {
-            if (typeof game.addScore === "function") game.addScore(25000);
+            if (typeof game.addCash === "function") game.addCash(25000, "🚀 SERA ARTEMIS VI LAUNCH!");
             if (game.audio) game.audio.playPickup("WEAPON");
             if (typeof game.showBigBanner === "function") {
                 game.showBigBanner("🚀 SERA ARTEMIS VI — IGNITION SEQUENCE!", "MAIN ENGINES START • UMBILICAL ARMS RETRACTING • +$25,000", "#f97316", 3.2);
@@ -1300,7 +1307,7 @@ class WorldObjectEngine {
             const lp = this.landmarks3D.launchpad;
             if (this.rocketLaunch && this.rocketLaunch.capsuleActive && Math.hypot(px - this.rocketLaunch.capsuleX, py - this.rocketLaunch.capsuleY) < 92) {
                 this.rocketLaunch.capsuleActive = false;
-                if (typeof game.addScore === "function") game.addScore(50000);
+                if (typeof game.addCash === "function") game.addCash(50000, "🪂 ORION LUNAR CAPSULE!");
                 if (game.audio) game.audio.playPickup("WEAPON");
                 if (typeof game.showBigBanner === "function") {
                     game.showBigBanner("🪂 ORION CAPSULE RECOVERED!", "CLASSIFIED NASA LUNAR PAYLOAD SECURED • +$50,000", "#4ade80", 3.4);
@@ -1741,7 +1748,9 @@ class WorldObjectEngine {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 76) {
                     su.cooldown = 35.0;
                     su.robbedOnce = true;
+                    game.player.bandana = true;
                     game.player.bandanaOn = true;
+                    if (typeof game.renderPortraits === "function") game.renderPortraits();
                     const robbedCount = this.stickUpStores.filter(s => s.robbedOnce).length;
                     const totalStores = this.stickUpStores.length;
                     const isAllRobbed = robbedCount === totalStores;
@@ -1845,10 +1854,31 @@ class WorldObjectEngine {
                 if (dBoat < 64 || (this.activeHeist && this.activeHeist.target === ht && dPier < 75)) {
                     const ux = Math.cos(db.pierAng);
                     const uy = Math.sin(db.pierAng);
-                    game.player.x = db.worldX + ux * 42;
-                    game.player.y = db.worldY + uy * 42;
+                    const spawnX = db.worldX + ux * 36;
+                    const spawnY = db.worldY + uy * 36;
+                    game.player.x = spawnX;
+                    game.player.y = spawnY;
+                    if (typeof Vehicle === "function" && Array.isArray(game.vehicles)) {
+                        const boatKey = (db.spr && String(db.spr).includes("jetski")) ? "JETSKI" : "SPEEDBOAT";
+                        let boat = db._liveBoat && !db._liveBoat.destroyed && game.vehicles.includes(db._liveBoat) ? db._liveBoat : null;
+                        if (!boat) {
+                            boat = new Vehicle(`pier_boat_${ht.instId}_${Date.now()}`, boatKey, spawnX, spawnY, db.pierAng);
+                            boat.z = 1.0;
+                            boat.isEstateCar = true;
+                            game.vehicles.push(boat);
+                            db._liveBoat = boat;
+                        } else {
+                            boat.x = spawnX;
+                            boat.y = spawnY;
+                            boat.angle = db.pierAng;
+                        }
+                        boat.driver = game.player;
+                        game.player.inVehicle = boat;
+                        game.player.seatIndex = 0;
+                        if (typeof game.updateHud === "function") game.updateHud();
+                    }
                     if (this.activeHeist && this.activeHeist.target === ht) {
-                        if (typeof game.addScore === "function") game.addScore(7500);
+                        if (typeof game.addCash === "function") game.addCash(7500, "🚤 MARINE SPEEDBOAT GETAWAY!");
                         if (game.wantedSystem) game.wantedSystem.level = Math.max(0, (game.wantedSystem.level || 0) - 2);
                         if (Array.isArray(game.floatingTexts)) {
                             game.floatingTexts.push({
@@ -1862,7 +1892,7 @@ class WorldObjectEngine {
                         }
                         this.activeHeist = null;
                     } else {
-                        if (typeof game.addScore === "function") game.addScore(500);
+                        if (typeof game.addCash === "function") game.addCash(500, "🚤 PIER SPEEDBOAT LAUNCH!");
                         if (Array.isArray(game.floatingTexts)) {
                             game.floatingTexts.push({
                                 x: game.player.x,
@@ -1885,7 +1915,7 @@ class WorldObjectEngine {
             if (!ht.hacked && Math.hypot(px - ht.keypadX, py - ht.keypadY) < 48) {
                 ht.hacked = true;
                 ht.alarmTripped = false;
-                if (typeof game.addScore === "function") game.addScore(1500);
+                if (typeof game.addCash === "function") game.addCash(1500, "🔓 LASER GRID HACKED!");
                 if (game.audio) game.audio.playPickup("SCORE");
                 if (Array.isArray(game.floatingTexts)) {
                     game.floatingTexts.push({
@@ -2044,7 +2074,7 @@ class WorldObjectEngine {
                 const bonusText = (p.inVehicle && pVeh && pVeh.isEstateCar)
                     ? `🏎️ SUPERCAR HEIST GETAWAY COMPLETE! +$${escapeBonus.toLocaleString()}!`
                     : `🏆 VILLA HEIST ESCAPE COMPLETE! +$${escapeBonus.toLocaleString()}!`;
-                if (typeof game.addScore === "function") game.addScore(escapeBonus);
+                if (typeof game.addCash === "function") game.addCash(escapeBonus, "🏆 VILLA HEIST GETAWAY!");
                 if (game.audio) game.audio.playPickup("WEAPON");
                 if (Array.isArray(game.floatingTexts)) {
                     game.floatingTexts.push({
@@ -2178,7 +2208,7 @@ class WorldObjectEngine {
                 } else if (p && Math.hypot(px - rl.capsuleX, py - rl.capsuleY) < 54) {
                     // Instant pickup when walking/swimming/boating over the splashed-down capsule!
                     rl.capsuleActive = false;
-                    if (typeof game.addScore === "function") game.addScore(50000);
+                    if (typeof game.addCash === "function") game.addCash(50000, "🪂 ORION LUNAR CAPSULE!");
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner("🪂 ORION CAPSULE RECOVERED!", "CLASSIFIED NASA LUNAR PAYLOAD SECURED • +$50,000", "#4ade80", 3.4);
