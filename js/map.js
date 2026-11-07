@@ -3338,9 +3338,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 142, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE" },
-                    { x: 165, y: 245, angle: 0, type: "civ1", label: "GUEST" },
-                    { x: 665, y: 84, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER" }
+                    { x: 410, y: 142, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE", dialog: "WELCOME BACK TO HOTEL DIXON! YOUR SUITE STASH IS UPSTAIRS." },
+                    { x: 165, y: 245, angle: 0, type: "civ1", label: "GUEST", dialog: "OCEAN DRIVE NEVER SLEEPS... PASS ME ANOTHER MOJITO!" },
+                    { x: 665, y: 84, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER", dialog: "COLDEST CUBAN MOJITOS ON SOUTH BEACH!" }
                 ],
                 stations: [
                     {
@@ -3384,11 +3384,11 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 94, z: 2.34, angle: Math.PI * 0.5, type: "gang", label: "RESIDENT DJ" },
-                    { x: 355, y: 275, angle: 0.8, type: "civ2", label: "DANCER", dancing: true },
+                    { x: 410, y: 94, z: 2.34, angle: Math.PI * 0.5, type: "gang", label: "RESIDENT DJ", dialog: "CLUB NINE1NINE IN THE MIX! STEP UP TO THE DECKS!" },
+                    { x: 355, y: 275, angle: 0.8, type: "civ2", label: "DANCER", dancing: true, dialog: "THIS BASSLINE IS SHAKING THE WHOLE BAY!" },
                     { x: 465, y: 275, angle: -0.8, type: "civ1", label: "DANCER", dancing: true },
                     { x: 410, y: 335, angle: -1.5, type: "civ3", label: "DANCER", dancing: true },
-                    { x: 645, y: 345, angle: Math.PI, type: "civ0", label: "VIP HOST" }
+                    { x: 645, y: 345, angle: Math.PI, type: "civ0", label: "VIP HOST", dialog: "PRIVATE BOTTLE SERVICE WEST, MANAGER'S VAULT EAST." }
                 ],
                 stations: [
                     {
@@ -3432,10 +3432,10 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 262, z: 2.22, angle: Math.PI * 0.5, type: "bikini_pink", label: "STAGE PERFORMER", dancing: true },
-                    { x: 300, y: 295, angle: 0, type: "gang", label: "BOOBIE IKE VIP" },
-                    { x: 520, y: 295, angle: Math.PI, type: "civ1", label: "PATRON" },
-                    { x: 645, y: 345, angle: Math.PI, type: "gang", label: "VAULT GUARD" }
+                    { x: 410, y: 262, z: 2.22, angle: Math.PI * 0.5, type: "bikini_pink", label: "STAGE PERFORMER", dancing: true, dialog: "MAKE IT RAIN AT THE JACK OF HEARTS, BABY!" },
+                    { x: 300, y: 295, angle: 0, type: "gang", label: "BOOBIE IKE VIP", dialog: "BOOBIE IKE OWNS THIS WHOLE BLOCK, WATCH YOUR STEP." },
+                    { x: 520, y: 295, angle: Math.PI, type: "civ1", label: "PATRON", dialog: "BEST VIP LOUNGE IN LEONIDA!" },
+                    { x: 645, y: 345, angle: Math.PI, type: "gang", label: "VAULT GUARD", dialog: "BACKROOM COUNTING OFFICE IS STRICTLY OFF-LIMITS!" }
                 ],
                 stations: [
                     {
@@ -3479,9 +3479,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 375, y: 275, angle: 0.5, type: "civ1", label: "SALSA DANCER", dancing: true },
+                    { x: 375, y: 275, angle: 0.5, type: "civ1", label: "SALSA DANCER", dancing: true, dialog: "ESPAÑOLA WAY FEELS JUST LIKE HAVANA TONIGHT!" },
                     { x: 445, y: 275, angle: -2.5, type: "civ2", label: "SALSA DANCER", dancing: true },
-                    { x: 125, y: 105, angle: Math.PI * 0.5, type: "gang", label: "SMUGGLER" }
+                    { x: 125, y: 105, angle: Math.PI * 0.5, type: "gang", label: "SMUGGLER", dialog: "FRESH CRATE JUST CAME IN OFF A FAST BOAT FROM THE KEYS." }
                 ],
                 stations: [
                     {
@@ -3525,9 +3525,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 84, angle: Math.PI * 0.5, type: "gang", label: "CARTEL BOSS" },
-                    { x: 315, y: 268, angle: 0, type: "gang", label: "BODYGUARD" },
-                    { x: 505, y: 268, angle: Math.PI, type: "civ2", label: "VIP GUEST" }
+                    { x: 410, y: 84, angle: Math.PI * 0.5, type: "gang", label: "CARTEL BOSS", dialog: "THE WORLD IS YOURS... IF YOU CAN HOLD ON TO IT." },
+                    { x: 315, y: 268, angle: 0, type: "gang", label: "BODYGUARD", dialog: "EYES OFF THE DESK, PAL. BOSS IS COUNTING." },
+                    { x: 505, y: 268, angle: Math.PI, type: "civ2", label: "VIP GUEST", dialog: "HAVE YOU SEEN THAT GOLDEN GLOBE FOUNTAIN?!" }
                 ],
                 stations: [
                     {
@@ -3571,9 +3571,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 92, angle: Math.PI * 0.5, type: "civ1", label: "FLIGHT DIRECTOR" },
-                    { x: 315, y: 335, angle: 0, type: "civ0", label: "ENGINEER" },
-                    { x: 505, y: 335, angle: Math.PI, type: "civ3", label: "ASTRONAUT" }
+                    { x: 410, y: 92, angle: Math.PI * 0.5, type: "civ1", label: "FLIGHT DIRECTOR", dialog: "PAD 39A TELEMETRY IS GREEN! READY FOR ORBITAL IGNITION." },
+                    { x: 315, y: 335, angle: 0, type: "civ0", label: "ENGINEER", dialog: "BOOSTER FUEL PRESSURE STABLE AT 104 PERCENT." },
+                    { x: 505, y: 335, angle: Math.PI, type: "civ3", label: "ASTRONAUT", dialog: "NEXT STOP: LOW LEONIDA ORBIT!" }
                 ],
                 stations: [
                     {
@@ -3597,7 +3597,7 @@ class LeonidaMap {
                     {
                         id: "SERA_MEDPOD",
                         x: 655,
-                        y: 345,
+                        y: 255,
                         color: "#39ff14",
                         label: "🧬 ZERO-G BIO-MEDPOD",
                         sub: "+1 EXTRA LIFE & 100% HEALTH!",
@@ -3617,9 +3617,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 400, y: 78, angle: Math.PI * 0.5, type: "police", label: "WARDEN" },
-                    { x: 165, y: 112, angle: Math.PI * 0.5, type: "monk", label: "INMATE #09" },
-                    { x: 505, y: 275, angle: Math.PI, type: "police", label: "CORRECTIONS OFFICER" }
+                    { x: 400, y: 78, angle: Math.PI * 0.5, type: "police", label: "WARDEN", dialog: "BAD LUCK I GUESS? STAY OUT OF TROUBLE ON PAROLE!" },
+                    { x: 165, y: 112, angle: Math.PI * 0.5, type: "monk", label: "INMATE #09", dialog: "LUCIA LEFT HER OLD STASH HIDDEN UNDER BUNK #06..." },
+                    { x: 505, y: 275, angle: Math.PI, type: "police", label: "CORRECTIONS OFFICER", dialog: "CELLBLOCK B LOCKDOWN IN TEN MINUTES! KEEP MOVING!" }
                 ],
                 stations: [
                     {
@@ -3663,9 +3663,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 345, y: 98, angle: Math.PI * 0.5, type: "civ0", label: "CASHIER" },
-                    { x: 220, y: 275, angle: Math.PI, type: "civ3", label: "DINER CUSTOMER" },
-                    { x: 635, y: 92, angle: Math.PI * 0.5, type: "gang", label: "PAWN BROKER" }
+                    { x: 345, y: 98, angle: Math.PI * 0.5, type: "civ0", label: "CASHIER", dialog: "WELCOME TO HANK'S WAFFLES! PLEASE DON'T ROB THE REGISTER!" },
+                    { x: 220, y: 275, angle: Math.PI, type: "civ3", label: "DINER CUSTOMER", dialog: "BEST PECAN WAFFLES & BLACK COFFEE IN PORT GELLHORN." },
+                    { x: 635, y: 92, angle: Math.PI * 0.5, type: "gang", label: "PAWN BROKER", dialog: "UNCLE JACK'S PAWN: WE BUY GOLD, WATCHES & HEAVY IRON!" }
                 ],
                 stations: [
                     {

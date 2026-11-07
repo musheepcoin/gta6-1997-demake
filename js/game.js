@@ -4717,8 +4717,6 @@ class LeonidaGame {
 
         }
 
-        st.cooldown = 8.0;
-
         const p = this.player;
 
         const grantWep = (wKey, ammoAmt) => {
@@ -4730,6 +4728,158 @@ class LeonidaGame {
             p.weapon = wKey;
 
         };
+
+        // Handle interactive Shop Stations (st.action & st.cost / st.reward)
+        if (st.action) {
+            const cost = Math.max(0, Number(st.cost) || 0);
+            if (cost > 0 && this.cash < cost) {
+                if (this.audio && this.audio.playTone) this.audio.playTone(150, 0.16, "sawtooth", 0.25);
+                this.showBigBanner("INSUFFICIENT CASH", `NEED $${cost.toLocaleString()} FOR ${st.label.split(" (")[0]}`, "#ef4444", 1.8);
+                return;
+            }
+            if (cost > 0) {
+                this.cash -= cost;
+            }
+            st.cooldown = st.action === "ROB_REGISTER" ? 28.0 : 2.5;
+            let bannerTitle = st.label.split(" (")[0];
+            let bannerSub = st.sub || "PURCHASED!";
+            let bannerCol = st.color || "#39ff14";
+
+            switch (st.action) {
+                case "BUY_PISTOL":
+                    grantWep("PISTOL", 40);
+                    if (this.audio && this.audio.playPickup) this.audio.playPickup();
+                    bannerSub = "EQUIPPED 9MM PISTOL (+40 ROUNDS)";
+                    break;
+                case "BUY_UZI":
+                    grantWep("UZI", 80);
+                    if (this.audio && this.audio.playPickup) this.audio.playPickup();
+                    bannerSub = "EQUIPPED MICRO-UZI (+80 ROUNDS)";
+                    break;
+                case "BUY_SHOTGUN":
+                    grantWep("SHOTGUN", 25);
+                    if (this.audio && this.audio.playPickup) this.audio.playPickup();
+                    bannerSub = "EQUIPPED PUMP SHOTGUN (+25 SHELLS)";
+                    break;
+                case "BUY_ROCKET":
+                    grantWep("ROCKET", 8);
+                    if (this.audio && this.audio.playPickup) this.audio.playPickup();
+                    bannerSub = "EQUIPPED HEAVY ROCKET LAUNCHER (+8 ROCKETS)";
+                    break;
+                case "BUY_ARMOR":
+                    p.armor = 100;
+                    if (this.audio && this.audio.playPickup) this.audio.playPickup();
+                    bannerSub = "+100% KEVLAR TACTICAL BODY ARMOR!";
+                    break;
+                case "BUY_SNACK":
+                    p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.35));
+                    bannerSub = "+35% HEALTH RESTORED!";
+                    break;
+                case "BUY_MEAL":
+                    p.hp = p.maxHp;
+                    bannerSub = "+100% FULL HEALTH RESTORED!";
+                    break;
+                case "BUY_DRINK":
+                case "BUY_ENERGY":
+                    p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.50));
+                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 20.0);
+                    bannerSub = "+50% HP & 20S ADRENALINE SPEED BOOST!";
+                    break;
+                case "BUY_COCKTAIL":
+                    p.hp = p.maxHp;
+                    p.armor = Math.min(100, (p.armor || 0) + 25);
+                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 18.0);
+                    bannerSub = "100% HP + 25 ARMOR + TROPICAL RUSH!";
+                    break;
+                case "RENT_SUITE":
+                    p.hp = p.maxHp;
+                    p.armor = 100;
+                    this.setWantedLevel(0);
+                    bannerSub = "100% HP & ARMOR + WANTED LEVEL CLEARED!";
+                    break;
+                case "CHANGE_OUTFIT":
+                case "BUY_OUTFIT_1":
+                case "BUY_OUTFIT_2":
+                    p.hp = p.maxHp;
+                    p.bandana = !p.bandana;
+                    this.setWantedLevel(0);
+                    this.renderPortraits();
+                    bannerSub = "FRESH VICE THREADS! WANTED LEVEL CLEARED!";
+                    break;
+                case "BUY_OUTFIT_VIP":
+                    p.hp = p.maxHp;
+                    p.armor = 100;
+                    p.bandana = !p.bandana;
+                    this.multiplier += 1;
+                    this.setWantedLevel(0);
+                    this.renderPortraits();
+                    bannerSub = "VIP COUTURE! +100 ARMOR, +1 MULTIPLIER & 0 WANTED!";
+                    break;
+                case "HOTEL_PERK":
+                    p.hp = p.maxHp;
+                    p.armor = Math.min(100, (p.armor || 0) + 50);
+                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 25.0);
+                    bannerSub = "SPA & PENTHOUSE BUFF: 100% HP + 50 ARMOR + SPEED!";
+                    break;
+                case "PLAY_LOTTO": {
+                    const roll = Math.random();
+                    if (roll < 0.22) {
+                        this.addCash(2500, "🎰 FLORIDA LOTTO JACKPOT!");
+                        bannerTitle = "🎰 LOTTO JACKPOT WINNER!";
+                        bannerSub = "SCRATCHED 3 GOLDEN FLAMINGOS: WON +$2,500!";
+                        bannerCol = "#fde047";
+                    } else if (roll < 0.58) {
+                        this.addCash(250, "🎟️ LOTTO PRIZE WINNER!");
+                        bannerTitle = "🎟️ SCRATCH-OFF WINNER!";
+                        bannerSub = "MATCHED 2 PALM TREES: WON +$250!";
+                        bannerCol = "#39ff14";
+                    } else {
+                        bannerTitle = "🎟️ NO MATCH THIS TIME";
+                        bannerSub = "TRY AGAIN! JACKPOT UP TO $2,500!";
+                        bannerCol = "#94a3b8";
+                    }
+                    break;
+                }
+                case "PLAY_POOL": {
+                    if (Math.random() < 0.65) {
+                        this.addCash(500, "🎱 8-BALL BANK SHOT HUSTLE!");
+                        bannerTitle = "🎱 SANK THE 8-BALL!";
+                        bannerSub = "CLEAN TABLE RUN! HUSTLED +$500 FROM LOCAL SHARK!";
+                        bannerCol = "#39ff14";
+                    } else {
+                        bannerTitle = "🎱 SCRATCH ON THE 8-BALL!";
+                        bannerSub = "TOUGH BREAK! RACK 'EM UP AGAIN ($100)";
+                        bannerCol = "#fb923c";
+                    }
+                    break;
+                }
+                case "ROB_REGISTER": {
+                    const take = Number(st.reward) || 1250;
+                    this.addCash(take, "💵 ARMED REGISTER HOLD-UP!");
+                    this.setWantedLevel(Math.max(this.wantedLevel + 1, 2));
+                    if (this.audio && this.audio.playSirenBlip) this.audio.playSirenBlip();
+                    bannerTitle = "🚨 ARMED HOLD-UP COMPLETE!";
+                    bannerSub = `STOLE +$${take.toLocaleString()} CASH! VCPD DISPATCHED (+2★)!`;
+                    bannerCol = "#ef4444";
+                    if (this.activeInterior && Array.isArray(this.activeInterior.npcs)) {
+                        for (const npc of this.activeInterior.npcs) {
+                            npc._robbedTimer = 14.0;
+                        }
+                    }
+                    break;
+                }
+                default:
+                    p.hp = p.maxHp;
+                    break;
+            }
+
+            if (this.audio && this.audio.playCashSound) this.audio.playCashSound();
+            this.showBigBanner(bannerTitle, bannerSub, bannerCol, 2.2);
+            this.updateHud();
+            return;
+        }
+
+        st.cooldown = 8.0;
 
 
 
@@ -9220,10 +9370,134 @@ class LeonidaGame {
 
             }
 
-            this.interiorX = Math.max(40, Math.min(intr.w - 40, this.interiorX));
+            this.interiorX = Math.max(poseBounds.minX, Math.min(poseBounds.maxX, this.interiorX));
 
-            this.interiorY = Math.max(82, Math.min(intr.h - 24, this.interiorY));
+            this.interiorY = Math.max(poseBounds.minY, Math.min(poseBounds.maxY, this.interiorY));
 
+        }
+
+        // Decay indoor bullet tracers & floating target popups
+        if (Array.isArray(this.interiorTracers)) {
+            for (let i = this.interiorTracers.length - 1; i >= 0; i--) {
+                this.interiorTracers[i].life -= dt;
+                if (this.interiorTracers[i].life <= 0) this.interiorTracers.splice(i, 1);
+            }
+        }
+        if (Array.isArray(this.interiorPopups)) {
+            for (let i = this.interiorPopups.length - 1; i >= 0; i--) {
+                this.interiorPopups[i].y -= 24 * dt;
+                this.interiorPopups[i].life -= dt;
+                if (this.interiorPopups[i].life <= 0) this.interiorPopups.splice(i, 1);
+            }
+        }
+        if (Array.isArray(intr.npcs)) {
+            for (const npc of intr.npcs) {
+                if ((npc._robbedTimer || 0) > 0) npc._robbedTimer = Math.max(0, npc._robbedTimer - dt);
+            }
+        }
+
+        // Live Indoor Weapon Firing & Ammu-Nation 4-Lane Firing Range Target Practice!
+        p.fireTimer = Math.max(0, (p.fireTimer || 0) - dt);
+        if (this.input.shoot && p.fireTimer <= 0) {
+            const wKey = p.weapon || "FIST";
+            const wDef = WEAPONS[wKey] || WEAPONS.FIST;
+            if (wKey !== "FIST" && (p.ammo[wKey] || 0) <= 0) {
+                p.weapon = "FIST";
+            } else {
+                p.fireTimer = wDef.cooldown || 0.22;
+                if (wKey !== "FIST" && !this.infiniteAmmo) {
+                    p.ammo[wKey] = Math.max(0, (p.ammo[wKey] || 0) - 1);
+                }
+                const ang = this.interiorAngle !== undefined ? this.interiorAngle : (p.angle || -Math.PI * 0.5);
+                const maxRange = wKey === "FIST" ? 42 : 460;
+                const obs = (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function")
+                    ? window.ShopInteriors.getObstacles(intr)
+                    : [];
+                let hitX = this.interiorX + Math.cos(ang) * maxRange;
+                let hitY = this.interiorY + Math.sin(ang) * maxRange;
+                const steps = Math.ceil(maxRange / 6);
+                for (let s = 3; s <= steps; s++) {
+                    const sx = this.interiorX + Math.cos(ang) * (s * 6);
+                    const sy = this.interiorY + Math.sin(ang) * (s * 6);
+                    if (sx <= 18 || sx >= intr.w - 18 || sy <= 56 || sy >= intr.h - 18) {
+                        hitX = sx;
+                        hitY = sy;
+                        break;
+                    }
+                    let blocked = false;
+                    for (let k = 0; k < obs.length; k++) {
+                        const b = obs[k];
+                        if (b.isWall && sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h) {
+                            blocked = true;
+                            break;
+                        }
+                    }
+                    if (blocked) {
+                        hitX = sx;
+                        hitY = sy;
+                        break;
+                    }
+                }
+
+                if (wKey !== "FIST") {
+                    if (!this.interiorTracers) this.interiorTracers = [];
+                    this.interiorTracers.push({
+                        x1: this.interiorX + Math.cos(ang) * 14,
+                        y1: this.interiorY + Math.sin(ang) * 14,
+                        x2: hitX,
+                        y2: hitY,
+                        color: wDef.color || "#fde047",
+                        life: 0.11
+                    });
+                    if (this.audio && this.audio.playShot) this.audio.playShot(wKey);
+                } else if (this.audio && this.audio.playPunch) {
+                    this.audio.playPunch();
+                }
+
+                // Check Ammu-Nation 4-Lane Downrange Bullseye Targets!
+                let hitRangeTarget = false;
+                if (intr.theme === "SHOP_GUN_SHOP" && wKey !== "FIST" && window.ShopInteriors && typeof window.ShopInteriors.transformPoint === "function") {
+                    const tNow = performance.now() * 0.001;
+                    for (let lane = 0; lane < 4; lane++) {
+                        const lx = 550 + lane * 58;
+                        const targY = 86 + Math.sin(tNow * 2.0 + lane * 1.4) * 6;
+                        const tp = window.ShopInteriors.transformPoint(lx + 27, targY + 2, 0, intr);
+                        // Distance from ray segment to target center
+                        const rdx = hitX - this.interiorX;
+                        const rdy = hitY - this.interiorY;
+                        const rLen2 = rdx * rdx + rdy * rdy;
+                        const u = rLen2 > 1 ? Math.max(0, Math.min(1, ((tp.x - this.interiorX) * rdx + (tp.y - this.interiorY) * rdy) / rLen2)) : 0;
+                        const cx = this.interiorX + u * rdx;
+                        const cy = this.interiorY + u * rdy;
+                        const dist = Math.hypot(tp.x - cx, tp.y - cy);
+                        if (dist <= 24) {
+                            hitRangeTarget = true;
+                            const isBullseye = dist <= 10;
+                            const prize = isBullseye ? 250 : 100;
+                            this.cash += prize;
+                            this.score += prize * this.multiplier;
+                            if (!this.interiorPopups) this.interiorPopups = [];
+                            this.interiorPopups.push({
+                                x: tp.x,
+                                y: tp.y,
+                                text: isBullseye ? `🎯 BULLSEYE! +$${prize}` : `🎯 TARGET HIT! +$${prize}`,
+                                color: isBullseye ? "#fde047" : "#39ff14",
+                                life: 1.15
+                            });
+                            if (this.audio && this.audio.playCashSound) this.audio.playCashSound();
+                            this.updateHud();
+                            break;
+                        }
+                    }
+                }
+
+                // If firing inside a shop outside the range (or hitting near an NPC), trigger panic / hold-up!
+                if (!hitRangeTarget && wKey !== "FIST" && Array.isArray(intr.npcs)) {
+                    for (const npc of intr.npcs) {
+                        npc._robbedTimer = Math.max(npc._robbedTimer || 0, 8.0);
+                    }
+                }
+            }
         }
 
 

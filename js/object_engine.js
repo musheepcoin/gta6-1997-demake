@@ -9783,25 +9783,25 @@ class WorldObjectEngine {
                 boxR(lx + 24, targY - 2, 6, 9, 2.25, 2.31, [0.98, 0.82, 0.16], 10);
             }
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
-            // North Stainless Cooking Line (x=48..528, y=62..90) + Prep Island (x=220..400, y=124..148)
-            aoR(48, 62, 480, 28, 2.004, 8, 0.42);
-            boxR(48, 62, 480, 28, 2.00, 2.22, [0.78, 0.82, 0.88], 9);
+            const cookW = theme === "DINER_PAWN" ? 384 : 480;
+            // North Stainless Cooking Line + Sizzling Griddle & Deep-Fryer Vats
+            aoR(48, 62, cookW, 28, 2.004, 8, 0.42);
+            boxR(48, 62, cookW, 28, 2.00, 2.22, [0.78, 0.82, 0.88], 9);
             boxR(56, 66, 140, 20, 2.22, 2.25, [0.18, 0.20, 0.24], 9); // Sizzling flattop griddle
             for (let p = 0; p < 4; p++) {
                 cyl(72 + p * 28, 76, 5, 5, 2.25, 2.28, 8, [0.52, 0.24, 0.10], 9, true); // Burger patties
             }
             boxR(212, 66, 110, 20, 2.22, 2.26, [0.92, 0.68, 0.14], 10); // Golden deep-fryer vats
-            boxR(408, 66, 48, 20, 2.22, 2.38, [0.88, 0.18, 0.22], 9); // Espresso machine
-            boxR(46, 58, 484, 24, 2.48, 2.64, [0.82, 0.86, 0.92], 9); // Overhead stainless hood
-            aoR(220, 124, 180, 24, 2.004, 8, 0.40);
-            boxR(220, 124, 180, 24, 2.00, 2.22, [0.88, 0.92, 0.96], 9);
-            posterBoxR(260, 56, 136, 12, 2.26, 2.62, "ad_burgershot", [0.92, 0.38, 0.14]);
+            boxR(348, 66, 48, 20, 2.22, 2.38, [0.88, 0.18, 0.22], 9); // Espresso machine
+            boxR(46, 58, cookW + 4, 24, 2.48, 2.64, [0.82, 0.86, 0.92], 9); // Overhead stainless hood
+            posterBoxR(230, 56, 136, 12, 2.26, 2.62, "ad_burgershot", [0.92, 0.38, 0.14]);
 
             if (theme === "DINER_PAWN") {
-                // Short-Order Diner Counter (x=56..432, y=132..158) + Red Chrome Stools
+                // Short-Order Diner Counter (x=56..432, y=132..158) + Cash Register + Red Chrome Stools
                 aoR(56, 132, 376, 26, 2.004, 10, 0.42);
                 boxR(56, 132, 376, 26, 2.00, 2.22, [0.84, 0.18, 0.22], 9);
                 boxR(54, 130, 380, 30, 2.22, 2.25, [0.96, 0.96, 0.98], 9);
+                boxR(332, 134, 26, 18, 2.25, 2.38, [0.88, 0.76, 0.24], 9); // Diner Hold-Up Cash Register
                 for (let sx = 76; sx <= 408; sx += 46) {
                     cyl(sx, 172, 7, 7, 2.00, 2.15, 10, [0.92, 0.18, 0.22], 9, true);
                 }
@@ -9809,14 +9809,20 @@ class WorldObjectEngine {
                     aoR(38, by, 118, 36, 2.004, 8, 0.38);
                     boxR(38, by, 118, 36, 2.00, 2.20, [0.84, 0.14, 0.20], 11);
                 }
-                // East Wing: Uncle Jack's Caged Pawn Vault & Showcase Counter
+                // East Wing: Uncle Jack's Caged Pawn Vault & Showcase Counter + 3D Pawn Guitars/Rifles on North Wall
                 aoR(536, 124, 210, 28, 2.004, 10, 0.44);
                 boxR(536, 124, 210, 28, 2.00, 2.22, [0.48, 0.26, 0.14], 11);
                 boxR(534, 122, 214, 32, 2.22, 2.26, [0.92, 0.74, 0.22], 9);
                 boxR(536, 124, 210, 6, 2.26, 2.50, [0.88, 0.72, 0.22], 4);
+                for (let gw = 0; gw < 6; gw++) {
+                    boxR(548 + gw * 32, 60, 18, 5, 2.22, 2.48, gw % 2 === 0 ? [0.88, 0.68, 0.20] : [0.22, 0.26, 0.32], 6);
+                }
                 aoR(546, 346, 196, 32, 2.004, 10, 0.42);
                 boxR(546, 346, 196, 32, 2.00, 2.22, [0.22, 0.28, 0.36], 9);
             } else {
+                // Chef Prep Island (x=220..400, y=124..148)
+                aoR(220, 124, 180, 24, 2.004, 8, 0.40);
+                boxR(220, 124, 180, 24, 2.00, 2.22, [0.88, 0.92, 0.96], 9);
                 // West Leather Booths + Center White-Tablecloth Dining Tables
                 for (const by of [238, 338]) {
                     aoR(36, by, 96, 42, 2.004, 8, 0.38);
@@ -9845,13 +9851,24 @@ class WorldObjectEngine {
             aoR(42, 122, 124, 28, 2.004, 8, 0.38);
             boxR(42, 122, 124, 28, 2.00, 2.22, [0.58, 0.34, 0.18], 11);
             boxR(46, 126, 116, 20, 2.22, 2.25, [0.94, 0.90, 0.82], 9);
+            // Folded pastel silk stacks on tailor table
+            boxR(52, 128, 26, 16, 2.25, 2.31, [0.22, 0.88, 0.96], 9);
+            boxR(86, 128, 26, 16, 2.25, 2.31, [0.96, 0.38, 0.74], 9);
+            boxR(120, 128, 26, 16, 2.25, 2.31, [0.98, 0.84, 0.24], 9);
             aoR(42, 316, 124, 26, 2.004, 8, 0.36);
             boxR(42, 316, 124, 26, 2.00, 2.06, [0.92, 0.76, 0.24], 9);
-            boxR(46, 322, 116, 14, 2.06, 2.36, [0.94, 0.36, 0.72], 4);
+            boxR(46, 326, 116, 4, 2.34, 2.38, [0.92, 0.82, 0.36], 9); // Brass garment rail
+            const gCols = [[0.96, 0.28, 0.68], [0.18, 0.88, 0.96], [0.98, 0.82, 0.20], [0.96, 0.96, 0.98], [0.64, 0.28, 0.96], [0.22, 0.92, 0.54]];
+            for (let g = 0; g < 6; g++) {
+                boxR(50 + g * 18, 320, 11, 18, 2.08, 2.34, gCols[g], 9);
+            }
             // North-East Glass Jewelry & POS Counter (x=602..766, y=118..146)
             aoR(602, 118, 164, 28, 2.004, 10, 0.40);
             boxR(602, 118, 164, 28, 2.00, 2.16, [0.94, 0.88, 0.76], 9);
-            boxR(602, 118, 164, 28, 2.16, 2.23, [0.42, 0.90, 0.98], 10, 0.65);
+            for (let j = 0; j < 4; j++) {
+                boxR(614 + j * 34, 124, 18, 14, 2.16, 2.20, [0.96, 0.78, 0.18], 10); // Gold watch/chain velvet pads
+            }
+            boxR(602, 118, 164, 28, 2.20, 2.25, [0.42, 0.90, 0.98], 10, 0.62);
             // South-East 3 Partitioned Fitting Cabins with 3D Full-Length Mirrors & Ottomans
             for (const fy of [215, 315, 435]) {
                 boxR(768, fy, 12, 54, 2.04, 2.52, [0.56, 0.92, 1.0], 10);
@@ -9866,29 +9883,45 @@ class WorldObjectEngine {
             aoR(580, 76, 160, 32, 2.004, 8, 0.42);
             boxR(580, 76, 160, 32, 2.00, 2.24, [0.22, 0.28, 0.36], 9);
             boxR(700, 68, 52, 38, 2.00, 2.48, [0.18, 0.22, 0.28], 6);
-            // West Bulletproof Cashier Cage Counter (x=38..206, y=232..260)
+            // West Bulletproof Cashier Cage Counter (x=38..206, y=232..260) + Scratch-Off Lotto Dispenser
             aoR(38, 232, 168, 28, 2.004, 10, 0.42);
             boxR(38, 232, 168, 28, 2.00, 2.22, [0.18, 0.56, 0.48], 9);
             boxR(36, 230, 172, 32, 2.22, 2.25, [0.92, 0.96, 0.98], 9);
+            boxR(136, 234, 28, 18, 2.25, 2.40, [0.98, 0.80, 0.18], 10); // Florida Lotto Terminal
             boxR(42, 234, 160, 6, 2.25, 2.50, [0.38, 0.88, 0.98], 10, 0.65);
             // Center 3 Double-Sided 3D Supermarket Gondola Shelving Aisles (x=286, 398, 510, y=248..412)
-            for (const gx of [286, 398, 510]) {
+            const aisleCols = [[0.92, 0.22, 0.18], [0.18, 0.82, 0.38], [0.96, 0.76, 0.16]];
+            for (let ai = 0; ai < 3; ai++) {
+                const gx = 286 + ai * 112;
                 aoR(gx, 248, 42, 164, 2.004, 8, 0.42);
                 boxR(gx, 248, 42, 164, 2.00, 2.36, [0.92, 0.94, 0.98], 9);
-                boxR(gx + 4, 252, 34, 156, 2.08, 2.32, [0.92, 0.38, 0.18], 11);
+                for (let sy = 256; sy <= 388; sy += 26) {
+                    boxR(gx + 3, sy, 14, 18, 2.08, 2.32, aisleCols[(ai + sy) % 3], 9);
+                    boxR(gx + 25, sy, 14, 18, 2.08, 2.32, aisleCols[(ai + sy + 1) % 3], 9);
+                }
                 boxR(gx + 17, 248, 8, 164, 2.00, 2.40, [0.18, 0.24, 0.34], 9);
             }
             // East Walk-In Refrigerated Beverage Racks & Slushie Domes
-            boxR(756, 204, 22, 280, 2.00, 2.54, [0.22, 0.86, 0.98], 10, 0.85);
+            boxR(756, 204, 22, 280, 2.00, 2.54, [0.14, 0.22, 0.32], 9);
+            for (let cy = 212; cy <= 460; cy += 36) {
+                boxR(758, cy, 16, 26, 2.08, 2.46, (cy % 72 === 0) ? [0.94, 0.18, 0.22] : [0.18, 0.92, 0.42], 10);
+            }
+            boxR(754, 204, 6, 280, 2.04, 2.52, [0.36, 0.90, 1.0], 10, 0.65);
             cyl(668, 228, 14, 14, 2.00, 2.38, 12, [0.98, 0.18, 0.32], 10, true);
             cyl(668, 262, 14, 14, 2.00, 2.38, 12, [0.18, 0.88, 0.98], 10, true);
         } else if (theme === "SHOP_BAR" || theme === "NEON_CLUB" || theme === "STRIP_CLUB" || theme === "MALIBU_CLUB") {
+            // North Backlit Tiered Liquor Bottle Wall & Draft Towers (x=312..508)
+            boxR(316, 58, 188, 14, 2.00, 2.52, [0.16, 0.10, 0.24], 9);
+            boxR(320, 62, 180, 6, 2.24, 2.28, [0.18, 0.90, 0.98], 10);
+            boxR(320, 62, 180, 6, 2.38, 2.42, [0.98, 0.26, 0.68], 10);
             // Center North Main Bar / DJ Turntable Stage (x=312..508, y=122..154)
             aoR(312, 122, 196, 32, 2.004, 12, 0.46);
             boxR(312, 122, 196, 32, 2.00, 2.24, [0.24, 0.14, 0.28], 11);
             boxR(308, 120, 204, 36, 2.24, 2.28, accentRgb, 10);
             cyl(372, 136, 12, 12, 2.28, 2.32, 12, [0.12, 0.14, 0.18], 9, true);
             cyl(448, 136, 12, 12, 2.28, 2.32, 12, [0.12, 0.14, 0.18], 9, true);
+            cyl(332, 132, 4, 4, 2.28, 2.44, 8, [0.94, 0.80, 0.24], 9, true); // Brass draft tower W
+            cyl(488, 132, 4, 4, 2.28, 2.44, 8, [0.94, 0.80, 0.24], 9, true); // Brass draft tower E
             posterBoxR(344, 56, 132, 12, 2.28, 2.62, theme === "SHOP_BAR" ? "ad_pisswasser" : "ad_angstipan", accentRgb);
 
             if (theme === "STRIP_CLUB") {
@@ -9899,12 +9932,15 @@ class WorldObjectEngine {
                 cyl(410, 256, 3.5, 3.5, 2.16, 2.66, 10, [0.98, 0.82, 0.24], 9, true);
                 cyl(410, 324, 3.5, 3.5, 2.16, 2.66, 10, [0.98, 0.82, 0.24], 9, true);
             } else if (theme === "SHOP_BAR") {
-                // South-West Tournament Pool Table (x=56..180, y=338..402)
+                // South-West Tournament Pool Table (x=56..180, y=338..402) + Cue Stick & Billiard Balls
                 aoR(56, 338, 124, 64, 2.004, 10, 0.46);
                 boxR(56, 338, 124, 64, 2.00, 2.18, [0.48, 0.24, 0.12], 11);
                 boxR(64, 346, 108, 48, 2.04, 2.20, [0.08, 0.58, 0.32], 9);
-                cyl(96, 370, 3.5, 3.5, 2.20, 2.23, 8, [0.98, 0.98, 1.0], 9, true);
-                cyl(142, 370, 8.0, 8.0, 2.20, 2.23, 6, [0.96, 0.78, 0.16], 9, true);
+                cyl(92, 370, 3.2, 3.2, 2.20, 2.23, 8, [0.98, 0.98, 1.0], 9, true); // Cue ball
+                cyl(136, 370, 3.2, 3.2, 2.20, 2.23, 8, [0.98, 0.82, 0.14], 9, true); // 1-ball
+                cyl(143, 366, 3.2, 3.2, 2.20, 2.23, 8, [0.14, 0.14, 0.18], 9, true); // 8-ball
+                cyl(143, 374, 3.2, 3.2, 2.20, 2.23, 8, [0.92, 0.18, 0.22], 9, true); // 3-ball
+                boxR(72, 352, 54, 2.5, 2.21, 2.23, [0.86, 0.68, 0.38], 11); // Maple pool cue
             } else {
                 // Animated Pulsing 3D LED Glass Dancefloor Matrix in Center Hall (x=310..510, y=224..376)
                 for (let gx = 0; gx < 4; gx++) {
@@ -9978,9 +10014,16 @@ class WorldObjectEngine {
             aoR(332, 102, 136, 28, 2.004, 10, 0.44);
             boxR(332, 102, 136, 28, 2.00, 2.22, [0.46, 0.28, 0.16], 11);
             boxR(384, 106, 32, 18, 2.22, 2.38, [0.22, 0.88, 0.98], 10);
-            // North-East SWAT Riot Armory Racks (x=566..762, y=92..120)
+            // North-East SWAT Riot Armory Racks (x=566..762, y=92..120) + 3D Vertical Rifles
             aoR(566, 92, 196, 28, 2.004, 10, 0.44);
             boxR(566, 92, 196, 28, 2.00, 2.36, [0.20, 0.26, 0.36], 6);
+            for (let rwX = 578; rwX <= 748; rwX += 24) {
+                boxR(rwX, 96, 6, 18, 2.36, 2.52, [0.14, 0.18, 0.24], 9);
+            }
+            // 3D Vertical Steel Cell Bars Flanking Cell #06 & Armory Doorways (y=216)
+            for (const bx of [190, 266, 616, 688]) {
+                cyl(bx, 216, 3.5, 3.5, 2.00, 2.50, 8, [0.58, 0.64, 0.72], 9, true);
+            }
             // Center Dayroom Steel Mess Table (x=312..508, y=336..372) & Interrogation / Guard Lockers
             aoR(312, 336, 196, 36, 2.004, 8, 0.40);
             boxR(312, 336, 196, 36, 2.00, 2.18, [0.68, 0.74, 0.82], 9);
@@ -10237,15 +10280,17 @@ class WorldObjectEngine {
             renderer.batchPedSprite3D(role, frame, nx, ny, npcZ, nAng, 1.42, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
 
-        // 5. Companion Partner (Jason Duval or Lucia Caminos) standing watch beside the oriented building entrance
+        // 5. Companion Partner (Jason Duval or Lucia Caminos) standing watch beside the oriented building entrance (only when recruited!)
         const p = game.player;
-        const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
-        const partnerRole = isJasonPlayer ? "lucia" : "jason";
         const pose = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
             ? window.ShopInteriors.getEntrancePose(intr)
             : { partnerX: rw * 0.5 - 62, partnerY: rh - 56, partnerAngle: -Math.PI * 0.35 };
-        const jAng = pose.partnerAngle + Math.sin(t * 1.2) * 0.15;
-        renderer.batchPedSprite3D(partnerRole, 98, pose.partnerX, pose.partnerY, 2.055, jAng, 1.40, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        if (game.jason && game.jason.recruited) {
+            const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
+            const partnerRole = isJasonPlayer ? "lucia" : "jason";
+            const jAng = pose.partnerAngle + Math.sin(t * 1.2) * 0.15;
+            renderer.batchPedSprite3D(partnerRole, 98, pose.partnerX, pose.partnerY, 2.055, jAng, 1.40, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        }
 
         // 6. Active Player Character inside the 3D Interior
         if (p) {
@@ -10253,8 +10298,9 @@ class WorldObjectEngine {
             const py = game.interiorY || pose.spawnY || rh - 78;
             const pAng = (game.interiorAngle !== undefined ? game.interiorAngle : (p.angle || -Math.PI * 0.5));
             const isMoving = !!(p.isMoving || game._interiorMoveTarget);
+            const isFiring = !!(game.input && game.input.shoot && (p.fireTimer || 0) > 0);
             const pFrame = renderer.getPedFrameIndex
-                ? renderer.getPedFrameIndex("FIST", isMoving, false, p.walkPhase || t)
+                ? renderer.getPedFrameIndex(p.weapon || "FIST", isMoving, isFiring, p.walkPhase || t)
                 : (isMoving ? (Math.floor((p.walkPhase || t) * 8.0) % 8) : 98);
             const charRole = (p.pedType || (p.charId ? String(p.charId).toLowerCase() : "lucia"));
 
@@ -10262,7 +10308,7 @@ class WorldObjectEngine {
             const pRing = 20 + Math.sin(t * 6.0) * 2.0;
             renderer.pushSolidQuad3D(px, py, 2.012, pRing, pRing, t * 1.5, 0.96, 0.32, 0.72, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
-            renderer.batchPedSprite3D(charRole, pFrame, px, py, 2.058, pAng, 1.46, (p.muzzleTimer || 0) > 0, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            renderer.batchPedSprite3D(charRole, pFrame, px, py, 2.058, pAng, 1.46, isFiring, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
     }
 }

@@ -11333,7 +11333,41 @@ class RetroRenderer {
             }
         }
 
-        // 4. 3D-Projected Venue NPC Role Labels & Partner Tag
+        // 3B. Indoor Bullet Tracers & Target Bullseye Floating Popups
+        if (Array.isArray(game.interiorTracers)) {
+            for (const tr of game.interiorTracers) {
+                const s1 = this.worldToScreen(tr.x1, tr.y1, 2.15);
+                const s2 = this.worldToScreen(tr.x2, tr.y2, 2.15);
+                ctx.save();
+                ctx.strokeStyle = tr.color || "#fde047";
+                ctx.lineWidth = 2.4;
+                ctx.beginPath();
+                ctx.moveTo(s1.x, s1.y);
+                ctx.lineTo(s2.x, s2.y);
+                ctx.stroke();
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(s2.x, s2.y, 4.0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+        if (Array.isArray(game.interiorPopups)) {
+            for (const pop of game.interiorPopups) {
+                const pPos = this.worldToScreen(pop.x, pop.y, 2.38);
+                ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+                const pw = ctx.measureText(pop.text).width + 14;
+                ctx.fillStyle = "rgba(7, 11, 22, 0.92)";
+                ctx.fillRect(pPos.x - pw * 0.5, pPos.y - 11, pw, 20);
+                ctx.strokeStyle = pop.color || "#fde047";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(pPos.x - pw * 0.5, pPos.y - 11, pw, 20);
+                ctx.fillStyle = pop.color || "#fde047";
+                ctx.fillText(pop.text, pPos.x, pPos.y - 1);
+            }
+        }
+
+        // 4. 3D-Projected Venue NPC Role Labels, Proximity Speech Bubbles & Partner Tag
         if (Array.isArray(intr.npcs)) {
             for (let i = 0; i < intr.npcs.length; i++) {
                 const npc = intr.npcs[i];
@@ -11353,22 +11387,42 @@ class RetroRenderer {
                 ctx.strokeRect(nScr.x - tw * 0.5, nScr.y - 18, tw, 13);
                 ctx.fillStyle = "#e2e8f0";
                 ctx.fillText(npc.label, nScr.x, nScr.y - 11.5);
+
+                // Proximity 1997 Arcade Speech Bubble when player approaches NPC or during an armed hold-up!
+                const distNpc = Math.hypot(px - nx, py - ny);
+                const robbedLine = (npc._robbedTimer || 0) > 0 ? "🙌 DON'T SHOOT! TAKE WHATEVER YOU WANT!" : null;
+                const speech = robbedLine || (distNpc < 105 ? npc.dialog : null);
+                if (speech) {
+                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+                    const sw = Math.min(340, ctx.measureText(speech).width + 16);
+                    const sx = Math.max(14, Math.min(W - sw - 14, Math.round(nScr.x - sw * 0.5)));
+                    const sy = Math.round(nScr.y - 36);
+                    ctx.fillStyle = robbedLine ? "rgba(69, 10, 10, 0.94)" : "rgba(15, 23, 42, 0.94)";
+                    ctx.fillRect(sx, sy, sw, 16);
+                    ctx.strokeStyle = robbedLine ? "#ef4444" : (intr.accent || "#38bdf8");
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 15);
+                    ctx.fillStyle = robbedLine ? "#fecaca" : "#fde047";
+                    ctx.fillText(speech, sx + sw * 0.5, sy + 8.5);
+                }
             }
         }
 
-        // Companion Tag (Jason or Lucia standing watch near the entrance)
+        // Companion Tag (Jason or Lucia standing watch near the entrance — only when recruited!)
         const pose = (window.ShopInteriors && window.ShopInteriors.getEntrancePose)
             ? window.ShopInteriors.getEntrancePose(intr)
             : { partnerX: rw * 0.5 - 64, partnerY: rh - 62, exitX: rw * 0.5, exitY: rh - 8 };
-        const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
-        const partnerName = isJasonPlayer ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
-        const jScr = this.worldToScreen(pose.partnerX, pose.partnerY, 2.22);
-        ctx.font = "bold 9px Consolas, monospace";
-        const jTw = ctx.measureText(partnerName).width + 10;
-        ctx.fillStyle = "rgba(8, 12, 24, 0.84)";
-        ctx.fillRect(jScr.x - jTw * 0.5, jScr.y - 18, jTw, 13);
-        ctx.fillStyle = "#38bdf8";
-        ctx.fillText(partnerName, jScr.x, jScr.y - 11.5);
+        if (game.jason && game.jason.recruited) {
+            const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
+            const partnerName = isJasonPlayer ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
+            const jScr = this.worldToScreen(pose.partnerX, pose.partnerY, 2.22);
+            ctx.font = "bold 9px Consolas, monospace";
+            const jTw = ctx.measureText(partnerName).width + 10;
+            ctx.fillStyle = "rgba(8, 12, 24, 0.84)";
+            ctx.fillRect(jScr.x - jTw * 0.5, jScr.y - 18, jTw, 13);
+            ctx.fillStyle = "#38bdf8";
+            ctx.fillText(partnerName, jScr.x, jScr.y - 11.5);
+        }
 
         // 5. 3D-Projected Active Player Tag
         const pTopScr = this.worldToScreen(px, py, 2.24);
