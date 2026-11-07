@@ -3398,8 +3398,13 @@ class Pedestrian {
         this.speed = props.speed !== undefined ? props.speed : 36;
         this.kind = props.kind || "CIVILIAN"; // CIVILIAN, COP, MONK, HOSTILE, GATOR
         this.g24Type = props.g24Type || null;
+        this.g2Remapped = Boolean(props.g2Remapped);
         this.archetype = props.archetype || null;
         this.missionTag = props.missionTag || null;
+        this.isVillaGuard = Boolean(props.isVillaGuard);
+        this.isAlertedGuard = Boolean(props.isAlertedGuard);
+        this.guardBaseX = props.guardBaseX;
+        this.guardBaseY = props.guardBaseY;
         this.monkIndex = props.monkIndex !== undefined ? props.monkIndex : 0;
         this.shirtColor = props.shirtColor || "#06b6d4";
         const defaultHp = this.kind === "COP" ? 105 : 35;

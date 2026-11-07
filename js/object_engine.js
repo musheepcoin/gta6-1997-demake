@@ -1962,11 +1962,12 @@ class WorldObjectEngine {
                         }
                         continue;
                     }
-                    if (g.ped.hp < g.ped.maxHp || (g.ped.panicTimer || 0) > 0 || (g.ped.stunnedTimer || 0) > 0) {
+                    if (g.ped.hp < g.ped.maxHp || g.ped.isAlertedGuard || (g.ped.panicTimer || 0) > 0 || (g.ped.stunnedTimer || 0) > 0) {
                         ht.alarmTripped = true;
                     }
                     if (ht.alarmTripped) {
                         g.ped.isAlertedGuard = true;
+                        g.ped.panicTimer = 0;
                     }
                     if (!g.ped.isAlertedGuard) {
                         const nx = g.baseX + Math.cos(t * 1.1 + g.phase) * 18.0;

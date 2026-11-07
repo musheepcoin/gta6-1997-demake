@@ -7918,9 +7918,10 @@ class LeonidaGame {
 
                     ped.y += Math.sin(angle) * 10;
 
-                    ped.stunnedTimer = ped.kind === "COP" ? 0.22 : 1.25;
+                    ped.stunnedTimer = (ped.kind === "COP" || ped.isVillaGuard) ? 0.22 : 1.25;
+                    if (ped.isVillaGuard) ped.isAlertedGuard = true;
 
-                    ped.panicTimer = ped.kind === "COP" ? 0 : 4.5;
+                    ped.panicTimer = (ped.kind === "COP" || ped.isVillaGuard) ? 0 : 4.5;
 
                     if (ped.kind === "COP") {
 
@@ -8004,7 +8005,15 @@ class LeonidaGame {
 
             if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - shooterX, ped.y - shooterY) < 280) {
 
-                ped.panicTimer = 5.5;
+                if (ped.isVillaGuard) {
+                    if (isPlayer) {
+                        ped.isAlertedGuard = true;
+                        ped.panicTimer = 0;
+                        ped.angle = Math.atan2(shooterY - ped.y, shooterX - ped.x);
+                    }
+                } else {
+                    ped.panicTimer = 5.5;
+                }
 
             }
 
@@ -12339,36 +12348,52 @@ class LeonidaGame {
             } else {
 
                 // Private Estate Security / Villa Bodyguard AI:
-                // Patrols calmly until attacked or the villa alarm is tripped, then engages the intruder!
+                // Patrols calmly until attacked, shot at, or the villa alarm is tripped, then draws weapon & engages!
                 if (ped.isVillaGuard) {
                     if (ped.hp < ped.maxHp || (ped.panicTimer || 0) > 0 || (ped.stunnedTimer || 0) > 0) {
                         ped.isAlertedGuard = true;
                         ped.panicTimer = 0;
                     }
                     if (ped.isAlertedGuard && !p.dead && !this.activeInterior) {
-                        const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
+                        const targetEnt = p.inVehicle || p;
+                        const dPlayer = Math.hypot(targetEnt.x - ped.x, targetEnt.y - ped.y);
                         const postX = ped.guardBaseX !== undefined ? ped.guardBaseX : ped.x;
                         const postY = ped.guardBaseY !== undefined ? ped.guardBaseY : ped.y;
-                        const dPost = Math.hypot(p.x - postX, p.y - postY);
-                        if (dPlayer < 310 && dPost < 390) {
-                            const aimAng = Math.atan2(p.y - ped.y, p.x - ped.x);
-                            ped.angle = aimAng;
-                            if (dPlayer > 88) {
-                                ped.speed = 68;
-                                ped.x += Math.cos(aimAng) * 68 * dt;
-                                ped.y += Math.sin(aimAng) * 68 * dt;
+                        const dPost = Math.hypot(targetEnt.x - postX, targetEnt.y - postY);
+                        if (dPlayer < 360 && dPost < 440) {
+                            const aimAng = Math.atan2(targetEnt.y - ped.y, targetEnt.x - ped.x);
+                            if (dPlayer > 82) {
+                                const moveAng = typeof this.steerPedWithObstacleFeelers === "function"
+                                    ? this.steerPedWithObstacleFeelers(ped, targetEnt.x, targetEnt.y, null)
+                                    : aimAng;
+                                ped.angle = aimAng;
+                                ped.speed = 74;
+                                ped.x += Math.cos(moveAng) * 74 * dt;
+                                ped.y += Math.sin(moveAng) * 74 * dt;
+                                const gCol = this.map.resolveCircleBuildingCollision(ped.x, ped.y, 8, ped.z || 2.0);
+                                if (gCol.hit) {
+                                    ped.x = gCol.x;
+                                    ped.y = gCol.y;
+                                }
+                                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, 7.5, ped.z || 2.0, null);
+                                if (vCol.hit) {
+                                    ped.x = vCol.x;
+                                    ped.y = vCol.y;
+                                }
+                                ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
                             } else {
+                                ped.angle = aimAng;
                                 ped.speed = 0;
                             }
                             ped.shootCooldown = Math.max(0, (ped.shootCooldown || 0) - dt);
-                            if (dPlayer < 245 && ped.shootCooldown <= 0) {
-                                ped.shootCooldown = 0.78 + Math.random() * 0.25;
-                                if (this.hasLineOfSight(ped.x, ped.y, p.x, p.y)) {
+                            if (dPlayer < 275 && ped.shootCooldown <= 0) {
+                                ped.shootCooldown = 0.72 + Math.random() * 0.22;
+                                if (this.hasLineOfSight(ped.x, ped.y, targetEnt.x, targetEnt.y)) {
                                     ped.muzzleTimer = 0.09;
-                                    this.fireWeapon(ped.x, ped.y, aimAng + (Math.random() - 0.5) * 0.14, ped.copWeapon || "PISTOL", false, false, "CRIMINAL");
+                                    this.fireWeapon(ped.x, ped.y, aimAng + (Math.random() - 0.5) * 0.12, ped.copWeapon || "PISTOL", false, false, "CRIMINAL");
                                 }
                             }
-                        } else if (dPlayer >= 420) {
+                        } else if (dPlayer >= 460) {
                             ped.isAlertedGuard = false;
                         }
                     }

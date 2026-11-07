@@ -8303,9 +8303,9 @@ class RetroRenderer {
                 // Use the two-handed aiming frames (136..143 / 152) — they are baked into the recolored g2 atlas,
                 // unlike the flamethrower frames (118..134) which would fall back to the raw green/blue civilian base
                 frameIdx = this.getPedFrameIndex(spraying ? "UZI" : "FIST", ped.speed > 0 && !spraying, spraying, walkPhase);
-            } else if (ped.kind === "CRIMINAL") {
+            } else if (ped.kind === "CRIMINAL" || ped.isAlertedGuard) {
                 const walkPhase = this.time * 2.1 + ped.animSeed;
-                frameIdx = this.getPedFrameIndex(ped.copWeapon || "UZI", ped.speed > 0, true, walkPhase);
+                frameIdx = this.getPedFrameIndex(ped.copWeapon || (ped.isAlertedGuard ? "PISTOL" : "UZI"), ped.speed > 0, true, walkPhase);
             } else if (ped.kind === "HOSTILE") {
                 const walkPhase = this.time * 2.2 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex("FIST", true, true, walkPhase);
