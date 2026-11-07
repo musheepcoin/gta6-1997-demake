@@ -3376,6 +3376,72 @@ class WorldObjectEngine {
             }
         }
 
+        // 3A-bis. 3D Low Park, Promenade & Villa Walkway Bollard Lights (this.map.parkBollardLights):
+        //     - Low-mounted landscape fixtures (h ≈ 0.20 blocks) knocked flat (state = 2) when struck by any moving vehicle
+        if (this.map && Array.isArray(this.map.parkBollardLights)) {
+            for (let i = 0; i < this.map.parkBollardLights.length; i++) {
+                const bl = this.map.parkBollardLights[i];
+                if (bl.hitCooldown > 0) bl.hitCooldown = Math.max(0, bl.hitCooldown - dt);
+                if (bl.state === 2) {
+                    bl.knockdownTimer = (bl.knockdownTimer || 0) + dt;
+                    if (bl.knockdownTimer > 25.0) {
+                        const distToPlayer = Math.hypot((bl.x || 0) - px, (bl.y || 0) - py);
+                        if (distToPlayer > 320) {
+                            bl.state = 0;
+                            bl.knockdownTimer = 0;
+                        }
+                    }
+                    continue;
+                }
+                if (Math.abs(bl.x - px) > 760 || Math.abs(bl.y - py) > 760) continue;
+
+                for (let cIdx = 0; cIdx < activeCars.length; cIdx++) {
+                    const pCar = activeCars[cIdx];
+                    if (Math.abs(pCar.x - bl.x) > 36 || Math.abs(pCar.y - bl.y) > 36) continue;
+                    const dx = bl.x - pCar.x;
+                    const dy = bl.y - pCar.y;
+                    const dist = Math.hypot(dx, dy);
+                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0);
+                    if (dist < 20 && spd > 32 && (!bl.hitCooldown || bl.hitCooldown <= 0)) {
+                        bl.hitCooldown = 0.55;
+                        bl.state = 2;
+                        bl.knockdownTimer = 0;
+                        const impAng = spd > 10 ? Math.atan2(pCar.vy, pCar.vx) : (pCar.angle || 0);
+                        bl.fallAngle = impAng;
+                        bl.fallenX = bl.x + Math.cos(impAng) * 14;
+                        bl.fallenY = bl.y + Math.sin(impAng) * 14;
+                        pCar.vx *= 0.88;
+                        pCar.vy *= 0.88;
+                        pCar.speed = Math.hypot(pCar.vx, pCar.vy);
+                        if (game.audio && typeof game.audio.playCarCrash === "function") {
+                            game.audio.playCarCrash(0.55);
+                        }
+                        if (typeof game.spawnParticle === "function") {
+                            for (let k = 0; k < 7; k++) {
+                                game.spawnParticle(
+                                    bl.x + (Math.random() - 0.5) * 10,
+                                    bl.y + (Math.random() - 0.5) * 10,
+                                    k % 2 === 0 ? "SPARK" : "DEBRIS"
+                                );
+                            }
+                        }
+                        if (typeof game.addScore === "function") game.addScore(35);
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: bl.x,
+                                y: bl.y,
+                                z: 2.28,
+                                text: "💥 PARK BOLLARD SMASHED! +$35",
+                                color: "#fde047",
+                                life: 1.05
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
         // 3B. 3D Junction Traffic Signal Gantries (this.map.trafficSignals):
         //     - Heavy vehicles ONLY (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
         //     - Standard cars ONLY bend & damage them ("abîmé", state = 1, tilting gantry + malfunctioning flashing signal + bounce & crash sound)!
@@ -7828,6 +7894,45 @@ class WorldObjectEngine {
                     1.0,
                     bulbLit ? 10 : 9
                 );
+            }
+        }
+
+        // 3B-bis. True 3D Low Park, Promenade & Villa Walkway Bollard Lights (this.map.parkBollardLights)
+        if (this.map && Array.isArray(this.map.parkBollardLights)) {
+            const lightsOn = nf > 0.12;
+            for (let i = 0; i < this.map.parkBollardLights.length; i++) {
+                const bl = this.map.parkBollardLights[i];
+                if (bl.x < minX || bl.x > maxX || bl.y < minY || bl.y > maxY) continue;
+                const bz = bl.z || 2.0;
+                const isVilla = bl.style === "VILLA_PATH";
+                const isDecoPark = bl.style === "DECO_PARK";
+                const baseCol = isVilla ? [0.24, 0.20, 0.15] : (isDecoPark ? [0.22, 0.25, 0.28] : [0.16, 0.20, 0.18]);
+                const poleCol = isVilla ? [0.30, 0.25, 0.18] : (isDecoPark ? [0.30, 0.34, 0.38] : [0.20, 0.26, 0.22]);
+                const hoodCol = isVilla ? [0.20, 0.16, 0.11] : [0.14, 0.17, 0.16];
+
+                if (bl.state === 2) {
+                    // Knocked-down bollard lying on the grass/walkway edge
+                    const fAng = bl.fallAngle || 0;
+                    const fCos = Math.cos(fAng);
+                    const fSin = Math.sin(fAng);
+                    const fx = bl.fallenX || (bl.x + fCos * 12);
+                    const fy = bl.fallenY || (bl.y + fSin * 12);
+                    emitDynCylinder(bl.x, bl.y, 0, 0, 3.2, 2.8, bz, bz + 0.028, 6, baseCol, 9, true);
+                    emitDynBox(fx, fy, fCos, fSin, 0, 0, 13.0, 3.6, bz + 0.008, bz + 0.048, poleCol, 1.0, 9);
+                    continue;
+                }
+
+                // 1. Low Octagonal Pedestal Base (bz .. bz + 0.04)
+                emitDynCylinder(bl.x, bl.y, 0, 0, 3.5, 2.9, bz, bz + 0.04, 8, baseCol, 9, true);
+                // 2. Vertical Bollard Body Shaft (bz + 0.04 .. bz + 0.13)
+                emitDynCylinder(bl.x, bl.y, 0, 0, 2.5, 2.4, bz + 0.04, bz + 0.13, 8, poleCol, 9, true);
+                // 3. 360° Warm Frosted Glass Lantern Chamber (bz + 0.13 .. bz + 0.175)
+                const bulbCol = lightsOn
+                    ? (isVilla ? [1.0, 0.90, 0.56] : (isDecoPark ? [1.0, 0.92, 0.64] : [1.0, 0.87, 0.48]))
+                    : [0.82, 0.85, 0.80];
+                emitDynCylinder(bl.x, bl.y, 0, 0, 2.35, 2.35, bz + 0.13, bz + 0.175, 8, bulbCol, lightsOn ? 10 : 7, false);
+                // 4. Louvered Top Anti-Glare Cap (bz + 0.175 .. bz + 0.202) — wider than glass diffuser so light projects downward onto the lawn & path!
+                emitDynCylinder(bl.x, bl.y, 0, 0, 3.15, 1.95, bz + 0.175, bz + 0.202, 8, hoodCol, 9, true);
             }
         }
 

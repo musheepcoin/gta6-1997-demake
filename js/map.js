@@ -2626,6 +2626,201 @@ class LeonidaMap {
             }
         }
 
+        // Low-Level 3D Architectural Park, Promenade & Garden Walkway Bollard Lights ("this.parkBollardLights")
+        // Placed logically along the grass/walkway borders of Lummus Park, Bayfront Park, urban green parks, and villa walkways.
+        this.parkBollardLights = [];
+        const canPlaceBollard = (bx, by, minSpacing = 180) => {
+            const tc = Math.floor(bx / TILE_SIZE);
+            const tr = Math.floor(by / TILE_SIZE);
+            if (tc < 4 || tc >= MAP_COLS - 4 || tr < 4 || tr >= MAP_ROWS - 4) return false;
+            const gIdx = tr * MAP_COLS + tc;
+            const gt = this.surfaceGround[gIdx];
+            if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
+            if (this.coastalSandMask && this.coastalSandMask[gIdx] === 1) return false;
+            if (this.voxelGrid && this.voxelGrid[(2 * MAP_ROWS + tr) * MAP_COLS + tc] > 0) return false;
+            for (let i = 0; i < this.parkBollardLights.length; i++) {
+                const b = this.parkBollardLights[i];
+                if (Math.hypot(b.x - bx, b.y - by) < minSpacing) return false;
+            }
+            for (let i = 0; i < this.streetlights.length; i++) {
+                const sl = this.streetlights[i];
+                if (Math.hypot(sl.baseX - bx, sl.baseY - by) < 46) return false;
+            }
+            for (let i = 0; i < this.trafficSignals.length; i++) {
+                const ts = this.trafficSignals[i];
+                if (Math.hypot(ts.baseX - bx, ts.baseY - by) < 46) return false;
+            }
+            if (Array.isArray(this.interiors)) {
+                for (let i = 0; i < this.interiors.length; i++) {
+                    if (Math.hypot(this.interiors[i].doorX - bx, this.interiors[i].doorY - by) < 52) return false;
+                }
+            }
+            if (Array.isArray(this.vicePalms)) {
+                for (let i = 0; i < this.vicePalms.length; i++) {
+                    if (Math.hypot(this.vicePalms[i].x - bx, this.vicePalms[i].y - by) < 34) return false;
+                }
+            }
+            if (Array.isArray(this.trees)) {
+                for (let i = 0; i < this.trees.length; i++) {
+                    if (Math.hypot(this.trees[i].x - bx, this.trees[i].y - by) < 38) return false;
+                }
+            }
+            if (Array.isArray(this.tikiBars)) {
+                for (let i = 0; i < this.tikiBars.length; i++) {
+                    if (Math.hypot(this.tikiBars[i].x - bx, this.tikiBars[i].y - by) < 48) return false;
+                }
+            }
+            if (Array.isArray(this.muscleBeachGyms)) {
+                for (let i = 0; i < this.muscleBeachGyms.length; i++) {
+                    if (Math.hypot(this.muscleBeachGyms[i].x - bx, this.muscleBeachGyms[i].y - by) < 48) return false;
+                }
+            }
+            return true;
+        };
+
+        // Pass 1: Lummus Park Oceanfront Boardwalk & Park Lawn Edges (c = 448..451, r = 44..360)
+        for (let r = 44; r <= 360; r++) {
+            if ((r >= 54 && r <= 55) || (r >= 72 && r <= 75) || (r >= 131 && r <= 137) || (r >= 192 && r <= 197)) continue;
+            const b448 = this.getBlockInfo(448, r, 1);
+            const b449 = this.getBlockInfo(449, r, 1);
+            const b450 = this.getBlockInfo(450, r, 1);
+            const b451 = this.getBlockInfo(451, r, 1);
+            // A) West edge of Oceanfront Boardwalk (c=451) bordering Lummus Park lawn (c=450, lid=10)
+            if ((r % 4 === 1) && b450 && b450.lid === 10 && b451 && (b451.lid === 8 || b451.lid === 9)) {
+                const bx = (450 + 0.92) * TILE_SIZE;
+                const by = (r + 0.5) * TILE_SIZE;
+                if (canPlaceBollard(bx, by, 140)) {
+                    this.parkBollardLights.push({
+                        x: bx,
+                        y: by,
+                        homeX: bx,
+                        homeY: by,
+                        z: 2.0,
+                        dirX: 1,
+                        dirY: 0,
+                        style: "DECO_PARK",
+                        state: 0
+                    });
+                }
+            }
+            // B) East edge of Ocean Drive Promenade (c=448) bordering Lummus Park lawn (c=449, lid=10)
+            if ((r % 6 === 3) && b449 && b449.lid === 10 && b448 && (b448.lid === 8 || b448.lid === 9)) {
+                const bx = (449 + 0.08) * TILE_SIZE;
+                const by = (r + 0.5) * TILE_SIZE;
+                if (canPlaceBollard(bx, by, 140)) {
+                    this.parkBollardLights.push({
+                        x: bx,
+                        y: by,
+                        homeX: bx,
+                        homeY: by,
+                        z: 2.0,
+                        dirX: -1,
+                        dirY: 0,
+                        style: "DECO_PARK",
+                        state: 0
+                    });
+                }
+            }
+        }
+
+        // Pass 2: City-Wide Urban Parks, Bayfront Park, Star Island & Promenade Walkways (PAWEMENT bordering FIELD park grass)
+        const isParkGrassTile = (tc, tr) => {
+            if (tc < 4 || tc >= MAP_COLS - 4 || tr < 4 || tr >= MAP_ROWS - 4) return false;
+            const gIdx = tr * MAP_COLS + tc;
+            if (this.surfaceGround[gIdx] !== GROUND_TYPE.FIELD) return false;
+            if (this.coastalSandMask && this.coastalSandMask[gIdx] === 1) return false;
+            const b1 = this.getBlockInfo(tc, tr, 1);
+            return Boolean(b1 && b1.lid === 10);
+        };
+        for (let r = 38; r <= 435; r++) {
+            for (let c = 40; c <= 447; c++) {
+                // Exclude wilderness, swamp, mountain, prison, airport, stadium, speedway & Lake Leonida wild shores
+                if (c < MAP_X_256[36] || (c < MAP_X_256[115] && r > MAP_Y_256[182]) || (c < MAP_X_256[105] && r < MAP_Y_256[42])) continue;
+                if ((c >= 54 && c <= 70 && r >= 74 && r <= 148) ||
+                    (c >= 63 && c <= 167 && r >= 298 && r <= 370) ||
+                    (c >= 178 && c <= 198 && r >= 163 && r <= 181) ||
+                    (c >= 25 && c <= 88 && r >= 148 && r <= 201) ||
+                    (c >= 75 && c <= 175 && r >= 180 && r <= 262)) {
+                    continue;
+                }
+                const idx = r * MAP_COLS + c;
+                if (this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT) continue;
+                if ((this.surfaceLayer[idx] || 2) > 2) continue;
+                if (this.coastalSandMask && this.coastalSandMask[idx] === 1) continue;
+                const blk1 = this.getBlockInfo(c, r, 1);
+                if (!blk1 || blk1.lid === 69) continue;
+
+                // Check if this paved walkway/sidewalk borders a multi-tile grass park (lid 10)
+                let fDc = 0, fDr = 0;
+                if (isParkGrassTile(c + 1, r) && isParkGrassTile(c + 2, r)) { fDc = 1; fDr = 0; }
+                else if (isParkGrassTile(c - 1, r) && isParkGrassTile(c - 2, r)) { fDc = -1; fDr = 0; }
+                else if (isParkGrassTile(c, r + 1) && isParkGrassTile(c, r + 2)) { fDc = 0; fDr = 1; }
+                else if (isParkGrassTile(c, r - 1) && isParkGrassTile(c, r - 2)) { fDc = 0; fDr = -1; }
+                if (fDc === 0 && fDr === 0) continue;
+
+                const isVertEdge = (fDc !== 0);
+                const coordAlong = isVertEdge ? r : c;
+                if ((coordAlong % 4) !== 2) continue;
+
+                // Ensure the walkway continues straight along the park edge
+                const prevC = isVertEdge ? c : c - 1;
+                const prevR = isVertEdge ? r - 1 : r;
+                const nextC = isVertEdge ? c : c + 1;
+                const nextR = isVertEdge ? r + 1 : r;
+                if (this.surfaceGround[prevR * MAP_COLS + prevC] !== GROUND_TYPE.PAWEMENT ||
+                    this.surfaceGround[nextR * MAP_COLS + nextC] !== GROUND_TYPE.PAWEMENT) {
+                    continue;
+                }
+
+                // Place bollard right on the grass/walkway edge (+26px toward the park lawn) so the sidewalk center stays 100% clear!
+                const bx = (c + 0.5) * TILE_SIZE + fDc * 26.0;
+                const by = (r + 0.5) * TILE_SIZE + fDr * 26.0;
+                if (!canPlaceBollard(bx, by, 196)) continue;
+
+                this.parkBollardLights.push({
+                    x: bx,
+                    y: by,
+                    homeX: bx,
+                    homeY: by,
+                    z: this.surfaceLayer[idx] || 2.0,
+                    dirX: -fDc,
+                    dirY: -fDr,
+                    style: (c >= 365) ? "DECO_PARK" : "WARM_PARK",
+                    state: 0
+                });
+            }
+        }
+
+        // Pass 3: Luxury Villa & Mansion Garden Portico Walkway Bollards
+        if (Array.isArray(this.residentialHouses)) {
+            for (let hi = 0; hi < this.residentialHouses.length; hi++) {
+                const rh = this.residentialHouses[hi];
+                if (!rh || rh.kind === "swamp_stilt_shack") continue;
+                const cosA = Math.cos(rh.ang || 0);
+                const sinA = Math.sin(rh.ang || 0);
+                const sc = rh.scale || 1.0;
+                const frontY = ((rh.hh || 64) + 28) * sc;
+                for (const side of [-1, 1]) {
+                    const lx = side * 32 * sc;
+                    const bx = rh.x + cosA * lx - sinA * frontY;
+                    const by = rh.y + sinA * lx + cosA * frontY;
+                    if (canPlaceBollard(bx, by, 48)) {
+                        this.parkBollardLights.push({
+                            x: bx,
+                            y: by,
+                            homeX: bx,
+                            homeY: by,
+                            z: rh.z || 2.0,
+                            dirX: -side * cosA,
+                            dirY: -side * sinA,
+                            style: "WARM_PARK",
+                            state: 0
+                        });
+                    }
+                }
+            }
+        }
+
         // Deep-Dive Vice City Architectural Streetscape Props:
         // A. Ocean Drive Art Deco Sidewalk Café Parasols (West sidewalk directly in front of 3D Art Deco hotels)
         for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r += 3) {

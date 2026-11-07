@@ -9210,6 +9210,22 @@ class RetroRenderer {
             }
         }
 
+        // 7C-bis. Short Daytime Solar Ground Shadows for 3D Low Park & Promenade Bollard Lights
+        if (this.map && Array.isArray(this.map.parkBollardLights)) {
+            const nf = nfGlobal;
+            if (nf < 0.85) {
+                const bollardShadowLen = sunShadowLen * 0.32;
+                for (const bl of this.map.parkBollardLights) {
+                    if (bl.state === 2) continue;
+                    if (bl.x < minX || bl.x > maxX || bl.y < minY || bl.y > maxY) continue;
+                    const sz = bl.z || 2.0;
+                    const shX = bl.x + Math.cos(sunShadowAngle) * (bollardShadowLen * 0.5);
+                    const shY = bl.y + Math.sin(sunShadowAngle) * (bollardShadowLen * 0.5);
+                    this.pushSolidQuad3D(shX, shY, sz + 0.018, bollardShadowLen, 3.2, sunShadowAngle, 0.04, 0.06, 0.10, 0.30 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+
         // 7D. Daytime Solar Ground Shadows for 3D Traffic Signal Gantries (3D volumetric gantry, mast arm & 3-lens box rendered by WorldObjectEngine!)
         this.lastGameRef = game;
         if (this.map && Array.isArray(this.map.trafficSignals)) {
@@ -9543,6 +9559,39 @@ class RetroRenderer {
                         warmSodium: false
                     });
                 }
+            }
+        }
+
+        // 2A-bis. Low Park, Promenade & Villa Walkway Bollard Lights (this.map.parkBollardLights)
+        //         Casts a compact, downward-directed warm landscape light pool right onto the adjacent grass & path
+        if (this.map && Array.isArray(this.map.parkBollardLights)) {
+            for (const bl of this.map.parkBollardLights) {
+                if (bl.state === 2) continue;
+                if (Math.abs(bl.x - this.camX) > 960 || Math.abs(bl.y - this.camY) > 740) continue;
+                const sz = bl.z || 2.0;
+                // Slightly offset the ground light pool (+6px) toward the walkway/park edge
+                const poolX = bl.x + (bl.dirX || 0) * 6.0;
+                const poolY = bl.y + (bl.dirY || 0) * 6.0;
+                const gSc = this.worldToScreen(poolX, poolY, sz + 0.02);
+                if (gSc.x < -120 || gSc.x > W + 120 || gSc.y < -120 || gSc.y > H + 120) continue;
+                const pxScale = (gSc.scale * H) / 128.0;
+
+                // Low-mounted warm landscape ground pool (reveals grass & pavement texture at night)
+                if (bl.style === "VILLA_PATH") {
+                    addLightPool(gSc.x, gSc.y, 40 * pxScale, "rgba(255, 224, 138, 0.72)", "rgba(235, 165, 58, 0.24)");
+                } else {
+                    addLightPool(gSc.x, gSc.y, 46 * pxScale, "rgba(255, 228, 142, 0.74)", "rgba(232, 170, 62, 0.25)");
+                }
+
+                // Subtle low-level lantern glow at the bollard diffuser height (sz + 0.155)
+                const hSc = this.worldToScreen(bl.x, bl.y, sz + 0.155);
+                highResFlares.push({
+                    x: hSc.x,
+                    y: hSc.y,
+                    r: 11 * pxScale,
+                    isLampHalo: true,
+                    warmSodium: bl.style !== "DECO_PARK"
+                });
             }
         }
 
