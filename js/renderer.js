@@ -25,6 +25,7 @@ class RetroRenderer {
         this.nightMode = false;
         this.nightFactor = 0.0;
         this.sunsetFactor = 0.0;
+        this.windowLitFactor = 0.0;
         this.time = 0;
         this.lastFrameDt = 0.0166;
         this.fpsSmoothed = 60.0;
@@ -190,6 +191,7 @@ class RetroRenderer {
             uniform float uNightTint;
             uniform float uSunsetTint;
             uniform float uViceStyle;
+            uniform float uWinLit; // fraction (0..1) of building windows that are lit right now (evolves through the night)
             uniform float uTime;
             uniform vec2 uSunDir;
 
@@ -712,10 +714,11 @@ class RetroRenderer {
                         float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
                         float isGlassOrNeon = clamp((lum - 0.48) * 3.8 + (sat - 0.32) * 2.8, 0.0, 1.0);
 
-                        // Deterministic 3D room cell hash so ~64% of hotel/office rooms are lit and ~36% are dark
+                        // Deterministic 3D room cell hash with progressive nocturnal turn-on threshold (uWinLit rises from dusk -> peaks at 0.92 in deep night!)
                         vec3 roomCell = floor(vWorldPos * vec3(2.0, 2.0, 2.0));
                         float roomHash = fract(sin(dot(roomCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-                        float roomLit = step(0.35, roomHash);
+                        float roomThresh = 0.05 + roomHash * 0.87;
+                        float roomLit = smoothstep(roomThresh - 0.04, roomThresh + 0.02, uWinLit);
 
                         vec3 roomTint = vec3(1.0, 0.86, 0.52); // Warm tungsten hotel/apartment window light
                         if (uViceStyle > 0.5) {
@@ -729,7 +732,7 @@ class RetroRenderer {
                         vec3 streetNeonWash = vec3(0.06, 0.03, 0.08) * clamp(1.0 - (vWorldPos.y - 2.0) * 0.55, 0.0, 1.0);
                         vec3 wallDark = c.rgb * vec3(0.45, 0.53, 0.78) + streetNeonWash;
                         vec3 windowGlow = min(vec3(1.0), mix(c.rgb * 1.40, roomTint * winGrad, 0.46) + vec3(0.08, 0.05, 0.10));
-                        nightRgb = mix(wallDark, windowGlow, isGlassOrNeon * (0.28 + 0.72 * roomLit));
+                        nightRgb = mix(wallDark, windowGlow, isGlassOrNeon * (0.04 + 0.96 * roomLit));
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal navy
                         nightRgb = c.rgb * vec3(0.42, 0.52, 0.78);
@@ -798,6 +801,7 @@ class RetroRenderer {
             uTex: gl.getUniformLocation(this.cityProg, "uTex"),
             uDayLightTex: gl.getUniformLocation(this.cityProg, "uDayLightTex"),
             uNightTint: gl.getUniformLocation(this.cityProg, "uNightTint"),
+            uWinLit: gl.getUniformLocation(this.cityProg, "uWinLit"),
             uSunsetTint: gl.getUniformLocation(this.cityProg, "uSunsetTint"),
             uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle"),
             uTime: gl.getUniformLocation(this.cityProg, "uTime"),
@@ -6079,6 +6083,26 @@ class RetroRenderer {
         ]);
     }
 
+    getWindowLitFactor(game) {
+        if (typeof this.windowLitFactor === "number" && this.windowLitFactor > 0.001) {
+            return this.windowLitFactor;
+        }
+        if (game && typeof game.worldMinutes === "number") {
+            const hour = (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+            const sm = (t) => {
+                const c = Math.max(0, Math.min(1, t));
+                return c * c * (3 - 2 * c);
+            };
+            if (hour >= 22.5 || hour < 2.0) return 0.92;
+            if (hour >= 17.5 && hour < 19.5) return sm((hour - 17.5) / 2.0) * 0.34;
+            if (hour >= 19.5 && hour < 22.5) return 0.34 + sm((hour - 19.5) / 3.0) * 0.58;
+            if (hour >= 2.0 && hour < 5.25) return 0.92 - sm((hour - 2.0) / 3.25) * 0.50;
+            if (hour >= 5.25 && hour < 7.15) return 0.42 * (1.0 - sm((hour - 5.25) / 1.9));
+            return 0.0;
+        }
+        return (this.nightFactor || 0) > 0.05 ? Math.min(0.92, (this.nightFactor || 0) * 0.88) : (this.nightMode ? 0.88 : 0.0);
+    }
+
     renderWebGLScene(game, viewProj) {
         const gl = this.gl;
         if (!gl) return;
@@ -6135,6 +6159,9 @@ class RetroRenderer {
         gl.uniform1f(this.cityLocs.uWaterStep, Math.floor(this.time * 7.0) % 11);
         gl.uniform1f(this.cityLocs.uFanStep, Math.floor(this.time * 9.0) % 6);
         gl.uniform1f(this.cityLocs.uNightTint, nf);
+        if (this.cityLocs.uWinLit) {
+            gl.uniform1f(this.cityLocs.uWinLit, this.getWindowLitFactor(game));
+        }
         if (this.cityLocs.uSunsetTint) {
             gl.uniform1f(this.cityLocs.uSunsetTint, sf);
         }
@@ -9567,6 +9594,104 @@ class RetroRenderer {
                     isCyan ? "rgba(30, 240, 255, 0.82)" : "rgba(255, 65, 195, 0.82)",
                     isCyan ? "rgba(0, 175, 235, 0.32)" : "rgba(210, 20, 145, 0.32)"
                 );
+            }
+        }
+
+        // 3C. Progressive Nocturnal Window Light Spills for Both 3D Houses/Villas & 3D City Buildings!
+        // As night progresses from dusk (winLit ~0.15) to deep night ("nuit ferme", winLit ~0.92),
+        // more and more individual house and building windows turn on and cast warm light pools onto facades, lawns & sidewalks!
+        const winLit = this.getWindowLitFactor(game);
+        if (winLit > 0.04) {
+            // (a) 3D Residential Houses, Mansions & Villas (this.map.objectEngine.instances)
+            if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.instances)) {
+                const houses = this.map.objectEngine.instances;
+                for (let hi = 0; hi < houses.length; hi++) {
+                    const h = houses[hi];
+                    if (Math.abs(h.x - this.camX) > 900 || Math.abs(h.y - this.camY) > 680) continue;
+                    const hSc = h.scale || 1.0;
+                    const w1 = (h.spec.w1 || 140) * hSc;
+                    const d1 = (h.spec.d1 || 110) * hSc;
+                    const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
+                        ? this.map.getHeightAtPixel(h.x, h.y, 4.0)
+                        : (h.z || 2.0);
+                    const csH = Math.cos(h.ang);
+                    const snH = Math.sin(h.ang);
+                    const winOffsets = [
+                        [-w1 * 0.28,  d1 * 0.54],
+                        [ w1 * 0.28,  d1 * 0.54],
+                        [-w1 * 0.28, -d1 * 0.54],
+                        [ w1 * 0.28, -d1 * 0.54],
+                        [-w1 * 0.54, -d1 * 0.24],
+                        [-w1 * 0.54,  d1 * 0.24],
+                        [ w1 * 0.54, -d1 * 0.24],
+                        [ w1 * 0.54,  d1 * 0.24]
+                    ];
+                    for (let wi = 0; wi < winOffsets.length; wi++) {
+                        const wHash = (((hi * 41 + wi * 67 + 19) % 97) / 97.0);
+                        const wThresh = 0.05 + wHash * 0.84;
+                        if (winLit <= wThresh) continue;
+                        const [lx, ly] = winOffsets[wi];
+                        const wx = h.x + csH * lx - snH * ly;
+                        const wy = h.y + snH * lx + csH * ly;
+                        const sc = this.worldToScreen(wx, wy, bz + 0.16);
+                        if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
+                        const pxScale = (sc.scale * H) / 128.0;
+                        const isTv = wHash > 0.82;
+                        addLightPool(
+                            sc.x,
+                            sc.y,
+                            46 * pxScale,
+                            isTv ? "rgba(155, 215, 255, 0.68)" : "rgba(255, 214, 112, 0.74)",
+                            isTv ? "rgba(70, 145, 225, 0.24)" : "rgba(235, 148, 38, 0.26)"
+                        );
+                    }
+                }
+            }
+
+            // (b) 3D City Buildings in Camera Frustum: progressive warm/neon window light spills along exposed facades!
+            if (this.map && this.map.cmpLoaded && typeof this.map.getNavigationBlock === "function") {
+                const cbx = Math.floor(this.camX / TILE_SIZE);
+                const cby = Math.floor(this.camY / TILE_SIZE);
+                const minBx = Math.max(2, cbx - 12);
+                const maxBx = Math.min(MAP_COLS - 3, cbx + 12);
+                const minBy = Math.max(2, cby - 9);
+                const maxBy = Math.min(MAP_ROWS - 3, cby + 9);
+                for (let by = minBy; by <= maxBy; by++) {
+                    for (let bx = minBx; bx <= maxBx; bx++) {
+                        const blk = this.map.getNavigationBlock(bx, by, 2);
+                        if (!blk || blk.groundType !== GROUND_TYPE.BUILDING) continue;
+                        // Deterministic hash per building block in [0, 1)
+                        const bHash = (((bx * 73 + by * 131 + (bx ^ by) * 19) & 1023) / 1024.0);
+                        const bThresh = 0.05 + bHash * 0.85;
+                        if (winLit <= bThresh) continue;
+                        // Check if this building block has an exposed street/sidewalk edge
+                        const nS = this.map.getNavigationBlock(bx, by + 1, 2);
+                        const nN = this.map.getNavigationBlock(bx, by - 1, 2);
+                        const nE = this.map.getNavigationBlock(bx + 1, by, 2);
+                        const nW = this.map.getNavigationBlock(bx - 1, by, 2);
+                        const expS = nS && nS.groundType !== GROUND_TYPE.BUILDING;
+                        const expN = nN && nN.groundType !== GROUND_TYPE.BUILDING;
+                        const expE = nE && nE.groundType !== GROUND_TYPE.BUILDING;
+                        const expW = nW && nW.groundType !== GROUND_TYPE.BUILDING;
+                        if (!expS && !expN && !expE && !expW) continue;
+
+                        const wx = (bx + 0.5 + (expE ? 0.42 : (expW ? -0.42 : 0))) * TILE_SIZE;
+                        const wy = (by + 0.5 + (expS ? 0.42 : (expN ? -0.42 : 0))) * TILE_SIZE;
+                        const sc = this.worldToScreen(wx, wy, 2.38);
+                        if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
+                        const pxScale = (sc.scale * H) / 128.0;
+                        let innerCol = "rgba(255, 212, 108, 0.62)";
+                        let midCol = "rgba(230, 145, 36, 0.22)";
+                        if (this.mapStyle === "VICE" && bHash > 0.84) {
+                            innerCol = "rgba(50, 238, 255, 0.60)";
+                            midCol = "rgba(10, 155, 220, 0.20)";
+                        } else if (this.mapStyle === "VICE" && bHash > 0.72) {
+                            innerCol = "rgba(255, 82, 192, 0.60)";
+                            midCol = "rgba(205, 25, 135, 0.20)";
+                        }
+                        addLightPool(sc.x, sc.y, 52 * pxScale, innerCol, midCol);
+                    }
+                }
             }
         }
 

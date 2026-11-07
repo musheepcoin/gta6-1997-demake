@@ -384,7 +384,20 @@ class LeonidaGame {
 
 
 
-        return { hour, nightFactor, sunsetFactor, phase, icon, dockLabel };
+        // Progressive Nocturnal Window Lighting Factor (0.0 by day -> rises through dusk/evening -> peaks at 0.92 in deep night 22:30..02:00 -> tapers toward dawn)
+        let windowLitFactor = 0.0;
+        if (hour >= 22.5 || hour < 2.0) {
+            windowLitFactor = 0.92;
+        } else if (hour >= 17.5 && hour < 19.5) {
+            windowLitFactor = smooth((hour - 17.5) / 2.0) * 0.34;
+        } else if (hour >= 19.5 && hour < 22.5) {
+            windowLitFactor = 0.34 + smooth((hour - 19.5) / 3.0) * 0.58;
+        } else if (hour >= 2.0 && hour < 5.25) {
+            windowLitFactor = 0.92 - smooth((hour - 2.0) / 3.25) * 0.50;
+        } else if (hour >= 5.25 && hour < 7.15) {
+            windowLitFactor = 0.42 * (1.0 - smooth((hour - 5.25) / 1.9));
+        }
+        return { hour, nightFactor, sunsetFactor, windowLitFactor, phase, icon, dockLabel };
 
     }
 
@@ -399,6 +412,7 @@ class LeonidaGame {
         this.renderer.nightFactor = info.nightFactor;
 
         this.renderer.sunsetFactor = info.sunsetFactor;
+        this.renderer.windowLitFactor = info.windowLitFactor;
 
         this.renderer.nightMode = info.nightFactor >= 0.25;
 
@@ -12324,6 +12338,42 @@ class LeonidaGame {
 
             } else {
 
+                // Private Estate Security / Villa Bodyguard AI:
+                // Patrols calmly until attacked or the villa alarm is tripped, then engages the intruder!
+                if (ped.isVillaGuard) {
+                    if (ped.hp < ped.maxHp || (ped.panicTimer || 0) > 0 || (ped.stunnedTimer || 0) > 0) {
+                        ped.isAlertedGuard = true;
+                        ped.panicTimer = 0;
+                    }
+                    if (ped.isAlertedGuard && !p.dead && !this.activeInterior) {
+                        const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
+                        const postX = ped.guardBaseX !== undefined ? ped.guardBaseX : ped.x;
+                        const postY = ped.guardBaseY !== undefined ? ped.guardBaseY : ped.y;
+                        const dPost = Math.hypot(p.x - postX, p.y - postY);
+                        if (dPlayer < 310 && dPost < 390) {
+                            const aimAng = Math.atan2(p.y - ped.y, p.x - ped.x);
+                            ped.angle = aimAng;
+                            if (dPlayer > 88) {
+                                ped.speed = 68;
+                                ped.x += Math.cos(aimAng) * 68 * dt;
+                                ped.y += Math.sin(aimAng) * 68 * dt;
+                            } else {
+                                ped.speed = 0;
+                            }
+                            ped.shootCooldown = Math.max(0, (ped.shootCooldown || 0) - dt);
+                            if (dPlayer < 245 && ped.shootCooldown <= 0) {
+                                ped.shootCooldown = 0.78 + Math.random() * 0.25;
+                                if (this.hasLineOfSight(ped.x, ped.y, p.x, p.y)) {
+                                    ped.muzzleTimer = 0.09;
+                                    this.fireWeapon(ped.x, ped.y, aimAng + (Math.random() - 0.5) * 0.14, ped.copWeapon || "PISTOL", false, false, "CRIMINAL");
+                                }
+                            }
+                        } else if (dPlayer >= 420) {
+                            ped.isAlertedGuard = false;
+                        }
+                    }
+                    continue;
+                }
                 // Exact Port of 1997 GTA 1 AiCharacterController::UpdateWandering / ChooseWalkWaypoint / ContinueWalkToWaypoint
 
                 // (AiCharacterController.cpp lines 250-365): Pedestrians stay strictly on PAWEMENT / FIELD blocks!
@@ -13626,7 +13676,7 @@ class LeonidaGame {
 
                     (pr.npcFaction === "COP" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && pd.carjackedCop))) ||
 
-                    (pr.npcFaction === "CRIMINAL" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && pd.kind === "CRIMINAL" && (pd.provokedByPlayer || pd.missionTag === "MISSION_ENEMY")))) ||
+                    (pr.npcFaction === "CRIMINAL" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && (pd.isAlertedGuard || (pd.kind === "CRIMINAL" && (pd.provokedByPlayer || pd.missionTag === "MISSION_ENEMY")))))) ||
 
                     (!pr.npcFaction && this.wantedLevel > 0);
 

@@ -1187,8 +1187,8 @@ class WorldObjectEngine {
                 vaultX: vtPos.x,
                 vaultY: vtPos.y,
                 guards: [
-                    { baseX: g1Pos.x, baseY: g1Pos.y, x: g1Pos.x, y: g1Pos.y, ang: inst.ang + Math.PI * 0.5, phase: i * 1.1 },
-                    { baseX: g2Pos.x, baseY: g2Pos.y, x: g2Pos.x, y: g2Pos.y, ang: inst.ang - Math.PI * 0.5, phase: i * 1.1 + 3.14 }
+                    { baseX: g1Pos.x, baseY: g1Pos.y, x: g1Pos.x, y: g1Pos.y, ang: inst.ang + Math.PI * 0.5, phase: i * 1.1, ped: null, deadUntilReset: false },
+                    { baseX: g2Pos.x, baseY: g2Pos.y, x: g2Pos.x, y: g2Pos.y, ang: inst.ang - Math.PI * 0.5, phase: i * 1.1 + 3.14, ped: null, deadUntilReset: false }
                 ]
             });
         }
@@ -1902,25 +1902,96 @@ class WorldObjectEngine {
 
         for (let i = 0; i < this.heistTargets.length; i++) {
             const ht = this.heistTargets[i];
+            const distVilla = Math.hypot(px - ht.inst.x, py - ht.inst.y);
             if (ht.looted) {
                 ht.cooldown = Math.max(0, ht.cooldown - dt);
-                if (ht.cooldown <= 0 && Math.hypot(px - ht.inst.x, py - ht.inst.y) > 650) {
+                if (ht.cooldown <= 0 && distVilla > 650) {
                     ht.looted = false;
                     ht.hacked = false;
                     ht.alarmTripped = false;
+                    for (const g of ht.guards) {
+                        g.deadUntilReset = false;
+                    }
+                }
+            } else if (distVilla > 780) {
+                for (const g of ht.guards) {
+                    if (g.deadUntilReset && (!g.ped || !game.peds.includes(g.ped))) {
+                        g.deadUntilReset = false;
+                    }
                 }
             }
 
-            // Patrol Cartel Bodyguards around the villa perimeter
+            // Spawn & Patrol Attackable Private Estate Bodyguards (no military SWAT!) around the villa perimeter
+            const bz = ht.inst.z || 2.0;
             for (let gi = 0; gi < ht.guards.length; gi++) {
                 const g = ht.guards[gi];
-                const speed = ht.alarmTripped ? 2.8 : 1.1;
-                const rad = ht.alarmTripped ? 26.0 : 18.0;
-                const nx = g.baseX + Math.cos(t * speed + g.phase) * rad;
-                const ny = g.baseY + Math.sin(t * speed + g.phase) * rad;
-                g.ang = Math.atan2(ny - g.y, nx - g.x);
-                g.x = nx;
-                g.y = ny;
+                if (g.ped && !game.peds.includes(g.ped)) {
+                    g.ped = null;
+                }
+                if (!g.ped && !g.deadUntilReset && distVilla < 720 && Array.isArray(game.peds) && typeof Pedestrian === "function") {
+                    const guardArch = gi === 0 ? "g2_zaibatsu" : "g2_yakuza";
+                    g.ped = new Pedestrian({
+                        id: `villa_guard_${i}_${gi}_${Date.now()}`,
+                        x: g.baseX,
+                        y: g.baseY,
+                        z: bz,
+                        angle: g.ang,
+                        speed: 28,
+                        kind: "CIVILIAN",
+                        g24Type: guardArch,
+                        g2Remapped: true,
+                        isVillaGuard: true,
+                        missionTag: "VILLA_GUARD",
+                        guardBaseX: g.baseX,
+                        guardBaseY: g.baseY,
+                        shirtColor: gi === 0 ? "#1e293b" : "#1e3a8a",
+                        hp: 75,
+                        maxHp: 75,
+                        copWeapon: "PISTOL",
+                        shootCooldown: 0.85,
+                        dead: false
+                    });
+                    game.peds.push(g.ped);
+                }
+
+                if (g.ped) {
+                    if (g.ped.dead) {
+                        if (!g.deadUntilReset) {
+                            g.deadUntilReset = true;
+                            ht.alarmTripped = true;
+                        }
+                        continue;
+                    }
+                    if (g.ped.hp < g.ped.maxHp || (g.ped.panicTimer || 0) > 0 || (g.ped.stunnedTimer || 0) > 0) {
+                        ht.alarmTripped = true;
+                    }
+                    if (ht.alarmTripped) {
+                        g.ped.isAlertedGuard = true;
+                    }
+                    if (!g.ped.isAlertedGuard) {
+                        const nx = g.baseX + Math.cos(t * 1.1 + g.phase) * 18.0;
+                        const ny = g.baseY + Math.sin(t * 1.1 + g.phase) * 18.0;
+                        g.ang = Math.atan2(ny - g.ped.y, nx - g.ped.x);
+                        g.x = nx;
+                        g.y = ny;
+                        g.ped.angle = g.ang;
+                        g.ped.x = nx;
+                        g.ped.y = ny;
+                        g.ped.speed = 28;
+                    } else {
+                        g.x = g.ped.x;
+                        g.y = g.ped.y;
+                        g.ang = g.ped.angle;
+                    }
+                } else if (!g.deadUntilReset) {
+                    const speed = ht.alarmTripped ? 2.8 : 1.1;
+                    const rad = ht.alarmTripped ? 26.0 : 18.0;
+                    const nx = g.baseX + Math.cos(t * speed + g.phase) * rad;
+                    const ny = g.baseY + Math.sin(t * speed + g.phase) * rad;
+                    g.ang = Math.atan2(ny - g.y, nx - g.x);
+                    g.x = nx;
+                    g.y = ny;
+                }
             }
 
             // Check if player walks through unhacked 3D Red Laser Security Grid
@@ -3463,6 +3534,7 @@ class WorldObjectEngine {
             uniform sampler2D uDayLightTex;
             uniform vec2 uSunDir;
             uniform float uNightTint;
+            uniform float uWinLit;
             uniform float uSunsetTint;
 
             float hash21(vec2 p) {
@@ -3675,9 +3747,20 @@ class WorldObjectEngine {
                             float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
                             float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
                             float isWindow = clamp((lum - 0.50) * 3.4 + (sat - 0.28) * 2.6, 0.0, 1.0);
-                            vec3 darkWall = c.rgb * vec3(0.46, 0.54, 0.78);
-                            vec3 warmGlow = min(vec3(1.0), mix(c.rgb * 1.38, vec3(1.0, 0.86, 0.52), 0.42));
-                            vec3 nightRgb = mix(darkWall, warmGlow, isWindow * 0.90);
+                            // Per-room 3D cell hash so house & custom building windows switch on progressively as uWinLit rises through the night!
+                            vec3 hCell = floor(vWorldPos * vec3(1.6, 2.0, 1.6));
+                            float hHash = fract(sin(dot(hCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+                            float hThresh = 0.05 + hHash * 0.86;
+                            float hLit = smoothstep(hThresh - 0.04, hThresh + 0.02, uWinLit);
+                            // Synthesize warm residential window panes along vertical house walls (vWorldPos.y > 2.08)
+                            float wx = fract((vWorldPos.x + vWorldPos.z) * 1.6);
+                            float wy = fract((vWorldPos.y - 2.0) * 2.2);
+                            float procWin = step(0.22, wx) * step(wx, 0.78) * step(0.24, wy) * step(wy, 0.78) * step(2.08, vWorldPos.y) * step(vWorldPos.y, 2.95);
+                            float winMask = max(isWindow, procWin * 0.78);
+                            vec3 roomTint = (hHash > 0.82) ? vec3(0.74, 0.88, 1.0) : vec3(1.0, 0.86, 0.48);
+                            vec3 darkWall = c.rgb * vec3(0.45, 0.53, 0.78);
+                            vec3 warmGlow = min(vec3(1.0), mix(c.rgb * 1.38, roomTint, 0.58) + vec3(0.08, 0.05, 0.02));
+                            vec3 nightRgb = mix(darkWall, warmGlow, winMask * (0.04 + 0.94 * hLit));
                             c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
                         }
                     }
@@ -3696,6 +3779,7 @@ class WorldObjectEngine {
             uDayLightTex: gl.getUniformLocation(this.meshProg, "uDayLightTex"),
             uSunDir: gl.getUniformLocation(this.meshProg, "uSunDir"),
             uNightTint: gl.getUniformLocation(this.meshProg, "uNightTint"),
+            uWinLit: gl.getUniformLocation(this.meshProg, "uWinLit"),
             uSunsetTint: gl.getUniformLocation(this.meshProg, "uSunsetTint")
         };
     }
@@ -7115,6 +7199,12 @@ class WorldObjectEngine {
         gl.useProgram(this.meshProg);
         gl.uniformMatrix4fv(this.meshLocs.uViewProj, false, viewProj);
         gl.uniform1f(this.meshLocs.uNightTint, nf);
+        if (this.meshLocs.uWinLit) {
+            const winLit = typeof renderer.getWindowLitFactor === "function"
+                ? renderer.getWindowLitFactor(renderer.lastGameRef)
+                : (renderer.windowLitFactor || 0.0);
+            gl.uniform1f(this.meshLocs.uWinLit, winLit);
+        }
         gl.uniform1f(this.meshLocs.uSunsetTint, sf);
         if (this.meshLocs.uSunDir) {
             const gameRef = renderer.lastGameRef;
@@ -8239,6 +8329,60 @@ class WorldObjectEngine {
                 renderer.batchObjectSprite3D(db.spr, boatX + sunCos * 3.5, boatY + sunSin * 3.5, 2.015, boatAng, 1.12, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.28);
                 renderer.batchObjectSprite3D(db.spr, boatX, boatY, 2.045 + bob, boatAng, 1.12, SPRITE_DRAW_ORDER.CAR);
             }
+
+            // Progressive Night Window Glow & Lawn Light Spills on 3D Houses & Villas
+            const winLit = typeof renderer.getWindowLitFactor === "function"
+                ? renderer.getWindowLitFactor(game)
+                : (renderer.windowLitFactor || 0.0);
+            if (winLit > 0.04 && (renderer.nightFactor || 0) > 0.08) {
+                const w1 = (h.spec.w1 || 140) * sc;
+                const d1 = (h.spec.d1 || 110) * sc;
+                const h1 = (h.spec.h1 || 0.42) * sc;
+                const csH = Math.cos(h.ang);
+                const snH = Math.sin(h.ang);
+                const winBays = [
+                    { lx: -w1 * 0.28, ly:  d1 * 0.50, nx:  0, ny:  1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
+                    { lx:  w1 * 0.28, ly:  d1 * 0.50, nx:  0, ny:  1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
+                    { lx: -w1 * 0.28, ly: -d1 * 0.50, nx:  0, ny: -1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
+                    { lx:  w1 * 0.28, ly: -d1 * 0.50, nx:  0, ny: -1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
+                    { lx: -w1 * 0.50, ly: -d1 * 0.24, nx: -1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 },
+                    { lx: -w1 * 0.50, ly:  d1 * 0.24, nx: -1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 },
+                    { lx:  w1 * 0.50, ly: -d1 * 0.24, nx:  1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 },
+                    { lx:  w1 * 0.50, ly:  d1 * 0.24, nx:  1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 }
+                ];
+                for (let wi = 0; wi < winBays.length; wi++) {
+                    const wHash = (((i * 41 + wi * 67 + 19) % 97) / 97.0);
+                    const wThresh = 0.05 + wHash * 0.84;
+                    if (winLit <= wThresh) continue;
+                    const wb = winBays[wi];
+                    const fade = Math.min(1.0, (winLit - wThresh) / 0.07) * Math.min(1.0, (renderer.nightFactor || 0) * 1.3);
+                    const isTvRoom = wHash > 0.82;
+                    const rCol = isTvRoom ? 0.68 : 1.00;
+                    const gCol = isTvRoom ? 0.88 : 0.86;
+                    const bCol = isTvRoom ? 1.00 : 0.46;
+                    // 1) Illuminated 3D window sill strip along the house facade
+                    const sillLx = wb.lx + wb.nx * 1.8;
+                    const sillLy = wb.ly + wb.ny * 1.8;
+                    const wx = h.x + csH * sillLx - snH * sillLy;
+                    const wy = h.y + snH * sillLx + csH * sillLy;
+                    renderer.pushSolidQuad3D(
+                        wx, wy, wb.z,
+                        wb.nx !== 0 ? 4.2 * sc : wb.w * 0.85,
+                        wb.ny !== 0 ? 4.2 * sc : wb.d * 0.85,
+                        h.ang, rCol, gCol, bCol, 0.88 * fade, SPRITE_DRAW_ORDER.ROOF_LIGHTS
+                    );
+                    // 2) Warm window light spill cast onto the ground/lawn right outside the window
+                    const spLx = wb.lx + wb.nx * (11.0 * sc);
+                    const spLy = wb.ly + wb.ny * (11.0 * sc);
+                    const spX = h.x + csH * spLx - snH * spLy;
+                    const spY = h.y + snH * spLx + csH * spLy;
+                    renderer.pushSolidQuad3D(
+                        spX, spY, bz + 0.024,
+                        wb.w * 1.25, wb.d * 1.25,
+                        h.ang, rCol, gCol, bCol, 0.28 * fade, SPRITE_DRAW_ORDER.TIRE_MARKS
+                    );
+                }
+            }
         }
 
         // Render Poolside Interactive Props
@@ -8282,7 +8426,9 @@ class WorldObjectEngine {
 
                 for (let gi = 0; gi < ht.guards.length; gi++) {
                     const g = ht.guards[gi];
-                    renderer.batchPedSprite3D(gi === 0 ? "g2_swat" : "gang", walkFrame, g.x, g.y, bz + 0.045, g.ang, 1.26, false, SPRITE_DRAW_ORDER.PED);
+                    if (!g.ped && !g.deadUntilReset) {
+                        renderer.batchPedSprite3D(gi === 0 ? "g2_zaibatsu" : "g2_yakuza", walkFrame, g.x, g.y, bz + 0.045, g.ang, 1.26, false, SPRITE_DRAW_ORDER.PED);
+                    }
                 }
 
                 if (!ht.looted) {
