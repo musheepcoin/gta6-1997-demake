@@ -2282,11 +2282,13 @@ class LeonidaGame {
                     this.player.weaponDrawnTimer = 0;
 
                     const wSpec = WEAPON_SPECS[this.player.weapon] || { name: this.player.weapon };
-
-                    this.addFloatingText(this.player.x, this.player.y - 26, this.player.weapon === "FIST" ? "👊 FIST" : `🔫 ${wSpec.name}`, "#ffd13b");
-
+                    const wLabel = this.player.weapon === "FIST" ? "👊 FIST" : `🔫 ${wSpec.name}`;
+                    this.addFloatingText(this.player.x, this.player.y - 26, wLabel, "#ffd13b");
+                    if (this.activeInterior) {
+                        if (!this.interiorPopups) this.interiorPopups = [];
+                        this.interiorPopups.push({ x: this.interiorX, y: this.interiorY - 12, text: wLabel, color: "#ffd13b", life: 0.95 });
+                    }
                     this.audio.playBeep(660, 0.04, "square", 0.05);
-
                     this.updateHud();
 
                 }
@@ -4336,11 +4338,13 @@ class LeonidaGame {
         this.player.weaponDrawnTimer = 0;
 
         const wSpec = WEAPON_SPECS[this.player.weapon] || { name: this.player.weapon };
-
-        this.addFloatingText(this.player.x, this.player.y - 26, this.player.weapon === "FIST" ? "👊 FIST" : `🔫 ${wSpec.name}`, "#ffd13b");
-
+        const wLabel = this.player.weapon === "FIST" ? "👊 FIST" : `🔫 ${wSpec.name}`;
+        this.addFloatingText(this.player.x, this.player.y - 26, wLabel, "#ffd13b");
+        if (this.activeInterior) {
+            if (!this.interiorPopups) this.interiorPopups = [];
+            this.interiorPopups.push({ x: this.interiorX, y: this.interiorY - 12, text: wLabel, color: "#ffd13b", life: 0.95 });
+        }
         this.audio.playBeep(620, 0.04, "square", 0.04);
-
         this.updateHud();
 
     }
@@ -4780,6 +4784,11 @@ class LeonidaGame {
                     bannerSub = "+100% FULL HEALTH RESTORED!";
                     break;
                 case "BUY_DRINK":
+                    p.hp = p.maxHp;
+                    p.armor = Math.min(100, (p.armor || 0) + 50);
+                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 14.0);
+                    bannerSub = "100% HEALTH RESTORED + +50 ARMOR!";
+                    break;
                 case "BUY_ENERGY":
                     p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.50));
                     p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 20.0);
@@ -4799,12 +4808,19 @@ class LeonidaGame {
                     break;
                 case "CHANGE_OUTFIT":
                 case "BUY_OUTFIT_1":
-                case "BUY_OUTFIT_2":
                     p.hp = p.maxHp;
                     p.bandana = !p.bandana;
                     this.setWantedLevel(0);
                     this.renderPortraits();
                     bannerSub = "FRESH VICE THREADS! WANTED LEVEL CLEARED!";
+                    break;
+                case "BUY_OUTFIT_2":
+                    p.hp = p.maxHp;
+                    p.armor = Math.min(100, (p.armor || 0) + 50);
+                    p.bandana = !p.bandana;
+                    this.setWantedLevel(0);
+                    this.renderPortraits();
+                    bannerSub = "PASTEL LINEN SUIT! +50 ARMOR & 0 WANTED!";
                     break;
                 case "BUY_OUTFIT_VIP":
                     p.hp = p.maxHp;
@@ -4815,12 +4831,16 @@ class LeonidaGame {
                     this.renderPortraits();
                     bannerSub = "VIP COUTURE! +100 ARMOR, +1 MULTIPLIER & 0 WANTED!";
                     break;
-                case "HOTEL_PERK":
+                case "HOTEL_PERK": {
+                    const stash = Number(st.reward) || 1500;
+                    st.cooldown = 20.0;
                     p.hp = p.maxHp;
                     p.armor = Math.min(100, (p.armor || 0) + 50);
-                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 25.0);
-                    bannerSub = "SPA & PENTHOUSE BUFF: 100% HP + 50 ARMOR + SPEED!";
+                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 20.0);
+                    this.addCash(stash, "🛎️ VIP GUEST STASH!");
+                    bannerSub = `COLLECTED +$${stash.toLocaleString()} VIP STASH + 100% HP & +50 ARMOR!`;
                     break;
+                }
                 case "PLAY_LOTTO": {
                     const roll = Math.random();
                     if (roll < 0.22) {
@@ -4841,10 +4861,16 @@ class LeonidaGame {
                     break;
                 }
                 case "PLAY_POOL": {
-                    if (Math.random() < 0.65) {
-                        this.addCash(500, "🎱 8-BALL BANK SHOT HUSTLE!");
+                    const poolRoll = Math.random();
+                    if (poolRoll < 0.25) {
+                        this.addCash(3000, "🎱 8-BALL TABLE RUN HUSTLE!");
+                        bannerTitle = "🎱 CLEAN TABLE RUN!";
+                        bannerSub = "RAN THE RACK ON THE SHARK: WON +$3,000!";
+                        bannerCol = "#fde047";
+                    } else if (poolRoll < 0.70) {
+                        this.addCash(800, "🎱 8-BALL BANK SHOT HUSTLE!");
                         bannerTitle = "🎱 SANK THE 8-BALL!";
-                        bannerSub = "CLEAN TABLE RUN! HUSTLED +$500 FROM LOCAL SHARK!";
+                        bannerSub = "CORNER POCKET BANK SHOT: HUSTLED +$800!";
                         bannerCol = "#39ff14";
                     } else {
                         bannerTitle = "🎱 SCRATCH ON THE 8-BALL!";
@@ -4857,6 +4883,9 @@ class LeonidaGame {
                     const take = Number(st.reward) || 1250;
                     this.addCash(take, "💵 ARMED REGISTER HOLD-UP!");
                     this.setWantedLevel(Math.max(this.wantedLevel + 1, 2));
+                    if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
+                        this.missions.onInteriorRobbery();
+                    }
                     if (this.audio && this.audio.playSirenBlip) this.audio.playSirenBlip();
                     bannerTitle = "🚨 ARMED HOLD-UP COMPLETE!";
                     bannerSub = `STOLE +$${take.toLocaleString()} CASH! VCPD DISPATCHED (+2★)!`;
@@ -4962,6 +4991,10 @@ class LeonidaGame {
                 grantWep("UZI", 150);
 
                 this.addCash(12000, "VAULT CRACKED!");
+
+                if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
+                    this.missions.onInteriorRobbery();
+                }
 
                 if (this.map && this.map.objectEngine && typeof this.map.objectEngine.onInteriorVaultCracked === "function") {
 
@@ -6546,7 +6579,7 @@ class LeonidaGame {
 
             targetKills: kf.targetKills || 6,
 
-            timer: kf.duration || 30,
+            timer: kf.duration || kf.timeLimit || 35,
 
             reward: kf.reward || 30000
 
@@ -9420,6 +9453,16 @@ class LeonidaGame {
             }
         }
 
+        // Live 360-degree Mouse Aiming inside Interiors when mouseShoot is enabled!
+        if (p.mouseShoot && this.input.shoot && this.renderer && typeof this.renderer.worldToScreen === "function") {
+            const pScr = this.renderer.worldToScreen(this.interiorX, this.interiorY, 2.05);
+            const mdx = (this.input.mouseX || 0) - pScr.x;
+            const mdy = (this.input.mouseY || 0) - pScr.y;
+            if (mdx * mdx + mdy * mdy > 16) {
+                this.interiorAngle = Math.atan2(mdy, mdx);
+            }
+        }
+
         // Live Indoor Weapon Firing & Ammu-Nation 4-Lane Firing Range Target Practice!
         p.fireTimer = Math.max(0, (p.fireTimer || 0) - dt);
         if (this.input.shoot && p.fireTimer <= 0) {
@@ -9527,6 +9570,11 @@ class LeonidaGame {
         }
 
 
+
+        // Keep active missions ticking while inside a building (so interior robberies, wanted clears, and hotel check-ins complete immediately!)
+        if (this.missions && typeof this.missions.update === "function") {
+            this.missions.update(dt);
+        }
 
         // The companion stays outside while the player is in a venue
 

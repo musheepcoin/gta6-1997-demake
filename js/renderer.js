@@ -9322,6 +9322,14 @@ class RetroRenderer {
                 const rect = this.gta1Meta.sprites.hud["24"];
                 this.pushAtlasSprite3D(rect, ax, ay, this.camZBlocks + 0.25, angle + Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.HUD_ARROW);
             }
+            // Active Mission 3D Ground Beacon Corona (pulsing gold & cyan objective marker on the street!)
+            if (game.missions && game.missions.activeMission && dist < 900) {
+                const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
+                const tz = game.map.getHeightAtPx(target.x, target.y) + 0.03;
+                const ringSz = 38 + pulse * 14;
+                this.pushSolidQuad3D(target.x, target.y, tz, ringSz, ringSz, performance.now() * 0.002, 1.0, 0.85, 0.15, 0.28 + pulse * 0.22, SPRITE_DRAW_ORDER.DECALS);
+                this.pushSolidQuad3D(target.x, target.y, tz + 0.01, ringSz * 0.58, ringSz * 0.58, -performance.now() * 0.003, 0.0, 0.94, 1.0, 0.35 + pulse * 0.25, SPRITE_DRAW_ORDER.DECALS);
+            }
         }
     }
 
@@ -11329,6 +11337,9 @@ class RetroRenderer {
                     ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
                     ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
                     ctx.fillText(ready ? `[E] CONFIRM • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 21);
+                    if (isNear && ready && Array.isArray(this.cheatButtons)) {
+                        this.cheatButtons.push({ id: "TRIGGER_STATION", x: bx, y: by, w: bw, h: bh, station: st });
+                    }
                 }
             }
         }

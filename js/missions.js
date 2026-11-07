@@ -98,6 +98,7 @@ class MissionManager {
     abortMission() {
         if (!this.activeMission) return false;
         const g = this.game;
+        this.cleanupMissionVehicles();
         this.activeMission = null;
         if (g) {
             if (typeof g.showBigBanner === "function") {
@@ -112,6 +113,33 @@ class MissionManager {
             }
         }
         return true;
+    }
+
+    cleanupMissionVehicles() {
+        const g = this.game;
+        if (!g || !Array.isArray(g.vehicles)) return;
+        const pVeh = g.player ? g.player.inVehicle : null;
+        g.vehicles = g.vehicles.filter((v) => {
+            if (!v || v === pVeh) return true;
+            return v.id !== "mission_cheetah" && v.id !== "mission_brinks";
+        });
+    }
+
+    onInteriorRobbery() {
+        const m = this.activeMission;
+        const g = this.game;
+        if (!m || !g) return;
+        if (m.id === "M1_UNCLE_JACK" && m.stage === 1) {
+            m.stage = 2;
+            g.setWantedLevel(Math.max(g.wantedLevel, 2));
+            g.sendPager(
+                "JASON (SMARTPHONE)",
+                "REGISTER CLEARED! VCPD cruisers incoming! Drive to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave (or change outfits) to lose the heat!",
+                true
+            );
+            m.targetPos = { x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
+            m.objectiveLabel = "RESPRAY AT VICE CUSTOMS (COLLINS AVE)";
+        }
     }
 
     getTargetPosition() {
@@ -156,7 +184,7 @@ class MissionManager {
                         "REGISTER CLEARED ($15,000)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
                         true
                     );
-                    m.targetPos = { x: mx256(203.0) * TILE_SIZE, y: my256(146.5) * TILE_SIZE };
+                    m.targetPos = { x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
                     m.objectiveLabel = "RESPRAY AT VICE CUSTOMS (COLLINS AVE)";
                 }
             } else if (m.stage === 2) {
@@ -189,12 +217,16 @@ class MissionManager {
                     );
                 }
             } else if (m.stage === 2) {
-                if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 75) {
+                const insideHotelDixon = Boolean(g.activeInterior && g.activeInterior.id === "HOTEL_DIXON");
+                if (insideHotelDixon || Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 82) {
                     this.completeMission(m.phone, "VICE BEACH CONTRABAND RUN", 45000);
                 }
             }
         } else if (m.id === "M3_OCEAN_DRIVE") {
             if (m.stage === 1) {
+                if (m.targetCar && !m.targetCar.destroyed) {
+                    m.targetPos = { x: m.targetCar.x, y: m.targetCar.y };
+                }
                 if (p.inVehicle && p.inVehicle === m.targetCar) {
                     m.stage = 2;
                     m.timer = 90;
@@ -214,27 +246,32 @@ class MissionManager {
                     this.failMission("THE TARGET CHEETAH WAS DESTROYED!");
                     return;
                 }
-                if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 85) {
+                const craneDist = Math.hypot(p.x - mx256(171.5) * TILE_SIZE, p.y - my256(162.5) * TILE_SIZE);
+                if (p.inVehicle === m.targetCar && (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 95 || craneDist < 110)) {
                     this.completeMission(m.phone, "STAR ISLAND GRAND THEFT", 75000);
                 }
             }
         } else if (m.id === "M4_ANKLE_OVERRIDE") {
             if (m.stage === 1) {
                 const v = m.armoredVan;
+                if (v && !v.destroyed) {
+                    m.targetPos = { x: v.x, y: v.y };
+                }
                 if (!v || v.destroyed || p.inVehicle === v) {
                     m.stage = 2;
                     g.addCash(50000, "ARMORED VAULT LOOT!");
                     g.setWantedLevel(Math.max(g.wantedLevel, 4));
-                    m.targetPos = { x: mx256(66.5) * TILE_SIZE, y: my256(152.0) * TILE_SIZE };
+                    m.targetPos = { x: 128.0 * TILE_SIZE, y: 297.5 * TILE_SIZE };
                     m.objectiveLabel = "HACK DOC RELAY AT VCIA AIRPORT";
                     g.sendPager(
                         "LUCIA & JASON",
-                        "Vault cash secured! 4-STAR SWAT MANHUNT! Race east to VCIA International Airport to scramble Lucia's DOC Ankle Monitor!",
+                        "Vault cash secured! 4-STAR SWAT MANHUNT! Race south to VCIA International Airport Terminal (128, 297) to scramble Lucia's DOC Ankle Monitor!",
                         true
                     );
                 }
             } else if (m.stage === 2) {
-                if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 80) {
+                const altAirDist = Math.hypot(p.x - mx256(66.5) * TILE_SIZE, p.y - my256(152.0) * TILE_SIZE);
+                if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 92 || altAirDist < 92) {
                     g.player.ankleScrambled = true;
                     g.setWantedLevel(0);
                     this.completeMission(m.phone, "LEONIDA KINGPIN — ANKLE MONITOR OVERRIDDEN!", 150000);
@@ -245,6 +282,7 @@ class MissionManager {
 
     startMission(phone) {
         const g = this.game;
+        this.cleanupMissionVehicles();
         g.audio.playCashSound();
 
         if (phone.missionId === "M1_UNCLE_JACK") {
@@ -261,7 +299,7 @@ class MissionManager {
             g.toggleBandana(true);
             g.sendPager(
                 "LUCIA & JASON",
-                "MISSION 1: 'TRUST?' — Red heist bandana on! Head south down Ocean Drive, rob the register, and lose the cops at Vice Customs on Collins Ave!",
+                "MISSION 1: 'TRUST?' — Red heist bandana on! Head south down Ocean Drive (or enter any Bodega/Shop to rob the register), then lose the cops at Vice Customs!",
                 true
             );
             g.showBigBanner("MISSION 1: TRUST?", "ROB SOUTH BEACH LIQUOR WITH JASON", "#ff2a85", 2.4);
@@ -288,7 +326,10 @@ class MissionManager {
             );
             g.showBigBanner("PIER CONTRABAND RUN", "COLLECT 3 CRATES ON VICE BEACH & OCEAN PIER", "#a3e635", 2.4);
         } else if (phone.missionId === "M3_OCEAN_DRIVE") {
-            const cheetah = new Vehicle("mission_cheetah", "VICE_CHEETAH", mx256(173.5) * TILE_SIZE, my256(107.5) * TILE_SIZE, 0);
+            const cx = mx256(173.5) * TILE_SIZE;
+            const cy = my256(107.5) * TILE_SIZE;
+            const cheetah = new Vehicle("mission_cheetah", "VICE_CHEETAH", cx, cy, 0);
+            cheetah.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(cx, cy, 4.0) : 2.0;
             cheetah.missionTag = "TARGET_CHEETAH";
             g.vehicles.push(cheetah);
 
@@ -309,7 +350,10 @@ class MissionManager {
             );
             g.showBigBanner("CHEETAH BOOST", "STEAL THE VIP CHEETAH ON STAR ISLAND", "#00f0ff", 2.4);
         } else if (phone.missionId === "M4_ANKLE_OVERRIDE") {
-            const brinks = new Vehicle("mission_brinks", "BRINKS_TRUCK", mx256(38.5) * TILE_SIZE, my256(140.5) * TILE_SIZE, Math.PI * 0.5);
+            const bx = 70.5 * TILE_SIZE;
+            const by = 213.5 * TILE_SIZE;
+            const brinks = new Vehicle("mission_brinks", "BRINKS_TRUCK", bx, by, 0);
+            brinks.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(bx, by, 4.0) : 2.0;
             brinks.missionTag = "ARMORED_TARGET";
             g.vehicles.push(brinks);
 
@@ -326,7 +370,7 @@ class MissionManager {
             g.recruitJason();
             g.sendPager(
                 "LUCIA & JASON",
-                "FINAL MISSION: 'ANKLE MONITOR OVERRIDE' — Hit the Grupo Seguro Armored Van at Uncle Jack's in Port Gellhorn (38, 140), then hack the DOC Relay at VCIA Airport!",
+                "FINAL MISSION: 'ANKLE MONITOR OVERRIDE' — Hit the Grupo Seguro Armored Van outside Uncle Jack's & Hank's Waffles in Port Gellhorn (70, 213), then hack the DOC Relay at VCIA Airport!",
                 true
             );
             g.showBigBanner("THE BIG LEONIDA SCORE", "AMBUSH THE ARMORED VAN & HACK DOC RELAY", "#ffd13b", 2.6);
