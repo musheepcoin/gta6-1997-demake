@@ -8121,11 +8121,11 @@ class RetroRenderer {
                         // Threshold step on the sidewalk
                         this.pushSolidQuad3D(tcx - fnv[0] * 24, tcy - fnv[1] * 24, dz, 36, 8, dAng, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     }
-                    // Glowing sidewalk welcome mat positioned outside the 3D canopy overhang so it is ALWAYS visible from above!
-                    const matX = intr.isEstatePortico ? intr.doorX : (tcx - fnv[0] * 12);
-                    const matY = intr.isEstatePortico ? intr.doorY : (tcy - fnv[1] * 12);
-                    this.pushSolidQuad3D(matX, matY, dz + 0.004, 30, 14, dAng, mrgb[0], mrgb[1], mrgb[2], pulse * 0.85, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    this.pushSolidQuad3D(matX, matY, dz + 0.009, 20, 8, dAng, 0.15, 0.95, 1.0, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Glowing sidewalk welcome mat positioned right in front of the 3D canopy overhang so it is ALWAYS visible from above!
+                    const matX = intr.isEstatePortico ? intr.doorX : (tcx + fnv[0] * 4);
+                    const matY = intr.isEstatePortico ? intr.doorY : (tcy + fnv[1] * 4);
+                    this.pushSolidQuad3D(matX, matY, dz + 0.004, 34, 15, dAng, mrgb[0], mrgb[1], mrgb[2], pulse * 0.88, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(matX, matY, dz + 0.009, 24, 9, dAng, 0.15, 0.95, 1.0, 0.94, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     continue;
                 }
                 this.pushSolidQuad3D(intr.doorX, intr.doorY, dz, 26, 26, this.time * 1.2, mrgb[0], mrgb[1], mrgb[2], pulse, SPRITE_DRAW_ORDER.MAP_OBJECT);

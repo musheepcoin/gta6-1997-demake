@@ -165,39 +165,39 @@
     // facade orientation (facing: "S" | "N" | "E" | "W") matching its street!
     // ============================================================================
     const HANDCRAFTED_ESTABLISHMENTS = [
-        // --- OCEAN DRIVE & SOUTH BEACH (West of Ocean Drive faces EAST toward beach!) ---
-        { id: "ESTAB_COLONY_HOTEL", tpl: "SHOP_HOTEL", name: "🏨 THE COLONY ART DECO HOTEL", district: "OCEAN DRIVE", c: 442, r: 299, facing: "E" },
-        { id: "ESTAB_CAFFE_ROMA", tpl: "SHOP_RESTAURANT", name: "🍝 CAFFÈ ROMA OCEAN TERRACE", district: "OCEAN DRIVE", c: 442, r: 274, facing: "E" },
-        { id: "ESTAB_GIANNI_COUTURE", tpl: "SHOP_CLOTHES", name: "👗 GIANNI'S COUTURE & SILK", district: "OCEAN DRIVE", c: 442, r: 262, facing: "E" },
-        { id: "ESTAB_CLEVELANDER_BAR", tpl: "SHOP_BAR", name: "🍹 THE CLEVELANDER POOL BAR", district: "OCEAN DRIVE", c: 442, r: 180, facing: "E" },
-        { id: "ESTAB_SOBE_BODEGA", tpl: "SHOP_CONVENIENCE", name: "🏪 SOUTH POINTE 24/7 BODEGA", district: "SOUTH BEACH", c: 394, r: 306, facing: "S" },
-        { id: "ESTAB_COLLINS_AMMU", tpl: "SHOP_GUN_SHOP", name: "🔫 COLLINS AVE AMMU-NATION", district: "SOUTH BEACH", c: 382, r: 280, facing: "W" },
+        // --- OCEAN DRIVE & SOUTH BEACH (Verified straight-wall storefronts in c=431..443) ---
+        { id: "ESTAB_COLONY_HOTEL", tpl: "SHOP_HOTEL", name: "🏨 THE COLONY ART DECO HOTEL", district: "OCEAN DRIVE", c: 443, r: 301, facing: "E" },
+        { id: "ESTAB_CAFFE_ROMA", tpl: "SHOP_RESTAURANT", name: "🍝 CAFFÈ ROMA OCEAN TERRACE", district: "OCEAN DRIVE", c: 443, r: 275, facing: "E" },
+        { id: "ESTAB_GIANNI_COUTURE", tpl: "SHOP_CLOTHES", name: "👗 GIANNI'S COUTURE & SILK", district: "OCEAN DRIVE", c: 441, r: 253, facing: "S" },
+        { id: "ESTAB_CLEVELANDER_BAR", tpl: "SHOP_BAR", name: "🍹 THE CLEVELANDER POOL BAR", district: "OCEAN DRIVE", c: 443, r: 166, facing: "E" },
+        { id: "ESTAB_SOBE_BODEGA", tpl: "SHOP_CONVENIENCE", name: "🏪 SOUTH POINTE 24/7 BODEGA", district: "SOUTH BEACH", c: 431, r: 306, facing: "S" },
+        { id: "ESTAB_COLLINS_AMMU", tpl: "SHOP_GUN_SHOP", name: "🔫 COLLINS AVE AMMU-NATION", district: "SOUTH BEACH", c: 438, r: 278, facing: "W" },
 
         // --- MID-BEACH, ESPAÑOLA WAY & WASHINGTON AVE ---
-        { id: "ESTAB_HAVANA_TAPAS", tpl: "SHOP_RESTAURANT", name: "🥘 HAVANA TAPAS & GRILL", district: "ESPAÑOLA WAY", c: 388, r: 162, facing: "S" },
-        { id: "ESTAB_FLAMINGO_LOUNGE", tpl: "SHOP_BAR", name: "🦩 FLAMINGO COCKTAIL LOUNGE", district: "MID-BEACH", c: 388, r: 175, facing: "N" },
-        { id: "ESTAB_WASH_SURPLUS", tpl: "SHOP_GUN_SHOP", name: "🔫 MID-BEACH TACTICAL SURPLUS", district: "WASHINGTON AVE", c: 382, r: 154, facing: "W" },
-        { id: "ESTAB_OCEAN_SUITES", tpl: "SHOP_HOTEL", name: "🏨 CARLYLE ART DECO SUITES", district: "MID-BEACH", c: 442, r: 152, facing: "E" },
-        { id: "ESTAB_MIDBEACH_MART", tpl: "SHOP_CONVENIENCE", name: "🏪 FLAMINGO PARK QUICK-STOP", district: "MID-BEACH", c: 392, r: 259, facing: "N" },
+        { id: "ESTAB_HAVANA_TAPAS", tpl: "SHOP_RESTAURANT", name: "🥘 HAVANA TAPAS & GRILL", district: "ESPAÑOLA WAY", c: 440, r: 168, facing: "S" },
+        { id: "ESTAB_FLAMINGO_LOUNGE", tpl: "SHOP_BAR", name: "🦩 FLAMINGO COCKTAIL LOUNGE", district: "MID-BEACH", c: 440, r: 170, facing: "N" },
+        { id: "ESTAB_WASH_SURPLUS", tpl: "SHOP_GUN_SHOP", name: "🔫 MID-BEACH TACTICAL SURPLUS", district: "WASHINGTON AVE", c: 438, r: 155, facing: "W" },
+        { id: "ESTAB_OCEAN_SUITES", tpl: "SHOP_HOTEL", name: "🏨 CARLYLE ART DECO SUITES", district: "MID-BEACH", c: 441, r: 153, facing: "N" },
+        { id: "ESTAB_MIDBEACH_MART", tpl: "SHOP_CONVENIENCE", name: "🏪 FLAMINGO PARK QUICK-STOP", district: "MID-BEACH", c: 431, r: 248, facing: "N" },
 
         // --- NORTH BEACH & VICE POINT ---
-        { id: "ESTAB_VICEPOINT_SURF", tpl: "SHOP_CLOTHES", name: "👕 VICE POINT SURF & TAILOR", district: "VICE POINT", c: 442, r: 96, facing: "E" },
-        { id: "ESTAB_NORTH_AMMU", tpl: "SHOP_GUN_SHOP", name: "🔫 NORTH BEACH GUN & RANGE", district: "NORTH BEACH", c: 388, r: 66, facing: "S" },
-        { id: "ESTAB_STARLIGHT_HOTEL", tpl: "SHOP_HOTEL", name: "🏨 STARLIGHT OCEAN RESORT", district: "NORTH BEACH", c: 442, r: 58, facing: "E" },
-        { id: "ESTAB_NEON_PALM_BAR", tpl: "SHOP_BAR", name: "🍸 NEON PALM COCKTAIL CLUB", district: "NORTH BEACH", c: 382, r: 88, facing: "W" },
-        { id: "ESTAB_SHORES_OUTLET", tpl: "SHOP_CLOTHES", name: "🧥 VICE SHORES DESIGNER ATELIER", district: "NORTH VICE SHORES", c: 172, r: 54, facing: "N" },
+        { id: "ESTAB_VICEPOINT_SURF", tpl: "SHOP_CLOTHES", name: "👕 VICE POINT SURF & TAILOR", district: "VICE POINT", c: 443, r: 97, facing: "E" },
+        { id: "ESTAB_NORTH_AMMU", tpl: "SHOP_GUN_SHOP", name: "🔫 NORTH BEACH GUN & RANGE", district: "NORTH BEACH", c: 431, r: 66, facing: "S" },
+        { id: "ESTAB_STARLIGHT_HOTEL", tpl: "SHOP_HOTEL", name: "🏨 STARLIGHT OCEAN RESORT", district: "NORTH BEACH", c: 448, r: 43, facing: "E" },
+        { id: "ESTAB_NEON_PALM_BAR", tpl: "SHOP_BAR", name: "🍸 NEON PALM COCKTAIL CLUB", district: "NORTH BEACH", c: 438, r: 87, facing: "W" },
+        { id: "ESTAB_SHORES_OUTLET", tpl: "SHOP_CLOTHES", name: "🧥 VICE SHORES DESIGNER ATELIER", district: "NORTH VICE SHORES", c: 172, r: 66, facing: "N" },
 
         // --- DOWNTOWN VICE CITY, LITTLE HAVANA, LITTLE HAITI & WYNWOOD ---
-        { id: "ESTAB_DOWNTOWN_ARMS", tpl: "SHOP_GUN_SHOP", name: "🔫 DOWNTOWN EXECUTIVE ARMS", district: "DOWNTOWN VC", c: 288, r: 172, facing: "E" },
-        { id: "ESTAB_BAYFRONT_BISTRO", tpl: "SHOP_RESTAURANT", name: "🥩 BAYFRONT GRAND BRASSERIE", district: "DOWNTOWN VC", c: 286, r: 262, facing: "S" },
-        { id: "ESTAB_CALLE_OCHO_CAFE", tpl: "SHOP_RESTAURANT", name: "☕ CALLE OCHO CAFÉ CUBANO", district: "LITTLE HAVANA", c: 230, r: 284, facing: "N" },
-        { id: "ESTAB_HAVANA_BODEGA", tpl: "SHOP_CONVENIENCE", name: "🏪 LITTLE HAVANA BODEGA & LOTTO", district: "LITTLE HAVANA", c: 226, r: 262, facing: "S" },
-        { id: "ESTAB_TOUSSAINT_RUM", tpl: "SHOP_BAR", name: "🥃 TOUSSAINT CREOLE RUM BAR", district: "LITTLE HAITI", c: 182, r: 162, facing: "W" },
-        { id: "ESTAB_WYNWOOD_THREADS", tpl: "SHOP_CLOTHES", name: "🕶️ WYNWOOD VINTAGE & COUTURE", district: "WYNWOOD", c: 228, r: 162, facing: "E" },
+        { id: "ESTAB_DOWNTOWN_ARMS", tpl: "SHOP_GUN_SHOP", name: "🔫 DOWNTOWN EXECUTIVE ARMS", district: "DOWNTOWN VC", c: 283, r: 169, facing: "E" },
+        { id: "ESTAB_BAYFRONT_BISTRO", tpl: "SHOP_RESTAURANT", name: "🥩 BAYFRONT GRAND BRASSERIE", district: "DOWNTOWN VC", c: 281, r: 265, facing: "S" },
+        { id: "ESTAB_CALLE_OCHO_CAFE", tpl: "SHOP_RESTAURANT", name: "☕ CALLE OCHO CAFÉ CUBANO", district: "LITTLE HAVANA", c: 241, r: 287, facing: "N" },
+        { id: "ESTAB_HAVANA_BODEGA", tpl: "SHOP_CONVENIENCE", name: "🏪 LITTLE HAVANA BODEGA & LOTTO", district: "LITTLE HAVANA", c: 229, r: 259, facing: "S" },
+        { id: "ESTAB_TOUSSAINT_RUM", tpl: "SHOP_BAR", name: "🥃 TOUSSAINT CREOLE RUM BAR", district: "LITTLE HAITI", c: 178, r: 157, facing: "W" },
+        { id: "ESTAB_WYNWOOD_THREADS", tpl: "SHOP_CLOTHES", name: "🕶️ WYNWOOD VINTAGE & COUTURE", district: "WYNWOOD", c: 231, r: 157, facing: "E" },
 
         // --- PORT GELLHORN & INDUSTRIAL MAINLAND ---
-        { id: "ESTAB_TURNPIKE_DINER", tpl: "SHOP_RESTAURANT", name: "🍔 TURNPIKE TRUCKER SMOKEHOUSE", district: "PORT GELLHORN", c: 122, r: 262, facing: "S" },
-        { id: "ESTAB_KELLY_GUN_PAWN", tpl: "SHOP_GUN_SHOP", name: "🔫 KELLY COUNTY GUN & RANGE", district: "PORT GELLHORN", c: 76, r: 162, facing: "E" }
+        { id: "ESTAB_TURNPIKE_DINER", tpl: "SHOP_RESTAURANT", name: "🍔 TURNPIKE TRUCKER SMOKEHOUSE", district: "PORT GELLHORN", c: 170, r: 259, facing: "S" },
+        { id: "ESTAB_KELLY_GUN_PAWN", tpl: "SHOP_GUN_SHOP", name: "🔫 KELLY COUNTY GUN & RANGE", district: "PORT GELLHORN", c: 68, r: 143, facing: "E" }
     ];
 
     // ============================================================================
@@ -466,18 +466,19 @@
         const cols = 512;
         const rows = 512;
         const ground = map.surfaceGround;
-        const topZ = map.topZ;
-        if (!ground || !topZ) return null;
+        const surfZ = map.surfaceLayer;
+        if (!ground) return null;
 
+        // GROUND_TYPE.BUILDING === 5, GROUND_TYPE.PAWEMENT === 3, GROUND_TYPE.ROAD === 2
         const isBuilding = (c, r) => {
             if (c < 2 || r < 2 || c >= cols - 2 || r >= rows - 2) return false;
             const idx = r * cols + c;
-            return ground[idx] === 4 && (!topZ || topZ[idx] >= 3);
+            return ground[idx] === 5 && (!surfZ || surfZ[idx] >= 3);
         };
         const isWalkableSidewalk = (c, r) => {
             if (c < 2 || r < 2 || c >= cols - 2 || r >= rows - 2) return false;
-            const g = ground[r * cols + c];
-            return g === 5 || g === 3;
+            const idx = r * cols + c;
+            return ground[idx] === 3 && (!surfZ || surfZ[idx] <= 2);
         };
 
         // Direction vectors from sidewalk tile (c, r) into adjacent building tile (c + dx, r + dy)
@@ -499,9 +500,17 @@
                 const dist = Math.hypot(dc, dr);
                 for (const d of dirs) {
                     if (!isBuilding(c + d.dx, r + d.dy)) continue;
-                    // Strongly prefer the authored building orientation so the door matches the intended facade!
+                    // Outward tile (in front of door) must be walkable sidewalk (3) or street (2)
+                    const outG = ground[(r - d.dy) * cols + (c - d.dx)];
+                    if (outG !== 2 && outG !== 3) continue;
+                    // Strongly prefer straight walls where the building continues on both sides along the facade
+                    const perpX = d.dy;
+                    const perpY = d.dx;
+                    const wallCont = (isBuilding(c + d.dx + perpX, r + d.dy + perpY) ? 1 : 0) +
+                                     (isBuilding(c + d.dx - perpX, r + d.dy - perpY) ? 1 : 0);
+                    const cornerPen = wallCont === 2 ? 0.0 : (wallCont === 1 ? 3.5 : 8.0);
                     const facePen = (preferredFacing && d.facing !== preferredFacing) ? 9.5 : 0.0;
-                    const score = dist + facePen + treePen;
+                    const score = dist + facePen + cornerPen + treePen;
                     if (score < bestScore) {
                         bestScore = score;
                         best = { c, r, facing: d.facing };
@@ -517,18 +526,6 @@
         if (!map || !Array.isArray(map.interiors)) return;
         const ts = 64;
 
-        // Explicit authentic building facade orientations for the 8 Vice City & Leonida landmarks:
-        // Ocean Drive landmarks (HOTEL_DIXON, CLUB_NINE1NINE) sit on the West side of Ocean Drive (c=441)
-        // and face EAST ("E") toward Lummus Park & the beach!
-        const preferredLandmarkFacings = {
-            HOTEL_DIXON: "E",
-            CLUB_NINE1NINE: "E",
-            ESPANOLA_WAY: "S",
-            JACK_OF_HEARTS: "W",
-            PENITENTIARY: "S",
-            PORT_GELLHORN: "S"
-        };
-
         for (const intr of map.interiors) {
             if (!intr) continue;
             // Ensure consistent room dimensions for multi-room floorplans
@@ -542,8 +539,8 @@
 
             const c0 = Math.floor(intr.doorX / ts);
             const r0 = Math.floor(intr.doorY / ts);
-            const prefFacing = preferredLandmarkFacings[intr.id] || intr.facing || "S";
-            const snapped = snapDoorToBuildingFacade(map, c0, r0, prefFacing, 16);
+            // Snap landmark door to the actual building wall at its tile so the door frame, awning & interior always match 100%!
+            const snapped = snapDoorToBuildingFacade(map, c0, r0, null, 12);
 
             if (snapped) {
                 const pos = computeDoorPixelPos(snapped.c, snapped.r, snapped.facing, ts);

@@ -7220,10 +7220,11 @@ class WorldObjectEngine {
                     bDirY = fnv[1];
                     foundWall = true;
                 } else {
-                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    for (const [dx, dy, fCode] of [[0, -1, 'S'], [0, 1, 'N'], [-1, 0, 'E'], [1, 0, 'W']]) {
                         if (bTopZ[(dr + dy) * M + (dc + dx)] >= 3) {
                             bDirX = -dx;
                             bDirY = -dy;
+                            intr.facing = fCode;
                             foundWall = true;
                             break;
                         }
