@@ -7923,17 +7923,17 @@ class WorldObjectEngine {
                     continue;
                 }
 
-                // 1. Low Octagonal Pedestal Base (bz .. bz + 0.04)
-                emitDynCylinder(bl.x, bl.y, 0, 0, 3.5, 2.9, bz, bz + 0.04, 8, baseCol, 9, true);
-                // 2. Vertical Bollard Body Shaft (bz + 0.04 .. bz + 0.13)
-                emitDynCylinder(bl.x, bl.y, 0, 0, 2.5, 2.4, bz + 0.04, bz + 0.13, 8, poleCol, 9, true);
-                // 3. 360° Warm Frosted Glass Lantern Chamber (bz + 0.13 .. bz + 0.175)
+                // 1. Low Octagonal Pedestal Base (bz .. bz + 0.045)
+                emitDynCylinder(bl.x, bl.y, 0, 0, 4.2, 3.4, bz, bz + 0.045, 8, baseCol, 9, true);
+                // 2. Vertical Bollard Body Shaft (bz + 0.045 .. bz + 0.135)
+                emitDynCylinder(bl.x, bl.y, 0, 0, 2.8, 2.5, bz + 0.045, bz + 0.135, 8, poleCol, 9, true);
+                // 3. 360° Warm Frosted Glass Lantern Globe/Collar (bz + 0.135 .. bz + 0.195) — wider than top finial so glowing ring is clearly visible from 2.5D top-down camera!
                 const bulbCol = lightsOn
-                    ? (isVilla ? [1.0, 0.90, 0.56] : (isDecoPark ? [1.0, 0.92, 0.64] : [1.0, 0.87, 0.48]))
+                    ? (isVilla ? [1.0, 0.90, 0.56] : (isDecoPark ? [1.0, 0.93, 0.65] : [1.0, 0.88, 0.50]))
                     : [0.82, 0.85, 0.80];
-                emitDynCylinder(bl.x, bl.y, 0, 0, 2.35, 2.35, bz + 0.13, bz + 0.175, 8, bulbCol, lightsOn ? 10 : 7, false);
-                // 4. Louvered Top Anti-Glare Cap (bz + 0.175 .. bz + 0.202) — wider than glass diffuser so light projects downward onto the lawn & path!
-                emitDynCylinder(bl.x, bl.y, 0, 0, 3.15, 1.95, bz + 0.175, bz + 0.202, 8, hoodCol, 9, true);
+                emitDynCylinder(bl.x, bl.y, 0, 0, 3.7, 3.3, bz + 0.135, bz + 0.195, 8, bulbCol, lightsOn ? 10 : 7, true);
+                // 4. Compact Top Center Finial Cap (bz + 0.195 .. bz + 0.215)
+                emitDynCylinder(bl.x, bl.y, 0, 0, 2.1, 1.1, bz + 0.195, bz + 0.215, 8, hoodCol, 9, true);
             }
         }
 

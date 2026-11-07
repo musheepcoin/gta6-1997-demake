@@ -2629,7 +2629,7 @@ class LeonidaMap {
         // Low-Level 3D Architectural Park, Promenade & Garden Walkway Bollard Lights ("this.parkBollardLights")
         // Placed logically along the grass/walkway borders of Lummus Park, Bayfront Park, urban green parks, and villa walkways.
         this.parkBollardLights = [];
-        const canPlaceBollard = (bx, by, minSpacing = 180) => {
+        const canPlaceBollard = (bx, by, minSpacing = 160) => {
             const tc = Math.floor(bx / TILE_SIZE);
             const tr = Math.floor(by / TILE_SIZE);
             if (tc < 4 || tc >= MAP_COLS - 4 || tr < 4 || tr >= MAP_ROWS - 4) return false;
@@ -2637,59 +2637,85 @@ class LeonidaMap {
             const gt = this.surfaceGround[gIdx];
             if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
             if (this.coastalSandMask && this.coastalSandMask[gIdx] === 1) return false;
-            if (this.voxelGrid && this.voxelGrid[(2 * MAP_ROWS + tr) * MAP_COLS + tc] > 0) return false;
+            const blkZ2 = this.getBlockInfo(tc, tr, 2);
+            if (blkZ2 && blkZ2.lid !== 0) return false;
             for (let i = 0; i < this.parkBollardLights.length; i++) {
                 const b = this.parkBollardLights[i];
                 if (Math.hypot(b.x - bx, b.y - by) < minSpacing) return false;
             }
             for (let i = 0; i < this.streetlights.length; i++) {
                 const sl = this.streetlights[i];
-                if (Math.hypot(sl.baseX - bx, sl.baseY - by) < 46) return false;
+                if (Math.hypot(sl.baseX - bx, sl.baseY - by) < 54) return false;
             }
             for (let i = 0; i < this.trafficSignals.length; i++) {
                 const ts = this.trafficSignals[i];
-                if (Math.hypot(ts.baseX - bx, ts.baseY - by) < 46) return false;
+                if (Math.hypot(ts.baseX - bx, ts.baseY - by) < 54) return false;
             }
             if (Array.isArray(this.interiors)) {
                 for (let i = 0; i < this.interiors.length; i++) {
-                    if (Math.hypot(this.interiors[i].doorX - bx, this.interiors[i].doorY - by) < 52) return false;
+                    if (Math.hypot(this.interiors[i].doorX - bx, this.interiors[i].doorY - by) < 56) return false;
                 }
             }
+            // Never place a bollard light underneath or close to any palm tree or sidewalk tree!
             if (Array.isArray(this.vicePalms)) {
                 for (let i = 0; i < this.vicePalms.length; i++) {
-                    if (Math.hypot(this.vicePalms[i].x - bx, this.vicePalms[i].y - by) < 34) return false;
+                    if (Math.hypot(this.vicePalms[i].x - bx, this.vicePalms[i].y - by) < 54) return false;
                 }
             }
             if (Array.isArray(this.trees)) {
                 for (let i = 0; i < this.trees.length; i++) {
-                    if (Math.hypot(this.trees[i].x - bx, this.trees[i].y - by) < 38) return false;
+                    if (Math.hypot(this.trees[i].x - bx, this.trees[i].y - by) < 52) return false;
                 }
             }
             if (Array.isArray(this.tikiBars)) {
                 for (let i = 0; i < this.tikiBars.length; i++) {
-                    if (Math.hypot(this.tikiBars[i].x - bx, this.tikiBars[i].y - by) < 48) return false;
+                    if (Math.hypot(this.tikiBars[i].x - bx, this.tikiBars[i].y - by) < 52) return false;
                 }
             }
             if (Array.isArray(this.muscleBeachGyms)) {
                 for (let i = 0; i < this.muscleBeachGyms.length; i++) {
-                    if (Math.hypot(this.muscleBeachGyms[i].x - bx, this.muscleBeachGyms[i].y - by) < 48) return false;
+                    if (Math.hypot(this.muscleBeachGyms[i].x - bx, this.muscleBeachGyms[i].y - by) < 52) return false;
                 }
             }
             return true;
         };
 
+        // Helper: true when (tc, tr) is an open ground-level grass lawn tile (lid === 10 at z=1, no building above)
+        // Note: In NYC.CMP, urban park lawns on promenades/medians can have surfaceGround === PAWEMENT or FIELD at z=2 while displaying lid === 10 at z=1!
+        const isParkGrassTile = (tc, tr) => {
+            if (tc < 4 || tc >= MAP_COLS - 4 || tr < 4 || tr >= MAP_ROWS - 4) return false;
+            const gIdx = tr * MAP_COLS + tc;
+            const gt = this.surfaceGround[gIdx];
+            if (gt !== GROUND_TYPE.FIELD && gt !== GROUND_TYPE.PAWEMENT) return false;
+            if ((this.surfaceLayer[gIdx] || 2) > 2) return false;
+            if (this.coastalSandMask && this.coastalSandMask[gIdx] === 1) return false;
+            const b2 = this.getBlockInfo(tc, tr, 2);
+            if (b2 && b2.lid !== 0) return false;
+            const b1 = this.getBlockInfo(tc, tr, 1);
+            return Boolean(b1 && b1.lid === 10);
+        };
+
+        // Helper: true when (tc, tr) is a clean paved sidewalk/promenade tile (lid 8 or 9 at z=1, never grass 10 or planter 69)
+        const isCleanPavedWalkway = (tc, tr) => {
+            if (tc < 4 || tc >= MAP_COLS - 4 || tr < 4 || tr >= MAP_ROWS - 4) return false;
+            const gIdx = tr * MAP_COLS + tc;
+            if (this.surfaceGround[gIdx] !== GROUND_TYPE.PAWEMENT) return false;
+            if ((this.surfaceLayer[gIdx] || 2) > 2) return false;
+            if (this.coastalSandMask && this.coastalSandMask[gIdx] === 1) return false;
+            const b2 = this.getBlockInfo(tc, tr, 2);
+            if (b2 && b2.lid !== 0) return false;
+            const b1 = this.getBlockInfo(tc, tr, 1);
+            return Boolean(b1 && (b1.lid === 8 || b1.lid === 9));
+        };
+
         // Pass 1: Lummus Park Oceanfront Boardwalk & Park Lawn Edges (c = 448..451, r = 44..360)
         for (let r = 44; r <= 360; r++) {
             if ((r >= 54 && r <= 55) || (r >= 72 && r <= 75) || (r >= 131 && r <= 137) || (r >= 192 && r <= 197)) continue;
-            const b448 = this.getBlockInfo(448, r, 1);
-            const b449 = this.getBlockInfo(449, r, 1);
-            const b450 = this.getBlockInfo(450, r, 1);
-            const b451 = this.getBlockInfo(451, r, 1);
             // A) West edge of Oceanfront Boardwalk (c=451) bordering Lummus Park lawn (c=450, lid=10)
-            if ((r % 4 === 1) && b450 && b450.lid === 10 && b451 && (b451.lid === 8 || b451.lid === 9)) {
-                const bx = (450 + 0.92) * TILE_SIZE;
+            if ((r % 4 === 1) && isParkGrassTile(450, r) && isCleanPavedWalkway(451, r)) {
+                const bx = (450 + 0.94) * TILE_SIZE;
                 const by = (r + 0.5) * TILE_SIZE;
-                if (canPlaceBollard(bx, by, 140)) {
+                if (canPlaceBollard(bx, by, 136)) {
                     this.parkBollardLights.push({
                         x: bx,
                         y: by,
@@ -2704,10 +2730,10 @@ class LeonidaMap {
                 }
             }
             // B) East edge of Ocean Drive Promenade (c=448) bordering Lummus Park lawn (c=449, lid=10)
-            if ((r % 6 === 3) && b449 && b449.lid === 10 && b448 && (b448.lid === 8 || b448.lid === 9)) {
-                const bx = (449 + 0.08) * TILE_SIZE;
+            if ((r % 4 === 3) && isParkGrassTile(449, r) && isCleanPavedWalkway(448, r)) {
+                const bx = (449 + 0.06) * TILE_SIZE;
                 const by = (r + 0.5) * TILE_SIZE;
-                if (canPlaceBollard(bx, by, 140)) {
+                if (canPlaceBollard(bx, by, 136)) {
                     this.parkBollardLights.push({
                         x: bx,
                         y: by,
@@ -2723,15 +2749,8 @@ class LeonidaMap {
             }
         }
 
-        // Pass 2: City-Wide Urban Parks, Bayfront Park, Star Island & Promenade Walkways (PAWEMENT bordering FIELD park grass)
-        const isParkGrassTile = (tc, tr) => {
-            if (tc < 4 || tc >= MAP_COLS - 4 || tr < 4 || tr >= MAP_ROWS - 4) return false;
-            const gIdx = tr * MAP_COLS + tc;
-            if (this.surfaceGround[gIdx] !== GROUND_TYPE.FIELD) return false;
-            if (this.coastalSandMask && this.coastalSandMask[gIdx] === 1) return false;
-            const b1 = this.getBlockInfo(tc, tr, 1);
-            return Boolean(b1 && b1.lid === 10);
-        };
+        // Pass 2: City-Wide Urban Parks, Promenade Lawn Islands, Bayfront Park & Star Island Walkways
+        // Places low bollards right on the grass/pavement border where a paved walkway borders a grass park or lawn strip
         for (let r = 38; r <= 435; r++) {
             for (let c = 40; c <= 447; c++) {
                 // Exclude wilderness, swamp, mountain, prison, airport, stadium, speedway & Lake Leonida wild shores
@@ -2743,39 +2762,42 @@ class LeonidaMap {
                     (c >= 75 && c <= 175 && r >= 180 && r <= 262)) {
                     continue;
                 }
+                if (!isCleanPavedWalkway(c, r)) continue;
                 const idx = r * MAP_COLS + c;
-                if (this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT) continue;
-                if ((this.surfaceLayer[idx] || 2) > 2) continue;
-                if (this.coastalSandMask && this.coastalSandMask[idx] === 1) continue;
-                const blk1 = this.getBlockInfo(c, r, 1);
-                if (!blk1 || blk1.lid === 69) continue;
 
-                // Check if this paved walkway/sidewalk borders a multi-tile grass park (lid 10)
+                // Check if this paved walkway tile directly borders a park grass lawn tile (lid 10)
                 let fDc = 0, fDr = 0;
-                if (isParkGrassTile(c + 1, r) && isParkGrassTile(c + 2, r)) { fDc = 1; fDr = 0; }
-                else if (isParkGrassTile(c - 1, r) && isParkGrassTile(c - 2, r)) { fDc = -1; fDr = 0; }
-                else if (isParkGrassTile(c, r + 1) && isParkGrassTile(c, r + 2)) { fDc = 0; fDr = 1; }
-                else if (isParkGrassTile(c, r - 1) && isParkGrassTile(c, r - 2)) { fDc = 0; fDr = -1; }
+                if (isParkGrassTile(c + 1, r)) { fDc = 1; fDr = 0; }
+                else if (isParkGrassTile(c - 1, r)) { fDc = -1; fDr = 0; }
+                else if (isParkGrassTile(c, r + 1)) { fDc = 0; fDr = 1; }
+                else if (isParkGrassTile(c, r - 1)) { fDc = 0; fDr = -1; }
                 if (fDc === 0 && fDr === 0) continue;
 
                 const isVertEdge = (fDc !== 0);
-                const coordAlong = isVertEdge ? r : c;
-                if ((coordAlong % 4) !== 2) continue;
-
-                // Ensure the walkway continues straight along the park edge
                 const prevC = isVertEdge ? c : c - 1;
                 const prevR = isVertEdge ? r - 1 : r;
                 const nextC = isVertEdge ? c : c + 1;
                 const nextR = isVertEdge ? r + 1 : r;
-                if (this.surfaceGround[prevR * MAP_COLS + prevC] !== GROUND_TYPE.PAWEMENT ||
-                    this.surfaceGround[nextR * MAP_COLS + nextC] !== GROUND_TYPE.PAWEMENT) {
+
+                // Require the grass lawn to continue for at least 2 tiles along the walkway (or be 2+ tiles deep)
+                const grassContinuesAlong =
+                    isParkGrassTile(prevC + fDc, prevR + fDr) ||
+                    isParkGrassTile(nextC + fDc, nextR + fDr) ||
+                    isParkGrassTile(c + fDc * 2, r + fDr * 2);
+                if (!grassContinuesAlong) continue;
+
+                // Ensure the paved walkway itself continues along the park border
+                if (!isCleanPavedWalkway(prevC, prevR) && !isCleanPavedWalkway(nextC, nextR)) {
                     continue;
                 }
 
-                // Place bollard right on the grass/walkway edge (+26px toward the park lawn) so the sidewalk center stays 100% clear!
-                const bx = (c + 0.5) * TILE_SIZE + fDc * 26.0;
-                const by = (r + 0.5) * TILE_SIZE + fDr * 26.0;
-                if (!canPlaceBollard(bx, by, 196)) continue;
+                const coordAlong = isVertEdge ? r : c;
+                if ((coordAlong % 3) !== 1) continue;
+
+                // Place bollard right on the grass/walkway edge (+28px from sidewalk center toward the grass lawn)
+                const bx = (c + 0.5) * TILE_SIZE + fDc * 28.0;
+                const by = (r + 0.5) * TILE_SIZE + fDr * 28.0;
+                if (!canPlaceBollard(bx, by, 148)) continue;
 
                 this.parkBollardLights.push({
                     x: bx,

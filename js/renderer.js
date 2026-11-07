@@ -9569,26 +9569,26 @@ class RetroRenderer {
                 if (bl.state === 2) continue;
                 if (Math.abs(bl.x - this.camX) > 960 || Math.abs(bl.y - this.camY) > 740) continue;
                 const sz = bl.z || 2.0;
-                // Slightly offset the ground light pool (+6px) toward the walkway/park edge
-                const poolX = bl.x + (bl.dirX || 0) * 6.0;
-                const poolY = bl.y + (bl.dirY || 0) * 6.0;
+                // Slightly offset the ground light pool (+3px) toward the walkway/park edge
+                const poolX = bl.x + (bl.dirX || 0) * 3.0;
+                const poolY = bl.y + (bl.dirY || 0) * 3.0;
                 const gSc = this.worldToScreen(poolX, poolY, sz + 0.02);
                 if (gSc.x < -120 || gSc.x > W + 120 || gSc.y < -120 || gSc.y > H + 120) continue;
                 const pxScale = (gSc.scale * H) / 128.0;
 
                 // Low-mounted warm landscape ground pool (reveals grass & pavement texture at night)
                 if (bl.style === "VILLA_PATH") {
-                    addLightPool(gSc.x, gSc.y, 40 * pxScale, "rgba(255, 224, 138, 0.72)", "rgba(235, 165, 58, 0.24)");
+                    addLightPool(gSc.x, gSc.y, 44 * pxScale, "rgba(255, 224, 138, 0.78)", "rgba(235, 165, 58, 0.28)");
                 } else {
-                    addLightPool(gSc.x, gSc.y, 46 * pxScale, "rgba(255, 228, 142, 0.74)", "rgba(232, 170, 62, 0.25)");
+                    addLightPool(gSc.x, gSc.y, 52 * pxScale, "rgba(255, 228, 142, 0.80)", "rgba(232, 170, 62, 0.28)");
                 }
 
-                // Subtle low-level lantern glow at the bollard diffuser height (sz + 0.155)
-                const hSc = this.worldToScreen(bl.x, bl.y, sz + 0.155);
+                // Subtle low-level lantern glow at the bollard diffuser height (sz + 0.165)
+                const hSc = this.worldToScreen(bl.x, bl.y, sz + 0.165);
                 highResFlares.push({
                     x: hSc.x,
                     y: hSc.y,
-                    r: 11 * pxScale,
+                    r: 14 * pxScale,
                     isLampHalo: true,
                     warmSodium: bl.style !== "DECO_PARK"
                 });
@@ -9693,26 +9693,6 @@ class RetroRenderer {
             }
         }
 
-        // 3B. Ocean Drive Art Deco Hotel Blade Neon Reflections, Royal Palm Uplighting & Española Way Festoons!
-        if (this.map && Array.isArray(this.map.vicePalms) && Math.abs(this.camX - 447.0 * 64) < 1200) {
-            for (let pi = 0; pi < this.map.vicePalms.length; pi++) {
-                const pm = this.map.vicePalms[pi];
-                // Uplight Royal Palms along Ocean Drive & Lummus Park promenade (c = 442.5..451.8)
-                if (pm.x < 442.5 * 64 || pm.x > 451.8 * 64) continue;
-                if (Math.abs(pm.y - this.camY) > 680) continue;
-                const sc = this.worldToScreen(pm.x, pm.y, 2.08);
-                if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
-                const pxScale = (sc.scale * H) / 128.0;
-                const isPink = (pi % 2) === 0;
-                addLightPool(
-                    sc.x,
-                    sc.y,
-                    48 * pxScale,
-                    isPink ? "rgba(255, 70, 200, 0.78)" : "rgba(0, 235, 255, 0.78)",
-                    isPink ? "rgba(220, 30, 150, 0.28)" : "rgba(0, 160, 220, 0.28)"
-                );
-            }
-        }
         // 4. Lucia & Jason Subtle Visibility Halo (plus Muzzle Flash light when firing!)
         const p = game.player;
         if (p && !p.dead) {
