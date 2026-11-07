@@ -2813,7 +2813,7 @@ class LeonidaMap {
                             z: rh.z || 2.0,
                             dirX: -side * cosA,
                             dirY: -side * sinA,
-                            style: "WARM_PARK",
+                            style: "VILLA_PATH",
                             state: 0
                         });
                     }

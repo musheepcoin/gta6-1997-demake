@@ -7899,6 +7899,7 @@ class WorldObjectEngine {
 
         // 3B-bis. True 3D Low Park, Promenade & Villa Walkway Bollard Lights (this.map.parkBollardLights)
         if (this.map && Array.isArray(this.map.parkBollardLights)) {
+            const nf = Math.max(0, Math.min(1, renderer.nightFactor || 0)) || (renderer.nightMode ? 1.0 : 0.0);
             const lightsOn = nf > 0.12;
             for (let i = 0; i < this.map.parkBollardLights.length; i++) {
                 const bl = this.map.parkBollardLights[i];
