@@ -3719,6 +3719,7 @@ class WorldObjectEngine {
                 }
 
                 // Apply exact cityFS (js/renderer.js) Daytime Solar Grading, Ray-Marched Lightmap (uDayLightTex) & Storey AO!
+                if (uNightTint < -0.5 && isShadowSkirt) discard;
                 if (!isShadowSkirt) {
                     if (uSunsetTint < -0.5) {
                         // Dedicated Indoor Studio Lighting (bypasses outdoor uDayLightTex shadow map!)
@@ -3749,21 +3750,21 @@ class WorldObjectEngine {
                             float nfAmt = emissiveOnly ? 1.0 : clamp(uNightTint, 0.0, 1.0);
                             // Detect true window glass texels on 3D house facades (MODE D y>0.95) & 64x64 building walls (MODE A y<0.478)
                             bool isWallFace = (vUV.x >= 0.0 && vUV.x < 1.5 && vUV.y > 0.950) || (vUV.x >= 1.5 && vUV.y < 0.478);
-                            float isGlassTex = isWallFace ? clamp((rawTex.b - rawTex.r - 0.025) * 5.0, 0.0, 1.0) : 0.0;
-                            // Per-room 3D cell hash so house & custom building windows switch on progressively as uWinLit rises through the night!
-                            vec3 hCell = floor(vWorldPos * vec3(1.2, 1.6, 1.2));
+                            float isGlassTex = isWallFace ? clamp((rawTex.b - rawTex.r - 0.03) * 5.0, 0.0, 1.0) : 0.0;
+                            // Per-room 3D cell hash: even at peak night (uWinLit=0.92), at most ~38% of house windows light up (~62% stay dark!)
+                            vec3 hCell = floor(vWorldPos * vec3(1.5, 1.6, 1.5));
                             float hHash = fract(sin(dot(hCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-                            float hThresh = 0.05 + hHash * 0.86;
-                            float hLit = smoothstep(hThresh - 0.025, hThresh + 0.01, uWinLit);
+                            float activeQuota = uWinLit * 0.41;
+                            float hLit = smoothstep(hHash - 0.015, hHash + 0.005, activeQuota) * step(hHash, activeQuota);
                             float litMask = isGlassTex * hLit;
                             if (emissiveOnly) {
                                 if (litMask < 0.12) discard;
                             }
-                            vec3 roomTint = (hHash > 0.72) ? vec3(1.0, 0.94, 0.76) : ((hHash > 0.40) ? vec3(1.0, 0.88, 0.54) : vec3(0.98, 0.79, 0.44));
+                            vec3 roomTint = (hHash > 0.28) ? vec3(1.0, 0.94, 0.76) : ((hHash > 0.14) ? vec3(1.0, 0.88, 0.54) : vec3(0.98, 0.79, 0.44));
                             float texRelief = 0.78 + 0.36 * dot(rawTex, vec3(0.299, 0.587, 0.114));
                             vec3 warmGlow = min(vec3(1.0), roomTint * texRelief);
                             if (emissiveOnly) {
-                                gl_FragColor = vec4(warmGlow, litMask);
+                                gl_FragColor = vec4(warmGlow * litMask, 1.0);
                                 return;
                             }
                             vec3 darkWall = c.rgb * vec3(0.45, 0.53, 0.78);

@@ -670,15 +670,8 @@ class RetroRenderer {
 
                     // Eliminate any synthwave purple / magenta / hot-pink / neon-cyan hue on vertical building walls
                     float wallLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                    float isGlass = clamp((c.b - c.r - 0.04) * 4.2, 0.0, 1.0);
-                    float storeyY0 = fract(vWorldPos.y);
-                    float wallHoriz0 = fract(vWorldPos.x + vWorldPos.z);
-                    float paneU = fract(wallHoriz0 * 4.0);
-                    float paneV = fract(storeyY0 * 2.0);
-                    float inPaneBox = step(0.16, paneU) * step(paneU, 0.84) * step(0.18, storeyY0) * step(storeyY0, 0.82);
-                    float isMullion = step(0.46, paneU) * step(paneU, 0.54) + step(0.46, paneV) * step(paneV, 0.54);
-                    float isDarkPane = clamp((0.38 - wallLum) * 4.5, 0.0, 1.0) * inPaneBox;
-                    winGlassMask = clamp(max(isGlass, isDarkPane), 0.0, 1.0) * (1.0 - clamp(isMullion, 0.0, 1.0) * 0.78);
+                    float isGlass = clamp((c.b - c.r - 0.04) * 4.5, 0.0, 1.0);
+                    winGlassMask = isGlass;
                     float purpleTint = clamp((min(c.r, c.b) - c.g + 0.02) * 4.5, 0.0, 1.0) * (1.0 - isGlass);
                     vec3 stoneNeutral = vec3(wallLum * 1.04, wallLum * 0.99, wallLum * 0.92);
                     c.rgb = mix(c.rgb, stoneNeutral, purpleTint);
@@ -721,12 +714,19 @@ class RetroRenderer {
                     float nfAmt = emissiveOnly ? 1.0 : clamp(uNightTint, 0.0, 1.0);
                     vec3 nightRgb = c.rgb;
                     if (vAnim < -0.5) {
-                        // Deterministic 3D room cell hash with progressive nocturnal turn-on threshold (uWinLit rises from dusk -> peaks at 0.92 in deep night!)
-                        vec3 roomCell = floor(vWorldPos * vec3(2.0, 2.0, 2.0));
+                        // Deterministic wall-face room hash: even at peak night (uWinLit=0.92), at most ~35% of windows light up (~65% stay dark!)
+                        float isEW = step(-2.5, vAnim); // 1.0 for West(-1)/East(-2), 0.0 for North(-3)/South(-4)
+                        float wallAlong = mix(vWorldPos.x, vWorldPos.z, isEW);
+                        float wallFixed = floor(mix(vWorldPos.z, vWorldPos.x, isEW) + 0.5);
+                        float faceIdx = floor(-vAnim + 0.5);
+                        vec3 roomCell = vec3(floor(wallAlong * 2.0), floor(vWorldPos.y * 2.0), wallFixed * 4.0 + faceIdx);
                         float roomHash = fract(sin(dot(roomCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-                        float roomThresh = 0.05 + roomHash * 0.87;
-                        float roomLit = smoothstep(roomThresh - 0.025, roomThresh + 0.01, uWinLit);
-                        float litMask = winGlassMask * roomLit;
+                        float activeQuota = uWinLit * 0.38;
+                        float roomLit = smoothstep(roomHash - 0.015, roomHash + 0.005, activeQuota) * step(roomHash, activeQuota);
+                        float paneU = fract(wallAlong * 2.0);
+                        float paneV = fract(vWorldPos.y * 2.0);
+                        float paneFrame = step(0.07, paneU) * step(paneU, 0.93) * step(0.09, paneV) * step(paneV, 0.91);
+                        float litMask = winGlassMask * roomLit * paneFrame;
 
                         if (emissiveOnly) {
                             if (litMask < 0.12) discard;
@@ -734,20 +734,20 @@ class RetroRenderer {
 
                         // Realistic warm interior room illumination (warm tungsten, soft cream lamp, cozy amber, or warm daylight — zero multicolored neon!)
                         vec3 roomTint = vec3(1.0, 0.88, 0.54);
-                        if (roomHash > 0.78) roomTint = vec3(1.0, 0.94, 0.76);
-                        else if (roomHash > 0.52) roomTint = vec3(0.98, 0.80, 0.44);
-                        else if (roomHash < 0.16) roomTint = vec3(0.90, 0.94, 1.0);
+                        if (roomHash > 0.28) roomTint = vec3(1.0, 0.94, 0.76);
+                        else if (roomHash > 0.16) roomTint = vec3(0.98, 0.80, 0.44);
+                        else if (roomHash < 0.06) roomTint = vec3(0.90, 0.94, 1.0);
 
                         // Real interior window texture detail: ceiling-to-sill gradient + Venetian blind slats + original facade texture relief
                         float sy = fract(vWorldPos.y);
                         float winGrad = 0.82 + 0.26 * fract(sy * 2.0);
-                        float blindMask = step(0.55 + 0.30 * roomHash, fract(sy * 2.0)) * step(0.32, roomHash);
+                        float blindMask = step(0.55 + 0.30 * roomHash, fract(sy * 2.0)) * step(0.14, roomHash);
                         float blindSlats = 0.78 + 0.22 * sin(sy * 96.0);
                         float texRelief = 0.78 + 0.36 * dot(rawTexRgb, vec3(0.299, 0.587, 0.114));
                         vec3 windowGlow = min(vec3(1.0), roomTint * winGrad * texRelief * mix(1.0, blindSlats * 0.82, blindMask));
 
                         if (emissiveOnly) {
-                            gl_FragColor = vec4(windowGlow, litMask);
+                            gl_FragColor = vec4(windowGlow * litMask, 1.0);
                             return;
                         }
                         vec3 wallDark = c.rgb * vec3(0.45, 0.53, 0.78);
@@ -6265,17 +6265,16 @@ class RetroRenderer {
             : (this.tilesTexNyc || this.tilesTex);
         if (!this.gta1Ready || !this.cmpReady || !activeTilesTex) return false;
 
-        // Clear ONLY the color buffer to transparent (0,0,0,0) while preserving the hardware 3D depth buffer
+        // Clear ONLY the color buffer to black (0,0,0,1) while preserving the hardware 3D depth buffer
         // from renderWebGLScene so roofs, overhangs, trees, and vehicles occlude lit windows with 100% 3D accuracy!
         gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
-        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
         gl.depthMask(false);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.BLEND);
 
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
@@ -9861,10 +9860,11 @@ class RetroRenderer {
         ctx.globalCompositeOperation = "multiply";
         ctx.drawImage(this.nightCanvas, 0, 0, W, H);
 
-        // 7B. Stamp True 3D Depth-Tested Emissive Window Textures (Buildings & Houses) directly onto the darkened scene (zero blurry halos!)
+        // 7B. Stamp True 3D Depth-Tested Emissive Window Textures (Buildings & Houses) onto the darkened scene using "screen"
+        // (black glCanvas pixels are a 100% no-op so roads/roofs/cars are untouched, while lit 3D windows stay razor-sharp!)
         if (!this.glLost && this._lastViewProj && this.renderEmissiveWindowsWebGL(game, this._lastViewProj)) {
-            ctx.globalCompositeOperation = "source-over";
-            ctx.globalAlpha = Math.min(1.0, nf * 1.15);
+            ctx.globalCompositeOperation = "screen";
+            ctx.globalAlpha = Math.min(0.92, nf * 1.08);
             ctx.drawImage(this.glCanvas, 0, 0, W, H);
             ctx.globalAlpha = 1.0;
         }
