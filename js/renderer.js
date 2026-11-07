@@ -316,7 +316,10 @@ class RetroRenderer {
             }
 
             void main() {
+                if (uNightTint < -0.5 && vAnim >= -0.5) discard;
                 vec4 c = texture2D(uTex, vUV);
+                vec3 rawTexRgb = c.rgb;
+                float winGlassMask = 0.0;
                 bool isShoreTile = (vAnim > 3.5 && vAnim < 4.5);
                 bool isRoad = (vAnim > 4.9 && vAnim < 26.0);
                 bool isFootpathSandEdge = (vAnim > 27.5 && vAnim < 28.5);
@@ -667,7 +670,15 @@ class RetroRenderer {
 
                     // Eliminate any synthwave purple / magenta / hot-pink / neon-cyan hue on vertical building walls
                     float wallLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                    float isGlass = clamp((c.b - c.r - 0.05) * 3.6, 0.0, 1.0);
+                    float isGlass = clamp((c.b - c.r - 0.04) * 4.2, 0.0, 1.0);
+                    float storeyY0 = fract(vWorldPos.y);
+                    float wallHoriz0 = fract(vWorldPos.x + vWorldPos.z);
+                    float paneU = fract(wallHoriz0 * 4.0);
+                    float paneV = fract(storeyY0 * 2.0);
+                    float inPaneBox = step(0.16, paneU) * step(paneU, 0.84) * step(0.18, storeyY0) * step(storeyY0, 0.82);
+                    float isMullion = step(0.46, paneU) * step(paneU, 0.54) + step(0.46, paneV) * step(paneV, 0.54);
+                    float isDarkPane = clamp((0.38 - wallLum) * 4.5, 0.0, 1.0) * inPaneBox;
+                    winGlassMask = clamp(max(isGlass, isDarkPane), 0.0, 1.0) * (1.0 - clamp(isMullion, 0.0, 1.0) * 0.78);
                     float purpleTint = clamp((min(c.r, c.b) - c.g + 0.02) * 4.5, 0.0, 1.0) * (1.0 - isGlass);
                     vec3 stoneNeutral = vec3(wallLum * 1.04, wallLum * 0.99, wallLum * 0.92);
                     c.rgb = mix(c.rgb, stoneNeutral, purpleTint);
@@ -705,34 +716,42 @@ class RetroRenderer {
                     vec3 sunsetCol = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
                     c.rgb = mix(c.rgb, min(vec3(1.0), sunsetCol), uSunsetTint * 0.65);
                 }
-                if (uNightTint > 0.01) {
+                if (abs(uNightTint) > 0.01) {
+                    bool emissiveOnly = (uNightTint < -0.5);
+                    float nfAmt = emissiveOnly ? 1.0 : clamp(uNightTint, 0.0, 1.0);
                     vec3 nightRgb = c.rgb;
                     if (vAnim < -0.5) {
-                        // Inspired by gta2-rtx-remix SubUSDs/*_emissive.e.rtex.dds & GTA 6 Night Skyline:
-                        // Vertical 3D building facade (face < 4) with per-room interior depth, Venetian blinds & street-level neon wash!
-                        float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                        float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                        float isGlassOrNeon = clamp((lum - 0.48) * 3.8 + (sat - 0.32) * 2.8, 0.0, 1.0);
-
                         // Deterministic 3D room cell hash with progressive nocturnal turn-on threshold (uWinLit rises from dusk -> peaks at 0.92 in deep night!)
                         vec3 roomCell = floor(vWorldPos * vec3(2.0, 2.0, 2.0));
                         float roomHash = fract(sin(dot(roomCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
                         float roomThresh = 0.05 + roomHash * 0.87;
-                        float roomLit = smoothstep(roomThresh - 0.04, roomThresh + 0.02, uWinLit);
+                        float roomLit = smoothstep(roomThresh - 0.025, roomThresh + 0.01, uWinLit);
+                        float litMask = winGlassMask * roomLit;
 
-                        vec3 roomTint = vec3(1.0, 0.86, 0.52); // Warm tungsten hotel/apartment window light
-                        if (uViceStyle > 0.5) {
-                            if (roomHash > 0.84) roomTint = vec3(0.24, 0.95, 1.0);      // Ocean Drive Neon Cyan
-                            else if (roomHash > 0.70) roomTint = vec3(1.0, 0.34, 0.76); // Art Deco Flamingo Pink
-                            else if (roomHash > 0.58) roomTint = vec3(0.72, 0.86, 1.0); // Cool Office / TV Screen Glow
+                        if (emissiveOnly) {
+                            if (litMask < 0.12) discard;
                         }
 
-                        // Subtle horizontal interior blind / ceiling gradient inside lit windows
-                        float winGrad = 0.84 + 0.24 * fract(vWorldPos.y * 2.0);
-                        vec3 streetNeonWash = vec3(0.06, 0.03, 0.08) * clamp(1.0 - (vWorldPos.y - 2.0) * 0.55, 0.0, 1.0);
-                        vec3 wallDark = c.rgb * vec3(0.45, 0.53, 0.78) + streetNeonWash;
-                        vec3 windowGlow = min(vec3(1.0), mix(c.rgb * 1.40, roomTint * winGrad, 0.46) + vec3(0.08, 0.05, 0.10));
-                        nightRgb = mix(wallDark, windowGlow, isGlassOrNeon * (0.04 + 0.96 * roomLit));
+                        // Realistic warm interior room illumination (warm tungsten, soft cream lamp, cozy amber, or warm daylight — zero multicolored neon!)
+                        vec3 roomTint = vec3(1.0, 0.88, 0.54);
+                        if (roomHash > 0.78) roomTint = vec3(1.0, 0.94, 0.76);
+                        else if (roomHash > 0.52) roomTint = vec3(0.98, 0.80, 0.44);
+                        else if (roomHash < 0.16) roomTint = vec3(0.90, 0.94, 1.0);
+
+                        // Real interior window texture detail: ceiling-to-sill gradient + Venetian blind slats + original facade texture relief
+                        float sy = fract(vWorldPos.y);
+                        float winGrad = 0.82 + 0.26 * fract(sy * 2.0);
+                        float blindMask = step(0.55 + 0.30 * roomHash, fract(sy * 2.0)) * step(0.32, roomHash);
+                        float blindSlats = 0.78 + 0.22 * sin(sy * 96.0);
+                        float texRelief = 0.78 + 0.36 * dot(rawTexRgb, vec3(0.299, 0.587, 0.114));
+                        vec3 windowGlow = min(vec3(1.0), roomTint * winGrad * texRelief * mix(1.0, blindSlats * 0.82, blindMask));
+
+                        if (emissiveOnly) {
+                            gl_FragColor = vec4(windowGlow, litMask);
+                            return;
+                        }
+                        vec3 wallDark = c.rgb * vec3(0.45, 0.53, 0.78);
+                        nightRgb = mix(wallDark, windowGlow, litMask);
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal navy
                         nightRgb = c.rgb * vec3(0.42, 0.52, 0.78);
@@ -744,15 +763,8 @@ class RetroRenderer {
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!)
                         vec3 nightScale = mix(vec3(0.68, 0.73, 0.90), vec3(0.42, 0.52, 0.78), waterCoverage);
                         nightRgb = c.rgb * nightScale;
-                        if (uViceStyle > 0.5 && vWorldPos.y > 1.5 && waterCoverage < 0.05) {
-                            // Illuminated Vice City rooftop swimming pools, glass skylight atriums & neon parapet trims at night!
-                            float rSat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                            float rLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                            float poolOrNeon = clamp((rSat - 0.32) * 2.6 + (rLum - 0.62) * 1.8, 0.0, 1.0);
-                            nightRgb = mix(nightRgb, min(vec3(1.0), c.rgb * 1.18 + vec3(0.04, 0.08, 0.12)), poolOrNeon * 0.75);
-                        }
                     }
-                    c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
+                    c.rgb = mix(c.rgb, nightRgb, nfAmt);
                 }
                 gl_FragColor = c;
             }
@@ -6240,6 +6252,69 @@ class RetroRenderer {
         this.beginSpriteBatch();
         this.batchWorldSprites3D(game, minPxX, minPxY, maxPxX, maxPxY);
         this.flushSpriteBatch(viewProj);
+        this._lastViewProj = viewProj;
+    }
+
+    renderEmissiveWindowsWebGL(game, viewProj) {
+        const gl = this.gl;
+        if (!gl || !viewProj || (game && game.activeInterior)) return false;
+        const winLit = this.getWindowLitFactor(game);
+        if (winLit <= 0.03) return false;
+        const activeTilesTex = this.mapStyle === "VICE"
+            ? (this.tilesTexVice || this.tilesTex)
+            : (this.tilesTexNyc || this.tilesTex);
+        if (!this.gta1Ready || !this.cmpReady || !activeTilesTex) return false;
+
+        // Clear ONLY the color buffer to transparent (0,0,0,0) while preserving the hardware 3D depth buffer
+        // from renderWebGLScene so roofs, overhangs, trees, and vehicles occlude lit windows with 100% 3D accuracy!
+        gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        gl.depthMask(false);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        const camXBlocks = this.camX / TILE_SIZE;
+        const camYBlocks = this.camY / TILE_SIZE;
+        const minBX = camXBlocks - 14.0;
+        const maxBX = camXBlocks + 14.0;
+        const minBY = camYBlocks - 11.0;
+        const maxBY = camYBlocks + 11.0;
+
+        // 1) Draw Crisp 3D Emissive Window Textures on City Buildings (uNightTint = -1.0 discards non-window pixels)
+        gl.useProgram(this.cityProg);
+        gl.uniformMatrix4fv(this.cityLocs.uViewProj, false, viewProj);
+        gl.uniform1f(this.cityLocs.uNightTint, -1.0);
+        if (this.cityLocs.uWinLit) gl.uniform1f(this.cityLocs.uWinLit, winLit);
+        if (this.cityLocs.uSunsetTint) gl.uniform1f(this.cityLocs.uSunsetTint, 0.0);
+        gl.uniform1f(this.cityLocs.uViceStyle, this.mapStyle === "VICE" ? 1.0 : 0.0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, activeTilesTex);
+        gl.uniform1i(this.cityLocs.uTex, 0);
+
+        const stride = 6 * 4;
+        for (const ch of this.cityChunks) {
+            if (ch.maxX < minBX || ch.minX > maxBX || ch.maxY < minBY || ch.minY > maxBY) continue;
+            if (ch.opaqueCount === 0) continue;
+            gl.bindBuffer(gl.ARRAY_BUFFER, ch.vbo);
+            gl.enableVertexAttribArray(this.cityLocs.aPos);
+            gl.vertexAttribPointer(this.cityLocs.aPos, 3, gl.FLOAT, false, stride, 0);
+            gl.enableVertexAttribArray(this.cityLocs.aUV);
+            gl.vertexAttribPointer(this.cityLocs.aUV, 2, gl.FLOAT, false, stride, 12);
+            gl.enableVertexAttribArray(this.cityLocs.aAnim);
+            gl.vertexAttribPointer(this.cityLocs.aAnim, 1, gl.FLOAT, false, stride, 20);
+            gl.drawArrays(gl.TRIANGLES, 0, ch.opaqueCount);
+        }
+
+        // 2) Draw Crisp 3D Emissive Window Textures on 3D Houses, Villas & Custom Buildings (uNightTint = -1.0)
+        if (this.map && this.map.objectEngine) {
+            this.map.objectEngine.renderStatic3DMesh(gl, this, viewProj, -1.0, 0.0, true);
+        }
+        gl.depthMask(true);
+        return true;
     }
 
     getEntityZ(ent, offset = 0.03) {
@@ -9577,124 +9652,6 @@ class RetroRenderer {
                 );
             }
         }
-        // Ocean Drive Hotel Neon Blade Reflections across the West Curb & Asphalt (every 8 rows, r = 44..356)
-        if (Math.abs(this.camX - 443.6 * 64) < 1050) {
-            for (let r = 44; r <= 356; r += 8) {
-                const by = (r + 0.5) * 64;
-                if (Math.abs(by - this.camY) > 700) continue;
-                const bx = 443.6 * 64;
-                const sc = this.worldToScreen(bx, by, 2.02);
-                if (sc.x < -160 || sc.x > W + 160 || sc.y < -160 || sc.y > H + 160) continue;
-                const pxScale = (sc.scale * H) / 128.0;
-                const isCyan = ((r / 8) % 2) === 0;
-                addLightPool(
-                    sc.x,
-                    sc.y,
-                    92 * pxScale,
-                    isCyan ? "rgba(30, 240, 255, 0.82)" : "rgba(255, 65, 195, 0.82)",
-                    isCyan ? "rgba(0, 175, 235, 0.32)" : "rgba(210, 20, 145, 0.32)"
-                );
-            }
-        }
-
-        // 3C. Progressive Nocturnal Window Light Spills for Both 3D Houses/Villas & 3D City Buildings!
-        // As night progresses from dusk (winLit ~0.15) to deep night ("nuit ferme", winLit ~0.92),
-        // more and more individual house and building windows turn on and cast warm light pools onto facades, lawns & sidewalks!
-        const winLit = this.getWindowLitFactor(game);
-        if (winLit > 0.04) {
-            // (a) 3D Residential Houses, Mansions & Villas (this.map.objectEngine.instances)
-            if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.instances)) {
-                const houses = this.map.objectEngine.instances;
-                for (let hi = 0; hi < houses.length; hi++) {
-                    const h = houses[hi];
-                    if (Math.abs(h.x - this.camX) > 900 || Math.abs(h.y - this.camY) > 680) continue;
-                    const hSc = h.scale || 1.0;
-                    const w1 = (h.spec.w1 || 140) * hSc;
-                    const d1 = (h.spec.d1 || 110) * hSc;
-                    const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
-                        ? this.map.getHeightAtPixel(h.x, h.y, 4.0)
-                        : (h.z || 2.0);
-                    const csH = Math.cos(h.ang);
-                    const snH = Math.sin(h.ang);
-                    const winOffsets = [
-                        [-w1 * 0.28,  d1 * 0.54],
-                        [ w1 * 0.28,  d1 * 0.54],
-                        [-w1 * 0.28, -d1 * 0.54],
-                        [ w1 * 0.28, -d1 * 0.54],
-                        [-w1 * 0.54, -d1 * 0.24],
-                        [-w1 * 0.54,  d1 * 0.24],
-                        [ w1 * 0.54, -d1 * 0.24],
-                        [ w1 * 0.54,  d1 * 0.24]
-                    ];
-                    for (let wi = 0; wi < winOffsets.length; wi++) {
-                        const wHash = (((hi * 41 + wi * 67 + 19) % 97) / 97.0);
-                        const wThresh = 0.05 + wHash * 0.84;
-                        if (winLit <= wThresh) continue;
-                        const [lx, ly] = winOffsets[wi];
-                        const wx = h.x + csH * lx - snH * ly;
-                        const wy = h.y + snH * lx + csH * ly;
-                        const sc = this.worldToScreen(wx, wy, bz + 0.16);
-                        if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
-                        const pxScale = (sc.scale * H) / 128.0;
-                        const isTv = wHash > 0.82;
-                        addLightPool(
-                            sc.x,
-                            sc.y,
-                            46 * pxScale,
-                            isTv ? "rgba(155, 215, 255, 0.68)" : "rgba(255, 214, 112, 0.74)",
-                            isTv ? "rgba(70, 145, 225, 0.24)" : "rgba(235, 148, 38, 0.26)"
-                        );
-                    }
-                }
-            }
-
-            // (b) 3D City Buildings in Camera Frustum: progressive warm/neon window light spills along exposed facades!
-            if (this.map && this.map.cmpLoaded && typeof this.map.getNavigationBlock === "function") {
-                const cbx = Math.floor(this.camX / TILE_SIZE);
-                const cby = Math.floor(this.camY / TILE_SIZE);
-                const minBx = Math.max(2, cbx - 12);
-                const maxBx = Math.min(MAP_COLS - 3, cbx + 12);
-                const minBy = Math.max(2, cby - 9);
-                const maxBy = Math.min(MAP_ROWS - 3, cby + 9);
-                for (let by = minBy; by <= maxBy; by++) {
-                    for (let bx = minBx; bx <= maxBx; bx++) {
-                        const blk = this.map.getNavigationBlock(bx, by, 2);
-                        if (!blk || blk.groundType !== GROUND_TYPE.BUILDING) continue;
-                        // Deterministic hash per building block in [0, 1)
-                        const bHash = (((bx * 73 + by * 131 + (bx ^ by) * 19) & 1023) / 1024.0);
-                        const bThresh = 0.05 + bHash * 0.85;
-                        if (winLit <= bThresh) continue;
-                        // Check if this building block has an exposed street/sidewalk edge
-                        const nS = this.map.getNavigationBlock(bx, by + 1, 2);
-                        const nN = this.map.getNavigationBlock(bx, by - 1, 2);
-                        const nE = this.map.getNavigationBlock(bx + 1, by, 2);
-                        const nW = this.map.getNavigationBlock(bx - 1, by, 2);
-                        const expS = nS && nS.groundType !== GROUND_TYPE.BUILDING;
-                        const expN = nN && nN.groundType !== GROUND_TYPE.BUILDING;
-                        const expE = nE && nE.groundType !== GROUND_TYPE.BUILDING;
-                        const expW = nW && nW.groundType !== GROUND_TYPE.BUILDING;
-                        if (!expS && !expN && !expE && !expW) continue;
-
-                        const wx = (bx + 0.5 + (expE ? 0.42 : (expW ? -0.42 : 0))) * TILE_SIZE;
-                        const wy = (by + 0.5 + (expS ? 0.42 : (expN ? -0.42 : 0))) * TILE_SIZE;
-                        const sc = this.worldToScreen(wx, wy, 2.38);
-                        if (sc.x < -120 || sc.x > W + 120 || sc.y < -120 || sc.y > H + 120) continue;
-                        const pxScale = (sc.scale * H) / 128.0;
-                        let innerCol = "rgba(255, 212, 108, 0.62)";
-                        let midCol = "rgba(230, 145, 36, 0.22)";
-                        if (this.mapStyle === "VICE" && bHash > 0.84) {
-                            innerCol = "rgba(50, 238, 255, 0.60)";
-                            midCol = "rgba(10, 155, 220, 0.20)";
-                        } else if (this.mapStyle === "VICE" && bHash > 0.72) {
-                            innerCol = "rgba(255, 82, 192, 0.60)";
-                            midCol = "rgba(205, 25, 135, 0.20)";
-                        }
-                        addLightPool(sc.x, sc.y, 52 * pxScale, innerCol, midCol);
-                    }
-                }
-            }
-        }
-
         // 4. Lucia & Jason Subtle Visibility Halo (plus Muzzle Flash light when firing!)
         const p = game.player;
         if (p && !p.dead) {
@@ -9903,6 +9860,14 @@ class RetroRenderer {
         ctx.imageSmoothingEnabled = true;
         ctx.globalCompositeOperation = "multiply";
         ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+
+        // 7B. Stamp True 3D Depth-Tested Emissive Window Textures (Buildings & Houses) directly onto the darkened scene (zero blurry halos!)
+        if (!this.glLost && this._lastViewProj && this.renderEmissiveWindowsWebGL(game, this._lastViewProj)) {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.globalAlpha = Math.min(1.0, nf * 1.15);
+            ctx.drawImage(this.glCanvas, 0, 0, W, H);
+            ctx.globalAlpha = 1.0;
+        }
 
         // 8. Composite Pass 2: Soft Atmospheric Screen Bloom + High-Res Headlight Beams & Lens Flares
         if (lightInt > 0.02) {

@@ -3725,7 +3725,8 @@ class WorldObjectEngine {
                         float indoorAO = mix(0.90, 1.04, smoothstep(2.0, 2.58, vWorldPos.y));
                         c.rgb = min(vec3(1.0), c.rgb * indoorAO);
                     } else {
-                        float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
+                        vec3 rawTex = c.rgb;
+                        float dayAmt = clamp(1.0 - max(0.0, uNightTint) * 1.15, 0.0, 1.0);
                         if (dayAmt > 0.01) {
                             vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                             float onGround = clamp(2.65 - vWorldPos.y, 0.0, 1.0);
@@ -3743,25 +3744,31 @@ class WorldObjectEngine {
                             vec3 sunsetRgb = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.04, 0.01, 0.02);
                             c.rgb = mix(c.rgb, min(vec3(1.0), sunsetRgb), uSunsetTint * 0.60);
                         }
-                        if (uNightTint > 0.01) {
-                            float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                            float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-                            float isWindow = clamp((lum - 0.50) * 3.4 + (sat - 0.28) * 2.6, 0.0, 1.0);
+                        if (abs(uNightTint) > 0.01) {
+                            bool emissiveOnly = (uNightTint < -0.5);
+                            float nfAmt = emissiveOnly ? 1.0 : clamp(uNightTint, 0.0, 1.0);
+                            // Detect true window glass texels on 3D house facades (MODE D y>0.95) & 64x64 building walls (MODE A y<0.478)
+                            bool isWallFace = (vUV.x >= 0.0 && vUV.x < 1.5 && vUV.y > 0.950) || (vUV.x >= 1.5 && vUV.y < 0.478);
+                            float isGlassTex = isWallFace ? clamp((rawTex.b - rawTex.r - 0.025) * 5.0, 0.0, 1.0) : 0.0;
                             // Per-room 3D cell hash so house & custom building windows switch on progressively as uWinLit rises through the night!
-                            vec3 hCell = floor(vWorldPos * vec3(1.6, 2.0, 1.6));
+                            vec3 hCell = floor(vWorldPos * vec3(1.2, 1.6, 1.2));
                             float hHash = fract(sin(dot(hCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
                             float hThresh = 0.05 + hHash * 0.86;
-                            float hLit = smoothstep(hThresh - 0.04, hThresh + 0.02, uWinLit);
-                            // Synthesize warm residential window panes along vertical house walls (vWorldPos.y > 2.08)
-                            float wx = fract((vWorldPos.x + vWorldPos.z) * 1.6);
-                            float wy = fract((vWorldPos.y - 2.0) * 2.2);
-                            float procWin = step(0.22, wx) * step(wx, 0.78) * step(0.24, wy) * step(wy, 0.78) * step(2.08, vWorldPos.y) * step(vWorldPos.y, 2.95);
-                            float winMask = max(isWindow, procWin * 0.78);
-                            vec3 roomTint = (hHash > 0.82) ? vec3(0.74, 0.88, 1.0) : vec3(1.0, 0.86, 0.48);
+                            float hLit = smoothstep(hThresh - 0.025, hThresh + 0.01, uWinLit);
+                            float litMask = isGlassTex * hLit;
+                            if (emissiveOnly) {
+                                if (litMask < 0.12) discard;
+                            }
+                            vec3 roomTint = (hHash > 0.72) ? vec3(1.0, 0.94, 0.76) : ((hHash > 0.40) ? vec3(1.0, 0.88, 0.54) : vec3(0.98, 0.79, 0.44));
+                            float texRelief = 0.78 + 0.36 * dot(rawTex, vec3(0.299, 0.587, 0.114));
+                            vec3 warmGlow = min(vec3(1.0), roomTint * texRelief);
+                            if (emissiveOnly) {
+                                gl_FragColor = vec4(warmGlow, litMask);
+                                return;
+                            }
                             vec3 darkWall = c.rgb * vec3(0.45, 0.53, 0.78);
-                            vec3 warmGlow = min(vec3(1.0), mix(c.rgb * 1.38, roomTint, 0.58) + vec3(0.08, 0.05, 0.02));
-                            vec3 nightRgb = mix(darkWall, warmGlow, winMask * (0.04 + 0.94 * hLit));
-                            c.rgb = mix(c.rgb, nightRgb, clamp(uNightTint, 0.0, 1.0));
+                            vec3 nightRgb = mix(darkWall, warmGlow, litMask);
+                            c.rgb = mix(c.rgb, nightRgb, nfAmt);
                         }
                     }
                 }
@@ -7193,7 +7200,7 @@ class WorldObjectEngine {
     /* ========================================================================
        5. RENDER HARDWARE-DEPTH-BUFFERED 3D STATIC + DYNAMIC ANIMATED MESHES
        ======================================================================== */
-    renderStatic3DMesh(gl, renderer, viewProj, nf = 0.0, sf = 0.0) {
+    renderStatic3DMesh(gl, renderer, viewProj, nf = 0.0, sf = 0.0, emissivePass = false) {
         if (!gl || !this.staticChunks || this.staticChunks.length === 0 || !this.meshProg || !renderer.spritesTex) return;
 
         gl.useProgram(this.meshProg);
@@ -7243,7 +7250,7 @@ class WorldObjectEngine {
 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
-        gl.depthMask(true);
+        gl.depthMask(!emissivePass);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -7267,7 +7274,9 @@ class WorldObjectEngine {
 
         // Pass 2: Dynamic 3D Animated Landmarks (Vertically-Rotating 3D Ferris Wheel,
         //         3D Windmill Sails, Cylindrical Artemis VI Rocket) & 3D Street Furniture!
-        this.renderDynamic3DMeshes(gl, renderer, stride);
+        if (!emissivePass) {
+            this.renderDynamic3DMeshes(gl, renderer, stride);
+        }
 
         // Restore active texture unit 0 for subsequent 2D/3D passes in renderer.js
         gl.activeTexture(gl.TEXTURE0);
@@ -8328,60 +8337,6 @@ class WorldObjectEngine {
                 const bob = Math.sin(renderer.time * 2.2 + i * 1.3) * 0.008;
                 renderer.batchObjectSprite3D(db.spr, boatX + sunCos * 3.5, boatY + sunSin * 3.5, 2.015, boatAng, 1.12, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.28);
                 renderer.batchObjectSprite3D(db.spr, boatX, boatY, 2.045 + bob, boatAng, 1.12, SPRITE_DRAW_ORDER.CAR);
-            }
-
-            // Progressive Night Window Glow & Lawn Light Spills on 3D Houses & Villas
-            const winLit = typeof renderer.getWindowLitFactor === "function"
-                ? renderer.getWindowLitFactor(game)
-                : (renderer.windowLitFactor || 0.0);
-            if (winLit > 0.04 && (renderer.nightFactor || 0) > 0.08) {
-                const w1 = (h.spec.w1 || 140) * sc;
-                const d1 = (h.spec.d1 || 110) * sc;
-                const h1 = (h.spec.h1 || 0.42) * sc;
-                const csH = Math.cos(h.ang);
-                const snH = Math.sin(h.ang);
-                const winBays = [
-                    { lx: -w1 * 0.28, ly:  d1 * 0.50, nx:  0, ny:  1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
-                    { lx:  w1 * 0.28, ly:  d1 * 0.50, nx:  0, ny:  1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
-                    { lx: -w1 * 0.28, ly: -d1 * 0.50, nx:  0, ny: -1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
-                    { lx:  w1 * 0.28, ly: -d1 * 0.50, nx:  0, ny: -1, w: 18 * sc, d: 12 * sc, z: bz + h1 * 0.52 },
-                    { lx: -w1 * 0.50, ly: -d1 * 0.24, nx: -1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 },
-                    { lx: -w1 * 0.50, ly:  d1 * 0.24, nx: -1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 },
-                    { lx:  w1 * 0.50, ly: -d1 * 0.24, nx:  1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 },
-                    { lx:  w1 * 0.50, ly:  d1 * 0.24, nx:  1, ny:  0, w: 12 * sc, d: 18 * sc, z: bz + h1 * 0.52 }
-                ];
-                for (let wi = 0; wi < winBays.length; wi++) {
-                    const wHash = (((i * 41 + wi * 67 + 19) % 97) / 97.0);
-                    const wThresh = 0.05 + wHash * 0.84;
-                    if (winLit <= wThresh) continue;
-                    const wb = winBays[wi];
-                    const fade = Math.min(1.0, (winLit - wThresh) / 0.07) * Math.min(1.0, (renderer.nightFactor || 0) * 1.3);
-                    const isTvRoom = wHash > 0.82;
-                    const rCol = isTvRoom ? 0.68 : 1.00;
-                    const gCol = isTvRoom ? 0.88 : 0.86;
-                    const bCol = isTvRoom ? 1.00 : 0.46;
-                    // 1) Illuminated 3D window sill strip along the house facade
-                    const sillLx = wb.lx + wb.nx * 1.8;
-                    const sillLy = wb.ly + wb.ny * 1.8;
-                    const wx = h.x + csH * sillLx - snH * sillLy;
-                    const wy = h.y + snH * sillLx + csH * sillLy;
-                    renderer.pushSolidQuad3D(
-                        wx, wy, wb.z,
-                        wb.nx !== 0 ? 4.2 * sc : wb.w * 0.85,
-                        wb.ny !== 0 ? 4.2 * sc : wb.d * 0.85,
-                        h.ang, rCol, gCol, bCol, 0.88 * fade, SPRITE_DRAW_ORDER.ROOF_LIGHTS
-                    );
-                    // 2) Warm window light spill cast onto the ground/lawn right outside the window
-                    const spLx = wb.lx + wb.nx * (11.0 * sc);
-                    const spLy = wb.ly + wb.ny * (11.0 * sc);
-                    const spX = h.x + csH * spLx - snH * spLy;
-                    const spY = h.y + snH * spLx + csH * spLy;
-                    renderer.pushSolidQuad3D(
-                        spX, spY, bz + 0.024,
-                        wb.w * 1.25, wb.d * 1.25,
-                        h.ang, rCol, gCol, bCol, 0.28 * fade, SPRITE_DRAW_ORDER.TIRE_MARKS
-                    );
-                }
             }
         }
 
