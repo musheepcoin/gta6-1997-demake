@@ -885,7 +885,53 @@ class LeonidaGame {
 
             { c: 353.5, r: 168.5, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH", raw512: true },
 
+            // Extra GTA 6 Trailer 1 High-Density Vice Beach Strollers (raw512 c = 453.5..467.5, r = 212..330)
+            { c: 454.5, r: 214.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   missionTag: "BEACH" },
+            { c: 458.5, r: 217.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
+            { c: 462.5, r: 220.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
+            { c: 465.5, r: 223.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 455.5, r: 226.5, raw512: true, a: Math.PI * 0.5,  type: "vc_bodybuilder",missionTag: "BEACH" },
+            { c: 459.5, r: 229.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_red",    missionTag: "BEACH" },
+            { c: 463.5, r: 232.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
+            { c: 454.5, r: 235.5, raw512: true, a: -Math.PI * 0.5, type: "vc_jogger",     missionTag: "BEACH" },
+            { c: 458.5, r: 238.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   missionTag: "BEACH" },
+            { c: 462.5, r: 241.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
+            { c: 466.5, r: 244.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
+            { c: 455.5, r: 247.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 460.5, r: 251.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_red",    missionTag: "BEACH" },
+            { c: 464.5, r: 255.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist",    missionTag: "BEACH" },
+            { c: 456.5, r: 259.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
+            { c: 461.5, r: 263.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_pink",   missionTag: "BEACH" },
+            { c: 465.5, r: 267.5, raw512: true, a: Math.PI * 0.5,  type: "surfer_guy",    missionTag: "BEACH" },
+            { c: 454.5, r: 271.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   missionTag: "BEACH" },
+            { c: 459.5, r: 275.5, raw512: true, a: Math.PI * 0.5,  type: "vc_bodybuilder",missionTag: "BEACH" },
+            { c: 463.5, r: 279.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 455.5, r: 292.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_red",    missionTag: "BEACH" },
+            { c: 460.5, r: 296.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_pink",   missionTag: "BEACH" },
+            { c: 464.5, r: 302.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
+            { c: 457.5, r: 308.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
+            { c: 462.5, r: 314.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
+            { c: 456.5, r: 320.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
 
+            // Extra Ocean Drive Sidewalk Crowd (c = 443.5 West Art Deco Hotel Sidewalk & c = 448.5 East Lummus Park Sidewalk)
+            { c: 443.5, r: 218.5, raw512: true, a: Math.PI * 0.5,  type: "vc_tourist" },
+            { c: 443.5, r: 221.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_pink" },
+            { c: 443.5, r: 224.5, raw512: true, a: Math.PI * 0.5,  type: "vc_crockett" },
+            { c: 443.5, r: 227.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_aqua" },
+            { c: 443.5, r: 230.5, raw512: true, a: Math.PI * 0.5,  type: "vc_tubbs" },
+            { c: 443.5, r: 233.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan" },
+            { c: 443.5, r: 236.5, raw512: true, a: Math.PI * 0.5,  type: "vc_hawaiian_red" },
+            { c: 443.5, r: 239.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_pink" },
+            { c: 443.5, r: 242.5, raw512: true, a: Math.PI * 0.5,  type: "vc_tommy" },
+            { c: 443.5, r: 245.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow" },
+            { c: 448.5, r: 220.5, raw512: true, a: Math.PI * 0.5,  type: "vc_jogger" },
+            { c: 448.5, r: 223.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy" },
+            { c: 448.5, r: 226.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_red" },
+            { c: 448.5, r: 229.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist" },
+            { c: 448.5, r: 232.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white" },
+            { c: 448.5, r: 235.5, raw512: true, a: -Math.PI * 0.5, type: "vc_bodybuilder" },
+            { c: 448.5, r: 238.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink" },
+            { c: 448.5, r: 241.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_aqua" },
 
             // Grassrivers Everglades Alligators near Thrillbilly Mud Park & Swamp Islands
 
@@ -1372,7 +1418,7 @@ class LeonidaGame {
 
         }
 
-        this.populateNearbySidewalks(this.player.x, this.player.y, 32, 14);
+        this.populateNearbySidewalks(this.player.x, this.player.y, 96, 14);
 
         this.seedPenitentiaryInmatesAndGuards();
 
@@ -1500,7 +1546,7 @@ class LeonidaGame {
 
 
 
-    populateNearbySidewalks(centerX, centerY, targetCount = 30, radiusBlocks = 14) {
+    populateNearbySidewalks(centerX, centerY, targetCount = 96, radiusBlocks = 14) {
 
         if (!this.map || !this.map.cmpLoaded) return;
 
@@ -1555,12 +1601,19 @@ class LeonidaGame {
                 if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
 
                 const nav = this.map.getNavigationBlock(bx, by, 2.0);
+                if (!nav) continue;
+                const col = this.map.getColumn ? this.map.getColumn(bx, by) : null;
+                if (col && col.length > 1) continue;
+                const lid = this.map.getTopTile ? this.map.getTopTile(bx, by) : 0;
+                if (lid === 69) continue; // tree planter
+                if ((bx === 449 || bx === 450) && lid === 10) continue; // Lummus Park palm grass strip
 
                 const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
+                const isSand = !!(this.map.coastalSandMask && this.map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);
 
-                if (nav && (nav.groundType === GROUND_TYPE.PAWEMENT || (inPrisonYard && nav.groundType === GROUND_TYPE.FIELD))) {
+                if (nav.groundType === GROUND_TYPE.PAWEMENT || isSand || (inPrisonYard && nav.groundType === GROUND_TYPE.FIELD)) {
 
-                    candidates.push({ bx, by, inPrisonYard });
+                    candidates.push({ bx, by, isSand, inPrisonYard });
 
                 }
 
@@ -1582,7 +1635,7 @@ class LeonidaGame {
 
 
 
-        for (let i = 0; i < needed * 3 && spawned < needed; i++) {
+        for (let i = 0; i < needed * 4 && spawned < needed; i++) {
 
             const pick = candidates[Math.floor(Math.random() * candidates.length)];
 
@@ -1594,7 +1647,7 @@ class LeonidaGame {
 
             for (const other of this.peds) {
 
-                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 28) {
+                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 22) {
 
                     tooClose = true;
 
@@ -1607,6 +1660,10 @@ class LeonidaGame {
             if (tooClose) continue;
 
             const pz = this.map.getHeightAtPixel(px, py, 4.0);
+            if (typeof this.map.resolveCircleBuildingCollision === "function" && this.map.resolveCircleBuildingCollision(px, py, 10, pz).hit) continue;
+            if (typeof this.resolveCircleVehicleCollision === "function" && this.resolveCircleVehicleCollision(px, py, 11, pz).hit) continue;
+            if (typeof this.map.isInsideLivingEventZone === "function" && this.map.isInsideLivingEventZone(px, py, 14)) continue;
+            if (this.map.objectEngine && Array.isArray(this.map.objectEngine.clearZones) && this.map.objectEngine.clearZones.some((cz) => Math.hypot(cz.x - px, cz.y - py) < Math.min(72, cz.r || 60))) continue;
 
             const isPrisonGuard = pick.inPrisonYard && (i % 5 === 0);
 
@@ -1618,25 +1675,23 @@ class LeonidaGame {
 
                     : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45 })
 
-                : {
-
-                    kind: "CIVILIAN",
-
-                    g24Type: civTypes[(this.peds.length + i) % civTypes.length],
-
-                    shirtColor: "#06b6d4",
-
-                    hp: 35
-
-                };
+                : (this.trafficManager && typeof this.trafficManager.chooseDistrictPedSpec === "function"
+                    ? this.trafficManager.chooseDistrictPedSpec(pick.bx, pick.by, pick.isSand, this.map, this.peds.length + i + 1)
+                    : {
+                        kind: "CIVILIAN",
+                        g24Type: civTypes[(this.peds.length + i) % civTypes.length],
+                        shirtColor: "#06b6d4",
+                        hp: 35
+                    });
 
             const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];
 
             const pedStep = this.map.chooseNextSidewalkBlock ? this.map.chooseNextSidewalkBlock(pick.bx, pick.by, rawAngle, pz, Math.random(), false) : null;
 
             const pedAngle = pedStep ? pedStep.angle : rawAngle;
+            const baseSpeed = pedProps.isRollerblader ? (54 + Math.random() * 10) : (pedProps.isChild ? (30 + Math.random() * 7) : (35 + Math.random() * 9));
 
-            this.peds.push(new Pedestrian({
+            const newPed = new Pedestrian({
 
                 x: px,
 
@@ -1646,7 +1701,7 @@ class LeonidaGame {
 
                 angle: pedAngle,
 
-                speed: 35 + Math.random() * 9,
+                speed: baseSpeed,
 
                 ...pedProps,
 
@@ -1660,7 +1715,10 @@ class LeonidaGame {
 
                 turnSeed: this.peds.length + i + 1
 
-            }));
+            });
+            if (pedProps.isRollerblader) newPed.isRollerblader = true;
+            if (pedProps.isChild) newPed.isChild = true;
+            this.peds.push(newPed);
 
             spawned++;
 
@@ -1974,7 +2032,7 @@ class LeonidaGame {
 
 
 
-        this.populateNearbySidewalks(this.player.x, this.player.y, 30, 14);
+        this.populateNearbySidewalks(this.player.x, this.player.y, 96, 14);
 
         this.currentDistrict = this.map.getDistrictName(this.player.x, this.player.y);
 
@@ -13327,44 +13385,52 @@ class LeonidaGame {
 
                 const dist2 = dx * dx + dy * dy;
 
-                const minDist = 18; // 18px separation diameter
+                const minDist = 15.5; // 15.5px separation diameter for dense sidewalks without pushing onto roads
 
                 if (dist2 < minDist * minDist && dist2 > 0.001) {
 
                     const dist = Math.sqrt(dist2);
 
-                    const overlap = (minDist - dist) * 0.5;
+                    const overlap = (minDist - dist) * 0.45;
 
                     const nx = dx / dist;
 
                     const ny = dy / dist;
 
-                    p1.x += nx * overlap;
-
-                    p1.y += ny * overlap;
-
-                    p2.x -= nx * overlap;
-
-                    p2.y -= ny * overlap;
-
-
+                    let nx1 = p1.x + nx * overlap;
+                    let ny1 = p1.y + ny * overlap;
+                    let nx2 = p2.x - nx * overlap;
+                    let ny2 = p2.y - ny * overlap;
 
                     // If pedestrians are heading towards each other, step slightly to their right (reciprocal detour)
-
                     const dot = Math.cos(p1.angle) * Math.cos(p2.angle) + Math.sin(p1.angle) * Math.sin(p2.angle);
 
                     if (dot < -0.3) {
 
-                        const sideStep = 14 * dt;
+                        const sideStep = 12 * dt;
 
-                        p1.x += -Math.sin(p1.angle) * sideStep;
+                        nx1 += -Math.sin(p1.angle) * sideStep;
 
-                        p1.y += Math.cos(p1.angle) * sideStep;
+                        ny1 += Math.cos(p1.angle) * sideStep;
 
-                        p2.x += -Math.sin(p2.angle) * sideStep;
+                        nx2 += -Math.sin(p2.angle) * sideStep;
 
-                        p2.y += Math.cos(p2.angle) * sideStep;
+                        ny2 += Math.cos(p2.angle) * sideStep;
 
+                    }
+
+                    // Smart positioning guard: never let crowd separation push a pedestrian onto road lanes, water, or inside buildings
+                    const nav1 = this.map.getNavigationBlock(Math.floor(nx1 / TILE_SIZE), Math.floor(ny1 / TILE_SIZE), p1.z || 2);
+                    if (nav1 && nav1.groundType !== GROUND_TYPE.ROAD && nav1.groundType !== GROUND_TYPE.WATER && nav1.groundType !== GROUND_TYPE.BUILDING &&
+                        !this.map.resolveCircleBuildingCollision(nx1, ny1, 9, p1.z || 2).hit) {
+                        p1.x = nx1;
+                        p1.y = ny1;
+                    }
+                    const nav2 = this.map.getNavigationBlock(Math.floor(nx2 / TILE_SIZE), Math.floor(ny2 / TILE_SIZE), p2.z || 2);
+                    if (nav2 && nav2.groundType !== GROUND_TYPE.ROAD && nav2.groundType !== GROUND_TYPE.WATER && nav2.groundType !== GROUND_TYPE.BUILDING &&
+                        !this.map.resolveCircleBuildingCollision(nx2, ny2, 9, p2.z || 2).hit) {
+                        p2.x = nx2;
+                        p2.y = ny2;
                     }
 
                 }
@@ -14923,6 +14989,9 @@ class LeonidaGame {
                         if (sb.friendPedType) {
                             members.push({ ped: sb.friendPedType, x: fx, y: fy });
                         }
+                        if (sb.standingFriendType) {
+                            members.push({ ped: sb.standingFriendType, x: sb.x + 14, y: sb.y - 12 });
+                        }
                         if (sb.propSpr === "sandcastle_prop") {
                             const px = sb.x + (sb.propDx !== undefined ? sb.propDx : 24) + 11;
                             const py = sb.y + (sb.propDy !== undefined ? sb.propDy : -8) + 4;
@@ -14964,7 +15033,7 @@ class LeonidaGame {
             }
         }
 
-        // 1. Street Events (Wynwood Breakdance Cyphers & Ocean Drive Livestreamers)
+        // 1. Street Events (Wynwood Breakdance Cyphers, Ocean Drive Livestreamers, Sidewalk Social Groups, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles)
         if (Array.isArray(this.map.streetEvents)) {
             for (let i = 0; i < this.map.streetEvents.length; i++) {
                 const ev = this.map.streetEvents[i];
@@ -14975,13 +15044,46 @@ class LeonidaGame {
                             { ped: "vc_cuban", x: ev.x, y: ev.y + 1 },
                             { ped: "vc_haitian", x: ev.x, y: ev.y - 26 },
                             { ped: "g2_civ_aqua", x: ev.x - 20, y: ev.y + 4 },
-                            { ped: "bikini_pink", x: ev.x + 20, y: ev.y + 4 }
+                            { ped: "bikini_pink", x: ev.x + 20, y: ev.y + 4 },
+                            { ped: "vc_tourist", x: ev.x - 14, y: ev.y - 18 },
+                            { ped: "g2_civ_pink", x: ev.x + 14, y: ev.y - 18 }
                         ], "💥 CYPHER CRASHED!");
+                    } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
+                        spawnScenePeds(ev, [
+                            { ped: "bikini_pink", x: ev.x - 9, y: ev.y - 7 },
+                            { ped: "vc_crockett", x: ev.x + 9, y: ev.y - 6 },
+                            { ped: "bikini_cyan", x: ev.x - 8, y: ev.y + 8 },
+                            { ped: "vc_tourist", x: ev.x + 8, y: ev.y + 7 }
+                        ], "🍹 OCEAN DRIVE CROWD SCATTERED!");
+                    } else if (ev.kind === "CLUB_VIP_LINE") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_bodybuilder", x: ev.x, y: ev.y - 18 },
+                            { ped: "bikini_red", x: ev.x - 5, y: ev.y - 5 },
+                            { ped: "vc_tubbs", x: ev.x + 5, y: ev.y + 5 },
+                            { ped: "bikini_pink", x: ev.x - 4, y: ev.y + 15 },
+                            { ped: "g2_civ_aqua", x: ev.x + 4, y: ev.y + 24 }
+                        ], "🥂 VIP CLUB LINE CRASHED!");
+                    } else if (ev.kind === "LITTLE_CUBA_CROWD") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_cuban", x: ev.x - 10, y: ev.y - 6 },
+                            { ped: "vc_hawaiian_red", x: ev.x + 10, y: ev.y - 6 },
+                            { ped: "vc_cuban", x: ev.x - 8, y: ev.y + 9 },
+                            { ped: "g2_civ_pink", x: ev.x + 9, y: ev.y + 8 }
+                        ], "☕ CALLE OCHO GATHERING SCATTERED!");
+                    } else if (ev.kind === "BEACH_SOCIAL_CIRCLE") {
+                        spawnScenePeds(ev, [
+                            { ped: "bikini_pink", x: ev.x - 10, y: ev.y - 8 },
+                            { ped: "surfer_guy", x: ev.x + 10, y: ev.y - 7 },
+                            { ped: "bikini_cyan", x: ev.x - 9, y: ev.y + 9 },
+                            { ped: "bikini_yellow", x: ev.x + 9, y: ev.y + 8 },
+                            { ped: "vc_bodybuilder", x: ev.x, y: ev.y - 13 }
+                        ], "🏖️ BEACH PARTY CIRCLE SCATTERED!", true);
                     } else {
                         spawnScenePeds(ev, [
                             { ped: "bikini_pink", x: ev.x + 6, y: ev.y },
                             { ped: "vc_tourist", x: ev.x - 19, y: ev.y },
-                            { ped: "vc_crockett", x: ev.x + 4, y: ev.y - 14 }
+                            { ped: "vc_crockett", x: ev.x + 4, y: ev.y - 14 },
+                            { ped: "bikini_cyan", x: ev.x + 16, y: ev.y + 10 }
                         ], "📱 LIVESTREAM PHOTOBOMBED!");
                     }
                 }
@@ -15017,31 +15119,35 @@ class LeonidaGame {
             for (let i = 0; i < this.map.beachVolleyballCourts.length; i++) {
                 const vc = this.map.beachVolleyballCourts[i];
                 if ((vc.wipeoutTimer || 0) > 0) continue;
-                if (Math.hypot(vc.x - hitX, vc.y - hitY) < hitRad + 28) {
+                if (Math.hypot(vc.x - hitX, vc.y - hitY) < hitRad + 32) {
                     spawnScenePeds(vc, [
                         { ped: vc.p0 || "bikini_pink", x: vc.x - 11, y: vc.y - 21 },
                         { ped: vc.p1 || "bikini_yellow", x: vc.x + 11, y: vc.y - 19 },
                         { ped: vc.p2 || "bikini_cyan", x: vc.x - 11, y: vc.y + 20 },
-                        { ped: vc.p3 || "surfer_guy", x: vc.x + 11, y: vc.y + 22 }
-                    ], "🏐 VOLLEYBALL MATCH CRASHED!");
+                        { ped: vc.p3 || "surfer_guy", x: vc.x + 11, y: vc.y + 22 },
+                        { ped: "bikini_red", x: vc.x - 28, y: vc.y - 8 },
+                        { ped: "surfer_guy", x: vc.x - 28, y: vc.y + 10 },
+                        { ped: "bikini_white", x: vc.x + 28, y: vc.y - 9 },
+                        { ped: "vc_bodybuilder", x: vc.x + 28, y: vc.y + 9 }
+                    ], "🏐 VOLLEYBALL MATCH CRASHED!", true);
                 }
             }
         }
 
         // 4. Beach Aerobics & Boombox Dance Parties
         if (Array.isArray(this.map.beachParties)) {
-            const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white"];
+            const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white", "bikini_red", "vc_bodybuilder", "vc_jogger"];
             for (let i = 0; i < this.map.beachParties.length; i++) {
                 const bp = this.map.beachParties[i];
                 if ((bp.wipeoutTimer || 0) > 0) continue;
-                if (Math.hypot(bp.x - hitX, bp.y - hitY) < hitRad + 28) {
+                if (Math.hypot(bp.x - hitX, bp.y - hitY) < hitRad + 32) {
                     const members = [{ ped: "bikini_red", x: bp.x - 4, y: bp.y }];
-                    for (let di = 0; di < 4; di++) {
-                        const row = (di % 2) === 0 ? -11 : 11;
-                        const col = di < 2 ? 12 : 24;
+                    for (let di = 0; di < 8; di++) {
+                        const row = ((di % 4) - 1.5) * 10;
+                        const col = di < 4 ? 12 : 24;
                         members.push({ ped: dancerPeds[(di + i) % dancerPeds.length], x: bp.x + col, y: bp.y + row });
                     }
-                    spawnScenePeds(bp, members, "📻 BEACH PARTY CRASHED!");
+                    spawnScenePeds(bp, members, "📻 BEACH PARTY CRASHED!", true);
                 }
             }
         }

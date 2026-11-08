@@ -3531,14 +3531,167 @@ class TrafficManager {
         this.game = game;
         this.lastGenCarsTime = 0;
         this.lastGenPedsTime = 0;
-        this.genCarsCooldown = 0.70;
-        this.genPedsCooldown = 0.28;
-        this.maxTrafficCars = 14;
-        this.maxTrafficPeds = 38;
-        this.carsMaxDistanceBlocks = 5; // mTrafficGenCarsMaxDistance
-        this.pedsMaxDistanceBlocks = 4; // mTrafficGenPedsMaxDistance
+        this.genCarsCooldown = 0.55;
+        this.genPedsCooldown = 0.20;
+        this.maxTrafficCars = 22;
+        this.maxTrafficPeds = 104;
+        this.carsMaxDistanceBlocks = 6; // mTrafficGenCarsMaxDistance
+        this.pedsMaxDistanceBlocks = 9; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
         this._trafficSeq = 1;
+    }
+
+    chooseDistrictPedSpec(bx, by, isSand = false, map = null, seed = 0) {
+        const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
+        if (inPrisonYard) {
+            if ((seed % 5) === 0) {
+                return { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 38 };
+            }
+            return { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45, speed: 35 };
+        }
+
+        const r1 = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
+        const pickFrom = (arr) => arr[r1 % arr.length];
+
+        // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Surfers & Bodybuilders
+        if (isSand || (bx >= 452 && bx <= 484 && by >= 46 && by <= 375)) {
+            const beachPool = [
+                "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
+                "surfer_guy", "surfer_guy", "vc_bodybuilder", "vc_jogger", "vc_tourist",
+                "bikini_pink", "bikini_cyan", "kid_beach", "kid_girl_pink"
+            ];
+            const gType = pickFrom(beachPool);
+            const isChild = gType.startsWith("kid_");
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                missionTag: "BEACH",
+                shirtColor: "#f472b6",
+                hp: 35,
+                speed: (gType === "vc_jogger") ? 52 : (isChild ? 34 : (34 + (r1 % 8))),
+                isChild
+            };
+        }
+
+        // 2. Lummus Park Oceanfront Boardwalk (c = 451..452): Rollerbladers, Joggers & Beach Promenaders
+        if ((bx === 451 || bx === 452) && by >= 44 && by <= 362) {
+            const skatePool = [
+                "vc_jogger", "bikini_cyan", "bikini_pink", "g2_civ_pink",
+                "g2_civ_aqua", "vc_tourist", "kid_skater", "bikini_yellow", "surfer_guy"
+            ];
+            const gType = pickFrom(skatePool);
+            const isRollerblader = (r1 % 10) < 6 || gType === "kid_skater";
+            const isChild = gType.startsWith("kid_");
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#00f0ff",
+                hp: 35,
+                speed: isRollerblader ? (60 + (r1 % 9)) : (37 + (r1 % 7)),
+                isRollerblader,
+                isChild
+            };
+        }
+
+        // 3. Ocean Drive, Lummus Curbside, South Beach & Española Way (bx = 408..450, by = 40..370)
+        if (bx >= 408 && bx <= 450 && by >= 40 && by <= 370) {
+            const oceanDrivePool = [
+                "vc_tourist", "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
+                "surfer_guy", "vc_jogger", "vc_bodybuilder", "vc_hawaiian_red", "vc_crockett", "vc_tubbs",
+                "vc_tommy", "g2_civ_aqua", "g2_civ_pink", "civ0", "civ1", "civ2", "civ3", "kid_boy_cap", "kid_girl_pink"
+            ];
+            const gType = pickFrom(oceanDrivePool);
+            const isRollerblader = (bx === 448 && (r1 % 6) === 0);
+            const isChild = gType.startsWith("kid_");
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#ff2a85",
+                hp: 35,
+                speed: isRollerblader ? 62 : (gType === "vc_jogger" ? 50 : (35 + (r1 % 9))),
+                isRollerblader,
+                isChild
+            };
+        }
+
+        // 4. Little Cuba / Calle Ocho (bx = 255..325, by = 215..292)
+        if (bx >= 255 && bx <= 325 && by >= 215 && by <= 292) {
+            const cubaPool = [
+                "vc_cuban", "vc_cuban", "vc_cuban", "vc_hawaiian_red",
+                "vc_tourist", "g2_civ_aqua", "civ0", "civ1", "civ2", "civ3"
+            ];
+            const gType = pickFrom(cubaPool);
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#f59e0b",
+                hp: 38,
+                speed: 35 + (r1 % 8)
+            };
+        }
+
+        // 5. Wynwood Walls, Little Haiti & Club Jack of Hearts (bx = 165..265, by = 92..212)
+        if (bx >= 165 && bx <= 265 && by >= 92 && by <= 212) {
+            const wynwoodPool = [
+                "vc_haitian", "vc_haitian", "vc_cuban", "gang",
+                "vc_tourist", "g2_civ_pink", "g2_civ_aqua", "civ1", "civ2", "civ3"
+            ];
+            const gType = pickFrom(wynwoodPool);
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#a855f7",
+                hp: 38,
+                speed: 35 + (r1 % 9)
+            };
+        }
+
+        // 6. Star Island & Venetian Isles Luxury Archipelago (bx = 328..407, by = 118..215)
+        if (bx >= 328 && bx <= 407 && by >= 118 && by <= 215) {
+            const starPool = [
+                "bikini_white", "bikini_pink", "bikini_cyan", "vc_crockett",
+                "vc_tubbs", "vc_tommy", "vc_tourist", "vc_jogger", "g2_civ_aqua", "g2_civ_pink"
+            ];
+            const gType = pickFrom(starPool);
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#38bdf8",
+                hp: 35,
+                speed: gType === "vc_jogger" ? 50 : (36 + (r1 % 8))
+            };
+        }
+
+        // 7. Leonida Keys Tropical Islands (by >= 400)
+        if (by >= 400) {
+            const keysPool = [
+                "vc_tourist", "surfer_guy", "bikini_cyan", "bikini_yellow",
+                "bikini_pink", "vc_hawaiian_red", "civ0", "civ2", "g2_civ_aqua"
+            ];
+            const gType = pickFrom(keysPool);
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#2dd4bf",
+                hp: 35,
+                speed: 35 + (r1 % 8)
+            };
+        }
+
+        // 8. Downtown Vice City, Vice Port, Port Gellhorn & Mainland
+        const cityPool = [
+            "civ0", "civ1", "civ2", "civ3", "vc_tourist", "vc_jogger",
+            "vc_crockett", "vc_tubbs", "vc_hawaiian_red", "g2_civ_aqua",
+            "g2_civ_pink", "vc_cuban", "vc_haitian", "gang"
+        ];
+        const gType = pickFrom(cityPool);
+        return {
+            kind: "CIVILIAN",
+            g24Type: gType,
+            shirtColor: "#06b6d4",
+            hp: 35,
+            speed: gType === "vc_jogger" ? 50 : (35 + (r1 % 9))
+        };
     }
 
     getAllHumanPlayerViewports() {
@@ -3793,12 +3946,12 @@ class TrafficManager {
     removeOffscreenPeds(viewports) {
         const game = this.game;
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
-        const outerRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 2));
-        const farRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 7));
+        const outerRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 5));
+        const farRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 9));
 
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
-            if (ped.missionTag || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
+            if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
             // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway
@@ -3837,10 +3990,10 @@ class TrafficManager {
         }
         if (nearbyPeds >= this.maxTrafficPeds) return;
 
-        // Collect all valid sidewalk (PAWEMENT) and promenade/beach (FIELD) tiles in outerRect.
-        // If nearby pedestrian density is low (< 18), also allow sidewalk tiles on screen at least 170px from the player
-        // so fast driving or teleporting into a district immediately shows bustling sidewalks.
-        const allowEdgeOnScreen = nearbyPeds < 18;
+        // Collect all valid sidewalk (PAWEMENT) and verified coastal beach sand tiles in outerRect.
+        // If nearby pedestrian density is below 58, also allow sidewalk/beach tiles near the screen edges (>= 185px from player)
+        // so Vice Beach, Ocean Drive, Downtown, Little Cuba, and Wynwood always feel packed like GTA 6 Trailer 1.
+        const allowEdgeOnScreen = nearbyPeds < 58;
         const px = refX !== null ? refX : (game.player ? game.player.x : 0);
         const py = refY !== null ? refY : (game.player ? game.player.y : 0);
         const candidates = [];
@@ -3858,34 +4011,41 @@ class TrafficManager {
                 if (inScreen && !allowEdgeOnScreen) continue;
                 const pedX = (bx + 0.5) * TILE_SIZE;
                 const pedY = (by + 0.5) * TILE_SIZE;
-                if (inScreen && Math.hypot(pedX - px, pedY - py) < 175) continue;
+                if (inScreen && Math.hypot(pedX - px, pedY - py) < 185) continue;
 
                 const nav = map.getNavigationBlock(bx, by, camZ);
                 if (!nav) continue;
+                const col = map.getColumn ? map.getColumn(bx, by) : null;
+                if (col && col.length > 1) continue; // skip solid building blocks
+                const lid = map.getTopTile ? map.getTopTile(bx, by) : 0;
+                if (lid === 69) continue; // tree planter box
+                if ((bx === 449 || bx === 450) && lid === 10) continue; // Lummus Park palm grass median
+
                 const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
+                const isSand = !!(map.coastalSandMask && map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);
                 if (
                     nav.groundType === GROUND_TYPE.PAWEMENT ||
-                    (nav.groundType === GROUND_TYPE.FIELD && (bx >= 216 || inPrisonYard))
+                    isSand ||
+                    (nav.groundType === GROUND_TYPE.FIELD && inPrisonYard)
                 ) {
-                    candidates.push({ bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT, inPrisonYard });
+                    candidates.push({ bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT, isSand, inPrisonYard });
                 }
             }
         }
         if (candidates.length === 0) return;
 
-        const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
         const dirs = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
-        const needed = Math.min(5, this.maxTrafficPeds - nearbyPeds);
+        const needed = Math.min(10, this.maxTrafficPeds - nearbyPeds);
         let spawned = 0;
 
-        for (let attempt = 0; attempt < 18 && spawned < needed; attempt++) {
+        for (let attempt = 0; attempt < 36 && spawned < needed; attempt++) {
             const pick = candidates[Math.floor(Math.random() * candidates.length)];
             const pedX = (pick.bx + 0.25 + Math.random() * 0.5) * TILE_SIZE;
             const pedY = (pick.by + 0.25 + Math.random() * 0.5) * TILE_SIZE;
 
             let tooClose = false;
             for (const other of game.peds) {
-                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 28) {
+                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 22) {
                     tooClose = true;
                     break;
                 }
@@ -3893,37 +4053,47 @@ class TrafficManager {
             if (tooClose) continue;
 
             const pedZ = map.getHeightAtPixel(pedX, pedY, 4.0);
-            if (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(pedX, pedY, 10, pedZ).hit) {
+            if (typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(pedX, pedY, 10, pedZ).hit) {
                 continue;
             }
+            if (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(pedX, pedY, 11, pedZ).hit) {
+                continue;
+            }
+            if (typeof map.isInsideLivingEventZone === "function" && map.isInsideLivingEventZone(pedX, pedY, 14)) {
+                continue;
+            }
+            if (map.objectEngine && Array.isArray(map.objectEngine.clearZones) && map.objectEngine.clearZones.some((cz) => Math.hypot(cz.x - pedX, cz.y - pedY) < Math.min(72, cz.r || 60))) {
+                continue;
+            }
+
             const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];
             const pedStep = map.chooseNextSidewalkBlock ? map.chooseNextSidewalkBlock(pick.bx, pick.by, rawAngle, camZ, Math.random(), false) : null;
             const pedAngle = pedStep ? pedStep.angle : rawAngle;
             const isPrisonGuard = pick.inPrisonYard && (attempt % 5 === 0);
-            const pedProp = pick.inPrisonYard
+            this._trafficSeq = (this._trafficSeq || 0) + 1;
+            const districtSpec = pick.inPrisonYard
                 ? (isPrisonGuard
                     ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110 }
                     : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45 })
-                : {
-                    kind: "CIVILIAN",
-                    g24Type: civTypes[Math.floor(Math.random() * civTypes.length)],
-                    shirtColor: "#06b6d4",
-                    hp: 35
-                };
+                : this.chooseDistrictPedSpec(pick.bx, pick.by, pick.isSand, map, this._trafficSeq + attempt);
 
-            game.peds.push(new Pedestrian({
+            const baseSpeed = districtSpec.isRollerblader ? (54 + Math.random() * 10) : (districtSpec.isChild ? (30 + Math.random() * 7) : (35 + Math.random() * 9));
+            const newPed = new Pedestrian({
                 x: pedX,
                 y: pedY,
                 z: pedZ,
                 angle: pedAngle,
-                speed: 35 + Math.random() * 9,
-                ...pedProp,
+                speed: baseSpeed,
+                ...districtSpec,
                 dead: false,
                 panicTimer: 0,
                 targetBx: pedStep ? pedStep.bx : null,
                 targetBy: pedStep ? pedStep.by : null,
                 turnSeed: (game.peds.length + attempt + 1)
-            }));
+            });
+            if (districtSpec.isRollerblader) newPed.isRollerblader = true;
+            if (districtSpec.isChild) newPed.isChild = true;
+            game.peds.push(newPed);
             spawned++;
         }
     }

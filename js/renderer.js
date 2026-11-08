@@ -6602,6 +6602,11 @@ class RetroRenderer {
                         }
                     }
                 }
+                if (sb.standingFriendType && !isWipedOut) {
+                    const stFr = 50 + (Math.floor(this.time * 3.6 + i * 3) % 4);
+                    const stAng = ang + Math.PI * 0.75 + Math.sin(this.time * 1.9 + i) * 0.18;
+                    this.batchPedSprite3D(sb.standingFriendType, stFr, sb.x + 14, sb.y - 12, bz + 0.039, stAng, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
 
                 // Side Beach Activity Props (Surfboard, Beach Ball, Sandcastle, Cooler) + Playful Beach Kids!
                 if (sb.propSpr) {
@@ -6723,6 +6728,14 @@ class RetroRenderer {
                     const ballArcZ = Math.sin(flight * Math.PI) * 0.34;
                     this.pushSolidQuad3D(ballX + sunCos * 8, ballY + sunSin * 8, bz + 0.020, 6.5, 6.5, 0, 0.03, 0.04, 0.08, 0.36 * (1.0 - nfGlobal * 0.5), SPRITE_DRAW_ORDER.TIRE_MARKS);
                     this.batchObjectSprite3D("beach_ball", ballX, ballY, bz + 0.08 + ballArcZ, this.time * 5.0 + ci, 0.82 + ballArcZ * 0.35, SPRITE_DRAW_ORDER.TREES);
+
+                    // 4 Cheering Beach Spectators along the East/West sidelines watching the rally!
+                    const specFr0 = 50 + (Math.floor(this.time * 5.2 + ci) % 4);
+                    const specFr1 = 50 + (Math.floor(this.time * 4.8 + ci + 2) % 4);
+                    this.batchPedSprite3D("bikini_red", specFr0, vc.x - 28, vc.y - 8, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("surfer_guy", specFr1, vc.x - 28, vc.y + 10, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("bikini_white", specFr1, vc.x + 28, vc.y - 9, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("vc_bodybuilder", specFr0, vc.x + 28, vc.y + 9, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 } else {
                     // Volleyball resting on sand when players have been wiped out
                     this.batchObjectSprite3D("beach_ball", vc.x + 8, vc.y + 12, bz + 0.028, ci, 0.78, SPRITE_DRAW_ORDER.MAP_OBJECT);
@@ -6755,11 +6768,11 @@ class RetroRenderer {
                     const instFr = 50 + (Math.floor(this.time * 6.5) % 4);
                     this.batchPedSprite3D("bikini_red", instFr, bp.x - 4, bp.y + instSway, bz + 0.040, 0, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
-                    // Synchronized Bikini & Surfer Dancers in a 2x2 formation
-                    const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white"];
-                    for (let di = 0; di < 4; di++) {
-                        const row = (di % 2) === 0 ? -11 : 11;
-                        const col = di < 2 ? 12 : 24;
+                    // Synchronized Bikini & Surfer Dancers in a packed 2x4 formation (8 dancers per beach party!)
+                    const dancerPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "surfer_guy", "bikini_white", "bikini_red", "vc_bodybuilder", "vc_jogger"];
+                    for (let di = 0; di < 8; di++) {
+                        const row = ((di % 4) - 1.5) * 10;
+                        const col = di < 4 ? 12 : 24;
                         const stepX = Math.cos(this.time * 5.5 + di * 0.8) * 2.5;
                         const stepY = Math.sin(this.time * 5.5 + di * 0.4) * 3.5;
                         const dx = bp.x + col + stepX;
@@ -6796,8 +6809,18 @@ class RetroRenderer {
                     const surfFr = (si % 2 === 0) ? (50 + (Math.floor(this.time * 4.5 + si) % 4)) : 42;
                     this.batchPedSprite3D(sw.pedType || "surfer_guy", surfFr, wx, wy, bz + 0.036, surfAng, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 } else {
+                    if (sw.hasFloatRing) {
+                        this.batchObjectSprite3D("flamingo_float", wx, wy, bz + 0.020, this.time * 0.35 + si, 0.84, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    }
                     const swimFr = 50 + (Math.floor(this.time * 4.2 + si) % 4);
-                    this.batchPedSprite3D(sw.pedType || "bikini_cyan", swimFr, wx, wy, bz + 0.026, (sw.angle || 0) + Math.sin(waveT) * 0.25, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D(sw.pedType || "bikini_cyan", swimFr, wx, wy, bz + 0.028, (sw.angle || 0) + Math.sin(waveT) * 0.25, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (sw.friendWaderType) {
+                        const fwx = wx + 8;
+                        const fwy = wy + 13;
+                        const fwFr = 50 + (Math.floor(this.time * 3.9 + si + 2) % 4);
+                        this.pushSolidQuad3D(fwx, fwy, bz + 0.014, rippleSize * 0.9, rippleSize * 0.65, 0, 0.85, 0.97, 1.0, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.batchPedSprite3D(sw.friendWaderType, fwFr, fwx, fwy, bz + 0.028, (sw.angle || 0) + Math.PI - Math.sin(waveT) * 0.2, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 }
             }
         }
@@ -6951,11 +6974,14 @@ class RetroRenderer {
                 const djY = yy - sinA * 18.0;
                 this.batchObjectSprite3D("dj_turntable_deck", djX, djY, bz + 0.042, ang, 0.82, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
-                // 3 VIP Bikini & Vice Dancers on the bow sun-pads and stern jacuzzi deck!
+                // 6 VIP Bikini & Vice Dancers on the bow sun-pads, flybridge, and stern jacuzzi deck!
                 const deckOffsets = [
                     { fwd: 22.0, lat: -6.5 },
                     { fwd: 22.0, lat: 6.5 },
-                    { fwd: -28.0, lat: 0.0 }
+                    { fwd: 8.0,  lat: -7.5 },
+                    { fwd: 8.0,  lat: 7.5 },
+                    { fwd: -26.0, lat: -5.5 },
+                    { fwd: -28.0, lat: 5.5 }
                 ];
                 for (let di = 0; di < deckOffsets.length; di++) {
                     const doff = deckOffsets[di];
@@ -7053,6 +7079,55 @@ class RetroRenderer {
                         const specFr = 50 + (Math.floor(this.time * 5.5 + ei) % 4);
                         this.batchPedSprite3D("g2_civ_aqua", specFr, ev.x - 20, ev.y + 4, bz + 0.038, 0, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         this.batchPedSprite3D("bikini_pink", specFr, ev.x + 20, ev.y + 4, bz + 0.038, Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tourist", specFr, ev.x - 14, ev.y - 18, bz + 0.038, 0.6, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("g2_civ_pink", specFr, ev.x + 14, ev.y - 18, bz + 0.038, 2.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
+                    if (!evWiped) {
+                        const cFr0 = 50 + (Math.floor(this.time * 4.5 + ei) % 4);
+                        const cFr1 = 50 + (Math.floor(this.time * 5.2 + ei + 2) % 4);
+                        this.batchPedSprite3D("bikini_pink", cFr0, ev.x - 9, ev.y - 7, bz + 0.038, 0.7, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_crockett", cFr1, ev.x + 9, ev.y - 6, bz + 0.038, 2.4, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_cyan", cFr1, ev.x - 8, ev.y + 8, bz + 0.038, -0.7, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tourist", cFr0, ev.x + 8, ev.y + 7, bz + 0.038, -2.4, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                } else if (ev.kind === "CLUB_VIP_LINE") {
+                    // Velvet-rope VIP stanchions + Bouncer + 4 Nightclub VIPs waiting in line
+                    this.pushSolidQuad3D(ev.x - 9, ev.y + 4, bz + 0.045, 2.2, 28.0, 0, 0.85, 0.12, 0.28, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    for (const syOff of [-10, 4, 18]) {
+                        this.pushSolidQuad3D(ev.x - 9, ev.y + syOff, bz + 0.06, 3.4, 3.4, 0, 0.96, 0.80, 0.22, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    }
+                    if (!evWiped) {
+                        const qFr0 = 50 + (Math.floor(this.time * 4.2 + ei) % 4);
+                        const qFr1 = 50 + (Math.floor(this.time * 3.8 + ei + 1) % 4);
+                        this.batchPedSprite3D("vc_bodybuilder", 0, ev.x, ev.y - 18, bz + 0.040, Math.PI * 0.5, 1.10, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_red", qFr0, ev.x - 3, ev.y - 5, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tubbs", qFr1, ev.x + 3, ev.y + 5, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_pink", qFr0, ev.x - 2, ev.y + 15, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("g2_civ_aqua", qFr1, ev.x + 2, ev.y + 24, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                } else if (ev.kind === "LITTLE_CUBA_CROWD") {
+                    this.batchObjectSprite3D("beach_cooler", ev.x, ev.y, bz + 0.026, 0, 0.88, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    if (!evWiped) {
+                        const lcFr0 = 50 + (Math.floor(this.time * 4.6 + ei) % 4);
+                        const lcFr1 = 50 + (Math.floor(this.time * 4.0 + ei + 2) % 4);
+                        this.batchPedSprite3D("vc_cuban", lcFr0, ev.x - 10, ev.y - 6, bz + 0.038, 0.6, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_hawaiian_red", lcFr1, ev.x + 10, ev.y - 6, bz + 0.038, 2.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_cuban", lcFr1, ev.x - 8, ev.y + 9, bz + 0.038, -0.7, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("g2_civ_pink", lcFr0, ev.x + 9, ev.y + 8, bz + 0.038, -2.4, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                } else if (ev.kind === "BEACH_SOCIAL_CIRCLE") {
+                    // GTA 6 Trailer 1 (0:12) Beach Social Circle chatting & dancing around a beach cooler & beach ball on clean golden sand!
+                    this.batchObjectSprite3D("beach_cooler", ev.x, ev.y, bz + 0.026, 0.25, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.batchObjectSprite3D("beach_ball", ev.x + 12, ev.y + 2, bz + 0.026, this.time * 0.5 + ei, 0.78, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    if (!evWiped) {
+                        const bsFr0 = 50 + (Math.floor(this.time * 5.0 + ei) % 4);
+                        const bsFr1 = 50 + (Math.floor(this.time * 4.3 + ei + 2) % 4);
+                        this.batchPedSprite3D("bikini_pink", bsFr0, ev.x - 10, ev.y - 8, bz + 0.038, 0.7, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("surfer_guy", bsFr1, ev.x + 10, ev.y - 7, bz + 0.038, 2.4, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_cyan", bsFr1, ev.x - 9, ev.y + 9, bz + 0.038, -0.7, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_yellow", bsFr0, ev.x + 9, ev.y + 8, bz + 0.038, -2.4, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_bodybuilder", bsFr0, ev.x, ev.y - 13, bz + 0.038, Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else {
                     // Ocean Drive Social-Media Influencer Livestreaming with 3D Glowing LED Ring-Light Tripod!

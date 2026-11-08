@@ -334,7 +334,7 @@ class RetroAudioEngine {
     _preloadRawAudioFiles() {
         if (typeof window === "undefined" || typeof fetch !== "function") return;
         for (const [key, url] of Object.entries(VEHICLE_AUDIO_MANIFEST)) {
-            fetch(`${url}?v=101_22`)
+            fetch(`${url}?v=101_23`)
                 .then((res) => (res.ok ? res.arrayBuffer() : null))
                 .then((buf) => {
                     if (!buf) return;

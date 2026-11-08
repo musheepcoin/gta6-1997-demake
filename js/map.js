@@ -925,6 +925,12 @@ class LeonidaMap {
             { x: 453.5 * TILE_SIZE,        y: my256(155.2) * TILE_SIZE, z: 2.0 },
             { x: 453.5 * TILE_SIZE,        y: my256(50.5) * TILE_SIZE,  z: 2.0 },
             { x: 453.5 * TILE_SIZE,        y: 218.5 * TILE_SIZE,        z: 2.0 },
+            { x: 458.5 * TILE_SIZE,        y: 232.5 * TILE_SIZE,        z: 2.0 },
+            { x: 462.5 * TILE_SIZE,        y: 256.5 * TILE_SIZE,        z: 2.0 },
+            { x: 456.5 * TILE_SIZE,        y: 274.5 * TILE_SIZE,        z: 2.0 },
+            { x: 461.5 * TILE_SIZE,        y: 306.5 * TILE_SIZE,        z: 2.0 },
+            { x: 455.5 * TILE_SIZE,        y: 326.5 * TILE_SIZE,        z: 2.0 },
+            { x: 458.5 * TILE_SIZE,        y: 158.5 * TILE_SIZE,        z: 2.0 },
             { x: mx256(192.4) * TILE_SIZE, y: my256(112.5) * TILE_SIZE, z: 2.0 },
             // West Coast Beach & Southern Keys Tiki Boombox Parties
             { x: mx256(16.5) * TILE_SIZE,  y: my256(60.5) * TILE_SIZE,  z: 2.0 },
@@ -935,8 +941,10 @@ class LeonidaMap {
         ];
 
         // 3C. Sunbathing Bikini Women on Striped Towels & Resort Sun Loungers shaded by 3D Umbrellas + Side Beach Props
+        // GTA 6 Trailer 1 (0:11-0:15) ultra-dense Vice Beach layout across 4 staggered sand bands (West, Mid-West, Mid-East, East Surfline)
         this.beachSunbathers = [];
         const bikiniPool = ["bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white"];
+        const standFriendPool = ["surfer_guy", "bikini_pink", "vc_bodybuilder", "bikini_cyan", "vc_jogger", "bikini_yellow", "vc_tourist", "bikini_red"];
         const towelPool = ["beach_towel_pink", "beach_towel_cyan", "beach_towel_yellow", "beach_towel_coral", "beach_lounger"];
         const umbPool = ["umbrella_pink", "umbrella_cyan", "umbrella_yellow"];
         const sidePropPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow", "beach_ball", "sandcastle", "beach_cooler"];
@@ -948,12 +956,14 @@ class LeonidaMap {
         ];
         const sunbatherRows512 = [
             ...sunbatherRowsY256.map(y => my256(y)),
-            116.5, 124.5, 132.5, 140.5, 192.5, 200.5, 208.5, 216.5, 224.5, 232.5, 240.5, 248.5, 334.5, 344.5, 354.5
+            54.5, 62.5, 70.5, 78.5, 94.5, 102.5, 110.5, 116.5, 124.5, 132.5, 140.5, 148.5, 156.5, 164.5, 172.5, 180.5, 188.5,
+            192.5, 200.5, 204.5, 208.5, 212.5, 216.5, 220.5, 224.5, 228.5, 232.5, 236.5, 240.5, 244.5, 248.5, 252.5, 256.5,
+            262.5, 268.5, 274.5, 282.5, 290.5, 298.5, 306.5, 314.5, 322.5, 330.5, 334.5, 340.5, 344.5, 350.5, 354.5, 360.5
         ];
         for (let i = 0; i < sunbatherRows512.length; i++) {
             const by = sunbatherRows512[i];
-            // West/Mid Beach group right next to Lummus Park (starting at x = 453.2 so visible directly from Ocean Drive!)
-            const westCol = 453.2 + (i % 4) * 2.4;
+            // Band 1: West Beach group right next to Lummus Park (x = 453.3..455.5, visible directly from Ocean Drive!)
+            const westCol = 453.3 + (i % 3) * 1.1;
             this.beachSunbathers.push({
                 x: westCol * TILE_SIZE,
                 y: by * TILE_SIZE,
@@ -963,6 +973,7 @@ class LeonidaMap {
                 towelSpr: towelPool[i % towelPool.length],
                 friendPedType: bikiniPool[(i + 2) % bikiniPool.length],
                 friendTowelSpr: towelPool[(i + 1) % towelPool.length],
+                standingFriendType: (i % 3 !== 2) ? standFriendPool[i % standFriendPool.length] : null,
                 umbSpr: umbPool[i % umbPool.length],
                 umbDx: -23,
                 umbDy: -13,
@@ -975,8 +986,56 @@ class LeonidaMap {
                 extraPropDy: 18
             });
 
-            // East Shoreline group near the Atlantic surf
-            const eastCol = mx256(235.4 + ((i + 1) % 3) * 2.1);
+            // Band 2: Mid-West Golden Sand Band (x = 457.8..460.4)
+            const midWestCol = 457.8 + ((i + 1) % 3) * 1.2;
+            this.beachSunbathers.push({
+                x: midWestCol * TILE_SIZE,
+                y: (by + 1.2) * TILE_SIZE,
+                z: 2.0,
+                angle: ((i % 2) === 1 ? -0.14 : 0.10),
+                pedType: bikiniPool[(i + 3) % bikiniPool.length],
+                towelSpr: towelPool[(i + 3) % towelPool.length],
+                friendPedType: (i % 2 === 0) ? "surfer_guy" : bikiniPool[(i + 4) % bikiniPool.length],
+                friendTowelSpr: towelPool[(i + 4) % towelPool.length],
+                standingFriendType: (i % 2 === 0) ? standFriendPool[(i + 3) % standFriendPool.length] : null,
+                umbSpr: umbPool[(i + 2) % umbPool.length],
+                umbDx: -23,
+                umbDy: -13,
+                propSpr: sidePropPool[(i + 3) % sidePropPool.length],
+                propDx: 26,
+                propDy: -10,
+                propAngle: -0.28,
+                extraPropSpr: (i % 3 === 0) ? "beach_cooler" : "beach_ball",
+                extraPropDx: 24,
+                extraPropDy: 18
+            });
+
+            // Band 3: Mid-East Sand Band (x = 462.6..465.2)
+            const midEastCol = 462.6 + ((i + 2) % 3) * 1.2;
+            this.beachSunbathers.push({
+                x: midEastCol * TILE_SIZE,
+                y: (by - 0.8) * TILE_SIZE,
+                z: 2.0,
+                angle: 0.08,
+                pedType: bikiniPool[(i + 4) % bikiniPool.length],
+                towelSpr: towelPool[(i + 1) % towelPool.length],
+                friendPedType: bikiniPool[(i + 1) % bikiniPool.length],
+                friendTowelSpr: towelPool[(i + 2) % towelPool.length],
+                standingFriendType: (i % 3 === 0) ? standFriendPool[(i + 5) % standFriendPool.length] : null,
+                umbSpr: umbPool[(i + 1) % umbPool.length],
+                umbDx: -23,
+                umbDy: -13,
+                propSpr: sidePropPool[(i + 4) % sidePropPool.length],
+                propDx: 26,
+                propDy: -10,
+                propAngle: 0.32,
+                extraPropSpr: (i % 2 === 0) ? "sandcastle" : "beach_cooler",
+                extraPropDx: 24,
+                extraPropDy: 18
+            });
+
+            // Band 4: East Shoreline group near the Atlantic surf
+            const eastCol = mx256(235.4 + ((i + 1) % 3) * 1.9);
             this.beachSunbathers.push({
                 x: eastCol * TILE_SIZE,
                 y: (by + 0.6) * TILE_SIZE,
@@ -986,6 +1045,7 @@ class LeonidaMap {
                 towelSpr: towelPool[(i + 2) % towelPool.length],
                 friendPedType: (i % 3 === 0) ? "surfer_guy" : bikiniPool[(i + 3) % bikiniPool.length],
                 friendTowelSpr: towelPool[(i + 3) % towelPool.length],
+                standingFriendType: (i % 2 === 1) ? standFriendPool[(i + 2) % standFriendPool.length] : null,
                 umbSpr: umbPool[(i + 1) % umbPool.length],
                 umbDx: -23,
                 umbDy: -13,
@@ -1011,6 +1071,7 @@ class LeonidaMap {
                 towelSpr: towelPool[bi % towelPool.length],
                 friendPedType: bikiniPool[(bi + 1) % bikiniPool.length],
                 friendTowelSpr: towelPool[(bi + 2) % towelPool.length],
+                standingFriendType: standFriendPool[bi % standFriendPool.length],
                 umbSpr: umbPool[bi % umbPool.length],
                 umbDx: 15,
                 umbDy: -10,
@@ -1029,6 +1090,7 @@ class LeonidaMap {
                 towelSpr: "beach_lounger",
                 friendPedType: "bikini_white",
                 friendTowelSpr: "beach_lounger",
+                standingFriendType: "vc_tourist",
                 umbSpr: "umbrella_pink",
                 propSpr: "beach_cooler"
             },
@@ -1041,12 +1103,13 @@ class LeonidaMap {
                 towelSpr: "beach_lounger",
                 friendPedType: "bikini_cyan",
                 friendTowelSpr: "beach_lounger",
+                standingFriendType: "surfer_guy",
                 umbSpr: "umbrella_cyan",
                 propSpr: "beach_ball"
             }
         );
 
-        // 3D. Atlantic & Biscayne Bay Wave Surfers & Shallow-Water Bikini Swimmers
+        // 3D. Atlantic & Biscayne Bay Wave Surfers & Shallow-Water Bikini Swimmers (GTA 6 Trailer 1 dense surfline!)
         this.beachSwimmers = [];
         const surfRowsY256 = [
             44.5, 51.0, 64.0, 78.0, 90.0, 105.0, 122.0,
@@ -1054,19 +1117,23 @@ class LeonidaMap {
         ];
         const surfRows512 = [
             ...surfRowsY256.map(y => my256(y)),
-            122.0, 138.0, 198.0, 215.0, 232.0, 248.0, 340.0
+            58.0, 74.0, 92.0, 108.0, 122.0, 138.0, 154.0, 170.0, 184.0,
+            198.0, 204.0, 210.0, 215.0, 220.0, 226.0, 232.0, 238.0, 244.0, 248.0, 254.0,
+            262.0, 270.0, 278.0, 286.0, 294.0, 302.0, 310.0, 318.0, 326.0, 334.0, 340.0, 348.0, 356.0
         ];
         const boardPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow"];
         for (let si = 0; si < surfRows512.length; si++) {
             const sy = surfRows512[si];
-            // Shallow-water bikini swimmer wading/swimming at the shoreline
+            // Shallow-water bikini swimmer wading/chatting at the shoreline (with a friend wader or flamingo float ring!)
             this.beachSwimmers.push({
                 x: mx256(241.7 + (si % 2) * 0.6) * TILE_SIZE,
                 y: sy * TILE_SIZE,
                 z: 2.0,
                 angle: Math.PI,
                 isSurfer: false,
-                pedType: bikiniPool[si % bikiniPool.length]
+                pedType: bikiniPool[si % bikiniPool.length],
+                friendWaderType: (si % 2 === 0) ? standFriendPool[(si + 1) % standFriendPool.length] : null,
+                hasFloatRing: (si % 3 === 1)
             });
             // Atlantic wave surfer riding/paddling on surfboard
             this.beachSwimmers.push({
@@ -1210,14 +1277,6 @@ class LeonidaMap {
 
         this.beachUmbrellas = this.beachUmbrellas.filter(u => isCleanSandTile(Math.floor(u.x / TILE_SIZE), Math.floor(u.y / TILE_SIZE), false));
 
-        this.beachSunbathers = this.beachSunbathers.filter(sb => {
-            const snapped = snapPxToCleanSand(sb.x, sb.y, sb.towelSpr === "beach_lounger");
-            if (!snapped) return false;
-            sb.x = snapped.x;
-            sb.y = snapped.y;
-            return true;
-        });
-
         this.beachVolleyballCourts = this.beachVolleyballCourts.filter(vc => {
             const snapped = snapPxToCleanSand(vc.x, vc.y, false);
             if (!snapped) return false;
@@ -1229,6 +1288,7 @@ class LeonidaMap {
         this.beachParties = this.beachParties.filter(bp => {
             const snapped = snapPxToCleanSand(bp.x, bp.y, false);
             if (!snapped) return false;
+            if (this.beachVolleyballCourts.some(vc => Math.hypot(vc.x - snapped.x, vc.y - snapped.y) < 58)) return false;
             bp.x = snapped.x;
             bp.y = snapped.y;
             return true;
@@ -1243,11 +1303,29 @@ class LeonidaMap {
             return true;
         });
 
+        const acceptedSunbathers = [];
+        this.beachSunbathers = this.beachSunbathers.filter(sb => {
+            const snapped = snapPxToCleanSand(sb.x, sb.y, sb.towelSpr === "beach_lounger");
+            if (!snapped) return false;
+            sb.x = snapped.x;
+            sb.y = snapped.y;
+            // Smart positioning: never overlap volleyball courts, beach dance parties, lifeguard towers, or other sunbathers!
+            if (this.beachVolleyballCourts.some(vc => Math.hypot(vc.x - sb.x, vc.y - sb.y) < 54)) return false;
+            if (this.beachParties.some(bp => Math.hypot(bp.x - sb.x, bp.y - sb.y) < 50)) return false;
+            if (this.beachProps.some(pr => Math.hypot(pr.x - sb.x, pr.y - sb.y) < 46)) return false;
+            if (acceptedSunbathers.some(other => Math.hypot(other.x - sb.x, other.y - sb.y) < 42)) return false;
+            acceptedSunbathers.push(sb);
+            return true;
+        });
+
+        const acceptedSwimmers = [];
         this.beachSwimmers = this.beachSwimmers.filter(sw => {
             const snapped = snapPxToCleanWater(sw.x, sw.y);
             if (!snapped) return false;
             sw.x = snapped.x;
             sw.y = snapped.y;
+            if (acceptedSwimmers.some(other => Math.hypot(other.x - sw.x, other.y - sw.y) < 28)) return false;
+            acceptedSwimmers.push(sw);
             return true;
         });
 
@@ -1285,23 +1363,46 @@ class LeonidaMap {
         // =========================================================================
         // 3F. GTA 6 LEONIDA & VICE CITY LIVING WORLD ECOSYSTEMS (Ground-Truth Snapped)
         // =========================================================================
-        const isSafePedTile = (c, r) => {
+        const isSafePedTile = (c, r, requirePavement = false) => {
             if (c < 3 || c >= MAP_COLS - 3 || r < 3 || r >= MAP_ROWS - 3) return false;
+            // Exclude restricted complexes (VCIA tarmac, Port Gellhorn Speedway, SERA Spaceport, Mambas Stadium bowl, Prison fence)
+            if (c >= 64 && c <= 165 && r >= 299 && r <= 368) return false;
+            if (c >= 26 && c <= 87 && r >= 149 && r <= 200) return false;
+            if (c >= 458 && c <= 481 && r >= 21 && r <= 45) return false;
+            if (c >= 179 && c <= 197 && r >= 164 && r <= 180) return false;
+            if (c >= 56 && c <= 68 && r >= 76 && r <= 146) return false;
             const gt = this.surfaceGround[r * MAP_COLS + c];
-            if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
-            // Ensure no road or building right on the same tile
+            if (requirePavement) {
+                if (gt !== GROUND_TYPE.PAWEMENT) return false;
+            } else {
+                if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
+            }
+            const col = this.getColumn ? this.getColumn(c, r) : null;
+            if (col && col.length > 1) return false;
+            const lid = this.getBlockInfo(c, r, 1)?.lid || 0;
+            if (lid === 69 || lid === 77) return false; // never on planter boxes or wooden docks
+            if ((c === 449 || c === 450) && lid === 10) return false; // never on Lummus Park palm grass median
+            // Keep stationary street crowds at least 46px clear of building entrance doors
+            const px = (c + 0.5) * TILE_SIZE;
+            const py = (r + 0.5) * TILE_SIZE;
+            if (Array.isArray(this.interiors)) {
+                for (let ii = 0; ii < this.interiors.length; ii++) {
+                    const intr = this.interiors[ii];
+                    if (Math.hypot((intr.doorX || 0) - px, (intr.doorY || 0) - py) < 46) return false;
+                }
+            }
             return (this.surfaceLayer[r * MAP_COLS + c] || 2) <= 2;
         };
-        const snapToVerifiedPed = (px, py, maxRad = 5) => {
+        const snapToVerifiedPed = (px, py, maxRad = 5, requirePavement = false) => {
             const c0 = Math.floor(px / TILE_SIZE);
             const r0 = Math.floor(py / TILE_SIZE);
-            if (isSafePedTile(c0, r0)) return { x: px, y: py, z: 2.0 };
+            if (isSafePedTile(c0, r0, requirePavement)) return { x: px, y: py, z: 2.0 };
             for (let rad = 1; rad <= maxRad; rad++) {
                 for (let dr = -rad; dr <= rad; dr++) {
                     for (let dc = -rad; dc <= rad; dc++) {
                         if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
                         const nc = c0 + dc, nr = r0 + dr;
-                        if (isSafePedTile(nc, nr)) {
+                        if (isSafePedTile(nc, nr, requirePavement)) {
                             return { x: (nc + 0.5) * TILE_SIZE, y: (nr + 0.5) * TILE_SIZE, z: 2.0 };
                         }
                     }
@@ -1475,7 +1576,7 @@ class LeonidaMap {
             }
         }
 
-        // 5) Wynwood Walls Street-Art Breakdance Cyphers & Ocean Drive Social-Media Livestreamers ("streetEvents")
+        // 5) Wynwood Walls Street-Art Breakdance Cyphers, Ocean Drive Livestreamers, Sidewalk Social Groups, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles ("streetEvents")
         this.streetEvents = [];
         const rawStreetEvents = [
             // Wynwood & Little Haiti Street-Art Mural + DJ Booth + Breakdancers
@@ -1484,18 +1585,108 @@ class LeonidaMap {
             { c: mx256(135.5), r: my256(72.5), kind: "WYNWOOD_CYPHER" },
             { c: mx256(101.5), r: my256(68.5), kind: "WYNWOOD_CYPHER" },
             { c: 212.5,        r: 128.5,       kind: "WYNWOOD_CYPHER" },
+            { c: 274.5,        r: 171.5,       kind: "WYNWOOD_CYPHER" },
+            { c: 295.5,        r: 185.5,       kind: "WYNWOOD_CYPHER" },
+            { c: 311.5,        r: 173.5,       kind: "WYNWOOD_CYPHER" },
             // Ocean Drive & South Beach Social-Media Influencer Ring-Light Livestreamers (GTA 6 Trailer 1!)
             { c: mx256(218.4), r: my256(88.5),  kind: "INFLUENCER_STREAM" },
             { c: mx256(218.4), r: my256(112.5), kind: "INFLUENCER_STREAM" },
             { c: mx256(218.4), r: 222.5,        kind: "INFLUENCER_STREAM" },
             { c: mx256(218.4), r: my256(138.5), kind: "INFLUENCER_STREAM" },
             { c: mx256(218.4), r: my256(162.5), kind: "INFLUENCER_STREAM" },
-            { c: mx256(204.5), r: my256(119.5), kind: "INFLUENCER_STREAM" }
+            { c: mx256(204.5), r: my256(119.5), kind: "INFLUENCER_STREAM" },
+            { c: 448.5,        r: 238.5,        kind: "INFLUENCER_STREAM" },
+            { c: 448.5,        r: 266.5,        kind: "INFLUENCER_STREAM" },
+            { c: 448.5,        r: 296.5,        kind: "INFLUENCER_STREAM" },
+            { c: 443.5,        r: 248.5,        kind: "INFLUENCER_STREAM" },
+            // Ocean Drive & Lummus Park Sidewalk Social Groups (GTA 6 Trailer 1 0:38-0:44 packed neon strip!)
+            { c: 443.5, r: 196.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 204.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 212.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 218.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 226.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 232.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 240.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 246.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 254.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 260.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 270.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 276.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 284.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 290.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 300.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 308.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 443.5, r: 316.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 448.5, r: 324.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 451.5, r: 215.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 451.5, r: 235.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 451.5, r: 255.5, kind: "OCEAN_DRIVE_CROWD" },
+            { c: 451.5, r: 285.5, kind: "OCEAN_DRIVE_CROWD" },
+            // Club VIP Velvet-Rope Queues & Bouncers (Ocean Drive, Collins Ave & Downtown Vice Nightclubs)
+            { c: 443.5, r: 220.5, kind: "CLUB_VIP_LINE" },
+            { c: 443.5, r: 262.5, kind: "CLUB_VIP_LINE" },
+            { c: 443.5, r: 292.5, kind: "CLUB_VIP_LINE" },
+            { c: 423.5, r: 228.5, kind: "CLUB_VIP_LINE" },
+            { c: 423.5, r: 274.5, kind: "CLUB_VIP_LINE" },
+            { c: 431.5, r: 244.5, kind: "CLUB_VIP_LINE" },
+            { c: 431.5, r: 286.5, kind: "CLUB_VIP_LINE" },
+            { c: 285.5, r: 212.5, kind: "CLUB_VIP_LINE" },
+            { c: 299.5, r: 226.5, kind: "CLUB_VIP_LINE" },
+            { c: 318.5, r: 214.5, kind: "CLUB_VIP_LINE" },
+            // Little Cuba Calle Ocho Sidewalk Domino & Cafecito Crowds
+            { c: 280.5, r: 252.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 290.5, r: 256.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 299.5, r: 252.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 309.5, r: 258.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 285.5, r: 268.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 295.5, r: 272.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 304.5, r: 268.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 314.5, r: 274.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 280.5, r: 284.5, kind: "LITTLE_CUBA_CROWD" },
+            { c: 299.5, r: 286.5, kind: "LITTLE_CUBA_CROWD" },
+            // Vice Beach Standing Social Circles on Clean Golden Sand (GTA 6 Trailer 1 0:12 beachgoers chatting around coolers & boomboxes!)
+            { c: 456.2, r: 106.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.2, r: 120.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 455.8, r: 144.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 460.8, r: 160.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 456.4, r: 176.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.5, r: 186.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 455.8, r: 202.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.4, r: 210.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 466.2, r: 218.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 456.2, r: 226.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.8, r: 234.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 466.4, r: 242.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 455.8, r: 250.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.2, r: 258.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 466.0, r: 266.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 456.4, r: 274.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.6, r: 284.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 466.2, r: 292.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 455.8, r: 300.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.4, r: 310.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 466.0, r: 318.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 456.2, r: 328.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 461.5, r: 338.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 456.0, r: 348.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];
-            const sp = snapToVerifiedPed(ev.c * TILE_SIZE, ev.r * TILE_SIZE, 5);
-            if (sp) {
+            const rawX = ev.c * TILE_SIZE;
+            const rawY = ev.r * TILE_SIZE;
+            if (ev.onSand) {
+                const spSand = snapPxToCleanSand(rawX, rawY, false);
+                if (!spSand) continue;
+                if (this.beachVolleyballCourts.some(vc => Math.hypot(vc.x - spSand.x, vc.y - spSand.y) < 54)) continue;
+                if (this.beachParties.some(bp => Math.hypot(bp.x - spSand.x, bp.y - spSand.y) < 50)) continue;
+                if (this.muscleBeachGyms.some(gm => Math.hypot(gm.x - spSand.x, gm.y - spSand.y) < 50)) continue;
+                if (this.beachSunbathers.some(sb => Math.hypot(sb.x - spSand.x, sb.y - spSand.y) < 38)) continue;
+                if (this.streetEvents.some(other => Math.hypot(other.x - spSand.x, other.y - spSand.y) < 42)) continue;
+                this.streetEvents.push({ x: spSand.x, y: spSand.y, z: 2.0, kind: ev.kind, seed: ei * 1.9 });
+            } else {
+                const sp = snapToVerifiedPed(rawX, rawY, 5, true);
+                if (!sp) continue;
+                if (this.streetEvents.some(other => Math.hypot(other.x - sp.x, other.y - sp.y) < 42)) continue;
                 this.streetEvents.push({ x: sp.x, y: sp.y, z: 2.0, kind: ev.kind, seed: ei * 1.9 });
             }
         }

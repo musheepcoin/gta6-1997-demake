@@ -1014,10 +1014,23 @@ class WorldObjectEngine {
         const notInClearZone = (obj) => !clearZones.some(z => Math.hypot(obj.x - z.x, obj.y - z.y) < z.r);
         if (Array.isArray(map.vicePalms)) map.vicePalms = map.vicePalms.filter(notInClearZone);
         if (Array.isArray(map.trees)) map.trees = map.trees.filter(notInClearZone);
-        if (Array.isArray(map.beachSunbathers)) map.beachSunbathers = map.beachSunbathers.filter(notInClearZone);
         if (Array.isArray(map.beachUmbrellas)) map.beachUmbrellas = map.beachUmbrellas.filter(notInClearZone);
         if (Array.isArray(map.beachVolleyballCourts)) map.beachVolleyballCourts = map.beachVolleyballCourts.filter(notInClearZone);
         if (Array.isArray(map.beachParties)) map.beachParties = map.beachParties.filter(notInClearZone);
+        if (Array.isArray(map.beachSunbathers)) {
+            map.beachSunbathers = map.beachSunbathers.filter(sb =>
+                notInClearZone(sb) &&
+                (!Array.isArray(map.beachVolleyballCourts) || !map.beachVolleyballCourts.some(vc => Math.hypot(vc.x - sb.x, vc.y - sb.y) < 54)) &&
+                (!Array.isArray(map.beachParties) || !map.beachParties.some(bp => Math.hypot(bp.x - sb.x, bp.y - sb.y) < 50))
+            );
+        }
+        if (Array.isArray(map.streetEvents)) {
+            map.streetEvents = map.streetEvents.filter(ev =>
+                notInClearZone(ev) &&
+                (!Array.isArray(map.beachVolleyballCourts) || !map.beachVolleyballCourts.some(vc => Math.hypot(vc.x - ev.x, vc.y - ev.y) < 54)) &&
+                (!Array.isArray(map.beachParties) || !map.beachParties.some(bp => Math.hypot(bp.x - ev.x, bp.y - ev.y) < 50))
+            );
+        }
 
         this.registerEstateInteriors();
         this.generate3DStreetProps();
