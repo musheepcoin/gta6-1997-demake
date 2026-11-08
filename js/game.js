@@ -4459,23 +4459,24 @@ class LeonidaGame {
 
 
         // Remember exterior coordinates right outside this venue's door on the sidewalk
-
         const { x: dtx, y: dty, fnv: dn } = this.getDoorThresholdPos(intr);
-
-        p.x = dtx + dn[0] * 18;
-
-        p.y = dty + dn[1] * 18;
-
+        p.x = dtx + dn[0] * 20;
+        p.y = dty + dn[1] * 20;
+        if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+            const resolvedP = this.map.resolveCircleBuildingCollision(p.x, p.y, p.radius || 8, 0);
+            p.x = resolvedP.x;
+            p.y = resolvedP.y;
+        }
         p.z = this.map.getHeightAtPixel(p.x, p.y, 4.0);
-
         if (this.jason) {
-
-            this.jason.x = p.x + 24;
-
-            this.jason.y = p.y;
-
+            this.jason.x = p.x - dn[1] * 24;
+            this.jason.y = p.y + dn[0] * 24;
+            if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                const resolvedJ = this.map.resolveCircleBuildingCollision(this.jason.x, this.jason.y, this.jason.radius || 8, 0);
+                this.jason.x = resolvedJ.x;
+                this.jason.y = resolvedJ.y;
+            }
             this.jason.z = p.z;
-
         }
 
 
@@ -4542,27 +4543,28 @@ class LeonidaGame {
         }
 
         const { x: dtx, y: dty, fnv: dnx } = this.getDoorThresholdPos(intr);
-
-        this.player.x = dtx + dnx[0] * 18;
-
-        this.player.y = dty + dnx[1] * 18;
-
+        this.player.x = dtx + dnx[0] * 20;
+        this.player.y = dty + dnx[1] * 20;
+        if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+            const resolvedP = this.map.resolveCircleBuildingCollision(this.player.x, this.player.y, this.player.radius || 8, 0);
+            this.player.x = resolvedP.x;
+            this.player.y = resolvedP.y;
+        }
         this.player.z = this.map.getHeightAtPixel(this.player.x, this.player.y, 4.0);
         this.player.angle = Math.atan2(dnx[1], dnx[0]);
         this.player.vx = 0;
-
         this.player.vy = 0;
-
         this.player.isMoving = false;
-
         if (this.jason) {
-
-            this.jason.x = this.player.x + 24;
-
-            this.jason.y = this.player.y;
-
+            this.jason.x = this.player.x - dnx[1] * 24;
+            this.jason.y = this.player.y + dnx[0] * 24;
+            if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                const resolvedJ = this.map.resolveCircleBuildingCollision(this.jason.x, this.jason.y, this.jason.radius || 8, 0);
+                this.jason.x = resolvedJ.x;
+                this.jason.y = resolvedJ.y;
+            }
             this.jason.z = this.player.z;
-
+            this.jason.angle = this.player.angle;
         }
 
         this.renderer.camX = this.player.x;
@@ -9452,6 +9454,11 @@ class LeonidaGame {
                 if ((npc._robbedTimer || 0) > 0) npc._robbedTimer = Math.max(0, npc._robbedTimer - dt);
             }
         }
+        if (Array.isArray(intr._targetHitTimers)) {
+            for (let i = 0; i < intr._targetHitTimers.length; i++) {
+                if ((intr._targetHitTimers[i] || 0) > 0) intr._targetHitTimers[i] = Math.max(0, intr._targetHitTimers[i] - dt);
+            }
+        }
 
         // Live 360-degree Mouse Aiming inside Interiors when mouseShoot is enabled!
         if (p.mouseShoot && this.input.shoot && this.renderer && typeof this.renderer.worldToScreen === "function") {
@@ -9541,6 +9548,8 @@ class LeonidaGame {
                         const dist = Math.hypot(tp.x - cx, tp.y - cy);
                         if (dist <= 24) {
                             hitRangeTarget = true;
+                            if (!intr._targetHitTimers) intr._targetHitTimers = [0, 0, 0, 0];
+                            intr._targetHitTimers[lane] = 0.30;
                             const isBullseye = dist <= 10;
                             const prize = isBullseye ? 250 : 100;
                             this.cash += prize;

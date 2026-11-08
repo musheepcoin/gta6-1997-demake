@@ -10345,7 +10345,7 @@ class RetroRenderer {
         const rh = intr.h || 560;
         const t = intr.theme || "SHOP_CONVENIENCE";
         const facing = intr.facing || "S";
-        const key = `${t}_${facing}_${rw}_${rh}`;
+        const key = `v3_${t}_${facing}_${rw}_${rh}`;
         if (this._interiorFloorTexCache[key]) {
             return this._interiorFloorTexCache[key];
         }
@@ -10401,18 +10401,21 @@ class RetroRenderer {
             for (let hx = 544; hx < 784; hx += 18) {
                 fillR(hx, 304, 9, 8, "#090d16");
             }
-            // Downrange 10m and 25m range lines & spent brass casings
+            // Downrange 10m and 25m range lines, lane numbers & spent brass casings
             fillR(544, 218, 242, 2, "rgba(250, 204, 21, 0.35)");
             fillR(544, 138, 242, 2, "rgba(250, 204, 21, 0.35)");
             fillR(544, 62, 242, 24, "#451a03", "#78350f", 1.5); // Downrange sandtrap berm
+            for (let lane = 0; lane < 4; lane++) {
+                const lx = 550 + lane * 58;
+                fillR(lx + 4, 268, 44, 26, "rgba(250, 204, 21, 0.10)", "rgba(250, 204, 21, 0.35)", 1.0);
+            }
             for (let s = 0; s < 22; s++) {
                 const bx = 556 + ((s * 37) % 216);
                 const by = 336 + ((s * 19) % 34);
                 fillR(bx, by, 4, 2.5, "#fde047");
             }
-            // South Security Vestibule diamond-plate floor & red welcome runner
+            // South Security Vestibule diamond-plate floor (no garish welcome mat)
             fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#334155", 1.0);
-            fillR(330, 444, 160, 78, tex.carpet_royal, "#fbbf24", 1.5);
         } else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") {
             fillR(18, 56, rw - 36, 136, tex.kitchen_tile, "#64748b", 1.5);
             if (t === "DINER_PAWN") {
@@ -10504,10 +10507,24 @@ class RetroRenderer {
             g.fillRect(rw - 52, 56, 34, rh - 74);
         }
 
+        // 4. Soft Contact Ambient Occlusion Halos around all Interior Partition Walls & Heavy Counters
+        if (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function") {
+            const obs = window.ShopInteriors.getObstacles(intr);
+            for (let i = 0; i < obs.length; i++) {
+                const ob = obs[i];
+                const pad = ob.isWall ? 10 : 7;
+                g.fillStyle = ob.isWall ? "rgba(0, 0, 0, 0.34)" : "rgba(0, 0, 0, 0.24)";
+                g.fillRect(ob.x - pad, ob.y - pad, ob.w + pad * 2, ob.h + pad * 2);
+                g.fillStyle = "rgba(0, 0, 0, 0.45)";
+                g.fillRect(ob.x - 3, ob.y - 3, ob.w + 6, ob.h + 6);
+            }
+        }
+
         g.restore();
 
         const glTex = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, glTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -11317,24 +11334,45 @@ class RetroRenderer {
         ctx.fillStyle = intr.accent || "#38bdf8";
         ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 31);
 
-        // 3. 3D-Projected Interactive Station Badges (compact pill when far, expanded [E] card when near!)
+        // 3. 3D-Projected Interactive Station Badges (compact pill when far, expanded [E] card when near, with automatic overlap resolution!)
+        const placedRects = [];
+        const resolveLabelOverlap = (x, y, w, h) => {
+            let cy = y;
+            for (let pass = 0; pass < 4; pass++) {
+                let hit = false;
+                for (let i = 0; i < placedRects.length; i++) {
+                    const r = placedRects[i];
+                    if (x < r.x + r.w + 4 && x + w + 4 > r.x && cy < r.y + r.h + 3 && cy + h + 3 > r.y) {
+                        cy = (cy <= r.y) ? (r.y - h - 4) : (r.y + r.h + 4);
+                        hit = true;
+                    }
+                }
+                if (!hit) break;
+            }
+            placedRects.push({ x, y: cy, w, h });
+            return cy;
+        };
+
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
-                const stTop = this.worldToScreen(st.x, st.y, 2.26);
+                const stTop = this.worldToScreen(st.x, st.y, 2.24);
                 const ready = (st.cooldown || 0) <= 0;
                 const distToPlayer = Math.hypot(px - st.x, py - st.y);
-                const isNear = distToPlayer < 52;
+                const isNear = distToPlayer < 64;
                 const stCol = ready ? (st.color || "#39ff14") : "#64748b";
 
                 const cleanSub = String(st.sub || "").replace(/^\[E\]\s*/i, "");
-                ctx.font = isNear ? "bold 10px Consolas, 'Courier New', monospace" : "bold 9px Consolas, 'Courier New', monospace";
+                ctx.font = isNear ? "bold 10px Consolas, 'Courier New', monospace" : "bold 8.5px Consolas, 'Courier New', monospace";
                 const lblW = ctx.measureText(st.label).width;
-                const bw = isNear ? Math.max(186, Math.round(lblW + 24)) : Math.max(128, Math.round(lblW + 18));
-                const bh = isNear ? 30 : 18;
+                const subTxt = ready ? `[E] CONFIRM • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`;
+                const subW = (isNear || !ready) ? ctx.measureText(subTxt).width : 0;
+                const bw = isNear ? Math.max(182, Math.round(Math.max(lblW, subW) + 22)) : Math.max(114, Math.round(lblW + 14));
+                const bh = (isNear || !ready) ? 29 : 16;
                 const bx = Math.round(stTop.x - bw * 0.5);
-                const by = Math.round(stTop.y - bh - (isNear ? 8 : 2));
+                const rawBy = Math.round(stTop.y - bh - (isNear ? 10 : 3));
+                const by = resolveLabelOverlap(bx, rawBy, bw, bh);
 
-                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.94)" : "rgba(8, 12, 24, 0.78)";
+                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.95)" : "rgba(8, 12, 24, 0.80)";
                 ctx.fillRect(bx, by, bw, bh);
                 ctx.fillStyle = stCol;
                 ctx.fillRect(bx, by, 3, bh);
@@ -11343,11 +11381,11 @@ class RetroRenderer {
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
                 ctx.fillStyle = ready ? "#ffffff" : "#94a3b8";
-                ctx.fillText(st.label, stTop.x + 2, by + (isNear ? 9.5 : 9.0));
+                ctx.fillText(st.label, bx + bw * 0.5 + 1, by + ((isNear || !ready) ? 9.5 : 8.5));
                 if (isNear || !ready) {
                     ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
                     ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
-                    ctx.fillText(ready ? `[E] CONFIRM • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`, stTop.x + 2, by + 21);
+                    ctx.fillText(subTxt, bx + bw * 0.5 + 1, by + 20.5);
                     if (isNear && ready && Array.isArray(this.cheatButtons)) {
                         this.cheatButtons.push({ id: "TRIGGER_STATION", x: bx, y: by, w: bw, h: bh, station: st });
                     }
@@ -11400,25 +11438,27 @@ class RetroRenderer {
                 const npcZ = (npc.z || 2.055) + 0.165;
                 const nScr = this.worldToScreen(nx, ny, npcZ);
 
-                ctx.font = "bold 9px Consolas, monospace";
+                ctx.font = "bold 8.5px Consolas, monospace";
                 const tw = ctx.measureText(npc.label).width + 10;
-                ctx.fillStyle = "rgba(8, 12, 24, 0.82)";
-                ctx.fillRect(nScr.x - tw * 0.5, nScr.y - 18, tw, 13);
-                ctx.strokeStyle = "rgba(148, 163, 184, 0.45)";
+                const tx = Math.round(nScr.x - tw * 0.5);
+                const ty = resolveLabelOverlap(tx, Math.round(nScr.y - 18), tw, 13);
+                ctx.fillStyle = "rgba(8, 12, 24, 0.86)";
+                ctx.fillRect(tx, ty, tw, 13);
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.48)";
                 ctx.lineWidth = 1;
-                ctx.strokeRect(nScr.x - tw * 0.5, nScr.y - 18, tw, 13);
+                ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, 12);
                 ctx.fillStyle = "#e2e8f0";
-                ctx.fillText(npc.label, nScr.x, nScr.y - 11.5);
+                ctx.fillText(npc.label, tx + tw * 0.5, ty + 6.5);
 
                 // Proximity 1997 Arcade Speech Bubble when player approaches NPC or during an armed hold-up!
                 const distNpc = Math.hypot(px - nx, py - ny);
                 const robbedLine = (npc._robbedTimer || 0) > 0 ? "🙌 DON'T SHOOT! TAKE WHATEVER YOU WANT!" : null;
-                const speech = robbedLine || (distNpc < 105 ? npc.dialog : null);
+                const speech = robbedLine || (distNpc < 96 ? npc.dialog : null);
                 if (speech) {
                     ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     const sw = Math.min(340, ctx.measureText(speech).width + 16);
                     const sx = Math.max(14, Math.min(W - sw - 14, Math.round(nScr.x - sw * 0.5)));
-                    const sy = Math.round(nScr.y - 36);
+                    const sy = resolveLabelOverlap(sx, ty - 19, sw, 16);
                     ctx.fillStyle = robbedLine ? "rgba(69, 10, 10, 0.94)" : "rgba(15, 23, 42, 0.94)";
                     ctx.fillRect(sx, sy, sw, 16);
                     ctx.strokeStyle = robbedLine ? "#ef4444" : (intr.accent || "#38bdf8");
@@ -11440,10 +11480,12 @@ class RetroRenderer {
             const jScr = this.worldToScreen(pose.partnerX, pose.partnerY, 2.22);
             ctx.font = "bold 9px Consolas, monospace";
             const jTw = ctx.measureText(partnerName).width + 10;
-            ctx.fillStyle = "rgba(8, 12, 24, 0.84)";
-            ctx.fillRect(jScr.x - jTw * 0.5, jScr.y - 18, jTw, 13);
+            const jx = Math.round(jScr.x - jTw * 0.5);
+            const jy = resolveLabelOverlap(jx, Math.round(jScr.y - 18), jTw, 13);
+            ctx.fillStyle = "rgba(8, 12, 24, 0.86)";
+            ctx.fillRect(jx, jy, jTw, 13);
             ctx.fillStyle = "#38bdf8";
-            ctx.fillText(partnerName, jScr.x, jScr.y - 11.5);
+            ctx.fillText(partnerName, jx + jTw * 0.5, jy + 6.5);
         }
 
         // 5. 3D-Projected Active Player Tag
@@ -11451,7 +11493,7 @@ class RetroRenderer {
         const pLabel = (p && p.charId ? p.charId : "lucia").toUpperCase();
         ctx.font = "bold 10px Consolas, monospace";
         const pTw = ctx.measureText(pLabel).width + 10;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+        ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
         ctx.fillRect(pTopScr.x - pTw * 0.5, pTopScr.y - 18, pTw, 14);
         ctx.strokeStyle = "#f472b6";
         ctx.lineWidth = 1;
@@ -11461,18 +11503,18 @@ class RetroRenderer {
 
         // 6. 3D-Projected Threshold [🚪 EXIT TO STREET] Button (anchored on actual building entrance wall)
         const exScr = this.worldToScreen(pose.exitX, pose.exitY, 2.08);
-        const exitW = 176;
-        const exitH = 28;
+        const exitW = 154;
+        const exitH = 24;
         const exitX = Math.max(12, Math.min(W - exitW - 12, Math.round(exScr.x - exitW * 0.5)));
         const exitY = Math.max(48, Math.min(H - 36, Math.round(exScr.y - exitH * 0.5)));
 
-        ctx.fillStyle = "rgba(131, 24, 67, 0.94)";
+        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
-        ctx.strokeStyle = "#fde047";
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = intr.accent || "#38bdf8";
+        ctx.lineWidth = 1.6;
         ctx.strokeRect(exitX + 0.5, exitY + 0.5, exitW - 1, exitH - 1);
-        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 10px Consolas, 'Courier New', monospace";
+        ctx.fillStyle = "#f8fafc";
         ctx.fillText("🚪 EXIT TO STREET", exitX + exitW * 0.5, exitY + exitH * 0.5);
 
         this.cheatButtons.push({

@@ -235,10 +235,8 @@
             };
         }
 
-        const isThinVWall = (w >= 14 && w <= 19 && h >= 36);
-        const isThinHWall = (h >= 14 && h <= 19 && w >= 36);
-        const isThinVProp = (w < 14 && h > w * 1.5);
-        const isThinHProp = (h < 14 && w > h * 1.5);
+        const isThinVWall = (w === 16 && h >= 36);
+        const isThinHWall = (h === 16 && w >= 36);
 
         if (facing === "E") {
             // Canonical South (v = 1) -> East (u' = 1); Canonical North (v = 0) -> West (u' = 0)
@@ -251,19 +249,11 @@
                 const midX = nx + nw * 0.5;
                 nw = 16;
                 nx = midX - 8;
-            } else if (isThinHProp) {
-                const midX = nx + nw * 0.5;
-                nw = h;
-                nx = midX - nw * 0.5;
             }
             if (isThinVWall) {
                 const midY = ny + nh * 0.5;
                 nh = 16;
                 ny = midY - 8;
-            } else if (isThinVProp) {
-                const midY = ny + nh * 0.5;
-                nh = w;
-                ny = midY - nh * 0.5;
             }
             return {
                 x: Math.round(nx),
@@ -284,19 +274,11 @@
                 const midX = nx + nw * 0.5;
                 nw = 16;
                 nx = midX - 8;
-            } else if (isThinHProp) {
-                const midX = nx + nw * 0.5;
-                nw = h;
-                nx = midX - nw * 0.5;
             }
             if (isThinVWall) {
                 const midY = ny + nh * 0.5;
                 nh = 16;
                 ny = midY - 8;
-            } else if (isThinVProp) {
-                const midY = ny + nh * 0.5;
-                nh = w;
-                ny = midY - nh * 0.5;
             }
             return {
                 x: Math.round(nx),

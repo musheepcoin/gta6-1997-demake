@@ -9819,8 +9819,12 @@ class WorldObjectEngine {
             // Downrange Angled Sandtrap Berm (x=544..788, y=62..84) + Overhead Target Carrier Rail
             boxR(544, 62, 244, 22, 2.00, 2.18, [0.44, 0.28, 0.14], 11);
             boxR(548, 86, 236, 4, 2.44, 2.48, [0.36, 0.42, 0.50], 9);
+            const hitTimers = (intr && intr._targetHitTimers) || [];
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
+                const hitFlash = (hitTimers[lane] || 0) > 0;
+                // Overhead target pulley rail per lane
+                boxR(lx + 25, 86, 4, 226, 2.45, 2.48, [0.26, 0.32, 0.40], 9);
                 // Red acoustic shooting earmuffs & brass ammo box on each booth counter
                 cyl(lx + 26, 322, 5, 5, 2.24, 2.29, 8, [0.92, 0.16, 0.20], 9, true);
                 boxR(lx + 8, 316, 12, 10, 2.24, 2.29, [0.94, 0.78, 0.20], 9);
@@ -9831,8 +9835,10 @@ class WorldObjectEngine {
                 }
                 // Crisp flat paper silhouette bullseye target hanging from the overhead carrier rail (y=86..92)
                 const targY = Math.round(88 + Math.sin(t * 2.0 + lane * 1.4) * 5);
-                boxR(lx + 11, targY, 32, 3, 2.10, 2.44, [0.96, 0.95, 0.90], 9);
-                boxR(lx + 17, targY + 1, 20, 3, 2.18, 2.36, [0.92, 0.16, 0.20], 10);
+                const sheetCol = hitFlash ? [1.0, 0.92, 0.28] : [0.96, 0.95, 0.90];
+                const ringCol = hitFlash ? [0.22, 1.0, 0.36] : [0.92, 0.16, 0.20];
+                boxR(lx + 11, targY, 32, 3, 2.10, 2.44, sheetCol, hitFlash ? 10 : 9);
+                boxR(lx + 17, targY + 1, 20, 3, 2.18, 2.36, ringCol, 10);
                 boxR(lx + 23, targY + 2, 8, 3, 2.24, 2.30, [0.98, 0.84, 0.16], 10);
             }
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
@@ -10137,8 +10143,9 @@ class WorldObjectEngine {
                         const wx = Math.round((ob.x + ob2.x) * 0.5);
                         const ww = Math.max(ob.w, ob2.w);
                         rawWallBoxR(wx, topY, ww, gap, 2.42, 2.54, wallTint, wallCrownCol);
-                        rawCyl(wx + ww * 0.5, topY + 2, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
-                        rawCyl(wx + ww * 0.5, botY - 2, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
+                        rawBoxR(wx + 2, topY, Math.max(4, ww - 4), gap, 2.001, 2.008, [0.14, 0.18, 0.26], 9);
+                        rawCyl(wx + ww * 0.5, topY + 2, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
+                        rawCyl(wx + ww * 0.5, botY - 2, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
                     }
                 } else if (ob.h <= 28 && ob2.h <= 28 && Math.abs(ob.y - ob2.y) <= 6) {
                     const leftX = Math.min(ob.x + ob.w, ob2.x + ob2.w);
@@ -10148,8 +10155,9 @@ class WorldObjectEngine {
                         const wy = Math.round((ob.y + ob2.y) * 0.5);
                         const wh = Math.max(ob.h, ob2.h);
                         rawWallBoxR(leftX, wy, gap, wh, 2.42, 2.54, wallTint, wallCrownCol);
-                        rawCyl(leftX + 2, wy + wh * 0.5, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
-                        rawCyl(rightX - 2, wy + wh * 0.5, 5, 5, 2.00, 2.42, 10, [0.88, 0.72, 0.24], 9, true);
+                        rawBoxR(leftX, wy + 2, gap, Math.max(4, wh - 4), 2.001, 2.008, [0.14, 0.18, 0.26], 9);
+                        rawCyl(leftX + 2, wy + wh * 0.5, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
+                        rawCyl(rightX - 2, wy + wh * 0.5, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
                     }
                 }
             }
@@ -10167,11 +10175,10 @@ class WorldObjectEngine {
             const rightX = rw * 0.5 + doorHalfW;
             rawWallBoxR(0, 40, leftW, 20, 2.00, 2.68, wallTint, wallCrownCol);
             rawWallBoxR(rightX, 40, Math.max(40, rw - rightX), 20, 2.00, 2.68, wallTint, wallCrownCol);
-            // North Entrance Welcome Threshold Rug & Twin 3D Brass Columns
-            rawBoxR(rw * 0.5 - 80, 42, 160, 26, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
-            rawBoxR(rw * 0.5 - 84, 40, 168, 30, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
-            rawCyl(rw * 0.5 - 84, 52, 9, 8, 2.00, 2.52, 12, [0.96, 0.80, 0.24], 9, true);
-            rawCyl(rw * 0.5 + 84, 52, 9, 8, 2.00, 2.52, 12, [0.96, 0.80, 0.24], 9, true);
+            // Flush architectural steel threshold sill & dark slate doorjamb pillars (no colorful rugs)
+            rawBoxR(rw * 0.5 - 82, 42, 164, 16, 2.001, 2.009, [0.14, 0.18, 0.26], 9);
+            rawCyl(rw * 0.5 - 84, 50, 6, 6, 2.00, 2.52, 10, [0.24, 0.30, 0.38], 9, true);
+            rawCyl(rw * 0.5 + 84, 50, 6, 6, 2.00, 2.52, 10, [0.24, 0.30, 0.38], 9, true);
         } else {
             rawWallBoxR(0, 40, rw, 20, 2.00, 2.68, wallTint, wallCrownCol);
         }
@@ -10183,11 +10190,10 @@ class WorldObjectEngine {
             const botY = doorMidY + 74;
             rawWallBoxR(0, 40, 18, topH, 2.00, 2.62, wallTint, wallCrownCol);
             rawWallBoxR(0, botY, 18, Math.max(36, rh - 6 - botY), 2.00, 2.62, wallTint, wallCrownCol);
-            // West Entrance Welcome Threshold Rug & Twin 3D Brass Columns
-            rawBoxR(6, doorMidY - 68, 26, 136, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
-            rawBoxR(4, doorMidY - 72, 30, 144, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
-            rawCyl(12, doorMidY - 72, 9, 8, 2.00, 2.50, 12, [0.96, 0.80, 0.24], 9, true);
-            rawCyl(12, doorMidY + 72, 9, 8, 2.00, 2.50, 12, [0.96, 0.80, 0.24], 9, true);
+            // Flush architectural steel threshold sill & dark slate doorjamb pillars (no colorful rugs)
+            rawBoxR(2, doorMidY - 70, 14, 140, 2.001, 2.009, [0.14, 0.18, 0.26], 9);
+            rawCyl(10, doorMidY - 72, 6, 6, 2.00, 2.50, 10, [0.24, 0.30, 0.38], 9, true);
+            rawCyl(10, doorMidY + 72, 6, 6, 2.00, 2.50, 10, [0.24, 0.30, 0.38], 9, true);
         } else {
             rawWallBoxR(0, 40, 18, rh - 46, 2.00, 2.62, wallTint, wallCrownCol);
         }
@@ -10199,11 +10205,10 @@ class WorldObjectEngine {
             const botY = doorMidY + 74;
             rawWallBoxR(rw - 18, 40, 18, topH, 2.00, 2.62, wallTint, wallCrownCol);
             rawWallBoxR(rw - 18, botY, 18, Math.max(36, rh - 6 - botY), 2.00, 2.62, wallTint, wallCrownCol);
-            // East Entrance Welcome Threshold Rug & Twin 3D Brass Columns
-            rawBoxR(rw - 32, doorMidY - 68, 26, 136, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
-            rawBoxR(rw - 34, doorMidY - 72, 30, 144, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
-            rawCyl(rw - 12, doorMidY - 72, 9, 8, 2.00, 2.50, 12, [0.96, 0.80, 0.24], 9, true);
-            rawCyl(rw - 12, doorMidY + 72, 9, 8, 2.00, 2.50, 12, [0.96, 0.80, 0.24], 9, true);
+            // Flush architectural steel threshold sill & dark slate doorjamb pillars (no colorful rugs)
+            rawBoxR(rw - 16, doorMidY - 70, 14, 140, 2.001, 2.009, [0.14, 0.18, 0.26], 9);
+            rawCyl(rw - 10, doorMidY - 72, 6, 6, 2.00, 2.50, 10, [0.24, 0.30, 0.38], 9, true);
+            rawCyl(rw - 10, doorMidY + 72, 6, 6, 2.00, 2.50, 10, [0.24, 0.30, 0.38], 9, true);
         } else {
             rawWallBoxR(rw - 18, 40, 18, rh - 46, 2.00, 2.62, wallTint, wallCrownCol);
         }
@@ -10215,11 +10220,10 @@ class WorldObjectEngine {
             const rightWallW = Math.max(40, rw - rightWallX);
             rawWallBoxR(0, rh - 18, leftWallW, 18, 2.00, 2.26, wallTint, wallCrownCol);
             rawWallBoxR(rightWallX, rh - 18, rightWallW, 18, 2.00, 2.26, wallTint, wallCrownCol);
-            // South Entrance Welcome Threshold Rug & Twin 3D Brass Columns
-            rawBoxR(rw * 0.5 - 80, rh - 28, 160, 24, 2.002, 2.012, [0.46, 0.14, 0.22], 9);
-            rawBoxR(rw * 0.5 - 84, rh - 30, 168, 28, 2.001, 2.008, [0.96, 0.78, 0.22], 9);
-            rawCyl(rw * 0.5 - 84, rh - 12, 9, 8, 2.00, 2.48, 12, [0.96, 0.80, 0.24], 9, true);
-            rawCyl(rw * 0.5 + 84, rh - 12, 9, 8, 2.00, 2.48, 12, [0.96, 0.80, 0.24], 9, true);
+            // Flush architectural steel threshold sill & dark slate doorjamb pillars (no colorful rugs)
+            rawBoxR(rw * 0.5 - 82, rh - 16, 164, 14, 2.001, 2.009, [0.14, 0.18, 0.26], 9);
+            rawCyl(rw * 0.5 - 84, rh - 10, 6, 6, 2.00, 2.48, 10, [0.24, 0.30, 0.38], 9, true);
+            rawCyl(rw * 0.5 + 84, rh - 10, 6, 6, 2.00, 2.48, 10, [0.24, 0.30, 0.38], 9, true);
         } else {
             rawWallBoxR(0, rh - 18, rw, 18, 2.00, 2.26, wallTint, wallCrownCol);
         }
