@@ -10468,30 +10468,50 @@ class RetroRenderer {
             fillR(532, 56, rw - 550, 152, tex.gunmetal_plate, "#38bdf8", 1.5);
         }
 
-        // 3. Soft Perimeter Wall Ambient Occlusion Vignette on Floor
+        // 3. Soft Perimeter Wall Ambient Occlusion Vignette on Floor (with clean doorway gap on active entrance wall)
         const nGrad = g.createLinearGradient(0, 56, 0, 92);
         nGrad.addColorStop(0, "rgba(0, 0, 0, 0.55)");
         nGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = nGrad;
-        g.fillRect(18, 56, rw - 36, 36);
+        if (facing === "N") {
+            g.fillRect(18, 56, 326, 36);
+            g.fillRect(476, 56, rw - 494, 36);
+        } else {
+            g.fillRect(18, 56, rw - 36, 36);
+        }
 
         const sGrad = g.createLinearGradient(0, rh - 18, 0, rh - 52);
         sGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
         sGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = sGrad;
-        g.fillRect(18, rh - 52, rw - 36, 34);
+        if (facing === "S") {
+            g.fillRect(18, rh - 52, 326, 34);
+            g.fillRect(476, rh - 52, rw - 494, 34);
+        } else {
+            g.fillRect(18, rh - 52, rw - 36, 34);
+        }
 
         const wGrad = g.createLinearGradient(18, 0, 52, 0);
         wGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
         wGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = wGrad;
-        g.fillRect(18, 56, 34, rh - 74);
+        if (facing === "W") {
+            g.fillRect(18, 56, 34, 176);
+            g.fillRect(18, 364, 34, rh - 382);
+        } else {
+            g.fillRect(18, 56, 34, rh - 74);
+        }
 
         const eGrad = g.createLinearGradient(rw - 18, 0, rw - 52, 0);
         eGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
         eGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = eGrad;
-        g.fillRect(rw - 52, 56, 34, rh - 74);
+        if (facing === "E") {
+            g.fillRect(rw - 52, 56, 34, 176);
+            g.fillRect(rw - 52, 364, 34, rh - 382);
+        } else {
+            g.fillRect(rw - 52, 56, 34, rh - 74);
+        }
 
         g.restore();
 

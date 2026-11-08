@@ -9699,6 +9699,16 @@ class WorldObjectEngine {
             cyl(280, 466, 3, 3, 2.08, 2.38, 8, [0.96, 0.80, 0.24], 9, true);
             cyl(314, 466, 3, 3, 2.08, 2.38, 8, [0.96, 0.80, 0.24], 9, true);
             boxR(284, 466, 24, 18, 2.08, 2.24, [0.58, 0.34, 0.16], 11);
+            // Twin Art Deco Velvet Lobby Lounge Sofas, Brass Coffee Tables & Potted Tropical Palms Flanking the Red Carpet Runner
+            for (const lx of [272, 502]) {
+                aoR(lx, 278, 34, 74, 2.004, 8, 0.38);
+                boxR(lx, 278, 34, 74, 2.00, 2.18, [0.86, 0.18, 0.48], 11);
+                boxR(lx + (lx < 400 ? 0 : 24), 278, 10, 74, 2.18, 2.30, [0.94, 0.78, 0.24], 9);
+            }
+            for (const px of [284, 524]) {
+                cyl(px, 112, 11, 13, 2.00, 2.18, 10, [0.92, 0.74, 0.22], 9, true);
+                cone(px, 112, 20, 2.18, 2.52, 10, [0.16, 0.78, 0.38], 9);
+            }
 
             // North-West King Bedroom Suite: 3D King Bed (x=28..146, y=96..182) & Nightstands
             aoR(28, 96, 118, 86, 2.004, 12, 0.44);
@@ -9788,29 +9798,39 @@ class WorldObjectEngine {
                 boxR(rx + 14, 295, 68, 14, 2.28, 2.33, [0.92, 0.44, 0.12], 9); // Ordnance warhead case
             }
 
-            // 5. Entrance Security Vestibule Bulletproof Guard Window (x=350..470, y=412..432)
+            // 5. Entrance Security Vestibule Bulletproof Guard Window (x=350..470, y=412..432) + Vestibule Guard Desk & Ordnance Crates
             boxR(350, 412, 120, 20, 2.20, 2.52, [0.32, 0.88, 0.98], 10, 0.72);
+            aoR(54, 468, 96, 30, 2.004, 8, 0.42);
+            boxR(54, 468, 96, 30, 2.00, 2.22, [0.20, 0.26, 0.34], 9); // Vestibule Range Officer security desk
+            boxR(52, 466, 100, 34, 2.22, 2.25, [0.58, 0.36, 0.18], 11);
+            boxR(64, 472, 26, 16, 2.25, 2.38, [0.22, 0.88, 0.98], 10); // Security CCTV monitor
+            aoR(664, 468, 96, 30, 2.004, 8, 0.42);
+            boxR(664, 468, 96, 30, 2.00, 2.24, [0.26, 0.36, 0.18], 11); // Vestibule olive-drab ammo pallet
+            cyl(684, 452, 11, 11, 2.00, 2.28, 10, [0.84, 0.64, 0.18], 9, true); // Brass 5.56mm ammo drum
+            cyl(712, 452, 11, 11, 2.00, 2.28, 10, [0.24, 0.34, 0.18], 9, true);
 
             // 6. East 4-Lane Live Indoor Firing Range (Shooting booths at y=312..334, lane dividers y=148..312, targets at y=78!)
             aoR(548, 312, 236, 22, 2.004, 8, 0.44);
             boxR(548, 312, 236, 22, 2.00, 2.20, [0.18, 0.22, 0.30], 9);
             boxR(546, 310, 240, 26, 2.20, 2.24, [0.58, 0.36, 0.18], 11); // Shooting booth bench top
-            // Downrange Angled Sandtrap Berm (x=544..788, y=62..84)
+            // Downrange Angled Sandtrap Berm (x=544..788, y=62..84) + Overhead Target Carrier Rail
             boxR(544, 62, 244, 22, 2.00, 2.18, [0.44, 0.28, 0.14], 11);
+            boxR(548, 86, 236, 4, 2.44, 2.48, [0.36, 0.42, 0.50], 9);
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
-                // Red acoustic shooting earmuffs on each booth counter
+                // Red acoustic shooting earmuffs & brass ammo box on each booth counter
                 cyl(lx + 26, 322, 5, 5, 2.24, 2.29, 8, [0.92, 0.16, 0.20], 9, true);
+                boxR(lx + 8, 316, 12, 10, 2.24, 2.29, [0.94, 0.78, 0.20], 9);
                 // Ballistic lane divider walls extending downrange from the front of the bench (y=148..312 — never crossing the bench!)
                 if (lane > 0) {
                     boxR(lx - 3, 148, 6, 164, 2.00, 2.26, [0.22, 0.26, 0.34], 9);
                     boxR(lx - 2, 148, 4, 164, 2.26, 2.44, [0.38, 0.86, 0.98], 10, 0.50);
                 }
-                // Paper silhouette bullseye target hanging at the downrange sandtrap berm (y=86..94)
-                const targY = 86 + Math.sin(t * 2.0 + lane * 1.4) * 6;
-                boxR(lx + 12, targY, 30, 5, 2.10, 2.44, [0.96, 0.95, 0.90], 9);
-                boxR(lx + 19, targY - 1, 16, 7, 2.20, 2.36, [0.92, 0.16, 0.20], 10);
-                boxR(lx + 24, targY - 2, 6, 9, 2.25, 2.31, [0.98, 0.82, 0.16], 10);
+                // Crisp flat paper silhouette bullseye target hanging from the overhead carrier rail (y=86..92)
+                const targY = Math.round(88 + Math.sin(t * 2.0 + lane * 1.4) * 5);
+                boxR(lx + 11, targY, 32, 3, 2.10, 2.44, [0.96, 0.95, 0.90], 9);
+                boxR(lx + 17, targY + 1, 20, 3, 2.18, 2.36, [0.92, 0.16, 0.20], 10);
+                boxR(lx + 23, targY + 2, 8, 3, 2.24, 2.30, [0.98, 0.84, 0.16], 10);
             }
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
             const cookW = theme === "DINER_PAWN" ? 384 : 480;
@@ -9870,13 +9890,34 @@ class WorldObjectEngine {
                 // East Private VIP Wine Cellar & Sommelier Tasting Room
                 boxR(748, 224, 28, 180, 2.00, 2.52, [0.42, 0.20, 0.12], 11); // Mahogany wine racks
                 cyl(656, 324, 26, 26, 2.00, 2.20, 14, [0.64, 0.14, 0.24], 9, true);
+                // North-East Manager's Office & Safe Room (x=592..792, y=64..186) + South Foyer Jukebox & Maitre D' Podium
+                aoR(628, 66, 144, 30, 2.004, 8, 0.42);
+                boxR(628, 66, 92, 28, 2.00, 2.22, [0.48, 0.26, 0.14], 11); // Manager's mahogany desk
+                boxR(636, 70, 28, 18, 2.22, 2.28, [0.22, 0.84, 0.38], 10); // Cash bundles on desk
+                boxR(724, 64, 48, 34, 2.00, 2.48, [0.20, 0.24, 0.32], 6); // Heavy steel combination safe
+                cyl(748, 98, 6, 6, 2.22, 2.26, 10, [0.96, 0.80, 0.22], 9, true);
+                aoR(56, 466, 64, 36, 2.004, 8, 0.40);
+                boxR(56, 466, 64, 36, 2.00, 2.44, [0.56, 0.18, 0.34], 9); // Classic Neon Wurlitzer Jukebox
+                boxR(62, 470, 52, 28, 2.18, 2.40, [0.98, 0.56, 0.18], 10);
+                boxR(312, 444, 28, 24, 2.00, 2.28, [0.48, 0.24, 0.12], 11); // Maitre D' reservation podium
             }
         } else if (theme === "SHOP_CLOTHES") {
             posterBoxR(340, 56, 144, 12, 2.22, 2.62, "ad_call_morgan", [0.96, 0.36, 0.76]);
-            // Center Velvet Catwalk Runway & Mannequin Rotunda Stage (x=358..462, y=266..338)
+            // North Illuminated Designer Sneaker & Handbag Showcase Wall (x=266..540, y=58..72)
+            boxR(266, 58, 274, 14, 2.00, 2.48, [0.22, 0.14, 0.28], 9);
+            for (let sx = 278; sx <= 518; sx += 34) {
+                boxR(sx, 62, 22, 8, 2.18, 2.26, [0.96, 0.82, 0.24], 10);
+                boxR(sx, 62, 22, 8, 2.34, 2.42, [0.22, 0.90, 0.98], 10);
+            }
+            // Center Velvet Catwalk Runway & Mannequin Rotunda Stage (x=358..462, y=266..338) + 2 Couture Mannequins
             aoR(358, 266, 104, 72, 2.004, 10, 0.42);
             cyl(410, 302, 52, 52, 2.00, 2.10, 18, [0.92, 0.74, 0.22], 9, true);
             cyl(410, 302, 46, 46, 2.10, 2.16, 18, [0.78, 0.14, 0.44], 9, true);
+            for (const mx of [392, 428]) {
+                cyl(mx, 302, 4, 2, 2.16, 2.30, 8, [0.94, 0.80, 0.24], 9, true);
+                cyl(mx, 302, 7, 5, 2.28, 2.46, 10, mx < 410 ? [0.98, 0.26, 0.68] : [0.18, 0.90, 0.98], 9, true);
+                cyl(mx, 302, 4.5, 4.5, 2.46, 2.53, 10, [0.96, 0.92, 0.86], 9, true);
+            }
             // West Tailor Cutting Table (y=122..150) & Streetwear Garment Rack (y=316..342)
             aoR(42, 122, 124, 28, 2.004, 8, 0.38);
             boxR(42, 122, 124, 28, 2.00, 2.22, [0.58, 0.34, 0.18], 11);
@@ -9931,7 +9972,7 @@ class WorldObjectEngine {
                 }
                 boxR(gx + 17, 248, 8, 164, 2.00, 2.40, [0.18, 0.24, 0.34], 9);
             }
-            // East Walk-In Refrigerated Beverage Racks & Slushie Domes
+            // East Walk-In Refrigerated Beverage Racks & Slushie Domes + South-West ATM & Ice Chest
             boxR(756, 204, 22, 280, 2.00, 2.54, [0.14, 0.22, 0.32], 9);
             for (let cy = 212; cy <= 460; cy += 36) {
                 boxR(758, cy, 16, 26, 2.08, 2.46, (cy % 72 === 0) ? [0.94, 0.18, 0.22] : [0.18, 0.92, 0.42], 10);
@@ -9939,11 +9980,19 @@ class WorldObjectEngine {
             boxR(754, 204, 6, 280, 2.04, 2.52, [0.36, 0.90, 1.0], 10, 0.65);
             cyl(668, 228, 14, 14, 2.00, 2.38, 12, [0.98, 0.18, 0.32], 10, true);
             cyl(668, 262, 14, 14, 2.00, 2.38, 12, [0.18, 0.88, 0.98], 10, true);
+            boxR(38, 434, 42, 34, 2.00, 2.46, [0.14, 0.32, 0.56], 9); // 24h Cash ATM Kiosk
+            boxR(44, 440, 30, 18, 2.24, 2.40, [0.22, 0.94, 0.64], 10);
+            boxR(96, 488, 84, 30, 2.00, 2.20, [0.88, 0.94, 0.98], 9); // Bagged Ice Freezer Chest
         } else if (theme === "SHOP_BAR" || theme === "NEON_CLUB" || theme === "STRIP_CLUB" || theme === "MALIBU_CLUB") {
-            // North Backlit Tiered Liquor Bottle Wall & Draft Towers (x=312..508)
+            // North Backlit Tiered Liquor Bottle Wall & Draft Towers (x=312..508) + Twin Concert Subwoofer Stacks
             boxR(316, 58, 188, 14, 2.00, 2.52, [0.16, 0.10, 0.24], 9);
             boxR(320, 62, 180, 6, 2.24, 2.28, [0.18, 0.90, 0.98], 10);
             boxR(320, 62, 180, 6, 2.38, 2.42, [0.98, 0.26, 0.68], 10);
+            for (const spkX of [268, 518]) {
+                boxR(spkX, 64, 34, 30, 2.00, 2.48, [0.12, 0.14, 0.18], 9);
+                cyl(spkX + 17, 94, 9, 9, 2.12, 2.28, 10, accentRgb, 10, true);
+                cyl(spkX + 17, 94, 7, 7, 2.32, 2.44, 10, [0.22, 0.88, 0.98], 10, true);
+            }
             // Center North Main Bar / DJ Turntable Stage (x=312..508, y=122..154)
             aoR(312, 122, 196, 32, 2.004, 12, 0.46);
             boxR(312, 122, 196, 32, 2.00, 2.24, [0.24, 0.14, 0.28], 11);

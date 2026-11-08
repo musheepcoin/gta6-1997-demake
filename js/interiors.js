@@ -235,8 +235,10 @@
             };
         }
 
-        const isThinVWall = (w <= 20 && h >= 36);
-        const isThinHWall = (h <= 20 && w >= 36);
+        const isThinVWall = (w >= 14 && w <= 19 && h >= 36);
+        const isThinHWall = (h >= 14 && h <= 19 && w >= 36);
+        const isThinVProp = (w < 14 && h > w * 1.5);
+        const isThinHProp = (h < 14 && w > h * 1.5);
 
         if (facing === "E") {
             // Canonical South (v = 1) -> East (u' = 1); Canonical North (v = 0) -> West (u' = 0)
@@ -249,17 +251,25 @@
                 const midX = nx + nw * 0.5;
                 nw = 16;
                 nx = midX - 8;
+            } else if (isThinHProp) {
+                const midX = nx + nw * 0.5;
+                nw = h;
+                nx = midX - nw * 0.5;
             }
             if (isThinVWall) {
                 const midY = ny + nh * 0.5;
                 nh = 16;
                 ny = midY - 8;
+            } else if (isThinVProp) {
+                const midY = ny + nh * 0.5;
+                nh = w;
+                ny = midY - nh * 0.5;
             }
             return {
                 x: Math.round(nx),
                 y: Math.round(ny),
-                w: Math.max(4, Math.round(nw)),
-                h: Math.max(4, Math.round(nh))
+                w: Math.max(2, Math.round(nw)),
+                h: Math.max(2, Math.round(nh))
             };
         }
 
@@ -274,17 +284,25 @@
                 const midX = nx + nw * 0.5;
                 nw = 16;
                 nx = midX - 8;
+            } else if (isThinHProp) {
+                const midX = nx + nw * 0.5;
+                nw = h;
+                nx = midX - nw * 0.5;
             }
             if (isThinVWall) {
                 const midY = ny + nh * 0.5;
                 nh = 16;
                 ny = midY - 8;
+            } else if (isThinVProp) {
+                const midY = ny + nh * 0.5;
+                nh = w;
+                ny = midY - nh * 0.5;
             }
             return {
                 x: Math.round(nx),
                 y: Math.round(ny),
-                w: Math.max(4, Math.round(nw)),
-                h: Math.max(4, Math.round(nh))
+                w: Math.max(2, Math.round(nw)),
+                h: Math.max(2, Math.round(nh))
             };
         }
 
@@ -653,13 +671,15 @@
             // 3. East 4-Lane Live Firing Range Wing Wall (x = 516, framed range doorway at y=216..306)
             add(516, 56, 16, 160, true);
             add(516, 306, 16, 108, true);
-            // 4. Gunsmith Workbench, Kevlar Rack, Glass Weapon Showcase, Surplus Crates & Firing Line Booths
+            // 4. Gunsmith Workbench, Kevlar Rack, Glass Weapon Showcase, Surplus Crates, Vestibule Desks & Firing Line Booths
             add(36, 68, 164, 26);
             add(36, 352, 164, 28);
             add(262, 128, 232, 28);
             add(266, 288, 96, 28);
             add(394, 288, 96, 28);
             add(548, 312, 236, 22);
+            add(54, 468, 96, 30);
+            add(664, 468, 96, 30);
         } else if (t === "SHOP_RESTAURANT") {
             // 1. Maitre D' Reception Foyer Partition Walls (y = 424, grand arch at x=346..474 & side passages)
             add(18, 424, 172, 16, true);
@@ -675,15 +695,17 @@
             // 4. East Private VIP Wine Cellar Wall (x = 552, framed doorway at y=288..376)
             add(552, 208, 16, 80, true);
             add(552, 376, 16, 48, true);
-            // 5. Stainless Kitchen Line, Dining Booths, Central Tables & Wine Table
+            // 5. Stainless Kitchen Line, Dining Booths, Central Tables, NE Office Safe/Desk & Foyer Jukebox
             add(48, 64, 480, 28);
             add(220, 124, 180, 24);
+            add(628, 66, 144, 30);
             add(36, 238, 96, 42);
             add(36, 338, 96, 42);
             add(258, 278, 64, 52);
             add(398, 278, 64, 52);
             add(258, 356, 64, 48);
             add(398, 356, 64, 48);
+            add(56, 466, 64, 36);
         } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
             // 1. Grand Colonnade Foyer Partition Screens (y = 424, center arch x=348..472)
             add(250, 424, 98, 16, true);
@@ -698,8 +720,10 @@
             add(548, 326, 16, rh - 344, true);
             // 5. East Bar / Jacuzzi Courtyard Divider (y = 252, doorway at x=564..658)
             add(658, 252, rw - 676, 16, true);
-            // 6. Concierge Desk, King Bed, Wardrobe Dresser, Bar Counter & Jacuzzi Pool
+            // 6. Concierge Desk, Lobby Velvet Sofas, King Bed, Wardrobe Dresser, Bar Counter & Jacuzzi Pool
             add(316, 178, 188, 30);
+            add(272, 278, 34, 74);
+            add(502, 278, 34, 74);
             add(28, 96, 118, 86);
             add(28, 442, 112, 30);
             add(584, 112, 176, 28);
