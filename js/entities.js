@@ -3024,9 +3024,13 @@ class Vehicle {
         // Water-only craft (jet-ski, speedboat): the hull runs aground on beaches, docks & quays
         if (this.waterOnly && map.isWaterAtPixel) {
             const dirSign = (this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle)) >= 0 ? 1 : -1;
-            const bowX = this.x + Math.cos(this.angle) * (this.w || 40) * 0.42 * dirSign;
-            const bowY = this.y + Math.sin(this.angle) * (this.w || 40) * 0.42 * dirSign;
-            if (!map.isWaterAtPixel(this.x, this.y) || !map.isWaterAtPixel(bowX, bowY)) {
+            const bowX = this.x + Math.cos(this.angle) * (this.w || 40) * 0.36 * dirSign;
+            const bowY = this.y + Math.sin(this.angle) * (this.w || 40) * 0.36 * dirSign;
+            const preBowX = preMoveX + Math.cos(this.angle) * (this.w || 40) * 0.36 * dirSign;
+            const preBowY = preMoveY + Math.sin(this.angle) * (this.w || 40) * 0.36 * dirSign;
+            const centerHitLand = !map.isWaterAtPixel(this.x, this.y) && map.isWaterAtPixel(preMoveX, preMoveY);
+            const bowHitLand = !map.isWaterAtPixel(bowX, bowY) && map.isWaterAtPixel(preBowX, preBowY);
+            if (centerHitLand || bowHitLand) {
                 const impact = Math.hypot(this.vx, this.vy);
                 this.x = preMoveX;
                 this.y = preMoveY;
@@ -3054,7 +3058,7 @@ class Vehicle {
             this.y,
             wallRad,
             curZ,
-            Boolean(this.amphibious || (this.stuntAirTimer || 0) > 0)
+            Boolean(this.amphibious || this.waterOnly || (this.stuntAirTimer || 0) > 0)
         );
         if (col.hit) {
             const impact = Math.hypot(this.vx, this.vy);
@@ -3090,7 +3094,10 @@ class Vehicle {
             }
         }
         if (typeof map.getHeightAtPixel === "function") {
-            this.z = map.getHeightAtPixel(this.x, this.y, curZ);
+            const onWater = Boolean((this.waterOnly || this.amphibious) && map.isWaterAtPixel && map.isWaterAtPixel(this.x, this.y));
+            this.z = onWater
+                ? Math.max(2.0, map.getHeightAtPixel(this.x, this.y, curZ, false))
+                : map.getHeightAtPixel(this.x, this.y, curZ);
         }
         this.emitWheelTracks(map, game);
     }

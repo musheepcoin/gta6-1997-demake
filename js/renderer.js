@@ -6970,7 +6970,7 @@ class RetroRenderer {
         if (Array.isArray(this.map.jetSkiers)) {
             for (let ji = 0; ji < this.map.jetSkiers.length; ji++) {
                 const js = this.map.jetSkiers[ji];
-                if (js.x < minX - 96 || js.x > maxX + 96 || js.y < minY - 96 || js.y > maxY + 96) continue;
+                if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
                 const bz = js.z || 2.0;
                 const t = this.time * (js.speed || 1.35) + js.seed;
                 const jx = js.x + Math.cos(t) * js.rx;
@@ -6978,6 +6978,10 @@ class RetroRenderer {
                 const vx = -Math.sin(t) * js.rx;
                 const vy = Math.cos(t) * js.ry;
                 const jAng = Math.atan2(vy, vx);
+                js._liveX = jx;
+                js._liveY = jy;
+                js._liveAng = jAng;
+                if (jx < minX - 96 || jx > maxX + 96 || jy < minY - 96 || jy > maxY + 96) continue;
                 const cosA = Math.cos(jAng);
                 const sinA = Math.sin(jAng);
 
@@ -7516,6 +7520,7 @@ class RetroRenderer {
         if (portTerms && portTerms.length > 0) {
             for (let i = 0; i < portTerms.length; i++) {
                 const pt = portTerms[i];
+                if (pt._boardedVehicle && !pt._boardedVehicle.destroyed) continue;
                 if (pt.x < minX - 160 || pt.x > maxX + 160 || pt.y < minY - 160 || pt.y > maxY + 160) continue;
                 const bz = pt.z || 2.0;
                 const bob = Math.sin(this.time * 1.8 + pt.seed) * 0.008;
@@ -7543,13 +7548,17 @@ class RetroRenderer {
         if (airboats && airboats.length > 0) {
             for (let i = 0; i < airboats.length; i++) {
                 const ab = airboats[i];
+                if (ab._boardedVehicle && !ab._boardedVehicle.destroyed) continue;
                 const t = this.time * ab.speed + ab.seed;
                 const ax = ab.x + Math.cos(t) * ab.rx;
                 const ay = ab.y + Math.sin(t * 2.0) * (ab.ry * 0.55);
-                if (ax < minX - 110 || ax > maxX + 110 || ay < minY - 110 || ay > maxY + 110) continue;
                 const vx = -Math.sin(t) * ab.rx;
                 const vy = Math.cos(t * 2.0) * (ab.ry * 1.1);
                 const ang = Math.atan2(vy, vx);
+                ab._liveX = ax;
+                ab._liveY = ay;
+                ab._liveAng = ang;
+                if (ax < minX - 110 || ax > maxX + 110 || ay < minY - 110 || ay > maxY + 110) continue;
                 const cs = Math.cos(ang), sn = Math.sin(ang);
                 const bz = ab.z || 2.0;
 

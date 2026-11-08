@@ -1841,43 +1841,47 @@ class WorldObjectEngine {
             }
         }
 
-        if (!this.heistTargets || this.heistTargets.length === 0) return false;
-
-        for (let i = 0; i < this.heistTargets.length; i++) {
-            const ht = this.heistTargets[i];
-
-            // 1. Marine Speedboat / Jet-Ski Getaway on the 3D Waterfront Pier!
-            if (ht.inst.dockBoat) {
-                const db = ht.inst.dockBoat;
+        // 0. Waterfront Villa / Mansion Pier Speedboat & Jet-Ski Launch (works on any dockBoat in this.instances!)
+        if (Array.isArray(this.instances)) {
+            for (let idx = 0; idx < this.instances.length; idx++) {
+                const inst = this.instances[idx];
+                if (!inst || !inst.dockBoat) continue;
+                const db = inst.dockBoat;
                 const dBoat = Math.hypot(px - db.worldX, py - db.worldY);
                 const dPier = Math.hypot(px - db.pierMidX, py - db.pierMidY);
-                if (dBoat < 64 || (this.activeHeist && this.activeHeist.target === ht && dPier < 75)) {
+                if (dBoat < 165 || dPier < 138) {
                     const ux = Math.cos(db.pierAng);
                     const uy = Math.sin(db.pierAng);
-                    const spawnX = db.worldX + ux * 36;
-                    const spawnY = db.worldY + uy * 36;
-                    game.player.x = spawnX;
-                    game.player.y = spawnY;
+                    const spawnX = db.worldX + ux * 20;
+                    const spawnY = db.worldY + uy * 20;
                     if (typeof Vehicle === "function" && Array.isArray(game.vehicles)) {
                         const boatKey = (db.spr && String(db.spr).includes("jetski")) ? "JETSKI" : "SPEEDBOAT";
                         let boat = db._liveBoat && !db._liveBoat.destroyed && game.vehicles.includes(db._liveBoat) ? db._liveBoat : null;
                         if (!boat) {
-                            boat = new Vehicle(`pier_boat_${ht.instId}_${Date.now()}`, boatKey, spawnX, spawnY, db.pierAng);
-                            boat.z = 1.0;
+                            boat = new Vehicle(`pier_boat_${idx}_${Date.now()}`, boatKey, spawnX, spawnY, db.pierAng);
+                            boat.z = 2.0;
                             boat.isEstateCar = true;
                             game.vehicles.push(boat);
                             db._liveBoat = boat;
                         } else {
-                            boat.x = spawnX;
-                            boat.y = spawnY;
-                            boat.angle = db.pierAng;
+                            boat.z = 2.0;
                         }
-                        boat.driver = game.player;
-                        game.player.inVehicle = boat;
-                        game.player.seatIndex = 0;
-                        if (typeof game.updateHud === "function") game.updateHud();
+                        if (typeof game.completeVehicleEntry === "function") {
+                            game.completeVehicleEntry(boat);
+                        } else {
+                            boat.driver = "PLAYER";
+                            game.player.inVehicle = boat;
+                            game.player.seatIndex = 0;
+                            game.player.x = boat.x;
+                            game.player.y = boat.y;
+                            game.player.z = 2.0;
+                            if (typeof game.updateHud === "function") game.updateHud();
+                        }
                     }
-                    if (this.activeHeist && this.activeHeist.target === ht) {
+                    const matchingHeist = Array.isArray(this.heistTargets)
+                        ? this.heistTargets.find((ht) => ht.inst === inst)
+                        : null;
+                    if (this.activeHeist && matchingHeist && this.activeHeist.target === matchingHeist) {
                         if (typeof game.addCash === "function") game.addCash(7500, "🚤 MARINE SPEEDBOAT GETAWAY!");
                         if (game.wantedSystem) game.wantedSystem.level = Math.max(0, (game.wantedSystem.level || 0) - 2);
                         if (Array.isArray(game.floatingTexts)) {
@@ -1891,7 +1895,8 @@ class WorldObjectEngine {
                             });
                         }
                         this.activeHeist = null;
-                    } else {
+                    } else if (!db._launchedOnce) {
+                        db._launchedOnce = true;
                         if (typeof game.addCash === "function") game.addCash(500, "🚤 PIER SPEEDBOAT LAUNCH!");
                         if (Array.isArray(game.floatingTexts)) {
                             game.floatingTexts.push({
@@ -1908,6 +1913,12 @@ class WorldObjectEngine {
                     return true;
                 }
             }
+        }
+
+        if (!this.heistTargets || this.heistTargets.length === 0) return false;
+
+        for (let i = 0; i < this.heistTargets.length; i++) {
+            const ht = this.heistTargets[i];
 
             if (ht.looted) continue;
 
@@ -8499,7 +8510,7 @@ class WorldObjectEngine {
                 }
             }
 
-            if (h.dockBoat) {
+            if (h.dockBoat && (!h.dockBoat._liveBoat || h.dockBoat._liveBoat.destroyed)) {
                 const db = h.dockBoat;
                 const boatX = db.worldX;
                 const boatY = db.worldY;

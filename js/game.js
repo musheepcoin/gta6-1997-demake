@@ -564,7 +564,7 @@ class LeonidaGame {
 
             { spec: "GATOR_4X4", c: 464.5, r: 300.0, raw512: true, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
 
-            { spec: "AIRBOAT", c: 250.5, r: 154.0, a: 0, z: 1.0, missionTag: "LANDMARK" },
+            { spec: "AIRBOAT", c: 250.5, r: 154.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
 
 
@@ -594,7 +594,7 @@ class LeonidaGame {
 
             { spec: "PENETRATOR_GT", c: 343.5, r: 171.5, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "AIRBOAT", c: 185.5, r: 160.0, a: 0, z: 1.0, missionTag: "LANDMARK" },
+            { spec: "AIRBOAT", c: 185.5, r: 160.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
 
 
@@ -610,7 +610,7 @@ class LeonidaGame {
 
             { spec: "HARLEY_BIKE", c: 116.5, r: 82.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "AIRBOAT", c: 101.5, r: 102.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "AIRBOAT", c: 101.5, r: 102.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "CAMPER_PICKUP", c: 73.5, r: 76.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
@@ -642,7 +642,7 @@ class LeonidaGame {
 
             { spec: "PICKUP_TRUCK", c: 58.0, r: 212.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
-            { spec: "AIRBOAT", c: 86.0, r: 402.0, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "AIRBOAT", c: 86.0, r: 402.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "STINGER_CABRIO", c: 231.0, r: 480.5, a: -Math.PI, z: 2.0, driver: "AI_TRAFFIC", raw512: true },
 
@@ -658,9 +658,9 @@ class LeonidaGame {
 
             { spec: "CHALLENGER_RT", c: 285.5, r: 215.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC", raw512: true },
 
-            { spec: "AIRBOAT", c: 120.0, r: 184.0, a: 0.4, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "AIRBOAT", c: 120.0, r: 184.0, a: 0.4, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "AIRBOAT", c: 145.0, r: 412.0, a: 0.0, z: 1.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "AIRBOAT", c: 145.0, r: 412.0, a: 0.0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "GATOR_4X4", c: 465.5, r: 219.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
@@ -679,17 +679,24 @@ class LeonidaGame {
             { id: "micromob_9", spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
             { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 135.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            // --- N. Drivable water craft moored at the harbors (speedboats) & jet-skis beside them ---
-            { id: "boat_speed_0", spec: "SPEEDBOAT", c: 325.0, r: 312.0, a: Math.PI * 0.5, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_1", spec: "SPEEDBOAT", c: 105.5, r: 100.2, a: Math.PI, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_2", spec: "SPEEDBOAT", c: 373.5, r: 121.2, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_3", spec: "SPEEDBOAT", c: 379.5, r: 220.0, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_4", spec: "SPEEDBOAT", c: 424.0, r: 426.0, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_5", spec: "SPEEDBOAT", c: 329.0, r: 496.5, a: Math.PI * 0.5, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_0", spec: "JETSKI", c: 327.5, r: 314.5, a: Math.PI * 0.5, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_1", spec: "JETSKI", c: 376.0, r: 123.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_2", spec: "JETSKI", c: 382.0, r: 222.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_3", spec: "JETSKI", c: 426.5, r: 428.5, a: 0, z: 1.0, missionTag: "LANDMARK", raw512: true }
+            // --- N. Drivable water craft moored at the harbors, beaches & piers (z = 2.0 on water surface!) ---
+            { id: "boat_speed_0", spec: "SPEEDBOAT", c: 325.0, r: 312.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_1", spec: "SPEEDBOAT", c: 105.5, r: 100.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_2", spec: "SPEEDBOAT", c: 373.5, r: 121.2, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_3", spec: "SPEEDBOAT", c: 379.5, r: 220.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_4", spec: "SPEEDBOAT", c: 424.0, r: 426.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_5", spec: "SPEEDBOAT", c: 329.0, r: 496.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_6", spec: "SPEEDBOAT", c: 472.5, r: 224.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_7", spec: "SPEEDBOAT", c: 472.5, r: 300.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_8", spec: "SPEEDBOAT", c: 356.0, r: 220.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_9", spec: "SPEEDBOAT", c: 220.0, r: 478.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_0", spec: "JETSKI", c: 327.5, r: 314.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_1", spec: "JETSKI", c: 376.0, r: 123.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_2", spec: "JETSKI", c: 382.0, r: 222.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_3", spec: "JETSKI", c: 426.5, r: 428.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_4", spec: "JETSKI", c: 472.0, r: 228.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_5", spec: "JETSKI", c: 472.0, r: 296.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_6", spec: "JETSKI", c: 392.0, r: 175.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true }
 
         ];
 
@@ -943,34 +950,52 @@ class LeonidaGame {
 
 
 
-    // Water-only craft (jet-skis, speedboats) must float: move each one that is not on open water
-    // to the nearest open-water spot (spiral search up to ~8 tiles). Called after spawning and once the real map is loaded.
+    // Water-only craft (jet-skis, speedboats) must float at z = 2.0 on the water surface and moor near shorelines/piers
+    // so the player can easily board them from the beach or dock.
     snapWaterCraftToWater() {
         if (!this.map || typeof this.map.isWaterAtPixel !== "function" || !Array.isArray(this.vehicles)) return;
         const isOpenWater = (x, y) => {
-            for (const [ox, oy] of [[0, 0], [24, 0], [-24, 0], [0, 18], [0, -18]]) {
+            for (const [ox, oy] of [[0, 0], [16, 0], [-16, 0], [0, 14], [0, -14]]) {
                 if (!this.map.isWaterAtPixel(x + ox, y + oy)) return false;
             }
             return true;
         };
+        const isNearDryShore = (x, y) => {
+            for (let r = 24; r <= 72; r += 16) {
+                for (let k = 0; k < 12; k++) {
+                    const ang = (k / 12) * Math.PI * 2;
+                    if (!this.map.isWaterAtPixel(x + Math.cos(ang) * r, y + Math.sin(ang) * r)) return true;
+                }
+            }
+            return false;
+        };
         for (const v of this.vehicles) {
+            if (v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious) {
+                v.z = Math.max(2.0, v.z || 2.0);
+            }
             if (!v.waterOnly || v.driver || v.destroyed) continue;
-            if (isOpenWater(v.x, v.y)) continue;
+            if (isOpenWater(v.x, v.y) && isNearDryShore(v.x, v.y)) continue;
             let found = null;
-            for (let rad = 12; rad <= TILE_SIZE * 8 && !found; rad += 12) {
+            let fallbackWater = isOpenWater(v.x, v.y) ? { x: v.x, y: v.y } : null;
+            for (let rad = 12; rad <= TILE_SIZE * 10 && !found; rad += 12) {
                 for (let k = 0; k < 16; k++) {
                     const ang = (k / 16) * Math.PI * 2;
                     const tx = v.x + Math.cos(ang) * rad;
                     const ty = v.y + Math.sin(ang) * rad;
                     if (isOpenWater(tx, ty) && !this.vehicles.some((o) => o !== v && Math.hypot(o.x - tx, o.y - ty) < 40)) {
-                        found = { x: tx, y: ty };
-                        break;
+                        if (!fallbackWater) fallbackWater = { x: tx, y: ty };
+                        if (isNearDryShore(tx, ty)) {
+                            found = { x: tx, y: ty };
+                            break;
+                        }
                     }
                 }
             }
-            if (found) {
-                v.x = found.x;
-                v.y = found.y;
+            const targetSpot = found || fallbackWater;
+            if (targetSpot) {
+                v.x = targetSpot.x;
+                v.y = targetSpot.y;
+                v.z = 2.0;
                 v.vx = 0;
                 v.vy = 0;
                 v.speed = 0;
@@ -5243,15 +5268,14 @@ class LeonidaGame {
 
             if (this.map.getGroundTypeAt(exitX, exitY) === GROUND_TYPE.WATER) {
 
-                // Search nearby dry land (dock / shore) if exiting an airboat near the coast
-
+                // Search nearby dry land (dock / shore / bridge) if exiting a boat or airboat near the coast
                 let foundDry = null;
 
-                for (let r = 24; r <= 96 && !foundDry; r += 16) {
+                for (let r = 24; r <= 192 && !foundDry; r += 14) {
 
-                    for (let a = 0; a < 8; a++) {
+                    for (let a = 0; a < 16; a++) {
 
-                        const ang = (a / 8) * Math.PI * 2;
+                        const ang = (a / 16) * Math.PI * 2;
 
                         const tx = v.x + Math.cos(ang) * r;
 
@@ -5273,7 +5297,7 @@ class LeonidaGame {
 
                 if (!foundDry) {
 
-                    this.showBanner("CANNOT EXIT INTO DEEP WATER", 1.5);
+                    this.showBanner("CANNOT EXIT INTO DEEP WATER — DRIVE CLOSER TO SHORE OR DOCK!", 1.8);
 
                     return;
 
@@ -5353,21 +5377,23 @@ class LeonidaGame {
 
 
 
-        // Snappy Vehicle Entry + .G24 Door Swing: enter immediately if within 68px,
-
+        // Snappy Vehicle Entry + .G24 Door Swing: enter immediately if within 68px (or up to 195px for moored boats/jet-skis/airboats),
         // or run quickly to the nearest door if up to 125px away!
-
         let closest = null;
 
-        let bestDist = 125;
+        let bestDist = 195;
 
         for (const v of this.vehicles) {
 
             if (v.destroyed) continue;
 
+            const isWaterCraft = Boolean(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious);
+
+            const maxReach = isWaterCraft ? 195 : 125;
+
             const d = Math.hypot(v.x - p.x, v.y - p.y);
 
-            if (d < bestDist) {
+            if (d < maxReach && d < bestDist) {
 
                 bestDist = d;
 
@@ -5377,11 +5403,72 @@ class LeonidaGame {
 
         }
 
+        // Also allow boarding any nearby animated Jet-Ski, Everglades Airboat, or Port Speedboat/Yacht within 195px!
+        if (!closest && this.map && typeof Vehicle === "function") {
+            const tNow = (this.renderer && typeof this.renderer.time === "number") ? this.renderer.time : (performance.now() * 0.001);
+            if (Array.isArray(this.map.jetSkiers)) {
+                for (let ji = 0; ji < this.map.jetSkiers.length; ji++) {
+                    const js = this.map.jetSkiers[ji];
+                    if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
+                    const t = tNow * (js.speed || 1.35) + (js.seed || 0);
+                    const jx = js._liveX !== undefined ? js._liveX : (js.x + Math.cos(t) * js.rx);
+                    const jy = js._liveY !== undefined ? js._liveY : (js.y + Math.sin(t) * js.ry);
+                    const jAng = js._liveAng !== undefined ? js._liveAng : Math.atan2(Math.cos(t) * js.ry, -Math.sin(t) * js.rx);
+                    const d = Math.hypot(jx - p.x, jy - p.y);
+                    if (d < bestDist) {
+                        const boat = new Vehicle(`jetski_live_${ji}_${Date.now()}`, "JETSKI", jx, jy, jAng);
+                        boat.z = 2.0;
+                        this.vehicles.push(boat);
+                        js._boardedVehicle = boat;
+                        bestDist = d;
+                        closest = boat;
+                    }
+                }
+            }
+            if (Array.isArray(this.map.evergladesAirboats)) {
+                for (let ai = 0; ai < this.map.evergladesAirboats.length; ai++) {
+                    const ab = this.map.evergladesAirboats[ai];
+                    if (ab._boardedVehicle && !ab._boardedVehicle.destroyed) continue;
+                    const t = tNow * (ab.speed || 0.7) + (ab.seed || 0);
+                    const ax = ab._liveX !== undefined ? ab._liveX : (ab.x + Math.cos(t) * ab.rx);
+                    const ay = ab._liveY !== undefined ? ab._liveY : (ab.y + Math.sin(t * 2.0) * (ab.ry * 0.55));
+                    const aAng = ab._liveAng !== undefined ? ab._liveAng : Math.atan2(Math.cos(t * 2.0) * (ab.ry * 1.1), -Math.sin(t) * ab.rx);
+                    const d = Math.hypot(ax - p.x, ay - p.y);
+                    if (d < bestDist) {
+                        const boat = new Vehicle(`airboat_live_${ai}_${Date.now()}`, "AIRBOAT", ax, ay, aAng);
+                        boat.z = 2.0;
+                        this.vehicles.push(boat);
+                        ab._boardedVehicle = boat;
+                        bestDist = d;
+                        closest = boat;
+                    }
+                }
+            }
+            if (Array.isArray(this.map.portTerminals)) {
+                for (let pi = 0; pi < this.map.portTerminals.length; pi++) {
+                    const pt = this.map.portTerminals[pi];
+                    if (pt.kind !== "SPEEDBOAT" && pt.kind !== "YACHT") continue;
+                    if (pt._boardedVehicle && !pt._boardedVehicle.destroyed) continue;
+                    const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+                    if (d < bestDist) {
+                        const boat = new Vehicle(`port_boat_${pi}_${Date.now()}`, "SPEEDBOAT", pt.x, pt.y, pt.ang || 0);
+                        boat.z = 2.0;
+                        this.vehicles.push(boat);
+                        pt._boardedVehicle = boat;
+                        bestDist = d;
+                        closest = boat;
+                    }
+                }
+            }
+        }
+
 
 
         if (closest) {
 
-            if (bestDist < 68) {
+            const isWaterCraft = Boolean(closest.waterOnly || closest.specKey === "AIRBOAT" || closest.amphibious);
+
+            if (bestDist < 68 || isWaterCraft) {
 
                 this.completeVehicleEntry(closest);
 
@@ -5497,6 +5584,10 @@ class LeonidaGame {
 
 
 
+        if (closest.waterOnly || closest.specKey === "AIRBOAT" || closest.amphibious) {
+            closest.z = Math.max(2.0, closest.z || 2.0);
+        }
+
         if (freeSeat === 0) {
 
             closest.driver = "PLAYER";
@@ -5524,6 +5615,8 @@ class LeonidaGame {
         p.x = seatPos.x;
 
         p.y = seatPos.y;
+
+        p.z = closest.z !== undefined ? closest.z : (p.z || 2.0);
 
 
 
