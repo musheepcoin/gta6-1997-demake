@@ -2945,6 +2945,25 @@ class Vehicle {
             );
         }
 
+        // Fast early-out for stationary parked vehicles (zero per-frame physics/collision overhead while motionless!)
+        if (
+            !this.driver &&
+            !this.towedByTruck &&
+            Math.abs(this.speed || 0) < 0.05 &&
+            Math.abs(this.vx || 0) < 0.05 &&
+            Math.abs(this.vy || 0) < 0.05 &&
+            (this.stuntAirTimer || 0) <= 0
+        ) {
+            this.speed = 0;
+            this.vx = 0;
+            this.vy = 0;
+            this.angularVelocity = 0;
+            return;
+        }
+        if (this.isStaticParked && (this.driver || Math.abs(this.speed || 0) > 25)) {
+            this.isStaticParked = false;
+        }
+
         // Control inputs
         let throttle = 0;
         let steer = 0;
@@ -3782,6 +3801,13 @@ class TrafficManager {
         const minKeep = 24 + (vps.length - 1) * 10;
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
         const farWreckRects = vps.map((vp) => this.expandRect(vp.area, 28));
+        let activeMovingCount = 0;
+        for (let k = 0; k < game.vehicles.length; k++) {
+            const mv = game.vehicles[k];
+            if (mv && !mv.destroyed && (mv.driver === "AI_TRAFFIC" || mv.driver === "AI_EMERGENCY" || mv.driver === "AI_COP")) {
+                activeMovingCount++;
+            }
+        }
 
         for (let i = game.vehicles.length - 1; i >= 0; i--) {
             const v = game.vehicles[i];
@@ -3817,7 +3843,7 @@ class TrafficManager {
             }
             const isApproachingTowTruck = v.driver === "AI_TOW" && Boolean(v.towTarget) && !v.towingVehicle;
             const isRespondingFireTruck = v.specKey === "FIRE_TRUCK" && (v.aiState === "EMERGENCY_FIRE" || Boolean(v.sirenActive));
-            if (game.vehicles.length <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isRespondingFireTruck) continue;
+            if (activeMovingCount <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isRespondingFireTruck) continue;
             // Burned wrecks, abandoned cars, Tow Trucks, and responding Fire Trucks stay in the neighborhood;
             // only garbage-collect them if the player has driven far away into another district (> 28 blocks / ~1800px)!
             const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isRespondingFireTruck) ? farWreckRects : outerRects;
@@ -3829,6 +3855,9 @@ class TrafficManager {
                         game.vehicles.splice(tIdx, 1);
                         if (tIdx < i) i--;
                     }
+                }
+                if (v.driver === "AI_TRAFFIC" || v.driver === "AI_EMERGENCY" || v.driver === "AI_COP") {
+                    activeMovingCount--;
                 }
                 game.vehicles.splice(i, 1);
             }
@@ -3918,7 +3947,8 @@ class TrafficManager {
             const vy = (by + 0.5) * TILE_SIZE;
             let occupied = false;
             for (const other of game.vehicles) {
-                if (Math.hypot(other.x - vx, other.y - vy) < 135) {
+                const minGap = (other.isStaticParked && !other.driver) ? 42 : 135;
+                if (Math.hypot(other.x - vx, other.y - vy) < minGap) {
                     occupied = true;
                     break;
                 }

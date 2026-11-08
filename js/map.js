@@ -455,6 +455,271 @@ class LeonidaMap {
             }
         }
 
+        // =========================================================================
+        // CITY-WIDE URBAN SIDEWALK WIDENING & CURBSIDE PARKING ESPLANADE PASS
+        // 1) Recesses 1-tile step-down outer building skirts into 2-tile-wide sidewalks
+        //    while transferring 100% of outer wall facade textures (w, e, n, s) onto the
+        //    taller building core so every building facade stays seamless and 3D.
+        // 2) Transforms the 5 over-wide 4-lane urban boulevards (Port Gellhorn Blvd 52..55,
+        //    Downtown/Little Cuba Blvd 284..287, Washington Ave 424..427, Collins Ave 434..437,
+        //    Ocean Drive 444..447) into 2-lane boulevards with 2- to 3-tile-wide Grand Sidewalks
+        //    & Curbside Parking Esplanades on both sides.
+        // 3) Paves 2-tile-wide sidewalks (lid 8 stone / lid 9 coral) along all urban & Keys
+        //    road edges that previously touched raw grass/field directly with 0 sidewalk.
+        // =========================================================================
+        {
+            const stonePaveCol = [];
+            const coralPaveCol = [];
+            const roadSouthCol = [];
+            const roadNorthCol = [];
+            for (let z = 0; z < MAP_LAYERS; z++) {
+                stonePaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 170) * MAP_COLS + 178]; // lid 8 stone sidewalk
+                coralPaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 286) * MAP_COLS + 448]; // lid 9 coral sidewalk
+                roadSouthCol[z] = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 88];  // lid 74 Southbound (D)
+                roadNorthCol[z] = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 89];  // lid 74 Northbound (U)
+            }
+
+            const getColHeight = (cx, cy) => {
+                for (let z = MAP_LAYERS - 1; z >= 0; z--) {
+                    const b = this.blocksData[this.voxelGrid[(z * MAP_ROWS + cy) * MAP_COLS + cx]];
+                    if (b && b.groundType !== GROUND_TYPE.AIR) return z + 1;
+                }
+                return 1;
+            };
+            const getColGt = (cx, cy) => {
+                const ch = getColHeight(cx, cy);
+                if (ch >= 4) return GROUND_TYPE.BUILDING;
+                const b = this.blocksData[this.voxelGrid[((ch >= 3 ? 2 : 1) * MAP_ROWS + cy) * MAP_COLS + cx]];
+                return b ? b.groundType : GROUND_TYPE.WATER;
+            };
+            const getColLid1 = (cx, cy) => {
+                const b = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + cy) * MAP_COLS + cx]];
+                return b ? b.lid : 0;
+            };
+            const isProtectedCompound = (cx, cy) => (
+                (cx >= 55 && cx <= 69 && cy >= 75 && cy <= 147) ||
+                (cx >= 64 && cx <= 166 && cy >= 299 && cy <= 369) ||
+                (cx >= 179 && cx <= 197 && cy >= 164 && cy <= 180) ||
+                (cx >= 458 && cx <= 481 && cy >= 21 && cy <= 45) ||
+                (cx >= 26 && cx <= 87 && cy >= 149 && cy <= 200)
+            );
+
+            // Helper to clone a building block with updated wall face textures (w, e, n, s)
+            const wallVariantCache = new Map();
+            const getWallVariantIdx = (origIdx, nw, ne, nn, ns) => {
+                const src = this.blocksData[origIdx];
+                if (!src) return origIdx;
+                if (src.w === nw && src.e === ne && src.n === nn && src.s === ns) return origIdx;
+                const key = `${origIdx}_${nw}_${ne}_${nn}_${ns}`;
+                if (wallVariantCache.has(key)) return wallVariantCache.get(key);
+                const clone = {
+                    ...src,
+                    w: nw,
+                    e: ne,
+                    n: nn,
+                    s: ns,
+                    faces: [nw, ne, nn, ns, src.lid]
+                };
+                const nextIdx = this.blocksData.length;
+                this.blocksData.push(clone);
+                wallVariantCache.set(key, nextIdx);
+                return nextIdx;
+            };
+
+            // Pass A: Recess 1-tile step-down outer building skirts into 2-tile-wide sidewalks
+            const colHeights = new Uint8Array(MAP_ROWS * MAP_COLS);
+            for (let y = 0; y < MAP_ROWS; y++) {
+                for (let x = 0; x < MAP_COLS; x++) {
+                    colHeights[y * MAP_COLS + x] = getColHeight(x, y);
+                }
+            }
+            const isSkirt = new Uint8Array(MAP_ROWS * MAP_COLS);
+            for (let y = 25; y < 485; y++) {
+                for (let x = 30; x < 445; x++) {
+                    if (isProtectedCompound(x, y)) continue;
+                    const ch = colHeights[y * MAP_COLS + x];
+                    if (ch < 4) continue;
+                    const chW = colHeights[y * MAP_COLS + (x - 1)];
+                    const chE = colHeights[y * MAP_COLS + (x + 1)];
+                    const chN = colHeights[(y - 1) * MAP_COLS + x];
+                    const chS = colHeights[(y + 1) * MAP_COLS + x];
+                    // In South Beach (x >= 420), avenue narrowing already widens W/E sidewalks while keeping 4-tile Art Deco hotel width
+                    const allowWE = (x < 415);
+                    const wSk = allowWE && (chW <= 3 && chE > ch);
+                    const eSk = allowWE && (chE <= 3 && chW > ch);
+                    const nSk = (chN <= 3 && chS > ch);
+                    const sSk = (chS <= 3 && chN > ch);
+                    const nwSk = allowWE && (chW <= 3 && chN <= 3 && chE === ch && chS === ch && colHeights[(y + 1) * MAP_COLS + (x + 1)] > ch);
+                    const neSk = allowWE && (chE <= 3 && chN <= 3 && chW === ch && chS === ch && colHeights[(y + 1) * MAP_COLS + (x - 1)] > ch);
+                    const swSk = allowWE && (chW <= 3 && chS <= 3 && chE === ch && chN === ch && colHeights[(y - 1) * MAP_COLS + (x + 1)] > ch);
+                    const seSk = allowWE && (chE <= 3 && chS <= 3 && chW === ch && chN === ch && colHeights[(y - 1) * MAP_COLS + (x - 1)] > ch);
+                    if (wSk || eSk || nSk || sSk || nwSk || neSk || swSk || seSk) {
+                        isSkirt[y * MAP_COLS + x] = 1;
+                    }
+                }
+            }
+
+            // Transfer wall face textures from recessed skirt tiles onto newly exposed core building tiles
+            for (let y = 25; y < 485; y++) {
+                for (let x = 30; x < 445; x++) {
+                    const idx = y * MAP_COLS + x;
+                    if (isSkirt[idx] || colHeights[idx] < 4) continue;
+                    const coreCh = colHeights[idx];
+                    const expW = isSkirt[y * MAP_COLS + (x - 1)] === 1;
+                    const expE = isSkirt[y * MAP_COLS + (x + 1)] === 1;
+                    const expN = isSkirt[(y - 1) * MAP_COLS + x] === 1;
+                    const expS = isSkirt[(y + 1) * MAP_COLS + x] === 1;
+                    if (!expW && !expE && !expN && !expS) continue;
+
+                    const topCoreBlk = this.blocksData[this.voxelGrid[((coreCh - 1) * MAP_ROWS + y) * MAP_COLS + x]] || EMPTY_BLOCK;
+                    for (let z = 2; z < coreCh; z++) {
+                        const gIdx = (z * MAP_ROWS + y) * MAP_COLS + x;
+                        const origIdx = this.voxelGrid[gIdx];
+                        const curBlk = this.blocksData[origIdx];
+                        if (!curBlk) continue;
+                        let nw = curBlk.w, ne = curBlk.e, nn = curBlk.n, ns = curBlk.s;
+                        const pickFaceTex = (skX, skY, faceKey) => {
+                            const skCh = colHeights[skY * MAP_COLS + skX];
+                            const sampleZ = Math.min(z, Math.max(2, skCh - 2));
+                            const skBlk = this.blocksData[this.voxelGrid[(sampleZ * MAP_ROWS + skY) * MAP_COLS + skX]] || EMPTY_BLOCK;
+                            return (
+                                skBlk[faceKey] ||
+                                topCoreBlk[faceKey] ||
+                                curBlk.w || curBlk.e || curBlk.n || curBlk.s ||
+                                skBlk.w || skBlk.e || skBlk.n || skBlk.s ||
+                                86
+                            );
+                        };
+                        if (expW && !nw) nw = pickFaceTex(x - 1, y, "w");
+                        if (expE && !ne) ne = pickFaceTex(x + 1, y, "e");
+                        if (expN && !nn) nn = pickFaceTex(x, y - 1, "n");
+                        if (expS && !ns) ns = pickFaceTex(x, y + 1, "s");
+                        this.voxelGrid[gIdx] = getWallVariantIdx(origIdx, nw, ne, nn, ns);
+                    }
+                }
+            }
+
+            // Convert recessed skirt columns into ground PAWEMENT sidewalks
+            for (let y = 25; y < 485; y++) {
+                for (let x = 30; x < 445; x++) {
+                    if (isSkirt[y * MAP_COLS + x] === 1) {
+                        const paveCol = (x >= 420) ? coralPaveCol : stonePaveCol;
+                        for (let z = 0; z < MAP_LAYERS; z++) {
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] = paveCol[z];
+                        }
+                    }
+                }
+            }
+
+            // Pass B: Convert the 5 over-wide 4-lane urban avenues (52..55, 284..287, 424..427, 434..437, 444..447)
+            // into 2-lane boulevards (53..54, 285..286, 425..426, 435..436, 445..446) with wide Curbside Parking Esplanades
+            for (const c0 of [52, 284, 424, 434, 444]) {
+                const paveCol = (c0 >= 420) ? coralPaveCol : stonePaveCol;
+                for (let y = 48; y <= 372; y++) {
+                    if (
+                        getColHeight(c0, y) > 3 ||
+                        getColHeight(c0 + 1, y) > 3 ||
+                        getColHeight(c0 + 2, y) > 3 ||
+                        getColHeight(c0 + 3, y) > 3
+                    ) {
+                        continue;
+                    }
+                    if (
+                        getColGt(c0, y) !== GROUND_TYPE.ROAD ||
+                        getColGt(c0 + 1, y) !== GROUND_TYPE.ROAD ||
+                        getColGt(c0 + 2, y) !== GROUND_TYPE.ROAD ||
+                        getColGt(c0 + 3, y) !== GROUND_TYPE.ROAD
+                    ) {
+                        continue;
+                    }
+                    const l0 = getColLid1(c0, y);
+                    const l1 = getColLid1(c0 + 1, y);
+                    const l2 = getColLid1(c0 + 2, y);
+                    const l3 = getColLid1(c0 + 3, y);
+                    const isStraight4Lane =
+                        (l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) ||
+                        (l0 === 74 && l1 === 74 && l2 === 74 && l3 === 74 && getColLid1(c0 - 1, y) !== 41 && getColLid1(c0 + 4, y) !== 41);
+
+                    if (isStraight4Lane) {
+                        for (let z = 0; z < MAP_LAYERS; z++) {
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0]     = paveCol[z];
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 1] = roadSouthCol[z];
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 2] = roadNorthCol[z];
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 3] = paveCol[z];
+                        }
+                    } else if (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24) {
+                        for (let z = 0; z < MAP_LAYERS; z++) {
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0]     = paveCol[z];
+                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 3] = paveCol[z];
+                        }
+                    } else if (l0 === 25 && l1 === 25 && l2 === 25 && l3 === 25) {
+                        const westIsRoad = getColGt(c0 - 1, y) === GROUND_TYPE.ROAD;
+                        const eastIsRoad = getColGt(c0 + 4, y) === GROUND_TYPE.ROAD;
+                        for (let z = 0; z < MAP_LAYERS; z++) {
+                            const rowOff = (z * MAP_ROWS + y) * MAP_COLS;
+                            if (westIsRoad) {
+                                this.voxelGrid[rowOff + c0]     = this.voxelGrid[rowOff + c0 - 1];
+                                this.voxelGrid[rowOff + c0 - 1] = this.voxelGrid[rowOff + c0 - 2];
+                            } else {
+                                this.voxelGrid[rowOff + c0 + 1] = this.voxelGrid[rowOff + c0];
+                                this.voxelGrid[rowOff + c0]     = paveCol[z];
+                            }
+                            if (eastIsRoad) {
+                                this.voxelGrid[rowOff + c0 + 3] = this.voxelGrid[rowOff + c0 + 4];
+                                this.voxelGrid[rowOff + c0 + 4] = this.voxelGrid[rowOff + c0 + 5];
+                            } else {
+                                this.voxelGrid[rowOff + c0 + 2] = this.voxelGrid[rowOff + c0 + 3];
+                                this.voxelGrid[rowOff + c0 + 3] = paveCol[z];
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Pass C: Universal 2-tile-wide sidewalk paving where urban or Leonida Keys roads touch FIELD (grass/inland sand)
+            const groundRoadMask = new Uint8Array(MAP_ROWS * MAP_COLS);
+            for (let y = 2; y < MAP_ROWS - 2; y++) {
+                for (let x = 2; x < MAP_COLS - 2; x++) {
+                    if (getColHeight(x, y) <= 3 && getColGt(x, y) === GROUND_TYPE.ROAD) {
+                        groundRoadMask[y * MAP_COLS + x] = 1;
+                    }
+                }
+            }
+            const toPave = [];
+            for (let y = 40; y <= 485; y++) {
+                for (let x = 34; x <= 448; x++) {
+                    if (isProtectedCompound(x, y)) continue;
+                    if (y > 368 && !(x >= 185 && x <= 415 && y >= 435 && y <= 485)) continue;
+                    if (getColHeight(x, y) > 3) continue;
+                    if (getColGt(x, y) !== GROUND_TYPE.FIELD) continue;
+                    const lid1 = getColLid1(x, y);
+                    // Preserve natural coastal & Lake Leonida beach sand (lid 98)
+                    if (lid1 >= 98 && lid1 <= 101 && (y > 368 || (x >= 75 && x <= 175 && y >= 180 && y <= 262))) {
+                        continue;
+                    }
+                    let nearUrbanRoad = false;
+                    for (let dy = -2; dy <= 2 && !nearUrbanRoad; dy++) {
+                        for (let dx = -2; dx <= 2; dx++) {
+                            if (Math.abs(dx) + Math.abs(dy) <= 2 && groundRoadMask[(y + dy) * MAP_COLS + (x + dx)] === 1) {
+                                nearUrbanRoad = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (nearUrbanRoad) {
+                        toPave.push([x, y]);
+                    }
+                }
+            }
+            for (let i = 0; i < toPave.length; i++) {
+                const [px, py] = toPave[i];
+                const paveCol = (px >= 420) ? coralPaveCol : stonePaveCol;
+                for (let z = 0; z < MAP_LAYERS; z++) {
+                    this.voxelGrid[(z * MAP_ROWS + py) * MAP_COLS + px] = paveCol[z];
+                }
+            }
+        }
+
         // Global 1-Tile Pinched Grass Sliver / Spur Cleanup Pass:
         // Because the curved-lawn SDF shader (animType 30.0) rounds grass edges by ~0.45 tiles inward from each bordering
         // pavement/sand side, any 1-tile-thick grass strip (sandwiched between N&S or W&E non-grass ground) gets pinched into
@@ -2832,7 +3097,7 @@ class LeonidaMap {
                 if (!isVerticalCurb && dr < 0) continue;
 
                 // Realistic urban spacing (7 tiles on Ocean Drive, 9 tiles on avenues) with staggered quinconce offset on opposite curbs!
-                const isOceanDriveCurb = (c === oceanDriveW || c === oceanDriveE) && r >= urbanSigMinY && r <= urbanSigMaxY;
+                const isOceanDriveCurb = (c === 444 || c === 447 || c === oceanDriveW || c === oceanDriveE) && r >= urbanSigMinY && r <= urbanSigMaxY;
                 const spacing = isOceanDriveCurb ? 7 : 9;
                 const sideOffset = (dc < 0 || dr < 0) ? Math.floor(spacing * 0.5) : 0;
                 const coordAlong = isVerticalCurb ? r : c;
@@ -3305,9 +3570,278 @@ class LeonidaMap {
             }
         }
 
+        // 18. Build City-Wide Curbside Sidewalk Parking Bays & 3D Parking Meters (for real drivable parked cars!)
+        this.curbParkingBays = this.buildCurbsideParkingBays();
+
         if (districtsMeta && Array.isArray(districtsMeta)) {
             this.districts = districtsMeta;
         }
+    }
+
+    buildCurbsideParkingBays() {
+        const bays = [];
+        if (!this.surfaceGround || !this.surfaceLayer) return bays;
+
+        const districtLimits = {
+            OCEAN_DRIVE: 36,
+            SOBE_COLLINS_WASH: 34,
+            STAR_VENETIAN: 16,
+            DOWNTOWN_CUBA: 44,
+            HAITI_WYNWOOD: 32,
+            PORT_GELLHORN: 24,
+            LEONIDA_KEYS: 14
+        };
+        const districtCounts = {
+            OCEAN_DRIVE: 0,
+            SOBE_COLLINS_WASH: 0,
+            STAR_VENETIAN: 0,
+            DOWNTOWN_CUBA: 0,
+            HAITI_WYNWOOD: 0,
+            PORT_GELLHORN: 0,
+            LEONIDA_KEYS: 0
+        };
+        const districtSpecs = {
+            OCEAN_DRIVE: [
+                "STINGER_CABRIO", "TURISMO_CABRIO", "VICE_CHEETAH", "BANSHEE_GT",
+                "PENETRATOR_GT", "PORKA_TURBO", "SILVER_ROADSTER", "MINT_STALLION",
+                "SUPERBIKE", "STRETCH_LIMO", "COSSIE_RS", "STINGER_CABRIO"
+            ],
+            SOBE_COLLINS_WASH: [
+                "TURISMO_CABRIO", "STINGER_CABRIO", "COSSIE_RS", "PORKA_TURBO",
+                "BANSHEE_GT", "VICE_CAB", "HARLEY_BIKE", "SUPERBIKE",
+                "LELAND_SEDAN", "REGAL_SEDAN", "SILVER_ROADSTER", "MINT_STALLION"
+            ],
+            STAR_VENETIAN: [
+                "VICE_CHEETAH", "PENETRATOR_GT", "STINGER_CABRIO", "TURISMO_CABRIO",
+                "PORKA_TURBO", "STRETCH_LIMO", "SILVER_ROADSTER", "BANSHEE_GT"
+            ],
+            DOWNTOWN_CUBA: [
+                "LELAND_SEDAN", "REGAL_SEDAN", "VICE_CAB", "STRETCH_LIMO",
+                "BANSHEE_GT", "TULIP_MUSCLE", "CHALLENGER_RT", "MINT_STALLION",
+                "FJORD_FASTBACK", "MUNDANO_WAGON", "BOXVILLE_VAN", "HOTDOG_VAN",
+                "COSSIE_RS", "VCPD_CRUISER"
+            ],
+            HAITI_WYNWOOD: [
+                "TULIP_MUSCLE", "CHALLENGER_RT", "MINT_STALLION", "FJORD_FASTBACK",
+                "BEETLE_BUG", "PICKUP_TRUCK", "CAMPER_PICKUP", "BOXVILLE_VAN",
+                "HOTDOG_VAN", "HARLEY_BIKE", "VICE_CAB", "MUNDANO_WAGON"
+            ],
+            PORT_GELLHORN: [
+                "PICKUP_TRUCK", "CAMPER_PICKUP", "GATOR_4X4", "CHALLENGER_RT",
+                "TULIP_MUSCLE", "FJORD_FASTBACK", "BOXVILLE_VAN", "HARLEY_BIKE",
+                "VCPD_CRUISER", "MUNDANO_WAGON", "BEETLE_BUG"
+            ],
+            LEONIDA_KEYS: [
+                "CAMPER_PICKUP", "PICKUP_TRUCK", "STINGER_CABRIO", "MINT_STALLION",
+                "BEETLE_BUG", "GATOR_4X4", "HARLEY_BIKE", "TURISMO_CABRIO"
+            ]
+        };
+
+        const payphoneSpots = [
+            [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
+            [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 293.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 292.5 * TILE_SIZE],
+            [344.5 * TILE_SIZE, 171.5 * TILE_SIZE],
+            [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
+        ];
+        const czList = (this.objectEngine && Array.isArray(this.objectEngine.clearZones))
+            ? this.objectEngine.clearZones
+            : [];
+
+        const isCleanCurbSpot = (px, py, z) => {
+            if (typeof this.isInsideLivingEventZone === "function" && this.isInsideLivingEventZone(px, py, 38)) {
+                return false;
+            }
+            if (typeof this.resolveCircleBuildingCollision === "function" && this.resolveCircleBuildingCollision(px, py, 16, z).hit) {
+                return false;
+            }
+            for (let i = 0; i < czList.length; i++) {
+                const cz = czList[i];
+                if (Math.hypot(cz.x - px, cz.y - py) < Math.max(52, cz.r || 52)) return false;
+            }
+            if (Array.isArray(this.interiors)) {
+                for (let i = 0; i < this.interiors.length; i++) {
+                    if (Math.hypot(this.interiors[i].doorX - px, this.interiors[i].doorY - py) < 68) return false;
+                }
+            }
+            if (Array.isArray(this.streetlights)) {
+                for (let i = 0; i < this.streetlights.length; i++) {
+                    if (Math.hypot(this.streetlights[i].baseX - px, this.streetlights[i].baseY - py) < 42) return false;
+                }
+            }
+            if (Array.isArray(this.trafficSignals)) {
+                for (let i = 0; i < this.trafficSignals.length; i++) {
+                    if (Math.hypot(this.trafficSignals[i].baseX - px, this.trafficSignals[i].baseY - py) < 56) return false;
+                }
+            }
+            if (Array.isArray(this.parkBollardLights)) {
+                for (let i = 0; i < this.parkBollardLights.length; i++) {
+                    if (Math.hypot(this.parkBollardLights[i].x - px, this.parkBollardLights[i].y - py) < 40) return false;
+                }
+            }
+            if (Array.isArray(this.vicePalms)) {
+                for (let i = 0; i < this.vicePalms.length; i++) {
+                    if (Math.hypot(this.vicePalms[i].x - px, this.vicePalms[i].y - py) < 44) return false;
+                }
+            }
+            if (Array.isArray(this.trees)) {
+                for (let i = 0; i < this.trees.length; i++) {
+                    if (Math.hypot(this.trees[i].x - px, this.trees[i].y - py) < 44) return false;
+                }
+            }
+            if (Array.isArray(this.viceStreetDetails)) {
+                for (let i = 0; i < this.viceStreetDetails.length; i++) {
+                    if (Math.hypot(this.viceStreetDetails[i].x - px, this.viceStreetDetails[i].y - py) < 40) return false;
+                }
+            }
+            if (Array.isArray(this.stuntRamps)) {
+                for (let i = 0; i < this.stuntRamps.length; i++) {
+                    if (Math.hypot(this.stuntRamps[i].x - px, this.stuntRamps[i].y - py) < 96) return false;
+                }
+            }
+            for (let i = 0; i < payphoneSpots.length; i++) {
+                if (Math.hypot(payphoneSpots[i][0] - px, payphoneSpots[i][1] - py) < 62) return false;
+            }
+            return true;
+        };
+
+        for (let r = 44; r <= 480; r++) {
+            for (let c = 36; c <= 447; c++) {
+                if (this.isRestrictedNoTrafficZone && this.isRestrictedNoTrafficZone(c, r)) continue;
+                if (c >= 179 && c <= 197 && r >= 164 && r <= 180) continue; // Mambas Stadium
+                const idx = r * MAP_COLS + c;
+                if (this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT) continue;
+                const surfZ = this.surfaceLayer[idx] || 2.0;
+                if (surfZ > 2) continue;
+                if (this.coastalSandMask && this.coastalSandMask[idx] === 1) continue;
+                const blk1 = this.getBlockInfo(c, r, 1);
+                if (!blk1 || (blk1.lid !== 8 && blk1.lid !== 9)) continue;
+
+                // Must border exactly 1 orthogonal ROAD tile
+                const eRoad = this.surfaceGround[r * MAP_COLS + (c + 1)] === GROUND_TYPE.ROAD;
+                const wRoad = this.surfaceGround[r * MAP_COLS + (c - 1)] === GROUND_TYPE.ROAD;
+                const sRoad = this.surfaceGround[(r + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
+                const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
+                const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
+                if (roadCount !== 1) continue;
+
+                const dc = eRoad ? 1 : (wRoad ? -1 : 0);
+                const dr = sRoad ? 1 : (nRoad ? -1 : 0);
+                const perpX = -dr;
+                const perpY = dc;
+
+                // Require the sidewalk to be at least 2 tiles wide (inner sidewalk tile behind (c, r) must be PAWEMENT)
+                // so pedestrians always have an unobstructed inner walkway!
+                const innerGt = this.surfaceGround[(r - dr) * MAP_COLS + (c - dc)];
+                if (innerGt !== GROUND_TYPE.PAWEMENT) continue;
+
+                // Require straight mid-block road & sidewalk continuity for +/- 2 tiles along the street
+                let midBlockOk = true;
+                for (let k = -2; k <= 2; k++) {
+                    const sc = c + perpX * k;
+                    const sr = r + perpY * k;
+                    const rc = sc + dc;
+                    const rr = sr + dr;
+                    if (this.surfaceGround[sr * MAP_COLS + sc] !== GROUND_TYPE.PAWEMENT) {
+                        midBlockOk = false;
+                        break;
+                    }
+                    if (this.surfaceGround[rr * MAP_COLS + rc] !== GROUND_TYPE.ROAD) {
+                        midBlockOk = false;
+                        break;
+                    }
+                    const rLid = this.getBlockInfo(rc, rr, 1)?.lid || 0;
+                    if (rLid === 24 || rLid === 25 || this.isStopLineBlock(rc, rr)) {
+                        midBlockOk = false;
+                        break;
+                    }
+                }
+                if (!midBlockOk) continue;
+
+                // Classify district
+                let districtKey = null;
+                let stride = 8;
+                let minSpacing = 168;
+                if ((c === 444 || c === 447) && r >= 76 && r <= 360) {
+                    districtKey = "OCEAN_DRIVE";
+                    stride = 5;
+                    minSpacing = 148;
+                } else if (c >= 415 && r >= 44 && r <= 364) {
+                    districtKey = "SOBE_COLLINS_WASH";
+                    stride = 7;
+                    minSpacing = 156;
+                } else if (c >= 325 && c < 415 && r >= 115 && r <= 230) {
+                    districtKey = "STAR_VENETIAN";
+                    stride = 6;
+                    minSpacing = 160;
+                } else if (c >= 235 && c < 325 && r >= 52 && r <= 365) {
+                    districtKey = "DOWNTOWN_CUBA";
+                    stride = 11;
+                    minSpacing = 164;
+                } else if (c >= 175 && c < 235 && r >= 52 && r <= 365) {
+                    districtKey = "HAITI_WYNWOOD";
+                    stride = 12;
+                    minSpacing = 168;
+                } else if (c >= 36 && c < 175 && r >= 52 && r <= 365) {
+                    districtKey = "PORT_GELLHORN";
+                    stride = 12;
+                    minSpacing = 172;
+                } else if (c >= 185 && c <= 415 && r >= 435 && r <= 480) {
+                    districtKey = "LEONIDA_KEYS";
+                    stride = 6;
+                    minSpacing = 160;
+                }
+                if (!districtKey || districtCounts[districtKey] >= districtLimits[districtKey]) continue;
+
+                const coordAlong = (dc !== 0) ? r : c;
+                const sideSalt = (dc > 0 || dr > 0) ? 0 : Math.floor(stride * 0.5);
+                if (((coordAlong + sideSalt + ((c * 3 + r * 5) % 3)) % stride) !== 0) continue;
+
+                // Park vehicle on the outer half of the curbside sidewalk tile (+8.5px toward the curb),
+                // 100% off the active road lane and leaving 90+ px of inner sidewalk clear for pedestrians!
+                const px = (c + 0.5) * TILE_SIZE + dc * 8.5;
+                const py = (r + 0.5) * TILE_SIZE + dr * 8.5;
+                if (!isCleanCurbSpot(px, py, surfZ)) continue;
+
+                let tooClose = false;
+                for (let i = 0; i < bays.length; i++) {
+                    if (Math.hypot(bays[i].x - px, bays[i].y - py) < minSpacing) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (tooClose) continue;
+
+                const fallbackAng = (dc !== 0) ? (dc > 0 ? Math.PI * 0.5 : -Math.PI * 0.5) : (dr > 0 ? Math.PI : 0);
+                const parkAng = this.getAlignedRoadAngle(c + dc, r + dr, fallbackAng, surfZ);
+                const pool = districtSpecs[districtKey];
+                const hashIdx = (((c * 73856093) ^ (r * 19349663) ^ (districtCounts[districtKey] * 83492791)) >>> 0) % pool.length;
+                const specKey = pool[hashIdx];
+
+                const fwdX = Math.cos(parkAng);
+                const fwdY = Math.sin(parkAng);
+                const meterX = (c + 0.5) * TILE_SIZE - dc * 16.5 + fwdX * 19.0;
+                const meterY = (r + 0.5) * TILE_SIZE - dr * 16.5 + fwdY * 19.0;
+
+                districtCounts[districtKey]++;
+                bays.push({
+                    c,
+                    r,
+                    dc,
+                    dr,
+                    x: px,
+                    y: py,
+                    z: surfZ,
+                    angle: parkAng,
+                    meterX,
+                    meterY,
+                    districtKey,
+                    specKey
+                });
+            }
+        }
+        return bays;
     }
 
     buildGta6Landmarks() {

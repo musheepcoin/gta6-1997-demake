@@ -9357,6 +9357,65 @@ class RetroRenderer {
             }
         }
 
+        // 7C-ter. Curbside Sidewalk Parking Stall Markings (Painted White T-Stalls) & 3D Dual-Head Parking Meters
+        if (this.map && Array.isArray(this.map.curbParkingBays)) {
+            const nf = nfGlobal;
+            const meterShadowLen = sunShadowLen * 0.25;
+            for (let bi = 0; bi < this.map.curbParkingBays.length; bi++) {
+                const bay = this.map.curbParkingBays[bi];
+                if (bay.x < minX || bay.x > maxX || bay.y < minY || bay.y > maxY) continue;
+                const sz = bay.z || 2.0;
+                const ang = bay.angle || 0;
+                const ca = Math.cos(ang);
+                const sa = Math.sin(ang);
+                const halfL = 27.0;
+                // Front & rear transverse white stall boundary lines on the sidewalk pavement
+                const fx = bay.x + ca * halfL;
+                const fy = bay.y + sa * halfL;
+                const rx = bay.x - ca * halfL;
+                const ry = bay.y - sa * halfL;
+                const crossAng = ang + Math.PI * 0.5;
+                this.pushSolidQuad3D(fx, fy, sz + 0.006, 22.0, 1.7, crossAng, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(rx, ry, sz + 0.006, 22.0, 1.7, crossAng, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Longitudinal T-corner ticks framing the stall
+                const roadDirX = bay.roadSide === "W" ? -1 : (bay.roadSide === "E" ? 1 : 0);
+                const roadDirY = bay.roadSide === "N" ? -1 : (bay.roadSide === "S" ? 1 : 0);
+                const edgeX = bay.x + roadDirX * 10.5;
+                const edgeY = bay.y + roadDirY * 10.5;
+                this.pushSolidQuad3D(edgeX + ca * (halfL - 4.5), edgeY + sa * (halfL - 4.5), sz + 0.006, 9.0, 1.7, ang, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(edgeX - ca * (halfL - 4.5), edgeY - sa * (halfL - 4.5), sz + 0.006, 9.0, 1.7, ang, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing
+                const mx = bay.meterX;
+                const my = bay.meterY;
+                if (mx !== undefined && my !== undefined) {
+                    if (nf < 0.85) {
+                        const shX = mx + Math.cos(sunShadowAngle) * (meterShadowLen * 0.5);
+                        const shY = my + Math.sin(sunShadowAngle) * (meterShadowLen * 0.5);
+                        this.pushSolidQuad3D(shX, shY, sz + 0.016, meterShadowLen, 2.2, sunShadowAngle, 0.04, 0.06, 0.10, 0.28 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    // Cast-iron sidewalk base plate + galvanized steel pedestal + dual-head meter housing + LED indicator
+                    this.pushSolidQuad3D(mx, my, sz + 0.015, 3.8, 3.8, 0, 0.15, 0.20, 0.28, 0.95, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                    this.pushSolidQuad3D(mx, my, sz + 0.075, 2.3, 2.3, 0, 0.45, 0.52, 0.62, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                    this.pushSolidQuad3D(mx, my, sz + 0.145, 4.8, 3.1, ang, 0.22, 0.29, 0.39, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                    const isGreenLed = ((bi * 7) % 5) !== 0;
+                    this.pushSolidQuad3D(
+                        mx,
+                        my,
+                        sz + 0.162,
+                        2.3,
+                        1.5,
+                        ang,
+                        isGreenLed ? 0.16 : 0.96,
+                        isGreenLed ? 0.92 : 0.24,
+                        isGreenLed ? 0.52 : 0.28,
+                        0.98,
+                        SPRITE_DRAW_ORDER.PEDESTRIANS
+                    );
+                }
+            }
+        }
+
         // 7D. Daytime Solar Ground Shadows for 3D Traffic Signal Gantries (3D volumetric gantry, mast arm & 3-lens box rendered by WorldObjectEngine!)
         this.lastGameRef = game;
         if (this.map && Array.isArray(this.map.trafficSignals)) {

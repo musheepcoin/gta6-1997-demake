@@ -992,6 +992,11 @@ class LeonidaGame {
 
         this.spawnMonkChain();
 
+        // If the 512x512 CMP map is already loaded (e.g., on restartGame), immediately seed curbside sidewalk parked vehicles!
+        if (this.map && this.map.cmpLoaded) {
+            this.seedCityCurbsideParkedVehicles();
+        }
+
     }
 
 
@@ -1297,14 +1302,14 @@ class LeonidaGame {
                     czList.some(cz => Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54)) ||
                     beachStructs.some(bs => Math.hypot(bs.x - px, bs.y - py) < 76);
 
-                if (nav && nav.groundType === GROUND_TYPE.ROAD) {
+                if (nav && nav.groundType === GROUND_TYPE.ROAD && !v.isCurbParked && !v.isStaticParked) {
                     // Never snap a road vehicle onto a pedestrian sidewalk: convert it to live moving traffic!
                     v.driver = "AI_TRAFFIC";
                     v.isStaticParked = false;
                     v.x = (bx + 0.5) * TILE_SIZE;
                     v.y = (by + 0.5) * TILE_SIZE;
                     v.angle = this.map.getAlignedRoadAngle(bx, by, v.angle, v.z);
-                } else if (v.missionTag !== "LANDMARK" && hitsClearZone(v.x, v.y)) {
+                } else if (v.missionTag !== "LANDMARK" && !v.isCurbParked && hitsClearZone(v.x, v.y)) {
 
                     // Never leave a driverless parked car underneath a 3D billboard/landmark or overlapping another parked vehicle!
 
@@ -1422,10 +1427,52 @@ class LeonidaGame {
 
         this.seedPenitentiaryInmatesAndGuards();
 
+        this.seedCityCurbsideParkedVehicles();
+
         this.currentDistrict = this.map.getDistrictName(this.player.x, this.player.y);
 
         this.districtPopupTimer = 0;
 
+    }
+
+
+
+    seedCityCurbsideParkedVehicles() {
+        if (!this.map || !this.map.cmpLoaded || !Array.isArray(this.map.curbParkingBays)) return;
+        // Remove any previously seeded curb-parked vehicles before re-seeding
+        if (Array.isArray(this.vehicles)) {
+            this.vehicles = this.vehicles.filter(v => !v.isCurbParked);
+        } else {
+            this.vehicles = [];
+        }
+
+        const bays = this.map.curbParkingBays;
+        for (let i = 0; i < bays.length; i++) {
+            const bay = bays[i];
+            if (!bay || !bay.specKey) continue;
+            // Ensure no overlap with player or existing vehicles (hero cars, estate cars, traffic)
+            if (this.player && Math.hypot(this.player.x - bay.x, this.player.y - bay.y) < 42) continue;
+            let occupied = false;
+            for (let j = 0; j < this.vehicles.length; j++) {
+                const other = this.vehicles[j];
+                if (Math.hypot(other.x - bay.x, other.y - bay.y) < 52) {
+                    occupied = true;
+                    break;
+                }
+            }
+            if (occupied) continue;
+
+            const v = new Vehicle(`curb_park_${i}`, bay.specKey, bay.x, bay.y, bay.angle);
+            v.z = bay.z || 2.0;
+            v.driver = null;
+            v.isStaticParked = true;
+            v.isCurbParked = true;
+            v.curbBayIndex = i;
+            v.speed = 0;
+            v.vx = 0;
+            v.vy = 0;
+            this.vehicles.push(v);
+        }
     }
 
 
@@ -10954,11 +11001,13 @@ class LeonidaGame {
 
         for (let i = 0; i < this.vehicles.length; i++) {
 
+            const a = this.vehicles[i];
+            const aActive = Boolean(a.driver || Math.abs(a.speed || 0) > 0.05 || Math.abs(a.vx || 0) > 0.05 || Math.abs(a.vy || 0) > 0.05);
+
             for (let j = i + 1; j < this.vehicles.length; j++) {
 
-                const a = this.vehicles[i];
-
                 const b = this.vehicles[j];
+                if (!aActive && !b.driver && Math.abs(b.speed || 0) <= 0.05 && Math.abs(b.vx || 0) <= 0.05 && Math.abs(b.vy || 0) <= 0.05) continue;
 
                 if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
 
