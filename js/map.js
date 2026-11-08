@@ -911,6 +911,11 @@ class LeonidaMap {
             { x: 454.2 * TILE_SIZE,        y: my256(158.8) * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "surfer_guy",    p2: "bikini_cyan",  p3: "bikini_red" },
             { x: 454.2 * TILE_SIZE,        y: my256(168.5) * TILE_SIZE, z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_white", p3: "surfer_guy" },
             { x: 454.2 * TILE_SIZE,        y: 344.5 * TILE_SIZE,        z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
+            // Central-East & East Golden Sand Volleyball Courts across the wide 38-tile Vice Beach expanse
+            { x: 470.5 * TILE_SIZE,        y: 222.5 * TILE_SIZE,        z: 2.0, p0: "bikini_pink",   p1: "bikini_yellow", p2: "surfer_guy",   p3: "bikini_cyan" },
+            { x: 476.5 * TILE_SIZE,        y: 254.5 * TILE_SIZE,        z: 2.0, p0: "bikini_cyan",   p1: "bikini_red",    p2: "bikini_white", p3: "surfer_guy" },
+            { x: 470.5 * TILE_SIZE,        y: 286.5 * TILE_SIZE,        z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_cyan",  p3: "surfer_guy" },
+            { x: 468.5 * TILE_SIZE,        y: 318.5 * TILE_SIZE,        z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "surfer_guy",   p3: "bikini_pink" },
             // West Coast Beach & Southern Keys Volleyball Courts
             { x: mx256(18.5) * TILE_SIZE,  y: my256(48.5) * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
             { x: mx256(15.5) * TILE_SIZE,  y: my256(96.5) * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
@@ -931,6 +936,9 @@ class LeonidaMap {
             { x: 461.5 * TILE_SIZE,        y: 306.5 * TILE_SIZE,        z: 2.0 },
             { x: 455.5 * TILE_SIZE,        y: 326.5 * TILE_SIZE,        z: 2.0 },
             { x: 458.5 * TILE_SIZE,        y: 158.5 * TILE_SIZE,        z: 2.0 },
+            { x: 471.5 * TILE_SIZE,        y: 240.5 * TILE_SIZE,        z: 2.0 },
+            { x: 475.5 * TILE_SIZE,        y: 268.5 * TILE_SIZE,        z: 2.0 },
+            { x: 471.5 * TILE_SIZE,        y: 298.5 * TILE_SIZE,        z: 2.0 },
             { x: mx256(192.4) * TILE_SIZE, y: my256(112.5) * TILE_SIZE, z: 2.0 },
             // West Coast Beach & Southern Keys Tiki Boombox Parties
             { x: mx256(16.5) * TILE_SIZE,  y: my256(60.5) * TILE_SIZE,  z: 2.0 },
@@ -1030,6 +1038,54 @@ class LeonidaMap {
                 propDy: -10,
                 propAngle: 0.32,
                 extraPropSpr: (i % 2 === 0) ? "sandcastle" : "beach_cooler",
+                extraPropDx: 24,
+                extraPropDy: 18
+            });
+
+            // Band 3B: Central-East Golden Sand Band (x = 468.2..471.4, filling the wide central-east Vice Beach expanse!)
+            const centerEastCol = 468.2 + ((i + 1) % 3) * 1.5;
+            this.beachSunbathers.push({
+                x: centerEastCol * TILE_SIZE,
+                y: (by + 1.6) * TILE_SIZE,
+                z: 2.0,
+                angle: ((i % 2) === 0 ? -0.10 : 0.14),
+                pedType: bikiniPool[(i + 2) % bikiniPool.length],
+                towelSpr: towelPool[(i + 4) % towelPool.length],
+                friendPedType: (i % 3 === 1) ? "surfer_guy" : bikiniPool[(i + 3) % bikiniPool.length],
+                friendTowelSpr: towelPool[(i + 1) % towelPool.length],
+                standingFriendType: (i % 2 === 0) ? standFriendPool[(i + 4) % standFriendPool.length] : null,
+                umbSpr: umbPool[(i + 2) % umbPool.length],
+                umbDx: -23,
+                umbDy: -13,
+                propSpr: sidePropPool[(i + 1) % sidePropPool.length],
+                propDx: 26,
+                propDy: -10,
+                propAngle: -0.22,
+                extraPropSpr: (i % 2 === 0) ? "beach_ball" : "beach_cooler",
+                extraPropDx: 24,
+                extraPropDy: 18
+            });
+
+            // Band 3C: Outer-East Golden Sand Band (x = 474.4..478.0, seamless density up to the East Surfline!)
+            const outerEastCol = 474.4 + ((i + 2) % 3) * 1.6;
+            this.beachSunbathers.push({
+                x: outerEastCol * TILE_SIZE,
+                y: (by - 1.4) * TILE_SIZE,
+                z: 2.0,
+                angle: ((i % 2) === 1 ? 0.12 : -0.08),
+                pedType: bikiniPool[(i + 3) % bikiniPool.length],
+                towelSpr: towelPool[(i + 2) % towelPool.length],
+                friendPedType: bikiniPool[(i + 4) % bikiniPool.length],
+                friendTowelSpr: towelPool[(i + 3) % towelPool.length],
+                standingFriendType: (i % 3 !== 0) ? standFriendPool[(i + 6) % standFriendPool.length] : null,
+                umbSpr: umbPool[i % umbPool.length],
+                umbDx: -23,
+                umbDy: -13,
+                propSpr: sidePropPool[(i + 5) % sidePropPool.length],
+                propDx: 26,
+                propDy: -10,
+                propAngle: 0.28,
+                extraPropSpr: (i % 3 === 0) ? "sandcastle" : "beach_ball",
                 extraPropDx: 24,
                 extraPropDy: 18
             });
@@ -1259,21 +1315,41 @@ class LeonidaMap {
             return true;
         };
 
-        const snapPxToCleanWater = (px, py) => {
+        const snapPxToCleanWater = (px, py, maxSteps = 20) => {
             const cxF = px / TILE_SIZE;
             const ryF = py / TILE_SIZE;
             const c0 = Math.floor(cxF);
             const r0 = Math.floor(ryF);
             const fracX = cxF - c0;
             if (isCleanWaterTile(c0, r0)) return { x: px, y: py };
-            const dirs = c0 > MAP_X_256[210] ? [1, 2, 3, 4, 5, 6, -1, -2] : [-1, -2, -3, -4, -5, 1, 2, 3];
-            for (const dc of dirs) {
-                if (isCleanWaterTile(c0 + dc, r0)) {
-                    return { x: (c0 + dc + fracX) * TILE_SIZE, y: py };
+            const preferEast = c0 > MAP_X_256[210];
+            for (let step = 1; step <= maxSteps; step++) {
+                const firstDc = preferEast ? step : -step;
+                const secondDc = preferEast ? -step : step;
+                if (isCleanWaterTile(c0 + firstDc, r0)) {
+                    return { x: (c0 + firstDc + fracX) * TILE_SIZE, y: py };
+                }
+                if (step <= 6 && isCleanWaterTile(c0 + secondDc, r0)) {
+                    return { x: (c0 + secondDc + fracX) * TILE_SIZE, y: py };
+                }
+            }
+            for (let rad = 1; rad <= maxSteps; rad++) {
+                for (let dr = -rad; dr <= rad; dr++) {
+                    for (let dc = -rad; dc <= rad; dc++) {
+                        if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+                        if (isCleanWaterTile(c0 + dc, r0 + dr)) {
+                            return { x: (c0 + dc + 0.5) * TILE_SIZE, y: (r0 + dr + 0.5) * TILE_SIZE };
+                        }
+                    }
                 }
             }
             return null;
         };
+
+        this.isCleanSandTile = isCleanSandTile;
+        this.snapPxToCleanSand = snapPxToCleanSand;
+        this.isCleanWaterTile = isCleanWaterTile;
+        this.snapPxToCleanWater = snapPxToCleanWater;
 
         this.beachUmbrellas = this.beachUmbrellas.filter(u => isCleanSandTile(Math.floor(u.x / TILE_SIZE), Math.floor(u.y / TILE_SIZE), false));
 
@@ -1668,7 +1744,15 @@ class LeonidaMap {
             { c: 466.0, r: 318.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
             { c: 456.2, r: 328.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
             { c: 461.5, r: 338.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
-            { c: 456.0, r: 348.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true }
+            { c: 456.0, r: 348.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 472.2, r: 214.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 477.4, r: 230.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 472.0, r: 248.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 477.6, r: 262.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 472.4, r: 278.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 476.8, r: 292.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 471.8, r: 308.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            { c: 469.5, r: 324.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];

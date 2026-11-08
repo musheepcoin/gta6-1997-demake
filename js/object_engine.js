@@ -467,15 +467,16 @@ class WorldObjectEngine {
             { id: "snap_star_sunset", name: "STAR ISLAND SUNSET SUPERYACHT PIER",x: 344.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, snapped: false }
         ];
         // 10. GTA 6 Trailer 1 & Official Screenshots: Vice Bay, Ocean Beach & Leonida Keys Leaping 3D Dolphin Pods
+        // Placed strictly in verified offshore Atlantic Ocean, Biscayne Bay & Leonida Keys deep water (gt=WATER, lid=41)
         this.dolphinPods = [
-            { x: 472.5 * TILE_SIZE, y: 218.5 * TILE_SIZE, z: 2.0, ang: -1.35, seed: 0.0 },
-            { x: 474.5 * TILE_SIZE, y: 262.5 * TILE_SIZE, z: 2.0, ang: -1.55, seed: 1.4 },
-            { x: 472.5 * TILE_SIZE, y: 304.5 * TILE_SIZE, z: 2.0, ang: -1.45, seed: 2.8 },
+            { x: 496.5 * TILE_SIZE, y: 218.5 * TILE_SIZE, z: 2.0, ang: -1.35, seed: 0.0 },
+            { x: 495.5 * TILE_SIZE, y: 262.5 * TILE_SIZE, z: 2.0, ang: -1.55, seed: 1.4 },
+            { x: 488.5 * TILE_SIZE, y: 304.5 * TILE_SIZE, z: 2.0, ang: -1.45, seed: 2.8 },
             { x: 364.5 * TILE_SIZE, y: 192.5 * TILE_SIZE, z: 2.0, ang:  1.50, seed: 4.1 },
             { x: 366.5 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, ang: -1.50, seed: 5.5 },
-            { x: 324.5 * TILE_SIZE, y: 332.5 * TILE_SIZE, z: 2.0, ang:  0.35, seed: 0.9 },
+            { x: 312.5 * TILE_SIZE, y: 332.5 * TILE_SIZE, z: 2.0, ang:  0.35, seed: 0.9 },
             { x: 244.5 * TILE_SIZE, y: 470.5 * TILE_SIZE, z: 2.0, ang:  0.15, seed: 2.3 },
-            { x: 186.5 * TILE_SIZE, y: 484.5 * TILE_SIZE, z: 2.0, ang: -0.20, seed: 3.7 }
+            { x: 196.5 * TILE_SIZE, y: 492.5 * TILE_SIZE, z: 2.0, ang: -0.20, seed: 3.7 }
         ];
         // 11. GTA 6 Vice City Little Cuba Domino Park Pavilions & Gourmet Street Food Trucks
         this.littleCubaDominoParks = [
@@ -866,11 +867,16 @@ class WorldObjectEngine {
                     clearZones.push({ x: ft.x, y: ft.y, r: 58 });
                 }
             }
-            if (Array.isArray(this.dolphinPods) && typeof map.snapPxToCleanWater === "function") {
-                for (const dp of this.dolphinPods) {
-                    const sn = map.snapPxToCleanWater(dp.x, dp.y, 14);
-                    if (sn) { dp.x = sn.x; dp.y = sn.y; }
-                }
+            if (Array.isArray(this.dolphinPods)) {
+                this.dolphinPods = this.dolphinPods.filter((dp) => {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(dp.x, dp.y, 24);
+                        if (sn) { dp.x = sn.x; dp.y = sn.y; }
+                    }
+                    const dc = Math.floor(dp.x / TILE_SIZE);
+                    const dr = Math.floor(dp.y / TILE_SIZE);
+                    return isDeepWater(dc, dr);
+                });
             }
             if (Array.isArray(this.stickUpStores)) {
                 for (const su of this.stickUpStores) {
@@ -8903,6 +8909,15 @@ class WorldObjectEngine {
                         const lat = (di - 1) * 16.0;
                         const wx = dp.x + fwd * cA - lat * sA;
                         const wy = dp.y + fwd * sA + lat * cA;
+                        const wCol = Math.floor(wx / TILE_SIZE);
+                        const wRow = Math.floor(wy / TILE_SIZE);
+                        if (
+                            wCol < 2 || wCol >= MAP_COLS - 2 ||
+                            wRow < 2 || wRow >= MAP_ROWS - 2 ||
+                            (this.map && this.map.surfaceGround && this.map.surfaceGround[wRow * MAP_COLS + wCol] !== GROUND_TYPE.WATER)
+                        ) {
+                            continue;
+                        }
                         const arcZ = Math.sin(u * Math.PI) * 0.32;
                         const dz = 2.00 + arcZ;
                         // Sleek Bottlenose Silver-Blue Torso + Curved Dorsal Fin + Nose Rostrum & Tail Flukes
@@ -8910,10 +8925,10 @@ class WorldObjectEngine {
                         emitDynBox(wx, wy, cA, sA, 8, 0, 7, 3.2, dz + 0.01, dz + 0.05, [0.64, 0.78, 0.90], 1.0, 5);
                         emitDynCone(wx, wy, -1, 0, 3.2, dz + 0.08, dz + 0.15, 6, [0.42, 0.58, 0.74], 5);
                         emitDynBox(wx, wy, cA, sA, -10, 0, 5, 9.5, dz + 0.01, dz + 0.04, [0.46, 0.62, 0.78], 1.0, 5);
-                        // Expanding 3D White Sea-Foam Splash Ring at Entry / Exit
+                        // Expanding 3D White Sea-Foam Splash Ring at Entry / Exit (matId=0 for clean unpatterned sea-foam!)
                         if (u < 0.22 || u > 0.78) {
                             const spR = 7.0 + Math.abs(u - 0.5) * 16.0;
-                            emitDynCylinder(wx, wy, 0, 0, spR, spR * 0.85, 2.005, 2.035, 10, [0.92, 0.98, 1.00], 7, true, 0.78);
+                            emitDynCylinder(wx, wy, 0, 0, spR, spR * 0.85, 2.005, 2.035, 10, [0.92, 0.98, 1.00], 0, true, 0.78);
                         }
                     }
                 }

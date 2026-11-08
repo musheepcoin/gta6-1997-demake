@@ -682,21 +682,21 @@ class LeonidaGame {
             // --- N. Drivable water craft moored at the harbors, beaches & piers (z = 2.0 on water surface!) ---
             { id: "boat_speed_0", spec: "SPEEDBOAT", c: 325.0, r: 312.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
             { id: "boat_speed_1", spec: "SPEEDBOAT", c: 105.5, r: 100.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_2", spec: "SPEEDBOAT", c: 373.5, r: 121.2, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_2", spec: "SPEEDBOAT", c: 375.5, r: 121.2, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
             { id: "boat_speed_3", spec: "SPEEDBOAT", c: 379.5, r: 220.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_4", spec: "SPEEDBOAT", c: 424.0, r: 426.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_4", spec: "SPEEDBOAT", c: 425.5, r: 426.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
             { id: "boat_speed_5", spec: "SPEEDBOAT", c: 329.0, r: 496.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_6", spec: "SPEEDBOAT", c: 472.5, r: 224.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_7", spec: "SPEEDBOAT", c: 472.5, r: 300.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_8", spec: "SPEEDBOAT", c: 356.0, r: 220.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_speed_9", spec: "SPEEDBOAT", c: 220.0, r: 478.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_6", spec: "SPEEDBOAT", c: 496.5, r: 224.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_7", spec: "SPEEDBOAT", c: 481.2, r: 300.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_8", spec: "SPEEDBOAT", c: 339.5, r: 220.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_speed_9", spec: "SPEEDBOAT", c: 231.5, r: 478.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
             { id: "boat_jetski_0", spec: "JETSKI", c: 327.5, r: 314.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_1", spec: "JETSKI", c: 376.0, r: 123.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_1", spec: "JETSKI", c: 378.5, r: 121.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
             { id: "boat_jetski_2", spec: "JETSKI", c: 382.0, r: 222.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_3", spec: "JETSKI", c: 426.5, r: 428.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_4", spec: "JETSKI", c: 472.0, r: 228.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_5", spec: "JETSKI", c: 472.0, r: 296.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
-            { id: "boat_jetski_6", spec: "JETSKI", c: 392.0, r: 175.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true }
+            { id: "boat_jetski_3", spec: "JETSKI", c: 427.5, r: 428.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_4", spec: "JETSKI", c: 497.5, r: 228.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_5", spec: "JETSKI", c: 497.5, r: 296.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { id: "boat_jetski_6", spec: "JETSKI", c: 392.0, r: 192.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true }
 
         ];
 
@@ -1023,9 +1023,9 @@ class LeonidaGame {
             if (isOpenWater(v.x, v.y) && isNearDryShore(v.x, v.y)) continue;
             let found = null;
             let fallbackWater = isOpenWater(v.x, v.y) ? { x: v.x, y: v.y } : null;
-            for (let rad = 12; rad <= TILE_SIZE * 10 && !found; rad += 12) {
-                for (let k = 0; k < 16; k++) {
-                    const ang = (k / 16) * Math.PI * 2;
+            for (let rad = 12; rad <= TILE_SIZE * 28 && !found; rad += 12) {
+                for (let k = 0; k < 20; k++) {
+                    const ang = (k / 20) * Math.PI * 2;
                     const tx = v.x + Math.cos(ang) * rad;
                     const ty = v.y + Math.sin(ang) * rad;
                     if (isOpenWater(tx, ty) && !this.vehicles.some((o) => o !== v && Math.hypot(o.x - tx, o.y - ty) < 40)) {
