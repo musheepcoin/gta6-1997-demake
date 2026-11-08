@@ -7242,6 +7242,11 @@ class LeonidaGame {
         };
     }
 
+    hasLineOfSight(x1, y1, x2, y2, z = 2.0) {
+        if (!this.map || typeof this.map.traceSegment2D !== "function") return true;
+        return !this.map.traceSegment2D(x1, y1, x2, y2, z).hit;
+    }
+
 
 
     addFloatingText(x, y, text, color = "#39ff14") {
@@ -12893,7 +12898,7 @@ class LeonidaGame {
                             ped.shootCooldown = Math.max(0, (ped.shootCooldown || 0) - dt);
                             if (dPlayer < 275 && ped.shootCooldown <= 0) {
                                 ped.shootCooldown = 0.72 + Math.random() * 0.22;
-                                if (this.hasLineOfSight(ped.x, ped.y, targetEnt.x, targetEnt.y)) {
+                                if (this.hasLineOfSight(ped.x, ped.y, targetEnt.x, targetEnt.y, ped.z || 2.0)) {
                                     ped.muzzleTimer = 0.09;
                                     this.fireWeapon(ped.x, ped.y, aimAng + (Math.random() - 0.5) * 0.12, ped.copWeapon || "PISTOL", false, false, "CRIMINAL");
                                 }
@@ -14061,7 +14066,7 @@ class LeonidaGame {
 
                     // Jason's cover fire never hits innocent civilians or monks!
 
-                    if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE" && ped.kind !== "CRIMINAL") continue;
+                    if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE" && ped.kind !== "CRIMINAL" && !ped.isAlertedGuard) continue;
 
                     // Police bullets only hit armed criminals on foot (never friendly fire other cops or civilians)
 
@@ -14071,7 +14076,7 @@ class LeonidaGame {
 
                     if (pr.npcFaction === "CRIMINAL" && ped.kind !== "COP") continue;
 
-                    if (Math.hypot(ped.x - pr.x, ped.y - pr.y) < 13) {
+                    if (Math.hypot(ped.x - pr.x, pr.y - ped.y) < 13) {
 
                         if (pr.isElectro) {
 
@@ -14108,6 +14113,10 @@ class LeonidaGame {
 
                             ped.attackedByPlayer = true;
 
+                        }
+                        if (pr.fromPlayer && ped.isVillaGuard) {
+                            ped.isAlertedGuard = true;
+                            ped.panicTimer = 0;
                         }
 
                         this.spawnParticle(pr.x, pr.y, "BLOOD");
@@ -15417,28 +15426,32 @@ class LeonidaGame {
 
             last = now;
 
-            this.update(dt);
+            try {
+                this.update(dt);
 
-            this.renderer.render(this, dt);
+                this.renderer.render(this, dt);
 
-            if (this.fullMapOpen && this.renderer) {
+                if (this.fullMapOpen && this.renderer) {
 
-                this.renderer.renderFullMap(this);
+                    this.renderer.renderFullMap(this);
 
-            }
+                }
 
-            if (
+                if (
 
-                this.killFrenzy ||
+                    this.killFrenzy ||
 
-                (this.player.inVehicle && this.player.inVehicle.bombArmed) ||
+                    (this.player.inVehicle && this.player.inVehicle.bombArmed) ||
 
-                (this.missions.activeMission && this.missions.activeMission.timer !== null)
+                    (this.missions.activeMission && this.missions.activeMission.timer !== null)
 
-            ) {
+                ) {
 
-                this.updateHud();
+                    this.updateHud();
 
+                }
+            } catch (err) {
+                console.error("Game frame error:", err);
             }
 
             requestAnimationFrame(frame);
