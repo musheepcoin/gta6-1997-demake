@@ -456,19 +456,17 @@ class LeonidaMap {
         }
 
         // =========================================================================
-        // CITY-WIDE URBAN SIDEWALK, ASPHALT PARKING SHOULDER & SURFACE PARKING LOT PASS
-        // 1) Recesses 1-tile step-down outer building skirts into 2-tile-wide sidewalks
-        //    while transferring 100% of outer wall facade textures (w, e, n, s) onto the
-        //    taller building core so every building facade stays seamless and 3D.
-        // 2) Transforms the 5 over-wide 4-lane urban boulevards (Port Gellhorn Blvd 52..55,
-        //    Downtown/Little Cuba Blvd 284..287, Washington Ave 424..427, Collins Ave 434..437,
-        //    Ocean Drive 444..447) into 2 active center driving lanes (lid 80) flanked by
-        //    dedicated Asphalt Curbside Parking Shoulders (lid 1, dir = 0) and intersection
-        //    sidewalk curb bulb-outs (PAWEMENT), with pedestrian sidewalks strictly outside!
-        // 3) Paves 2-tile-wide sidewalks (lid 8 stone / lid 9 coral) along urban & Keys roads.
-        // 4) Carves dedicated Off-Street 3x4 Asphalt Surface Parking Lots (lid 25) and
-        //    Recessed Asphalt Street-Side Parking Lay-Bys (lid 1, dir = 0) along 2-lane streets
-        //    so 100% of parked vehicles sit on real asphalt bays/lots and NEVER on sidewalks!
+        // AUTHENTIC MIAMI STRAIGHT BOULEVARD PARALLEL PARKING & OFF-STREET PARKING LOT PASS
+        // 1) Keeps 100% of street curbs, buildings, and Lummus Park geometry straight and
+        //    untouched (zero road narrowing, zero 64px sidewalk notches, zero mid-block signals).
+        // 2) On all 4-lane vertical boulevards (Port Gellhorn Blvd 52..55, Downtown/Calle Ocho
+        //    Blvd 284..287, Washington Ave 424..427, Collins Ave 434..437, Ocean Drive 444..447)
+        //    and 4-lane horizontal boulevards (y = 72..75, 295..298, 369..372), reserves the
+        //    straight outer curbside asphalt lanes (lid 1) as dedicated On-Street Parallel Parking
+        //    Lanes (z = 2 set to roadParkingNavIdx, isParkingBay = true) while moving AI traffic
+        //    flows smoothly in the 2 inner travel lanes (lid 80)!
+        // 3) Identifies clean 3x4 flat off-street lots behind the pedestrian sidewalk across the
+        //    cities for dedicated Asphalt Surface Parking Lots (90° stalls + 3D wheel stops).
         // =========================================================================
         {
             const roadParkingNavIdx = this.blocksData.length;
@@ -496,24 +494,6 @@ class LeonidaMap {
             });
             this.roadParkingNavIdx = roadParkingNavIdx;
 
-            const stonePaveCol = [];
-            const coralPaveCol = [];
-            const roadSouthCol = [];
-            const roadNorthCol = [];
-            const innerSouthCol = [0, 116, 94, 0, 0, 0];  // lid 80 Southbound (dashed white W, yellow center E)
-            const innerNorthCol = [0, 117, 104, 0, 0, 0]; // lid 80 Northbound (yellow center W, dashed white E)
-            const asphaltParkWestCol  = [0, 115, roadParkingNavIdx, 0, 0, 0]; // lid 1 rot 0 (curb W, dashed white E)
-            const asphaltParkEastCol  = [0, 118, roadParkingNavIdx, 0, 0, 0]; // lid 1 rot 2 (dashed white W, curb E)
-            const asphaltParkNorthCol = [0, 234, roadParkingNavIdx, 0, 0, 0]; // lid 1 rot 1 (curb N, dashed white S)
-            const asphaltParkSouthCol = [0, 239, roadParkingNavIdx, 0, 0, 0]; // lid 1 rot 3 (dashed white N, curb S)
-            const asphaltLotCol       = [0, 93,  roadParkingNavIdx, 0, 0, 0]; // lid 25 seamless asphalt parking lot
-            for (let z = 0; z < MAP_LAYERS; z++) {
-                stonePaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 170) * MAP_COLS + 178]; // lid 8 stone sidewalk
-                coralPaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 286) * MAP_COLS + 448]; // lid 9 coral sidewalk
-                roadSouthCol[z] = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 88];  // lid 74 Southbound (D)
-                roadNorthCol[z] = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 89];  // lid 74 Northbound (U)
-            }
-
             const getColHeight = (cx, cy) => {
                 for (let z = MAP_LAYERS - 1; z >= 0; z--) {
                     const b = this.blocksData[this.voxelGrid[(z * MAP_ROWS + cy) * MAP_COLS + cx]];
@@ -539,251 +519,66 @@ class LeonidaMap {
                 (cx >= 26 && cx <= 87 && cy >= 149 && cy <= 200)
             );
 
-            // Helper to clone a building block with updated wall face textures (w, e, n, s)
-            const wallVariantCache = new Map();
-            const getWallVariantIdx = (origIdx, nw, ne, nn, ns) => {
-                const src = this.blocksData[origIdx];
-                if (!src) return origIdx;
-                if (src.w === nw && src.e === ne && src.n === nn && src.s === ns) return origIdx;
-                const key = `${origIdx}_${nw}_${ne}_${nn}_${ns}`;
-                if (wallVariantCache.has(key)) return wallVariantCache.get(key);
-                const clone = {
-                    ...src,
-                    w: nw,
-                    e: ne,
-                    n: nn,
-                    s: ns,
-                    faces: [nw, ne, nn, ns, src.lid]
-                };
-                const nextIdx = this.blocksData.length;
-                this.blocksData.push(clone);
-                wallVariantCache.set(key, nextIdx);
-                return nextIdx;
-            };
-
-            // Pass A: Recess 1-tile step-down outer building skirts into 2-tile-wide sidewalks
-            const colHeights = new Uint8Array(MAP_ROWS * MAP_COLS);
-            for (let y = 0; y < MAP_ROWS; y++) {
-                for (let x = 0; x < MAP_COLS; x++) {
-                    colHeights[y * MAP_COLS + x] = getColHeight(x, y);
-                }
-            }
-            const isSkirt = new Uint8Array(MAP_ROWS * MAP_COLS);
-            for (let y = 25; y < 485; y++) {
-                for (let x = 30; x < 445; x++) {
-                    if (isProtectedCompound(x, y)) continue;
-                    const ch = colHeights[y * MAP_COLS + x];
-                    if (ch < 4) continue;
-                    const chW = colHeights[y * MAP_COLS + (x - 1)];
-                    const chE = colHeights[y * MAP_COLS + (x + 1)];
-                    const chN = colHeights[(y - 1) * MAP_COLS + x];
-                    const chS = colHeights[(y + 1) * MAP_COLS + x];
-                    const allowWE = (x < 415);
-                    const wSk = allowWE && (chW <= 3 && chE > ch);
-                    const eSk = allowWE && (chE <= 3 && chW > ch);
-                    const nSk = (chN <= 3 && chS > ch);
-                    const sSk = (chS <= 3 && chN > ch);
-                    const nwSk = allowWE && (chW <= 3 && chN <= 3 && chE === ch && chS === ch && colHeights[(y + 1) * MAP_COLS + (x + 1)] > ch);
-                    const neSk = allowWE && (chE <= 3 && chN <= 3 && chW === ch && chS === ch && colHeights[(y + 1) * MAP_COLS + (x - 1)] > ch);
-                    const swSk = allowWE && (chW <= 3 && chS <= 3 && chE === ch && chN === ch && colHeights[(y - 1) * MAP_COLS + (x + 1)] > ch);
-                    const seSk = allowWE && (chE <= 3 && chS <= 3 && chW === ch && chN === ch && colHeights[(y - 1) * MAP_COLS + (x - 1)] > ch);
-                    if (wSk || eSk || nSk || sSk || nwSk || neSk || swSk || seSk) {
-                        isSkirt[y * MAP_COLS + x] = 1;
-                    }
-                }
-            }
-
-            // Transfer wall face textures from recessed skirt tiles onto newly exposed core building tiles
-            for (let y = 25; y < 485; y++) {
-                for (let x = 30; x < 445; x++) {
-                    const idx = y * MAP_COLS + x;
-                    if (isSkirt[idx] || colHeights[idx] < 4) continue;
-                    const coreCh = colHeights[idx];
-                    const expW = isSkirt[y * MAP_COLS + (x - 1)] === 1;
-                    const expE = isSkirt[y * MAP_COLS + (x + 1)] === 1;
-                    const expN = isSkirt[(y - 1) * MAP_COLS + x] === 1;
-                    const expS = isSkirt[(y + 1) * MAP_COLS + x] === 1;
-                    if (!expW && !expE && !expN && !expS) continue;
-
-                    const topCoreBlk = this.blocksData[this.voxelGrid[((coreCh - 1) * MAP_ROWS + y) * MAP_COLS + x]] || EMPTY_BLOCK;
-                    for (let z = 2; z < coreCh; z++) {
-                        const gIdx = (z * MAP_ROWS + y) * MAP_COLS + x;
-                        const origIdx = this.voxelGrid[gIdx];
-                        const curBlk = this.blocksData[origIdx];
-                        if (!curBlk) continue;
-                        let nw = curBlk.w, ne = curBlk.e, nn = curBlk.n, ns = curBlk.s;
-                        const pickFaceTex = (skX, skY, faceKey) => {
-                            const skCh = colHeights[skY * MAP_COLS + skX];
-                            const sampleZ = Math.min(z, Math.max(2, skCh - 2));
-                            const skBlk = this.blocksData[this.voxelGrid[(sampleZ * MAP_ROWS + skY) * MAP_COLS + skX]] || EMPTY_BLOCK;
-                            return (
-                                skBlk[faceKey] ||
-                                topCoreBlk[faceKey] ||
-                                curBlk.w || curBlk.e || curBlk.n || curBlk.s ||
-                                skBlk.w || skBlk.e || skBlk.n || skBlk.s ||
-                                86
-                            );
-                        };
-                        if (expW && !nw) nw = pickFaceTex(x - 1, y, "w");
-                        if (expE && !ne) ne = pickFaceTex(x + 1, y, "e");
-                        if (expN && !nn) nn = pickFaceTex(x, y - 1, "n");
-                        if (expS && !ns) ns = pickFaceTex(x, y + 1, "s");
-                        this.voxelGrid[gIdx] = getWallVariantIdx(origIdx, nw, ne, nn, ns);
-                    }
-                }
-            }
-
-            // Convert recessed skirt columns into ground PAWEMENT sidewalks
-            for (let y = 25; y < 485; y++) {
-                for (let x = 30; x < 445; x++) {
-                    if (isSkirt[y * MAP_COLS + x] === 1) {
-                        const paveCol = (x >= 420) ? coralPaveCol : stonePaveCol;
-                        for (let z = 0; z < MAP_LAYERS; z++) {
-                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + x] = paveCol[z];
-                        }
-                    }
-                }
-            }
-
-            // Pass B: Convert the 5 over-wide 4-lane urban avenues (52..55, 284..287, 424..427, 434..437, 444..447)
-            // into 2 active center driving lanes (c0+1 Southbound, c0+2 Northbound) flanked by real Asphalt Curbside
-            // Parking Shoulders (c0 West, c0+3 East, lid 1 with dir=0) and intersection sidewalk curb bulb-outs!
+            // 1) Reserve the outer curbside asphalt lanes (c0 West, c0+3 East) of the 5 vertical 4-lane boulevards
+            //    as straight Miami On-Street Parallel Parking Lanes (keeping visual z=1 tiles 100% straight and original!)
             for (const c0 of [52, 284, 424, 434, 444]) {
-                const paveCol = (c0 >= 420) ? coralPaveCol : stonePaveCol;
                 for (let y = 48; y <= 372; y++) {
-                    if (
-                        getColHeight(c0, y) > 3 ||
-                        getColHeight(c0 + 1, y) > 3 ||
-                        getColHeight(c0 + 2, y) > 3 ||
-                        getColHeight(c0 + 3, y) > 3
-                    ) {
-                        continue;
-                    }
-                    if (
-                        getColGt(c0, y) !== GROUND_TYPE.ROAD ||
-                        getColGt(c0 + 1, y) !== GROUND_TYPE.ROAD ||
-                        getColGt(c0 + 2, y) !== GROUND_TYPE.ROAD ||
-                        getColGt(c0 + 3, y) !== GROUND_TYPE.ROAD
-                    ) {
-                        continue;
-                    }
+                    if (getColHeight(c0, y) > 3 || getColHeight(c0 + 3, y) > 3) continue;
+                    const isBridgeRow = (getColLid1(c0 - 1, y) === 41 || getColLid1(c0 + 4, y) === 41);
+                    if (isBridgeRow) continue;
                     const l0 = getColLid1(c0, y);
                     const l1 = getColLid1(c0 + 1, y);
                     const l2 = getColLid1(c0 + 2, y);
                     const l3 = getColLid1(c0 + 3, y);
-                    const isBridgeRow = (getColLid1(c0 - 1, y) === 41 || getColLid1(c0 + 4, y) === 41);
-                    const isStraight4Lane =
-                        (l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) ||
-                        (l0 === 74 && l1 === 74 && l2 === 74 && l3 === 74 && !isBridgeRow);
-
-                    if (isStraight4Lane) {
-                        // Check if within 1 tile of an intersection stop-line (24) or junction box (25):
-                        // place a Miami Beach sidewalk curb bulb-out ("oreille de trottoir") at intersection corners,
-                        // and a recessed Asphalt Curbside Parking Shoulder (lid 1, dir = 0) along the mid-block stretch!
-                        const adjN = getColLid1(c0 + 1, y - 1);
-                        const adjS = getColLid1(c0 + 1, y + 1);
-                        const isCornerBulbOut = (adjN === 24 || adjN === 25 || adjS === 24 || adjS === 25);
-                        for (let z = 0; z < MAP_LAYERS; z++) {
-                            if (isCornerBulbOut) {
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0]     = paveCol[z];
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 1] = roadSouthCol[z];
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 2] = roadNorthCol[z];
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 3] = paveCol[z];
-                            } else {
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0]     = asphaltParkWestCol[z];
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 1] = innerSouthCol[z];
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 2] = innerNorthCol[z];
-                                this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 3] = asphaltParkEastCol[z];
-                            }
-                        }
-                    } else if (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24) {
-                        for (let z = 0; z < MAP_LAYERS; z++) {
-                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0]     = paveCol[z];
-                            this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + c0 + 3] = paveCol[z];
-                        }
-                    } else if (l0 === 25 && l1 === 25 && l2 === 25 && l3 === 25) {
-                        const westIsRoad = getColGt(c0 - 1, y) === GROUND_TYPE.ROAD;
-                        const eastIsRoad = getColGt(c0 + 4, y) === GROUND_TYPE.ROAD;
-                        for (let z = 0; z < MAP_LAYERS; z++) {
-                            const rowOff = (z * MAP_ROWS + y) * MAP_COLS;
-                            if (westIsRoad) {
-                                this.voxelGrid[rowOff + c0]     = this.voxelGrid[rowOff + c0 - 1];
-                                this.voxelGrid[rowOff + c0 - 1] = this.voxelGrid[rowOff + c0 - 2];
-                            } else {
-                                this.voxelGrid[rowOff + c0 + 1] = this.voxelGrid[rowOff + c0];
-                                this.voxelGrid[rowOff + c0]     = paveCol[z];
-                            }
-                            if (eastIsRoad) {
-                                this.voxelGrid[rowOff + c0 + 3] = this.voxelGrid[rowOff + c0 + 4];
-                                this.voxelGrid[rowOff + c0 + 4] = this.voxelGrid[rowOff + c0 + 5];
-                            } else {
-                                this.voxelGrid[rowOff + c0 + 2] = this.voxelGrid[rowOff + c0 + 3];
-                                this.voxelGrid[rowOff + c0 + 3] = paveCol[z];
-                            }
-                        }
+                    if ((l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) || (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24)) {
+                        this.voxelGrid[(2 * MAP_ROWS + y) * MAP_COLS + c0]     = roadParkingNavIdx;
+                        this.voxelGrid[(2 * MAP_ROWS + y) * MAP_COLS + c0 + 3] = roadParkingNavIdx;
                     }
                 }
             }
 
-            // Pass C: Universal 2-tile-wide sidewalk paving where urban or Leonida Keys roads touch FIELD (grass/inland sand)
-            const groundRoadMask = new Uint8Array(MAP_ROWS * MAP_COLS);
-            for (let y = 2; y < MAP_ROWS - 2; y++) {
-                for (let x = 2; x < MAP_COLS - 2; x++) {
-                    if (getColHeight(x, y) <= 3 && getColGt(x, y) === GROUND_TYPE.ROAD) {
-                        groundRoadMask[y * MAP_COLS + x] = 1;
+            // 2) Reserve the outer curbside asphalt lanes (r0 North, r0+3 South) of the horizontal 4-lane boulevards
+            for (const r0 of [72, 295, 369]) {
+                for (let x = 48; x <= 442; x++) {
+                    if (isProtectedCompound(x, r0)) continue;
+                    if (getColHeight(x, r0) > 3 || getColHeight(x, r0 + 3) > 3) continue;
+                    const isBridgeCol = (getColLid1(x, r0 - 1) === 41 || getColLid1(x, r0 + 4) === 41);
+                    if (isBridgeCol) continue;
+                    const l0 = getColLid1(x, r0);
+                    const l1 = getColLid1(x, r0 + 1);
+                    const l2 = getColLid1(x, r0 + 2);
+                    const l3 = getColLid1(x, r0 + 3);
+                    if ((l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) || (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24)) {
+                        this.voxelGrid[(2 * MAP_ROWS + r0) * MAP_COLS + x]       = roadParkingNavIdx;
+                        this.voxelGrid[(2 * MAP_ROWS + (r0 + 3)) * MAP_COLS + x] = roadParkingNavIdx;
                     }
-                }
-            }
-            const toPave = [];
-            for (let y = 40; y <= 485; y++) {
-                for (let x = 34; x <= 448; x++) {
-                    if (isProtectedCompound(x, y)) continue;
-                    if (y > 368 && !(x >= 185 && x <= 415 && y >= 435 && y <= 485)) continue;
-                    if (getColHeight(x, y) > 3) continue;
-                    if (getColGt(x, y) !== GROUND_TYPE.FIELD) continue;
-                    const lid1 = getColLid1(x, y);
-                    // Preserve natural coastal & Lake Leonida beach sand (lid 98)
-                    if (lid1 >= 98 && lid1 <= 101 && (y > 368 || (x >= 75 && x <= 175 && y >= 180 && y <= 262))) {
-                        continue;
-                    }
-                    let nearUrbanRoad = false;
-                    for (let dy = -2; dy <= 2 && !nearUrbanRoad; dy++) {
-                        for (let dx = -2; dx <= 2; dx++) {
-                            if (Math.abs(dx) + Math.abs(dy) <= 2 && groundRoadMask[(y + dy) * MAP_COLS + (x + dx)] === 1) {
-                                nearUrbanRoad = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (nearUrbanRoad) {
-                        toPave.push([x, y]);
-                    }
-                }
-            }
-            for (let i = 0; i < toPave.length; i++) {
-                const [px, py] = toPave[i];
-                const paveCol = (px >= 420) ? coralPaveCol : stonePaveCol;
-                for (let z = 0; z < MAP_LAYERS; z++) {
-                    this.voxelGrid[(z * MAP_ROWS + py) * MAP_COLS + px] = paveCol[z];
                 }
             }
 
-            // Pass D1: Carve Dedicated Off-Street 3x4 Asphalt Surface Parking Lots (lid 25) with Dashed Driveway Entrances
-            //          across South Beach, Wynwood, Little Haiti, Downtown, Little Cuba & Port Gellhorn
+            const stonePaveCol = [];
+            const coralPaveCol = [];
+            for (let z = 0; z < MAP_LAYERS; z++) {
+                stonePaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 170) * MAP_COLS + 178];
+                coralPaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 286) * MAP_COLS + 448];
+            }
+
+            // 3) Detect clean 3x4 flat off-street lots set back behind the pedestrian sidewalk (x-1 is sidewalk, x-2 is road;
+            //    or x+3 is sidewalk, x+4 is road) for dedicated Off-Street Asphalt Surface Parking Lots (zero road voxel changes!)
             this.surfaceParkingLots = [];
-            for (let y = 48; y <= 354; y += 2) {
-                for (let x = 38; x <= 440; x += 2) {
-                    if (isProtectedCompound(x, y) || isProtectedCompound(x + 3, y + 5)) continue;
+            for (let y = 52; y <= 352; y += 2) {
+                for (let x = 40; x <= 438; x += 2) {
+                    if (isProtectedCompound(x, y) || isProtectedCompound(x + 2, y + 3)) continue;
                     if (x >= 75 && x <= 175 && y >= 180 && y <= 262) continue; // Lake Leonida
+                    if (x >= 330 && x <= 406 && y >= 120 && y <= 215) continue; // Keep Star & Venetian mansion lawns green
+                    if (x >= 442) continue; // Keep Lummus Park & Vice Beach 100% untouched
                     if (this.surfaceParkingLots.some((lot) => Math.hypot(lot.x0 - x, lot.y0 - y) < 22)) continue;
 
-                    // Require a flat 4x6 block of PAWEMENT/FIELD (not water, boardwalk or beach sand)
                     let blockOk = true;
-                    for (let dy = 0; dy < 6 && blockOk; dy++) {
-                        for (let dx = 0; dx < 4; dx++) {
+                    for (let dy = 0; dy < 4 && blockOk; dy++) {
+                        for (let dx = 0; dx < 3; dx++) {
                             const cx = x + dx;
                             const cy = y + dy;
-                            if (getColHeight(cx, cy) > 3) { blockOk = false; break; }
+                            if (getColHeight(cx, cy) > 2) { blockOk = false; break; }
                             const gt = getColGt(cx, cy);
                             const l1 = getColLid1(cx, cy);
                             if ((gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) || (l1 !== 8 && l1 !== 9 && l1 !== 10)) {
@@ -794,150 +589,37 @@ class LeonidaMap {
                     }
                     if (!blockOk) continue;
 
-                    // Check if West (x - 1) is a straight Northbound lane (z1 === 121) or East (x + 4) is a straight Southbound lane (z1 === 120)
-                    let roadSide = null;
-                    let wStraight = true;
-                    let eStraight = true;
-                    for (let dy = 0; dy < 6; dy++) {
-                        if (this.voxelGrid[(1 * MAP_ROWS + (y + dy)) * MAP_COLS + (x - 1)] !== 121) wStraight = false;
-                        if (this.voxelGrid[(1 * MAP_ROWS + (y + dy)) * MAP_COLS + (x + 4)] !== 120) eStraight = false;
+                    let wOk = true;
+                    let eOk = true;
+                    for (let dy = 0; dy < 4; dy++) {
+                        if (getColGt(x - 1, y + dy) !== GROUND_TYPE.PAWEMENT || getColGt(x - 2, y + dy) !== GROUND_TYPE.ROAD) wOk = false;
+                        if (getColGt(x + 3, y + dy) !== GROUND_TYPE.PAWEMENT || getColGt(x + 4, y + dy) !== GROUND_TYPE.ROAD) eOk = false;
                     }
-                    if (wStraight) roadSide = "W";
-                    else if (eStraight) roadSide = "E";
+                    const roadSide = wOk ? "W" : (eOk ? "E" : null);
                     if (!roadSide) continue;
 
                     const paveCol = (x >= 420) ? coralPaveCol : stonePaveCol;
-                    for (let dy = 0; dy < 6; dy++) {
-                        for (let dx = 0; dx < 4; dx++) {
-                            const cx = x + dx;
-                            const cy = y + dy;
-                            const isInnerAsphalt = (dy >= 1 && dy <= 4) && (roadSide === "W" ? (dx <= 2) : (dx >= 1));
-                            const srcCol = isInnerAsphalt ? asphaltLotCol : paveCol;
+                    for (let dy = 0; dy < 4; dy++) {
+                        for (let dx = 0; dx < 3; dx++) {
                             for (let z = 0; z < MAP_LAYERS; z++) {
-                                this.voxelGrid[(z * MAP_ROWS + cy) * MAP_COLS + cx] = srcCol[z];
+                                this.voxelGrid[(z * MAP_ROWS + (y + dy)) * MAP_COLS + (x + dx)] = paveCol[z];
                             }
                         }
-                    }
-                    // Open the street curb along the 4 asphalt lot rows (y+1 .. y+4) with a dashed white entrance line (lid 80)
-                    const roadColX = roadSide === "W" ? (x - 1) : (x + 4);
-                    const dashedZ1 = roadSide === "W" ? 117 : 116;
-                    for (let dy = 1; dy <= 4; dy++) {
-                        this.voxelGrid[(1 * MAP_ROWS + (y + dy)) * MAP_COLS + roadColX] = dashedZ1;
                     }
 
                     this.surfaceParkingLots.push({
                         x0: x,
                         y0: y,
                         roadSide,
-                        asphaltMinX: roadSide === "W" ? x : (x + 1),
-                        asphaltMaxX: roadSide === "W" ? (x + 2) : (x + 3),
-                        asphaltMinY: y + 1,
-                        asphaltMaxY: y + 4,
-                        stallCol: roadSide === "W" ? (x + 2) : (x + 1)
+                        asphaltMinX: x,
+                        asphaltMaxX: x + 2,
+                        asphaltMinY: y,
+                        asphaltMaxY: y + 3,
+                        stallCol: roadSide === "W" ? (x + 2) : x
                     });
-                    if (this.surfaceParkingLots.length >= 18) break;
+                    if (this.surfaceParkingLots.length >= 22) break;
                 }
-                if (this.surfaceParkingLots.length >= 18) break;
-            }
-
-            // Pass D2: Carve Recessed 3-Tile Asphalt Street-Side Parking Lay-Bys (lid 1, dir = 0) along 2-Lane Streets
-            //          wherever a 2-tile-wide PAWEMENT sidewalk exists (leaving the inner sidewalk tile 100% intact for peds!)
-            // 1) Vertical 2-lane streets (West side adjacent to z1=120 Southbound, East side adjacent to z1=121 Northbound)
-            for (let y = 46; y <= 476; y++) {
-                for (let x = 36; x <= 442; x++) {
-                    if (isProtectedCompound(x, y)) continue;
-                    // West side recessed bay at x (adjacent to Southbound lane at x + 1, with inner sidewalk at x - 1)
-                    if (((y + x * 3) % 7) === 0) {
-                        let okW = true;
-                        for (let dy = -1; dy <= 3; dy++) {
-                            const cy = y + dy;
-                            if (this.voxelGrid[(1 * MAP_ROWS + cy) * MAP_COLS + (x + 1)] !== 120) { okW = false; break; }
-                            if (getColGt(x, cy) !== GROUND_TYPE.PAWEMENT || getColGt(x - 1, cy) !== GROUND_TYPE.PAWEMENT) { okW = false; break; }
-                            const lOuter = getColLid1(x, cy);
-                            const lInner = getColLid1(x - 1, cy);
-                            if ((lOuter !== 8 && lOuter !== 9) || (lInner !== 8 && lInner !== 9)) { okW = false; break; }
-                        }
-                        if (okW) {
-                            for (let dy = 0; dy <= 2; dy++) {
-                                const cy = y + dy;
-                                for (let z = 0; z < MAP_LAYERS; z++) {
-                                    this.voxelGrid[(z * MAP_ROWS + cy) * MAP_COLS + x] = asphaltParkWestCol[z];
-                                }
-                                this.voxelGrid[(1 * MAP_ROWS + cy) * MAP_COLS + (x + 1)] = 116; // lid 80 dashed white line
-                            }
-                        }
-                    }
-                    // East side recessed bay at x (adjacent to Northbound lane at x - 1, with inner sidewalk at x + 1)
-                    if (((y + x * 5 + 3) % 7) === 0) {
-                        let okE = true;
-                        for (let dy = -1; dy <= 3; dy++) {
-                            const cy = y + dy;
-                            if (this.voxelGrid[(1 * MAP_ROWS + cy) * MAP_COLS + (x - 1)] !== 121) { okE = false; break; }
-                            if (getColGt(x, cy) !== GROUND_TYPE.PAWEMENT || getColGt(x + 1, cy) !== GROUND_TYPE.PAWEMENT) { okE = false; break; }
-                            const lOuter = getColLid1(x, cy);
-                            const lInner = getColLid1(x + 1, cy);
-                            if ((lOuter !== 8 && lOuter !== 9) || (lInner !== 8 && lInner !== 9)) { okE = false; break; }
-                        }
-                        if (okE) {
-                            for (let dy = 0; dy <= 2; dy++) {
-                                const cy = y + dy;
-                                for (let z = 0; z < MAP_LAYERS; z++) {
-                                    this.voxelGrid[(z * MAP_ROWS + cy) * MAP_COLS + x] = asphaltParkEastCol[z];
-                                }
-                                this.voxelGrid[(1 * MAP_ROWS + cy) * MAP_COLS + (x - 1)] = 117; // lid 80 dashed white line
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2) Horizontal 2-lane streets (North side adjacent to z1=99 Westbound, South side adjacent to z1=103 Eastbound)
-            for (let y = 46; y <= 476; y++) {
-                for (let x = 36; x <= 442; x++) {
-                    if (isProtectedCompound(x, y)) continue;
-                    // North side recessed bay at y (adjacent to Westbound lane at y + 1, with inner sidewalk at y - 1)
-                    if (((x + y * 3) % 8) === 0) {
-                        let okN = true;
-                        for (let dx = -1; dx <= 3; dx++) {
-                            const cx = x + dx;
-                            if (this.voxelGrid[(1 * MAP_ROWS + (y + 1)) * MAP_COLS + cx] !== 99) { okN = false; break; }
-                            if (getColGt(cx, y) !== GROUND_TYPE.PAWEMENT || getColGt(cx, y - 1) !== GROUND_TYPE.PAWEMENT) { okN = false; break; }
-                            const lOuter = getColLid1(cx, y);
-                            const lInner = getColLid1(cx, y - 1);
-                            if ((lOuter !== 8 && lOuter !== 9) || (lInner !== 8 && lInner !== 9)) { okN = false; break; }
-                        }
-                        if (okN) {
-                            for (let dx = 0; dx <= 2; dx++) {
-                                const cx = x + dx;
-                                for (let z = 0; z < MAP_LAYERS; z++) {
-                                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + cx] = asphaltParkNorthCol[z];
-                                }
-                                this.voxelGrid[(1 * MAP_ROWS + (y + 1)) * MAP_COLS + cx] = 235; // lid 80 dashed white line
-                            }
-                        }
-                    }
-                    // South side recessed bay at y (adjacent to Eastbound lane at y - 1, with inner sidewalk at y + 1)
-                    if (((x + y * 5 + 4) % 8) === 0) {
-                        let okS = true;
-                        for (let dx = -1; dx <= 3; dx++) {
-                            const cx = x + dx;
-                            if (this.voxelGrid[(1 * MAP_ROWS + (y - 1)) * MAP_COLS + cx] !== 103) { okS = false; break; }
-                            if (getColGt(cx, y) !== GROUND_TYPE.PAWEMENT || getColGt(cx, y + 1) !== GROUND_TYPE.PAWEMENT) { okS = false; break; }
-                            const lOuter = getColLid1(cx, y);
-                            const lInner = getColLid1(cx, y + 1);
-                            if ((lOuter !== 8 && lOuter !== 9) || (lInner !== 8 && lInner !== 9)) { okS = false; break; }
-                        }
-                        if (okS) {
-                            for (let dx = 0; dx <= 2; dx++) {
-                                const cx = x + dx;
-                                for (let z = 0; z < MAP_LAYERS; z++) {
-                                    this.voxelGrid[(z * MAP_ROWS + y) * MAP_COLS + cx] = asphaltParkSouthCol[z];
-                                }
-                                this.voxelGrid[(1 * MAP_ROWS + (y - 1)) * MAP_COLS + cx] = 236; // lid 80 dashed white line
-                            }
-                        }
-                    }
-                }
+                if (this.surfaceParkingLots.length >= 22) break;
             }
         }
 
@@ -4012,6 +3694,15 @@ class LeonidaMap {
                 // Require the adjacent tile behind the concrete curb (c - dc, r - dr) to be a real PAWEMENT pedestrian sidewalk
                 const sidewalkGt = this.surfaceGround[(r - dr) * MAP_COLS + (c - dc)];
                 if (sidewalkGt !== GROUND_TYPE.PAWEMENT) continue;
+
+                // Never park on an intersection stop-line / crosswalk row (leave 1 full tile clearance at every corner!)
+                if (
+                    this.isStopLineBlock(c, r) ||
+                    this.getBlockInfo(c - perpX, r - perpY, 1)?.lid === 25 ||
+                    this.getBlockInfo(c + perpX, r + perpY, 1)?.lid === 25
+                ) {
+                    continue;
+                }
 
                 // Require at least 1 neighbor tile along the bay (+1 or -1) to also be part of the same asphalt parking bay
                 const prevIsBay = this.voxelGrid[(2 * MAP_ROWS + (r - perpY)) * MAP_COLS + (c - perpX)] === this.roadParkingNavIdx;

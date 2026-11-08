@@ -5411,10 +5411,11 @@ class RetroRenderer {
                 // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
                 if (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80) animType = 5.0;
                 else if (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82) animType = 5.25;
-                // Junction box tiles (lid 25) and recessed asphalt parking bay tiles (lid 1) facing non-road blocks
-                // encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader continues the concrete curb,
-                // gutter & yellow edge line around every sidewalk/bulb-out boundary!
-                if ((effTileIdx === 25 || effTileIdx === 1) && this.map) {
+                // Junction box tiles (lid 25) have no curb at all, so where a box side faces the pavement
+                // (T-junctions, box wider than the crossing road) bare asphalt bulged into the sidewalk like a
+                // pasted rectangle. Encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader
+                // continues the curb, gutter & yellow edge line straight through the junction.
+                if (effTileIdx === 25 && this.map) {
                     const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
                     const nonRoad = (cx, cy) => {
                         const bi = this.map.getBlockIndex(cx, cy, y_elev);
@@ -9356,7 +9357,20 @@ class RetroRenderer {
             }
         }
 
-        // 7C-ter. Asphalt Parking Shoulder Stall Markings (T-Stalls), Off-Street Parking Lot 90° Stalls & 3D Wheel Stops + Sidewalk Parking Meters
+        // 7C-ter. Off-Street Asphalt Surface Parking Lots (Tarmac Pad + 90° Stalls + 3D Wheel Stops) & Straight Boulevard Parallel Parking Boxes
+        if (this.map && Array.isArray(this.map.surfaceParkingLots)) {
+            for (let li = 0; li < this.map.surfaceParkingLots.length; li++) {
+                const lot = this.map.surfaceParkingLots[li];
+                const cx = ((lot.asphaltMinX + lot.asphaltMaxX + 1) * 0.5) * TILE_SIZE;
+                const cy = ((lot.asphaltMinY + lot.asphaltMaxY + 1) * 0.5) * TILE_SIZE;
+                if (cx < minX - 180 || cx > maxX + 180 || cy < minY - 180 || cy > maxY + 180) continue;
+                const lotW = (lot.asphaltMaxX - lot.asphaltMinX + 1) * TILE_SIZE;
+                const lotH = (lot.asphaltMaxY - lot.asphaltMinY + 1) * TILE_SIZE;
+                // Concrete perimeter curb frame + dark asphalt surface parking lot tarmac pad
+                this.pushSolidQuad3D(cx, cy, 2.002, lotH + 6.0, lotW + 6.0, Math.PI * 0.5, 0.76, 0.73, 0.68, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy, 2.004, lotH, lotW, Math.PI * 0.5, 0.19, 0.21, 0.25, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
         if (this.map && Array.isArray(this.map.curbParkingBays)) {
             const nf = nfGlobal;
             const meterShadowLen = sunShadowLen * 0.25;
