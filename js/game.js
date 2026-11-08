@@ -1449,7 +1449,7 @@ class LeonidaGame {
         const bays = this.map.curbParkingBays;
         for (let i = 0; i < bays.length; i++) {
             const bay = bays[i];
-            if (!bay || !bay.specKey) continue;
+            if (!bay || !bay.specKey || bay.emptyStall) continue;
             // Ensure no overlap with player or existing vehicles (hero cars, estate cars, traffic)
             if (this.player && Math.hypot(this.player.x - bay.x, this.player.y - bay.y) < 42) continue;
             let occupied = false;

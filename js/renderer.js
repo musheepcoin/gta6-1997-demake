@@ -5411,11 +5411,10 @@ class RetroRenderer {
                 // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
                 if (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80) animType = 5.0;
                 else if (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82) animType = 5.25;
-                // Junction box tiles (lid 25) have no curb at all, so where a box side faces the pavement
-                // (T-junctions, box wider than the crossing road) bare asphalt bulged into the sidewalk like a
-                // pasted rectangle. Encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader
-                // continues the curb, gutter & yellow edge line straight through the junction.
-                if (effTileIdx === 25 && this.map) {
+                // Junction box tiles (lid 25) and recessed asphalt parking bay tiles (lid 1) facing non-road blocks
+                // encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader continues the concrete curb,
+                // gutter & yellow edge line around every sidewalk/bulb-out boundary!
+                if ((effTileIdx === 25 || effTileIdx === 1) && this.map) {
                     const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
                     const nonRoad = (cx, cy) => {
                         const bi = this.map.getBlockIndex(cx, cy, y_elev);
@@ -9357,7 +9356,7 @@ class RetroRenderer {
             }
         }
 
-        // 7C-ter. Curbside Sidewalk Parking Stall Markings (Painted White T-Stalls) & 3D Dual-Head Parking Meters
+        // 7C-ter. Asphalt Parking Shoulder Stall Markings (T-Stalls), Off-Street Parking Lot 90° Stalls & 3D Wheel Stops + Sidewalk Parking Meters
         if (this.map && Array.isArray(this.map.curbParkingBays)) {
             const nf = nfGlobal;
             const meterShadowLen = sunShadowLen * 0.25;
@@ -9368,24 +9367,38 @@ class RetroRenderer {
                 const ang = bay.angle || 0;
                 const ca = Math.cos(ang);
                 const sa = Math.sin(ang);
-                const halfL = 27.0;
-                // Front & rear transverse white stall boundary lines on the sidewalk pavement
+                const crossAng = ang + Math.PI * 0.5;
+
+                if (bay.isLotParked) {
+                    // Dedicated Off-Street Asphalt Parking Lot 90° Perpendicular Stall Lines + 3D Concrete Wheel Stop Bumper
+                    const nx = -sa;
+                    const ny = ca;
+                    const halfW = 31.0;
+                    this.pushSolidQuad3D(bay.x + nx * halfW, bay.y + ny * halfW, sz + 0.006, 54.0, 2.0, ang, 0.96, 0.97, 0.99, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bay.x - nx * halfW, bay.y - ny * halfW, sz + 0.006, 54.0, 2.0, ang, 0.96, 0.97, 0.99, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (bay.wheelStopX !== undefined && bay.wheelStopY !== undefined) {
+                        // 3D yellow/concrete wheel stop bumper ("butée de parking en béton") near the front of the stall
+                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.012, 36.0, 5.2, crossAng, 0.14, 0.18, 0.24, 0.65, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.032, 34.0, 4.0, crossAng, 0.95, 0.78, 0.18, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    continue;
+                }
+
+                const halfL = 27.5;
+                // Front & rear transverse white stall boundary lines painted directly on the Asphalt Parking Shoulder / Lay-By
                 const fx = bay.x + ca * halfL;
                 const fy = bay.y + sa * halfL;
                 const rx = bay.x - ca * halfL;
                 const ry = bay.y - sa * halfL;
-                const crossAng = ang + Math.PI * 0.5;
-                this.pushSolidQuad3D(fx, fy, sz + 0.006, 22.0, 1.7, crossAng, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(rx, ry, sz + 0.006, 22.0, 1.7, crossAng, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                // Longitudinal T-corner ticks framing the stall
-                const roadDirX = bay.roadSide === "W" ? -1 : (bay.roadSide === "E" ? 1 : 0);
-                const roadDirY = bay.roadSide === "N" ? -1 : (bay.roadSide === "S" ? 1 : 0);
-                const edgeX = bay.x + roadDirX * 10.5;
-                const edgeY = bay.y + roadDirY * 10.5;
-                this.pushSolidQuad3D(edgeX + ca * (halfL - 4.5), edgeY + sa * (halfL - 4.5), sz + 0.006, 9.0, 1.7, ang, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(edgeX - ca * (halfL - 4.5), edgeY - sa * (halfL - 4.5), sz + 0.006, 9.0, 1.7, ang, 0.94, 0.96, 0.98, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(fx, fy, sz + 0.006, 23.0, 1.8, crossAng, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(rx, ry, sz + 0.006, 23.0, 1.8, crossAng, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Longitudinal T-corner ticks on the street-side edge of the asphalt parking stall
+                const edgeX = bay.x + (bay.dc || 0) * 11.0;
+                const edgeY = bay.y + (bay.dr || 0) * 11.0;
+                this.pushSolidQuad3D(edgeX + ca * (halfL - 4.5), edgeY + sa * (halfL - 4.5), sz + 0.006, 9.5, 1.8, ang, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(edgeX - ca * (halfL - 4.5), edgeY - sa * (halfL - 4.5), sz + 0.006, 9.5, 1.8, ang, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
-                // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing
+                // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing (standing on the raised PAWEMENT sidewalk behind the curb!)
                 const mx = bay.meterX;
                 const my = bay.meterY;
                 if (mx !== undefined && my !== undefined) {
