@@ -10160,9 +10160,49 @@ class LeonidaGame {
 
 
 
-                // B. Motorcycle Wheelie Bonus ([SPACE] while riding a Superbike or Chopper at speed!)
+                // B. Motorcycle Wheelie Bonus OR Marine Hydro-Boost Roostertail & Wave Crest Jump ([SPACE] at speed!)
 
-                if (mySeat === 0 && v.isMotorcycle && this.input.handbrake && Math.hypot(v.vx, v.vy) > 130) {
+                if ((v._waveJumpCd || 0) > 0) v._waveJumpCd = Math.max(0, v._waveJumpCd - dt);
+
+                const isWaterCraft = Boolean(v.waterOnly || v.specKey === "AIRBOAT");
+
+                if (mySeat === 0 && isWaterCraft && this.input.handbrake && Math.hypot(v.vx, v.vy) > 95 && this.map.isWaterAtPixel(v.x, v.y)) {
+
+                    v.wheelieTimer = (v.wheelieTimer || 0) + dt;
+
+                    v.roostertailActive = true;
+
+                    v.vx += Math.cos(v.angle) * 165 * dt;
+
+                    v.vy += Math.sin(v.angle) * 165 * dt;
+
+                    if (Math.hypot(v.vx, v.vy) > 290 && (v.stuntAirTimer || 0) <= 0 && (v._waveJumpCd || 0) <= 0 && v.wheelieTimer > 0.65) {
+
+                        v._waveJumpCd = 4.2;
+
+                        v.stuntMaxTime = 0.88;
+
+                        v.stuntAirTimer = 0.88;
+
+                        v.lastRampName = "VICE BAY WAVE CREST JUMP";
+
+                        this.audio.playBeep(560, 0.10, "sawtooth", 0.07);
+
+                        this.addFloatingText(v.x, v.y - 26, "🌊 WAVE CREST JUMP!", "#38bdf8");
+
+                    }
+
+                    if (v.wheelieTimer >= 1.35) {
+
+                        v.wheelieTimer = 0;
+
+                        this.addCash(400, "🚤 HYDRO ROOSTERTAIL BOOST!");
+
+                    }
+
+                } else if (mySeat === 0 && v.isMotorcycle && this.input.handbrake && Math.hypot(v.vx, v.vy) > 130) {
+
+                    v.roostertailActive = false;
 
                     v.wheelieTimer = (v.wheelieTimer || 0) + dt;
 
@@ -10179,6 +10219,8 @@ class LeonidaGame {
                     }
 
                 } else if (mySeat === 0) {
+
+                    v.roostertailActive = false;
 
                     v.wheelieTimer = 0;
 

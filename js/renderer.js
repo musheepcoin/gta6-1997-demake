@@ -8711,16 +8711,56 @@ class RetroRenderer {
             }
 
             // A2. Miami / Vice City Custom Neon Underglow for Sports Cars, Convertibles, Muscle Cars & Neon E-Scooters!
-            // A1b. White V-shaped foam wake behind boats moving on water (jet-ski, speedboat, airboat)
-            if (!v.destroyed && (v.waterOnly || v.specKey === "AIRBOAT") && Math.abs(v.speed || Math.hypot(v.vx || 0, v.vy || 0)) > 35 &&
+            // A1b. High-Fidelity 3D V-Shaped Diverging Wake, Prop Wash & Hydro-Roostertail Plume behind Boats on Water
+            if (!v.destroyed && (v.waterOnly || v.specKey === "AIRBOAT") &&
                 this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) {
-                const wSpd = Math.min(1, Math.hypot(v.vx || 0, v.vy || 0) / 380);
-                const halfL = (v.w || 40) * 0.5;
-                for (let wk = 1; wk <= 4; wk++) {
-                    const wx = v.x - cosA * (halfL + wk * 7);
-                    const wy = v.y - sinA * (halfL + wk * 7);
-                    this.pushSolidQuad3D(wx, wy, vz - 0.018, 8 + wk * 3, (v.h || 16) * 0.6 + wk * 4 * wSpd, v.angle, 0.92, 0.98, 1.0, (0.55 - wk * 0.11) * (0.4 + wSpd * 0.6), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const rawSpd = Math.hypot(v.vx || 0, v.vy || 0);
+                if (rawSpd > 22) {
+                    const wSpd = Math.min(1, rawSpd / 360);
+                    const halfL = (v.w || 40) * 0.48;
+                    for (let wk = 1; wk <= 5; wk++) {
+                        const distBack = halfL + wk * (v.specKey === "JETSKI" ? 6.5 : 8.5);
+                        const spread = wk * (v.specKey === "JETSKI" ? 3.2 : 5.0) * (0.45 + wSpd * 0.55);
+                        const cx = v.x - cosA * distBack;
+                        const cy = v.y - sinA * distBack;
+                        const alpha = (0.58 - wk * 0.095) * (0.38 + wSpd * 0.62);
+                        // Center turbulent white prop wash
+                        this.pushSolidQuad3D(cx, cy, vz - 0.018, 7 + wk * 2.5, (v.h || 16) * 0.45 + wk * 2.4 * wSpd, v.angle, 0.90, 0.98, 1.0, alpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        // Diverging Port & Starboard V-Wake arms
+                        for (const side of [-1, 1]) {
+                            const armX = cx - sinA * (spread * side);
+                            const armY = cy + cosA * (spread * side);
+                            this.pushSolidQuad3D(armX, armY, vz - 0.017, 9 + wk * 2.8, 3.2 + wk * 1.1, v.angle - side * 0.34, 0.95, 0.99, 1.0, alpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        }
+                    }
+                    // High-pressure vertical Hydro-Roostertail plume when boosting with [SPACE]
+                    if (v.roostertailActive) {
+                        for (let rt = 1; rt <= 4; rt++) {
+                            const rx = v.x - cosA * (halfL + rt * 5.5);
+                            const ry = v.y - sinA * (halfL + rt * 5.5);
+                            const rz = vz + 0.02 + Math.sin((rt / 4) * Math.PI) * 0.095;
+                            this.pushSolidQuad3D(rx, ry, rz, 8 + rt * 2.2, 4.5 + rt * 1.6, v.angle, 0.86, 0.98, 1.0, 0.78 - rt * 0.14, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        }
+                    }
                 }
+                // Marine Port (Red) / Starboard (Green) Bow Navigation Lights & White Stern Mast Light on Speedboats
+                if (v.specKey === "SPEEDBOAT") {
+                    const bowDist = (v.w || 58) * 0.30;
+                    const beamHalf = (v.h || 30) * 0.36;
+                    const navAlpha = Math.max(0.72, 0.65 + nfGlobal * 0.35);
+                    // Port (left, -sinA/+cosA wait: in screen/world coords, port is -lat, starboard is +lat)
+                    this.pushSolidQuad3D(v.x + cosA * bowDist + sinA * beamHalf, v.y + sinA * bowDist - cosA * beamHalf, vz + airZ + 0.015, 2.8, 2.4, v.angle, 1.0, 0.12, 0.18, navAlpha, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    this.pushSolidQuad3D(v.x + cosA * bowDist - sinA * beamHalf, v.y + sinA * bowDist + cosA * beamHalf, vz + airZ + 0.015, 2.8, 2.4, v.angle, 0.12, 1.0, 0.38, navAlpha, SPRITE_DRAW_ORDER.CAR_ROOF);
+                    this.pushSolidQuad3D(v.x - cosA * ((v.w || 58) * 0.44), v.y - sinA * ((v.w || 58) * 0.44), vz + airZ + 0.018, 2.6, 2.6, v.angle, 0.96, 0.98, 1.0, navAlpha, SPRITE_DRAW_ORDER.CAR_ROOF);
+                }
+            }
+            // Spinning 3D Aero-Propeller Blade inside the rear fan cage of drivable AIRBOAT vehicles
+            if (!v.destroyed && v.specKey === "AIRBOAT") {
+                const fanX = v.x - cosA * 19.5;
+                const fanY = v.y - sinA * 19.5;
+                const fanSpeed = v.driver ? 26.0 : 4.5;
+                const bladeSpan = 15.0 * Math.abs(Math.sin(this.time * fanSpeed + (v.x * 0.01)));
+                this.pushSolidQuad3D(fanX, fanY, vz + airZ + 0.045, 2.6, 3.0 + bladeSpan, v.angle, 0.92, 0.95, 0.98, 0.90, SPRITE_DRAW_ORDER.CAR_ROOF);
             }
             if (!v.destroyed && airZ < 0.08) {
                 const sk = v.specKey || "";
@@ -8956,6 +8996,7 @@ class RetroRenderer {
                     v.waterOnly
                 ) {
                     const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
+                    const seatFrame = v.specKey === "JETSKI" ? 84 : 97;
                     if (occSeats.length > 0) {
                         for (const occ of occSeats) {
                             const sPos = typeof v.getSeatWorldPos === "function"
@@ -8965,7 +9006,7 @@ class RetroRenderer {
                             const dScale = vScale * (isCustom24 ? 0.88 : 0.98);
                             this.batchPedSprite3D(
                                 occ.pedType || "gang",
-                                97,
+                                seatFrame,
                                 sPos.x,
                                 sPos.y,
                                 vz + airZ + 0.014 + occ.seat * 0.001,
@@ -8984,7 +9025,7 @@ class RetroRenderer {
                         const dy = v.y + sinA * longOff + cosA * latOff;
                         this.batchPedSprite3D(
                             aiPedType,
-                            97,
+                            seatFrame,
                             dx,
                             dy,
                             vz + airZ + 0.014,
@@ -10069,6 +10110,126 @@ class RetroRenderer {
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 17);
                 ctx.fillStyle = "#fde047";
                 ctx.fillText(label, sc.x, by + 9);
+            }
+        }
+
+        // 2B. Interactive Watercraft Boarding Prompt ([E] 🚤 BOARD SPEEDBOAT / JET-SKI / AIRBOAT) when near shore, piers or marinas!
+        if (!p.inVehicle) {
+            let bestBoat = null;
+            let bestBoatDist = 235;
+            if (Array.isArray(game.vehicles)) {
+                for (const v of game.vehicles) {
+                    if (v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious)) continue;
+                    const d = Math.hypot(v.x - p.x, v.y - p.y);
+                    if (d < bestBoatDist) {
+                        bestBoatDist = d;
+                        const bName = v.specKey === "JETSKI" ? "JET-SKI" : (v.specKey === "AIRBOAT" ? "AIRBOAT" : "SPEEDBOAT");
+                        bestBoat = { x: v.x, y: v.y, z: Math.max(2.0, v.z || 2.0) + 0.14, name: bName, dist: d };
+                    }
+                }
+            }
+            if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.instances)) {
+                for (const inst of this.map.objectEngine.instances) {
+                    if (!inst || !inst.dockBoat) continue;
+                    const db = inst.dockBoat;
+                    if (db._liveBoat && !db._liveBoat.destroyed) continue;
+                    const d = Math.min(Math.hypot(db.worldX - p.x, db.worldY - p.y), Math.hypot(db.pierMidX - p.x, db.pierMidY - p.y));
+                    if (d < bestBoatDist) {
+                        bestBoatDist = d;
+                        const bName = (db.spr && String(db.spr).includes("jetski")) ? "PIER JET-SKI" : "PIER SPEEDBOAT";
+                        bestBoat = { x: db.worldX, y: db.worldY, z: 2.14, name: bName, dist: d };
+                    }
+                }
+            }
+            if (this.map && Array.isArray(this.map.jetSkiers)) {
+                for (const js of this.map.jetSkiers) {
+                    if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
+                    const jx = js._liveX !== undefined ? js._liveX : js.x;
+                    const jy = js._liveY !== undefined ? js._liveY : js.y;
+                    const d = Math.hypot(jx - p.x, jy - p.y);
+                    if (d < bestBoatDist) {
+                        bestBoatDist = d;
+                        bestBoat = { x: jx, y: jy, z: 2.14, name: "NEON JET-SKI", dist: d };
+                    }
+                }
+            }
+            if (this.map && Array.isArray(this.map.evergladesAirboats)) {
+                for (const ab of this.map.evergladesAirboats) {
+                    if (ab._boardedVehicle && !ab._boardedVehicle.destroyed) continue;
+                    const ax = ab._liveX !== undefined ? ab._liveX : ab.x;
+                    const ay = ab._liveY !== undefined ? ab._liveY : ab.y;
+                    const d = Math.hypot(ax - p.x, ay - p.y);
+                    if (d < bestBoatDist) {
+                        bestBoatDist = d;
+                        bestBoat = { x: ax, y: ay, z: 2.14, name: "SWAMP AIRBOAT", dist: d };
+                    }
+                }
+            }
+            if (this.map && Array.isArray(this.map.portTerminals)) {
+                for (const pt of this.map.portTerminals) {
+                    if ((pt.kind !== "SPEEDBOAT" && pt.kind !== "YACHT") || (pt._boardedVehicle && !pt._boardedVehicle.destroyed)) continue;
+                    const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+                    if (d < bestBoatDist) {
+                        bestBoatDist = d;
+                        bestBoat = { x: pt.x, y: pt.y, z: 2.14, name: "HARBOR SPEEDBOAT", dist: d };
+                    }
+                }
+            }
+            if (bestBoat) {
+                const sc = this.worldToScreen(bestBoat.x, bestBoat.y, bestBoat.z);
+                const canBoardNow = bestBoat.dist <= 195;
+                const label = canBoardNow ? `🚤 [E] / [F] BOARD ${bestBoat.name}` : `🚤 ${bestBoat.name}`;
+                const bw = Math.max(142, ctx.measureText(label).width + 18);
+                const bh = 22;
+                const bx = Math.round(sc.x - bw * 0.5);
+                const by = Math.round(sc.y - 26);
+                ctx.fillStyle = canBoardNow ? "rgba(6, 78, 115, 0.94)" : "rgba(8, 15, 30, 0.86)";
+                ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = canBoardNow ? "#00f0ff" : "#38bdf8";
+                ctx.lineWidth = canBoardNow ? 2.0 : 1.2;
+                ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+                ctx.fillStyle = canBoardNow ? "#fde047" : "#e0f2fe";
+                ctx.fillText(label, sc.x, by + bh * 0.5);
+                if (canBoardNow && Array.isArray(this.cheatButtons)) {
+                    this.cheatButtons.push({ id: "BOARD_BOAT", x: bx, y: by, w: bw, h: bh });
+                }
+            }
+        }
+
+        // 2C. Street Interactive Props Prompt ([E] ATM, Retro Arcade Cabinet, Sprunk Soda Machine)
+        if (!p.inVehicle && this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.interactiveProps)) {
+            let bestProp = null;
+            let bestPropDist = 92;
+            for (const pr of this.map.objectEngine.interactiveProps) {
+                if (pr.broken || (pr.cooldown || 0) > 0) continue;
+                const s = String(pr.spr || "");
+                if (!s.includes("atm") && !s.includes("arcade") && !s.includes("vending") && !s.includes("soda")) continue;
+                const d = Math.hypot(pr.x - p.x, pr.y - p.y);
+                if (d < bestPropDist) {
+                    bestPropDist = d;
+                    bestProp = pr;
+                }
+            }
+            if (bestProp) {
+                const sc = this.worldToScreen(bestProp.x, bestProp.y, (bestProp.z || 2.0) + 0.14);
+                const s = String(bestProp.spr || "");
+                const pTitle = s.includes("atm")
+                    ? "🏧 [E] SKIM ATM (+$350)"
+                    : (s.includes("arcade") ? "🕹️ [E] PLAY ARCADE (+500 PTS)" : "🥤 [E] DRINK SODA (+25 HP)");
+                const bw = Math.max(138, ctx.measureText(pTitle).width + 16);
+                const bh = 20;
+                const bx = Math.round(sc.x - bw * 0.5);
+                const by = Math.round(sc.y - 22);
+                ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+                ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = "#39ff14";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(pTitle, sc.x, by + bh * 0.5);
+                if (Array.isArray(this.cheatButtons)) {
+                    this.cheatButtons.push({ id: "BOARD_BOAT", x: bx, y: by, w: bw, h: bh });
+                }
             }
         }
 
@@ -11539,19 +11700,21 @@ class RetroRenderer {
 
         // 6. 3D-Projected Threshold [🚪 EXIT TO STREET] Button (anchored on actual building entrance wall)
         const exScr = this.worldToScreen(pose.exitX, pose.exitY, 2.08);
-        const exitW = 154;
+        const nearExit = Math.hypot(px - pose.exitX, py - pose.exitY) < 88;
+        const exitTxt = nearExit ? "🚪 [ESC / WALK] EXIT TO STREET" : "🚪 EXIT TO STREET [ESC]";
+        const exitW = nearExit ? 196 : 166;
         const exitH = 24;
         const exitX = Math.max(12, Math.min(W - exitW - 12, Math.round(exScr.x - exitW * 0.5)));
         const exitY = Math.max(48, Math.min(H - 36, Math.round(exScr.y - exitH * 0.5)));
 
-        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+        ctx.fillStyle = nearExit ? "rgba(180, 24, 112, 0.96)" : "rgba(15, 23, 42, 0.94)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
-        ctx.strokeStyle = intr.accent || "#38bdf8";
-        ctx.lineWidth = 1.6;
+        ctx.strokeStyle = nearExit ? "#fde047" : (intr.accent || "#38bdf8");
+        ctx.lineWidth = nearExit ? 2.0 : 1.6;
         ctx.strokeRect(exitX + 0.5, exitY + 0.5, exitW - 1, exitH - 1);
         ctx.font = "bold 10px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = "#f8fafc";
-        ctx.fillText("🚪 EXIT TO STREET", exitX + exitW * 0.5, exitY + exitH * 0.5);
+        ctx.fillStyle = nearExit ? "#fde047" : "#f8fafc";
+        ctx.fillText(exitTxt, exitX + exitW * 0.5, exitY + exitH * 0.5);
 
         this.cheatButtons.push({
             id: "EXIT_INTERIOR",
@@ -12375,6 +12538,25 @@ class RetroRenderer {
             ctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
         }
 
+        // Moored & Active Watercraft Blips on Smartphone GPS (Speedboats, Jet-Skis, Airboats)
+        if (Array.isArray(game.vehicles)) {
+            for (const v of game.vehicles) {
+                if (v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT")) continue;
+                const bpt = worldToMini(v.x, v.y);
+                if (bpt.x >= mx + 4 && bpt.x <= mx + mw - 4 && bpt.y >= my + 4 && bpt.y <= my + mh - 4) {
+                    ctx.save();
+                    ctx.translate(bpt.x, bpt.y);
+                    ctx.rotate(Math.PI * 0.25);
+                    ctx.fillStyle = "#00f0ff";
+                    ctx.fillRect(-2.6, -2.6, 5.2, 5.2);
+                    ctx.strokeStyle = "#050811";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(-2.6, -2.6, 5.2, 5.2);
+                    ctx.restore();
+                }
+            }
+        }
+
         // Jason Partner Blip
         if (game.jason) {
             const jp = worldToMini(game.jason.x, game.jason.y);
@@ -12488,6 +12670,10 @@ class RetroRenderer {
                 }
                 if (btn.id === "TRIGGER_STATION" && btn.station && typeof game.triggerInteriorStation === "function") {
                     game.triggerInteriorStation(btn.station);
+                    return true;
+                }
+                if (btn.id === "BOARD_BOAT" && typeof game.tryEnterExitVehicle === "function") {
+                    game.tryEnterExitVehicle();
                     return true;
                 }
                 if (btn.id === "MINIMAP_FULLMAP" && typeof game.toggleFullMap === "function") {

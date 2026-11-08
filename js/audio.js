@@ -367,12 +367,15 @@ class RetroAudioEngine {
             case "MONSTER_BUGGY":
             case "GATOR_4X4":
             case "VCPD_CRUISER":
+            case "SPEEDBOAT":
                 return "V8";
 
             case "SUPERBIKE":
+            case "JETSKI":
                 return "MOTO";
 
             case "HARLEY_BIKE":
+            case "AIRBOAT":
                 return "HARLEY";
 
             case "BMX_BIKE":
@@ -921,14 +924,15 @@ class RetroAudioEngine {
                 this._prevAbsSpeed = absSpeed;
             } else {
 
-            // 5-Speed Automatic Transmission Gear Selection with Hysteresis
+            // 5-Speed Automatic Transmission Gear Selection with Hysteresis (continuous marine drive for boats!)
+            const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
             let targetGear = 1;
             if (speedNorm > 0.78) targetGear = 5;
             else if (speedNorm > 0.56) targetGear = 4;
             else if (speedNorm > 0.36) targetGear = 3;
             else if (speedNorm > 0.17) targetGear = 2;
 
-            if (targetGear !== this._currentGear && this._shiftCooldown <= 0 && vehClass !== "TANK") {
+            if (targetGear !== this._currentGear && this._shiftCooldown <= 0 && vehClass !== "TANK" && !isWaterCraft) {
                 const isUpshift = targetGear > this._currentGear;
                 this._currentGear = targetGear;
                 this._shiftCooldown = 0.32;
@@ -1012,7 +1016,7 @@ class RetroAudioEngine {
                 }
             }
 
-            this._updateSkidLoop(now, Boolean(state.vehicleDrifting), speedNorm);
+            this._updateSkidLoop(now, Boolean(state.vehicleDrifting && !isWaterCraft), speedNorm);
             this._prevThrottle = throttle;
             this._prevAbsSpeed = absSpeed;
             }
@@ -1325,7 +1329,15 @@ class RetroAudioEngine {
         let rate = 0.97 + Math.random() * 0.06;
         let maxDur = 0.55;
 
-        if (specKey === "MONSTER_BUGGY" || specKey === "GATOR_4X4" || specKey === "HOTDOG_VAN") {
+        if (specKey === "SPEEDBOAT" || specKey === "AIRBOAT") {
+            hornKey = "horn_airhorn";
+            rate = 0.78;
+            maxDur = 0.75;
+        } else if (specKey === "JETSKI") {
+            hornKey = "horn_sport";
+            rate = 1.12;
+            maxDur = 0.42;
+        } else if (specKey === "MONSTER_BUGGY" || specKey === "GATOR_4X4" || specKey === "HOTDOG_VAN") {
             hornKey = "horn_dixie";
             maxDur = 1.35;
         } else if (vehClass === "TRUCK" || vehClass === "TANK") {
@@ -1457,7 +1469,10 @@ class RetroAudioEngine {
             return;
         }
 
-        if (!isMotorcycle) {
+        const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
+        if (isWaterCraft) {
+            this.playWaterSplash(0.78);
+        } else if (!isMotorcycle) {
             const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "gta_car_door_open";
             this.playSample(doorKey, 0.115, 0.96 + Math.random() * 0.08, 0.55);
             setTimeout(() => {
@@ -1492,11 +1507,17 @@ class RetroAudioEngine {
                 maxDur = 1.45;
             }
             this.playSample(startKey, 0.125, startRate, maxDur);
-        }, isMotorcycle ? 35 : 190);
+        }, (isMotorcycle || isWaterCraft) ? 35 : 190);
     }
 
     playCarExit(isMotorcycle = false, specKey = null) {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
+        if (isWaterCraft) {
+            this.playWaterSplash(0.72);
+            this.playSample("step_soft", 0.075, 0.98, 0.18);
+            return;
+        }
         if (isMotorcycle) {
             this.playSample("step_soft", 0.075, 0.95, 0.18);
             return;

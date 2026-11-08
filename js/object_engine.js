@@ -10354,10 +10354,20 @@ class WorldObjectEngine {
             }
         }
 
-        // 3. 3D Floating / Rotating Weapon & Item Icons above Interactive Stations
+        // 3. 3D Floating / Rotating Weapon & Item Icons + Pulsing Proximity Floor Halo at Interactive Stations
         const stations = intr.stations || [];
+        const pInX = game.interiorX || (rw * 0.5);
+        const pInY = game.interiorY || (rh - 78);
         for (let i = 0; i < stations.length; i++) {
             const st = stations[i];
+            const ready = (st.cooldown || 0) <= 0;
+            const distSt = Math.hypot(pInX - st.x, pInY - st.y);
+            const isNearSt = distSt < 64;
+            if (ready) {
+                const ringSz = isNearSt ? (34 + Math.sin(t * 7.5) * 4.0) : (24 + Math.sin(t * 3.5 + i) * 2.0);
+                const rCol = isNearSt ? [1.0, 0.88, 0.22, 0.52] : [0.22, 0.88, 0.98, 0.22];
+                renderer.pushSolidQuad3D(st.x, st.y, 2.011, ringSz, ringSz, t * (isNearSt ? 2.2 : 0.8) + i, rCol[0], rCol[1], rCol[2], rCol[3], SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
             const bobZ = 2.14 + Math.sin(t * 4.2 + i) * 0.025;
             const spinA = t * 2.4 + i;
             let iconSpr = null;
@@ -10365,12 +10375,12 @@ class WorldObjectEngine {
             else if (st.action === "BUY_UZI") iconSpr = "uzi";
             else if (st.action === "BUY_SHOTGUN") iconSpr = "shotgun";
             else if (st.action === "BUY_ROCKET" || st.action === "ORBITAL_STRIKE") iconSpr = "rocket";
-            else if (st.action === "BUY_ARMOR") iconSpr = "armor";
-            else if (st.action === "BUY_SNACK" || st.action === "BUY_MEAL" || st.action === "BUY_ENERGY" || st.action === "ZERO_G_HEAL") iconSpr = "medkit";
-            else if (st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH") iconSpr = "briefcase";
+            else if (st.action === "BUY_ARMOR" || st.action === "BUY_OUTFIT") iconSpr = "armor";
+            else if (st.action === "BUY_SNACK" || st.action === "BUY_MEAL" || st.action === "BUY_ENERGY" || st.action === "ZERO_G_HEAL" || st.action === "HEAL_FULL" || st.action === "SAVE_GAME") iconSpr = "medkit";
+            else if (st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH" || st.action === "EXPORT_CAR") iconSpr = "briefcase";
 
-            if (iconSpr) {
-                renderer.batchObjectSprite3D(iconSpr, st.x, st.y, bobZ, spinA, 1.15, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            if (iconSpr && ready) {
+                renderer.batchObjectSprite3D(iconSpr, st.x, st.y, bobZ, spinA, isNearSt ? 1.28 : 1.15, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         }
 

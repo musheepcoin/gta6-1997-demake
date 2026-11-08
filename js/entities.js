@@ -1112,11 +1112,19 @@ class Vehicle {
         if (this.specKey === "MICRO_KART") {
             return { lx: -1.5, ly: 0 };
         }
-        if (this.isMotorcycle) {
-            return s === 0 ? { lx: 2.0, ly: 0 } : { lx: -7.5, ly: 0 };
+        if (this.isMotorcycle || this.specKey === "JETSKI") {
+            return s === 0 ? { lx: (this.specKey === "JETSKI" ? 0.0 : 2.0), ly: 0 } : { lx: -7.5, ly: 0 };
         }
         if (this.specKey === "AIRBOAT") {
-            return s === 0 ? { lx: 2.0, ly: -3.5 } : { lx: 2.0, ly: 3.5 };
+            return s === 0 ? { lx: 1.0, ly: -3.2 } : { lx: 1.0, ly: 3.2 };
+        }
+        if (this.specKey === "SPEEDBOAT") {
+            const row = Math.floor(s / 2);
+            const isRight = (s % 2) === 1;
+            return {
+                lx: 2.0 - row * 10.0,
+                ly: isRight ? 4.8 : -4.8
+            };
         }
         if (this.maxSeats === 2) {
             return s === 0 ? { lx: -2.0, ly: -4.5 } : { lx: -2.0, ly: 4.5 };
@@ -1173,6 +1181,17 @@ class Vehicle {
                     });
                 }
             }
+        }
+        if (this.hasJason && (this.maxSeats || 4) >= 2 && !list.some((o) => o.seat === 1)) {
+            list.push({
+                seat: 1,
+                isLocal: false,
+                id: "jason_partner",
+                name: "JASON",
+                color: "#38bdf8",
+                pedType: "jason",
+                muzzleTimer: (game.jason && game.jason.muzzleTimer) || 0
+            });
         }
         list.sort((a, b) => a.seat - b.seat);
         return list;
@@ -3295,12 +3314,15 @@ class Vehicle {
 
     computeSurfaceMultiplier(map) {
         const currentTile = map.getTileAtPixel(this.x, this.y);
-        if ((currentTile === TILE.SAND || currentTile === TILE.SWAMP_MUD) && !this.amphibious) {
+        if ((currentTile === TILE.SAND || currentTile === TILE.SWAMP_MUD) && !this.amphibious && !this.waterOnly) {
             return 0.72;
         }
-        if (map.isWaterAtPixel(this.x, this.y) && !this.amphibious) {
+        if (map.isWaterAtPixel(this.x, this.y) && !this.amphibious && !this.waterOnly) {
             this.burnTimer = 0; // water extinguishes engine fire
             return 0.22;
+        }
+        if (map.isWaterAtPixel(this.x, this.y)) {
+            this.burnTimer = 0;
         }
         return 1.0;
     }
@@ -3329,6 +3351,7 @@ class Vehicle {
         const fy = Math.sin(this.angle);
         const rx = -fy;
         const ry = fx;
+        const isWaterCraft = Boolean(this.waterOnly || this.specKey === "AIRBOAT");
 
         let forwardVel = this.vx * fx + this.vy * fy;
         let lateralVel = this.vx * rx + this.vy * ry;
@@ -3336,10 +3359,10 @@ class Vehicle {
         if (throttle !== 0) {
             forwardVel += throttle * this.accel * dt;
         } else {
-            forwardVel *= Math.pow(0.22, dt);
+            forwardVel *= Math.pow(isWaterCraft ? 0.42 : 0.22, dt);
         }
 
-        if (handbrake) {
+        if (handbrake && !isWaterCraft) {
             forwardVel *= Math.pow(0.18, dt);
         }
 
@@ -3352,16 +3375,22 @@ class Vehicle {
             aiMaxCap = this.aiCruiseFactor;
         }
         const effectiveMax = this.maxSpeed * surfaceMult * aiMaxCap;
-        forwardVel = Math.max(-this.maxSpeed * 0.45, Math.min(effectiveMax, forwardVel));
+        forwardVel = Math.max(-this.maxSpeed * (isWaterCraft ? 0.52 : 0.45), Math.min(effectiveMax, forwardVel));
         this.speed = forwardVel;
 
         const maxSteerAngle = 0.5236;
+        const normSteer = this.steerAngleRad / maxSteerAngle;
         if (Math.abs(forwardVel) > 8) {
             const dir = forwardVel >= 0 ? 1 : -1;
-            const speedFactor = Math.min(1, Math.abs(forwardVel) / 115);
+            const speedFactor = isWaterCraft
+                ? Math.max(0.48, Math.min(1, Math.abs(forwardVel) / 95))
+                : Math.min(1, Math.abs(forwardVel) / 115);
             const driftBoost = handbrake ? 1.34 : 1.0;
-            const normSteer = this.steerAngleRad / maxSteerAngle;
             this.angularVelocity = normSteer * this.turnSpeed * speedFactor * driftBoost * dir;
+            this.angle += this.angularVelocity * dt;
+        } else if (isWaterCraft && Math.abs(normSteer) > 0.05) {
+            // Marine waterjet / outboard vector thrust allows pivoting in place away from docks & shorelines!
+            this.angularVelocity = normSteer * this.turnSpeed * 0.65;
             this.angle += this.angularVelocity * dt;
         } else {
             this.angularVelocity = 0;
