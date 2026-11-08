@@ -580,7 +580,7 @@
             const c0 = Math.floor(intr.doorX / ts);
             const r0 = Math.floor(intr.doorY / ts);
             // Snap landmark door to the actual building wall at its tile so the door frame, awning & interior always match 100%!
-            const snapped = snapDoorToBuildingFacade(map, c0, r0, null, 12);
+            const snapped = snapDoorToBuildingFacade(map, c0, r0, intr.facing || null, 12);
 
             if (snapped) {
                 const pos = computeDoorPixelPos(snapped.c, snapped.r, snapped.facing, ts);

@@ -7260,6 +7260,9 @@ class WorldObjectEngine {
                             bDirX = -dx;
                             bDirY = -dy;
                             intr.facing = fCode;
+                            if (window.ShopInteriors && typeof window.ShopInteriors.orientInterior === "function") {
+                                window.ShopInteriors.orientInterior(intr);
+                            }
                             foundWall = true;
                             break;
                         }

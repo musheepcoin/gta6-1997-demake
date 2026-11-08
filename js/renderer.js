@@ -8095,9 +8095,8 @@ class RetroRenderer {
             }
         }
 
-        // 2B. Enterable Venue Interior Glowing Door Mats & Unique Stunt Jump Ramps in 3D
+        // 2B. Enterable Venue Interior Doors & Unique Stunt Jump Ramps in 3D
         if (Array.isArray(this.map.interiors)) {
-            const pulse = 0.65 + Math.sin(this.time * 6.0) * 0.25;
             for (const intr of this.map.interiors) {
                 if (intr.doorX < minX || intr.doorX > maxX || intr.doorY < minY || intr.doorY > maxY) continue;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.03;
@@ -8118,18 +8117,10 @@ class RetroRenderer {
                         vq(38, 0.48, 0.50, 0.20, 0.15, 0.12, 1.0, 0.02);           // door frame
                         vq(31, 0.46, 0.46, 0.0, 0.0, 0.0, 1.0, 0.05);              // black doorway
                         vq(3, 0.42, 0.04, 0.95, 0.80, 0.25, 1.0, 0.08);           // brass handle
-                        // Threshold step on the sidewalk
+                        // Subtle dark stone threshold step flush against the doorway
                         this.pushSolidQuad3D(tcx - fnv[0] * 24, tcy - fnv[1] * 24, dz, 36, 8, dAng, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     }
-                    // Glowing sidewalk welcome mat positioned right in front of the 3D canopy overhang so it is ALWAYS visible from above!
-                    const matX = intr.isEstatePortico ? intr.doorX : (tcx + fnv[0] * 4);
-                    const matY = intr.isEstatePortico ? intr.doorY : (tcy + fnv[1] * 4);
-                    this.pushSolidQuad3D(matX, matY, dz + 0.004, 34, 15, dAng, mrgb[0], mrgb[1], mrgb[2], pulse * 0.88, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    this.pushSolidQuad3D(matX, matY, dz + 0.009, 24, 9, dAng, 0.15, 0.95, 1.0, 0.94, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    continue;
                 }
-                this.pushSolidQuad3D(intr.doorX, intr.doorY, dz, 26, 26, this.time * 1.2, mrgb[0], mrgb[1], mrgb[2], pulse, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.pushSolidQuad3D(intr.doorX, intr.doorY, dz + 0.01, 16, 16, -this.time * 1.8, 0.15, 0.92, 0.98, 0.9, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         }
         if (Array.isArray(this.map.stuntRamps)) {
