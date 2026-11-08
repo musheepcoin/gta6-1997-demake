@@ -50,6 +50,17 @@ const VEHICLE_AUDIO_MANIFEST = {
     tank_start: "assets/sfx/vehicles/tank_start.wav",
     tank_tracks: "assets/sfx/vehicles/tank_tracks.wav",
 
+    // Authentic GTA 1 Boat Engine (STYLE001.G24 eVehicleClass_Boat mEngine=12 / LEVEL001.SDT #57) & Marine Watercraft Loops
+    gta_boat_engine: "assets/sfx/vehicles/gta_boat_engine.wav",
+    boat_idle: "assets/sfx/vehicles/boat_idle.wav",
+    boat_rev: "assets/sfx/vehicles/boat_rev.wav",
+    jetski_idle: "assets/sfx/vehicles/jetski_idle.wav",
+    jetski_rev: "assets/sfx/vehicles/jetski_rev.wav",
+    airboat_idle: "assets/sfx/vehicles/airboat_idle.wav",
+    airboat_rev: "assets/sfx/vehicles/airboat_rev.wav",
+    boat_water_loop: "assets/sfx/vehicles/boat_water_loop.wav",
+    horn_boat: "assets/sfx/vehicles/horn_boat.wav",
+
     // Starters & Doors
     start_v8: "assets/sfx/vehicles/start_v8.wav",
     start_super: "assets/sfx/vehicles/start_super.wav",
@@ -225,6 +236,23 @@ const ENGINE_BANK_SPECS = {
         { key: "tank_idle", center: 0.0, width: 0.50, baseRate: 0.92, rateSpan: 0.24, gain: 0.18 },
         { key: "tank_rev", center: 0.68, width: 0.68, baseRate: 0.78, rateSpan: 0.44, gain: 0.20 },
         { key: "tank_tracks", center: 0.56, width: 0.75, baseRate: 0.75, rateSpan: 0.55, gain: 0.16 }
+    ],
+    BOAT: [
+        { key: "boat_idle", center: 0.0, width: 0.56, baseRate: 0.90, rateSpan: 0.28, gain: 0.17 },
+        { key: "gta_boat_engine", center: 0.48, width: 0.62, baseRate: 0.82, rateSpan: 0.42, gain: 0.18 },
+        { key: "boat_rev", center: 0.82, width: 0.66, baseRate: 0.80, rateSpan: 0.44, gain: 0.20 },
+        { key: "boat_water_loop", center: 0.55, width: 0.85, baseRate: 0.84, rateSpan: 0.38, gain: 0.19 }
+    ],
+    JETSKI: [
+        { key: "jetski_idle", center: 0.0, width: 0.54, baseRate: 0.92, rateSpan: 0.32, gain: 0.16 },
+        { key: "gta_boat_engine", center: 0.50, width: 0.60, baseRate: 0.94, rateSpan: 0.48, gain: 0.16 },
+        { key: "jetski_rev", center: 0.82, width: 0.66, baseRate: 0.84, rateSpan: 0.50, gain: 0.19 },
+        { key: "boat_water_loop", center: 0.55, width: 0.85, baseRate: 0.92, rateSpan: 0.42, gain: 0.18 }
+    ],
+    AIRBOAT: [
+        { key: "airboat_idle", center: 0.0, width: 0.54, baseRate: 0.90, rateSpan: 0.30, gain: 0.17 },
+        { key: "airboat_rev", center: 0.74, width: 0.72, baseRate: 0.78, rateSpan: 0.46, gain: 0.20 },
+        { key: "boat_water_loop", center: 0.55, width: 0.85, baseRate: 0.86, rateSpan: 0.40, gain: 0.18 }
     ]
 };
 
@@ -306,7 +334,7 @@ class RetroAudioEngine {
     _preloadRawAudioFiles() {
         if (typeof window === "undefined" || typeof fetch !== "function") return;
         for (const [key, url] of Object.entries(VEHICLE_AUDIO_MANIFEST)) {
-            fetch(`${url}?v=99_13`)
+            fetch(`${url}?v=101_21`)
                 .then((res) => (res.ok ? res.arrayBuffer() : null))
                 .then((buf) => {
                     if (!buf) return;
@@ -367,16 +395,22 @@ class RetroAudioEngine {
             case "MONSTER_BUGGY":
             case "GATOR_4X4":
             case "VCPD_CRUISER":
-            case "SPEEDBOAT":
                 return "V8";
 
+            case "SPEEDBOAT":
+                return "BOAT";
+
             case "SUPERBIKE":
-            case "JETSKI":
                 return "MOTO";
 
+            case "JETSKI":
+                return "JETSKI";
+
             case "HARLEY_BIKE":
-            case "AIRBOAT":
                 return "HARLEY";
+
+            case "AIRBOAT":
+                return "AIRBOAT";
 
             case "BMX_BIKE":
                 return "BICYCLE";
@@ -952,8 +986,8 @@ class RetroAudioEngine {
                 }
             }
 
-            // Throttle lift-off at high RPM -> Turbo Blow-Off Valve or Exhaust Crackle/Backfire!
-            if (this._prevThrottle > 0.5 && throttle <= 0 && this._smoothedRpm > 0.68 && absSpeed > 140 && this._bovCooldown <= 0) {
+            // Throttle lift-off at high RPM -> Turbo Blow-Off Valve or Exhaust Crackle/Backfire (land cars/bikes only!)
+            if (!isWaterCraft && this._prevThrottle > 0.5 && throttle <= 0 && this._smoothedRpm > 0.68 && absSpeed > 140 && this._bovCooldown <= 0) {
                 this._bovCooldown = 0.75;
                 if (vehClass === "SUPER") {
                     this.playSample("turbo_bov", 0.09, 0.94 + Math.random() * 0.12);
@@ -980,17 +1014,21 @@ class RetroAudioEngine {
                 }
             }
 
-            // Compute within-gear RPM + overall engine load [0.0 .. 1.0]
+            // Compute within-gear RPM + overall engine load [0.0 .. 1.0] (continuous marine direct-drive for boats!)
             const gearBounds = [0.0, 0.20, 0.39, 0.59, 0.79, 1.04];
             const gLow = gearBounds[this._currentGear - 1] || 0;
             const gHigh = gearBounds[this._currentGear] || 1;
             const inGearNorm = Math.max(0, Math.min(1, (speedNorm - gLow) / Math.max(0.12, gHigh - gLow)));
             const throttleBoost = throttle > 0 ? 0.12 : (throttle < 0 ? -0.04 : -0.02);
-            const targetRpm = Math.max(0.0, Math.min(1.0, speedNorm * 0.62 + inGearNorm * 0.34 + throttleBoost));
-            this._smoothedRpm += (targetRpm - this._smoothedRpm) * Math.min(1.0, dt * 9.5);
+            const targetRpm = isWaterCraft
+                ? Math.max(0.0, Math.min(1.0, speedNorm * 0.76 + (throttle > 0 ? 0.18 : (throttle < 0 ? 0.08 : 0.0))))
+                : Math.max(0.0, Math.min(1.0, speedNorm * 0.62 + inGearNorm * 0.34 + throttleBoost));
+            this._smoothedRpm += (targetRpm - this._smoothedRpm) * Math.min(1.0, dt * (isWaterCraft ? 6.5 : 9.5));
 
             const shiftDip = this._shiftDipTimer > 0 ? 0.48 : 1.0;
-            const loadFilterHz = 1650 + this._smoothedRpm * 2800 + (throttle > 0 ? 750 : 0);
+            const loadFilterHz = isWaterCraft
+                ? (1200 + this._smoothedRpm * 1950 + (throttle > 0 ? 450 : 0))
+                : (1650 + this._smoothedRpm * 2800 + (throttle > 0 ? 750 : 0));
             if (this.engineMasterFilter && this.engineMasterGain) {
                 this._setParamSmooth(this.engineMasterFilter.frequency, loadFilterHz, 0.28);
                 this._setParamSmooth(this.engineMasterGain.gain, (0.40 + this._smoothedRpm * 0.18) * shiftDip, 0.28);
@@ -1003,6 +1041,8 @@ class RetroAudioEngine {
                     let w = 0;
                     if (s.key === "tank_tracks") {
                         w = Math.min(1.0, absSpeed / 95);
+                    } else if (s.key === "boat_water_loop") {
+                        w = Math.min(1.0, absSpeed / 120);
                     } else {
                         const dist = Math.abs(rpm - s.center);
                         w = Math.max(0, 1.0 - dist / s.width);
@@ -1330,13 +1370,13 @@ class RetroAudioEngine {
         let maxDur = 0.55;
 
         if (specKey === "SPEEDBOAT" || specKey === "AIRBOAT") {
-            hornKey = "horn_airhorn";
-            rate = 0.78;
-            maxDur = 0.75;
+            hornKey = "horn_boat";
+            rate = specKey === "SPEEDBOAT" ? 0.96 : 1.08;
+            maxDur = 0.85;
         } else if (specKey === "JETSKI") {
-            hornKey = "horn_sport";
-            rate = 1.12;
-            maxDur = 0.42;
+            hornKey = "horn_boat";
+            rate = 1.38;
+            maxDur = 0.45;
         } else if (specKey === "MONSTER_BUGGY" || specKey === "GATOR_4X4" || specKey === "HOTDOG_VAN") {
             hornKey = "horn_dixie";
             maxDur = 1.35;
@@ -1471,7 +1511,15 @@ class RetroAudioEngine {
 
         const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
         if (isWaterCraft) {
-            this.playWaterSplash(0.78);
+            this.playWaterSplash(0.85);
+            setTimeout(() => {
+                if (!this.ctx || this.muted) return;
+                const boatStartKey = specKey === "AIRBOAT"
+                    ? "airboat_idle"
+                    : (specKey === "JETSKI" ? "jetski_idle" : "gta_boat_engine");
+                this.playSample(boatStartKey, 0.125, 0.94 + Math.random() * 0.08, 0.85);
+            }, 40);
+            return;
         } else if (!isMotorcycle) {
             const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "gta_car_door_open";
             this.playSample(doorKey, 0.115, 0.96 + Math.random() * 0.08, 0.55);

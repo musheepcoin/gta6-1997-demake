@@ -10182,17 +10182,19 @@ class LeonidaGame {
 
                 const isWaterCraft = Boolean(v.waterOnly || v.specKey === "AIRBOAT");
 
-                if (mySeat === 0 && isWaterCraft && this.input.handbrake && Math.hypot(v.vx, v.vy) > 95 && this.map.isWaterAtPixel(v.x, v.y)) {
+                if (mySeat === 0 && isWaterCraft && this.input.handbrake && Math.hypot(v.vx, v.vy) > 85 && this.map.isWaterAtPixel(v.x, v.y)) {
 
                     v.wheelieTimer = (v.wheelieTimer || 0) + dt;
 
                     v.roostertailActive = true;
 
-                    v.vx += Math.cos(v.angle) * 165 * dt;
+                    const curBoatSpd = Math.hypot(v.vx, v.vy);
+                    if (curBoatSpd < (v.maxSpeed || 245) * 1.12) {
+                        v.vx += Math.cos(v.angle) * 45 * dt;
+                        v.vy += Math.sin(v.angle) * 45 * dt;
+                    }
 
-                    v.vy += Math.sin(v.angle) * 165 * dt;
-
-                    if (Math.hypot(v.vx, v.vy) > 290 && (v.stuntAirTimer || 0) <= 0 && (v._waveJumpCd || 0) <= 0 && v.wheelieTimer > 0.65) {
+                    if (Math.hypot(v.vx, v.vy) > 195 && (v.stuntAirTimer || 0) <= 0 && (v._waveJumpCd || 0) <= 0 && v.wheelieTimer > 0.65) {
 
                         v._waveJumpCd = 4.2;
 
@@ -10202,7 +10204,7 @@ class LeonidaGame {
 
                         v.lastRampName = "VICE BAY WAVE CREST JUMP";
 
-                        this.audio.playBeep(560, 0.10, "sawtooth", 0.07);
+                        this.audio.playWaterSplash(0.95);
 
                         this.addFloatingText(v.x, v.y - 26, "🌊 WAVE CREST JUMP!", "#38bdf8");
 
