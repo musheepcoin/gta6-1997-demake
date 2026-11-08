@@ -317,6 +317,7 @@ class WorldObjectEngine {
             sevenMileOldSpan: { x: 202.0 * TILE_SIZE, y: 478.6 * TILE_SIZE, z: 2.0, jumpX: 202.0 * TILE_SIZE, jumpY: 480.5 * TILE_SIZE, cooldown: 0 },
             // GTA 6 Trailer 1, Trailer 2 & 70 Official Screenshots Iconic Landmarks:
             briansBoatyard: { x: 216.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            rustyAnchorBar: { x: 225.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             jackOfHearts: { x: 193.5 * TILE_SIZE, y: 131.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             calHamptonOutpost: { x: 149.5 * TILE_SIZE, y: 125.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             highwayGantries: [
@@ -450,6 +451,10 @@ class WorldObjectEngine {
         this.takeoverCooldown = 0;
         this.gymCooldown = 0;
         this.tikiCooldown = 0;
+        this.volleyballCooldown = 0;
+        this.yachtPartyCooldown = 0;
+        this.dominoCooldown = 0;
+        this.foodTruckCooldown = 0;
         // 8. Outdoor sidewalk stick-up boxes removed (robberies happen inside the enterable 3D interiors)
         this.stickUpStores = [];
         // 9. GTA 6 70+ Official Screenshots: Leonida Snapmatic / Social-Media Photo Safari Viewpoints
@@ -460,6 +465,28 @@ class WorldObjectEngine {
             { id: "snap_kalaga_peak", name: "MOUNT KALAGA CANYON TRAIL OVERLOOK",x: 138.5 * TILE_SIZE, y: 25.5 * TILE_SIZE,  z: 2.0, snapped: false },
             { id: "snap_vice_cruise", name: "VICE PORT MEGA-CRUISE SHIP QUAY",   x: 356.5 * TILE_SIZE, y: 318.5 * TILE_SIZE, z: 2.0, snapped: false },
             { id: "snap_star_sunset", name: "STAR ISLAND SUNSET SUPERYACHT PIER",x: 344.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, snapped: false }
+        ];
+        // 10. GTA 6 Trailer 1 & Official Screenshots: Vice Bay, Ocean Beach & Leonida Keys Leaping 3D Dolphin Pods
+        this.dolphinPods = [
+            { x: 472.5 * TILE_SIZE, y: 218.5 * TILE_SIZE, z: 2.0, ang: -1.35, seed: 0.0 },
+            { x: 474.5 * TILE_SIZE, y: 262.5 * TILE_SIZE, z: 2.0, ang: -1.55, seed: 1.4 },
+            { x: 472.5 * TILE_SIZE, y: 304.5 * TILE_SIZE, z: 2.0, ang: -1.45, seed: 2.8 },
+            { x: 364.5 * TILE_SIZE, y: 192.5 * TILE_SIZE, z: 2.0, ang:  1.50, seed: 4.1 },
+            { x: 366.5 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, ang: -1.50, seed: 5.5 },
+            { x: 324.5 * TILE_SIZE, y: 332.5 * TILE_SIZE, z: 2.0, ang:  0.35, seed: 0.9 },
+            { x: 244.5 * TILE_SIZE, y: 470.5 * TILE_SIZE, z: 2.0, ang:  0.15, seed: 2.3 },
+            { x: 186.5 * TILE_SIZE, y: 484.5 * TILE_SIZE, z: 2.0, ang: -0.20, seed: 3.7 }
+        ];
+        // 11. GTA 6 Vice City Little Cuba Domino Park Pavilions & Gourmet Street Food Trucks
+        this.littleCubaDominoParks = [
+            { name: "CALLE OCHO MÁXIMO GÓMEZ DOMINO PARK", x: 283.5 * TILE_SIZE, y: 244.5 * TILE_SIZE, z: 2.0 },
+            { name: "LITTLE CUBA HAVANA PLAZA DOMINOES",   x: 283.5 * TILE_SIZE, y: 252.5 * TILE_SIZE, z: 2.0 }
+        ];
+        this.foodTrucks = [
+            { name: "LITTLE CUBA CAFECITO & CROQUETAS", x: 281.5 * TILE_SIZE, y: 248.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_mambos_latin", tint: [0.98, 0.78, 0.22] },
+            { name: "HANK'S WAFFLES EXPRESS DINER TRUCK", x: 72.5 * TILE_SIZE,  y: 204.5 * TILE_SIZE, z: 2.0, ang: 0,           ad: "ad_ecola",        tint: [0.96, 0.42, 0.18] },
+            { name: "TISHA-WOCKA FLEA MARKET TACOS",    x: 191.5 * TILE_SIZE, y: 133.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_sprunk",       tint: [0.22, 0.88, 0.64] },
+            { name: "VICE BEACH AÇAÍ & GELATO CRUISER", x: 451.5 * TILE_SIZE, y: 226.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,ad: "ad_vice26",       tint: [0.98, 0.36, 0.78] }
         ];
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -815,6 +842,10 @@ class WorldObjectEngine {
                 snapOffRoad(this.landmarks3D.briansBoatyard);
                 clearZones.push({ x: this.landmarks3D.briansBoatyard.x, y: this.landmarks3D.briansBoatyard.y, r: 92 });
             }
+            if (this.landmarks3D.rustyAnchorBar) {
+                snapOffRoad(this.landmarks3D.rustyAnchorBar);
+                clearZones.push({ x: this.landmarks3D.rustyAnchorBar.x, y: this.landmarks3D.rustyAnchorBar.y, r: 84 });
+            }
             if (this.landmarks3D.jackOfHearts) {
                 snapOffRoad(this.landmarks3D.jackOfHearts);
                 clearZones.push({ x: this.landmarks3D.jackOfHearts.x, y: this.landmarks3D.jackOfHearts.y, r: 92 });
@@ -822,6 +853,24 @@ class WorldObjectEngine {
             if (this.landmarks3D.calHamptonOutpost) {
                 snapOffRoad(this.landmarks3D.calHamptonOutpost);
                 clearZones.push({ x: this.landmarks3D.calHamptonOutpost.x, y: this.landmarks3D.calHamptonOutpost.y, r: 82 });
+            }
+            if (Array.isArray(this.littleCubaDominoParks)) {
+                for (const dp of this.littleCubaDominoParks) {
+                    snapOffRoad(dp);
+                    clearZones.push({ x: dp.x, y: dp.y, r: 64 });
+                }
+            }
+            if (Array.isArray(this.foodTrucks)) {
+                for (const ft of this.foodTrucks) {
+                    snapOffRoad(ft);
+                    clearZones.push({ x: ft.x, y: ft.y, r: 58 });
+                }
+            }
+            if (Array.isArray(this.dolphinPods) && typeof map.snapPxToCleanWater === "function") {
+                for (const dp of this.dolphinPods) {
+                    const sn = map.snapPxToCleanWater(dp.x, dp.y, 14);
+                    if (sn) { dp.x = sn.x; dp.y = sn.y; }
+                }
             }
             if (Array.isArray(this.stickUpStores)) {
                 for (const su of this.stickUpStores) {
@@ -1505,24 +1554,81 @@ class WorldObjectEngine {
         // 0I. Muscle Beach 3D Outdoor Weightlifting Bench-Press Challenge ([E]!)
         if (this.map && Array.isArray(this.map.muscleBeachGyms) && (this.gymCooldown || 0) <= 0) {
             for (const mg of this.map.muscleBeachGyms) {
-                if (Math.hypot(px - mg.x, py - mg.y) < 68) {
+                if (Math.hypot(px - mg.x, py - mg.y) < 74) {
                     this.gymCooldown = 14.0;
                     game.player.maxHp = 150;
                     game.player.hp = 150;
-                    if (typeof game.addScore === "function") game.addScore(2000);
-                    if (typeof game.addCash === "function") game.addCash(2000, "💪 MUSCLE BEACH BENCH-PRESS RECORD!");
+                    if (typeof game.addScore === "function") game.addScore(3000);
+                    if (typeof game.addCash === "function") game.addCash(3000, "💪 MUSCLE BEACH BENCH-PRESS RECORD!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
-                        game.showBigBanner("💪 MUSCLE BEACH IRON PUMPED!", "315 LBS BENCH-PRESS REP RECORD • MAX HP UPGRADED TO 150 & +$2,000!", "#4ade80", 2.8);
+                        game.showBigBanner("💪 MUSCLE BEACH IRON PUMPED!", "315 LBS BENCH-PRESS REP RECORD • 150 MAX HP, +$3,000 & +1X!", "#4ade80", 2.8);
                     }
                     if (Array.isArray(game.floatingTexts)) {
                         game.floatingTexts.push({
                             x: mg.x,
                             y: mg.y,
                             z: 2.65,
-                            text: "💪 MUSCLE BEACH GAINS! 150 MAX HP + $2,000!",
+                            text: "💪 MUSCLE BEACH GAINS! 150 MAX HP + $3,000 + +1X!",
                             color: "#4ade80",
                             life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0I-2. Vice Beach 3D Volleyball Court Spike Challenge ([E]!)
+        if (this.map && Array.isArray(this.map.beachVolleyballCourts) && (this.volleyballCooldown || 0) <= 0) {
+            for (const vc of this.map.beachVolleyballCourts) {
+                if (Math.hypot(px - vc.x, py - vc.y) < 82) {
+                    this.volleyballCooldown = 12.0;
+                    if (typeof game.addScore === "function") game.addScore(3500);
+                    if (typeof game.addCash === "function") game.addCash(3500, "🏐 VICE BEACH VOLLEYBALL SPIKE!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🏐 VICE BEACH VOLLEYBALL ACE!", "TOURNAMENT JUMP-SERVE SPIKE • +$3,500 & +1X MULTIPLIER!", "#38bdf8", 2.6);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: vc.x,
+                            y: vc.y,
+                            z: 2.65,
+                            text: "🏐 BEACH VOLLEYBALL SPIKE ACE! +$3,500 + +1X!",
+                            color: "#38bdf8",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0I-3. Biscayne Bay & Ocean Beach 3D Luxury Catamaran VIP Yacht Party ([E]!)
+        if (this.map && Array.isArray(this.map.yachtParties) && (this.yachtPartyCooldown || 0) <= 0) {
+            for (const yp of this.map.yachtParties) {
+                if (Math.hypot(px - yp.x, py - yp.y) < 105) {
+                    this.yachtPartyCooldown = 16.0;
+                    game.player.hp = game.player.maxHp || 100;
+                    game.player.armor = 100;
+                    if (typeof game.addScore === "function") game.addScore(8000);
+                    if (typeof game.addCash === "function") game.addCash(8000, "🛥️ DADBODSQUAD VIP YACHT PARTY!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🛥️ VIP SUPERYACHT DECK PARTY!", "CHAMPAGNE & DJ SUNSET SET • FULL HP/ARMOR, +$8,000 & +1X!", "#f472b6", 3.0);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: yp.x,
+                            y: yp.y,
+                            z: 2.75,
+                            text: "🛥️ VIP YACHT PARTY! FULL HP/ARMOR + $8,000 + +1X!",
+                            color: "#f472b6",
+                            life: 2.8
                         });
                     }
                     return true;
@@ -1739,6 +1845,88 @@ class WorldObjectEngine {
                     });
                 }
                 return true;
+            }
+        }
+
+        // 0P-2. GTA 6 Trailer 2: Key Lento "The Rusty Anchor" Waterfront Bar ([E]!)
+        if (this.landmarks3D && this.landmarks3D.rustyAnchorBar) {
+            const ra = this.landmarks3D.rustyAnchorBar;
+            if ((ra.cooldown || 0) <= 0 && Math.hypot(px - ra.x, py - ra.y) < 86) {
+                ra.cooldown = 16.0;
+                game.player.hp = game.player.maxHp || 100;
+                game.player.armor = 100;
+                if (typeof game.addScore === "function") game.addScore(6000);
+                if (typeof game.addCash === "function") game.addCash(6000, "⚓ THE RUSTY ANCHOR KEYS ROUND!");
+                if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                if (game.audio) game.audio.playPickup("SCORE");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner("⚓ THE RUSTY ANCHOR — KEY LENTO!", "COLD PATRIOT BEER & KEYS CONCH FRITTERS • FULL HP/ARMOR & +$6,000!", "#fb923c", 2.8);
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: ra.x,
+                        y: ra.y,
+                        z: 2.70,
+                        text: "⚓ THE RUSTY ANCHOR HAPPY HOUR! FULL HP/ARMOR + $6,000!",
+                        color: "#fb923c",
+                        life: 2.8
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0P-3. Little Cuba Domino Park High-Stakes Table ([E]!)
+        if (Array.isArray(this.littleCubaDominoParks) && (this.dominoCooldown || 0) <= 0) {
+            for (const dp of this.littleCubaDominoParks) {
+                if (Math.hypot(px - dp.x, py - dp.y) < 76) {
+                    this.dominoCooldown = 14.0;
+                    if (typeof game.addScore === "function") game.addScore(4500);
+                    if (typeof game.addCash === "function") game.addCash(4500, "🀄 LITTLE CUBA DOMINOES CAPICÚ!");
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner("🀄 LITTLE CUBA DOMINOES CHAMPION!", `${dp.name} • DOUBLE-SIX CAPICÚ SLAM +$4,500 & +1X!`, "#facc15", 2.8);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: dp.x,
+                            y: dp.y,
+                            z: 2.65,
+                            text: "🀄 LITTLE CUBA DOMINOES CAPICÚ! +$4,500 + +1X!",
+                            color: "#facc15",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-4. Leonida Gourmet Street Food Trucks ([E]!)
+        if (Array.isArray(this.foodTrucks) && (this.foodTruckCooldown || 0) <= 0) {
+            for (const ft of this.foodTrucks) {
+                if (Math.hypot(px - ft.x, py - ft.y) < 76) {
+                    this.foodTruckCooldown = 10.0;
+                    game.player.hp = game.player.maxHp || 100;
+                    if (typeof game.addScore === "function") game.addScore(2500);
+                    if (typeof game.addCash === "function") game.addCash(2500, `🌮 ${ft.name}!`);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(`🌮 ${ft.name}!`, "FRESH LEONIDA STREET FOOD • 100% HEALTH RESTORED & +$2,500!", "#4ade80", 2.5);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ft.x,
+                            y: ft.y,
+                            z: 2.65,
+                            text: `🌮 ${ft.name}! FULL HP + $2,500!`,
+                            color: "#4ade80",
+                            life: 2.5
+                        });
+                    }
+                    return true;
+                }
             }
         }
 
@@ -2570,11 +2758,18 @@ class WorldObjectEngine {
         // 12. Update Muscle Beach, Tiki Bars, Mambas Stadium, Mount Kalaga Skunk Ape & Street Takeover Drift Rings
         if ((this.gymCooldown || 0) > 0) this.gymCooldown = Math.max(0, this.gymCooldown - dt);
         if ((this.tikiCooldown || 0) > 0) this.tikiCooldown = Math.max(0, this.tikiCooldown - dt);
+        if ((this.volleyballCooldown || 0) > 0) this.volleyballCooldown = Math.max(0, this.volleyballCooldown - dt);
+        if ((this.yachtPartyCooldown || 0) > 0) this.yachtPartyCooldown = Math.max(0, this.yachtPartyCooldown - dt);
+        if ((this.dominoCooldown || 0) > 0) this.dominoCooldown = Math.max(0, this.dominoCooldown - dt);
+        if ((this.foodTruckCooldown || 0) > 0) this.foodTruckCooldown = Math.max(0, this.foodTruckCooldown - dt);
         if ((this.takeoverCooldown || 0) > 0) this.takeoverCooldown = Math.max(0, this.takeoverCooldown - dt);
         if ((this.cameraFlashTimer || 0) > 0) this.cameraFlashTimer = Math.max(0, this.cameraFlashTimer - dt);
         if (this.landmarks3D) {
             if (this.landmarks3D.briansBoatyard && (this.landmarks3D.briansBoatyard.cooldown || 0) > 0) {
                 this.landmarks3D.briansBoatyard.cooldown = Math.max(0, this.landmarks3D.briansBoatyard.cooldown - dt);
+            }
+            if (this.landmarks3D.rustyAnchorBar && (this.landmarks3D.rustyAnchorBar.cooldown || 0) > 0) {
+                this.landmarks3D.rustyAnchorBar.cooldown = Math.max(0, this.landmarks3D.rustyAnchorBar.cooldown - dt);
             }
             if (this.landmarks3D.jackOfHearts && (this.landmarks3D.jackOfHearts.cooldown || 0) > 0) {
                 this.landmarks3D.jackOfHearts.cooldown = Math.max(0, this.landmarks3D.jackOfHearts.cooldown - dt);
@@ -5969,22 +6164,44 @@ class WorldObjectEngine {
                     emitSolidBox3D(facadeX + 1.0, rowY, 1, 0, 0, 0, 11.0, 5.5, topZ + 0.08, topZ + 0.44, trimCol, 1);
                 }
 
-                // 3) Grounded Architectural Canvas Storefront Awning over West Sidewalk (skipping building entrance doors!)
-                if (r % 3 === 1) {
-                    const nearDoor = interiorsList.some(intr => Math.abs(intr.doorX - facadeX) < 96 && Math.abs(intr.doorY - rowY) < 42);
-                    if (!nearDoor) {
+                // 3) Grounded Architectural Canvas Storefront Awning, 3D Sidewalk Bistro Café & Art Deco Neon Uplights (skipping doors!)
+                const nearDoor = interiorsList.some(intr => Math.abs(intr.doorX - facadeX) < 96 && Math.abs(intr.doorY - rowY) < 42);
+                if (!nearDoor) {
+                    const neonPal = [
+                        [1.00, 0.28, 0.76], // Vice Hot Pink
+                        [0.18, 0.94, 0.98], // Electric Cyan
+                        [0.32, 0.98, 0.72], // Tropical Mint
+                        [1.00, 0.84, 0.24]  // Colony Gold
+                    ];
+                    const neonCol = neonPal[(oceanBldgGroup + r) % neonPal.length];
+                    // Vertical Art Deco Neon Pilaster Tubes flanking hotel windows (Trailer 1 0:32 Ocean Drive Night Cruise!)
+                    if (r % 2 === 0) {
+                        emitSolidBox3D(facadeX + 1.8, rowY - 22, 1, 0, 0, 0, 2.4, 3.2, 2.18, topZ - 0.12, neonCol, 10);
+                        emitSolidBox3D(facadeX + 1.8, rowY + 22, 1, 0, 0, 0, 2.4, 3.2, 2.18, topZ - 0.12, neonCol, 10);
+                    }
+                    if (r % 3 === 1) {
                         emitSolidBox3D(facadeX + 9.0, rowY, 1, 0, 0, 0, 18.0, 48.0, 2.38, 2.48, awnCol, 1);
                         emitSolidBox3D(facadeX + 17.5, rowY, 1, 0, 0, 0, 2.5, 48.0, 2.34, 2.40, [0.92, 0.90, 0.86], 1);
+                        // 3D Ocean Drive Sidewalk Bistro Table, Chairs, Octagonal Pastel Parasol & Neon Menu Podium
+                        for (const tyOff of [-14, 14]) {
+                            emitCylinder3D(facadeX + 11.5, rowY + tyOff, 0, 0, 5.2, 5.2, 2.09, 2.12, 8, [0.96, 0.95, 0.92], 1, true);
+                            emitCylinder3D(facadeX + 11.5, rowY + tyOff, 0, 0, 1.2, 1.2, 2.00, 2.28, 6, [0.82, 0.86, 0.90], 5, false);
+                            emitCone3D(facadeX + 11.5, rowY + tyOff, 0, 0, 9.5, 2.26, 2.35, 8, awnCol, 1);
+                        }
+                        emitSolidBox3D(facadeX + 16.5, rowY, 1, 0, 0, 0, 4.2, 5.2, 2.00, 2.16, [0.18, 0.20, 0.26], 5);
+                        emitSolidBox3D(facadeX + 17.2, rowY, 1, 0, 0, 0, 3.4, 4.4, 2.09, 2.15, neonCol, 10);
                     }
                 }
             }
 
-            // 20B. ESPAÑOLA WAY & LITTLE HAVANA 3D OVERHEAD FESTOON STRING LIGHTS (Warm Miami Night Ambiance)
+            // 20B. ESPAÑOLA WAY, LITTLE HAVANA & KEY LENTO 3D OVERHEAD FESTOON STRING LIGHTS (Warm Miami Night Ambiance)
             const festoonSpans = [
                 // Española Way Pedestrian Plaza & Cafe Terrace (c = 434..441, r = 160..174)
                 { x1: 434.2 * TILE_SIZE, x2: 441.8 * TILE_SIZE, rStart: 160, rEnd: 174, step: 2 },
                 // Little Havana / Calle Ocho Domino & Latin District (c = 280..288, r = 242..254)
-                { x1: 280.2 * TILE_SIZE, x2: 287.8 * TILE_SIZE, rStart: 242, rEnd: 254, step: 2 }
+                { x1: 280.2 * TILE_SIZE, x2: 287.8 * TILE_SIZE, rStart: 242, rEnd: 254, step: 2 },
+                // Key Lento Waterfront & The Rusty Anchor Boardwalk (c = 214..228, r = 474..478)
+                { x1: 214.5 * TILE_SIZE, x2: 227.5 * TILE_SIZE, rStart: 475, rEnd: 477, step: 2 }
             ];
             for (const fs of festoonSpans) {
                 for (let r = fs.rStart; r <= fs.rEnd; r += fs.step) {
@@ -6003,22 +6220,95 @@ class WorldObjectEngine {
             }
         }
 
-        // 21. MUSCLE BEACH 3D OUTDOOR WEIGHTLIFTING PAVILIONS & BENCH-PRESS RACKS (this.map.muscleBeachGyms)
+        // 21. MUSCLE BEACH 3D OUTDOOR WEIGHTLIFTING PAVILIONS, SQUAT CAGES & DUMBBELL RACKS (GTA 6 Trailer 2 0:38)
         if (this.map && Array.isArray(this.map.muscleBeachGyms)) {
             for (const mg of this.map.muscleBeachGyms) {
                 const bz = mg.z || 2.0;
-                emitAOShadow3D(mg.x, mg.y, 1, 0, 0, 0, 56, 42, bz, 0.34);
-                // Rubberized Outdoor Gym Mat Plinth (L87)
-                emitTileBox3D(mg.x, mg.y, 1, 0, 0, 0, 48, 34, bz, bz + 0.04, 177, 177, 87, [0.36, 0.42, 0.52], false);
-                // 3D Chrome Calisthenics Pull-Up Frame (at offX = -14)
-                emitTileBox3D(mg.x, mg.y, 1, 0, -14, -10, 3.5, 3.5, bz + 0.04, bz + 0.32, 363, 363, 45, [0.92, 0.94, 0.98], false);
-                emitTileBox3D(mg.x, mg.y, 1, 0, -14,  10, 3.5, 3.5, bz + 0.04, bz + 0.32, 363, 363, 45, [0.92, 0.94, 0.98], false);
-                emitSolidBox3D(mg.x, mg.y, 1, 0, -14, 0, 4.0, 24, bz + 0.29, bz + 0.33, [0.98, 0.82, 0.18], 5);
-                // 3D Bench-Press Pad & Heavy Olympic Barbell Discs (at offX = +10)
-                emitSolidBox3D(mg.x, mg.y, 1, 0, 10, 0, 18, 7, bz + 0.04, bz + 0.12, [0.88, 0.20, 0.22], 5);
-                emitSolidBox3D(mg.x, mg.y, 1, 0, 16, 0, 2.5, 22, bz + 0.16, bz + 0.19, [0.88, 0.92, 0.96], 5);
-                emitCylinder3D(mg.x, mg.y, 16, -9, 4.5, 4.5, bz + 0.13, bz + 0.22, 10, [0.16, 0.18, 0.22], 5, true);
-                emitCylinder3D(mg.x, mg.y, 16,  9, 4.5, 4.5, bz + 0.13, bz + 0.22, 10, [0.16, 0.18, 0.22], 5, true);
+                emitAOShadow3D(mg.x, mg.y, 1, 0, 0, 0, 68, 50, bz, 0.36);
+                // Rubberized Outdoor Gym Mat Plinth (L87) + Neon Cyan Perimeter Trim
+                emitTileBox3D(mg.x, mg.y, 1, 0, 0, 0, 60, 42, bz, bz + 0.04, 177, 177, 87, [0.34, 0.42, 0.54], false);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 0, 0, 62, 44, bz, bz + 0.025, [0.18, 0.88, 0.96], 7);
+                // 3D Chrome Calisthenics Pull-Up & Squat Cage Frame (at offX = -18)
+                for (const pxOff of [-22, -14]) {
+                    for (const pyOff of [-11, 11]) {
+                        emitTileBox3D(mg.x, mg.y, 1, 0, pxOff, pyOff, 3.2, 3.2, bz + 0.04, bz + 0.36, 363, 363, 45, [0.92, 0.94, 0.98], false);
+                    }
+                }
+                emitSolidBox3D(mg.x, mg.y, 1, 0, -18, 0, 12.0, 25, bz + 0.33, bz + 0.37, [0.98, 0.82, 0.18], 5);
+                // 3D Tiered Hex Dumbbell Rack (at offX = -2, offY = -14)
+                emitSolidBox3D(mg.x, mg.y, 1, 0, -2, -14, 18, 5, bz + 0.04, bz + 0.16, [0.22, 0.25, 0.30], 5);
+                for (const dbx of [-7, -2, 3]) {
+                    emitCylinder3D(mg.x, mg.y, dbx, -14, 2.2, 2.2, bz + 0.15, bz + 0.20, 8, [0.14, 0.16, 0.20], 5, true);
+                }
+                // 3D Bench-Press Pad & Upright Catch Uprights (at offX = +12; live animated barbell rendered in renderDynamic3DMeshes!)
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 12, 0, 20, 7.5, bz + 0.04, bz + 0.12, [0.88, 0.20, 0.24], 5);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 18, -6, 3.0, 3.0, bz + 0.04, bz + 0.24, [0.86, 0.90, 0.96], 5);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 18,  6, 3.0, 3.0, bz + 0.04, bz + 0.24, [0.86, 0.90, 0.96], 5);
+                // Muscle Beach Protein Shake & Ice Hydration Cooler (at offX = +22, offY = +13)
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 22, 13, 10, 8, bz + 0.04, bz + 0.15, [0.96, 0.34, 0.76], 5);
+                emitSolidBox3D(mg.x, mg.y, 1, 0, 22, 13, 11, 9, bz + 0.14, bz + 0.17, [0.96, 0.97, 1.00], 1);
+            }
+        }
+
+        // 21B. GTA 6 TRAILER 1 (0:11, 0:21): TRUE 3D ART DECO STILTED WOODEN VICE BEACH LIFEGUARD TOWERS & SANDCASTLES
+        if (this.map && Array.isArray(this.map.beachProps)) {
+            const lgPalette = [
+                { wall: [0.98, 0.54, 0.68], roof: [0.96, 0.28, 0.56], trim: [0.98, 0.96, 0.92] }, // Coral Pink
+                { wall: [0.46, 0.94, 0.80], roof: [0.16, 0.78, 0.66], trim: [0.98, 0.88, 0.34] }, // Tropical Mint
+                { wall: [0.38, 0.86, 0.98], roof: [0.14, 0.64, 0.92], trim: [0.98, 0.44, 0.76] }, // Ocean Aqua
+                { wall: [0.98, 0.86, 0.36], roof: [0.96, 0.52, 0.20], trim: [0.24, 0.88, 0.96] }  // Sunny Gold
+            ];
+            for (let i = 0; i < this.map.beachProps.length; i++) {
+                const bp = this.map.beachProps[i];
+                if (!bp || !bp.spr || !bp.spr.startsWith("lifeguard_")) continue;
+                const bz = bp.z || 2.0;
+                const pal = lgPalette[i % lgPalette.length];
+                const cA = Math.cos(bp.ang || 0);
+                const sA = Math.sin(bp.ang || 0);
+                emitAOShadow3D(bp.x, bp.y, cA, sA, 0, 0, 46, 42, bz, 0.36);
+                // 4 Angled Timber Stilts + Cross-Bracing supporting the Lookout Deck (bz .. bz + 0.18)
+                for (const [lx, ly] of [[-11, -10], [11, -10], [-11, 10], [11, 10]]) {
+                    emitSolidBox3D(bp.x, bp.y, cA, sA, lx, ly, 3.4, 3.4, bz, bz + 0.19, [0.76, 0.62, 0.44], 11);
+                }
+                // Wrap-Around Bleached Timber Observation Deck & White Guardrail Posts (bz + 0.18 .. bz + 0.23)
+                emitTileBox3D(bp.x, bp.y, cA, sA, 0, 0, 34, 30, bz + 0.18, bz + 0.23, 177, 177, 77, [0.88, 0.74, 0.54], false);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, 0, 0, 36, 32, bz + 0.29, bz + 0.32, pal.trim, 1);
+                // Pastel Art Deco Lifeguard Cabin + Panoramic Horizontal Observation Windows + Eyebrow Visor
+                emitSolidBox3D(bp.x, bp.y, cA, sA, -2, 0, 22, 20, bz + 0.23, bz + 0.48, pal.wall, 1);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, -2, 0, 23.5, 21.5, bz + 0.33, bz + 0.41, [0.22, 0.78, 0.92], 7);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, -2, 0, 26, 24, bz + 0.42, bz + 0.45, pal.trim, 1);
+                // Hipped Art Deco Roof + Lifeguard Cross Finial + Red Rescue Torpedo Buoy on Front Rail
+                emitHippedRoof3D(bp.x, bp.y, cA, sA, -2, 0, 28, 26, bz + 0.48, 0.16, "mansion_star_island", pal.roof, pal.trim);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, 15, 0, 3.5, 11, bz + 0.25, bz + 0.31, [0.96, 0.18, 0.20], 5);
+                // Front Wooden Steps leading down toward the surf + Adjacent 3D Sandcastle & Ice Cooler
+                emitSolidBox3D(bp.x, bp.y, cA, sA, 20, 0, 10, 8, bz, bz + 0.10, [0.82, 0.68, 0.48], 11);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, 16, 0, 6, 8, bz + 0.10, bz + 0.18, [0.82, 0.68, 0.48], 11);
+                // 3D Turreted Sandcastle & Blue Beach Cooler beside the tower
+                emitCylinder3D(bp.x, bp.y, -4, 24, 6.5, 5.2, bz, bz + 0.08, 8, [0.94, 0.84, 0.64], 1, true);
+                emitCone3D(bp.x, bp.y, -4, 24, 4.0, bz + 0.08, bz + 0.16, 8, [0.96, 0.86, 0.66], 1);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, 8, -22, 9, 6.5, bz, bz + 0.09, [0.18, 0.68, 0.96], 5);
+                emitSolidBox3D(bp.x, bp.y, cA, sA, 8, -22, 9.5, 7.0, bz + 0.08, bz + 0.105, [0.96, 0.98, 1.00], 1);
+            }
+        }
+
+        // 21C. GTA 6 TRAILER 1 (0:11): TRUE 3D INTERACTIVE VICE BEACH VOLLEYBALL COURTS & NETS
+        if (this.map && Array.isArray(this.map.beachVolleyballCourts)) {
+            for (let i = 0; i < this.map.beachVolleyballCourts.length; i++) {
+                const vc = this.map.beachVolleyballCourts[i];
+                const bz = vc.z || 2.0;
+                // Neon Cyan & Hot-Pink Sand Court Boundary Tape Ribbons (36x64px court)
+                emitSolidBox3D(vc.x, vc.y, 1, 0, -18, 0, 2.2, 64, bz + 0.008, bz + 0.022, [0.18, 0.90, 0.98], 7);
+                emitSolidBox3D(vc.x, vc.y, 1, 0,  18, 0, 2.2, 64, bz + 0.008, bz + 0.022, [0.18, 0.90, 0.98], 7);
+                emitSolidBox3D(vc.x, vc.y, 1, 0, 0, -32, 38, 2.2, bz + 0.008, bz + 0.022, [0.98, 0.34, 0.76], 7);
+                emitSolidBox3D(vc.x, vc.y, 1, 0, 0,  32, 38, 2.2, bz + 0.008, bz + 0.022, [0.98, 0.34, 0.76], 7);
+                // Twin 3D Powder-Coated Steel Net Posts + Elevated 3D Mesh Net & White Top Tape
+                emitCylinder3D(vc.x, vc.y, -19, 0, 2.0, 2.0, bz, bz + 0.30, 8, [0.90, 0.94, 0.98], 5, true);
+                emitCylinder3D(vc.x, vc.y,  19, 0, 2.0, 2.0, bz, bz + 0.30, 8, [0.90, 0.94, 0.98], 5, true);
+                emitTileBox3D(vc.x, vc.y, 1, 0, 0, 0, 36, 2.0, bz + 0.15, bz + 0.27, 363, 363, 45, [0.92, 0.96, 1.00], false);
+                emitSolidBox3D(vc.x, vc.y, 1, 0, 0, 0, 38, 2.6, bz + 0.265, bz + 0.29, [0.98, 0.98, 1.00], 1);
+                // Elevated Referee Chair & Sun Canopy on West Sideline (offX = -24)
+                emitSolidBox3D(vc.x, vc.y, 1, 0, -24, 0, 6, 6, bz, bz + 0.22, [0.88, 0.92, 0.96], 5);
+                emitCone3D(vc.x, vc.y, -24, 0, 8.5, bz + 0.30, bz + 0.38, 8, [0.98, 0.36, 0.76], 1);
             }
         }
 
@@ -6041,6 +6331,65 @@ class WorldObjectEngine {
                 }
                 emitHippedRoof3D(tb.x, tb.y, tCos, tSin, 0, 0, 52, 36, bz + 0.42, 0.20, "mansion_star_island", [0.80, 0.62, 0.34], [0.90, 0.72, 0.40]);
                 emitSolidBox3D(tb.x, tb.y, tCos, tSin, 0, 14, 22, 3, bz + 0.38, bz + 0.44, [0.98, 0.30, 0.74], 7);
+            }
+        }
+
+        // 22B. GTA 6 TRAILER 1 (0:41 "DADBODSQUAD"): 3D MULTI-DECK LUXURY CATAMARAN & SUPERYACHT PARTIES
+        if (this.map && Array.isArray(this.map.yachtParties)) {
+            for (const yp of this.map.yachtParties) {
+                const bz = 2.02;
+                const yCos = Math.cos(yp.ang || 0);
+                const ySin = Math.sin(yp.ang || 0);
+                // Glowing Turquoise Underwater Hull LED Halo + Twin Sleek White Catamaran Pontoons
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, 0, 96, 46, bz - 0.01, bz + 0.02, [0.12, 0.92, 0.96], 10);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, -14, 88, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0,  14, 88, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
+                // Teakwood Main Party Deck Bridging the Catamaran Hulls (L77 planks)
+                emitTileBox3D(yp.x, yp.y, yCos, ySin, -2, 0, 78, 38, bz + 0.14, bz + 0.20, 177, 177, 77, [0.86, 0.70, 0.48], false);
+                // Panoramic Tinted-Glass Main Salon Cabin + White Flybridge Sun Deck
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 2, 0, 44, 26, bz + 0.20, bz + 0.38, [0.16, 0.56, 0.78], 7);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, 0, 48, 28, bz + 0.38, bz + 0.43, [0.96, 0.98, 1.00], 5);
+                // Swept Aerodynamic Radar Arch + DJ Booth & Neon Pink/Cyan Speaker Stacks on Foredeck
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -8, 0, 10, 24, bz + 0.43, bz + 0.62, [0.94, 0.96, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 28, 0, 8, 16, bz + 0.20, bz + 0.32, [0.98, 0.28, 0.76], 10);
+            }
+        }
+
+        // 22C. GTA 6 VICE CITY LITTLE CUBA DOMINO PARK PAVILIONS & 3D GOURMET STREET FOOD TRUCKS
+        if (Array.isArray(this.littleCubaDominoParks)) {
+            for (const dp of this.littleCubaDominoParks) {
+                const bz = dp.z || 2.0;
+                emitAOShadow3D(dp.x, dp.y, 1, 0, 0, 0, 60, 48, bz, 0.36);
+                // Terracotta Checkered Plaza Plinth + 4 Cast-Iron Columns + Spanish Tile Shade Pavilion Roof
+                emitTileBox3D(dp.x, dp.y, 1, 0, 0, 0, 52, 40, bz, bz + 0.05, 177, 177, 8, [0.90, 0.78, 0.66], false);
+                for (const [px, py] of [[-20, -14], [20, -14], [-20, 14], [20, 14]]) {
+                    emitCylinder3D(dp.x, dp.y, px, py, 2.2, 2.2, bz + 0.05, bz + 0.40, 8, [0.22, 0.26, 0.30], 5, false);
+                }
+                emitHippedRoof3D(dp.x, dp.y, 1, 0, 0, 0, 56, 44, bz + 0.40, 0.18, "mansion_star_island", [0.84, 0.38, 0.22], [0.94, 0.78, 0.48]);
+                // 4 Green-Baize Cuban Domino Tables with Ivory Double-Six Tiles
+                for (const [tx, ty] of [[-10, -7], [10, -7], [-10, 7], [10, 7]]) {
+                    emitSolidBox3D(dp.x, dp.y, 1, 0, tx, ty, 9, 9, bz + 0.05, bz + 0.14, [0.58, 0.38, 0.22], 11);
+                    emitSolidBox3D(dp.x, dp.y, 1, 0, tx, ty, 10, 10, bz + 0.14, bz + 0.16, [0.14, 0.62, 0.34], 1);
+                    emitSolidBox3D(dp.x, dp.y, 1, 0, tx, ty, 4, 2.5, bz + 0.16, bz + 0.175, [0.98, 0.96, 0.90], 1);
+                }
+            }
+        }
+        if (Array.isArray(this.foodTrucks)) {
+            for (const ft of this.foodTrucks) {
+                const bz = ft.z || 2.0;
+                const fCos = Math.cos(ft.ang || 0);
+                const fSin = Math.sin(ft.ang || 0);
+                emitAOShadow3D(ft.x, ft.y, fCos, fSin, 0, 0, 52, 28, bz, 0.38);
+                // 4 Rubber Tires + Step-Van Chassis + Pastel/Neon Gourmet Food Truck Body
+                for (const [wx, wy] of [[-13, -10], [13, -10], [-13, 10], [13, 10]]) {
+                    emitSolidBox3D(ft.x, ft.y, fCos, fSin, wx, wy, 7, 3, bz, bz + 0.08, [0.14, 0.16, 0.20], 5);
+                }
+                emitSolidBox3D(ft.x, ft.y, fCos, fSin, 0, 0, 42, 20, bz + 0.05, bz + 0.34, ft.tint, 5);
+                emitSolidBox3D(ft.x, ft.y, fCos, fSin, 16, 0, 10, 18, bz + 0.18, bz + 0.30, [0.22, 0.78, 0.92], 7); // Windshield
+                // Pop-Up Side Serving Awning + Stainless Counter + Illuminated Rooftop Menu Billboard
+                emitSolidBox3D(ft.x, ft.y, fCos, fSin, -2, 13, 24, 8, bz + 0.28, bz + 0.32, [0.98, 0.94, 0.86], 1);
+                emitSolidBox3D(ft.x, ft.y, fCos, fSin, -2, 10.5, 22, 3, bz + 0.16, bz + 0.19, [0.88, 0.92, 0.96], 5);
+                emitBox3D(ft.x, ft.y, fCos, fSin, -2, 0, 28, 4.5, bz + 0.34, bz + 0.48, ft.ad, ft.ad, [1.0, 1.0, 1.0]);
             }
         }
 
@@ -6241,6 +6590,31 @@ class WorldObjectEngine {
             emitSolidBox3D(bb.x, bb.y, 1, 0, 0, 0, 50, 19, bz + 0.34, bz + 0.39, [0.18, 0.84, 0.78], 7);
             emitTileBox3D(bb.x, bb.y, 1, 0, -37, 0, 3, 8, bz + 0.08, bz + 0.92, 249, 249, 45, [0.92, 0.94, 0.98], false);
             emitSolidBox3D(bb.x, bb.y, 1, 0, 22, 18, 18, 14, bz + 0.08, bz + 0.26, [0.24, 0.52, 0.28], 6);
+            // Stacked Wooden Florida Keys Lobster Traps & Marine Fuel Drums (Trailer 2 0:08 & 1:21)
+            for (let lt = 0; lt < 3; lt++) {
+                emitTileBox3D(bb.x, bb.y, 1, 0, -22, -18, 11, 9, bz + 0.08 + lt * 0.09, bz + 0.165 + lt * 0.09, 249, 249, 77, [0.76, 0.58, 0.36], false);
+            }
+            emitCylinder3D(bb.x, bb.y, 24, -18, 4.2, 4.2, bz + 0.08, bz + 0.24, 8, [0.88, 0.22, 0.20], 5, true);
+        }
+
+        // 24B. GTA 6 TRAILER 2 (1:19, 2:32): KEY LENTO "THE RUSTY ANCHOR" WATERFRONT BAR & LOBSTER DOCK (c=225.5, r=476.5)
+        if (this.landmarks3D && this.landmarks3D.rustyAnchorBar) {
+            const ra = this.landmarks3D.rustyAnchorBar;
+            const bz = ra.z || 2.0;
+            emitAOShadow3D(ra.x, ra.y, 1, 0, 0, 0, 82, 58, bz, 0.40);
+            // Weathered Driftwood Waterfront Tavern Deck (L77 planks)
+            emitTileBox3D(ra.x, ra.y, 1, 0, 0, 0, 72, 48, bz, bz + 0.08, 177, 177, 77, [0.80, 0.64, 0.44], false);
+            // Rustic Key West Clapboard Tavern Cabin + Wrap-Around Outdoor Bar Counter + Neon Patriot Beer Signboard
+            emitTileBox3D(ra.x, ra.y, 1, 0, -6, -4, 44, 28, bz + 0.08, bz + 0.52, 177, 172, 64, [0.46, 0.66, 0.72], false);
+            emitHippedRoof3D(ra.x, ra.y, 1, 0, -6, -4, 50, 34, bz + 0.52, 0.20, "mansion_star_island", [0.72, 0.34, 0.22], [0.88, 0.78, 0.62]);
+            emitSolidBox3D(ra.x, ra.y, 1, 0, 18, 8, 22, 12, bz + 0.08, bz + 0.22, [0.64, 0.44, 0.24], 11);
+            emitSolidBox3D(ra.x, ra.y, 1, 0, 18, 8, 24, 14, bz + 0.22, bz + 0.25, [0.92, 0.80, 0.58], 1);
+            emitBox3D(ra.x, ra.y, 1, 0, -6, -4, 34, 30, bz + 0.56, bz + 0.82, "ad_patriot_beer", "ad_patriot_beer", [1.0, 0.86, 0.42]);
+            // Glowing Coral-Orange & Cyan Neon Anchor Sign + Stacked Wooden Keys Lobster Traps
+            emitSolidBox3D(ra.x, ra.y, 1, 0, -6, 11.5, 26, 3.0, bz + 0.42, bz + 0.48, [1.00, 0.46, 0.18], 10);
+            for (let lt = 0; lt < 2; lt++) {
+                emitTileBox3D(ra.x, ra.y, 1, 0, -28, 14, 10, 8, bz + 0.08 + lt * 0.09, bz + 0.165 + lt * 0.09, 249, 249, 77, [0.78, 0.60, 0.38], false);
+            }
         }
 
         // 25. GTA 6 TRAILER 1 & 2: BOOBIE IKE'S "JACK OF HEARTS" CLUB & STUDIO 3D NEON MARQUEE (c=193.5, r=131.5)
@@ -7070,16 +7444,23 @@ class WorldObjectEngine {
                         const wallCol = stoneWallPal[bId % stoneWallPal.length];
                         const capCol = copingCapPal[bId % copingCapPal.length];
                         if (rHash % 2 === 0) {
-                            // ARCHETYPE 2A: South Beach Rooftop Infinity Plunge Pool, Travertine Sundeck & Teak Cabana Pergola
+                            // ARCHETYPE 2A: South Beach Rooftop Infinity Plunge Pool, Cabana Daybeds & Sky-Lounge Bar (GTA 6 Trailer 1 0:37)
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 84, topY, 0.38);
                             emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 84, 72, topY, topY + 0.07, 177, 177, 8, [0.90, 0.86, 0.80], false);
-                            // Deep Turquoise Rooftop Plunge Pool Basin (at offX = -14)
+                            // Deep Turquoise Rooftop Plunge Pool Basin + Glowing Underwater Cyan LED Rim (at offX = -14)
                             emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 44, 52, topY + 0.07, topY + 0.13, [0.90, 0.88, 0.84], 1);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 38, 46, topY + 0.08, topY + 0.145, [0.16, 0.64, 0.78], 7);
-                            // Architectural Limestone Rooftop Lounge & Teak Wood Louvered Pergola (at offX = +22)
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 20, 48, topY + 0.07, topY + 0.38, wallCol, 1);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 24, 54, topY + 0.38, topY + 0.44, [0.62, 0.42, 0.26], 11);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 22, 0, 14, 32, topY + 0.44, topY + 0.56, capCol, 2);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 40, 48, topY + 0.125, topY + 0.14, [0.16, 0.92, 0.98], 10);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, -14, 0, 38, 46, topY + 0.08, topY + 0.148, [0.16, 0.64, 0.78], 7);
+                            // Twin 3D Plush White Rooftop Cabana Daybeds with Turquoise Accent Pillows beside the Pool (offX = +6)
+                            for (const dby of [-14, 14]) {
+                                emitSolidBox3D(cxPx, cyPx, 1, 0, 6, dby, 12, 16, topY + 0.07, topY + 0.13, [0.97, 0.97, 0.99], 1);
+                                emitSolidBox3D(cxPx, cyPx, 1, 0, 6, dby - 5, 10, 4, topY + 0.13, topY + 0.16, [0.18, 0.88, 0.94], 7);
+                            }
+                            // Architectural Limestone Rooftop Lounge, Backlit Neon Sky-Bar & Teak Wood Louvered Pergola (at offX = +24)
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 18, 48, topY + 0.07, topY + 0.38, wallCol, 1);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 15, 0, 3.5, 34, topY + 0.07, topY + 0.22, [0.98, 0.28, 0.76], 10);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 24, 54, topY + 0.38, topY + 0.44, [0.62, 0.42, 0.26], 11);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 14, 32, topY + 0.44, topY + 0.56, capCol, 2);
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.56 });
                         } else {
                             // ARCHETYPE 2B: Art Deco Stepped Limestone Elevator Cupola & Skylight Atrium
@@ -8460,6 +8841,85 @@ class WorldObjectEngine {
             }
         }
 
+        // 18. GTA 6 Trailer 2 (0:38): Muscle Beach Live Animated 3D Olympic Barbell Bench-Pressing
+        if (this.map && Array.isArray(this.map.muscleBeachGyms)) {
+            for (let i = 0; i < this.map.muscleBeachGyms.length; i++) {
+                const mg = this.map.muscleBeachGyms[i];
+                if (mg.x < minX - 120 || mg.x > maxX + 120 || mg.y < minY - 120 || mg.y > maxY + 120) continue;
+                const bz = mg.z || 2.0;
+                const repLift = (0.5 + 0.5 * Math.sin(t * 3.8 + i * 1.7)) * 0.085;
+                const barZ = bz + 0.16 + repLift;
+                // Chrome Olympic Barbell Shaft + Twin Double-Stacked 45-lb Cast-Iron Plates
+                emitDynBox(mg.x, mg.y, 1, 0, 18, 0, 2.4, 24, barZ, barZ + 0.025, [0.90, 0.94, 0.98], 1.0, 5);
+                for (const pyOff of [-10.5, -8.5, 8.5, 10.5]) {
+                    emitDynCylinder(mg.x, mg.y, 18, pyOff, 4.8, 4.8, barZ - 0.03, barZ + 0.055, 10, [0.14, 0.16, 0.22], 5, true);
+                }
+            }
+        }
+
+        // 19. GTA 6 Trailer 1 (0:11): Live Parabolic Arcing 3D Beach Volleyballs Across the Net
+        if (this.map && Array.isArray(this.map.beachVolleyballCourts)) {
+            for (let i = 0; i < this.map.beachVolleyballCourts.length; i++) {
+                const vc = this.map.beachVolleyballCourts[i];
+                if (vc.x < minX - 140 || vc.x > maxX + 140 || vc.y < minY - 140 || vc.y > maxY + 140) continue;
+                const bz = vc.z || 2.0;
+                const rallyPhase = t * 2.4 + i * 1.9;
+                const byOff = Math.sin(rallyPhase) * 24.0;
+                const bxOff = Math.sin(rallyPhase * 0.5) * 7.0;
+                const bArc = Math.abs(Math.cos(rallyPhase)) * 0.34;
+                const ballZ = bz + 0.16 + bArc;
+                // Ground shadow on the sand + 3D Neon-Yellow/White/Pink Beach Volleyball in flight
+                emitDynCylinder(vc.x, vc.y, bxOff, byOff, 3.6, 3.6, bz + 0.01, bz + 0.02, 8, [0.10, 0.12, 0.16], 1, true, 0.35);
+                emitDynCylinder(vc.x, vc.y, bxOff, byOff, 3.8, 3.4, ballZ, ballZ + 0.065, 10, [0.98, 0.92, 0.24], 7, true);
+            }
+        }
+
+        // 20. GTA 6 Trailer 1 (0:11): Vice Bay, Ocean Beach & Leonida Keys Leaping 3D Dolphin Pods
+        if (Array.isArray(this.dolphinPods)) {
+            for (let i = 0; i < this.dolphinPods.length; i++) {
+                const dp = this.dolphinPods[i];
+                if (dp.x < minX - 200 || dp.x > maxX + 200 || dp.y < minY - 200 || dp.y > maxY + 200) continue;
+                const cA = Math.cos(dp.ang || 0);
+                const sA = Math.sin(dp.ang || 0);
+                for (let di = 0; di < 3; di++) {
+                    const cyc = (t * 0.85 + dp.seed + di * 0.33) % 1.0;
+                    // Dolphin leaps during cyc in [0.15 .. 0.75]
+                    if (cyc >= 0.15 && cyc <= 0.75) {
+                        const u = (cyc - 0.15) / 0.60; // 0..1 across the leap
+                        const fwd = (u - 0.5) * 44.0 + (di - 1) * 14.0;
+                        const lat = (di - 1) * 16.0;
+                        const wx = dp.x + fwd * cA - lat * sA;
+                        const wy = dp.y + fwd * sA + lat * cA;
+                        const arcZ = Math.sin(u * Math.PI) * 0.32;
+                        const dz = 2.00 + arcZ;
+                        // Sleek Bottlenose Silver-Blue Torso + Curved Dorsal Fin + Nose Rostrum & Tail Flukes
+                        emitDynBox(wx, wy, cA, sA, 0, 0, 18, 5.5, dz, dz + 0.08, [0.52, 0.68, 0.82], 1.0, 5);
+                        emitDynBox(wx, wy, cA, sA, 8, 0, 7, 3.2, dz + 0.01, dz + 0.05, [0.64, 0.78, 0.90], 1.0, 5);
+                        emitDynCone(wx, wy, -1, 0, 3.2, dz + 0.08, dz + 0.15, 6, [0.42, 0.58, 0.74], 5);
+                        emitDynBox(wx, wy, cA, sA, -10, 0, 5, 9.5, dz + 0.01, dz + 0.04, [0.46, 0.62, 0.78], 1.0, 5);
+                        // Expanding 3D White Sea-Foam Splash Ring at Entry / Exit
+                        if (u < 0.22 || u > 0.78) {
+                            const spR = 7.0 + Math.abs(u - 0.5) * 16.0;
+                            emitDynCylinder(wx, wy, 0, 0, spR, spR * 0.85, 2.005, 2.035, 10, [0.92, 0.98, 1.00], 7, true, 0.78);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 21. GTA 6 Trailer 1 (0:41): 3D Luxury Catamaran Yacht Pulsing DJ Laser Equalizer Bars
+        if (this.map && Array.isArray(this.map.yachtParties)) {
+            for (let i = 0; i < this.map.yachtParties.length; i++) {
+                const yp = this.map.yachtParties[i];
+                if (yp.x < minX - 180 || yp.x > maxX + 180 || yp.y < minY - 180 || yp.y > maxY + 180) continue;
+                const yCos = Math.cos(yp.ang || 0);
+                const ySin = Math.sin(yp.ang || 0);
+                const eqH = 0.08 + 0.10 * Math.abs(Math.sin(t * 8.5 + i));
+                emitDynBox(yp.x, yp.y, yCos, ySin, 28, -5, 4, 4, 2.34, 2.34 + eqH, [0.18, 0.96, 0.98], 0.95, 10);
+                emitDynBox(yp.x, yp.y, yCos, ySin, 28,  5, 4, 4, 2.34, 2.34 + eqH * 0.85, [1.00, 0.30, 0.78], 0.95, 10);
+            }
+        }
+
         if (dLen === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -8954,12 +9414,42 @@ class WorldObjectEngine {
                     const scr = renderer.worldToScreen(mg.x, mg.y - 14, 2.34);
                     ctx.font = "900 11px monospace";
                     ctx.fillStyle = "rgba(8,12,22,0.90)";
-                    ctx.fillRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.fillRect(scr.x - 185, scr.y - 22, 370, 22);
                     ctx.strokeStyle = "#4ade80";
                     ctx.lineWidth = 1.5;
-                    ctx.strokeRect(scr.x - 175, scr.y - 22, 350, 22);
+                    ctx.strokeRect(scr.x - 185, scr.y - 22, 370, 22);
                     ctx.fillStyle = "#4ade80";
-                    ctx.fillText("💪 [E] PUMP IRON AT MUSCLE BEACH (150 MAX HP & +$2,000)", scr.x, scr.y - 7);
+                    ctx.fillText("💪 [E] PUMP IRON AT MUSCLE BEACH (150 MAX HP, +$3,000 & +1X)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && this.map && Array.isArray(this.map.beachVolleyballCourts) && (this.volleyballCooldown || 0) <= 0) {
+            for (const vc of this.map.beachVolleyballCourts) {
+                if (Math.hypot(px - vc.x, py - vc.y) < 105) {
+                    const scr = renderer.worldToScreen(vc.x, vc.y - 14, 2.40);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.90)";
+                    ctx.fillRect(scr.x - 185, scr.y - 22, 370, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 185, scr.y - 22, 370, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText("🏐 [E] SPIKE BEACH VOLLEYBALL TOURNAMENT (+$3,500 & +1X)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (this.map && Array.isArray(this.map.yachtParties) && (this.yachtPartyCooldown || 0) <= 0) {
+            for (const yp of this.map.yachtParties) {
+                if (Math.hypot(px - yp.x, py - yp.y) < 135) {
+                    const scr = renderer.worldToScreen(yp.x, yp.y - 16, 2.55);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.strokeStyle = "#f472b6";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.fillStyle = "#f472b6";
+                    ctx.fillText("🛥️ [E] JOIN VIP SUPERYACHT PARTY (FULL HP/ARMOR, +$8,000 & +1X)", scr.x, scr.y - 7);
                 }
             }
         }
@@ -9064,6 +9554,48 @@ class WorldObjectEngine {
                 ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
                 ctx.fillStyle = "#38bdf8";
                 ctx.fillText("📡 [E] CAL HAMPTON VCPD SCANNER JAMMER (0★ & +$7,500)", scr.x, scr.y - 7);
+            }
+            const ra = this.landmarks3D.rustyAnchorBar;
+            if (ra && (ra.cooldown || 0) <= 0 && Math.hypot(px - ra.x, py - ra.y) < 120) {
+                const scr = renderer.worldToScreen(ra.x, ra.y - 18, 2.68);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.strokeStyle = "#fb923c";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                ctx.fillStyle = "#fb923c";
+                ctx.fillText("⚓ [E] THE RUSTY ANCHOR KEYS BAR (FULL HP/ARMOR & +$6,000)", scr.x, scr.y - 7);
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.littleCubaDominoParks) && (this.dominoCooldown || 0) <= 0) {
+            for (const dp of this.littleCubaDominoParks) {
+                if (Math.hypot(px - dp.x, py - dp.y) < 105) {
+                    const scr = renderer.worldToScreen(dp.x, dp.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 190, scr.y - 22, 380, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 190, scr.y - 22, 380, 22);
+                    ctx.fillStyle = "#facc15";
+                    ctx.fillText("🀄 [E] PLAY LITTLE CUBA HIGH-STAKES DOMINOES (+$4,500 & +1X)", scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.foodTrucks) && (this.foodTruckCooldown || 0) <= 0) {
+            for (const ft of this.foodTrucks) {
+                if (Math.hypot(px - ft.x, py - ft.y) < 105) {
+                    const scr = renderer.worldToScreen(ft.x, ft.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText(`🌮 [E] ORDER AT ${ft.name} (FULL HP & +$2,500)`, scr.x, scr.y - 7);
+                }
             }
         }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
@@ -9357,6 +9889,28 @@ class WorldObjectEngine {
         if (lm.calHamptonOutpost) {
             ctx.fillStyle = "#38bdf8";
             ctx.fillRect((lm.calHamptonOutpost.x - 32) * sx, (lm.calHamptonOutpost.y - 24) * sy, 64 * sx, 48 * sy);
+        }
+        if (lm.rustyAnchorBar) {
+            ctx.fillStyle = "#fb923c";
+            ctx.fillRect((lm.rustyAnchorBar.x - 38) * sx, (lm.rustyAnchorBar.y - 26) * sy, 76 * sx, 52 * sy);
+        }
+        if (Array.isArray(this.littleCubaDominoParks)) {
+            ctx.fillStyle = "#facc15";
+            for (const dp of this.littleCubaDominoParks) {
+                ctx.fillRect((dp.x - 28) * sx, (dp.y - 22) * sy, 56 * sx, 44 * sy);
+            }
+        }
+        if (Array.isArray(this.foodTrucks)) {
+            ctx.fillStyle = "#4ade80";
+            for (const ft of this.foodTrucks) {
+                ctx.fillRect((ft.x - 24) * sx, (ft.y - 14) * sy, 48 * sx, 28 * sy);
+            }
+        }
+        if (this.map && Array.isArray(this.map.yachtParties)) {
+            ctx.fillStyle = "#f8fafc";
+            for (const yp of this.map.yachtParties) {
+                ctx.fillRect((yp.x - 44) * sx, (yp.y - 20) * sy, 88 * sx, 40 * sy);
+            }
         }
 
         for (let i = 0; i < this.instances.length; i++) {
