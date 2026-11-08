@@ -6330,10 +6330,19 @@ class RetroRenderer {
     }
 
     getEntityZ(ent, offset = 0.03) {
+        const isWaterEnt = Boolean(
+            ent && (
+                ent.waterOnly ||
+                ent.specKey === "AIRBOAT" ||
+                (this.map && typeof this.map.isWaterAtPixel === "function" && this.map.isWaterAtPixel(ent.x, ent.y))
+            )
+        );
         if (ent && typeof ent.z === "number" && !Number.isNaN(ent.z)) {
-            return ent.z + offset;
+            const baseZ = isWaterEnt ? Math.max(2.0, ent.z) : ent.z;
+            return baseZ + offset;
         }
-        const h = this.map.getHeightAtPixel(ent.x, ent.y, this.camZBlocks);
+        const rawH = this.map.getHeightAtPixel(ent.x, ent.y, this.camZBlocks, !isWaterEnt);
+        const h = isWaterEnt ? Math.max(2.0, rawH) : rawH;
         if (ent) ent.z = h;
         return h + offset;
     }
@@ -8548,7 +8557,9 @@ class RetroRenderer {
         const carScale = 1.0;
         for (const v of game.vehicles) {
             if (v.x < minX || v.x > maxX || v.y < minY || v.y > maxY) continue;
-            const vz = this.getEntityZ(v, 0.06);
+            const isWaterCraft = Boolean(v.waterOnly || v.specKey === "AIRBOAT");
+            const waveBob = isWaterCraft ? (0.012 + Math.sin(this.time * 2.6 + v.x * 0.02 + v.y * 0.015) * 0.008) : 0;
+            const vz = (isWaterCraft ? Math.max(2.065, this.getEntityZ(v, 0.065)) : this.getEntityZ(v, 0.06)) + waveBob;
             const mapInfo = this.getVehicleG24Mapping(v);
             let rect = null;
             let dmgRect = null;
@@ -8788,20 +8799,24 @@ class RetroRenderer {
             }
 
             // B. GTA 2 live_geometry.cpp SetSpriteConform (kSmoothing = 0.25f): 4-Corner Ground Slope Pitch + Wheelie/Stunt Pitch!
-            const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
-            const hRear = this.map.getHeightAtPixel(v.x - cosA * 20, v.y - sinA * 20, vz);
-            const rawSlopePitch = Math.max(-0.22, Math.min(0.22, (hFront - hRear) * 0.45));
-            v._conformPitch = (v._conformPitch || 0) * 0.75 + rawSlopePitch * 0.25;
+            // (Disabled on watercraft so getHeightAtPixel on water/shore transitions never pitches the hull below the Y=2.0 water surface!)
+            let rawSlopePitch = 0;
+            if (!isWaterCraft) {
+                const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
+                const hRear = this.map.getHeightAtPixel(v.x - cosA * 20, v.y - sinA * 20, vz);
+                rawSlopePitch = Math.max(-0.22, Math.min(0.22, (hFront - hRear) * 0.45));
+            }
+            v._conformPitch = isWaterCraft ? 0 : ((v._conformPitch || 0) * 0.75 + rawSlopePitch * 0.25);
             const wheeliePitch = (v.wheelieTimer || 0) > 0 ? 0.14 : 0;
             const stuntPitch = (v.stuntAirTimer || 0) > 0
                 ? (((v.stuntAirTimer / (v.stuntMaxTime || 1.15)) - 0.5) * 0.24)
                 : 0;
-            const totalPitchZ = v._conformPitch + wheeliePitch + stuntPitch;
+            const totalPitchZ = isWaterCraft ? 0 : (v._conformPitch + wheeliePitch + stuntPitch);
 
             // Car body sprite with GTA 2 live rotation-aware solar clearcoat specular sheen + 3D building cast shadow response!
-            const vehShade = (1.0 - nfGlobal) * this.getDayShadeAtPixel(v.x, v.y);
+            const vehShade = isWaterCraft ? 0 : ((1.0 - nfGlobal) * this.getDayShadeAtPixel(v.x, v.y));
             const sunAlign = Math.cos(v.angle - sunShadowAngle);
-            const carSunSpec = v.destroyed ? 1.0 : (1.0 + 0.12 * sunAlign * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.75));
+            const carSunSpec = v.destroyed ? 1.0 : (isWaterCraft ? 1.12 : (1.0 + 0.12 * sunAlign * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.75)));
             const vTintR = carSunSpec * (1.04 - vehShade * 0.22);
             const vTintG = carSunSpec * (1.01 - vehShade * 0.15);
             const vTintB = carSunSpec * (0.97 - vehShade * 0.04);
@@ -9786,30 +9801,33 @@ class RetroRenderer {
 
             const cosA = Math.cos(v.angle);
             const sinA = Math.sin(v.angle);
+            const isWaterCraft = Boolean(v.waterOnly || v.specKey === "AIRBOAT");
             const frontDist = (v.w || 48) * 0.46;
             const rearDist = -(v.w || 48) * 0.46;
-            const latSpread = v.isMotorcycle ? 0 : ((v.h || 24) * 0.32);
+            const latSpread = (v.isMotorcycle || isWaterCraft) ? 0 : ((v.h || 24) * 0.32);
             // Headlights are rigidly mounted to the front bumper: always aligned straight with the vehicle chassis (v.angle)
             const beamAng = v.angle;
 
-            // Warm ambient glow around the vehicle chassis (or neon mint-green deck glow for E_SCOOTER!)
-            if (v.specKey === "E_SCOOTER") {
+            // Warm ambient glow around the vehicle chassis (or bright marine deck halo for boats!)
+            if (isWaterCraft) {
+                addLightPool(sc.x, sc.y, 58 * pxScale, "rgba(220, 248, 255, 0.74)", "rgba(56, 189, 248, 0.28)");
+            } else if (v.specKey === "E_SCOOTER") {
                 addLightPool(sc.x, sc.y, 34 * pxScale, "rgba(80, 255, 160, 0.56)", "rgba(34, 211, 238, 0.18)");
             } else {
                 addLightPool(sc.x, sc.y, (v.specKey === "BMX_BIKE" ? 28 : 38) * pxScale, "rgba(200, 215, 255, 0.42)", "rgba(100, 130, 190, 0.15)");
             }
 
-            // Front Bumper Center in Screen Space
+            // Front Bumper / Bow Center in Screen Space
             const fxWorld = v.x + cosA * frontDist;
             const fyWorld = v.y + sinA * frontDist;
             const fSc = this.worldToScreen(fxWorld, fyWorld, vz);
 
-            // Long Wide-Base Headlight Beam (cars/trucks = wide dual beam, motorcycles = 140px single bulb, E_SCOOTER = 86px LED beam, BMX_BIKE = 52px warm dynamo lamp)
+            // Long Wide-Base Headlight Beam (cars/trucks = wide dual beam, motorcycles/boats = single central searchlight)
             const isBike = v.specKey === "BMX_BIKE";
             const isScoot = v.specKey === "E_SCOOTER";
             const beamLen = (isBike ? 52 : (isScoot ? 86 : (v.isMotorcycle ? 140 : (v.driver === "PLAYER" ? 185 : 158)))) * pxScale;
-            const coneSpread = isBike ? 0.28 : (isScoot ? 0.20 : (v.isMotorcycle ? 0.22 : 0.32));
-            const baseHalfWPx = v.isMotorcycle ? (2.0 * pxScale) : ((latSpread + 3.2) * pxScale);
+            const coneSpread = isBike ? 0.28 : (isScoot ? 0.20 : ((v.isMotorcycle || isWaterCraft) ? 0.22 : 0.32));
+            const baseHalfWPx = (v.isMotorcycle || isWaterCraft) ? (2.2 * pxScale) : ((latSpread + 3.2) * pxScale);
 
             addHeadlightCone(
                 fSc.x,
@@ -9832,45 +9850,47 @@ class RetroRenderer {
                 col1: "rgba(180, 220, 255, 0.07)"
             });
 
-            // Dual Front Headlight Bulbs (or Single Motorcycle Bulb) + Soft Bumper Halo
-            const headOffsets = v.isMotorcycle ? [0] : [-latSpread, latSpread];
+            // Front Headlight Bulbs (Dual for cars, Single central bow searchlight for motorcycles & boats)
+            const headOffsets = (v.isMotorcycle || isWaterCraft) ? [0] : [-latSpread, latSpread];
             for (const lat of headOffsets) {
                 const hx = v.x + cosA * frontDist - sinA * lat;
                 const hy = v.y + sinA * frontDist + cosA * lat;
                 const hSc = this.worldToScreen(hx, hy, vz);
-                addLightPool(hSc.x, hSc.y, (v.isMotorcycle ? 18 : 22) * pxScale, "rgba(255, 250, 225, 0.72)", "rgba(210, 230, 255, 0.24)");
+                addLightPool(hSc.x, hSc.y, ((v.isMotorcycle || isWaterCraft) ? 18 : 22) * pxScale, "rgba(255, 250, 225, 0.72)", "rgba(210, 230, 255, 0.24)");
                 highResFlares.push({
                     x: hSc.x,
                     y: hSc.y,
-                    r: (v.isMotorcycle ? 6.5 : 5.8) * pxScale,
+                    r: ((v.isMotorcycle || isWaterCraft) ? 6.2 : 5.8) * pxScale,
                     col: "rgba(255, 252, 230, 0.95)"
                 });
             }
 
-            // Rear Red Taillights / Brake Lights
-            const isBraking =
-                (v.driver === "PLAYER" && (game.input.down || game.input.handbrake)) ||
-                v.aiState === "STOPPED_LIGHT";
-            const rxWorld = v.x + cosA * rearDist;
-            const ryWorld = v.y + sinA * rearDist;
-            const rSc = this.worldToScreen(rxWorld, ryWorld, vz);
-            addLightPool(
-                rSc.x,
-                rSc.y,
-                (isBraking ? 34 : 22) * pxScale,
-                isBraking ? "rgba(255, 40, 65, 0.88)" : "rgba(235, 30, 55, 0.58)",
-                "rgba(180, 15, 35, 0.22)"
-            );
-            for (const lat of headOffsets) {
-                const tx = v.x + cosA * rearDist - sinA * lat;
-                const ty = v.y + sinA * rearDist + cosA * lat;
-                const tSc = this.worldToScreen(tx, ty, vz);
-                highResFlares.push({
-                    x: tSc.x,
-                    y: tSc.y,
-                    r: (isBraking ? 5.5 : 4.2) * pxScale,
-                    col: isBraking ? "rgba(255, 45, 70, 0.96)" : "rgba(255, 30, 55, 0.78)"
-                });
+            // Rear Red Taillights / Brake Lights (Land vehicles only — boats do not have red automotive brake lamps!)
+            if (!isWaterCraft) {
+                const isBraking =
+                    (v.driver === "PLAYER" && (game.input.down || game.input.handbrake)) ||
+                    v.aiState === "STOPPED_LIGHT";
+                const rxWorld = v.x + cosA * rearDist;
+                const ryWorld = v.y + sinA * rearDist;
+                const rSc = this.worldToScreen(rxWorld, ryWorld, vz);
+                addLightPool(
+                    rSc.x,
+                    rSc.y,
+                    (isBraking ? 34 : 22) * pxScale,
+                    isBraking ? "rgba(255, 40, 65, 0.88)" : "rgba(235, 30, 55, 0.58)",
+                    "rgba(180, 15, 35, 0.22)"
+                );
+                for (const lat of headOffsets) {
+                    const tx = v.x + cosA * rearDist - sinA * lat;
+                    const ty = v.y + sinA * rearDist + cosA * lat;
+                    const tSc = this.worldToScreen(tx, ty, vz);
+                    highResFlares.push({
+                        x: tSc.x,
+                        y: tSc.y,
+                        r: (isBraking ? 5.5 : 4.2) * pxScale,
+                        col: isBraking ? "rgba(255, 45, 70, 0.96)" : "rgba(255, 30, 55, 0.78)"
+                    });
+                }
             }
 
             // Flashing VCPD Police / Ambulance / Fire Truck Roof Strobe Lights!

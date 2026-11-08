@@ -1151,6 +1151,8 @@ class LeonidaGame {
 
         }
 
+        this.snapWaterCraftToWater();
+
 
 
         // 2. Refresh exact 3D elevation z & reset AI lane state once binary map is loaded
@@ -1164,8 +1166,14 @@ class LeonidaGame {
         }
 
         for (const v of this.vehicles) {
-
-            v.z = this.map.getHeightAtPixel(v.x, v.y, 4.0);
+            const isWaterVeh = Boolean(
+                v.waterOnly ||
+                v.specKey === "AIRBOAT" ||
+                (v.amphibious && this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y))
+            );
+            v.z = isWaterVeh
+                ? Math.max(2.0, this.map.getHeightAtPixel(v.x, v.y, 4.0, false))
+                : this.map.getHeightAtPixel(v.x, v.y, 4.0);
 
             let bx = Math.floor(v.x / TILE_SIZE);
 
@@ -10006,6 +10014,9 @@ class LeonidaGame {
 
                 p.y = seatPos.y;
 
+                if (v.waterOnly || v.specKey === "AIRBOAT") {
+                    v.z = Math.max(2.0, v.z || 2.0);
+                }
                 p.z = v.z !== undefined ? v.z : this.map.getHeightAtPixel(v.x, v.y, p.z || 2.0);
 
                 p.angle = v.angle;
@@ -10422,7 +10433,9 @@ class LeonidaGame {
 
                 }
 
-                p.z = this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0);
+                p.z = (this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y))
+                    ? Math.max(2.0, this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0, false))
+                    : this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0);
 
 
 

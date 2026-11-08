@@ -673,13 +673,13 @@ const VEHICLE_SPECS = {
         amphibious: false
     },
     AIRBOAT: {
-        name: "EVERGLADES HYDRO-SPEEDBOAT",
-        sprId: "49",
-        w: 48,
-        h: 26,
-        maxSpeed: 385,
-        accel: 310,
-        turnSpeed: 3.3,
+        name: "EVERGLADES HYDRO-AIRBOAT",
+        sprId: "airboat_fan",
+        w: 52,
+        h: 28,
+        maxSpeed: 395,
+        accel: 320,
+        turnSpeed: 3.4,
         grip: 0.85,
         driftGrip: 0.975,
         maxHp: 240,
@@ -688,6 +688,8 @@ const VEHICLE_SPECS = {
         stripeColor: "#fde047",
         bodyStyle: "AIRBOAT",
         useBaseOnly: true,
+        isConvertible: true,
+        horizontalSprite: true,
         amphibious: true
     },
     // --- Water-only craft: can only move on water, stop dead against beaches, docks & quays ---
@@ -2718,7 +2720,10 @@ class Vehicle {
                     }
                 }
                 if (map && typeof map.getHeightAtPixel === "function") {
-                    this.z = map.getHeightAtPixel(this.x, this.y, this.z !== undefined ? this.z : 2.0);
+                    const isWaterWreck = Boolean(this.waterOnly || this.specKey === "AIRBOAT" || (map.isWaterAtPixel && map.isWaterAtPixel(this.x, this.y)));
+                    this.z = isWaterWreck
+                        ? Math.max(2.0, map.getHeightAtPixel(this.x, this.y, this.z !== undefined ? this.z : 2.0, false))
+                        : map.getHeightAtPixel(this.x, this.y, this.z !== undefined ? this.z : 2.0);
                 }
                 // Scraping metal sparks while the hulk slides fast
                 if (wSpd > 70 && game && typeof game.spawnParticle === "function" && Math.random() < 0.35) {
@@ -3064,6 +3069,23 @@ class Vehicle {
                         game.audio.playCarCrash(Math.min(1.2, (impact - 140) / 160));
                     }
                 }
+            } else if (this.driver === "PLAYER" && !map.isWaterAtPixel(this.x, this.y)) {
+                // If a moored/spawned boat center slightly overlaps a pier/shore tile, slide it smoothly into adjacent water
+                for (let rad = 8; rad <= 48; rad += 8) {
+                    let pushed = false;
+                    for (let a = 0; a < 8; a++) {
+                        const ang = a * Math.PI * 0.25;
+                        const tx = this.x + Math.cos(ang) * rad;
+                        const ty = this.y + Math.sin(ang) * rad;
+                        if (map.isWaterAtPixel(tx, ty)) {
+                            this.x = tx;
+                            this.y = ty;
+                            pushed = true;
+                            break;
+                        }
+                    }
+                    if (pushed) break;
+                }
             }
         }
 
@@ -3113,7 +3135,7 @@ class Vehicle {
             }
         }
         if (typeof map.getHeightAtPixel === "function") {
-            const onWater = Boolean((this.waterOnly || this.amphibious) && map.isWaterAtPixel && map.isWaterAtPixel(this.x, this.y));
+            const onWater = Boolean(this.waterOnly || this.specKey === "AIRBOAT" || (this.amphibious && map.isWaterAtPixel && map.isWaterAtPixel(this.x, this.y)));
             this.z = onWater
                 ? Math.max(2.0, map.getHeightAtPixel(this.x, this.y, curZ, false))
                 : map.getHeightAtPixel(this.x, this.y, curZ);

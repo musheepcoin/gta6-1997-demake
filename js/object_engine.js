@@ -648,8 +648,8 @@ class WorldObjectEngine {
                             }
                         }
                     }
-                    const pierEndX = bx - ux * 16.0;
-                    const pierEndY = by - uy * 16.0;
+                    const pierEndX = bx - ux * 24.0;
+                    const pierEndY = by - uy * 24.0;
                     const pierMidX = (shoreX + pierEndX) * 0.5;
                     const pierMidY = (shoreY + pierEndY) * 0.5;
                     const pierLen = Math.min(180, Math.max(42, Math.hypot(pierEndX - shoreX, pierEndY - shoreY)));
@@ -659,7 +659,7 @@ class WorldObjectEngine {
                         spr: db.spr || "speedboat_v8",
                         worldX: bx,
                         worldY: by,
-                        worldAng: pierAng + Math.PI * 0.5,
+                        worldAng: pierAng,
                         pierMidX,
                         pierMidY,
                         pierLen,
@@ -1883,6 +1883,7 @@ class WorldObjectEngine {
                         : null;
                     if (this.activeHeist && matchingHeist && this.activeHeist.target === matchingHeist) {
                         if (typeof game.addCash === "function") game.addCash(7500, "🚤 MARINE SPEEDBOAT GETAWAY!");
+                        else if (typeof game.addScore === "function") game.addScore(7500);
                         if (game.wantedSystem) game.wantedSystem.level = Math.max(0, (game.wantedSystem.level || 0) - 2);
                         if (Array.isArray(game.floatingTexts)) {
                             game.floatingTexts.push({
@@ -1898,6 +1899,7 @@ class WorldObjectEngine {
                     } else if (!db._launchedOnce) {
                         db._launchedOnce = true;
                         if (typeof game.addCash === "function") game.addCash(500, "🚤 PIER SPEEDBOAT LAUNCH!");
+                        else if (typeof game.addScore === "function") game.addScore(500);
                         if (Array.isArray(game.floatingTexts)) {
                             game.floatingTexts.push({
                                 x: game.player.x,
@@ -3085,6 +3087,21 @@ class WorldObjectEngine {
                     v.isEstateCar = true;
                     game.vehicles.push(v);
                 }
+            }
+
+            // Spawn live drivable Speedboat / Jet-Ski directly at each waterfront villa's wooden pier so there is never a static duplicate prop
+            if (inst.dockBoat && typeof Vehicle === "function") {
+                const db = inst.dockBoat;
+                const boatKey = (db.spr && String(db.spr).includes("jetski")) ? "JETSKI" : "SPEEDBOAT";
+                let existing = game.vehicles.find(v => !v.destroyed && (v.waterOnly || v.specKey === "SPEEDBOAT" || v.specKey === "JETSKI") && Math.hypot(v.x - db.worldX, v.y - db.worldY) < 64);
+                if (!existing) {
+                    existing = new Vehicle(`estate_${inst.id}_pier_boat`, boatKey, db.worldX, db.worldY, db.pierAng);
+                    existing.z = 2.0;
+                    existing.missionTag = "LANDMARK";
+                    existing.isEstateCar = true;
+                    game.vehicles.push(existing);
+                }
+                db._liveBoat = existing;
             }
         }
 
