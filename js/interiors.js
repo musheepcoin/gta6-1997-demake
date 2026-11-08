@@ -19,7 +19,7 @@
                     { id: `${id}_UZI`, x: 452, y: 206, color: "#f97316", label: "🔫 MICRO-UZI SUBMACHINE GUN ($650)", sub: "BUY UZI + 80 ROUNDS!", action: "BUY_UZI", cost: 650 },
                     { id: `${id}_SHOTGUN`, x: 378, y: 362, color: "#ef4444", label: "💥 PUMP SHOTGUN ($900)", sub: "BUY SHOTGUN + 25 SHELLS!", action: "BUY_SHOTGUN", cost: 900 },
                     { id: `${id}_ARMOR`, x: 118, y: 296, color: "#38bdf8", label: "🛡️ KEVLAR TACTICAL VEST ($500)", sub: "+100% BODY ARMOR!", action: "BUY_ARMOR", cost: 500 },
-                    { id: `${id}_ROCKET`, x: 666, y: 372, color: "#a855f7", label: "🚀 HEAVY ROCKET LAUNCHER ($2,500)", sub: "RANGE SPECIAL: ROCKET + 8 ROCKETS!", action: "BUY_ROCKET", cost: 2500 }
+                    { id: `${id}_ROCKET`, x: 666, y: 382, color: "#a855f7", label: "🚀 HEAVY ROCKET LAUNCHER ($2,500)", sub: "RANGE SPECIAL: ROCKET + 8 ROCKETS!", action: "BUY_ROCKET", cost: 2500 }
                 ];
             },
             buildNpcs() {
@@ -27,8 +27,8 @@
                     { x: 378, y: 96, angle: Math.PI * 0.5, type: "gang", label: "ARMS DEALER", dialog: "WELCOME TO AMMU-NATION! NO RECEIPTS, NO QUESTIONS!" },
                     { x: 118, y: 126, angle: Math.PI * 0.5, type: "civ0", label: "GUNSMITH", dialog: "CUSTOM BARRELS AND KEVLAR VESTS IN THE BACK VAULT!" },
                     { x: 410, y: 458, angle: Math.PI * 0.5, type: "police", label: "RANGE OFFICER", dialog: "KEEP YOUR PIECE HOLSTERED IN THE VESTIBULE!" },
-                    { x: 588, y: 364, angle: -Math.PI * 0.5, type: "civ1", label: "SHOOTER", dialog: "TESTING OUT THIS NEW 12-GAUGE ON LANE 2!" },
-                    { x: 744, y: 364, angle: -Math.PI * 0.5, type: "gang", label: "MARKSMAN", dialog: "CENTER MASS EVERY TIME, PAL." }
+                    { x: 596, y: 348, angle: -Math.PI * 0.5, type: "civ1", label: "SHOOTER", dialog: "TESTING OUT THIS NEW 12-GAUGE ON LANE 2!" },
+                    { x: 712, y: 348, angle: -Math.PI * 0.5, type: "gang", label: "MARKSMAN", dialog: "CENTER MASS EVERY TIME, PAL." }
                 ];
             }
         },
@@ -227,64 +227,53 @@
         if (facing === "N") {
             const nx = ix0 + (1.0 - (u + du)) * iw;
             const ny = iy0 + (1.0 - (v + dv)) * ih;
+            const x1 = Math.round(nx);
+            const x2 = Math.round(nx + w);
+            const y1 = Math.round(ny);
+            const y2 = Math.round(ny + h);
             return {
-                x: Math.round(nx),
-                y: Math.round(ny),
-                w: Math.round(w),
-                h: Math.round(h)
+                x: x1,
+                y: y1,
+                w: Math.max(2, x2 - x1),
+                h: Math.max(2, y2 - y1)
             };
         }
-
-        const isThinVWall = (w === 16 && h >= 36);
-        const isThinHWall = (h === 16 && w >= 36);
 
         if (facing === "E") {
             // Canonical South (v = 1) -> East (u' = 1); Canonical North (v = 0) -> West (u' = 0)
             // Canonical West (u = 0) -> South (v' = 1); Canonical East (u = 1) -> North (v' = 0)
-            let nw = dv * iw;
-            let nh = du * ih;
-            let nx = ix0 + v * iw;
-            let ny = iy0 + (1.0 - (u + du)) * ih;
-            if (isThinHWall) {
-                const midX = nx + nw * 0.5;
-                nw = 16;
-                nx = midX - 8;
-            }
-            if (isThinVWall) {
-                const midY = ny + nh * 0.5;
-                nh = 16;
-                ny = midY - 8;
-            }
+            const nw = dv * iw;
+            const nh = du * ih;
+            const nx = ix0 + v * iw;
+            const ny = iy0 + (1.0 - (u + du)) * ih;
+            const x1 = Math.round(nx);
+            const x2 = Math.round(nx + nw);
+            const y1 = Math.round(ny);
+            const y2 = Math.round(ny + nh);
             return {
-                x: Math.round(nx),
-                y: Math.round(ny),
-                w: Math.max(2, Math.round(nw)),
-                h: Math.max(2, Math.round(nh))
+                x: x1,
+                y: y1,
+                w: Math.max(2, x2 - x1),
+                h: Math.max(2, y2 - y1)
             };
         }
 
         if (facing === "W") {
             // Canonical South (v = 1) -> West (u' = 0); Canonical North (v = 0) -> East (u' = 1)
             // Canonical West (u = 0) -> North (v' = 0); Canonical East (u = 1) -> South (v' = 1)
-            let nw = dv * iw;
-            let nh = du * ih;
-            let nx = ix0 + (1.0 - (v + dv)) * iw;
-            let ny = iy0 + u * ih;
-            if (isThinHWall) {
-                const midX = nx + nw * 0.5;
-                nw = 16;
-                nx = midX - 8;
-            }
-            if (isThinVWall) {
-                const midY = ny + nh * 0.5;
-                nh = 16;
-                ny = midY - 8;
-            }
+            const nw = dv * iw;
+            const nh = du * ih;
+            const nx = ix0 + (1.0 - (v + dv)) * iw;
+            const ny = iy0 + u * ih;
+            const x1 = Math.round(nx);
+            const x2 = Math.round(nx + nw);
+            const y1 = Math.round(ny);
+            const y2 = Math.round(ny + nh);
             return {
-                x: Math.round(nx),
-                y: Math.round(ny),
-                w: Math.max(2, Math.round(nw)),
-                h: Math.max(2, Math.round(nh))
+                x: x1,
+                y: y1,
+                w: Math.max(2, x2 - x1),
+                h: Math.max(2, y2 - y1)
             };
         }
 
@@ -526,11 +515,14 @@
                     const outG = ground[(r - d.dy) * cols + (c - d.dx)];
                     if (outG !== 2 && outG !== 3) continue;
                     // Strongly prefer straight walls where the building continues on both sides along the facade
+                    // AND where the sidewalk tile itself is not wedged into an inner L-corner!
                     const perpX = d.dy;
                     const perpY = d.dx;
                     const wallCont = (isBuilding(c + d.dx + perpX, r + d.dy + perpY) ? 1 : 0) +
                                      (isBuilding(c + d.dx - perpX, r + d.dy - perpY) ? 1 : 0);
-                    const cornerPen = wallCont === 2 ? 0.0 : (wallCont === 1 ? 3.5 : 8.0);
+                    const swCont = (!isBuilding(c + perpX, r + perpY) ? 1 : 0) +
+                                   (!isBuilding(c - perpX, r - perpY) ? 1 : 0);
+                    const cornerPen = (wallCont === 2 ? 0.0 : (wallCont === 1 ? 3.5 : 8.0)) + (2 - swCont) * 6.0;
                     const facePen = (preferredFacing && d.facing !== preferredFacing) ? 9.5 : 0.0;
                     const score = dist + facePen + cornerPen + treePen;
                     if (score < bestScore) {
@@ -559,10 +551,18 @@
                 continue;
             }
 
-            const c0 = Math.floor(intr.doorX / ts);
-            const r0 = Math.floor(intr.doorY / ts);
+            // Preserve original authored door coordinates & facing before the procedural fallback pass
+            // so when NYC.CMP loads later, snapping always starts from the clean authored coordinates!
+            if (intr._origDoorX === undefined) {
+                intr._origDoorX = intr.doorX;
+                intr._origDoorY = intr.doorY;
+                intr._origFacing = intr.facing || null;
+            }
+
+            const c0 = Math.floor(intr._origDoorX / ts);
+            const r0 = Math.floor(intr._origDoorY / ts);
             // Snap landmark door to the actual building wall at its tile so the door frame, awning & interior always match 100%!
-            const snapped = snapDoorToBuildingFacade(map, c0, r0, intr.facing || null, 12);
+            const snapped = snapDoorToBuildingFacade(map, c0, r0, intr._origFacing, 12);
 
             if (snapped) {
                 const pos = computeDoorPixelPos(snapped.c, snapped.r, snapped.facing, ts);
@@ -657,8 +657,8 @@
             add(36, 68, 164, 26);
             add(36, 352, 164, 28);
             add(262, 128, 232, 28);
-            add(266, 288, 96, 28);
-            add(394, 288, 96, 28);
+            add(258, 288, 86, 28);
+            add(412, 288, 86, 28);
             add(548, 312, 236, 22);
             add(54, 468, 96, 30);
             add(664, 468, 96, 30);
@@ -683,10 +683,10 @@
             add(628, 66, 144, 30);
             add(36, 238, 96, 42);
             add(36, 338, 96, 42);
-            add(258, 278, 64, 52);
-            add(398, 278, 64, 52);
-            add(258, 356, 64, 48);
-            add(398, 356, 64, 48);
+            add(254, 252, 62, 46);
+            add(402, 252, 62, 46);
+            add(254, 354, 62, 46);
+            add(402, 354, 62, 46);
             add(56, 466, 64, 36);
         } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
             // 1. Grand Colonnade Foyer Partition Screens (y = 424, center arch x=348..472)

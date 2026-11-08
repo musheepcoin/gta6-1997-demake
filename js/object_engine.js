@@ -7241,7 +7241,7 @@ class WorldObjectEngine {
             //           All overhead canopy geometry sits at z >= 2.40 so peds & vehicles never collide!
             for (let i = 0; i < interiorsList.length; i++) {
                 const intr = interiorsList[i];
-                if (!intr || !intr.doorX || !intr.doorY) continue;
+                if (!intr || !intr.doorX || !intr.doorY || intr.isEstatePortico) continue;
                 const dc = Math.floor(intr.doorX / TILE_SIZE);
                 const dr = Math.floor(intr.doorY / TILE_SIZE);
                 if (dc < 4 || dc >= M - 4 || dr < 4 || dr >= MAP_ROWS - 4) continue;
@@ -7260,6 +7260,8 @@ class WorldObjectEngine {
                             bDirX = -dx;
                             bDirY = -dy;
                             intr.facing = fCode;
+                            intr.doorX = (dc + 0.5) * TILE_SIZE - bDirX * 10.0;
+                            intr.doorY = (dr + 0.5) * TILE_SIZE - bDirY * 10.0;
                             if (window.ShopInteriors && typeof window.ShopInteriors.orientInterior === "function") {
                                 window.ShopInteriors.orientInterior(intr);
                             }
@@ -9471,7 +9473,11 @@ class WorldObjectEngine {
         };
         const boxR = (x, y, w, h, yBot, yTop, col, matId = 1, alpha = 1.0) => {
             const r = trRect(x, y, w, h);
-            rawBoxR(r.x, r.y, r.w, r.h, yBot, yTop, col, matId, alpha);
+            // Clamp tall wall-hugging props that rotate onto the low South cutaway wall (y + h > rh - 36)
+            // so they never obstruct the camera's view into the interior!
+            const topH = (r.y + r.h > rh - 36 && yTop > 2.28) ? 2.28 : yTop;
+            const botH = Math.min(yBot, topH - 0.04);
+            rawBoxR(r.x, r.y, r.w, r.h, botH, topH, col, matId, alpha);
         };
 
         // 3D Box textured with gta1_tiles_vice.png side & lid tiles
@@ -9573,33 +9579,28 @@ class WorldObjectEngine {
             rawFloorMatR(tr.x, tr.y, tr.w, tr.h, yElev, col, matId, alpha);
         };
 
-        // 3D Poster / Billboard / Sign mounted on the oriented Back Wall (transforms cleanly for S, N, E, W!)
+        // 3D Poster / Billboard / Sign mounted on the tall North Wall so it always faces the 2.5D camera cleanly!
         const posterBoxR = (x, y, w, h, yBot, yTop, sprKey, frameCol = [0.16, 0.20, 0.28]) => {
-            const tr = trRect(x, y, w, h);
-            rawBoxR(tr.x - 2, tr.y - 2, tr.w + 4, tr.h + 4, yBot - 0.015, yTop + 0.015, frameCol, 9);
+            const facing = (intr && intr.facing) || "S";
+            let px = x;
+            // When entrance is on the North wall (facing === "N"), shift center posters to the West wing so they never block the doorway!
+            if (facing === "N" && px + w > rw * 0.5 - 96 && px < rw * 0.5 + 96) {
+                px = 48;
+            }
+            const py = 56;
+            const pw = Math.min(w, 156);
+            const ph = 12;
+            rawBoxR(px - 2, py - 2, pw + 4, ph + 4, yBot - 0.015, yTop + 0.015, frameCol, 9);
             const uv = getSprUV(sprKey);
             if (!uv) {
-                rawBoxR(tr.x, tr.y, tr.w, tr.h, yBot, yTop, [0.95, 0.35, 0.65], 10);
+                rawBoxR(px, py, pw, ph, yBot, yTop, [0.95, 0.35, 0.65], 10);
                 return;
             }
-            const x0 = tr.x / TILE_SIZE;
-            const x1 = (tr.x + tr.w) / TILE_SIZE;
-            const z0 = tr.y / TILE_SIZE;
-            const z1 = (tr.y + tr.h) / TILE_SIZE;
-            const facing = (intr && intr.facing) || "S";
-            if (facing === "S") {
-                const fz = z1 + 1.5 / TILE_SIZE;
-                pushQuad([x0, yTop, fz], [x1, yTop, fz], [x0, yBot, fz], [x1, yBot, fz], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
-            } else if (facing === "N") {
-                const fz = z0 - 1.5 / TILE_SIZE;
-                pushQuad([x1, yTop, fz], [x0, yTop, fz], [x1, yBot, fz], [x0, yBot, fz], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
-            } else if (facing === "E") {
-                const fx = x1 + 1.5 / TILE_SIZE;
-                pushQuad([fx, yTop, z1], [fx, yTop, z0], [fx, yBot, z1], [fx, yBot, z0], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
-            } else if (facing === "W") {
-                const fx = x0 - 1.5 / TILE_SIZE;
-                pushQuad([fx, yTop, z0], [fx, yTop, z1], [fx, yBot, z0], [fx, yBot, z1], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
-            }
+            const x0 = px / TILE_SIZE;
+            const x1 = (px + pw) / TILE_SIZE;
+            const z1 = (py + ph) / TILE_SIZE;
+            const fz = z1 + 1.5 / TILE_SIZE;
+            pushQuad([x0, yTop, fz], [x1, yTop, fz], [x0, yBot, fz], [x1, yBot, fz], uv[0], uv[1], uv[2], uv[3], 1.0, 1.0, 1.0, 1.0);
         };
 
         // 3D Vertical Cylinder (Pillars, Barstools, Lamps, Turntables, Rocket Hologram, Prison Bars)
@@ -9762,8 +9763,9 @@ class WorldObjectEngine {
 
             // 2. West Tactical Gunsmith Vault: Workbench, Heavy Safe & Kevlar Body Armor Rack
             aoR(36, 68, 164, 26, 2.004, 8, 0.44);
-            boxR(36, 68, 52, 32, 2.00, 2.48, [0.16, 0.20, 0.28], 6); // Vault steel combination safe
-            cyl(62, 100, 6, 6, 2.22, 2.26, 10, [0.96, 0.78, 0.20], 9, true);
+            boxR(36, 68, 52, 32, 2.00, 2.48, [0.16, 0.20, 0.28], 9); // Vault steel combination safe (beveled brushed steel)
+            boxR(40, 98, 44, 4, 2.04, 2.44, [0.28, 0.34, 0.44], 9);  // Recessed armored safe door
+            cyl(62, 102, 6, 6, 2.22, 2.26, 10, [0.96, 0.78, 0.20], 9, true);
             boxR(92, 68, 108, 26, 2.00, 2.22, [0.22, 0.26, 0.34], 9); // Gunsmith workbench
             boxR(90, 66, 112, 30, 2.22, 2.25, [0.58, 0.36, 0.18], 11); // Hardwood workbench top
             boxR(112, 72, 28, 14, 2.25, 2.32, [0.42, 0.48, 0.56], 9); // Gunsmith steel vise
@@ -9793,16 +9795,18 @@ class WorldObjectEngine {
             boxR(260, 126, 236, 32, 2.18, 2.24, [0.38, 0.88, 0.98], 10, 0.42);
             boxR(266, 130, 28, 18, 2.24, 2.34, [0.20, 0.24, 0.32], 9);
 
-            // 4. Center Showroom Military Surplus Crate Islands (x=266..362 & x=394..490, y=288..316)
-            for (const rx of [266, 394]) {
-                aoR(rx, 288, 96, 28, 2.004, 8, 0.42);
-                boxR(rx, 288, 96, 28, 2.00, 2.24, [0.26, 0.36, 0.18], 11); // Olive-drab wood slat crate
-                boxR(rx + 4, 292, 88, 20, 2.24, 2.28, [0.46, 0.32, 0.16], 11);
-                boxR(rx + 14, 295, 68, 14, 2.28, 2.33, [0.92, 0.44, 0.12], 9); // Ordnance warhead case
+            // 4. Center Showroom Military Surplus Crate Islands (x=258..344 & x=412..498, y=288..316 — wide 68px center aisle!)
+            for (const rx of [258, 412]) {
+                aoR(rx, 288, 86, 28, 2.004, 8, 0.42);
+                boxR(rx, 288, 86, 28, 2.00, 2.24, [0.26, 0.36, 0.18], 11); // Olive-drab wood slat crate
+                boxR(rx + 4, 292, 78, 20, 2.24, 2.28, [0.46, 0.32, 0.16], 11);
+                boxR(rx + 12, 295, 62, 14, 2.28, 2.33, [0.92, 0.44, 0.12], 9); // Ordnance warhead case
             }
 
-            // 5. Entrance Security Vestibule Bulletproof Guard Window (x=350..470, y=412..432) + Vestibule Guard Desk & Ordnance Crates
-            boxR(350, 412, 120, 20, 2.20, 2.52, [0.32, 0.88, 0.98], 10, 0.72);
+            // 5. Entrance Security Vestibule Framed Bulletproof Guard Window (x=350..470, y=410..434) + Vestibule Guard Desk & Ordnance Crates
+            boxR(348, 410, 124, 24, 2.18, 2.23, [0.18, 0.24, 0.32], 9);       // Armored steel window sill
+            boxR(350, 411, 120, 22, 2.23, 2.52, [0.32, 0.88, 0.98], 10, 0.82); // Glowing bulletproof ballistic glass
+            boxR(348, 410, 124, 24, 2.52, 2.57, [0.22, 0.28, 0.38], 9);       // Overhead steel window frame lintel
             aoR(54, 468, 96, 30, 2.004, 8, 0.42);
             boxR(54, 468, 96, 30, 2.00, 2.22, [0.20, 0.26, 0.34], 9); // Vestibule Range Officer security desk
             boxR(52, 466, 100, 34, 2.22, 2.25, [0.58, 0.36, 0.18], 11);
@@ -9812,34 +9816,34 @@ class WorldObjectEngine {
             cyl(684, 452, 11, 11, 2.00, 2.28, 10, [0.84, 0.64, 0.18], 9, true); // Brass 5.56mm ammo drum
             cyl(712, 452, 11, 11, 2.00, 2.28, 10, [0.24, 0.34, 0.18], 9, true);
 
-            // 6. East 4-Lane Live Indoor Firing Range (Shooting booths at y=312..334, lane dividers y=148..312, targets at y=78!)
+            // 6. East 4-Lane Live Indoor Firing Range (Shooting booths at y=312..334, stall dividers y=282..334, targets at y=86!)
             aoR(548, 312, 236, 22, 2.004, 8, 0.44);
             boxR(548, 312, 236, 22, 2.00, 2.20, [0.18, 0.22, 0.30], 9);
             boxR(546, 310, 240, 26, 2.20, 2.24, [0.58, 0.36, 0.18], 11); // Shooting booth bench top
-            // Downrange Angled Sandtrap Berm (x=544..788, y=62..84) + Overhead Target Carrier Rail
-            boxR(544, 62, 244, 22, 2.00, 2.18, [0.44, 0.28, 0.14], 11);
+            // Downrange Angled Sandtrap Berm (x=544..788, y=62..82) + Overhead Target Carrier Crossbeam
+            boxR(544, 62, 244, 20, 2.00, 2.18, [0.44, 0.28, 0.14], 11);
             boxR(548, 86, 236, 4, 2.44, 2.48, [0.36, 0.42, 0.50], 9);
             const hitTimers = (intr && intr._targetHitTimers) || [];
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
                 const hitFlash = (hitTimers[lane] || 0) > 0;
-                // Overhead target pulley rail per lane
-                boxR(lx + 25, 86, 4, 226, 2.45, 2.48, [0.26, 0.32, 0.40], 9);
+                // Overhead target pulley rail per lane (subtle ceiling cable at z = 2.46..2.48)
+                boxR(lx + 26, 86, 3, 226, 2.46, 2.48, [0.26, 0.32, 0.40], 9);
                 // Red acoustic shooting earmuffs & brass ammo box on each booth counter
                 cyl(lx + 26, 322, 5, 5, 2.24, 2.29, 8, [0.92, 0.16, 0.20], 9, true);
                 boxR(lx + 8, 316, 12, 10, 2.24, 2.29, [0.94, 0.78, 0.20], 9);
-                // Ballistic lane divider walls extending downrange from the front of the bench (y=148..312 — never crossing the bench!)
+                // Compact ballistic stall dividers flanking each shooting booth (y=282..334 — leaves downrange lanes 100% open!)
                 if (lane > 0) {
-                    boxR(lx - 3, 148, 6, 164, 2.00, 2.26, [0.22, 0.26, 0.34], 9);
-                    boxR(lx - 2, 148, 4, 164, 2.26, 2.44, [0.38, 0.86, 0.98], 10, 0.50);
+                    boxR(lx - 3, 282, 6, 52, 2.00, 2.28, [0.22, 0.26, 0.34], 9);
+                    boxR(lx - 2, 284, 4, 48, 2.28, 2.46, [0.38, 0.86, 0.98], 10, 0.65);
                 }
-                // Crisp flat paper silhouette bullseye target hanging from the overhead carrier rail (y=86..92)
-                const targY = Math.round(88 + Math.sin(t * 2.0 + lane * 1.4) * 5);
+                // Crisp symmetric bullseye target hanging at y=86 ( concentric rings span full thickness so S/N/E/W views never split!)
+                const targY = Math.round(86 + Math.sin(t * 2.0 + lane * 1.4) * 3);
                 const sheetCol = hitFlash ? [1.0, 0.92, 0.28] : [0.96, 0.95, 0.90];
                 const ringCol = hitFlash ? [0.22, 1.0, 0.36] : [0.92, 0.16, 0.20];
-                boxR(lx + 11, targY, 32, 3, 2.10, 2.44, sheetCol, hitFlash ? 10 : 9);
-                boxR(lx + 17, targY + 1, 20, 3, 2.18, 2.36, ringCol, 10);
-                boxR(lx + 23, targY + 2, 8, 3, 2.24, 2.30, [0.98, 0.84, 0.16], 10);
+                boxR(lx + 12, targY, 30, 4, 2.10, 2.44, sheetCol, hitFlash ? 10 : 9);
+                boxR(lx + 18, targY - 1, 18, 6, 2.18, 2.36, ringCol, 10);
+                boxR(lx + 23, targY - 2, 8, 8, 2.24, 2.30, [0.98, 0.84, 0.16], 10);
             }
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
             const cookW = theme === "DINER_PAWN" ? 384 : 480;
@@ -9874,7 +9878,7 @@ class WorldObjectEngine {
                 boxR(534, 122, 214, 32, 2.22, 2.26, [0.92, 0.74, 0.22], 9);
                 boxR(536, 124, 210, 6, 2.26, 2.50, [0.88, 0.72, 0.22], 4);
                 for (let gw = 0; gw < 6; gw++) {
-                    boxR(548 + gw * 32, 60, 18, 5, 2.22, 2.48, gw % 2 === 0 ? [0.88, 0.68, 0.20] : [0.22, 0.26, 0.32], 6);
+                    boxR(548 + gw * 32, 60, 18, 5, 2.22, 2.48, gw % 2 === 0 ? [0.88, 0.68, 0.20] : [0.22, 0.26, 0.32], 9);
                 }
                 aoR(546, 346, 196, 32, 2.004, 10, 0.42);
                 boxR(546, 346, 196, 32, 2.00, 2.22, [0.22, 0.28, 0.36], 9);
@@ -9882,18 +9886,18 @@ class WorldObjectEngine {
                 // Chef Prep Island (x=220..400, y=124..148)
                 aoR(220, 124, 180, 24, 2.004, 8, 0.40);
                 boxR(220, 124, 180, 24, 2.00, 2.22, [0.88, 0.92, 0.96], 9);
-                // West Leather Booths + Center White-Tablecloth Dining Tables
+                // West Leather Booths + Center White-Tablecloth Dining Tables (wide 56px vertical & 86px horizontal aisles!)
                 for (const by of [238, 338]) {
                     aoR(36, by, 96, 42, 2.004, 8, 0.38);
                     boxR(36, by, 96, 42, 2.00, 2.22, [0.84, 0.14, 0.20], 11);
                 }
-                for (const tx of [258, 398]) {
-                    for (const ty of [278, 356]) {
-                        aoR(tx, ty, 64, 48, 2.004, 8, 0.38);
-                        boxR(tx, ty, 64, 48, 2.00, 2.18, [0.48, 0.26, 0.14], 11);
-                        boxR(tx - 2, ty - 2, 68, 52, 2.18, 2.22, [0.98, 0.96, 0.92], 9);
-                        cyl(tx + 18, ty + 24, 7, 7, 2.22, 2.24, 10, [1.0, 1.0, 1.0], 9, true);
-                        cyl(tx + 46, ty + 24, 7, 7, 2.22, 2.24, 10, [1.0, 1.0, 1.0], 9, true);
+                for (const tx of [254, 402]) {
+                    for (const ty of [252, 354]) {
+                        aoR(tx, ty, 62, 46, 2.004, 8, 0.38);
+                        boxR(tx, ty, 62, 46, 2.00, 2.18, [0.48, 0.26, 0.14], 11);
+                        boxR(tx - 2, ty - 2, 66, 50, 2.18, 2.22, [0.98, 0.96, 0.92], 9);
+                        cyl(tx + 18, ty + 23, 7, 7, 2.22, 2.24, 10, [1.0, 1.0, 1.0], 9, true);
+                        cyl(tx + 44, ty + 23, 7, 7, 2.22, 2.24, 10, [1.0, 1.0, 1.0], 9, true);
                     }
                 }
                 // East Private VIP Wine Cellar & Sommelier Tasting Room
@@ -9903,7 +9907,7 @@ class WorldObjectEngine {
                 aoR(628, 66, 144, 30, 2.004, 8, 0.42);
                 boxR(628, 66, 92, 28, 2.00, 2.22, [0.48, 0.26, 0.14], 11); // Manager's mahogany desk
                 boxR(636, 70, 28, 18, 2.22, 2.28, [0.22, 0.84, 0.38], 10); // Cash bundles on desk
-                boxR(724, 64, 48, 34, 2.00, 2.48, [0.20, 0.24, 0.32], 6); // Heavy steel combination safe
+                boxR(724, 64, 48, 34, 2.00, 2.48, [0.20, 0.24, 0.32], 9); // Heavy steel combination safe
                 cyl(748, 98, 6, 6, 2.22, 2.26, 10, [0.96, 0.80, 0.22], 9, true);
                 aoR(56, 466, 64, 36, 2.004, 8, 0.40);
                 boxR(56, 466, 64, 36, 2.00, 2.44, [0.56, 0.18, 0.34], 9); // Classic Neon Wurlitzer Jukebox
@@ -9962,13 +9966,15 @@ class WorldObjectEngine {
             boxR(54, 76, 140, 32, 2.00, 2.34, [0.68, 0.48, 0.26], 11);
             aoR(580, 76, 160, 32, 2.004, 8, 0.42);
             boxR(580, 76, 160, 32, 2.00, 2.24, [0.22, 0.28, 0.36], 9);
-            boxR(700, 68, 52, 38, 2.00, 2.48, [0.18, 0.22, 0.28], 6);
+            boxR(700, 68, 52, 38, 2.00, 2.48, [0.18, 0.22, 0.28], 9);
+            cyl(726, 106, 6, 6, 2.22, 2.26, 10, [0.96, 0.80, 0.22], 9, true);
             // West Bulletproof Cashier Cage Counter (x=38..206, y=232..260) + Scratch-Off Lotto Dispenser
             aoR(38, 232, 168, 28, 2.004, 10, 0.42);
             boxR(38, 232, 168, 28, 2.00, 2.22, [0.18, 0.56, 0.48], 9);
             boxR(36, 230, 172, 32, 2.22, 2.25, [0.92, 0.96, 0.98], 9);
             boxR(136, 234, 28, 18, 2.25, 2.40, [0.98, 0.80, 0.18], 10); // Florida Lotto Terminal
-            boxR(42, 234, 160, 6, 2.25, 2.50, [0.38, 0.88, 0.98], 10, 0.65);
+            boxR(42, 234, 160, 6, 2.25, 2.52, [0.38, 0.88, 0.98], 10, 0.78);
+            boxR(40, 232, 164, 10, 2.52, 2.56, [0.20, 0.26, 0.34], 9); // Overhead cashier cage steel header
             // Center 3 Double-Sided 3D Supermarket Gondola Shelving Aisles (x=286, 398, 510, y=248..412)
             const aisleCols = [[0.92, 0.22, 0.18], [0.18, 0.82, 0.38], [0.96, 0.76, 0.16]];
             for (let ai = 0; ai < 3; ai++) {
@@ -10047,7 +10053,8 @@ class WorldObjectEngine {
             // North-East Armored Cash Counting Vault Table (x=608..756, y=108..136) & South-East Arcade Cabinets
             aoR(608, 108, 148, 28, 2.004, 10, 0.44);
             boxR(608, 108, 148, 28, 2.00, 2.22, [0.24, 0.28, 0.36], 9);
-            boxR(716, 64, 56, 36, 2.00, 2.52, [0.20, 0.24, 0.30], 6);
+            boxR(716, 64, 56, 36, 2.00, 2.52, [0.20, 0.24, 0.30], 9);
+            cyl(744, 100, 6, 6, 2.24, 2.28, 10, [0.96, 0.80, 0.22], 9, true);
             for (let ai = 0; ai < 3; ai++) {
                 const ay = 286 + ai * 66;
                 boxR(736, ay, 42, 44, 2.00, 2.46, [0.18, 0.14, 0.34], 9);
@@ -10065,7 +10072,7 @@ class WorldObjectEngine {
             boxR(332, 100, 156, 40, 2.24, 2.28, [0.96, 0.78, 0.22], 9);
             // West Golden Heavy Armory Racks (x=42..218, y=92..122) & Cigar Study Table
             aoR(42, 92, 176, 30, 2.004, 10, 0.44);
-            boxR(42, 92, 176, 30, 2.00, 2.26, [0.24, 0.28, 0.34], 6);
+            boxR(42, 92, 176, 30, 2.00, 2.26, [0.24, 0.28, 0.34], 9);
             boxR(46, 96, 168, 22, 2.26, 2.30, [0.98, 0.80, 0.20], 9);
             boxR(56, 356, 136, 56, 2.00, 2.18, [0.08, 0.56, 0.32], 9);
             // East Sunken Roman Marble Jacuzzi (x=594..766, y=326..460) & North-East Suite Bar
@@ -10089,13 +10096,14 @@ class WorldObjectEngine {
             cone(410, 356, 9, 2.44, 2.60, 12, [0.98, 0.56, 0.18], 10, 0.92);
             // West Orbital Munitions Locker (x=44..118, y=168..304) & East Bio-Stasis Medpod (x=692..760, y=214..282)
             aoR(44, 168, 74, 136, 2.004, 10, 0.44);
-            boxR(44, 168, 74, 136, 2.00, 2.42, [0.22, 0.28, 0.38], 6);
+            boxR(44, 168, 74, 136, 2.00, 2.42, [0.22, 0.28, 0.38], 9);
+            boxR(114, 180, 6, 112, 2.18, 2.38, [0.18, 0.90, 0.98], 10);
             cyl(726, 248, 34, 34, 2.00, 2.12, 16, [0.82, 0.88, 0.94], 9, true);
             cyl(726, 248, 28, 28, 2.12, 2.54, 16, [0.22, 0.98, 0.64], 10, true, 0.82);
         } else if (theme === "PRISON_BLOCK") {
             // North-West Cell #06 Bunk (x=36..122, y=82..126) & Stainless Toilet
             aoR(36, 82, 86, 44, 2.004, 8, 0.44);
-            boxR(36, 82, 86, 44, 2.00, 2.28, [0.34, 0.40, 0.48], 6);
+            boxR(36, 82, 86, 44, 2.00, 2.28, [0.34, 0.40, 0.48], 9);
             boxR(40, 86, 78, 36, 2.14, 2.20, [0.92, 0.38, 0.16], 9);
             cyl(238, 88, 10, 12, 2.00, 2.18, 10, [0.82, 0.86, 0.92], 9, true);
             // North-Center Warden's Parole Office Desk (x=332..468, y=102..130)
@@ -10104,19 +10112,24 @@ class WorldObjectEngine {
             boxR(384, 106, 32, 18, 2.22, 2.38, [0.22, 0.88, 0.98], 10);
             // North-East SWAT Riot Armory Racks (x=566..762, y=92..120) + 3D Vertical Rifles
             aoR(566, 92, 196, 28, 2.004, 10, 0.44);
-            boxR(566, 92, 196, 28, 2.00, 2.36, [0.20, 0.26, 0.36], 6);
+            boxR(566, 92, 196, 28, 2.00, 2.36, [0.20, 0.26, 0.36], 9);
             for (let rwX = 578; rwX <= 748; rwX += 24) {
                 boxR(rwX, 96, 6, 18, 2.36, 2.52, [0.14, 0.18, 0.24], 9);
             }
-            // 3D Vertical Steel Cell Bars Flanking Cell #06 & Armory Doorways (y=216)
-            for (const bx of [190, 266, 616, 688]) {
-                cyl(bx, 216, 3.5, 3.5, 2.00, 2.50, 8, [0.58, 0.64, 0.72], 9, true);
+            // 3D Vertical Steel Cell Bars along Cell #06 Front (x=34..134) & SWAT Armory Front (x=678..774) at y=216
+            boxR(28, 206, 112, 20, 2.53, 2.57, [0.36, 0.42, 0.50], 9);
+            boxR(672, 206, 112, 20, 2.53, 2.57, [0.36, 0.42, 0.50], 9);
+            for (let bx = 34; bx <= 134; bx += 20) {
+                cyl(bx, 216, 3.2, 3.2, 2.00, 2.58, 8, [0.64, 0.70, 0.78], 9, true);
+            }
+            for (let bx = 678; bx <= 778; bx += 20) {
+                cyl(bx, 216, 3.2, 3.2, 2.00, 2.58, 8, [0.64, 0.70, 0.78], 9, true);
             }
             // Center Dayroom Steel Mess Table (x=312..508, y=336..372) & Interrogation / Guard Lockers
             aoR(312, 336, 196, 36, 2.004, 8, 0.40);
             boxR(312, 336, 196, 36, 2.00, 2.18, [0.68, 0.74, 0.82], 9);
             boxR(64, 344, 112, 36, 2.00, 2.18, [0.48, 0.52, 0.58], 9);
-            boxR(612, 344, 144, 36, 2.00, 2.38, [0.22, 0.28, 0.38], 6);
+            boxR(612, 344, 144, 36, 2.00, 2.38, [0.22, 0.28, 0.38], 9);
         }
 
         // 4. 3D INTERIOR PARTITION WALLS & OVERHEAD DOORWAY LINTELS (Supports BOTH Vertical & Horizontal Doorways!)
@@ -10135,11 +10148,11 @@ class WorldObjectEngine {
             for (let j = i + 1; j < obsList.length; j++) {
                 const ob2 = obsList[j];
                 if (!ob2.isWall) continue;
-                if (ob.w <= 28 && ob2.w <= 28 && Math.abs(ob.x - ob2.x) <= 6) {
+                if (ob.w <= 30 && ob2.w <= 30 && Math.abs(ob.x - ob2.x) <= 6) {
                     const topY = Math.min(ob.y + ob.h, ob2.y + ob2.h);
                     const botY = Math.max(ob.y, ob2.y);
                     const gap = botY - topY;
-                    if (gap >= 40 && gap <= 165) {
+                    if (gap >= 36 && gap <= 190) {
                         const wx = Math.round((ob.x + ob2.x) * 0.5);
                         const ww = Math.max(ob.w, ob2.w);
                         rawWallBoxR(wx, topY, ww, gap, 2.42, 2.54, wallTint, wallCrownCol);
@@ -10147,11 +10160,11 @@ class WorldObjectEngine {
                         rawCyl(wx + ww * 0.5, topY + 2, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
                         rawCyl(wx + ww * 0.5, botY - 2, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
                     }
-                } else if (ob.h <= 28 && ob2.h <= 28 && Math.abs(ob.y - ob2.y) <= 6) {
+                } else if (ob.h <= 30 && ob2.h <= 30 && Math.abs(ob.y - ob2.y) <= 6) {
                     const leftX = Math.min(ob.x + ob.w, ob2.x + ob2.w);
                     const rightX = Math.max(ob.x, ob2.x);
                     const gap = rightX - leftX;
-                    if (gap >= 40 && gap <= 165) {
+                    if (gap >= 36 && gap <= 190) {
                         const wy = Math.round((ob.y + ob2.y) * 0.5);
                         const wh = Math.max(ob.h, ob2.h);
                         rawWallBoxR(leftX, wy, gap, wh, 2.42, 2.54, wallTint, wallCrownCol);
@@ -10350,20 +10363,31 @@ class WorldObjectEngine {
             }
         }
 
-        // 4. All Interior NPCs (Bartenders, Clerks, Guards, Dancers, Mechanics, Guests)
+        // 4. All Interior NPCs (Bartenders, Clerks, Guards, Dancers, Mechanics, Guests & Live Range Shooters)
         const npcs = intr.npcs || [];
         for (let i = 0; i < npcs.length; i++) {
             const npc = npcs[i];
             const isDancing = !!(npc.dancing || npc.label === "DANCER" || npc.label === "CLUBBER");
-            const nx = npc.x + (isDancing ? Math.sin(t * 4.0 + i) * 7.5 : Math.sin(t * 1.4 + i * 2.1) * 1.4);
-            const ny = npc.y + (isDancing ? Math.cos(t * 4.0 + i) * 5.5 : Math.cos(t * 1.1 + i * 1.7) * 1.0);
+            const isRangeShooter = (theme === "SHOP_GUN_SHOP") && (npc.label === "SHOOTER" || npc.label === "MARKSMAN");
+            const nx = npc.x + (isDancing ? Math.sin(t * 4.0 + i) * 7.5 : (isRangeShooter ? 0 : Math.sin(t * 1.4 + i * 2.1) * 1.4));
+            const ny = npc.y + (isDancing ? Math.cos(t * 4.0 + i) * 5.5 : (isRangeShooter ? 0 : Math.cos(t * 1.1 + i * 1.7) * 1.0));
             const baseAng = npc.angle !== undefined ? npc.angle : Math.PI * 0.5;
-            const nAng = isDancing ? (baseAng + Math.sin(t * 3.0 + i) * 0.65) : (baseAng + Math.sin(t * 1.6 + i) * 0.16);
-            const frame = isDancing ? (Math.floor(t * 6.0 + i * 2) % 8) : 98;
+            const nAng = isDancing ? (baseAng + Math.sin(t * 3.0 + i) * 0.65) : (isRangeShooter ? baseAng : (baseAng + Math.sin(t * 1.6 + i) * 0.16));
+            const shootPulse = isRangeShooter && ((Math.floor(t * 4.5 + i * 2.3) % 7) === 0);
+            const frame = isDancing ? (Math.floor(t * 6.0 + i * 2) % 8) : (isRangeShooter ? (shootPulse ? 16 : 12) : 98);
             const role = npc.type || npc.role || "civ2";
             const npcZ = npc.z || 2.055;
 
-            renderer.batchPedSprite3D(role, frame, nx, ny, npcZ, nAng, 1.42, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            // Ground contact shadow beneath every interior NPC
+            renderer.pushSolidQuad3D(nx + 2, ny + 3, 2.008, 18, 14, nAng, 0.02, 0.03, 0.06, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            renderer.batchPedSprite3D(role, frame, nx, ny, npcZ, nAng, 1.42, shootPulse, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            if (shootPulse) {
+                const mx = nx + Math.cos(nAng) * 16;
+                const my = ny + Math.sin(nAng) * 16;
+                renderer.batchObjectSprite3D("235", mx, my, npcZ + 0.04, nAng, 0.52, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                if (!intr._targetHitTimers) intr._targetHitTimers = [0, 0, 0, 0];
+                intr._targetHitTimers[npc.label === "SHOOTER" ? 1 : 3] = 0.18;
+            }
         }
 
         // 5. Companion Partner (Jason Duval or Lucia Caminos) standing watch beside the oriented building entrance (only when recruited!)
@@ -10375,6 +10399,7 @@ class WorldObjectEngine {
             const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
             const partnerRole = isJasonPlayer ? "lucia" : "jason";
             const jAng = pose.partnerAngle + Math.sin(t * 1.2) * 0.15;
+            renderer.pushSolidQuad3D(pose.partnerX + 2, pose.partnerY + 3, 2.008, 18, 14, jAng, 0.02, 0.03, 0.06, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
             renderer.batchPedSprite3D(partnerRole, 98, pose.partnerX, pose.partnerY, 2.055, jAng, 1.40, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
 

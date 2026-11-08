@@ -10345,19 +10345,19 @@ class RetroRenderer {
         const rh = intr.h || 560;
         const t = intr.theme || "SHOP_CONVENIENCE";
         const facing = intr.facing || "S";
-        const key = `v3_${t}_${facing}_${rw}_${rh}`;
+        const key = `v4_${t}_${facing}_${rw}_${rh}`;
         if (this._interiorFloorTexCache[key]) {
             return this._interiorFloorTexCache[key];
         }
 
         const c = document.createElement("canvas");
-        c.width = 1024;
-        c.height = 1024;
+        c.width = rw * 2;
+        c.height = rh * 2;
         const g = c.getContext("2d");
         const tex = this.getInteriorTextures(g);
 
         g.save();
-        g.scale(1024 / rw, 1024 / rh);
+        g.scale(2, 2);
 
         const trR = (x, y, w, h) => {
             if (window.ShopInteriors && typeof window.ShopInteriors.transformRect === "function") {
@@ -11300,7 +11300,34 @@ class RetroRenderer {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        // 1. Subtle Volumetric Indoor Spotlight around Player & Stations (over the 3D WebGL Room)
+        // 1. Multi-Room Volumetric Ceiling Chandelier / Neon / Caustic Light Pools & Player Spotlight
+        const trPtL = (lx, ly) => {
+            if (window.ShopInteriors && typeof window.ShopInteriors.transformPoint === "function") {
+                return window.ShopInteriors.transformPoint(lx, ly, 0, intr);
+            }
+            return { x: lx, y: ly };
+        };
+        const tTheme = intr.theme || "SHOP_CONVENIENCE";
+        const isClubTheme = tTheme === "NEON_CLUB" || tTheme === "STRIP_CLUB" || tTheme === "MALIBU_CLUB" || tTheme === "SHOP_BAR";
+        const isPoolTheme = tTheme === "SHOP_HOTEL" || tTheme === "ART_DECO_HOTEL" || tTheme === "MANSION";
+        const roomLights = [
+            { x: 410, y: 270, r: 135, col: isClubTheme ? "rgba(236, 72, 153, 0.12)" : "rgba(255, 240, 195, 0.11)" },
+            { x: 125, y: 240, r: 105, col: isClubTheme ? "rgba(56, 189, 248, 0.10)" : "rgba(255, 236, 190, 0.09)" },
+            { x: 675, y: 360, r: 115, col: isPoolTheme ? "rgba(34, 211, 238, 0.15)" : (tTheme === "SHOP_GUN_SHOP" ? "rgba(250, 204, 21, 0.10)" : "rgba(255, 236, 190, 0.09)") }
+        ];
+        for (let li = 0; li < roomLights.length; li++) {
+            const rl = roomLights[li];
+            const lp = trPtL(rl.x, rl.y);
+            const lScr = this.worldToScreen(lp.x, lp.y, 2.02);
+            const lg = ctx.createRadialGradient(lScr.x, lScr.y, 8, lScr.x, lScr.y, rl.r);
+            lg.addColorStop(0, rl.col);
+            lg.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+            ctx.fillStyle = lg;
+            ctx.beginPath();
+            ctx.arc(lScr.x, lScr.y, rl.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         const p = game.player;
         const px = game.interiorX || rw * 0.5;
         const py = game.interiorY || rh - 78;
