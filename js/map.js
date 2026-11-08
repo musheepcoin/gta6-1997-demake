@@ -456,18 +456,17 @@ class LeonidaMap {
         }
 
         // =========================================================================
-        // AUTHENTIC MIAMI STRAIGHT BOULEVARD PARALLEL PARKING & OFF-STREET PARKING LOT PASS
-        // 1) Keeps 100% of street curbs, buildings, and Lummus Park geometry straight and
-        //    untouched (zero road narrowing, zero 64px sidewalk notches, zero mid-block signals).
-        // 2) On all 4-lane vertical boulevards (Port Gellhorn Blvd 52..55, Downtown/Calle Ocho
+        // AUTHENTIC MIAMI UNIFORM 2-LANE BOULEVARD ESPLANADE & RECESSED PARKING PASS
+        // 1) Converts the 5 vertical 4-lane avenues (Port Gellhorn Blvd 52..55, Downtown/Calle Ocho
         //    Blvd 284..287, Washington Ave 424..427, Collins Ave 434..437, Ocean Drive 444..447)
-        //    and 4-lane horizontal boulevards (y = 72..75, 295..298, 369..372), reserves the
-        //    straight outer curbside asphalt lanes (lid 1) as dedicated On-Street Parallel Parking
-        //    Lanes (z = 2 set to roadParkingNavIdx, isParkingBay = true) while moving AI traffic
-        //    flows smoothly in the 2 inner travel lanes (lid 80)!
-        // 3) Identifies clean 3x4 flat off-street lots behind the pedestrian sidewalk across the
-        //    cities for dedicated Asphalt Surface Parking Lots (90° stalls + 3D wheel stops).
+        //    100% uniformly from top to bottom into straight 2-lane avenues (c0+1 Southbound lid 74,
+        //    c0+2 Northbound lid 74) with clean 2x2 intersections and unbroken straight curbs!
+        // 2) Turns the outer columns (c0 West, c0+3 East) on all non-cross-street rows into wide
+        //    boulevard esplanades (boulevardParkingEsplanadeMask) that host dedicated Recessed
+        //    Asphalt Curbside Parking Bays (completely outside the 2 active travel lanes!).
         // =========================================================================
+        const preservedStopLines = [];
+        this.boulevardParkingEsplanadeMask = new Uint8Array(MAP_ROWS * MAP_COLS);
         {
             const roadParkingNavIdx = this.blocksData.length;
             this.blocksData.push({
@@ -511,115 +510,105 @@ class LeonidaMap {
                 const b = this.blocksData[this.voxelGrid[(1 * MAP_ROWS + cy) * MAP_COLS + cx]];
                 return b ? b.lid : 0;
             };
-            const isProtectedCompound = (cx, cy) => (
-                (cx >= 55 && cx <= 69 && cy >= 75 && cy <= 147) ||
-                (cx >= 64 && cx <= 166 && cy >= 299 && cy <= 369) ||
-                (cx >= 179 && cx <= 197 && cy >= 164 && cy <= 180) ||
-                (cx >= 458 && cx <= 481 && cy >= 21 && cy <= 45) ||
-                (cx >= 26 && cx <= 87 && cy >= 149 && cy <= 200)
-            );
+            const copyColVoxels = (srcX, srcY, dstX, dstY) => {
+                for (let z = 0; z < MAP_LAYERS; z++) {
+                    this.voxelGrid[(z * MAP_ROWS + dstY) * MAP_COLS + dstX] =
+                        this.voxelGrid[(z * MAP_ROWS + srcY) * MAP_COLS + srcX];
+                }
+            };
+            const setColVoxels = (dstX, dstY, colArr) => {
+                for (let z = 0; z < MAP_LAYERS; z++) {
+                    this.voxelGrid[(z * MAP_ROWS + dstY) * MAP_COLS + dstX] = colArr[z];
+                }
+            };
 
-            // 1) Reserve the outer curbside asphalt lanes (c0 West, c0+3 East) of the 5 vertical 4-lane boulevards
-            //    as straight Miami On-Street Parallel Parking Lanes (keeping visual z=1 tiles 100% straight and original!)
-            for (const c0 of [52, 284, 424, 434, 444]) {
-                for (let y = 48; y <= 372; y++) {
+            const roadSouthVoxels = [];
+            const roadNorthVoxels = [];
+            const stonePaveCol = [];
+            const coralPaveCol = [];
+            for (let z = 0; z < MAP_LAYERS; z++) {
+                roadSouthVoxels[z] = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 88];
+                roadNorthVoxels[z] = this.voxelGrid[(z * MAP_ROWS + 165) * MAP_COLS + 89];
+                stonePaveCol[z]    = this.voxelGrid[(z * MAP_ROWS + 170) * MAP_COLS + 178];
+                coralPaveCol[z]    = this.voxelGrid[(z * MAP_ROWS + 286) * MAP_COLS + 448];
+            }
+
+            const verticalBoulevards = [
+                [52,  72, 372],
+                [284, 52, 308],
+                [424, 72, 362],
+                [434, 72, 362],
+                [444, 72, 368]
+            ];
+
+            for (const [c0, yMin, yMax] of verticalBoulevards) {
+                const paveCol = (c0 >= 424) ? coralPaveCol : stonePaveCol;
+                for (let y = yMin; y <= yMax; y++) {
                     if (getColHeight(c0, y) > 3 || getColHeight(c0 + 3, y) > 3) continue;
-                    const isBridgeRow = (getColLid1(c0 - 1, y) === 41 || getColLid1(c0 + 4, y) === 41);
-                    if (isBridgeRow) continue;
                     const l0 = getColLid1(c0, y);
                     const l1 = getColLid1(c0 + 1, y);
                     const l2 = getColLid1(c0 + 2, y);
                     const l3 = getColLid1(c0 + 3, y);
-                    if ((l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) || (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24)) {
-                        this.voxelGrid[(2 * MAP_ROWS + y) * MAP_COLS + c0]     = roadParkingNavIdx;
-                        this.voxelGrid[(2 * MAP_ROWS + y) * MAP_COLS + c0 + 3] = roadParkingNavIdx;
-                    }
-                }
-            }
+                    const isBridgeSpan = (getColLid1(c0 - 1, y) === 41 || getColLid1(c0 + 4, y) === 41);
 
-            // 2) Reserve the outer curbside asphalt lanes (r0 North, r0+3 South) of the horizontal 4-lane boulevards
-            for (const r0 of [72, 295, 369]) {
-                for (let x = 48; x <= 442; x++) {
-                    if (isProtectedCompound(x, r0)) continue;
-                    if (getColHeight(x, r0) > 3 || getColHeight(x, r0 + 3) > 3) continue;
-                    const isBridgeCol = (getColLid1(x, r0 - 1) === 41 || getColLid1(x, r0 + 4) === 41);
-                    if (isBridgeCol) continue;
-                    const l0 = getColLid1(x, r0);
-                    const l1 = getColLid1(x, r0 + 1);
-                    const l2 = getColLid1(x, r0 + 2);
-                    const l3 = getColLid1(x, r0 + 3);
-                    if ((l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) || (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24)) {
-                        this.voxelGrid[(2 * MAP_ROWS + r0) * MAP_COLS + x]       = roadParkingNavIdx;
-                        this.voxelGrid[(2 * MAP_ROWS + (r0 + 3)) * MAP_COLS + x] = roadParkingNavIdx;
-                    }
-                }
-            }
-
-            const stonePaveCol = [];
-            const coralPaveCol = [];
-            for (let z = 0; z < MAP_LAYERS; z++) {
-                stonePaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 170) * MAP_COLS + 178];
-                coralPaveCol[z] = this.voxelGrid[(z * MAP_ROWS + 286) * MAP_COLS + 448];
-            }
-
-            // 3) Detect clean 3x4 flat off-street lots set back behind the pedestrian sidewalk (x-1 is sidewalk, x-2 is road;
-            //    or x+3 is sidewalk, x+4 is road) for dedicated Off-Street Asphalt Surface Parking Lots (zero road voxel changes!)
-            this.surfaceParkingLots = [];
-            for (let y = 52; y <= 352; y += 2) {
-                for (let x = 40; x <= 438; x += 2) {
-                    if (isProtectedCompound(x, y) || isProtectedCompound(x + 2, y + 3)) continue;
-                    if (x >= 75 && x <= 175 && y >= 180 && y <= 262) continue; // Lake Leonida
-                    if (x >= 330 && x <= 406 && y >= 120 && y <= 215) continue; // Keep Star & Venetian mansion lawns green
-                    if (x >= 442) continue; // Keep Lummus Park & Vice Beach 100% untouched
-                    if (this.surfaceParkingLots.some((lot) => Math.hypot(lot.x0 - x, lot.y0 - y) < 22)) continue;
-
-                    let blockOk = true;
-                    for (let dy = 0; dy < 4 && blockOk; dy++) {
-                        for (let dx = 0; dx < 3; dx++) {
-                            const cx = x + dx;
-                            const cy = y + dy;
-                            if (getColHeight(cx, cy) > 2) { blockOk = false; break; }
-                            const gt = getColGt(cx, cy);
-                            const l1 = getColLid1(cx, cy);
-                            if ((gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) || (l1 !== 8 && l1 !== 9 && l1 !== 10)) {
-                                blockOk = false;
-                                break;
+                    if (
+                        (l0 === 1 && l1 === 80 && l2 === 80 && l3 === 1) ||
+                        (l0 === 74 && l1 === 74 && l2 === 74 && l3 === 74) ||
+                        (l0 === 9 && l1 === 74 && l2 === 74 && l3 === 9)
+                    ) {
+                        setColVoxels(c0,     y, paveCol);
+                        setColVoxels(c0 + 1, y, roadSouthVoxels);
+                        setColVoxels(c0 + 2, y, roadNorthVoxels);
+                        setColVoxels(c0 + 3, y, paveCol);
+                        if (!isBridgeSpan) {
+                            this.boulevardParkingEsplanadeMask[y * MAP_COLS + c0]       = 1; // West esplanade (dc = +1)
+                            this.boulevardParkingEsplanadeMask[y * MAP_COLS + (c0 + 3)] = 2; // East esplanade (dc = -1)
+                        }
+                    } else if (
+                        (l0 === 24 && l1 === 24 && l2 === 24 && l3 === 24) ||
+                        (l0 === 9 && l1 === 24 && l2 === 24 && l3 === 9)
+                    ) {
+                        setColVoxels(c0,     y, paveCol);
+                        setColVoxels(c0 + 1, y, roadSouthVoxels);
+                        setColVoxels(c0 + 2, y, roadNorthVoxels);
+                        setColVoxels(c0 + 3, y, paveCol);
+                        preservedStopLines.push([c0 + 1, y], [c0 + 2, y]);
+                    } else if (l1 === 25 && l2 === 25) {
+                        // West approach (c0): extend horizontal cross-street if present on West, else straight boulevard sidewalk
+                        if (getColGt(c0 - 1, y) === GROUND_TYPE.ROAD) {
+                            const westWasStop = (getColLid1(c0 - 1, y) === 24);
+                            copyColVoxels(c0 - 1, y, c0, y);
+                            if (westWasStop) preservedStopLines.push([c0, y]);
+                            if (getColGt(c0 - 2, y) === GROUND_TYPE.ROAD) {
+                                copyColVoxels(c0 - 2, y, c0 - 1, y);
                             }
+                        } else {
+                            setColVoxels(c0, y, paveCol);
+                        }
+                        // East approach (c0 + 3): extend horizontal cross-street if present on East, else straight boulevard sidewalk
+                        if (getColGt(c0 + 4, y) === GROUND_TYPE.ROAD) {
+                            const eastWasStop = (getColLid1(c0 + 4, y) === 24);
+                            copyColVoxels(c0 + 4, y, c0 + 3, y);
+                            if (eastWasStop) preservedStopLines.push([c0 + 3, y]);
+                            if (getColGt(c0 + 5, y) === GROUND_TYPE.ROAD) {
+                                copyColVoxels(c0 + 5, y, c0 + 4, y);
+                            }
+                        } else {
+                            setColVoxels(c0 + 3, y, paveCol);
                         }
                     }
-                    if (!blockOk) continue;
-
-                    let wOk = true;
-                    let eOk = true;
-                    for (let dy = 0; dy < 4; dy++) {
-                        if (getColGt(x - 1, y + dy) !== GROUND_TYPE.PAWEMENT || getColGt(x - 2, y + dy) !== GROUND_TYPE.ROAD) wOk = false;
-                        if (getColGt(x + 3, y + dy) !== GROUND_TYPE.PAWEMENT || getColGt(x + 4, y + dy) !== GROUND_TYPE.ROAD) eOk = false;
-                    }
-                    const roadSide = wOk ? "W" : (eOk ? "E" : null);
-                    if (!roadSide) continue;
-
-                    const paveCol = (x >= 420) ? coralPaveCol : stonePaveCol;
-                    for (let dy = 0; dy < 4; dy++) {
-                        for (let dx = 0; dx < 3; dx++) {
-                            for (let z = 0; z < MAP_LAYERS; z++) {
-                                this.voxelGrid[(z * MAP_ROWS + (y + dy)) * MAP_COLS + (x + dx)] = paveCol[z];
-                            }
-                        }
-                    }
-
-                    this.surfaceParkingLots.push({
-                        x0: x,
-                        y0: y,
-                        roadSide,
-                        asphaltMinX: x,
-                        asphaltMaxX: x + 2,
-                        asphaltMinY: y,
-                        asphaltMaxY: y + 3,
-                        stallCol: roadSide === "W" ? (x + 2) : x
-                    });
-                    if (this.surfaceParkingLots.length >= 22) break;
                 }
-                if (this.surfaceParkingLots.length >= 22) break;
+            }
+
+            // Harmonize Vice Beach open hotel courtyard ground pavers (x = 428..443, y = 76..360) to coral promenade pavers
+            for (let y = 76; y <= 360; y++) {
+                for (let x = 428; x <= 443; x++) {
+                    if (getColHeight(x, y) > 3) continue;
+                    const l1 = getColLid1(x, y);
+                    if (l1 === 8 || l1 === 98) {
+                        setColVoxels(x, y, coralPaveCol);
+                    }
+                }
             }
         }
 
@@ -690,6 +679,10 @@ class LeonidaMap {
                     }
                 }
             }
+        }
+        for (let si = 0; si < preservedStopLines.length; si++) {
+            const [sx, sy] = preservedStopLines[si];
+            this.stopLineMask[sy * MAP_COLS + sx] = 1;
         }
 
         // Miami Art Deco Rooftop Pool & Glass Skylight Atrium Pass:
@@ -910,8 +903,13 @@ class LeonidaMap {
                     }
                     // c=451: ZERO TREES! 100% open paved oceanfront boardwalk for rollerblading & walking!
                 }
-                // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road)
-                else if ((blkZ1.lid === 69 || (blkZ1.lid === 8 && adjRoad)) && (surfGt === GROUND_TYPE.PAWEMENT || surfGt === GROUND_TYPE.FIELD) && c < 443) {
+                // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road — never inside boulevard parking bays!)
+                else if (
+                    (blkZ1.lid === 69 || (blkZ1.lid === 8 && adjRoad)) &&
+                    (surfGt === GROUND_TYPE.PAWEMENT || surfGt === GROUND_TYPE.FIELD) &&
+                    c < 443 &&
+                    (!this.boulevardParkingEsplanadeMask || !this.boulevardParkingEsplanadeMask[idx])
+                ) {
                     if (seed % 28 === 0) {
                         chosenKind = "palm_tree";
                         scaleMul = 0.88 + hs1 * 0.35;
@@ -3014,11 +3012,12 @@ class LeonidaMap {
                 if (this.streetlights.some(sl => Math.hypot(sl.c - c, sl.r - r) < 4.5)) continue;
 
                 const surfZ = this.surfaceLayer[idx] || 2.0;
-                // Position base near the curb edge of the sidewalk (+22px toward road), overhanging luminaire head +18px out over the street
-                const baseX = (c + 0.5) * TILE_SIZE + dc * 22.0;
-                const baseY = (r + 0.5) * TILE_SIZE + dr * 22.0;
-                const headX = baseX + dc * 18.0;
-                const headY = baseY + dr * 18.0;
+                const isParkingEsplanade = Boolean(this.boulevardParkingEsplanadeMask && this.boulevardParkingEsplanadeMask[idx]);
+                // On boulevard parking esplanades, position the streetlamp base on the raised pedestrian sidewalk behind the parking bay curb (-15px)
+                const baseX = (c + 0.5) * TILE_SIZE + dc * (isParkingEsplanade ? -15.0 : 22.0);
+                const baseY = (r + 0.5) * TILE_SIZE + dr * (isParkingEsplanade ? -15.0 : 22.0);
+                const headX = (c + 0.5) * TILE_SIZE + dc * 40.0;
+                const headY = (r + 0.5) * TILE_SIZE + dr * 40.0;
                 const armAngle = Math.atan2(dr, dc);
 
                 // District-authentic GTA 2 / Vice City warm yellow/sodium streetlamp style
@@ -3476,7 +3475,7 @@ class LeonidaMap {
             }
         }
 
-        // 18. Build City-Wide Curbside Sidewalk Parking Bays & 3D Parking Meters (for real drivable parked cars!)
+        // 18. Build City-Wide Off-Street Surface Parking Lots, Recessed Curbside Parking Bays & 3D Parking Meters
         this.curbParkingBays = this.buildCurbsideParkingBays();
 
         if (districtsMeta && Array.isArray(districtsMeta)) {
@@ -3486,16 +3485,18 @@ class LeonidaMap {
 
     buildCurbsideParkingBays() {
         const bays = [];
+        this.surfaceParkingLots = [];
+        this.curbParkingStrips = [];
         if (!this.surfaceGround || !this.surfaceLayer) return bays;
 
         const districtLimits = {
-            OCEAN_DRIVE: 36,
-            SOBE_COLLINS_WASH: 34,
+            OCEAN_DRIVE: 46,
+            SOBE_COLLINS_WASH: 58,
             STAR_VENETIAN: 16,
-            DOWNTOWN_CUBA: 44,
-            HAITI_WYNWOOD: 32,
-            PORT_GELLHORN: 24,
-            LEONIDA_KEYS: 14
+            DOWNTOWN_CUBA: 56,
+            HAITI_WYNWOOD: 42,
+            PORT_GELLHORN: 34,
+            LEONIDA_KEYS: 16
         };
         const districtCounts = {
             OCEAN_DRIVE: 0,
@@ -3506,11 +3507,12 @@ class LeonidaMap {
             PORT_GELLHORN: 0,
             LEONIDA_KEYS: 0
         };
+        // Standard-length vehicles (48..54px) so every parked vehicle fits strictly inside its 64px painted stall box!
         const districtSpecs = {
             OCEAN_DRIVE: [
                 "STINGER_CABRIO", "TURISMO_CABRIO", "VICE_CHEETAH", "BANSHEE_GT",
                 "PENETRATOR_GT", "PORKA_TURBO", "SILVER_ROADSTER", "MINT_STALLION",
-                "SUPERBIKE", "STRETCH_LIMO", "COSSIE_RS", "STINGER_CABRIO"
+                "SUPERBIKE", "COSSIE_RS", "STINGER_CABRIO", "TURISMO_CABRIO"
             ],
             SOBE_COLLINS_WASH: [
                 "TURISMO_CABRIO", "STINGER_CABRIO", "COSSIE_RS", "PORKA_TURBO",
@@ -3519,13 +3521,12 @@ class LeonidaMap {
             ],
             STAR_VENETIAN: [
                 "VICE_CHEETAH", "PENETRATOR_GT", "STINGER_CABRIO", "TURISMO_CABRIO",
-                "PORKA_TURBO", "STRETCH_LIMO", "SILVER_ROADSTER", "BANSHEE_GT"
+                "PORKA_TURBO", "SILVER_ROADSTER", "BANSHEE_GT", "COSSIE_RS"
             ],
             DOWNTOWN_CUBA: [
-                "LELAND_SEDAN", "REGAL_SEDAN", "VICE_CAB", "STRETCH_LIMO",
-                "BANSHEE_GT", "TULIP_MUSCLE", "CHALLENGER_RT", "MINT_STALLION",
-                "FJORD_FASTBACK", "MUNDANO_WAGON", "BOXVILLE_VAN", "HOTDOG_VAN",
-                "COSSIE_RS", "VCPD_CRUISER"
+                "LELAND_SEDAN", "REGAL_SEDAN", "VICE_CAB", "BANSHEE_GT",
+                "TULIP_MUSCLE", "CHALLENGER_RT", "MINT_STALLION", "FJORD_FASTBACK",
+                "MUNDANO_WAGON", "BOXVILLE_VAN", "HOTDOG_VAN", "COSSIE_RS", "VCPD_CRUISER"
             ],
             HAITI_WYNWOOD: [
                 "TULIP_MUSCLE", "CHALLENGER_RT", "MINT_STALLION", "FJORD_FASTBACK",
@@ -3554,60 +3555,72 @@ class LeonidaMap {
         const czList = (this.objectEngine && Array.isArray(this.objectEngine.clearZones))
             ? this.objectEngine.clearZones
             : [];
+        const isProtectedCompound = (cx, cy) => (
+            (cx >= 55 && cx <= 69 && cy >= 75 && cy <= 147) ||
+            (cx >= 64 && cx <= 166 && cy >= 299 && cy <= 369) ||
+            (cx >= 179 && cx <= 197 && cy >= 164 && cy <= 180) ||
+            (cx >= 458 && cx <= 481 && cy >= 21 && cy <= 45) ||
+            (cx >= 26 && cx <= 87 && cy >= 149 && cy <= 200)
+        );
 
-        const isCleanCurbSpot = (px, py, z) => {
-            if (typeof this.isInsideLivingEventZone === "function" && this.isInsideLivingEventZone(px, py, 38)) {
+        const isCleanLotArea = (px, py, z) => {
+            if (typeof this.isInsideLivingEventZone === "function" && this.isInsideLivingEventZone(px, py, 36)) {
                 return false;
             }
-            if (typeof this.resolveCircleBuildingCollision === "function" && this.resolveCircleBuildingCollision(px, py, 16, z).hit) {
+            if (typeof this.resolveCircleBuildingCollision === "function" && this.resolveCircleBuildingCollision(px, py, 14, z).hit) {
                 return false;
             }
             for (let i = 0; i < czList.length; i++) {
                 const cz = czList[i];
-                if (Math.hypot(cz.x - px, cz.y - py) < Math.max(52, cz.r || 52)) return false;
+                if (Math.hypot(cz.x - px, cz.y - py) < Math.max(48, cz.r || 48)) return false;
             }
             if (Array.isArray(this.interiors)) {
                 for (let i = 0; i < this.interiors.length; i++) {
-                    if (Math.hypot(this.interiors[i].doorX - px, this.interiors[i].doorY - py) < 68) return false;
-                }
-            }
-            if (Array.isArray(this.streetlights)) {
-                for (let i = 0; i < this.streetlights.length; i++) {
-                    if (Math.hypot(this.streetlights[i].baseX - px, this.streetlights[i].baseY - py) < 42) return false;
-                }
-            }
-            if (Array.isArray(this.trafficSignals)) {
-                for (let i = 0; i < this.trafficSignals.length; i++) {
-                    if (Math.hypot(this.trafficSignals[i].baseX - px, this.trafficSignals[i].baseY - py) < 56) return false;
-                }
-            }
-            if (Array.isArray(this.parkBollardLights)) {
-                for (let i = 0; i < this.parkBollardLights.length; i++) {
-                    if (Math.hypot(this.parkBollardLights[i].x - px, this.parkBollardLights[i].y - py) < 40) return false;
-                }
-            }
-            if (Array.isArray(this.vicePalms)) {
-                for (let i = 0; i < this.vicePalms.length; i++) {
-                    if (Math.hypot(this.vicePalms[i].x - px, this.vicePalms[i].y - py) < 44) return false;
-                }
-            }
-            if (Array.isArray(this.trees)) {
-                for (let i = 0; i < this.trees.length; i++) {
-                    if (Math.hypot(this.trees[i].x - px, this.trees[i].y - py) < 44) return false;
-                }
-            }
-            if (Array.isArray(this.viceStreetDetails)) {
-                for (let i = 0; i < this.viceStreetDetails.length; i++) {
-                    if (Math.hypot(this.viceStreetDetails[i].x - px, this.viceStreetDetails[i].y - py) < 40) return false;
+                    if (Math.hypot(this.interiors[i].doorX - px, this.interiors[i].doorY - py) < 58) return false;
                 }
             }
             if (Array.isArray(this.stuntRamps)) {
                 for (let i = 0; i < this.stuntRamps.length; i++) {
-                    if (Math.hypot(this.stuntRamps[i].x - px, this.stuntRamps[i].y - py) < 96) return false;
+                    if (Math.hypot(this.stuntRamps[i].x - px, this.stuntRamps[i].y - py) < 88) return false;
+                }
+            }
+            return true;
+        };
+
+        const isCleanCurbSpot = (px, py, z) => {
+            if (!isCleanLotArea(px, py, z)) return false;
+            if (Array.isArray(this.streetlights)) {
+                for (let i = 0; i < this.streetlights.length; i++) {
+                    if (Math.hypot(this.streetlights[i].baseX - px, this.streetlights[i].baseY - py) < 28) return false;
+                }
+            }
+            if (Array.isArray(this.trafficSignals)) {
+                for (let i = 0; i < this.trafficSignals.length; i++) {
+                    if (Math.hypot(this.trafficSignals[i].baseX - px, this.trafficSignals[i].baseY - py) < 48) return false;
+                }
+            }
+            if (Array.isArray(this.parkBollardLights)) {
+                for (let i = 0; i < this.parkBollardLights.length; i++) {
+                    if (Math.hypot(this.parkBollardLights[i].x - px, this.parkBollardLights[i].y - py) < 34) return false;
+                }
+            }
+            if (Array.isArray(this.vicePalms)) {
+                for (let i = 0; i < this.vicePalms.length; i++) {
+                    if (Math.hypot(this.vicePalms[i].x - px, this.vicePalms[i].y - py) < 36) return false;
+                }
+            }
+            if (Array.isArray(this.trees)) {
+                for (let i = 0; i < this.trees.length; i++) {
+                    if (Math.hypot(this.trees[i].x - px, this.trees[i].y - py) < 36) return false;
+                }
+            }
+            if (Array.isArray(this.viceStreetDetails)) {
+                for (let i = 0; i < this.viceStreetDetails.length; i++) {
+                    if (Math.hypot(this.viceStreetDetails[i].x - px, this.viceStreetDetails[i].y - py) < 34) return false;
                 }
             }
             for (let i = 0; i < payphoneSpots.length; i++) {
-                if (Math.hypot(payphoneSpots[i][0] - px, payphoneSpots[i][1] - py) < 62) return false;
+                if (Math.hypot(payphoneSpots[i][0] - px, payphoneSpots[i][1] - py) < 56) return false;
             }
             return true;
         };
@@ -3623,28 +3636,246 @@ class LeonidaMap {
             return null;
         };
 
-        // 1) Populate Dedicated Off-Street 3x4 Asphalt Surface Parking Lots (perpendicular 90° stalls + concrete wheel stops)
-        if (Array.isArray(this.surfaceParkingLots)) {
-            for (let li = 0; li < this.surfaceParkingLots.length; li++) {
-                const lot = this.surfaceParkingLots[li];
+        // =========================================================================
+        // 1A) Discover Vice Beach 4x2 Hotel Courtyard Surface Parking Lots (x0 = 429 & 439)
+        //     including the Mid-Beach hotel courtyards at (429, 222) & (439, 222)!
+        // =========================================================================
+        for (const x0 of [429, 439]) {
+            for (let y = 78; y <= 354; y++) {
+                if (this.surfaceParkingLots.some((lot) => lot.asphaltMinX === x0 && Math.abs(lot.asphaltMinY - y) < 9)) {
+                    continue;
+                }
+                let blockOk = true;
+                for (let dy = 0; dy < 2 && blockOk; dy++) {
+                    for (let dx = 0; dx < 4; dx++) {
+                        const cx = x0 + dx;
+                        const cy = y + dy;
+                        const idx = cy * MAP_COLS + cx;
+                        const gt = this.surfaceGround[idx];
+                        const sz = this.surfaceLayer[idx] || 2;
+                        const l1 = this.getBlockInfo(cx, cy, 1)?.lid || 0;
+                        if (
+                            sz > 2 ||
+                            (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) ||
+                            (l1 !== 8 && l1 !== 9 && l1 !== 10 && l1 !== 98) ||
+                            !isCleanLotArea((cx + 0.5) * TILE_SIZE, (cy + 0.5) * TILE_SIZE, sz)
+                        ) {
+                            blockOk = false;
+                            break;
+                        }
+                    }
+                }
+                if (!blockOk) continue;
+
+                let nBldg = 0;
+                let sBldg = 0;
+                for (let dx = 0; dx < 4; dx++) {
+                    if (this.surfaceGround[(y - 1) * MAP_COLS + (x0 + dx)] === GROUND_TYPE.BUILDING) nBldg++;
+                    if (this.surfaceGround[(y + 2) * MAP_COLS + (x0 + dx)] === GROUND_TYPE.BUILDING) sBldg++;
+                }
+                if (nBldg < 2 && sBldg < 2) continue;
+
+                const wallSide = nBldg >= sBldg ? "N" : "S";
+                this.surfaceParkingLots.push({
+                    x0,
+                    y0: y,
+                    orientation: "H",
+                    wallSide,
+                    asphaltMinX: x0,
+                    asphaltMaxX: x0 + 3,
+                    asphaltMinY: y,
+                    asphaltMaxY: y + 1,
+                    stallRow: wallSide === "N" ? y : (y + 1),
+                    aisleRow: wallSide === "N" ? (y + 1) : y
+                });
+            }
+        }
+
+        // 1B) Discover South Beach 2x4 Hotel Side-Courtyard Parking Lots (x0 = 431 & 441, e.g. y = 323..326)
+        for (const x0 of [431, 441]) {
+            for (let y = 290; y <= 350; y++) {
+                if (this.surfaceParkingLots.some((lot) => Math.hypot(lot.x0 - x0, lot.y0 - y) < 10)) continue;
+                let blockOk = true;
+                let wBldg = 0;
+                for (let dy = 0; dy < 4 && blockOk; dy++) {
+                    if (this.surfaceGround[(y + dy) * MAP_COLS + (x0 - 1)] === GROUND_TYPE.BUILDING) wBldg++;
+                    for (let dx = 0; dx < 2; dx++) {
+                        const cx = x0 + dx;
+                        const cy = y + dy;
+                        const idx = cy * MAP_COLS + cx;
+                        const gt = this.surfaceGround[idx];
+                        const sz = this.surfaceLayer[idx] || 2;
+                        const l1 = this.getBlockInfo(cx, cy, 1)?.lid || 0;
+                        if (
+                            sz > 2 ||
+                            (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) ||
+                            (l1 !== 8 && l1 !== 9 && l1 !== 10 && l1 !== 98) ||
+                            !isCleanLotArea((cx + 0.5) * TILE_SIZE, (cy + 0.5) * TILE_SIZE, sz)
+                        ) {
+                            blockOk = false;
+                            break;
+                        }
+                    }
+                }
+                if (!blockOk || wBldg < 3) continue;
+                this.surfaceParkingLots.push({
+                    x0,
+                    y0: y,
+                    orientation: "V",
+                    roadSide: "E",
+                    asphaltMinX: x0,
+                    asphaltMaxX: x0 + 1,
+                    asphaltMinY: y,
+                    asphaltMaxY: y + 3,
+                    stallCol: x0,
+                    aisleCol: x0 + 1
+                });
+            }
+        }
+
+        // 1C) Discover Mainland 3x4 Off-Street Surface Parking Lots (Downtown, Little Cuba, Little Haiti, Wynwood, Port Gellhorn)
+        let mainlandLotsCount = 0;
+        for (let y = 52; y <= 352 && mainlandLotsCount < 28; y += 2) {
+            for (let x = 40; x <= 420 && mainlandLotsCount < 28; x += 2) {
+                if (isProtectedCompound(x, y) || isProtectedCompound(x + 2, y + 3)) continue;
+                if (x >= 75 && x <= 175 && y >= 180 && y <= 262) continue; // Lake Leonida
+                if (x >= 330 && x <= 406 && y >= 120 && y <= 215) continue; // Star & Venetian Island lawns
+                if (this.surfaceParkingLots.some((lot) => Math.hypot(lot.x0 - x, lot.y0 - y) < 20)) continue;
+
+                let blockOk = true;
+                for (let dy = 0; dy < 4 && blockOk; dy++) {
+                    for (let dx = 0; dx < 3; dx++) {
+                        const cx = x + dx;
+                        const cy = y + dy;
+                        const idx = cy * MAP_COLS + cx;
+                        const gt = this.surfaceGround[idx];
+                        const sz = this.surfaceLayer[idx] || 2;
+                        const l1 = this.getBlockInfo(cx, cy, 1)?.lid || 0;
+                        if (
+                            sz > 2 ||
+                            (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) ||
+                            (l1 !== 8 && l1 !== 9 && l1 !== 10 && l1 !== 98) ||
+                            !isCleanLotArea((cx + 0.5) * TILE_SIZE, (cy + 0.5) * TILE_SIZE, sz)
+                        ) {
+                            blockOk = false;
+                            break;
+                        }
+                    }
+                }
+                if (!blockOk) continue;
+
+                let wOk = true;
+                let eOk = true;
+                for (let dy = 0; dy < 4; dy++) {
+                    if (
+                        this.surfaceGround[(y + dy) * MAP_COLS + (x - 1)] !== GROUND_TYPE.PAWEMENT ||
+                        this.surfaceGround[(y + dy) * MAP_COLS + (x - 2)] !== GROUND_TYPE.ROAD
+                    ) {
+                        wOk = false;
+                    }
+                    if (
+                        this.surfaceGround[(y + dy) * MAP_COLS + (x + 3)] !== GROUND_TYPE.PAWEMENT ||
+                        this.surfaceGround[(y + dy) * MAP_COLS + (x + 4)] !== GROUND_TYPE.ROAD
+                    ) {
+                        eOk = false;
+                    }
+                }
+                const roadSide = wOk ? "W" : (eOk ? "E" : null);
+                if (!roadSide) continue;
+
+                this.surfaceParkingLots.push({
+                    x0: x,
+                    y0: y,
+                    orientation: "V",
+                    roadSide,
+                    asphaltMinX: x,
+                    asphaltMaxX: x + 2,
+                    asphaltMinY: y,
+                    asphaltMaxY: y + 3,
+                    stallCol: roadSide === "W" ? (x + 2) : x,
+                    aisleCol: roadSide === "W" ? (x + 1) : (x + 1)
+                });
+                mainlandLotsCount++;
+            }
+        }
+
+        // Populate stalls for all Off-Street Surface Parking Lots & mark their ground tiles as roadParkingNavIdx
+        for (let li = 0; li < this.surfaceParkingLots.length; li++) {
+            const lot = this.surfaceParkingLots[li];
+            for (let r = lot.asphaltMinY; r <= lot.asphaltMaxY; r++) {
+                for (let c = lot.asphaltMinX; c <= lot.asphaltMaxX; c++) {
+                    this.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = this.roadParkingNavIdx;
+                    this.surfaceGround[r * MAP_COLS + c] = GROUND_TYPE.ROAD;
+                }
+            }
+            const minPxX = lot.asphaltMinX * TILE_SIZE - 16;
+            const maxPxX = (lot.asphaltMaxX + 1) * TILE_SIZE + 16;
+            const minPxY = lot.asphaltMinY * TILE_SIZE - 16;
+            const maxPxY = (lot.asphaltMaxY + 1) * TILE_SIZE + 16;
+            if (Array.isArray(this.vicePalms)) {
+                this.vicePalms = this.vicePalms.filter((pm) => pm.x < minPxX || pm.x > maxPxX || pm.y < minPxY || pm.y > maxPxY);
+            }
+            if (Array.isArray(this.trees)) {
+                this.trees = this.trees.filter((tr) => tr.x < minPxX || tr.x > maxPxX || tr.y < minPxY || tr.y > maxPxY);
+            }
+
+            if (lot.orientation === "H") {
+                // 4x2 Courtyard Lot: 4 perpendicular (90°) stalls across x = asphaltMinX..asphaltMaxX on stallRow
+                const sr = lot.stallRow;
+                const backDirY = lot.wallSide === "N" ? -1 : 1;
+                const parkAng = lot.wallSide === "N" ? Math.PI * 0.5 : -Math.PI * 0.5;
+                for (let sc = lot.asphaltMinX; sc <= lot.asphaltMaxX; sc++) {
+                    const districtKey = classifyDistrict(sc, sr) || "SOBE_COLLINS_WASH";
+                    const px = (sc + 0.5) * TILE_SIZE;
+                    const py = (sr + 0.5) * TILE_SIZE + backDirY * 3.0;
+                    const surfZ = this.surfaceLayer[sr * MAP_COLS + sc] || 2.0;
+                    const slotIdx = sc - lot.asphaltMinX;
+                    // Leave 1 of the 4 perpendicular stalls open ([ P ]) so the painted spaces are unmistakable!
+                    const openSlot = ((li + 1) % 4);
+                    const spawnCar = (slotIdx !== openSlot) && isCleanCurbSpot(px, py, surfZ);
+                    const pool = districtSpecs[districtKey] || districtSpecs.SOBE_COLLINS_WASH;
+                    const hashIdx = (((sc * 73856093) ^ (sr * 19349663) ^ (li * 83492791)) >>> 0) % pool.length;
+                    const specKey = pool[hashIdx];
+
+                    if (spawnCar) {
+                        districtCounts[districtKey] = (districtCounts[districtKey] || 0) + 1;
+                    }
+                    bays.push({
+                        c: sc,
+                        r: sr,
+                        dc: 0,
+                        dr: -backDirY,
+                        x: px,
+                        y: py,
+                        z: surfZ,
+                        angle: parkAng,
+                        isLotParked: true,
+                        emptyStall: !spawnCar,
+                        wheelStopX: px,
+                        wheelStopY: (sr + 0.5) * TILE_SIZE + backDirY * 24.5,
+                        districtKey,
+                        specKey
+                    });
+                }
+            } else {
+                // 3x4 or 2x4 Vertical Surface Lot: 4 perpendicular (90°) stalls along y = asphaltMinY..asphaltMaxY on stallCol
                 const sc = lot.stallCol;
                 const backDirX = lot.roadSide === "W" ? 1 : -1;
                 const parkAng = lot.roadSide === "W" ? 0 : Math.PI;
                 for (let sr = lot.asphaltMinY; sr <= lot.asphaltMaxY; sr++) {
                     const districtKey = classifyDistrict(sc, sr) || "DOWNTOWN_CUBA";
-                    const px = (sc + 0.5) * TILE_SIZE + backDirX * 2.0;
+                    const px = (sc + 0.5) * TILE_SIZE + backDirX * 3.0;
                     const py = (sr + 0.5) * TILE_SIZE;
                     const surfZ = this.surfaceLayer[sr * MAP_COLS + sc] || 2.0;
-                    if (!isCleanCurbSpot(px, py, surfZ)) continue;
-
-                    // Leave 1 of the 4 stalls occasionally open for the player to pull into!
-                    const spawnCar = (((li * 5 + sr * 3) % 4) !== 2);
+                    const slotIdx = sr - lot.asphaltMinY;
+                    const openSlot = ((li + 2) % 4);
+                    const spawnCar = (slotIdx !== openSlot) && isCleanCurbSpot(px, py, surfZ);
                     const pool = districtSpecs[districtKey] || districtSpecs.DOWNTOWN_CUBA;
                     const hashIdx = (((sc * 73856093) ^ (sr * 19349663) ^ (li * 83492791)) >>> 0) % pool.length;
                     const specKey = pool[hashIdx];
 
-                    if (spawnCar && districtCounts[districtKey] < districtLimits[districtKey]) {
-                        districtCounts[districtKey]++;
+                    if (spawnCar) {
+                        districtCounts[districtKey] = (districtCounts[districtKey] || 0) + 1;
                     }
                     bays.push({
                         c: sc,
@@ -3657,7 +3888,7 @@ class LeonidaMap {
                         angle: parkAng,
                         isLotParked: true,
                         emptyStall: !spawnCar,
-                        wheelStopX: (sc + 0.5) * TILE_SIZE + backDirX * 23.5,
+                        wheelStopX: (sc + 0.5) * TILE_SIZE + backDirX * 24.5,
                         wheelStopY: py,
                         districtKey,
                         specKey
@@ -3666,113 +3897,138 @@ class LeonidaMap {
             }
         }
 
-        // 2) Populate Boulevard Asphalt Parking Shoulders & Recessed 2-Lane Asphalt Parking Lay-Bys
-        //    (100% on real dark asphalt lid=1 with z2=roadParkingNavIdx — NEVER on pedestrian sidewalks!)
-        for (let r = 44; r <= 480; r++) {
-            for (let c = 36; c <= 447; c++) {
-                if (this.isRestrictedNoTrafficZone && this.isRestrictedNoTrafficZone(c, r)) continue;
-                if (c >= 179 && c <= 197 && r >= 164 && r <= 180) continue; // Mambas Stadium
-                if (this.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] !== this.roadParkingNavIdx) continue;
-                const blk1 = this.getBlockInfo(c, r, 1);
-                if (!blk1 || blk1.lid !== 1) continue;
+        // =========================================================================
+        // 2) Build Dedicated Recessed Asphalt Curbside Parallel Parking Bays
+        //    along the wide boulevard esplanades (c = 52, 55, 284, 287, 424, 427, 434, 437, 444, 447)
+        // =========================================================================
+        const esplanadeCols = [52, 55, 284, 287, 424, 427, 434, 437, 444, 447];
+        for (let ci = 0; ci < esplanadeCols.length; ci++) {
+            const c = esplanadeCols[ci];
+            let r = 50;
+            while (r <= 372) {
+                const isEligibleRow = (ry) => {
+                    if (ry < 50 || ry > 372) return false;
+                    const maskVal = this.boulevardParkingEsplanadeMask
+                        ? this.boulevardParkingEsplanadeMask[ry * MAP_COLS + c]
+                        : 0;
+                    if (!maskVal) return false;
+                    const dc = maskVal === 1 ? 1 : -1;
+                    if (this.isStopLineBlock(c + dc, ry)) return false;
+                    const roadBlk = this.getBlockInfo(c + dc, ry, 1);
+                    if (!roadBlk || roadBlk.lid === 25) return false;
+                    const roadEdgeX = (c + (dc > 0 ? 1 : 0)) * TILE_SIZE;
+                    const stallX = roadEdgeX - dc * 18.0;
+                    const stallY = (ry + 0.5) * TILE_SIZE;
+                    return isCleanLotArea(stallX, stallY, this.surfaceLayer[ry * MAP_COLS + c] || 2.0);
+                };
 
-                const idx = r * MAP_COLS + c;
-                const surfZ = this.surfaceLayer[idx] || 2.0;
-                if (surfZ > 2) continue;
-
-                // Determine direction (dc, dr) toward the adjacent active driving lane from lidRotation:
-                // rot 0 = West shoulder (active lane on East: dc = +1)
-                // rot 2 = East shoulder (active lane on West: dc = -1)
-                // rot 1 = North shoulder (active lane on South: dr = +1)
-                // rot 3 = South shoulder (active lane on North: dr = -1)
-                const rot = blk1.lidRotation & 3;
-                const dc = (rot === 0) ? 1 : (rot === 2 ? -1 : 0);
-                const dr = (rot === 1) ? 1 : (rot === 3 ? -1 : 0);
-                const perpX = -dr;
-                const perpY = dc;
-
-                // Require the adjacent tile behind the concrete curb (c - dc, r - dr) to be a real PAWEMENT pedestrian sidewalk
-                const sidewalkGt = this.surfaceGround[(r - dr) * MAP_COLS + (c - dc)];
-                if (sidewalkGt !== GROUND_TYPE.PAWEMENT) continue;
-
-                // Never park on an intersection stop-line / crosswalk row (leave 1 full tile clearance at every corner!)
-                if (
-                    this.isStopLineBlock(c, r) ||
-                    this.getBlockInfo(c - perpX, r - perpY, 1)?.lid === 25 ||
-                    this.getBlockInfo(c + perpX, r + perpY, 1)?.lid === 25
-                ) {
+                if (!isEligibleRow(r)) {
+                    r++;
                     continue;
                 }
-
-                // Require at least 1 neighbor tile along the bay (+1 or -1) to also be part of the same asphalt parking bay
-                const prevIsBay = this.voxelGrid[(2 * MAP_ROWS + (r - perpY)) * MAP_COLS + (c - perpX)] === this.roadParkingNavIdx;
-                const nextIsBay = this.voxelGrid[(2 * MAP_ROWS + (r + perpY)) * MAP_COLS + (c + perpX)] === this.roadParkingNavIdx;
-                if (!prevIsBay && !nextIsBay) continue;
-
-                const districtKey = classifyDistrict(c, r);
-                if (!districtKey || districtCounts[districtKey] >= districtLimits[districtKey]) continue;
-
-                let stride = 4;
-                let minSpacing = 128;
-                if (districtKey === "OCEAN_DRIVE") {
-                    stride = 3;
-                    minSpacing = 118;
-                } else if (districtKey === "SOBE_COLLINS_WASH") {
-                    stride = 4;
-                    minSpacing = 124;
-                } else if (districtKey === "STAR_VENETIAN" || districtKey === "LEONIDA_KEYS") {
-                    stride = 2;
-                    minSpacing = 116;
+                const r0 = r;
+                while (r <= 372 && isEligibleRow(r)) {
+                    r++;
                 }
+                const r1 = r - 1;
+                const runLen = r1 - r0 + 1;
+                if (runLen < 2) continue;
 
-                const coordAlong = (dc !== 0) ? r : c;
-                const sideSalt = (dc > 0 || dr > 0) ? 0 : Math.floor(stride * 0.5);
-                if (prevIsBay && nextIsBay && ((coordAlong + sideSalt) % stride) !== 0) continue;
+                const maskVal = this.boulevardParkingEsplanadeMask[r0 * MAP_COLS + c];
+                const dc = maskVal === 1 ? 1 : -1;
+                const roadEdgeX = (c + (dc > 0 ? 1 : 0)) * TILE_SIZE;
+                const bayDepth = 36.0;
+                const surfZ = this.surfaceLayer[r0 * MAP_COLS + c] || 2.0;
 
-                // Park vehicle squarely inside the Asphalt Parking Shoulder / Lay-By (-5.5px toward the outer concrete curb),
-                // 100% on the dark asphalt bay, completely clear of the active driving lane AND 100% off the pedestrian sidewalk!
-                const px = (c + 0.5) * TILE_SIZE - dc * 5.5;
-                const py = (r + 0.5) * TILE_SIZE - dr * 5.5;
-                if (!isCleanCurbSpot(px, py, surfZ)) continue;
-
-                let tooClose = false;
-                for (let i = 0; i < bays.length; i++) {
-                    if (Math.hypot(bays[i].x - px, bays[i].y - py) < minSpacing) {
-                        tooClose = true;
-                        break;
-                    }
-                }
-                if (tooClose) continue;
-
-                const fallbackAng = (dc !== 0) ? (dc > 0 ? Math.PI * 0.5 : -Math.PI * 0.5) : (dr > 0 ? Math.PI : 0);
-                const parkAng = this.getAlignedRoadAngle(c + dc, r + dr, fallbackAng, surfZ);
-                const pool = districtSpecs[districtKey];
-                const hashIdx = (((c * 73856093) ^ (r * 19349663) ^ (districtCounts[districtKey] * 83492791)) >>> 0) % pool.length;
-                const specKey = pool[hashIdx];
-
-                const fwdX = Math.cos(parkAng);
-                const fwdY = Math.sin(parkAng);
-                // Place the 3D dual-head parking meter on the adjacent raised PAWEMENT sidewalk tile (c - dc, r - dr) just behind the curb!
-                const meterX = (c + 0.5) * TILE_SIZE - dc * 39.0 + fwdX * 18.0;
-                const meterY = (r + 0.5) * TILE_SIZE - dr * 39.0 + fwdY * 18.0;
-
-                districtCounts[districtKey]++;
-                bays.push({
+                this.curbParkingStrips.push({
                     c,
-                    r,
                     dc,
-                    dr,
-                    x: px,
-                    y: py,
-                    z: surfZ,
-                    angle: parkAng,
-                    meterX,
-                    meterY,
-                    districtKey,
-                    specKey
+                    r0,
+                    r1,
+                    roadEdgeX,
+                    yMin: r0 * TILE_SIZE + 2.0,
+                    yMax: (r1 + 1) * TILE_SIZE - 2.0,
+                    bayDepth,
+                    z: surfZ
                 });
+
+                const parkAng = dc > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+                const fwdY = Math.sin(parkAng);
+
+                for (let ry = r0; ry <= r1; ry++) {
+                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + c] = this.roadParkingNavIdx;
+                    const stallX = roadEdgeX - dc * 18.0;
+                    const stallY = (ry + 0.5) * TILE_SIZE;
+                    const districtKey = classifyDistrict(c, ry) || "DOWNTOWN_CUBA";
+                    const pool = districtSpecs[districtKey] || districtSpecs.DOWNTOWN_CUBA;
+                    const hashIdx = (((c * 73856093) ^ (ry * 19349663) ^ (runLen * 83492791)) >>> 0) % pool.length;
+                    const specKey = pool[hashIdx];
+
+                    // Alternate occupied vs. empty painted stalls ([CAR] [ P ] [CAR]) so empty painted spaces
+                    // are always visible right next to parked cars in every bay!
+                    const k = ry - r0;
+                    let wantEmpty = false;
+                    if (runLen === 2) {
+                        wantEmpty = (k === ((c & 1) ? 0 : 1));
+                    } else if (runLen === 3) {
+                        wantEmpty = (k === 1); // [CAR] [ P ] [CAR]
+                    } else {
+                        wantEmpty = (((k + (dc > 0 ? 1 : 0)) % 3) === 1);
+                    }
+
+                    const canSpawnCar = !wantEmpty &&
+                        isCleanCurbSpot(stallX, stallY, surfZ) &&
+                        (districtCounts[districtKey] < districtLimits[districtKey]);
+
+                    if (canSpawnCar) {
+                        districtCounts[districtKey]++;
+                    }
+
+                    // 3D dual-head parking meter on the raised pedestrian sidewalk just behind the bay's concrete curb
+                    const meterX = roadEdgeX - dc * (bayDepth + 6.5);
+                    const meterY = stallY + fwdY * 18.0;
+
+                    bays.push({
+                        c,
+                        r: ry,
+                        dc,
+                        dr: 0,
+                        x: stallX,
+                        y: stallY,
+                        z: surfZ,
+                        angle: parkAng,
+                        roadEdgeX,
+                        bayDepth,
+                        emptyStall: !canSpawnCar,
+                        meterX,
+                        meterY,
+                        districtKey,
+                        specKey
+                    });
+                }
             }
         }
+
+        // Rebuild floraGrid in case any courtyard trees were removed inside surfaceParkingLots
+        if (this.floraGrid instanceof Map && Array.isArray(this.vicePalms)) {
+            this.floraGrid.clear();
+            for (let pi = 0; pi < this.vicePalms.length; pi++) {
+                const item = this.vicePalms[pi];
+                if (!item) continue;
+                const k = item.kind;
+                if (k !== "palm_tree" && k !== "banyan_tree" && k !== "live_oak" && k !== "swamp_cypress" && k !== "slash_pine") continue;
+                const fbx = Math.floor(item.x / TILE_SIZE);
+                const fby = Math.floor(item.y / TILE_SIZE);
+                const fkey = (fby << 16) | (fbx & 0xffff);
+                let cell = this.floraGrid.get(fkey);
+                if (!cell) {
+                    cell = [];
+                    this.floraGrid.set(fkey, cell);
+                }
+                cell.push(item);
+            }
+        }
+
         return bays;
     }
 

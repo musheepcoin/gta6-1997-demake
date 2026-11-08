@@ -840,7 +840,7 @@ class RetroRenderer {
 
         // Dynamic vertex buffer for 3D SpriteBatch (9 floats per vertex: x, y_elev, z_south, u, v, r, g, b, a)
         this.spriteBuffer = gl.createBuffer();
-        this.maxSprites = 4096;
+        this.maxSprites = 12288;
         this.spriteVerts = new Float32Array(this.maxSprites * 6 * 9);
         this.spriteCount = 0;
     }
@@ -9357,18 +9357,81 @@ class RetroRenderer {
             }
         }
 
-        // 7C-ter. Off-Street Asphalt Surface Parking Lots (Tarmac Pad + 90° Stalls + 3D Wheel Stops) & Straight Boulevard Parallel Parking Boxes
+        // 7C-ter. Off-Street Asphalt Surface Parking Lots (Tarmac Pad + 90° Stalls + 3D Wheel Stops) & Recessed Boulevard Curbside Parking Bays
+        const parkLit = 1.0 - (nfGlobal || 0) * 0.42;
         if (this.map && Array.isArray(this.map.surfaceParkingLots)) {
             for (let li = 0; li < this.map.surfaceParkingLots.length; li++) {
                 const lot = this.map.surfaceParkingLots[li];
                 const cx = ((lot.asphaltMinX + lot.asphaltMaxX + 1) * 0.5) * TILE_SIZE;
                 const cy = ((lot.asphaltMinY + lot.asphaltMaxY + 1) * 0.5) * TILE_SIZE;
-                if (cx < minX - 180 || cx > maxX + 180 || cy < minY - 180 || cy > maxY + 180) continue;
-                const lotW = (lot.asphaltMaxX - lot.asphaltMinX + 1) * TILE_SIZE;
-                const lotH = (lot.asphaltMaxY - lot.asphaltMinY + 1) * TILE_SIZE;
-                // Concrete perimeter curb frame + dark asphalt surface parking lot tarmac pad
-                this.pushSolidQuad3D(cx, cy, 2.002, lotH + 6.0, lotW + 6.0, Math.PI * 0.5, 0.76, 0.73, 0.68, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(cx, cy, 2.004, lotH, lotW, Math.PI * 0.5, 0.19, 0.21, 0.25, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                if (cx < minX - 220 || cx > maxX + 220 || cy < minY - 220 || cy > maxY + 220) continue;
+                const lotW = (lot.asphaltMaxX - lot.asphaltMinX + 1) * TILE_SIZE - 4.0;
+                const lotH = (lot.asphaltMaxY - lot.asphaltMinY + 1) * TILE_SIZE - 4.0;
+                // 3D Concrete perimeter curb border + dark sealed-asphalt parking lot tarmac pad
+                this.pushSolidQuad3D(cx, cy, 2.010, lotW + 8.0, lotH + 8.0, 0, 0.80 * parkLit, 0.77 * parkLit, 0.71 * parkLit, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(cx, cy, 2.013, lotW, lotH, 0, 0.17 * parkLit, 0.19 * parkLit, 0.23 * parkLit, 0.99, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Painted white drive-aisle directional lane dashes
+                if (lot.orientation === "H" && lot.aisleRow !== undefined) {
+                    const ay = (lot.aisleRow + 0.5) * TILE_SIZE;
+                    this.pushSolidQuad3D(cx - 48.0, ay, 2.016, 28.0, 2.4, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(cx + 48.0, ay, 2.016, 28.0, 2.4, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                } else if (lot.aisleCol !== undefined) {
+                    const ax = (lot.aisleCol + 0.5) * TILE_SIZE;
+                    this.pushSolidQuad3D(ax, cy - 48.0, 2.016, 2.4, 28.0, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(ax, cy + 48.0, 2.016, 2.4, 28.0, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (this.map && Array.isArray(this.map.curbParkingStrips)) {
+            for (let si = 0; si < this.map.curbParkingStrips.length; si++) {
+                const st = this.map.curbParkingStrips[si];
+                const stripCy = (st.yMin + st.yMax) * 0.5;
+                const stripH = st.yMax - st.yMin;
+                const stripCx = st.roadEdgeX - st.dc * (st.bayDepth * 0.5);
+                if (stripCx < minX - 120 || stripCx > maxX + 120 || st.yMax < minY - 60 || st.yMin > maxY + 60) continue;
+                const sz = st.z || 2.0;
+                // Raised 3D concrete curb rim framing the sidewalk side and top/bottom ends of the recessed bay
+                this.pushSolidQuad3D(
+                    stripCx - st.dc * 2.0,
+                    stripCy,
+                    sz + 0.010,
+                    st.bayDepth + 4.0,
+                    stripH + 7.0,
+                    0,
+                    0.80 * parkLit,
+                    0.77 * parkLit,
+                    0.71 * parkLit,
+                    0.98,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                );
+                // Recessed dark sealed-asphalt curbside parking bay pad connecting seamlessly to roadEdgeX
+                this.pushSolidQuad3D(
+                    stripCx + st.dc * 1.0,
+                    stripCy,
+                    sz + 0.013,
+                    st.bayDepth + 2.0,
+                    stripH,
+                    0,
+                    0.17 * parkLit,
+                    0.19 * parkLit,
+                    0.23 * parkLit,
+                    0.99,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                );
+                // Curb-side longitudinal white guide line along the inner edge of the recessed parking bay
+                this.pushSolidQuad3D(
+                    st.roadEdgeX - st.dc * (st.bayDepth - 2.2),
+                    stripCy,
+                    sz + 0.016,
+                    2.2,
+                    stripH - 4.0,
+                    0,
+                    0.95 * parkLit,
+                    0.97 * parkLit,
+                    1.0 * parkLit,
+                    0.78,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                );
             }
         }
         if (this.map && Array.isArray(this.map.curbParkingBays)) {
@@ -9376,41 +9439,63 @@ class RetroRenderer {
             const meterShadowLen = sunShadowLen * 0.25;
             for (let bi = 0; bi < this.map.curbParkingBays.length; bi++) {
                 const bay = this.map.curbParkingBays[bi];
-                if (bay.x < minX || bay.x > maxX || bay.y < minY || bay.y > maxY) continue;
+                if (bay.x < minX - 48 || bay.x > maxX + 48 || bay.y < minY - 48 || bay.y > maxY + 48) continue;
                 const sz = bay.z || 2.0;
                 const ang = bay.angle || 0;
                 const ca = Math.cos(ang);
                 const sa = Math.sin(ang);
                 const crossAng = ang + Math.PI * 0.5;
+                const pw = 0.96 * parkLit;
+                const pg = 0.98 * parkLit;
+                const pb = 1.00 * parkLit;
 
                 if (bay.isLotParked) {
-                    // Dedicated Off-Street Asphalt Parking Lot 90° Perpendicular Stall Lines + 3D Concrete Wheel Stop Bumper
+                    // Dedicated Off-Street Asphalt Parking Lot 90° Perpendicular Stall Box + 3D Yellow Wheel Stop Bumper
                     const nx = -sa;
                     const ny = ca;
-                    const halfW = 31.0;
-                    this.pushSolidQuad3D(bay.x + nx * halfW, bay.y + ny * halfW, sz + 0.006, 54.0, 2.0, ang, 0.96, 0.97, 0.99, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(bay.x - nx * halfW, bay.y - ny * halfW, sz + 0.006, 54.0, 2.0, ang, 0.96, 0.97, 0.99, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const halfW = 30.5;
+                    // Left & right 90° perpendicular stall lines (56px deep x 2.8px wide)
+                    this.pushSolidQuad3D(bay.x + nx * halfW, bay.y + ny * halfW, sz + 0.018, 56.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bay.x - nx * halfW, bay.y - ny * halfW, sz + 0.018, 56.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Back-of-stall closure line behind the wheel stop
+                    this.pushSolidQuad3D(bay.x - ca * 27.5, bay.y - sa * 27.5, sz + 0.018, 62.0, 2.6, crossAng, pw, pg, pb, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Front T-corner entrance ticks facing the drive aisle
+                    this.pushSolidQuad3D(bay.x + ca * 27.5 + nx * (halfW - 4.5), bay.y + sa * 27.5 + ny * (halfW - 4.5), sz + 0.018, 10.0, 2.6, crossAng, pw, pg, pb, 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bay.x + ca * 27.5 - nx * (halfW - 4.5), bay.y + sa * 27.5 - ny * (halfW - 4.5), sz + 0.018, 10.0, 2.6, crossAng, pw, pg, pb, 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (bay.emptyStall) {
+                        // Painted white "P" stencil in the center of empty parking lot stalls
+                        this.pushSolidQuad3D(bay.x, bay.y, sz + 0.017, 16.0, 14.0, ang, pw, pg, pb, 0.22, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(bay.x - nx * 4.5, bay.y - ny * 4.5, sz + 0.019, 12.0, 2.4, ang, pw, pg, pb, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(bay.x + ca * 3.0, bay.y + sa * 3.0, sz + 0.019, 6.5, 8.5, ang, pw, pg, pb, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
                     if (bay.wheelStopX !== undefined && bay.wheelStopY !== undefined) {
-                        // 3D yellow/concrete wheel stop bumper ("butée de parking en béton") near the front of the stall
-                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.012, 36.0, 5.2, crossAng, 0.14, 0.18, 0.24, 0.65, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.032, 34.0, 4.0, crossAng, 0.95, 0.78, 0.18, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        // 3D yellow/concrete wheel stop bumper ("butée de parking en béton") near the back of the stall
+                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.020, 38.0, 5.8, crossAng, 0.08, 0.10, 0.14, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.026, 36.0, 4.4, crossAng, 0.96 * parkLit, 0.80 * parkLit, 0.16 * parkLit, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     }
                     continue;
                 }
 
-                const halfL = 27.5;
-                // Front & rear transverse white stall boundary lines painted directly on the Asphalt Parking Shoulder / Lay-By
+                // Recessed Curbside Parallel Parking Stall Box (60px x 32px) painted on the dark asphalt bay
+                const halfL = 29.5;
                 const fx = bay.x + ca * halfL;
                 const fy = bay.y + sa * halfL;
                 const rx = bay.x - ca * halfL;
                 const ry = bay.y - sa * halfL;
-                this.pushSolidQuad3D(fx, fy, sz + 0.006, 23.0, 1.8, crossAng, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(rx, ry, sz + 0.006, 23.0, 1.8, crossAng, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                // Longitudinal T-corner ticks on the street-side edge of the asphalt parking stall
-                const edgeX = bay.x + (bay.dc || 0) * 11.0;
-                const edgeY = bay.y + (bay.dr || 0) * 11.0;
-                this.pushSolidQuad3D(edgeX + ca * (halfL - 4.5), edgeY + sa * (halfL - 4.5), sz + 0.006, 9.5, 1.8, ang, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(edgeX - ca * (halfL - 4.5), edgeY - sa * (halfL - 4.5), sz + 0.006, 9.5, 1.8, ang, 0.95, 0.97, 0.99, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Bold front & rear transverse white stall divider lines (32px wide x 2.8px thick)
+                this.pushSolidQuad3D(fx, fy, sz + 0.018, 32.0, 2.8, crossAng, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(rx, ry, sz + 0.018, 32.0, 2.8, crossAng, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Street-side longitudinal white corner brackets & dashed bay-separation line
+                const edgeX = bay.x + (bay.dc || 0) * 15.0;
+                const edgeY = bay.y + (bay.dr || 0) * 15.0;
+                this.pushSolidQuad3D(edgeX + ca * (halfL - 7.0), edgeY + sa * (halfL - 7.0), sz + 0.018, 14.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(edgeX - ca * (halfL - 7.0), edgeY - sa * (halfL - 7.0), sz + 0.018, 14.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                if (bay.emptyStall) {
+                    // Painted white "[ P ]" stencil inside empty curbside parking spaces so players spot open spaces immediately!
+                    this.pushSolidQuad3D(bay.x, bay.y, sz + 0.017, 22.0, 14.0, ang, pw, pg, pb, 0.20, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bay.x - (bay.dc || 0) * 4.0, bay.y, sz + 0.019, 13.0, 2.4, ang, pw, pg, pb, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bay.x + ca * 3.0, bay.y + sa * 3.0, sz + 0.019, 6.5, 8.5, ang, pw, pg, pb, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
 
                 // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing (standing on the raised PAWEMENT sidewalk behind the curb!)
                 const mx = bay.meterX;
@@ -9422,10 +9507,10 @@ class RetroRenderer {
                         this.pushSolidQuad3D(shX, shY, sz + 0.016, meterShadowLen, 2.2, sunShadowAngle, 0.04, 0.06, 0.10, 0.28 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
                     }
                     // Cast-iron sidewalk base plate + galvanized steel pedestal + dual-head meter housing + LED indicator
-                    this.pushSolidQuad3D(mx, my, sz + 0.015, 3.8, 3.8, 0, 0.15, 0.20, 0.28, 0.95, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                    this.pushSolidQuad3D(mx, my, sz + 0.075, 2.3, 2.3, 0, 0.45, 0.52, 0.62, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                    this.pushSolidQuad3D(mx, my, sz + 0.145, 4.8, 3.1, ang, 0.22, 0.29, 0.39, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                    const isGreenLed = ((bi * 7) % 5) !== 0;
+                    this.pushSolidQuad3D(mx, my, sz + 0.015, 3.8, 3.8, 0, 0.15, 0.20, 0.28, 0.95, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(mx, my, sz + 0.075, 2.3, 2.3, 0, 0.45, 0.52, 0.62, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(mx, my, sz + 0.145, 4.8, 3.1, ang, 0.22, 0.29, 0.39, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    const isGreenLed = !bay.emptyStall ? (((bi * 7) % 5) !== 0) : true;
                     this.pushSolidQuad3D(
                         mx,
                         my,
@@ -9437,7 +9522,7 @@ class RetroRenderer {
                         isGreenLed ? 0.92 : 0.24,
                         isGreenLed ? 0.52 : 0.28,
                         0.98,
-                        SPRITE_DRAW_ORDER.PEDESTRIANS
+                        SPRITE_DRAW_ORDER.PEDESTRIAN
                     );
                 }
             }
