@@ -770,7 +770,7 @@ class RetroRenderer {
             }
         `;
 
-        // 1B. 3D SpriteBatch Shader: Renders .G24 vehicles, peds, props & shadows in 3D space with depth test
+        // 1B. 3D SpriteBatch Shader: Renders .G24 vehicles, peds, props, shadows & world-space procedural asphalt bays/markings
         const spriteVS = `
             attribute vec3 aPos;
             attribute vec2 aUV;
@@ -778,9 +778,11 @@ class RetroRenderer {
             uniform mat4 uViewProj;
             varying vec2 vUV;
             varying vec4 vColor;
+            varying vec3 vWorldPos;
             void main() {
                 vUV = aUV;
                 vColor = aColor;
+                vWorldPos = aPos;
                 gl_Position = uViewProj * vec4(aPos, 1.0);
             }
         `;
@@ -789,10 +791,118 @@ class RetroRenderer {
             precision mediump float;
             varying vec2 vUV;
             varying vec4 vColor;
+            varying vec3 vWorldPos;
             uniform sampler2D uTex;
+            uniform sampler2D uDayLightTex;
+            uniform float uNightTint;
+            uniform float uSunsetTint;
+            uniform vec2 uSunDir;
+
+            float sHash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+            }
+            float sNoise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(
+                    mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x),
+                    mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x),
+                    f.y
+                );
+            }
+            vec3 applyRoadLighting(vec3 col) {
+                float dayAmt = 1.0 - clamp(uNightTint * 1.4, 0.0, 1.0);
+                if (dayAmt > 0.01) {
+                    vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
+                    float bldAO = lm.g * 0.22;
+                    float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
+                    float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45));
+                    float totalShade = clamp(bldShadow * 0.82 + bldAO * 0.25, 0.0, 1.0);
+                    vec3 sunlitTint = vec3(1.11, 1.07, 0.98);
+                    vec3 shadowTint = vec3(0.58, 0.67, 0.85);
+                    vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
+                    vec3 sunlitRgb = clamp((col - 0.5) * (1.0 + 0.14 * (1.0 - totalShade)) + 0.5, 0.0, 1.0);
+                    sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading);
+                    col = mix(col, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
+                }
+                if (uSunsetTint > 0.01) {
+                    vec3 sunsetCol = col * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
+                    col = mix(col, min(vec3(1.0), sunsetCol), uSunsetTint * 0.65);
+                }
+                if (uNightTint > 0.01) {
+                    float nfAmt = clamp(uNightTint * 1.35, 0.0, 0.72);
+                    col = mix(col, col * vec3(0.68, 0.73, 0.90), nfAmt);
+                }
+                return col;
+            }
+
             void main() {
                 if (vUV.x < 0.0) {
-                    // Solid color quad (drop shadows, skidmarks, laser sights, bullets)
+                    // Mode A: Procedural Weathered Asphalt Parking Bay / Lot Pad (vUV.x in [-2.6 .. -1.4])
+                    if (vUV.x > -2.7 && vUV.x < -1.3) {
+                        float uBay = clamp(vUV.x + 2.5, 0.0, 1.0);
+                        float vBay = clamp(vUV.y, 0.0, 1.0);
+                        float modeFlag = vColor.r;
+                        float wPx = max(16.0, vColor.g);
+                        float hPx = max(16.0, vColor.b);
+
+                        vec2 wp = vWorldPos.xz;
+                        float big   = sNoise(wp * 0.52);
+                        float mid   = sNoise(wp * 2.15 + 7.3);
+                        float grain = sHash(floor(wp * 24.0));
+                        float fine  = sHash(floor(wp * 64.0));
+                        float tar   = smoothstep(0.66, 0.84, sNoise(wp * 1.35 + 19.1));
+                        float seam  = smoothstep(0.93, 0.985, sNoise(wp * 4.8 + vec2(mid * 1.4, big * 1.4)));
+                        // Base road asphalt formula identical to cityFS asphaltSurface()
+                        vec3 col = vec3(0.245, 0.258, 0.285);
+                        col += (big - 0.5) * 0.022 + (mid - 0.5) * 0.018;
+                        col += (grain - 0.5) * 0.028 + (fine - 0.5) * 0.018;
+                        col = mix(col, vec3(0.185, 0.196, 0.220), tar * 0.42);
+                        col = mix(col, vec3(0.150, 0.160, 0.180), seam * 0.35);
+
+                        float dSidePx = uBay * wPx;
+                        float dRoadPx = (1.0 - uBay) * wPx;
+                        float dEndPx  = min(vBay, 1.0 - vBay) * hPx;
+
+                        // Subtle recessed bay patina & tire-wear darkening inside the bay (fading to 0 at roadEdgeX so it merges 100% seamlessly with the street!)
+                        float bayInterior = (modeFlag > 0.5)
+                            ? (1.0 - smoothstep(6.5, 11.5, wPx - dSidePx))
+                            : 1.0;
+                        float oilMottle = sNoise(wp * 3.2 + vec2(13.7, 29.1));
+                        col *= mix(1.0, 0.91 - 0.06 * smoothstep(0.45, 0.82, oilMottle), bayInterior);
+
+                        // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter along the sidewalk edge (matching cityFS junctionCurb)
+                        float dCurbPx = (modeFlag > 0.5)
+                            ? ((dRoadPx > 7.8) ? min(dSidePx, dEndPx) : 99.0)
+                            : min(min(dSidePx, dRoadPx), dEndPx);
+                        if (dCurbPx < 2.2) {
+                            float cGrain = sHash(floor(wp * 18.0));
+                            col = mix(vec3(0.83, 0.80, 0.75), vec3(0.72, 0.69, 0.64), cGrain);
+                        } else if (dCurbPx < 3.3) {
+                            col = vec3(0.47, 0.45, 0.42);
+                        } else if (dCurbPx < 5.2) {
+                            float gMix = (dCurbPx - 3.3) / 1.9;
+                            col = mix(vec3(0.16, 0.18, 0.20), col, gMix);
+                        }
+
+                        col = applyRoadLighting(col);
+                        gl_FragColor = vec4(col, vColor.a);
+                        return;
+                    }
+                    // Mode B: Procedural Worn, Chipped & Shadowed Road Paint / Oil Stain (vUV.x <= -2.8)
+                    if (vUV.x <= -2.8) {
+                        vec2 wp = vWorldPos.xz;
+                        float wear = 0.52 + 0.48 * sNoise(wp * 6.8 + 31.4);
+                        float chip = step(0.68, sHash(floor(wp * 42.0))) * 0.36;
+                        float alpha = vColor.a * clamp(wear - chip, 0.18, 1.0);
+                        if (alpha < 0.03) discard;
+                        vec3 col = vColor.rgb + (sHash(floor(wp * 32.0)) - 0.5) * 0.035;
+                        col = applyRoadLighting(clamp(col, 0.0, 1.0));
+                        gl_FragColor = vec4(col, alpha);
+                        return;
+                    }
+                    // Standard solid color quad (drop shadows, skidmarks, laser sights, bullets)
                     gl_FragColor = vColor;
                     return;
                 }
@@ -835,7 +945,11 @@ class RetroRenderer {
             aUV: gl.getAttribLocation(this.spriteProg, "aUV"),
             aColor: gl.getAttribLocation(this.spriteProg, "aColor"),
             uViewProj: gl.getUniformLocation(this.spriteProg, "uViewProj"),
-            uTex: gl.getUniformLocation(this.spriteProg, "uTex")
+            uTex: gl.getUniformLocation(this.spriteProg, "uTex"),
+            uDayLightTex: gl.getUniformLocation(this.spriteProg, "uDayLightTex"),
+            uNightTint: gl.getUniformLocation(this.spriteProg, "uNightTint"),
+            uSunsetTint: gl.getUniformLocation(this.spriteProg, "uSunsetTint"),
+            uSunDir: gl.getUniformLocation(this.spriteProg, "uSunDir")
         };
 
         // Dynamic vertex buffer for 3D SpriteBatch (9 floats per vertex: x, y_elev, z_south, u, v, r, g, b, a)
@@ -5783,6 +5897,17 @@ class RetroRenderer {
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -1.0, -1.0, -1.0, -1.0, r, g, b, a, drawOrder);
     }
 
+    pushAsphaltBayQuad3D(xPx, yPx, zBlocks, wPx, hPx, isCurbBay = true, dc = 1, drawOrder = 1) {
+        const u0 = (isCurbBay && dc < 0) ? -1.5 : -2.5;
+        const u1 = (isCurbBay && dc < 0) ? -2.5 : -1.5;
+        const modeFlag = isCurbBay ? 1.0 : 0.25;
+        this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, 0, u0, 0.0, u1, 1.0, modeFlag, wPx, hPx, 1.0, drawOrder);
+    }
+
+    pushWornPaintQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, r, g, b, a, drawOrder = 1) {
+        this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -3.0, -3.0, -3.0, -3.0, r, g, b, a, drawOrder);
+    }
+
     /* ========================================================================
        SpriteBatch::SortSprites (SpriteBatch.cpp:201-213)
        Sorts by (mHeight, mDrawOrder) using quantized layer bucket + eSpriteDrawOrder
@@ -5846,17 +5971,33 @@ class RetroRenderer {
         this.spriteCount = count;
     }
 
-    flushSpriteBatch(viewProj) {
+    flushSpriteBatch(viewProj, nf = 0.0, sf = 0.0, sunDirX = 0.0, sunDirY = 1.0) {
         const gl = this.gl;
         this.sortAndBuildSpriteBatch();
         if (!gl || this.spriteCount === 0 || !this.spritesTex) return;
 
         gl.useProgram(this.spriteProg);
         gl.uniformMatrix4fv(this.spriteLocs.uViewProj, false, viewProj);
+        if (this.spriteLocs.uNightTint !== null && this.spriteLocs.uNightTint !== undefined) {
+            gl.uniform1f(this.spriteLocs.uNightTint, nf);
+        }
+        if (this.spriteLocs.uSunsetTint !== null && this.spriteLocs.uSunsetTint !== undefined) {
+            gl.uniform1f(this.spriteLocs.uSunsetTint, sf);
+        }
+        if (this.spriteLocs.uSunDir !== null && this.spriteLocs.uSunDir !== undefined) {
+            gl.uniform2f(this.spriteLocs.uSunDir, sunDirX, sunDirY);
+        }
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.spritesTex);
         gl.uniform1i(this.spriteLocs.uTex, 0);
+
+        if (this.dayLightTex && this.spriteLocs.uDayLightTex !== null && this.spriteLocs.uDayLightTex !== undefined) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this.dayLightTex);
+            gl.uniform1i(this.spriteLocs.uDayLightTex, 1);
+            gl.activeTexture(gl.TEXTURE0);
+        }
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.spriteBuffer);
         gl.bufferData(
@@ -6193,13 +6334,15 @@ class RetroRenderer {
         if (this.cityLocs.uTime) {
             gl.uniform1f(this.cityLocs.uTime, this.time);
         }
+        const clockHr = (game && typeof game.worldMinutes === "number")
+            ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
+            : 12.0;
+        // Sun moves from East (+X) at 06:00 -> South (+Z) at 12:00 -> West (-X) at 18:00
+        const sunAz = ((clockHr - 6.0) / 12.0) * Math.PI;
+        const sunDirX = Math.cos(sunAz);
+        const sunDirY = Math.max(0.25, Math.sin(sunAz));
         if (this.cityLocs.uSunDir) {
-            const clockHr = (game && typeof game.worldMinutes === "number")
-                ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
-                : 12.0;
-            // Sun moves from East (+X) at 06:00 -> South (+Z) at 12:00 -> West (-X) at 18:00
-            const sunAz = ((clockHr - 6.0) / 12.0) * Math.PI;
-            gl.uniform2f(this.cityLocs.uSunDir, Math.cos(sunAz), Math.max(0.25, Math.sin(sunAz)));
+            gl.uniform2f(this.cityLocs.uSunDir, sunDirX, sunDirY);
         }
         gl.uniform1f(this.cityLocs.uViceStyle, this.mapStyle === "VICE" ? 1.0 : 0.0);
 
@@ -6264,7 +6407,7 @@ class RetroRenderer {
 
         this.beginSpriteBatch();
         this.batchWorldSprites3D(game, minPxX, minPxY, maxPxX, maxPxY);
-        this.flushSpriteBatch(viewProj);
+        this.flushSpriteBatch(viewProj, nf, sf, sunDirX, sunDirY);
         this._lastViewProj = viewProj;
     }
 
@@ -9357,8 +9500,7 @@ class RetroRenderer {
             }
         }
 
-        // 7C-ter. Off-Street Asphalt Surface Parking Lots (Tarmac Pad + 90° Stalls + 3D Wheel Stops) & Recessed Boulevard Curbside Parking Bays
-        const parkLit = 1.0 - (nfGlobal || 0) * 0.42;
+        // 7C-ter. Off-Street Asphalt Surface Parking Lots & Recessed Boulevard Curbside Parking Bays (World-Space Procedural Asphalt + Worn Paint)
         if (this.map && Array.isArray(this.map.surfaceParkingLots)) {
             for (let li = 0; li < this.map.surfaceParkingLots.length; li++) {
                 const lot = this.map.surfaceParkingLots[li];
@@ -9367,18 +9509,17 @@ class RetroRenderer {
                 if (cx < minX - 220 || cx > maxX + 220 || cy < minY - 220 || cy > maxY + 220) continue;
                 const lotW = (lot.asphaltMaxX - lot.asphaltMinX + 1) * TILE_SIZE - 4.0;
                 const lotH = (lot.asphaltMaxY - lot.asphaltMinY + 1) * TILE_SIZE - 4.0;
-                // 3D Concrete perimeter curb border + dark sealed-asphalt parking lot tarmac pad
-                this.pushSolidQuad3D(cx, cy, 2.010, lotW + 8.0, lotH + 8.0, 0, 0.80 * parkLit, 0.77 * parkLit, 0.71 * parkLit, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(cx, cy, 2.013, lotW, lotH, 0, 0.17 * parkLit, 0.19 * parkLit, 0.23 * parkLit, 0.99, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                // Painted white drive-aisle directional lane dashes
+                // Procedural world-space asphalt pad with 3D stone curb border & building cast shadows (uDayLightTex)
+                this.pushAsphaltBayQuad3D(cx, cy, 2.012, lotW + 6.0, lotH + 6.0, false, 1, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Subtle worn drive-aisle directional lane dashes
                 if (lot.orientation === "H" && lot.aisleRow !== undefined) {
                     const ay = (lot.aisleRow + 0.5) * TILE_SIZE;
-                    this.pushSolidQuad3D(cx - 48.0, ay, 2.016, 28.0, 2.4, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(cx + 48.0, ay, 2.016, 28.0, 2.4, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushWornPaintQuad3D(cx - 48.0, ay, 2.015, 22.0, 1.5, 0, 0.78, 0.76, 0.72, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushWornPaintQuad3D(cx + 48.0, ay, 2.015, 22.0, 1.5, 0, 0.78, 0.76, 0.72, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 } else if (lot.aisleCol !== undefined) {
                     const ax = (lot.aisleCol + 0.5) * TILE_SIZE;
-                    this.pushSolidQuad3D(ax, cy - 48.0, 2.016, 2.4, 28.0, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(ax, cy + 48.0, 2.016, 2.4, 28.0, 0, 0.92 * parkLit, 0.95 * parkLit, 0.98 * parkLit, 0.70, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushWornPaintQuad3D(ax, cy - 48.0, 2.015, 1.5, 22.0, 0, 0.78, 0.76, 0.72, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushWornPaintQuad3D(ax, cy + 48.0, 2.015, 1.5, 22.0, 0, 0.78, 0.76, 0.72, 0.34, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
             }
         }
@@ -9387,49 +9528,19 @@ class RetroRenderer {
                 const st = this.map.curbParkingStrips[si];
                 const stripCy = (st.yMin + st.yMax) * 0.5;
                 const stripH = st.yMax - st.yMin;
-                const stripCx = st.roadEdgeX - st.dc * (st.bayDepth * 0.5);
-                if (stripCx < minX - 120 || stripCx > maxX + 120 || st.yMax < minY - 60 || st.yMin > maxY + 60) continue;
+                // Extend 8px across roadEdgeX so the recessed asphalt bay covers the road's yellow curb line and merges 100% seamlessly into the street
+                const padW = st.bayDepth + 8.0;
+                const padCx = st.roadEdgeX - st.dc * ((st.bayDepth - 8.0) * 0.5);
+                if (padCx < minX - 120 || padCx > maxX + 120 || st.yMax < minY - 60 || st.yMin > maxY + 60) continue;
                 const sz = st.z || 2.0;
-                // Raised 3D concrete curb rim framing the sidewalk side and top/bottom ends of the recessed bay
-                this.pushSolidQuad3D(
-                    stripCx - st.dc * 2.0,
+                this.pushAsphaltBayQuad3D(
+                    padCx,
                     stripCy,
-                    sz + 0.010,
-                    st.bayDepth + 4.0,
-                    stripH + 7.0,
-                    0,
-                    0.80 * parkLit,
-                    0.77 * parkLit,
-                    0.71 * parkLit,
-                    0.98,
-                    SPRITE_DRAW_ORDER.TIRE_MARKS
-                );
-                // Recessed dark sealed-asphalt curbside parking bay pad connecting seamlessly to roadEdgeX
-                this.pushSolidQuad3D(
-                    stripCx + st.dc * 1.0,
-                    stripCy,
-                    sz + 0.013,
-                    st.bayDepth + 2.0,
-                    stripH,
-                    0,
-                    0.17 * parkLit,
-                    0.19 * parkLit,
-                    0.23 * parkLit,
-                    0.99,
-                    SPRITE_DRAW_ORDER.TIRE_MARKS
-                );
-                // Curb-side longitudinal white guide line along the inner edge of the recessed parking bay
-                this.pushSolidQuad3D(
-                    st.roadEdgeX - st.dc * (st.bayDepth - 2.2),
-                    stripCy,
-                    sz + 0.016,
-                    2.2,
-                    stripH - 4.0,
-                    0,
-                    0.95 * parkLit,
-                    0.97 * parkLit,
-                    1.0 * parkLit,
-                    0.78,
+                    sz + 0.012,
+                    padW,
+                    stripH + 4.0,
+                    true,
+                    st.dc,
                     SPRITE_DRAW_ORDER.TIRE_MARKS
                 );
             }
@@ -9439,89 +9550,87 @@ class RetroRenderer {
             const meterShadowLen = sunShadowLen * 0.25;
             for (let bi = 0; bi < this.map.curbParkingBays.length; bi++) {
                 const bay = this.map.curbParkingBays[bi];
-                if (bay.x < minX - 48 || bay.x > maxX + 48 || bay.y < minY - 48 || bay.y > maxY + 48) continue;
+                const scx = bay.stallCenterX !== undefined ? bay.stallCenterX : bay.x;
+                const scy = bay.stallCenterY !== undefined ? bay.stallCenterY : bay.y;
+                if (scx < minX - 56 || scx > maxX + 56 || scy < minY - 56 || scy > maxY + 56) continue;
                 const sz = bay.z || 2.0;
-                const ang = bay.angle || 0;
-                const ca = Math.cos(ang);
-                const sa = Math.sin(ang);
-                const crossAng = ang + Math.PI * 0.5;
-                const pw = 0.96 * parkLit;
-                const pg = 0.98 * parkLit;
-                const pb = 1.00 * parkLit;
+                const stallAng = bay.dc ? (bay.dc > 0 ? Math.PI * 0.5 : -Math.PI * 0.5) : (bay.angle || 0);
+                const ca = Math.cos(stallAng);
+                const sa = Math.sin(stallAng);
+                const crossAng = stallAng + Math.PI * 0.5;
+                // Sun-faded, weathered road paint color + per-stall wear variance (shaded dynamically by applyRoadLighting in spriteFS)
+                const pw = 0.78;
+                const pg = 0.77;
+                const pb = 0.72;
+                const wearAlpha = 0.34 + ((bi * 17) % 5) * 0.028;
+
+                // Subtle dark engine-oil / tire-drip stain in the middle of each stall
+                const oilOff = (((bi * 13) % 5) - 2) * 1.4;
+                this.pushWornPaintQuad3D(
+                    scx + ca * oilOff,
+                    scy + sa * oilOff,
+                    sz + 0.015,
+                    18.0,
+                    9.5,
+                    stallAng,
+                    0.11,
+                    0.12,
+                    0.14,
+                    0.26,
+                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                );
 
                 if (bay.isLotParked) {
-                    // Dedicated Off-Street Asphalt Parking Lot 90° Perpendicular Stall Box + 3D Yellow Wheel Stop Bumper
+                    // Off-Street Asphalt Parking Lot 90° Perpendicular Stall Lines (thin, worn, weathered) + Concrete Wheel Stop
                     const nx = -sa;
                     const ny = ca;
                     const halfW = 30.5;
-                    // Left & right 90° perpendicular stall lines (56px deep x 2.8px wide)
-                    this.pushSolidQuad3D(bay.x + nx * halfW, bay.y + ny * halfW, sz + 0.018, 56.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(bay.x - nx * halfW, bay.y - ny * halfW, sz + 0.018, 56.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    // Back-of-stall closure line behind the wheel stop
-                    this.pushSolidQuad3D(bay.x - ca * 27.5, bay.y - sa * 27.5, sz + 0.018, 62.0, 2.6, crossAng, pw, pg, pb, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    // Front T-corner entrance ticks facing the drive aisle
-                    this.pushSolidQuad3D(bay.x + ca * 27.5 + nx * (halfW - 4.5), bay.y + sa * 27.5 + ny * (halfW - 4.5), sz + 0.018, 10.0, 2.6, crossAng, pw, pg, pb, 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(bay.x + ca * 27.5 - nx * (halfW - 4.5), bay.y + sa * 27.5 - ny * (halfW - 4.5), sz + 0.018, 10.0, 2.6, crossAng, pw, pg, pb, 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    if (bay.emptyStall) {
-                        // Painted white "P" stencil in the center of empty parking lot stalls
-                        this.pushSolidQuad3D(bay.x, bay.y, sz + 0.017, 16.0, 14.0, ang, pw, pg, pb, 0.22, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushSolidQuad3D(bay.x - nx * 4.5, bay.y - ny * 4.5, sz + 0.019, 12.0, 2.4, ang, pw, pg, pb, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushSolidQuad3D(bay.x + ca * 3.0, bay.y + sa * 3.0, sz + 0.019, 6.5, 8.5, ang, pw, pg, pb, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    }
+                    this.pushWornPaintQuad3D(scx + nx * halfW, scy + ny * halfW, sz + 0.016, 46.0, 1.5, stallAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushWornPaintQuad3D(scx - nx * halfW, scy - ny * halfW, sz + 0.016, 46.0, 1.5, stallAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     if (bay.wheelStopX !== undefined && bay.wheelStopY !== undefined) {
-                        // 3D yellow/concrete wheel stop bumper ("butée de parking en béton") near the back of the stall
-                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.020, 38.0, 5.8, crossAng, 0.08, 0.10, 0.14, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushSolidQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.026, 36.0, 4.4, crossAng, 0.96 * parkLit, 0.80 * parkLit, 0.16 * parkLit, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushWornPaintQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.018, 34.0, 4.4, crossAng, 0.10, 0.12, 0.15, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushWornPaintQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.022, 32.0, 3.2, crossAng, 0.72, 0.67, 0.48, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     }
                     continue;
                 }
 
-                // Recessed Curbside Parallel Parking Stall Box (60px x 32px) painted on the dark asphalt bay
+                // Discreet, worn Miami curbside parallel parking T-ticks / L-corner marks (thin 1.5px, subtle opacity, zero [P] stencils!)
                 const halfL = 29.5;
-                const fx = bay.x + ca * halfL;
-                const fy = bay.y + sa * halfL;
-                const rx = bay.x - ca * halfL;
-                const ry = bay.y - sa * halfL;
-                // Bold front & rear transverse white stall divider lines (32px wide x 2.8px thick)
-                this.pushSolidQuad3D(fx, fy, sz + 0.018, 32.0, 2.8, crossAng, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(rx, ry, sz + 0.018, 32.0, 2.8, crossAng, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                // Street-side longitudinal white corner brackets & dashed bay-separation line
-                const edgeX = bay.x + (bay.dc || 0) * 15.0;
-                const edgeY = bay.y + (bay.dr || 0) * 15.0;
-                this.pushSolidQuad3D(edgeX + ca * (halfL - 7.0), edgeY + sa * (halfL - 7.0), sz + 0.018, 14.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(edgeX - ca * (halfL - 7.0), edgeY - sa * (halfL - 7.0), sz + 0.018, 14.0, 2.8, ang, pw, pg, pb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                if (bay.emptyStall) {
-                    // Painted white "[ P ]" stencil inside empty curbside parking spaces so players spot open spaces immediately!
-                    this.pushSolidQuad3D(bay.x, bay.y, sz + 0.017, 22.0, 14.0, ang, pw, pg, pb, 0.20, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(bay.x - (bay.dc || 0) * 4.0, bay.y, sz + 0.019, 13.0, 2.4, ang, pw, pg, pb, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(bay.x + ca * 3.0, bay.y + sa * 3.0, sz + 0.019, 6.5, 8.5, ang, pw, pg, pb, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                }
+                const tickCenterX = scx + (bay.dc || 0) * 8.5;
+                const tickCenterY = scy + (bay.dr || 0) * 8.5;
+                this.pushWornPaintQuad3D(tickCenterX + ca * halfL, tickCenterY + sa * halfL, sz + 0.016, 13.0, 1.5, crossAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushWornPaintQuad3D(tickCenterX - ca * halfL, tickCenterY - sa * halfL, sz + 0.016, 13.0, 1.5, crossAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
-                // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing (standing on the raised PAWEMENT sidewalk behind the curb!)
+                // Short longitudinal L-corner ticks along the lane edge
+                const edgeX = scx + (bay.dc || 0) * 14.5;
+                const edgeY = scy + (bay.dr || 0) * 14.5;
+                this.pushWornPaintQuad3D(edgeX + ca * (halfL - 4.5), edgeY + sa * (halfL - 4.5), sz + 0.016, 9.0, 1.5, stallAng, pw, pg, pb, wearAlpha * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushWornPaintQuad3D(edgeX - ca * (halfL - 4.5), edgeY - sa * (halfL - 4.5), sz + 0.016, 9.0, 1.5, stallAng, pw, pg, pb, wearAlpha * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing (only 1 dual-head meter per 2 stalls!)
                 const mx = bay.meterX;
                 const my = bay.meterY;
-                if (mx !== undefined && my !== undefined) {
+                if (bay.hasMeter !== false && mx !== undefined && my !== undefined) {
                     if (nf < 0.85) {
                         const shX = mx + Math.cos(sunShadowAngle) * (meterShadowLen * 0.5);
                         const shY = my + Math.sin(sunShadowAngle) * (meterShadowLen * 0.5);
-                        this.pushSolidQuad3D(shX, shY, sz + 0.016, meterShadowLen, 2.2, sunShadowAngle, 0.04, 0.06, 0.10, 0.28 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(shX, shY, sz + 0.016, meterShadowLen, 2.0, sunShadowAngle, 0.04, 0.06, 0.10, 0.25 * (1.0 - nf * 0.8), SPRITE_DRAW_ORDER.TIRE_MARKS);
                     }
-                    // Cast-iron sidewalk base plate + galvanized steel pedestal + dual-head meter housing + LED indicator
-                    this.pushSolidQuad3D(mx, my, sz + 0.015, 3.8, 3.8, 0, 0.15, 0.20, 0.28, 0.95, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(mx, my, sz + 0.075, 2.3, 2.3, 0, 0.45, 0.52, 0.62, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(mx, my, sz + 0.145, 4.8, 3.1, ang, 0.22, 0.29, 0.39, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(mx, my, sz + 0.015, 3.4, 3.4, 0, 0.15, 0.20, 0.28, 0.92, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(mx, my, sz + 0.075, 2.1, 2.1, 0, 0.42, 0.49, 0.58, 0.95, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(mx, my, sz + 0.140, 4.2, 2.8, stallAng, 0.22, 0.28, 0.36, 0.95, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     const isGreenLed = !bay.emptyStall ? (((bi * 7) % 5) !== 0) : true;
                     this.pushSolidQuad3D(
                         mx,
                         my,
-                        sz + 0.162,
-                        2.3,
-                        1.5,
-                        ang,
-                        isGreenLed ? 0.16 : 0.96,
-                        isGreenLed ? 0.92 : 0.24,
-                        isGreenLed ? 0.52 : 0.28,
-                        0.98,
+                        sz + 0.156,
+                        2.0,
+                        1.3,
+                        stallAng,
+                        isGreenLed ? 0.16 : 0.88,
+                        isGreenLed ? 0.84 : 0.24,
+                        isGreenLed ? 0.48 : 0.28,
+                        0.90,
                         SPRITE_DRAW_ORDER.PEDESTRIAN
                     );
                 }
