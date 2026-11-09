@@ -800,6 +800,53 @@ class WorldObjectEngine {
             { name: "WYNWOOD PIXEL & PINBALL LOUNGE",         x: 198.5 * TILE_SIZE, y: 146.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "VICE PIER BOARDWALK ARCADE STAND",       x: 462.5 * TILE_SIZE, y: 204.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 38. Official GTA 6 West Coast Golden Sunset Beach Tiki Pavilions & Gulf Pier Manatee / Tarpon Feeding Decks (Loop 31 — West Coast Void)
+        this.gulfSunsetTikiClubs = [
+            { name: "NORTH GOLDEN BEACH SUNSET TIKI CLUB",    x: 48.5 * TILE_SIZE,  y: 78.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "GELLHORN BAY TROPICAL TIKI PAVILION",    x: 48.5 * TILE_SIZE,  y: 124.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WEST COAST CORAL REEF TIKI DECK",        x: 48.5 * TILE_SIZE,  y: 262.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH GULF SUNSET TIKI LOUNGE",          x: 48.5 * TILE_SIZE,  y: 334.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.gulfManateePiers = [
+            { name: "CLEARWATER BAY MANATEE SANCTUARY PIER",  x: 36.5 * TILE_SIZE,  y: 92.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "GELLHORN COVE TARPON & MANATEE DOCK",    x: 36.5 * TILE_SIZE,  y: 248.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CAPE ROMANO WEST GULF ECO-PIER",         x: 38.5 * TILE_SIZE,  y: 356.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 39. Official GTA 6 Redhill / North-Central Citrus Groves & Gator-wrestling Rodeo Arenas (Loop 32 — North-Central & Heartland Void)
+        this.citrusOrchardStands = [
+            { name: "REDHILL SUNSHINE CITRUS & HONEY MILL",   x: 242.5 * TILE_SIZE, y: 54.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "NORTH AMBROSIA ORANGE GROVE STAND",      x: 176.5 * TILE_SIZE, y: 82.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "HEARTLAND CANE & CITRUS FARMERS MARKET", x: 196.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "HOMESTEAD TROPICAL GROVE JUICE STAND",   x: 214.5 * TILE_SIZE, y: 342.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.gatorWrestlingRodeos = [
+            { name: "LAKE LEONIDA GATOR-WRESTLING RODEO PIT", x: 162.5 * TILE_SIZE, y: 212.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "REDHILL BACKWOODS REPTILE RODEO RING",   x: 218.5 * TILE_SIZE, y: 58.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "SOUTH HEARTLAND SWAMP RODEO ARENA",      x: 168.5 * TILE_SIZE, y: 354.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 40. Official GTA 6 North Biscayne / Venetian Floating Aqua-Cabana Clubs & Stiltsville Smuggler Stilt-Lodge Bars (Loop 33 — Lagoon & East Bay Void)
+        this.lagoonFloatingCabanas = [
+            { name: "NORTH BISCAYNE FLOATING DAYCLUB",        x: 342.5 * TILE_SIZE, y: 84.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "JULIA TUTTLE LAGOON AQUA-LOUNGE",        x: 398.5 * TILE_SIZE, y: 92.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "SOUTH BAY EMERALD FLOATING OASIS",       x: 328.5 * TILE_SIZE, y: 274.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CORAL GABLES WATERWAY FLOATING BAR",     x: 274.5 * TILE_SIZE, y: 358.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.stiltsvilleOutposts = [
+            { name: "STILTSVILLE BISCAYNE RUM-RUNNER LODGE",  x: 376.5 * TILE_SIZE, y: 386.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOLDIER KEY OFFSHORE STILT HIDEAWAY",    x: 416.5 * TILE_SIZE, y: 418.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "ELLIOTT KEY REEF STILT SPEAKEASY",       x: 348.5 * TILE_SIZE, y: 446.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 41. Official GTA 6 VCIA South Cargo Hangar Auctions & Coral Gables Botanical Orchid Conservatories (Loop 34 — South Mainland & Suburbs Void)
+        this.hangarBlackMarkets = [
+            { name: "VCIA SOUTH TARMAC BLACK-MARKET AUCTION", x: 118.5 * TILE_SIZE, y: 368.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WEST CARGO APRON EXOTIC CRATE VAULT",    x: 68.5 * TILE_SIZE,  y: 348.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "EAST RUNWAY SMUGGLER HANGAR AUCTION",    x: 168.5 * TILE_SIZE, y: 318.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.botanicalGlasshouses = [
+            { name: "CORAL GABLES ROYAL ORCHID CONSERVATORY", x: 248.5 * TILE_SIZE, y: 318.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "NORTH SHORES TROPICAL PALM ARBORETUM",   x: 388.5 * TILE_SIZE, y: 54.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "BAYFRONT PARK BUTTERFLY GLASSHOUSE",     x: 236.5 * TILE_SIZE, y: 68.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1513,6 +1560,60 @@ class WorldObjectEngine {
                 for (const na of this.neonArcadePavilions) {
                     snapOffRoad(na);
                     clearZones.push({ x: na.x, y: na.y, r: 38 });
+                }
+            }
+            if (Array.isArray(this.gulfSunsetTikiClubs)) {
+                for (const gt of this.gulfSunsetTikiClubs) {
+                    snapOffRoad(gt);
+                    clearZones.push({ x: gt.x, y: gt.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.gulfManateePiers)) {
+                for (const mp of this.gulfManateePiers) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(mp.x, mp.y, 18);
+                        if (sn) { mp.x = sn.x; mp.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.citrusOrchardStands)) {
+                for (const co of this.citrusOrchardStands) {
+                    snapOffRoad(co);
+                    clearZones.push({ x: co.x, y: co.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.gatorWrestlingRodeos)) {
+                for (const gr of this.gatorWrestlingRodeos) {
+                    snapOffRoad(gr);
+                    clearZones.push({ x: gr.x, y: gr.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.lagoonFloatingCabanas)) {
+                for (const lc of this.lagoonFloatingCabanas) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(lc.x, lc.y, 18);
+                        if (sn) { lc.x = sn.x; lc.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.stiltsvilleOutposts)) {
+                for (const so of this.stiltsvilleOutposts) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(so.x, so.y, 18);
+                        if (sn) { so.x = sn.x; so.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.hangarBlackMarkets)) {
+                for (const hb of this.hangarBlackMarkets) {
+                    snapOffRoad(hb);
+                    clearZones.push({ x: hb.x, y: hb.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.botanicalGlasshouses)) {
+                for (const bg of this.botanicalGlasshouses) {
+                    snapOffRoad(bg);
+                    clearZones.push({ x: bg.x, y: bg.y, r: 46 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -4449,6 +4550,304 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P30. Official GTA 6 West Coast Golden Sunset Beach Tiki Clubs & Gulf Manatee Sanctuary Piers ([E], Loop 31)
+        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+            for (const gt of this.gulfSunsetTikiClubs) {
+                if ((gt.cooldown || 0) <= 0 && Math.hypot(px - gt.x, py - gt.y) < 70) {
+                    gt.cooldown = 26.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🍹 GULF SUNSET TIKI BEACH PARTY!`,
+                            `${gt.name} • 150 HP/ARMOR + 0★ WANTED & +$6,500!`,
+                            "#fb923c",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gt.x,
+                            y: gt.y,
+                            z: 2.70,
+                            text: `🍹 GULF SUNSET TIKI! 150 HP/ARMOR + 0★ + +$6,500!`,
+                            color: "#fb923c",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.gulfManateePiers)) {
+            for (const mp of this.gulfManateePiers) {
+                if ((mp.cooldown || 0) <= 0 && Math.hypot(px - mp.x, py - mp.y) < 74) {
+                    mp.cooldown = 26.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🦭 GULF MANATEE & TARPON SANCTUARY!`,
+                            `${mp.name} • ECO-BOUNTY 150 HP/ARMOR + +$6,000 & +1X!`,
+                            "#38bdf8",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: mp.x,
+                            y: mp.y,
+                            z: 2.70,
+                            text: `🦭 MANATEE SANCTUARY! 150 HP/ARMOR + +$6,000 + +1X!`,
+                            color: "#38bdf8",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P31. Official GTA 6 Redhill / Heartland Citrus Groves & Gator-Wrestling Rodeo Arenas ([E], Loop 32)
+        if (Array.isArray(this.citrusOrchardStands)) {
+            for (const co of this.citrusOrchardStands) {
+                if ((co.cooldown || 0) <= 0 && Math.hypot(px - co.x, py - co.y) < 68) {
+                    co.cooldown = 25.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(5500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 5500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🍊 LEONIDA SUNSHINE CITRUS HARVEST!`,
+                            `${co.name} • FRESH GROVE BOOST 150 HP/ARMOR & +$5,500!`,
+                            "#facc15",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: co.x,
+                            y: co.y,
+                            z: 2.68,
+                            text: `🍊 SUNSHINE CITRUS HARVEST! 150 HP/ARMOR + +$5,500!`,
+                            color: "#facc15",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.gatorWrestlingRodeos)) {
+            for (const gr of this.gatorWrestlingRodeos) {
+                if ((gr.cooldown || 0) <= 0 && Math.hypot(px - gr.x, py - gr.y) < 74) {
+                    gr.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(8000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 8000;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🐊 LEONIDA GATOR-WRESTLING RODEO CHAMP!`,
+                            `${gr.name} • JAW-LOCK TROPHY +$8,000 + 150 HP/ARMOR & +1X!`,
+                            "#4ade80",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gr.x,
+                            y: gr.y,
+                            z: 2.72,
+                            text: `🐊 GATOR RODEO CHAMP! +$8,000 + 150 HP/ARMOR + +1X!`,
+                            color: "#4ade80",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P32. Official GTA 6 Biscayne Lagoon Floating Aqua-Cabanas & Stiltsville Smuggler Stilt-Lodges ([E], Loop 33)
+        if (Array.isArray(this.lagoonFloatingCabanas)) {
+            for (const lc of this.lagoonFloatingCabanas) {
+                if ((lc.cooldown || 0) <= 0 && Math.hypot(px - lc.x, py - lc.y) < 76) {
+                    lc.cooldown = 26.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🏖️ BISCAYNE FLOATING AQUA-DAYCLUB!`,
+                            `${lc.name} • VIP LAGOON OASIS 0★ + 150 HP/ARMOR & +$6,500!`,
+                            "#2dd4bf",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: lc.x,
+                            y: lc.y,
+                            z: 2.70,
+                            text: `🏖️ FLOATING AQUA-DAYCLUB! 0★ + 150 HP/ARMOR + +$6,500!`,
+                            color: "#2dd4bf",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.stiltsvilleOutposts)) {
+            for (const so of this.stiltsvilleOutposts) {
+                if ((so.cooldown || 0) <= 0 && Math.hypot(px - so.x, py - so.y) < 78) {
+                    so.cooldown = 28.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(8500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 8500;
+                    }
+                    if (game.audio) game.audio.playPickup("ARMOR");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🏚️ STILTSVILLE RUM-RUNNER SPEAKEASY!`,
+                            `${so.name} • OFFSHORE SAFEHOUSE 0★ + 150 ARMOR + +$8,500 & +1X!`,
+                            "#f59e0b",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: so.x,
+                            y: so.y,
+                            z: 2.74,
+                            text: `🏚️ STILTSVILLE STASH! 0★ + 150 ARMOR + +$8,500 + +1X!`,
+                            color: "#f59e0b",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P33. Official GTA 6 VCIA South Cargo Hangar Auctions & Botanical Orchid Conservatories ([E], Loop 34)
+        if (Array.isArray(this.hangarBlackMarkets)) {
+            for (const hb of this.hangarBlackMarkets) {
+                if ((hb.cooldown || 0) <= 0 && Math.hypot(px - hb.x, py - hb.y) < 74) {
+                    hb.cooldown = 30.0;
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(9500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 9500;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `✈️ TARMAC BLACK-MARKET CARGO AUCTION!`,
+                            `${hb.name} • HIGH-VALUE CRATE +$9,500 + 150 ARMOR & +1X!`,
+                            "#a855f7",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: hb.x,
+                            y: hb.y,
+                            z: 2.74,
+                            text: `✈️ BLACK-MARKET CARGO! +$9,500 + 150 ARMOR + +1X!`,
+                            color: "#a855f7",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.botanicalGlasshouses)) {
+            for (const bg of this.botanicalGlasshouses) {
+                if ((bg.cooldown || 0) <= 0 && Math.hypot(px - bg.x, py - bg.y) < 72) {
+                    bg.cooldown = 26.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🌺 ROYAL ORCHID BOTANICAL GLASSHOUSE!`,
+                            `${bg.name} • RARE GHOST ORCHID 0★ + 150 HP/ARMOR & +$6,500!`,
+                            "#ec4899",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bg.x,
+                            y: bg.y,
+                            z: 2.72,
+                            text: `🌺 GHOST ORCHID SANCTUARY! 0★ + 150 HP/ARMOR + +$6,500!`,
+                            color: "#ec4899",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -5563,6 +5962,46 @@ class WorldObjectEngine {
         if (Array.isArray(this.neonArcadePavilions)) {
             for (const na of this.neonArcadePavilions) {
                 if ((na.cooldown || 0) > 0) na.cooldown = Math.max(0, na.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+            for (const gt of this.gulfSunsetTikiClubs) {
+                if ((gt.cooldown || 0) > 0) gt.cooldown = Math.max(0, gt.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.gulfManateePiers)) {
+            for (const mp of this.gulfManateePiers) {
+                if ((mp.cooldown || 0) > 0) mp.cooldown = Math.max(0, mp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.citrusOrchardStands)) {
+            for (const co of this.citrusOrchardStands) {
+                if ((co.cooldown || 0) > 0) co.cooldown = Math.max(0, co.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.gatorWrestlingRodeos)) {
+            for (const gr of this.gatorWrestlingRodeos) {
+                if ((gr.cooldown || 0) > 0) gr.cooldown = Math.max(0, gr.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.lagoonFloatingCabanas)) {
+            for (const lc of this.lagoonFloatingCabanas) {
+                if ((lc.cooldown || 0) > 0) lc.cooldown = Math.max(0, lc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.stiltsvilleOutposts)) {
+            for (const so of this.stiltsvilleOutposts) {
+                if ((so.cooldown || 0) > 0) so.cooldown = Math.max(0, so.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.hangarBlackMarkets)) {
+            for (const hb of this.hangarBlackMarkets) {
+                if ((hb.cooldown || 0) > 0) hb.cooldown = Math.max(0, hb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.botanicalGlasshouses)) {
+            for (const bg of this.botanicalGlasshouses) {
+                if ((bg.cooldown || 0) > 0) bg.cooldown = Math.max(0, bg.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -9906,6 +10345,85 @@ class WorldObjectEngine {
             }
         }
 
+        // 22P. Official GTA 6 Regional Void-Filling Landmarks: West Gulf Sunset Tiki Clubs, Manatee Piers, Citrus Orchards, Gator Rodeos, Lagoon Floating Cabanas, Stiltsville Stilt-Lodges, Hangar Auctions & Botanical Glasshouses (Loops 31-34)
+        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+            for (const gt of this.gulfSunsetTikiClubs) {
+                const bz = gt.z || 2.0;
+                emitAOShadow3D(gt.x, gt.y, 1, 0, 0, 0, 42, 30, bz, 0.36);
+                // Elevated Cedar Boardwalk Deck + Horseshoe Tiki Bar + High-Pitched Golden Palm Thatch Roof + Corner Torch Posts
+                emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 36, 24, bz, bz + 0.06, [0.68, 0.46, 0.24], 4);
+                emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 20, 12, bz + 0.06, bz + 0.18, [0.82, 0.56, 0.28], 4);
+                emitGableRoof3D(gt.x, gt.y, 1, 0, 0, 0, 38, 26, bz + 0.28, bz + 0.48, [0.92, 0.64, 0.24], true, 4);
+                emitCylinder3D(gt.x - 16, gt.y - 10, 0, 0, 2.0, 2.0, bz + 0.06, bz + 0.28, 6, [0.98, 0.52, 0.14], 1, true);
+                emitCylinder3D(gt.x + 16, gt.y + 10, 0, 0, 2.0, 2.0, bz + 0.06, bz + 0.28, 6, [0.98, 0.52, 0.14], 1, true);
+            }
+        }
+        if (Array.isArray(this.gulfManateePiers)) {
+            for (const mp of this.gulfManateePiers) {
+                const bz = mp.z || 2.0;
+                // Floating Timber Eco-Observation Pier + Aqua Canopy Gazebo + Manatee Feeding Basin
+                emitSolidBox3D(mp.x, mp.y, 1, 0, 0, 0, 34, 18, bz - 0.02, bz + 0.08, [0.62, 0.44, 0.24], 4);
+                emitGableRoof3D(mp.x, mp.y, 1, 0, 0, 0, 26, 16, bz + 0.24, bz + 0.36, [0.16, 0.78, 0.94], true, 1);
+            }
+        }
+        if (Array.isArray(this.citrusOrchardStands)) {
+            for (const co of this.citrusOrchardStands) {
+                const bz = co.z || 2.0;
+                emitAOShadow3D(co.x, co.y, 1, 0, 0, 0, 34, 24, bz, 0.34);
+                // Rustic Timber Farmers Market Stand + Bright Orange Crate Displays + Sunshine Yellow/Green Striped Awning
+                emitSolidBox3D(co.x, co.y, 1, 0, 0, 0, 26, 16, bz, bz + 0.16, [0.66, 0.44, 0.22], 4);
+                emitSolidBox3D(co.x - 6, co.y + 3, 1, 0, 0, 0, 9, 6, bz + 0.16, bz + 0.22, [0.98, 0.58, 0.12], 1);
+                emitSolidBox3D(co.x + 6, co.y + 3, 1, 0, 0, 0, 9, 6, bz + 0.16, bz + 0.22, [0.98, 0.84, 0.16], 1);
+                emitGableRoof3D(co.x, co.y, 1, 0, 0, 0, 30, 20, bz + 0.26, bz + 0.38, [0.98, 0.64, 0.14], true, 4);
+            }
+        }
+        if (Array.isArray(this.gatorWrestlingRodeos)) {
+            for (const gr of this.gatorWrestlingRodeos) {
+                const bz = gr.z || 2.0;
+                emitAOShadow3D(gr.x, gr.y, 1, 0, 0, 0, 44, 44, bz, 0.36);
+                // Octagonal Timber Sand-and-Water Gator Pit + Bleacher Bench Ring
+                emitCylinder3D(gr.x, gr.y, 0, 0, 18.0, 18.0, bz, bz + 0.14, 8, [0.56, 0.38, 0.20], 4, true);
+                emitCylinder3D(gr.x, gr.y, 0, 0, 14.0, 14.0, bz + 0.14, bz + 0.16, 8, [0.18, 0.64, 0.48], 1, true);
+            }
+        }
+        if (Array.isArray(this.lagoonFloatingCabanas)) {
+            for (const lc of this.lagoonFloatingCabanas) {
+                const bz = lc.z || 2.0;
+                // White Floating Pontoon Oasis + Turquoise Pool Inlay + Coral Daybed Canopy
+                emitSolidBox3D(lc.x, lc.y, 1, 0, 0, 0, 36, 28, bz - 0.02, bz + 0.06, [0.94, 0.96, 0.98], 1);
+                emitSolidBox3D(lc.x - 6, lc.y, 1, 0, 0, 0, 14, 16, bz + 0.06, bz + 0.08, [0.14, 0.88, 0.84], 1);
+                emitGableRoof3D(lc.x + 8, lc.y, 1, 0, 0, 0, 16, 20, bz + 0.22, bz + 0.34, [0.98, 0.42, 0.66], true, 1);
+            }
+        }
+        if (Array.isArray(this.stiltsvilleOutposts)) {
+            for (const so of this.stiltsvilleOutposts) {
+                const bz = so.z || 2.0;
+                // Historic Biscayne Bay Elevated Wood-Piling Stilt House + Wrap-Around Dock + Tin Roof
+                emitSolidBox3D(so.x, so.y, 1, 0, 0, 0, 34, 26, bz - 0.02, bz + 0.16, [0.48, 0.34, 0.20], 4);
+                emitSolidBox3D(so.x, so.y, 1, 0, 0, 0, 26, 20, bz + 0.16, bz + 0.42, [0.86, 0.78, 0.62], 4);
+                emitGableRoof3D(so.x, so.y, 1, 0, 0, 0, 30, 24, bz + 0.42, bz + 0.56, [0.78, 0.34, 0.22], true, 3);
+            }
+        }
+        if (Array.isArray(this.hangarBlackMarkets)) {
+            for (const hb of this.hangarBlackMarkets) {
+                const bz = hb.z || 2.0;
+                emitAOShadow3D(hb.x, hb.y, 1, 0, 0, 0, 40, 28, bz, 0.36);
+                // Armored Tarmac Cargo Container + Open Gold/Purple Contraband Crates + Floodlight Mast
+                emitSolidBox3D(hb.x, hb.y, 1, 0, 0, 0, 32, 16, bz, bz + 0.28, [0.22, 0.26, 0.34], 5);
+                emitSolidBox3D(hb.x, hb.y + 8, 1, 0, 0, 0, 14, 8, bz, bz + 0.14, [0.68, 0.26, 0.94], 1);
+            }
+        }
+        if (Array.isArray(this.botanicalGlasshouses)) {
+            for (const bg of this.botanicalGlasshouses) {
+                const bz = bg.z || 2.0;
+                emitAOShadow3D(bg.x, bg.y, 1, 0, 0, 0, 42, 30, bz, 0.35);
+                // Victorian White-Iron & Emerald/Cyan Glass Conservatory + Pink Orchid Dome
+                emitSolidBox3D(bg.x, bg.y, 1, 0, 0, 0, 34, 22, bz, bz + 0.26, [0.74, 0.96, 0.92], 1);
+                emitGableRoof3D(bg.x, bg.y, 1, 0, 0, 0, 36, 24, bz + 0.26, bz + 0.44, [0.86, 0.98, 0.96], true, 1);
+                emitCylinder3D(bg.x, bg.y, 0, 0, 6.5, 4.5, bz + 0.44, bz + 0.56, 8, [0.96, 0.38, 0.74], 1, true);
+            }
+        }
+
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
         //     West & East Drive-Through Vehicle Tunnels, Cantilevered White Canopy Roof, 4 Cylindrical Spiral Ramps,
@@ -13384,6 +13902,86 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+            for (let i = 0; i < this.gulfSunsetTikiClubs.length; i++) {
+                const gt = this.gulfSunsetTikiClubs[i];
+                if (gt.x < minX - 140 || gt.x > maxX + 140 || gt.y < minY - 140 || gt.y > maxY + 140) continue;
+                if ((gt.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 5.4 + i) * 3.4;
+                    renderer.pushSolidQuad3D(gt.x, gt.y, 2.03, rSz, rSz, renderer.time * 1.2, 0.98, 0.58, 0.22, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.gulfManateePiers)) {
+            for (let i = 0; i < this.gulfManateePiers.length; i++) {
+                const mp = this.gulfManateePiers[i];
+                if (mp.x < minX - 130 || mp.x > maxX + 130 || mp.y < minY - 130 || mp.y > maxY + 130) continue;
+                if ((mp.cooldown || 0) <= 0) {
+                    const rSz = 30 + Math.sin(renderer.time * 5.2 + i) * 3.2;
+                    renderer.pushSolidQuad3D(mp.x, mp.y, 2.03, rSz, rSz, -renderer.time * 1.3, 0.22, 0.82, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.citrusOrchardStands)) {
+            for (let i = 0; i < this.citrusOrchardStands.length; i++) {
+                const co = this.citrusOrchardStands[i];
+                if (co.x < minX - 130 || co.x > maxX + 130 || co.y < minY - 130 || co.y > maxY + 130) continue;
+                if ((co.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 5.6 + i) * 3.0;
+                    renderer.pushSolidQuad3D(co.x, co.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.78, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.gatorWrestlingRodeos)) {
+            for (let i = 0; i < this.gatorWrestlingRodeos.length; i++) {
+                const gr = this.gatorWrestlingRodeos[i];
+                if (gr.x < minX - 140 || gr.x > maxX + 140 || gr.y < minY - 140 || gr.y > maxY + 140) continue;
+                if ((gr.cooldown || 0) <= 0) {
+                    const rSz = 36 + Math.sin(renderer.time * 5.8 + i) * 3.5;
+                    renderer.pushSolidQuad3D(gr.x, gr.y, 2.03, rSz, rSz, -renderer.time * 1.5, 0.28, 0.92, 0.48, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.lagoonFloatingCabanas)) {
+            for (let i = 0; i < this.lagoonFloatingCabanas.length; i++) {
+                const lc = this.lagoonFloatingCabanas[i];
+                if (lc.x < minX - 140 || lc.x > maxX + 140 || lc.y < minY - 140 || lc.y > maxY + 140) continue;
+                if ((lc.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 5.4 + i) * 3.4;
+                    renderer.pushSolidQuad3D(lc.x, lc.y, 2.03, rSz, rSz, renderer.time * 1.3, 0.18, 0.92, 0.84, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.stiltsvilleOutposts)) {
+            for (let i = 0; i < this.stiltsvilleOutposts.length; i++) {
+                const so = this.stiltsvilleOutposts[i];
+                if (so.x < minX - 140 || so.x > maxX + 140 || so.y < minY - 140 || so.y > maxY + 140) continue;
+                if ((so.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 5.6 + i) * 3.4;
+                    renderer.pushSolidQuad3D(so.x, so.y, 2.03, rSz, rSz, -renderer.time * 1.4, 0.98, 0.68, 0.18, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.hangarBlackMarkets)) {
+            for (let i = 0; i < this.hangarBlackMarkets.length; i++) {
+                const hb = this.hangarBlackMarkets[i];
+                if (hb.x < minX - 140 || hb.x > maxX + 140 || hb.y < minY - 140 || hb.y > maxY + 140) continue;
+                if ((hb.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 6.0 + i) * 3.4;
+                    renderer.pushSolidQuad3D(hb.x, hb.y, 2.03, rSz, rSz, renderer.time * 1.6, 0.72, 0.34, 0.98, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.botanicalGlasshouses)) {
+            for (let i = 0; i < this.botanicalGlasshouses.length; i++) {
+                const bg = this.botanicalGlasshouses[i];
+                if (bg.x < minX - 140 || bg.x > maxX + 140 || bg.y < minY - 140 || bg.y > maxY + 140) continue;
+                if ((bg.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 5.4 + i) * 3.4;
+                    renderer.pushSolidQuad3D(bg.x, bg.y, 2.03, rSz, rSz, -renderer.time * 1.2, 0.96, 0.36, 0.72, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -14575,6 +15173,126 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+            for (const gt of this.gulfSunsetTikiClubs) {
+                if ((gt.cooldown || 0) <= 0 && Math.hypot(px - gt.x, py - gt.y) < 115) {
+                    const scr = renderer.worldToScreen(gt.x, gt.y - 18, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#fb923c";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fed7aa";
+                    ctx.fillText(`🍹 [E] PARTY AT GULF SUNSET TIKI CLUB (150 HP/ARMOR + 0★ & +$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.gulfManateePiers)) {
+            for (const mp of this.gulfManateePiers) {
+                if ((mp.cooldown || 0) <= 0 && Math.hypot(px - mp.x, py - mp.y) < 115) {
+                    const scr = renderer.worldToScreen(mp.x, mp.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#bae6fd";
+                    ctx.fillText(`🦭 [E] VISIT GULF MANATEE SANCTUARY (150 HP/ARMOR + +$6,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.citrusOrchardStands)) {
+            for (const co of this.citrusOrchardStands) {
+                if ((co.cooldown || 0) <= 0 && Math.hypot(px - co.x, py - co.y) < 115) {
+                    const scr = renderer.worldToScreen(co.x, co.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillText(`🍊 [E] HARVEST SUNSHINE CITRUS GROVE (150 HP/ARMOR & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.gatorWrestlingRodeos)) {
+            for (const gr of this.gatorWrestlingRodeos) {
+                if ((gr.cooldown || 0) <= 0 && Math.hypot(px - gr.x, py - gr.y) < 120) {
+                    const scr = renderer.worldToScreen(gr.x, gr.y - 18, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#bbf7d0";
+                    ctx.fillText(`🐊 [E] ENTER GATOR-WRESTLING RODEO (+$8,000 + 150 HP/ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.lagoonFloatingCabanas)) {
+            for (const lc of this.lagoonFloatingCabanas) {
+                if ((lc.cooldown || 0) <= 0 && Math.hypot(px - lc.x, py - lc.y) < 115) {
+                    const scr = renderer.worldToScreen(lc.x, lc.y - 18, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#2dd4bf";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#99f6e4";
+                    ctx.fillText(`🏖️ [E] RELAX AT FLOATING AQUA-DAYCLUB (0★ + 150 HP/ARMOR & +$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.stiltsvilleOutposts)) {
+            for (const so of this.stiltsvilleOutposts) {
+                if ((so.cooldown || 0) <= 0 && Math.hypot(px - so.x, py - so.y) < 120) {
+                    const scr = renderer.worldToScreen(so.x, so.y - 18, 2.56);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#f59e0b";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fde68a";
+                    ctx.fillText(`🏚️ [E] RAID STILTSVILLE RUM-RUNNER LODGE (0★ + 150 ARMOR + +$8,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.hangarBlackMarkets)) {
+            for (const hb of this.hangarBlackMarkets) {
+                if ((hb.cooldown || 0) <= 0 && Math.hypot(px - hb.x, py - hb.y) < 115) {
+                    const scr = renderer.worldToScreen(hb.x, hb.y - 18, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#a855f7";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#e9d5ff";
+                    ctx.fillText(`✈️ [E] BID AT TARMAC BLACK-MARKET AUCTION (+$9,500 + 150 ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.botanicalGlasshouses)) {
+            for (const bg of this.botanicalGlasshouses) {
+                if ((bg.cooldown || 0) <= 0 && Math.hypot(px - bg.x, py - bg.y) < 115) {
+                    const scr = renderer.worldToScreen(bg.x, bg.y - 18, 2.56);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#ec4899";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fbcfe8";
+                    ctx.fillText(`🌺 [E] ENTER ROYAL ORCHID GLASSHOUSE (0★ + 150 HP/ARMOR & +$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -15191,6 +15909,54 @@ class WorldObjectEngine {
             ctx.fillStyle = "#c084fc";
             for (const na of this.neonArcadePavilions) {
                 ctx.fillRect((na.x - 13) * sx, (na.y - 9) * sy, 26 * sx, 18 * sy);
+            }
+        }
+        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+            ctx.fillStyle = "#fb923c";
+            for (const gt of this.gulfSunsetTikiClubs) {
+                ctx.fillRect((gt.x - 19) * sx, (gt.y - 13) * sy, 38 * sx, 26 * sy);
+            }
+        }
+        if (Array.isArray(this.gulfManateePiers)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const mp of this.gulfManateePiers) {
+                ctx.fillRect((mp.x - 17) * sx, (mp.y - 9) * sy, 34 * sx, 18 * sy);
+            }
+        }
+        if (Array.isArray(this.citrusOrchardStands)) {
+            ctx.fillStyle = "#facc15";
+            for (const co of this.citrusOrchardStands) {
+                ctx.fillRect((co.x - 15) * sx, (co.y - 10) * sy, 30 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.gatorWrestlingRodeos)) {
+            ctx.fillStyle = "#4ade80";
+            for (const gr of this.gatorWrestlingRodeos) {
+                ctx.fillRect((gr.x - 18) * sx, (gr.y - 18) * sy, 36 * sx, 36 * sy);
+            }
+        }
+        if (Array.isArray(this.lagoonFloatingCabanas)) {
+            ctx.fillStyle = "#2dd4bf";
+            for (const lc of this.lagoonFloatingCabanas) {
+                ctx.fillRect((lc.x - 18) * sx, (lc.y - 14) * sy, 36 * sx, 28 * sy);
+            }
+        }
+        if (Array.isArray(this.stiltsvilleOutposts)) {
+            ctx.fillStyle = "#f59e0b";
+            for (const so of this.stiltsvilleOutposts) {
+                ctx.fillRect((so.x - 17) * sx, (so.y - 13) * sy, 34 * sx, 26 * sy);
+            }
+        }
+        if (Array.isArray(this.hangarBlackMarkets)) {
+            ctx.fillStyle = "#a855f7";
+            for (const hb of this.hangarBlackMarkets) {
+                ctx.fillRect((hb.x - 16) * sx, (hb.y - 10) * sy, 32 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.botanicalGlasshouses)) {
+            ctx.fillStyle = "#ec4899";
+            for (const bg of this.botanicalGlasshouses) {
+                ctx.fillRect((bg.x - 18) * sx, (bg.y - 12) * sy, 36 * sx, 24 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
