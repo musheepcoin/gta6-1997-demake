@@ -532,6 +532,19 @@ class WorldObjectEngine {
             { name: "WYNWOOD CUSTOM DONK & LOWRIDER MEET",    x: 187.5 * TILE_SIZE, y: 126.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "PORT GELLHORN MUSCLE & TUNER MEET",      x: 84.5 * TILE_SIZE,  y: 211.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 15. Official GTA 6 Keys & Ocean Beach Coral Reef Scuba Dive Buoys & Port Gellhorn / Kalaga Dirt-Bike Stunt Ramps
+        this.coralDiveSites = [
+            { name: "KEY LENTO LIONFISH CORAL REEF DIVE",     x: 238.5 * TILE_SIZE, y: 492.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.4 },
+            { name: "SEVEN MILE SUNKEN GALLEON REEF DIVE",    x: 184.5 * TILE_SIZE, y: 488.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 1.8 },
+            { name: "OCEAN BEACH EMERALD REEF SCUBA BUOY",    x: 492.5 * TILE_SIZE, y: 245.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.2 },
+            { name: "STAR ISLAND SUNKEN YACHT CORAL DIVE",    x: 362.5 * TILE_SIZE, y: 182.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 4.6 }
+        ];
+        this.dirtBikeStuntRamps = [
+            { name: "PORT GELLHORN MOTOCROSS SUPER-RAMP",     x: 78.5 * TILE_SIZE,  y: 224.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0 },
+            { name: "MOUNT KALAGA CANYON RIDGE JUMP",         x: 122.5 * TILE_SIZE, y: 24.5 * TILE_SIZE,  z: 2.0, ang: 0,             cooldown: 0 },
+            { name: "AMBROSIA SUGAR MILL DIRT-BIKE RAMP",     x: 154.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0 },
+            { name: "VICE BEACH SOUTH JETTY DUNE RAMP",       x: 468.5 * TILE_SIZE, y: 344.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -955,6 +968,20 @@ class WorldObjectEngine {
                 for (const cm of this.carMeets) {
                     snapOffRoad(cm);
                     clearZones.push({ x: cm.x, y: cm.y, r: 64 });
+                }
+            }
+            if (Array.isArray(this.coralDiveSites)) {
+                for (const cd of this.coralDiveSites) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(cd.x, cd.y, 20);
+                        if (sn) { cd.x = sn.x; cd.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.dirtBikeStuntRamps)) {
+                for (const sr of this.dirtBikeStuntRamps) {
+                    snapOffRoad(sr);
+                    clearZones.push({ x: sr.x, y: sr.y, r: 48 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2313,6 +2340,40 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-12. Official GTA 6 Leonida Keys & Ocean Beach Coral Reef Scuba Dive & Treasure Salvage ([E]!)
+        if (Array.isArray(this.coralDiveSites)) {
+            for (const cd of this.coralDiveSites) {
+                if ((cd.cooldown || 0) <= 0 && Math.hypot(px - cd.x, py - cd.y) < 95) {
+                    cd.cooldown = 18.0;
+                    game.player.hp = game.player.maxHp || 100;
+                    game.player.armor = 100;
+                    if (typeof game.addScore === "function") game.addScore(8500);
+                    if (typeof game.addCash === "function") game.addCash(8500, `🤿 ${cd.name} SALVAGE!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🤿 CORAL REEF SCUBA TREASURE!`,
+                            `${cd.name} • SUNKEN DOUBLOONS SALVAGED +$8,500 & +1X!`,
+                            "#2dd4bf",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cd.x,
+                            y: cd.y,
+                            z: 2.70,
+                            text: `🤿 SCUBA CORAL REEF TREASURE! +$8,500 + FULL ARMOR!`,
+                            color: "#2dd4bf",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -3176,6 +3237,42 @@ class WorldObjectEngine {
         if (Array.isArray(this.carMeets)) {
             for (const cm of this.carMeets) {
                 if ((cm.cooldown || 0) > 0) cm.cooldown = Math.max(0, cm.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.coralDiveSites)) {
+            for (const cd of this.coralDiveSites) {
+                if ((cd.cooldown || 0) > 0) cd.cooldown = Math.max(0, cd.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.dirtBikeStuntRamps)) {
+            for (const sr of this.dirtBikeStuntRamps) {
+                if ((sr.cooldown || 0) > 0) sr.cooldown = Math.max(0, sr.cooldown - dt);
+                if (pVeh && (sr.cooldown || 0) <= 0 && Math.hypot(pVeh.x - sr.x, pVeh.y - sr.y) < 52) {
+                    const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
+                    if (spd > 60) {
+                        sr.cooldown = 14.0;
+                        pVeh.vx = (pVeh.vx || 0) * 1.30;
+                        pVeh.vy = (pVeh.vy || 0) * 1.30;
+                        pVeh.vz = Math.max(pVeh.vz || 0, 0.15);
+                        if (typeof game.addScore === "function") game.addScore(6500);
+                        if (typeof game.addCash === "function") game.addCash(6500, `🏍️ ${sr.name}!`);
+                        if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                        if (game.audio) game.audio.playPickup("WEAPON");
+                        if (typeof game.showBigBanner === "function") {
+                            game.showBigBanner(`🏍️ ${sr.name}!`, "BIG-AIR MOTOCROSS STUNT JUMP • +$6,500 + NITRO & +1X!", "#f97316", 2.6);
+                        }
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: sr.x,
+                                y: sr.y,
+                                z: 2.75,
+                                text: `🏍️ STUNT RAMP BIG AIR! +$6,500 + NITRO!`,
+                                color: "#f97316",
+                                life: 2.6
+                            });
+                        }
+                    }
+                }
             }
         }
         if ((this.miniGolfCooldown || 0) > 0) this.miniGolfCooldown = Math.max(0, this.miniGolfCooldown - dt);
@@ -6962,6 +7059,35 @@ class WorldObjectEngine {
                 emitSolidBox3D(cm.x, cm.y, 1, 0,  26, -14, 12, 8, bz + 0.02, bz + 0.22, [0.14, 0.16, 0.22], 5);
             }
         }
+        // 22G. OFFICIAL GTA 6 KEYS CORAL REEF SCUBA DIVE BUOYS & MOTOCROSS / DIRT-BIKE STUNT RAMPS
+        if (Array.isArray(this.coralDiveSites)) {
+            for (const cd of this.coralDiveSites) {
+                const bz = 2.01;
+                // Luminous Underwater Turquoise & Coral-Pink Reef Glow Patch + Red/White Scuba Diver-Down Flag Buoy
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 0, 0, 44, 44, bz - 0.01, bz + 0.008, [0.10, 0.88, 0.84], 10);
+                emitCylinder3D(cd.x, cd.y, -10, -8, 6.5, 5.0, bz, bz + 0.03, 6, [0.98, 0.42, 0.68], 1, true);
+                emitCylinder3D(cd.x, cd.y,  12,  7, 5.5, 4.5, bz, bz + 0.03, 6, [0.98, 0.74, 0.22], 1, true);
+                emitCylinder3D(cd.x, cd.y, 0, 0, 4.2, 4.2, bz, bz + 0.08, 8, [0.96, 0.98, 1.00], 5, true);
+                emitCylinder3D(cd.x, cd.y, 0, 0, 0.8, 0.8, bz + 0.08, bz + 0.28, 6, [0.92, 0.94, 0.98], 5, false);
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 4.5, 0, 9.0, 2.0, bz + 0.20, bz + 0.27, [0.96, 0.16, 0.18], 1);
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 4.5, 0, 8.5, 2.2, bz + 0.225, bz + 0.245, [0.98, 0.98, 1.00], 1);
+            }
+        }
+        if (Array.isArray(this.dirtBikeStuntRamps)) {
+            for (const sr of this.dirtBikeStuntRamps) {
+                const bz = sr.z || 2.0;
+                const cA = Math.cos(sr.ang || 0), sA = Math.sin(sr.ang || 0);
+                emitAOShadow3D(sr.x, sr.y, cA, sA, 0, 0, 42, 26, bz, 0.36);
+                // Stepped 3D Yellow/Orange Hazard Stunt Ramp Wedge + Checkered Side Rails
+                for (let step = 0; step < 5; step++) {
+                    const sx = -12 + step * 6;
+                    const sh = 0.05 + step * 0.055;
+                    emitSolidBox3D(sr.x, sr.y, cA, sA, sx, 0, 7.0, 20, bz, bz + sh, (step % 2 === 0) ? [0.98, 0.52, 0.12] : [0.98, 0.84, 0.16], 5);
+                }
+                emitSolidBox3D(sr.x, sr.y, cA, sA, 0, -10.5, 34, 2.0, bz, bz + 0.28, [0.18, 0.22, 0.28], 5);
+                emitSolidBox3D(sr.x, sr.y, cA, sA, 0,  10.5, 34, 2.0, bz, bz + 0.28, [0.18, 0.22, 0.28], 5);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -9912,6 +10038,38 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_tommy", mFr, cm.x + 28, cm.y + 12, 2.042, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
+        if (Array.isArray(this.coralDiveSites)) {
+            for (let i = 0; i < this.coralDiveSites.length; i++) {
+                const cd = this.coralDiveSites[i];
+                if (cd.x < minX - 140 || cd.x > maxX + 140 || cd.y < minY - 140 || cd.y > maxY + 140) continue;
+                if ((cd.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 5.0 + cd.seed) * 4.5;
+                    renderer.pushSolidQuad3D(cd.x, cd.y, 2.024, rSz, rSz, renderer.time * 1.2, 0.14, 0.94, 0.88, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Scuba diver swimming over the coral reef + rising air-bubble rings + tropical lionfish!
+                const dAng = renderer.time * 0.9 + cd.seed;
+                const dx = cd.x + Math.cos(dAng) * 14.0;
+                const dy = cd.y + Math.sin(dAng) * 14.0;
+                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), dx, dy, 2.028, dAng + Math.PI * 0.5, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                const bubSz = 6.0 + ((renderer.time * 6.0 + i) % 6.0);
+                renderer.pushSolidQuad3D(dx, dy, 2.032, bubSz, bubSz, renderer.time * 2.0, 0.88, 0.98, 1.0, 0.65, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                // 3 Tropical Lionfish / Reef Fish darting around the coral heads
+                for (let fi = 0; fi < 3; fi++) {
+                    const fT = -renderer.time * 1.8 + fi * 2.1 + cd.seed;
+                    const fx = cd.x + Math.cos(fT) * (9.0 + fi * 4.0);
+                    const fy = cd.y + Math.sin(fT) * (9.0 + fi * 4.0);
+                    renderer.pushSolidQuad3D(fx, fy, 2.018, 4.5, 2.4, fT - Math.PI * 0.5, 0.98, 0.42, 0.18, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.dirtBikeStuntRamps)) {
+            for (let i = 0; i < this.dirtBikeStuntRamps.length; i++) {
+                const sr = this.dirtBikeStuntRamps[i];
+                if ((sr.cooldown || 0) > 0 || sr.x < minX - 120 || sr.x > maxX + 120 || sr.y < minY - 120 || sr.y > maxY + 120) continue;
+                const rSz = 26 + Math.sin(renderer.time * 6.0 + i) * 3.5;
+                renderer.pushSolidQuad3D(sr.x, sr.y, 2.03, rSz, rSz, renderer.time * 1.6, 0.98, 0.54, 0.14, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
     }
 
     /* ========================================================================
@@ -10428,6 +10586,36 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.coralDiveSites)) {
+            for (const cd of this.coralDiveSites) {
+                if ((cd.cooldown || 0) <= 0 && Math.hypot(px - cd.x, py - cd.y) < 125) {
+                    const scr = renderer.worldToScreen(cd.x, cd.y - 16, 2.45);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#2dd4bf";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#2dd4bf";
+                    ctx.fillText(`🤿 [E] SCUBA DIVE: ${cd.name} (+$8,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.dirtBikeStuntRamps)) {
+            for (const sr of this.dirtBikeStuntRamps) {
+                if ((sr.cooldown || 0) <= 0 && Math.hypot(px - sr.x, py - sr.y) < 115) {
+                    const scr = renderer.worldToScreen(sr.x, sr.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.strokeStyle = "#f97316";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`🏍️ HIT RAMP AT SPEED: ${sr.name} (+$6,500 & NITRO)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -10774,6 +10962,18 @@ class WorldObjectEngine {
             ctx.fillStyle = "#ec4899";
             for (const cm of this.carMeets) {
                 ctx.fillRect((cm.x - 34) * sx, (cm.y - 22) * sy, 68 * sx, 44 * sy);
+            }
+        }
+        if (Array.isArray(this.coralDiveSites)) {
+            ctx.fillStyle = "#2dd4bf";
+            for (const cd of this.coralDiveSites) {
+                ctx.fillRect((cd.x - 22) * sx, (cd.y - 22) * sy, 44 * sx, 44 * sy);
+            }
+        }
+        if (Array.isArray(this.dirtBikeStuntRamps)) {
+            ctx.fillStyle = "#f97316";
+            for (const sr of this.dirtBikeStuntRamps) {
+                ctx.fillRect((sr.x - 18) * sx, (sr.y - 11) * sy, 36 * sx, 22 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
