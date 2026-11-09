@@ -585,15 +585,22 @@ class WorldObjectEngine {
                 const maxC = Math.min(M - 3, Math.floor((wx + extX + 24) / TILE_SIZE));
                 const minR = Math.max(2, Math.floor((wy - extY - 24) / TILE_SIZE));
                 const maxR = Math.min(MAP_ROWS - 3, Math.floor((wy + extY + 24) / TILE_SIZE));
+                const isUrbanPavedVilla = (
+                    raw.district === "SOUTH BEACH" ||
+                    raw.district === "LITTLE HAITI" ||
+                    raw.district === "LITTLE HAVANA"
+                );
                 for (let r = minR; r <= maxR; r++) {
                     for (let c = minC; c <= maxC; c++) {
                         const idx = r * M + c;
                         if (map.surfaceGround[idx] === GROUND_TYPE.BUILDING) {
+                            const refC = isUrbanPavedVilla ? (c >= 420 ? 448 : 178) : 339;
+                            const refR = isUrbanPavedVilla ? (c >= 420 ? 286 : 170) : 165;
                             for (let z = 0; z < MAP_LAYERS; z++) {
                                 map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
-                                    map.voxelGrid[(z * MAP_ROWS + 165) * M + 339];
+                                    map.voxelGrid[(z * MAP_ROWS + refR) * M + refC];
                             }
-                            map.surfaceGround[idx] = GROUND_TYPE.FIELD;
+                            map.surfaceGround[idx] = isUrbanPavedVilla ? GROUND_TYPE.PAWEMENT : GROUND_TYPE.FIELD;
                             map.surfaceLayer[idx] = 2;
                         }
                     }
@@ -1039,7 +1046,6 @@ class WorldObjectEngine {
         }
 
         this.registerEstateInteriors();
-        this.generate3DStreetProps();
         this.initVillaHeists();
     }
 
@@ -2978,7 +2984,13 @@ class WorldObjectEngine {
                 const px = (c + 0.5) * TILE_SIZE + curbDx;
                 const py = (r + 0.5) * TILE_SIZE + curbDy;
 
-                // Ensure not blocking any interior door, tree/palm canopy, café parasol, soda machine, streetlamp, or mission payphone
+                // Ensure not blocking any parking bay, surface parking lot, interior door, tree/palm canopy, café parasol, soda machine, streetlamp, or mission payphone
+                if (Array.isArray(map.curbParkingStrips) && map.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) {
+                    continue;
+                }
+                if (Array.isArray(map.surfaceParkingLots) && map.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) {
+                    continue;
+                }
                 if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - px, it.doorY - py) < 52)) {
                     continue;
                 }
@@ -3193,6 +3205,7 @@ class WorldObjectEngine {
             return true;
         };
 
+        this.estateDriveways = [];
         for (let i = 0; i < this.instances.length; i++) {
             const inst = this.instances[i];
             if (!inst.drivewayCars || inst.drivewayCars.length === 0) continue;
@@ -3294,6 +3307,20 @@ class WorldObjectEngine {
                 }
 
                 const specKey = dc.spec || sprToSpec[dc.sprIdx] || "STINGER_CABRIO";
+                if (
+                    inst.district === "SOUTH BEACH" ||
+                    inst.district === "LITTLE HAITI" ||
+                    inst.district === "LITTLE HAVANA" ||
+                    inst.district === "STAR ISLAND" ||
+                    inst.district === "VENETIAN ISLANDS"
+                ) {
+                    this.estateDriveways.push({
+                        x: chosen.vx,
+                        y: chosen.vy,
+                        z: bz,
+                        angle: chosen.vang
+                    });
+                }
                 if (typeof Vehicle === "function") {
                     const v = new Vehicle(`estate_${inst.id}_car_${ci}`, specKey, chosen.vx, chosen.vy, chosen.vang);
                     v.z = bz;

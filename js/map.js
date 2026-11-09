@@ -803,9 +803,12 @@ class LeonidaMap {
                     // Keep only ~28% of circular planters asymmetrically across intersections (and 0% inside prison/airport),
                     // replacing the remaining ~72% with their natural adjacent sidewalk stone paver (lid 8 or lid 9).
                     const planterHash = (((c * 92837111) ^ (r * 689287499) ^ ((c * r) * 283927)) >>> 0) % 100;
-                    const keepPlanter = !isInsidePrisonOrAirport && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28);
+                    const planterX = (c + 0.5) * TILE_SIZE;
+                    const planterY = (r + 0.5) * TILE_SIZE;
+                    const tooCloseTree = this.trees.some(tr => Math.hypot(tr.x - planterX, tr.y - planterY) < 96.0);
+                    const keepPlanter = !isInsidePrisonOrAirport && !tooCloseTree && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28);
                     if (keepPlanter) {
-                        this.trees.push({ x: (c + 0.5) * TILE_SIZE, y: (r + 0.5) * TILE_SIZE, z: 2.0, scale: 1.0 });
+                        this.trees.push({ x: planterX, y: planterY, z: 2.0, scale: 1.0 });
                     } else {
                         const gIdx1 = (1 * MAP_ROWS + r) * MAP_COLS + c;
                         const origIdx1 = this.voxelGrid[gIdx1];
@@ -988,15 +991,20 @@ class LeonidaMap {
                 }
 
                 if (chosenKind) {
-                    this.vicePalms.push({
-                        kind: chosenKind,
-                        x: posX,
-                        y: posY,
-                        z: plantZ,
-                        scale: scaleMul,
-                        height: heightMul,
-                        angle: ((c * 23 + r * 41) % 628) * 0.01
-                    });
+                    const tooCloseFlora =
+                        (Array.isArray(this.trees) && this.trees.some(tr => Math.hypot(tr.x - posX, tr.y - posY) < 58.0)) ||
+                        (Array.isArray(this.vicePalms) && this.vicePalms.some(pm => Math.hypot(pm.x - posX, pm.y - posY) < 54.0));
+                    if (!tooCloseFlora) {
+                        this.vicePalms.push({
+                            kind: chosenKind,
+                            x: posX,
+                            y: posY,
+                            z: plantZ,
+                            scale: scaleMul,
+                            height: heightMul,
+                            angle: ((c * 23 + r * 41) % 628) * 0.01
+                        });
+                    }
                 }
             }
         }
@@ -2903,6 +2911,10 @@ class LeonidaMap {
             }
         }
 
+        // 3B. Build City-Wide Off-Street Surface Parking Lots, Recessed Curbside Parking Bays & 3D Parking Meters
+        //     FIRST so streetlamps, traffic signals, flora, and 3D street props can respect exact bay boundaries!
+        this.curbParkingBays = this.buildCurbsideParkingBays();
+
         // 4. Build GTA 2 Style 3D Curb Streetlamps (this.streetlights), 3-Phase Junction Traffic Signals (this.trafficSignals) & Vice City Streetscape Details
         this.streetlights = [];
         this.trafficSignals = [];
@@ -2924,16 +2936,17 @@ class LeonidaMap {
                 const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
                 const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
 
-                // Signalized Urban Intersections (1 NS + 1 EW gantry per intersection; ignore parking bays/lots!)
+                // Signalized Urban Intersections (1 NS + 1 EW gantry per intersection, including East-side T-junctions; ignore parking bays/lots!)
                 const isUrbanSignalZone = (c >= urbanSigMinX && c <= urbanSigMaxX && r >= urbanSigMinY && r <= urbanSigMaxY);
                 const eIsActiveRoad = eRoad && this.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + (c + 1)] !== this.roadParkingNavIdx;
+                const wIsActiveRoad = wRoad && this.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + (c - 1)] !== this.roadParkingNavIdx;
                 const sIsActiveRoad = sRoad && this.voxelGrid[(2 * MAP_ROWS + (r + 1)) * MAP_COLS + c] !== this.roadParkingNavIdx;
                 const nIsActiveRoad = nRoad && this.voxelGrid[(2 * MAP_ROWS + (r - 1)) * MAP_COLS + c] !== this.roadParkingNavIdx;
-                if (isUrbanSignalZone && roadCount === 2 && eIsActiveRoad && (sIsActiveRoad || nIsActiveRoad)) {
-                    const dcCorner = 1;
-                    const drCorner = sRoad ? 1 : -1;
-                    // NW corner (eRoad && sRoad) -> 1 NS signal; SW corner (eRoad && nRoad) -> 1 EW signal
-                    const isNS = sRoad;
+                if (isUrbanSignalZone && roadCount === 2 && (eIsActiveRoad || wIsActiveRoad) && (sIsActiveRoad || nIsActiveRoad)) {
+                    const dcCorner = eIsActiveRoad ? 1 : -1;
+                    const drCorner = sIsActiveRoad ? 1 : -1;
+                    // NW/NE corner (sRoad) -> 1 NS signal; SW/SE corner (nRoad) -> 1 EW signal
+                    const isNS = sIsActiveRoad;
                     const axis = isNS ? "NS" : "EW";
                     const tooClose = this.trafficSignals.some(
                         ts => ts.axis === axis && Math.abs(ts.c - c) < 7 && Math.abs(ts.r - r) < 6
@@ -2946,7 +2959,7 @@ class LeonidaMap {
                         const dirY = isNS ? 0 : drCorner;
                         const headX = baseX + dirX * 32.0;
                         const headY = baseY + dirY * 32.0;
-                        const armAngle = isNS ? 0 : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
+                        const armAngle = isNS ? (dcCorner > 0 ? 0 : Math.PI) : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
                         this.trafficSignals.push({
                             c,
                             r,
@@ -3012,11 +3025,18 @@ class LeonidaMap {
                 if (this.streetlights.some(sl => Math.hypot(sl.c - c, sl.r - r) < 4.5)) continue;
 
                 const surfZ = this.surfaceLayer[idx] || 2.0;
-                const isParkingEsplanade = Boolean(this.boulevardParkingEsplanadeMask && this.boulevardParkingEsplanadeMask[idx]);
-                // On boulevard parking esplanades, position the streetlamp base on the raised pedestrian sidewalk behind the parking bay curb (-15px)
-                const baseX = (c + 0.5) * TILE_SIZE + dc * (isParkingEsplanade ? -15.0 : 22.0);
-                const baseY = (r + 0.5) * TILE_SIZE + dr * (isParkingEsplanade ? -15.0 : 22.0);
-                const headX = (c + 0.5) * TILE_SIZE + dc * 40.0;
+                const activeStrip = Array.isArray(this.curbParkingStrips)
+                    ? this.curbParkingStrips.find(st => st.c === c && r >= st.r0 && r <= st.r1)
+                    : null;
+                // When a recessed curbside parking bay is present on this block, place the streetlamp on the sidewalk behind the bay curb
+                // with a compact 12px luminaire arm so the pole never slices across parked cars! When no bay is present, use the street curb (+22px).
+                const baseX = activeStrip
+                    ? (activeStrip.roadEdgeX - dc * (activeStrip.bayDepth + 6.0))
+                    : ((c + 0.5) * TILE_SIZE + dc * 22.0);
+                const baseY = (r + 0.5) * TILE_SIZE + dr * 22.0;
+                const headX = activeStrip
+                    ? (baseX + dc * 12.0)
+                    : ((c + 0.5) * TILE_SIZE + dc * 40.0);
                 const headY = (r + 0.5) * TILE_SIZE + dr * 40.0;
                 const armAngle = Math.atan2(dr, dc);
 
@@ -3422,6 +3442,8 @@ class LeonidaMap {
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
                 if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) return false;
+                if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) return false;
+                if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                 return true;
             });
 
@@ -3438,6 +3460,8 @@ class LeonidaMap {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
                     if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) return false;
+                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) return false;
+                    if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
                         const gt = this.surfaceGround[r * MAP_COLS + c];
                         if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
@@ -3445,6 +3469,16 @@ class LeonidaMap {
                     for (let i = 0; i < payphoneSpots.length; i++) {
                         if (Math.hypot(tr.x - payphoneSpots[i][0], tr.y - payphoneSpots[i][1]) < 58) return false;
                     }
+                    return true;
+                });
+            }
+
+            if (Array.isArray(this.viceStreetDetails) && this.viceStreetDetails.length > 0) {
+                this.viceStreetDetails = this.viceStreetDetails.filter(vd => {
+                    const c = Math.floor(vd.x / TILE_SIZE);
+                    const r = Math.floor(vd.y / TILE_SIZE);
+                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) return false;
+                    if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                     return true;
                 });
             }
@@ -3475,8 +3509,11 @@ class LeonidaMap {
             }
         }
 
-        // 18. Build City-Wide Off-Street Surface Parking Lots, Recessed Curbside Parking Bays & 3D Parking Meters
-        this.curbParkingBays = this.buildCurbsideParkingBays();
+        // 18. Generate 3D Interactive Street Props AFTER parking bays, streetlamps, traffic signals, and streetscape details exist
+        if (this.objectEngine && typeof this.objectEngine.generate3DStreetProps === "function") {
+            this.objectEngine.streetPropsGenerated = false;
+            this.objectEngine.generate3DStreetProps();
+        }
 
         if (districtsMeta && Array.isArray(districtsMeta)) {
             this.districts = districtsMeta;
@@ -4007,6 +4044,8 @@ class LeonidaMap {
                 const roadEdgeX = (c + (dc > 0 ? 1 : 0)) * TILE_SIZE;
                 const bayDepth = 42.0;
                 const surfZ = this.surfaceLayer[r0 * MAP_COLS + c] || 2.0;
+                const adjRoadLid = this.getBlockInfo(c + dc, r0, 1)?.lid || 0;
+                const darkAsphalt = (adjRoadLid === 2 || adjRoadLid === 75 || adjRoadLid === 81 || adjRoadLid === 82);
 
                 this.curbParkingStrips.push({
                     c,
@@ -4018,6 +4057,7 @@ class LeonidaMap {
                     yMax,
                     bayDepth,
                     z: surfZ,
+                    darkAsphalt,
                     seed: sideHash
                 });
 

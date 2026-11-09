@@ -856,16 +856,19 @@ class RetroRenderer {
                         float dRoadPx = (1.0 - uBay) * wPx;
                         float dEndPx  = min(vBay, 1.0 - vBay) * hPx;
 
-                        // Diagonal 45-degree curb flare at the North/South entry and exit of curbside parallel bays
+                        // Smooth S-curve curb flare at the North/South entry and exit of curbside parallel bays:
+                        // At dEndPx = 0, taperIn = wPx - 8.0 so dCurbPx = dSidePx - (wPx - 8.0) = 8.0 - dRoadPx,
+                        // aligning the curb stone (0..2px), shadow (2..3px), gutter (3..4px), and yellow line (5..7px)
+                        // to 0.000px with the street tile's own curb! In the bay middle (dEndPx >= 15.0), taperIn = 0
+                        // so dCurbPx = dSidePx seamlessly erases the road's curb and yellow line across the 8px overlap.
+                        float taperT = clamp(1.0 - dEndPx / 15.0, 0.0, 1.0);
+                        float taperCurve = taperT * taperT * (3.0 - 2.0 * taperT);
                         float taperIn = (modeFlag > 0.5)
-                            ? max(0.0, 13.0 - dEndPx) * ((wPx - 8.0) / 13.0)
+                            ? taperCurve * (wPx - 8.0)
                             : 0.0;
                         float dCurbPx = (modeFlag > 0.5)
                             ? (dSidePx - taperIn)
                             : min(min(dSidePx, dRoadPx), dEndPx);
-                        if (modeFlag > 0.5 && dRoadPx <= 7.8) {
-                            dCurbPx = 99.0; // Seamless overlap erasing the street's yellow curb line
-                        }
                         if (dCurbPx < 0.0) discard;
 
                         vec2 p = vWorldPos.xz;
@@ -873,7 +876,8 @@ class RetroRenderer {
                         float mid   = sNoise(p * 4.0 + 13.0);
                         float grain = sHash(floor(p * 40.0));
                         float fine  = sHash(floor(p * 96.0) + 19.0);
-                        vec3 base = vec3(0.255, 0.285, 0.310);
+                        float darkFamily = step(1.25, modeFlag);
+                        vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
                         vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
                         col *= 0.94 + grain * 0.05 + fine * 0.08;
                         col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);
@@ -882,7 +886,7 @@ class RetroRenderer {
                         float seam = 1.0 - smoothstep(0.0, 0.022, abs(sNoise(p * 1.1 + 57.0) - 0.5));
                         col *= 1.0 - seam * 0.12 * step(0.68, sNoise(p * 0.3 + 3.0));
 
-                        // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter along the sidewalk edge (matching cityFS junctionCurb)
+                        // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter + Continuous Worn Yellow Curb Line (matching cityFS)
                         if (dCurbPx < 2.0) {
                             col = mix(vec3(0.83, 0.80, 0.75), vec3(0.72, 0.69, 0.64), dCurbPx * 0.5);
                         } else if (dCurbPx < 3.0) {
@@ -890,6 +894,10 @@ class RetroRenderer {
                         } else if (dCurbPx < 4.2) {
                             float gMix = (dCurbPx - 3.0) / 1.2;
                             col = mix(vec3(0.18, 0.21, 0.24), col, gMix);
+                        } else if (modeFlag > 0.5 && dCurbPx >= 5.0 && dCurbPx < 7.0) {
+                            float yWear = clamp(0.68 + sNoise(p * 7.5 + 43.0) * 0.32 - step(0.72, sHash(floor(p * 36.0))) * 0.28, 0.22, 0.88);
+                            vec3 yPaint = vec3(0.95, 0.77, 0.20) * (0.90 + sNoise(p * 9.0 + 71.0) * 0.12);
+                            col = mix(col, yPaint, yWear);
                         }
 
                         col = applyRoadLighting(col);
@@ -5903,10 +5911,10 @@ class RetroRenderer {
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -1.0, -1.0, -1.0, -1.0, r, g, b, a, drawOrder);
     }
 
-    pushAsphaltBayQuad3D(xPx, yPx, zBlocks, wPx, hPx, isCurbBay = true, dc = 1, drawOrder = 1) {
+    pushAsphaltBayQuad3D(xPx, yPx, zBlocks, wPx, hPx, isCurbBay = true, dc = 1, drawOrder = 1, darkAsphalt = false) {
         const u0 = (isCurbBay && dc < 0) ? -1.5 : -2.5;
         const u1 = (isCurbBay && dc < 0) ? -2.5 : -1.5;
-        const modeFlag = isCurbBay ? 1.0 : 0.25;
+        const modeFlag = isCurbBay ? (darkAsphalt ? 1.5 : 1.0) : 0.25;
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, 0, u0, 0.0, u1, 1.0, modeFlag, wPx, hPx, 1.0, drawOrder);
     }
 
@@ -9547,8 +9555,33 @@ class RetroRenderer {
                     stripH + 4.0,
                     true,
                     st.dc,
-                    SPRITE_DRAW_ORDER.TIRE_MARKS
+                    SPRITE_DRAW_ORDER.TIRE_MARKS,
+                    Boolean(st.darkAsphalt)
                 );
+            }
+        }
+        if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.estateDriveways)) {
+            for (let di = 0; di < this.map.objectEngine.estateDriveways.length; di++) {
+                const dw = this.map.objectEngine.estateDriveways[di];
+                if (dw.x < minX - 64 || dw.x > maxX + 64 || dw.y < minY - 64 || dw.y > maxY + 64) continue;
+                const dz = dw.z || 2.0;
+                const ca = Math.cos(dw.angle || 0);
+                const sa = Math.sin(dw.angle || 0);
+                // Architectural private villa parking pad (paved dark slate border + worn corner L-brackets + concrete wheel stop)
+                this.pushSolidQuad3D(dw.x, dw.y, dz + 0.011, 66.0, 36.0, dw.angle || 0, 0.22, 0.24, 0.27, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(dw.x, dw.y, dz + 0.012, 62.0, 32.0, dw.angle || 0, 0.27, 0.30, 0.33, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                for (const sgnX of [-1, 1]) {
+                    for (const sgnY of [-1, 1]) {
+                        const lx = dw.x + ca * (sgnX * 29.0) - sa * (sgnY * 14.5);
+                        const ly = dw.y + sa * (sgnX * 29.0) + ca * (sgnY * 14.5);
+                        this.pushWornPaintQuad3D(lx - ca * (sgnX * 4.5), ly - sa * (sgnX * 4.5), dz + 0.014, 9.0, 1.5, dw.angle || 0, 0.85, 0.82, 0.74, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushWornPaintQuad3D(lx - (-sa * (sgnY * 4.0)), ly - (ca * (sgnY * 4.0)), dz + 0.014, 1.5, 8.0, dw.angle || 0, 0.85, 0.82, 0.74, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+                const stopX = dw.x + ca * 24.5;
+                const stopY = dw.y + sa * 24.5;
+                this.pushSolidQuad3D(stopX + 1.0, stopY + 1.0, dz + 0.015, 3.2, 22.0, dw.angle || 0, 0.06, 0.08, 0.11, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(stopX, stopY, dz + 0.018, 2.6, 21.0, dw.angle || 0, 0.78, 0.76, 0.70, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
         if (this.map && Array.isArray(this.map.curbParkingBays)) {
