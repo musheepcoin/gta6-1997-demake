@@ -596,6 +596,32 @@ class WorldObjectEngine {
             { name: "STAR ISLAND HELIPAD DROP ZONE",          x: 352.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "OCEAN DRIVE ROOFTOP PARACHUTE PAD",      x: 441.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 20. Official GTA 6 Vice Beach Kitesurfing / Foilboard Launch Stands & VIP Red-Carpet Valet Podiums (Loop 13)
+        this.kitesurfStands = [
+            { name: "NORTH BEACH KITESURF & FOIL LAUNCH",     x: 476.5 * TILE_SIZE, y: 118.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.4 },
+            { name: "MID-BEACH NEON FOILBOARD STATION",       x: 476.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 1.8 },
+            { name: "SOUTH POINTE WIND-KITE LAUNCH",          x: 476.5 * TILE_SIZE, y: 336.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.2 },
+            { name: "BAHIA HONDA KEYS KITESURF CAMP",         x: 204.5 * TILE_SIZE, y: 478.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 4.6 }
+        ];
+        this.luxuryValetStands = [
+            { name: "HOTEL DIXON VIP EXOTIC VALET",           x: 443.5 * TILE_SIZE, y: 282.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CARLYLE ART DECO GRAND VALET",           x: 443.5 * TILE_SIZE, y: 238.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "STAR ISLAND PALAZZO VIP VALET",          x: 351.5 * TILE_SIZE, y: 162.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "DOWNTOWN BAYFRONT TOWER VALET",          x: 286.5 * TILE_SIZE, y: 206.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 21. Official GTA 6 Grassrivers Gator-Safari Tour Docks & Wynwood Live Graffiti Mural Scaffolds (Loop 14)
+        this.gatorTourDocks = [
+            { name: "GRASSRIVERS GATOR SAFARI BOARDWALK",     x: 108.5 * TILE_SIZE, y: 408.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.6 },
+            { name: "LAKE LEONIDA CYPRESS GATOR OUTPOST",     x: 114.5 * TILE_SIZE, y: 248.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 2.0 },
+            { name: "EVERGLADES SWAMP GATOR LOOKOUT",         x: 72.5 * TILE_SIZE,  y: 428.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.4 },
+            { name: "NORTH SHORE LAGOON GATOR DOCK",          x: 142.5 * TILE_SIZE, y: 58.5 * TILE_SIZE,  z: 2.0, cooldown: 0, seed: 4.8 }
+        ];
+        this.graffitiScaffolds = [
+            { name: "WYNWOOD WALLS NEON MURAL SCAFFOLD",      x: 184.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CROSSTOWN UNDERPASS GRAFFITI RIG",       x: 202.5 * TILE_SIZE, y: 142.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI CARIBBEAN ART WALL",        x: 222.5 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH BEACH ALLEYWAY NEON MURAL",        x: 431.5 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1085,6 +1111,30 @@ class WorldObjectEngine {
                 for (const bj of this.baseJumpPads) {
                     snapOffRoad(bj);
                     clearZones.push({ x: bj.x, y: bj.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.kitesurfStands)) {
+                for (const ks of this.kitesurfStands) {
+                    snapOffRoad(ks);
+                    clearZones.push({ x: ks.x, y: ks.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.luxuryValetStands)) {
+                for (const lv of this.luxuryValetStands) {
+                    snapOffRoad(lv);
+                    clearZones.push({ x: lv.x, y: lv.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.gatorTourDocks)) {
+                for (const gt of this.gatorTourDocks) {
+                    snapOffRoad(gt);
+                    clearZones.push({ x: gt.x, y: gt.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.graffitiScaffolds)) {
+                for (const gs of this.graffitiScaffolds) {
+                    snapOffRoad(gs);
+                    clearZones.push({ x: gs.x, y: gs.y, r: 42 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2725,6 +2775,152 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-20. Official GTA 6 Vice Beach Kitesurf & Foilboard Launch Stations ([E]!)
+        if (Array.isArray(this.kitesurfStands)) {
+            for (const ks of this.kitesurfStands) {
+                if ((ks.cooldown || 0) <= 0 && Math.hypot(px - ks.x, py - ks.y) < 78) {
+                    ks.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(5000);
+                    if (typeof game.addCash === "function") game.addCash(5000, `🪁 ${ks.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🪁 VICE BEACH KITESURF & HYDROFOIL!`,
+                            `${ks.name} • AERIAL WAVE CARVE +$5,000 + 150 HP/ARMOR & +1X!`,
+                            "#06b6d4",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ks.x,
+                            y: ks.y,
+                            z: 2.70,
+                            text: `🪁 KITESURF BIG AIR! +$5,000 + 150 HP/ARMOR!`,
+                            color: "#06b6d4",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-21. Official GTA 6 Ocean Drive & Star Island VIP Red-Carpet Valet Podiums ([E]!)
+        if (Array.isArray(this.luxuryValetStands)) {
+            for (const lv of this.luxuryValetStands) {
+                if ((lv.cooldown || 0) <= 0 && Math.hypot(px - lv.x, py - lv.y) < 82) {
+                    lv.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (game.player.inVehicle) {
+                        game.player.inVehicle.hp = game.player.inVehicle.maxHp || 100;
+                        game.player.inVehicle.damage = 0;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(6000);
+                    if (typeof game.addCash === "function") game.addCash(6000, `🔑 ${lv.name} VIP VALET!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🔑 VIP RED-CARPET EXOTIC VALET!`,
+                            `${lv.name} • FULL REPAIR + 150 ARMOR + +$6,000 & +1X!`,
+                            "#facc15",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: lv.x,
+                            y: lv.y,
+                            z: 2.72,
+                            text: `🔑 VIP VALET SERVICE! +$6,000 + FULL REPAIR/ARMOR!`,
+                            color: "#facc15",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-22. Official GTA 6 Grassrivers & Lake Leonida Gator-Safari Wildlife Tour Docks ([E]!)
+        if (Array.isArray(this.gatorTourDocks)) {
+            for (const gt of this.gatorTourDocks) {
+                if ((gt.cooldown || 0) <= 0 && Math.hypot(px - gt.x, py - gt.y) < 82) {
+                    gt.cooldown = 16.0;
+                    this.cameraFlashTimer = 0.35;
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") game.addScore(6000);
+                    if (typeof game.addCash === "function") game.addCash(6000, `🐊 ${gt.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🐊 LEONIDA BULL-GATOR SAFARI!`,
+                            `${gt.name} • GATOR FEED & SNAPSHOT +$6,000 + 150 ARMOR & +1X!`,
+                            "#4ade80",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gt.x,
+                            y: gt.y,
+                            z: 2.70,
+                            text: `🐊 BULL-GATOR SAFARI! +$6,000 + 150 ARMOR!`,
+                            color: "#4ade80",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-23. Official GTA 6 Wynwood & Little Haiti Live Street-Art Graffiti Scaffolds ([E]!)
+        if (Array.isArray(this.graffitiScaffolds)) {
+            for (const gs of this.graffitiScaffolds) {
+                if ((gs.cooldown || 0) <= 0 && Math.hypot(px - gs.x, py - gs.y) < 78) {
+                    gs.cooldown = 18.0;
+                    if (typeof game.clearWanted === "function") {
+                        game.clearWanted();
+                    } else {
+                        game.wantedLevel = 0;
+                        game.wantedDecayTimer = 0;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(5500);
+                    if (typeof game.addCash === "function") game.addCash(5500, `🎨 ${gs.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎨 WYNWOOD MASTERPIECE MURAL TAGGED!`,
+                            `${gs.name} • 0★ WANTED CLEARED + +$5,500 & +1X!`,
+                            "#ec4899",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gs.x,
+                            y: gs.y,
+                            z: 2.70,
+                            text: `🎨 STREET MURAL TAGGED! +$5,500 + 0★ WANTED!`,
+                            color: "#ec4899",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -3659,6 +3855,26 @@ class WorldObjectEngine {
         if (Array.isArray(this.baseJumpPads)) {
             for (const bj of this.baseJumpPads) {
                 if ((bj.cooldown || 0) > 0) bj.cooldown = Math.max(0, bj.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.kitesurfStands)) {
+            for (const ks of this.kitesurfStands) {
+                if ((ks.cooldown || 0) > 0) ks.cooldown = Math.max(0, ks.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.luxuryValetStands)) {
+            for (const lv of this.luxuryValetStands) {
+                if ((lv.cooldown || 0) > 0) lv.cooldown = Math.max(0, lv.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.gatorTourDocks)) {
+            for (const gt of this.gatorTourDocks) {
+                if ((gt.cooldown || 0) > 0) gt.cooldown = Math.max(0, gt.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.graffitiScaffolds)) {
+            for (const gs of this.graffitiScaffolds) {
+                if ((gs.cooldown || 0) > 0) gs.cooldown = Math.max(0, gs.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -7606,6 +7822,56 @@ class WorldObjectEngine {
                 emitSolidBox3D(bj.x, bj.y, 1, 0, 14, -10, 7.5, 2.4, bz + 0.28, bz + 0.33, [0.98, 0.46, 0.12], 1);
             }
         }
+        // 22J. OFFICIAL GTA 6 KITESURF FOIL STATIONS, VIP RED-CARPET VALET PODIUMS, GATOR-SAFARI DOCKS & GRAFFITI SCAFFOLDS (LOOPS 13 & 14)
+        if (Array.isArray(this.kitesurfStands)) {
+            for (const ks of this.kitesurfStands) {
+                const bz = ks.z || 2.0;
+                emitAOShadow3D(ks.x, ks.y, 1, 0, 0, 0, 28, 24, bz, 0.32);
+                // Kitesurf beach timber rack + neon hydrofoil boards + arched rainbow kite canopy on display
+                emitSolidBox3D(ks.x, ks.y, 1, 0, -4, 0, 16, 18, bz, bz + 0.04, [0.64, 0.46, 0.26], 8);
+                emitSolidBox3D(ks.x, ks.y, 1, 0, -4, -5, 12, 3.6, bz + 0.04, bz + 0.08, [0.10, 0.88, 0.98], 1);
+                emitSolidBox3D(ks.x, ks.y, 1, 0, -4,  5, 12, 3.6, bz + 0.04, bz + 0.08, [0.98, 0.26, 0.72], 1);
+                emitGableRoof3D(ks.x, ks.y, 1, 0, 6, 0, 14, 22, bz + 0.12, bz + 0.32, [0.12, 0.92, 0.86], false, 1);
+            }
+        }
+        if (Array.isArray(this.luxuryValetStands)) {
+            for (const lv of this.luxuryValetStands) {
+                const bz = lv.z || 2.0;
+                emitAOShadow3D(lv.x, lv.y, 1, 0, 0, 0, 28, 22, bz, 0.35);
+                // VIP Red-Carpet Runner + Gold Brass Stanchions + Crimson Valet Umbrella & Key Podium
+                emitSolidBox3D(lv.x, lv.y, 1, 0, 0, 0, 24, 14, bz, bz + 0.025, [0.82, 0.12, 0.18], 11);
+                emitSolidBox3D(lv.x, lv.y, 1, 0, -6, 0, 7, 8, bz + 0.025, bz + 0.18, [0.16, 0.18, 0.24], 5);
+                emitSolidBox3D(lv.x, lv.y, 1, 0, -6, 0, 8, 9, bz + 0.17, bz + 0.20, [0.98, 0.82, 0.18], 1);
+                emitCylinder3D(lv.x, lv.y, -6, 0, 0.9, 0.9, bz + 0.20, bz + 0.36, 6, [0.96, 0.84, 0.24], 5, false);
+                emitCylinder3D(lv.x, lv.y, -6, 0, 9.5, 1.5, bz + 0.34, bz + 0.42, 8, [0.92, 0.16, 0.24], 1, true);
+            }
+        }
+        if (Array.isArray(this.gatorTourDocks)) {
+            for (const gt of this.gatorTourDocks) {
+                const bz = gt.z || 2.0;
+                emitAOShadow3D(gt.x, gt.y, 1, 0, 0, 0, 34, 24, bz, 0.35);
+                // Weathered Cypress Swamp Boardwalk Deck + Tiki Roof + 3D Basking Bull-Alligator
+                emitSolidBox3D(gt.x, gt.y, 1, 0, -4, 0, 22, 18, bz, bz + 0.06, [0.48, 0.34, 0.20], 8);
+                emitGableRoof3D(gt.x, gt.y, 1, 0, -4, 0, 24, 20, bz + 0.24, bz + 0.35, [0.76, 0.60, 0.32], true, 8);
+                // 3D Bull Alligator basking beside the dock (armored olive-green body, snout & ridged tail)
+                emitSolidBox3D(gt.x, gt.y, 1, 0, 14, 0, 16, 5.5, bz, bz + 0.06, [0.22, 0.44, 0.20], 6);
+                emitSolidBox3D(gt.x, gt.y, 1, 0, 23, 0,  7, 4.0, bz, bz + 0.045, [0.26, 0.48, 0.22], 6);
+                emitSolidBox3D(gt.x, gt.y, 1, 0,  4, 0,  8, 3.0, bz, bz + 0.045, [0.18, 0.38, 0.16], 6);
+            }
+        }
+        if (Array.isArray(this.graffitiScaffolds)) {
+            for (const gs of this.graffitiScaffolds) {
+                const bz = gs.z || 2.0;
+                emitAOShadow3D(gs.x, gs.y, 1, 0, 0, 0, 30, 18, bz, 0.35);
+                // Wynwood Street-Art Mural Wall + Two-Tier Painter's Steel Scaffold + Neon Spray Panels
+                emitSolidBox3D(gs.x, gs.y, 1, 0, -5, 0, 6, 24, bz, bz + 0.38, [0.18, 0.16, 0.26], 3);
+                emitSolidBox3D(gs.x, gs.y, 1, 0, -1.8, -6, 1.2, 9, bz + 0.08, bz + 0.34, [0.98, 0.22, 0.68], 1);
+                emitSolidBox3D(gs.x, gs.y, 1, 0, -1.8,  5, 1.2, 9, bz + 0.08, bz + 0.34, [0.14, 0.90, 0.98], 1);
+                emitSolidBox3D(gs.x, gs.y, 1, 0,  4, 0, 8, 22, bz + 0.16, bz + 0.185, [0.64, 0.46, 0.24], 8);
+                emitCylinder3D(gs.x, gs.y, 7, -10, 0.8, 0.8, bz, bz + 0.34, 6, [0.76, 0.80, 0.86], 5, false);
+                emitCylinder3D(gs.x, gs.y, 7,  10, 0.8, 0.8, bz, bz + 0.34, 6, [0.76, 0.80, 0.86], 5, false);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -10679,6 +10945,55 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.kitesurfStands)) {
+            for (let i = 0; i < this.kitesurfStands.length; i++) {
+                const ks = this.kitesurfStands[i];
+                if (ks.x < minX - 140 || ks.x > maxX + 140 || ks.y < minY - 140 || ks.y > maxY + 140) continue;
+                if ((ks.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.4 + ks.seed) * 3.2;
+                    renderer.pushSolidQuad3D(ks.x, ks.y, 2.028, rSz, rSz, renderer.time * 1.5, 0.08, 0.88, 0.96, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // High-altitude neon kitesurf wing carving in figure-8s above the surf!
+                const kAng = renderer.time * 1.4 + ks.seed;
+                const kx = ks.x + 28 + Math.cos(kAng) * 14.0;
+                const ky = ks.y + Math.sin(kAng * 2.0) * 18.0;
+                renderer.pushSolidQuad3D(kx, ky, 2.82, 16, 6.5, kAng, 0.98, 0.28, 0.72, 0.92, SPRITE_DRAW_ORDER.TREES);
+                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 5.0 + i) % 4), ks.x + 12, ks.y, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.luxuryValetStands)) {
+            for (let i = 0; i < this.luxuryValetStands.length; i++) {
+                const lv = this.luxuryValetStands[i];
+                if (lv.x < minX - 120 || lv.x > maxX + 120 || lv.y < minY - 120 || lv.y > maxY + 120) continue;
+                if ((lv.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.2 + i) * 3.0;
+                    renderer.pushSolidQuad3D(lv.x, lv.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.98, 0.84, 0.18, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("vc_suit", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), lv.x + 4, lv.y + 10, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.gatorTourDocks)) {
+            for (let i = 0; i < this.gatorTourDocks.length; i++) {
+                const gt = this.gatorTourDocks[i];
+                if (gt.x < minX - 130 || gt.x > maxX + 130 || gt.y < minY - 130 || gt.y > maxY + 130) continue;
+                if ((gt.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.0 + gt.seed) * 3.2;
+                    renderer.pushSolidQuad3D(gt.x, gt.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.28, 0.92, 0.46, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("vc_biker", 50 + (Math.floor(renderer.time * 4.0 + i) % 4), gt.x - 4, gt.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.graffitiScaffolds)) {
+            for (let i = 0; i < this.graffitiScaffolds.length; i++) {
+                const gs = this.graffitiScaffolds[i];
+                if (gs.x < minX - 120 || gs.x > maxX + 120 || gs.y < minY - 120 || gs.y > maxY + 120) continue;
+                if ((gs.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.8 + i) * 3.2;
+                    renderer.pushSolidQuad3D(gs.x, gs.y, 2.028, rSz, rSz, -renderer.time * 1.5, 0.96, 0.26, 0.72, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 5.2 + i) % 4), gs.x + 4, gs.y, 2.20, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
     }
 
     /* ========================================================================
@@ -11330,6 +11645,66 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.kitesurfStands)) {
+            for (const ks of this.kitesurfStands) {
+                if ((ks.cooldown || 0) <= 0 && Math.hypot(px - ks.x, py - ks.y) < 110) {
+                    const scr = renderer.worldToScreen(ks.x, ks.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#06b6d4";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#22d3ee";
+                    ctx.fillText(`🪁 [E] LAUNCH KITESURF & FOIL (150 HP/ARMOR & +$5,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.luxuryValetStands)) {
+            for (const lv of this.luxuryValetStands) {
+                if ((lv.cooldown || 0) <= 0 && Math.hypot(px - lv.x, py - lv.y) < 115) {
+                    const scr = renderer.worldToScreen(lv.x, lv.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`🔑 [E] VIP EXOTIC VALET (FULL REPAIR + 150 ARMOR & +$6,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.gatorTourDocks)) {
+            for (const gt of this.gatorTourDocks) {
+                if ((gt.cooldown || 0) <= 0 && Math.hypot(px - gt.x, py - gt.y) < 115) {
+                    const scr = renderer.worldToScreen(gt.x, gt.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText(`🐊 [E] BULL-GATOR SAFARI TOUR (+$6,000 & 150 ARMOR)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.graffitiScaffolds)) {
+            for (const gs of this.graffitiScaffolds) {
+                if ((gs.cooldown || 0) <= 0 && Math.hypot(px - gs.x, py - gs.y) < 110) {
+                    const scr = renderer.worldToScreen(gs.x, gs.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#ec4899";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#f472b6";
+                    ctx.fillText(`🎨 [E] TAG WYNWOOD STREET MURAL (0★ WANTED & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -11730,6 +12105,30 @@ class WorldObjectEngine {
             ctx.fillStyle = "#a855f7";
             for (const bj of this.baseJumpPads) {
                 ctx.fillRect((bj.x - 15) * sx, (bj.y - 15) * sy, 30 * sx, 30 * sy);
+            }
+        }
+        if (Array.isArray(this.kitesurfStands)) {
+            ctx.fillStyle = "#06b6d4";
+            for (const ks of this.kitesurfStands) {
+                ctx.fillRect((ks.x - 15) * sx, (ks.y - 12) * sy, 30 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.luxuryValetStands)) {
+            ctx.fillStyle = "#facc15";
+            for (const lv of this.luxuryValetStands) {
+                ctx.fillRect((lv.x - 14) * sx, (lv.y - 10) * sy, 28 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.gatorTourDocks)) {
+            ctx.fillStyle = "#4ade80";
+            for (const gt of this.gatorTourDocks) {
+                ctx.fillRect((gt.x - 16) * sx, (gt.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.graffitiScaffolds)) {
+            ctx.fillStyle = "#ec4899";
+            for (const gs of this.graffitiScaffolds) {
+                ctx.fillRect((gs.x - 15) * sx, (gs.y - 10) * sy, 30 * sx, 20 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
