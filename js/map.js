@@ -4463,6 +4463,34 @@ class LeonidaMap {
             }
         }
 
+        // Build O(1) spatial indices for recessed curb parking bays & strips (used by dynamic Vehicle AI & Pedestrian AI)
+        this.curbParkingBayByRoadTile = new Map();
+        this.curbParkingStripByCol = new Map();
+        if (Array.isArray(this.curbParkingStrips)) {
+            for (let si = 0; si < this.curbParkingStrips.length; si++) {
+                const st = this.curbParkingStrips[si];
+                let list = this.curbParkingStripByCol.get(st.c);
+                if (!list) {
+                    list = [];
+                    this.curbParkingStripByCol.set(st.c, list);
+                }
+                list.push(st);
+            }
+        }
+        for (let bi = 0; bi < bays.length; bi++) {
+            const bay = bays[bi];
+            if (!bay || bay.isLotParked || !bay.emptyStall) continue;
+            const roadC = bay.c + (bay.dc || 0);
+            const roadR = bay.r;
+            const rKey = (roadR << 16) | (roadC & 0xffff);
+            let cell = this.curbParkingBayByRoadTile.get(rKey);
+            if (!cell) {
+                cell = [];
+                this.curbParkingBayByRoadTile.set(rKey, cell);
+            }
+            cell.push(bay);
+        }
+
         // Rebuild floraGrid in case any courtyard trees were removed inside surfaceParkingLots
         if (this.floraGrid instanceof Map && Array.isArray(this.vicePalms)) {
             this.floraGrid.clear();
@@ -4484,6 +4512,26 @@ class LeonidaMap {
         }
 
         return bays;
+    }
+
+    getCurbParkingStripAt(px, py, margin = 4) {
+        if (!this.curbParkingStripByCol) return null;
+        const c = Math.floor(px / TILE_SIZE);
+        const list = this.curbParkingStripByCol.get(c);
+        if (!list) return null;
+        for (let i = 0; i < list.length; i++) {
+            const st = list[i];
+            if (py >= st.yMin - margin && py <= st.yMax + margin) {
+                const minX = st.dc > 0 ? (st.roadEdgeX - st.bayDepth - margin) : (st.roadEdgeX - margin);
+                const maxX = st.dc > 0 ? (st.roadEdgeX + margin) : (st.roadEdgeX + st.bayDepth + margin);
+                if (px >= minX && px <= maxX) return st;
+            }
+        }
+        return null;
+    }
+
+    isInsideCurbParkingBay(px, py, margin = 2) {
+        return Boolean(this.getCurbParkingStripAt(px, py, margin));
     }
 
     buildGta6Landmarks() {
@@ -5565,13 +5613,33 @@ class LeonidaMap {
     }
 
     // Exact port of AiCharacterController::ChooseWalkWaypoint (AiCharacterController.cpp lines 287-345)
-    // Enhanced with 3D structure OBB, Lummus Park lawn, and stopped-vehicle avoidance
-    chooseNextSidewalkBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, isPanic = false, vehicles = null, avoidBx = -1, avoidBy = -1) {
+    // Enhanced with 3D structure OBB, Lummus Park lawn, stopped-vehicle avoidance, directional threat fleeing, and signalized zebra crosswalk crossing
+    chooseNextSidewalkBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, isPanic = false, vehicles = null, avoidBx = -1, avoidBy = -1, navContext = null) {
         const normSeed = turnSeed > 1.0 ? (((turnSeed * 0.6180339887) % 1.0) + 1.0) % 1.0 : (((turnSeed % 1.0) + 1.0) % 1.0);
         const curBlk = this.getNavigationBlock(bx, by, zBlocks);
         const onRoadNow = curBlk && curBlk.groundType === GROUND_TYPE.ROAD;
         const curLid1 = this.getBlockInfo(bx, by, 1)?.lid || 0;
         const onLummusGrassNow = (bx >= 449 && bx <= 450 && by >= 42 && by <= 362 && curLid1 === 10);
+
+        // 0. If pedestrian is actively crossing a zebra crosswalk, keep stepping straight along (crossDirX, crossDirY) until reaching the opposite sidewalk!
+        if (navContext && navContext.isCrossingRoad && (navContext.crossDirX || navContext.crossDirY)) {
+            const cdx = navContext.crossDirX || 0;
+            const cdy = navContext.crossDirY || 0;
+            const nbx = bx + cdx;
+            const nby = by + cdy;
+            const nb = this.getNavigationBlock(nbx, nby, zBlocks);
+            if (nb && (nb.groundType === GROUND_TYPE.ROAD || nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)) {
+                return {
+                    dx: cdx,
+                    dy: cdy,
+                    bx: nbx,
+                    by: nby,
+                    angle: Math.atan2(cdy, cdx),
+                    isCrosswalkStep: nb.groundType === GROUND_TYPE.ROAD,
+                    reachedOppositeSidewalk: (nb.groundType === GROUND_TYPE.PAWEMENT || nb.groundType === GROUND_TYPE.FIELD)
+                };
+            }
+        }
 
         const cardinals = [
             { key: "U", dx: 0, dy: -1, angle: -Math.PI * 0.5 },
@@ -5669,8 +5737,76 @@ class LeonidaMap {
             }
         }
 
+        // 1B. Signalized Zebra Crosswalk Crossing at Intersections:
+        //     When a calm pedestrian on a sidewalk corner is adjacent to a stop-line/zebra crosswalk tile
+        //     and the traffic signal for vehicles on that road axis is RED (pedestrian WALK phase) with no speeding cars approaching,
+        //     allow crossing straight across the 2-lane street to the opposite sidewalk!
+        if (!isPanic && !onRoadNow && navContext && navContext.allowCrosswalk && normSeed > 0.64) {
+            for (const rDir of roadDirs) {
+                if (rDir.isUturn || rDir.blocked) continue;
+                if (!this.isStopLineBlock(rDir.bx, rDir.by)) continue;
+                // Walking horizontally (dx !== 0) crosses a North/South road -> safe when NS light is RED (!nsGreen)
+                // Walking vertically (dy !== 0) crosses an East/West road -> safe when EW light is RED (!ewGreen)
+                const walkSignalGreen = (rDir.dx !== 0) ? !navContext.nsGreen : !navContext.ewGreen;
+                if (!walkSignalGreen) continue;
+
+                // Verify that walking 2..3 tiles straight along (rDir.dx, rDir.dy) lands on a valid, unblocked opposite sidewalk
+                let oppositeSidewalk = null;
+                let roadSpanClear = true;
+                for (let step = 1; step <= 3; step++) {
+                    const tx = bx + rDir.dx * step;
+                    const ty = by + rDir.dy * step;
+                    if (tx < 2 || tx >= MAP_COLS - 2 || ty < 2 || ty >= MAP_ROWS - 2) {
+                        roadSpanClear = false;
+                        break;
+                    }
+                    const tb = this.getNavigationBlock(tx, ty, zBlocks);
+                    if (!tb) {
+                        roadSpanClear = false;
+                        break;
+                    }
+                    if (tb.groundType === GROUND_TYPE.PAWEMENT || tb.groundType === GROUND_TYPE.FIELD) {
+                        if (step >= 2 && !this.isTileBlockedForPed(tx, ty, zBlocks, vehicles)) {
+                            oppositeSidewalk = { bx: tx, by: ty, steps: step };
+                        }
+                        break;
+                    }
+                    if (tb.groundType !== GROUND_TYPE.ROAD || this.getBlockInfo(tx, ty, 1)?.lid === 25) {
+                        roadSpanClear = false;
+                        break;
+                    }
+                    // Ensure no moving or stopped vehicle is blocking or charging toward this crosswalk tile
+                    if (Array.isArray(vehicles)) {
+                        const cx = (tx + 0.5) * TILE_SIZE;
+                        const cy = (ty + 0.5) * TILE_SIZE;
+                        for (let vi = 0; vi < vehicles.length; vi++) {
+                            const v = vehicles[vi];
+                            if (!v || v.destroyed) continue;
+                            const d = Math.hypot(v.x - cx, v.y - cy);
+                            const vSpd = Math.abs(v.speed || 0);
+                            if (d < 46 || (vSpd > 24 && d < 105)) {
+                                roadSpanClear = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!roadSpanClear) break;
+                }
+                if (roadSpanClear && oppositeSidewalk) {
+                    return {
+                        ...rDir,
+                        isCrosswalkEntry: true,
+                        crossDirX: rDir.dx,
+                        crossDirY: rDir.dy,
+                        crossDestBx: oppositeSidewalk.bx,
+                        crossDestBy: oppositeSidewalk.by
+                    };
+                }
+            }
+        }
+
         // 2. AiCharacterController::ChooseWalkWaypoint:
-        //    Pedestrians NEVER step from a sidewalk (PAWEMENT/FIELD) onto a ROAD block,
+        //    Pedestrians NEVER step from a sidewalk (PAWEMENT/FIELD) onto a ROAD block (except via valid signalized crosswalk above),
         //    and always prefer unblocked tiles clear of 3D structures & stopped vehicles!
         let pool = sidewalkDirs;
         const clearPool = pool.filter((d) => !d.blocked && !d.isAvoided);
@@ -5693,6 +5829,20 @@ class LeonidaMap {
                 by: by + dy,
                 angle: revAngle
             };
+        }
+
+        // 2B. Directional Threat Evasion (Gunfire, Explosions, Car Crashes):
+        //     When panicked by a known threat source (threatX, threatY), pick the sidewalk direction that flees AWAY from the threat!
+        if (isPanic && navContext && typeof navContext.threatX === "number" && typeof navContext.threatY === "number") {
+            const curPx = (bx + 0.5) * TILE_SIZE;
+            const curPy = (by + 0.5) * TILE_SIZE;
+            const awayAng = Math.atan2(curPy - navContext.threatY, curPx - navContext.threatX);
+            pool.sort((a, b) => {
+                const diffA = Math.abs(this.normalizeAngleDiff(a.angle, awayAng));
+                const diffB = Math.abs(this.normalizeAngleDiff(b.angle, awayAng));
+                return diffA - diffB;
+            });
+            return pool[0];
         }
 
         const nonUturn = pool.filter((d) => !d.isUturn);

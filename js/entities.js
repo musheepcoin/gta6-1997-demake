@@ -1349,10 +1349,12 @@ class Vehicle {
             const fnb = map.getNavigationBlock ? map.getNavigationBlock(nbx + dx, nby + dy, curZ) : null;
             if (!fnb || fnb.groundType !== GROUND_TYPE.ROAD) continue;
 
-            // Check that no vehicle or pedestrian is occupying the adjacent lane window [-44px .. +135px]
+            // Check that no vehicle or pedestrian is occupying the adjacent lane window [-halfLenSum .. +135px]
+            // AND check rear-view mirror closing speed so we never cut off a fast-approaching vehicle or the player!
             const laneCenterX = (nbx + 0.5) * TILE_SIZE;
             const laneCenterY = (nby + 0.5) * TILE_SIZE;
             let laneClear = true;
+            const mySpd = Math.abs(this.speed || 0);
 
             if (game && Array.isArray(game.vehicles)) {
                 for (const other of game.vehicles) {
@@ -1362,9 +1364,18 @@ class Vehicle {
                     const ody = other.y - laneCenterY;
                     const longDist = odx * fx + ody * fy;
                     const latDist = Math.abs(odx * perpX + ody * perpY);
-                    if (longDist > -44 && longDist < 135 && latDist < 28) {
-                        laneClear = false;
-                        break;
+                    const halfLenSum = ((this.w || 48) + (other.w || 48)) * 0.5 + 14;
+                    if (latDist < 28) {
+                        if (longDist > -halfLenSum && longDist < 135) {
+                            laneClear = false;
+                            break;
+                        }
+                        // Rear-view mirror check: yield to fast cars or the player closing in from behind in the target lane
+                        const otherSpd = Math.abs(other.speed || 0);
+                        if (longDist <= -halfLenSum && longDist > -165 && (otherSpd > mySpd + 24 || (other.driver === "PLAYER" && otherSpd > 35))) {
+                            laneClear = false;
+                            break;
+                        }
                     }
                 }
             }
@@ -1505,11 +1516,141 @@ class Vehicle {
         const isPanicked = this.aiPanicTimer > 0 || Boolean(this.sirenActive);
         let desiredThrottle = isPanicked ? 0.78 : this.aiCruiseFactor;
         this.aiState = isPanicked ? "PANIC" : "CRUISE";
+        if (this.aiCurbParkCooldown > 0) {
+            this.aiCurbParkCooldown = Math.max(0, this.aiCurbParkCooldown - dt);
+        }
         if (this.aiPullOverTimer > 0) {
             this.aiPullOverTimer = Math.max(0, this.aiPullOverTimer - dt);
         } else if (this.aiPullOverOffset) {
             this.aiPullOverOffset *= Math.pow(0.06, dt);
             if (Math.abs(this.aiPullOverOffset) < 0.4) this.aiPullOverOffset = 0;
+        }
+
+        // Release any active curbside parking stall if panicked or no longer normal AI traffic
+        if (this.aiCurbParkingBay && (isPanicked || this.driver !== "AI_TRAFFIC")) {
+            if (this.aiCurbParkingBay._occupiedBy === this) {
+                this.aiCurbParkingBay._occupiedBy = null;
+            }
+            this.aiCurbParkingBay = null;
+            this.aiCurbParkedTimer = 0;
+        }
+
+        // 1A. Dynamic Curbside Parallel Parking Bay Pull-In & Pull-Out:
+        //     Calm civilian cars occasionally pull into an unoccupied recessed curbside bay, park for 10..18s,
+        //     and then check their mirror before smoothly merging back out into the travel lane!
+        if (
+            movedOutOfLane &&
+            !this.aiCurbParkingBay &&
+            !isPanicked &&
+            this.driver === "AI_TRAFFIC" &&
+            !this.isHeavyVehicle &&
+            !this.isMotorcycle &&
+            !this.isPolice &&
+            !this.isEmergency &&
+            (this.aiCurbParkCooldown || 0) <= 0 &&
+            this.aiChosenDir &&
+            !this.aiChosenDir.isTurn &&
+            this.aiChosenDir.dy !== 0 &&
+            map.curbParkingBayByRoadTile &&
+            this.aiTurnSeed < 0.22
+        ) {
+            const rKey0 = (by << 16) | (bx & 0xffff);
+            const rKey1 = ((by + this.aiChosenDir.dy) << 16) | (bx & 0xffff);
+            const bayList0 = map.curbParkingBayByRoadTile.get(rKey0) || [];
+            const bayList1 = map.curbParkingBayByRoadTile.get(rKey1) || [];
+            const bayCandidates = bayList0.length > 0 && bayList1.length > 0 ? bayList0.concat(bayList1) : (bayList0.length > 0 ? bayList0 : bayList1);
+            if (bayCandidates.length > 0 && game && Array.isArray(game.vehicles)) {
+                for (let bi = 0; bi < bayCandidates.length; bi++) {
+                    const bay = bayCandidates[bi];
+                    if (bay._occupiedBy && !bay._occupiedBy.destroyed && bay._occupiedBy.aiCurbParkingBay === bay) continue;
+                    const alongBay = (bay.y - this.y) * this.aiChosenDir.dy;
+                    if (alongBay < 4 || alongBay > 115) continue;
+                    let stallFree = true;
+                    for (let vi = 0; vi < game.vehicles.length; vi++) {
+                        const ov = game.vehicles[vi];
+                        if (!ov || ov === this) continue;
+                        if (Math.hypot(ov.x - bay.x, ov.y - bay.y) < 54) {
+                            stallFree = false;
+                            break;
+                        }
+                    }
+                    if (stallFree) {
+                        this.aiCurbParkingBay = bay;
+                        bay._occupiedBy = this;
+                        this.aiCurbParkedTimer = 10.0 + ((this.aiTurnSeed * 43.0) % 9.0);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (this.aiCurbParkingBay) {
+            const bay = this.aiCurbParkingBay;
+            const travelSignY = Math.sin(bay.angle) >= 0 ? 1 : -1;
+            const alongErr = (bay.y - this.y) * travelSignY;
+            const latErr = bay.x - this.x;
+            // Smoothly steer/glide laterally into the recessed bay
+            this.x += Math.max(-92 * dt, Math.min(92 * dt, latErr * Math.min(1, dt * 6.5)));
+            const angErr = this.normalizeAngle(bay.angle - this.angle);
+            this.angle += angErr * Math.min(1, dt * 10.0);
+            this.angularVelocity = 0;
+            this.steerAngleRad = 0;
+
+            if (Math.abs(alongErr) <= 10 && Math.abs(latErr) <= 5) {
+                this.x = bay.x;
+                this.angle = bay.angle;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 0;
+                this.aiState = "CURB_PARKED";
+                this.aiCurbParkedTimer = (this.aiCurbParkedTimer || 0) - dt;
+                if (this.aiCurbParkedTimer <= 0) {
+                    // Check mirror & adjacent travel lane before pulling back out into traffic
+                    const roadLaneX = (bay.c + (bay.dc || 0) + 0.5) * TILE_SIZE;
+                    let canPullOut = true;
+                    if (game && Array.isArray(game.vehicles)) {
+                        for (let vi = 0; vi < game.vehicles.length; vi++) {
+                            const ov = game.vehicles[vi];
+                            if (!ov || ov === this) continue;
+                            if (Math.abs(ov.x - roadLaneX) < 30) {
+                                const relY = (ov.y - this.y) * travelSignY;
+                                if (relY > -105 && relY < 72) {
+                                    canPullOut = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (canPullOut) {
+                        if (bay._occupiedBy === this) bay._occupiedBy = null;
+                        this.aiCurbParkingBay = null;
+                        this.aiCurbParkCooldown = 26.0;
+                        this.aiBlockX = bay.c + (bay.dc || 0);
+                        this.aiBlockY = bay.r;
+                        this.aiTargetBlockX = this.aiBlockX;
+                        this.aiTargetBlockY = this.aiBlockY + travelSignY;
+                        this.aiState = "CRUISE";
+                    } else {
+                        this.aiCurbParkedTimer = 1.5; // Wait 1.5s for traffic to pass before checking mirror again
+                    }
+                }
+                return { throttle: 0, steer: 0, handbrake: true };
+            } else if (alongErr > -14 && alongErr < 125) {
+                this.aiState = "FOLLOWING";
+                const approachSpd = Math.max(14, Math.min(48, Math.abs(alongErr) * 1.4));
+                if (this.speed > approachSpd) {
+                    this.vx *= Math.pow(0.04, dt);
+                    this.vy *= Math.pow(0.04, dt);
+                    this.speed *= Math.pow(0.04, dt);
+                    return { throttle: 0, steer: 0, handbrake: false };
+                }
+                return { throttle: 0.22, steer: 0, handbrake: false };
+            } else {
+                // Missed the bay window -> release and continue cruising
+                if (bay._occupiedBy === this) bay._occupiedBy = null;
+                this.aiCurbParkingBay = null;
+                this.aiCurbParkCooldown = 14.0;
+            }
         }
 
         // 1B. Emergency Corridor / Siren Detection (Ambulances, Tow Trucks, Fire Engines & Police)
@@ -1732,20 +1873,31 @@ class Vehicle {
                     }
                 }
 
-                // C. Moving Cross-Traffic Inside Intersection Box (lidZ1 === 25):
+                // C. Moving Cross-Traffic & Turning Priority Inside/Approaching Intersection Box (lidZ1 === 25):
                 // NEVER yield to a stopped car (which would cause both cars to wait forever!).
-                // Only yield briefly if a perpendicular car is ACTIVELY MOVING across our path right in front of us!
+                // 1) Turning vehicles yield to fast-moving straight-through priority vehicles on oncoming or cross lanes.
+                // 2) Inside the box, yield if a perpendicular car is actively crossing in front of us (with deterministic ID tie-breaker).
                 const otherSpd = Math.abs(other.speed || Math.hypot(other.vx || 0, other.vy || 0));
-                if (inIntersectionBox && cosDiff <= 0.55 && !other.destroyed && (otherSpd > 18 || other.driver === "PLAYER")) {
-                    if (forwardDist > 4 && forwardDist < 62 && lateralDist < 30) {
-                        const otherFx = Math.cos(other.angle);
-                        const otherFy = Math.sin(other.angle);
-                        const theirForwardDist = (-dx) * otherFx + (-dy) * otherFy;
+                const nearOrInBox = inIntersectionBox || (nextLidZ1 === 25 && distToTargetCenter < 50);
+                if (nearOrInBox && !other.destroyed && (otherSpd > 18 || other.driver === "PLAYER")) {
+                    const otherFx = Math.cos(other.angle);
+                    const otherFy = Math.sin(other.angle);
+                    const theirForwardDist = (-dx) * otherFx + (-dy) * otherFy;
+                    const myTurning = Boolean(this.aiChosenDir && this.aiChosenDir.isTurn);
+                    const otherTurning = Boolean(other.aiChosenDir && other.aiChosenDir.isTurn);
+
+                    if (inIntersectionBox && cosDiff <= 0.55 && forwardDist > 4 && forwardDist < 66 && lateralDist < 32) {
+                        const tieBreakYield = Math.abs(theirForwardDist - forwardDist) < 8 && String(this.id) < String(other.id);
                         const mustYieldToOther =
                             other.driver === "PLAYER" ||
                             other.sirenActive ||
-                            (theirForwardDist > -10 && theirForwardDist < forwardDist);
+                            (theirForwardDist > -10 && (theirForwardDist < forwardDist - 4 || tieBreakYield));
                         if (mustYieldToOther) {
+                            crossTrafficYield = true;
+                        }
+                    } else if (myTurning && !otherTurning && otherSpd > 24 && cosDiff < 0.35) {
+                        // Turning car checks Time-To-Collision (TTC) against straight-through oncoming/cross traffic
+                        if (forwardDist > -6 && forwardDist < 96 && lateralDist < 46 && theirForwardDist > -8 && theirForwardDist < 98) {
                             crossTrafficYield = true;
                         }
                     }
@@ -1753,7 +1905,7 @@ class Vehicle {
             }
         }
 
-        // Check pedestrians or player on foot directly in front of car's bumper
+        // Check pedestrians or player on foot directly in front of car's bumper (and wider scan on zebra crosswalks!)
         if (!isPanicked && game) {
             const myFrontHalf = (this.w || 48) * 0.34 + 6;
             if (game.player && !game.player.inVehicle && !game.player.dead) {
@@ -1775,10 +1927,16 @@ class Vehicle {
                     if (ped.dead) continue;
                     const dx = ped.x - this.x;
                     const dy = ped.y - this.y;
-                    if (Math.abs(dx) > 65 || Math.abs(dy) > 65) continue;
+                    if (Math.abs(dx) > 88 || Math.abs(dy) > 88) continue;
                     const forwardDist = dx * fx + dy * fy;
                     const lateralDist = Math.abs(dx * rx + dy * ry);
-                    if (forwardDist > 6 && forwardDist < 52 && lateralDist < 14) {
+                    const onZebraCrosswalk = Boolean(
+                        ped.isCrossingRoad ||
+                        (map && map.isStopLineBlock && map.isStopLineBlock(Math.floor(ped.x / TILE_SIZE), Math.floor(ped.y / TILE_SIZE)))
+                    );
+                    const maxFwd = (onZebraCrosswalk && !this.aiAggressive) ? 82 : 52;
+                    const maxLat = (onZebraCrosswalk && !this.aiAggressive) ? 26 : 14;
+                    if (forwardDist > 6 && forwardDist < maxFwd && lateralDist < maxLat) {
                         const gap = Math.max(0, forwardDist - myFrontHalf);
                         if (gap < closestBumperGap) {
                             closestBumperGap = gap;
@@ -1808,7 +1966,14 @@ class Vehicle {
                 isDeadOrAbandonedObstacle ||
                 (obstacleSpeed < 10 && this.aiState !== "STOPPED_LIGHT")
             );
-            if ((isStationaryCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 98 && this.aiLaneChangeCooldown <= 0) {
+            const myDesiredCruiseSpd = (this.maxSpeed || 210) * (this.aiCruiseFactor || 0.50);
+            const isSlowerMovingCar = Boolean(
+                this.aiState !== "STOPPED_LIGHT" &&
+                obstacleSpeed >= 10 &&
+                obstacleSpeed < myDesiredCruiseSpd * 0.78 &&
+                (this.isMotorcycle || this.aiAggressive || (this.aiCruiseFactor || 0.5) >= 0.50 || closestEntity.isHeavyVehicle)
+            );
+            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 98 && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
             // Never wait forever behind a destroyed wreck or abandoned driverless car (or when hauling a wreck as AI_TOW):
@@ -2767,7 +2932,7 @@ class Vehicle {
             this.gridlockAvoidTimer = Math.max(0, this.gridlockAvoidTimer - dt);
         }
         const isAiDriven = this.driver === "AI_TRAFFIC" || this.driver === "AI_TOW" || this.driver === "AI_EMERGENCY";
-        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0)) {
+        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && this.aiState !== "CURB_PARKED" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0)) {
             let counts = true;
             if (this.driver === "AI_TOW") counts = (this.approachNoProgress || 0) > 3.0 && !this.towHookTimer;
             else if (this.driver === "AI_EMERGENCY") counts = !this.deployedFireman && !this.deployedMedic && (this.approachNoProgress || 0) > 3.0;

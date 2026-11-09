@@ -6436,6 +6436,12 @@ class LeonidaGame {
 
                 }
 
+                if (typeof this.map.isInsideCurbParkingBay === "function" && this.map.isInsideCurbParkingBay(p1x, p1y, 3)) {
+
+                    score -= 34;
+
+                }
+
                 if (this.map.getNavigationBlock) {
 
                     const fbx = Math.floor(p1x / TILE_SIZE);
@@ -6444,7 +6450,7 @@ class LeonidaGame {
 
                     const fNav = this.map.getNavigationBlock(fbx, fby, pz);
 
-                    if (fNav && fNav.groundType === GROUND_TYPE.ROAD) {
+                    if (fNav && fNav.groundType === GROUND_TYPE.ROAD && !ped.isCrossingRoad) {
 
                         score -= 55;
 
@@ -6672,18 +6678,46 @@ class LeonidaGame {
 
             }
 
-            // Make nearby pedestrians panic and clear the road
-
+            // Make nearby pedestrians panic and clear the road away from the honking vehicle
             for (const ped of this.peds) {
-
                 if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - v.x, ped.y - v.y) < 150) {
-
                     ped.panicTimer = 3.5;
-
+                    ped.threatX = v.x;
+                    ped.threatY = v.y;
+                    ped.isCrossingRoad = false;
                     ped.angle = Math.atan2(ped.y - v.y, ped.x - v.x);
-
+                    ped.targetBx = null;
+                    ped.targetBy = null;
                 }
+            }
 
+            // Make AI traffic cars directly ahead react to the player's horn (change lanes / pull over or honk back!)
+            if (Array.isArray(this.vehicles)) {
+                const vCos = Math.cos(v.angle || 0);
+                const vSin = Math.sin(v.angle || 0);
+                for (const ov of this.vehicles) {
+                    if (!ov || ov === v || ov.destroyed || ov.driver !== "AI_TRAFFIC") continue;
+                    const dx = ov.x - v.x;
+                    const dy = ov.y - v.y;
+                    const fwd = dx * vCos + dy * vSin;
+                    const lat = Math.abs(-dx * vSin + dy * vCos);
+                    if (fwd > 12 && fwd < 165 && lat < 38 && Math.cos((ov.angle || 0) - (v.angle || 0)) > 0.45) {
+                        if (ov.aiAggressive) {
+                            if (this.audio && typeof this.audio.playHorn === "function") {
+                                this.audio.playHorn(false, ov.specKey);
+                            }
+                            ov.aiCruiseFactor = Math.min(0.80, (ov.aiCruiseFactor || 0.52) + 0.10);
+                        } else {
+                            const obx = Math.floor(ov.x / TILE_SIZE);
+                            const oby = Math.floor(ov.y / TILE_SIZE);
+                            ov.aiLaneChangeCooldown = 0;
+                            if (typeof ov.tryAdjacentLaneChange === "function" && !ov.tryAdjacentLaneChange(obx, oby, ov.z || 2.0, this.map, this)) {
+                                ov.aiPullOverOffset = 20;
+                                ov.aiPullOverTimer = 2.2;
+                            }
+                        }
+                    }
+                }
             }
 
         } else {
@@ -7655,6 +7689,12 @@ class LeonidaGame {
             } else if (d < radius * 2.5) {
 
                 ped.panicTimer = 6.5;
+                ped.threatX = x;
+                ped.threatY = y;
+                ped.isCrossingRoad = false;
+                ped.angle = Math.atan2(ped.y - y, ped.x - x);
+                ped.targetBx = null;
+                ped.targetBy = null;
 
             }
 
@@ -8452,6 +8492,12 @@ class LeonidaGame {
                     }
                 } else {
                     ped.panicTimer = 5.5;
+                    ped.threatX = shooterX;
+                    ped.threatY = shooterY;
+                    ped.isCrossingRoad = false;
+                    ped.angle = Math.atan2(ped.y - shooterY, ped.x - shooterX);
+                    ped.targetBx = null;
+                    ped.targetBy = null;
                 }
 
             }
@@ -11376,7 +11422,24 @@ class LeonidaGame {
 
                         }
 
-                        this.spawnParticle((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, "SPARK");
+                        const crashX = (a.x + b.x) * 0.5;
+                        const crashY = (a.y + b.y) * 0.5;
+                        this.spawnParticle(crashX, crashY, "SPARK");
+
+                        // Startle nearby sidewalk pedestrians so they step away from the violent car crash
+                        if (Array.isArray(this.peds)) {
+                            for (const ped of this.peds) {
+                                if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - crashX, ped.y - crashY) < 115) {
+                                    ped.panicTimer = Math.max(ped.panicTimer || 0, 3.2);
+                                    ped.threatX = crashX;
+                                    ped.threatY = crashY;
+                                    ped.isCrossingRoad = false;
+                                    ped.angle = Math.atan2(ped.y - crashY, ped.x - crashX);
+                                    ped.targetBx = null;
+                                    ped.targetBy = null;
+                                }
+                            }
+                        }
 
                         if (Math.hypot(a.x - p.x, a.y - p.y) < 480) {
 
@@ -13101,17 +13164,93 @@ class LeonidaGame {
                 }
 
                 if (!pursuingStealCar) {
+                if ((ped.crosswalkCooldown || 0) > 0) {
+                    ped.crosswalkCooldown = Math.max(0, ped.crosswalkCooldown - dt);
+                }
+                if ((ped._shoutCooldown || 0) > 0) {
+                    ped._shoutCooldown = Math.max(0, ped._shoutCooldown - dt);
+                }
+                if ((ped.dodgeTimer || 0) > 0) {
+                    ped.dodgeTimer = Math.max(0, ped.dodgeTimer - dt);
+                }
+
                 const baseWalkSpd = ped.kind === "COP" ? 38 : (ped.speed || 36);
-
-                const spd = (ped.burnTimer || 0) > 0 ? 105 : (ped.panicTimer > 0 ? 82 : baseWalkSpd);
-
                 const bx = Math.floor(ped.x / TILE_SIZE);
-
                 const by = Math.floor(ped.y / TILE_SIZE);
-
                 const pz = ped.z !== undefined ? ped.z : 2.0;
 
+                // Predictive Oncoming Speeding Vehicle Evasion (Dive / Sidestep Reflex):
+                // If a fast-moving vehicle is barreling toward this pedestrian within 115px, sidestep perpendicular to its trajectory!
+                if ((ped.dodgeTimer || 0) <= 0 && Array.isArray(this.vehicles)) {
+                    for (let vi = 0; vi < this.vehicles.length; vi++) {
+                        const v = this.vehicles[vi];
+                        if (!v || v.destroyed) continue;
+                        const vSpd = Math.abs(v.speed || 0);
+                        if (vSpd < 62) continue;
+                        if (v.z !== undefined && Math.abs(v.z - pz) > 0.85) continue;
+                        const dx = ped.x - v.x;
+                        const dy = ped.y - v.y;
+                        if (Math.abs(dx) > 122 || Math.abs(dy) > 122) continue;
+                        const vCos = Math.cos(v.angle || 0);
+                        const vSin = Math.sin(v.angle || 0);
+                        const fwdProj = dx * vCos + dy * vSin;
+                        const latProj = -dx * vSin + dy * vCos;
+                        const dangerCorridor = (v.h || 24) * 0.5 + 15;
+                        if (fwdProj > 14 && fwdProj < 115 && Math.abs(latProj) < dangerCorridor && (fwdProj / vSpd) < 1.15) {
+                            const sideSign = latProj >= 0 ? 1 : -1;
+                            let dodgeAng = (v.angle || 0) + sideSign * Math.PI * 0.5;
+                            // Prefer dodging toward the nearest PAWEMENT/FIELD sidewalk if one side is sidewalk
+                            const testX1 = ped.x + Math.cos(dodgeAng) * 26;
+                            const testY1 = ped.y + Math.sin(dodgeAng) * 26;
+                            const altAng = (v.angle || 0) - sideSign * Math.PI * 0.5;
+                            const testX2 = ped.x + Math.cos(altAng) * 26;
+                            const testY2 = ped.y + Math.sin(altAng) * 26;
+                            const gt1 = this.map.getGroundTypeAt ? this.map.getGroundTypeAt(testX1, testY1) : GROUND_TYPE.PAWEMENT;
+                            const gt2 = this.map.getGroundTypeAt ? this.map.getGroundTypeAt(testX2, testY2) : GROUND_TYPE.PAWEMENT;
+                            if (gt1 === GROUND_TYPE.ROAD && (gt2 === GROUND_TYPE.PAWEMENT || gt2 === GROUND_TYPE.FIELD)) {
+                                dodgeAng = altAng;
+                            }
+                            ped.dodgeTimer = 0.68;
+                            ped.dodgeAngle = dodgeAng;
+                            ped.panicTimer = Math.max(ped.panicTimer || 0, 2.8);
+                            ped.threatX = v.x;
+                            ped.threatY = v.y;
+                            ped.isCrossingRoad = false;
+                            if (v.driver === "PLAYER" && (ped._shoutCooldown || 0) <= 0 && Math.random() < 0.35) {
+                                ped._shoutCooldown = 5.0;
+                                this.addFloatingText(ped.x, ped.y - 20, Math.random() < 0.5 ? "😱 WATCH IT!" : "⚠️ HEY!", "#fde047");
+                            }
+                            break;
+                        }
+                    }
+                }
 
+                const curNavPre = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;
+                if (ped.isCrossingRoad && curNavPre && (curNavPre.groundType === GROUND_TYPE.PAWEMENT || curNavPre.groundType === GROUND_TYPE.FIELD)) {
+                    // If we already stepped onto at least one road tile and now reached the opposite sidewalk, finish crossing!
+                    if (ped._enteredRoadOnCrosswalk) {
+                        ped.isCrossingRoad = false;
+                        ped._enteredRoadOnCrosswalk = false;
+                        ped.crosswalkCooldown = 9.0;
+                    }
+                } else if (ped.isCrossingRoad && curNavPre && curNavPre.groundType === GROUND_TYPE.ROAD) {
+                    ped._enteredRoadOnCrosswalk = true;
+                }
+
+                const nsGreenNow = typeof this.isNSGreen === "function" ? this.isNSGreen() : true;
+                const ewGreenNow = typeof this.isEWGreen === "function" ? this.isEWGreen() : false;
+                const hurryOnCrosswalk = Boolean(
+                    ped.isCrossingRoad &&
+                    ped._enteredRoadOnCrosswalk &&
+                    ((ped.crossDirX !== 0 && nsGreenNow) || (ped.crossDirY !== 0 && ewGreenNow))
+                );
+                const spd = (ped.burnTimer || 0) > 0
+                    ? 105
+                    : ((ped.dodgeTimer || 0) > 0
+                        ? 96
+                        : (ped.panicTimer > 0
+                            ? 82
+                            : (hurryOnCrosswalk ? baseWalkSpd * 1.55 : (ped.isCrossingRoad ? baseWalkSpd * 1.22 : baseWalkSpd))));
 
                 ped.waypointTimer = (ped.waypointTimer || 0) + dt;
 
@@ -13149,7 +13288,18 @@ class LeonidaGame {
 
                     ped.turnSeed = (ped.turnSeed || 1) + 1;
 
-                    // Choose next sidewalk block while avoiding 3D structures, Lummus Park grass, and stopped vehicles
+                    const navContext = {
+                        isCrossingRoad: Boolean(ped.isCrossingRoad),
+                        crossDirX: ped.crossDirX || 0,
+                        crossDirY: ped.crossDirY || 0,
+                        allowCrosswalk: ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && (ped.crosswalkCooldown || 0) <= 0,
+                        nsGreen: nsGreenNow,
+                        ewGreen: ewGreenNow,
+                        threatX: (ped.panicTimer || 0) > 0 ? ped.threatX : undefined,
+                        threatY: (ped.panicTimer || 0) > 0 ? ped.threatY : undefined
+                    };
+
+                    // Choose next sidewalk block while avoiding 3D structures, Lummus Park grass, stopped vehicles, and threats
                     const nextStep = this.map.chooseNextSidewalkBlock(
 
                         baseX,
@@ -13168,9 +13318,22 @@ class LeonidaGame {
 
                         ped._avoidBx ?? -1,
 
-                        ped._avoidBy ?? -1
+                        ped._avoidBy ?? -1,
+
+                        navContext
 
                     );
+
+                    if (nextStep.isCrosswalkEntry) {
+                        ped.isCrossingRoad = true;
+                        ped._enteredRoadOnCrosswalk = false;
+                        ped.crossDirX = nextStep.crossDirX || nextStep.dx || 0;
+                        ped.crossDirY = nextStep.crossDirY || nextStep.dy || 0;
+                    } else if (nextStep.reachedOppositeSidewalk) {
+                        ped.isCrossingRoad = false;
+                        ped._enteredRoadOnCrosswalk = false;
+                        ped.crosswalkCooldown = 9.0;
+                    }
 
                     ped.targetBx = nextStep.bx;
 
@@ -13184,13 +13347,23 @@ class LeonidaGame {
 
                     ped.targetOffY = 0;
 
-                    // If a stopped vehicle or structure partially overlaps the center of (targetBx, targetBy),
-                    // shift the waypoint laterally (±18..24px) inside the corridor so the pedestrian bypasses it cleanly!
                     const centerTx = (ped.targetBx + 0.5) * TILE_SIZE;
                     const centerTy = (ped.targetBy + 0.5) * TILE_SIZE;
+                    // Keep walking pedestrians on the inner paved sidewalk corridor behind any recessed curbside parking bay!
+                    if (!ped.isCrossingRoad && typeof this.map.getCurbParkingStripAt === "function") {
+                        const strip = this.map.getCurbParkingStripAt(centerTx, centerTy, 8);
+                        if (strip && strip.dc) {
+                            ped.targetOffX = -strip.dc * 18;
+                        }
+                    }
+
+                    // If a stopped vehicle or structure partially overlaps the waypoint,
+                    // shift the waypoint laterally (±18..24px) inside the corridor so the pedestrian bypasses it cleanly!
+                    const testWpX = centerTx + (ped.targetOffX || 0);
+                    const testWpY = centerTy + (ped.targetOffY || 0);
                     if (
-                        this.resolveCircleVehicleCollision(centerTx, centerTy, 11, pz, null).hit ||
-                        this.map.resolveCircleBuildingCollision(centerTx, centerTy, 11, pz).hit
+                        this.resolveCircleVehicleCollision(testWpX, testWpY, 11, pz, null).hit ||
+                        this.map.resolveCircleBuildingCollision(testWpX, testWpY, 11, pz).hit
                     ) {
                         const perpX = -Math.sin(nextStep.angle);
                         const perpY = Math.cos(nextStep.angle);
@@ -13217,7 +13390,14 @@ class LeonidaGame {
 
 
 
-                if (ped.targetBx !== null && ped.targetBx !== undefined) {
+                if ((ped.dodgeTimer || 0) > 0 && typeof ped.dodgeAngle === "number") {
+                    ped.angle = this.steerPedWithObstacleFeelers(
+                        ped,
+                        ped.x + Math.cos(ped.dodgeAngle) * 44,
+                        ped.y + Math.sin(ped.dodgeAngle) * 44,
+                        ped._boardingVeh || null
+                    );
+                } else if (ped.targetBx !== null && ped.targetBx !== undefined) {
 
                     const tx = (ped.targetBx + 0.5) * TILE_SIZE + (ped.targetOffX || 0);
 
@@ -13235,8 +13415,7 @@ class LeonidaGame {
 
 
 
-                // Keep normal walking civilians strictly on PAWEMENT/FIELD sidewalks so they never wander into road lanes
-
+                // Keep normal walking civilians strictly on PAWEMENT/FIELD sidewalks (unless actively crossing a zebra crosswalk!)
                 const curNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;
 
                 const newBx = Math.floor(ped.x / TILE_SIZE);
@@ -13247,7 +13426,7 @@ class LeonidaGame {
 
                     const nextNav = this.map.getNavigationBlock(newBx, newBy, pz);
 
-                    if (nextNav && nextNav.groundType === GROUND_TYPE.ROAD) {
+                    if (nextNav && nextNav.groundType === GROUND_TYPE.ROAD && !ped.isCrossingRoad) {
 
                         ped.x = prevX;
 
@@ -13263,7 +13442,7 @@ class LeonidaGame {
 
                 } else if (curNav && curNav.groundType === GROUND_TYPE.ROAD) {
 
-                    if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0) {
+                    if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && !ped.isCrossingRoad) {
 
                         ped.panicTimer = 1.6; // Hasten off the asphalt road!
 
