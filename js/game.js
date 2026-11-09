@@ -6060,7 +6060,7 @@ class LeonidaGame {
 
         if (reason === "BAIL_FIRE") {
 
-            const fleeAngle = vehicle.angle + Math.PI * 0.5 + (Math.random() - 0.5) * 0.8;
+            const fleeAngle = Math.atan2(doorY - vehicle.y, doorX - vehicle.x) + (Math.random() - 0.5) * 0.45;
 
             this.peds.push(new Pedestrian({
 
@@ -6085,6 +6085,10 @@ class LeonidaGame {
                 dead: false,
 
                 panicTimer: 8.5,
+
+                threatX: vehicle.x,
+
+                threatY: vehicle.y,
 
                 exitAnimTimer: 0.32,
 
@@ -6190,6 +6194,46 @@ class LeonidaGame {
             this.addFloatingText(doorX, doorY - 22, "🚑 PARAMEDIC YANKED OUT!", "#38bdf8");
         }
 
+    }
+
+    spawnAlightingPassenger(vehicle) {
+        if (!vehicle || vehicle.destroyed || !Array.isArray(this.peds) || this.peds.length >= 135) return;
+        const vz = vehicle.z !== undefined ? vehicle.z : 2.0;
+        const cosA = Math.cos(vehicle.angle || 0);
+        const sinA = Math.sin(vehicle.angle || 0);
+        // Right-hand passenger door (sidewalk side)
+        const rx = -sinA;
+        const ry = cosA;
+        const testX = vehicle.x + rx * 28;
+        const testY = vehicle.y + ry * 28;
+        const sbx = Math.floor(testX / TILE_SIZE);
+        const sby = Math.floor(testY / TILE_SIZE);
+        const sNav = this.map && this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, vz) : null;
+        if (!sNav || (sNav.groundType !== GROUND_TYPE.PAWEMENT && sNav.groundType !== GROUND_TYPE.FIELD)) return;
+        const spawnX = (sbx + 0.5) * TILE_SIZE;
+        const spawnY = (sby + 0.5) * TILE_SIZE;
+        if (this.map.resolveCircleBuildingCollision && this.map.resolveCircleBuildingCollision(spawnX, spawnY, 10, vz).hit) return;
+
+        vehicle.doorOpenSide = 1;
+        vehicle.doorOpenTimer = 0.48;
+        const civTypes = ["civ1", "civ2", "civ3", "civ4"];
+        const shirtPalette = ["#38bdf8", "#f472b6", "#34d399", "#fbbf24", "#a78bfa", "#f87171"];
+        this.peds.push(new Pedestrian({
+            x: spawnX,
+            y: spawnY,
+            z: vz,
+            angle: Math.atan2(ry, rx),
+            speed: 35 + Math.random() * 7,
+            kind: "CIVILIAN",
+            g24Type: civTypes[Math.floor(Math.random() * civTypes.length)],
+            shirtColor: shirtPalette[Math.floor(Math.random() * shirtPalette.length)],
+            hp: 40,
+            dead: false,
+            exitAnimTimer: 0.28,
+            targetBx: sbx,
+            targetBy: sby,
+            turnSeed: Math.floor(Math.random() * 16) + 1
+        }));
     }
 
 
@@ -13173,24 +13217,52 @@ class LeonidaGame {
                 if ((ped.dodgeTimer || 0) > 0) {
                     ped.dodgeTimer = Math.max(0, ped.dodgeTimer - dt);
                 }
+                if ((ped.socialCooldown || 0) > 0) {
+                    ped.socialCooldown = Math.max(0, ped.socialCooldown - dt);
+                }
+                if ((ped.taxiHailCooldown || 0) > 0) {
+                    ped.taxiHailCooldown = Math.max(0, ped.taxiHailCooldown - dt);
+                }
 
                 const baseWalkSpd = ped.kind === "COP" ? 38 : (ped.speed || 36);
                 const bx = Math.floor(ped.x / TILE_SIZE);
                 const by = Math.floor(ped.y / TILE_SIZE);
                 const pz = ped.z !== undefined ? ped.z : 2.0;
 
-                // Predictive Oncoming Speeding Vehicle Evasion (Dive / Sidestep Reflex):
-                // If a fast-moving vehicle is barreling toward this pedestrian within 115px, sidestep perpendicular to its trajectory!
-                if ((ped.dodgeTimer || 0) <= 0 && Array.isArray(this.vehicles)) {
+                // 1) Burning Vehicle Hazard Evasion + Predictive Oncoming Speeding Vehicle Evasion (Dive / Sidestep Reflex):
+                if (Array.isArray(this.vehicles)) {
                     for (let vi = 0; vi < this.vehicles.length; vi++) {
                         const v = this.vehicles[vi];
-                        if (!v || v.destroyed) continue;
-                        const vSpd = Math.abs(v.speed || 0);
-                        if (vSpd < 62) continue;
+                        if (!v) continue;
                         if (v.z !== undefined && Math.abs(v.z - pz) > 0.85) continue;
                         const dx = ped.x - v.x;
                         const dy = ped.y - v.y;
-                        if (Math.abs(dx) > 122 || Math.abs(dy) > 122) continue;
+                        if (Math.abs(dx) > 135 || Math.abs(dy) > 135) continue;
+
+                        // A. Burning / About-to-Explode Vehicle Hazard Evasion (< 130px)
+                        const isBurningCar = Boolean(
+                            (v.burnTimer || 0) > 0 ||
+                            (!v.destroyed && typeof v.hp === "number" && v.hp <= 42 && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER")
+                        );
+                        if (isBurningCar && Math.hypot(dx, dy) < 130) {
+                            ped.panicTimer = Math.max(ped.panicTimer || 0, 4.5);
+                            ped.threatX = v.x;
+                            ped.threatY = v.y;
+                            ped.waitingAtCrosswalk = false;
+                            ped.socialTimer = 0;
+                            ped.hailingTaxiTimer = 0;
+                            ped._hailingTaxi = null;
+                            if ((ped._shoutCooldown || 0) <= 0 && Math.random() < 0.25) {
+                                ped._shoutCooldown = 6.0;
+                                this.addFloatingText(ped.x, ped.y - 20, "🔥 IT'S GONNA BLOW!", "#fb923c");
+                            }
+                            break;
+                        }
+
+                        // B. Oncoming Speeding Vehicle Sidestep Reflex
+                        if (v.destroyed || (ped.dodgeTimer || 0) > 0) continue;
+                        const vSpd = Math.abs(v.speed || 0);
+                        if (vSpd < 62) continue;
                         const vCos = Math.cos(v.angle || 0);
                         const vSin = Math.sin(v.angle || 0);
                         const fwdProj = dx * vCos + dy * vSin;
@@ -13216,6 +13288,9 @@ class LeonidaGame {
                             ped.threatX = v.x;
                             ped.threatY = v.y;
                             ped.isCrossingRoad = false;
+                            ped.waitingAtCrosswalk = false;
+                            ped.socialTimer = 0;
+                            ped.hailingTaxiTimer = 0;
                             if (v.driver === "PLAYER" && (ped._shoutCooldown || 0) <= 0 && Math.random() < 0.35) {
                                 ped._shoutCooldown = 5.0;
                                 this.addFloatingText(ped.x, ped.y - 20, Math.random() < 0.5 ? "😱 WATCH IT!" : "⚠️ HEY!", "#fde047");
@@ -13223,6 +13298,17 @@ class LeonidaGame {
                             break;
                         }
                     }
+                }
+
+                // Cancel calm states if panicked
+                if ((ped.panicTimer || 0) > 0) {
+                    ped.waitingAtCrosswalk = false;
+                    ped.socialTimer = 0;
+                    if (ped._hailingTaxi && ped._hailingTaxi.aiPassengerTarget === ped) {
+                        ped._hailingTaxi.aiPassengerTarget = null;
+                    }
+                    ped._hailingTaxi = null;
+                    ped.hailingTaxiTimer = 0;
                 }
 
                 const curNavPre = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;
@@ -13239,20 +13325,178 @@ class LeonidaGame {
 
                 const nsGreenNow = typeof this.isNSGreen === "function" ? this.isNSGreen() : true;
                 const ewGreenNow = typeof this.isEWGreen === "function" ? this.isEWGreen() : false;
+
+                // 2) Crosswalk Curb Waiting State (Wait for WALK signal & look left/right before stepping onto zebra crosswalk)
+                if (ped.waitingAtCrosswalk) {
+                    ped.crossWaitTimer = (ped.crossWaitTimer || 0) - dt;
+                    const baseA = typeof ped.crossBaseAngle === "number" ? ped.crossBaseAngle : ped.angle;
+                    ped.angle = baseA + Math.sin(performance.now() * 0.0045 + (ped.turnSeed || 0)) * 0.32;
+                    const walkGreen = (ped.crossDirX !== 0) ? !nsGreenNow : !ewGreenNow;
+                    if (walkGreen && typeof ped.crossStartBx === "number" && typeof ped.crossStartBy === "number") {
+                        const rCx = (ped.crossStartBx + 0.5) * TILE_SIZE;
+                        const rCy = (ped.crossStartBy + 0.5) * TILE_SIZE;
+                        let roadClear = true;
+                        if (Array.isArray(this.vehicles)) {
+                            for (let vi = 0; vi < this.vehicles.length; vi++) {
+                                const v = this.vehicles[vi];
+                                if (!v || v.destroyed) continue;
+                                if (Math.hypot(v.x - rCx, v.y - rCy) < 82 && (Math.abs(v.speed || 0) > 15 || v.sirenActive)) {
+                                    roadClear = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (roadClear) {
+                            ped.waitingAtCrosswalk = false;
+                            ped.isCrossingRoad = true;
+                            ped._enteredRoadOnCrosswalk = false;
+                            ped.targetBx = ped.crossStartBx;
+                            ped.targetBy = ped.crossStartBy;
+                            ped.angle = baseA;
+                            ped.waypointTimer = 0;
+                        }
+                    } else if ((ped.crossWaitTimer || 0) <= 0) {
+                        ped.waitingAtCrosswalk = false;
+                        ped.crosswalkCooldown = 6.5;
+                        ped.waypointTimer = 99;
+                    }
+                }
+
+                // 3) Autonomous Taxi Hailing & Boarding (Calm adult sidewalk pedestrians hail passing AI VICE_CABs)
+                if (
+                    ped.kind === "CIVILIAN" &&
+                    !ped.isChild &&
+                    !ped.missionTag &&
+                    (ped.panicTimer || 0) <= 0 &&
+                    !ped.isCrossingRoad &&
+                    !ped.waitingAtCrosswalk &&
+                    (ped.socialTimer || 0) <= 0 &&
+                    curNavPre &&
+                    curNavPre.groundType === GROUND_TYPE.PAWEMENT
+                ) {
+                    if ((ped.hailingTaxiTimer || 0) > 0 && ped._hailingTaxi) {
+                        ped.hailingTaxiTimer = Math.max(0, ped.hailingTaxiTimer - dt);
+                        const cab = ped._hailingTaxi;
+                        const cabDist = (!cab || cab.destroyed || cab.driver !== "AI_TRAFFIC") ? 999 : Math.hypot(cab.x - ped.x, cab.y - ped.y);
+                        if (ped.hailingTaxiTimer <= 0 || cabDist > 165) {
+                            if (cab && cab.aiPassengerTarget === ped) cab.aiPassengerTarget = null;
+                            ped._hailingTaxi = null;
+                            ped.hailingTaxiTimer = 0;
+                            ped.taxiHailCooldown = 22.0;
+                        } else if (Math.abs(cab.speed || 0) < 12 && cabDist < 88) {
+                            // Walk to the stopped taxi's right-hand passenger door and board!
+                            const doorX = cab.x - Math.sin(cab.angle || 0) * 18;
+                            const doorY = cab.y + Math.cos(cab.angle || 0) * 18;
+                            if (Math.hypot(doorX - ped.x, doorY - ped.y) < 22) {
+                                cab.doorOpenSide = 1;
+                                cab.doorOpenTimer = 0.45;
+                                cab.aiPassengerTarget = null;
+                                cab.aiPassengerStopTimer = 0.8;
+                                cab.aiPassengerStopCooldown = 26.0;
+                                this.addFloatingText(cab.x, cab.y - 22, "🚕 FARE PICKED UP!", "#facc15");
+                                ped.dead = true;
+                                ped.removeOnBoard = true;
+                                this.peds.splice(i, 1);
+                                continue;
+                            }
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, doorX, doorY, cab);
+                            ped.x += Math.cos(ped.angle) * baseWalkSpd * 1.15 * dt;
+                            ped.y += Math.sin(ped.angle) * baseWalkSpd * 1.15 * dt;
+                            ped.waypointTimer = 0;
+                        } else {
+                            // Wave at the approaching taxi from the curb
+                            ped.angle = Math.atan2(cab.y - ped.y, cab.x - ped.x);
+                        }
+                    } else if ((ped.taxiHailCooldown || 0) <= 0 && ((ped.turnSeed || 0) % 19 === 0) && Array.isArray(this.vehicles)) {
+                        for (let vi = 0; vi < this.vehicles.length; vi++) {
+                            const v = this.vehicles[vi];
+                            if (!v || v.destroyed || v.specKey !== "VICE_CAB" || v.driver !== "AI_TRAFFIC") continue;
+                            if (v.aiPassengerTarget || (v.aiPassengerStopTimer || 0) > 0 || (v.aiPassengerStopCooldown || 0) > 0) continue;
+                            const dx = ped.x - v.x;
+                            const dy = ped.y - v.y;
+                            if (Math.abs(dx) > 125 || Math.abs(dy) > 125) continue;
+                            const vCos = Math.cos(v.angle || 0);
+                            const vSin = Math.sin(v.angle || 0);
+                            const fwd = dx * vCos + dy * vSin;
+                            const rightLat = -dx * vSin + dy * vCos;
+                            if (fwd > 18 && fwd < 115 && rightLat > 12 && rightLat < 68) {
+                                ped._hailingTaxi = v;
+                                ped.hailingTaxiTimer = 7.5;
+                                ped.taxiHailCooldown = 30.0;
+                                v.aiPassengerTarget = ped;
+                                if ((ped._shoutCooldown || 0) <= 0) {
+                                    ped._shoutCooldown = 6.0;
+                                    this.addFloatingText(ped.x, ped.y - 20, "🚕 TAXI!", "#facc15");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 4) Social Sidewalk Micro-Interactions & Storefront Window-Shopping
+                if ((ped.socialTimer || 0) > 0) {
+                    ped.socialTimer = Math.max(0, ped.socialTimer - dt);
+                    if (typeof ped.socialAngle === "number") {
+                        ped.angle = ped.socialAngle + Math.sin(performance.now() * 0.003 + (ped.turnSeed || 0)) * 0.12;
+                    }
+                } else if (
+                    ped.kind === "CIVILIAN" &&
+                    !ped.missionTag &&
+                    (ped.panicTimer || 0) <= 0 &&
+                    !ped.isCrossingRoad &&
+                    !ped.waitingAtCrosswalk &&
+                    (ped.hailingTaxiTimer || 0) <= 0 &&
+                    (ped.socialCooldown || 0) <= 0 &&
+                    curNavPre &&
+                    curNavPre.groundType === GROUND_TYPE.PAWEMENT &&
+                    ((ped.turnSeed || 0) % 13 === 0)
+                ) {
+                    // Check if another calm civilian is passing nearby on the same sidewalk to chat briefly
+                    for (let pj = 0; pj < this.peds.length; pj++) {
+                        const otherPed = this.peds[pj];
+                        if (!otherPed || otherPed === ped || otherPed.dead || otherPed.kind !== "CIVILIAN") continue;
+                        if ((otherPed.panicTimer || 0) > 0 || otherPed.isCrossingRoad || (otherPed.socialCooldown || 0) > 0) continue;
+                        const distP = Math.hypot(otherPed.x - ped.x, otherPed.y - ped.y);
+                        if (distP > 18 && distP < 34) {
+                            const chatDur = 2.6 + Math.random() * 1.4;
+                            ped.socialTimer = chatDur;
+                            ped.socialCooldown = 28.0;
+                            ped.socialAngle = Math.atan2(otherPed.y - ped.y, otherPed.x - ped.x);
+                            otherPed.socialTimer = chatDur;
+                            otherPed.socialCooldown = 28.0;
+                            otherPed.socialAngle = Math.atan2(ped.y - otherPed.y, ped.x - otherPed.x);
+                            if ((ped._shoutCooldown || 0) <= 0 && Math.random() < 0.35) {
+                                ped._shoutCooldown = 8.0;
+                                this.addFloatingText(ped.x, ped.y - 20, "💬", "#e2e8f0");
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                const isStandingStill = Boolean(
+                    ped.waitingAtCrosswalk ||
+                    (ped.socialTimer || 0) > 0 ||
+                    ((ped.hailingTaxiTimer || 0) > 0 && ped._hailingTaxi && Math.abs(ped._hailingTaxi.speed || 0) >= 12)
+                );
+
                 const hurryOnCrosswalk = Boolean(
                     ped.isCrossingRoad &&
                     ped._enteredRoadOnCrosswalk &&
                     ((ped.crossDirX !== 0 && nsGreenNow) || (ped.crossDirY !== 0 && ewGreenNow))
                 );
-                const spd = (ped.burnTimer || 0) > 0
-                    ? 105
-                    : ((ped.dodgeTimer || 0) > 0
-                        ? 96
-                        : (ped.panicTimer > 0
-                            ? 82
-                            : (hurryOnCrosswalk ? baseWalkSpd * 1.55 : (ped.isCrossingRoad ? baseWalkSpd * 1.22 : baseWalkSpd))));
+                const spd = isStandingStill
+                    ? 0
+                    : ((ped.burnTimer || 0) > 0
+                        ? 105
+                        : ((ped.dodgeTimer || 0) > 0
+                            ? 96
+                            : (ped.panicTimer > 0
+                                ? 82
+                                : (hurryOnCrosswalk ? baseWalkSpd * 1.55 : (ped.isCrossingRoad ? baseWalkSpd * 1.22 : baseWalkSpd)))));
 
-                ped.waypointTimer = (ped.waypointTimer || 0) + dt;
+                ped.waypointTimer = (ped.waypointTimer || 0) + (isStandingStill ? 0 : dt);
 
                 const curTx = ped.targetBx !== null && ped.targetBx !== undefined
                     ? (ped.targetBx + 0.5) * TILE_SIZE + (ped.targetOffX || 0)
@@ -13262,30 +13506,23 @@ class LeonidaGame {
                     : ped.y;
 
                 const needTarget =
-
-                    ped.targetBx === null ||
-
-                    ped.targetBx === undefined ||
-
-                    ped.waypointTimer > 2.2 ||
-
-                    Math.hypot(curTx - ped.x, curTy - ped.y) < 18;
-
-
+                    !isStandingStill &&
+                    (ped.hailingTaxiTimer || 0) <= 0 &&
+                    (
+                        ped.targetBx === null ||
+                        ped.targetBx === undefined ||
+                        ped.waypointTimer > 2.2 ||
+                        Math.hypot(curTx - ped.x, curTy - ped.y) < 18
+                    );
 
                 if (needTarget) {
-
                     const reachedTarget = ped.targetBx !== null && ped.targetBx !== undefined && Math.hypot(curTx - ped.x, curTy - ped.y) < 18;
-
                     const baseX = reachedTarget ? ped.targetBx : bx;
-
                     const baseY = reachedTarget ? ped.targetBy : by;
-
                     if (reachedTarget) {
                         ped._avoidBx = -1;
                         ped._avoidBy = -1;
                     }
-
                     ped.turnSeed = (ped.turnSeed || 1) + 1;
 
                     const navContext = {
@@ -13301,50 +13538,44 @@ class LeonidaGame {
 
                     // Choose next sidewalk block while avoiding 3D structures, Lummus Park grass, stopped vehicles, and threats
                     const nextStep = this.map.chooseNextSidewalkBlock(
-
                         baseX,
-
                         baseY,
-
                         ped.angle,
-
                         pz,
-
                         ped.turnSeed,
-
                         (ped.panicTimer || 0) > 0,
-
                         this.vehicles,
-
                         ped._avoidBx ?? -1,
-
                         ped._avoidBy ?? -1,
-
                         navContext
-
                     );
 
-                    if (nextStep.isCrosswalkEntry) {
+                    if (nextStep.isWaitingAtCurb) {
+                        ped.waitingAtCrosswalk = true;
+                        ped.crossWaitTimer = 5.5;
+                        ped.crossBaseAngle = nextStep.angle;
+                        ped.crossStartBx = nextStep.crossStartBx;
+                        ped.crossStartBy = nextStep.crossStartBy;
+                        ped.crossDirX = nextStep.crossDirX || 0;
+                        ped.crossDirY = nextStep.crossDirY || 0;
+                    } else if (nextStep.isCrosswalkEntry) {
+                        ped.waitingAtCrosswalk = false;
                         ped.isCrossingRoad = true;
                         ped._enteredRoadOnCrosswalk = false;
                         ped.crossDirX = nextStep.crossDirX || nextStep.dx || 0;
                         ped.crossDirY = nextStep.crossDirY || nextStep.dy || 0;
                     } else if (nextStep.reachedOppositeSidewalk) {
+                        ped.waitingAtCrosswalk = false;
                         ped.isCrossingRoad = false;
                         ped._enteredRoadOnCrosswalk = false;
                         ped.crosswalkCooldown = 9.0;
                     }
 
                     ped.targetBx = nextStep.bx;
-
                     ped.targetBy = nextStep.by;
-
                     ped.angle = nextStep.angle;
-
                     ped.waypointTimer = 0;
-
                     ped.targetOffX = 0;
-
                     ped.targetOffY = 0;
 
                     const centerTx = (ped.targetBx + 0.5) * TILE_SIZE;
@@ -13385,10 +13616,7 @@ class LeonidaGame {
                             }
                         }
                     }
-
                 }
-
-
 
                 if ((ped.dodgeTimer || 0) > 0 && typeof ped.dodgeAngle === "number") {
                     ped.angle = this.steerPedWithObstacleFeelers(
@@ -13397,20 +13625,13 @@ class LeonidaGame {
                         ped.y + Math.sin(ped.dodgeAngle) * 44,
                         ped._boardingVeh || null
                     );
-                } else if (ped.targetBx !== null && ped.targetBx !== undefined) {
-
+                } else if (!isStandingStill && (ped.hailingTaxiTimer || 0) <= 0 && ped.targetBx !== null && ped.targetBx !== undefined) {
                     const tx = (ped.targetBx + 0.5) * TILE_SIZE + (ped.targetOffX || 0);
-
                     const ty = (ped.targetBy + 0.5) * TILE_SIZE + (ped.targetOffY || 0);
-
                     ped.angle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
-
                 }
 
-
-
                 ped.x += Math.cos(ped.angle) * spd * dt;
-
                 ped.y += Math.sin(ped.angle) * spd * dt;
 
 

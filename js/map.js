@@ -5737,32 +5737,34 @@ class LeonidaMap {
             }
         }
 
-        // 1B. Signalized Zebra Crosswalk Crossing at Intersections:
-        //     When a calm pedestrian on a sidewalk corner is adjacent to a stop-line/zebra crosswalk tile
-        //     and the traffic signal for vehicles on that road axis is RED (pedestrian WALK phase) with no speeding cars approaching,
-        //     allow crossing straight across the 2-lane street to the opposite sidewalk!
-        if (!isPanic && !onRoadNow && navContext && navContext.allowCrosswalk && normSeed > 0.64) {
+        // 1B. Signalized Zebra Crosswalk Crossing & Curb Waiting at Intersections:
+        //     When a calm pedestrian on a sidewalk corner is adjacent to a stop-line/zebra crosswalk tile:
+        //     - If the traffic signal for vehicles on that road axis is RED (pedestrian WALK phase) and no car is charging through,
+        //       step onto the zebra crosswalk and cross straight to the opposite sidewalk!
+        //     - If the vehicle light is GREEN (DON'T WALK phase) or a car is passing through, the pedestrian can stop at the curb
+        //       and wait for the light to change (`isWaitingAtCurb: true`), glancing left and right before crossing!
+        if (!isPanic && !onRoadNow && navContext && navContext.allowCrosswalk && normSeed > 0.60) {
             for (const rDir of roadDirs) {
                 if (rDir.isUturn || rDir.blocked) continue;
                 if (!this.isStopLineBlock(rDir.bx, rDir.by)) continue;
                 // Walking horizontally (dx !== 0) crosses a North/South road -> safe when NS light is RED (!nsGreen)
                 // Walking vertically (dy !== 0) crosses an East/West road -> safe when EW light is RED (!ewGreen)
                 const walkSignalGreen = (rDir.dx !== 0) ? !navContext.nsGreen : !navContext.ewGreen;
-                if (!walkSignalGreen) continue;
 
                 // Verify that walking 2..3 tiles straight along (rDir.dx, rDir.dy) lands on a valid, unblocked opposite sidewalk
                 let oppositeSidewalk = null;
-                let roadSpanClear = true;
+                let roadGeometryValid = true;
+                let roadTrafficClear = true;
                 for (let step = 1; step <= 3; step++) {
                     const tx = bx + rDir.dx * step;
                     const ty = by + rDir.dy * step;
                     if (tx < 2 || tx >= MAP_COLS - 2 || ty < 2 || ty >= MAP_ROWS - 2) {
-                        roadSpanClear = false;
+                        roadGeometryValid = false;
                         break;
                     }
                     const tb = this.getNavigationBlock(tx, ty, zBlocks);
                     if (!tb) {
-                        roadSpanClear = false;
+                        roadGeometryValid = false;
                         break;
                     }
                     if (tb.groundType === GROUND_TYPE.PAWEMENT || tb.groundType === GROUND_TYPE.FIELD) {
@@ -5772,7 +5774,7 @@ class LeonidaMap {
                         break;
                     }
                     if (tb.groundType !== GROUND_TYPE.ROAD || this.getBlockInfo(tx, ty, 1)?.lid === 25) {
-                        roadSpanClear = false;
+                        roadGeometryValid = false;
                         break;
                     }
                     // Ensure no moving or stopped vehicle is blocking or charging toward this crosswalk tile
@@ -5784,23 +5786,39 @@ class LeonidaMap {
                             if (!v || v.destroyed) continue;
                             const d = Math.hypot(v.x - cx, v.y - cy);
                             const vSpd = Math.abs(v.speed || 0);
-                            if (d < 46 || (vSpd > 24 && d < 105)) {
-                                roadSpanClear = false;
+                            if (d < 46 || (vSpd > 24 && d < 105) || (v.sirenActive && d < 145)) {
+                                roadTrafficClear = false;
                                 break;
                             }
                         }
                     }
-                    if (!roadSpanClear) break;
                 }
-                if (roadSpanClear && oppositeSidewalk) {
-                    return {
-                        ...rDir,
-                        isCrosswalkEntry: true,
-                        crossDirX: rDir.dx,
-                        crossDirY: rDir.dy,
-                        crossDestBx: oppositeSidewalk.bx,
-                        crossDestBy: oppositeSidewalk.by
-                    };
+                if (roadGeometryValid && oppositeSidewalk) {
+                    if (walkSignalGreen && roadTrafficClear) {
+                        return {
+                            ...rDir,
+                            isCrosswalkEntry: true,
+                            crossDirX: rDir.dx,
+                            crossDirY: rDir.dy,
+                            crossDestBx: oppositeSidewalk.bx,
+                            crossDestBy: oppositeSidewalk.by
+                        };
+                    } else if (normSeed > 0.70) {
+                        return {
+                            dx: 0,
+                            dy: 0,
+                            bx,
+                            by,
+                            angle: rDir.angle,
+                            isWaitingAtCurb: true,
+                            crossStartBx: rDir.bx,
+                            crossStartBy: rDir.by,
+                            crossDirX: rDir.dx,
+                            crossDirY: rDir.dy,
+                            crossDestBx: oppositeSidewalk.bx,
+                            crossDestBy: oppositeSidewalk.by
+                        };
+                    }
                 }
             }
         }

@@ -9496,8 +9496,19 @@ class RetroRenderer {
                 const isReversing = isDriven && (v.speed || 0) < -10;
 
                 const isVcpdCharger = (v.specKey === "VCPD_CRUISER" || mapInfo.sprId === "73");
+                const turnSig = isDriven
+                    ? (v.driver === "PLAYER"
+                        ? (Math.abs(v.steerAngleRad || 0) > 0.16 ? (v.steerAngleRad > 0 ? 1 : -1) : 0)
+                        : (v.aiTurnSignal || 0))
+                    : 0;
+                const blinkOn = turnSig !== 0 && Math.sin(this.time * 11.5 + (v.sirenPhase || 0)) > 0;
 
                 for (const lat of lampOffsets) {
+                    const isBlinkSide = blinkOn && lat !== 0 && (
+                        turnSig === 2 ||
+                        (turnSig < 0 && lat < 0) ||
+                        (turnSig > 0 && lat > 0)
+                    );
                     // 1) Front Headlight Lenses (bright xenon-white when driven at dusk/night, crisp silver-blue glass housing by day)
                     //    If front-dented on VCPD Charger, right headlight (lat > 0) is shattered out!
                     const rightLampBroken = isVcpdCharger && (v.frontDented || v.heavyDented) && lat > 0;
@@ -9508,6 +9519,12 @@ class RetroRenderer {
                             this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 3.0, 2.5, v.angle, 1.0, 0.98, 0.88, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
                         } else {
                             this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 2.4, 2.1, v.angle, 0.82, 0.91, 0.98, 0.82, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        }
+                        if (isBlinkSide) {
+                            const bLat = lat + (lat > 0 ? 1.15 : -1.15);
+                            const bfx = v.x + cosA * (frontDist - 0.4) - sinA * bLat;
+                            const bfy = v.y + sinA * (frontDist - 0.4) + cosA * bLat;
+                            this.pushSolidQuad3D(bfx, bfy, vz + airZ + totalPitchZ + 0.015, 2.8, 2.2, v.angle, 1.0, 0.68, 0.06, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
                         }
                     }
 
@@ -9523,6 +9540,12 @@ class RetroRenderer {
                         } else {
                             // Unlit dark ruby taillight housing by day / when parked
                             this.pushSolidQuad3D(rx, ry, vz + airZ - totalPitchZ + 0.012, 2.5, 2.1, v.angle, 0.58, 0.07, 0.11, 0.85, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        }
+                        if (isBlinkSide) {
+                            const bLat = lat + (lat > 0 ? 1.15 : -1.15);
+                            const brx = v.x + cosA * (rearDist + 0.4) - sinA * bLat;
+                            const bry = v.y + sinA * (rearDist + 0.4) + cosA * bLat;
+                            this.pushSolidQuad3D(brx, bry, vz + airZ - totalPitchZ + 0.015, 2.9, 2.3, v.angle, 1.0, 0.65, 0.05, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
                         }
                     }
                 }

@@ -1397,6 +1397,8 @@ class Vehicle {
                 this.aiTargetBlockY = nby + dy;
                 this.aiLaneChangeCooldown = this.isMotorcycle ? 1.8 : 2.8;
                 this.aiLaneShiftTimer = 0.58;
+                this.aiLaneChangeSign = side;
+                this.aiTurnSignal = side;
                 this.aiState = "LANE_CHANGE";
                 return true;
             }
@@ -1412,6 +1414,8 @@ class Vehicle {
         if (this.aiLaneChangeCooldown > 0) this.aiLaneChangeCooldown -= dt;
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
         if (this.aiPanicTimer > 0) this.aiPanicTimer = Math.max(0, this.aiPanicTimer - dt);
+        if (this.aiPassengerStopCooldown > 0) this.aiPassengerStopCooldown = Math.max(0, this.aiPassengerStopCooldown - dt);
+        this.aiTurnSignal = 0;
 
         const curZ = this.z !== undefined ? this.z : 2.0;
         this.aiReverseTimer = 0;
@@ -1589,6 +1593,8 @@ class Vehicle {
             const travelSignY = Math.sin(bay.angle) >= 0 ? 1 : -1;
             const alongErr = (bay.y - this.y) * travelSignY;
             const latErr = bay.x - this.x;
+            // Right-hand side relative to vertical travel (0, travelSignY) is (-travelSignY, 0), so bay.dc * (-travelSignY) gives +1 right / -1 left
+            const bayTurnSign = (bay.dc || 1) * (-travelSignY) >= 0 ? 1 : -1;
             // Smoothly steer/glide laterally into the recessed bay
             this.x += Math.max(-92 * dt, Math.min(92 * dt, latErr * Math.min(1, dt * 6.5)));
             const angErr = this.normalizeAngle(bay.angle - this.angle);
@@ -1604,6 +1610,10 @@ class Vehicle {
                 this.speed = 0;
                 this.aiState = "CURB_PARKED";
                 this.aiCurbParkedTimer = (this.aiCurbParkedTimer || 0) - dt;
+                // Activate road-side indicator 2.2s before pulling back out into the lane!
+                if (this.aiCurbParkedTimer < 2.2) {
+                    this.aiTurnSignal = -bayTurnSign;
+                }
                 if (this.aiCurbParkedTimer <= 0) {
                     // Check mirror & adjacent travel lane before pulling back out into traffic
                     const roadLaneX = (bay.c + (bay.dc || 0) + 0.5) * TILE_SIZE;
@@ -1629,6 +1639,9 @@ class Vehicle {
                         this.aiBlockY = bay.r;
                         this.aiTargetBlockX = this.aiBlockX;
                         this.aiTargetBlockY = this.aiBlockY + travelSignY;
+                        this.aiLaneShiftTimer = 0.65;
+                        this.aiLaneChangeSign = -bayTurnSign;
+                        this.aiTurnSignal = -bayTurnSign;
                         this.aiState = "CRUISE";
                     } else {
                         this.aiCurbParkedTimer = 1.5; // Wait 1.5s for traffic to pass before checking mirror again
@@ -1637,6 +1650,7 @@ class Vehicle {
                 return { throttle: 0, steer: 0, handbrake: true };
             } else if (alongErr > -14 && alongErr < 125) {
                 this.aiState = "FOLLOWING";
+                this.aiTurnSignal = bayTurnSign;
                 const approachSpd = Math.max(14, Math.min(48, Math.abs(alongErr) * 1.4));
                 if (this.speed > approachSpd) {
                     this.vx *= Math.pow(0.04, dt);
@@ -1650,6 +1664,64 @@ class Vehicle {
                 if (bay._occupiedBy === this) bay._occupiedBy = null;
                 this.aiCurbParkingBay = null;
                 this.aiCurbParkCooldown = 14.0;
+            }
+        }
+
+        // 1A-bis. Autonomous Taxi & City Bus Curbside Passenger Service (VICE_CAB, CITY_BUS, TOUR_COACH):
+        //         Taxis respond to hailing pedestrians or pull over to drop off a fare; buses make brief scheduled curb stops!
+        if (
+            !isPanicked &&
+            this.driver === "AI_TRAFFIC" &&
+            !this.aiCurbParkingBay &&
+            lidZ1 !== 25 &&
+            (this.specKey === "VICE_CAB" || this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH")
+        ) {
+            if (
+                movedOutOfLane &&
+                !this.aiPassengerTarget &&
+                (this.aiPassengerStopTimer || 0) <= 0 &&
+                (this.aiPassengerStopCooldown || 0) <= 0 &&
+                this.aiChosenDir &&
+                !this.aiChosenDir.isTurn &&
+                this.aiTurnSeed > 0.84
+            ) {
+                // Check if right-hand side is a paved sidewalk (GROUND_TYPE.PAWEMENT)
+                const rightBx = bx - (this.aiChosenDir.dy || 0);
+                const rightBy = by + (this.aiChosenDir.dx || 0);
+                const rightNav = map.getNavigationBlock ? map.getNavigationBlock(rightBx, rightBy, curZ) : null;
+                if (rightNav && rightNav.groundType === GROUND_TYPE.PAWEMENT) {
+                    this.aiPassengerStopTimer = this.specKey === "VICE_CAB" ? 3.2 : 4.2;
+                    this.aiPassengerDropPending = true;
+                }
+            }
+            const hailedPed = this.aiPassengerTarget;
+            if (hailedPed && (hailedPed.dead || (hailedPed.panicTimer || 0) > 0 || (hailedPed.hailingTaxiTimer || 0) <= 0)) {
+                this.aiPassengerTarget = null;
+            }
+            if (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0) {
+                this.aiPullOverOffset = 18;
+                this.aiPullOverTimer = 1.2;
+                this.aiTurnSignal = 2; // 4-way hazard flashers while picking up / dropping off passengers
+                this.aiState = "STOPPED_LIGHT";
+                const brakeMult = Math.pow(0.015, dt);
+                this.vx *= brakeMult;
+                this.vy *= brakeMult;
+                this.speed *= brakeMult;
+                if (Math.abs(this.speed) < 12) {
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.speed = 0;
+                    if (this.aiPassengerDropPending && game && typeof game.spawnAlightingPassenger === "function") {
+                        this.aiPassengerDropPending = false;
+                        game.spawnAlightingPassenger(this);
+                    }
+                }
+                if ((this.aiPassengerStopTimer || 0) > 0) {
+                    this.aiPassengerStopTimer = Math.max(0, this.aiPassengerStopTimer - dt);
+                    if (this.aiPassengerStopTimer <= 0) {
+                        this.aiPassengerStopCooldown = 28.0;
+                    }
+                }
             }
         }
 
@@ -1786,12 +1858,66 @@ class Vehicle {
         const isPreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 === 25);
 
         const hasSignal = map && typeof map.hasTrafficSignalNear === "function" ? map.hasTrafficSignalNear(this.x, this.y, 380) : true;
-        if (!isPanicked && !sirenBehind && curBlk && (isStopBlock || isPreStopBlock) && hasSignal && game) {
+        // Compute active turn signal / blinker indicator (-1 = left, +1 = right, 2 = 4-way hazards)
+        if (!this.aiTurnSignal) {
+            if (this.aiLaneShiftTimer > 0 && this.aiLaneChangeSign) {
+                this.aiTurnSignal = this.aiLaneChangeSign;
+            } else if (this.aiChosenDir && this.aiChosenDir.isTurn) {
+                const entryA = typeof this.aiIntersectionEntryAngle === "number" ? this.aiIntersectionEntryAngle : this.angle;
+                const turnDelta = this.normalizeAngle(this.aiChosenDir.angle - entryA);
+                if (Math.abs(turnDelta) > 0.12) {
+                    this.aiTurnSignal = turnDelta >= 0 ? 1 : -1;
+                }
+            } else if (isStopBlock && typeof map.chooseNextRoadBlock === "function") {
+                // Pre-signal upcoming turn at the intersection box ahead!
+                const previewTurn = map.chooseNextRoadBlock(
+                    this.aiTargetBlockX,
+                    this.aiTargetBlockY,
+                    this.aiChosenDir ? this.aiChosenDir.angle : this.angle,
+                    curZ,
+                    (this.aiTurnSeed * 1.6180339887 + 0.31) % 1.0,
+                    false,
+                    this.aiChosenDir ? this.aiChosenDir.angle : this.angle
+                );
+                if (previewTurn && previewTurn.isTurn) {
+                    const turnDelta = this.normalizeAngle(previewTurn.angle - (this.aiChosenDir ? this.aiChosenDir.angle : this.angle));
+                    if (Math.abs(turnDelta) > 0.12) {
+                        this.aiTurnSignal = turnDelta >= 0 ? 1 : -1;
+                    }
+                }
+            }
+        }
+
+        // 3B. "Don't Block the Box" Anti-Gridlock Rule:
+        // Even on a GREEN light, if a same-direction car inside or just exiting the intersection box ahead is stopped (< 8px/s),
+        // hold behind the stop line so we never trap cross-traffic when the signal changes!
+        let boxExitBlocked = false;
+        if (!isPanicked && !sirenBehind && isStopBlock && game && Array.isArray(game.vehicles)) {
+            for (let vi = 0; vi < game.vehicles.length; vi++) {
+                const ov = game.vehicles[vi];
+                if (!ov || ov === this || ov.destroyed) continue;
+                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) continue;
+                const dx = ov.x - this.x;
+                const dy = ov.y - this.y;
+                const fwd = dx * fx + dy * fy;
+                const lat = Math.abs(dx * rx + dy * ry);
+                if (fwd > 22 && fwd < 128 && lat < 20 && Math.cos(ov.angle - this.angle) > 0.65) {
+                    const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
+                    const ovLid = map.getBlockInfo ? map.getBlockInfo(Math.floor(ov.x / TILE_SIZE), Math.floor(ov.y / TILE_SIZE), 1).lid : 0;
+                    if (ovSpd < 8 && ovLid === 25) {
+                        boxExitBlocked = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!isPanicked && !sirenBehind && curBlk && (isStopBlock || isPreStopBlock) && (hasSignal || boxExitBlocked) && game) {
             const isNSLane = stepDy !== 0 ? true : (Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right);
             const isEWLane = stepDx !== 0 ? true : (Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down);
             const nsRed = isNSLane && typeof game.isNSGreen === "function" && !game.isNSGreen();
             const ewRed = isEWLane && typeof game.isEWGreen === "function" && !game.isEWGreen();
-            if (nsRed || ewRed) {
+            if (nsRed || ewRed || boxExitBlocked) {
                 // The stop line is measured for the car's CENTER: a standard car (~48px) stops with its nose at the line,
                 // so longer vehicles (bus 88px, limo 90px, tanker 92px...) must stop proportionally further back
                 // (half of the extra length) instead of sticking far out into the junction.
@@ -2032,6 +2158,11 @@ class Vehicle {
                     desiredThrottle = 0.14;
                 }
             }
+        }
+
+        if (!isPanicked && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0)) {
+            desiredThrottle = 0;
+            return { throttle: 0, steer: 0, handbrake: true };
         }
 
         return { throttle: desiredThrottle, steer, handbrake: false };
