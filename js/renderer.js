@@ -273,11 +273,56 @@ class RetroRenderer {
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
                 if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.08, 0.0, 0.94) / max(mx, 0.01));
                 paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
+
+                // Subtle dual tire-rut wear along all traffic lanes
+                vec2 lp = fract(p);
+                float laneRutX = exp(-pow((lp.x - 0.32) * 5.5, 2.0)) + exp(-pow((lp.x - 0.68) * 5.5, 2.0));
+                float laneRutY = exp(-pow((lp.y - 0.32) * 5.5, 2.0)) + exp(-pow((lp.y - 0.68) * 5.5, 2.0));
+                col *= 1.0 - max(laneRutX, laneRutY) * 0.038 * (0.65 + mid * 0.35);
+
+                // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (vAnim in 5.50 .. 9.375)
+                float cwPaint = 0.0;
+                vec3 cwCol = vec3(0.76, 0.77, 0.75);
+                if (vAnim > 5.45 && vAnim < 9.45) {
+                    float idx = floor((vAnim - 5.5) * 8.0 + 0.5);
+                    float curbMax = mod(floor(idx / 2.0), 2.0);
+                    float curbMin = mod(floor(idx / 4.0), 2.0);
+                    float cwDir   = floor(idx / 8.0); // 0=N, 1=S, 2=W, 3=E
+                    float along  = (cwDir < 0.5) ? lp.y : (cwDir < 1.5) ? (1.0 - lp.y) : (cwDir < 2.5) ? lp.x : (1.0 - lp.x);
+                    float across = (cwDir < 1.5) ? lp.x : lp.y;
+                    float acMin  = (curbMin > 0.5) ? 0.135 : 0.035;
+                    float acMax  = (curbMax > 0.5) ? 0.865 : 0.965;
+                    bool inCurbSide = (curbMin > 0.5 && across < 0.125) || (curbMax > 0.5 && across > 0.875);
+
+                    // Terminate dashed white lane divider cleanly behind the stop bar while preserving curb & yellow lines
+                    if (along < 0.52 && !yellow && !inCurbSide) {
+                        paint = 0.0;
+                    }
+                    if (!yellow && across > acMin && across < acMax) {
+                        float tireRut = exp(-pow((across - 0.31) * 6.2, 2.0)) + exp(-pow((across - 0.69) * 6.2, 2.0));
+                        float chip = aNoise(p * 16.0 + 41.0) * 0.65 + fine * 0.35;
+                        float wearMask = clamp(1.0 - tireRut * (0.42 + (1.0 - chip) * 0.28), 0.28, 1.0);
+
+                        // 4 longitudinal FDOT Continental Crosswalk zebra bars per lane tile
+                        float cwAlong = smoothstep(0.035, 0.050, along) * (1.0 - smoothstep(0.285, 0.300, along));
+                        float barPhase = fract(across * 4.0 + 0.12);
+                        float cwBar = smoothstep(0.22, 0.26, barPhase) * (1.0 - smoothstep(0.74, 0.78, barPhase));
+                        float edgePad = smoothstep(acMin, acMin + 0.025, across) * (1.0 - smoothstep(acMax - 0.025, acMax, across));
+
+                        // Transverse FDOT White Stop Bar set back behind the crosswalk
+                        float stopAlong = smoothstep(0.375, 0.388, along) * (1.0 - smoothstep(0.428, 0.440, along));
+                        float stopAcross = smoothstep(acMin + 0.02, acMin + 0.04, across) * (1.0 - smoothstep(acMax - 0.04, acMax - 0.02, across));
+
+                        cwPaint = max(cwAlong * cwBar * edgePad, stopAlong * stopAcross) * wearMask * (0.72 + chip * 0.14);
+                        cwCol = vec3(0.75, 0.76, 0.74) * (0.88 + aNoise(p * 10.0 + 23.0) * 0.14);
+                    }
+                }
+
                 vec3 outCol = mix(col, paintCol, paint);
+                outCol = mix(outCol, cwCol, cwPaint);
                 if (vAnim > 9.5) {
                     // Junction box side facing the pavement: continue curb + gutter + yellow edge line
                     float bits = floor(vAnim - 10.0 + 0.5);
-                    vec2 lp = fract(p);
                     if (mod(bits, 2.0) > 0.5)              outCol = junctionCurb(outCol, lp.y);
                     if (mod(floor(bits / 2.0), 2.0) > 0.5) outCol = junctionCurb(outCol, 1.0 - lp.y);
                     if (mod(floor(bits / 4.0), 2.0) > 0.5) outCol = junctionCurb(outCol, lp.x);
@@ -326,7 +371,8 @@ class RetroRenderer {
                 bool isCurvedLawn = (vAnim > 29.5 && vAnim < 1999.5);
                 bool isCurvedWater = (vAnim > 1999.5);
                 float waterCoverage = (vAnim > 0.5 && vAnim < 1.5) ? 1.0 : 0.0;
-                if (isRoad) c.rgb = asphaltSurface(c.rgb, (vAnim > 5.1 && vAnim < 5.4) ? 1.0 : 0.0);
+                bool isDarkRoad = (vAnim > 5.1 && vAnim < 5.4) || (vAnim > 5.45 && vAnim < 9.45 && mod(floor((vAnim - 5.5) * 8.0 + 0.5), 2.0) > 0.5);
+                if (isRoad) c.rgb = asphaltSurface(c.rgb, isDarkRoad ? 1.0 : 0.0);
                 if (c.a < 0.03 && !isShoreTile) discard;
 
                 float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
@@ -5537,8 +5583,41 @@ class RetroRenderer {
             else if (!b.isFlat && effRemap === 0) {
                 // Asphalt road lids: shader replaces the 64px texel base with one seamless world-space
                 // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
-                if (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80) animType = 5.0;
-                else if (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82) animType = 5.25;
+                const isLightRoad = (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80);
+                const isDarkRoad  = (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82);
+                if (isLightRoad) animType = 5.0;
+                else if (isDarkRoad) animType = 5.25;
+
+                // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (stopLineMask === 1 adjacent to lid 25 junction box):
+                // Encode approach direction toward the junction box (0=N, 1=S, 2=W, 3=E), lateral sidewalk curb mask (curbMin, curbMax), & darkRoad bit:
+                if ((isLightRoad || isDarkRoad) && effTileIdx !== 25 && y_elev === 1 && this.map && this.map.stopLineMask && this.map.stopLineMask[z_south * MAP_COLS + x] === 1) {
+                    const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
+                    const isJuncBox = (cx, cy) => {
+                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+                        if (!bi) return false;
+                        const nb = this.map.getBlockInfo(bi);
+                        return !!(nb && nb.lid === 25);
+                    };
+                    const nonRoad = (cx, cy) => {
+                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+                        if (!bi) return false;
+                        const nb = this.map.getBlockInfo(bi);
+                        return !!(nb && nb.lid && ROAD_LIDS.indexOf(nb.lid) < 0);
+                    };
+                    let cwDir = -1;
+                    if (isJuncBox(x, z_south - 1)) cwDir = 0;      // Junction is North (lp.y = 0 edge)
+                    else if (isJuncBox(x, z_south + 1)) cwDir = 1; // Junction is South (lp.y = 1 edge)
+                    else if (isJuncBox(x - 1, z_south)) cwDir = 2; // Junction is West  (lp.x = 0 edge)
+                    else if (isJuncBox(x + 1, z_south)) cwDir = 3; // Junction is East  (lp.x = 1 edge)
+                    if (cwDir >= 0) {
+                        const curbMin = (cwDir < 2) ? (nonRoad(x - 1, z_south) ? 1 : 0) : (nonRoad(x, z_south - 1) ? 1 : 0);
+                        const curbMax = (cwDir < 2) ? (nonRoad(x + 1, z_south) ? 1 : 0) : (nonRoad(x, z_south + 1) ? 1 : 0);
+                        const darkBit = isDarkRoad ? 1 : 0;
+                        const cwIdx = cwDir * 8 + curbMin * 4 + curbMax * 2 + darkBit;
+                        animType = 5.5 + cwIdx * 0.125;
+                    }
+                }
+
                 // Junction box tiles (lid 25) have no curb at all, so where a box side faces the pavement
                 // (T-junctions, box wider than the crossing road) bare asphalt bulged into the sidewalk like a
                 // pasted rectangle. Encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader
@@ -9473,6 +9552,76 @@ class RetroRenderer {
                                 SPRITE_DRAW_ORDER.TREES
                             );
                         }
+                    } else if (vd.kind === "SERPENTINE_WALL") {
+                        // Iconic Lummus Park 3D Undulating Art Deco Low Serpentine Wall (Ocean Drive & Vice Beach border)
+                        const wAng = vd.angle || 0;
+                        const wLen = vd.len || 66;
+                        const isPink = vd.theme === "PINK";
+                        // Cast shadow on coral pavers/sand
+                        this.pushSolidQuad3D(
+                            vd.x + sunCos * 5.0,
+                            vd.y + sunSin * 5.0,
+                            vz + 0.003,
+                            5.5,
+                            wLen,
+                            wAng,
+                            0.04,
+                            0.06,
+                            0.10,
+                            sunShadowAlpha * 0.45,
+                            SPRITE_DRAW_ORDER.SKIDMARKS
+                        );
+                        // Cream-white Art Deco stucco low ribbon wall base
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.055, 6.2, wLen, wAng, 0.96, 0.93, 0.87, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        // Pastel coral-pink or tropical turquoise Art Deco top coping cap
+                        this.pushSolidQuad3D(
+                            vd.x,
+                            vd.y,
+                            vz + 0.085,
+                            4.4,
+                            wLen - 1.5,
+                            wAng,
+                            isPink ? 0.96 : 0.28,
+                            isPink ? 0.54 : 0.86,
+                            isPink ? 0.72 : 0.88,
+                            0.98,
+                            SPRITE_DRAW_ORDER.PEDESTRIANS
+                        );
+                        // Subtle recessed neon tube accent strip
+                        if (nfGlobal > 0.05) {
+                            this.pushSolidQuad3D(
+                                vd.x - 1.8,
+                                vd.y,
+                                vz + 0.070,
+                                1.4,
+                                wLen - 4.0,
+                                wAng,
+                                isPink ? 1.0 : 0.20,
+                                isPink ? 0.32 : 0.95,
+                                isPink ? 0.78 : 1.0,
+                                Math.min(0.95, 0.35 + nfGlobal * 0.60),
+                                SPRITE_DRAW_ORDER.PEDESTRIANS
+                            );
+                        }
+                    } else if (vd.kind === "VALET_PODIUM") {
+                        // Ocean Drive Art Deco Hotel Valet Stand & Neon Podium
+                        const isPink = vd.theme === "PINK";
+                        this.pushSolidQuad3D(vd.x + sunCos * 4.5, vd.y + sunSin * 4.5, vz + 0.003, 9, 9, 0, 0.04, 0.06, 0.10, sunShadowAlpha * 0.45, SPRITE_DRAW_ORDER.SKIDMARKS);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.06, 7.5, 9.5, 0, 0.94, 0.91, 0.86, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.11, 5.5, 7.5, 0, isPink ? 0.96 : 0.22, isPink ? 0.36 : 0.86, isPink ? 0.68 : 0.94, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                    } else if (vd.kind === "CUBA_DOMINO_TABLE") {
+                        // Little Cuba (Calle Ocho / Maximo Gomez Domino Park) Sidewalk Domino Table & 4 Guayabera Stools
+                        this.pushSolidQuad3D(vd.x + sunCos * 5.0, vd.y + sunSin * 5.0, vz + 0.003, 14, 14, 0, 0.04, 0.06, 0.10, sunShadowAlpha * 0.45, SPRITE_DRAW_ORDER.SKIDMARKS);
+                        // Mahogany wood table frame + green felt tabletop + miniature ivory domino tiles
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.055, 11.5, 11.5, 0, 0.48, 0.25, 0.12, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.065, 8.8, 8.8, 0, 0.14, 0.54, 0.30, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x - 1.4, vd.y - 0.8, vz + 0.072, 2.2, 1.2, 0.4, 0.96, 0.95, 0.88, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x + 1.5, vd.y + 1.0, vz + 0.072, 2.2, 1.2, -0.3, 0.96, 0.95, 0.88, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        // 4 surrounding wooden stools
+                        this.pushSolidQuad3D(vd.x - 8.2, vd.y, vz + 0.04, 3.6, 3.6, 0, 0.62, 0.36, 0.18, 0.96, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x + 8.2, vd.y, vz + 0.04, 3.6, 3.6, 0, 0.62, 0.36, 0.18, 0.96, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x, vd.y - 8.2, vz + 0.04, 3.6, 3.6, 0, 0.62, 0.36, 0.18, 0.96, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x, vd.y + 8.2, vz + 0.04, 3.6, 3.6, 0, 0.62, 0.36, 0.18, 0.96, SPRITE_DRAW_ORDER.PEDESTRIANS);
                     }
                 }
             }

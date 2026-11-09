@@ -2968,15 +2968,25 @@ class WorldObjectEngine {
                 const blk1 = map.getBlockInfo ? map.getBlockInfo(c, r, 1) : null;
                 if (blk1 && blk1.lid === 69) continue;
 
-                // Check which neighbor is a ROAD tile so we place the prop near the curb facing the street
+                // Check which neighbor is an active ROAD tile (ignoring off-street parking lots) so we place the prop near the curb facing the street
+                const isActiveStreet = (tc, tr) => {
+                    if (g[tr * M + tc] !== GROUND_TYPE.ROAD) return false;
+                    if (map.voxelGrid && map.roadParkingNavIdx !== undefined && map.voxelGrid[(2 * MAP_ROWS + tr) * M + tc] === map.roadParkingNavIdx) {
+                        const b1 = map.getBlockInfo ? map.getBlockInfo(tc, tr, 1) : null;
+                        if (!b1 || (b1.lid !== 1 && b1.lid !== 2 && b1.lid !== 24 && b1.lid !== 25 && b1.lid !== 74 && b1.lid !== 75 && b1.lid !== 80 && b1.lid !== 81 && b1.lid !== 82)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
                 let curbDx = 0, curbDy = 0, armAng = 0, hasRoad = false;
-                if (g[r * M + (c + 1)] === GROUND_TYPE.ROAD) {
+                if (isActiveStreet(c + 1, r)) {
                     curbDx = 18; curbDy = 0; armAng = 0; hasRoad = true;
-                } else if (g[r * M + (c - 1)] === GROUND_TYPE.ROAD) {
+                } else if (isActiveStreet(c - 1, r)) {
                     curbDx = -18; curbDy = 0; armAng = Math.PI; hasRoad = true;
-                } else if (g[(r + 1) * M + c] === GROUND_TYPE.ROAD) {
+                } else if (isActiveStreet(c, r + 1)) {
                     curbDx = 0; curbDy = 18; armAng = Math.PI * 0.5; hasRoad = true;
-                } else if (g[(r - 1) * M + c] === GROUND_TYPE.ROAD) {
+                } else if (isActiveStreet(c, r - 1)) {
                     curbDx = 0; curbDy = -18; armAng = -Math.PI * 0.5; hasRoad = true;
                 }
                 if (!hasRoad) continue;

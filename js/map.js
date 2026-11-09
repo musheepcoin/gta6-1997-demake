@@ -895,13 +895,19 @@ class LeonidaMap {
                         posX = (c + 0.78 + (hs1 - 0.5) * 0.10) * TILE_SIZE; // Curbside royal palm row facing Lummus Park
                         scaleMul = 1.02 + hs1 * 0.35;
                         heightMul = 0.95 + hs2 * 0.60;
-                    } else if (isGardenVerge && (r % 10 === 4) && (c === 449 + ((r >> 3) & 1))) {
-                        if (seed % 3 === 0) {
+                    } else if (isGardenVerge && ((r % 3 === 1 && c === 449) || (r % 3 === 2 && c === 450))) {
+                        // Lush Lummus Park tropical lawn colonnade (tall swaying Royal/Coconut Palms + Fan Palms + Bougainvillea)
+                        if (r % 6 === 1 || r % 6 === 5) {
+                            chosenKind = "palm_tree";
+                            posX = (c + 0.50 + (hs1 - 0.5) * 0.24) * TILE_SIZE;
+                            scaleMul = 0.96 + hs1 * 0.34;
+                            heightMul = 0.92 + hs2 * 0.58;
+                        } else if (seed % 2 === 0) {
                             chosenKind = "fan_palm";
-                            scaleMul = 0.88 + hs1 * 0.28;
+                            scaleMul = 0.92 + hs1 * 0.28;
                         } else {
                             chosenKind = "bougainvillea_bush";
-                            scaleMul = 0.90 + hs1 * 0.26;
+                            scaleMul = 0.94 + hs1 * 0.26;
                         }
                     }
                     // c=451: ZERO TREES! 100% open paved oceanfront boardwalk for rollerblading & walking!
@@ -2930,10 +2936,21 @@ class LeonidaMap {
                 if (this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT) continue;
                 if (this.coastalSandMask[idx]) continue;
 
-                const eRoad = this.surfaceGround[r * MAP_COLS + (c + 1)] === GROUND_TYPE.ROAD;
-                const wRoad = this.surfaceGround[r * MAP_COLS + (c - 1)] === GROUND_TYPE.ROAD;
-                const sRoad = this.surfaceGround[(r + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
-                const nRoad = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
+                const isRealStreetTile = (tc, tr) => {
+                    if (this.surfaceGround[tr * MAP_COLS + tc] !== GROUND_TYPE.ROAD) return false;
+                    // Never treat off-street surfaceParkingLots as active streets for streetlamps or signals
+                    if (this.voxelGrid[(2 * MAP_ROWS + tr) * MAP_COLS + tc] === this.roadParkingNavIdx) {
+                        const blk1 = this.getBlockInfo(tc, tr, 1);
+                        if (!blk1 || (blk1.lid !== 1 && blk1.lid !== 2 && blk1.lid !== 24 && blk1.lid !== 25 && blk1.lid !== 74 && blk1.lid !== 75 && blk1.lid !== 80 && blk1.lid !== 81 && blk1.lid !== 82)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                const eRoad = isRealStreetTile(c + 1, r);
+                const wRoad = isRealStreetTile(c - 1, r);
+                const sRoad = isRealStreetTile(c, r + 1);
+                const nRoad = isRealStreetTile(c, r - 1);
                 const roadCount = (eRoad ? 1 : 0) + (wRoad ? 1 : 0) + (sRoad ? 1 : 0) + (nRoad ? 1 : 0);
 
                 // Signalized Urban Intersections (1 NS + 1 EW gantry per intersection, including East-side T-junctions; ignore parking bays/lots!)
@@ -3334,6 +3351,51 @@ class LeonidaMap {
                 z: 2.0,
                 theme: (c % 4 === 0) ? "PINK" : "AMBER"
             });
+        }
+
+        // C. Lummus Park Iconic 3D Undulating Pastel/Neon Art Deco Serpentine Wall (Boardwalk-to-Sand border at c = 452.35)
+        for (let r = 56; r <= 356; r++) {
+            // Leave generous pedestrian beach-access openings every 8 rows and around Vice Beach Pier / Cape Lighthouse / Stunt Ramps
+            if ((r % 8) === 0 || (r % 8) === 1) continue;
+            if (r >= 130 && r <= 139) continue;
+            if (r >= 190 && r <= 200) continue;
+            if (r >= 263 && r <= 267) continue;
+            if (r >= 290 && r <= 294) continue;
+            const blk = this.getBlockInfo(452, r, 1);
+            if (!blk || blk.groundType === GROUND_TYPE.ROAD || blk.groundType === GROUND_TYPE.WATER) continue;
+            const waveX  = Math.sin(r * 0.65) * 0.14;
+            const dWaveX = Math.cos(r * 0.65) * 0.65 * 0.14;
+            this.viceStreetDetails.push({
+                kind: "SERPENTINE_WALL",
+                x: (452.38 + waveX) * TILE_SIZE,
+                y: (r + 0.5) * TILE_SIZE,
+                z: 2.0,
+                len: TILE_SIZE + 3.0,
+                angle: -Math.atan(dWaveX),
+                theme: ((Math.floor(r / 8) % 2) === 0) ? "PINK" : "CYAN"
+            });
+        }
+
+        // D. Ocean Drive Art Deco Hotel Valet Podiums & Little Cuba (Calle Ocho) Sidewalk Domino Tables
+        for (const rValet of [222, 246, 270, 286, 302, 318]) {
+            this.viceStreetDetails.push({
+                kind: "VALET_PODIUM",
+                x: (oceanDriveW + 0.72) * TILE_SIZE,
+                y: (rValet + 0.5) * TILE_SIZE,
+                z: 2.0,
+                theme: (rValet % 4 === 0) ? "PINK" : "CYAN"
+            });
+        }
+        for (const [dc, dr] of [[254, 244], [260, 244], [266, 244], [256, 260], [264, 260]]) {
+            if (this.surfaceGround[dr * MAP_COLS + dc] === GROUND_TYPE.PAWEMENT) {
+                this.viceStreetDetails.push({
+                    kind: "CUBA_DOMINO_TABLE",
+                    x: (dc + 0.5) * TILE_SIZE,
+                    y: (dr + 0.5) * TILE_SIZE,
+                    z: 2.0,
+                    theme: "AMBER"
+                });
+            }
         }
 
         // 16 Official GTA 6 (State of Leonida & Vice City) Bespoke Landmarks
