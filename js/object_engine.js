@@ -571,6 +571,31 @@ class WorldObjectEngine {
             { name: "WYNWOOD ELECTRIC GRAFFITI TATTOO",       x: 191.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "CALLE OCHO HAVANA BLADE & INK PARLOR",   x: 286.5 * TILE_SIZE, y: 252.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 18. Official GTA 6 Sandbar Boat-Party DJ Barges & Vice Beach Giant Sandcastle Sculptures (Loop 11)
+        this.sandbarPartyBarges = [
+            { name: "BISCAYNE BAY HAULOVER SANDBAR PARTY",    x: 378.5 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.5 },
+            { name: "VICE BEACH SOUTH POINTE SANDBAR BARGE",  x: 484.5 * TILE_SIZE, y: 318.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 1.9 },
+            { name: "ISLAMORADA KEYS SANDBAR TIKI BARGE",     x: 228.5 * TILE_SIZE, y: 486.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.3 }
+        ];
+        this.sandcastles = [
+            { name: "NORTH BEACH ROYAL SANDCASTLE",           x: 472.5 * TILE_SIZE, y: 142.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PIER PLAZA TITAN SAND FORTRESS",         x: 472.5 * TILE_SIZE, y: 198.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS BEACH ART DECO SAND PALACE",      x: 472.5 * TILE_SIZE, y: 248.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE MEGA SAND SCULPTURE",       x: 472.5 * TILE_SIZE, y: 306.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 19. Official GTA 6 Mount Kalaga & Grassrivers Kayak Outposts & Extreme Parachute Base-Jump Pads (Loop 12)
+        this.kayakOutposts = [
+            { name: "MOUNT KALAGA CANYON KAYAK OUTPOST",      x: 138.5 * TILE_SIZE, y: 34.5 * TILE_SIZE,  z: 2.0, cooldown: 0, seed: 0.7 },
+            { name: "LAKE LEONIDA NORTH SHORE KAYAK DOCK",    x: 126.5 * TILE_SIZE, y: 176.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 2.1 },
+            { name: "GRASSRIVERS CYPRESS BAYOU CANOE CAMP",   x: 96.5 * TILE_SIZE,  y: 412.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.5 },
+            { name: "KEY LENTO MANGROVE KAYAK TRAIL",         x: 244.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 4.9 }
+        ];
+        this.baseJumpPads = [
+            { name: "DOWNTOWN SKY-TOWER BASE JUMP",           x: 289.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "MOUNT KALAGA EAGLE CRAG BASE JUMP",      x: 128.5 * TILE_SIZE, y: 22.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "STAR ISLAND HELIPAD DROP ZONE",          x: 352.5 * TILE_SIZE, y: 168.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "OCEAN DRIVE ROOFTOP PARACHUTE PAD",      x: 441.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1034,6 +1059,32 @@ class WorldObjectEngine {
                 for (const tp of this.tattooParlors) {
                     snapOffRoad(tp);
                     clearZones.push({ x: tp.x, y: tp.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.sandbarPartyBarges)) {
+                for (const sb of this.sandbarPartyBarges) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(sb.x, sb.y, 20);
+                        if (sn) { sb.x = sn.x; sb.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.sandcastles)) {
+                for (const sc of this.sandcastles) {
+                    snapOffRoad(sc);
+                    clearZones.push({ x: sc.x, y: sc.y, r: 36 });
+                }
+            }
+            if (Array.isArray(this.kayakOutposts)) {
+                for (const ko of this.kayakOutposts) {
+                    snapOffRoad(ko);
+                    clearZones.push({ x: ko.x, y: ko.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.baseJumpPads)) {
+                for (const bj of this.baseJumpPads) {
+                    snapOffRoad(bj);
+                    clearZones.push({ x: bj.x, y: bj.y, r: 40 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2536,6 +2587,144 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-16. Official GTA 6 Haulover / Keys Sandbar Floating DJ Boat-Party Barges ([E]!)
+        if (Array.isArray(this.sandbarPartyBarges)) {
+            for (const sb of this.sandbarPartyBarges) {
+                if ((sb.cooldown || 0) <= 0 && Math.hypot(px - sb.x, py - sb.y) < 95) {
+                    sb.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(6500);
+                    if (typeof game.addCash === "function") game.addCash(6500, `🎉 ${sb.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎉 SANDBAR BOAT-PARTY VIP!`,
+                            `${sb.name} • 150 HP/ARMOR + +$6,500 & +1X!`,
+                            "#f472b6",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sb.x,
+                            y: sb.y,
+                            z: 2.70,
+                            text: `🎉 SANDBAR DJ PARTY! 150 HP/ARMOR + +$6,500!`,
+                            color: "#f472b6",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-17. Official GTA 6 Vice Beach Giant Sandcastle Sculptures ([E]!)
+        if (Array.isArray(this.sandcastles)) {
+            for (const sc of this.sandcastles) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 74) {
+                    sc.cooldown = 15.0;
+                    this.cameraFlashTimer = 0.35;
+                    if (typeof game.addScore === "function") game.addScore(3500);
+                    if (typeof game.addCash === "function") game.addCash(3500, `🏰 ${sc.name} SNAPSHOT!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🏰 VICE BEACH MASTER SANDCASTLE!`,
+                            `${sc.name} • VIRAL SNAPSHOT +$3,500 & +1X!`,
+                            "#facc15",
+                            2.5
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sc.x,
+                            y: sc.y,
+                            z: 2.66,
+                            text: `🏰 SANDCASTLE SNAPSHOT! +$3,500 + +1X!`,
+                            color: "#facc15",
+                            life: 2.5
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-18. Official GTA 6 Mount Kalaga & Grassrivers Kayak Expedition Outposts ([E]!)
+        if (Array.isArray(this.kayakOutposts)) {
+            for (const ko of this.kayakOutposts) {
+                if ((ko.cooldown || 0) <= 0 && Math.hypot(px - ko.x, py - ko.y) < 82) {
+                    ko.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(5500);
+                    if (typeof game.addCash === "function") game.addCash(5500, `🛶 ${ko.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🛶 LEONIDA KAYAK EXPEDITION!`,
+                            `${ko.name} • RAPIDS TROPHY +$5,500 + 150 HP/ARMOR & +1X!`,
+                            "#38bdf8",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ko.x,
+                            y: ko.y,
+                            z: 2.68,
+                            text: `🛶 KAYAK EXPEDITION! +$5,500 + 150 HP/ARMOR!`,
+                            color: "#38bdf8",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-19. Official GTA 6 Extreme Skyscraper & Ridge Parachute Base-Jump Pads ([E]!)
+        if (Array.isArray(this.baseJumpPads)) {
+            for (const bj of this.baseJumpPads) {
+                if ((bj.cooldown || 0) <= 0 && Math.hypot(px - bj.x, py - bj.y) < 78) {
+                    bj.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(7000);
+                    if (typeof game.addCash === "function") game.addCash(7000, `🪂 ${bj.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🪂 EXTREME BASE-JUMP LANDING!`,
+                            `${bj.name} • BULLSEYE DROP +$7,000 + 150 ARMOR & +1X!`,
+                            "#a855f7",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bj.x,
+                            y: bj.y,
+                            z: 2.72,
+                            text: `🪂 BASE-JUMP BULLSEYE! +$7,000 + 150 ARMOR!`,
+                            color: "#a855f7",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -3450,6 +3639,26 @@ class WorldObjectEngine {
         if (Array.isArray(this.tattooParlors)) {
             for (const tp of this.tattooParlors) {
                 if ((tp.cooldown || 0) > 0) tp.cooldown = Math.max(0, tp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.sandbarPartyBarges)) {
+            for (const sb of this.sandbarPartyBarges) {
+                if ((sb.cooldown || 0) > 0) sb.cooldown = Math.max(0, sb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.sandcastles)) {
+            for (const sc of this.sandcastles) {
+                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.kayakOutposts)) {
+            for (const ko of this.kayakOutposts) {
+                if ((ko.cooldown || 0) > 0) ko.cooldown = Math.max(0, ko.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.baseJumpPads)) {
+            for (const bj of this.baseJumpPads) {
+                if ((bj.cooldown || 0) > 0) bj.cooldown = Math.max(0, bj.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -7344,6 +7553,59 @@ class WorldObjectEngine {
                 emitCylinder3D(tp.x, tp.y, 12, 6, 2.8, 2.8, bz + 0.18, bz + 0.24, 8, [0.16, 0.44, 0.96], 1, false);
             }
         }
+        // 22I. OFFICIAL GTA 6 SANDBAR DJ BOAT-PARTY BARGES, VICE BEACH SANDCASTLES, KAYAK OUTPOSTS & BASE-JUMP PADS (LOOPS 11 & 12)
+        if (Array.isArray(this.sandbarPartyBarges)) {
+            for (const sb of this.sandbarPartyBarges) {
+                const bz = 2.01;
+                // Luminous shallow turquoise sandbar pad + twin pontoons + teak deck + neon DJ booth & canopy
+                emitSolidBox3D(sb.x, sb.y, 1, 0, 0, 0, 56, 40, bz - 0.008, bz + 0.006, [0.18, 0.92, 0.88], 10);
+                emitSolidBox3D(sb.x, sb.y, 1, 0, 0, -11, 36, 4.5, bz, bz + 0.07, [0.88, 0.92, 0.96], 5);
+                emitSolidBox3D(sb.x, sb.y, 1, 0, 0,  11, 36, 4.5, bz, bz + 0.07, [0.88, 0.92, 0.96], 5);
+                emitSolidBox3D(sb.x, sb.y, 1, 0, 0, 0, 34, 24, bz + 0.06, bz + 0.10, [0.76, 0.56, 0.36], 8);
+                emitSolidBox3D(sb.x, sb.y, 1, 0, -8, 0, 8, 14, bz + 0.10, bz + 0.22, [0.14, 0.16, 0.24], 5);
+                emitSolidBox3D(sb.x, sb.y, 1, 0, -8, 0, 9, 15, bz + 0.21, bz + 0.24, [0.98, 0.24, 0.72], 1);
+                emitGableRoof3D(sb.x, sb.y, 1, 0, 0, 0, 32, 22, bz + 0.30, bz + 0.40, [0.98, 0.32, 0.74], true, 1);
+            }
+        }
+        if (Array.isArray(this.sandcastles)) {
+            for (const sc of this.sandcastles) {
+                const bz = sc.z || 2.0;
+                emitAOShadow3D(sc.x, sc.y, 1, 0, 0, 0, 26, 26, bz, 0.30);
+                // Multi-tiered golden sandcastle fortress + 4 corner turrets + central keep + red pennant flag
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 20, 20, bz, bz + 0.08, [0.94, 0.82, 0.58], 6);
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 12, 12, bz + 0.08, bz + 0.17, [0.96, 0.85, 0.62], 6);
+                emitCylinder3D(sc.x, sc.y, -8, -8, 3.2, 2.4, bz, bz + 0.16, 6, [0.92, 0.79, 0.54], 6, true);
+                emitCylinder3D(sc.x, sc.y,  8, -8, 3.2, 2.4, bz, bz + 0.16, 6, [0.92, 0.79, 0.54], 6, true);
+                emitCylinder3D(sc.x, sc.y, -8,  8, 3.2, 2.4, bz, bz + 0.16, 6, [0.92, 0.79, 0.54], 6, true);
+                emitCylinder3D(sc.x, sc.y,  8,  8, 3.2, 2.4, bz, bz + 0.16, 6, [0.92, 0.79, 0.54], 6, true);
+                emitCylinder3D(sc.x, sc.y,  0,  0, 4.0, 2.6, bz + 0.17, bz + 0.27, 6, [0.98, 0.88, 0.66], 6, true);
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 2.5, 0, 5.0, 1.4, bz + 0.27, bz + 0.32, [0.98, 0.22, 0.32], 1);
+            }
+        }
+        if (Array.isArray(this.kayakOutposts)) {
+            for (const ko of this.kayakOutposts) {
+                const bz = ko.z || 2.0;
+                emitAOShadow3D(ko.x, ko.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
+                // Timber expedition rack + 3 vibrant whitewater kayaks (red, yellow, cyan) + cedar gear shed
+                emitSolidBox3D(ko.x, ko.y, 1, 0, -6, 0, 14, 16, bz, bz + 0.22, [0.54, 0.36, 0.20], 8);
+                emitGableRoof3D(ko.x, ko.y, 1, 0, -6, 0, 17, 19, bz + 0.22, bz + 0.31, [0.18, 0.58, 0.34], true, 12);
+                emitSolidBox3D(ko.x, ko.y, 1, 0,  8, -5.5, 18, 3.6, bz + 0.03, bz + 0.08, [0.96, 0.22, 0.20], 1);
+                emitSolidBox3D(ko.x, ko.y, 1, 0,  8,  0.0, 18, 3.6, bz + 0.03, bz + 0.08, [0.98, 0.84, 0.14], 1);
+                emitSolidBox3D(ko.x, ko.y, 1, 0,  8,  5.5, 18, 3.6, bz + 0.03, bz + 0.08, [0.14, 0.86, 0.96], 1);
+            }
+        }
+        if (Array.isArray(this.baseJumpPads)) {
+            for (const bj of this.baseJumpPads) {
+                const bz = bj.z || 2.0;
+                emitAOShadow3D(bj.x, bj.y, 1, 0, 0, 0, 30, 30, bz, 0.35);
+                // Extreme Parachute Base-Jump Launch Pad + Bullseye Target Deck + Orange Windsock Mast
+                emitSolidBox3D(bj.x, bj.y, 1, 0, 0, 0, 24, 24, bz, bz + 0.05, [0.18, 0.20, 0.28], 5);
+                emitSolidBox3D(bj.x, bj.y, 1, 0, 0, 0, 16, 16, bz + 0.05, bz + 0.065, [0.68, 0.28, 0.96], 1);
+                emitSolidBox3D(bj.x, bj.y, 1, 0, 0, 0,  8,  8, bz + 0.065, bz + 0.08, [0.98, 0.88, 0.22], 1);
+                emitCylinder3D(bj.x, bj.y, 10, -10, 0.9, 0.9, bz + 0.05, bz + 0.34, 6, [0.90, 0.92, 0.96], 5, false);
+                emitSolidBox3D(bj.x, bj.y, 1, 0, 14, -10, 7.5, 2.4, bz + 0.28, bz + 0.33, [0.98, 0.46, 0.12], 1);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -10371,6 +10633,52 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 4.8 + i) % 4), tp.x, tp.y + 13, 2.042, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
+        if (Array.isArray(this.sandbarPartyBarges)) {
+            for (let i = 0; i < this.sandbarPartyBarges.length; i++) {
+                const sb = this.sandbarPartyBarges[i];
+                if (sb.x < minX - 150 || sb.x > maxX + 150 || sb.y < minY - 150 || sb.y > maxY + 150) continue;
+                if ((sb.cooldown || 0) <= 0) {
+                    const rSz = 36 + Math.sin(renderer.time * 5.5 + sb.seed) * 4.5;
+                    renderer.pushSolidQuad3D(sb.x, sb.y, 2.025, rSz, rSz, renderer.time * 1.4, 0.98, 0.28, 0.74, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                const dFr = 50 + (Math.floor(renderer.time * 6.0 + i) % 4);
+                renderer.batchPedSprite3D("bikini_pink", dFr, sb.x + 2, sb.y - 4, 2.11, renderer.time * 2.2, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("bikini_cyan", dFr, sb.x + 8, sb.y + 5, 2.11, -renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("surfer_guy", dFr, sb.x - 20, sb.y + 14, 2.03, 0.4, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.sandcastles)) {
+            for (let i = 0; i < this.sandcastles.length; i++) {
+                const sc = this.sandcastles[i];
+                if (sc.x < minX - 120 || sc.x > maxX + 120 || sc.y < minY - 120 || sc.y > maxY + 120) continue;
+                if ((sc.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.0 + i) * 3.0;
+                    renderer.pushSolidQuad3D(sc.x, sc.y, 2.025, rSz, rSz, renderer.time * 1.2, 0.98, 0.84, 0.18, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), sc.x - 13, sc.y + 4, 2.04, 0, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.kayakOutposts)) {
+            for (let i = 0; i < this.kayakOutposts.length; i++) {
+                const ko = this.kayakOutposts[i];
+                if (ko.x < minX - 130 || ko.x > maxX + 130 || ko.y < minY - 130 || ko.y > maxY + 130) continue;
+                if ((ko.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.2 + ko.seed) * 3.4;
+                    renderer.pushSolidQuad3D(ko.x, ko.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.16, 0.86, 0.98, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.6 + i) % 4), ko.x + 2, ko.y + 13, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.baseJumpPads)) {
+            for (let i = 0; i < this.baseJumpPads.length; i++) {
+                const bj = this.baseJumpPads[i];
+                if (bj.x < minX - 120 || bj.x > maxX + 120 || bj.y < minY - 120 || bj.y > maxY + 120) continue;
+                if ((bj.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 6.2 + i) * 3.8;
+                    renderer.pushSolidQuad3D(bj.x, bj.y, 2.030, rSz, rSz, renderer.time * 1.8, 0.68, 0.28, 0.98, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -10962,6 +11270,66 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.sandbarPartyBarges)) {
+            for (const sb of this.sandbarPartyBarges) {
+                if ((sb.cooldown || 0) <= 0 && Math.hypot(px - sb.x, py - sb.y) < 125) {
+                    const scr = renderer.worldToScreen(sb.x, sb.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f472b6";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#f472b6";
+                    ctx.fillText(`🎉 [E] JOIN SANDBAR BOAT PARTY (150 HP/ARMOR & +$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.sandcastles)) {
+            for (const sc of this.sandcastles) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 105) {
+                    const scr = renderer.worldToScreen(sc.x, sc.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`🏰 [E] SNAPSHOT SANDCASTLE SCULPTURE (+$3,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.kayakOutposts)) {
+            for (const ko of this.kayakOutposts) {
+                if ((ko.cooldown || 0) <= 0 && Math.hypot(px - ko.x, py - ko.y) < 115) {
+                    const scr = renderer.worldToScreen(ko.x, ko.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`🛶 [E] LAUNCH KAYAK EXPEDITION (150 HP/ARMOR & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.baseJumpPads)) {
+            for (const bj of this.baseJumpPads) {
+                if ((bj.cooldown || 0) <= 0 && Math.hypot(px - bj.x, py - bj.y) < 115) {
+                    const scr = renderer.worldToScreen(bj.x, bj.y - 16, 2.55);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#a855f7";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#e879f9";
+                    ctx.fillText(`🪂 [E] LAUNCH EXTREME BASE-JUMP (+$7,000 & 150 ARMOR)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -11338,6 +11706,30 @@ class WorldObjectEngine {
             ctx.fillStyle = "#f472b6";
             for (const tp of this.tattooParlors) {
                 ctx.fillRect((tp.x - 14) * sx, (tp.y - 11) * sy, 28 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.sandbarPartyBarges)) {
+            ctx.fillStyle = "#f472b6";
+            for (const sb of this.sandbarPartyBarges) {
+                ctx.fillRect((sb.x - 26) * sx, (sb.y - 18) * sy, 52 * sx, 36 * sy);
+            }
+        }
+        if (Array.isArray(this.sandcastles)) {
+            ctx.fillStyle = "#facc15";
+            for (const sc of this.sandcastles) {
+                ctx.fillRect((sc.x - 12) * sx, (sc.y - 12) * sy, 24 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.kayakOutposts)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const ko of this.kayakOutposts) {
+                ctx.fillRect((ko.x - 16) * sx, (ko.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.baseJumpPads)) {
+            ctx.fillStyle = "#a855f7";
+            for (const bj of this.baseJumpPads) {
+                ctx.fillRect((bj.x - 15) * sx, (bj.y - 15) * sy, 30 * sx, 30 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
