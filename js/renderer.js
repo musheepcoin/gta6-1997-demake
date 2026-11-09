@@ -4809,84 +4809,165 @@ class RetroRenderer {
 
     loadAuthenticGta1Assets() {
         this.loadProgress = 0;
-        this.loadTotal = 4;
+        this.loadTotal = 8;
+        this.loadStageLabel = "DOWNLOADING ASSETS...";
         let viceTilesLoaded = false;
         let spritesLoaded = false;
         let mapBinBuffer = null;
         let buildingPipeline = false;
 
+        const updateStartModalButton = (ready = false) => {
+            if (typeof document === "undefined") return;
+            const btn = document.getElementById("btn-start-game");
+            if (!btn) return;
+            if (ready) {
+                btn.textContent = "[ ENTER VICE CITY 26 — PLAY NOW (ENTER) ]";
+                btn.style.opacity = "1";
+                return;
+            }
+            const pct = Math.min(99, Math.max(5, Math.round(((this.loadProgress || 0) / (this.loadTotal || 8)) * 100)));
+            const pendingClick = Boolean(window.game && window.game._pendingStartGame);
+            btn.textContent = pendingClick
+                ? `⏳ ENTERING VICE CITY 26 (${pct}%) — ${this.loadStageLabel}`
+                : `⏳ LOADING VICE CITY 26 (${pct}%) — CLICK OR PRESS ENTER`;
+        };
+
         const checkReady = () => {
-            this.loadProgress =
-                (viceTilesLoaded ? 1 : 0) +
-                (spritesLoaded ? 1 : 0) +
-                (this.gta1Meta ? 1 : 0) +
-                (mapBinBuffer ? 1 : 0);
+            if (!buildingPipeline) {
+                this.loadProgress =
+                    (viceTilesLoaded ? 1 : 0) +
+                    (spritesLoaded ? 1 : 0) +
+                    (this.gta1Meta ? 1 : 0) +
+                    (mapBinBuffer ? 1 : 0);
+                updateStartModalButton(false);
+            }
 
             if (viceTilesLoaded && spritesLoaded && this.gta1Meta && mapBinBuffer && !this.gta1Ready && !buildingPipeline) {
                 buildingPipeline = true;
-                this.vehicleBySprIdx = {};
-                if (Array.isArray(this.gta1Meta.sprites.vehicles)) {
-                    for (const ve of this.gta1Meta.sprites.vehicles) {
-                        this.vehicleBySprIdx[String(ve.spr_idx)] = ve;
-                    }
-                }
-                if (this.gl) {
-                    const enhancedViceTiles = this.processViceTilesRtx(this.gta1TilesViceImg);
-                    this.tilesTexVice = this.createGLTexture(enhancedViceTiles, true);
-                    if (enhancedViceTiles && enhancedViceTiles !== this.gta1TilesViceImg) {
-                        enhancedViceTiles.width = 1;
-                        enhancedViceTiles.height = 1;
-                    }
-                    this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
-                    this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
-                }
+                this.loadStageLabel = "BUILDING 3D TEXTURES...";
+                updateStartModalButton(false);
 
-                // Stagger heavy sprite-atlas processing and 3D CityMesh generation across animation frames
-                // so mobile browsers (iOS Safari / Android Chrome) can garbage-collect temporary buffers between steps!
-                requestAnimationFrame(() => {
+                try {
+                    this.vehicleBySprIdx = {};
+                    if (this.gta1Meta && this.gta1Meta.sprites && Array.isArray(this.gta1Meta.sprites.vehicles)) {
+                        for (const ve of this.gta1Meta.sprites.vehicles) {
+                            this.vehicleBySprIdx[String(ve.spr_idx)] = ve;
+                        }
+                    }
                     if (this.gl) {
-                        const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
-                        this.spritesTex = this.createGLTexture(enhancedSprites, true);
-                        if (enhancedSprites && enhancedSprites !== this.gta1SpritesImg) {
-                            enhancedSprites.width = 1;
-                            enhancedSprites.height = 1;
+                        const enhancedViceTiles = this.processViceTilesRtx(this.gta1TilesViceImg);
+                        this.tilesTexVice = this.createGLTexture(enhancedViceTiles, true);
+                        if (enhancedViceTiles && enhancedViceTiles !== this.gta1TilesViceImg) {
+                            enhancedViceTiles.width = 1;
+                            enhancedViceTiles.height = 1;
                         }
+                        this.tilesTexNyc = this.tilesTexNyc || this.tilesTexVice;
+                        this.tilesTex = this.mapStyle === "VICE" ? this.tilesTexVice : this.tilesTexNyc;
+                    }
+                } catch (err) {
+                    console.error("Stage 1 (Vice tiles texture) error:", err);
+                }
+
+                // Use un-throttled setTimeout micro-slices (instead of nested requestAnimationFrame)
+                // so startup compilation never stalls in background tabs or throttled webviews,
+                // and never blocks the main thread for 1+ second in a single frame!
+                setTimeout(() => {
+                    try {
+                        this.loadProgress = 5;
+                        this.loadStageLabel = "PROCESSING SPRITE ATLAS...";
+                        updateStartModalButton(false);
+                        if (this.gl) {
+                            const enhancedSprites = this.processGtaSpritesRtx(this.gta1SpritesImg, this.gta1Meta);
+                            this.spritesTex = this.createGLTexture(enhancedSprites, true);
+                            if (enhancedSprites && enhancedSprites !== this.gta1SpritesImg) {
+                                enhancedSprites.width = 1;
+                                enhancedSprites.height = 1;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Stage 2 (Sprites atlas) error:", err);
                     }
 
-                    requestAnimationFrame(() => {
-                        // Decompress NYC.CMP 256x256x6 voxel map into LeonidaMap and build 3D WebGL CityMesh!
-                        this.map.mapStyle = this.mapStyle;
-                        this.map.loadCmpBinary(mapBinBuffer, this.gta1Meta.districts);
-                        mapBinBuffer = null;
-                        this.buildCityMesh();
-                        this.gta1Ready = true;
-                        this.cmpReady = true;
-                        this.bakeRadarBackground();
-
-                        if (window.game && typeof window.game.onCmpLoaded === "function") {
-                            window.game.onCmpLoaded(this.gta1Meta);
+                    setTimeout(() => {
+                        try {
+                            this.loadProgress = 6;
+                            this.loadStageLabel = "DECODING LEONIDA 3D MAP...";
+                            updateStartModalButton(false);
+                            this.map.mapStyle = this.mapStyle;
+                            this.map.loadCmpBinary(mapBinBuffer, this.gta1Meta ? this.gta1Meta.districts : null);
+                            mapBinBuffer = null;
+                        } catch (err) {
+                            console.error("Stage 3 (loadCmpBinary) error:", err);
                         }
 
-                        // Only preload secondary NYC classic tile atlas on desktop; on mobile, lazy-load only if user switches to NYC
-                        if (!this.isMobileInit) {
-                            loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
-                                if (this.gl) {
-                                    this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
-                                    if (this.mapStyle === "NYC") {
-                                        this.tilesTex = this.tilesTexNyc;
+                        setTimeout(() => {
+                            try {
+                                this.loadProgress = 7;
+                                this.loadStageLabel = "BUILDING 3D CITY MESH...";
+                                updateStartModalButton(false);
+                                this.buildCityMesh(true);
+                            } catch (err) {
+                                console.error("Stage 4 (buildCityMesh) error:", err);
+                            }
+
+                            setTimeout(() => {
+                                try {
+                                    this.loadStageLabel = "BAKING SOLAR SHADOWS & RADAR...";
+                                    if (this.gl && this.map && this.map.objectEngine) {
+                                        this.map.objectEngine.buildStatic3DMesh(this.gl, this);
+                                    }
+                                    this.buildDayLightTexture();
+                                } catch (err) {
+                                    console.error("Stage 5 (Static3DMesh / DayLightTex) error:", err);
+                                }
+
+                                this.loadProgress = 8;
+                                this.gta1Ready = true;
+                                this.cmpReady = true;
+                                updateStartModalButton(true);
+
+                                try {
+                                    this.bakeRadarBackground();
+                                } catch (err) {
+                                    console.error("Stage 5 (bakeRadarBackground) error:", err);
+                                }
+
+                                if (window.game && typeof window.game.onCmpLoaded === "function") {
+                                    try {
+                                        window.game.onCmpLoaded(this.gta1Meta);
+                                    } catch (err) {
+                                        console.error("Stage 5 (onCmpLoaded) error:", err);
                                     }
                                 }
-                            });
-                        }
-                    });
-                });
+
+                                // Only preload secondary NYC classic tile atlas on desktop; on mobile, lazy-load only if user switches to NYC
+                                if (!this.isMobileInit) {
+                                    loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
+                                        if (this.gl) {
+                                            this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
+                                            if (this.mapStyle === "NYC") {
+                                                this.tilesTex = this.tilesTexNyc;
+                                            }
+                                        }
+                                    });
+                                }
+                            }, 16);
+                        }, 16);
+                    }, 16);
+                }, 16);
             }
         };
 
-        const loadImageWithRetry = (img, baseUrl, onSuccess, maxRetries = 5) => {
+        const loadImageWithRetry = (img, baseUrl, onSuccess, maxRetries = 5, allowFallback = false) => {
             let attempt = 0;
-            img.onload = () => {
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
                 onSuccess();
+            };
+            img.onload = () => {
+                finish();
             };
             img.onerror = () => {
                 attempt++;
@@ -4897,6 +4978,9 @@ class RetroRenderer {
                     }, 300 * attempt);
                 } else {
                     console.error("Failed to load image after retries:", baseUrl);
+                    if (allowFallback) {
+                        finish();
+                    }
                 }
             };
             img.src = baseUrl;
@@ -4905,8 +4989,12 @@ class RetroRenderer {
 
         const fetchWithRetry = (url, asArrayBuffer = false, maxRetries = 5) => {
             let attempt = 0;
+            const sep = url.includes("?") ? "&" : "?";
             const run = () =>
-                fetch(attempt === 0 ? url : `${url}&retry=${attempt}_${Date.now()}`)
+                fetch(
+                    attempt === 0 ? url : `${url}${sep}retry=${attempt}_${Date.now()}`,
+                    attempt === 0 ? undefined : { cache: "no-store" }
+                )
                     .then((res) => {
                         if (!res.ok) throw new Error(`HTTP ${res.status}`);
                         return asArrayBuffer ? res.arrayBuffer() : res.json();
@@ -4927,28 +5015,28 @@ class RetroRenderer {
             if (window.game && typeof window.game.renderPortraits === "function") {
                 window.game.renderPortraits();
             }
-        });
+        }, 5, true);
 
         loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_11", () => {
             viceTilesLoaded = true;
             checkReady();
-        });
+        }, 5, true);
 
         loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_72", () => {
             spritesLoaded = true;
             checkReady();
-        });
+        }, 5, true);
 
         loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=100_71", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
-        });
+        }, 5, true);
 
         if (!this.isMobileInit) {
             loadImageWithRetry(this.nycOverviewImg, "assets/gta1/nyc_cmp_overview.png?v=98_11", () => {
                 this.nycOverviewReady = true;
                 this.bakeRadarBackground();
-            });
+            }, 5, true);
         }
 
         fetchWithRetry("assets/gta1/gta1_meta.json?v=99_72", false)
@@ -5018,7 +5106,7 @@ class RetroRenderer {
        - kFlatFaceOffset: Outward normal offset on flat panels to eliminate 3D Z-fighting
        - 3D Cardinal Wall Normals (-1..-4) for live Solar Azimuth Directional Lighting & Ground-Contact AO
        ======================================================================== */
-    buildCityMesh() {
+    buildCityMesh(skipAux = false) {
         const gl = this.gl;
         if (!gl || !this.map.cmpLoaded || !this.gta1Meta) return;
 
@@ -5145,17 +5233,19 @@ class RetroRenderer {
             }
         }
 
-        // 2B. Build True 3D Volumetric Architectural Prefab Mesh (WorldObjectEngine)
-        if (this.map && this.map.objectEngine) {
-            try {
-                this.map.objectEngine.buildStatic3DMesh(gl, this);
-            } catch (err) {
-                console.error("WorldObjectEngine.buildStatic3DMesh error:", err);
+        if (!skipAux) {
+            // 2B. Build True 3D Volumetric Architectural Prefab Mesh (WorldObjectEngine)
+            if (this.map && this.map.objectEngine) {
+                try {
+                    this.map.objectEngine.buildStatic3DMesh(gl, this);
+                } catch (err) {
+                    console.error("WorldObjectEngine.buildStatic3DMesh error:", err);
+                }
             }
-        }
 
-        // 3. Build 512x512 Ray-Marched 3D Building Solar Cast Shadow & Ambient Occlusion Lightmap (this.dayLightTex)
-        this.buildDayLightTexture();
+            // 3. Build 512x512 Ray-Marched 3D Building Solar Cast Shadow & Ambient Occlusion Lightmap (this.dayLightTex)
+            this.buildDayLightTexture();
+        }
     }
 
     buildDayLightTexture() {
@@ -6213,8 +6303,9 @@ class RetroRenderer {
 
             ctx.font = "bold 14px Consolas, 'Courier New', monospace";
             ctx.fillStyle = "#fde047";
-            const pct = Math.min(99, Math.round(((this.loadProgress || 0) / (this.loadTotal || 4)) * 100));
-            ctx.fillText(`LOADING 3D VICE CITY 26 WORLD... ${pct}%`, cx, cy - 8);
+            const pct = Math.min(99, Math.round(((this.loadProgress || 0) / (this.loadTotal || 8)) * 100));
+            const stageTxt = this.loadStageLabel || "LOADING 3D VICE CITY 26 WORLD...";
+            ctx.fillText(`${stageTxt} (${pct}%)`, cx, cy - 8);
 
             const bw = 340;
             const bh = 16;
@@ -6226,7 +6317,7 @@ class RetroRenderer {
             ctx.lineWidth = 2;
             ctx.strokeRect(bx, by, bw, bh);
 
-            const fillW = Math.max(24, Math.round((bw - 6) * Math.max(0.15, (this.loadProgress || 0) / (this.loadTotal || 4))));
+            const fillW = Math.max(24, Math.round((bw - 6) * Math.max(0.15, (this.loadProgress || 0) / (this.loadTotal || 8))));
             const barGrad = ctx.createLinearGradient(bx, by, bx + bw, by);
             barGrad.addColorStop(0, "#ff2a85");
             barGrad.addColorStop(1, "#00f0ff");

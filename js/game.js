@@ -28,7 +28,7 @@ class LeonidaGame {
 
         this.trafficManager = new TrafficManager(this);
 
-        this.net = typeof ViceNetworkManager !== "undefined" ? new ViceNetworkManager(this) : null;
+        this.net = null;
 
 
 
@@ -248,15 +248,25 @@ class LeonidaGame {
 
 
 
-        // Start directly in the live GTA 1 street scene!
+        // Start directly in the live GTA 1 street scene once the 3D map is compiled!
 
         this.started = true;
+
+        this.worldReady = false;
+
+        this._pendingStartGame = false;
+
+        this._hasEnteredModal = false;
+
+        this._resetLoopClock = false;
 
         this.respawnTimer = 0;
 
 
 
         this.initWorldEntities();
+
+        this.net = typeof ViceNetworkManager !== "undefined" ? new ViceNetworkManager(this) : null;
 
         this.bindEvents();
 
@@ -1431,7 +1441,17 @@ class LeonidaGame {
 
         this.currentDistrict = this.map.getDistrictName(this.player.x, this.player.y);
 
-        this.districtPopupTimer = 0;
+        if (!this._hasEnteredModal) {
+            this.districtPopupTimer = 0;
+        }
+
+        this.worldReady = true;
+        this._resetLoopClock = true;
+
+        if (this._pendingStartGame) {
+            this._pendingStartGame = false;
+            this.startGame();
+        }
 
     }
 
@@ -2293,19 +2313,15 @@ class LeonidaGame {
 
 
             // Start / Character Selection modal shortcut
-
             const startModal = document.getElementById("start-modal");
-
             const startModalOpen = startModal && !startModal.classList.contains("hidden");
-
-            if ((!this.started || startModalOpen) && (code === "Enter" || code === "Space")) {
-
-                e.preventDefault();
-
-                this.startGame();
-
+            if (!this.started || startModalOpen) {
+                if (code === "Enter" || code === "Space") {
+                    e.preventDefault();
+                    this.startGame();
+                }
+                // Block gameplay movement/weapon/vehicle keys while the character selection modal is open
                 return;
-
             }
 
 
@@ -4362,6 +4378,35 @@ class LeonidaGame {
         this.started = true;
 
         this.audio.resume();
+
+        if (this.input) {
+            this.input.up = false;
+            this.input.down = false;
+            this.input.left = false;
+            this.input.right = false;
+            this.input.handbrake = false;
+            this.input.shoot = false;
+            this.input.sprint = false;
+        }
+
+        // If the 3D map & WebGL assets are still finishing their startup micro-slices,
+        // queue the start action and show immediate feedback on the button so we enter
+        // the exact millisecond onCmpLoaded completes (zero race condition!).
+        if (!this.worldReady && (!this.map || !this.map.cmpLoaded || !this.renderer || !this.renderer.gta1Ready)) {
+            this._pendingStartGame = true;
+            const btn = document.getElementById("btn-start-game");
+            if (btn) {
+                const pct = this.renderer
+                    ? Math.min(99, Math.max(10, Math.round(((this.renderer.loadProgress || 0) / (this.renderer.loadTotal || 8)) * 100)))
+                    : 50;
+                btn.textContent = `⏳ ENTERING VICE CITY 26 (${pct}%)...`;
+            }
+            return;
+        }
+
+        this._pendingStartGame = false;
+        this._hasEnteredModal = true;
+        this._resetLoopClock = true;
 
 
 
@@ -9881,6 +9926,12 @@ class LeonidaGame {
     update(dt) {
 
         if (!this.started) return;
+
+        // Wait until the binary 3D map (cmpLoaded) and WebGL renderer (gta1Ready) are ready
+        // so AI traffic and pedestrians never simulate on uninitialized PAWEMENT tiles during startup!
+        if (!this.map || !this.map.cmpLoaded || !this.renderer || !this.renderer.gta1Ready) {
+            return;
+        }
 
 
 
@@ -15579,7 +15630,11 @@ class LeonidaGame {
 
         const frame = (now) => {
 
-            const dt = Math.min(0.05, (now - last) / 1000);
+            let dt = Math.min(0.05, (now - last) / 1000);
+            if (this._resetLoopClock) {
+                this._resetLoopClock = false;
+                dt = 0.016;
+            }
 
             last = now;
 

@@ -528,22 +528,25 @@ class ViceNetworkManager {
        ======================================================================== */
     initWebRTCMesh() {
         if (typeof window === "undefined") return;
-        if (typeof window.Peer === "function") {
-            this.claimRoomSlot(0);
-            return;
-        }
-        const script = document.createElement("script");
-        script.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
-        script.async = true;
-        script.onload = () => {
+        // Defer PeerJS WebRTC initialization until initial 3D map assets have priority on the network & main thread
+        setTimeout(() => {
             if (typeof window.Peer === "function") {
                 this.claimRoomSlot(0);
+                return;
             }
-        };
-        script.onerror = () => {
-            this.statusText = `LOCAL ONLINE (${this.roomCode})`;
-        };
-        document.head.appendChild(script);
+            const script = document.createElement("script");
+            script.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
+            script.async = true;
+            script.onload = () => {
+                if (typeof window.Peer === "function") {
+                    this.claimRoomSlot(0);
+                }
+            };
+            script.onerror = () => {
+                this.statusText = `LOCAL ONLINE (${this.roomCode})`;
+            };
+            document.head.appendChild(script);
+        }, 1200);
     }
 
     getSlotPeerId(slotIdx) {
@@ -563,6 +566,10 @@ class ViceNetworkManager {
 
     createPeerInstance(peerId, slotIdx) {
         try {
+            if (this._slotDialTimer) {
+                clearInterval(this._slotDialTimer);
+                this._slotDialTimer = null;
+            }
             if (this.peer) {
                 try { this.peer.destroy(); } catch (_e) {}
             }
@@ -573,14 +580,24 @@ class ViceNetworkManager {
                 this.slotIndex = slotIdx;
                 this.webrtcReady = true;
                 this.statusText = `ONLINE (${this.roomCode})`;
-                // Connect to all other slots in the room to form a full P2P mesh
-                for (let s = 0; s < this.maxSlots; s++) {
-                    if (s === slotIdx) continue;
-                    const targetPeerId = this.getSlotPeerId(s);
-                    if (targetPeerId === id) continue;
-                    const conn = peer.connect(targetPeerId, { reliable: false });
-                    this.setupDataConnection(conn);
-                }
+                // Stagger outgoing P2P mesh slot connections (1 per 35ms instead of 23 in 1 frame)
+                // so WebRTC ICE setup never causes a main-thread hitch!
+                let s = 0;
+                this._slotDialTimer = setInterval(() => {
+                    if (!this.peer || this.peer !== peer || this.peer.destroyed || s >= this.maxSlots) {
+                        clearInterval(this._slotDialTimer);
+                        this._slotDialTimer = null;
+                        return;
+                    }
+                    const curSlot = s++;
+                    if (curSlot === slotIdx) return;
+                    const targetPeerId = this.getSlotPeerId(curSlot);
+                    if (targetPeerId === id) return;
+                    try {
+                        const conn = peer.connect(targetPeerId, { reliable: false });
+                        this.setupDataConnection(conn);
+                    } catch (_e) {}
+                }, 35);
             });
 
             peer.on("connection", (conn) => {
@@ -993,7 +1010,7 @@ class ViceNetworkManager {
     }
 
     broadcastWorldSync() {
-        if (!this.enabled || !this.game) return;
+        if (!this.enabled || !this.game || !this.game.map || !this.game.map.cmpLoaded) return;
         const g = this.game;
 
         const drvToCode = (d) => {
@@ -1082,7 +1099,7 @@ class ViceNetworkManager {
     }
 
     applyWorldSync(pkt) {
-        if (!this.game || !pkt) return;
+        if (!this.game || !this.game.map || !this.game.map.cmpLoaded || !pkt) return;
         this.lastWorldSyncReceivedMs = performance.now();
         const g = this.game;
 
