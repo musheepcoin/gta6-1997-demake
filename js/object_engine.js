@@ -545,6 +545,32 @@ class WorldObjectEngine {
             { name: "AMBROSIA SUGAR MILL DIRT-BIKE RAMP",     x: 154.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0 },
             { name: "VICE BEACH SOUTH JETTY DUNE RAMP",       x: 468.5 * TILE_SIZE, y: 344.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,cooldown: 0 }
         ];
+        // 16. Official GTA 6 Vice Beach Surfboard / Paddleboard Rental Shacks & Offshore Jet-Ski Slalom Course Gates (Loop 9)
+        this.surfShacks = [
+            { name: "NORTH VICE BEACH SURF & PADDLE SHACK",   x: 465.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS SANDS PRO SURFBOARD HUT",         x: 465.5 * TILE_SIZE, y: 204.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "OCEAN DRIVE WAVE-RUNNER SURF SHACK",     x: 465.5 * TILE_SIZE, y: 264.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "KEY LENTO TROPICAL PADDLEBOARD HUT",     x: 218.5 * TILE_SIZE, y: 477.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.jetSkiSlalomGates = [
+            { name: "VICE SURF SLALOM GATE #1 (NORTH)",       x: 486.5 * TILE_SIZE, y: 185.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE SURF SLALOM GATE #2 (PIER)",        x: 486.5 * TILE_SIZE, y: 215.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE SURF SLALOM GATE #3 (MID-BEACH)",   x: 486.5 * TILE_SIZE, y: 245.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE SURF SLALOM GATE #4 (SOUTH POINTE)",x: 486.5 * TILE_SIZE, y: 275.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "BISCAYNE BAY SPEEDBOAT SLALOM GATE",     x: 358.5 * TILE_SIZE, y: 215.0 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 17. Official GTA 6 Leonida Pit-BBQ & Gator-Tail Smoker Stands & Neon Ink Tattoo / Barber Parlors (Loop 10)
+        this.bbqSmokerStands = [
+            { name: "PORT GELLHORN SMOKEHOUSE BARREL BBQ",    x: 74.5 * TILE_SIZE,  y: 212.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "GRASSRIVERS GATOR-TAIL PIT SMOKER",      x: 118.5 * TILE_SIZE, y: 398.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "AMBROSIA CANE-WOOD RIBS & BRISKET",      x: 152.5 * TILE_SIZE, y: 118.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI CREOLE JERK & BBQ PIT",     x: 226.5 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.tattooParlors = [
+            { name: "OCEAN BEACH NEON INK & BARBER STUDIO",   x: 431.5 * TILE_SIZE, y: 252.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WYNWOOD ELECTRIC GRAFFITI TATTOO",       x: 191.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CALLE OCHO HAVANA BLADE & INK PARLOR",   x: 286.5 * TILE_SIZE, y: 252.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -982,6 +1008,32 @@ class WorldObjectEngine {
                 for (const sr of this.dirtBikeStuntRamps) {
                     snapOffRoad(sr);
                     clearZones.push({ x: sr.x, y: sr.y, r: 48 });
+                }
+            }
+            if (Array.isArray(this.surfShacks)) {
+                for (const ss of this.surfShacks) {
+                    snapOffRoad(ss);
+                    clearZones.push({ x: ss.x, y: ss.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.jetSkiSlalomGates)) {
+                for (const jg of this.jetSkiSlalomGates) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(jg.x, jg.y, 18);
+                        if (sn) { jg.x = sn.x; jg.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.bbqSmokerStands)) {
+                for (const bq of this.bbqSmokerStands) {
+                    snapOffRoad(bq);
+                    clearZones.push({ x: bq.x, y: bq.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.tattooParlors)) {
+                for (const tp of this.tattooParlors) {
+                    snapOffRoad(tp);
+                    clearZones.push({ x: tp.x, y: tp.y, r: 42 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2374,6 +2426,116 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-13. Official GTA 6 Vice Beach Surfboard & Paddleboard Rental Shacks ([E]!)
+        if (Array.isArray(this.surfShacks)) {
+            for (const ss of this.surfShacks) {
+                if ((ss.cooldown || 0) <= 0 && Math.hypot(px - ss.x, py - ss.y) < 78) {
+                    ss.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(4000);
+                    if (typeof game.addCash === "function") game.addCash(4000, `🏄 ${ss.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🏄 VICE BEACH PRO SURF & PADDLE!`,
+                            `${ss.name} • 150 MAX HP/ARMOR + +$4,000 & +1X!`,
+                            "#38bdf8",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ss.x,
+                            y: ss.y,
+                            z: 2.68,
+                            text: `🏄 PRO SURF GEAR! 150 HP/ARMOR + +$4,000!`,
+                            color: "#38bdf8",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-14. Official GTA 6 Leonida Roadside Pit-BBQ & Gator-Tail Smoker Stands ([E]!)
+        if (Array.isArray(this.bbqSmokerStands)) {
+            for (const bq of this.bbqSmokerStands) {
+                if ((bq.cooldown || 0) <= 0 && Math.hypot(px - bq.x, py - bq.y) < 76) {
+                    bq.cooldown = 15.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(3500);
+                    if (typeof game.addCash === "function") game.addCash(3500, `🍖 ${bq.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🍖 LEONIDA SMOKEHOUSE PIT-BBQ!`,
+                            `${bq.name} • SMOKED RIBS & GATOR TAIL: 150 HP/ARMOR + +$3,500!`,
+                            "#fb923c",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bq.x,
+                            y: bq.y,
+                            z: 2.68,
+                            text: `🍖 PIT-BBQ FEAST! 150 HP/ARMOR + +$3,500!`,
+                            color: "#fb923c",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-15. Official GTA 6 Vice City Neon Ink Tattoo & Barber Disguise Studios ([E]!)
+        if (Array.isArray(this.tattooParlors)) {
+            for (const tp of this.tattooParlors) {
+                if ((tp.cooldown || 0) <= 0 && Math.hypot(px - tp.x, py - tp.y) < 76) {
+                    tp.cooldown = 20.0;
+                    game.player.hp = Math.max(game.player.hp || 100, 125);
+                    game.player.armor = Math.max(game.player.armor || 0, 100);
+                    if (typeof game.clearWanted === "function") {
+                        game.clearWanted();
+                    } else {
+                        game.wantedLevel = 0;
+                        game.wantedDecayTimer = 0;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(5000);
+                    if (typeof game.addCash === "function") game.addCash(5000, `💈 ${tp.name} FRESH INK & FADE!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `💈 FRESH VICE INK & BARBER DISGUISE!`,
+                            `${tp.name} • 0★ WANTED HEAT CLEARED + +$5,000 & +1X!`,
+                            "#f472b6",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: tp.x,
+                            y: tp.y,
+                            z: 2.70,
+                            text: `💈 FRESH INK & FADE! 0★ WANTED + +$5,000!`,
+                            color: "#f472b6",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -3271,6 +3433,52 @@ class WorldObjectEngine {
                                 life: 2.6
                             });
                         }
+                    }
+                }
+            }
+        }
+        if (Array.isArray(this.surfShacks)) {
+            for (const ss of this.surfShacks) {
+                if ((ss.cooldown || 0) > 0) ss.cooldown = Math.max(0, ss.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.bbqSmokerStands)) {
+            for (const bq of this.bbqSmokerStands) {
+                if ((bq.cooldown || 0) > 0) bq.cooldown = Math.max(0, bq.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.tattooParlors)) {
+            for (const tp of this.tattooParlors) {
+                if ((tp.cooldown || 0) > 0) tp.cooldown = Math.max(0, tp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.jetSkiSlalomGates)) {
+            for (const jg of this.jetSkiSlalomGates) {
+                if ((jg.cooldown || 0) > 0) jg.cooldown = Math.max(0, jg.cooldown - dt);
+                const actorX = pVeh ? pVeh.x : (game.player ? game.player.x : 0);
+                const actorY = pVeh ? pVeh.y : (game.player ? game.player.y : 0);
+                if ((jg.cooldown || 0) <= 0 && Math.hypot(actorX - jg.x, actorY - jg.y) < 58) {
+                    jg.cooldown = 12.0;
+                    if (pVeh) {
+                        pVeh.vx = (pVeh.vx || 0) * 1.25;
+                        pVeh.vy = (pVeh.vy || 0) * 1.25;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(4500);
+                    if (typeof game.addCash === "function") game.addCash(4500, `🚤 ${jg.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(`🚤 ${jg.name} CLEARED!`, "OFFSHORE WATERCRAFT SLALOM • +$4,500 + TURBO & +1X!", "#38bdf8", 2.4);
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: jg.x,
+                            y: jg.y,
+                            z: 2.65,
+                            text: `🚤 SLALOM GATE TURBO! +$4,500 + +1X!`,
+                            color: "#38bdf8",
+                            life: 2.4
+                        });
                     }
                 }
             }
@@ -7088,6 +7296,54 @@ class WorldObjectEngine {
                 emitSolidBox3D(sr.x, sr.y, cA, sA, 0,  10.5, 34, 2.0, bz, bz + 0.28, [0.18, 0.22, 0.28], 5);
             }
         }
+        // 22H. OFFICIAL GTA 6 VICE BEACH SURF SHACKS, WATERCRAFT SLALOM BUOYS, PIT-BBQ SMOKERS & NEON TATTOO PARLORS (LOOPS 9 & 10)
+        if (Array.isArray(this.surfShacks)) {
+            for (const ss of this.surfShacks) {
+                const bz = ss.z || 2.0;
+                emitAOShadow3D(ss.x, ss.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
+                // Tropical pastel surf hut + corrugated turquoise roof + vertical neon surfboard rack (pink, cyan, gold boards)
+                emitSolidBox3D(ss.x, ss.y, 1, 0, -4, 0, 18, 16, bz, bz + 0.24, [0.96, 0.90, 0.78], 8);
+                emitGableRoof3D(ss.x, ss.y, 1, 0, -4, 0, 22, 19, bz + 0.24, bz + 0.34, [0.14, 0.84, 0.88], true, 12);
+                emitSolidBox3D(ss.x, ss.y, 1, 0, 10, 0, 6, 16, bz, bz + 0.04, [0.58, 0.40, 0.22], 8);
+                emitSolidBox3D(ss.x, ss.y, 1, 0, 10, -5.0, 2.4, 4.2, bz + 0.04, bz + 0.30, [0.98, 0.26, 0.68], 1);
+                emitSolidBox3D(ss.x, ss.y, 1, 0, 10,  0.0, 2.4, 4.2, bz + 0.04, bz + 0.32, [0.16, 0.88, 0.98], 1);
+                emitSolidBox3D(ss.x, ss.y, 1, 0, 10,  5.0, 2.4, 4.2, bz + 0.04, bz + 0.28, [0.98, 0.86, 0.18], 1);
+            }
+        }
+        if (Array.isArray(this.jetSkiSlalomGates)) {
+            for (const jg of this.jetSkiSlalomGates) {
+                const bz = 2.01;
+                // Twin neon orange/cyan offshore slalom gate buoys + floating lane markers
+                emitCylinder3D(jg.x, jg.y, -22, 0, 5.2, 4.0, bz, bz + 0.26, 8, [0.98, 0.36, 0.12], 5, true);
+                emitCylinder3D(jg.x, jg.y,  22, 0, 5.2, 4.0, bz, bz + 0.26, 8, [0.14, 0.88, 0.98], 5, true);
+                emitCylinder3D(jg.x, jg.y, -22, 0, 2.8, 2.8, bz + 0.26, bz + 0.34, 6, [1.00, 0.92, 0.24], 1, true);
+                emitCylinder3D(jg.x, jg.y,  22, 0, 2.8, 2.8, bz + 0.26, bz + 0.34, 6, [1.00, 0.92, 0.24], 1, true);
+            }
+        }
+        if (Array.isArray(this.bbqSmokerStands)) {
+            for (const bq of this.bbqSmokerStands) {
+                const bz = bq.z || 2.0;
+                emitAOShadow3D(bq.x, bq.y, 1, 0, 0, 0, 32, 22, bz, 0.36);
+                // Heavy cast-iron barrel pit-smoker + firebox + tall smokestack chimney + red-checkered picnic table
+                emitSolidBox3D(bq.x, bq.y, 1, 0, -6, 0, 16, 9, bz, bz + 0.14, [0.14, 0.16, 0.20], 5);
+                emitSolidBox3D(bq.x, bq.y, 1, 0, -6, 0, 14, 10, bz + 0.14, bz + 0.23, [0.20, 0.22, 0.26], 5);
+                emitSolidBox3D(bq.x, bq.y, 1, 0, -12, -3, 3.0, 3.0, bz + 0.22, bz + 0.38, [0.12, 0.14, 0.18], 5);
+                emitSolidBox3D(bq.x, bq.y, 1, 0,  9, 0, 12, 14, bz, bz + 0.13, [0.88, 0.22, 0.22], 1);
+                emitSolidBox3D(bq.x, bq.y, 1, 0,  9, 0, 10, 10, bz + 0.13, bz + 0.145, [0.98, 0.96, 0.94], 1);
+            }
+        }
+        if (Array.isArray(this.tattooParlors)) {
+            for (const tp of this.tattooParlors) {
+                const bz = tp.z || 2.0;
+                emitAOShadow3D(tp.x, tp.y, 1, 0, 0, 0, 28, 22, bz, 0.35);
+                // Sidewalk Neon Ink & Barber Studio Kiosk + Classic Red/White/Blue Barber Pole + Hot-Pink Neon Frame
+                emitSolidBox3D(tp.x, tp.y, 1, 0, 0, 0, 20, 14, bz, bz + 0.25, [0.16, 0.14, 0.24], 3);
+                emitSolidBox3D(tp.x, tp.y, 1, 0, 0, 0, 22, 16, bz + 0.25, bz + 0.30, [0.98, 0.22, 0.68], 1);
+                emitCylinder3D(tp.x, tp.y, 12, 6, 2.6, 2.6, bz, bz + 0.28, 8, [0.96, 0.98, 1.00], 1, true);
+                emitCylinder3D(tp.x, tp.y, 12, 6, 2.8, 2.8, bz + 0.08, bz + 0.14, 8, [0.94, 0.18, 0.22], 1, false);
+                emitCylinder3D(tp.x, tp.y, 12, 6, 2.8, 2.8, bz + 0.18, bz + 0.24, 8, [0.16, 0.44, 0.96], 1, false);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -10070,6 +10326,51 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(sr.x, sr.y, 2.03, rSz, rSz, renderer.time * 1.6, 0.98, 0.54, 0.14, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
+        if (Array.isArray(this.surfShacks)) {
+            for (let i = 0; i < this.surfShacks.length; i++) {
+                const ss = this.surfShacks[i];
+                if (ss.x < minX - 120 || ss.x > maxX + 120 || ss.y < minY - 120 || ss.y > maxY + 120) continue;
+                if ((ss.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.2 + i) * 3.2;
+                    renderer.pushSolidQuad3D(ss.x, ss.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.22, 0.86, 0.98, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), ss.x + 2, ss.y + 13, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.jetSkiSlalomGates)) {
+            for (let i = 0; i < this.jetSkiSlalomGates.length; i++) {
+                const jg = this.jetSkiSlalomGates[i];
+                if ((jg.cooldown || 0) > 0 || jg.x < minX - 140 || jg.x > maxX + 140 || jg.y < minY - 140 || jg.y > maxY + 140) continue;
+                const pulse = 0.55 + 0.35 * Math.sin(renderer.time * 6.5 + i);
+                renderer.pushSolidQuad3D(jg.x, jg.y, 2.022, 34, 8, 0, 0.16, 0.92, 0.98, pulse * 0.58, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (Array.isArray(this.bbqSmokerStands)) {
+            for (let i = 0; i < this.bbqSmokerStands.length; i++) {
+                const bq = this.bbqSmokerStands[i];
+                if (bq.x < minX - 120 || bq.x > maxX + 120 || bq.y < minY - 120 || bq.y > maxY + 120) continue;
+                if ((bq.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.0 + i) * 3.0;
+                    renderer.pushSolidQuad3D(bq.x, bq.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.98, 0.56, 0.20, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Rising hickory BBQ smoke puffs from the smokestack + Pitmaster chef!
+                const smkPhase = (renderer.time * 1.8 + i * 0.7) % 1.0;
+                const smkSz = 6.0 + smkPhase * 10.0;
+                renderer.pushSolidQuad3D(bq.x - 12, bq.y - 3, 2.38 + smkPhase * 0.28, smkSz, smkSz, renderer.time * 1.5, 0.86, 0.88, 0.92, (1.0 - smkPhase) * 0.62, SPRITE_DRAW_ORDER.TREES);
+                renderer.batchPedSprite3D("vc_biker", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bq.x - 4, bq.y + 12, 2.042, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.tattooParlors)) {
+            for (let i = 0; i < this.tattooParlors.length; i++) {
+                const tp = this.tattooParlors[i];
+                if (tp.x < minX - 120 || tp.x > maxX + 120 || tp.y < minY - 120 || tp.y > maxY + 120) continue;
+                if ((tp.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.6 + i) * 3.2;
+                    renderer.pushSolidQuad3D(tp.x, tp.y, 2.028, rSz, rSz, -renderer.time * 1.5, 0.96, 0.28, 0.72, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 4.8 + i) % 4), tp.x, tp.y + 13, 2.042, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
     }
 
     /* ========================================================================
@@ -10616,6 +10917,51 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.surfShacks)) {
+            for (const ss of this.surfShacks) {
+                if ((ss.cooldown || 0) <= 0 && Math.hypot(px - ss.x, py - ss.y) < 110) {
+                    const scr = renderer.worldToScreen(ss.x, ss.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`🏄 [E] RENT PRO SURF GEAR (150 HP/ARMOR & +$4,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.bbqSmokerStands)) {
+            for (const bq of this.bbqSmokerStands) {
+                if ((bq.cooldown || 0) <= 0 && Math.hypot(px - bq.x, py - bq.y) < 110) {
+                    const scr = renderer.worldToScreen(bq.x, bq.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#fb923c";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#fb923c";
+                    ctx.fillText(`🍖 [E] EAT PIT-BBQ RIBS & GATOR (150 HP/ARMOR & +$3,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.tattooParlors)) {
+            for (const tp of this.tattooParlors) {
+                if ((tp.cooldown || 0) <= 0 && Math.hypot(px - tp.x, py - tp.y) < 110) {
+                    const scr = renderer.worldToScreen(tp.x, tp.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#f472b6";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#f472b6";
+                    ctx.fillText(`💈 [E] GET FRESH INK & FADE (0★ WANTED & +$5,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -10974,6 +11320,24 @@ class WorldObjectEngine {
             ctx.fillStyle = "#f97316";
             for (const sr of this.dirtBikeStuntRamps) {
                 ctx.fillRect((sr.x - 18) * sx, (sr.y - 11) * sy, 36 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.surfShacks)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const ss of this.surfShacks) {
+                ctx.fillRect((ss.x - 16) * sx, (ss.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.bbqSmokerStands)) {
+            ctx.fillStyle = "#fb923c";
+            for (const bq of this.bbqSmokerStands) {
+                ctx.fillRect((bq.x - 16) * sx, (bq.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.tattooParlors)) {
+            ctx.fillStyle = "#f472b6";
+            for (const tp of this.tattooParlors) {
+                ctx.fillRect((tp.x - 14) * sx, (tp.y - 11) * sy, 28 * sx, 22 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
