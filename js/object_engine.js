@@ -536,7 +536,7 @@ class WorldObjectEngine {
         this.coralDiveSites = [
             { name: "KEY LENTO LIONFISH CORAL REEF DIVE",     x: 238.5 * TILE_SIZE, y: 492.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.4 },
             { name: "SEVEN MILE SUNKEN GALLEON REEF DIVE",    x: 184.5 * TILE_SIZE, y: 488.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 1.8 },
-            { name: "OCEAN BEACH EMERALD REEF SCUBA BUOY",    x: 492.5 * TILE_SIZE, y: 245.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.2 },
+            { name: "OCEAN BEACH EMERALD REEF SCUBA BUOY",    x: 492.5 * TILE_SIZE, y: 256.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.2 },
             { name: "STAR ISLAND SUNKEN YACHT CORAL DIVE",    x: 362.5 * TILE_SIZE, y: 182.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 4.6 }
         ];
         this.dirtBikeStuntRamps = [
@@ -1225,30 +1225,82 @@ class WorldObjectEngine {
             if (this.landmarks3D.sevenMileOldSpan) {
                 clearZones.push({ x: this.landmarks3D.sevenMileOldSpan.x, y: this.landmarks3D.sevenMileOldSpan.y, r: 110 });
             }
+            const isCleanLandTile = (c, r, margin = 0) => {
+                if (c <= 2 + margin || c >= M - 3 - margin || r <= 2 + margin || r >= MAP_ROWS - 3 - margin) return false;
+                for (let dr = -margin; dr <= margin; dr++) {
+                    for (let dc = -margin; dc <= margin; dc++) {
+                        const gt = map.surfaceGround[(r + dr) * M + (c + dc)];
+                        if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
+                    }
+                }
+                return true;
+            };
+            const isFootprintCleanLand = (px, py) => {
+                for (const dy of [-16, 0, 16]) {
+                    for (const dx of [-16, 0, 16]) {
+                        const sc = Math.floor((px + dx) / TILE_SIZE);
+                        const sr = Math.floor((py + dy) / TILE_SIZE);
+                        if (sc <= 2 || sc >= M - 3 || sr <= 2 || sr >= MAP_ROWS - 3) return false;
+                        const gt = map.surfaceGround[sr * M + sc];
+                        if (gt !== GROUND_TYPE.PAWEMENT && gt !== GROUND_TYPE.FIELD) return false;
+                    }
+                }
+                return true;
+            };
             const snapOffRoad = (pt) => {
                 if (!pt || !map.surfaceGround) return;
+                if (isFootprintCleanLand(pt.x, pt.y)) return;
                 const c0 = Math.floor(pt.x / TILE_SIZE);
                 const r0 = Math.floor(pt.y / TILE_SIZE);
-                if (c0 > 2 && c0 < M - 3 && r0 > 2 && r0 < MAP_ROWS - 3 && map.surfaceGround[r0 * M + c0] === GROUND_TYPE.ROAD) {
-                    for (let rad = 1; rad <= 5; rad++) {
-                        let found = false;
-                        for (let dr = -rad; dr <= rad && !found; dr++) {
-                            for (let dc = -rad; dc <= rad && !found; dc++) {
-                                const nc = c0 + dc, nr = r0 + dr;
-                                if (nc > 2 && nc < M - 3 && nr > 2 && nr < MAP_ROWS - 3) {
-                                    const gt = map.surfaceGround[nr * M + nc];
-                                    if (gt === GROUND_TYPE.PAWEMENT || gt === GROUND_TYPE.FIELD) {
-                                        pt.x = (nc + 0.5) * TILE_SIZE;
-                                        pt.y = (nr + 0.5) * TILE_SIZE;
-                                        found = true;
-                                    }
+                // Pass 1: find nearest tile with a clean 3x3 PAWEMENT/FIELD margin so [-16,0,16] px footprint is 100% clean
+                for (let rad = 0; rad <= 42; rad++) {
+                    let bestDistSq = Infinity, bestC = -1, bestR = -1;
+                    for (let dr = -rad; dr <= rad; dr++) {
+                        for (let dc = -rad; dc <= rad; dc++) {
+                            if (Math.max(Math.abs(dr), Math.abs(dc)) !== rad) continue;
+                            const nc = c0 + dc, nr = r0 + dr;
+                            if (isCleanLandTile(nc, nr, 1)) {
+                                const d2 = dc * dc + dr * dr;
+                                if (d2 < bestDistSq) {
+                                    bestDistSq = d2;
+                                    bestC = nc;
+                                    bestR = nr;
                                 }
                             }
                         }
-                        if (found) break;
+                    }
+                    if (bestC >= 0) {
+                        pt.x = (bestC + 0.5) * TILE_SIZE;
+                        pt.y = (bestR + 0.5) * TILE_SIZE;
+                        return;
+                    }
+                }
+                // Pass 2: fallback to any single clean PAWEMENT/FIELD tile
+                for (let rad = 0; rad <= 42; rad++) {
+                    for (let dr = -rad; dr <= rad; dr++) {
+                        for (let dc = -rad; dc <= rad; dc++) {
+                            if (Math.max(Math.abs(dr), Math.abs(dc)) !== rad) continue;
+                            const nc = c0 + dc, nr = r0 + dr;
+                            if (isCleanLandTile(nc, nr, 0)) {
+                                pt.x = (nc + 0.5) * TILE_SIZE;
+                                pt.y = (nr + 0.5) * TILE_SIZE;
+                                return;
+                            }
+                        }
                     }
                 }
             };
+            if (this.landmarks3D.wynwoodWalls) {
+                snapOffRoad(this.landmarks3D.wynwoodWalls);
+            }
+            if (Array.isArray(this.smugglerDrops)) {
+                for (const sd of this.smugglerDrops) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(sd.x, sd.y, 36);
+                        if (sn) { sd.x = sn.x; sd.y = sn.y; }
+                    }
+                }
+            }
             if (this.landmarks3D.briansBoatyard) {
                 snapOffRoad(this.landmarks3D.briansBoatyard);
                 clearZones.push({ x: this.landmarks3D.briansBoatyard.x, y: this.landmarks3D.briansBoatyard.y, r: 92 });
@@ -10318,9 +10370,9 @@ class WorldObjectEngine {
                 const bz = ss.z || 2.0;
                 emitAOShadow3D(ss.x, ss.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
                 // Tropical pastel surf hut + corrugated turquoise roof + vertical neon surfboard rack (pink, cyan, gold boards)
-                emitSolidBox3D(ss.x, ss.y, 1, 0, -4, 0, 18, 16, bz, bz + 0.24, [0.96, 0.90, 0.78], 8);
+                emitSolidBox3D(ss.x, ss.y, 1, 0, -4, 0, 18, 16, bz, bz + 0.24, [0.96, 0.90, 0.78], 11);
                 emitGableRoof3D(ss.x, ss.y, 1, 0, -4, 0, 22, 19, bz + 0.24, bz + 0.34, [0.14, 0.84, 0.88], true, 12);
-                emitSolidBox3D(ss.x, ss.y, 1, 0, 10, 0, 6, 16, bz, bz + 0.04, [0.58, 0.40, 0.22], 8);
+                emitSolidBox3D(ss.x, ss.y, 1, 0, 10, 0, 6, 16, bz, bz + 0.04, [0.58, 0.40, 0.22], 11);
                 emitSolidBox3D(ss.x, ss.y, 1, 0, 10, -5.0, 2.4, 4.2, bz + 0.04, bz + 0.30, [0.98, 0.26, 0.68], 1);
                 emitSolidBox3D(ss.x, ss.y, 1, 0, 10,  0.0, 2.4, 4.2, bz + 0.04, bz + 0.32, [0.16, 0.88, 0.98], 1);
                 emitSolidBox3D(ss.x, ss.y, 1, 0, 10,  5.0, 2.4, 4.2, bz + 0.04, bz + 0.28, [0.98, 0.86, 0.18], 1);
@@ -10353,7 +10405,7 @@ class WorldObjectEngine {
                 const bz = tp.z || 2.0;
                 emitAOShadow3D(tp.x, tp.y, 1, 0, 0, 0, 28, 22, bz, 0.35);
                 // Sidewalk Neon Ink & Barber Studio Kiosk + Classic Red/White/Blue Barber Pole + Hot-Pink Neon Frame
-                emitSolidBox3D(tp.x, tp.y, 1, 0, 0, 0, 20, 14, bz, bz + 0.25, [0.16, 0.14, 0.24], 3);
+                emitSolidBox3D(tp.x, tp.y, 1, 0, 0, 0, 20, 14, bz, bz + 0.25, [0.16, 0.14, 0.24], 12);
                 emitSolidBox3D(tp.x, tp.y, 1, 0, 0, 0, 22, 16, bz + 0.25, bz + 0.30, [0.98, 0.22, 0.68], 1);
                 emitCylinder3D(tp.x, tp.y, 12, 6, 2.6, 2.6, bz, bz + 0.28, 8, [0.96, 0.98, 1.00], 1, true);
                 emitCylinder3D(tp.x, tp.y, 12, 6, 2.8, 2.8, bz + 0.08, bz + 0.14, 8, [0.94, 0.18, 0.22], 1, false);
@@ -10368,7 +10420,7 @@ class WorldObjectEngine {
                 emitSolidBox3D(sb.x, sb.y, 1, 0, 0, 0, 56, 40, bz - 0.008, bz + 0.006, [0.18, 0.92, 0.88], 10);
                 emitSolidBox3D(sb.x, sb.y, 1, 0, 0, -11, 36, 4.5, bz, bz + 0.07, [0.88, 0.92, 0.96], 5);
                 emitSolidBox3D(sb.x, sb.y, 1, 0, 0,  11, 36, 4.5, bz, bz + 0.07, [0.88, 0.92, 0.96], 5);
-                emitSolidBox3D(sb.x, sb.y, 1, 0, 0, 0, 34, 24, bz + 0.06, bz + 0.10, [0.76, 0.56, 0.36], 8);
+                emitSolidBox3D(sb.x, sb.y, 1, 0, 0, 0, 34, 24, bz + 0.06, bz + 0.10, [0.76, 0.56, 0.36], 11);
                 emitSolidBox3D(sb.x, sb.y, 1, 0, -8, 0, 8, 14, bz + 0.10, bz + 0.22, [0.14, 0.16, 0.24], 5);
                 emitSolidBox3D(sb.x, sb.y, 1, 0, -8, 0, 9, 15, bz + 0.21, bz + 0.24, [0.98, 0.24, 0.72], 1);
                 emitGableRoof3D(sb.x, sb.y, 1, 0, 0, 0, 32, 22, bz + 0.30, bz + 0.40, [0.98, 0.32, 0.74], true, 1);
@@ -10394,7 +10446,7 @@ class WorldObjectEngine {
                 const bz = ko.z || 2.0;
                 emitAOShadow3D(ko.x, ko.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
                 // Timber expedition rack + 3 vibrant whitewater kayaks (red, yellow, cyan) + cedar gear shed
-                emitSolidBox3D(ko.x, ko.y, 1, 0, -6, 0, 14, 16, bz, bz + 0.22, [0.54, 0.36, 0.20], 8);
+                emitSolidBox3D(ko.x, ko.y, 1, 0, -6, 0, 14, 16, bz, bz + 0.22, [0.54, 0.36, 0.20], 11);
                 emitGableRoof3D(ko.x, ko.y, 1, 0, -6, 0, 17, 19, bz + 0.22, bz + 0.31, [0.18, 0.58, 0.34], true, 12);
                 emitSolidBox3D(ko.x, ko.y, 1, 0,  8, -5.5, 18, 3.6, bz + 0.03, bz + 0.08, [0.96, 0.22, 0.20], 1);
                 emitSolidBox3D(ko.x, ko.y, 1, 0,  8,  0.0, 18, 3.6, bz + 0.03, bz + 0.08, [0.98, 0.84, 0.14], 1);
@@ -10419,7 +10471,7 @@ class WorldObjectEngine {
                 const bz = ks.z || 2.0;
                 emitAOShadow3D(ks.x, ks.y, 1, 0, 0, 0, 28, 24, bz, 0.32);
                 // Kitesurf beach timber rack + neon hydrofoil boards + arched rainbow kite canopy on display
-                emitSolidBox3D(ks.x, ks.y, 1, 0, -4, 0, 16, 18, bz, bz + 0.04, [0.64, 0.46, 0.26], 8);
+                emitSolidBox3D(ks.x, ks.y, 1, 0, -4, 0, 16, 18, bz, bz + 0.04, [0.64, 0.46, 0.26], 11);
                 emitSolidBox3D(ks.x, ks.y, 1, 0, -4, -5, 12, 3.6, bz + 0.04, bz + 0.08, [0.10, 0.88, 0.98], 1);
                 emitSolidBox3D(ks.x, ks.y, 1, 0, -4,  5, 12, 3.6, bz + 0.04, bz + 0.08, [0.98, 0.26, 0.72], 1);
                 emitGableRoof3D(ks.x, ks.y, 1, 0, 6, 0, 14, 22, bz + 0.12, bz + 0.32, [0.12, 0.92, 0.86], false, 1);
@@ -10442,8 +10494,8 @@ class WorldObjectEngine {
                 const bz = gt.z || 2.0;
                 emitAOShadow3D(gt.x, gt.y, 1, 0, 0, 0, 34, 24, bz, 0.35);
                 // Weathered Cypress Swamp Boardwalk Deck + Tiki Roof + 3D Basking Bull-Alligator
-                emitSolidBox3D(gt.x, gt.y, 1, 0, -4, 0, 22, 18, bz, bz + 0.06, [0.48, 0.34, 0.20], 8);
-                emitGableRoof3D(gt.x, gt.y, 1, 0, -4, 0, 24, 20, bz + 0.24, bz + 0.35, [0.76, 0.60, 0.32], true, 8);
+                emitSolidBox3D(gt.x, gt.y, 1, 0, -4, 0, 22, 18, bz, bz + 0.06, [0.48, 0.34, 0.20], 11);
+                emitGableRoof3D(gt.x, gt.y, 1, 0, -4, 0, 24, 20, bz + 0.24, bz + 0.35, [0.76, 0.60, 0.32], true, 11);
                 // 3D Bull Alligator basking beside the dock (armored olive-green body, snout & ridged tail)
                 emitSolidBox3D(gt.x, gt.y, 1, 0, 14, 0, 16, 5.5, bz, bz + 0.06, [0.22, 0.44, 0.20], 6);
                 emitSolidBox3D(gt.x, gt.y, 1, 0, 23, 0,  7, 4.0, bz, bz + 0.045, [0.26, 0.48, 0.22], 6);
@@ -10455,10 +10507,10 @@ class WorldObjectEngine {
                 const bz = gs.z || 2.0;
                 emitAOShadow3D(gs.x, gs.y, 1, 0, 0, 0, 30, 18, bz, 0.35);
                 // Wynwood Street-Art Mural Wall + Two-Tier Painter's Steel Scaffold + Neon Spray Panels
-                emitSolidBox3D(gs.x, gs.y, 1, 0, -5, 0, 6, 24, bz, bz + 0.38, [0.18, 0.16, 0.26], 3);
+                emitSolidBox3D(gs.x, gs.y, 1, 0, -5, 0, 6, 24, bz, bz + 0.38, [0.18, 0.16, 0.26], 12);
                 emitSolidBox3D(gs.x, gs.y, 1, 0, -1.8, -6, 1.2, 9, bz + 0.08, bz + 0.34, [0.98, 0.22, 0.68], 1);
                 emitSolidBox3D(gs.x, gs.y, 1, 0, -1.8,  5, 1.2, 9, bz + 0.08, bz + 0.34, [0.14, 0.90, 0.98], 1);
-                emitSolidBox3D(gs.x, gs.y, 1, 0,  4, 0, 8, 22, bz + 0.16, bz + 0.185, [0.64, 0.46, 0.24], 8);
+                emitSolidBox3D(gs.x, gs.y, 1, 0,  4, 0, 8, 22, bz + 0.16, bz + 0.185, [0.64, 0.46, 0.24], 11);
                 emitCylinder3D(gs.x, gs.y, 7, -10, 0.8, 0.8, bz, bz + 0.34, 6, [0.76, 0.80, 0.86], 5, false);
                 emitCylinder3D(gs.x, gs.y, 7,  10, 0.8, 0.8, bz, bz + 0.34, 6, [0.76, 0.80, 0.86], 5, false);
             }
@@ -10481,7 +10533,7 @@ class WorldObjectEngine {
                 const bz = lb.z || 2.0;
                 emitAOShadow3D(lb.x, lb.y, 1, 0, 0, 0, 32, 24, bz, 0.35);
                 // Wooden Salsa & Conga Bandstand Stage + Twin Conga Drums + Warm Fiesta Canopy
-                emitSolidBox3D(lb.x, lb.y, 1, 0, 0, 0, 26, 18, bz, bz + 0.06, [0.58, 0.38, 0.20], 8);
+                emitSolidBox3D(lb.x, lb.y, 1, 0, 0, 0, 26, 18, bz, bz + 0.06, [0.58, 0.38, 0.20], 11);
                 emitGableRoof3D(lb.x, lb.y, 1, 0, 0, 0, 28, 20, bz + 0.26, bz + 0.36, [0.98, 0.56, 0.14], true, 1);
                 emitCylinder3D(lb.x, lb.y, -4, -3, 2.4, 2.0, bz + 0.06, bz + 0.18, 8, [0.88, 0.24, 0.18], 1, true);
                 emitCylinder3D(lb.x, lb.y, -4,  3, 2.4, 2.0, bz + 0.06, bz + 0.18, 8, [0.96, 0.78, 0.22], 1, true);
@@ -10527,8 +10579,8 @@ class WorldObjectEngine {
                 const bz = cr.z || 2.0;
                 emitAOShadow3D(cr.x, cr.y, 1, 0, 0, 0, 28, 20, bz, 0.34);
                 // Mahogany Cigar Torcedor Rolling Table + Aged Oak Rum Barrel + Terracotta Awning
-                emitSolidBox3D(cr.x, cr.y, 1, 0, -3, 0, 16, 12, bz, bz + 0.14, [0.46, 0.24, 0.12], 8);
-                emitCylinder3D(cr.x, cr.y, 9, 0, 4.2, 3.8, bz, bz + 0.18, 8, [0.54, 0.32, 0.16], 8, true);
+                emitSolidBox3D(cr.x, cr.y, 1, 0, -3, 0, 16, 12, bz, bz + 0.14, [0.46, 0.24, 0.12], 11);
+                emitCylinder3D(cr.x, cr.y, 9, 0, 4.2, 3.8, bz, bz + 0.18, 8, [0.54, 0.32, 0.16], 11, true);
                 emitGableRoof3D(cr.x, cr.y, 1, 0, 0, 0, 24, 16, bz + 0.24, bz + 0.33, [0.84, 0.34, 0.18], true, 12);
             }
         }
@@ -10539,10 +10591,10 @@ class WorldObjectEngine {
                 // 4 Tall Timber Truss Legs + Elevated Observation Cabin + Green Pyramid Roof
                 for (const lx of [-8, 8]) {
                     for (const ly of [-8, 8]) {
-                        emitSolidBox3D(kl.x, kl.y, 1, 0, lx, ly, 2.8, 2.8, bz, bz + 0.42, [0.48, 0.32, 0.18], 8);
+                        emitSolidBox3D(kl.x, kl.y, 1, 0, lx, ly, 2.8, 2.8, bz, bz + 0.42, [0.48, 0.32, 0.18], 11);
                     }
                 }
-                emitSolidBox3D(kl.x, kl.y, 1, 0, 0, 0, 22, 22, bz + 0.42, bz + 0.56, [0.62, 0.44, 0.24], 8);
+                emitSolidBox3D(kl.x, kl.y, 1, 0, 0, 0, 22, 22, bz + 0.42, bz + 0.56, [0.62, 0.44, 0.24], 11);
                 emitGableRoof3D(kl.x, kl.y, 1, 0, 0, 0, 26, 26, bz + 0.56, bz + 0.68, [0.16, 0.54, 0.28], true, 12);
             }
         }
@@ -10551,7 +10603,7 @@ class WorldObjectEngine {
                 const bz = bc.z || 2.0;
                 emitAOShadow3D(bc.x, bc.y, 1, 0, 0, 0, 28, 24, bz, 0.32);
                 // Teak Four-Poster Beach Cabana + Plush Turquoise Daybed + White Draped Canopy
-                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz, bz + 0.06, [0.66, 0.48, 0.28], 8);
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz, bz + 0.06, [0.66, 0.48, 0.28], 11);
                 emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 16, 12, bz + 0.06, bz + 0.12, [0.18, 0.86, 0.88], 1);
                 emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz + 0.26, bz + 0.31, [0.98, 0.98, 1.00], 1);
             }
@@ -10583,7 +10635,7 @@ class WorldObjectEngine {
                 const bz = cs.z || 2.0;
                 emitAOShadow3D(cs.x, cs.y, 1, 0, 0, 0, 28, 22, bz, 0.34);
                 // Key Lime Green Caribbean Shack + Coral Pink Roof + Giant Conch Shell Emblem
-                emitSolidBox3D(cs.x, cs.y, 1, 0, 0, 0, 20, 14, bz, bz + 0.22, [0.64, 0.92, 0.36], 8);
+                emitSolidBox3D(cs.x, cs.y, 1, 0, 0, 0, 20, 14, bz, bz + 0.22, [0.64, 0.92, 0.36], 11);
                 emitGableRoof3D(cs.x, cs.y, 1, 0, 0, 0, 23, 17, bz + 0.22, bz + 0.32, [0.98, 0.48, 0.62], true, 12);
                 emitCylinder3D(cs.x, cs.y, 0, 0, 4.5, 2.8, bz + 0.32, bz + 0.40, 8, [0.98, 0.76, 0.68], 1, true);
             }
@@ -10595,8 +10647,8 @@ class WorldObjectEngine {
                 // Gleaming Copper Moonshine Boiler + Condenser Coil Drum + Oak Mash Barrels
                 emitCylinder3D(ms.x, ms.y, -6, 0, 5.5, 4.8, bz, bz + 0.26, 8, [0.88, 0.48, 0.22], 5, true);
                 emitCylinder3D(ms.x, ms.y, -6, 0, 3.0, 2.0, bz + 0.26, bz + 0.34, 8, [0.94, 0.58, 0.28], 5, true);
-                emitCylinder3D(ms.x, ms.y,  6, -4, 4.0, 4.0, bz, bz + 0.18, 8, [0.54, 0.36, 0.18], 8, true);
-                emitCylinder3D(ms.x, ms.y,  6,  5, 4.0, 4.0, bz, bz + 0.18, 8, [0.54, 0.36, 0.18], 8, true);
+                emitCylinder3D(ms.x, ms.y,  6, -4, 4.0, 4.0, bz, bz + 0.18, 8, [0.54, 0.36, 0.18], 11, true);
+                emitCylinder3D(ms.x, ms.y,  6,  5, 4.0, 4.0, bz, bz + 0.18, 8, [0.54, 0.36, 0.18], 11, true);
             }
         }
         if (Array.isArray(this.spaceViewingStands)) {
@@ -10680,7 +10732,7 @@ class WorldObjectEngine {
             for (const lb of this.lobsterTrapBuoys) {
                 const bz = lb.z || 2.0;
                 // Floating Wooden Slatted Lobster Crate + High-Vis Coral/White Marker Buoy
-                emitSolidBox3D(lb.x, lb.y, 1, 0, 0, 0, 16, 12, bz - 0.02, bz + 0.08, [0.64, 0.44, 0.22], 4);
+                emitSolidBox3D(lb.x, lb.y, 1, 0, 0, 0, 16, 12, bz - 0.02, bz + 0.08, [0.64, 0.44, 0.22], 11);
                 emitCylinder3D(lb.x, lb.y, 0, 0, 3.6, 2.2, bz + 0.08, bz + 0.26, 8, [0.98, 0.34, 0.42], 1, true);
             }
         }
@@ -10701,8 +10753,8 @@ class WorldObjectEngine {
                 const bz = cb.z || 2.0;
                 emitAOShadow3D(cb.x, cb.y, 1, 0, 0, 0, 26, 20, bz, 0.32);
                 // Tropical Bamboo Counter + Emerald/Lime Thatch Roof
-                emitSolidBox3D(cb.x, cb.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.16, [0.76, 0.56, 0.30], 4);
-                emitGableRoof3D(cb.x, cb.y, 1, 0, 0, 0, 24, 18, bz + 0.24, bz + 0.36, [0.16, 0.84, 0.52], true, 4);
+                emitSolidBox3D(cb.x, cb.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.16, [0.76, 0.56, 0.30], 11);
+                emitGableRoof3D(cb.x, cb.y, 1, 0, 0, 0, 24, 18, bz + 0.24, bz + 0.36, [0.16, 0.84, 0.52], true, 1);
             }
         }
         if (Array.isArray(this.goldPanningCamps)) {
@@ -10710,9 +10762,9 @@ class WorldObjectEngine {
                 const bz = gp.z || 2.0;
                 emitAOShadow3D(gp.x, gp.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
                 // Timber Water-Sluice Trough + Prospector Canvas Tent + Gold Ore Pile
-                emitSolidBox3D(gp.x - 6, gp.y + 4, 1, 0, 0, 0, 18, 6, bz, bz + 0.10, [0.58, 0.38, 0.18], 4);
+                emitSolidBox3D(gp.x - 6, gp.y + 4, 1, 0, 0, 0, 18, 6, bz, bz + 0.10, [0.58, 0.38, 0.18], 11);
                 emitSolidBox3D(gp.x - 6, gp.y + 4, 1, 0, 0, 0, 14, 4, bz + 0.10, bz + 0.12, [0.22, 0.74, 0.96], 1);
-                emitGableRoof3D(gp.x + 8, gp.y - 4, 1, 0, 0, 0, 14, 14, bz, bz + 0.24, [0.86, 0.78, 0.58], true, 4);
+                emitGableRoof3D(gp.x + 8, gp.y - 4, 1, 0, 0, 0, 14, 14, bz, bz + 0.24, [0.86, 0.78, 0.58], true, 1);
                 emitCylinder3D(gp.x - 10, gp.y - 5, 0, 0, 4.0, 2.0, bz, bz + 0.12, 7, [0.98, 0.82, 0.16], 1, true);
             }
         }
@@ -10733,7 +10785,7 @@ class WorldObjectEngine {
                 const bz = yd.z || 2.0;
                 emitAOShadow3D(yd.x, yd.y, 1, 0, 0, 0, 38, 28, bz, 0.32);
                 // Teakwood Zen Platform + 3 Pastel Aqua/Coral/Lavender Yoga Mats + White Shade Pergola
-                emitSolidBox3D(yd.x, yd.y, 1, 0, 0, 0, 32, 22, bz, bz + 0.05, [0.76, 0.56, 0.34], 4);
+                emitSolidBox3D(yd.x, yd.y, 1, 0, 0, 0, 32, 22, bz, bz + 0.05, [0.76, 0.56, 0.34], 11);
                 emitSolidBox3D(yd.x - 9, yd.y, 1, 0, 0, 0, 6, 14, bz + 0.05, bz + 0.07, [0.18, 0.88, 0.78], 1);
                 emitSolidBox3D(yd.x, yd.y, 1, 0, 0, 0, 6, 14, bz + 0.05, bz + 0.07, [0.98, 0.44, 0.68], 1);
                 emitSolidBox3D(yd.x + 9, yd.y, 1, 0, 0, 0, 6, 14, bz + 0.05, bz + 0.07, [0.68, 0.46, 0.98], 1);
@@ -10744,9 +10796,9 @@ class WorldObjectEngine {
                 const bz = dp.z || 2.0;
                 emitAOShadow3D(dp.x, dp.y, 1, 0, 0, 0, 28, 28, bz, 0.34);
                 // Green Felt Domino Table + 4 Stools + Terracotta Cuban Park Gazebo Roof
-                emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 14, 14, bz, bz + 0.14, [0.58, 0.36, 0.18], 4);
+                emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 14, 14, bz, bz + 0.14, [0.58, 0.36, 0.18], 11);
                 emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 12, 12, bz + 0.14, bz + 0.16, [0.12, 0.68, 0.38], 1);
-                emitGableRoof3D(dp.x, dp.y, 1, 0, 0, 0, 24, 24, bz + 0.28, bz + 0.40, [0.88, 0.42, 0.22], true, 3);
+                emitGableRoof3D(dp.x, dp.y, 1, 0, 0, 0, 24, 24, bz + 0.28, bz + 0.40, [0.88, 0.42, 0.22], true, 12);
             }
         }
         if (Array.isArray(this.pythonBountyCamps)) {
@@ -10754,7 +10806,7 @@ class WorldObjectEngine {
                 const bz = pb.z || 2.0;
                 emitAOShadow3D(pb.x, pb.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
                 // Swamp Camo Tent + Steel Specimen Cage + Bounty Weigh-In Scale Post
-                emitGableRoof3D(pb.x - 6, pb.y, 1, 0, 0, 0, 16, 16, bz, bz + 0.24, [0.36, 0.54, 0.24], true, 4);
+                emitGableRoof3D(pb.x - 6, pb.y, 1, 0, 0, 0, 16, 16, bz, bz + 0.24, [0.36, 0.54, 0.24], true, 1);
                 emitSolidBox3D(pb.x + 8, pb.y, 1, 0, 0, 0, 10, 10, bz, bz + 0.16, [0.52, 0.78, 0.18], 5);
             }
         }
@@ -10782,7 +10834,7 @@ class WorldObjectEngine {
                 const bz = ob.z || 2.0;
                 emitAOShadow3D(ob.x, ob.y, 1, 0, 0, 0, 26, 20, bz, 0.32);
                 // Crushed-Ice Raw Oyster Bar Counter + Aqua Striped Coastal Awning
-                emitSolidBox3D(ob.x, ob.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.14, [0.22, 0.34, 0.46], 4);
+                emitSolidBox3D(ob.x, ob.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.14, [0.22, 0.34, 0.46], 11);
                 emitSolidBox3D(ob.x, ob.y, 1, 0, 0, 0, 16, 10, bz + 0.14, bz + 0.17, [0.84, 0.96, 0.98], 1);
                 emitGableRoof3D(ob.x, ob.y, 1, 0, 0, 0, 22, 16, bz + 0.24, bz + 0.34, [0.18, 0.86, 0.78], true, 1);
             }
@@ -10792,9 +10844,9 @@ class WorldObjectEngine {
                 const bz = kz.z || 2.0;
                 emitAOShadow3D(kz.x, kz.y, 1, 0, 0, 0, 30, 30, bz, 0.36);
                 // Timber A-Frame Canopy Tower + Elevated Launch Deck + Orange Safety Roof
-                emitSolidBox3D(kz.x, kz.y, 1, 0, 0, 0, 18, 18, bz, bz + 0.48, [0.54, 0.36, 0.18], 4);
-                emitSolidBox3D(kz.x, kz.y, 1, 0, 0, 0, 24, 24, bz + 0.48, bz + 0.54, [0.68, 0.46, 0.24], 4);
-                emitGableRoof3D(kz.x, kz.y, 1, 0, 0, 0, 26, 26, bz + 0.64, bz + 0.76, [0.98, 0.48, 0.16], true, 4);
+                emitSolidBox3D(kz.x, kz.y, 1, 0, 0, 0, 18, 18, bz, bz + 0.48, [0.54, 0.36, 0.18], 11);
+                emitSolidBox3D(kz.x, kz.y, 1, 0, 0, 0, 24, 24, bz + 0.48, bz + 0.54, [0.68, 0.46, 0.24], 11);
+                emitGableRoof3D(kz.x, kz.y, 1, 0, 0, 0, 26, 26, bz + 0.64, bz + 0.76, [0.98, 0.48, 0.16], true, 12);
             }
         }
         if (Array.isArray(this.neonArcadePavilions)) {
@@ -10815,9 +10867,9 @@ class WorldObjectEngine {
                 const bz = gt.z || 2.0;
                 emitAOShadow3D(gt.x, gt.y, 1, 0, 0, 0, 42, 30, bz, 0.36);
                 // Elevated Cedar Boardwalk Deck + Horseshoe Tiki Bar + High-Pitched Golden Palm Thatch Roof + Corner Torch Posts
-                emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 36, 24, bz, bz + 0.06, [0.68, 0.46, 0.24], 4);
-                emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 20, 12, bz + 0.06, bz + 0.18, [0.82, 0.56, 0.28], 4);
-                emitGableRoof3D(gt.x, gt.y, 1, 0, 0, 0, 38, 26, bz + 0.28, bz + 0.48, [0.92, 0.64, 0.24], true, 4);
+                emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 36, 24, bz, bz + 0.06, [0.68, 0.46, 0.24], 11);
+                emitSolidBox3D(gt.x, gt.y, 1, 0, 0, 0, 20, 12, bz + 0.06, bz + 0.18, [0.82, 0.56, 0.28], 11);
+                emitGableRoof3D(gt.x, gt.y, 1, 0, 0, 0, 38, 26, bz + 0.28, bz + 0.48, [0.92, 0.64, 0.24], true, 11);
                 emitCylinder3D(gt.x - 16, gt.y - 10, 0, 0, 2.0, 2.0, bz + 0.06, bz + 0.28, 6, [0.98, 0.52, 0.14], 1, true);
                 emitCylinder3D(gt.x + 16, gt.y + 10, 0, 0, 2.0, 2.0, bz + 0.06, bz + 0.28, 6, [0.98, 0.52, 0.14], 1, true);
             }
@@ -10826,7 +10878,7 @@ class WorldObjectEngine {
             for (const mp of this.gulfManateePiers) {
                 const bz = mp.z || 2.0;
                 // Floating Timber Eco-Observation Pier + Aqua Canopy Gazebo + Manatee Feeding Basin
-                emitSolidBox3D(mp.x, mp.y, 1, 0, 0, 0, 34, 18, bz - 0.02, bz + 0.08, [0.62, 0.44, 0.24], 4);
+                emitSolidBox3D(mp.x, mp.y, 1, 0, 0, 0, 34, 18, bz - 0.02, bz + 0.08, [0.62, 0.44, 0.24], 11);
                 emitGableRoof3D(mp.x, mp.y, 1, 0, 0, 0, 26, 16, bz + 0.24, bz + 0.36, [0.16, 0.78, 0.94], true, 1);
             }
         }
@@ -10835,10 +10887,10 @@ class WorldObjectEngine {
                 const bz = co.z || 2.0;
                 emitAOShadow3D(co.x, co.y, 1, 0, 0, 0, 34, 24, bz, 0.34);
                 // Rustic Timber Farmers Market Stand + Bright Orange Crate Displays + Sunshine Yellow/Green Striped Awning
-                emitSolidBox3D(co.x, co.y, 1, 0, 0, 0, 26, 16, bz, bz + 0.16, [0.66, 0.44, 0.22], 4);
+                emitSolidBox3D(co.x, co.y, 1, 0, 0, 0, 26, 16, bz, bz + 0.16, [0.66, 0.44, 0.22], 11);
                 emitSolidBox3D(co.x - 6, co.y + 3, 1, 0, 0, 0, 9, 6, bz + 0.16, bz + 0.22, [0.98, 0.58, 0.12], 1);
                 emitSolidBox3D(co.x + 6, co.y + 3, 1, 0, 0, 0, 9, 6, bz + 0.16, bz + 0.22, [0.98, 0.84, 0.16], 1);
-                emitGableRoof3D(co.x, co.y, 1, 0, 0, 0, 30, 20, bz + 0.26, bz + 0.38, [0.98, 0.64, 0.14], true, 4);
+                emitGableRoof3D(co.x, co.y, 1, 0, 0, 0, 30, 20, bz + 0.26, bz + 0.38, [0.98, 0.64, 0.14], true, 1);
             }
         }
         if (Array.isArray(this.gatorWrestlingRodeos)) {
@@ -10846,7 +10898,7 @@ class WorldObjectEngine {
                 const bz = gr.z || 2.0;
                 emitAOShadow3D(gr.x, gr.y, 1, 0, 0, 0, 44, 44, bz, 0.36);
                 // Octagonal Timber Sand-and-Water Gator Pit + Bleacher Bench Ring
-                emitCylinder3D(gr.x, gr.y, 0, 0, 18.0, 18.0, bz, bz + 0.14, 8, [0.56, 0.38, 0.20], 4, true);
+                emitCylinder3D(gr.x, gr.y, 0, 0, 18.0, 18.0, bz, bz + 0.14, 8, [0.56, 0.38, 0.20], 11, true);
                 emitCylinder3D(gr.x, gr.y, 0, 0, 14.0, 14.0, bz + 0.14, bz + 0.16, 8, [0.18, 0.64, 0.48], 1, true);
             }
         }
@@ -10863,9 +10915,9 @@ class WorldObjectEngine {
             for (const so of this.stiltsvilleOutposts) {
                 const bz = so.z || 2.0;
                 // Historic Biscayne Bay Elevated Wood-Piling Stilt House + Wrap-Around Dock + Tin Roof
-                emitSolidBox3D(so.x, so.y, 1, 0, 0, 0, 34, 26, bz - 0.02, bz + 0.16, [0.48, 0.34, 0.20], 4);
-                emitSolidBox3D(so.x, so.y, 1, 0, 0, 0, 26, 20, bz + 0.16, bz + 0.42, [0.86, 0.78, 0.62], 4);
-                emitGableRoof3D(so.x, so.y, 1, 0, 0, 0, 30, 24, bz + 0.42, bz + 0.56, [0.78, 0.34, 0.22], true, 3);
+                emitSolidBox3D(so.x, so.y, 1, 0, 0, 0, 34, 26, bz - 0.02, bz + 0.16, [0.48, 0.34, 0.20], 11);
+                emitSolidBox3D(so.x, so.y, 1, 0, 0, 0, 26, 20, bz + 0.16, bz + 0.42, [0.86, 0.78, 0.62], 11);
+                emitGableRoof3D(so.x, so.y, 1, 0, 0, 0, 30, 24, bz + 0.42, bz + 0.56, [0.78, 0.34, 0.22], true, 12);
             }
         }
         if (Array.isArray(this.hangarBlackMarkets)) {
@@ -10903,9 +10955,9 @@ class WorldObjectEngine {
                 const bz = ls.z || 2.0;
                 emitAOShadow3D(ls.x, ls.y, 1, 0, 0, 0, 40, 28, bz, 0.35);
                 // Timber Sawmill Shed + Stacked Pine Log Pyramid + Red Barn Roof
-                emitSolidBox3D(ls.x - 6, ls.y, 1, 0, 0, 0, 24, 18, bz, bz + 0.26, [0.64, 0.42, 0.22], 4);
-                emitGableRoof3D(ls.x - 6, ls.y, 1, 0, 0, 0, 28, 22, bz + 0.26, bz + 0.42, [0.84, 0.24, 0.18], true, 3);
-                emitSolidBox3D(ls.x + 12, ls.y, 1, 0, 0, 0, 12, 16, bz, bz + 0.18, [0.76, 0.54, 0.28], 4);
+                emitSolidBox3D(ls.x - 6, ls.y, 1, 0, 0, 0, 24, 18, bz, bz + 0.26, [0.64, 0.42, 0.22], 11);
+                emitGableRoof3D(ls.x - 6, ls.y, 1, 0, 0, 0, 28, 22, bz + 0.26, bz + 0.42, [0.84, 0.24, 0.18], true, 12);
+                emitSolidBox3D(ls.x + 12, ls.y, 1, 0, 0, 0, 12, 16, bz, bz + 0.18, [0.76, 0.54, 0.28], 11);
             }
         }
         if (Array.isArray(this.horseRanchCorrals)) {
@@ -10913,8 +10965,8 @@ class WorldObjectEngine {
                 const bz = hr.z || 2.0;
                 emitAOShadow3D(hr.x, hr.y, 1, 0, 0, 0, 46, 36, bz, 0.35);
                 // Sand Rodeo Ring + White Split-Rail Corral + Red Kentucky-Style Horse Barn
-                emitCylinder3D(hr.x - 8, hr.y, 0, 0, 15.0, 15.0, bz, bz + 0.08, 8, [0.88, 0.74, 0.52], 4, true);
-                emitSolidBox3D(hr.x + 12, hr.y, 1, 0, 0, 0, 18, 22, bz, bz + 0.28, [0.88, 0.22, 0.18], 3);
+                emitCylinder3D(hr.x - 8, hr.y, 0, 0, 15.0, 15.0, bz, bz + 0.08, 8, [0.88, 0.74, 0.52], 11, true);
+                emitSolidBox3D(hr.x + 12, hr.y, 1, 0, 0, 0, 18, 22, bz, bz + 0.28, [0.88, 0.22, 0.18], 12);
                 emitGableRoof3D(hr.x + 12, hr.y, 1, 0, 0, 0, 22, 26, bz + 0.28, bz + 0.46, [0.96, 0.96, 0.98], true, 1);
             }
         }
@@ -10932,8 +10984,8 @@ class WorldObjectEngine {
             for (const sc of this.stoneCrabCamps) {
                 const bz = sc.z || 2.0;
                 // Floating Mangrove Crabber Dock + Stacked Coral/Yellow Crab Traps + Tin-Roof Boathouse
-                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 32, 22, bz - 0.02, bz + 0.08, [0.58, 0.40, 0.22], 4);
-                emitSolidBox3D(sc.x - 7, sc.y, 1, 0, 0, 0, 14, 14, bz + 0.08, bz + 0.28, [0.94, 0.36, 0.42], 4);
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 32, 22, bz - 0.02, bz + 0.08, [0.58, 0.40, 0.22], 11);
+                emitSolidBox3D(sc.x - 7, sc.y, 1, 0, 0, 0, 14, 14, bz + 0.08, bz + 0.28, [0.94, 0.36, 0.42], 11);
                 emitGableRoof3D(sc.x - 7, sc.y, 1, 0, 0, 0, 18, 18, bz + 0.28, bz + 0.40, [0.76, 0.82, 0.86], true, 5);
             }
         }
