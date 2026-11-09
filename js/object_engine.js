@@ -847,6 +847,50 @@ class WorldObjectEngine {
             { name: "NORTH SHORES TROPICAL PALM ARBORETUM",   x: 388.5 * TILE_SIZE, y: 54.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
             { name: "BAYFRONT PARK BUTTERFLY GLASSHOUSE",     x: 236.5 * TILE_SIZE, y: 68.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
         ];
+        // 42. Official GTA 6 Far-Northwest Cape & Gulf Offshore Oil-Rig Helipads & Pinewoods Lumberjack Chainsaw Camps (Loop 35 — Far-NW Void)
+        this.gulfOilRigPlatforms = [
+            { name: "NORTH GULF DEEPWATER DRILLING RIG",      x: 18.5 * TILE_SIZE,  y: 44.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "GELLHORN OFFSHORE PETRO PLATFORM",       x: 16.5 * TILE_SIZE,  y: 142.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WEST STRAITS JACK-UP OIL DERRICK",       x: 18.5 * TILE_SIZE,  y: 288.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.lumberjackSawmills = [
+            { name: "WEST KALAGA TIMBER SAWMILL CAMP",        x: 78.5 * TILE_SIZE,  y: 34.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "PINEWOODS LOGGING & CHAINSAW MILL",      x: 96.5 * TILE_SIZE,  y: 54.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "NORTH RIDGE REDWOOD LUMBER YARD",        x: 64.5 * TILE_SIZE,  y: 58.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        // 43. Official GTA 6 North-Central Equestrian Ranch Arenas & Solar-Thermal Mirror Farms (Loop 36 — North-Central & East Kalaga Void)
+        this.horseRanchCorrals = [
+            { name: "OCALA TRAIL EQUESTRIAN RODEO CORRAL",    x: 224.5 * TILE_SIZE, y: 32.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "NORTH REDHILL THOROUGHBRED STABLES",     x: 278.5 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "HEARTLAND PALOMINO QUARTER-HORSE RANCH", x: 182.5 * TILE_SIZE, y: 64.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        this.solarPowerArrays = [
+            { name: "NORTH LEONIDA HELIOSTAT SOLAR FARM",     x: 334.5 * TILE_SIZE, y: 34.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "CAPE SERA SOLAR TELEMETRY ARRAY",        x: 412.5 * TILE_SIZE, y: 32.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "AMBROSIA RENEWABLE SOLAR GRID",          x: 214.5 * TILE_SIZE, y: 84.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        // 44. Official GTA 6 Far-Southwest Ten Thousand Islands Mangrove Crab Camps & Flamingo Eco-Sanctuaries (Loop 37 — Far-SW Void)
+        this.stoneCrabCamps = [
+            { name: "TEN THOUSAND ISLANDS STONE-CRAB DOCK",   x: 32.5 * TILE_SIZE,  y: 418.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CHOKOLOSKEE MANGROVE CRABBER SHACK",     x: 46.5 * TILE_SIZE,  y: 468.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTHWEST CAPE CLAW & TRAP OUTPOST",     x: 24.5 * TILE_SIZE,  y: 484.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.flamingoSanctuaries = [
+            { name: "GARNET LAGOON PINK FLAMINGO ROOST",      x: 58.5 * TILE_SIZE,  y: 388.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH EVERGLADES FLAMINGO SANCTUARY",    x: 138.5 * TILE_SIZE, y: 458.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "FLORIDA BAY ROSEATE FLAMINGO COVE",      x: 162.5 * TILE_SIZE, y: 468.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 45. Official GTA 6 Far-East Keys Coral Underwater Observatories & Deep-Sea Salvage Barges (Loop 38 — Far-SE Ocean Void)
+        this.underwaterObservatories = [
+            { name: "KEY LARGO REEF GLASS OBSERVATORY",       x: 318.5 * TILE_SIZE, y: 464.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PENNEKAMP CORAL ATOLL DOME",             x: 384.5 * TILE_SIZE, y: 468.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "BISCAYNE ABYSSAL REEF RESEARCH POD",     x: 446.5 * TILE_SIZE, y: 428.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.salvageDredgeBarges = [
+            { name: "SPANISH TREASURE FLEET SALVAGE BARGE",   x: 472.5 * TILE_SIZE, y: 464.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "ATLANTIC TRENCH GOLD DREDGE PLATFORM",   x: 488.5 * TILE_SIZE, y: 396.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CAPE CANAVERAL BOOSTER RECOVERY BARGE",  x: 492.5 * TILE_SIZE, y: 96.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1614,6 +1658,62 @@ class WorldObjectEngine {
                 for (const bg of this.botanicalGlasshouses) {
                     snapOffRoad(bg);
                     clearZones.push({ x: bg.x, y: bg.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.gulfOilRigPlatforms)) {
+                for (const or of this.gulfOilRigPlatforms) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(or.x, or.y, 18);
+                        if (sn) { or.x = sn.x; or.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.lumberjackSawmills)) {
+                for (const ls of this.lumberjackSawmills) {
+                    snapOffRoad(ls);
+                    clearZones.push({ x: ls.x, y: ls.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.horseRanchCorrals)) {
+                for (const hr of this.horseRanchCorrals) {
+                    snapOffRoad(hr);
+                    clearZones.push({ x: hr.x, y: hr.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.solarPowerArrays)) {
+                for (const sp of this.solarPowerArrays) {
+                    snapOffRoad(sp);
+                    clearZones.push({ x: sp.x, y: sp.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.stoneCrabCamps)) {
+                for (const sc of this.stoneCrabCamps) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(sc.x, sc.y, 18);
+                        if (sn) { sc.x = sn.x; sc.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.flamingoSanctuaries)) {
+                for (const fs of this.flamingoSanctuaries) {
+                    snapOffRoad(fs);
+                    clearZones.push({ x: fs.x, y: fs.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.underwaterObservatories)) {
+                for (const uo of this.underwaterObservatories) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(uo.x, uo.y, 18);
+                        if (sn) { uo.x = sn.x; uo.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.salvageDredgeBarges)) {
+                for (const sb of this.salvageDredgeBarges) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(sb.x, sb.y, 18);
+                        if (sn) { sb.x = sn.x; sb.y = sn.y; }
+                    }
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -4848,6 +4948,302 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P34. Official GTA 6 Far-NW Offshore Oil-Rig Helipads & Pinewoods Lumberjack Sawmills ([E], Loop 35)
+        if (Array.isArray(this.gulfOilRigPlatforms)) {
+            for (const or of this.gulfOilRigPlatforms) {
+                if ((or.cooldown || 0) <= 0 && Math.hypot(px - or.x, py - or.y) < 82) {
+                    or.cooldown = 30.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(10000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 10000;
+                    }
+                    if (game.audio) game.audio.playPickup("ARMOR");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🛢️ OFFSHORE GULF OIL-RIG PAYROLL!`,
+                            `${or.name} • DEEPWATER HELIPAD CACHE +$10,000 + 150 HP/ARMOR & +1X!`,
+                            "#f97316",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: or.x,
+                            y: or.y,
+                            z: 2.78,
+                            text: `🛢️ OFFSHORE OIL-RIG PAYROLL! +$10,000 + 150 HP/ARMOR + +1X!`,
+                            color: "#f97316",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.lumberjackSawmills)) {
+            for (const ls of this.lumberjackSawmills) {
+                if ((ls.cooldown || 0) <= 0 && Math.hypot(px - ls.x, py - ls.y) < 72) {
+                    ls.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(7500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 7500;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🪵 KALAGA TIMBER SAWMILL DERBY!`,
+                            `${ls.name} • LUMBERJACK PRIZE +$7,500 + 150 HP/ARMOR & +1X!`,
+                            "#d97706",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ls.x,
+                            y: ls.y,
+                            z: 2.72,
+                            text: `🪵 SAWMILL CHAMPION! +$7,500 + 150 HP/ARMOR + +1X!`,
+                            color: "#d97706",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P35. Official GTA 6 North-Central Equestrian Ranch Arenas & Solar-Thermal Mirror Farms ([E], Loop 36)
+        if (Array.isArray(this.horseRanchCorrals)) {
+            for (const hr of this.horseRanchCorrals) {
+                if ((hr.cooldown || 0) <= 0 && Math.hypot(px - hr.x, py - hr.y) < 76) {
+                    hr.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(8000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 8000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🐎 THOROUGHBRED RANCH RODEO CHAMPION!`,
+                            `${hr.name} • DERBY PURSE +$8,000 + 150 HP/ARMOR & +1X!`,
+                            "#f59e0b",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: hr.x,
+                            y: hr.y,
+                            z: 2.72,
+                            text: `🐎 RANCH RODEO PURSE! +$8,000 + 150 HP/ARMOR + +1X!`,
+                            color: "#f59e0b",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.solarPowerArrays)) {
+            for (const sp of this.solarPowerArrays) {
+                if ((sp.cooldown || 0) <= 0 && Math.hypot(px - sp.x, py - sp.y) < 74) {
+                    sp.cooldown = 26.0;
+                    if (game.player.inVehicle) {
+                        game.player.inVehicle.health = 100;
+                        game.player.inVehicle.onFire = false;
+                    }
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(7000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 7000;
+                    }
+                    if (game.audio) game.audio.playPickup("ARMOR");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `☀️ SOLAR-THERMAL OVERCHARGE SURGE!`,
+                            `${sp.name} • 150 ARMOR + FULL VEHICLE CHARGE & +$7,000!`,
+                            "#38bdf8",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sp.x,
+                            y: sp.y,
+                            z: 2.72,
+                            text: `☀️ SOLAR GRID SURGE! 150 ARMOR + +$7,000!`,
+                            color: "#38bdf8",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P36. Official GTA 6 Far-SW Ten Thousand Islands Stone-Crab Camps & Pink Flamingo Sanctuaries ([E], Loop 37)
+        if (Array.isArray(this.stoneCrabCamps)) {
+            for (const sc of this.stoneCrabCamps) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 76) {
+                    sc.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(7500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 7500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🦀 TEN THOUSAND ISLANDS STONE-CRAB HAUL!`,
+                            `${sc.name} • JUMBO CLAW BOUNTY +$7,500 + 150 HP/ARMOR & +1X!`,
+                            "#fb7185",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sc.x,
+                            y: sc.y,
+                            z: 2.70,
+                            text: `🦀 STONE-CRAB HAUL! +$7,500 + 150 HP/ARMOR + +1X!`,
+                            color: "#fb7185",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.flamingoSanctuaries)) {
+            for (const fs of this.flamingoSanctuaries) {
+                if ((fs.cooldown || 0) <= 0 && Math.hypot(px - fs.x, py - fs.y) < 72) {
+                    fs.cooldown = 26.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🦩 LEONIDA PINK FLAMINGO SANCTUARY!`,
+                            `${fs.name} • ECO-SAFARI 0★ WANTED + 150 HP/ARMOR & +$6,500!`,
+                            "#f472b6",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: fs.x,
+                            y: fs.y,
+                            z: 2.70,
+                            text: `🦩 FLAMINGO SANCTUARY! 0★ + 150 HP/ARMOR + +$6,500!`,
+                            color: "#f472b6",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P37. Official GTA 6 Far-SE Coral Underwater Observatories & Deep-Sea Treasure Salvage Barges ([E], Loop 38)
+        if (Array.isArray(this.underwaterObservatories)) {
+            for (const uo of this.underwaterObservatories) {
+                if ((uo.cooldown || 0) <= 0 && Math.hypot(px - uo.x, py - uo.y) < 78) {
+                    uo.cooldown = 28.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(8000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 8000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🐠 CORAL REEF GLASS OBSERVATORY DOME!`,
+                            `${uo.name} • ABYSSAL DISCOVERY 0★ + 150 HP/ARMOR + +$8,000 & +1X!`,
+                            "#22d3ee",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: uo.x,
+                            y: uo.y,
+                            z: 2.74,
+                            text: `🐠 REEF OBSERVATORY! 0★ + 150 HP/ARMOR + +$8,000 + +1X!`,
+                            color: "#22d3ee",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.salvageDredgeBarges)) {
+            for (const sb of this.salvageDredgeBarges) {
+                if ((sb.cooldown || 0) <= 0 && Math.hypot(px - sb.x, py - sb.y) < 82) {
+                    sb.cooldown = 30.0;
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(10000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 10000;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `⚓ SPANISH GALLEON GOLD SALVAGE!`,
+                            `${sb.name} • SUNKEN DOUBLOON HOARD +$10,000 + 150 ARMOR & +1X!`,
+                            "#facc15",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sb.x,
+                            y: sb.y,
+                            z: 2.76,
+                            text: `⚓ SUNKEN GOLD SALVAGE! +$10,000 + 150 ARMOR + +1X!`,
+                            color: "#facc15",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -6002,6 +6398,46 @@ class WorldObjectEngine {
         if (Array.isArray(this.botanicalGlasshouses)) {
             for (const bg of this.botanicalGlasshouses) {
                 if ((bg.cooldown || 0) > 0) bg.cooldown = Math.max(0, bg.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.gulfOilRigPlatforms)) {
+            for (const or of this.gulfOilRigPlatforms) {
+                if ((or.cooldown || 0) > 0) or.cooldown = Math.max(0, or.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.lumberjackSawmills)) {
+            for (const ls of this.lumberjackSawmills) {
+                if ((ls.cooldown || 0) > 0) ls.cooldown = Math.max(0, ls.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.horseRanchCorrals)) {
+            for (const hr of this.horseRanchCorrals) {
+                if ((hr.cooldown || 0) > 0) hr.cooldown = Math.max(0, hr.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.solarPowerArrays)) {
+            for (const sp of this.solarPowerArrays) {
+                if ((sp.cooldown || 0) > 0) sp.cooldown = Math.max(0, sp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.stoneCrabCamps)) {
+            for (const sc of this.stoneCrabCamps) {
+                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.flamingoSanctuaries)) {
+            for (const fs of this.flamingoSanctuaries) {
+                if ((fs.cooldown || 0) > 0) fs.cooldown = Math.max(0, fs.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.underwaterObservatories)) {
+            for (const uo of this.underwaterObservatories) {
+                if ((uo.cooldown || 0) > 0) uo.cooldown = Math.max(0, uo.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.salvageDredgeBarges)) {
+            for (const sb of this.salvageDredgeBarges) {
+                if ((sb.cooldown || 0) > 0) sb.cooldown = Math.max(0, sb.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -10424,6 +10860,82 @@ class WorldObjectEngine {
             }
         }
 
+        // 22Q. Official GTA 6 Outer-Perimeter Void-Filling Landmarks: Gulf Offshore Oil Rigs, Lumberjack Sawmills, Horse Ranch Corrals, Solar Farms, Stone-Crab Camps, Flamingo Sanctuaries, Underwater Observatories & Salvage Barges (Loops 35-38)
+        if (Array.isArray(this.gulfOilRigPlatforms)) {
+            for (const or of this.gulfOilRigPlatforms) {
+                const bz = or.z || 2.0;
+                // Steel Jack-Up Offshore Drilling Platform + Derrick Tower + Helipad Deck + Gas Flare Boom
+                emitSolidBox3D(or.x, or.y, 1, 0, 0, 0, 46, 46, bz - 0.02, bz + 0.28, [0.24, 0.28, 0.34], 5);
+                emitSolidBox3D(or.x - 10, or.y, 1, 0, 0, 0, 20, 20, bz + 0.28, bz + 0.34, [0.96, 0.78, 0.14], 1);
+                emitCylinder3D(or.x + 10, or.y, 0, 0, 8.0, 3.0, bz + 0.28, bz + 0.88, 6, [0.94, 0.38, 0.14], 5, true);
+            }
+        }
+        if (Array.isArray(this.lumberjackSawmills)) {
+            for (const ls of this.lumberjackSawmills) {
+                const bz = ls.z || 2.0;
+                emitAOShadow3D(ls.x, ls.y, 1, 0, 0, 0, 40, 28, bz, 0.35);
+                // Timber Sawmill Shed + Stacked Pine Log Pyramid + Red Barn Roof
+                emitSolidBox3D(ls.x - 6, ls.y, 1, 0, 0, 0, 24, 18, bz, bz + 0.26, [0.64, 0.42, 0.22], 4);
+                emitGableRoof3D(ls.x - 6, ls.y, 1, 0, 0, 0, 28, 22, bz + 0.26, bz + 0.42, [0.84, 0.24, 0.18], true, 3);
+                emitSolidBox3D(ls.x + 12, ls.y, 1, 0, 0, 0, 12, 16, bz, bz + 0.18, [0.76, 0.54, 0.28], 4);
+            }
+        }
+        if (Array.isArray(this.horseRanchCorrals)) {
+            for (const hr of this.horseRanchCorrals) {
+                const bz = hr.z || 2.0;
+                emitAOShadow3D(hr.x, hr.y, 1, 0, 0, 0, 46, 36, bz, 0.35);
+                // Sand Rodeo Ring + White Split-Rail Corral + Red Kentucky-Style Horse Barn
+                emitCylinder3D(hr.x - 8, hr.y, 0, 0, 15.0, 15.0, bz, bz + 0.08, 8, [0.88, 0.74, 0.52], 4, true);
+                emitSolidBox3D(hr.x + 12, hr.y, 1, 0, 0, 0, 18, 22, bz, bz + 0.28, [0.88, 0.22, 0.18], 3);
+                emitGableRoof3D(hr.x + 12, hr.y, 1, 0, 0, 0, 22, 26, bz + 0.28, bz + 0.46, [0.96, 0.96, 0.98], true, 1);
+            }
+        }
+        if (Array.isArray(this.solarPowerArrays)) {
+            for (const sp of this.solarPowerArrays) {
+                const bz = sp.z || 2.0;
+                emitAOShadow3D(sp.x, sp.y, 1, 0, 0, 0, 44, 32, bz, 0.34);
+                // 3 Rows of Deep Cobalt-Blue Photovoltaic Solar Panels + Central White Collector Tower
+                emitSolidBox3D(sp.x - 12, sp.y, 1, 0, 0, 0, 10, 24, bz, bz + 0.16, [0.12, 0.46, 0.94], 1);
+                emitSolidBox3D(sp.x + 12, sp.y, 1, 0, 0, 0, 10, 24, bz, bz + 0.16, [0.12, 0.46, 0.94], 1);
+                emitCylinder3D(sp.x, sp.y, 0, 0, 4.5, 3.0, bz, bz + 0.64, 8, [0.96, 0.98, 1.0], 1, true);
+            }
+        }
+        if (Array.isArray(this.stoneCrabCamps)) {
+            for (const sc of this.stoneCrabCamps) {
+                const bz = sc.z || 2.0;
+                // Floating Mangrove Crabber Dock + Stacked Coral/Yellow Crab Traps + Tin-Roof Boathouse
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 32, 22, bz - 0.02, bz + 0.08, [0.58, 0.40, 0.22], 4);
+                emitSolidBox3D(sc.x - 7, sc.y, 1, 0, 0, 0, 14, 14, bz + 0.08, bz + 0.28, [0.94, 0.36, 0.42], 4);
+                emitGableRoof3D(sc.x - 7, sc.y, 1, 0, 0, 0, 18, 18, bz + 0.28, bz + 0.40, [0.76, 0.82, 0.86], true, 5);
+            }
+        }
+        if (Array.isArray(this.flamingoSanctuaries)) {
+            for (const fs of this.flamingoSanctuaries) {
+                const bz = fs.z || 2.0;
+                emitAOShadow3D(fs.x, fs.y, 1, 0, 0, 0, 38, 30, bz, 0.33);
+                // Turquoise Shallow Lagoon Pool + Roseate Pink Flamingo Nesting Island + Bamboo Observation Deck
+                emitCylinder3D(fs.x, fs.y, 0, 0, 16.0, 16.0, bz, bz + 0.05, 8, [0.16, 0.86, 0.82], 1, true);
+                emitCylinder3D(fs.x, fs.y, 0, 0, 7.5, 7.5, bz + 0.05, bz + 0.14, 8, [0.98, 0.42, 0.72], 1, true);
+            }
+        }
+        if (Array.isArray(this.underwaterObservatories)) {
+            for (const uo of this.underwaterObservatories) {
+                const bz = uo.z || 2.0;
+                // White Ring Research Platform + Glowing Cyan Geodesic Glass Reef Dome
+                emitCylinder3D(uo.x, uo.y, 0, 0, 18.0, 18.0, bz - 0.02, bz + 0.08, 8, [0.92, 0.96, 0.98], 1, true);
+                emitCylinder3D(uo.x, uo.y, 0, 0, 11.0, 7.5, bz + 0.08, bz + 0.38, 8, [0.14, 0.88, 0.98], 1, true);
+            }
+        }
+        if (Array.isArray(this.salvageDredgeBarges)) {
+            for (const sb of this.salvageDredgeBarges) {
+                const bz = sb.z || 2.0;
+                // Heavy Steel Salvage Barge Hull + Yellow A-Frame Dredge Crane + Sunken Gold Chest Pile
+                emitSolidBox3D(sb.x, sb.y, 1, 0, 0, 0, 44, 24, bz - 0.02, bz + 0.12, [0.24, 0.28, 0.34], 5);
+                emitSolidBox3D(sb.x - 10, sb.y, 1, 0, 0, 0, 14, 16, bz + 0.12, bz + 0.36, [0.98, 0.78, 0.14], 5);
+                emitSolidBox3D(sb.x + 10, sb.y, 1, 0, 0, 0, 10, 10, bz + 0.12, bz + 0.24, [0.98, 0.86, 0.22], 1);
+            }
+        }
+
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
         //     West & East Drive-Through Vehicle Tunnels, Cantilevered White Canopy Roof, 4 Cylindrical Spiral Ramps,
@@ -13982,6 +14494,86 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.gulfOilRigPlatforms)) {
+            for (let i = 0; i < this.gulfOilRigPlatforms.length; i++) {
+                const or = this.gulfOilRigPlatforms[i];
+                if (or.x < minX - 150 || or.x > maxX + 150 || or.y < minY - 150 || or.y > maxY + 150) continue;
+                if ((or.cooldown || 0) <= 0) {
+                    const rSz = 38 + Math.sin(renderer.time * 5.6 + i) * 3.6;
+                    renderer.pushSolidQuad3D(or.x, or.y, 2.03, rSz, rSz, renderer.time * 1.3, 0.98, 0.48, 0.14, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.lumberjackSawmills)) {
+            for (let i = 0; i < this.lumberjackSawmills.length; i++) {
+                const ls = this.lumberjackSawmills[i];
+                if (ls.x < minX - 140 || ls.x > maxX + 140 || ls.y < minY - 140 || ls.y > maxY + 140) continue;
+                if ((ls.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 5.4 + i) * 3.2;
+                    renderer.pushSolidQuad3D(ls.x, ls.y, 2.03, rSz, rSz, -renderer.time * 1.2, 0.92, 0.54, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.horseRanchCorrals)) {
+            for (let i = 0; i < this.horseRanchCorrals.length; i++) {
+                const hr = this.horseRanchCorrals[i];
+                if (hr.x < minX - 140 || hr.x > maxX + 140 || hr.y < minY - 140 || hr.y > maxY + 140) continue;
+                if ((hr.cooldown || 0) <= 0) {
+                    const rSz = 36 + Math.sin(renderer.time * 5.5 + i) * 3.4;
+                    renderer.pushSolidQuad3D(hr.x, hr.y, 2.03, rSz, rSz, renderer.time * 1.3, 0.98, 0.68, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.solarPowerArrays)) {
+            for (let i = 0; i < this.solarPowerArrays.length; i++) {
+                const sp = this.solarPowerArrays[i];
+                if (sp.x < minX - 140 || sp.x > maxX + 140 || sp.y < minY - 140 || sp.y > maxY + 140) continue;
+                if ((sp.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 6.0 + i) * 3.4;
+                    renderer.pushSolidQuad3D(sp.x, sp.y, 2.03, rSz, rSz, -renderer.time * 1.5, 0.22, 0.78, 0.98, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.stoneCrabCamps)) {
+            for (let i = 0; i < this.stoneCrabCamps.length; i++) {
+                const sc = this.stoneCrabCamps[i];
+                if (sc.x < minX - 130 || sc.x > maxX + 130 || sc.y < minY - 130 || sc.y > maxY + 130) continue;
+                if ((sc.cooldown || 0) <= 0) {
+                    const rSz = 30 + Math.sin(renderer.time * 5.4 + i) * 3.2;
+                    renderer.pushSolidQuad3D(sc.x, sc.y, 2.03, rSz, rSz, renderer.time * 1.3, 0.98, 0.44, 0.54, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.flamingoSanctuaries)) {
+            for (let i = 0; i < this.flamingoSanctuaries.length; i++) {
+                const fs = this.flamingoSanctuaries[i];
+                if (fs.x < minX - 130 || fs.x > maxX + 130 || fs.y < minY - 130 || fs.y > maxY + 130) continue;
+                if ((fs.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 5.6 + i) * 3.2;
+                    renderer.pushSolidQuad3D(fs.x, fs.y, 2.03, rSz, rSz, -renderer.time * 1.2, 0.98, 0.42, 0.76, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.underwaterObservatories)) {
+            for (let i = 0; i < this.underwaterObservatories.length; i++) {
+                const uo = this.underwaterObservatories[i];
+                if (uo.x < minX - 140 || uo.x > maxX + 140 || uo.y < minY - 140 || uo.y > maxY + 140) continue;
+                if ((uo.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 5.8 + i) * 3.4;
+                    renderer.pushSolidQuad3D(uo.x, uo.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.14, 0.88, 0.98, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.salvageDredgeBarges)) {
+            for (let i = 0; i < this.salvageDredgeBarges.length; i++) {
+                const sb = this.salvageDredgeBarges[i];
+                if (sb.x < minX - 140 || sb.x > maxX + 140 || sb.y < minY - 140 || sb.y > maxY + 140) continue;
+                if ((sb.cooldown || 0) <= 0) {
+                    const rSz = 36 + Math.sin(renderer.time * 5.6 + i) * 3.6;
+                    renderer.pushSolidQuad3D(sb.x, sb.y, 2.03, rSz, rSz, -renderer.time * 1.3, 0.98, 0.84, 0.16, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -15293,6 +15885,126 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.gulfOilRigPlatforms)) {
+            for (const or of this.gulfOilRigPlatforms) {
+                if ((or.cooldown || 0) <= 0 && Math.hypot(px - or.x, py - or.y) < 120) {
+                    const scr = renderer.worldToScreen(or.x, or.y - 18, 2.65);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#f97316";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fed7aa";
+                    ctx.fillText(`🛢️ [E] RAID OFFSHORE OIL-RIG HELIPAD (+$10,000 + 150 HP/ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.lumberjackSawmills)) {
+            for (const ls of this.lumberjackSawmills) {
+                if ((ls.cooldown || 0) <= 0 && Math.hypot(px - ls.x, py - ls.y) < 115) {
+                    const scr = renderer.worldToScreen(ls.x, ls.y - 18, 2.54);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#d97706";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fde68a";
+                    ctx.fillText(`🪵 [E] WIN KALAGA TIMBER SAWMILL DERBY (+$7,500 + 150 HP/ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.horseRanchCorrals)) {
+            for (const hr of this.horseRanchCorrals) {
+                if ((hr.cooldown || 0) <= 0 && Math.hypot(px - hr.x, py - hr.y) < 115) {
+                    const scr = renderer.worldToScreen(hr.x, hr.y - 18, 2.54);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#f59e0b";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillText(`🐎 [E] RIDE THOROUGHBRED RANCH RODEO (+$8,000 + 150 HP/ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.solarPowerArrays)) {
+            for (const sp of this.solarPowerArrays) {
+                if ((sp.cooldown || 0) <= 0 && Math.hypot(px - sp.x, py - sp.y) < 115) {
+                    const scr = renderer.worldToScreen(sp.x, sp.y - 18, 2.58);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#bae6fd";
+                    ctx.fillText(`☀️ [E] TAP SOLAR-THERMAL POWER GRID (150 ARMOR + REPAIR & +$7,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.stoneCrabCamps)) {
+            for (const sc of this.stoneCrabCamps) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 115) {
+                    const scr = renderer.worldToScreen(sc.x, sc.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#fb7185";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fecdd3";
+                    ctx.fillText(`🦀 [E] HAUL JUMBO STONE-CRAB TRAPS (+$7,500 + 150 HP/ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.flamingoSanctuaries)) {
+            for (const fs of this.flamingoSanctuaries) {
+                if ((fs.cooldown || 0) <= 0 && Math.hypot(px - fs.x, py - fs.y) < 115) {
+                    const scr = renderer.worldToScreen(fs.x, fs.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#f472b6";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fbcfe8";
+                    ctx.fillText(`🦩 [E] VISIT PINK FLAMINGO SANCTUARY (0★ + 150 HP/ARMOR & +$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.underwaterObservatories)) {
+            for (const uo of this.underwaterObservatories) {
+                if ((uo.cooldown || 0) <= 0 && Math.hypot(px - uo.x, py - uo.y) < 120) {
+                    const scr = renderer.worldToScreen(uo.x, uo.y - 18, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#22d3ee";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#a5f3fc";
+                    ctx.fillText(`🐠 [E] ENTER REEF GLASS OBSERVATORY (0★ + 150 HP/ARMOR + +$8,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.salvageDredgeBarges)) {
+            for (const sb of this.salvageDredgeBarges) {
+                if ((sb.cooldown || 0) <= 0 && Math.hypot(px - sb.x, py - sb.y) < 120) {
+                    const scr = renderer.worldToScreen(sb.x, sb.y - 18, 2.54);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillText(`⚓ [E] DREDGE SPANISH GALLEON GOLD (+$10,000 + 150 ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -15957,6 +16669,54 @@ class WorldObjectEngine {
             ctx.fillStyle = "#ec4899";
             for (const bg of this.botanicalGlasshouses) {
                 ctx.fillRect((bg.x - 18) * sx, (bg.y - 12) * sy, 36 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.gulfOilRigPlatforms)) {
+            ctx.fillStyle = "#f97316";
+            for (const or of this.gulfOilRigPlatforms) {
+                ctx.fillRect((or.x - 22) * sx, (or.y - 22) * sy, 44 * sx, 44 * sy);
+            }
+        }
+        if (Array.isArray(this.lumberjackSawmills)) {
+            ctx.fillStyle = "#d97706";
+            for (const ls of this.lumberjackSawmills) {
+                ctx.fillRect((ls.x - 18) * sx, (ls.y - 13) * sy, 36 * sx, 26 * sy);
+            }
+        }
+        if (Array.isArray(this.horseRanchCorrals)) {
+            ctx.fillStyle = "#f59e0b";
+            for (const hr of this.horseRanchCorrals) {
+                ctx.fillRect((hr.x - 20) * sx, (hr.y - 16) * sy, 40 * sx, 32 * sy);
+            }
+        }
+        if (Array.isArray(this.solarPowerArrays)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const sp of this.solarPowerArrays) {
+                ctx.fillRect((sp.x - 19) * sx, (sp.y - 14) * sy, 38 * sx, 28 * sy);
+            }
+        }
+        if (Array.isArray(this.stoneCrabCamps)) {
+            ctx.fillStyle = "#fb7185";
+            for (const sc of this.stoneCrabCamps) {
+                ctx.fillRect((sc.x - 16) * sx, (sc.y - 11) * sy, 32 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.flamingoSanctuaries)) {
+            ctx.fillStyle = "#f472b6";
+            for (const fs of this.flamingoSanctuaries) {
+                ctx.fillRect((fs.x - 16) * sx, (fs.y - 16) * sy, 32 * sx, 32 * sy);
+            }
+        }
+        if (Array.isArray(this.underwaterObservatories)) {
+            ctx.fillStyle = "#22d3ee";
+            for (const uo of this.underwaterObservatories) {
+                ctx.fillRect((uo.x - 18) * sx, (uo.y - 18) * sy, 36 * sx, 36 * sy);
+            }
+        }
+        if (Array.isArray(this.salvageDredgeBarges)) {
+            ctx.fillStyle = "#facc15";
+            for (const sb of this.salvageDredgeBarges) {
+                ctx.fillRect((sb.x - 20) * sx, (sb.y - 12) * sy, 40 * sx, 24 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
