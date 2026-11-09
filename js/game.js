@@ -718,11 +718,11 @@ class LeonidaGame {
 
             let vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
 
-            // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed parked vehicle
-            for (let shiftTry = 0; shiftTry < 4; shiftTry++) {
-                const overlap = this.vehicles.some((other) => Math.hypot(other.x - vx, other.y - vy) < 36);
+            // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed vehicle
+            for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
+                const overlap = this.vehicles.some((other) => Math.hypot(other.x - vx, other.y - vy) < 68);
                 if (!overlap) break;
-                vy += 42;
+                vy += 56;
             }
 
             const v = new Vehicle(p.id || `parked_${idx}`, p.spec, vx, vy, p.a);
@@ -1283,6 +1283,25 @@ class LeonidaGame {
                 v.y = (by + 0.5) * TILE_SIZE;
 
                 v.angle = this.map.getAlignedRoadAngle(bx, by, v.angle, v.z);
+
+                // Ensure no two AI_TRAFFIC vehicles snap onto the exact same road tile at startup
+                for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
+                    const hitOther = this.vehicles.some((other) => other !== v && Math.hypot(other.x - v.x, other.y - v.y) < 62);
+                    if (!hitOther) break;
+                    const fwdX = Math.cos(v.angle);
+                    const fwdY = Math.sin(v.angle);
+                    const candX = v.x + fwdX * TILE_SIZE;
+                    const candY = v.y + fwdY * TILE_SIZE;
+                    const cbx = Math.floor(candX / TILE_SIZE);
+                    const cby = Math.floor(candY / TILE_SIZE);
+                    const nb = this.map.getNavigationBlock(cbx, cby, v.z);
+                    if (nb && nb.groundType === GROUND_TYPE.ROAD) {
+                        v.x = (cbx + 0.5) * TILE_SIZE;
+                        v.y = (cby + 0.5) * TILE_SIZE;
+                    } else {
+                        v.y += (shiftTry % 2 === 0 ? 1 : -1) * TILE_SIZE;
+                    }
+                }
 
                 v.steerAngleRad = 0;
 

@@ -9955,7 +9955,8 @@ class RetroRenderer {
                     }
                 }
             }
-        } else if (this.map.trees) {
+        }
+        if (this.map && Array.isArray(this.map.trees)) {
             for (const tr of this.map.trees) {
                 if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
                 this.batchObjectSprite3D("257", tr.x, tr.y, this.getEntityZ(tr, 0.12), 0, (tr.scale || 1.0), SPRITE_DRAW_ORDER.TREES);

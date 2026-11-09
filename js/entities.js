@@ -847,10 +847,14 @@ const PED_STATE = Object.freeze({
 const SPRITE_DRAW_ORDER = Object.freeze({
     BACKGROUND: 0,
     GROUND_DECALS: 1,
+    DECALS: 1,
     CORPSE: 2,
+    SKIDMARKS: 2,
     TIRE_MARKS: 3,
     MAP_OBJECT: 4,
     PEDESTRIAN: 5,
+    PED: 5,
+    PEDESTRIANS: 5,
     CAR_PASSENGER: 6,
     CAR: 7,
     CONVERTIBLE_PASSENGER: 8,
@@ -858,6 +862,7 @@ const SPRITE_DRAW_ORDER = Object.freeze({
     JUMPING_PEDESTRIAN: 10,
     TREES: 11,
     PROJECTILES: 12,
+    ROOF_LIGHTS: 12,
     EXPLOSION: 13,
     HUD_ARROW: 14,
     FOREGROUND: 15

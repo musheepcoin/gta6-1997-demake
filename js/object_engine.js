@@ -913,6 +913,8 @@ class WorldObjectEngine {
     validateAndPrepareLots() {
         const map = this.map;
         if (!map || !Array.isArray(map.residentialHouses)) return;
+        if (this._lotsValidated) return;
+        this._lotsValidated = true;
 
         this.instances = [];
         this.interactiveProps = [];
@@ -984,10 +986,33 @@ class WorldObjectEngine {
             raw.hh = hh;
 
             if (map.voxelGrid && map.surfaceGround && map.surfaceLayer) {
-                const minC = Math.max(2, Math.floor((wx - extX - 24) / TILE_SIZE));
-                const maxC = Math.min(M - 3, Math.floor((wx + extX + 24) / TILE_SIZE));
-                const minR = Math.max(2, Math.floor((wy - extY - 24) / TILE_SIZE));
-                const maxR = Math.min(MAP_ROWS - 3, Math.floor((wy + extY + 24) / TILE_SIZE));
+                let minPxX = wx - extX - 36;
+                let maxPxX = wx + extX + 36;
+                let minPxY = wy - extY - 36;
+                let maxPxY = wy + extY + 36;
+                if (raw.pool) {
+                    const px = wx + cosA * (raw.pool.dx || 0) - sinA * (raw.pool.dy || 0);
+                    const py = wy + sinA * (raw.pool.dx || 0) + cosA * (raw.pool.dy || 0);
+                    minPxX = Math.min(minPxX, px - 86);
+                    maxPxX = Math.max(maxPxX, px + 86);
+                    minPxY = Math.min(minPxY, py - 86);
+                    maxPxY = Math.max(maxPxY, py + 86);
+                }
+                if (Array.isArray(raw.drivewayCars)) {
+                    for (let ci = 0; ci < raw.drivewayCars.length; ci++) {
+                        const dc = raw.drivewayCars[ci];
+                        const vx = wx + cosA * (dc.dx || 0) - sinA * (dc.dy || 0);
+                        const vy = wy + sinA * (dc.dx || 0) + cosA * (dc.dy || 0);
+                        minPxX = Math.min(minPxX, vx - 52);
+                        maxPxX = Math.max(maxPxX, vx + 52);
+                        minPxY = Math.min(minPxY, vy - 52);
+                        maxPxY = Math.max(maxPxY, vy + 52);
+                    }
+                }
+                const minC = Math.max(2, Math.floor(minPxX / TILE_SIZE));
+                const maxC = Math.min(M - 3, Math.floor(maxPxX / TILE_SIZE));
+                const minR = Math.max(2, Math.floor(minPxY / TILE_SIZE));
+                const maxR = Math.min(MAP_ROWS - 3, Math.floor(maxPxY / TILE_SIZE));
                 const isUrbanPavedVilla = (
                     raw.district === "SOUTH BEACH" ||
                     raw.district === "LITTLE HAITI" ||
@@ -996,7 +1021,10 @@ class WorldObjectEngine {
                 for (let r = minR; r <= maxR; r++) {
                     for (let c = minC; c <= maxC; c++) {
                         const idx = r * M + c;
-                        if (map.surfaceGround[idx] === GROUND_TYPE.BUILDING) {
+                        if (
+                            map.surfaceGround[idx] === GROUND_TYPE.BUILDING ||
+                            (isUrbanPavedVilla && map.surfaceGround[idx] === GROUND_TYPE.FIELD)
+                        ) {
                             const refC = isUrbanPavedVilla ? (c >= 420 ? 448 : 178) : 339;
                             const refR = isUrbanPavedVilla ? (c >= 420 ? 286 : 170) : 165;
                             for (let z = 0; z < MAP_LAYERS; z++) {
@@ -1007,6 +1035,35 @@ class WorldObjectEngine {
                             map.surfaceLayer[idx] = 2;
                         }
                     }
+                }
+                if (isUrbanPavedVilla) {
+                    const fMinC = Math.max(2, Math.floor(raw.c - 4.5));
+                    const fMaxC = Math.min(M - 3, Math.ceil(raw.c + 4.5));
+                    const fMinR = Math.max(2, Math.floor(raw.r - 5.5));
+                    const fMaxR = Math.min(MAP_ROWS - 3, Math.ceil(raw.r + 5.5));
+                    for (let r = fMinR; r <= fMaxR; r++) {
+                        for (let c = fMinC; c <= fMaxC; c++) {
+                            const idx = r * M + c;
+                            if (map.surfaceGround[idx] === GROUND_TYPE.FIELD) {
+                                const refC = c >= 420 ? 448 : 178;
+                                const refR = c >= 420 ? 286 : 170;
+                                for (let z = 0; z < MAP_LAYERS; z++) {
+                                    map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
+                                        map.voxelGrid[(z * MAP_ROWS + refR) * M + refC];
+                                }
+                                map.surfaceGround[idx] = GROUND_TYPE.PAWEMENT;
+                                map.surfaceLayer[idx] = 2;
+                            }
+                        }
+                    }
+                }
+                if (Array.isArray(map.interiors)) {
+                    map.interiors = map.interiors.filter(intr => {
+                        if (!intr || intr.isEstatePortico || !intr.isShop) return true;
+                        const ic = Math.floor(intr.doorX / TILE_SIZE);
+                        const ir = Math.floor(intr.doorY / TILE_SIZE);
+                        return !(ic >= minC - 1 && ic <= maxC + 1 && ir >= minR - 1 && ir <= maxR + 1);
+                    });
                 }
             }
 
@@ -1135,29 +1192,6 @@ class WorldObjectEngine {
                 interiorSpec: raw.interior || null
             };
             this.instances.push(inst);
-
-            if (validPool) {
-                const pAng = ang + (validPool.ang || 0);
-                const pSc = validPool.scale || 0.90;
-                const csP = Math.cos(pAng);
-                const snP = Math.sin(pAng);
-                const ux = validPool.worldX + csP * (-58 * pSc);
-                const uy = validPool.worldY + snP * (-58 * pSc);
-                this.interactiveProps.push({
-                    x: ux, y: uy, z: inst.z || 2.0,
-                    vx: 0, vy: 0, vz: 0, ang: i * 0.7, vang: 0,
-                    spr: "beach_umbrella_pink", scale: 1.05, broken: false, timer: 0
-                });
-                for (let li = -1; li <= 1; li += 2) {
-                    const lx = validPool.worldX + csP * (-58 * pSc) - snP * (li * 18 * pSc);
-                    const ly = validPool.worldY + snP * (-58 * pSc) + csP * (li * 18 * pSc);
-                    this.interactiveProps.push({
-                        x: lx, y: ly, z: inst.z || 2.0,
-                        vx: 0, vy: 0, vz: 0, ang: pAng, vang: 0,
-                        spr: "beach_lounger", scale: 1.02, broken: false, timer: 0
-                    });
-                }
-            }
         }
 
         const clearZones = [];
@@ -2153,9 +2187,9 @@ class WorldObjectEngine {
 
             const kpPos = toWorld(pW * 0.5 + 16, frontY - 4);
             const lsPos = toWorld(0, frontY);
-            const vtPos = toWorld(0, -inst.spec.d1 * 0.5 - 24);
+            const vtPos = toWorld(-pW * 0.5 - 22, frontY - 6);
             const g1Pos = toWorld(-pW * 0.65 - 18, frontY + 14);
-            const g2Pos = toWorld(pW * 0.65 + 18, -inst.spec.d1 * 0.45);
+            const g2Pos = toWorld(pW * 0.65 + 18, frontY + 14);
 
             this.heistTargets.push({
                 ...sp,
@@ -8448,13 +8482,20 @@ class WorldObjectEngine {
             if (inst.pool) {
                 const pl = inst.pool;
                 const pSc = pl.scale || 0.90;
-                // Authentic L8 Travertine Paver Pool Deck + L27 Turquoise GTA 1 Water Basin!
-                emitTileBox3D(cx, cy, cosA, sinA, pl.dx, pl.dy, 154 * pSc, 94 * pSc, bz, bz + 0.030, 177, 177, 8, [0.96, 0.95, 0.92], true);
-                emitTileBox3D(cx, cy, cosA, sinA, pl.dx, pl.dy, 126 * pSc, 68 * pSc, bz + 0.030, bz + 0.034, 177, 177, 27, [0.88, 0.98, 1.00], true);
-                // Glowing Cyan Underwater LED Pool Coping Strips & 3D White Springboard Diving Board
-                emitSolidBox3D(cx, cy, cosA, sinA, pl.dx, pl.dy - 34 * pSc, 126 * pSc, 2.5 * pSc, bz + 0.032, bz + 0.045, [0.18, 0.94, 1.00], 10);
-                emitSolidBox3D(cx, cy, cosA, sinA, pl.dx, pl.dy + 34 * pSc, 126 * pSc, 2.5 * pSc, bz + 0.032, bz + 0.045, [0.18, 0.94, 1.00], 10);
-                emitSolidBox3D(cx, cy, cosA, sinA, pl.dx - 58 * pSc, pl.dy, 22 * pSc, 7.5 * pSc, bz + 0.034, bz + 0.068, [0.98, 0.98, 1.00], 9);
+                const wOffX = pl.dx + 16 * pSc;
+                // Authentic L8 Travertine Paver Pool Deck +L35/MAT 10 Turquoise Water Basin!
+                emitTileBox3D(cx, cy, cosA, sinA, pl.dx, pl.dy, 168 * pSc, 96 * pSc, bz, bz + 0.026, 177, 177, 8, [0.96, 0.95, 0.92], true);
+                emitSolidBox3D(cx, cy, cosA, sinA, wOffX, pl.dy, 108 * pSc, 68 * pSc, bz + 0.026, bz + 0.036, [0.16, 0.84, 0.96], 10);
+                // Glowing Cyan Underwater LED Pool Coping Strips & 3D White Springboard Diving Board at far end (+64*pSc)
+                emitSolidBox3D(cx, cy, cosA, sinA, wOffX, pl.dy - 34 * pSc, 108 * pSc, 2.5 * pSc, bz + 0.034, bz + 0.045, [0.18, 0.96, 1.00], 10);
+                emitSolidBox3D(cx, cy, cosA, sinA, wOffX, pl.dy + 34 * pSc, 108 * pSc, 2.5 * pSc, bz + 0.034, bz + 0.045, [0.18, 0.96, 1.00], 10);
+                emitSolidBox3D(cx, cy, cosA, sinA, pl.dx + 64 * pSc, pl.dy, 20 * pSc, 7.5 * pSc, bz + 0.036, bz + 0.068, [0.98, 0.98, 1.00], 9);
+                // Twin 3D Poolside Sun-Loungers on Dry Travertine Sun-Deck (at -58*pSc, underneath sunbathers at bz+0.052!)
+                for (const li of [-1, 1]) {
+                    const ly = pl.dy + li * 18 * pSc;
+                    emitSolidBox3D(cx, cy, cosA, sinA, pl.dx - 58 * pSc, ly, 24 * pSc, 11 * pSc, bz + 0.026, bz + 0.040, [0.97, 0.97, 0.99], 9);
+                    emitSolidBox3D(cx, cy, cosA, sinA, pl.dx - 66 * pSc, ly, 6 * pSc, 9 * pSc, bz + 0.040, bz + 0.050, [0.22, 0.88, 0.96], 9);
+                }
             }
 
             if (inst.dockBoat) {
@@ -10012,44 +10053,6 @@ class WorldObjectEngine {
                         emitSolidBox3D(facadeX + 16.5, rowY, 1, 0, 0, 0, 4.2, 5.2, 2.00, 2.16, [0.18, 0.20, 0.26], 5);
                         emitSolidBox3D(facadeX + 17.2, rowY, 1, 0, 0, 0, 3.4, 4.4, 2.09, 2.15, neonCol, 10);
                     }
-                }
-            }
-
-            // 20B. ESPAÑOLA WAY, LITTLE HAVANA & KEY LENTO 3D OVERHEAD FESTOON STRING LIGHTS (Warm Miami Night Ambiance)
-            const festoonSpans = [
-                // Española Way Pedestrian Plaza & Cafe Terrace (c = 434..441, r = 160..174)
-                { x1: 434.2 * TILE_SIZE, x2: 441.8 * TILE_SIZE, rStart: 160, rEnd: 174, step: 2 },
-                // Ocean Drive / Hotel Dixon & Clevelander String-Lit Front Patio Terrace (Official GTA 6 Ocean View Screenshot!)
-                { x1: 442.8 * TILE_SIZE, x2: 448.8 * TILE_SIZE, rStart: 204, rEnd: 312, step: 3 },
-                // Little Havana / Calle Ocho Domino & Latin District (c = 280..288, r = 242..254)
-                { x1: 280.2 * TILE_SIZE, x2: 287.8 * TILE_SIZE, rStart: 242, rEnd: 254, step: 2 },
-                // Tisha-Wocka Open-Air Flea Market Canopy Plaza (c = 188..195, r = 133..138)
-                { x1: 188.5 * TILE_SIZE, x2: 194.5 * TILE_SIZE, rStart: 133, rEnd: 138, step: 1 },
-                // Key Lento Waterfront & The Rusty Anchor Boardwalk (c = 214..228, r = 474..478)
-                { x1: 214.5 * TILE_SIZE, x2: 227.5 * TILE_SIZE, rStart: 475, rEnd: 477, step: 2 }
-            ];
-            for (const fs of festoonSpans) {
-                for (let r = fs.rStart; r <= fs.rEnd; r += fs.step) {
-                    const fy = (r + 0.5) * TILE_SIZE;
-                    const bulbs = 7;
-                    for (let bi = 0; bi <= bulbs; bi++) {
-                        const t = bi / bulbs;
-                        const bx = fs.x1 + (fs.x2 - fs.x1) * t;
-                        const sag = Math.sin(t * Math.PI) * 0.08;
-                        const bz = 2.58 - sag;
-                        const isPinkBulb = ((bi + r) % 3) === 0;
-                        const bulbCol = isPinkBulb ? [1.0, 0.52, 0.82] : [1.0, 0.90, 0.52];
-                        emitSolidBox3D(bx, fy, 1, 0, 0, 0, 3.6, 3.6, bz, bz + 0.04, bulbCol, 6);
-                    }
-                }
-            }
-            // Official GTA 6 Ocean View Hotel Screenshot: Warm Golden Fairy-Light Wrapped Palm Trunks & Patio Cafe Tables along Ocean Drive!
-            for (let r = 204; r <= 316; r += 8) {
-                const px = 443.4 * TILE_SIZE;
-                const py = (r + 0.5) * TILE_SIZE;
-                for (let ring = 0; ring < 4; ring++) {
-                    const rz = 2.06 + ring * 0.08;
-                    emitCylinder3D(px, py, 0, 0, 3.6, 3.6, rz, rz + 0.025, 8, [1.0, 0.88, 0.42], 6, false);
                 }
             }
         }
@@ -11822,14 +11825,21 @@ class WorldObjectEngine {
                     if (z < 3 || z > 5) continue;
 
                     // Verify a 3-tile-wide (c..c+2) x 2-tile-deep (r-1..r) flat commercial roof plateau
+                    // with zero taller adjacent building tiers (dr = -2..1, dc = -1..3) so billboards never clip into taller walls!
                     let roofFlatOk = true;
-                    for (let dr = -1; dr <= 0 && roofFlatOk; dr++) {
+                    for (let dr = -2; dr <= 1 && roofFlatOk; dr++) {
                         const rrOff = (r + dr) * M;
-                        for (let dc = 0; dc <= 2; dc++) {
+                        for (let dc = -1; dc <= 3; dc++) {
                             const idx = rrOff + (c + dc);
-                            if (bTopZ[idx] !== z || bTopLid[idx] === 35 || roofUsed[idx] || customMask[idx]) {
+                            if (bTopZ[idx] > z) {
                                 roofFlatOk = false;
                                 break;
+                            }
+                            if (dr >= -1 && dr <= 0 && dc >= 0 && dc <= 2) {
+                                if (bTopZ[idx] !== z || bTopLid[idx] === 35 || roofUsed[idx] || customMask[idx]) {
+                                    roofFlatOk = false;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -11992,7 +12002,9 @@ class WorldObjectEngine {
                     for (let dr = -1; dr <= 2 && !hasVentOrPoolNear; dr++) {
                         const rrOff = (r + dr) * M;
                         for (let dc = -1; dc <= 2; dc++) {
-                            if (isSpecialRoofLid(bTopLid[rrOff + (c + dc)])) {
+                            const nIdx = rrOff + (c + dc);
+                            // Never place a rooftop superstructure inside a recessed lower courtyard next to a taller building tier!
+                            if (isSpecialRoofLid(bTopLid[nIdx]) || bTopZ[nIdx] > z) {
                                 hasVentOrPoolNear = true;
                                 break;
                             }
@@ -12180,91 +12192,6 @@ class WorldObjectEngine {
                                 emitSolidBox3D(corX, corY, 1, 0, 0, 0, 9.4, 9.4, z + 0.16, z + 0.20, capCol, 2);
                             }
                         }
-                    }
-                }
-            }
-
-            // Pass 29E: Narrow-Wing (1x2 / 2x1) & Stepped-Setback 3D Rooftop Superstructures:
-            //           3D Rooftop Steel-Truss Advertising Billboards, Setback Glass Solariums,
-            //           Elevator Bulkheads, Twin Exhaust Turbines & Rooftop Satellite Dishes!
-            for (let r = 6; r < MAP_ROWS - 6; r += 3) {
-                for (let c = 6; c < M - 6; c += 3) {
-                    const idx = r * M + c;
-                    if (roofUsed[idx] || customMask[idx]) continue;
-                    const z = bTopZ[idx];
-                    if (z < 3 || isSpecialRoofLid(bTopLid[idx])) continue;
-
-                    const hasRight = (bTopZ[r * M + (c + 1)] === z && !roofUsed[r * M + (c + 1)] && !customMask[r * M + (c + 1)] && !isSpecialRoofLid(bTopLid[r * M + (c + 1)]));
-                    const hasDown  = (bTopZ[(r + 1) * M + c] === z && !roofUsed[(r + 1) * M + c] && !customMask[(r + 1) * M + c] && !isSpecialRoofLid(bTopLid[(r + 1) * M + c]));
-                    if (!hasRight && !hasDown) continue;
-
-                    // Mark 4x4 neighborhood so narrow wings get 1 clean superstructure per wing
-                    for (let dr = -1; dr <= 2; dr++) {
-                        for (let dc = -1; dc <= 2; dc++) {
-                            const cc = c + dc, rr = r + dr;
-                            if (cc >= 0 && cc < M && rr >= 0 && rr < MAP_ROWS) {
-                                roofUsed[rr * M + cc] = 1;
-                            }
-                        }
-                    }
-
-                    const cxPx = (c + (hasRight ? 1.0 : 0.5)) * TILE_SIZE;
-                    const cyPx = (r + (hasRight ? 0.5 : 1.0)) * TILE_SIZE;
-                    const topY = z;
-                    const wCos = hasRight ? 1 : 0;
-                    const wSin = hasRight ? 0 : 1;
-                    const nHash = (((c * 83492791) ^ (r * 19349663)) >>> 0);
-
-                    // Check if this roof wing borders a higher building tier (setback terrace) or a street below
-                    let bordersHigherTier = false;
-                    let bordersStreet = false;
-                    for (const [dx, dy] of [[-1, 0], [2, 0], [0, -1], [0, 2]]) {
-                        const tc = Math.min(M - 2, Math.max(1, c + dx));
-                        const tr = Math.min(MAP_ROWS - 2, Math.max(1, r + dy));
-                        const nz = bTopZ[tr * M + tc];
-                        if (nz > z) bordersHigherTier = true;
-                        if (nz === 0 && surfGtGrid && (surfGtGrid[tr * M + tc] === GROUND_TYPE.ROAD || surfGtGrid[tr * M + tc] === GROUND_TYPE.PAWEMENT)) {
-                            bordersStreet = true;
-                        }
-                    }
-
-                    if (bordersStreet && (nHash % 3 === 0)) {
-                        // ARCHETYPE 6: 3D Rooftop Open-Lattice Steel Truss Advertising Billboard & Sky-Sign
-                        const adKey = bladeAdKeys[nHash % bladeAdKeys.length];
-                        const capCol = copingCapPal[nHash % copingCapPal.length];
-                        emitAOShadow3D(cxPx, cyPx, wCos, wSin, 0, 0, 74, 28, topY, 0.36);
-                        for (const sx of [-22, 22]) {
-                            emitTileBox3D(cxPx, cyPx, wCos, wSin, sx, 0, 8, 8, topY, topY + 0.10, 177, 177, 71, [0.80, 0.82, 0.86], false);
-                            emitTileBox3D(cxPx, cyPx, wCos, wSin, sx, 0, 6, 6, topY + 0.10, topY + 0.42, 363, 363, 64, [0.76, 0.80, 0.86], false);
-                        }
-                        emitTileBox3D(cxPx, cyPx, wCos, wSin, 0, 6, 64, 5, topY + 0.38, topY + 0.42, 250, 250, 45, [0.76, 0.80, 0.86], false);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 68, 7.0, topY + 0.40, topY + 0.78, [0.16, 0.20, 0.28], 5);
-                        emitBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 64, 8.4, topY + 0.42, topY + 0.76, adKey, adKey, [1.0, 1.0, 1.0]);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, 0, 0, 70, 8.6, topY + 0.78, topY + 0.82, capCol, 5);
-                        this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 0, topElev: topY + 0.82 });
-                    } else if (bordersHigherTier) {
-                        // ARCHETYPE 7: Stepped Building Setback Glass Solarium Conservatory & Split-AC Condenser Bank
-                        emitAOShadow3D(cxPx, cyPx, wCos, wSin, 0, 0, 76, 44, topY, 0.36);
-                        emitTileBox3D(cxPx, cyPx, wCos, wSin, -12, 0, 44, 34, topY, topY + 0.28, 199, 199, 31, [0.86, 0.90, 0.94], false);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, -12, 0, 46, 36, topY + 0.28, topY + 0.32, [0.20, 0.32, 0.42], 7);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin,  22, -7, 16, 11, topY, topY + 0.18, [0.74, 0.78, 0.84], 6);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin,  22,  7, 16, 11, topY, topY + 0.18, [0.74, 0.78, 0.84], 6);
-                    } else {
-                        // ARCHETYPE 8: Rooftop Elevator Stair Bulkhead, Twin Spinning-Style Exhaust Turbines & Satellite Dish
-                        emitAOShadow3D(cxPx, cyPx, wCos, wSin, 0, 0, 72, 42, topY, 0.34);
-                        emitTileBox3D(cxPx, cyPx, wCos, wSin, -14, 0, 30, 28, topY, topY + 0.34, 172, 177, 86, [0.84, 0.82, 0.78], false);
-                        emitSolidBox3D(cxPx, cyPx, wCos, wSin, -14, 0, 32, 30, topY + 0.34, topY + 0.38, [0.28, 0.32, 0.38], 5);
-                        // Twin Cylindrical Metal Roof Ventilator Turbines + Parabolic Satellite Dish
-                        const v1x = cxPx + wCos * 14 - wSin * (-8);
-                        const v1y = cyPx + wSin * 14 + wCos * (-8);
-                        const v2x = cxPx + wCos * 14 - wSin * 8;
-                        const v2y = cyPx + wSin * 14 + wCos * 8;
-                        emitCylinder3D(v1x, v1y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 8, [0.78, 0.82, 0.88], 5, true);
-                        emitCylinder3D(v2x, v2y, 0, 0, 5.2, 6.2, topY, topY + 0.20, 8, [0.78, 0.82, 0.88], 5, true);
-                        const satX = cxPx + wCos * 26;
-                        const satY = cyPx + wSin * 26;
-                        emitCylinder3D(satX, satY, 0, 0, 2.2, 1.8, topY, topY + 0.16, 6, [0.64, 0.68, 0.74], 5, false);
-                        emitCylinder3D(satX, satY, 0, 0, 4.0, 9.5, topY + 0.16, topY + 0.26, 8, [0.88, 0.90, 0.94], 2, true);
                     }
                 }
             }
@@ -13163,14 +13090,14 @@ class WorldObjectEngine {
                     }
                 }
 
-                // 3D Black & Gold Armored Cartel Vault on Rear/Poolside Terrace (MAT 5/6 steel plating)
+                // 3D Black & Gold Armored Cartel Vault beside Portico Terrace (MAT 9/6 steel plating)
                 if (ht.looted) {
                     emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 22, 16, bz, bz + 0.14, [0.18, 0.20, 0.26], 1.0, 6);
-                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 14, 10, bz + 0.14, bz + 0.19, [0.94, 0.78, 0.18], 1.0, 5);
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 14, 10, bz + 0.14, bz + 0.19, [0.94, 0.78, 0.18], 1.0, 9);
                 } else {
                     emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 22, 16, bz, bz + 0.28, [0.16, 0.18, 0.24], 1.0, 6);
-                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 24, 18, bz + 0.26, bz + 0.30, [0.92, 0.74, 0.16], 1.0, 5);
-                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 10, 17, bz + 0.08, bz + 0.20, [0.94, 0.80, 0.22], 1.0, 5);
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 24, 18, bz + 0.26, bz + 0.30, [0.92, 0.74, 0.16], 1.0, 9);
+                    emitDynBox(ht.vaultX, ht.vaultY, cosA, sinA, 0, 0, 10, 17, bz + 0.08, bz + 0.20, [0.94, 0.80, 0.22], 1.0, 9);
                 }
 
                 // Pulsing 3D Red Roof Alarm Strobes when Alarm is Tripped
@@ -13602,18 +13529,6 @@ class WorldObjectEngine {
             const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
                 ? this.map.getHeightAtPixel(h.x, h.y, 4.0)
                 : (h.z || 2.0);
-            const sc = h.scale || 1.0;
-
-            renderer.batchObjectSprite3D(
-                h.spec.roofTex1 || "mansion_star_island",
-                h.x + sunCos * 14,
-                h.y + sunSin * 14,
-                bz + 0.015,
-                h.ang,
-                sc * 1.06,
-                SPRITE_DRAW_ORDER.TIRE_MARKS,
-                0.02, 0.03, 0.06, 0.36
-            );
 
             if (h.pool) {
                 const pl = h.pool;
@@ -13624,16 +13539,14 @@ class WorldObjectEngine {
                 const csP = Math.cos(pAng);
                 const snP = Math.sin(pAng);
 
-                renderer.batchObjectSprite3D("vercetti_pool", px, py, bz + 0.036, pAng, pSc, SPRITE_DRAW_ORDER.TIRE_MARKS);
-
-                const flX = px + Math.sin(renderer.time * 1.8 + i) * 5.0;
-                const flY = py + Math.cos(renderer.time * 1.5 + i) * 3.5;
-                renderer.batchObjectSprite3D("flamingo_float", flX, flY, bz + 0.044, renderer.time * 0.35 + i, 0.88, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                const flX = px + csP * (16 * pSc) + Math.sin(renderer.time * 1.8 + i) * 5.0;
+                const flY = py + snP * (16 * pSc) + Math.cos(renderer.time * 1.5 + i) * 3.5;
+                renderer.batchObjectSprite3D("flamingo_float", flX, flY, bz + 0.048, renderer.time * 0.35 + i, 0.88, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
                 for (let li = -1; li <= 1; li += 2) {
                     const lx = px + csP * (-58 * pSc) - snP * (li * 18 * pSc);
                     const ly = py + snP * (-58 * pSc) + csP * (li * 18 * pSc);
-                    renderer.batchPedSprite3D(li < 0 ? "bikini_pink" : "bikini_cyan", 42, lx, ly, bz + 0.048, pAng, 1.24, false, SPRITE_DRAW_ORDER.CORPSE);
+                    renderer.batchPedSprite3D(li < 0 ? "bikini_pink" : "bikini_cyan", 42, lx, ly, bz + 0.052, pAng, 1.24, false, SPRITE_DRAW_ORDER.CORPSE);
                 }
             }
 
@@ -14336,7 +14249,7 @@ class WorldObjectEngine {
                     renderer.pushSolidQuad3D(br.x, br.y, 2.03, rSz, rSz, renderer.time * 1.2, 0.98, 0.24, 0.36, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
                 const spar = Math.sin(renderer.time * 6.5 + i) * 3.5;
-                renderer.batchPedSprite3D("muscle_guy", boxFrame, br.x - 5 + spar * 0.5, br.y, 2.13, 0, 1.24, false, SPRITE_DRAW_ORDER.PED);
+                renderer.batchPedSprite3D("vc_bodybuilder", boxFrame, br.x - 5 + spar * 0.5, br.y, 2.13, 0, 1.24, false, SPRITE_DRAW_ORDER.PED);
                 renderer.batchPedSprite3D("civ2", (boxFrame + 4) % 8, br.x + 5 - spar * 0.5, br.y, 2.13, Math.PI, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }

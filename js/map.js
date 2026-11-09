@@ -799,9 +799,21 @@ class LeonidaMap {
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
                 if (blkZ1 && blkZ1.lid === 69) {
-                    // Break rigid 4-corner symmetry of NYC.CMP circular sidewalk planters (lid 69):
-                    // Keep only ~28% of circular planters asymmetrically across intersections (and 0% inside prison/airport),
-                    // replacing the remaining ~72% with their natural adjacent sidewalk stone paver (lid 8 or lid 9).
+                    // Always replace NYC.CMP flat 2D circular sidewalk planter tile (lid 69) with clean sidewalk stone paver (lid 8 or lid 9)
+                    // so no orphan flat green circle is ever baked into a sidewalk tile when trees are filtered around houses/parking!
+                    const gIdx1 = (1 * MAP_ROWS + r) * MAP_COLS + c;
+                    const origIdx1 = this.voxelGrid[gIdx1];
+                    let targetPaverLid = 8;
+                    const nCoords = [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]];
+                    for (let ni = 0; ni < nCoords.length; ni++) {
+                        const nb = this.getBlockInfo(nCoords[ni][0], nCoords[ni][1], 1);
+                        if (nb && (nb.lid === 8 || nb.lid === 9)) {
+                            targetPaverLid = nb.lid;
+                            break;
+                        }
+                    }
+                    this.voxelGrid[gIdx1] = getRoofVariantIdx(origIdx1, targetPaverLid, blkZ1.remap || 0);
+
                     const planterHash = (((c * 92837111) ^ (r * 689287499) ^ ((c * r) * 283927)) >>> 0) % 100;
                     const planterX = (c + 0.5) * TILE_SIZE;
                     const planterY = (r + 0.5) * TILE_SIZE;
@@ -809,19 +821,6 @@ class LeonidaMap {
                     const keepPlanter = !isInsidePrisonOrAirport && !tooCloseTree && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28);
                     if (keepPlanter) {
                         this.trees.push({ x: planterX, y: planterY, z: 2.0, scale: 1.0 });
-                    } else {
-                        const gIdx1 = (1 * MAP_ROWS + r) * MAP_COLS + c;
-                        const origIdx1 = this.voxelGrid[gIdx1];
-                        let targetPaverLid = 8;
-                        const nCoords = [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]];
-                        for (let ni = 0; ni < nCoords.length; ni++) {
-                            const nb = this.getBlockInfo(nCoords[ni][0], nCoords[ni][1], 1);
-                            if (nb && (nb.lid === 8 || nb.lid === 9)) {
-                                targetPaverLid = nb.lid;
-                                break;
-                            }
-                        }
-                        this.voxelGrid[gIdx1] = getRoofVariantIdx(origIdx1, targetPaverLid, blkZ1.remap || 0);
                     }
                 }
             }
@@ -3761,6 +3760,16 @@ class LeonidaMap {
             if (typeof this.resolveCircleBuildingCollision === "function" && this.resolveCircleBuildingCollision(px, py, 14, z).hit) {
                 return false;
             }
+            if (Array.isArray(this.residentialHouses)) {
+                for (let hi = 0; hi < this.residentialHouses.length; hi++) {
+                    const rh = this.residentialHouses[hi];
+                    const rhX = rh.x !== undefined ? rh.x : rh.c * TILE_SIZE;
+                    const rhY = rh.y !== undefined ? rh.y : rh.r * TILE_SIZE;
+                    if (Math.abs(px - rhX) <= 4.8 * TILE_SIZE && Math.abs(py - rhY) <= 6.8 * TILE_SIZE) {
+                        return false;
+                    }
+                }
+            }
             for (let i = 0; i < czList.length; i++) {
                 const cz = czList[i];
                 if (Math.hypot(cz.x - px, cz.y - py) < Math.max(48, cz.r || 48)) return false;
@@ -4109,15 +4118,27 @@ class LeonidaMap {
 
         // =========================================================================
         // 2) Build Asymmetric, Spacious Recessed Asphalt Curbside Parallel Parking Bays
-        //    along the wide boulevard esplanades (c = 52, 55, 284, 287, 424, 427, 434, 437, 444, 447)
+        //    along the wide boulevard esplanades (c = 52, 55, 284, 287, 424, 427, 434, 437, 444)
+        //    Note: c = 447 is the Lummus Park beach promenade edge and must NEVER have asphalt bays carved into it!
         // =========================================================================
-        const esplanadeCols = [52, 55, 284, 287, 424, 427, 434, 437, 444, 447];
+        const esplanadeCols = [52, 55, 284, 287, 424, 427, 434, 437, 444];
         for (let ci = 0; ci < esplanadeCols.length; ci++) {
             const c = esplanadeCols[ci];
             let r = 50;
             while (r <= 372) {
                 const isEligibleRow = (ry) => {
                     if (ry < 50 || ry > 372) return false;
+                    // Never carve commercial curbside parking bays next to 3D residential villa lots (which have their own private driveways)
+                    if (Array.isArray(this.residentialHouses)) {
+                        for (let hi = 0; hi < this.residentialHouses.length; hi++) {
+                            const rh = this.residentialHouses[hi];
+                            const rhC = rh.x !== undefined ? (rh.x / TILE_SIZE) : rh.c;
+                            const rhR = rh.y !== undefined ? (rh.y / TILE_SIZE) : rh.r;
+                            if (Math.abs(c - rhC) <= 4.8 && Math.abs(ry - rhR) <= 6.8) {
+                                return false;
+                            }
+                        }
+                    }
                     const maskVal = this.boulevardParkingEsplanadeMask
                         ? this.boulevardParkingEsplanadeMask[ry * MAP_COLS + c]
                         : 0;
@@ -4984,8 +5005,8 @@ class LeonidaMap {
 
         // 10 High-Flying Unique Stunt Jump Ramps across Vice City & Leonida!
         this.stuntRamps = [
-            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: 447.5 * TILE_SIZE, y: 292.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: 447.5 * TILE_SIZE, y: 265.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: 452.5 * TILE_SIZE, y: 292.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: 452.5 * TILE_SIZE, y: 265.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
             { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: 356.0 * TILE_SIZE, y: 297.5 * TILE_SIZE, angle: 0 },
             { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: 356.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, angle: 0 },
             { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 356.0 * TILE_SIZE, y: 75.0 * TILE_SIZE, angle: 0 },
