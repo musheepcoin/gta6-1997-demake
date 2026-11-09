@@ -1415,7 +1415,10 @@ class Vehicle {
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
         if (this.aiPanicTimer > 0) this.aiPanicTimer = Math.max(0, this.aiPanicTimer - dt);
         if (this.aiPassengerStopCooldown > 0) this.aiPassengerStopCooldown = Math.max(0, this.aiPassengerStopCooldown - dt);
-        this.aiTurnSignal = 0;
+        if (this.aiHazardStopTimer > 0) this.aiHazardStopTimer = Math.max(0, this.aiHazardStopTimer - dt);
+        if (this.aiFlashHeadlightsTimer > 0) this.aiFlashHeadlightsTimer = Math.max(0, this.aiFlashHeadlightsTimer - dt);
+        if (this.aiFilteringTimer > 0) this.aiFilteringTimer = Math.max(0, this.aiFilteringTimer - dt);
+        this.aiTurnSignal = (this.aiHazardStopTimer || 0) > 0 ? 2 : 0;
 
         const curZ = this.z !== undefined ? this.z : 2.0;
         this.aiReverseTimer = 0;
@@ -1987,8 +1990,15 @@ class Vehicle {
 
                 // B. Same-Direction Vehicle OR Stationary Wreck/Abandoned Car Ahead in Same Lane:
                 // Strictly maintain true bumper-to-bumper gap (half of our length + half of lead car's length)
+                // Exception: when a motorcycle is actively lane-splitting (`this.aiFilteringQueue`), narrow lateral corridor to 10px so it can filter past stopped cars!
                 const isStationaryObstacle = Boolean(other.destroyed || other.driver === null);
-                const halfWidthSum = (this.h + (other.h || 24)) * 0.46 + 4;
+                const filteringPastThis = Boolean(
+                    this.isMotorcycle &&
+                    this.aiFilteringTimer > 0 &&
+                    !other.isMotorcycle &&
+                    Math.abs(other.speed || 0) < 10
+                );
+                const halfWidthSum = filteringPastThis ? 10 : ((this.h + (other.h || 24)) * 0.46 + 4);
                 const halfLengthSum = ((this.w || 48) + (other.w || 48)) * 0.50;
                 if ((cosDiff > 0.45 || isStationaryObstacle) && forwardDist > 4 && lateralDist < halfWidthSum) {
                     const bumperGap = Math.max(0, forwardDist - halfLengthSum);
@@ -1999,11 +2009,45 @@ class Vehicle {
                     }
                 }
 
+                // B2. Rear-View Mirror Tailgater Detection:
+                // If a fast-moving vehicle (player or speeding car) is closing in directly behind us in our lane,
+                // cautious drivers yield the lane or pull slightly right, while aggressive drivers honk!
+                const otherSpd = Math.abs(other.speed || Math.hypot(other.vx || 0, other.vy || 0));
+                if (
+                    !isPanicked &&
+                    this.driver === "AI_TRAFFIC" &&
+                    this.aiState !== "STOPPED_LIGHT" &&
+                    cosDiff > 0.72 &&
+                    forwardDist < -14 &&
+                    forwardDist > -95 &&
+                    lateralDist < 20 &&
+                    otherSpd > Math.abs(this.speed || 0) + 42
+                ) {
+                    if (!this.aiAggressive) {
+                        if (this.aiLaneChangeCooldown <= 0) {
+                            this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+                        } else {
+                            const testRightX = this.x + rx * 14;
+                            const testRightY = this.y + ry * 14;
+                            if (
+                                (!map.isWaterAtPixel || !map.isWaterAtPixel(testRightX, testRightY)) &&
+                                (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(testRightX, testRightY, 13, curZ).hit)
+                            ) {
+                                this.aiPullOverOffset = 14;
+                                this.aiPullOverTimer = 1.1;
+                                this.aiTurnSignal = 1;
+                            }
+                        }
+                    } else if (this.aiHornCooldown <= 0 && game && game.audio && other.driver === "PLAYER") {
+                        this.aiHornCooldown = 5.0;
+                        game.audio.playHorn(false, this.specKey);
+                    }
+                }
+
                 // C. Moving Cross-Traffic & Turning Priority Inside/Approaching Intersection Box (lidZ1 === 25):
                 // NEVER yield to a stopped car (which would cause both cars to wait forever!).
                 // 1) Turning vehicles yield to fast-moving straight-through priority vehicles on oncoming or cross lanes.
                 // 2) Inside the box, yield if a perpendicular car is actively crossing in front of us (with deterministic ID tie-breaker).
-                const otherSpd = Math.abs(other.speed || Math.hypot(other.vx || 0, other.vy || 0));
                 const nearOrInBox = inIntersectionBox || (nextLidZ1 === 25 && distToTargetCenter < 50);
                 if (nearOrInBox && !other.destroyed && (otherSpd > 18 || other.driver === "PLAYER")) {
                     const otherFx = Math.cos(other.angle);
@@ -2102,6 +2146,37 @@ class Vehicle {
             if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 98 && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
+            // Motorcycle Lane-Splitting / Queue Filtering at Red Lights & Traffic Queues:
+            // Agile motorcycles filter along the lane-divider strip (±15px) past stopped cars up to the stop line!
+            if (
+                this.isMotorcycle &&
+                !isPanicked &&
+                closestEntity &&
+                closestEntity.w &&
+                !closestEntity.isMotorcycle &&
+                obstacleSpeed < 10 &&
+                closestBumperGap < 68 &&
+                (!isStopBlock || distToTargetCenter > 68) &&
+                (!this.aiChosenDir || !this.aiChosenDir.isTurn)
+            ) {
+                for (const fSide of [-1, 1]) {
+                    const stripX = this.x + rx * fSide * 15;
+                    const stripY = this.y + ry * fSide * 15;
+                    const stripAheadX = stripX + fx * 38;
+                    const stripAheadY = stripY + fy * 38;
+                    if (
+                        (!map.isWaterAtPixel || (!map.isWaterAtPixel(stripX, stripY) && !map.isWaterAtPixel(stripAheadX, stripAheadY))) &&
+                        (!map.resolveCircleBuildingCollision || (!map.resolveCircleBuildingCollision(stripX, stripY, 9, curZ).hit && !map.resolveCircleBuildingCollision(stripAheadX, stripAheadY, 9, curZ).hit))
+                    ) {
+                        this.aiPullOverOffset = fSide * 15;
+                        this.aiPullOverTimer = 1.0;
+                        this.aiFilteringTimer = 1.0;
+                        this.aiTurnSignal = fSide;
+                        this.aiState = "LANE_CHANGE";
+                        return { throttle: this.speed > 52 ? 0 : 0.28, steer: 0, handbrake: false };
+                    }
+                }
+            }
             // Never wait forever behind a destroyed wreck or abandoned driverless car (or when hauling a wreck as AI_TOW):
             // actively steer around the pileup using 9-feeler obstacle bypass!
             if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 58) {
@@ -2125,6 +2200,9 @@ class Vehicle {
                 }
             }
             this.aiState = "FOLLOWING";
+            if (closestBumperGap < 46 && (isPlayerBlocking || (closestEntity && closestEntity.kind === "CIVILIAN"))) {
+                this.aiFlashHeadlightsTimer = Math.max(this.aiFlashHeadlightsTimer || 0, 0.85);
+            }
             if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
                 const brakeMult = Math.pow(0.002, dt);
@@ -2160,7 +2238,20 @@ class Vehicle {
             }
         }
 
-        if (!isPanicked && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0)) {
+        if (!isPanicked && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0 || (this.aiHazardStopTimer || 0) > 0)) {
+            if ((this.aiHazardStopTimer || 0) > 0) {
+                this.aiTurnSignal = 2;
+                this.aiState = "STOPPED_LIGHT";
+                const hMult = Math.pow(0.015, dt);
+                this.vx *= hMult;
+                this.vy *= hMult;
+                this.speed *= hMult;
+                if (Math.abs(this.speed) < 10) {
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.speed = 0;
+                }
+            }
             desiredThrottle = 0;
             return { throttle: 0, steer: 0, handbrake: true };
         }
@@ -3793,6 +3884,8 @@ class Pedestrian {
         this.dead = Boolean(props.dead);
         this.revived = Boolean(props.revived);
         this.panicTimer = props.panicTimer || 0;
+        this.threatX = props.threatX;
+        this.threatY = props.threatY;
         this.stunnedTimer = props.stunnedTimer || 0;
         this.burnTimer = props.burnTimer || 0;
         this.exitAnimTimer = props.exitAnimTimer || 0;
@@ -3814,6 +3907,13 @@ class Pedestrian {
         if ((this.slideCarTimer || 0) > 0) return PED_STATE.SLIDE_ON_CAR;
         if ((this.panicTimer || 0) > 0 || (this.burnTimer || 0) > 0 || this.kind === "COP" || this.kind === "HOSTILE") {
             return PED_STATE.RUNS;
+        }
+        if (
+            this.waitingAtCrosswalk ||
+            (this.socialTimer || 0) > 0 ||
+            ((this.hailingTaxiTimer || 0) > 0 && this._hailingTaxi && Math.abs(this._hailingTaxi.speed || 0) >= 12)
+        ) {
+            return PED_STATE.STANDING_STILL;
         }
         if (this.speed > 1) return PED_STATE.WALKS;
         return PED_STATE.STANDING_STILL;

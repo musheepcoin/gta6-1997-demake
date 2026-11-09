@@ -9502,6 +9502,7 @@ class RetroRenderer {
                         : (v.aiTurnSignal || 0))
                     : 0;
                 const blinkOn = turnSig !== 0 && Math.sin(this.time * 11.5 + (v.sirenPhase || 0)) > 0;
+                const highBeamFlash = isDriven && (v.aiFlashHeadlightsTimer || 0) > 0 && Math.sin(this.time * 24.0) > -0.15;
 
                 for (const lat of lampOffsets) {
                     const isBlinkSide = blinkOn && lat !== 0 && (
@@ -9509,13 +9510,15 @@ class RetroRenderer {
                         (turnSig < 0 && lat < 0) ||
                         (turnSig > 0 && lat > 0)
                     );
-                    // 1) Front Headlight Lenses (bright xenon-white when driven at dusk/night, crisp silver-blue glass housing by day)
+                    // 1) Front Headlight Lenses (bright xenon-white when driven at dusk/night or flashing high-beams, crisp silver-blue glass housing by day)
                     //    If front-dented on VCPD Charger, right headlight (lat > 0) is shattered out!
                     const rightLampBroken = isVcpdCharger && (v.frontDented || v.heavyDented) && lat > 0;
                     if (!rightLampBroken) {
                         const fx = v.x + cosA * frontDist - sinA * lat;
                         const fy = v.y + sinA * frontDist + cosA * lat;
-                        if (isDriven && nfGlobal > 0.15) {
+                        if (highBeamFlash) {
+                            this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.014, 3.8, 3.0, v.angle, 1.0, 0.99, 0.92, 0.99, SPRITE_DRAW_ORDER.CAR_ROOF);
+                        } else if (isDriven && nfGlobal > 0.15) {
                             this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 3.0, 2.5, v.angle, 1.0, 0.98, 0.88, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
                         } else {
                             this.pushSolidQuad3D(fx, fy, vz + airZ + totalPitchZ + 0.012, 2.4, 2.1, v.angle, 0.82, 0.91, 0.98, 0.82, SPRITE_DRAW_ORDER.CAR_ROOF);
