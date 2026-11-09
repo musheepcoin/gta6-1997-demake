@@ -799,25 +799,29 @@ class RetroRenderer {
             uniform vec2 uSunDir;
 
             float sHash(vec2 p) {
-                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+                p = mod(p, 512.0);
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
             }
             float sNoise(vec2 p) {
                 vec2 i = floor(p);
                 vec2 f = fract(p);
-                f = f * f * (3.0 - 2.0 * f);
+                vec2 u = f * f * (3.0 - 2.0 * f);
                 return mix(
-                    mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x),
-                    mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x),
-                    f.y
+                    mix(sHash(i), sHash(i + vec2(1.0, 0.0)), u.x),
+                    mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), u.x),
+                    u.y
                 );
             }
             vec3 applyRoadLighting(vec3 col) {
-                float dayAmt = 1.0 - clamp(uNightTint * 1.4, 0.0, 1.0);
+                float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
                 if (dayAmt > 0.01) {
                     vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
-                    float bldAO = lm.g * 0.22;
+                    float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
+                    float bldAO = lm.g * onGround * 0.22;
                     float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
-                    float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45));
+                    float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround;
                     float totalShade = clamp(bldShadow * 0.82 + bldAO * 0.25, 0.0, 1.0);
                     vec3 sunlitTint = vec3(1.11, 1.07, 0.98);
                     vec3 shadowTint = vec3(0.58, 0.67, 0.85);
@@ -840,6 +844,7 @@ class RetroRenderer {
             void main() {
                 if (vUV.x < 0.0) {
                     // Mode A: Procedural Weathered Asphalt Parking Bay / Lot Pad (vUV.x in [-2.6 .. -1.4])
+                    // Uses 100% bit-for-bit identical asphaltSurface() formula as cityFS so road and parking bay merge with zero color jump!
                     if (vUV.x > -2.7 && vUV.x < -1.3) {
                         float uBay = clamp(vUV.x + 2.5, 0.0, 1.0);
                         float vBay = clamp(vUV.y, 0.0, 1.0);
@@ -847,43 +852,44 @@ class RetroRenderer {
                         float wPx = max(16.0, vColor.g);
                         float hPx = max(16.0, vColor.b);
 
-                        vec2 wp = vWorldPos.xz;
-                        float big   = sNoise(wp * 0.52);
-                        float mid   = sNoise(wp * 2.15 + 7.3);
-                        float grain = sHash(floor(wp * 24.0));
-                        float fine  = sHash(floor(wp * 64.0));
-                        float tar   = smoothstep(0.66, 0.84, sNoise(wp * 1.35 + 19.1));
-                        float seam  = smoothstep(0.93, 0.985, sNoise(wp * 4.8 + vec2(mid * 1.4, big * 1.4)));
-                        // Base road asphalt formula identical to cityFS asphaltSurface()
-                        vec3 col = vec3(0.245, 0.258, 0.285);
-                        col += (big - 0.5) * 0.022 + (mid - 0.5) * 0.018;
-                        col += (grain - 0.5) * 0.028 + (fine - 0.5) * 0.018;
-                        col = mix(col, vec3(0.185, 0.196, 0.220), tar * 0.42);
-                        col = mix(col, vec3(0.150, 0.160, 0.180), seam * 0.35);
-
                         float dSidePx = uBay * wPx;
                         float dRoadPx = (1.0 - uBay) * wPx;
                         float dEndPx  = min(vBay, 1.0 - vBay) * hPx;
 
-                        // Subtle recessed bay patina & tire-wear darkening inside the bay (fading to 0 at roadEdgeX so it merges 100% seamlessly with the street!)
-                        float bayInterior = (modeFlag > 0.5)
-                            ? (1.0 - smoothstep(6.5, 11.5, wPx - dSidePx))
-                            : 1.0;
-                        float oilMottle = sNoise(wp * 3.2 + vec2(13.7, 29.1));
-                        col *= mix(1.0, 0.91 - 0.06 * smoothstep(0.45, 0.82, oilMottle), bayInterior);
+                        // Diagonal 45-degree curb flare at the North/South entry and exit of curbside parallel bays
+                        float taperIn = (modeFlag > 0.5)
+                            ? max(0.0, 13.0 - dEndPx) * ((wPx - 8.0) / 13.0)
+                            : 0.0;
+                        float dCurbPx = (modeFlag > 0.5)
+                            ? (dSidePx - taperIn)
+                            : min(min(dSidePx, dRoadPx), dEndPx);
+                        if (modeFlag > 0.5 && dRoadPx <= 7.8) {
+                            dCurbPx = 99.0; // Seamless overlap erasing the street's yellow curb line
+                        }
+                        if (dCurbPx < 0.0) discard;
+
+                        vec2 p = vWorldPos.xz;
+                        float big   = sNoise(p * 0.45) * 0.6 + sNoise(p * 1.3 + 7.0) * 0.4;
+                        float mid   = sNoise(p * 4.0 + 13.0);
+                        float grain = sHash(floor(p * 40.0));
+                        float fine  = sHash(floor(p * 96.0) + 19.0);
+                        vec3 base = vec3(0.255, 0.285, 0.310);
+                        vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
+                        col *= 0.94 + grain * 0.05 + fine * 0.08;
+                        col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);
+                        float tar = smoothstep(0.66, 0.80, sNoise(p * 0.7 + 31.0));
+                        col *= 1.0 - tar * 0.13;
+                        float seam = 1.0 - smoothstep(0.0, 0.022, abs(sNoise(p * 1.1 + 57.0) - 0.5));
+                        col *= 1.0 - seam * 0.12 * step(0.68, sNoise(p * 0.3 + 3.0));
 
                         // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter along the sidewalk edge (matching cityFS junctionCurb)
-                        float dCurbPx = (modeFlag > 0.5)
-                            ? ((dRoadPx > 7.8) ? min(dSidePx, dEndPx) : 99.0)
-                            : min(min(dSidePx, dRoadPx), dEndPx);
-                        if (dCurbPx < 2.2) {
-                            float cGrain = sHash(floor(wp * 18.0));
-                            col = mix(vec3(0.83, 0.80, 0.75), vec3(0.72, 0.69, 0.64), cGrain);
-                        } else if (dCurbPx < 3.3) {
+                        if (dCurbPx < 2.0) {
+                            col = mix(vec3(0.83, 0.80, 0.75), vec3(0.72, 0.69, 0.64), dCurbPx * 0.5);
+                        } else if (dCurbPx < 3.0) {
                             col = vec3(0.47, 0.45, 0.42);
-                        } else if (dCurbPx < 5.2) {
-                            float gMix = (dCurbPx - 3.3) / 1.9;
-                            col = mix(vec3(0.16, 0.18, 0.20), col, gMix);
+                        } else if (dCurbPx < 4.2) {
+                            float gMix = (dCurbPx - 3.0) / 1.2;
+                            col = mix(vec3(0.18, 0.21, 0.24), col, gMix);
                         }
 
                         col = applyRoadLighting(col);
@@ -9565,47 +9571,47 @@ class RetroRenderer {
                 const wearAlpha = 0.34 + ((bi * 17) % 5) * 0.028;
 
                 // Subtle dark engine-oil / tire-drip stain in the middle of each stall
-                const oilOff = (((bi * 13) % 5) - 2) * 1.4;
+                const oilOff = (((bi * 13) % 5) - 2) * 1.6;
                 this.pushWornPaintQuad3D(
                     scx + ca * oilOff,
                     scy + sa * oilOff,
                     sz + 0.015,
-                    18.0,
-                    9.5,
+                    15.0,
+                    7.5,
                     stallAng,
-                    0.11,
-                    0.12,
-                    0.14,
-                    0.26,
+                    0.15,
+                    0.17,
+                    0.20,
+                    0.16,
                     SPRITE_DRAW_ORDER.TIRE_MARKS
                 );
 
                 if (bay.isLotParked) {
-                    // Off-Street Asphalt Parking Lot 90° Perpendicular Stall Lines (thin, worn, weathered) + Concrete Wheel Stop
+                    // Off-Street Asphalt Parking Lot 90° Perpendicular Stall Lines (wide 74px spacing, thin 1.4px worn lines) + Concrete Wheel Stop
                     const nx = -sa;
                     const ny = ca;
-                    const halfW = 30.5;
-                    this.pushWornPaintQuad3D(scx + nx * halfW, scy + ny * halfW, sz + 0.016, 46.0, 1.5, stallAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushWornPaintQuad3D(scx - nx * halfW, scy - ny * halfW, sz + 0.016, 46.0, 1.5, stallAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const halfW = bay.stallWidth ? (bay.stallWidth * 0.5) : 37.0;
+                    this.pushWornPaintQuad3D(scx + nx * halfW, scy + ny * halfW, sz + 0.016, 48.0, 1.4, stallAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushWornPaintQuad3D(scx - nx * halfW, scy - ny * halfW, sz + 0.016, 48.0, 1.4, stallAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     if (bay.wheelStopX !== undefined && bay.wheelStopY !== undefined) {
-                        this.pushWornPaintQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.018, 34.0, 4.4, crossAng, 0.10, 0.12, 0.15, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushWornPaintQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.022, 32.0, 3.2, crossAng, 0.72, 0.67, 0.48, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushWornPaintQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.018, 34.0, 4.2, crossAng, 0.12, 0.14, 0.17, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushWornPaintQuad3D(bay.wheelStopX, bay.wheelStopY, sz + 0.022, 32.0, 3.0, crossAng, 0.72, 0.67, 0.48, 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     }
                     continue;
                 }
 
-                // Discreet, worn Miami curbside parallel parking T-ticks / L-corner marks (thin 1.5px, subtle opacity, zero [P] stencils!)
-                const halfL = 29.5;
-                const tickCenterX = scx + (bay.dc || 0) * 8.5;
-                const tickCenterY = scy + (bay.dr || 0) * 8.5;
-                this.pushWornPaintQuad3D(tickCenterX + ca * halfL, tickCenterY + sa * halfL, sz + 0.016, 13.0, 1.5, crossAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushWornPaintQuad3D(tickCenterX - ca * halfL, tickCenterY - sa * halfL, sz + 0.016, 13.0, 1.5, crossAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Spacious Miami curbside parallel parking T-ticks / L-corner marks (82..86px long x 42px wide bay, thin 1.4px worn paint)
+                const halfL = bay.stallLen ? (bay.stallLen * 0.5) : 41.0;
+                const tickCenterX = scx + (bay.dc || 0) * 11.5;
+                const tickCenterY = scy + (bay.dr || 0) * 11.5;
+                this.pushWornPaintQuad3D(tickCenterX + ca * halfL, tickCenterY + sa * halfL, sz + 0.016, 13.0, 1.4, crossAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushWornPaintQuad3D(tickCenterX - ca * halfL, tickCenterY - sa * halfL, sz + 0.016, 13.0, 1.4, crossAng, pw, pg, pb, wearAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
                 // Short longitudinal L-corner ticks along the lane edge
-                const edgeX = scx + (bay.dc || 0) * 14.5;
-                const edgeY = scy + (bay.dr || 0) * 14.5;
-                this.pushWornPaintQuad3D(edgeX + ca * (halfL - 4.5), edgeY + sa * (halfL - 4.5), sz + 0.016, 9.0, 1.5, stallAng, pw, pg, pb, wearAlpha * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushWornPaintQuad3D(edgeX - ca * (halfL - 4.5), edgeY - sa * (halfL - 4.5), sz + 0.016, 9.0, 1.5, stallAng, pw, pg, pb, wearAlpha * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const edgeX = scx + (bay.dc || 0) * 17.5;
+                const edgeY = scy + (bay.dr || 0) * 17.5;
+                this.pushWornPaintQuad3D(edgeX + ca * (halfL - 5.0), edgeY + sa * (halfL - 5.0), sz + 0.016, 10.0, 1.4, stallAng, pw, pg, pb, wearAlpha * 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushWornPaintQuad3D(edgeX - ca * (halfL - 5.0), edgeY - sa * (halfL - 5.0), sz + 0.016, 10.0, 1.4, stallAng, pw, pg, pb, wearAlpha * 0.90, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
                 // 3D Sidewalk Parking Meter Post & Digital Dual-Head Housing (only 1 dual-head meter per 2 stalls!)
                 const mx = bay.meterX;
