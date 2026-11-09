@@ -4912,46 +4912,59 @@ class RetroRenderer {
 
                             setTimeout(() => {
                                 try {
-                                    this.loadStageLabel = "BAKING SOLAR SHADOWS & RADAR...";
+                                    this.loadStageLabel = "BUILDING 3D PROPS & LANDMARKS...";
                                     if (this.gl && this.map && this.map.objectEngine) {
                                         this.map.objectEngine.buildStatic3DMesh(this.gl, this);
                                     }
-                                    this.buildDayLightTexture();
                                 } catch (err) {
-                                    console.error("Stage 5 (Static3DMesh / DayLightTex) error:", err);
+                                    console.error("Stage 5A (Static3DMesh) error:", err);
                                 }
 
-                                this.loadProgress = 8;
-                                this.gta1Ready = true;
-                                this.cmpReady = true;
-                                updateStartModalButton(true);
-
-                                try {
-                                    this.bakeRadarBackground();
-                                } catch (err) {
-                                    console.error("Stage 5 (bakeRadarBackground) error:", err);
-                                }
-
-                                if (window.game && typeof window.game.onCmpLoaded === "function") {
+                                setTimeout(() => {
                                     try {
-                                        window.game.onCmpLoaded(this.gta1Meta);
+                                        this.loadStageLabel = "BAKING SOLAR SHADOWS...";
+                                        this.buildDayLightTexture();
                                     } catch (err) {
-                                        console.error("Stage 5 (onCmpLoaded) error:", err);
+                                        console.error("Stage 5B (DayLightTex) error:", err);
                                     }
-                                }
 
-                                // Only preload secondary NYC classic tile atlas on desktop; on mobile, lazy-load only if user switches to NYC
-                                if (!this.isMobileInit) {
-                                    loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
-                                        if (this.gl) {
-                                            this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
-                                            if (this.mapStyle === "NYC") {
-                                                this.tilesTex = this.tilesTexNyc;
-                                            }
+                                    setTimeout(() => {
+                                        try {
+                                            this.loadStageLabel = "BAKING RADAR & SPAWNING TRAFFIC...";
+                                            this.bakeRadarBackground();
+                                        } catch (err) {
+                                            console.error("Stage 5C (bakeRadarBackground) error:", err);
                                         }
-                                    });
-                                }
-                            }, 16);
+
+                                        this.loadProgress = 8;
+                                        this.gta1Ready = true;
+                                        this.cmpReady = true;
+                                        updateStartModalButton(true);
+
+                                        setTimeout(() => {
+                                            if (window.game && typeof window.game.onCmpLoaded === "function") {
+                                                try {
+                                                    window.game.onCmpLoaded(this.gta1Meta);
+                                                } catch (err) {
+                                                    console.error("Stage 5D (onCmpLoaded) error:", err);
+                                                }
+                                            }
+
+                                            // Only preload secondary NYC classic tile atlas on desktop; on mobile, lazy-load only if user switches to NYC
+                                            if (!this.isMobileInit) {
+                                                loadImageWithRetry(this.gta1TilesImg, "assets/gta1/gta1_tiles.png?v=98_11", () => {
+                                                    if (this.gl) {
+                                                        this.tilesTexNyc = this.createGLTexture(this.gta1TilesImg, true);
+                                                        if (this.mapStyle === "NYC") {
+                                                            this.tilesTex = this.tilesTexNyc;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }, 24);
+                                    }, 24);
+                                }, 24);
+                            }, 24);
                         }, 16);
                     }, 16);
                 }, 16);
@@ -5087,8 +5100,16 @@ class RetroRenderer {
     }
 
     resize() {
-        const w = Math.max(1, Math.min(2560, window.innerWidth || 800));
-        const h = Math.max(1, Math.min(1600, window.innerHeight || 600));
+        let w = Math.max(1, Math.min(2560, window.innerWidth || 800));
+        let h = Math.max(1, Math.min(1600, window.innerHeight || 600));
+        if (this.isMobileInit) {
+            const maxDim = Math.max(w, h);
+            if (maxDim > 960) {
+                const scale = 960 / maxDim;
+                w = Math.max(320, Math.round(w * scale));
+                h = Math.max(240, Math.round(h * scale));
+            }
+        }
         this.canvas.width = w;
         this.canvas.height = h;
         if (this.glCanvas) {
@@ -6334,7 +6355,8 @@ class RetroRenderer {
         }
 
         // 2A. Daytime Ambient Florida Sunlight, Volumetric Sunbeams & Tropical Sky-Shadow Atmosphere
-        if ((this.nightFactor || 0) < 0.72 && !this.nightMode && !game.activeInterior) {
+        // (On mobile, WebGL shaders already compute full directional sunlight & shadow maps in hardware, avoiding software 2D canvas full-screen blends)
+        if (!this.isMobileInit && (this.nightFactor || 0) < 0.72 && !this.nightMode && !game.activeInterior) {
             this.renderDaylightAtmosphere(ctx, game);
         }
 
@@ -9441,11 +9463,18 @@ class RetroRenderer {
 
             // B. GTA 2 live_geometry.cpp SetSpriteConform (kSmoothing = 0.25f): 4-Corner Ground Slope Pitch + Wheelie/Stunt Pitch!
             // (Disabled on watercraft so getHeightAtPixel on water/shore transitions never pitches the hull below the Y=2.0 water surface!)
+            const isStationaryParked = !v.driver && Math.abs(v.speed || 0) < 0.1;
+            const posUnchanged = isStationaryParked && v._cacheShadeX !== undefined && Math.abs(v.x - v._cacheShadeX) < 2 && Math.abs(v.y - v._cacheShadeY) < 2;
             let rawSlopePitch = 0;
             if (!isWaterCraft) {
-                const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
-                const hRear = this.map.getHeightAtPixel(v.x - cosA * 20, v.y - sinA * 20, vz);
-                rawSlopePitch = Math.max(-0.22, Math.min(0.22, (hFront - hRear) * 0.45));
+                if (posUnchanged && v._cachedRawSlopePitch !== undefined) {
+                    rawSlopePitch = v._cachedRawSlopePitch;
+                } else {
+                    const hFront = this.map.getHeightAtPixel(v.x + cosA * 20, v.y + sinA * 20, vz);
+                    const hRear = this.map.getHeightAtPixel(v.x - cosA * 20, v.y - sinA * 20, vz);
+                    rawSlopePitch = Math.max(-0.22, Math.min(0.22, (hFront - hRear) * 0.45));
+                    v._cachedRawSlopePitch = rawSlopePitch;
+                }
             }
             v._conformPitch = isWaterCraft ? 0 : ((v._conformPitch || 0) * 0.75 + rawSlopePitch * 0.25);
             const wheeliePitch = (v.wheelieTimer || 0) > 0 ? 0.14 : 0;
@@ -9455,7 +9484,18 @@ class RetroRenderer {
             const totalPitchZ = isWaterCraft ? 0 : (v._conformPitch + wheeliePitch + stuntPitch);
 
             // Car body sprite with GTA 2 live rotation-aware solar clearcoat specular sheen + 3D building cast shadow response!
-            const vehShade = isWaterCraft ? 0 : ((1.0 - nfGlobal) * this.getDayShadeAtPixel(v.x, v.y));
+            let rawDayShade = 0;
+            if (!isWaterCraft) {
+                if (posUnchanged && v._cachedDayShade !== undefined) {
+                    rawDayShade = v._cachedDayShade;
+                } else {
+                    rawDayShade = this.getDayShadeAtPixel(v.x, v.y);
+                    v._cachedDayShade = rawDayShade;
+                    v._cacheShadeX = v.x;
+                    v._cacheShadeY = v.y;
+                }
+            }
+            const vehShade = isWaterCraft ? 0 : ((1.0 - nfGlobal) * rawDayShade);
             const sunAlign = Math.cos(v.angle - sunShadowAngle);
             const carSunSpec = v.destroyed ? 1.0 : (isWaterCraft ? 1.12 : (1.0 + 0.12 * sunAlign * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.75)));
             const vTintR = carSunSpec * (1.04 - vehShade * 0.22);
@@ -10682,22 +10722,23 @@ class RetroRenderer {
 
         // 5. Vehicle Conical Headlights, Red Taillights & Flashing Police/Emergency Sirens!
         for (const v of game.vehicles) {
+            const isBurning = (v.destroyed && !v.fireExtinguished) || (v.burnTimer || 0) > 0;
+            // Parked unlit vehicles (v.driver === null && !isBurning) never emit light — skip BEFORE getEntityZ & worldToScreen!
+            if (!v.driver && !isBurning) continue;
+            if (Math.abs(v.x - this.camX) > 960 || Math.abs(v.y - this.camY) > 720) continue;
+
             const vz = this.getEntityZ(v, 0.08) + (v.stuntZOffset || 0);
             const sc = this.worldToScreen(v.x, v.y, vz);
             if (sc.x < -260 || sc.x > W + 260 || sc.y < -260 || sc.y > H + 260) continue;
             const pxScale = (sc.scale * H) / 128.0;
 
-            if ((v.destroyed && !v.fireExtinguished) || (v.burnTimer || 0) > 0) {
+            if (isBurning) {
                 if (v.specKey === "BMX_BIKE" || (v.specKey === "E_SCOOTER" && v.destroyed)) continue;
                 const flick = 0.88 + Math.sin(this.time * 22 + v.x) * 0.12;
                 addLightPool(sc.x, sc.y, 110 * pxScale * flick, "rgba(255, 165, 50, 0.95)", "rgba(235, 65, 15, 0.45)");
                 highResFlares.push({ x: sc.x, y: sc.y, r: 26 * pxScale, col: "rgba(255, 140, 35, 0.65)" });
                 continue;
             }
-
-            // Parked vehicles (v.driver === null) never have their headlights or taillights turned on!
-            const hasHeadlights = Boolean(v.driver);
-            if (!hasHeadlights) continue;
 
             const cosA = Math.cos(v.angle);
             const sinA = Math.sin(v.angle);
@@ -10873,7 +10914,8 @@ class RetroRenderer {
 
         // 7B. Stamp True 3D Depth-Tested Emissive Window Textures (Buildings & Houses) onto the darkened scene using "screen"
         // (black glCanvas pixels are a 100% no-op so roads/roofs/cars are untouched, while lit 3D windows stay razor-sharp!)
-        if (!this.glLost && this._lastViewProj && this.renderEmissiveWindowsWebGL(game, this._lastViewProj)) {
+        // Skip the second full-city WebGL pass on mobile so mobile GPUs only draw the 3D city mesh once per frame.
+        if (!this.isMobileInit && !this.glLost && this._lastViewProj && this.renderEmissiveWindowsWebGL(game, this._lastViewProj)) {
             ctx.globalCompositeOperation = "screen";
             ctx.globalAlpha = Math.min(0.92, nf * 1.08);
             ctx.drawImage(this.glCanvas, 0, 0, W, H);

@@ -5598,7 +5598,9 @@ class LeonidaMap {
                 const v = vehicles[i];
                 if (!v || Math.abs(v.speed || 0) > 28) continue;
                 const dx = cx - v.x;
+                if (dx > 52 || dx < -52) continue;
                 const dy = cy - v.y;
+                if (dy > 52 || dy < -52) continue;
                 if (dx * dx + dy * dy > 52 * 52) continue;
                 const cosA = Math.cos(v.angle || 0);
                 const sinA = Math.sin(v.angle || 0);
@@ -5784,6 +5786,7 @@ class LeonidaMap {
                         for (let vi = 0; vi < vehicles.length; vi++) {
                             const v = vehicles[vi];
                             if (!v || v.destroyed) continue;
+                            if (Math.abs(v.x - cx) > 145 || Math.abs(v.y - cy) > 145) continue;
                             const d = Math.hypot(v.x - cx, v.y - cy);
                             const vSpd = Math.abs(v.speed || 0);
                             if (d < 46 || (vSpd > 24 && d < 105) || (v.sirenActive && d < 145)) {

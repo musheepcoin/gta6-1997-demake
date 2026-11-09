@@ -1230,6 +1230,20 @@ class LeonidaGame {
 
         }
 
+        const czList = (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.clearZones))
+            ? this.map.objectEngine.clearZones
+            : [];
+        const beachStructs = [
+            ...(this.map && Array.isArray(this.map.beachProps) ? this.map.beachProps : []),
+            ...(this.map && Array.isArray(this.map.tikiBars) ? this.map.tikiBars : []),
+            ...(this.map && Array.isArray(this.map.muscleBeachGyms) ? this.map.muscleBeachGyms : []),
+            ...(this.map && Array.isArray(this.map.beachVolleyballCourts) ? this.map.beachVolleyballCourts : []),
+            ...(this.map && Array.isArray(this.map.beachParties) ? this.map.beachParties : [])
+        ];
+        const hitsClearZone = (px, py) =>
+            czList.some(cz => Math.abs(cz.x - px) < 96 && Math.abs(cz.y - py) < 96 && Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54)) ||
+            beachStructs.some(bs => Math.abs(bs.x - px) < 80 && Math.abs(bs.y - py) < 80 && Math.hypot(bs.x - px, bs.y - py) < 76);
+
         for (const v of this.vehicles) {
             const isWaterVeh = Boolean(
                 v.waterOnly ||
@@ -1320,20 +1334,6 @@ class LeonidaGame {
                 v.aiTurnedInIntersection = false;
 
             } else if (!v.driver) {
-
-                const czList = (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.clearZones))
-                    ? this.map.objectEngine.clearZones
-                    : [];
-                const beachStructs = [
-                    ...(this.map && Array.isArray(this.map.beachProps) ? this.map.beachProps : []),
-                    ...(this.map && Array.isArray(this.map.tikiBars) ? this.map.tikiBars : []),
-                    ...(this.map && Array.isArray(this.map.muscleBeachGyms) ? this.map.muscleBeachGyms : []),
-                    ...(this.map && Array.isArray(this.map.beachVolleyballCourts) ? this.map.beachVolleyballCourts : []),
-                    ...(this.map && Array.isArray(this.map.beachParties) ? this.map.beachParties : [])
-                ];
-                const hitsClearZone = (px, py) =>
-                    czList.some(cz => Math.hypot(cz.x - px, cz.y - py) < Math.max(54, cz.r || 54)) ||
-                    beachStructs.some(bs => Math.hypot(bs.x - px, bs.y - py) < 76);
 
                 if (nav && nav.groundType === GROUND_TYPE.ROAD && !v.isCurbParked && !v.isStaticParked) {
                     // Never snap a road vehicle onto a pedestrian sidewalk: convert it to live moving traffic!
@@ -1473,7 +1473,10 @@ class LeonidaGame {
 
         if (this._pendingStartGame) {
             this._pendingStartGame = false;
-            this.startGame();
+            setTimeout(() => {
+                this._resetLoopClock = true;
+                this.startGame();
+            }, 32);
         }
 
     }
@@ -6398,6 +6401,11 @@ class LeonidaGame {
 
         const directAngle = Math.atan2(targetY - ped.y, targetX - ped.x);
 
+        // Off-screen pedestrians (>840px from player) already have unobstructed tile targets from chooseNextSidewalkBlock: skip 26-ray feeler sweeps
+        if (this.player && (Math.abs(ped.x - this.player.x) > 840 || Math.abs(ped.y - this.player.y) > 640)) {
+            return directAngle;
+        }
+
         // Reuse cached clear steering on alternate frames for distant/unobstructed pedestrians to save CPU raycasts
         if (ped._lastFeelerClear && ped._cachedSteerAngle !== undefined) {
             ped._feelerTick = ((ped._feelerTick || 0) + 1) & 1;
@@ -10889,9 +10897,45 @@ class LeonidaGame {
 
         }
 
+        // Pre-filter active priority siren vehicles, hazard/speeding vehicles, and available taxis once per frame
+        // so per-AI-vehicle and per-pedestrian loops never iterate over 540+ parked cars!
+        const hazardVehicles = this._hazardVehicles || (this._hazardVehicles = []);
+        const prioritySirenVehicles = this._prioritySirenVehicles || (this._prioritySirenVehicles = []);
+        const activeTaxis = this._activeTaxis || (this._activeTaxis = []);
+        const movingOrCrosswalkVehicles = this._movingOrCrosswalkVehicles || (this._movingOrCrosswalkVehicles = []);
+        hazardVehicles.length = 0;
+        prioritySirenVehicles.length = 0;
+        activeTaxis.length = 0;
+        movingOrCrosswalkVehicles.length = 0;
+        for (let vi = 0; vi < this.vehicles.length; vi++) {
+            const sv = this.vehicles[vi];
+            if (!sv) continue;
+            const svSpd = Math.abs(sv.speed || 0);
+            const isBurningHazard = Boolean(
+                (sv.burnTimer || 0) > 0 ||
+                (!sv.destroyed && typeof sv.hp === "number" && sv.hp <= 42 && sv.specKey !== "BMX_BIKE" && sv.specKey !== "E_SCOOTER")
+            );
+            if (isBurningHazard || (!sv.destroyed && svSpd >= 58)) {
+                hazardVehicles.push(sv);
+            }
+            if (!sv.destroyed && (sv.sirenActive || (sv.driver === "AI_TOW" && (sv.towTarget || sv.towingVehicle)))) {
+                prioritySirenVehicles.push(sv);
+            }
+            if (!sv.destroyed && sv.specKey === "VICE_CAB" && sv.driver === "AI_TRAFFIC") {
+                activeTaxis.push(sv);
+            }
+            if (!sv.destroyed && (svSpd > 14 || sv.sirenActive)) {
+                movingOrCrosswalkVehicles.push(sv);
+            }
+        }
+
         for (const v of this.vehicles) {
 
             v.update(dt, this.input, this.map, this);
+
+            if (!v.driver && Math.abs(v.speed || 0) < 0.1 && Math.abs(v.vx || 0) < 0.1 && Math.abs(v.vy || 0) < 0.1) {
+                continue;
+            }
 
 
 
@@ -13240,9 +13284,10 @@ class LeonidaGame {
                 const pz = ped.z !== undefined ? ped.z : 2.0;
 
                 // 1) Burning Vehicle Hazard Evasion + Predictive Oncoming Speeding Vehicle Evasion (Dive / Sidestep Reflex):
-                if (Array.isArray(this.vehicles)) {
-                    for (let vi = 0; vi < this.vehicles.length; vi++) {
-                        const v = this.vehicles[vi];
+                const hazList = this._hazardVehicles || this.vehicles;
+                if (Array.isArray(hazList)) {
+                    for (let vi = 0; vi < hazList.length; vi++) {
+                        const v = hazList[vi];
                         if (!v) continue;
                         if (v.z !== undefined && Math.abs(v.z - pz) > 0.85) continue;
                         const dx = ped.x - v.x;
@@ -13346,11 +13391,12 @@ class LeonidaGame {
                         const rCx = (ped.crossStartBx + 0.5) * TILE_SIZE;
                         const rCy = (ped.crossStartBy + 0.5) * TILE_SIZE;
                         let roadClear = true;
-                        if (Array.isArray(this.vehicles)) {
-                            for (let vi = 0; vi < this.vehicles.length; vi++) {
-                                const v = this.vehicles[vi];
+                        const cwVehicles = this._movingOrCrosswalkVehicles || this.vehicles;
+                        if (Array.isArray(cwVehicles)) {
+                            for (let vi = 0; vi < cwVehicles.length; vi++) {
+                                const v = cwVehicles[vi];
                                 if (!v || v.destroyed) continue;
-                                if (Math.hypot(v.x - rCx, v.y - rCy) < 82 && (Math.abs(v.speed || 0) > 15 || v.sirenActive)) {
+                                if (Math.abs(v.x - rCx) < 82 && Math.abs(v.y - rCy) < 82 && Math.hypot(v.x - rCx, v.y - rCy) < 82 && (Math.abs(v.speed || 0) > 15 || v.sirenActive)) {
                                     roadClear = false;
                                     break;
                                 }
@@ -13416,9 +13462,10 @@ class LeonidaGame {
                             // Wave at the approaching taxi from the curb
                             ped.angle = Math.atan2(cab.y - ped.y, cab.x - ped.x);
                         }
-                    } else if ((ped.taxiHailCooldown || 0) <= 0 && ((ped.turnSeed || 0) % 19 === 0) && Array.isArray(this.vehicles)) {
-                        for (let vi = 0; vi < this.vehicles.length; vi++) {
-                            const v = this.vehicles[vi];
+                    } else if ((ped.taxiHailCooldown || 0) <= 0 && ((ped.turnSeed || 0) % 19 === 0) && Array.isArray(this._activeTaxis || this.vehicles)) {
+                        const cabList = this._activeTaxis || this.vehicles;
+                        for (let vi = 0; vi < cabList.length; vi++) {
+                            const v = cabList[vi];
                             if (!v || v.destroyed || v.specKey !== "VICE_CAB" || v.driver !== "AI_TRAFFIC") continue;
                             if (v.aiPassengerTarget || (v.aiPassengerStopTimer || 0) > 0 || (v.aiPassengerStopCooldown || 0) > 0) continue;
                             const dx = ped.x - v.x;
@@ -13699,31 +13746,6 @@ class LeonidaGame {
 
                 ped.x += Math.cos(ped.angle) * spd * dt;
                 ped.y += Math.sin(ped.angle) * spd * dt;
-
-                // 5) Personal-Space Separation (Anti-Clumping Force between pedestrians on the same sidewalk)
-                if (!ped.isLivingProp && Array.isArray(this.peds)) {
-                    for (let pj = 0; pj < this.peds.length; pj++) {
-                        const op = this.peds[pj];
-                        if (!op || op === ped || op.dead || op.isLivingProp) continue;
-                        const sdx = ped.x - op.x;
-                        const sdy = ped.y - op.y;
-                        if (Math.abs(sdx) > 13 || Math.abs(sdy) > 13) continue;
-                        const sDist = Math.hypot(sdx, sdy);
-                        if (sDist > 0.01 && sDist < 12.5) {
-                            const push = Math.min(28 * dt, (12.5 - sDist) * 0.45);
-                            const nx = ped.x + (sdx / sDist) * push;
-                            const ny = ped.y + (sdy / sDist) * push;
-                            const nNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(Math.floor(nx / TILE_SIZE), Math.floor(ny / TILE_SIZE), pz) : null;
-                            if (nNav && (nNav.groundType === GROUND_TYPE.PAWEMENT || nNav.groundType === GROUND_TYPE.FIELD || ped.isCrossingRoad)) {
-                                ped.x = nx;
-                                ped.y = ny;
-                            }
-                            break;
-                        }
-                    }
-                }
-
-
 
                 // Keep normal walking civilians strictly on PAWEMENT/FIELD sidewalks (unless actively crossing a zebra crosswalk!)
                 const curNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;

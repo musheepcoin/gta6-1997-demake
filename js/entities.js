@@ -1737,9 +1737,11 @@ class Vehicle {
         const ry = fx;
         let sirenBehind = false;
         let sirenYield = false;
-        if (!isPanicked && this.driver === "AI_TRAFFIC" && game && Array.isArray(game.vehicles)) {
-            for (const other of game.vehicles) {
-                if (other === this || other.destroyed) continue;
+        const sirenVehicles = (game && game._prioritySirenVehicles) || (game && game.vehicles);
+        if (!isPanicked && this.driver === "AI_TRAFFIC" && Array.isArray(sirenVehicles) && sirenVehicles.length > 0) {
+            for (let si = 0; si < sirenVehicles.length; si++) {
+                const other = sirenVehicles[si];
+                if (!other || other === this || other.destroyed) continue;
                 const isPriorityVeh = Boolean(
                     other.sirenActive ||
                     (other.driver === "AI_TOW" && (other.towTarget || other.towingVehicle))
@@ -1748,6 +1750,7 @@ class Vehicle {
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
+                if (Math.abs(dx) > 220 || Math.abs(dy) > 220) continue;
                 const dist = Math.hypot(dx, dy);
                 if (dist > 220) continue;
 
@@ -1860,7 +1863,9 @@ class Vehicle {
         const isStopBlock = (lidZ1 !== 25 && nextLidZ1 === 25 && distToTargetCenter > 33);
         const isPreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 === 25);
 
-        const hasSignal = map && typeof map.hasTrafficSignalNear === "function" ? map.hasTrafficSignalNear(this.x, this.y, 380) : true;
+        const hasSignal = (isStopBlock || isPreStopBlock) && map && typeof map.hasTrafficSignalNear === "function"
+            ? map.hasTrafficSignalNear(this.x, this.y, 380)
+            : true;
         // Compute active turn signal / blinker indicator (-1 = left, +1 = right, 2 = 4-way hazards)
         if (!this.aiTurnSignal) {
             if (this.aiLaneShiftTimer > 0 && this.aiLaneChangeSign) {
@@ -1981,6 +1986,7 @@ class Vehicle {
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
+                if (Math.abs(dx) > 240 || Math.abs(dy) > 240) continue;
                 const dist = Math.hypot(dx, dy);
                 if (dist > 240) continue;
 
@@ -3054,6 +3060,27 @@ class Vehicle {
     }
 
     update(dt, input, map, game) {
+        // Fast early-out for healthy stationary parked vehicles (~540 curb-parked & lot-parked cars):
+        // Avoids 300+ lines of per-frame timer/damage/AI/physics checks when completely idle!
+        if (
+            !this.driver &&
+            !this.destroyed &&
+            !this.towedByTruck &&
+            !this.bombArmed &&
+            !(this.chainExplodeTimer > 0) &&
+            !(this.burnTimer > 0) &&
+            this.hp > 30 &&
+            !(this.doorOpenTimer > 0) &&
+            !(this.crashCooldown > 0) &&
+            !(this.stuntAirTimer > 0) &&
+            Math.abs(this.speed || 0) < 0.05 &&
+            Math.abs(this.vx || 0) < 0.05 &&
+            Math.abs(this.vy || 0) < 0.05 &&
+            Math.abs(this.angularVelocity || 0) < 0.01
+        ) {
+            return;
+        }
+
         // If this vehicle or wreck is hooked to a Tow Truck, follow behind its rear hitch!
         if (this.towedByTruck) {
             const truck = this.towedByTruck;
