@@ -712,6 +712,50 @@ class WorldObjectEngine {
             { name: "DOWNTOWN SKYLINE DRONE LAUNCHPAD",       x: 284.5 * TILE_SIZE, y: 214.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "VICE PIER AERIAL DRONE STREAM",          x: 462.5 * TILE_SIZE, y: 196.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 30. Official GTA 6 Neon Tarot Palm-Reader Booths & Open-Air Boxing Sparring Rings (Loop 23)
+        this.tarotNeonBooths = [
+            { name: "OCEAN DRIVE NEON TAROT & PALM BOOTH",    x: 443.5 * TILE_SIZE, y: 244.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE PIER MYSTIC CRYSTAL PAVILION",      x: 462.5 * TILE_SIZE, y: 192.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CALLE OCHO SANTERIA FORTUNE BOOTH",      x: 272.5 * TILE_SIZE, y: 252.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.beachBoxingRings = [
+            { name: "LUMMUS SANDS OPEN-AIR BOXING RING",      x: 466.5 * TILE_SIZE, y: 238.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI CHAMPION BOXING GYM",       x: 218.5 * TILE_SIZE, y: 118.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PORT GELLHORN BACKYARD MMA CAGE",        x: 78.5 * TILE_SIZE,  y: 218.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 31. Official GTA 6 Racing Pit-Stop Overhaul Bays & Keys Spiny-Lobster Trap Buoys (Loop 24)
+        this.derbyPitGarages = [
+            { name: "PORT GELLHORN SPEEDWAY PIT LANE",        x: 88.5 * TILE_SIZE,  y: 178.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "THRILLBILLY MUD PARK TIRE & NITRO PIT",  x: 82.5 * TILE_SIZE,  y: 456.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "AMBROSIA DRAG-STRIP TUNER PIT",          x: 150.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.lobsterTrapBuoys = [
+            { name: "KEY LENTO SPINY LOBSTER TRAP LINE",      x: 242.5 * TILE_SIZE, y: 488.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "ISLAMORADA PEARL & CRAB POT BUOY",       x: 266.5 * TILE_SIZE, y: 488.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "BAHIA HONDA REEF LOBSTER POT",           x: 194.5 * TILE_SIZE, y: 486.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 32. Official GTA 6 Open-Air Block-Party Soundstages & Tropical Coconut Smoothie Bars (Loop 25)
+        this.blockPartyStages = [
+            { name: "WYNWOOD NEON BLOCK-PARTY SOUNDSTAGE",    x: 194.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI CARIBBEAN SOUND-SYSTEM",    x: 226.5 * TILE_SIZE, y: 104.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH BEACH PROMENADE DJ STAGE",         x: 451.5 * TILE_SIZE, y: 286.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.coconutSmoothieBars = [
+            { name: "LUMMUS BOARDWALK COCONUT & ACAI BAR",    x: 451.5 * TILE_SIZE, y: 178.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE TROPICAL SMOOTHIE HUT",     x: 451.5 * TILE_SIZE, y: 324.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "KEY WEST SUNSET COCONUT STAND",          x: 224.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 33. Official GTA 6 Mount Kalaga Gold-Panning Camps & VIP Armored Courier Drops (Loop 26)
+        this.goldPanningCamps = [
+            { name: "KALAGA CANYON GOLD-PANNING SLUICE",      x: 132.5 * TILE_SIZE, y: 28.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "PINE CREEK PROSPECTOR GEM CAMP",         x: 164.5 * TILE_SIZE, y: 32.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "NORTH RIDGE GOLD RUSH OUTPOST",          x: 118.5 * TILE_SIZE, y: 32.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        this.vipCourierDrops = [
+            { name: "STAR ISLAND BILLIONAIRE COURIER DROP",   x: 350.5 * TILE_SIZE, y: 172.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "DOWNTOWN BANK PLAZA ARMORED DROP",       x: 288.5 * TILE_SIZE, y: 232.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE PORT CUSTOMS CONTRABAND DROP",      x: 338.5 * TILE_SIZE, y: 324.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1325,6 +1369,56 @@ class WorldObjectEngine {
                 for (const dl of this.droneLaunchPads) {
                     snapOffRoad(dl);
                     clearZones.push({ x: dl.x, y: dl.y, r: 38 });
+                }
+            }
+            if (Array.isArray(this.tarotNeonBooths)) {
+                for (const tb of this.tarotNeonBooths) {
+                    snapOffRoad(tb);
+                    clearZones.push({ x: tb.x, y: tb.y, r: 38 });
+                }
+            }
+            if (Array.isArray(this.beachBoxingRings)) {
+                for (const br of this.beachBoxingRings) {
+                    snapOffRoad(br);
+                    clearZones.push({ x: br.x, y: br.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.derbyPitGarages)) {
+                for (const dp of this.derbyPitGarages) {
+                    snapOffRoad(dp);
+                    clearZones.push({ x: dp.x, y: dp.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.lobsterTrapBuoys)) {
+                for (const lb of this.lobsterTrapBuoys) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(lb.x, lb.y, 18);
+                        if (sn) { lb.x = sn.x; lb.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.blockPartyStages)) {
+                for (const bp of this.blockPartyStages) {
+                    snapOffRoad(bp);
+                    clearZones.push({ x: bp.x, y: bp.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.coconutSmoothieBars)) {
+                for (const cb of this.coconutSmoothieBars) {
+                    snapOffRoad(cb);
+                    clearZones.push({ x: cb.x, y: cb.y, r: 38 });
+                }
+            }
+            if (Array.isArray(this.goldPanningCamps)) {
+                for (const gp of this.goldPanningCamps) {
+                    snapOffRoad(gp);
+                    clearZones.push({ x: gp.x, y: gp.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.vipCourierDrops)) {
+                for (const vc of this.vipCourierDrops) {
+                    snapOffRoad(vc);
+                    clearZones.push({ x: vc.x, y: vc.y, r: 38 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -3681,6 +3775,297 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P22. Official GTA 6 Neon Tarot Palm-Reader Booths & Open-Air Boxing Rings ([E], Loop 23)
+        if (Array.isArray(this.tarotNeonBooths)) {
+            for (const tb of this.tarotNeonBooths) {
+                if ((tb.cooldown || 0) <= 0 && Math.hypot(px - tb.x, py - tb.y) < 62) {
+                    tb.cooldown = 28.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(5500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 5500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🔮 NEON TAROT & PALM ORACLE!`,
+                            `${tb.name} • 0★ WANTED + 150 HP/ARMOR & +$5,500!`,
+                            "#e879f9",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: tb.x,
+                            y: tb.y,
+                            z: 2.70,
+                            text: `🔮 NEON TAROT READING! 0★ WANTED + 150 HP/ARMOR + +$5,500!`,
+                            color: "#e879f9",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.beachBoxingRings)) {
+            for (const br of this.beachBoxingRings) {
+                if ((br.cooldown || 0) <= 0 && Math.hypot(px - br.x, py - br.y) < 68) {
+                    br.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6500;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🥊 KNOCKOUT BOXING CHAMPION!`,
+                            `${br.name} • 150 HP/ARMOR + +$6,500 & +1X!`,
+                            "#f43f5e",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: br.x,
+                            y: br.y,
+                            z: 2.72,
+                            text: `🥊 KNOCKOUT BOUT WON! 150 HP/ARMOR + +$6,500 & +1X!`,
+                            color: "#f43f5e",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P23. Official GTA 6 Racing Pit-Stop Overhaul Bays & Keys Spiny-Lobster Trap Buoys ([E], Loop 24)
+        if (Array.isArray(this.derbyPitGarages)) {
+            for (const dp of this.derbyPitGarages) {
+                if ((dp.cooldown || 0) <= 0 && Math.hypot(px - dp.x, py - dp.y) < 72) {
+                    dp.cooldown = 26.0;
+                    if (game.player.inVehicle) {
+                        game.player.inVehicle.health = 100;
+                        game.player.inVehicle.onFire = false;
+                        game.player.inVehicle.exploded = false;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6000;
+                    }
+                    if (game.audio) game.audio.playPickup("ARMOR");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🔧 RACING PIT-STOP OVERHAUL!`,
+                            `${dp.name} • FULL CHASSIS REPAIR + 150 ARMOR & +$6,000!`,
+                            "#f97316",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: dp.x,
+                            y: dp.y,
+                            z: 2.70,
+                            text: `🔧 PIT-STOP OVERHAUL! FULL REPAIR + 150 ARMOR + +$6,000!`,
+                            color: "#f97316",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.lobsterTrapBuoys)) {
+            for (const lb of this.lobsterTrapBuoys) {
+                if ((lb.cooldown || 0) <= 0 && Math.hypot(px - lb.x, py - lb.y) < 76) {
+                    lb.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🦞 KEYS LOBSTER & PEARL HAUL!`,
+                            `${lb.name} • 150 HP/ARMOR + +$6,000 & +1X!`,
+                            "#fb7185",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: lb.x,
+                            y: lb.y,
+                            z: 2.68,
+                            text: `🦞 LOBSTER & PEARL POT! 150 HP/ARMOR + +$6,000 & +1X!`,
+                            color: "#fb7185",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P24. Official GTA 6 Open-Air Block-Party Soundstages & Coconut Smoothie Bars ([E], Loop 25)
+        if (Array.isArray(this.blockPartyStages)) {
+            for (const bp of this.blockPartyStages) {
+                if ((bp.cooldown || 0) <= 0 && Math.hypot(px - bp.x, py - bp.y) < 72) {
+                    bp.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6500;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎧 VIP BLOCK-PARTY DJ DROP!`,
+                            `${bp.name} • 150 HP/ARMOR + +$6,500 & +1X!`,
+                            "#a855f7",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bp.x,
+                            y: bp.y,
+                            z: 2.74,
+                            text: `🎧 BLOCK-PARTY DJ SET! 150 HP/ARMOR + +$6,500 & +1X!`,
+                            color: "#a855f7",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.coconutSmoothieBars)) {
+            for (const cb of this.coconutSmoothieBars) {
+                if ((cb.cooldown || 0) <= 0 && Math.hypot(px - cb.x, py - cb.y) < 62) {
+                    cb.cooldown = 24.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(4000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 4000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🥥 TROPICAL COCONUT & ACAI BOOST!`,
+                            `${cb.name} • 150 HP/ARMOR & +$4,000!`,
+                            "#34d399",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cb.x,
+                            y: cb.y,
+                            z: 2.66,
+                            text: `🥥 COCONUT & ACAI BOOST! 150 HP/ARMOR + +$4,000!`,
+                            color: "#34d399",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P25. Official GTA 6 Mount Kalaga Gold-Panning Camps & VIP Armored Courier Drops ([E], Loop 26)
+        if (Array.isArray(this.goldPanningCamps)) {
+            for (const gp of this.goldPanningCamps) {
+                if ((gp.cooldown || 0) <= 0 && Math.hypot(px - gp.x, py - gp.y) < 68) {
+                    gp.cooldown = 30.0;
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(8000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 8000;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `⛏️ KALAGA CREEK GOLD NUGGET STRIKE!`,
+                            `${gp.name} • PROSPECTOR PAYOUT +$8,000 & +1X!`,
+                            "#facc15",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gp.x,
+                            y: gp.y,
+                            z: 2.70,
+                            text: `⛏️ GOLD NUGGET STRIKE! +$8,000 + +1X!`,
+                            color: "#facc15",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.vipCourierDrops)) {
+            for (const vc of this.vipCourierDrops) {
+                if ((vc.cooldown || 0) <= 0 && Math.hypot(px - vc.x, py - vc.y) < 64) {
+                    vc.cooldown = 32.0;
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(9000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 9000;
+                    }
+                    if (game.audio) game.audio.playPickup("ARMOR");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `💼 VIP TITANIUM BRIEFCASE INTERCEPTED!`,
+                            `${vc.name} • HIGH-ROLLER CACHE +$9,000 + 150 ARMOR & +1X!`,
+                            "#38bdf8",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: vc.x,
+                            y: vc.y,
+                            z: 2.72,
+                            text: `💼 VIP TITANIUM BRIEFCASE! +$9,000 + 150 ARMOR + +1X!`,
+                            color: "#38bdf8",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -4715,6 +5100,46 @@ class WorldObjectEngine {
         if (Array.isArray(this.droneLaunchPads)) {
             for (const dl of this.droneLaunchPads) {
                 if ((dl.cooldown || 0) > 0) dl.cooldown = Math.max(0, dl.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.tarotNeonBooths)) {
+            for (const tb of this.tarotNeonBooths) {
+                if ((tb.cooldown || 0) > 0) tb.cooldown = Math.max(0, tb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.beachBoxingRings)) {
+            for (const br of this.beachBoxingRings) {
+                if ((br.cooldown || 0) > 0) br.cooldown = Math.max(0, br.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.derbyPitGarages)) {
+            for (const dp of this.derbyPitGarages) {
+                if ((dp.cooldown || 0) > 0) dp.cooldown = Math.max(0, dp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.lobsterTrapBuoys)) {
+            for (const lb of this.lobsterTrapBuoys) {
+                if ((lb.cooldown || 0) > 0) lb.cooldown = Math.max(0, lb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.blockPartyStages)) {
+            for (const bp of this.blockPartyStages) {
+                if ((bp.cooldown || 0) > 0) bp.cooldown = Math.max(0, bp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.coconutSmoothieBars)) {
+            for (const cb of this.coconutSmoothieBars) {
+                if ((cb.cooldown || 0) > 0) cb.cooldown = Math.max(0, cb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.goldPanningCamps)) {
+            for (const gp of this.goldPanningCamps) {
+                if ((gp.cooldown || 0) > 0) gp.cooldown = Math.max(0, gp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.vipCourierDrops)) {
+            for (const vc of this.vipCourierDrops) {
+                if ((vc.cooldown || 0) > 0) vc.cooldown = Math.max(0, vc.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -8890,6 +9315,92 @@ class WorldObjectEngine {
             }
         }
 
+        // 22N. Official GTA 6 Neon Tarot Booths, Open-Air Boxing Rings, Pit-Stop Bays, Lobster Pots, Block-Party Stages, Coconut Bars, Gold Sluices & VIP Drops (Loops 23-26)
+        if (Array.isArray(this.tarotNeonBooths)) {
+            for (const tb of this.tarotNeonBooths) {
+                const bz = tb.z || 2.0;
+                emitAOShadow3D(tb.x, tb.y, 1, 0, 0, 0, 24, 20, bz, 0.34);
+                // Violet Velvet Fortune-Teller Table + Gold Pedestal + Glowing Cyan Crystal Ball + Mystic Canopy
+                emitSolidBox3D(tb.x, tb.y, 1, 0, 0, 0, 16, 12, bz, bz + 0.16, [0.46, 0.14, 0.68], 1);
+                emitCylinder3D(tb.x, tb.y, 0, 0, 3.4, 3.4, bz + 0.16, bz + 0.24, 8, [0.18, 0.94, 0.98], 1, true);
+                emitGableRoof3D(tb.x, tb.y, 1, 0, 0, 0, 22, 18, bz + 0.28, bz + 0.40, [0.84, 0.22, 0.92], true, 1);
+            }
+        }
+        if (Array.isArray(this.beachBoxingRings)) {
+            for (const br of this.beachBoxingRings) {
+                const bz = br.z || 2.0;
+                emitAOShadow3D(br.x, br.y, 1, 0, 0, 0, 42, 42, bz, 0.36);
+                // Raised Canvas Boxing Ring Apron + 4 Red/Blue Corner Posts + White Ropes
+                emitSolidBox3D(br.x, br.y, 1, 0, 0, 0, 34, 34, bz, bz + 0.08, [0.16, 0.22, 0.36], 5);
+                emitSolidBox3D(br.x, br.y, 1, 0, 0, 0, 30, 30, bz + 0.08, bz + 0.10, [0.92, 0.94, 0.98], 1);
+                emitSolidBox3D(br.x - 14, br.y - 14, 1, 0, 0, 0, 2.5, 2.5, bz + 0.10, bz + 0.28, [0.96, 0.18, 0.24], 1);
+                emitSolidBox3D(br.x + 14, br.y + 14, 1, 0, 0, 0, 2.5, 2.5, bz + 0.10, bz + 0.28, [0.18, 0.48, 0.98], 1);
+                emitSolidBox3D(br.x - 14, br.y + 14, 1, 0, 0, 0, 2.5, 2.5, bz + 0.10, bz + 0.28, [0.94, 0.94, 0.96], 1);
+                emitSolidBox3D(br.x + 14, br.y - 14, 1, 0, 0, 0, 2.5, 2.5, bz + 0.10, bz + 0.28, [0.94, 0.94, 0.96], 1);
+            }
+        }
+        if (Array.isArray(this.derbyPitGarages)) {
+            for (const dp of this.derbyPitGarages) {
+                const bz = dp.z || 2.0;
+                emitAOShadow3D(dp.x, dp.y, 1, 0, 0, 0, 42, 26, bz, 0.35);
+                // Concrete Service Apron + Red Snap-On Tool Chest + Racing Slick Tire Stack + Orange Pit Canopy
+                emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 36, 22, bz, bz + 0.04, [0.24, 0.26, 0.30], 5);
+                emitSolidBox3D(dp.x - 11, dp.y - 5, 1, 0, 0, 0, 10, 5, bz + 0.04, bz + 0.22, [0.94, 0.18, 0.18], 1);
+                emitCylinder3D(dp.x + 11, dp.y - 4, 0, 0, 4.2, 4.2, bz + 0.04, bz + 0.24, 8, [0.14, 0.15, 0.18], 5, true);
+                emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 38, 24, bz + 0.30, bz + 0.36, [0.98, 0.46, 0.12], 1);
+            }
+        }
+        if (Array.isArray(this.lobsterTrapBuoys)) {
+            for (const lb of this.lobsterTrapBuoys) {
+                const bz = lb.z || 2.0;
+                // Floating Wooden Slatted Lobster Crate + High-Vis Coral/White Marker Buoy
+                emitSolidBox3D(lb.x, lb.y, 1, 0, 0, 0, 16, 12, bz - 0.02, bz + 0.08, [0.64, 0.44, 0.22], 4);
+                emitCylinder3D(lb.x, lb.y, 0, 0, 3.6, 2.2, bz + 0.08, bz + 0.26, 8, [0.98, 0.34, 0.42], 1, true);
+            }
+        }
+        if (Array.isArray(this.blockPartyStages)) {
+            for (const bp of this.blockPartyStages) {
+                const bz = bp.z || 2.0;
+                emitAOShadow3D(bp.x, bp.y, 1, 0, 0, 0, 44, 28, bz, 0.36);
+                // Elevated DJ Soundstage Deck + Twin Subwoofer Stacks + Neon Purple/Cyan Truss Arch
+                emitSolidBox3D(bp.x, bp.y, 1, 0, 0, 0, 38, 22, bz, bz + 0.10, [0.18, 0.16, 0.26], 5);
+                emitSolidBox3D(bp.x - 14, bp.y - 4, 1, 0, 0, 0, 6, 6, bz + 0.10, bz + 0.32, [0.12, 0.12, 0.16], 5);
+                emitSolidBox3D(bp.x + 14, bp.y - 4, 1, 0, 0, 0, 6, 6, bz + 0.10, bz + 0.32, [0.12, 0.12, 0.16], 5);
+                emitSolidBox3D(bp.x, bp.y - 2, 1, 0, 0, 0, 12, 5, bz + 0.10, bz + 0.22, [0.16, 0.92, 0.98], 1);
+                emitSolidBox3D(bp.x, bp.y - 4, 1, 0, 0, 0, 36, 4, bz + 0.34, bz + 0.40, [0.68, 0.24, 0.98], 1);
+            }
+        }
+        if (Array.isArray(this.coconutSmoothieBars)) {
+            for (const cb of this.coconutSmoothieBars) {
+                const bz = cb.z || 2.0;
+                emitAOShadow3D(cb.x, cb.y, 1, 0, 0, 0, 26, 20, bz, 0.32);
+                // Tropical Bamboo Counter + Emerald/Lime Thatch Roof
+                emitSolidBox3D(cb.x, cb.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.16, [0.76, 0.56, 0.30], 4);
+                emitGableRoof3D(cb.x, cb.y, 1, 0, 0, 0, 24, 18, bz + 0.24, bz + 0.36, [0.16, 0.84, 0.52], true, 4);
+            }
+        }
+        if (Array.isArray(this.goldPanningCamps)) {
+            for (const gp of this.goldPanningCamps) {
+                const bz = gp.z || 2.0;
+                emitAOShadow3D(gp.x, gp.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
+                // Timber Water-Sluice Trough + Prospector Canvas Tent + Gold Ore Pile
+                emitSolidBox3D(gp.x - 6, gp.y + 4, 1, 0, 0, 0, 18, 6, bz, bz + 0.10, [0.58, 0.38, 0.18], 4);
+                emitSolidBox3D(gp.x - 6, gp.y + 4, 1, 0, 0, 0, 14, 4, bz + 0.10, bz + 0.12, [0.22, 0.74, 0.96], 1);
+                emitGableRoof3D(gp.x + 8, gp.y - 4, 1, 0, 0, 0, 14, 14, bz, bz + 0.24, [0.86, 0.78, 0.58], true, 4);
+                emitCylinder3D(gp.x - 10, gp.y - 5, 0, 0, 4.0, 2.0, bz, bz + 0.12, 7, [0.98, 0.82, 0.16], 1, true);
+            }
+        }
+        if (Array.isArray(this.vipCourierDrops)) {
+            for (const vc of this.vipCourierDrops) {
+                const bz = vc.z || 2.0;
+                emitAOShadow3D(vc.x, vc.y, 1, 0, 0, 0, 22, 22, bz, 0.32);
+                // Armored Obsidian Pedestal + Brushed Titanium Briefcase + Cyan Security Beacon
+                emitSolidBox3D(vc.x, vc.y, 1, 0, 0, 0, 14, 14, bz, bz + 0.12, [0.14, 0.18, 0.24], 5);
+                emitSolidBox3D(vc.x, vc.y, 1, 0, 0, 0, 9, 6, bz + 0.12, bz + 0.18, [0.84, 0.90, 0.98], 1);
+                emitCylinder3D(vc.x, vc.y, 0, 0, 2.2, 2.2, bz + 0.18, bz + 0.24, 8, [0.18, 0.86, 0.98], 1, true);
+            }
+        }
+
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
         //     West & East Drive-Through Vehicle Tunnels, Cantilevered White Canopy Roof, 4 Cylindrical Spiral Ramps,
@@ -12190,6 +12701,98 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(drX, drY, 2.52, 8.5, 8.5, renderer.time * 8.0, 0.14, 0.96, 1.0, 0.92, SPRITE_DRAW_ORDER.TREES);
             }
         }
+        if (Array.isArray(this.tarotNeonBooths)) {
+            for (let i = 0; i < this.tarotNeonBooths.length; i++) {
+                const tb = this.tarotNeonBooths[i];
+                if (tb.x < minX - 120 || tb.x > maxX + 120 || tb.y < minY - 120 || tb.y > maxY + 120) continue;
+                if ((tb.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.5 + i) * 3.0;
+                    renderer.pushSolidQuad3D(tb.x, tb.y, 2.03, rSz, rSz, -renderer.time * 1.4, 0.92, 0.38, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.beachBoxingRings)) {
+            const puv1 = pedSheet ? renderer.getUV("peds", "surfer_guy") : null;
+            const puv2 = pedSheet ? renderer.getUV("peds", "street_punk") : null;
+            for (let i = 0; i < this.beachBoxingRings.length; i++) {
+                const br = this.beachBoxingRings[i];
+                if (br.x < minX - 140 || br.x > maxX + 140 || br.y < minY - 140 || br.y > maxY + 140) continue;
+                if ((br.cooldown || 0) <= 0) {
+                    const rSz = 38 + Math.sin(renderer.time * 5.8 + i) * 3.5;
+                    renderer.pushSolidQuad3D(br.x, br.y, 2.03, rSz, rSz, renderer.time * 1.2, 0.98, 0.24, 0.36, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                if (puv1 && puv2) {
+                    const spar = Math.sin(renderer.time * 6.5 + i) * 3.5;
+                    renderer.pushSpriteQuad3D(br.x - 5 + spar * 0.5, br.y, 2.13, 13, 13, 0, pedTex, puv1.u0, puv1.v0, puv1.u1, puv1.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
+                    renderer.pushSpriteQuad3D(br.x + 5 - spar * 0.5, br.y, 2.13, 13, 13, Math.PI, pedTex, puv2.u0, puv2.v0, puv2.u1, puv2.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
+                }
+            }
+        }
+        if (Array.isArray(this.derbyPitGarages)) {
+            for (let i = 0; i < this.derbyPitGarages.length; i++) {
+                const dp = this.derbyPitGarages[i];
+                if (dp.x < minX - 140 || dp.x > maxX + 140 || dp.y < minY - 140 || dp.y > maxY + 140) continue;
+                if ((dp.cooldown || 0) <= 0) {
+                    const rSz = 36 + Math.sin(renderer.time * 5.4 + i) * 3.5;
+                    renderer.pushSolidQuad3D(dp.x, dp.y, 2.045, rSz, rSz, renderer.time * 1.1, 0.98, 0.48, 0.14, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.lobsterTrapBuoys)) {
+            for (let i = 0; i < this.lobsterTrapBuoys.length; i++) {
+                const lb = this.lobsterTrapBuoys[i];
+                if (lb.x < minX - 120 || lb.x > maxX + 120 || lb.y < minY - 120 || lb.y > maxY + 120) continue;
+                if ((lb.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.2 + i) * 3.2;
+                    renderer.pushSolidQuad3D(lb.x, lb.y, 2.03, rSz, rSz, -renderer.time * 1.3, 0.98, 0.38, 0.48, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.blockPartyStages)) {
+            const puv = pedSheet ? renderer.getUV("peds", "roller_girl") : null;
+            for (let i = 0; i < this.blockPartyStages.length; i++) {
+                const bp = this.blockPartyStages[i];
+                if (bp.x < minX - 140 || bp.x > maxX + 140 || bp.y < minY - 140 || bp.y > maxY + 140) continue;
+                if ((bp.cooldown || 0) <= 0) {
+                    const rSz = 38 + Math.sin(renderer.time * 6.2 + i) * 3.8;
+                    renderer.pushSolidQuad3D(bp.x, bp.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.68, 0.28, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                if (puv) {
+                    const djAng = renderer.time * 4.5 + i;
+                    renderer.pushSpriteQuad3D(bp.x, bp.y - 2, 2.13, 13, 13, djAng, pedTex, puv.u0, puv.v0, puv.u1, puv.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
+                }
+            }
+        }
+        if (Array.isArray(this.coconutSmoothieBars)) {
+            for (let i = 0; i < this.coconutSmoothieBars.length; i++) {
+                const cb = this.coconutSmoothieBars[i];
+                if (cb.x < minX - 120 || cb.x > maxX + 120 || cb.y < minY - 120 || cb.y > maxY + 120) continue;
+                if ((cb.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.4 + i) * 2.8;
+                    renderer.pushSolidQuad3D(cb.x, cb.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.22, 0.88, 0.58, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.goldPanningCamps)) {
+            for (let i = 0; i < this.goldPanningCamps.length; i++) {
+                const gp = this.goldPanningCamps[i];
+                if (gp.x < minX - 120 || gp.x > maxX + 120 || gp.y < minY - 120 || gp.y > maxY + 120) continue;
+                if ((gp.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 5.6 + i) * 3.2;
+                    renderer.pushSolidQuad3D(gp.x, gp.y, 2.03, rSz, rSz, renderer.time * 1.3, 0.98, 0.84, 0.16, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.vipCourierDrops)) {
+            for (let i = 0; i < this.vipCourierDrops.length; i++) {
+                const vc = this.vipCourierDrops[i];
+                if (vc.x < minX - 120 || vc.x > maxX + 120 || vc.y < minY - 120 || vc.y > maxY + 120) continue;
+                if ((vc.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 6.0 + i) * 3.0;
+                    renderer.pushSolidQuad3D(vc.x, vc.y, 2.03, rSz, rSz, -renderer.time * 1.6, 0.22, 0.78, 0.98, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -13141,6 +13744,126 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.tarotNeonBooths)) {
+            for (const tb of this.tarotNeonBooths) {
+                if ((tb.cooldown || 0) <= 0 && Math.hypot(px - tb.x, py - tb.y) < 110) {
+                    const scr = renderer.worldToScreen(tb.x, tb.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#e879f9";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#f0abfc";
+                    ctx.fillText(`🔮 [E] CONSULT NEON TAROT ORACLE (0★ WANTED + 150 HP/ARMOR & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.beachBoxingRings)) {
+            for (const br of this.beachBoxingRings) {
+                if ((br.cooldown || 0) <= 0 && Math.hypot(px - br.x, py - br.y) < 115) {
+                    const scr = renderer.worldToScreen(br.x, br.y - 18, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f43f5e";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fda4af";
+                    ctx.fillText(`🥊 [E] WIN OPEN-AIR BOXING BOUT (150 HP/ARMOR + +$6,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.derbyPitGarages)) {
+            for (const dp of this.derbyPitGarages) {
+                if ((dp.cooldown || 0) <= 0 && Math.hypot(px - dp.x, py - dp.y) < 115) {
+                    const scr = renderer.worldToScreen(dp.x, dp.y - 18, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#f97316";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fdba74";
+                    ctx.fillText(`🔧 [E] RACING PIT-STOP OVERHAUL (FULL REPAIR + 150 ARMOR & +$6,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.lobsterTrapBuoys)) {
+            for (const lb of this.lobsterTrapBuoys) {
+                if ((lb.cooldown || 0) <= 0 && Math.hypot(px - lb.x, py - lb.y) < 115) {
+                    const scr = renderer.worldToScreen(lb.x, lb.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#fb7185";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fecdd3";
+                    ctx.fillText(`🦞 [E] HAUL KEYS LOBSTER & PEARL POT (150 HP/ARMOR + +$6,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.blockPartyStages)) {
+            for (const bp of this.blockPartyStages) {
+                if ((bp.cooldown || 0) <= 0 && Math.hypot(px - bp.x, py - bp.y) < 115) {
+                    const scr = renderer.worldToScreen(bp.x, bp.y - 18, 2.54);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#a855f7";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#d8b4fe";
+                    ctx.fillText(`🎧 [E] DROP VIP BLOCK-PARTY DJ SET (150 HP/ARMOR + +$6,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.coconutSmoothieBars)) {
+            for (const cb of this.coconutSmoothieBars) {
+                if ((cb.cooldown || 0) <= 0 && Math.hypot(px - cb.x, py - cb.y) < 110) {
+                    const scr = renderer.worldToScreen(cb.x, cb.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#34d399";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#6ee7b7";
+                    ctx.fillText(`🥥 [E] DRINK COCONUT & ACAI BOOST (150 HP/ARMOR & +$4,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.goldPanningCamps)) {
+            for (const gp of this.goldPanningCamps) {
+                if ((gp.cooldown || 0) <= 0 && Math.hypot(px - gp.x, py - gp.y) < 115) {
+                    const scr = renderer.worldToScreen(gp.x, gp.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillText(`⛏️ [E] PAN KALAGA CREEK FOR GOLD (+$8,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.vipCourierDrops)) {
+            for (const vc of this.vipCourierDrops) {
+                if ((vc.cooldown || 0) <= 0 && Math.hypot(px - vc.x, py - vc.y) < 110) {
+                    const scr = renderer.worldToScreen(vc.x, vc.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#7dd3fc";
+                    ctx.fillText(`💼 [E] INTERCEPT VIP TITANIUM BRIEFCASE (+$9,000 + 150 ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -13661,6 +14384,54 @@ class WorldObjectEngine {
             ctx.fillStyle = "#22d3ee";
             for (const dl of this.droneLaunchPads) {
                 ctx.fillRect((dl.x - 12) * sx, (dl.y - 12) * sy, 24 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.tarotNeonBooths)) {
+            ctx.fillStyle = "#e879f9";
+            for (const tb of this.tarotNeonBooths) {
+                ctx.fillRect((tb.x - 12) * sx, (tb.y - 10) * sy, 24 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.beachBoxingRings)) {
+            ctx.fillStyle = "#f43f5e";
+            for (const br of this.beachBoxingRings) {
+                ctx.fillRect((br.x - 18) * sx, (br.y - 18) * sy, 36 * sx, 36 * sy);
+            }
+        }
+        if (Array.isArray(this.derbyPitGarages)) {
+            ctx.fillStyle = "#f97316";
+            for (const dp of this.derbyPitGarages) {
+                ctx.fillRect((dp.x - 18) * sx, (dp.y - 12) * sy, 36 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.lobsterTrapBuoys)) {
+            ctx.fillStyle = "#fb7185";
+            for (const lb of this.lobsterTrapBuoys) {
+                ctx.fillRect((lb.x - 12) * sx, (lb.y - 10) * sy, 24 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.blockPartyStages)) {
+            ctx.fillStyle = "#a855f7";
+            for (const bp of this.blockPartyStages) {
+                ctx.fillRect((bp.x - 19) * sx, (bp.y - 12) * sy, 38 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.coconutSmoothieBars)) {
+            ctx.fillStyle = "#34d399";
+            for (const cb of this.coconutSmoothieBars) {
+                ctx.fillRect((cb.x - 12) * sx, (cb.y - 10) * sy, 24 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.goldPanningCamps)) {
+            ctx.fillStyle = "#facc15";
+            for (const gp of this.goldPanningCamps) {
+                ctx.fillRect((gp.x - 16) * sx, (gp.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.vipCourierDrops)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const vc of this.vipCourierDrops) {
+                ctx.fillRect((vc.x - 11) * sx, (vc.y - 11) * sy, 22 * sx, 22 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
