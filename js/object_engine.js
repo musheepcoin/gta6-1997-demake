@@ -667,6 +667,51 @@ class WorldObjectEngine {
             { name: "NORTH BEACH TROPICAL VIP CABANA",        x: 466.5 * TILE_SIZE, y: 146.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "STAR ISLAND YACHT CLUB CABANA",          x: 354.5 * TILE_SIZE, y: 174.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 26. Official GTA 6 Vice Beach Baywatch Rescue Med-Stations & Open-Air Neon Roller-Disco Rinks (Loop 19)
+        this.beachRescueStations = [
+            { name: "NORTH BEACH BAYWATCH RESCUE POST",       x: 474.5 * TILE_SIZE, y: 108.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PIER SURF RESCUE & MED STATION",         x: 474.5 * TILE_SIZE, y: 190.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS SANDS LIFEGUARD MED POST",        x: 474.5 * TILE_SIZE, y: 258.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE JETTY RESCUE STATION",      x: 474.5 * TILE_SIZE, y: 342.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.rollerDiscoRinks = [
+            { name: "LUMMUS PARK NEON ROLLER-DISCO RINK",     x: 451.5 * TILE_SIZE, y: 232.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WYNWOOD RETRO ROLLER-BOOGIE RINK",       x: 188.5 * TILE_SIZE, y: 136.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE SUNSET ROLLER RINK",        x: 443.5 * TILE_SIZE, y: 346.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 27. Official GTA 6 Leonida Keys Conch Fritter & Key Lime Pie Shacks & Backwoods Moonshine Stills (Loop 20)
+        this.conchShacks = [
+            { name: "KEY LENTO CONCH FRITTER HUT",            x: 232.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "ISLAMORADA KEY LIME PIE SHACK",          x: 262.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "BAHIA HONDA CONCH SHELL STAND",          x: 198.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.moonshineStills = [
+            { name: "GRASSRIVERS BAYOU COPPER STILL",         x: 84.5 * TILE_SIZE,  y: 422.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "MOUNT KALAGA HOLLOW MOONSHINE CAMP",     x: 158.5 * TILE_SIZE, y: 28.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "AMBROSIA SWAMP BOOTLEG STILL",           x: 146.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 28. Official GTA 6 SERA Space Center Rocket Viewing Bleachers & Racing Catamaran Charter Docks (Loop 21)
+        this.spaceViewingStands = [
+            { name: "SERA CAPE VIP LAUNCH BLEACHERS",         x: 454.5 * TILE_SIZE, y: 48.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "NORTH BEACH ROCKET TRACKING DECK",       x: 466.5 * TILE_SIZE, y: 68.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "CAPE OBSERVATION TELEMETRY DISH",        x: 448.5 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        this.catamaranDocks = [
+            { name: "STAR ISLAND RACING CATAMARAN DOCK",      x: 356.5 * TILE_SIZE, y: 158.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VENETIAN CAUSEWAY TWIN-HULL MARINA",     x: 388.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "KEY WEST SUNSET CATAMARAN PIER",         x: 212.5 * TILE_SIZE, y: 482.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 29. Official GTA 6 Little Haiti Botanica Lucky Shrines & Viral Influencer Drone Launchpads (Loop 22)
+        this.botanicaShrines = [
+            { name: "LITTLE HAITI BOTANICA CHARM SHRINE",     x: 216.5 * TILE_SIZE, y: 112.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CROSSTOWN CARIBBEAN HERBALIST STAND",    x: 208.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "NORTH HAITI VOODOO TALISMAN ALTAR",      x: 228.5 * TILE_SIZE, y: 98.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        this.droneLaunchPads = [
+            { name: "OCEAN DRIVE VIRAL DRONE LIVESTREAM",     x: 443.5 * TILE_SIZE, y: 260.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "DOWNTOWN SKYLINE DRONE LAUNCHPAD",       x: 284.5 * TILE_SIZE, y: 214.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE PIER AERIAL DRONE STREAM",          x: 462.5 * TILE_SIZE, y: 196.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1230,6 +1275,56 @@ class WorldObjectEngine {
                 for (const bc of this.beachCabanaLounges) {
                     snapOffRoad(bc);
                     clearZones.push({ x: bc.x, y: bc.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.beachRescueStations)) {
+                for (const br of this.beachRescueStations) {
+                    snapOffRoad(br);
+                    clearZones.push({ x: br.x, y: br.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.rollerDiscoRinks)) {
+                for (const rd of this.rollerDiscoRinks) {
+                    snapOffRoad(rd);
+                    clearZones.push({ x: rd.x, y: rd.y, r: 48 });
+                }
+            }
+            if (Array.isArray(this.conchShacks)) {
+                for (const cs of this.conchShacks) {
+                    snapOffRoad(cs);
+                    clearZones.push({ x: cs.x, y: cs.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.moonshineStills)) {
+                for (const ms of this.moonshineStills) {
+                    snapOffRoad(ms);
+                    clearZones.push({ x: ms.x, y: ms.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.spaceViewingStands)) {
+                for (const sv of this.spaceViewingStands) {
+                    snapOffRoad(sv);
+                    clearZones.push({ x: sv.x, y: sv.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.catamaranDocks)) {
+                for (const cd of this.catamaranDocks) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(cd.x, cd.y, 18);
+                        if (sn) { cd.x = sn.x; cd.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.botanicaShrines)) {
+                for (const bs of this.botanicaShrines) {
+                    snapOffRoad(bs);
+                    clearZones.push({ x: bs.x, y: bs.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.droneLaunchPads)) {
+                for (const dl of this.droneLaunchPads) {
+                    snapOffRoad(dl);
+                    clearZones.push({ x: dl.x, y: dl.y, r: 38 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -3303,6 +3398,289 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-32. Official GTA 6 Vice Beach Baywatch Rescue & Medkit Stations ([E]!)
+        if (Array.isArray(this.beachRescueStations)) {
+            for (const br of this.beachRescueStations) {
+                if ((br.cooldown || 0) <= 0 && Math.hypot(px - br.x, py - br.y) < 78) {
+                    br.cooldown = 15.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(4500);
+                    if (typeof game.addCash === "function") game.addCash(4500, `🛟 ${br.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🛟 VICE BEACH BAYWATCH RESCUE GEAR!`,
+                            `${br.name} • 150 MAX HP/ARMOR + +$4,500 & +1X!`,
+                            "#ef4444",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: br.x,
+                            y: br.y,
+                            z: 2.68,
+                            text: `🛟 BAYWATCH RESCUE MEDKIT! 150 HP/ARMOR + +$4,500!`,
+                            color: "#ef4444",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-33. Official GTA 6 Open-Air Neon Roller-Disco Rinks ([E]!)
+        if (Array.isArray(this.rollerDiscoRinks)) {
+            for (const rd of this.rollerDiscoRinks) {
+                if ((rd.cooldown || 0) <= 0 && Math.hypot(px - rd.x, py - rd.y) < 86) {
+                    rd.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(5500);
+                    if (typeof game.addCash === "function") game.addCash(5500, `🛼 ${rd.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🛼 NEON ROLLER-DISCO BOOGIE!`,
+                            `${rd.name} • SKATE SHOWDOWN +$5,500 + 150 HP/ARMOR & +1X!`,
+                            "#ec4899",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: rd.x,
+                            y: rd.y,
+                            z: 2.70,
+                            text: `🛼 NEON ROLLER-DISCO! +$5,500 + 150 HP/ARMOR!`,
+                            color: "#ec4899",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-34. Official GTA 6 Leonida Keys Conch Fritter & Key Lime Pie Shacks ([E]!)
+        if (Array.isArray(this.conchShacks)) {
+            for (const cs of this.conchShacks) {
+                if ((cs.cooldown || 0) <= 0 && Math.hypot(px - cs.x, py - cs.y) < 78) {
+                    cs.cooldown = 15.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(4500);
+                    if (typeof game.addCash === "function") game.addCash(4500, `🥧 ${cs.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🥧 LEONIDA KEYS CONCH & KEY LIME FEAST!`,
+                            `${cs.name} • 150 MAX HP/ARMOR + +$4,500 & +1X!`,
+                            "#84cc16",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cs.x,
+                            y: cs.y,
+                            z: 2.68,
+                            text: `🥧 KEY LIME & CONCH FRITTERS! 150 HP/ARMOR + +$4,500!`,
+                            color: "#84cc16",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-35. Official GTA 6 Grassrivers & Kalaga Backwoods Moonshine Stills ([E]!)
+        if (Array.isArray(this.moonshineStills)) {
+            for (const ms of this.moonshineStills) {
+                if ((ms.cooldown || 0) <= 0 && Math.hypot(px - ms.x, py - ms.y) < 80) {
+                    ms.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(7500);
+                    if (typeof game.addCash === "function") game.addCash(7500, `🫙 ${ms.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🫙 BACKWOODS WHITE-LIGHTNING MOONSHINE!`,
+                            `${ms.name} • 150 HP/ARMOR + +$7,500 & +1X!`,
+                            "#f59e0b",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ms.x,
+                            y: ms.y,
+                            z: 2.70,
+                            text: `🫙 MOONSHINE STILL HAUL! +$7,500 + 150 HP/ARMOR!`,
+                            color: "#f59e0b",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-36. Official GTA 6 SERA Space Center Rocket Telemetry & Viewing Stands ([E]!)
+        if (Array.isArray(this.spaceViewingStands)) {
+            for (const sv of this.spaceViewingStands) {
+                if ((sv.cooldown || 0) <= 0 && Math.hypot(px - sv.x, py - sv.y) < 84) {
+                    sv.cooldown = 18.0;
+                    this.cameraFlashTimer = 0.35;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(7000);
+                    if (typeof game.addCash === "function") game.addCash(7000, `🚀 ${sv.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🚀 SERA SPACE LAUNCH TELEMETRY!`,
+                            `${sv.name} • ORBITAL DATA BOUNTY +$7,000 + 150 ARMOR & +1X!`,
+                            "#38bdf8",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sv.x,
+                            y: sv.y,
+                            z: 2.72,
+                            text: `🚀 SERA ROCKET TELEMETRY! +$7,000 + 150 ARMOR!`,
+                            color: "#38bdf8",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-37. Official GTA 6 Biscayne Bay & Keys Racing Catamaran Docks ([E]!)
+        if (Array.isArray(this.catamaranDocks)) {
+            for (const cd of this.catamaranDocks) {
+                if ((cd.cooldown || 0) <= 0 && Math.hypot(px - cd.x, py - cd.y) < 92) {
+                    cd.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(6500);
+                    if (typeof game.addCash === "function") game.addCash(6500, `⛵ ${cd.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `⛵ TWIN-HULL RACING CATAMARAN REGATTA!`,
+                            `${cd.name} • +$6,500 + 150 HP/ARMOR & +1X!`,
+                            "#06b6d4",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cd.x,
+                            y: cd.y,
+                            z: 2.70,
+                            text: `⛵ CATAMARAN REGATTA! +$6,500 + 150 HP/ARMOR!`,
+                            color: "#06b6d4",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-38. Official GTA 6 Little Haiti Botanica & Lucky Talisman Shrines ([E]!)
+        if (Array.isArray(this.botanicaShrines)) {
+            for (const bs of this.botanicaShrines) {
+                if ((bs.cooldown || 0) <= 0 && Math.hypot(px - bs.x, py - bs.y) < 78) {
+                    bs.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.clearWanted === "function") {
+                        game.clearWanted();
+                    } else {
+                        game.wantedLevel = 0;
+                        game.wantedDecayTimer = 0;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(5500);
+                    if (typeof game.addCash === "function") game.addCash(5500, `🕯️ ${bs.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🕯️ LITTLE HAITI BOTANICA BLESSING!`,
+                            `${bs.name} • 0★ WANTED + 150 HP/ARMOR + +$5,500 & +1X!`,
+                            "#c084fc",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bs.x,
+                            y: bs.y,
+                            z: 2.70,
+                            text: `🕯️ BOTANICA BLESSING! 0★ WANTED + 150 HP/ARMOR + +$5,500!`,
+                            color: "#c084fc",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-39. Official GTA 6 Viral Social-Media Influencer Drone Launchpads ([E]!)
+        if (Array.isArray(this.droneLaunchPads)) {
+            for (const dl of this.droneLaunchPads) {
+                if ((dl.cooldown || 0) <= 0 && Math.hypot(px - dl.x, py - dl.y) < 78) {
+                    dl.cooldown = 16.0;
+                    this.cameraFlashTimer = 0.35;
+                    if (typeof game.addScore === "function") game.addScore(6000);
+                    if (typeof game.addCash === "function") game.addCash(6000, `🛸 ${dl.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🛸 VIRAL 4K DRONE LIVESTREAM!`,
+                            `${dl.name} • 1M VIEWS SPONSOR PAYOUT +$6,000 & +1X!`,
+                            "#22d3ee",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: dl.x,
+                            y: dl.y,
+                            z: 2.72,
+                            text: `🛸 VIRAL DRONE LIVESTREAM! +$6,000 + +1X!`,
+                            color: "#22d3ee",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -4297,6 +4675,46 @@ class WorldObjectEngine {
         if (Array.isArray(this.beachCabanaLounges)) {
             for (const bc of this.beachCabanaLounges) {
                 if ((bc.cooldown || 0) > 0) bc.cooldown = Math.max(0, bc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.beachRescueStations)) {
+            for (const br of this.beachRescueStations) {
+                if ((br.cooldown || 0) > 0) br.cooldown = Math.max(0, br.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.rollerDiscoRinks)) {
+            for (const rd of this.rollerDiscoRinks) {
+                if ((rd.cooldown || 0) > 0) rd.cooldown = Math.max(0, rd.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.conchShacks)) {
+            for (const cs of this.conchShacks) {
+                if ((cs.cooldown || 0) > 0) cs.cooldown = Math.max(0, cs.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.moonshineStills)) {
+            for (const ms of this.moonshineStills) {
+                if ((ms.cooldown || 0) > 0) ms.cooldown = Math.max(0, ms.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.spaceViewingStands)) {
+            for (const sv of this.spaceViewingStands) {
+                if ((sv.cooldown || 0) > 0) sv.cooldown = Math.max(0, sv.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.catamaranDocks)) {
+            for (const cd of this.catamaranDocks) {
+                if ((cd.cooldown || 0) > 0) cd.cooldown = Math.max(0, cd.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.botanicaShrines)) {
+            for (const bs of this.botanicaShrines) {
+                if ((bs.cooldown || 0) > 0) bs.cooldown = Math.max(0, bs.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.droneLaunchPads)) {
+            for (const dl of this.droneLaunchPads) {
+                if ((dl.cooldown || 0) > 0) dl.cooldown = Math.max(0, dl.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -8387,6 +8805,90 @@ class WorldObjectEngine {
                 emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz + 0.26, bz + 0.31, [0.98, 0.98, 1.00], 1);
             }
         }
+        // 22L. OFFICIAL GTA 6 BAYWATCH RESCUE STATIONS, NEON ROLLER-DISCO RINKS, CONCH SHACKS, MOONSHINE STILLS, SPACE VIEWING BLEACHERS, CATAMARANS, BOTANICAS & DRONE PADS (LOOPS 19..22)
+        if (Array.isArray(this.beachRescueStations)) {
+            for (const br of this.beachRescueStations) {
+                const bz = br.z || 2.0;
+                emitAOShadow3D(br.x, br.y, 1, 0, 0, 0, 26, 20, bz, 0.32);
+                // White/Red Lifeguard First-Aid Locker + Red Rescue Paddleboards + Rescue Torpedo Buoy
+                emitSolidBox3D(br.x, br.y, 1, 0, -4, 0, 14, 14, bz, bz + 0.22, [0.98, 0.98, 1.00], 1);
+                emitSolidBox3D(br.x, br.y, 1, 0, -4, 0, 15, 15, bz + 0.22, bz + 0.26, [0.96, 0.18, 0.22], 1);
+                emitSolidBox3D(br.x, br.y, 1, 0,  8, -4, 14, 3.6, bz + 0.02, bz + 0.06, [0.96, 0.18, 0.22], 1);
+                emitSolidBox3D(br.x, br.y, 1, 0,  8,  4, 14, 3.6, bz + 0.02, bz + 0.06, [0.98, 0.84, 0.16], 1);
+            }
+        }
+        if (Array.isArray(this.rollerDiscoRinks)) {
+            for (const rd of this.rollerDiscoRinks) {
+                const bz = rd.z || 2.0;
+                emitAOShadow3D(rd.x, rd.y, 1, 0, 0, 0, 38, 28, bz, 0.34);
+                // Pastel Neon Roller-Disco Floor + Hot-Pink Low Barrier Wall + Mirror-Ball Arch
+                emitSolidBox3D(rd.x, rd.y, 1, 0, 0, 0, 34, 24, bz, bz + 0.04, [0.98, 0.24, 0.72], 1);
+                emitSolidBox3D(rd.x, rd.y, 1, 0, 0, 0, 30, 20, bz + 0.04, bz + 0.055, [0.16, 0.90, 0.96], 10);
+                emitCylinder3D(rd.x, rd.y, 0, 0, 3.6, 3.6, bz + 0.34, bz + 0.42, 8, [0.96, 0.98, 1.00], 5, true);
+            }
+        }
+        if (Array.isArray(this.conchShacks)) {
+            for (const cs of this.conchShacks) {
+                const bz = cs.z || 2.0;
+                emitAOShadow3D(cs.x, cs.y, 1, 0, 0, 0, 28, 22, bz, 0.34);
+                // Key Lime Green Caribbean Shack + Coral Pink Roof + Giant Conch Shell Emblem
+                emitSolidBox3D(cs.x, cs.y, 1, 0, 0, 0, 20, 14, bz, bz + 0.22, [0.64, 0.92, 0.36], 8);
+                emitGableRoof3D(cs.x, cs.y, 1, 0, 0, 0, 23, 17, bz + 0.22, bz + 0.32, [0.98, 0.48, 0.62], true, 12);
+                emitCylinder3D(cs.x, cs.y, 0, 0, 4.5, 2.8, bz + 0.32, bz + 0.40, 8, [0.98, 0.76, 0.68], 1, true);
+            }
+        }
+        if (Array.isArray(this.moonshineStills)) {
+            for (const ms of this.moonshineStills) {
+                const bz = ms.z || 2.0;
+                emitAOShadow3D(ms.x, ms.y, 1, 0, 0, 0, 30, 22, bz, 0.36);
+                // Gleaming Copper Moonshine Boiler + Condenser Coil Drum + Oak Mash Barrels
+                emitCylinder3D(ms.x, ms.y, -6, 0, 5.5, 4.8, bz, bz + 0.26, 8, [0.88, 0.48, 0.22], 5, true);
+                emitCylinder3D(ms.x, ms.y, -6, 0, 3.0, 2.0, bz + 0.26, bz + 0.34, 8, [0.94, 0.58, 0.28], 5, true);
+                emitCylinder3D(ms.x, ms.y,  6, -4, 4.0, 4.0, bz, bz + 0.18, 8, [0.54, 0.36, 0.18], 8, true);
+                emitCylinder3D(ms.x, ms.y,  6,  5, 4.0, 4.0, bz, bz + 0.18, 8, [0.54, 0.36, 0.18], 8, true);
+            }
+        }
+        if (Array.isArray(this.spaceViewingStands)) {
+            for (const sv of this.spaceViewingStands) {
+                const bz = sv.z || 2.0;
+                emitAOShadow3D(sv.x, sv.y, 1, 0, 0, 0, 36, 24, bz, 0.35);
+                // 3-Tier Spectator Bleachers + White NASA/SERA Telemetry Radar Dish
+                emitSolidBox3D(sv.x, sv.y, 1, 0, -6, 0, 18, 18, bz, bz + 0.08, [0.76, 0.80, 0.86], 5);
+                emitSolidBox3D(sv.x, sv.y, 1, 0, -9, 0, 12, 18, bz + 0.08, bz + 0.16, [0.84, 0.88, 0.94], 5);
+                emitCylinder3D(sv.x, sv.y, 10, 0, 2.2, 2.2, bz, bz + 0.22, 8, [0.64, 0.70, 0.78], 5, false);
+                emitCylinder3D(sv.x, sv.y, 10, 0, 7.5, 3.0, bz + 0.22, bz + 0.34, 8, [0.96, 0.98, 1.00], 5, true);
+            }
+        }
+        if (Array.isArray(this.catamaranDocks)) {
+            for (const cd of this.catamaranDocks) {
+                const bz = 2.01;
+                // Twin-Hull Racing Catamaran + Crossbeam Trampoline Deck + Tall White/Cyan Mainsail
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 0, -8, 32, 3.8, bz, bz + 0.07, [0.96, 0.98, 1.00], 5);
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 0,  8, 32, 3.8, bz, bz + 0.07, [0.96, 0.98, 1.00], 5);
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 0,  0, 20, 14, bz + 0.05, bz + 0.08, [0.14, 0.84, 0.96], 1);
+                emitSolidBox3D(cd.x, cd.y, 1, 0, 0,  0, 10, 2.0, bz + 0.08, bz + 0.56, [0.98, 0.98, 1.00], 1);
+            }
+        }
+        if (Array.isArray(this.botanicaShrines)) {
+            for (const bs of this.botanicaShrines) {
+                const bz = bs.z || 2.0;
+                emitAOShadow3D(bs.x, bs.y, 1, 0, 0, 0, 26, 20, bz, 0.34);
+                // Purple/Gold Caribbean Botanica Altar + Candle Pedestals + Talisman Canopy
+                emitSolidBox3D(bs.x, bs.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.16, [0.44, 0.18, 0.68], 1);
+                emitSolidBox3D(bs.x, bs.y, 1, 0, 0, 0, 14,  8, bz + 0.16, bz + 0.22, [0.98, 0.82, 0.18], 1);
+                emitGableRoof3D(bs.x, bs.y, 1, 0, 0, 0, 22, 16, bz + 0.24, bz + 0.34, [0.58, 0.22, 0.84], true, 1);
+            }
+        }
+        if (Array.isArray(this.droneLaunchPads)) {
+            for (const dl of this.droneLaunchPads) {
+                const bz = dl.z || 2.0;
+                emitAOShadow3D(dl.x, dl.y, 1, 0, 0, 0, 24, 24, bz, 0.32);
+                // Glowing Cyan/Magenta Influencer Quadcopter Landing Pad + Tripod Ring-Light
+                emitSolidBox3D(dl.x, dl.y, 1, 0, 0, 0, 18, 18, bz, bz + 0.04, [0.14, 0.18, 0.26], 5);
+                emitSolidBox3D(dl.x, dl.y, 1, 0, 0, 0, 12, 12, bz + 0.04, bz + 0.06, [0.12, 0.92, 0.98], 1);
+                emitCylinder3D(dl.x, dl.y, -9, -9, 3.2, 3.2, bz + 0.20, bz + 0.26, 8, [0.98, 0.28, 0.76], 1, true);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -11600,6 +12102,94 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_cyan", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bc.x + 2, bc.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
+        if (Array.isArray(this.beachRescueStations)) {
+            for (let i = 0; i < this.beachRescueStations.length; i++) {
+                const br = this.beachRescueStations[i];
+                if (br.x < minX - 120 || br.x > maxX + 120 || br.y < minY - 120 || br.y > maxY + 120) continue;
+                if ((br.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.4 + i) * 3.0;
+                    renderer.pushSolidQuad3D(br.x, br.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.98, 0.22, 0.26, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.4 + i) % 4), br.x + 2, br.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.rollerDiscoRinks)) {
+            for (let i = 0; i < this.rollerDiscoRinks.length; i++) {
+                const rd = this.rollerDiscoRinks[i];
+                if (rd.x < minX - 130 || rd.x > maxX + 130 || rd.y < minY - 130 || rd.y > maxY + 130) continue;
+                if ((rd.cooldown || 0) <= 0) {
+                    const rSz = 30 + Math.sin(renderer.time * 6.0 + i) * 3.6;
+                    renderer.pushSolidQuad3D(rd.x, rd.y, 2.062, rSz, rSz, renderer.time * 1.8, 0.98, 0.24, 0.76, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                const skAng = renderer.time * 2.2 + i;
+                renderer.batchPedSprite3D("bikini_pink", 8 + (Math.floor(renderer.time * 9.0 + i) % 8), rd.x + Math.cos(skAng) * 9, rd.y + Math.sin(skAng) * 6, 2.065, skAng + Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.conchShacks)) {
+            for (let i = 0; i < this.conchShacks.length; i++) {
+                const cs = this.conchShacks[i];
+                if (cs.x < minX - 120 || cs.x > maxX + 120 || cs.y < minY - 120 || cs.y > maxY + 120) continue;
+                if ((cs.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.2 + i) * 3.0;
+                    renderer.pushSolidQuad3D(cs.x, cs.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.54, 0.92, 0.22, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.moonshineStills)) {
+            for (let i = 0; i < this.moonshineStills.length; i++) {
+                const ms = this.moonshineStills[i];
+                if (ms.x < minX - 120 || ms.x > maxX + 120 || ms.y < minY - 120 || ms.y > maxY + 120) continue;
+                if ((ms.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.4 + i) * 3.2;
+                    renderer.pushSolidQuad3D(ms.x, ms.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.98, 0.64, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.spaceViewingStands)) {
+            for (let i = 0; i < this.spaceViewingStands.length; i++) {
+                const sv = this.spaceViewingStands[i];
+                if (sv.x < minX - 130 || sv.x > maxX + 130 || sv.y < minY - 130 || sv.y > maxY + 130) continue;
+                if ((sv.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 5.5 + i) * 3.4;
+                    renderer.pushSolidQuad3D(sv.x, sv.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.22, 0.78, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.catamaranDocks)) {
+            for (let i = 0; i < this.catamaranDocks.length; i++) {
+                const cd = this.catamaranDocks[i];
+                if (cd.x < minX - 140 || cd.x > maxX + 140 || cd.y < minY - 140 || cd.y > maxY + 140) continue;
+                if ((cd.cooldown || 0) <= 0) {
+                    const rSz = 30 + Math.sin(renderer.time * 5.2 + i) * 3.5;
+                    renderer.pushSolidQuad3D(cd.x, cd.y, 2.025, rSz, rSz, renderer.time * 1.3, 0.12, 0.88, 0.96, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.botanicaShrines)) {
+            for (let i = 0; i < this.botanicaShrines.length; i++) {
+                const bs = this.botanicaShrines[i];
+                if (bs.x < minX - 120 || bs.x > maxX + 120 || bs.y < minY - 120 || bs.y > maxY + 120) continue;
+                if ((bs.cooldown || 0) <= 0) {
+                    const rSz = 25 + Math.sin(renderer.time * 5.6 + i) * 3.0;
+                    renderer.pushSolidQuad3D(bs.x, bs.y, 2.028, rSz, rSz, -renderer.time * 1.5, 0.76, 0.34, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.droneLaunchPads)) {
+            for (let i = 0; i < this.droneLaunchPads.length; i++) {
+                const dl = this.droneLaunchPads[i];
+                if (dl.x < minX - 120 || dl.x > maxX + 120 || dl.y < minY - 120 || dl.y > maxY + 120) continue;
+                if ((dl.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 6.0 + i) * 3.0;
+                    renderer.pushSolidQuad3D(dl.x, dl.y, 2.065, rSz, rSz, renderer.time * 1.8, 0.14, 0.92, 0.98, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Hovering 4-Rotor Influencer Camera Drone buzzing overhead at z = 2.52!
+                const drAng = renderer.time * 2.4 + i;
+                const drX = dl.x + Math.cos(drAng) * 8.0;
+                const drY = dl.y + Math.sin(drAng) * 8.0;
+                renderer.pushSolidQuad3D(drX, drY, 2.52, 8.5, 8.5, renderer.time * 8.0, 0.14, 0.96, 1.0, 0.92, SPRITE_DRAW_ORDER.TREES);
+            }
+        }
     }
 
     /* ========================================================================
@@ -12431,6 +13021,126 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.beachRescueStations)) {
+            for (const br of this.beachRescueStations) {
+                if ((br.cooldown || 0) <= 0 && Math.hypot(px - br.x, py - br.y) < 110) {
+                    const scr = renderer.worldToScreen(br.x, br.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#ef4444";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fca5a5";
+                    ctx.fillText(`🛟 [E] GRAB BAYWATCH RESCUE MEDKIT (150 HP/ARMOR & +$4,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.rollerDiscoRinks)) {
+            for (const rd of this.rollerDiscoRinks) {
+                if ((rd.cooldown || 0) <= 0 && Math.hypot(px - rd.x, py - rd.y) < 115) {
+                    const scr = renderer.worldToScreen(rd.x, rd.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#ec4899";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#f472b6";
+                    ctx.fillText(`🛼 [E] SKATE NEON ROLLER-DISCO (150 HP/ARMOR & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.conchShacks)) {
+            for (const cs of this.conchShacks) {
+                if ((cs.cooldown || 0) <= 0 && Math.hypot(px - cs.x, py - cs.y) < 110) {
+                    const scr = renderer.worldToScreen(cs.x, cs.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#84cc16";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#bef264";
+                    ctx.fillText(`🥧 [E] EAT KEY LIME PIE & CONCH (150 HP/ARMOR & +$4,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.moonshineStills)) {
+            for (const ms of this.moonshineStills) {
+                if ((ms.cooldown || 0) <= 0 && Math.hypot(px - ms.x, py - ms.y) < 110) {
+                    const scr = renderer.worldToScreen(ms.x, ms.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f59e0b";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`🫙 [E] RAID MOONSHINE COPPER STILL (150 HP/ARMOR & +$7,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.spaceViewingStands)) {
+            for (const sv of this.spaceViewingStands) {
+                if ((sv.cooldown || 0) <= 0 && Math.hypot(px - sv.x, py - sv.y) < 115) {
+                    const scr = renderer.worldToScreen(sv.x, sv.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#7dd3fc";
+                    ctx.fillText(`🚀 [E] TRACK SERA ROCKET TELEMETRY (+$7,000 & 150 ARMOR)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.catamaranDocks)) {
+            for (const cd of this.catamaranDocks) {
+                if ((cd.cooldown || 0) <= 0 && Math.hypot(px - cd.x, py - cd.y) < 120) {
+                    const scr = renderer.worldToScreen(cd.x, cd.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#06b6d4";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#22d3ee";
+                    ctx.fillText(`⛵ [E] CHARTER RACING CATAMARAN (150 HP/ARMOR & +$6,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.botanicaShrines)) {
+            for (const bs of this.botanicaShrines) {
+                if ((bs.cooldown || 0) <= 0 && Math.hypot(px - bs.x, py - bs.y) < 110) {
+                    const scr = renderer.worldToScreen(bs.x, bs.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#c084fc";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#d8b4fe";
+                    ctx.fillText(`🕯️ [E] BOTANICA LUCKY TALISMAN (0★ WANTED & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.droneLaunchPads)) {
+            for (const dl of this.droneLaunchPads) {
+                if ((dl.cooldown || 0) <= 0 && Math.hypot(px - dl.x, py - dl.y) < 110) {
+                    const scr = renderer.worldToScreen(dl.x, dl.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#22d3ee";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#67e8f9";
+                    ctx.fillText(`🛸 [E] LAUNCH VIRAL 4K DRONE STREAM (+$6,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -12903,6 +13613,54 @@ class WorldObjectEngine {
             ctx.fillStyle = "#2dd4bf";
             for (const bc of this.beachCabanaLounges) {
                 ctx.fillRect((bc.x - 14) * sx, (bc.y - 12) * sy, 28 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.beachRescueStations)) {
+            ctx.fillStyle = "#ef4444";
+            for (const br of this.beachRescueStations) {
+                ctx.fillRect((br.x - 13) * sx, (br.y - 10) * sy, 26 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.rollerDiscoRinks)) {
+            ctx.fillStyle = "#ec4899";
+            for (const rd of this.rollerDiscoRinks) {
+                ctx.fillRect((rd.x - 18) * sx, (rd.y - 14) * sy, 36 * sx, 28 * sy);
+            }
+        }
+        if (Array.isArray(this.conchShacks)) {
+            ctx.fillStyle = "#84cc16";
+            for (const cs of this.conchShacks) {
+                ctx.fillRect((cs.x - 14) * sx, (cs.y - 11) * sy, 28 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.moonshineStills)) {
+            ctx.fillStyle = "#f59e0b";
+            for (const ms of this.moonshineStills) {
+                ctx.fillRect((ms.x - 15) * sx, (ms.y - 11) * sy, 30 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.spaceViewingStands)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const sv of this.spaceViewingStands) {
+                ctx.fillRect((sv.x - 18) * sx, (sv.y - 12) * sy, 36 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.catamaranDocks)) {
+            ctx.fillStyle = "#06b6d4";
+            for (const cd of this.catamaranDocks) {
+                ctx.fillRect((cd.x - 18) * sx, (cd.y - 12) * sy, 36 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.botanicaShrines)) {
+            ctx.fillStyle = "#c084fc";
+            for (const bs of this.botanicaShrines) {
+                ctx.fillRect((bs.x - 13) * sx, (bs.y - 10) * sy, 26 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.droneLaunchPads)) {
+            ctx.fillStyle = "#22d3ee";
+            for (const dl of this.droneLaunchPads) {
+                ctx.fillRect((dl.x - 12) * sx, (dl.y - 12) * sy, 24 * sx, 24 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
