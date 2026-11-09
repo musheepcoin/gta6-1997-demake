@@ -4374,10 +4374,22 @@ class LeonidaGame {
 
 
     startGame() {
-
         this.started = true;
+        this._hasEnteredModal = true;
+        this._resetLoopClock = true;
+        this._pendingStartGame = !this.worldReady;
 
-        this.audio.resume();
+        // Immediately hide #start-modal so the player is NEVER stuck on the modal screen
+        const modal = document.getElementById("start-modal");
+        if (modal) modal.classList.add("hidden");
+
+        try {
+            if (this.audio && typeof this.audio.resume === "function") {
+                this.audio.resume();
+            }
+        } catch (e) {
+            console.warn("audio.resume warning:", e);
+        }
 
         if (this.input) {
             this.input.up = false;
@@ -4389,121 +4401,59 @@ class LeonidaGame {
             this.input.sprint = false;
         }
 
-        // If the 3D map & WebGL assets are still finishing their startup micro-slices,
-        // queue the start action and show immediate feedback on the button so we enter
-        // the exact millisecond onCmpLoaded completes (zero race condition!).
-        if (!this.worldReady && (!this.map || !this.map.cmpLoaded || !this.renderer || !this.renderer.gta1Ready)) {
-            this._pendingStartGame = true;
-            const btn = document.getElementById("btn-start-game");
-            if (btn) {
-                const pct = this.renderer
-                    ? Math.min(99, Math.max(10, Math.round(((this.renderer.loadProgress || 0) / (this.renderer.loadTotal || 8)) * 100)))
-                    : 50;
-                btn.textContent = `⏳ ENTERING VICE CITY 26 (${pct}%)...`;
-            }
-            return;
-        }
-
-        this._pendingStartGame = false;
-        this._hasEnteredModal = true;
-        this._resetLoopClock = true;
-
-
-
         // Read chosen Nickname, Server Slot & Character from the Selection Modal
-
         const nickInput = document.getElementById("start-nickname-input");
-
         const activeSrvBtn = document.querySelector(".server-slot-btn.active-server");
-
         const activeCard = document.querySelector(".char-select-card.active-mug");
 
-
-
         const chosenCharId = activeCard ? (activeCard.getAttribute("data-char-id") || "LUCIA") : (this.player.charId || "LUCIA");
-
         const chosenPedType = activeCard ? (activeCard.getAttribute("data-ped-type") || "lucia") : (this.player.pedType || "lucia");
-
         const chosenColor = activeCard ? (activeCard.getAttribute("data-color") || "#ff2a85") : "#ff2a85";
-
-        const chosenWeapon = activeCard ? (activeCard.getAttribute("data-weapon") || "PISTOL") : "PISTOL";
-
         const chosenNick = (nickInput && nickInput.value.trim()) ? nickInput.value.trim().toUpperCase() : `${chosenCharId} #97`;
-
         const chosenRoom = activeSrvBtn ? (activeSrvBtn.getAttribute("data-room") || "VICE97") : "VICE97";
 
-
-
         this.player.charId = chosenCharId;
-
         this.player.pedType = chosenPedType;
-
         this.player.nickname = chosenNick;
-
         this.player.weapon = "PISTOL"; // Everyone starts with the exact same loadout & stats
 
         if (this.jason) {
             this.jason.pedType = chosenCharId === "JASON" ? "lucia" : "jason";
         }
 
-
-
-        if (this.net && typeof this.net.setIdentity === "function") {
-
-            this.net.setIdentity(chosenNick, chosenCharId, chosenPedType, chosenColor, chosenRoom);
-
+        try {
+            if (this.net && typeof this.net.setIdentity === "function") {
+                this.net.setIdentity(chosenNick, chosenCharId, chosenPedType, chosenColor, chosenRoom);
+            }
+            this.recordHighScore(chosenNick, chosenCharId, this.cash, chosenColor, true);
+            this.renderAllTimeHighScoresUI();
+            this.renderPortraits();
+            this.updateHud();
+        } catch (e) {
+            console.warn("startGame UI init warning:", e);
         }
 
-
-
-        this.recordHighScore(chosenNick, chosenCharId, this.cash, chosenColor, true);
-
-        this.renderAllTimeHighScoresUI();
-
-        this.renderPortraits();
-
-        this.updateHud();
-
-
-
-        if (this.ytMusicEnabled) {
-
-            const volSlider = document.getElementById("yt-vol-slider");
-
-            const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
-
-            this.sendYouTubeCommand("unMute", []);
-
-            this.sendYouTubeCommand("setVolume", [vol]);
-
-            this.sendYouTubeCommand("playVideo", []);
-
-            setTimeout(() => this.sendYouTubeCommand("setVolume", [vol]), 400);
-
+        try {
+            if (this.ytMusicEnabled) {
+                const volSlider = document.getElementById("yt-vol-slider");
+                const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
+                this.sendYouTubeCommand("unMute", []);
+                this.sendYouTubeCommand("setVolume", [vol]);
+                this.sendYouTubeCommand("playVideo", []);
+                setTimeout(() => this.sendYouTubeCommand("setVolume", [vol]), 400);
+            }
+        } catch (e) {
+            console.warn("startGame YouTube warning:", e);
         }
-
-        const modal = document.getElementById("start-modal");
-
-        if (modal) modal.classList.add("hidden");
-
-
 
         const displayRoom = chosenRoom === "VICE97" ? "VICE26" : chosenRoom;
-
         this.addFloatingText(this.player.x, this.player.y - 32, `🎭 ${chosenNick} (${chosenCharId}) READY!`, chosenColor);
-
         this.sendPager(
-
             "VICE CITY ONLINE",
-
             `Welcome to Vice City 26, ${chosenNick}! Playing as ${chosenCharId} in room [${displayRoom}].`,
-
             true
-
         );
-
         this.showDistrictBanner(`SOUTH BEACH — ${chosenNick}`);
-
     }
 
 

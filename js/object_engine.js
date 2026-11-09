@@ -8223,6 +8223,34 @@ class WorldObjectEngine {
             }
         };
 
+        const emitGableRoof3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yEave, yTop, col, ridgeAlongX = true, matId = 1) => {
+            const hw = wPx * 0.5;
+            const hd = dPx * 0.5;
+            const [r, g, b] = col || [0.9, 0.9, 0.9];
+            const eNW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY - hd, yEave);
+            const eNE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY - hd, yEave);
+            const eSW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY + hd, yEave);
+            const eSE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY + hd, yEave);
+            const uv0 = encodeMatUV(matId, 0.05, 0.05);
+            const uv1 = encodeMatUV(matId, 0.95, 0.05);
+            const uvApex = encodeMatUV(matId, 0.50, 0.95);
+            if (ridgeAlongX) {
+                const rW = toWorld(cxPx, cyPx, cosA, sinA, offX - hw, offY, yTop);
+                const rE = toWorld(cxPx, cyPx, cosA, sinA, offX + hw, offY, yTop);
+                pushMatQuad3D(eNW, eNE, rW, rE, matId, Math.min(1, r * 1.06), Math.min(1, g * 1.05), Math.min(1, b * 1.02), 1.0);
+                pushMatQuad3D(rW, rE, eSW, eSE, matId, r * 0.92, g * 0.91, b * 0.90, 1.0);
+                pushTri3D(eNW, eSW, rW, uv0, uv1, uvApex, r * 0.98, g * 0.98, b * 0.98, 1.0);
+                pushTri3D(eSE, eNE, rE, uv0, uv1, uvApex, r * 0.86, g * 0.86, b * 0.88, 1.0);
+            } else {
+                const rN = toWorld(cxPx, cyPx, cosA, sinA, offX, offY - hd, yTop);
+                const rS = toWorld(cxPx, cyPx, cosA, sinA, offX, offY + hd, yTop);
+                pushMatQuad3D(eNW, rN, eSW, rS, matId, Math.min(1, r * 1.04), Math.min(1, g * 1.04), Math.min(1, b * 1.02), 1.0);
+                pushMatQuad3D(rN, eNE, rS, eSE, matId, r * 0.90, g * 0.90, b * 0.92, 1.0);
+                pushTri3D(eNE, eNW, rN, uv0, uv1, uvApex, r * 0.98, g * 0.98, b * 0.98, 1.0);
+                pushTri3D(eSW, eSE, rS, uv0, uv1, uvApex, r * 0.88, g * 0.88, b * 0.90, 1.0);
+            }
+        };
+
         const emitModernFlatRoof3D = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yEave, parapetH, roofKey, trimCol) => {
             emitTileBox3D(cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yEave - 0.04, yEave + 0.03, 177, 177, 46, [0.95, 0.97, 0.99], true);
             const hw = (wPx - 8) * 0.5;
@@ -14247,8 +14275,7 @@ class WorldObjectEngine {
             }
         }
         if (Array.isArray(this.beachBoxingRings)) {
-            const puv1 = pedSheet ? renderer.getUV("peds", "surfer_guy") : null;
-            const puv2 = pedSheet ? renderer.getUV("peds", "street_punk") : null;
+            const boxFrame = Math.floor(renderer.time * 6.5) % 8;
             for (let i = 0; i < this.beachBoxingRings.length; i++) {
                 const br = this.beachBoxingRings[i];
                 if (br.x < minX - 140 || br.x > maxX + 140 || br.y < minY - 140 || br.y > maxY + 140) continue;
@@ -14256,11 +14283,9 @@ class WorldObjectEngine {
                     const rSz = 38 + Math.sin(renderer.time * 5.8 + i) * 3.5;
                     renderer.pushSolidQuad3D(br.x, br.y, 2.03, rSz, rSz, renderer.time * 1.2, 0.98, 0.24, 0.36, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                if (puv1 && puv2) {
-                    const spar = Math.sin(renderer.time * 6.5 + i) * 3.5;
-                    renderer.pushSpriteQuad3D(br.x - 5 + spar * 0.5, br.y, 2.13, 13, 13, 0, pedTex, puv1.u0, puv1.v0, puv1.u1, puv1.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
-                    renderer.pushSpriteQuad3D(br.x + 5 - spar * 0.5, br.y, 2.13, 13, 13, Math.PI, pedTex, puv2.u0, puv2.v0, puv2.u1, puv2.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
-                }
+                const spar = Math.sin(renderer.time * 6.5 + i) * 3.5;
+                renderer.batchPedSprite3D("muscle_guy", boxFrame, br.x - 5 + spar * 0.5, br.y, 2.13, 0, 1.24, false, SPRITE_DRAW_ORDER.PED);
+                renderer.batchPedSprite3D("civ2", (boxFrame + 4) % 8, br.x + 5 - spar * 0.5, br.y, 2.13, Math.PI, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }
         if (Array.isArray(this.derbyPitGarages)) {
@@ -14284,7 +14309,7 @@ class WorldObjectEngine {
             }
         }
         if (Array.isArray(this.blockPartyStages)) {
-            const puv = pedSheet ? renderer.getUV("peds", "roller_girl") : null;
+            const djFrame = Math.floor(renderer.time * 5.0) % 8;
             for (let i = 0; i < this.blockPartyStages.length; i++) {
                 const bp = this.blockPartyStages[i];
                 if (bp.x < minX - 140 || bp.x > maxX + 140 || bp.y < minY - 140 || bp.y > maxY + 140) continue;
@@ -14292,10 +14317,8 @@ class WorldObjectEngine {
                     const rSz = 38 + Math.sin(renderer.time * 6.2 + i) * 3.8;
                     renderer.pushSolidQuad3D(bp.x, bp.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.68, 0.28, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                if (puv) {
-                    const djAng = renderer.time * 4.5 + i;
-                    renderer.pushSpriteQuad3D(bp.x, bp.y - 2, 2.13, 13, 13, djAng, pedTex, puv.u0, puv.v0, puv.u1, puv.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
-                }
+                const djAng = renderer.time * 4.5 + i;
+                renderer.batchPedSprite3D("bikini_cyan", djFrame, bp.x, bp.y - 2, 2.13, djAng, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }
         if (Array.isArray(this.coconutSmoothieBars)) {
@@ -14329,7 +14352,6 @@ class WorldObjectEngine {
             }
         }
         if (Array.isArray(this.beachYogaDecks)) {
-            const puv = pedSheet ? renderer.getUV("peds", "bikini_girl") : null;
             for (let i = 0; i < this.beachYogaDecks.length; i++) {
                 const yd = this.beachYogaDecks[i];
                 if (yd.x < minX - 130 || yd.x > maxX + 130 || yd.y < minY - 130 || yd.y > maxY + 130) continue;
@@ -14337,11 +14359,9 @@ class WorldObjectEngine {
                     const rSz = 30 + Math.sin(renderer.time * 5.0 + i) * 3.0;
                     renderer.pushSolidQuad3D(yd.x, yd.y, 2.03, rSz, rSz, renderer.time * 1.1, 0.18, 0.88, 0.78, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                if (puv) {
-                    const stretchAng = Math.sin(renderer.time * 2.2 + i) * 0.45;
-                    renderer.pushSpriteQuad3D(yd.x - 9, yd.y, 2.09, 12, 12, stretchAng, pedTex, puv.u0, puv.v0, puv.u1, puv.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
-                    renderer.pushSpriteQuad3D(yd.x + 9, yd.y, 2.09, 12, 12, -stretchAng, pedTex, puv.u0, puv.v0, puv.u1, puv.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
-                }
+                const stretchAng = Math.sin(renderer.time * 2.2 + i) * 0.45;
+                renderer.batchPedSprite3D("bikini_pink", 0, yd.x - 9, yd.y, 2.09, stretchAng, 1.22, false, SPRITE_DRAW_ORDER.PED);
+                renderer.batchPedSprite3D("bikini_cyan", 0, yd.x + 9, yd.y, 2.09, -stretchAng, 1.22, false, SPRITE_DRAW_ORDER.PED);
             }
         }
         if (Array.isArray(this.dominoParkTables)) {
