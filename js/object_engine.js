@@ -756,6 +756,50 @@ class WorldObjectEngine {
             { name: "DOWNTOWN BANK PLAZA ARMORED DROP",       x: 288.5 * TILE_SIZE, y: 232.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "VICE PORT CUSTOMS CONTRABAND DROP",      x: 338.5 * TILE_SIZE, y: 324.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 34. Official GTA 6 Vice Beach Sunset Yoga Decks & Little Cuba Domino Park Pavilions (Loop 27)
+        this.beachYogaDecks = [
+            { name: "LUMMUS PARK SUNRISE YOGA PAVILION",      x: 454.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE OCEANFRONT PILATES DECK",   x: 454.5 * TILE_SIZE, y: 334.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "STAR ISLAND ZEN LOTUS SANCTUARY",        x: 364.5 * TILE_SIZE, y: 162.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.dominoParkTables = [
+            { name: "CALLE OCHO MAXIMO GOMEZ DOMINO PARK",    x: 266.5 * TILE_SIZE, y: 256.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE CUBA HAVANA CLUB DOMINO TABLE",   x: 282.5 * TILE_SIZE, y: 262.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI CARIBBEAN DOMINO PLAZA",    x: 222.5 * TILE_SIZE, y: 114.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 35. Official GTA 6 Grassrivers Python-Hunter Outposts & Offshore Smuggler Speedboat Caches (Loop 28)
+        this.pythonBountyCamps = [
+            { name: "GRASSRIVERS PYTHON BOUNTY STATION",      x: 92.5 * TILE_SIZE,  y: 368.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CYPRESS SWAMP BURMESE PYTHON CAMP",      x: 118.5 * TILE_SIZE, y: 392.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "GATOR KEYS REPTILE HUNTER OUTPOST",      x: 148.5 * TILE_SIZE, y: 424.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.smugglerFloatingCaches = [
+            { name: "ATLANTIC REEF SMUGGLER FLOATING CACHE",  x: 492.5 * TILE_SIZE, y: 274.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "STILTSVILLE CARTEL AIR-DROP BALE",       x: 396.5 * TILE_SIZE, y: 422.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "FLORIDA STRAITS FAST-BOAT DROP",         x: 294.5 * TILE_SIZE, y: 492.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 36. Official GTA 6 Neon Drive-In Movie Theaters & Beachside Raw Oyster & Ceviche Bars (Loop 29)
+        this.driveInScreens = [
+            { name: "VICE PIER SUNSET DRIVE-IN CINEMA",       x: 438.5 * TILE_SIZE, y: 148.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PORT GELLHORN RETRO DRIVE-IN SCREEN",    x: 94.5 * TILE_SIZE,  y: 162.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "HOMESTEAD STARLIGHT DRIVE-IN LOT",       x: 178.5 * TILE_SIZE, y: 378.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.oysterRawBars = [
+            { name: "OCEAN DRIVE CHAMPAGNE & OYSTER BAR",     x: 443.5 * TILE_SIZE, y: 222.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VENETIAN MARINA CEVICHE & CLAM DECK",    x: 382.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "KEY WEST CONCH & RAW OYSTER PIER",       x: 218.5 * TILE_SIZE, y: 472.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 37. Official GTA 6 Mount Kalaga Zip-Line Canopy Towers & Wynwood Neon Arcade Cabinets (Loop 30)
+        this.kalagaZiplineTowers = [
+            { name: "KALAGA PEAK CANOPY ZIP-LINE TOWER",      x: 146.5 * TILE_SIZE, y: 20.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "EAGLE GORGE RAPIDS ZIP-LINE PLATFORM",   x: 184.5 * TILE_SIZE, y: 26.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "PINE CANYONTREETOP ZIP-LINE DECK",       x: 112.5 * TILE_SIZE, y: 24.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        this.neonArcadePavilions = [
+            { name: "OCEAN DRIVE 1997 RETRO ARCade PAVILION", x: 443.5 * TILE_SIZE, y: 274.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WYNWOOD PIXEL & PINBALL LOUNGE",         x: 198.5 * TILE_SIZE, y: 146.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VICE PIER BOARDWALK ARCADE STAND",       x: 462.5 * TILE_SIZE, y: 204.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1419,6 +1463,56 @@ class WorldObjectEngine {
                 for (const vc of this.vipCourierDrops) {
                     snapOffRoad(vc);
                     clearZones.push({ x: vc.x, y: vc.y, r: 38 });
+                }
+            }
+            if (Array.isArray(this.beachYogaDecks)) {
+                for (const yd of this.beachYogaDecks) {
+                    snapOffRoad(yd);
+                    clearZones.push({ x: yd.x, y: yd.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.dominoParkTables)) {
+                for (const dp of this.dominoParkTables) {
+                    snapOffRoad(dp);
+                    clearZones.push({ x: dp.x, y: dp.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.pythonBountyCamps)) {
+                for (const pb of this.pythonBountyCamps) {
+                    snapOffRoad(pb);
+                    clearZones.push({ x: pb.x, y: pb.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.smugglerFloatingCaches)) {
+                for (const sc of this.smugglerFloatingCaches) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(sc.x, sc.y, 18);
+                        if (sn) { sc.x = sn.x; sc.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.driveInScreens)) {
+                for (const ds of this.driveInScreens) {
+                    snapOffRoad(ds);
+                    clearZones.push({ x: ds.x, y: ds.y, r: 48 });
+                }
+            }
+            if (Array.isArray(this.oysterRawBars)) {
+                for (const ob of this.oysterRawBars) {
+                    snapOffRoad(ob);
+                    clearZones.push({ x: ob.x, y: ob.y, r: 38 });
+                }
+            }
+            if (Array.isArray(this.kalagaZiplineTowers)) {
+                for (const kz of this.kalagaZiplineTowers) {
+                    snapOffRoad(kz);
+                    clearZones.push({ x: kz.x, y: kz.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.neonArcadePavilions)) {
+                for (const na of this.neonArcadePavilions) {
+                    snapOffRoad(na);
+                    clearZones.push({ x: na.x, y: na.y, r: 38 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -4066,6 +4160,295 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P26. Official GTA 6 Vice Beach Sunset Yoga Decks & Little Cuba Domino Park Pavilions ([E], Loop 27)
+        if (Array.isArray(this.beachYogaDecks)) {
+            for (const yd of this.beachYogaDecks) {
+                if ((yd.cooldown || 0) <= 0 && Math.hypot(px - yd.x, py - yd.y) < 66) {
+                    yd.cooldown = 26.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(5000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 5000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🧘 SUNRISE OCEANFRONT YOGA ZEN!`,
+                            `${yd.name} • 150 HP/ARMOR + 0★ WANTED & +$5,000!`,
+                            "#2dd4bf",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: yd.x,
+                            y: yd.y,
+                            z: 2.70,
+                            text: `🧘 OCEANFRONT YOGA ZEN! 150 HP/ARMOR + 0★ WANTED + +$5,000!`,
+                            color: "#2dd4bf",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.dominoParkTables)) {
+            for (const dp of this.dominoParkTables) {
+                if ((dp.cooldown || 0) <= 0 && Math.hypot(px - dp.x, py - dp.y) < 64) {
+                    dp.cooldown = 26.0;
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6000;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🁣 CALLE OCHO DOMINO SLAM CHAMPION!`,
+                            `${dp.name} • CAPICÚ TABLE POT +$6,000 & +1X!`,
+                            "#fbbf24",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: dp.x,
+                            y: dp.y,
+                            z: 2.68,
+                            text: `🁣 DOMINO SLAM POT! +$6,000 + +1X!`,
+                            color: "#fbbf24",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P27. Official GTA 6 Grassrivers Python-Hunter Outposts & Offshore Smuggler Speedboat Caches ([E], Loop 28)
+        if (Array.isArray(this.pythonBountyCamps)) {
+            for (const pb of this.pythonBountyCamps) {
+                if ((pb.cooldown || 0) <= 0 && Math.hypot(px - pb.x, py - pb.y) < 68) {
+                    pb.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(7500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 7500;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🐍 GRASSRIVERS GIANT PYTHON BOUNTY!`,
+                            `${pb.name} • 18-FOOT TROPHY REWARD +$7,500 + 150 ARMOR & +1X!`,
+                            "#84cc16",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: pb.x,
+                            y: pb.y,
+                            z: 2.72,
+                            text: `🐍 GIANT PYTHON BOUNTY! +$7,500 + 150 ARMOR + +1X!`,
+                            color: "#84cc16",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.smugglerFloatingCaches)) {
+            for (const sc of this.smugglerFloatingCaches) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 78) {
+                    sc.cooldown = 30.0;
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(9500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 9500;
+                    }
+                    if (game.audio) game.audio.playPickup("ARMOR");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `📦 SMUGGLER SEA-DROP INTERCEPTED!`,
+                            `${sc.name} • CONTRABAND BALE +$9,500 + 150 ARMOR & +1X!`,
+                            "#38bdf8",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sc.x,
+                            y: sc.y,
+                            z: 2.72,
+                            text: `📦 SMUGGLER SEA-DROP! +$9,500 + 150 ARMOR + +1X!`,
+                            color: "#38bdf8",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P28. Official GTA 6 Neon Drive-In Movie Theaters & Beachside Raw Oyster & Ceviche Bars ([E], Loop 29)
+        if (Array.isArray(this.driveInScreens)) {
+            for (const ds of this.driveInScreens) {
+                if ((ds.cooldown || 0) <= 0 && Math.hypot(px - ds.x, py - ds.y) < 76) {
+                    ds.cooldown = 28.0;
+                    if (game.police) {
+                        game.police.wanted = 0;
+                        game.police.heatTimer = 0;
+                    }
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(6000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 6000;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎬 RETRO DRIVE-IN DOUBLE FEATURE!`,
+                            `${ds.name} • 0★ WANTED + 150 HP/ARMOR & +$6,000!`,
+                            "#f472b6",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ds.x,
+                            y: ds.y,
+                            z: 2.74,
+                            text: `🎬 DRIVE-IN HIDEOUT! 0★ WANTED + 150 HP/ARMOR + +$6,000!`,
+                            color: "#f472b6",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.oysterRawBars)) {
+            for (const ob of this.oysterRawBars) {
+                if ((ob.cooldown || 0) <= 0 && Math.hypot(px - ob.x, py - ob.y) < 64) {
+                    ob.cooldown = 25.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(5500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 5500;
+                    }
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🦪 PEARL OYSTER & CEVICHE RAW BAR!`,
+                            `${ob.name} • RARE PEARL BONUS 150 HP/ARMOR + +$5,500 & +1X!`,
+                            "#5eead4",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ob.x,
+                            y: ob.y,
+                            z: 2.68,
+                            text: `🦪 OYSTER PEARL BONUS! 150 HP/ARMOR + +$5,500 + +1X!`,
+                            color: "#5eead4",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P29. Official GTA 6 Mount Kalaga Zip-Line Canopy Towers & Wynwood Neon Arcade Cabinets ([E], Loop 30)
+        if (Array.isArray(this.kalagaZiplineTowers)) {
+            for (const kz of this.kalagaZiplineTowers) {
+                if ((kz.cooldown || 0) <= 0 && Math.hypot(px - kz.x, py - kz.y) < 68) {
+                    kz.cooldown = 28.0;
+                    game.player.health = Math.max(game.player.health || 100, 150);
+                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(7500);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 7500;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🧗 KALAGA CANYON ZIP-LINE RUN!`,
+                            `${kz.name} • EXTREME CANOPY DROP 150 HP/ARMOR + +$7,500 & +1X!`,
+                            "#fb923c",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: kz.x,
+                            y: kz.y,
+                            z: 2.76,
+                            text: `🧗 CANOPY ZIP-LINE! 150 HP/ARMOR + +$7,500 + +1X!`,
+                            color: "#fb923c",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.neonArcadePavilions)) {
+            for (const na of this.neonArcadePavilions) {
+                if ((na.cooldown || 0) <= 0 && Math.hypot(px - na.x, py - na.y) < 64) {
+                    na.cooldown = 26.0;
+                    game.player.multiplier = Math.min(99, (game.player.multiplier || 1) + 1);
+                    if (typeof game.addScore === "function") {
+                        game.addScore(7000);
+                    } else {
+                        game.player.score = (game.player.score || 0) + 7000;
+                    }
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🕹️ 1997 RETRO ARCADE HIGH SCORE!`,
+                            `${na.name} • NEON PINBALL JACKPOT +$7,000 & +1X!`,
+                            "#c084fc",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: na.x,
+                            y: na.y,
+                            z: 2.70,
+                            text: `🕹️ ARCADE HIGH SCORE! +$7,000 + +1X!`,
+                            color: "#c084fc",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -5140,6 +5523,46 @@ class WorldObjectEngine {
         if (Array.isArray(this.vipCourierDrops)) {
             for (const vc of this.vipCourierDrops) {
                 if ((vc.cooldown || 0) > 0) vc.cooldown = Math.max(0, vc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.beachYogaDecks)) {
+            for (const yd of this.beachYogaDecks) {
+                if ((yd.cooldown || 0) > 0) yd.cooldown = Math.max(0, yd.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.dominoParkTables)) {
+            for (const dp of this.dominoParkTables) {
+                if ((dp.cooldown || 0) > 0) dp.cooldown = Math.max(0, dp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.pythonBountyCamps)) {
+            for (const pb of this.pythonBountyCamps) {
+                if ((pb.cooldown || 0) > 0) pb.cooldown = Math.max(0, pb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.smugglerFloatingCaches)) {
+            for (const sc of this.smugglerFloatingCaches) {
+                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.driveInScreens)) {
+            for (const ds of this.driveInScreens) {
+                if ((ds.cooldown || 0) > 0) ds.cooldown = Math.max(0, ds.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.oysterRawBars)) {
+            for (const ob of this.oysterRawBars) {
+                if ((ob.cooldown || 0) > 0) ob.cooldown = Math.max(0, ob.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.kalagaZiplineTowers)) {
+            for (const kz of this.kalagaZiplineTowers) {
+                if ((kz.cooldown || 0) > 0) kz.cooldown = Math.max(0, kz.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.neonArcadePavilions)) {
+            for (const na of this.neonArcadePavilions) {
+                if ((na.cooldown || 0) > 0) na.cooldown = Math.max(0, na.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -9401,6 +9824,88 @@ class WorldObjectEngine {
             }
         }
 
+        // 22O. Official GTA 6 Yoga Decks, Domino Park Tables, Python Hunter Camps, Smuggler Sea Caches, Drive-In Screens, Oyster Bars, Zip-Line Towers & Neon Arcades (Loops 27-30)
+        if (Array.isArray(this.beachYogaDecks)) {
+            for (const yd of this.beachYogaDecks) {
+                const bz = yd.z || 2.0;
+                emitAOShadow3D(yd.x, yd.y, 1, 0, 0, 0, 38, 28, bz, 0.32);
+                // Teakwood Zen Platform + 3 Pastel Aqua/Coral/Lavender Yoga Mats + White Shade Pergola
+                emitSolidBox3D(yd.x, yd.y, 1, 0, 0, 0, 32, 22, bz, bz + 0.05, [0.76, 0.56, 0.34], 4);
+                emitSolidBox3D(yd.x - 9, yd.y, 1, 0, 0, 0, 6, 14, bz + 0.05, bz + 0.07, [0.18, 0.88, 0.78], 1);
+                emitSolidBox3D(yd.x, yd.y, 1, 0, 0, 0, 6, 14, bz + 0.05, bz + 0.07, [0.98, 0.44, 0.68], 1);
+                emitSolidBox3D(yd.x + 9, yd.y, 1, 0, 0, 0, 6, 14, bz + 0.05, bz + 0.07, [0.68, 0.46, 0.98], 1);
+            }
+        }
+        if (Array.isArray(this.dominoParkTables)) {
+            for (const dp of this.dominoParkTables) {
+                const bz = dp.z || 2.0;
+                emitAOShadow3D(dp.x, dp.y, 1, 0, 0, 0, 28, 28, bz, 0.34);
+                // Green Felt Domino Table + 4 Stools + Terracotta Cuban Park Gazebo Roof
+                emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 14, 14, bz, bz + 0.14, [0.58, 0.36, 0.18], 4);
+                emitSolidBox3D(dp.x, dp.y, 1, 0, 0, 0, 12, 12, bz + 0.14, bz + 0.16, [0.12, 0.68, 0.38], 1);
+                emitGableRoof3D(dp.x, dp.y, 1, 0, 0, 0, 24, 24, bz + 0.28, bz + 0.40, [0.88, 0.42, 0.22], true, 3);
+            }
+        }
+        if (Array.isArray(this.pythonBountyCamps)) {
+            for (const pb of this.pythonBountyCamps) {
+                const bz = pb.z || 2.0;
+                emitAOShadow3D(pb.x, pb.y, 1, 0, 0, 0, 32, 24, bz, 0.34);
+                // Swamp Camo Tent + Steel Specimen Cage + Bounty Weigh-In Scale Post
+                emitGableRoof3D(pb.x - 6, pb.y, 1, 0, 0, 0, 16, 16, bz, bz + 0.24, [0.36, 0.54, 0.24], true, 4);
+                emitSolidBox3D(pb.x + 8, pb.y, 1, 0, 0, 0, 10, 10, bz, bz + 0.16, [0.52, 0.78, 0.18], 5);
+            }
+        }
+        if (Array.isArray(this.smugglerFloatingCaches)) {
+            for (const sc of this.smugglerFloatingCaches) {
+                const bz = sc.z || 2.0;
+                // Floating Blue Plastic Barrels + Waterproof White Contraband Bale + Strobe Buoy
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 18, 14, bz - 0.02, bz + 0.08, [0.14, 0.56, 0.94], 5);
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 0, 0, 12, 10, bz + 0.08, bz + 0.16, [0.94, 0.96, 0.98], 1);
+                emitCylinder3D(sc.x + 6, sc.y - 4, 0, 0, 2.2, 2.2, bz + 0.16, bz + 0.26, 8, [0.22, 0.88, 0.98], 1, true);
+            }
+        }
+        if (Array.isArray(this.driveInScreens)) {
+            for (const ds of this.driveInScreens) {
+                const bz = ds.z || 2.0;
+                emitAOShadow3D(ds.x, ds.y, 1, 0, 0, 0, 48, 22, bz, 0.38);
+                // Towering Retro Drive-In Cinema Frame + Glowing Technicolor Movie Screen + Neon Marquee Top
+                emitSolidBox3D(ds.x, ds.y, 1, 0, 0, 0, 42, 6, bz, bz + 0.62, [0.18, 0.20, 0.28], 5);
+                emitSolidBox3D(ds.x, ds.y + 2, 1, 0, 0, 0, 38, 3, bz + 0.14, bz + 0.56, [0.96, 0.88, 0.98], 1);
+                emitSolidBox3D(ds.x, ds.y, 1, 0, 0, 0, 44, 8, bz + 0.62, bz + 0.68, [0.96, 0.28, 0.68], 1);
+            }
+        }
+        if (Array.isArray(this.oysterRawBars)) {
+            for (const ob of this.oysterRawBars) {
+                const bz = ob.z || 2.0;
+                emitAOShadow3D(ob.x, ob.y, 1, 0, 0, 0, 26, 20, bz, 0.32);
+                // Crushed-Ice Raw Oyster Bar Counter + Aqua Striped Coastal Awning
+                emitSolidBox3D(ob.x, ob.y, 1, 0, 0, 0, 18, 12, bz, bz + 0.14, [0.22, 0.34, 0.46], 4);
+                emitSolidBox3D(ob.x, ob.y, 1, 0, 0, 0, 16, 10, bz + 0.14, bz + 0.17, [0.84, 0.96, 0.98], 1);
+                emitGableRoof3D(ob.x, ob.y, 1, 0, 0, 0, 22, 16, bz + 0.24, bz + 0.34, [0.18, 0.86, 0.78], true, 1);
+            }
+        }
+        if (Array.isArray(this.kalagaZiplineTowers)) {
+            for (const kz of this.kalagaZiplineTowers) {
+                const bz = kz.z || 2.0;
+                emitAOShadow3D(kz.x, kz.y, 1, 0, 0, 0, 30, 30, bz, 0.36);
+                // Timber A-Frame Canopy Tower + Elevated Launch Deck + Orange Safety Roof
+                emitSolidBox3D(kz.x, kz.y, 1, 0, 0, 0, 18, 18, bz, bz + 0.48, [0.54, 0.36, 0.18], 4);
+                emitSolidBox3D(kz.x, kz.y, 1, 0, 0, 0, 24, 24, bz + 0.48, bz + 0.54, [0.68, 0.46, 0.24], 4);
+                emitGableRoof3D(kz.x, kz.y, 1, 0, 0, 0, 26, 26, bz + 0.64, bz + 0.76, [0.98, 0.48, 0.16], true, 4);
+            }
+        }
+        if (Array.isArray(this.neonArcadePavilions)) {
+            for (const na of this.neonArcadePavilions) {
+                const bz = na.z || 2.0;
+                emitAOShadow3D(na.x, na.y, 1, 0, 0, 0, 28, 22, bz, 0.34);
+                // Row of 3 1997 Upright CRT Arcade & Pinball Cabinets + Neon Purple/Cyan Canopy
+                emitSolidBox3D(na.x - 7, na.y, 1, 0, 0, 0, 6, 8, bz, bz + 0.24, [0.58, 0.18, 0.88], 1);
+                emitSolidBox3D(na.x, na.y, 1, 0, 0, 0, 6, 8, bz, bz + 0.24, [0.14, 0.82, 0.96], 1);
+                emitSolidBox3D(na.x + 7, na.y, 1, 0, 0, 0, 6, 8, bz, bz + 0.24, [0.96, 0.22, 0.64], 1);
+                emitSolidBox3D(na.x, na.y, 1, 0, 0, 0, 24, 16, bz + 0.24, bz + 0.30, [0.72, 0.28, 0.98], 1);
+            }
+        }
+
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
         //     West & East Drive-Through Vehicle Tunnels, Cantilevered White Canopy Roof, 4 Cylindrical Spiral Ramps,
@@ -12793,6 +13298,92 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.beachYogaDecks)) {
+            const puv = pedSheet ? renderer.getUV("peds", "bikini_girl") : null;
+            for (let i = 0; i < this.beachYogaDecks.length; i++) {
+                const yd = this.beachYogaDecks[i];
+                if (yd.x < minX - 130 || yd.x > maxX + 130 || yd.y < minY - 130 || yd.y > maxY + 130) continue;
+                if ((yd.cooldown || 0) <= 0) {
+                    const rSz = 30 + Math.sin(renderer.time * 5.0 + i) * 3.0;
+                    renderer.pushSolidQuad3D(yd.x, yd.y, 2.03, rSz, rSz, renderer.time * 1.1, 0.18, 0.88, 0.78, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                if (puv) {
+                    const stretchAng = Math.sin(renderer.time * 2.2 + i) * 0.45;
+                    renderer.pushSpriteQuad3D(yd.x - 9, yd.y, 2.09, 12, 12, stretchAng, pedTex, puv.u0, puv.v0, puv.u1, puv.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
+                    renderer.pushSpriteQuad3D(yd.x + 9, yd.y, 2.09, 12, 12, -stretchAng, pedTex, puv.u0, puv.v0, puv.u1, puv.v1, 1, 1, 1, 1, SPRITE_DRAW_ORDER.PEDS);
+                }
+            }
+        }
+        if (Array.isArray(this.dominoParkTables)) {
+            for (let i = 0; i < this.dominoParkTables.length; i++) {
+                const dp = this.dominoParkTables[i];
+                if (dp.x < minX - 120 || dp.x > maxX + 120 || dp.y < minY - 120 || dp.y > maxY + 120) continue;
+                if ((dp.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.4 + i) * 3.0;
+                    renderer.pushSolidQuad3D(dp.x, dp.y, 2.03, rSz, rSz, -renderer.time * 1.3, 0.98, 0.78, 0.18, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.pythonBountyCamps)) {
+            for (let i = 0; i < this.pythonBountyCamps.length; i++) {
+                const pb = this.pythonBountyCamps[i];
+                if (pb.x < minX - 120 || pb.x > maxX + 120 || pb.y < minY - 120 || pb.y > maxY + 120) continue;
+                if ((pb.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 5.6 + i) * 3.2;
+                    renderer.pushSolidQuad3D(pb.x, pb.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.54, 0.88, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.smugglerFloatingCaches)) {
+            for (let i = 0; i < this.smugglerFloatingCaches.length; i++) {
+                const sc = this.smugglerFloatingCaches[i];
+                if (sc.x < minX - 120 || sc.x > maxX + 120 || sc.y < minY - 120 || sc.y > maxY + 120) continue;
+                if ((sc.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 6.0 + i) * 3.4;
+                    renderer.pushSolidQuad3D(sc.x, sc.y, 2.03, rSz, rSz, -renderer.time * 1.7, 0.22, 0.82, 0.98, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.driveInScreens)) {
+            for (let i = 0; i < this.driveInScreens.length; i++) {
+                const ds = this.driveInScreens[i];
+                if (ds.x < minX - 150 || ds.x > maxX + 150 || ds.y < minY - 150 || ds.y > maxY + 150) continue;
+                if ((ds.cooldown || 0) <= 0) {
+                    const rSz = 38 + Math.sin(renderer.time * 5.2 + i) * 3.6;
+                    renderer.pushSolidQuad3D(ds.x, ds.y, 2.03, rSz, rSz, renderer.time * 1.1, 0.96, 0.44, 0.74, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.oysterRawBars)) {
+            for (let i = 0; i < this.oysterRawBars.length; i++) {
+                const ob = this.oysterRawBars[i];
+                if (ob.x < minX - 120 || ob.x > maxX + 120 || ob.y < minY - 120 || ob.y > maxY + 120) continue;
+                if ((ob.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.5 + i) * 2.8;
+                    renderer.pushSolidQuad3D(ob.x, ob.y, 2.028, rSz, rSz, -renderer.time * 1.3, 0.34, 0.94, 0.86, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.kalagaZiplineTowers)) {
+            for (let i = 0; i < this.kalagaZiplineTowers.length; i++) {
+                const kz = this.kalagaZiplineTowers[i];
+                if (kz.x < minX - 130 || kz.x > maxX + 130 || kz.y < minY - 130 || kz.y > maxY + 130) continue;
+                if ((kz.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 5.8 + i) * 3.2;
+                    renderer.pushSolidQuad3D(kz.x, kz.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.56, 0.22, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.neonArcadePavilions)) {
+            for (let i = 0; i < this.neonArcadePavilions.length; i++) {
+                const na = this.neonArcadePavilions[i];
+                if (na.x < minX - 120 || na.x > maxX + 120 || na.y < minY - 120 || na.y > maxY + 120) continue;
+                if ((na.cooldown || 0) <= 0) {
+                    const rSz = 25 + Math.sin(renderer.time * 6.2 + i) * 3.0;
+                    renderer.pushSolidQuad3D(na.x, na.y, 2.03, rSz, rSz, -renderer.time * 1.6, 0.76, 0.38, 0.98, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -13864,6 +14455,126 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.beachYogaDecks)) {
+            for (const yd of this.beachYogaDecks) {
+                if ((yd.cooldown || 0) <= 0 && Math.hypot(px - yd.x, py - yd.y) < 110) {
+                    const scr = renderer.worldToScreen(yd.x, yd.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#2dd4bf";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#5eead4";
+                    ctx.fillText(`🧘 [E] JOIN OCEANFRONT YOGA SESSION (150 HP/ARMOR + 0★ & +$5,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.dominoParkTables)) {
+            for (const dp of this.dominoParkTables) {
+                if ((dp.cooldown || 0) <= 0 && Math.hypot(px - dp.x, py - dp.y) < 110) {
+                    const scr = renderer.worldToScreen(dp.x, dp.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#fbbf24";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#fde68a";
+                    ctx.fillText(`🁣 [E] SLAM CALLE OCHO DOMINO TABLE (+$6,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.pythonBountyCamps)) {
+            for (const pb of this.pythonBountyCamps) {
+                if ((pb.cooldown || 0) <= 0 && Math.hypot(px - pb.x, py - pb.y) < 115) {
+                    const scr = renderer.worldToScreen(pb.x, pb.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#84cc16";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#bef264";
+                    ctx.fillText(`🐍 [E] CLAIM GIANT PYTHON BOUNTY (+$7,500 + 150 ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.smugglerFloatingCaches)) {
+            for (const sc of this.smugglerFloatingCaches) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 115) {
+                    const scr = renderer.worldToScreen(sc.x, sc.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#7dd3fc";
+                    ctx.fillText(`📦 [E] HAUL SMUGGLER SEA-DROP BALE (+$9,500 + 150 ARMOR & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.driveInScreens)) {
+            for (const ds of this.driveInScreens) {
+                if ((ds.cooldown || 0) <= 0 && Math.hypot(px - ds.x, py - ds.y) < 120) {
+                    const scr = renderer.worldToScreen(ds.x, ds.y - 18, 2.60);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#f472b6";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fbcfe8";
+                    ctx.fillText(`🎬 [E] WATCH RETRO DRIVE-IN PREMIERE (0★ WANTED + 150 HP/ARMOR & +$6,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.oysterRawBars)) {
+            for (const ob of this.oysterRawBars) {
+                if ((ob.cooldown || 0) <= 0 && Math.hypot(px - ob.x, py - ob.y) < 110) {
+                    const scr = renderer.worldToScreen(ob.x, ob.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#5eead4";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#99f6e4";
+                    ctx.fillText(`🦪 [E] SHUCK PEARL OYSTER & CEVICHE (150 HP/ARMOR + +$5,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.kalagaZiplineTowers)) {
+            for (const kz of this.kalagaZiplineTowers) {
+                if ((kz.cooldown || 0) <= 0 && Math.hypot(px - kz.x, py - kz.y) < 115) {
+                    const scr = renderer.worldToScreen(kz.x, kz.y - 18, 2.65);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.strokeStyle = "#fb923c";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 215, scr.y - 22, 430, 22);
+                    ctx.fillStyle = "#fed7aa";
+                    ctx.fillText(`🧗 [E] RIDE KALAGA CANOPY ZIP-LINE (150 HP/ARMOR + +$7,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.neonArcadePavilions)) {
+            for (const na of this.neonArcadePavilions) {
+                if ((na.cooldown || 0) <= 0 && Math.hypot(px - na.x, py - na.y) < 110) {
+                    const scr = renderer.worldToScreen(na.x, na.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#c084fc";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#e9d5ff";
+                    ctx.fillText(`🕹️ [E] PLAY 1997 RETRO ARCADE CABINET (+$7,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -14432,6 +15143,54 @@ class WorldObjectEngine {
             ctx.fillStyle = "#38bdf8";
             for (const vc of this.vipCourierDrops) {
                 ctx.fillRect((vc.x - 11) * sx, (vc.y - 11) * sy, 22 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.beachYogaDecks)) {
+            ctx.fillStyle = "#2dd4bf";
+            for (const yd of this.beachYogaDecks) {
+                ctx.fillRect((yd.x - 16) * sx, (yd.y - 11) * sy, 32 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.dominoParkTables)) {
+            ctx.fillStyle = "#fbbf24";
+            for (const dp of this.dominoParkTables) {
+                ctx.fillRect((dp.x - 12) * sx, (dp.y - 12) * sy, 24 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.pythonBountyCamps)) {
+            ctx.fillStyle = "#84cc16";
+            for (const pb of this.pythonBountyCamps) {
+                ctx.fillRect((pb.x - 15) * sx, (pb.y - 11) * sy, 30 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.smugglerFloatingCaches)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const sc of this.smugglerFloatingCaches) {
+                ctx.fillRect((sc.x - 11) * sx, (sc.y - 9) * sy, 22 * sx, 18 * sy);
+            }
+        }
+        if (Array.isArray(this.driveInScreens)) {
+            ctx.fillStyle = "#f472b6";
+            for (const ds of this.driveInScreens) {
+                ctx.fillRect((ds.x - 21) * sx, (ds.y - 8) * sy, 42 * sx, 16 * sy);
+            }
+        }
+        if (Array.isArray(this.oysterRawBars)) {
+            ctx.fillStyle = "#5eead4";
+            for (const ob of this.oysterRawBars) {
+                ctx.fillRect((ob.x - 12) * sx, (ob.y - 9) * sy, 24 * sx, 18 * sy);
+            }
+        }
+        if (Array.isArray(this.kalagaZiplineTowers)) {
+            ctx.fillStyle = "#fb923c";
+            for (const kz of this.kalagaZiplineTowers) {
+                ctx.fillRect((kz.x - 13) * sx, (kz.y - 13) * sy, 26 * sx, 26 * sy);
+            }
+        }
+        if (Array.isArray(this.neonArcadePavilions)) {
+            ctx.fillStyle = "#c084fc";
+            for (const na of this.neonArcadePavilions) {
+                ctx.fillRect((na.x - 13) * sx, (na.y - 9) * sy, 26 * sx, 18 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
