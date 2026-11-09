@@ -489,6 +489,19 @@ class WorldObjectEngine {
             { name: "TISHA-WOCKA FLEA MARKET TACOS",    x: 191.5 * TILE_SIZE, y: 133.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_sprunk",       tint: [0.22, 0.88, 0.64] },
             { name: "VICE BEACH AÇAÍ & GELATO CRUISER", x: 451.5 * TILE_SIZE, y: 226.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,ad: "ad_vice26",       tint: [0.98, 0.36, 0.78] }
         ];
+        // 12. Official GTA 6 Vice-Dale / Crosstown Tisha-Wocka Open-Air Flea Market & Little Cuba Cafecito Ventanitas
+        this.tishaWockaMarket = {
+            name: "TISHA-WOCKA OPEN-AIR FLEA MARKET",
+            x: 191.5 * TILE_SIZE,
+            y: 135.8 * TILE_SIZE,
+            z: 2.0,
+            cooldown: 0
+        };
+        this.cubanVentanitas = [
+            { name: "LA CARRETA CALLE OCHO VENTANITA", x: 283.2 * TILE_SIZE, y: 246.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "VERSAILLES LITTLE CUBA CAFECITO", x: 290.2 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "HABANA VIEJA COLADA WALK-UP",     x: 298.2 * TILE_SIZE, y: 266.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
         this.meshVertexCount = 0;
@@ -872,6 +885,16 @@ class WorldObjectEngine {
                 for (const ft of this.foodTrucks) {
                     snapOffRoad(ft);
                     clearZones.push({ x: ft.x, y: ft.y, r: 58 });
+                }
+            }
+            if (this.tishaWockaMarket) {
+                snapOffRoad(this.tishaWockaMarket);
+                clearZones.push({ x: this.tishaWockaMarket.x, y: this.tishaWockaMarket.y, r: 78 });
+            }
+            if (Array.isArray(this.cubanVentanitas)) {
+                for (const cv of this.cubanVentanitas) {
+                    snapOffRoad(cv);
+                    clearZones.push({ x: cv.x, y: cv.y, r: 48 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -1955,6 +1978,79 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-5. Official GTA 6 Vice-Dale Tisha-Wocka Open-Air Flea Market Contraband Fence & Ammo Resupply ([E]!)
+        if (this.tishaWockaMarket && (this.tishaWockaMarket.cooldown || 0) <= 0) {
+            const tw = this.tishaWockaMarket;
+            if (Math.hypot(px - tw.x, py - tw.y) < 88) {
+                tw.cooldown = 16.0;
+                game.player.hp = game.player.maxHp || 100;
+                game.player.armor = 100;
+                if (game.player.weapons) {
+                    for (const wk of Object.keys(game.player.weapons)) {
+                        if (game.player.weapons[wk] && typeof game.player.weapons[wk].ammo === "number") {
+                            game.player.weapons[wk].ammo = Math.max(game.player.weapons[wk].ammo, 99);
+                        }
+                    }
+                }
+                if (typeof game.addScore === "function") game.addScore(6500);
+                if (typeof game.addCash === "function") game.addCash(6500, "🛍️ TISHA-WOCKA FLEA MARKET HUSTLE!");
+                if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                if (game.audio) game.audio.playPickup("WEAPON");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner(
+                        "🛍️ TISHA-WOCKA FLEA MARKET!",
+                        "CONTRABAND FENCED • +$6,500 + FULL AMMO/ARMOR & +1X MULTIPLIER!",
+                        "#f472b6",
+                        2.8
+                    );
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: tw.x,
+                        y: tw.y,
+                        z: 2.72,
+                        text: "🛍️ TISHA-WOCKA FLEA MARKET! +$6,500 + FULL AMMO/ARMOR!",
+                        color: "#f472b6",
+                        life: 2.8
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0P-6. Little Cuba Cafecito Colada Walk-Up Ventanitas ([E]!)
+        if (Array.isArray(this.cubanVentanitas)) {
+            for (const cv of this.cubanVentanitas) {
+                if ((cv.cooldown || 0) <= 0 && Math.hypot(px - cv.x, py - cv.y) < 74) {
+                    cv.cooldown = 12.0;
+                    game.player.hp = game.player.maxHp || 100;
+                    game.player.armor = Math.max(game.player.armor || 0, 100);
+                    if (typeof game.addScore === "function") game.addScore(3000);
+                    if (typeof game.addCash === "function") game.addCash(3000, `☕ ${cv.name}!`);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `☕ ${cv.name}!`,
+                            "CUBAN ESPRESSO COLADA RUSH • FULL HP/ARMOR & +$3,000!",
+                            "#facc15",
+                            2.5
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cv.x,
+                            y: cv.y,
+                            z: 2.65,
+                            text: `☕ CUBAN CAFECITO COLADA! FULL HP/ARMOR + $3,000!`,
+                            color: "#facc15",
+                            life: 2.5
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -2787,6 +2883,14 @@ class WorldObjectEngine {
         if ((this.yachtPartyCooldown || 0) > 0) this.yachtPartyCooldown = Math.max(0, this.yachtPartyCooldown - dt);
         if ((this.dominoCooldown || 0) > 0) this.dominoCooldown = Math.max(0, this.dominoCooldown - dt);
         if ((this.foodTruckCooldown || 0) > 0) this.foodTruckCooldown = Math.max(0, this.foodTruckCooldown - dt);
+        if (this.tishaWockaMarket && (this.tishaWockaMarket.cooldown || 0) > 0) {
+            this.tishaWockaMarket.cooldown = Math.max(0, this.tishaWockaMarket.cooldown - dt);
+        }
+        if (Array.isArray(this.cubanVentanitas)) {
+            for (const cv of this.cubanVentanitas) {
+                if ((cv.cooldown || 0) > 0) cv.cooldown = Math.max(0, cv.cooldown - dt);
+            }
+        }
         if ((this.takeoverCooldown || 0) > 0) this.takeoverCooldown = Math.max(0, this.takeoverCooldown - dt);
         if ((this.cameraFlashTimer || 0) > 0) this.cameraFlashTimer = Math.max(0, this.cameraFlashTimer - dt);
         if (this.landmarks3D) {
@@ -6254,8 +6358,12 @@ class WorldObjectEngine {
             const festoonSpans = [
                 // Española Way Pedestrian Plaza & Cafe Terrace (c = 434..441, r = 160..174)
                 { x1: 434.2 * TILE_SIZE, x2: 441.8 * TILE_SIZE, rStart: 160, rEnd: 174, step: 2 },
+                // Ocean Drive / Hotel Dixon & Clevelander String-Lit Front Patio Terrace (Official GTA 6 Ocean View Screenshot!)
+                { x1: 442.8 * TILE_SIZE, x2: 448.8 * TILE_SIZE, rStart: 204, rEnd: 312, step: 3 },
                 // Little Havana / Calle Ocho Domino & Latin District (c = 280..288, r = 242..254)
                 { x1: 280.2 * TILE_SIZE, x2: 287.8 * TILE_SIZE, rStart: 242, rEnd: 254, step: 2 },
+                // Tisha-Wocka Open-Air Flea Market Canopy Plaza (c = 188..195, r = 133..138)
+                { x1: 188.5 * TILE_SIZE, x2: 194.5 * TILE_SIZE, rStart: 133, rEnd: 138, step: 1 },
                 // Key Lento Waterfront & The Rusty Anchor Boardwalk (c = 214..228, r = 474..478)
                 { x1: 214.5 * TILE_SIZE, x2: 227.5 * TILE_SIZE, rStart: 475, rEnd: 477, step: 2 }
             ];
@@ -6272,6 +6380,15 @@ class WorldObjectEngine {
                         const bulbCol = isPinkBulb ? [1.0, 0.52, 0.82] : [1.0, 0.90, 0.52];
                         emitSolidBox3D(bx, fy, 1, 0, 0, 0, 3.6, 3.6, bz, bz + 0.04, bulbCol, 6);
                     }
+                }
+            }
+            // Official GTA 6 Ocean View Hotel Screenshot: Warm Golden Fairy-Light Wrapped Palm Trunks & Patio Cafe Tables along Ocean Drive!
+            for (let r = 204; r <= 316; r += 8) {
+                const px = 443.4 * TILE_SIZE;
+                const py = (r + 0.5) * TILE_SIZE;
+                for (let ring = 0; ring < 4; ring++) {
+                    const rz = 2.06 + ring * 0.08;
+                    emitCylinder3D(px, py, 0, 0, 3.6, 3.6, rz, rz + 0.025, 8, [1.0, 0.88, 0.42], 6, false);
                 }
             }
         }
@@ -6446,6 +6563,49 @@ class WorldObjectEngine {
                 emitSolidBox3D(ft.x, ft.y, fCos, fSin, -2, 13, 24, 8, bz + 0.28, bz + 0.32, [0.98, 0.94, 0.86], 1);
                 emitSolidBox3D(ft.x, ft.y, fCos, fSin, -2, 10.5, 22, 3, bz + 0.16, bz + 0.19, [0.88, 0.92, 0.96], 5);
                 emitBox3D(ft.x, ft.y, fCos, fSin, -2, 0, 28, 4.5, bz + 0.34, bz + 0.48, ft.ad, ft.ad, [1.0, 1.0, 1.0]);
+            }
+        }
+
+        // 22D. OFFICIAL GTA 6 VICE-DALE / CROSSTOWN TISHA-WOCKA OPEN-AIR FLEA MARKET & LITTLE CUBA CAFECITO VENTANITAS
+        if (this.tishaWockaMarket) {
+            const tw = this.tishaWockaMarket;
+            const bz = tw.z || 2.0;
+            emitAOShadow3D(tw.x, tw.y, 1, 0, 0, 0, 92, 68, bz, 0.38);
+            // Concrete Open-Air Market Plaza Slab + Neon Arch Entry Sign ("TISHA-WOCKA")
+            emitTileBox3D(tw.x, tw.y, 1, 0, 0, 0, 84, 60, bz, bz + 0.04, 177, 177, 8, [0.88, 0.84, 0.78], false);
+            emitCylinder3D(tw.x, tw.y, -36, -26, 2.4, 2.4, bz + 0.04, bz + 0.56, 8, [0.22, 0.88, 0.84], 5, false);
+            emitCylinder3D(tw.x, tw.y,  36, -26, 2.4, 2.4, bz + 0.04, bz + 0.56, 8, [0.22, 0.88, 0.84], 5, false);
+            emitSolidBox3D(tw.x, tw.y, 1, 0, 0, -26, 76, 6, bz + 0.48, bz + 0.60, [0.98, 0.28, 0.74], 7);
+            emitBox3D(tw.x, tw.y, 1, 0, 0, -26, 52, 7.5, bz + 0.50, bz + 0.66, "ad_vice26", "ad_vice26", [1.0, 1.0, 1.0]);
+            // 4 Colorful Pop-Up Flea Market Canopy Tents + Bootleg Sneaker / Merch Display Tables
+            const tentSpecs = [
+                { ox: -22, oy: -10, roof: [0.98, 0.36, 0.72], trim: [0.98, 0.92, 0.34] },
+                { ox:  22, oy: -10, roof: [0.20, 0.88, 0.96], trim: [0.98, 0.40, 0.76] },
+                { ox: -22, oy:  14, roof: [0.98, 0.82, 0.22], trim: [0.22, 0.88, 0.68] },
+                { ox:  22, oy:  14, roof: [0.34, 0.94, 0.64], trim: [0.98, 0.86, 0.28] }
+            ];
+            for (const ts of tentSpecs) {
+                for (const [lx, ly] of [[-11, -8], [11, -8], [-11, 8], [11, 8]]) {
+                    emitSolidBox3D(tw.x, tw.y, 1, 0, ts.ox + lx, ts.oy + ly, 1.8, 1.8, bz + 0.04, bz + 0.34, [0.88, 0.92, 0.96], 5);
+                }
+                emitHippedRoof3D(tw.x, tw.y, 1, 0, ts.ox, ts.oy, 26, 20, bz + 0.34, 0.15, "mansion_star_island", ts.roof, ts.trim);
+                // Merch table + stacked sneaker boxes & neon boombox
+                emitSolidBox3D(tw.x, tw.y, 1, 0, ts.ox, ts.oy, 18, 9, bz + 0.04, bz + 0.16, [0.94, 0.96, 0.98], 1);
+                emitSolidBox3D(tw.x, tw.y, 1, 0, ts.ox - 4, ts.oy, 5, 4, bz + 0.16, bz + 0.21, [0.96, 0.32, 0.22], 5);
+                emitSolidBox3D(tw.x, tw.y, 1, 0, ts.ox + 4, ts.oy, 5, 4, bz + 0.16, bz + 0.21, [0.20, 0.78, 0.96], 5);
+            }
+        }
+        if (Array.isArray(this.cubanVentanitas)) {
+            for (const cv of this.cubanVentanitas) {
+                const bz = cv.z || 2.0;
+                emitAOShadow3D(cv.x, cv.y, 1, 0, 0, 0, 38, 28, bz, 0.36);
+                // Cuban Terracotta & Gold Walk-Up Cafecito Kiosk + Striped Canopy Awning + Chrome La Marzocco Espresso Machine
+                emitTileBox3D(cv.x, cv.y, 1, 0, 0, 0, 30, 20, bz, bz + 0.20, 177, 177, 8, [0.92, 0.72, 0.46], false);
+                emitSolidBox3D(cv.x, cv.y, 1, 0, 0, 8, 32, 6, bz + 0.18, bz + 0.22, [0.96, 0.94, 0.88], 1); // Walk-up marble counter
+                emitSolidBox3D(cv.x, cv.y, 1, 0, -6, 7, 8, 5, bz + 0.22, bz + 0.31, [0.88, 0.92, 0.98], 5); // Chrome espresso machine
+                emitCylinder3D(cv.x, cv.y, 6, 8, 2.0, 1.8, bz + 0.22, bz + 0.27, 8, [0.98, 0.98, 1.00], 1, true); // Colada cup stack
+                emitHippedRoof3D(cv.x, cv.y, 1, 0, 0, 2, 36, 26, bz + 0.36, 0.14, "mansion_star_island", [0.86, 0.26, 0.18], [0.98, 0.84, 0.24]);
+                emitBox3D(cv.x, cv.y, 1, 0, 0, 0, 22, 4, bz + 0.48, bz + 0.58, "ad_mambos_latin", "ad_mambos_latin", [1.0, 1.0, 1.0]);
             }
         }
 
@@ -8985,6 +9145,24 @@ class WorldObjectEngine {
             }
         }
 
+        // 22. Official GTA 6 Tisha-Wocka Flea Market Pulsing Neon Banner & Little Cuba Cafecito Steam Plumes
+        if (this.tishaWockaMarket) {
+            const tw = this.tishaWockaMarket;
+            if (tw.x >= minX - 140 && tw.x <= maxX + 140 && tw.y >= minY - 140 && tw.y <= maxY + 140) {
+                const pulse = 0.5 + 0.5 * Math.sin(t * 6.5);
+                emitDynBox(tw.x, tw.y, 1, 0, -28 + pulse * 56, -26, 12, 7.5, 2.66, 2.71, [0.18, 0.96, 0.98], 0.92, 10);
+            }
+        }
+        if (Array.isArray(this.cubanVentanitas)) {
+            for (let i = 0; i < this.cubanVentanitas.length; i++) {
+                const cv = this.cubanVentanitas[i];
+                if (cv.x < minX - 100 || cv.x > maxX + 100 || cv.y < minY - 100 || cv.y > maxY + 100) continue;
+                const stU = (t * 0.9 + i * 0.37) % 1.0;
+                const stZ = 2.28 + stU * 0.16;
+                emitDynCylinder(cv.x, cv.y, 6, 8, 1.5 + stU * 2.2, 2.2 + stU * 2.5, stZ, stZ + 0.03, 6, [0.96, 0.98, 1.00], 0, true, (1.0 - stU) * 0.55);
+            }
+        }
+
         if (dLen === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
@@ -9263,6 +9441,32 @@ class WorldObjectEngine {
                 if (ps.snapped || ps.x < minX - 140 || ps.x > maxX + 140 || ps.y < minY - 140 || ps.y > maxY + 140) continue;
                 const rSz = 24 + Math.sin(renderer.time * 5.2 + i) * 3.0;
                 renderer.pushSolidQuad3D(ps.x, ps.y, 2.03, rSz, rSz, renderer.time * 1.6, 0.22, 0.90, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+        if (this.tishaWockaMarket && (this.tishaWockaMarket.cooldown || 0) <= 0) {
+            const tw = this.tishaWockaMarket;
+            if (tw.x >= minX - 140 && tw.x <= maxX + 140 && tw.y >= minY - 140 && tw.y <= maxY + 140) {
+                const rSz = 34 + Math.sin(renderer.time * 5.6) * 4.0;
+                renderer.pushSolidQuad3D(tw.x, tw.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.36, 0.76, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Flea market vendors & bargain-hunting shoppers browsing the canopy tents!
+                const vFr = 50 + (Math.floor(renderer.time * 4.8) % 4);
+                renderer.batchPedSprite3D("vc_haitian", vFr, tw.x - 22, tw.y - 10, 2.042, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_cuban", vFr, tw.x + 22, tw.y - 10, 2.042, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_tourist", vFr, tw.x - 10, tw.y + 4, 2.042, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("bikini_pink", vFr, tw.x + 12, tw.y + 6, 2.042, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.cubanVentanitas)) {
+            for (let i = 0; i < this.cubanVentanitas.length; i++) {
+                const cv = this.cubanVentanitas[i];
+                if (cv.x < minX - 120 || cv.x > maxX + 120 || cv.y < minY - 120 || cv.y > maxY + 120) continue;
+                if ((cv.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.4 + i) * 3.0;
+                    renderer.pushSolidQuad3D(cv.x, cv.y + 12, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.84, 0.20, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                const cFr = 50 + (Math.floor(renderer.time * 4.5 + i) % 4);
+                renderer.batchPedSprite3D("vc_cuban", cFr, cv.x - 8, cv.y + 14, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_hawaiian_red", cFr, cv.x + 8, cv.y + 14, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
     }
@@ -9663,6 +9867,35 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (!p.inVehicle && this.tishaWockaMarket && (this.tishaWockaMarket.cooldown || 0) <= 0) {
+            const tw = this.tishaWockaMarket;
+            if (Math.hypot(px - tw.x, py - tw.y) < 115) {
+                const scr = renderer.worldToScreen(tw.x, tw.y - 18, 2.66);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                ctx.strokeStyle = "#f472b6";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                ctx.fillStyle = "#f472b6";
+                ctx.fillText("🛍️ [E] TISHA-WOCKA FLEA MARKET FENCE (+$6,500 & FULL AMMO)", scr.x, scr.y - 7);
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.cubanVentanitas)) {
+            for (const cv of this.cubanVentanitas) {
+                if ((cv.cooldown || 0) <= 0 && Math.hypot(px - cv.x, py - cv.y) < 105) {
+                    const scr = renderer.worldToScreen(cv.x, cv.y - 16, 2.55);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.fillStyle = "#facc15";
+                    ctx.fillText(`☕ [E] ${cv.name} (FULL HP/ARMOR & +$3,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -9969,6 +10202,16 @@ class WorldObjectEngine {
             ctx.fillStyle = "#4ade80";
             for (const ft of this.foodTrucks) {
                 ctx.fillRect((ft.x - 24) * sx, (ft.y - 14) * sy, 48 * sx, 28 * sy);
+            }
+        }
+        if (this.tishaWockaMarket) {
+            ctx.fillStyle = "#f472b6";
+            ctx.fillRect((this.tishaWockaMarket.x - 42) * sx, (this.tishaWockaMarket.y - 30) * sy, 84 * sx, 60 * sy);
+        }
+        if (Array.isArray(this.cubanVentanitas)) {
+            ctx.fillStyle = "#facc15";
+            for (const cv of this.cubanVentanitas) {
+                ctx.fillRect((cv.x - 16) * sx, (cv.y - 12) * sy, 32 * sx, 24 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {

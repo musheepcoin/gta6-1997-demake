@@ -7153,6 +7153,76 @@ class RetroRenderer {
         }
 
         // =========================================================================
+        // 4B. ROLLING ATLANTIC SURF BREAKERS & WET-SAND SHIMMER + SAND CATCH GAMES / METAL-DETECTOR COMBERS
+        // =========================================================================
+        {
+            const surfXBase = 481.2 * TILE_SIZE;
+            if (surfXBase >= minX - 96 && surfXBase <= maxX + 96) {
+                const rSurfMin = Math.max(54, Math.floor((minY - 64) / TILE_SIZE));
+                const rSurfMax = Math.min(354, Math.ceil((maxY + 64) / TILE_SIZE));
+                for (let sr = rSurfMin; sr <= rSurfMax; sr += 2) {
+                    const sy = (sr + 0.5) * TILE_SIZE;
+                    const wavePhase = this.time * 1.85 + sr * 0.35;
+                    const surge = Math.sin(wavePhase);
+                    const crestX = surfXBase - surge * 11.0;
+                    const foamAlpha = 0.22 + (0.5 - 0.5 * surge) * 0.32;
+                    // Wet-sand turquoise reflection ribbon on the tideline
+                    this.pushSolidQuad3D(surfXBase - 6.0, sy, 2.008, 14.0, 62.0, 0, 0.42, 0.88, 0.96, 0.16, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Rolling white Atlantic surf breaker crest washing onto the sand
+                    this.pushSolidQuad3D(crestX, sy, 2.015, 5.5 + (1.0 - surge) * 2.5, 60.0, Math.sin(sr * 0.7) * 0.05, 0.94, 0.99, 1.00, foamAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Secondary offshore turquoise breaker line
+                    const outerPhase = this.time * 1.85 + sr * 0.35 - 1.35;
+                    const outerSurge = Math.sin(outerPhase);
+                    this.pushSolidQuad3D(surfXBase + 18.0 - outerSurge * 8.0, sy, 2.014, 3.8, 56.0, 0, 0.82, 0.98, 1.00, 0.26, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.map.beachCatchGames)) {
+            for (let bi = 0; bi < this.map.beachCatchGames.length; bi++) {
+                const bg = this.map.beachCatchGames[bi];
+                if (bg.x < minX - 64 || bg.x > maxX + 64 || bg.y < minY - 64 || bg.y > maxY + 64) continue;
+                const bz = bg.z || 2.0;
+                if (bg.kind === "METAL_DETECTOR") {
+                    // Eccentric Florida Beachcomber sweeping a 3D metal detector along the golden sand!
+                    const walkT = this.time * 0.95 + bg.seed;
+                    const cx = bg.x + Math.cos(walkT) * 7.0;
+                    const cy = bg.y + Math.sin(walkT) * 18.0;
+                    const cAng = Math.atan2(Math.cos(walkT) * 18.0, -Math.sin(walkT) * 7.0);
+                    const sweepAng = cAng + Math.sin(this.time * 4.8 + bi) * 0.55;
+                    const walkFr = Math.floor(this.time * 6.0 + bi) % 8;
+                    this.batchPedSprite3D("vc_tourist", walkFr, cx, cy, bz + 0.036, cAng, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Metal detector shaft + circular search coil hovering above sand
+                    const coilX = cx + Math.cos(sweepAng) * 11.5;
+                    const coilY = cy + Math.sin(sweepAng) * 11.5;
+                    this.pushSolidQuad3D((cx + coilX) * 0.5, (cy + coilY) * 0.5, bz + 0.028, 11.0, 1.8, sweepAng, 0.82, 0.88, 0.94, 0.95, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(coilX, coilY, bz + 0.016, 6.2, 6.2, sweepAng, 0.16, 0.20, 0.26, 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (Math.sin(this.time * 3.2 + bi) > 0.75) {
+                        this.pushSolidQuad3D(coilX, coilY, bz + 0.022, 4.0, 4.0, this.time * 3.0, 0.98, 0.86, 0.20, 0.85, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    }
+                } else {
+                    // Beach Football / Neon Frisbee Catch Game between two beachgoers on the sand!
+                    const p1y = bg.y - 18.0;
+                    const p2y = bg.y + 18.0;
+                    const cyc = (this.time * 1.35 + bg.seed) % 2.0;
+                    const u = cyc < 1.0 ? cyc : (2.0 - cyc);
+                    const arcZ = Math.sin(u * Math.PI) * 0.24;
+                    const ballY = p1y + (p2y - p1y) * u;
+                    const p1Jump = (u < 0.18) ? Math.sin((u / 0.18) * Math.PI) * 0.05 : 0;
+                    const p2Jump = (u > 0.82) ? Math.sin(((u - 0.82) / 0.18) * Math.PI) * 0.05 : 0;
+                    this.batchPedSprite3D("surfer_guy", 50 + (Math.floor(this.time * 5.5 + bi) % 4), bg.x, p1y, bz + 0.036 + p1Jump, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.batchPedSprite3D("bikini_cyan", 50 + (Math.floor(this.time * 5.5 + bi + 2) % 4), bg.x, p2y, bz + 0.036 + p2Jump, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Shadow on sand + 3D arcing football or neon pink frisbee
+                    this.pushSolidQuad3D(bg.x + sunCos * 3.0, ballY + sunSin * 3.0, bz + 0.014, 4.8, 4.8, 0, 0.02, 0.03, 0.06, 0.30, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (bg.kind === "FOOTBALL_TOSS") {
+                        this.pushSolidQuad3D(bg.x, ballY, bz + 0.05 + arcZ, 6.2, 3.8, Math.PI * 0.5, 0.58, 0.28, 0.12, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    } else {
+                        this.pushSolidQuad3D(bg.x, ballY, bz + 0.05 + arcZ, 6.5, 6.5, this.time * 6.0, 0.98, 0.28, 0.78, 0.96, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
         // 5. MUSCLE BEACH OUTDOOR FITNESS PARK (Weightlifting Benches, Pull-Up Racks & Bodybuilders)
         // =========================================================================
         if (Array.isArray(this.map.muscleBeachGyms)) {
@@ -7360,6 +7430,58 @@ class RetroRenderer {
         }
 
         // =========================================================================
+        // 8B. OFFSHORE ATLANTIC & KEYS PARASAILING SPEEDBOATS ("parasailBoats")
+        // =========================================================================
+        if (Array.isArray(this.map.parasailBoats)) {
+            for (let pi = 0; pi < this.map.parasailBoats.length; pi++) {
+                const pb = this.map.parasailBoats[pi];
+                const bz = pb.z || 2.0;
+                const t = this.time * (pb.speed || 0.50) + pb.seed;
+                const bx = pb.x + Math.cos(t) * pb.rx;
+                const by = pb.y + Math.sin(t) * pb.ry;
+                const vx = -Math.sin(t) * pb.rx;
+                const vy = Math.cos(t) * pb.ry;
+                const bAng = Math.atan2(vy, vx);
+                if (bx < minX - 140 || bx > maxX + 140 || by < minY - 140 || by > maxY + 140) continue;
+                const cosA = Math.cos(bAng);
+                const sinA = Math.sin(bAng);
+
+                // White V-spray ocean wake behind tow speedboat
+                for (let wk = 1; wk <= 3; wk++) {
+                    const wx = bx - cosA * (14 + wk * 9);
+                    const wy = by - sinA * (14 + wk * 9);
+                    this.pushSolidQuad3D(wx, wy, bz + 0.014, 14 + wk * 4, 8 + wk * 3, bAng, 0.90, 0.98, 1.0, 0.50 - wk * 0.12, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Tow Speedboat ("jetski_neon" scaled up as twin-engine offshore tow craft) + Driver
+                this.batchObjectSprite3D("jetski_neon", bx, by, bz + 0.028, bAng, 1.32, SPRITE_DRAW_ORDER.CAR);
+                this.batchPedSprite3D("vc_crockett", 84, bx - cosA * 2.5, by - sinA * 2.5, bz + 0.042, bAng, 1.04, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+
+                // Elevated 3D Parasail Canopy & Suspended Rider trailing 44px astern at z = 3.25!
+                const sway = Math.sin(this.time * 1.6 + pi) * 6.5;
+                const paraX = bx - cosA * 44.0 - sinA * sway;
+                const paraY = by - sinA * 44.0 + cosA * sway;
+                const paraZ = bz + 1.22 + Math.sin(this.time * 2.1 + pi) * 0.08;
+                // 3D Diagonal Tow-Line Cable segments rising from boat stern to parasail harness
+                for (let seg = 1; seg <= 5; seg++) {
+                    const u = seg / 6;
+                    const lx = bx - cosA * 8.0 + (paraX - (bx - cosA * 8.0)) * u;
+                    const ly = by - sinA * 8.0 + (paraY - (by - sinA * 8.0)) * u;
+                    const lz = bz + 0.05 + (paraZ - 0.12 - (bz + 0.05)) * u;
+                    this.pushSolidQuad3D(lx, ly, lz, 7.5, 1.4, bAng, 0.92, 0.96, 1.0, 0.78, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+                }
+                // Solar shadow of parasail canopy on the water surface below
+                this.pushSolidQuad3D(paraX + sunCos * 14.0, paraY + sunSin * 14.0, bz + 0.015, 22.0, 32.0, bAng, 0.02, 0.04, 0.08, 0.28, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Suspended Parasailer Ped hanging in harness below canopy
+                this.batchPedSprite3D(pb.ped || "bikini_pink", 52, paraX, paraY, paraZ - 0.10, bAng, 1.04, false, SPRITE_DRAW_ORDER.HUD_ARROW);
+                // Multi-panel 3D Neon Parasail Wing Canopy overhead
+                const col = pb.color || [0.98, 0.28, 0.72];
+                this.pushSolidQuad3D(paraX, paraY, paraZ, 18.0, 30.0, bAng, col[0], col[1], col[2], 0.96, SPRITE_DRAW_ORDER.HUD_ARROW);
+                this.pushSolidQuad3D(paraX, paraY, paraZ + 0.012, 16.0, 12.0, bAng, 0.98, 0.98, 1.00, 0.96, SPRITE_DRAW_ORDER.HUD_ARROW);
+                this.pushSolidQuad3D(paraX + cosA * 2.0, paraY + sinA * 2.0, paraZ + 0.020, 6.0, 26.0, bAng, 0.18, 0.92, 0.98, 0.92, SPRITE_DRAW_ORDER.HUD_ARROW);
+            }
+        }
+
+        // =========================================================================
         // 9. HIGH-RISE ROOFTOP POOL PARTIES (Hotel Dixon, Ocean Drive & Penthouses at 3D Roof Elevation!)
         // =========================================================================
         if (Array.isArray(this.map.rooftopParties)) {
@@ -7371,14 +7493,29 @@ class RetroRenderer {
                 const floatX = rp.x + Math.sin(this.time * 1.9 + rp.seed) * 4.5;
                 const floatY = rp.y + Math.cos(this.time * 1.5 + rp.seed) * 4.5;
 
+                // Glowing Turquoise Rooftop Pool Water Caustics & 3D Cyan Glass Balcony Guardrails (Official GTA 6 Rooftop Screenshot!)
+                const shimmer = 0.28 + 0.12 * Math.sin(this.time * 3.2 + ri);
+                this.pushSolidQuad3D(rp.x, rp.y, rz + 0.010, 26.0, 26.0, 0, 0.14, 0.92, 0.98, shimmer, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(rp.x + 22.0, rp.y, rz + 0.045, 2.2, 42.0, 0, 0.35, 0.92, 1.00, 0.68, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(rp.x, rp.y - 22.0, rz + 0.045, 42.0, 2.2, 0, 0.35, 0.92, 1.00, 0.68, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(rp.x, rp.y + 22.0, rz + 0.045, 42.0, 2.2, 0, 0.35, 0.92, 1.00, 0.68, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
                 // Floating Neon Pink Flamingo Ring ("flamingo_float") bobbing inside the 3D turquoise rooftop pool!
                 this.batchObjectSprite3D("flamingo_float", floatX, floatY, rz + 0.022, this.time * 0.35 + ri, 0.86, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
-                // Sun lounger on the rooftop pool coping + VIP rooftop swimmer/dancer
-                this.batchObjectSprite3D("beach_lounger", rp.x - 16, rp.y - 16, rz + 0.018, 0, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Sun loungers on the rooftop pool coping + Striped Rooftop Parasol + Penthouse DJ Booth
+                this.batchObjectSprite3D("beach_lounger", rp.x - 16, rp.y - 14, rz + 0.018, 0, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("beach_lounger", rp.x - 16, rp.y + 12, rz + 0.018, 0, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("dj_turntable_deck", rp.x - 18, rp.y, rz + 0.032, 0, 0.78, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchObjectSprite3D("parasol_pink", rp.x + 14 + sunCos * 3.5, rp.y - 14 + sunSin * 3.5, rz + 0.014, 0, 0.78, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.32);
+                this.batchObjectSprite3D("parasol_pink", rp.x + 14, rp.y - 14, rz + 0.095, this.time * 0.08 + ri, 0.78, SPRITE_DRAW_ORDER.TREES);
+
+                // VIP rooftop swimmer/dancer + Skyline Balcony Couple overlooking Ocean Drive / Vice City!
                 const rPed = roofPeds[ri % roofPeds.length];
                 const rFr = 50 + (Math.floor(this.time * 5.8 + ri) % 4);
-                this.batchPedSprite3D(rPed, rFr, rp.x + 12, rp.y + 10, rz + 0.035, Math.sin(this.time * 2.5 + ri), 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D(rPed, rFr, rp.x + 10, rp.y + 8, rz + 0.035, Math.sin(this.time * 2.5 + ri), 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("vc_tommy", 0, rp.x + 19, rp.y - 4, rz + 0.035, 0, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.batchPedSprite3D("bikini_cyan", 0, rp.x + 19, rp.y + 4, rz + 0.035, 0, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
 
@@ -7455,6 +7592,23 @@ class RetroRenderer {
                         this.batchPedSprite3D("bikini_cyan", bsFr1, ev.x - 9, ev.y + 9, bz + 0.038, -0.7, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         this.batchPedSprite3D("bikini_yellow", bsFr0, ev.x + 9, ev.y + 8, bz + 0.038, -2.4, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         this.batchPedSprite3D("vc_bodybuilder", bsFr0, ev.x, ev.y - 13, bz + 0.038, Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                } else if (ev.kind === "BOARDWALK_IGUANA_ACT") {
+                    // Official GTA 6 Vice Beach Boardwalk Screenshot: Shirtless Florida Local with Green Iguana on Shoulder + Tourists Snapping Photos!
+                    if (!evWiped) {
+                        const handlerAng = Math.sin(this.time * 1.4 + ei) * 0.45;
+                        this.batchPedSprite3D("surfer_guy", 0, ev.x, ev.y, bz + 0.038, handlerAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        // Bright Emerald-Green Leonida Iguana perched on shoulder (scaled reptile sprite + tail)
+                        const igX = ev.x + Math.cos(handlerAng + 1.2) * 4.2;
+                        const igY = ev.y + Math.sin(handlerAng + 1.2) * 4.2;
+                        this.batchObjectSprite3D("gator_3d", igX, igY, bz + 0.062, handlerAng + Math.sin(this.time * 3.0 + ei) * 0.2, 0.42, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN, 0.25, 0.96, 0.38, 0.98);
+                        // Two Boardwalk Tourists admiring & snapping smartphone photos with periodic camera flash!
+                        const tFr = 50 + (Math.floor(this.time * 4.2 + ei) % 4);
+                        this.batchPedSprite3D("vc_tourist", tFr, ev.x - 13, ev.y - 7, bz + 0.038, 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_pink", tFr, ev.x + 13, ev.y + 7, bz + 0.038, -2.6, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        if (Math.sin(this.time * 4.5 + ei * 2.1) > 0.88) {
+                            this.pushSolidQuad3D(ev.x - 10, ev.y - 5, bz + 0.075, 8.5, 8.5, this.time * 3.0, 1.0, 1.0, 0.95, 0.92, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        }
                     }
                 } else {
                     // Ocean Drive Social-Media Influencer Livestreaming with 3D Glowing LED Ring-Light Tripod!

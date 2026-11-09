@@ -1832,6 +1832,66 @@ class LeonidaMap {
             }
         }
 
+        // 4B) Offshore Atlantic & Keys Parasailing Speedboats ("parasailBoats") & Vice Beach Sand Catch/Comber Games ("beachCatchGames")
+        this.parasailBoats = [];
+        const rawParasailBoats = [
+            { c: 492.5, r: 125.0, rx: 16.0, ry: 72.0, speed: 0.52, color: [0.98, 0.28, 0.72], ped: "bikini_pink" },
+            { c: 494.5, r: 178.0, rx: 18.0, ry: 78.0, speed: 0.48, color: [0.18, 0.92, 0.98], ped: "surfer_guy" },
+            { c: 493.0, r: 228.0, rx: 16.0, ry: 74.0, speed: 0.55, color: [0.98, 0.86, 0.18], ped: "bikini_cyan" },
+            { c: 495.0, r: 278.0, rx: 18.0, ry: 76.0, speed: 0.50, color: [0.32, 0.96, 0.56], ped: "bikini_yellow" },
+            { c: 492.5, r: 326.0, rx: 16.0, ry: 68.0, speed: 0.54, color: [0.98, 0.42, 0.22], ped: "bikini_red" },
+            { c: 286.0, r: 492.0, rx: 76.0, ry: 18.0, speed: 0.50, color: [0.98, 0.30, 0.78], ped: "bikini_pink" }
+        ];
+        for (let pi = 0; pi < rawParasailBoats.length; pi++) {
+            const rp = rawParasailBoats[pi];
+            const spWater = snapPxToCleanWater(rp.c * TILE_SIZE, rp.r * TILE_SIZE, 20);
+            if (spWater) {
+                this.parasailBoats.push({
+                    x: spWater.x,
+                    y: spWater.y,
+                    z: 2.0,
+                    rx: rp.rx,
+                    ry: rp.ry,
+                    speed: rp.speed,
+                    color: rp.color,
+                    ped: rp.ped,
+                    seed: pi * 1.85
+                });
+            }
+        }
+
+        this.beachCatchGames = [];
+        const rawBeachCatchGames = [
+            { c: 468.5, r: 118.5, kind: "FOOTBALL_TOSS" },
+            { c: 470.5, r: 152.5, kind: "FRISBEE_TOSS" },
+            { c: 468.5, r: 192.5, kind: "METAL_DETECTOR" },
+            { c: 474.5, r: 206.5, kind: "FOOTBALL_TOSS" },
+            { c: 475.2, r: 222.5, kind: "FRISBEE_TOSS" },
+            { c: 474.8, r: 238.5, kind: "METAL_DETECTOR" },
+            { c: 475.5, r: 256.5, kind: "FOOTBALL_TOSS" },
+            { c: 474.5, r: 272.5, kind: "FRISBEE_TOSS" },
+            { c: 475.2, r: 286.5, kind: "METAL_DETECTOR" },
+            { c: 474.5, r: 302.5, kind: "FOOTBALL_TOSS" },
+            { c: 470.5, r: 318.5, kind: "FRISBEE_TOSS" },
+            { c: 468.5, r: 336.5, kind: "METAL_DETECTOR" }
+        ];
+        for (let bi = 0; bi < rawBeachCatchGames.length; bi++) {
+            const bg = rawBeachCatchGames[bi];
+            const spSand = snapPxToCleanSand(bg.c * TILE_SIZE, bg.r * TILE_SIZE, false);
+            if (!spSand) continue;
+            if (this.beachVolleyballCourts.some(vc => Math.hypot(vc.x - spSand.x, vc.y - spSand.y) < 54)) continue;
+            if (this.beachParties.some(bp => Math.hypot(bp.x - spSand.x, bp.y - spSand.y) < 48)) continue;
+            if (this.muscleBeachGyms.some(gm => Math.hypot(gm.x - spSand.x, gm.y - spSand.y) < 48)) continue;
+            if (this.beachCatchGames.some(other => Math.hypot(other.x - spSand.x, other.y - spSand.y) < 42)) continue;
+            this.beachCatchGames.push({
+                x: spSand.x,
+                y: spSand.y,
+                z: 2.0,
+                kind: bg.kind,
+                seed: bi * 1.65
+            });
+        }
+
         // 5) Wynwood Walls Street-Art Breakdance Cyphers, Ocean Drive Livestreamers, Sidewalk Social Groups, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles ("streetEvents")
         this.streetEvents = [];
         const rawStreetEvents = [
@@ -1932,7 +1992,13 @@ class LeonidaMap {
             { c: 472.4, r: 278.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
             { c: 476.8, r: 292.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
             { c: 471.8, r: 308.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
-            { c: 469.5, r: 324.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true }
+            { c: 469.5, r: 324.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
+            // Official GTA 6 Vice Beach Boardwalk Screenshot: Florida Man with Green Iguana on Shoulder & Tourists Snapping Photos!
+            { c: 451.5, r: 208.5, kind: "BOARDWALK_IGUANA_ACT" },
+            { c: 451.5, r: 246.5, kind: "BOARDWALK_IGUANA_ACT" },
+            { c: 451.5, r: 274.5, kind: "BOARDWALK_IGUANA_ACT" },
+            { c: 448.5, r: 282.5, kind: "BOARDWALK_IGUANA_ACT" },
+            { c: 451.5, r: 306.5, kind: "BOARDWALK_IGUANA_ACT" }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];
