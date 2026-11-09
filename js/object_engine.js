@@ -514,6 +514,25 @@ class WorldObjectEngine {
             { name: "KEY LENTO WATERFRONT POOL TABLE",   x: 223.2 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "CROSSTOWN BOOBIE'S PATIO 8-BALL",   x: 195.8 * TILE_SIZE, y: 131.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 14. Official GTA 6 Confirmed Activities: Sport-Fishing Piers, Street Basketball Half-Courts & Neon Lowrider / Custom Car Meets
+        this.fishingSpots = [
+            { name: "VICE PIER DEEP-SEA TARPON ANGLING",     x: 474.5 * TILE_SIZE, y: 195.0 * TILE_SIZE, z: 2.0, ang: 0,              cooldown: 0 },
+            { name: "SEVEN MILE OLD BRIDGE SHARK FISHING",   x: 200.5 * TILE_SIZE, y: 478.6 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5,  cooldown: 0 },
+            { name: "LAKE LEONIDA BASS & GATOR PIER",        x: 125.5 * TILE_SIZE, y: 101.8 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5, cooldown: 0 },
+            { name: "GRASSRIVERS BAYOU CATFISH DOCK",        x: 116.5 * TILE_SIZE, y: 400.2 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5,  cooldown: 0 },
+            { name: "MOUNT KALAGA CANYON TROUT OVERLOOK",    x: 136.5 * TILE_SIZE, y: 26.2 * TILE_SIZE,  z: 2.0, ang: Math.PI * 0.5,  cooldown: 0 }
+        ];
+        this.streetBasketballCourts = [
+            { name: "LUMMUS PARK BEACHFRONT HOOPS",          x: 451.5 * TILE_SIZE, y: 214.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI COMMUNITY BLACKTOP",       x: 221.5 * TILE_SIZE, y: 111.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CROSSTOWN WYNWOOD STREETBALL COURT",    x: 186.5 * TILE_SIZE, y: 131.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.carMeets = [
+            { name: "OCEAN BEACH SOUTH POINTE NEON CAR MEET", x: 443.5 * TILE_SIZE, y: 340.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "WYNWOOD CUSTOM DONK & LOWRIDER MEET",    x: 187.5 * TILE_SIZE, y: 126.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PORT GELLHORN MUSCLE & TUNER MEET",      x: 84.5 * TILE_SIZE,  y: 211.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
         this.meshVertexCount = 0;
@@ -919,6 +938,23 @@ class WorldObjectEngine {
                 for (const pt of this.poolTables) {
                     snapOffRoad(pt);
                     clearZones.push({ x: pt.x, y: pt.y, r: 48 });
+                }
+            }
+            if (Array.isArray(this.fishingSpots)) {
+                for (const fs of this.fishingSpots) {
+                    clearZones.push({ x: fs.x, y: fs.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.streetBasketballCourts)) {
+                for (const bc of this.streetBasketballCourts) {
+                    snapOffRoad(bc);
+                    clearZones.push({ x: bc.x, y: bc.y, r: 54 });
+                }
+            }
+            if (Array.isArray(this.carMeets)) {
+                for (const cm of this.carMeets) {
+                    snapOffRoad(cm);
+                    clearZones.push({ x: cm.x, y: cm.y, r: 64 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2140,6 +2176,143 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-9. Official GTA 6 Sport-Fishing Piers & Bridges ([E]!)
+        if (Array.isArray(this.fishingSpots)) {
+            const catches = ["140-LB SILVER TARPON", "TROPHY FLORIDA SNOOK", "BULL SHARK", "GIANT GOLIATH GROUPER", "GOLDEN DORADO MAHI"];
+            for (let i = 0; i < this.fishingSpots.length; i++) {
+                const fs = this.fishingSpots[i];
+                if ((fs.cooldown || 0) <= 0 && Math.hypot(px - fs.x, py - fs.y) < 78) {
+                    fs.cooldown = 14.0;
+                    const fish = catches[(i + Math.floor(Math.random() * catches.length)) % catches.length];
+                    game.player.hp = game.player.maxHp || 100;
+                    if (typeof game.addScore === "function") game.addScore(5500);
+                    if (typeof game.addCash === "function") game.addCash(5500, `🎣 CAUGHT ${fish}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎣 TROPHY CATCH: ${fish}!`,
+                            `${fs.name} • +$5,500 + FULL HP & +1X MULTIPLIER!`,
+                            "#38bdf8",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: fs.x,
+                            y: fs.y,
+                            z: 2.68,
+                            text: `🎣 ${fish} LANDED! +$5,500 + +1X!`,
+                            color: "#38bdf8",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-10. Official GTA 6 Street Basketball Half-Courts & Port Gellhorn Mini-Golf Hole-in-One ([E]!)
+        if (Array.isArray(this.streetBasketballCourts)) {
+            for (const bc of this.streetBasketballCourts) {
+                if ((bc.cooldown || 0) <= 0 && Math.hypot(px - bc.x, py - bc.y) < 82) {
+                    bc.cooldown = 14.0;
+                    if (typeof game.addScore === "function") game.addScore(4500);
+                    if (typeof game.addCash === "function") game.addCash(4500, `🏀 ${bc.name} 3-POINTER!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🏀 NOTHING BUT NET! STREETBALL KING!`,
+                            `${bc.name} • 3-POINT CONTEST WINNER +$4,500 & +1X!`,
+                            "#f97316",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bc.x,
+                            y: bc.y,
+                            z: 2.68,
+                            text: `🏀 SWISH! 3-POINT CONTEST +$4,500 + +1X!`,
+                            color: "#f97316",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+        if (this.map && this.map.industrialAndParkDetails && this.map.industrialAndParkDetails.miniGolf && (this.miniGolfCooldown || 0) <= 0) {
+            const mg = this.map.industrialAndParkDetails.miniGolf;
+            if (Math.hypot(px - mg.x, py - mg.y) < 88) {
+                this.miniGolfCooldown = 14.0;
+                if (typeof game.addScore === "function") game.addScore(5000);
+                if (typeof game.addCash === "function") game.addCash(5000, "⛳ PORT GELLHORN MINI-GOLF HOLE-IN-ONE!");
+                if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                if (game.audio) game.audio.playPickup("SCORE");
+                if (typeof game.showBigBanner === "function") {
+                    game.showBigBanner(
+                        "⛳ WINDMILL HOLE-IN-ONE!",
+                        "PORT GELLHORN RETRO MINI-GOLF CHAMPION • +$5,000 & +1X!",
+                        "#4ade80",
+                        2.6
+                    );
+                }
+                if (Array.isArray(game.floatingTexts)) {
+                    game.floatingTexts.push({
+                        x: mg.x,
+                        y: mg.y,
+                        z: 2.68,
+                        text: "⛳ MINI-GOLF HOLE-IN-ONE! +$5,000 + +1X!",
+                        color: "#4ade80",
+                        life: 2.6
+                    });
+                }
+                return true;
+            }
+        }
+
+        // 0P-11. Official GTA 6 Custom Donk / Lowrider & Exotic Car Meets ([E]!)
+        if (Array.isArray(this.carMeets)) {
+            for (const cm of this.carMeets) {
+                if ((cm.cooldown || 0) <= 0 && Math.hypot(px - cm.x, py - cm.y) < 92) {
+                    cm.cooldown = 16.0;
+                    const pCar = game.player.inVehicle;
+                    if (pCar) {
+                        pCar.hp = pCar.maxHp || 100;
+                        pCar.vx = (pCar.vx || 0) * 1.25;
+                        pCar.vy = (pCar.vy || 0) * 1.25;
+                    }
+                    game.player.hp = game.player.maxHp || 100;
+                    game.player.armor = 100;
+                    if (typeof game.addScore === "function") game.addScore(7500);
+                    if (typeof game.addCash === "function") game.addCash(7500, `🏎️ ${cm.name} TROPHY!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🏎️ ${cm.name}!`,
+                            "HYDRAULICS & CUSTOM SHOWCASE WINNER • +$7,500 + FULL REPAIR & +1X!",
+                            "#ec4899",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cm.x,
+                            y: cm.y,
+                            z: 2.72,
+                            text: `🏎️ CAR MEET SHOWCASE TROPHY! +$7,500 + FULL REPAIR/ARMOR!`,
+                            color: "#ec4899",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -2990,6 +3163,22 @@ class WorldObjectEngine {
                 if ((pt.cooldown || 0) > 0) pt.cooldown = Math.max(0, pt.cooldown - dt);
             }
         }
+        if (Array.isArray(this.fishingSpots)) {
+            for (const fs of this.fishingSpots) {
+                if ((fs.cooldown || 0) > 0) fs.cooldown = Math.max(0, fs.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.streetBasketballCourts)) {
+            for (const bc of this.streetBasketballCourts) {
+                if ((bc.cooldown || 0) > 0) bc.cooldown = Math.max(0, bc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.carMeets)) {
+            for (const cm of this.carMeets) {
+                if ((cm.cooldown || 0) > 0) cm.cooldown = Math.max(0, cm.cooldown - dt);
+            }
+        }
+        if ((this.miniGolfCooldown || 0) > 0) this.miniGolfCooldown = Math.max(0, this.miniGolfCooldown - dt);
         if ((this.takeoverCooldown || 0) > 0) this.takeoverCooldown = Math.max(0, this.takeoverCooldown - dt);
         if ((this.cameraFlashTimer || 0) > 0) this.cameraFlashTimer = Math.max(0, this.cameraFlashTimer - dt);
         if (this.landmarks3D) {
@@ -6738,6 +6927,41 @@ class WorldObjectEngine {
                 emitSolidBox3D(pt.x, pt.y, 1, 0,  5, 0, 2.4, 2.4, bz + 0.185, bz + 0.205, [0.10, 0.12, 0.16], 5);
             }
         }
+        // 22F. OFFICIAL GTA 6 SPORT-FISHING PIERS, STREET BASKETBALL HALF-COURTS & NEON LOWRIDER / CAR MEET PAVILIONS
+        if (Array.isArray(this.fishingSpots)) {
+            for (const fs of this.fishingSpots) {
+                const bz = fs.z || 2.0;
+                const cA = Math.cos(fs.ang || 0), sA = Math.sin(fs.ang || 0);
+                // Bleached Timber Fishing Pier Post + Tackle Box + Ice Cooler + Angled 3D Graphite Fishing Rod
+                emitCylinder3D(fs.x, fs.y, 0, 0, 2.8, 2.8, bz, bz + 0.24, 6, [0.76, 0.60, 0.42], 11, true);
+                emitSolidBox3D(fs.x, fs.y, cA, sA, -6, 6, 9, 6.5, bz, bz + 0.10, [0.18, 0.68, 0.96], 5);
+                emitSolidBox3D(fs.x, fs.y, cA, sA, -6, -6, 6.5, 5.0, bz, bz + 0.08, [0.92, 0.24, 0.22], 5);
+                emitSolidBox3D(fs.x, fs.y, cA, sA, 8, 0, 18.0, 1.4, bz + 0.18, bz + 0.28, [0.90, 0.94, 0.98], 5);
+            }
+        }
+        if (Array.isArray(this.streetBasketballCourts)) {
+            for (const bc of this.streetBasketballCourts) {
+                const bz = bc.z || 2.0;
+                emitAOShadow3D(bc.x, bc.y, 1, 0, 0, 0, 56, 46, bz, 0.34);
+                // Painted Neon Vice Teal & Magenta Streetball Half-Court + Steel Pole + Acrylic Backboard & Orange Rim
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 48, 38, bz, bz + 0.015, [0.16, 0.66, 0.78], 1);
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, -9, 18, 16, bz + 0.015, bz + 0.025, [0.96, 0.28, 0.72], 1);
+                emitCylinder3D(bc.x, bc.y, 0, -18, 2.2, 2.2, bz, bz + 0.36, 8, [0.22, 0.26, 0.32], 5, false);
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, -16, 18, 2.4, bz + 0.28, bz + 0.40, [0.96, 0.98, 1.00], 7);
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, -13, 6.5, 6.5, bz + 0.27, bz + 0.295, [0.98, 0.44, 0.10], 5);
+            }
+        }
+        if (Array.isArray(this.carMeets)) {
+            for (const cm of this.carMeets) {
+                const bz = cm.z || 2.0;
+                emitAOShadow3D(cm.x, cm.y, 1, 0, 0, 0, 76, 52, bz, 0.36);
+                // Glowing Neon Underglow Car-Meet Display Pad + Tool Chest + Sound System Stack
+                emitSolidBox3D(cm.x, cm.y, 1, 0, 0, 0, 68, 44, bz, bz + 0.02, [0.18, 0.20, 0.26], 1);
+                emitSolidBox3D(cm.x, cm.y, 1, 0, 0, 0, 70, 46, bz, bz + 0.012, [0.98, 0.24, 0.78], 10);
+                emitSolidBox3D(cm.x, cm.y, 1, 0, -26, -14, 12, 8, bz + 0.02, bz + 0.18, [0.92, 0.18, 0.20], 5);
+                emitSolidBox3D(cm.x, cm.y, 1, 0,  26, -14, 12, 8, bz + 0.02, bz + 0.22, [0.14, 0.16, 0.22], 5);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -9626,6 +9850,68 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_cuban", pFr, pt.x + 19, pt.y, 2.040, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
+        if (Array.isArray(this.fishingSpots)) {
+            for (let i = 0; i < this.fishingSpots.length; i++) {
+                const fs = this.fishingSpots[i];
+                if (fs.x < minX - 120 || fs.x > maxX + 120 || fs.y < minY - 120 || fs.y > maxY + 120) continue;
+                const cA = Math.cos(fs.ang || 0), sA = Math.sin(fs.ang || 0);
+                if ((fs.cooldown || 0) <= 0) {
+                    const rSz = 22 + Math.sin(renderer.time * 5.2 + i) * 3.0;
+                    renderer.pushSolidQuad3D(fs.x, fs.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.22, 0.88, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Angler standing at pier rail + bobbing red/white fishing float in the water!
+                renderer.batchPedSprite3D("vc_sailor", 0, fs.x - cA * 4, fs.y - sA * 4, 2.040, fs.ang || 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                const bobX = fs.x + cA * 22.0 + Math.sin(renderer.time * 2.5 + i) * 1.8;
+                const bobY = fs.y + sA * 22.0 + Math.cos(renderer.time * 2.1 + i) * 1.8;
+                renderer.pushSolidQuad3D(bobX, bobY, 2.018, 9.0, 9.0, 0, 0.85, 0.98, 1.0, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                renderer.pushSolidQuad3D(bobX, bobY, 2.028, 3.6, 3.6, renderer.time * 2.0, 0.98, 0.20, 0.20, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            }
+        }
+        if (Array.isArray(this.streetBasketballCourts)) {
+            for (let i = 0; i < this.streetBasketballCourts.length; i++) {
+                const bc = this.streetBasketballCourts[i];
+                if (bc.x < minX - 120 || bc.x > maxX + 120 || bc.y < minY - 120 || bc.y > maxY + 120) continue;
+                if ((bc.cooldown || 0) <= 0) {
+                    const rSz = 26 + Math.sin(renderer.time * 5.6 + i) * 3.5;
+                    renderer.pushSolidQuad3D(bc.x, bc.y + 6, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.46, 0.12, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Two streetball players + arcing 3D orange basketball toward the hoop!
+                const shotU = (renderer.time * 1.15 + i * 0.4) % 1.0;
+                const bY = (bc.y + 10) + ((bc.y - 13) - (bc.y + 10)) * shotU;
+                const bZ = 2.06 + Math.sin(shotU * Math.PI) * 0.26;
+                renderer.pushSolidQuad3D(bc.x, bY, bZ, 5.5, 5.5, renderer.time * 5.0, 0.98, 0.44, 0.08, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                const sFr = 50 + (Math.floor(renderer.time * 6.0 + i) % 4);
+                renderer.batchPedSprite3D("vc_jogger", sFr, bc.x - 8, bc.y + 10, 2.040, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_haitian", sFr, bc.x + 9, bc.y + 4, 2.040, -Math.PI * 0.6, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.carMeets)) {
+            const vehSprites = renderer.gta1Meta && renderer.gta1Meta.sprites && renderer.gta1Meta.sprites.vehicles;
+            for (let i = 0; i < this.carMeets.length; i++) {
+                const cm = this.carMeets[i];
+                if (cm.x < minX - 140 || cm.x > maxX + 140 || cm.y < minY - 140 || cm.y > maxY + 140) continue;
+                if ((cm.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 5.8 + i) * 4.0;
+                    renderer.pushSolidQuad3D(cm.x, cm.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.26, 0.78, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Two custom lowrider / tuner show cars with bouncing hydraulics & neon underglow + admiring car-meet crowd!
+                for (let ci = -1; ci <= 1; ci += 2) {
+                    const cx = cm.x + ci * 18;
+                    const cy = cm.y + 2;
+                    const bounceZ = Math.abs(Math.sin(renderer.time * 4.5 + i + ci)) * 0.035;
+                    renderer.pushSolidQuad3D(cx, cy, 2.022, 18, 32, 0, ci < 0 ? 0.14 : 0.98, ci < 0 ? 0.92 : 0.24, 0.98, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const ve = vehSprites && (vehSprites[(i * 2 + (ci < 0 ? 0 : 1)) % vehSprites.length]);
+                    const vRect = ve && (Array.isArray(ve) ? ve : (ve.base || (ve.remaps && ve.remaps[0])));
+                    if (vRect) {
+                        renderer.pushAtlasSprite3D(vRect, cx, cy, 2.048 + bounceZ, 0, 0.94, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
+                    }
+                }
+                const mFr = 50 + (Math.floor(renderer.time * 5.2 + i) % 4);
+                renderer.batchPedSprite3D("bikini_pink", mFr, cm.x, cm.y - 16, 2.042, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_cuban", mFr, cm.x - 28, cm.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_tommy", mFr, cm.x + 28, cm.y + 12, 2.042, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
     }
 
     /* ========================================================================
@@ -10083,6 +10369,65 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (!p.inVehicle && Array.isArray(this.fishingSpots)) {
+            for (const fs of this.fishingSpots) {
+                if ((fs.cooldown || 0) <= 0 && Math.hypot(px - fs.x, py - fs.y) < 105) {
+                    const scr = renderer.worldToScreen(fs.x, fs.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`🎣 [E] CAST LINE: ${fs.name} (+$5,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.streetBasketballCourts)) {
+            for (const bc of this.streetBasketballCourts) {
+                if ((bc.cooldown || 0) <= 0 && Math.hypot(px - bc.x, py - bc.y) < 110) {
+                    const scr = renderer.worldToScreen(bc.x, bc.y - 18, 2.58);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.strokeStyle = "#f97316";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.fillStyle = "#f97316";
+                    ctx.fillText(`🏀 [E] 3-POINT SHOOTOUT: ${bc.name} (+$4,500 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && this.map && this.map.industrialAndParkDetails && this.map.industrialAndParkDetails.miniGolf && (this.miniGolfCooldown || 0) <= 0) {
+            const mg = this.map.industrialAndParkDetails.miniGolf;
+            if (Math.hypot(px - mg.x, py - mg.y) < 115) {
+                const scr = renderer.worldToScreen(mg.x, mg.y - 18, 2.58);
+                ctx.font = "900 11px monospace";
+                ctx.fillStyle = "rgba(8,12,22,0.92)";
+                ctx.fillRect(scr.x - 200, scr.y - 22, 400, 22);
+                ctx.strokeStyle = "#4ade80";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(scr.x - 200, scr.y - 22, 400, 22);
+                ctx.fillStyle = "#4ade80";
+                ctx.fillText("⛳ [E] PUTT WINDMILL HOLE-IN-ONE (+$5,000 & +1X)", scr.x, scr.y - 7);
+            }
+        }
+        if (Array.isArray(this.carMeets)) {
+            for (const cm of this.carMeets) {
+                if ((cm.cooldown || 0) <= 0 && Math.hypot(px - cm.x, py - cm.y) < 120) {
+                    const scr = renderer.worldToScreen(cm.x, cm.y - 18, 2.58);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.strokeStyle = "#ec4899";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 205, scr.y - 22, 410, 22);
+                    ctx.fillStyle = "#ec4899";
+                    ctx.fillText(`🏎️ [E] SHOWCASE AT ${cm.name} (+$7,500 & FULL REPAIR)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -10411,6 +10756,24 @@ class WorldObjectEngine {
             ctx.fillStyle = "#10b981";
             for (const pt of this.poolTables) {
                 ctx.fillRect((pt.x - 16) * sx, (pt.y - 10) * sy, 32 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.fishingSpots)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const fs of this.fishingSpots) {
+                ctx.fillRect((fs.x - 14) * sx, (fs.y - 14) * sy, 28 * sx, 28 * sy);
+            }
+        }
+        if (Array.isArray(this.streetBasketballCourts)) {
+            ctx.fillStyle = "#f97316";
+            for (const bc of this.streetBasketballCourts) {
+                ctx.fillRect((bc.x - 24) * sx, (bc.y - 19) * sy, 48 * sx, 38 * sy);
+            }
+        }
+        if (Array.isArray(this.carMeets)) {
+            ctx.fillStyle = "#ec4899";
+            for (const cm of this.carMeets) {
+                ctx.fillRect((cm.x - 34) * sx, (cm.y - 22) * sy, 68 * sx, 44 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
