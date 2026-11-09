@@ -3595,7 +3595,7 @@ class LeonidaMap {
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
                 if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) return false;
-                if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) return false;
+                if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (pm.y >= st.yMin - 18 && pm.y <= st.yMax + 18)))) return false;
                 if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                 return true;
             });
@@ -3613,7 +3613,7 @@ class LeonidaMap {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
                     if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) return false;
-                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) return false;
+                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (tr.y >= st.yMin - 18 && tr.y <= st.yMax + 18)))) return false;
                     if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
                         const gt = this.surfaceGround[r * MAP_COLS + c];
@@ -3630,7 +3630,7 @@ class LeonidaMap {
                 this.viceStreetDetails = this.viceStreetDetails.filter(vd => {
                     const c = Math.floor(vd.x / TILE_SIZE);
                     const r = Math.floor(vd.y / TILE_SIZE);
-                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) return false;
+                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (vd.y >= st.yMin - 18 && vd.y <= st.yMax + 18)))) return false;
                     if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                     return true;
                 });
@@ -3683,9 +3683,9 @@ class LeonidaMap {
             OCEAN_DRIVE: 145,
             SOBE_COLLINS_WASH: 185,
             STAR_VENETIAN: 28,
-            DOWNTOWN_CUBA: 165,
-            HAITI_WYNWOOD: 120,
-            PORT_GELLHORN: 95,
+            DOWNTOWN_CUBA: 250,
+            HAITI_WYNWOOD: 185,
+            PORT_GELLHORN: 145,
             LEONIDA_KEYS: 28
         };
         const districtCounts = {
@@ -4118,16 +4118,30 @@ class LeonidaMap {
 
         // =========================================================================
         // 2) Build Asymmetric, Spacious Recessed Asphalt Curbside Parallel Parking Bays
-        //    along the wide boulevard esplanades (c = 52, 55, 284, 287, 424, 427, 434, 437, 444)
+        //    along both the wide boulevard esplanades (c = 52/55, 284/287, 424/427, 434/437, 444)
+        //    AND intelligently across the urban mainland North-South avenues in Downtown,
+        //    Little Havana, Little Haiti, Wynwood & Port Gellhorn (c = 61..274).
         //    Note: c = 447 is the Lummus Park beach promenade edge and must NEVER have asphalt bays carved into it!
         // =========================================================================
-        const esplanadeCols = [52, 55, 284, 287, 424, 427, 434, 437, 444];
-        for (let ci = 0; ci < esplanadeCols.length; ci++) {
-            const c = esplanadeCols[ci];
+        const avenueCurbSpecs = [
+            // Port Gellhorn boulevards & urban avenues
+            [52, 1, true], [55, -1, true],
+            [61, 1, false], [64, -1, false], [87, 1, false], [125, 1, false], [130, -1, false], [165, 1, false], [168, -1, false],
+            // Little Haiti & Wynwood avenues
+            [175, 1, false], [178, -1, false], [187, 1, false], [190, -1, false], [199, 1, false], [202, -1, false], [211, 1, false], [214, -1, false], [223, 1, false], [226, -1, false],
+            // Downtown & Little Havana avenues (1st Ave, 2nd Ave, Miami Ave, Flagler/NE 1st, Biscayne Blvd)
+            [235, 1, false], [238, -1, false], [247, 1, false], [250, -1, false], [259, 1, false], [262, -1, false], [271, 1, false], [274, -1, false],
+            [284, 1, true], [287, -1, true],
+            // South Beach avenues (West/Alton, Washington/Collins, Ocean Drive West side)
+            [424, 1, true], [427, -1, true], [434, 1, true], [437, -1, true], [444, 1, true]
+        ];
+        for (let ci = 0; ci < avenueCurbSpecs.length; ci++) {
+            const [c, dc, isConvertedBoulevard] = avenueCurbSpecs[ci];
             let r = 50;
             while (r <= 372) {
                 const isEligibleRow = (ry) => {
                     if (ry < 50 || ry > 372) return false;
+                    if (!isConvertedBoulevard && isProtectedCompound(c, ry)) return false;
                     // Never carve commercial curbside parking bays next to 3D residential villa lots (which have their own private driveways)
                     if (Array.isArray(this.residentialHouses)) {
                         for (let hi = 0; hi < this.residentialHouses.length; hi++) {
@@ -4139,14 +4153,47 @@ class LeonidaMap {
                             }
                         }
                     }
-                    const maskVal = this.boulevardParkingEsplanadeMask
-                        ? this.boulevardParkingEsplanadeMask[ry * MAP_COLS + c]
-                        : 0;
-                    if (!maskVal) return false;
-                    const dc = maskVal === 1 ? 1 : -1;
+                    // Never place a curbside parallel bay across the entrance/frontage of an off-street surface parking lot
+                    if (Array.isArray(this.surfaceParkingLots)) {
+                        for (let li = 0; li < this.surfaceParkingLots.length; li++) {
+                            const lot = this.surfaceParkingLots[li];
+                            if (c >= lot.asphaltMinX - 2 && c <= lot.asphaltMaxX + 2 && ry >= lot.asphaltMinY - 1 && ry <= lot.asphaltMaxY + 1) {
+                                return false;
+                            }
+                        }
+                    }
+                    if (isConvertedBoulevard) {
+                        const maskVal = this.boulevardParkingEsplanadeMask
+                            ? this.boulevardParkingEsplanadeMask[ry * MAP_COLS + c]
+                            : 0;
+                        if (!maskVal) return false;
+                    } else {
+                        const idx = ry * MAP_COLS + c;
+                        const roadIdx = ry * MAP_COLS + (c + dc);
+                        const road2Idx = ry * MAP_COLS + (c + 2 * dc);
+                        const backIdx = ry * MAP_COLS + (c - dc);
+                        if (
+                            this.surfaceGround[idx] !== GROUND_TYPE.PAWEMENT ||
+                            (this.surfaceLayer[idx] || 2) !== 2 ||
+                            this.surfaceGround[roadIdx] !== GROUND_TYPE.ROAD ||
+                            (this.surfaceLayer[roadIdx] || 2) !== 2 ||
+                            this.surfaceGround[road2Idx] !== GROUND_TYPE.ROAD
+                        ) {
+                            return false;
+                        }
+                        const backGt = this.surfaceGround[backIdx];
+                        const backSz = this.surfaceLayer[backIdx] || 2;
+                        const isWideSidewalk = (backGt === GROUND_TYPE.PAWEMENT || backGt === GROUND_TYPE.FIELD) && backSz === 2;
+                        const isUrbanCommercialBlock = (c >= 175 && c <= 274 && backGt === GROUND_TYPE.BUILDING);
+                        if (!isWideSidewalk && !isUrbanCommercialBlock) return false;
+                    }
                     if (this.isStopLineBlock(c + dc, ry)) return false;
                     const roadBlk = this.getBlockInfo(c + dc, ry, 1);
-                    if (!roadBlk || roadBlk.lid === 25) return false;
+                    if (!roadBlk || roadBlk.lid === 25 || roadBlk.lid === 24) return false;
+                    if (!isConvertedBoulevard) {
+                        const lid = roadBlk.lid;
+                        if (lid !== 74 && lid !== 2 && lid !== 75 && lid !== 80 && lid !== 81 && lid !== 82) return false;
+                    }
                     const roadEdgeX = (c + (dc > 0 ? 1 : 0)) * TILE_SIZE;
                     const stallX = roadEdgeX - dc * 21.0;
                     const stallY = (ry + 0.5) * TILE_SIZE;
@@ -4165,35 +4212,85 @@ class LeonidaMap {
                 const fullRunLen = runEnd - runStart + 1;
                 if (fullRunLen < 2) continue;
 
-                const maskVal = this.boulevardParkingEsplanadeMask[runStart * MAP_COLS + c];
-                const dc = maskVal === 1 ? 1 : -1;
-                const aveC0 = dc > 0 ? c : (c - 3);
-                const blockBucket = Math.floor(runStart / 4);
-                const pairHash = (((aveC0 * 73856093) ^ (blockBucket * 19349663)) >>> 0) % 100;
-                const sideHash = (((c * 83492791) ^ (runStart * 2971215073)) >>> 0);
+                // Find the longest contiguous wide-esplanade sub-run (PAWEMENT or FIELD behind the sidewalk) inside [runStart..runEnd]
+                let bestWideStart = -1, bestWideLen = 0;
+                let curWideStart = -1, curWideLen = 0;
+                for (let ry = runStart; ry <= runEnd; ry++) {
+                    const backIdx = ry * MAP_COLS + (c - dc);
+                    const backGt = this.surfaceGround[backIdx];
+                    const backSz = this.surfaceLayer[backIdx] || 2;
+                    if (isConvertedBoulevard || ((backGt === GROUND_TYPE.PAWEMENT || backGt === GROUND_TYPE.FIELD) && backSz === 2)) {
+                        if (curWideLen === 0) curWideStart = ry;
+                        curWideLen++;
+                        if (curWideLen > bestWideLen) {
+                            bestWideLen = curWideLen;
+                            bestWideStart = curWideStart;
+                        }
+                    } else {
+                        curWideLen = 0;
+                    }
+                }
+                const isWideEsplanadeRun = isConvertedBoulevard || (bestWideLen >= 3);
+                const effStart = isWideEsplanadeRun ? bestWideStart : runStart;
+                const effEnd = isWideEsplanadeRun ? (bestWideStart + bestWideLen - 1) : runEnd;
+                const effLen = effEnd - effStart + 1;
 
-                // Break systematic left/right mirroring
-                if (c !== 444) {
-                    if (dc > 0 && pairHash >= 34 && pairHash < 68) continue;
-                    if (dc < 0 && pairHash < 34) continue;
-                    if (pairHash >= 88) continue;
+                const aveC0 = dc > 0 ? c : (c - 3);
+                const blockBucket = Math.floor(effStart / 4);
+                const pairHash = (((aveC0 * 73856093) ^ (blockBucket * 19349663)) >>> 0) % 100;
+                const sideHash = (((c * 83492791) ^ (effStart * 2971215073)) >>> 0);
+
+                if (isConvertedBoulevard) {
+                    // Break systematic left/right mirroring on major boulevards
+                    if (c !== 444) {
+                        if (dc > 0 && pairHash >= 34 && pairHash < 68) continue;
+                        if (dc < 0 && pairHash < 34) continue;
+                        if (pairHash >= 88) continue;
+                    } else {
+                        if (pairHash >= 72 && (blockBucket % 3) === 1) continue;
+                    }
+                } else if (isWideEsplanadeRun) {
+                    // On wide mainland plazas/parks (c = 61..274), require >= 3 tiles and stagger left/right so bays feel organic
+                    if (effLen < 3) continue;
+                    if (dc > 0 && pairHash >= 44) continue;
+                    if (dc < 0 && (pairHash < 44 || pairHash >= 88)) continue;
                 } else {
-                    if (pairHash >= 72 && (blockBucket % 3) === 1) continue;
+                    // On standard building-lined Downtown / Little Havana / Wynwood blocks:
+                    // - Require >= 4 clean tiles and inset away from intersections
+                    // - Selective urban density (strictly NEVER on both West and East sides of the same block!)
+                    if (effLen < 4) continue;
+                    const sideQuota = (c >= 235 && c <= 274) ? 36 : 26;
+                    if (dc > 0 && pairHash >= sideQuota) continue;
+                    if (dc < 0 && (pairHash < 50 || pairHash >= (50 + sideQuota))) continue;
                 }
 
                 // Choose spacious parallel parking stalls (78px..88px long per stall instead of 59px,
                 // so every car has 16px+ clearance in front and behind and never touches adjacent cars!)
-                let r0 = runStart;
-                let r1 = runEnd;
-                if (fullRunLen > 4) {
+                let r0 = effStart;
+                let r1 = effEnd;
+                if (!isWideEsplanadeRun) {
+                    // Center a compact 2- or 3-tile bay mid-block and ensure >= 1 full sidewalk tile remains at street corners
+                    const targetTiles = (effLen >= 5) ? 3 : 2;
+                    const offset = Math.floor((effLen - targetTiles) * 0.5);
+                    r0 = effStart + offset;
+                    r1 = r0 + targetTiles - 1;
+                    if (
+                        this.surfaceGround[(r0 - 1) * MAP_COLS + c] !== GROUND_TYPE.PAWEMENT ||
+                        this.surfaceGround[(r1 + 1) * MAP_COLS + c] !== GROUND_TYPE.PAWEMENT
+                    ) {
+                        continue;
+                    }
+                } else if (effLen > 4) {
                     const targetTiles = 3 + ((sideHash >>> 3) & 1);
-                    const offset = ((sideHash >>> 5) % (fullRunLen - targetTiles + 1));
-                    r0 = runStart + offset;
+                    const offset = ((sideHash >>> 5) % (effLen - targetTiles + 1));
+                    r0 = effStart + offset;
                     r1 = r0 + targetTiles - 1;
                 }
                 const runTiles = r1 - r0 + 1;
-                for (let ry = r0; ry <= r1; ry++) {
-                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + c] = this.roadParkingNavIdx;
+
+                // Never allow two bays on the same avenue (West & East curbs, |st.c - c| <= 4) to overlap or sit directly across the street from each other!
+                if (this.curbParkingStrips.some((st) => Math.abs(st.c - c) <= 4 && r0 <= st.r1 + 3 && r1 >= st.r0 - 3)) {
+                    continue;
                 }
 
                 let numStalls = 2;
@@ -4217,24 +4314,19 @@ class LeonidaMap {
                 const yMax = spanCenterY + totalBayLen * 0.5;
 
                 const roadEdgeX = (c + (dc > 0 ? 1 : 0)) * TILE_SIZE;
-                const bayDepth = 42.0;
+                const bayDepth = isWideEsplanadeRun ? 42.0 : 40.0;
+                const carOffsetFromRoadEdge = 21.0;
                 const surfZ = this.surfaceLayer[r0 * MAP_COLS + c] || 2.0;
                 const adjRoadLid = this.getBlockInfo(c + dc, r0, 1)?.lid || 0;
                 const darkAsphalt = (adjRoadLid === 2 || adjRoadLid === 75 || adjRoadLid === 81 || adjRoadLid === 82);
 
-                this.curbParkingStrips.push({
-                    c,
-                    dc,
-                    r0,
-                    r1,
-                    roadEdgeX,
-                    yMin,
-                    yMax,
-                    bayDepth,
-                    z: surfZ,
-                    darkAsphalt,
-                    seed: sideHash
-                });
+                // Clear any pre-generated sidewalk flora inside this recessed bay footprint before checking stall cleanliness
+                if (Array.isArray(this.vicePalms)) {
+                    this.vicePalms = this.vicePalms.filter((pm) => !(Math.floor(pm.x / TILE_SIZE) === c && pm.y >= yMin - 18.0 && pm.y <= yMax + 18.0));
+                }
+                if (Array.isArray(this.trees)) {
+                    this.trees = this.trees.filter((tr) => !(Math.floor(tr.x / TILE_SIZE) === c && tr.y >= yMin - 18.0 && tr.y <= yMax + 18.0));
+                }
 
                 const baseParkAng = dc > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
                 const fwdY = Math.sin(baseParkAng);
@@ -4245,16 +4337,17 @@ class LeonidaMap {
                     : (numStalls === 2 ? ((sideHash % 10) < 4) : false);
                 const openStallIdx = hasOpenStall ? ((sideHash >>> 7) % numStalls) : -1;
                 let spawnedInBay = 0;
+                const pendingBays = [];
 
                 for (let k = 0; k < numStalls; k++) {
-                    const stallCenterX = roadEdgeX - dc * 21.0;
+                    const stallCenterX = roadEdgeX - dc * carOffsetFromRoadEdge;
                     const stallCenterY = (yMin + taperMargin) + (k + 0.5) * stallLen;
                     const ry = Math.floor(stallCenterY / TILE_SIZE);
                     const stallHash = (((c * 73856093) ^ ((ry + k * 7) * 19349663) ^ sideHash) >>> 0);
-                    // Subtle human parking variance (stays well inside the generous 42px x 82..88px stall!)
-                    const jitterX = (((stallHash & 0xff) / 255.0) - 0.5) * 2.6;
+                    // Subtle human parking variance (stays well inside the generous stall!)
+                    const jitterX = (((stallHash & 0xff) / 255.0) - 0.5) * 2.4;
                     const jitterY = ((((stallHash >>> 8) & 0xff) / 255.0) - 0.5) * 4.4;
-                    const jitterAng = ((((stallHash >>> 16) & 0xff) / 255.0) - 0.5) * 0.060;
+                    const jitterAng = ((((stallHash >>> 16) & 0xff) / 0xff) - 0.5) * 0.060;
 
                     const carX = stallCenterX + jitterX;
                     const carY = stallCenterY + jitterY;
@@ -4267,19 +4360,18 @@ class LeonidaMap {
 
                     const canSpawnCar = !wantEmpty &&
                         isCleanCurbSpot(stallCenterX, stallCenterY, surfZ) &&
-                        (districtCounts[districtKey] < districtLimits[districtKey]);
+                        ((districtCounts[districtKey] + spawnedInBay) < districtLimits[districtKey]);
 
                     if (canSpawnCar) {
-                        districtCounts[districtKey]++;
                         spawnedInBay++;
                     }
 
-                    // 3D dual-head parking meter on the raised sidewalk behind the 42px bay curb (1 dual meter per 2 stalls)
+                    // 3D dual-head parking meter on the raised sidewalk behind the bay curb (1 dual meter per 2 stalls)
                     const hasMeter = ((k % 2) === 0);
-                    const meterX = roadEdgeX - dc * (bayDepth + 6.0);
+                    const meterX = roadEdgeX - dc * (bayDepth + (isWideEsplanadeRun ? 6.0 : 5.0));
                     const meterY = stallCenterY + fwdY * (stallLen * 0.28);
 
-                    bays.push({
+                    pendingBays.push({
                         c,
                         r: ry,
                         dc,
@@ -4301,6 +4393,32 @@ class LeonidaMap {
                         districtKey,
                         specKey
                     });
+                }
+
+                // Never carve an empty recessed parking bay with 0 parked cars
+                if (spawnedInBay === 0) continue;
+
+                for (let ry = r0; ry <= r1; ry++) {
+                    this.voxelGrid[(2 * MAP_ROWS + ry) * MAP_COLS + c] = this.roadParkingNavIdx;
+                }
+                this.curbParkingStrips.push({
+                    c,
+                    dc,
+                    r0,
+                    r1,
+                    roadEdgeX,
+                    yMin,
+                    yMax,
+                    bayDepth,
+                    z: surfZ,
+                    darkAsphalt,
+                    seed: sideHash
+                });
+                for (let k = 0; k < pendingBays.length; k++) {
+                    if (!pendingBays[k].emptyStall) {
+                        districtCounts[pendingBays[k].districtKey]++;
+                    }
+                    bays.push(pendingBays[k]);
                 }
             }
         }

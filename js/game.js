@@ -1494,7 +1494,8 @@ class LeonidaGame {
             let occupied = false;
             for (let j = 0; j < this.vehicles.length; j++) {
                 const other = this.vehicles[j];
-                if (Math.hypot(other.x - bay.x, other.y - bay.y) < 52) {
+                const minDist = (other.driver === "AI_TRAFFIC" || other.driver === "AI_EMERGENCY") ? 36 : 52;
+                if (Math.hypot(other.x - bay.x, other.y - bay.y) < minDist) {
                     occupied = true;
                     break;
                 }

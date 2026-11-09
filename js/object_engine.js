@@ -6766,7 +6766,7 @@ class WorldObjectEngine {
                 const py = (r + 0.5) * TILE_SIZE + curbDy;
 
                 // Ensure not blocking any parking bay, surface parking lot, interior door, tree/palm canopy, café parasol, soda machine, streetlamp, or mission payphone
-                if (Array.isArray(map.curbParkingStrips) && map.curbParkingStrips.some(st => st.c === c && r >= st.r0 && r <= st.r1)) {
+                if (Array.isArray(map.curbParkingStrips) && map.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 - 1 && r <= st.r1 + 1) || (py >= st.yMin - 24 && py <= st.yMax + 24)))) {
                     continue;
                 }
                 if (Array.isArray(map.surfaceParkingLots) && map.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) {

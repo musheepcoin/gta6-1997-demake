@@ -1150,6 +1150,9 @@ class ViceNetworkManager {
                     }
                 }
                 seenIds.add(id);
+                if (typeof id === "string" && id.startsWith("curb_park_") && drvCode === 0 && !(flags & 1)) {
+                    continue;
+                }
                 let v = existingById.get(id);
                 if (v && specKey && v.specKey !== specKey) {
                     const idx = g.vehicles.indexOf(v);
@@ -1200,7 +1203,7 @@ class ViceNetworkManager {
 
             for (let i = g.vehicles.length - 1; i >= 0; i--) {
                 const v = g.vehicles[i];
-                if (!seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId) {
+                if (!seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId && !(v.isCurbParked && v.isStaticParked)) {
                     g.vehicles.splice(i, 1);
                 }
             }
