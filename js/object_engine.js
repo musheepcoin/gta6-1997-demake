@@ -622,6 +622,51 @@ class WorldObjectEngine {
             { name: "LITTLE HAITI CARIBBEAN ART WALL",        x: 222.5 * TILE_SIZE, y: 106.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "SOUTH BEACH ALLEYWAY NEON MURAL",        x: 431.5 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 22. Official GTA 6 Vice Pier Carnival High-Striker Games & Live Latin Salsa / Conga Street Bands (Loop 15)
+        this.pierCarnivalGames = [
+            { name: "VICE PIER HIGH-STRIKER CARNIVAL BOOTH",  x: 466.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "NORTH BOARDWALK RING-TOSS CARNIVAL",     x: 451.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE BOARDWALK PRIZE BOOTH",     x: 451.5 * TILE_SIZE, y: 312.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.latinStreetBands = [
+            { name: "CALLE OCHO SALSA & CONGA PAVILION",      x: 276.5 * TILE_SIZE, y: 248.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS PARK TROPICAL BRASS BAND",        x: 451.5 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LITTLE HAITI KOMPA DRUM STAGE",          x: 224.5 * TILE_SIZE, y: 116.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 23. Official GTA 6 Thrillbilly / Port Gellhorn Monster-Truck Car-Crush Arenas & Keys Shark-Cage Charters (Loop 16)
+        this.monsterCrushPads = [
+            { name: "THRILLBILLY MUD PARK MONSTER CRUSH",     x: 90.5 * TILE_SIZE,  y: 458.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "PORT GELLHORN DERBY CRUSH ARENA",        x: 64.5 * TILE_SIZE,  y: 194.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "AMBROSIA JUNKYARD CAR-CRUSH RAMP",       x: 156.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.sharkCageCharters = [
+            { name: "KEY LENTO TIGER SHARK CAGE DIVE",        x: 254.5 * TILE_SIZE, y: 494.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.5 },
+            { name: "SEVEN MILE GREAT WHITE CAGE CHARTER",    x: 168.5 * TILE_SIZE, y: 492.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 2.2 },
+            { name: "VICE BEACH HAMMERHEAD REEF CAGE",        x: 494.5 * TILE_SIZE, y: 162.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.9 }
+        ];
+        // 24. Official GTA 6 Scenic VIP Helicopter Tour Helipads & Little Cuba Hand-Rolled Cigar / Rum Verandas (Loop 17)
+        this.heliTourPads = [
+            { name: "OCEAN BEACH SOUTH POINTE HELIPORT",      x: 443.5 * TILE_SIZE, y: 352.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "DOWNTOWN BAYFRONT VIP HELIPAD",          x: 292.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "KEY WEST SUNSET HELI-TOUR PAD",          x: 214.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.cigarRumStands = [
+            { name: "HABANA VIEJA CIGAR & RUM VERANDA",       x: 268.5 * TILE_SIZE, y: 244.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "MAXIMO GOMEZ TORCEDOR CIGAR STAND",      x: 282.5 * TILE_SIZE, y: 244.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "OCEAN DRIVE CUBAN LOUNGE TERRACE",       x: 443.5 * TILE_SIZE, y: 298.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        // 25. Official GTA 6 Mount Kalaga Fire-Lookout Towers & Vice Beach VIP Champagne Daybed Cabanas (Loop 18)
+        this.kalagaLookoutTowers = [
+            { name: "KALAGA WEST PEAK FIRE-LOOKOUT TOWER",    x: 112.5 * TILE_SIZE, y: 20.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "KALAGA CENTRAL CANYON WATCHTOWER",       x: 146.5 * TILE_SIZE, y: 22.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "KALAGA EAST RIDGE EAGLE TOWER",          x: 174.5 * TILE_SIZE, y: 26.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
+        ];
+        this.beachCabanaLounges = [
+            { name: "HOTEL DIXON BEACHFRONT VIP CABANA",      x: 466.5 * TILE_SIZE, y: 276.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS SANDS CHAMPAGNE DAYBED",          x: 466.5 * TILE_SIZE, y: 218.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "NORTH BEACH TROPICAL VIP CABANA",        x: 466.5 * TILE_SIZE, y: 146.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "STAR ISLAND YACHT CLUB CABANA",          x: 354.5 * TILE_SIZE, y: 174.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1135,6 +1180,56 @@ class WorldObjectEngine {
                 for (const gs of this.graffitiScaffolds) {
                     snapOffRoad(gs);
                     clearZones.push({ x: gs.x, y: gs.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.pierCarnivalGames)) {
+                for (const pc of this.pierCarnivalGames) {
+                    snapOffRoad(pc);
+                    clearZones.push({ x: pc.x, y: pc.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.latinStreetBands)) {
+                for (const lb of this.latinStreetBands) {
+                    snapOffRoad(lb);
+                    clearZones.push({ x: lb.x, y: lb.y, r: 44 });
+                }
+            }
+            if (Array.isArray(this.monsterCrushPads)) {
+                for (const mc of this.monsterCrushPads) {
+                    snapOffRoad(mc);
+                    clearZones.push({ x: mc.x, y: mc.y, r: 52 });
+                }
+            }
+            if (Array.isArray(this.sharkCageCharters)) {
+                for (const sc of this.sharkCageCharters) {
+                    if (typeof map.snapPxToCleanWater === "function") {
+                        const sn = map.snapPxToCleanWater(sc.x, sc.y, 20);
+                        if (sn) { sc.x = sn.x; sc.y = sn.y; }
+                    }
+                }
+            }
+            if (Array.isArray(this.heliTourPads)) {
+                for (const hp of this.heliTourPads) {
+                    snapOffRoad(hp);
+                    clearZones.push({ x: hp.x, y: hp.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.cigarRumStands)) {
+                for (const cr of this.cigarRumStands) {
+                    snapOffRoad(cr);
+                    clearZones.push({ x: cr.x, y: cr.y, r: 40 });
+                }
+            }
+            if (Array.isArray(this.kalagaLookoutTowers)) {
+                for (const kl of this.kalagaLookoutTowers) {
+                    snapOffRoad(kl);
+                    clearZones.push({ x: kl.x, y: kl.y, r: 46 });
+                }
+            }
+            if (Array.isArray(this.beachCabanaLounges)) {
+                for (const bc of this.beachCabanaLounges) {
+                    snapOffRoad(bc);
+                    clearZones.push({ x: bc.x, y: bc.y, r: 42 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2921,6 +3016,293 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-24. Official GTA 6 Vice Pier Carnival High-Striker & Prize Booths ([E]!)
+        if (Array.isArray(this.pierCarnivalGames)) {
+            for (const pc of this.pierCarnivalGames) {
+                if ((pc.cooldown || 0) <= 0 && Math.hypot(px - pc.x, py - pc.y) < 78) {
+                    pc.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(5500);
+                    if (typeof game.addCash === "function") game.addCash(5500, `🎪 ${pc.name} JACKPOT!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎪 CARNIVAL HIGH-STRIKER BELL RUNG!`,
+                            `${pc.name} • GRAND PRIZE +$5,500 + 150 HP/ARMOR & +1X!`,
+                            "#f43f5e",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: pc.x,
+                            y: pc.y,
+                            z: 2.70,
+                            text: `🎪 HIGH-STRIKER BELL! +$5,500 + 150 HP/ARMOR!`,
+                            color: "#f43f5e",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-25. Official GTA 6 Calle Ocho & Ocean Drive Live Latin Salsa / Conga Street Bands ([E]!)
+        if (Array.isArray(this.latinStreetBands)) {
+            for (const lb of this.latinStreetBands) {
+                if ((lb.cooldown || 0) <= 0 && Math.hypot(px - lb.x, py - lb.y) < 82) {
+                    lb.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(5000);
+                    if (typeof game.addCash === "function") game.addCash(5000, `🎺 ${lb.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎺 LIVE LATIN SALSA & CONGA JAM!`,
+                            `${lb.name} • CROWD ENCORE +$5,000 + 150 HP/ARMOR & +1X!`,
+                            "#f59e0b",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: lb.x,
+                            y: lb.y,
+                            z: 2.70,
+                            text: `🎺 SALSA BAND ENCORE! +$5,000 + 150 HP/ARMOR!`,
+                            color: "#f59e0b",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-26. Official GTA 6 Thrillbilly & Port Gellhorn Monster-Truck Car-Crush Arenas ([E]!)
+        if (Array.isArray(this.monsterCrushPads)) {
+            for (const mc of this.monsterCrushPads) {
+                if ((mc.cooldown || 0) <= 0 && Math.hypot(px - mc.x, py - mc.y) < 92) {
+                    mc.cooldown = 18.0;
+                    game.player.armor = 150;
+                    if (game.player.inVehicle) {
+                        game.player.inVehicle.hp = game.player.inVehicle.maxHp || 100;
+                        game.player.inVehicle.damage = 0;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(7500);
+                    if (typeof game.addCash === "function") game.addCash(7500, `🚜 ${mc.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🚜 MONSTER-TRUCK CAR CRUSH!`,
+                            `${mc.name} • DERBY TROPHY +$7,500 + FULL REPAIR & +1X!`,
+                            "#f97316",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: mc.x,
+                            y: mc.y,
+                            z: 2.72,
+                            text: `🚜 MONSTER CAR CRUSH! +$7,500 + FULL REPAIR!`,
+                            color: "#f97316",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-27. Official GTA 6 Leonida Keys & Vice Beach Shark-Cage Dive Charters ([E]!)
+        if (Array.isArray(this.sharkCageCharters)) {
+            for (const sc of this.sharkCageCharters) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 95) {
+                    sc.cooldown = 18.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(8500);
+                    if (typeof game.addCash === "function") game.addCash(8500, `🦈 ${sc.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🦈 APEX SHARK-CAGE DIVE SURVIVED!`,
+                            `${sc.name} • ADRENALINE BONUS +$8,500 + 150 HP/ARMOR & +1X!`,
+                            "#0ea5e9",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: sc.x,
+                            y: sc.y,
+                            z: 2.72,
+                            text: `🦈 SHARK-CAGE SURVIVAL! +$8,500 + 150 HP/ARMOR!`,
+                            color: "#0ea5e9",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-28. Official GTA 6 Vice City Scenic VIP Helicopter Tour Helipads ([E]!)
+        if (Array.isArray(this.heliTourPads)) {
+            for (const hp of this.heliTourPads) {
+                if ((hp.cooldown || 0) <= 0 && Math.hypot(px - hp.x, py - hp.y) < 86) {
+                    hp.cooldown = 18.0;
+                    game.player.armor = 150;
+                    if (typeof game.clearWanted === "function") {
+                        game.clearWanted();
+                    } else {
+                        game.wantedLevel = 0;
+                        game.wantedDecayTimer = 0;
+                    }
+                    if (typeof game.addScore === "function") game.addScore(7000);
+                    if (typeof game.addCash === "function") game.addCash(7000, `🚁 ${hp.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🚁 VIP SCENIC HELI-TOUR FLIGHT!`,
+                            `${hp.name} • 0★ WANTED + 150 ARMOR + +$7,000 & +1X!`,
+                            "#38bdf8",
+                            2.8
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: hp.x,
+                            y: hp.y,
+                            z: 2.72,
+                            text: `🚁 VIP HELI-TOUR! +$7,000 + 0★ WANTED + 150 ARMOR!`,
+                            color: "#38bdf8",
+                            life: 2.8
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-29. Official GTA 6 Little Cuba Hand-Rolled Cigar & Añejo Rum Verandas ([E]!)
+        if (Array.isArray(this.cigarRumStands)) {
+            for (const cr of this.cigarRumStands) {
+                if ((cr.cooldown || 0) <= 0 && Math.hypot(px - cr.x, py - cr.y) < 78) {
+                    cr.cooldown = 15.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(4500);
+                    if (typeof game.addCash === "function") game.addCash(4500, `🥃 ${cr.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🥃 CUBAN AÑEJO RUM & HAND-ROLLED RESERVA!`,
+                            `${cr.name} • 150 HP/ARMOR + +$4,500 & +1X!`,
+                            "#d97706",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: cr.x,
+                            y: cr.y,
+                            z: 2.68,
+                            text: `🥃 CUBAN RUM & CIGAR! 150 HP/ARMOR + +$4,500!`,
+                            color: "#f59e0b",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-30. Official GTA 6 Mount Kalaga National Park Fire-Lookout & Eagle Towers ([E]!)
+        if (Array.isArray(this.kalagaLookoutTowers)) {
+            for (const kl of this.kalagaLookoutTowers) {
+                if ((kl.cooldown || 0) <= 0 && Math.hypot(px - kl.x, py - kl.y) < 84) {
+                    kl.cooldown = 16.0;
+                    this.cameraFlashTimer = 0.35;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(6000);
+                    if (typeof game.addCash === "function") game.addCash(6000, `🔭 ${kl.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("WEAPON");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🔭 MOUNT KALAGA SUMMIT PANORAMA!`,
+                            `${kl.name} • WILDERNESS RECON +$6,000 + 150 HP/ARMOR & +1X!`,
+                            "#22c55e",
+                            2.7
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: kl.x,
+                            y: kl.y,
+                            z: 2.72,
+                            text: `🔭 KALAGA SUMMIT RECON! +$6,000 + 150 HP/ARMOR!`,
+                            color: "#22c55e",
+                            life: 2.7
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-31. Official GTA 6 Vice Beach VIP Champagne Daybed & Cabana Lounges ([E]!)
+        if (Array.isArray(this.beachCabanaLounges)) {
+            for (const bc of this.beachCabanaLounges) {
+                if ((bc.cooldown || 0) <= 0 && Math.hypot(px - bc.x, py - bc.y) < 80) {
+                    bc.cooldown = 16.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (typeof game.addScore === "function") game.addScore(5000);
+                    if (typeof game.addCash === "function") game.addCash(5000, `🥂 ${bc.name}!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("HEALTH");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🥂 VIP BEACH CABANA & CHAMPAGNE SERVICE!`,
+                            `${bc.name} • 150 MAX HP/ARMOR + +$5,000 & +1X!`,
+                            "#2dd4bf",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: bc.x,
+                            y: bc.y,
+                            z: 2.68,
+                            text: `🥂 VIP CABANA CHAMPAGNE! 150 HP/ARMOR + +$5,000!`,
+                            color: "#2dd4bf",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -3875,6 +4257,46 @@ class WorldObjectEngine {
         if (Array.isArray(this.graffitiScaffolds)) {
             for (const gs of this.graffitiScaffolds) {
                 if ((gs.cooldown || 0) > 0) gs.cooldown = Math.max(0, gs.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.pierCarnivalGames)) {
+            for (const pc of this.pierCarnivalGames) {
+                if ((pc.cooldown || 0) > 0) pc.cooldown = Math.max(0, pc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.latinStreetBands)) {
+            for (const lb of this.latinStreetBands) {
+                if ((lb.cooldown || 0) > 0) lb.cooldown = Math.max(0, lb.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.monsterCrushPads)) {
+            for (const mc of this.monsterCrushPads) {
+                if ((mc.cooldown || 0) > 0) mc.cooldown = Math.max(0, mc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.sharkCageCharters)) {
+            for (const sc of this.sharkCageCharters) {
+                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.heliTourPads)) {
+            for (const hp of this.heliTourPads) {
+                if ((hp.cooldown || 0) > 0) hp.cooldown = Math.max(0, hp.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.cigarRumStands)) {
+            for (const cr of this.cigarRumStands) {
+                if ((cr.cooldown || 0) > 0) cr.cooldown = Math.max(0, cr.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.kalagaLookoutTowers)) {
+            for (const kl of this.kalagaLookoutTowers) {
+                if ((kl.cooldown || 0) > 0) kl.cooldown = Math.max(0, kl.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.beachCabanaLounges)) {
+            for (const bc of this.beachCabanaLounges) {
+                if ((bc.cooldown || 0) > 0) bc.cooldown = Math.max(0, bc.cooldown - dt);
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
@@ -7872,6 +8294,99 @@ class WorldObjectEngine {
                 emitCylinder3D(gs.x, gs.y, 7,  10, 0.8, 0.8, bz, bz + 0.34, 6, [0.76, 0.80, 0.86], 5, false);
             }
         }
+        // 22K. OFFICIAL GTA 6 CARNIVAL HIGH-STRIKERS, LATIN STREET BANDS, MONSTER CRUSH ARENAS, SHARK CAGES, HELIPADS, CIGAR VERANDAS, KALAGA TOWERS & VIP CABANAS (LOOPS 15..18)
+        if (Array.isArray(this.pierCarnivalGames)) {
+            for (const pc of this.pierCarnivalGames) {
+                const bz = pc.z || 2.0;
+                emitAOShadow3D(pc.x, pc.y, 1, 0, 0, 0, 26, 22, bz, 0.34);
+                // Festive Red/White Striped Carnival Game Booth + Tall Vertical High-Striker Bell Tower
+                emitSolidBox3D(pc.x, pc.y, 1, 0, -4, 0, 14, 16, bz, bz + 0.22, [0.96, 0.22, 0.28], 1);
+                emitGableRoof3D(pc.x, pc.y, 1, 0, -4, 0, 17, 19, bz + 0.22, bz + 0.32, [0.98, 0.86, 0.20], true, 1);
+                emitSolidBox3D(pc.x, pc.y, 1, 0, 8, 0, 6, 6, bz, bz + 0.05, [0.22, 0.24, 0.30], 5);
+                emitSolidBox3D(pc.x, pc.y, 1, 0, 8, 0, 2.2, 2.2, bz + 0.05, bz + 0.44, [0.98, 0.24, 0.32], 1);
+                emitCylinder3D(pc.x, pc.y, 8, 0, 2.8, 2.8, bz + 0.44, bz + 0.50, 8, [0.98, 0.84, 0.18], 5, true);
+            }
+        }
+        if (Array.isArray(this.latinStreetBands)) {
+            for (const lb of this.latinStreetBands) {
+                const bz = lb.z || 2.0;
+                emitAOShadow3D(lb.x, lb.y, 1, 0, 0, 0, 32, 24, bz, 0.35);
+                // Wooden Salsa & Conga Bandstand Stage + Twin Conga Drums + Warm Fiesta Canopy
+                emitSolidBox3D(lb.x, lb.y, 1, 0, 0, 0, 26, 18, bz, bz + 0.06, [0.58, 0.38, 0.20], 8);
+                emitGableRoof3D(lb.x, lb.y, 1, 0, 0, 0, 28, 20, bz + 0.26, bz + 0.36, [0.98, 0.56, 0.14], true, 1);
+                emitCylinder3D(lb.x, lb.y, -4, -3, 2.4, 2.0, bz + 0.06, bz + 0.18, 8, [0.88, 0.24, 0.18], 1, true);
+                emitCylinder3D(lb.x, lb.y, -4,  3, 2.4, 2.0, bz + 0.06, bz + 0.18, 8, [0.96, 0.78, 0.22], 1, true);
+            }
+        }
+        if (Array.isArray(this.monsterCrushPads)) {
+            for (const mc of this.monsterCrushPads) {
+                const bz = mc.z || 2.0;
+                emitAOShadow3D(mc.x, mc.y, 1, 0, 0, 0, 48, 26, bz, 0.36);
+                // Twin Earthen Launch Ramps flanking 3 Crushed Derby Cars in the center
+                emitSolidBox3D(mc.x, mc.y, 1, 0, -18, 0, 10, 22, bz, bz + 0.16, [0.64, 0.44, 0.24], 6);
+                emitSolidBox3D(mc.x, mc.y, 1, 0,  18, 0, 10, 22, bz, bz + 0.16, [0.64, 0.44, 0.24], 6);
+                emitSolidBox3D(mc.x, mc.y, 1, 0, -6, 0, 5.5, 18, bz, bz + 0.11, [0.92, 0.22, 0.24], 5);
+                emitSolidBox3D(mc.x, mc.y, 1, 0,  0, 0, 5.5, 18, bz, bz + 0.11, [0.18, 0.62, 0.96], 5);
+                emitSolidBox3D(mc.x, mc.y, 1, 0,  6, 0, 5.5, 18, bz, bz + 0.11, [0.98, 0.78, 0.16], 5);
+            }
+        }
+        if (Array.isArray(this.sharkCageCharters)) {
+            for (const sc of this.sharkCageCharters) {
+                const bz = 2.01;
+                // Floating Charter Dive Platform + Steel Shark Cage + Davit Crane
+                emitSolidBox3D(sc.x, sc.y, 1, 0, -8, 0, 22, 18, bz, bz + 0.08, [0.92, 0.94, 0.98], 5);
+                emitSolidBox3D(sc.x, sc.y, 1, 0, -8, 0, 18, 14, bz + 0.08, bz + 0.18, [0.14, 0.58, 0.88], 5);
+                emitSolidBox3D(sc.x, sc.y, 1, 0, 10, 0, 12, 12, bz - 0.01, bz + 0.14, [0.62, 0.72, 0.82], 5);
+                emitCylinder3D(sc.x, sc.y, 10, 0, 4.5, 4.5, bz + 0.14, bz + 0.18, 8, [0.98, 0.52, 0.14], 5, true);
+            }
+        }
+        if (Array.isArray(this.heliTourPads)) {
+            for (const hp of this.heliTourPads) {
+                const bz = hp.z || 2.0;
+                emitAOShadow3D(hp.x, hp.y, 1, 0, 0, 0, 38, 38, bz, 0.34);
+                // VIP Helipad Octagonal/Square Concrete Deck + Yellow Perimeter Ring + Crisp White "H" Marking
+                emitSolidBox3D(hp.x, hp.y, 1, 0, 0, 0, 34, 34, bz, bz + 0.04, [0.22, 0.25, 0.30], 5);
+                emitSolidBox3D(hp.x, hp.y, 1, 0, 0, 0, 28, 28, bz + 0.04, bz + 0.05, [0.98, 0.82, 0.16], 1);
+                emitSolidBox3D(hp.x, hp.y, 1, 0, 0, 0, 24, 24, bz + 0.05, bz + 0.06, [0.24, 0.28, 0.34], 5);
+                emitSolidBox3D(hp.x, hp.y, 1, 0, -5, 0, 2.8, 14, bz + 0.06, bz + 0.07, [0.96, 0.98, 1.00], 1);
+                emitSolidBox3D(hp.x, hp.y, 1, 0,  5, 0, 2.8, 14, bz + 0.06, bz + 0.07, [0.96, 0.98, 1.00], 1);
+                emitSolidBox3D(hp.x, hp.y, 1, 0,  0, 0, 10, 2.8, bz + 0.06, bz + 0.07, [0.96, 0.98, 1.00], 1);
+            }
+        }
+        if (Array.isArray(this.cigarRumStands)) {
+            for (const cr of this.cigarRumStands) {
+                const bz = cr.z || 2.0;
+                emitAOShadow3D(cr.x, cr.y, 1, 0, 0, 0, 28, 20, bz, 0.34);
+                // Mahogany Cigar Torcedor Rolling Table + Aged Oak Rum Barrel + Terracotta Awning
+                emitSolidBox3D(cr.x, cr.y, 1, 0, -3, 0, 16, 12, bz, bz + 0.14, [0.46, 0.24, 0.12], 8);
+                emitCylinder3D(cr.x, cr.y, 9, 0, 4.2, 3.8, bz, bz + 0.18, 8, [0.54, 0.32, 0.16], 8, true);
+                emitGableRoof3D(cr.x, cr.y, 1, 0, 0, 0, 24, 16, bz + 0.24, bz + 0.33, [0.84, 0.34, 0.18], true, 12);
+            }
+        }
+        if (Array.isArray(this.kalagaLookoutTowers)) {
+            for (const kl of this.kalagaLookoutTowers) {
+                const bz = kl.z || 2.0;
+                emitAOShadow3D(kl.x, kl.y, 1, 0, 0, 0, 32, 32, bz, 0.38);
+                // 4 Tall Timber Truss Legs + Elevated Observation Cabin + Green Pyramid Roof
+                for (const lx of [-8, 8]) {
+                    for (const ly of [-8, 8]) {
+                        emitSolidBox3D(kl.x, kl.y, 1, 0, lx, ly, 2.8, 2.8, bz, bz + 0.42, [0.48, 0.32, 0.18], 8);
+                    }
+                }
+                emitSolidBox3D(kl.x, kl.y, 1, 0, 0, 0, 22, 22, bz + 0.42, bz + 0.56, [0.62, 0.44, 0.24], 8);
+                emitGableRoof3D(kl.x, kl.y, 1, 0, 0, 0, 26, 26, bz + 0.56, bz + 0.68, [0.16, 0.54, 0.28], true, 12);
+            }
+        }
+        if (Array.isArray(this.beachCabanaLounges)) {
+            for (const bc of this.beachCabanaLounges) {
+                const bz = bc.z || 2.0;
+                emitAOShadow3D(bc.x, bc.y, 1, 0, 0, 0, 28, 24, bz, 0.32);
+                // Teak Four-Poster Beach Cabana + Plush Turquoise Daybed + White Draped Canopy
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz, bz + 0.06, [0.66, 0.48, 0.28], 8);
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 16, 12, bz + 0.06, bz + 0.12, [0.18, 0.86, 0.88], 1);
+                emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz + 0.26, bz + 0.31, [0.98, 0.98, 1.00], 1);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -10994,6 +11509,97 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 5.2 + i) % 4), gs.x + 4, gs.y, 2.20, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
+        if (Array.isArray(this.pierCarnivalGames)) {
+            for (let i = 0; i < this.pierCarnivalGames.length; i++) {
+                const pc = this.pierCarnivalGames[i];
+                if (pc.x < minX - 120 || pc.x > maxX + 120 || pc.y < minY - 120 || pc.y > maxY + 120) continue;
+                if ((pc.cooldown || 0) <= 0) {
+                    const rSz = 25 + Math.sin(renderer.time * 5.6 + i) * 3.0;
+                    renderer.pushSolidQuad3D(pc.x, pc.y, 2.028, rSz, rSz, renderer.time * 1.5, 0.98, 0.24, 0.36, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("vc_cuban", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), pc.x + 2, pc.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.latinStreetBands)) {
+            for (let i = 0; i < this.latinStreetBands.length; i++) {
+                const lb = this.latinStreetBands[i];
+                if (lb.x < minX - 130 || lb.x > maxX + 130 || lb.y < minY - 130 || lb.y > maxY + 130) continue;
+                if ((lb.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 6.0 + i) * 3.4;
+                    renderer.pushSolidQuad3D(lb.x, lb.y, 2.028, rSz, rSz, renderer.time * 1.6, 0.98, 0.62, 0.14, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                const bFr = 50 + (Math.floor(renderer.time * 6.2 + i) % 4);
+                renderer.batchPedSprite3D("vc_cuban", bFr, lb.x + 2, lb.y - 3, 2.08, renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("bikini_pink", bFr, lb.x + 6, lb.y + 5, 2.08, -renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.monsterCrushPads)) {
+            for (let i = 0; i < this.monsterCrushPads.length; i++) {
+                const mc = this.monsterCrushPads[i];
+                if (mc.x < minX - 140 || mc.x > maxX + 140 || mc.y < minY - 140 || mc.y > maxY + 140) continue;
+                if ((mc.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 5.8 + i) * 3.8;
+                    renderer.pushSolidQuad3D(mc.x, mc.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.98, 0.48, 0.14, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.sharkCageCharters)) {
+            for (let i = 0; i < this.sharkCageCharters.length; i++) {
+                const sc = this.sharkCageCharters[i];
+                if (sc.x < minX - 150 || sc.x > maxX + 150 || sc.y < minY - 150 || sc.y > maxY + 150) continue;
+                if ((sc.cooldown || 0) <= 0) {
+                    const rSz = 34 + Math.sin(renderer.time * 5.2 + sc.seed) * 4.0;
+                    renderer.pushSolidQuad3D(sc.x, sc.y, 2.025, rSz, rSz, renderer.time * 1.3, 0.08, 0.68, 0.96, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Circling shark dorsal fin around the submerged steel shark cage!
+                const shAng = renderer.time * 1.5 + sc.seed;
+                const shX = sc.x + 10 + Math.cos(shAng) * 16.0;
+                const shY = sc.y + Math.sin(shAng) * 16.0;
+                renderer.pushSolidQuad3D(shX, shY, 2.035, 7.5, 3.0, shAng + Math.PI * 0.5, 0.28, 0.34, 0.42, 0.92, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.heliTourPads)) {
+            for (let i = 0; i < this.heliTourPads.length; i++) {
+                const hp = this.heliTourPads[i];
+                if (hp.x < minX - 130 || hp.x > maxX + 130 || hp.y < minY - 130 || hp.y > maxY + 130) continue;
+                if ((hp.cooldown || 0) <= 0) {
+                    const rSz = 32 + Math.sin(renderer.time * 5.5 + i) * 3.5;
+                    renderer.pushSolidQuad3D(hp.x, hp.y, 2.075, rSz, rSz, renderer.time * 1.4, 0.22, 0.78, 0.98, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.cigarRumStands)) {
+            for (let i = 0; i < this.cigarRumStands.length; i++) {
+                const cr = this.cigarRumStands[i];
+                if (cr.x < minX - 120 || cr.x > maxX + 120 || cr.y < minY - 120 || cr.y > maxY + 120) continue;
+                if ((cr.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.0 + i) * 2.8;
+                    renderer.pushSolidQuad3D(cr.x, cr.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.96, 0.62, 0.14, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("vc_cuban", 50 + (Math.floor(renderer.time * 4.0 + i) % 4), cr.x - 3, cr.y + 10, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.kalagaLookoutTowers)) {
+            for (let i = 0; i < this.kalagaLookoutTowers.length; i++) {
+                const kl = this.kalagaLookoutTowers[i];
+                if (kl.x < minX - 130 || kl.x > maxX + 130 || kl.y < minY - 130 || kl.y > maxY + 130) continue;
+                if ((kl.cooldown || 0) <= 0) {
+                    const rSz = 28 + Math.sin(renderer.time * 5.2 + i) * 3.4;
+                    renderer.pushSolidQuad3D(kl.x, kl.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.16, 0.84, 0.42, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+            }
+        }
+        if (Array.isArray(this.beachCabanaLounges)) {
+            for (let i = 0; i < this.beachCabanaLounges.length; i++) {
+                const bc = this.beachCabanaLounges[i];
+                if (bc.x < minX - 120 || bc.x > maxX + 120 || bc.y < minY - 120 || bc.y > maxY + 120) continue;
+                if ((bc.cooldown || 0) <= 0) {
+                    const rSz = 25 + Math.sin(renderer.time * 5.0 + i) * 3.0;
+                    renderer.pushSolidQuad3D(bc.x, bc.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.18, 0.88, 0.84, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                renderer.batchPedSprite3D("bikini_cyan", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bc.x + 2, bc.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
     }
 
     /* ========================================================================
@@ -11705,6 +12311,126 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.pierCarnivalGames)) {
+            for (const pc of this.pierCarnivalGames) {
+                if ((pc.cooldown || 0) <= 0 && Math.hypot(px - pc.x, py - pc.y) < 110) {
+                    const scr = renderer.worldToScreen(pc.x, pc.y - 16, 2.55);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f43f5e";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fb7185";
+                    ctx.fillText(`🎪 [E] RING CARNIVAL HIGH-STRIKER (150 HP/ARMOR & +$5,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.latinStreetBands)) {
+            for (const lb of this.latinStreetBands) {
+                if ((lb.cooldown || 0) <= 0 && Math.hypot(px - lb.x, py - lb.y) < 115) {
+                    const scr = renderer.worldToScreen(lb.x, lb.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f59e0b";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fbbf24";
+                    ctx.fillText(`🎺 [E] JAM WITH SALSA & CONGA BAND (150 HP/ARMOR & +$5,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.monsterCrushPads)) {
+            for (const mc of this.monsterCrushPads) {
+                if ((mc.cooldown || 0) <= 0 && Math.hypot(px - mc.x, py - mc.y) < 120) {
+                    const scr = renderer.worldToScreen(mc.x, mc.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f97316";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fdba74";
+                    ctx.fillText(`🚜 [E] MONSTER-TRUCK CAR CRUSH (+$7,500 & FULL REPAIR)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.sharkCageCharters)) {
+            for (const sc of this.sharkCageCharters) {
+                if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 125) {
+                    const scr = renderer.worldToScreen(sc.x, sc.y - 16, 2.48);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#0ea5e9";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`🦈 [E] SHARK-CAGE ADRENALINE DIVE (150 HP/ARMOR & +$8,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.heliTourPads)) {
+            for (const hp of this.heliTourPads) {
+                if ((hp.cooldown || 0) <= 0 && Math.hypot(px - hp.x, py - hp.y) < 115) {
+                    const scr = renderer.worldToScreen(hp.x, hp.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`🚁 [E] VIP SCENIC HELI-TOUR (+$7,000 + 0★ WANTED & ARMOR)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.cigarRumStands)) {
+            for (const cr of this.cigarRumStands) {
+                if ((cr.cooldown || 0) <= 0 && Math.hypot(px - cr.x, py - cr.y) < 110) {
+                    const scr = renderer.worldToScreen(cr.x, cr.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#f59e0b";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#fbbf24";
+                    ctx.fillText(`🥃 [E] CUBAN RUM & HAND-ROLLED CIGAR (150 HP/ARMOR & +$4,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.kalagaLookoutTowers)) {
+            for (const kl of this.kalagaLookoutTowers) {
+                if ((kl.cooldown || 0) <= 0 && Math.hypot(px - kl.x, py - kl.y) < 115) {
+                    const scr = renderer.worldToScreen(kl.x, kl.y - 16, 2.65);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#22c55e";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText(`🔭 [E] CLIMB KALAGA LOOKOUT TOWER (150 HP/ARMOR & +$6,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (Array.isArray(this.beachCabanaLounges)) {
+            for (const bc of this.beachCabanaLounges) {
+                if ((bc.cooldown || 0) <= 0 && Math.hypot(px - bc.x, py - bc.y) < 110) {
+                    const scr = renderer.worldToScreen(bc.x, bc.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.strokeStyle = "#2dd4bf";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 210, scr.y - 22, 420, 22);
+                    ctx.fillStyle = "#5eead4";
+                    ctx.fillText(`🥂 [E] VIP BEACH CHAMPAGNE CABANA (150 HP/ARMOR & +$5,000)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -12129,6 +12855,54 @@ class WorldObjectEngine {
             ctx.fillStyle = "#ec4899";
             for (const gs of this.graffitiScaffolds) {
                 ctx.fillRect((gs.x - 15) * sx, (gs.y - 10) * sy, 30 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.pierCarnivalGames)) {
+            ctx.fillStyle = "#f43f5e";
+            for (const pc of this.pierCarnivalGames) {
+                ctx.fillRect((pc.x - 14) * sx, (pc.y - 11) * sy, 28 * sx, 22 * sy);
+            }
+        }
+        if (Array.isArray(this.latinStreetBands)) {
+            ctx.fillStyle = "#f59e0b";
+            for (const lb of this.latinStreetBands) {
+                ctx.fillRect((lb.x - 16) * sx, (lb.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.monsterCrushPads)) {
+            ctx.fillStyle = "#f97316";
+            for (const mc of this.monsterCrushPads) {
+                ctx.fillRect((mc.x - 24) * sx, (mc.y - 13) * sy, 48 * sx, 26 * sy);
+            }
+        }
+        if (Array.isArray(this.sharkCageCharters)) {
+            ctx.fillStyle = "#0ea5e9";
+            for (const sc of this.sharkCageCharters) {
+                ctx.fillRect((sc.x - 20) * sx, (sc.y - 14) * sy, 40 * sx, 28 * sy);
+            }
+        }
+        if (Array.isArray(this.heliTourPads)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const hp of this.heliTourPads) {
+                ctx.fillRect((hp.x - 18) * sx, (hp.y - 18) * sy, 36 * sx, 36 * sy);
+            }
+        }
+        if (Array.isArray(this.cigarRumStands)) {
+            ctx.fillStyle = "#d97706";
+            for (const cr of this.cigarRumStands) {
+                ctx.fillRect((cr.x - 14) * sx, (cr.y - 10) * sy, 28 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.kalagaLookoutTowers)) {
+            ctx.fillStyle = "#22c55e";
+            for (const kl of this.kalagaLookoutTowers) {
+                ctx.fillRect((kl.x - 16) * sx, (kl.y - 16) * sy, 32 * sx, 32 * sy);
+            }
+        }
+        if (Array.isArray(this.beachCabanaLounges)) {
+            ctx.fillStyle = "#2dd4bf";
+            for (const bc of this.beachCabanaLounges) {
+                ctx.fillRect((bc.x - 14) * sx, (bc.y - 12) * sy, 28 * sx, 24 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {
