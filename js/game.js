@@ -630,7 +630,7 @@ class LeonidaGame {
 
             // --- H. Leonida State Penitentiary Yard & Port Gellhorn International Super-Speedway Oval ---
 
-            { spec: "VCPD_CRUISER", c: 59.5, r: 76.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "VCPD_CRUISER", c: 59.5, r: 74.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "CHALLENGER_RT", c: 84.5, r: 173.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
@@ -1155,6 +1155,10 @@ class LeonidaGame {
                 const bx = Math.floor(sc.x);
 
                 const by = Math.floor(sc.y);
+
+                if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
+
+                if (this.map.surfaceGround && this.map.surfaceGround[by * 512 + bx] !== GROUND_TYPE.ROAD) continue;
 
                 if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
 

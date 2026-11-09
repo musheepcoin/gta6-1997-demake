@@ -1137,6 +1137,9 @@ class ViceNetworkManager {
             for (const row of pkt.vehs) {
                 if (!Array.isArray(row) || row.length < 11) continue;
                 let [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag] = row;
+                if (g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(x, y) && specKey !== "AIRBOAT" && specKey !== "SPEEDBOAT" && specKey !== "JETSKI" && specKey !== "YACHT" && specKey !== "SWAMP_BOAT") {
+                    continue;
+                }
                 if (g.map && Array.isArray(g.map.beachProps)) {
                     for (const bp of g.map.beachProps) {
                         const dx = x - bp.x;
@@ -1150,7 +1153,7 @@ class ViceNetworkManager {
                     }
                 }
                 seenIds.add(id);
-                if (typeof id === "string" && id.startsWith("curb_park_") && drvCode === 0 && !(flags & 1)) {
+                if (typeof id === "string" && (id.startsWith("curb_park_") || id === "armored_vice_port" || id === "parked_35") && drvCode === 0 && !(flags & 1)) {
                     continue;
                 }
                 let v = existingById.get(id);

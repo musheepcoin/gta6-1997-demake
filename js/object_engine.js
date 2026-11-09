@@ -7132,7 +7132,7 @@ class WorldObjectEngine {
             const armoredSpecs = [
                 { id: "armored_ocean_dr",  x: 445.5 * TILE_SIZE, y: 222.0 * TILE_SIZE, ang: Math.PI * 0.5 },
                 { id: "armored_downtown",  x: 285.5 * TILE_SIZE, y: 250.0 * TILE_SIZE, ang: Math.PI * 0.5 },
-                { id: "armored_vice_port", x: 342.0 * TILE_SIZE, y: 326.0 * TILE_SIZE, ang: 0 }
+                { id: "armored_vice_port", x: 342.55 * TILE_SIZE, y: 327.5 * TILE_SIZE, ang: Math.PI * 0.5 }
             ];
             for (const as of armoredSpecs) {
                 if (game.vehicles.some(v => Math.hypot(v.x - as.x, v.y - as.y) < 36)) continue;

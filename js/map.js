@@ -3177,6 +3177,20 @@ class LeonidaMap {
             }
         }
 
+        // Ensure no 3D parking meter ever collides with a streetlamp or traffic signal pole on the curb
+        if (Array.isArray(this.curbParkingBays)) {
+            for (let bi = 0; bi < this.curbParkingBays.length; bi++) {
+                const bay = this.curbParkingBays[bi];
+                if (!bay || !bay.hasMeter || bay.isLotParked) continue;
+                const nearPole =
+                    (Array.isArray(this.streetlights) && this.streetlights.some((sl) => Math.hypot(sl.baseX - bay.meterX, sl.baseY - bay.meterY) < 24)) ||
+                    (Array.isArray(this.trafficSignals) && this.trafficSignals.some((ts) => Math.hypot(ts.baseX - bay.meterX, ts.baseY - bay.meterY) < 28));
+                if (nearPole) {
+                    bay.hasMeter = false;
+                }
+            }
+        }
+
         // Add Ornamental Streetlamps along the 3 Wooden Ocean Piers
         for (const pierR of [MAP_Y_256[45], MAP_Y_256[88], MAP_Y_256[154]]) {
             for (let c = MAP_X_256[233]; c <= MAP_X_256[245]; c += 6) {
@@ -3468,7 +3482,8 @@ class LeonidaMap {
         }
 
         // D. Ocean Drive Art Deco Hotel Valet Podiums & Little Cuba (Calle Ocho) Sidewalk Domino Tables
-        for (const rValet of [222, 246, 270, 286, 302, 318]) {
+        for (const rValet of [222, 244, 270, 286, 302, 316]) {
+            if (this.surfaceGround[rValet * MAP_COLS + oceanDriveW] !== GROUND_TYPE.PAWEMENT) continue;
             this.viceStreetDetails.push({
                 kind: "VALET_PODIUM",
                 x: (oceanDriveW + 0.72) * TILE_SIZE,
@@ -3595,6 +3610,8 @@ class LeonidaMap {
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
                 if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) return false;
+                if (Array.isArray(this.streetlights) && this.streetlights.some(sl => Math.hypot(sl.baseX - pm.x, sl.baseY - pm.y) < 24)) return false;
+                if (Array.isArray(this.trafficSignals) && this.trafficSignals.some(ts => Math.hypot(ts.baseX - pm.x, ts.baseY - pm.y) < 24)) return false;
                 if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (pm.y >= st.yMin - 18 && pm.y <= st.yMax + 18)))) return false;
                 if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                 return true;
@@ -3613,6 +3630,8 @@ class LeonidaMap {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
                     if ((c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) return false;
+                    if (Array.isArray(this.streetlights) && this.streetlights.some(sl => Math.hypot(sl.baseX - tr.x, sl.baseY - tr.y) < 24)) return false;
+                    if (Array.isArray(this.trafficSignals) && this.trafficSignals.some(ts => Math.hypot(ts.baseX - tr.x, ts.baseY - tr.y) < 24)) return false;
                     if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (tr.y >= st.yMin - 18 && tr.y <= st.yMax + 18)))) return false;
                     if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
@@ -4187,6 +4206,13 @@ class LeonidaMap {
                         const isUrbanCommercialBlock = (c >= 175 && c <= 274 && backGt === GROUND_TYPE.BUILDING);
                         if (!isWideSidewalk && !isUrbanCommercialBlock) return false;
                     }
+                    // Never carve a curbside parking bay on the immediate corner tile next to a cross-street or T-junction (keeps traffic signals & crosswalk corners 100% clear)
+                    if (
+                        this.surfaceGround[(ry - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD ||
+                        this.surfaceGround[(ry + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD
+                    ) {
+                        return false;
+                    }
                     if (this.isStopLineBlock(c + dc, ry)) return false;
                     const roadBlk = this.getBlockInfo(c + dc, ry, 1);
                     if (!roadBlk || roadBlk.lid === 25 || roadBlk.lid === 24) return false;
@@ -4212,9 +4238,12 @@ class LeonidaMap {
                 const fullRunLen = runEnd - runStart + 1;
                 if (fullRunLen < 2) continue;
 
-                // Find the longest contiguous wide-esplanade sub-run (PAWEMENT or FIELD behind the sidewalk) inside [runStart..runEnd]
+                // Find the longest contiguous wide-esplanade sub-run (PAWEMENT or FIELD behind the sidewalk)
+                // and longest contiguous uniform building-facade sub-run inside [runStart..runEnd]
                 let bestWideStart = -1, bestWideLen = 0;
                 let curWideStart = -1, curWideLen = 0;
+                let bestBldgStart = -1, bestBldgLen = 0;
+                let curBldgStart = -1, curBldgLen = 0;
                 for (let ry = runStart; ry <= runEnd; ry++) {
                     const backIdx = ry * MAP_COLS + (c - dc);
                     const backGt = this.surfaceGround[backIdx];
@@ -4226,13 +4255,24 @@ class LeonidaMap {
                             bestWideLen = curWideLen;
                             bestWideStart = curWideStart;
                         }
+                        curBldgLen = 0;
+                    } else if (backGt === GROUND_TYPE.BUILDING) {
+                        if (curBldgLen === 0) curBldgStart = ry;
+                        curBldgLen++;
+                        if (curBldgLen > bestBldgLen) {
+                            bestBldgLen = curBldgLen;
+                            bestBldgStart = curBldgStart;
+                        }
+                        curWideLen = 0;
                     } else {
                         curWideLen = 0;
+                        curBldgLen = 0;
                     }
                 }
                 const isWideEsplanadeRun = isConvertedBoulevard || (bestWideLen >= 3);
-                const effStart = isWideEsplanadeRun ? bestWideStart : runStart;
-                const effEnd = isWideEsplanadeRun ? (bestWideStart + bestWideLen - 1) : runEnd;
+                if (!isWideEsplanadeRun && bestBldgLen < 4) continue;
+                const effStart = isWideEsplanadeRun ? bestWideStart : bestBldgStart;
+                const effEnd = isWideEsplanadeRun ? (bestWideStart + bestWideLen - 1) : (bestBldgStart + bestBldgLen - 1);
                 const effLen = effEnd - effStart + 1;
 
                 const aveC0 = dc > 0 ? c : (c - 3);
