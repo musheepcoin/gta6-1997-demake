@@ -502,6 +502,18 @@ class WorldObjectEngine {
             { name: "VERSAILLES LITTLE CUBA CAFECITO", x: 290.2 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "HABANA VIEJA COLADA WALK-UP",     x: 298.2 * TILE_SIZE, y: 266.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // 13. Official GTA 6 Vice Beach Pier & Ocean Drive Ice-Cream / Gelato Carts & Port Gellhorn / Keys Billiards Pool Tables
+        this.iceCreamCarts = [
+            { name: "CHERRY POPPER VICE PIER GELATO",  x: 452.5 * TILE_SIZE, y: 195.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS PARK TROPICAL SORBET CART",x: 451.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH BEACH ART DECO GELATO",     x: 451.5 * TILE_SIZE, y: 268.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "OCEAN BEACH SUNSET AÇAÍ CART",    x: 451.5 * TILE_SIZE, y: 302.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
+        this.poolTables = [
+            { name: "PORT GELLHORN 8-BALL HUSTLE TABLE", x: 75.5 * TILE_SIZE,  y: 204.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "KEY LENTO WATERFRONT POOL TABLE",   x: 223.2 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "CROSSTOWN BOOBIE'S PATIO 8-BALL",   x: 195.8 * TILE_SIZE, y: 131.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
         this.meshVertexCount = 0;
@@ -895,6 +907,18 @@ class WorldObjectEngine {
                 for (const cv of this.cubanVentanitas) {
                     snapOffRoad(cv);
                     clearZones.push({ x: cv.x, y: cv.y, r: 48 });
+                }
+            }
+            if (Array.isArray(this.iceCreamCarts)) {
+                for (const ic of this.iceCreamCarts) {
+                    snapOffRoad(ic);
+                    clearZones.push({ x: ic.x, y: ic.y, r: 42 });
+                }
+            }
+            if (Array.isArray(this.poolTables)) {
+                for (const pt of this.poolTables) {
+                    snapOffRoad(pt);
+                    clearZones.push({ x: pt.x, y: pt.y, r: 48 });
                 }
             }
             if (Array.isArray(this.dolphinPods)) {
@@ -2051,6 +2075,71 @@ class WorldObjectEngine {
             }
         }
 
+        // 0P-7. Vice Beach Boardwalk & Pier Ice-Cream / Gelato Carts ([E]!)
+        if (Array.isArray(this.iceCreamCarts)) {
+            for (const ic of this.iceCreamCarts) {
+                if ((ic.cooldown || 0) <= 0 && Math.hypot(px - ic.x, py - ic.y) < 72) {
+                    ic.cooldown = 12.0;
+                    game.player.hp = game.player.maxHp || 100;
+                    game.player.armor = Math.max(game.player.armor || 0, 100);
+                    if (typeof game.addScore === "function") game.addScore(2500);
+                    if (typeof game.addCash === "function") game.addCash(2500, `🍦 ${ic.name}!`);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🍦 ${ic.name}!`,
+                            "TROPICAL VICE BEACH GELATO • FULL HP/ARMOR & +$2,500!",
+                            "#38bdf8",
+                            2.4
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: ic.x,
+                            y: ic.y,
+                            z: 2.62,
+                            text: `🍦 VICE BEACH GELATO! FULL HP/ARMOR + $2,500!`,
+                            color: "#38bdf8",
+                            life: 2.4
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-8. Official GTA 6 Screenshot: Port Gellhorn & Keys Outdoor 8-Ball Billiards Hustle Tables ([E]!)
+        if (Array.isArray(this.poolTables)) {
+            for (const pt of this.poolTables) {
+                if ((pt.cooldown || 0) <= 0 && Math.hypot(px - pt.x, py - pt.y) < 74) {
+                    pt.cooldown = 14.0;
+                    if (typeof game.addScore === "function") game.addScore(5000);
+                    if (typeof game.addCash === "function") game.addCash(5000, `🎱 ${pt.name} RUN-OUT!`);
+                    if (typeof game.addMultiplier === "function") game.addMultiplier(1);
+                    if (game.audio) game.audio.playPickup("SCORE");
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(
+                            `🎱 8-BALL BANK SHOT CHAMPION!`,
+                            `${pt.name} • TABLE RUN-OUT +$5,000 & +1X MULTIPLIER!`,
+                            "#4ade80",
+                            2.6
+                        );
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: pt.x,
+                            y: pt.y,
+                            z: 2.65,
+                            text: `🎱 8-BALL HUSTLE WIN! +$5,000 + +1X!`,
+                            color: "#4ade80",
+                            life: 2.6
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
         // 0Q. GTA 6 Trailer 1 Finale: Lucia & Jason Bandana Store Stick-Up Robbery Spree ([E]!)
         if (Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
@@ -2889,6 +2978,16 @@ class WorldObjectEngine {
         if (Array.isArray(this.cubanVentanitas)) {
             for (const cv of this.cubanVentanitas) {
                 if ((cv.cooldown || 0) > 0) cv.cooldown = Math.max(0, cv.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.iceCreamCarts)) {
+            for (const ic of this.iceCreamCarts) {
+                if ((ic.cooldown || 0) > 0) ic.cooldown = Math.max(0, ic.cooldown - dt);
+            }
+        }
+        if (Array.isArray(this.poolTables)) {
+            for (const pt of this.poolTables) {
+                if ((pt.cooldown || 0) > 0) pt.cooldown = Math.max(0, pt.cooldown - dt);
             }
         }
         if ((this.takeoverCooldown || 0) > 0) this.takeoverCooldown = Math.max(0, this.takeoverCooldown - dt);
@@ -6608,6 +6707,37 @@ class WorldObjectEngine {
                 emitBox3D(cv.x, cv.y, 1, 0, 0, 0, 22, 4, bz + 0.48, bz + 0.58, "ad_mambos_latin", "ad_mambos_latin", [1.0, 1.0, 1.0]);
             }
         }
+        // 22E. VICE BEACH BOARDWALK 3D ICE-CREAM / GELATO CARTS & PORT GELLHORN / KEYS 3D BILLIARDS POOL TABLES
+        if (Array.isArray(this.iceCreamCarts)) {
+            for (let i = 0; i < this.iceCreamCarts.length; i++) {
+                const ic = this.iceCreamCarts[i];
+                const bz = ic.z || 2.0;
+                emitAOShadow3D(ic.x, ic.y, 1, 0, 0, 0, 28, 22, bz, 0.35);
+                // Pastel Pink & Aqua Gelato Freezer Cart + Glass Gelato Display Case + Striped Parasol Canopy
+                emitSolidBox3D(ic.x, ic.y, 1, 0, -7, 6, 4.5, 2.0, bz, bz + 0.07, [0.16, 0.18, 0.22], 5);
+                emitSolidBox3D(ic.x, ic.y, 1, 0,  7, 6, 4.5, 2.0, bz, bz + 0.07, [0.16, 0.18, 0.22], 5);
+                emitSolidBox3D(ic.x, ic.y, 1, 0, 0, 0, 22, 14, bz + 0.03, bz + 0.18, (i % 2 === 0) ? [0.98, 0.48, 0.78] : [0.24, 0.90, 0.96], 5);
+                emitSolidBox3D(ic.x, ic.y, 1, 0, 0, 0, 20, 12, bz + 0.18, bz + 0.23, [0.76, 0.96, 1.00], 7);
+                emitCylinder3D(ic.x, ic.y, 0, 0, 1.4, 1.4, bz + 0.23, bz + 0.42, 6, [0.94, 0.96, 0.98], 5, false);
+                emitCone3D(ic.x, ic.y, 0, 0, 13.5, bz + 0.38, bz + 0.50, 8, (i % 2 === 0) ? [0.22, 0.88, 0.96] : [0.98, 0.36, 0.76], 1);
+            }
+        }
+        if (Array.isArray(this.poolTables)) {
+            for (const pt of this.poolTables) {
+                const bz = pt.z || 2.0;
+                emitAOShadow3D(pt.x, pt.y, 1, 0, 0, 0, 38, 26, bz, 0.36);
+                // 4 Mahogany Legs + Cushion Rails + Emerald-Green Baize Billiards Slate + 8-Ball Rack & Cue Stick
+                for (const [lx, ly] of [[-12, -7], [12, -7], [-12, 7], [12, 7]]) {
+                    emitSolidBox3D(pt.x, pt.y, 1, 0, lx, ly, 2.8, 2.8, bz, bz + 0.13, [0.46, 0.26, 0.14], 11);
+                }
+                emitSolidBox3D(pt.x, pt.y, 1, 0, 0, 0, 30, 18, bz + 0.12, bz + 0.17, [0.58, 0.32, 0.16], 11);
+                emitSolidBox3D(pt.x, pt.y, 1, 0, 0, 0, 26, 14, bz + 0.16, bz + 0.18, [0.10, 0.68, 0.38], 1);
+                // White cue ball + colorful racked pool balls on the green felt
+                emitSolidBox3D(pt.x, pt.y, 1, 0, -7, 0, 2.4, 2.4, bz + 0.18, bz + 0.20, [0.98, 0.98, 1.00], 5);
+                emitSolidBox3D(pt.x, pt.y, 1, 0,  6, 0, 5.0, 5.5, bz + 0.18, bz + 0.20, [0.98, 0.78, 0.18], 5);
+                emitSolidBox3D(pt.x, pt.y, 1, 0,  5, 0, 2.4, 2.4, bz + 0.185, bz + 0.205, [0.10, 0.12, 0.16], 5);
+            }
+        }
 
         // 23. VICE CITY MAMBAS 3D OCTAGONAL STADIUM ARENA ("HARD ROCK STADIUM" MIAMI ARCHITECTURE, c=188.5, r=172.5)
         //     100% 3D WorldObjectEngine Mesh: 8-Sided Octagonal Bowl, 5 Stepped Aqua/Orange Bleacher Tiers,
@@ -9469,6 +9599,33 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_hawaiian_red", cFr, cv.x + 8, cv.y + 14, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
+        if (Array.isArray(this.iceCreamCarts)) {
+            for (let i = 0; i < this.iceCreamCarts.length; i++) {
+                const ic = this.iceCreamCarts[i];
+                if (ic.x < minX - 120 || ic.x > maxX + 120 || ic.y < minY - 120 || ic.y > maxY + 120) continue;
+                if ((ic.cooldown || 0) <= 0) {
+                    const rSz = 22 + Math.sin(renderer.time * 5.6 + i) * 3.0;
+                    renderer.pushSolidQuad3D(ic.x, ic.y + 10, 2.03, rSz, rSz, renderer.time * 1.5, 0.22, 0.90, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                const gFr = 50 + (Math.floor(renderer.time * 4.8 + i) % 4);
+                renderer.batchPedSprite3D("vc_sailor", 0, ic.x, ic.y - 11, 2.040, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("bikini_pink", gFr, ic.x - 6, ic.y + 13, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
+        if (Array.isArray(this.poolTables)) {
+            for (let i = 0; i < this.poolTables.length; i++) {
+                const pt = this.poolTables[i];
+                if (pt.x < minX - 120 || pt.x > maxX + 120 || pt.y < minY - 120 || pt.y > maxY + 120) continue;
+                if ((pt.cooldown || 0) <= 0) {
+                    const rSz = 24 + Math.sin(renderer.time * 5.2 + i) * 3.0;
+                    renderer.pushSolidQuad3D(pt.x, pt.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.22, 0.94, 0.52, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                // Two pool sharks lined up around the 8-ball table with cue stick!
+                const pFr = 50 + (Math.floor(renderer.time * 4.2 + i) % 4);
+                renderer.batchPedSprite3D("g2_redneck_blond", pFr, pt.x - 19, pt.y, 2.040, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                renderer.batchPedSprite3D("vc_cuban", pFr, pt.x + 19, pt.y, 2.040, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            }
+        }
     }
 
     /* ========================================================================
@@ -9896,6 +10053,36 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (!p.inVehicle && Array.isArray(this.iceCreamCarts)) {
+            for (const ic of this.iceCreamCarts) {
+                if ((ic.cooldown || 0) <= 0 && Math.hypot(px - ic.x, py - ic.y) < 100) {
+                    const scr = renderer.worldToScreen(ic.x, ic.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.strokeStyle = "#38bdf8";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 195, scr.y - 22, 390, 22);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`🍦 [E] ${ic.name} (FULL HP/ARMOR & +$2,500)`, scr.x, scr.y - 7);
+                }
+            }
+        }
+        if (!p.inVehicle && Array.isArray(this.poolTables)) {
+            for (const pt of this.poolTables) {
+                if ((pt.cooldown || 0) <= 0 && Math.hypot(px - pt.x, py - pt.y) < 105) {
+                    const scr = renderer.worldToScreen(pt.x, pt.y - 16, 2.50);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.strokeStyle = "#4ade80";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 200, scr.y - 22, 400, 22);
+                    ctx.fillStyle = "#4ade80";
+                    ctx.fillText(`🎱 [E] PLAY 8-BALL: ${pt.name} (+$5,000 & +1X)`, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (!p.inVehicle && Array.isArray(this.stickUpStores)) {
             for (const su of this.stickUpStores) {
                 if ((su.cooldown || 0) <= 0 && Math.hypot(px - su.x, py - su.y) < 110) {
@@ -10212,6 +10399,18 @@ class WorldObjectEngine {
             ctx.fillStyle = "#facc15";
             for (const cv of this.cubanVentanitas) {
                 ctx.fillRect((cv.x - 16) * sx, (cv.y - 12) * sy, 32 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.iceCreamCarts)) {
+            ctx.fillStyle = "#38bdf8";
+            for (const ic of this.iceCreamCarts) {
+                ctx.fillRect((ic.x - 14) * sx, (ic.y - 10) * sy, 28 * sx, 20 * sy);
+            }
+        }
+        if (Array.isArray(this.poolTables)) {
+            ctx.fillStyle = "#10b981";
+            for (const pt of this.poolTables) {
+                ctx.fillRect((pt.x - 16) * sx, (pt.y - 10) * sy, 32 * sx, 20 * sy);
             }
         }
         if (this.map && Array.isArray(this.map.yachtParties)) {

@@ -1998,7 +1998,14 @@ class LeonidaMap {
             { c: 451.5, r: 246.5, kind: "BOARDWALK_IGUANA_ACT" },
             { c: 451.5, r: 274.5, kind: "BOARDWALK_IGUANA_ACT" },
             { c: 448.5, r: 282.5, kind: "BOARDWALK_IGUANA_ACT" },
-            { c: 451.5, r: 306.5, kind: "BOARDWALK_IGUANA_ACT" }
+            { c: 451.5, r: 306.5, kind: "BOARDWALK_IGUANA_ACT" },
+            // Official GTA 6 Vice Beach Boardwalk Rollerbladers & Street Buskers (Neon Roller-Skaters & Acoustic Guitar Performers!)
+            { c: 451.5, r: 192.5, kind: "BOARDWALK_ROLLERBLADERS" },
+            { c: 451.5, r: 220.5, kind: "BOARDWALK_BUSKER" },
+            { c: 451.5, r: 238.5, kind: "BOARDWALK_ROLLERBLADERS" },
+            { c: 451.5, r: 262.5, kind: "BOARDWALK_BUSKER" },
+            { c: 451.5, r: 292.5, kind: "BOARDWALK_ROLLERBLADERS" },
+            { c: 451.5, r: 318.5, kind: "BOARDWALK_BUSKER" }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];
@@ -2330,6 +2337,25 @@ class LeonidaMap {
             { x0: 332 * TILE_SIZE, y0: 84 * TILE_SIZE,  x1: 332 * TILE_SIZE, y1: 344 * TILE_SIZE, z: 4.65, speed: 0.046, seed: 1.8 },
             // Plane 3: Cruising W <-> E across Lake Leonida, Wynwood & Club Nine 1 Nine
             { x0: 108 * TILE_SIZE, y0: 88 * TILE_SIZE,  x1: 468 * TILE_SIZE, y1: 88 * TILE_SIZE,  z: 4.75, speed: 0.038, seed: 3.4 }
+        ];
+        // 13B) GTA 6 Trailer 1 (0:44) VCPD & News Aerial Searchlight Helicopters ("aerialSearchHelis") & Vice Beach Seagull / Pelican Flocks ("seagullFlocks")
+        this.aerialSearchHelis = [
+            // Heli 1: Patrolling Crosstown, Wynwood & Little Cuba
+            { cx: 245.0 * TILE_SIZE, cy: 195.0 * TILE_SIZE, rx: 460.0, ry: 340.0, z: 4.55, speed: 0.24, seed: 0.0 },
+            // Heli 2: Patrolling Ocean Drive, South Beach & Vice Port
+            { cx: 418.0 * TILE_SIZE, cy: 256.0 * TILE_SIZE, rx: 320.0, ry: 440.0, z: 4.58, speed: 0.22, seed: 2.1 },
+            // Heli 3: Patrolling Port Gellhorn & Lake Leonida South Shore
+            { cx: 92.0 * TILE_SIZE,  cy: 215.0 * TILE_SIZE, rx: 340.0, ry: 280.0, z: 4.52, speed: 0.25, seed: 4.2 }
+        ];
+        this.seagullFlocks = [
+            { x: 472.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, z: 2.0, count: 6, seed: 0.3 },
+            { x: 474.5 * TILE_SIZE, y: 168.0 * TILE_SIZE, z: 2.0, count: 7, seed: 1.4 },
+            { x: 466.0 * TILE_SIZE, y: 195.0 * TILE_SIZE, z: 2.0, count: 8, seed: 2.5 }, // Vice Pier
+            { x: 475.0 * TILE_SIZE, y: 234.0 * TILE_SIZE, z: 2.0, count: 6, seed: 3.6 },
+            { x: 475.5 * TILE_SIZE, y: 284.0 * TILE_SIZE, z: 2.0, count: 7, seed: 4.7 },
+            { x: 473.0 * TILE_SIZE, y: 332.0 * TILE_SIZE, z: 2.0, count: 6, seed: 5.8 },
+            { x: 222.0 * TILE_SIZE, y: 476.0 * TILE_SIZE, z: 2.0, count: 7, seed: 1.9 }, // Key Lento Marina
+            { x: 356.0 * TILE_SIZE, y: 318.0 * TILE_SIZE, z: 2.0, count: 6, seed: 3.1 }  // Vice Port Quay
         ];
         this.mooredSeaplanes = [
             { c: 101.5, r: 102.5, ang: 0 },

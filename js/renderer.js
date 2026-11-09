@@ -7610,6 +7610,35 @@ class RetroRenderer {
                             this.pushSolidQuad3D(ev.x - 10, ev.y - 5, bz + 0.075, 8.5, 8.5, this.time * 3.0, 1.0, 1.0, 0.95, 0.92, SPRITE_DRAW_ORDER.HUD_ARROW);
                         }
                     }
+                } else if (ev.kind === "BOARDWALK_ROLLERBLADERS") {
+                    // Official GTA 6 Vice Beach Boardwalk Screenshot: Neon 90s/2026 Rollerblade Duo weaving along the palm promenade!
+                    if (!evWiped) {
+                        const skateT = this.time * 2.1 + ei * 1.3;
+                        for (let si = -1; si <= 1; si += 2) {
+                            const phase = skateT + (si > 0 ? 0.65 : 0.0);
+                            const sy = ev.y + Math.sin(phase) * 24.0;
+                            const sx = ev.x + si * 6.5 + Math.cos(phase * 2.0) * 4.5;
+                            const vy = Math.cos(phase) * 24.0;
+                            const vx = -Math.sin(phase * 2.0) * 9.0;
+                            const sAng = Math.atan2(vy, vx);
+                            const sFr = Math.floor(this.time * 9.0 + si + ei) % 8;
+                            // Neon pink/cyan rollerblade wheel glow under feet + skater ped
+                            this.pushSolidQuad3D(sx, sy, bz + 0.018, 8.5, 5.5, sAng, si < 0 ? 0.98 : 0.18, si < 0 ? 0.28 : 0.92, 0.96, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                            this.batchPedSprite3D(si < 0 ? "bikini_pink" : "vc_jogger", sFr, sx, sy, bz + 0.040, sAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        }
+                    }
+                } else if (ev.kind === "BOARDWALK_BUSKER") {
+                    // Vice Beach Boardwalk Street Musician / Busker with Open Guitar Case, Boombox & Dancing Tourists!
+                    this.batchObjectSprite3D("beach_boombox", ev.x - 8, ev.y - 6, bz + 0.026, 0.3, 0.94, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Open velvet-lined guitar case with green dollar bills on the pavement
+                    this.pushSolidQuad3D(ev.x + 6, ev.y - 4, bz + 0.018, 9.0, 5.5, 0.2, 0.14, 0.16, 0.22, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(ev.x + 6, ev.y - 4, bz + 0.022, 6.5, 3.8, 0.2, 0.22, 0.88, 0.44, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (!evWiped) {
+                        const bFr = 50 + (Math.floor(this.time * 6.2 + ei) % 4);
+                        this.batchPedSprite3D("vc_hawaiian_red", bFr, ev.x - 2, ev.y - 12, bz + 0.038, Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_cyan", bFr, ev.x - 10, ev.y + 10, bz + 0.038, -Math.PI * 0.4, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tourist", bFr, ev.x + 11, ev.y + 9, bz + 0.038, -Math.PI * 0.6, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 } else {
                     // Ocean Drive Social-Media Influencer Livestreaming with 3D Glowing LED Ring-Light Tripod!
                     const ringX = ev.x - 10;
@@ -8179,6 +8208,62 @@ class RetroRenderer {
                 const bob = Math.sin(this.time * 2.1 + mp.seed) * 0.008;
                 this.batchObjectSprite3D("dodo_seaplane", mp.x + sunCos * 4, mp.y + sunSin * 4, 2.015, mp.ang, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
                 this.batchObjectSprite3D("dodo_seaplane", mp.x, mp.y, 2.048 + bob, mp.ang, 1.18, SPRITE_DRAW_ORDER.CAR);
+            }
+        }
+
+        // 13B) GTA 6 Trailer 1 (0:44) VCPD & News Aerial Searchlight Helicopters ("aerialSearchHelis") & Coastal Seagull Flocks ("seagullFlocks")
+        if (Array.isArray(this.map.aerialSearchHelis)) {
+            for (let hi = 0; hi < this.map.aerialSearchHelis.length; hi++) {
+                const ah = this.map.aerialSearchHelis[hi];
+                const t = this.time * (ah.speed || 0.24) + ah.seed;
+                const hx = ah.cx + Math.cos(t) * ah.rx;
+                const hy = ah.cy + Math.sin(t) * ah.ry;
+                if (hx < minX - 280 || hx > maxX + 280 || hy < minY - 280 || hy > maxY + 280) continue;
+                const vx = -Math.sin(t) * ah.rx;
+                const vy = Math.cos(t) * ah.ry;
+                const hAng = Math.atan2(vy, vx);
+                const cs = Math.cos(hAng), sn = Math.sin(hAng);
+                const hz = ah.z || 4.55;
+
+                // Sweeping ground searchlight cone illuminating streets & rooftops below + helicopter shadow
+                const sSweep = hAng + Math.sin(this.time * 1.45 + hi) * 0.55;
+                const beamX = hx + Math.cos(sSweep) * 64.0;
+                const beamY = hy + Math.sin(sSweep) * 64.0;
+                this.pushSolidQuad3D(beamX, beamY, 2.022, 62.0, 62.0, sSweep, 0.85, 0.96, 1.0, 0.20, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(beamX, beamY, 2.025, 32.0, 32.0, sSweep, 0.98, 0.99, 1.0, 0.28, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.batchObjectSprite3D("heli_vice", hx + sunCos * 38, hy + sunSin * 38, 2.02, hAng, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.26);
+
+                // Airborne Helicopter + Motion-Blurred Spinning Rotor (#540..#547) + Flashing Red/Blue Aviation Strobes
+                this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 1.18, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                const rotSpr = String(540 + (Math.floor(this.time * 24.0 + hi * 3) % 8));
+                this.batchObjectSprite3D(rotSpr, hx + cs * 7.0, hy + sn * 7.0, hz + 0.05, hAng, 0.86, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                const strobeRed = Math.sin(this.time * 9.0 + hi) >= 0;
+                this.pushSolidQuad3D(hx - cs * 14, hy - sn * 14, hz + 0.03, 6.5, 6.5, 0, strobeRed ? 1.0 : 0.18, strobeRed ? 0.16 : 0.65, strobeRed ? 0.20 : 1.0, 0.95, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+            }
+        }
+        if (Array.isArray(this.map.seagullFlocks)) {
+            const pRef = game && game.player;
+            for (let fi = 0; fi < this.map.seagullFlocks.length; fi++) {
+                const sf = this.map.seagullFlocks[fi];
+                if (sf.x < minX - 180 || sf.x > maxX + 180 || sf.y < minY - 180 || sf.y > maxY + 180) continue;
+                const dPlayer = pRef ? Math.hypot(pRef.x - sf.x, pRef.y - sf.y) : 999;
+                const startled = dPlayer < 130 ? Math.min(1.0, (130 - dPlayer) / 90) : 0.0;
+                const count = sf.count || 6;
+                for (let bi = 0; bi < count; bi++) {
+                    const orbitT = this.time * (1.25 + startled * 1.4) + sf.seed + (bi * Math.PI * 2) / count;
+                    const rad = 22.0 + (bi % 3) * 11.0 + startled * 28.0;
+                    const bx = sf.x + Math.cos(orbitT) * rad;
+                    const by = sf.y + Math.sin(orbitT * 0.85) * rad;
+                    const bAng = Math.atan2(Math.cos(orbitT * 0.85) * 0.85, -Math.sin(orbitT));
+                    const bz = 2.65 + (bi % 3) * 0.18 + Math.sin(this.time * 3.0 + bi) * 0.08 + startled * 0.55;
+                    const flap = Math.sin(this.time * (11.0 + startled * 6.0) + bi * 1.7) * 0.38;
+                    const wCos = Math.cos(bAng), wSin = Math.sin(bAng);
+                    // Ground shadow + 3D Seagull left/right flapping white wings with dark wingtips
+                    this.pushSolidQuad3D(bx + sunCos * 14, by + sunSin * 14, 2.015, 4.5, 8.5, bAng, 0.02, 0.03, 0.06, 0.22, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(bx, by, bz, 5.5, 2.2, bAng, 0.96, 0.98, 1.00, 0.96, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    this.pushSolidQuad3D(bx - wSin * 3.2, by + wCos * 3.2, bz + flap * 0.02, 3.0, 6.8, bAng + flap, 0.94, 0.96, 0.99, 0.95, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    this.pushSolidQuad3D(bx + wSin * 3.2, by - wCos * 3.2, bz + flap * 0.02, 3.0, 6.8, bAng - flap, 0.94, 0.96, 0.99, 0.95, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                }
             }
         }
 
