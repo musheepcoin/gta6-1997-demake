@@ -5548,6 +5548,7 @@ class WorldObjectEngine {
         const py = pVeh ? pVeh.y : (p ? p.y : 0);
         const t = performance.now() * 0.001;
 
+        const checkGuardArrays = ((this._heistGuardCheckTick = ((this._heistGuardCheckTick || 0) + 1) & 31) === 0);
         for (let i = 0; i < this.heistTargets.length; i++) {
             const ht = this.heistTargets[i];
             const distVilla = Math.hypot(px - ht.inst.x, py - ht.inst.y);
@@ -5561,7 +5562,7 @@ class WorldObjectEngine {
                         g.deadUntilReset = false;
                     }
                 }
-            } else if (distVilla > 780) {
+            } else if (distVilla > 780 && checkGuardArrays) {
                 for (const g of ht.guards) {
                     if (g.deadUntilReset && (!g.ped || !game.peds.includes(g.ped))) {
                         g.deadUntilReset = false;
@@ -5573,7 +5574,7 @@ class WorldObjectEngine {
             const bz = ht.inst.z || 2.0;
             for (let gi = 0; gi < ht.guards.length; gi++) {
                 const g = ht.guards[gi];
-                if (g.ped && !game.peds.includes(g.ped)) {
+                if (g.ped && (checkGuardArrays || distVilla < 820) && !game.peds.includes(g.ped)) {
                     g.ped = null;
                 }
                 if (!g.ped && !g.deadUntilReset && distVilla < 720 && Array.isArray(game.peds) && typeof Pedestrian === "function") {
@@ -5917,10 +5918,11 @@ class WorldObjectEngine {
         }
 
         // 6. Update Grupo Seguro Armored Cash Trucks & 3D Spinning Emerald/Gold Cash Briefcase Drops
-        if (Array.isArray(game.vehicles)) {
+        const cashTruckList = (game && game._armoredCashTrucks) ? game._armoredCashTrucks : (game && game.vehicles);
+        if (Array.isArray(cashTruckList)) {
             const pCar = pVeh;
-            for (const v of game.vehicles) {
-                if (!v.isArmoredCashTruck) continue;
+            for (const v of cashTruckList) {
+                if (!v || !v.isArmoredCashTruck) continue;
                 if (v.lastCashHitHp === undefined) v.lastCashHitHp = v.hp;
                 if ((v.cashBagsLeft || 0) > 0) {
                     const rammedByPlayer = pCar && pCar !== v && Math.hypot(pCar.x - v.x, pCar.y - v.y) < 58 &&
@@ -6203,7 +6205,7 @@ class WorldObjectEngine {
         if (Array.isArray(this.dirtBikeStuntRamps)) {
             for (const sr of this.dirtBikeStuntRamps) {
                 if ((sr.cooldown || 0) > 0) sr.cooldown = Math.max(0, sr.cooldown - dt);
-                if (pVeh && (sr.cooldown || 0) <= 0 && Math.hypot(pVeh.x - sr.x, pVeh.y - sr.y) < 52) {
+                if (pVeh && (sr.cooldown || 0) <= 0 && Math.abs(pVeh.x - sr.x) < 52 && Math.abs(pVeh.y - sr.y) < 52 && Math.hypot(pVeh.x - sr.x, pVeh.y - sr.y) < 52) {
                     const spd = Math.hypot(pVeh.vx || 0, pVeh.vy || 0) || Math.abs(pVeh.speed || 0);
                     if (spd > 60) {
                         sr.cooldown = 14.0;
@@ -6231,307 +6233,42 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.surfShacks)) {
-            for (const ss of this.surfShacks) {
-                if ((ss.cooldown || 0) > 0) ss.cooldown = Math.max(0, ss.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.bbqSmokerStands)) {
-            for (const bq of this.bbqSmokerStands) {
-                if ((bq.cooldown || 0) > 0) bq.cooldown = Math.max(0, bq.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.tattooParlors)) {
-            for (const tp of this.tattooParlors) {
-                if ((tp.cooldown || 0) > 0) tp.cooldown = Math.max(0, tp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.sandbarPartyBarges)) {
-            for (const sb of this.sandbarPartyBarges) {
-                if ((sb.cooldown || 0) > 0) sb.cooldown = Math.max(0, sb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.sandcastles)) {
-            for (const sc of this.sandcastles) {
-                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.kayakOutposts)) {
-            for (const ko of this.kayakOutposts) {
-                if ((ko.cooldown || 0) > 0) ko.cooldown = Math.max(0, ko.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.baseJumpPads)) {
-            for (const bj of this.baseJumpPads) {
-                if ((bj.cooldown || 0) > 0) bj.cooldown = Math.max(0, bj.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.kitesurfStands)) {
-            for (const ks of this.kitesurfStands) {
-                if ((ks.cooldown || 0) > 0) ks.cooldown = Math.max(0, ks.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.luxuryValetStands)) {
-            for (const lv of this.luxuryValetStands) {
-                if ((lv.cooldown || 0) > 0) lv.cooldown = Math.max(0, lv.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.gatorTourDocks)) {
-            for (const gt of this.gatorTourDocks) {
-                if ((gt.cooldown || 0) > 0) gt.cooldown = Math.max(0, gt.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.graffitiScaffolds)) {
-            for (const gs of this.graffitiScaffolds) {
-                if ((gs.cooldown || 0) > 0) gs.cooldown = Math.max(0, gs.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.pierCarnivalGames)) {
-            for (const pc of this.pierCarnivalGames) {
-                if ((pc.cooldown || 0) > 0) pc.cooldown = Math.max(0, pc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.latinStreetBands)) {
-            for (const lb of this.latinStreetBands) {
-                if ((lb.cooldown || 0) > 0) lb.cooldown = Math.max(0, lb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.monsterCrushPads)) {
-            for (const mc of this.monsterCrushPads) {
-                if ((mc.cooldown || 0) > 0) mc.cooldown = Math.max(0, mc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.sharkCageCharters)) {
-            for (const sc of this.sharkCageCharters) {
-                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.heliTourPads)) {
-            for (const hp of this.heliTourPads) {
-                if ((hp.cooldown || 0) > 0) hp.cooldown = Math.max(0, hp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.cigarRumStands)) {
-            for (const cr of this.cigarRumStands) {
-                if ((cr.cooldown || 0) > 0) cr.cooldown = Math.max(0, cr.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.kalagaLookoutTowers)) {
-            for (const kl of this.kalagaLookoutTowers) {
-                if ((kl.cooldown || 0) > 0) kl.cooldown = Math.max(0, kl.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.beachCabanaLounges)) {
-            for (const bc of this.beachCabanaLounges) {
-                if ((bc.cooldown || 0) > 0) bc.cooldown = Math.max(0, bc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.beachRescueStations)) {
-            for (const br of this.beachRescueStations) {
-                if ((br.cooldown || 0) > 0) br.cooldown = Math.max(0, br.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.rollerDiscoRinks)) {
-            for (const rd of this.rollerDiscoRinks) {
-                if ((rd.cooldown || 0) > 0) rd.cooldown = Math.max(0, rd.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.conchShacks)) {
-            for (const cs of this.conchShacks) {
-                if ((cs.cooldown || 0) > 0) cs.cooldown = Math.max(0, cs.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.moonshineStills)) {
-            for (const ms of this.moonshineStills) {
-                if ((ms.cooldown || 0) > 0) ms.cooldown = Math.max(0, ms.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.spaceViewingStands)) {
-            for (const sv of this.spaceViewingStands) {
-                if ((sv.cooldown || 0) > 0) sv.cooldown = Math.max(0, sv.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.catamaranDocks)) {
-            for (const cd of this.catamaranDocks) {
-                if ((cd.cooldown || 0) > 0) cd.cooldown = Math.max(0, cd.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.botanicaShrines)) {
-            for (const bs of this.botanicaShrines) {
-                if ((bs.cooldown || 0) > 0) bs.cooldown = Math.max(0, bs.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.droneLaunchPads)) {
-            for (const dl of this.droneLaunchPads) {
-                if ((dl.cooldown || 0) > 0) dl.cooldown = Math.max(0, dl.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.tarotNeonBooths)) {
-            for (const tb of this.tarotNeonBooths) {
-                if ((tb.cooldown || 0) > 0) tb.cooldown = Math.max(0, tb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.beachBoxingRings)) {
-            for (const br of this.beachBoxingRings) {
-                if ((br.cooldown || 0) > 0) br.cooldown = Math.max(0, br.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.derbyPitGarages)) {
-            for (const dp of this.derbyPitGarages) {
-                if ((dp.cooldown || 0) > 0) dp.cooldown = Math.max(0, dp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.lobsterTrapBuoys)) {
-            for (const lb of this.lobsterTrapBuoys) {
-                if ((lb.cooldown || 0) > 0) lb.cooldown = Math.max(0, lb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.blockPartyStages)) {
-            for (const bp of this.blockPartyStages) {
-                if ((bp.cooldown || 0) > 0) bp.cooldown = Math.max(0, bp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.coconutSmoothieBars)) {
-            for (const cb of this.coconutSmoothieBars) {
-                if ((cb.cooldown || 0) > 0) cb.cooldown = Math.max(0, cb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.goldPanningCamps)) {
-            for (const gp of this.goldPanningCamps) {
-                if ((gp.cooldown || 0) > 0) gp.cooldown = Math.max(0, gp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.vipCourierDrops)) {
-            for (const vc of this.vipCourierDrops) {
-                if ((vc.cooldown || 0) > 0) vc.cooldown = Math.max(0, vc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.beachYogaDecks)) {
-            for (const yd of this.beachYogaDecks) {
-                if ((yd.cooldown || 0) > 0) yd.cooldown = Math.max(0, yd.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.dominoParkTables)) {
-            for (const dp of this.dominoParkTables) {
-                if ((dp.cooldown || 0) > 0) dp.cooldown = Math.max(0, dp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.pythonBountyCamps)) {
-            for (const pb of this.pythonBountyCamps) {
-                if ((pb.cooldown || 0) > 0) pb.cooldown = Math.max(0, pb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.smugglerFloatingCaches)) {
-            for (const sc of this.smugglerFloatingCaches) {
-                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.driveInScreens)) {
-            for (const ds of this.driveInScreens) {
-                if ((ds.cooldown || 0) > 0) ds.cooldown = Math.max(0, ds.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.oysterRawBars)) {
-            for (const ob of this.oysterRawBars) {
-                if ((ob.cooldown || 0) > 0) ob.cooldown = Math.max(0, ob.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.kalagaZiplineTowers)) {
-            for (const kz of this.kalagaZiplineTowers) {
-                if ((kz.cooldown || 0) > 0) kz.cooldown = Math.max(0, kz.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.neonArcadePavilions)) {
-            for (const na of this.neonArcadePavilions) {
-                if ((na.cooldown || 0) > 0) na.cooldown = Math.max(0, na.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.gulfSunsetTikiClubs)) {
-            for (const gt of this.gulfSunsetTikiClubs) {
-                if ((gt.cooldown || 0) > 0) gt.cooldown = Math.max(0, gt.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.gulfManateePiers)) {
-            for (const mp of this.gulfManateePiers) {
-                if ((mp.cooldown || 0) > 0) mp.cooldown = Math.max(0, mp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.citrusOrchardStands)) {
-            for (const co of this.citrusOrchardStands) {
-                if ((co.cooldown || 0) > 0) co.cooldown = Math.max(0, co.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.gatorWrestlingRodeos)) {
-            for (const gr of this.gatorWrestlingRodeos) {
-                if ((gr.cooldown || 0) > 0) gr.cooldown = Math.max(0, gr.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.lagoonFloatingCabanas)) {
-            for (const lc of this.lagoonFloatingCabanas) {
-                if ((lc.cooldown || 0) > 0) lc.cooldown = Math.max(0, lc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.stiltsvilleOutposts)) {
-            for (const so of this.stiltsvilleOutposts) {
-                if ((so.cooldown || 0) > 0) so.cooldown = Math.max(0, so.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.hangarBlackMarkets)) {
-            for (const hb of this.hangarBlackMarkets) {
-                if ((hb.cooldown || 0) > 0) hb.cooldown = Math.max(0, hb.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.botanicalGlasshouses)) {
-            for (const bg of this.botanicalGlasshouses) {
-                if ((bg.cooldown || 0) > 0) bg.cooldown = Math.max(0, bg.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.gulfOilRigPlatforms)) {
-            for (const or of this.gulfOilRigPlatforms) {
-                if ((or.cooldown || 0) > 0) or.cooldown = Math.max(0, or.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.lumberjackSawmills)) {
-            for (const ls of this.lumberjackSawmills) {
-                if ((ls.cooldown || 0) > 0) ls.cooldown = Math.max(0, ls.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.horseRanchCorrals)) {
-            for (const hr of this.horseRanchCorrals) {
-                if ((hr.cooldown || 0) > 0) hr.cooldown = Math.max(0, hr.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.solarPowerArrays)) {
-            for (const sp of this.solarPowerArrays) {
-                if ((sp.cooldown || 0) > 0) sp.cooldown = Math.max(0, sp.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.stoneCrabCamps)) {
-            for (const sc of this.stoneCrabCamps) {
-                if ((sc.cooldown || 0) > 0) sc.cooldown = Math.max(0, sc.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.flamingoSanctuaries)) {
-            for (const fs of this.flamingoSanctuaries) {
-                if ((fs.cooldown || 0) > 0) fs.cooldown = Math.max(0, fs.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.underwaterObservatories)) {
-            for (const uo of this.underwaterObservatories) {
-                if ((uo.cooldown || 0) > 0) uo.cooldown = Math.max(0, uo.cooldown - dt);
-            }
-        }
-        if (Array.isArray(this.salvageDredgeBarges)) {
-            for (const sb of this.salvageDredgeBarges) {
-                if ((sb.cooldown || 0) > 0) sb.cooldown = Math.max(0, sb.cooldown - dt);
+        // Tick the 45 pure cooldown-only activity arrays at 10 Hz (dt * 6) to avoid 45 array scans every 60 Hz frame
+        this._cooldownSubTick = ((this._cooldownSubTick || 0) + 1) % 6;
+        if (this._cooldownSubTick === 0) {
+            const cDt = dt * 6;
+            const cdLists = this._cooldownArrayRefs || (this._cooldownArrayRefs = [
+                this.surfShacks, this.bbqSmokerStands, this.tattooParlors, this.sandbarPartyBarges,
+                this.sandcastles, this.kayakOutposts, this.baseJumpPads, this.kitesurfStands,
+                this.luxuryValetStands, this.gatorTourDocks, this.graffitiScaffolds, this.pierCarnivalGames,
+                this.latinStreetBands, this.monsterCrushPads, this.sharkCageCharters, this.heliTourPads,
+                this.cigarRumStands, this.kalagaLookoutTowers, this.beachCabanaLounges, this.beachRescueStations,
+                this.rollerDiscoRinks, this.conchShacks, this.moonshineStills, this.spaceViewingStands,
+                this.catamaranDocks, this.botanicaShrines, this.droneLaunchPads, this.tarotNeonBooths,
+                this.beachBoxingRings, this.derbyPitGarages, this.lobsterTrapBuoys, this.blockPartyStages,
+                this.coconutSmoothieBars, this.goldPanningCamps, this.vipCourierDrops, this.beachYogaDecks,
+                this.dominoParkTables, this.pythonBountyCamps, this.smugglerFloatingCaches, this.driveInScreens,
+                this.oysterRawBars, this.kalagaZiplineTowers, this.neonArcadePavilions, this.gulfSunsetTikiClubs,
+                this.gulfManateePiers, this.citrusOrchardStands, this.gatorWrestlingRodeos, this.lagoonFloatingCabanas,
+                this.stiltsvilleOutposts, this.hangarBlackMarkets, this.botanicalGlasshouses, this.gulfOilRigPlatforms,
+                this.lumberjackSawmills, this.horseRanchCorrals, this.solarPowerArrays, this.stoneCrabCamps,
+                this.flamingoSanctuaries, this.underwaterObservatories, this.salvageDredgeBarges
+            ]);
+            for (let li = 0; li < cdLists.length; li++) {
+                const arr = cdLists[li];
+                if (!Array.isArray(arr)) continue;
+                for (let j = 0; j < arr.length; j++) {
+                    const it = arr[j];
+                    if (it && (it.cooldown || 0) > 0) it.cooldown = Math.max(0, it.cooldown - cDt);
+                }
             }
         }
         if (Array.isArray(this.jetSkiSlalomGates)) {
+            const actorX = pVeh ? pVeh.x : (game.player ? game.player.x : 0);
+            const actorY = pVeh ? pVeh.y : (game.player ? game.player.y : 0);
             for (const jg of this.jetSkiSlalomGates) {
                 if ((jg.cooldown || 0) > 0) jg.cooldown = Math.max(0, jg.cooldown - dt);
-                const actorX = pVeh ? pVeh.x : (game.player ? game.player.x : 0);
-                const actorY = pVeh ? pVeh.y : (game.player ? game.player.y : 0);
-                if ((jg.cooldown || 0) <= 0 && Math.hypot(actorX - jg.x, actorY - jg.y) < 58) {
+                if ((jg.cooldown || 0) <= 0 && Math.abs(actorX - jg.x) < 58 && Math.abs(actorY - jg.y) < 58 && Math.hypot(actorX - jg.x, actorY - jg.y) < 58) {
                     jg.cooldown = 12.0;
                     if (pVeh) {
                         pVeh.vx = (pVeh.vx || 0) * 1.25;
@@ -7150,74 +6887,103 @@ class WorldObjectEngine {
     /* ========================================================================
        3B. DESTRUCTIBLE / INTERACTIVE WORLD PROP & STREET FURNITURE PHYSICS
        ======================================================================== */
+    _ensurePropCollisionGrid() {
+        if (this._propColGrid) return this._propColGrid;
+        if (!this.map || !Array.isArray(this.map.streetlights)) return null;
+        const grid = new Map();
+        const addItem = (px, py, bucketKey, item) => {
+            if (typeof px !== "number" || typeof py !== "number") return;
+            const cx = Math.max(0, Math.min(127, px >> 8));
+            const cy = Math.max(0, Math.min(127, py >> 8));
+            const k = (cy << 7) | cx;
+            let cell = grid.get(k);
+            if (!cell) {
+                cell = { iProps: [], sProps: [], lights: [], bollards: [], signals: [] };
+                grid.set(k, cell);
+            }
+            cell[bucketKey].push(item);
+        };
+        if (Array.isArray(this.interactiveProps)) {
+            for (let i = 0; i < this.interactiveProps.length; i++) {
+                const pr = this.interactiveProps[i];
+                addItem(pr.x, pr.y, "iProps", pr);
+            }
+        }
+        if (Array.isArray(this.streetProps)) {
+            for (let i = 0; i < this.streetProps.length; i++) {
+                const sp = this.streetProps[i];
+                addItem(sp.x, sp.y, "sProps", sp);
+            }
+        }
+        if (Array.isArray(this.map.streetlights)) {
+            for (let i = 0; i < this.map.streetlights.length; i++) {
+                const sl = this.map.streetlights[i];
+                addItem(sl.baseX, sl.baseY, "lights", sl);
+            }
+        }
+        if (Array.isArray(this.map.parkBollardLights)) {
+            for (let i = 0; i < this.map.parkBollardLights.length; i++) {
+                const bl = this.map.parkBollardLights[i];
+                addItem(bl.x, bl.y, "bollards", bl);
+            }
+        }
+        if (Array.isArray(this.map.trafficSignals)) {
+            for (let i = 0; i < this.map.trafficSignals.length; i++) {
+                const ts = this.map.trafficSignals[i];
+                addItem(ts.baseX, ts.baseY, "signals", ts);
+            }
+        }
+        this._propColGrid = grid;
+        return grid;
+    }
+
     updateAndCollideProps(game, dt) {
         if (!game) return;
         const player = game.player;
         const pCar = player ? (player.inVehicle || player.car || null) : null;
+        const cx = pCar ? pCar.x : (player ? player.x : 0);
+        const cy = pCar ? pCar.y : (player ? player.y : 0);
 
-        // 1. Poolside & Terrace Props
-        for (let i = 0; i < this.interactiveProps.length; i++) {
-            const pr = this.interactiveProps[i];
-            if (pr.broken) {
+        const actIProps = this._actIProps || (this._actIProps = new Set());
+        const actSProps = this._actSProps || (this._actSProps = new Set());
+        const actLights = this._actLights || (this._actLights = new Set());
+        const actBollards = this._actBollards || (this._actBollards = new Set());
+        const actSignals = this._actSignals || (this._actSignals = new Set());
+
+        // Step A: Update ONLY actively flying/broken/cooling props (0 items when idle!)
+        if (actIProps.size > 0) {
+            const dampXY = Math.pow(0.18, dt);
+            const dampAng = Math.pow(0.25, dt);
+            for (const pr of actIProps) {
+                if (!pr.broken) {
+                    actIProps.delete(pr);
+                    continue;
+                }
                 pr.timer += dt;
                 pr.x += pr.vx * dt;
                 pr.y += pr.vy * dt;
-                pr.vx *= Math.pow(0.18, dt);
-                pr.vy *= Math.pow(0.18, dt);
+                pr.vx *= dampXY;
+                pr.vy *= dampXY;
                 pr.ang += pr.vang * dt;
-                pr.vang *= Math.pow(0.25, dt);
+                pr.vang *= dampAng;
                 if (pr.timer > 18.0) {
                     pr.broken = false;
                     pr.timer = 0;
                     pr.vx = 0;
                     pr.vy = 0;
-                }
-                continue;
-            }
-            if (pCar && Math.hypot(pCar.x - pr.x, pCar.y - pr.y) < 34) {
-                const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                if (spd > 35) {
-                    pr.broken = true;
-                    pr.timer = 0;
-                    const dx = pr.x - pCar.x;
-                    const dy = pr.y - pCar.y;
-                    const d = Math.hypot(dx, dy) || 1.0;
-                    pr.vx = (dx / d) * Math.min(260, spd * 1.15);
-                    pr.vy = (dy / d) * Math.min(260, spd * 1.15);
-                    pr.vang = (Math.random() - 0.5) * 14.0;
+                    actIProps.delete(pr);
                 }
             }
         }
 
-        // 2. 3D Sidewalk Street Furniture (Hydrants, Neon Streetlights, Payphones, News Stands)
-        const cx = pCar ? pCar.x : (player ? player.x : 0);
-        const cy = pCar ? pCar.y : (player ? player.y : 0);
-        const isMicroVeh = pCar && (pCar.specKey === "BMX_BIKE" || pCar.specKey === "E_SCOOTER");
-        const isTwoWheeler = Boolean(
-            pCar && (
-                isMicroVeh ||
-                pCar.isMotorcycle ||
-                pCar.specKey === "STREET_BIKE" ||
-                pCar.specKey === "HARLEY_BIKE"
-            )
-        );
-        const heavySpecs = [
-            "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "TOUR_COACH", "TANKER_RIG",
-            "FLATBED_TRUCK", "BRINKS_TRUCK", "SWAT_ENFORCER", "BOXVILLE_VAN",
-            "HOTDOG_VAN", "MEDIC_AMBULANCE", "MONSTER_BUGGY", "GATOR_4X4",
-            "PICKUP_TRUCK", "CAMPER_PICKUP"
-        ];
-        const isHeavyVeh = Boolean(pCar && !isTwoWheeler && (pCar.crushesCars || heavySpecs.includes(pCar.specKey)));
-
-        if (this.streetProps && this.streetProps.length > 0) {
-            for (let i = 0; i < this.streetProps.length; i++) {
-                const sp = this.streetProps[i];
+        if (actSProps.size > 0) {
+            const dampXY = Math.pow(0.20, dt);
+            const dampAng = Math.pow(0.28, dt);
+            for (const sp of actSProps) {
                 if (sp.hitCooldown > 0) sp.hitCooldown = Math.max(0, sp.hitCooldown - dt);
                 if (sp.broken) {
                     sp.timer += dt;
-                    if (sp.geyserTimer > 0) {
-                        sp.geyserTimer = Math.max(0, sp.geyserTimer - dt);
-                    }
+                    if (sp.geyserTimer > 0) sp.geyserTimer = Math.max(0, sp.geyserTimer - dt);
                     sp.x += sp.vx * dt;
                     sp.y += sp.vy * dt;
                     sp.z += sp.vz * dt;
@@ -7227,11 +6993,10 @@ class WorldObjectEngine {
                         sp.z = 2.02;
                         sp.vz = Math.abs(sp.vz) > 0.15 ? Math.abs(sp.vz) * 0.35 : 0;
                     }
-                    sp.vx *= Math.pow(0.20, dt);
-                    sp.vy *= Math.pow(0.20, dt);
+                    sp.vx *= dampXY;
+                    sp.vy *= dampXY;
                     sp.ang += sp.vang * dt;
-                    sp.vang *= Math.pow(0.28, dt);
-
+                    sp.vang *= dampAng;
                     if (sp.timer > 24.0 && Math.hypot(cx - sp.homeX, cy - sp.homeY) > 320) {
                         sp.broken = false;
                         sp.damaged = false;
@@ -7246,122 +7011,27 @@ class WorldObjectEngine {
                         sp.vy = 0;
                         sp.vz = 0;
                     }
-                    continue;
                 }
-
-                const blockedByTwoWheeler = (sp.kind === "PAYPHONE_BOOTH") ? isTwoWheeler : isMicroVeh;
-                if (pCar && !blockedByTwoWheeler && Math.abs(pCar.x - sp.x) < 42 && Math.abs(pCar.y - sp.y) < 42) {
-                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                    const bOff = (pCar.w || 48) * 0.32;
-                    const noseX = pCar.x + Math.cos(pCar.angle || 0) * bOff;
-                    const noseY = pCar.y + Math.sin(pCar.angle || 0) * bOff;
-                    const dist = Math.min(Math.hypot(pCar.x - sp.x, pCar.y - sp.y), Math.hypot(noseX - sp.x, noseY - sp.y));
-                    if (dist < 25 && spd > 34 && (sp.hitCooldown || 0) <= 0) {
-                        const dx = sp.x - pCar.x;
-                        const dy = sp.y - pCar.y;
-                        const d = Math.hypot(dx, dy) || 1.0;
-
-                        if (sp.kind === "STREETLIGHT_NEON" && !isHeavyVeh) {
-                            // Standard cars ONLY bend/damage streetlamps — they never knock them down!
-                            const wasDamaged = sp.damaged;
-                            sp.damaged = true;
-                            sp.hitCooldown = 0.75;
-                            const impAng = Math.atan2(pCar.vy || Math.sin(pCar.angle), pCar.vx || Math.cos(pCar.angle));
-                            sp.tiltDx = Math.cos(impAng) * 6.5;
-                            sp.tiltDy = Math.sin(impAng) * 6.5;
-                            // Push car back off the steel pole & damp velocity
-                            pCar.x = sp.x - (dx / d) * 25;
-                            pCar.y = sp.y - (dy / d) * 25;
-                            pCar.vx *= -0.28;
-                            pCar.vy *= -0.28;
-                            pCar.speed = Math.hypot(pCar.vx, pCar.vy);
-                            if (typeof pCar.receiveImpactDamage === "function") {
-                                pCar.receiveImpactDamage(10, sp.x, sp.y);
-                            }
-                            pCar.crashCooldown = 0.45;
-                            if (game.audio && typeof game.audio.playCarCrash === "function") {
-                                game.audio.playCarCrash(0.85);
-                            }
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 6; k++) {
-                                    game.spawnParticle(sp.x + (Math.random() - 0.5) * 10, sp.y + (Math.random() - 0.5) * 10, "SPARK");
-                                }
-                            }
-                            if (!wasDamaged) {
-                                if (typeof game.addScore === "function") game.addScore(40);
-                                if (Array.isArray(game.floatingTexts)) {
-                                    game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ STREETLAMP BENT! +$40", color: "#fde047", life: 1.15 });
-                                }
-                            }
-                            continue;
-                        }
-
-                        sp.broken = true;
-                        sp.timer = 0;
-                        const launchSpd = Math.min(310, Math.max(110, spd * 1.25));
-                        sp.vx = (dx / d) * launchSpd;
-                        sp.vy = (dy / d) * launchSpd;
-                        sp.vz = 0.55;
-                        sp.vang = (Math.random() - 0.5) * 16.0;
-                        pCar.crashCooldown = 0.45;
-                        if (game.audio && typeof game.audio.playCarCrash === "function") {
-                            game.audio.playCarCrash(1.05);
-                        }
-
-                        if (sp.kind === "HYDRANT") {
-                            sp.geyserTimer = 14.0;
-                            if (typeof game.addScore === "function") game.addScore(125);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST! +$125", color: "#38bdf8", life: 1.3 });
-                            }
-                        } else if (sp.kind === "STREETLIGHT_NEON") {
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 10; k++) {
-                                    game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "SPARK");
-                                }
-                            }
-                            if (typeof game.addScore === "function") game.addScore(100);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "💥 STREETLAMP SMASHED! +$100", color: "#f472b6", life: 1.2 });
-                            }
-                        } else if (sp.kind === "PAYPHONE_BOOTH") {
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 8; k++) {
-                                    game.spawnParticle(sp.x + (Math.random() - 0.5) * 12, sp.y + (Math.random() - 0.5) * 12, "SPARK");
-                                }
-                            }
-                            if (typeof game.addScore === "function") game.addScore(85);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "☎️ PAYPHONE SMASHED! +$85", color: "#38bdf8", life: 1.2 });
-                            }
-                        } else {
-                            if (typeof game.addScore === "function") game.addScore(75);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "💥 PROP SMASH! +$75", color: "#fde047", life: 1.1 });
-                            }
-                        }
-                    }
+                if (!sp.broken && !(sp.hitCooldown > 0)) {
+                    actSProps.delete(sp);
                 }
             }
         }
 
-        // 3. Main 3D Curb Streetlamps (this.map.streetlights):
-        //    - Heavy vehicles ONLY (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
-        //    - Standard cars ONLY bend & damage them ("abîmé", state = 1, tilting pole + flickering bulb + physical bounce & crash sound)!
-        if (this.map && Array.isArray(this.map.streetlights)) {
-            for (let i = 0; i < this.map.streetlights.length; i++) {
-                const sl = this.map.streetlights[i];
+        if (actLights.size > 0) {
+            const dampFall = Math.pow(0.16, dt);
+            const dampVang = Math.pow(0.22, dt);
+            for (const sl of actLights) {
                 if (sl.hitCooldown > 0) sl.hitCooldown = Math.max(0, sl.hitCooldown - dt);
-
                 if (sl.state === 2) {
                     sl.timer = (sl.timer || 0) + dt;
                     if (sl.fallVx || sl.fallVy) {
                         sl.fallenX = (sl.fallenX ?? sl.baseX) + sl.fallVx * dt;
                         sl.fallenY = (sl.fallenY ?? sl.baseY) + sl.fallVy * dt;
                         sl.fallAngle = (sl.fallAngle || 0) + (sl.fallVang || 0) * dt;
-                        sl.fallVx *= Math.pow(0.16, dt);
-                        sl.fallVy *= Math.pow(0.16, dt);
-                        sl.fallVang = (sl.fallVang || 0) * Math.pow(0.22, dt);
+                        sl.fallVx *= dampFall;
+                        sl.fallVy *= dampFall;
+                        sl.fallVang = (sl.fallVang || 0) * dampVang;
                         if (Math.hypot(sl.fallVx, sl.fallVy) < 2.0) {
                             sl.fallVx = 0;
                             sl.fallVy = 0;
@@ -7373,186 +7043,43 @@ class WorldObjectEngine {
                         sl.tiltDx = 0;
                         sl.tiltDy = 0;
                     }
-                    continue;
                 }
-
-                if (pCar && !isMicroVeh && Math.abs(pCar.x - sl.baseX) < 28 && Math.abs(pCar.y - sl.baseY) < 28) {
-                    const dx = sl.baseX - pCar.x;
-                    const dy = sl.baseY - pCar.y;
-                    const dist = Math.hypot(dx, dy) || 1.0;
-                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                    if (dist < 22 && spd > 42 && (sl.hitCooldown || 0) <= 0) {
-                        const impAng = Math.atan2(
-                            pCar.vy || Math.sin(pCar.angle),
-                            pCar.vx || Math.cos(pCar.angle)
-                        );
-
-                        if (isHeavyVeh) {
-                            // Heavy vehicle uproots and knocks down the streetlamp!
-                            sl.state = 2;
-                            sl.timer = 0;
-                            sl.hitCooldown = 0.8;
-                            sl.fallAngle = impAng;
-                            sl.fallenX = sl.baseX + Math.cos(impAng) * 14;
-                            sl.fallenY = sl.baseY + Math.sin(impAng) * 14;
-                            const launchSpd = Math.min(250, Math.max(90, spd * 1.12));
-                            sl.fallVx = Math.cos(impAng) * launchSpd;
-                            sl.fallVy = Math.sin(impAng) * launchSpd;
-                            sl.fallVang = (Math.random() - 0.5) * 8.5;
-
-                            pCar.vx *= 0.90;
-                            pCar.vy *= 0.90;
-                            pCar.crashCooldown = 0.45;
-                            if (game.audio && typeof game.audio.playCarCrash === "function") {
-                                game.audio.playCarCrash(1.15);
-                            }
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 10; k++) {
-                                    game.spawnParticle(
-                                        sl.baseX + (Math.random() - 0.5) * 14,
-                                        sl.baseY + (Math.random() - 0.5) * 14,
-                                        "SPARK"
-                                    );
-                                }
-                            }
-                            if (typeof game.addScore === "function") game.addScore(100);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({
-                                    x: sl.baseX,
-                                    y: sl.baseY,
-                                    z: 2.42,
-                                    text: "💥 STREETLAMP SMASHED! +$100",
-                                    color: "#fb923c",
-                                    life: 1.25
-                                });
-                            }
-                        } else {
-                            // Standard car ONLY bends & damages the streetlamp and bounces off the pole!
-                            const wasDamaged = (sl.state === 1);
-                            sl.state = 1;
-                            sl.hitCooldown = 0.75;
-                            sl.tiltDx = Math.cos(impAng) * 7.5;
-                            sl.tiltDy = Math.sin(impAng) * 7.5;
-                            pCar.x = sl.baseX - (dx / dist) * 23;
-                            pCar.y = sl.baseY - (dy / dist) * 23;
-                            pCar.vx *= -0.30;
-                            pCar.vy *= -0.30;
-                            pCar.speed = Math.hypot(pCar.vx, pCar.vy);
-                            if (typeof pCar.receiveImpactDamage === "function") {
-                                pCar.receiveImpactDamage(11, sl.baseX, sl.baseY);
-                            }
-                            pCar.crashCooldown = 0.45;
-                            if (game.audio && typeof game.audio.playCarCrash === "function") {
-                                game.audio.playCarCrash(0.85);
-                            }
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 6; k++) {
-                                    game.spawnParticle(
-                                        sl.baseX + (Math.random() - 0.5) * 10,
-                                        sl.baseY + (Math.random() - 0.5) * 10,
-                                        "SPARK"
-                                    );
-                                }
-                            }
-                            if (!wasDamaged) {
-                                if (typeof game.addScore === "function") game.addScore(40);
-                                if (Array.isArray(game.floatingTexts)) {
-                                    game.floatingTexts.push({
-                                        x: sl.baseX,
-                                        y: sl.baseY,
-                                        z: 2.38,
-                                        text: "⚡ STREETLAMP BENT! +$40",
-                                        color: "#fde047",
-                                        life: 1.15
-                                    });
-                                }
-                            }
-                        }
-                    }
+                if (sl.state !== 2 && !(sl.hitCooldown > 0)) {
+                    actLights.delete(sl);
                 }
             }
         }
 
-        // 3A-bis. 3D Low Park, Promenade & Villa Walkway Bollard Lights (this.map.parkBollardLights):
-        //     - Low-mounted landscape fixtures (h ≈ 0.20 blocks) knocked flat (state = 2) when struck by any moving vehicle
-        if (this.map && Array.isArray(this.map.parkBollardLights)) {
-            for (let i = 0; i < this.map.parkBollardLights.length; i++) {
-                const bl = this.map.parkBollardLights[i];
+        if (actBollards.size > 0) {
+            for (const bl of actBollards) {
                 if (bl.hitCooldown > 0) bl.hitCooldown = Math.max(0, bl.hitCooldown - dt);
                 if (bl.state === 2) {
                     bl.knockdownTimer = (bl.knockdownTimer || 0) + dt;
-                    if (bl.knockdownTimer > 25.0) {
-                        const distToPlayer = Math.hypot((bl.x || 0) - cx, (bl.y || 0) - cy);
-                        if (distToPlayer > 320) {
-                            bl.state = 0;
-                            bl.knockdownTimer = 0;
-                        }
-                    }
-                    continue;
-                }
-                if (Math.abs(bl.x - cx) > 760 || Math.abs(bl.y - cy) > 760) continue;
-
-                if (pCar && Math.abs(pCar.x - bl.x) <= 36 && Math.abs(pCar.y - bl.y) <= 36) {
-                    const dx = bl.x - pCar.x;
-                    const dy = bl.y - pCar.y;
-                    const dist = Math.hypot(dx, dy);
-                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0);
-                    if (dist < 20 && spd > 32 && (!bl.hitCooldown || bl.hitCooldown <= 0)) {
-                        bl.hitCooldown = 0.55;
-                        bl.state = 2;
+                    if (bl.knockdownTimer > 25.0 && Math.hypot((bl.x || 0) - cx, (bl.y || 0) - cy) > 320) {
+                        bl.state = 0;
                         bl.knockdownTimer = 0;
-                        const impAng = spd > 10 ? Math.atan2(pCar.vy, pCar.vx) : (pCar.angle || 0);
-                        bl.fallAngle = impAng;
-                        bl.fallenX = bl.x + Math.cos(impAng) * 14;
-                        bl.fallenY = bl.y + Math.sin(impAng) * 14;
-                        pCar.vx *= 0.88;
-                        pCar.vy *= 0.88;
-                        pCar.speed = Math.hypot(pCar.vx, pCar.vy);
-                        if (game.audio && typeof game.audio.playCarCrash === "function") {
-                            game.audio.playCarCrash(0.55);
-                        }
-                        if (typeof game.spawnParticle === "function") {
-                            for (let k = 0; k < 7; k++) {
-                                game.spawnParticle(
-                                    bl.x + (Math.random() - 0.5) * 10,
-                                    bl.y + (Math.random() - 0.5) * 10,
-                                    k % 2 === 0 ? "SPARK" : "DEBRIS"
-                                );
-                            }
-                        }
-                        if (typeof game.addScore === "function") game.addScore(35);
-                        if (Array.isArray(game.floatingTexts)) {
-                            game.floatingTexts.push({
-                                x: bl.x,
-                                y: bl.y,
-                                z: 2.28,
-                                text: "💥 PARK BOLLARD SMASHED! +$35",
-                                color: "#fde047",
-                                life: 1.05
-                            });
-                        }
                     }
+                }
+                if (bl.state !== 2 && !(bl.hitCooldown > 0)) {
+                    actBollards.delete(bl);
                 }
             }
         }
 
-        // 3B. 3D Junction Traffic Signal Gantries (this.map.trafficSignals):
-        //     - Heavy vehicles ONLY (Tank, Truck, Bus, 4x4, SWAT, Ambulance) knock them flat ("défoncé", state = 2)
-        //     - Standard cars ONLY bend & damage them ("abîmé", state = 1, tilting gantry + malfunctioning flashing signal + bounce & crash sound)!
-        if (this.map && Array.isArray(this.map.trafficSignals)) {
-            for (let i = 0; i < this.map.trafficSignals.length; i++) {
-                const ts = this.map.trafficSignals[i];
+        if (actSignals.size > 0) {
+            const dampFall = Math.pow(0.16, dt);
+            const dampVang = Math.pow(0.22, dt);
+            for (const ts of actSignals) {
                 if (ts.hitCooldown > 0) ts.hitCooldown = Math.max(0, ts.hitCooldown - dt);
-
                 if (ts.state === 2) {
                     ts.timer = (ts.timer || 0) + dt;
                     if (ts.fallVx || ts.fallVy) {
                         ts.fallenX = (ts.fallenX ?? ts.baseX) + ts.fallVx * dt;
                         ts.fallenY = (ts.fallenY ?? ts.baseY) + ts.fallVy * dt;
                         ts.fallAngle = (ts.fallAngle || 0) + (ts.fallVang || 0) * dt;
-                        ts.fallVx *= Math.pow(0.16, dt);
-                        ts.fallVy *= Math.pow(0.16, dt);
-                        ts.fallVang = (ts.fallVang || 0) * Math.pow(0.22, dt);
+                        ts.fallVx *= dampFall;
+                        ts.fallVy *= dampFall;
+                        ts.fallVang = (ts.fallVang || 0) * dampVang;
                         if (Math.hypot(ts.fallVx, ts.fallVy) < 2.0) {
                             ts.fallVx = 0;
                             ts.fallVy = 0;
@@ -7564,98 +7091,346 @@ class WorldObjectEngine {
                         ts.tiltDx = 0;
                         ts.tiltDy = 0;
                     }
-                    continue;
+                }
+                if (ts.state !== 2 && !(ts.hitCooldown > 0)) {
+                    actSignals.delete(ts);
+                }
+            }
+        }
+
+        // Fast early-out when player is on foot or stationary in vehicle: zero 5,500-prop scans!
+        if (!pCar) return;
+        const carSpd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
+        if (carSpd <= 30) return;
+
+        const grid = this._ensurePropCollisionGrid();
+        if (!grid) return;
+
+        const isMicroVeh = (pCar.specKey === "BMX_BIKE" || pCar.specKey === "E_SCOOTER");
+        const isTwoWheeler = Boolean(
+            isMicroVeh ||
+            pCar.isMotorcycle ||
+            pCar.specKey === "STREET_BIKE" ||
+            pCar.specKey === "HARLEY_BIKE"
+        );
+        const heavySet = this._heavyPropSpecSet || (this._heavyPropSpecSet = new Set([
+            "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "TOUR_COACH", "TANKER_RIG",
+            "FLATBED_TRUCK", "BRINKS_TRUCK", "SWAT_ENFORCER", "BOXVILLE_VAN",
+            "HOTDOG_VAN", "MEDIC_AMBULANCE", "MONSTER_BUGGY", "GATOR_4X4",
+            "PICKUP_TRUCK", "CAMPER_PICKUP"
+        ]));
+        const isHeavyVeh = Boolean(!isTwoWheeler && (pCar.crushesCars || heavySet.has(pCar.specKey)));
+
+        const gcx = pCar.x >> 8;
+        const gcy = pCar.y >> 8;
+        const x0 = Math.max(0, gcx - 1);
+        const x1 = Math.min(127, gcx + 1);
+        const y0 = Math.max(0, gcy - 1);
+        const y1 = Math.min(127, gcy + 1);
+
+        // Step B: Query ONLY the 3x3 256px cells around pCar (~2-8 nearby props instead of 5,500+!)
+        for (let gy = y0; gy <= y1; gy++) {
+            const rowOff = gy << 7;
+            for (let gx = x0; gx <= x1; gx++) {
+                const cell = grid.get(rowOff | gx);
+                if (!cell) continue;
+
+                // 1. Poolside & Terrace Props
+                if (carSpd > 35) {
+                    const iProps = cell.iProps;
+                    for (let i = 0; i < iProps.length; i++) {
+                        const pr = iProps[i];
+                        if (pr.broken) continue;
+                        if (Math.abs(pCar.x - pr.x) < 34 && Math.abs(pCar.y - pr.y) < 34 && Math.hypot(pCar.x - pr.x, pCar.y - pr.y) < 34) {
+                            pr.broken = true;
+                            pr.timer = 0;
+                            const dx = pr.x - pCar.x;
+                            const dy = pr.y - pCar.y;
+                            const d = Math.hypot(dx, dy) || 1.0;
+                            pr.vx = (dx / d) * Math.min(260, carSpd * 1.15);
+                            pr.vy = (dy / d) * Math.min(260, carSpd * 1.15);
+                            pr.vang = (Math.random() - 0.5) * 14.0;
+                            actIProps.add(pr);
+                        }
+                    }
                 }
 
-                if (pCar && !isMicroVeh && Math.abs(pCar.x - ts.baseX) < 30 && Math.abs(pCar.y - ts.baseY) < 30) {
-                    const dx = ts.baseX - pCar.x;
-                    const dy = ts.baseY - pCar.y;
-                    const dist = Math.hypot(dx, dy) || 1.0;
-                    const spd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-                    if (dist < 23 && spd > 42 && (ts.hitCooldown || 0) <= 0) {
-                        const impAng = Math.atan2(
-                            pCar.vy || Math.sin(pCar.angle),
-                            pCar.vx || Math.cos(pCar.angle)
-                        );
+                // 2. 3D Sidewalk Street Furniture
+                if (carSpd > 34) {
+                    const sProps = cell.sProps;
+                    const bOff = (pCar.w || 48) * 0.32;
+                    const noseX = pCar.x + Math.cos(pCar.angle || 0) * bOff;
+                    const noseY = pCar.y + Math.sin(pCar.angle || 0) * bOff;
+                    for (let i = 0; i < sProps.length; i++) {
+                        const sp = sProps[i];
+                        if (sp.broken || (sp.hitCooldown || 0) > 0) continue;
+                        const blockedByTwoWheeler = (sp.kind === "PAYPHONE_BOOTH") ? isTwoWheeler : isMicroVeh;
+                        if (!blockedByTwoWheeler && Math.abs(pCar.x - sp.x) < 42 && Math.abs(pCar.y - sp.y) < 42) {
+                            const dist = Math.min(Math.hypot(pCar.x - sp.x, pCar.y - sp.y), Math.hypot(noseX - sp.x, noseY - sp.y));
+                            if (dist < 25) {
+                                const dx = sp.x - pCar.x;
+                                const dy = sp.y - pCar.y;
+                                const d = Math.hypot(dx, dy) || 1.0;
 
-                        if (isHeavyVeh) {
-                            // Heavy vehicle uproots and knocks down the traffic signal gantry!
-                            ts.state = 2;
-                            ts.timer = 0;
-                            ts.hitCooldown = 0.8;
-                            ts.fallAngle = impAng;
-                            ts.fallenX = ts.baseX + Math.cos(impAng) * 16;
-                            ts.fallenY = ts.baseY + Math.sin(impAng) * 16;
-                            const launchSpd = Math.min(255, Math.max(95, spd * 1.12));
-                            ts.fallVx = Math.cos(impAng) * launchSpd;
-                            ts.fallVy = Math.sin(impAng) * launchSpd;
-                            ts.fallVang = (Math.random() - 0.5) * 8.0;
+                                if (sp.kind === "STREETLIGHT_NEON" && !isHeavyVeh) {
+                                    const wasDamaged = sp.damaged;
+                                    sp.damaged = true;
+                                    sp.hitCooldown = 0.75;
+                                    actSProps.add(sp);
+                                    const impAng = Math.atan2(pCar.vy || Math.sin(pCar.angle), pCar.vx || Math.cos(pCar.angle));
+                                    sp.tiltDx = Math.cos(impAng) * 6.5;
+                                    sp.tiltDy = Math.sin(impAng) * 6.5;
+                                    pCar.x = sp.x - (dx / d) * 25;
+                                    pCar.y = sp.y - (dy / d) * 25;
+                                    pCar.vx *= -0.28;
+                                    pCar.vy *= -0.28;
+                                    pCar.speed = Math.hypot(pCar.vx, pCar.vy);
+                                    if (typeof pCar.receiveImpactDamage === "function") {
+                                        pCar.receiveImpactDamage(10, sp.x, sp.y);
+                                    }
+                                    pCar.crashCooldown = 0.45;
+                                    if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                        game.audio.playCarCrash(0.85);
+                                    }
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 6; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 10, sp.y + (Math.random() - 0.5) * 10, "SPARK");
+                                        }
+                                    }
+                                    if (!wasDamaged) {
+                                        if (typeof game.addScore === "function") game.addScore(40);
+                                        if (Array.isArray(game.floatingTexts)) {
+                                            game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "⚡ STREETLAMP BENT! +$40", color: "#fde047", life: 1.15 });
+                                        }
+                                    }
+                                    continue;
+                                }
 
-                            pCar.vx *= 0.90;
-                            pCar.vy *= 0.90;
-                            pCar.crashCooldown = 0.45;
-                            if (game.audio && typeof game.audio.playCarCrash === "function") {
-                                game.audio.playCarCrash(1.15);
-                            }
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 12; k++) {
-                                    game.spawnParticle(
-                                        ts.baseX + (Math.random() - 0.5) * 16,
-                                        ts.baseY + (Math.random() - 0.5) * 16,
-                                        "SPARK"
-                                    );
+                                sp.broken = true;
+                                sp.timer = 0;
+                                actSProps.add(sp);
+                                const launchSpd = Math.min(310, Math.max(110, carSpd * 1.25));
+                                sp.vx = (dx / d) * launchSpd;
+                                sp.vy = (dy / d) * launchSpd;
+                                sp.vz = 0.55;
+                                sp.vang = (Math.random() - 0.5) * 16.0;
+                                pCar.crashCooldown = 0.45;
+                                if (game.audio && typeof game.audio.playCarCrash === "function") {
+                                    game.audio.playCarCrash(1.05);
+                                }
+
+                                if (sp.kind === "HYDRANT") {
+                                    sp.geyserTimer = 14.0;
+                                    if (typeof game.addScore === "function") game.addScore(125);
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST! +$125", color: "#38bdf8", life: 1.3 });
+                                    }
+                                } else if (sp.kind === "STREETLIGHT_NEON") {
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 10; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "SPARK");
+                                        }
+                                    }
+                                    if (typeof game.addScore === "function") game.addScore(100);
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.40, text: "💥 STREETLAMP SMASHED! +$100", color: "#f472b6", life: 1.2 });
+                                    }
+                                } else if (sp.kind === "PAYPHONE_BOOTH") {
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 8; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 12, sp.y + (Math.random() - 0.5) * 12, "SPARK");
+                                        }
+                                    }
+                                    if (typeof game.addScore === "function") game.addScore(85);
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "☎️ PAYPHONE SMASHED! +$85", color: "#38bdf8", life: 1.2 });
+                                    }
+                                } else {
+                                    if (typeof game.addScore === "function") game.addScore(75);
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "💥 PROP SMASH! +$75", color: "#fde047", life: 1.1 });
+                                    }
                                 }
                             }
-                            if (typeof game.addScore === "function") game.addScore(125);
-                            if (Array.isArray(game.floatingTexts)) {
-                                game.floatingTexts.push({
-                                    x: ts.baseX,
-                                    y: ts.baseY,
-                                    z: 2.45,
-                                    text: "💥 TRAFFIC LIGHT SMASHED! +$125",
-                                    color: "#ef4444",
-                                    life: 1.3
-                                });
-                            }
-                        } else {
-                            // Standard car ONLY bends & damages the traffic signal gantry and bounces off the pole!
-                            const wasDamaged = (ts.state === 1);
-                            ts.state = 1;
-                            ts.hitCooldown = 0.75;
-                            ts.tiltDx = Math.cos(impAng) * 7.5;
-                            ts.tiltDy = Math.sin(impAng) * 7.5;
-                            pCar.x = ts.baseX - (dx / dist) * 24;
-                            pCar.y = ts.baseY - (dy / dist) * 24;
-                            pCar.vx *= -0.30;
-                            pCar.vy *= -0.30;
-                            pCar.speed = Math.hypot(pCar.vx, pCar.vy);
-                            if (typeof pCar.receiveImpactDamage === "function") {
-                                pCar.receiveImpactDamage(12, ts.baseX, ts.baseY);
-                            }
-                            pCar.crashCooldown = 0.45;
-                            if (game.audio && typeof game.audio.playCarCrash === "function") {
-                                game.audio.playCarCrash(0.85);
-                            }
-                            if (typeof game.spawnParticle === "function") {
-                                for (let k = 0; k < 6; k++) {
-                                    game.spawnParticle(
-                                        ts.baseX + (Math.random() - 0.5) * 10,
-                                        ts.baseY + (Math.random() - 0.5) * 10,
-                                        "SPARK"
-                                    );
+                        }
+                    }
+                }
+
+                // 3. Main 3D Curb Streetlamps
+                if (!isMicroVeh && carSpd > 42) {
+                    const lights = cell.lights;
+                    for (let i = 0; i < lights.length; i++) {
+                        const sl = lights[i];
+                        if (sl.state === 2 || (sl.hitCooldown || 0) > 0) continue;
+                        if (Math.abs(pCar.x - sl.baseX) < 28 && Math.abs(pCar.y - sl.baseY) < 28) {
+                            const dx = sl.baseX - pCar.x;
+                            const dy = sl.baseY - pCar.y;
+                            const dist = Math.hypot(dx, dy) || 1.0;
+                            if (dist < 22) {
+                                const impAng = Math.atan2(
+                                    pCar.vy || Math.sin(pCar.angle),
+                                    pCar.vx || Math.cos(pCar.angle)
+                                );
+                                if (isHeavyVeh) {
+                                    sl.state = 2;
+                                    sl.timer = 0;
+                                    sl.hitCooldown = 0.8;
+                                    actLights.add(sl);
+                                    sl.fallAngle = impAng;
+                                    sl.fallenX = sl.baseX + Math.cos(impAng) * 14;
+                                    sl.fallenY = sl.baseY + Math.sin(impAng) * 14;
+                                    const launchSpd = Math.min(250, Math.max(90, carSpd * 1.12));
+                                    sl.fallVx = Math.cos(impAng) * launchSpd;
+                                    sl.fallVy = Math.sin(impAng) * launchSpd;
+                                    sl.fallVang = (Math.random() - 0.5) * 8.5;
+                                    pCar.vx *= 0.90;
+                                    pCar.vy *= 0.90;
+                                    pCar.crashCooldown = 0.45;
+                                    if (game.audio && typeof game.audio.playCarCrash === "function") game.audio.playCarCrash(1.15);
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 10; k++) {
+                                            game.spawnParticle(sl.baseX + (Math.random() - 0.5) * 14, sl.baseY + (Math.random() - 0.5) * 14, "SPARK");
+                                        }
+                                    }
+                                    if (typeof game.addScore === "function") game.addScore(100);
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sl.baseX, y: sl.baseY, z: 2.42, text: "💥 STREETLAMP SMASHED! +$100", color: "#fb923c", life: 1.25 });
+                                    }
+                                } else {
+                                    const wasDamaged = (sl.state === 1);
+                                    sl.state = 1;
+                                    sl.hitCooldown = 0.75;
+                                    actLights.add(sl);
+                                    sl.tiltDx = Math.cos(impAng) * 7.5;
+                                    sl.tiltDy = Math.sin(impAng) * 7.5;
+                                    pCar.x = sl.baseX - (dx / dist) * 23;
+                                    pCar.y = sl.baseY - (dy / dist) * 23;
+                                    pCar.vx *= -0.30;
+                                    pCar.vy *= -0.30;
+                                    pCar.speed = Math.hypot(pCar.vx, pCar.vy);
+                                    if (typeof pCar.receiveImpactDamage === "function") pCar.receiveImpactDamage(11, sl.baseX, sl.baseY);
+                                    pCar.crashCooldown = 0.45;
+                                    if (game.audio && typeof game.audio.playCarCrash === "function") game.audio.playCarCrash(0.85);
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 6; k++) {
+                                            game.spawnParticle(sl.baseX + (Math.random() - 0.5) * 10, sl.baseY + (Math.random() - 0.5) * 10, "SPARK");
+                                        }
+                                    }
+                                    if (!wasDamaged) {
+                                        if (typeof game.addScore === "function") game.addScore(40);
+                                        if (Array.isArray(game.floatingTexts)) {
+                                            game.floatingTexts.push({ x: sl.baseX, y: sl.baseY, z: 2.38, text: "⚡ STREETLAMP BENT! +$40", color: "#fde047", life: 1.15 });
+                                        }
+                                    }
                                 }
                             }
-                            if (!wasDamaged) {
-                                if (typeof game.addScore === "function") game.addScore(50);
+                        }
+                    }
+                }
+
+                // 3A-bis. 3D Low Park, Promenade & Villa Walkway Bollard Lights
+                if (carSpd > 32) {
+                    const bollards = cell.bollards;
+                    for (let i = 0; i < bollards.length; i++) {
+                        const bl = bollards[i];
+                        if (bl.state === 2 || (bl.hitCooldown || 0) > 0) continue;
+                        if (Math.abs(pCar.x - bl.x) <= 36 && Math.abs(pCar.y - bl.y) <= 36) {
+                            const dx = bl.x - pCar.x;
+                            const dy = bl.y - pCar.y;
+                            const dist = Math.hypot(dx, dy);
+                            if (dist < 20) {
+                                bl.hitCooldown = 0.55;
+                                bl.state = 2;
+                                bl.knockdownTimer = 0;
+                                actBollards.add(bl);
+                                const impAng = carSpd > 10 ? Math.atan2(pCar.vy, pCar.vx) : (pCar.angle || 0);
+                                bl.fallAngle = impAng;
+                                bl.fallenX = bl.x + Math.cos(impAng) * 14;
+                                bl.fallenY = bl.y + Math.sin(impAng) * 14;
+                                pCar.vx *= 0.88;
+                                pCar.vy *= 0.88;
+                                pCar.speed = Math.hypot(pCar.vx, pCar.vy);
+                                if (game.audio && typeof game.audio.playCarCrash === "function") game.audio.playCarCrash(0.55);
+                                if (typeof game.spawnParticle === "function") {
+                                    for (let k = 0; k < 7; k++) {
+                                        game.spawnParticle(bl.x + (Math.random() - 0.5) * 10, bl.y + (Math.random() - 0.5) * 10, k % 2 === 0 ? "SPARK" : "DEBRIS");
+                                    }
+                                }
+                                if (typeof game.addScore === "function") game.addScore(35);
                                 if (Array.isArray(game.floatingTexts)) {
-                                    game.floatingTexts.push({
-                                        x: ts.baseX,
-                                        y: ts.baseY,
-                                        z: 2.42,
-                                        text: "⚡ TRAFFIC LIGHT BENT! +$50",
-                                        color: "#fde047",
-                                        life: 1.2
-                                    });
+                                    game.floatingTexts.push({ x: bl.x, y: bl.y, z: 2.28, text: "💥 PARK BOLLARD SMASHED! +$35", color: "#fde047", life: 1.05 });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3B. 3D Junction Traffic Signal Gantries
+                if (!isMicroVeh && carSpd > 42) {
+                    const signals = cell.signals;
+                    for (let i = 0; i < signals.length; i++) {
+                        const ts = signals[i];
+                        if (ts.state === 2 || (ts.hitCooldown || 0) > 0) continue;
+                        if (Math.abs(pCar.x - ts.baseX) < 30 && Math.abs(pCar.y - ts.baseY) < 30) {
+                            const dx = ts.baseX - pCar.x;
+                            const dy = ts.baseY - pCar.y;
+                            const dist = Math.hypot(dx, dy) || 1.0;
+                            if (dist < 23) {
+                                const impAng = Math.atan2(
+                                    pCar.vy || Math.sin(pCar.angle),
+                                    pCar.vx || Math.cos(pCar.angle)
+                                );
+                                if (isHeavyVeh) {
+                                    ts.state = 2;
+                                    ts.timer = 0;
+                                    ts.hitCooldown = 0.8;
+                                    actSignals.add(ts);
+                                    ts.fallAngle = impAng;
+                                    ts.fallenX = ts.baseX + Math.cos(impAng) * 16;
+                                    ts.fallenY = ts.baseY + Math.sin(impAng) * 16;
+                                    const launchSpd = Math.min(255, Math.max(95, carSpd * 1.12));
+                                    ts.fallVx = Math.cos(impAng) * launchSpd;
+                                    ts.fallVy = Math.sin(impAng) * launchSpd;
+                                    ts.fallVang = (Math.random() - 0.5) * 8.0;
+                                    pCar.vx *= 0.90;
+                                    pCar.vy *= 0.90;
+                                    pCar.crashCooldown = 0.45;
+                                    if (game.audio && typeof game.audio.playCarCrash === "function") game.audio.playCarCrash(1.15);
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 12; k++) {
+                                            game.spawnParticle(ts.baseX + (Math.random() - 0.5) * 16, ts.baseY + (Math.random() - 0.5) * 16, "SPARK");
+                                        }
+                                    }
+                                    if (typeof game.addScore === "function") game.addScore(125);
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: ts.baseX, y: ts.baseY, z: 2.45, text: "💥 TRAFFIC LIGHT SMASHED! +$125", color: "#ef4444", life: 1.3 });
+                                    }
+                                } else {
+                                    const wasDamaged = (ts.state === 1);
+                                    ts.state = 1;
+                                    ts.hitCooldown = 0.75;
+                                    actSignals.add(ts);
+                                    ts.tiltDx = Math.cos(impAng) * 7.5;
+                                    ts.tiltDy = Math.sin(impAng) * 7.5;
+                                    pCar.x = ts.baseX - (dx / dist) * 24;
+                                    pCar.y = ts.baseY - (dy / dist) * 24;
+                                    pCar.vx *= -0.30;
+                                    pCar.vy *= -0.30;
+                                    pCar.speed = Math.hypot(pCar.vx, pCar.vy);
+                                    if (typeof pCar.receiveImpactDamage === "function") pCar.receiveImpactDamage(12, ts.baseX, ts.baseY);
+                                    pCar.crashCooldown = 0.45;
+                                    if (game.audio && typeof game.audio.playCarCrash === "function") game.audio.playCarCrash(0.85);
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 6; k++) {
+                                            game.spawnParticle(ts.baseX + (Math.random() - 0.5) * 10, ts.baseY + (Math.random() - 0.5) * 10, "SPARK");
+                                        }
+                                    }
+                                    if (!wasDamaged) {
+                                        if (typeof game.addScore === "function") game.addScore(50);
+                                        if (Array.isArray(game.floatingTexts)) {
+                                            game.floatingTexts.push({ x: ts.baseX, y: ts.baseY, z: 2.42, text: "⚡ TRAFFIC LIGHT BENT! +$50", color: "#fde047", life: 1.2 });
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -12346,10 +12121,15 @@ class WorldObjectEngine {
         // Pass 1: Frustum-Culled 32x32-Tile Static 3D Chunks (Estates, Bridges, Parapets, Mega-Billboards & Landmarks)
         const camX = renderer.camX || 0;
         const camY = renderer.camY || 0;
-        const minTileX = (camX - 1180) / TILE_SIZE;
-        const maxTileX = (camX + 1180) / TILE_SIZE;
-        const minTileZ = (camY - 920) / TILE_SIZE;
-        const maxTileZ = (camY + 920) / TILE_SIZE;
+        const glW = (renderer.glCanvas && renderer.glCanvas.width) || 800;
+        const glH = (renderer.glCanvas && renderer.glCanvas.height) || 600;
+        const aspect = glW / Math.max(1, glH);
+        const spanX = renderer.isMobileInit ? Math.max(580, Math.min(1080, 760 * aspect + 220)) : 1180;
+        const spanY = renderer.isMobileInit ? 760 : 920;
+        const minTileX = (camX - spanX) / TILE_SIZE;
+        const maxTileX = (camX + spanX) / TILE_SIZE;
+        const minTileZ = (camY - spanY) / TILE_SIZE;
+        const maxTileZ = (camY + spanY) / TILE_SIZE;
 
         for (let i = 0; i < this.staticChunks.length; i++) {
             const ch = this.staticChunks[i];
@@ -12374,10 +12154,14 @@ class WorldObjectEngine {
     renderDynamic3DMeshes(gl, renderer, stride) {
         const camX = renderer.camX || 0;
         const camY = renderer.camY || 0;
-        const minX = camX - 920;
-        const maxX = camX + 920;
-        const minY = camY - 720;
-        const maxY = camY + 720;
+        const glW = (renderer.glCanvas && renderer.glCanvas.width) || 800;
+        const glH = (renderer.glCanvas && renderer.glCanvas.height) || 600;
+        const dynSpanX = renderer.isMobileInit ? Math.max(520, Math.min(860, 620 * (glW / Math.max(1, glH)) + 210)) : 920;
+        const dynSpanY = renderer.isMobileInit ? 640 : 720;
+        const minX = camX - dynSpanX;
+        const maxX = camX + dynSpanX;
+        const minY = camY - dynSpanY;
+        const maxY = camY + dynSpanY;
         const t = renderer.time || 0;
 
         if (!this.dynFloatBuf) {
@@ -13500,9 +13284,17 @@ class WorldObjectEngine {
         if (dLen === 0) return;
         if (!this.dynVbo) {
             this.dynVbo = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.dynVbo);
+            gl.bufferData(gl.ARRAY_BUFFER, this.dynFloatBuf.byteLength, gl.STREAM_DRAW);
+            this._dynVboCap = this.dynFloatBuf.byteLength;
+        } else {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.dynVbo);
+            if (this._dynVboCap !== this.dynFloatBuf.byteLength) {
+                gl.bufferData(gl.ARRAY_BUFFER, this.dynFloatBuf.byteLength, gl.STREAM_DRAW);
+                this._dynVboCap = this.dynFloatBuf.byteLength;
+            }
         }
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.dynVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, this.dynFloatBuf.subarray(0, dLen), gl.STREAM_DRAW);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.dynFloatBuf.subarray(0, dLen));
         gl.vertexAttribPointer(this.meshLocs.aPos, 3, gl.FLOAT, false, stride, 0);
         gl.vertexAttribPointer(this.meshLocs.aUV, 2, gl.FLOAT, false, stride, 12);
         gl.vertexAttribPointer(this.meshLocs.aColor, 4, gl.FLOAT, false, stride, 20);
@@ -13671,9 +13463,10 @@ class WorldObjectEngine {
         }
 
         // Render Armored Truck Gold Halos & Cash Drop Rings
-        if (game && Array.isArray(game.vehicles)) {
-            for (const v of game.vehicles) {
-                if (!v.isArmoredCashTruck || (v.cashBagsLeft || 0) <= 0) continue;
+        const cashTruckList = (game && game._armoredCashTrucks) ? game._armoredCashTrucks : (game && game.vehicles);
+        if (Array.isArray(cashTruckList)) {
+            for (const v of cashTruckList) {
+                if (!v || !v.isArmoredCashTruck || (v.cashBagsLeft || 0) <= 0) continue;
                 if (v.x < minX - 140 || v.x > maxX + 140 || v.y < minY - 140 || v.y > maxY + 140) continue;
                 const rSz = 44 + Math.sin(renderer.time * 5.0) * 4.5;
                 renderer.pushSolidQuad3D(v.x, v.y, (v.z || 2.0) + 0.024, rSz, 28, v.angle || 0, 0.98, 0.82, 0.16, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
@@ -14564,6 +14357,79 @@ class WorldObjectEngine {
     /* ========================================================================
        6B. RENDER 2D VILLA HEIST INTERACTION PROMPTS & ACTIVE GETAWAY BANNER
        ======================================================================== */
+    _ensurePromptCellMask() {
+        if (this._promptCellMask) return this._promptCellMask;
+        if (!this.map || !Array.isArray(this.heistTargets)) return null;
+        const mask = new Uint8Array(128 * 128);
+        const markPt = (px, py, pad = 215) => {
+            if (typeof px !== "number" || typeof py !== "number") return;
+            const x0 = Math.max(0, (px - pad) >> 8);
+            const x1 = Math.min(127, (px + pad) >> 8);
+            const y0 = Math.max(0, (py - pad) >> 8);
+            const y1 = Math.min(127, (py + pad) >> 8);
+            for (let cy = y0; cy <= y1; cy++) {
+                const rowOff = cy << 7;
+                for (let cx = x0; cx <= x1; cx++) {
+                    mask[rowOff | cx] = 1;
+                }
+            }
+        };
+        const skipKeys = new Set(["instances", "interactiveProps", "streetProps", "cashDrops", "_cooldownArrayRefs"]);
+        for (const k of Object.keys(this)) {
+            if (skipKeys.has(k)) continue;
+            const val = this[k];
+            if (Array.isArray(val) && val.length > 0 && val[0] && typeof val[0].x === "number" && typeof val[0].y === "number") {
+                for (let i = 0; i < val.length; i++) {
+                    markPt(val[i].x, val[i].y, 215);
+                }
+            }
+        }
+        const m = this.map;
+        for (const arr of [m.muscleBeachGyms, m.beachVolleyballCourts, m.yachtParties, m.tikiBars, m.streetTakeovers]) {
+            if (!Array.isArray(arr)) continue;
+            for (let i = 0; i < arr.length; i++) markPt(arr[i].x, arr[i].y, 215);
+        }
+        if (m.industrialAndParkDetails && m.industrialAndParkDetails.miniGolf) {
+            markPt(m.industrialAndParkDetails.miniGolf.x, m.industrialAndParkDetails.miniGolf.y, 215);
+        }
+        if (this.tishaWockaMarket) markPt(this.tishaWockaMarket.x, this.tishaWockaMarket.y, 215);
+        if (this.mambasStadium) {
+            markPt(this.mambasStadium.x, this.mambasStadium.y, 220);
+            markPt(this.mambasStadium.x, this.mambasStadium.y - 308, 200);
+            markPt(this.mambasStadium.x, this.mambasStadium.y + 308, 200);
+        }
+        if (this.landmarks3D) {
+            const lm = this.landmarks3D;
+            if (lm.launchpad) {
+                markPt(lm.launchpad.x, lm.launchpad.y, 215);
+                markPt(lm.launchpad.consoleX, lm.launchpad.consoleY, 200);
+            }
+            if (lm.thrillbillyArena) {
+                markPt(lm.thrillbillyArena.x, lm.thrillbillyArena.y, 215);
+                markPt(lm.thrillbillyArena.x, lm.thrillbillyArena.y - 126, 200);
+            }
+            if (lm.gellhornSpeedway) {
+                markPt(lm.gellhornSpeedway.x, lm.gellhornSpeedway.y, 215);
+                markPt(lm.gellhornSpeedway.pitX, lm.gellhornSpeedway.pitY, 200);
+                if (lm.gellhornSpeedway.westGateX) markPt(lm.gellhornSpeedway.westGateX, lm.gellhornSpeedway.westGateY, 200);
+            }
+            for (const obj of [lm.briansBoatyard, lm.jackOfHearts, lm.calHamptonOutpost, lm.rustyAnchorBar]) {
+                if (obj) markPt(obj.x, obj.y, 200);
+            }
+        }
+        for (let i = 0; i < this.heistTargets.length; i++) {
+            const ht = this.heistTargets[i];
+            markPt(ht.keypadX, ht.keypadY, 160);
+            markPt(ht.vaultX, ht.vaultY, 160);
+            if (ht.inst && ht.inst.dockBoat) {
+                markPt(ht.inst.dockBoat.worldX, ht.inst.dockBoat.worldY, 160);
+                markPt(ht.inst.dockBoat.pierMidX, ht.inst.dockBoat.pierMidY, 160);
+            }
+        }
+        this._promptCellMask = mask;
+        return mask;
+    }
+
     renderHeistPrompts(ctx, renderer, game) {
         if (!ctx || !renderer || !game || !game.player || game.activeInterior) return;
 
@@ -14571,6 +14437,39 @@ class WorldObjectEngine {
         const pVeh = p ? (p.inVehicle || p.car || null) : null;
         const px = pVeh ? pVeh.x : p.x;
         const py = pVeh ? pVeh.y : p.y;
+
+        // Fast O(1) cell-mask early exit when no global HUD banner, moving cash truck, skunk ape, or static prompt is nearby!
+        const rlCheck = this.rocketLaunch;
+        const hasGlobalBanner = Boolean(
+            this.activeHeist ||
+            (this.cameraFlashTimer || 0) > 0 ||
+            (this.speedwayRace && this.speedwayRace.active) ||
+            (rlCheck && (rlCheck.state === "COUNTDOWN" || rlCheck.state === "LIFTOFF" || rlCheck.capsuleActive)) ||
+            (this.skunkApe && this.skunkApe.active && Math.abs(px - this.skunkApe.x) < 150 && Math.abs(py - this.skunkApe.y) < 150)
+        );
+        const cashTrucks = game._armoredCashTrucks;
+        let nearCashTruck = false;
+        if (Array.isArray(cashTrucks)) {
+            for (let ti = 0; ti < cashTrucks.length; ti++) {
+                const tv = cashTrucks[ti];
+                if (tv && (tv.cashBagsLeft || 0) > 0 && Math.abs(px - tv.x) < 150 && Math.abs(py - tv.y) < 150) {
+                    nearCashTruck = true;
+                    break;
+                }
+            }
+        } else {
+            nearCashTruck = true;
+        }
+        if (!hasGlobalBanner && !nearCashTruck) {
+            const mask = this._ensurePromptCellMask();
+            if (mask) {
+                const gcx = px >> 8;
+                const gcy = py >> 8;
+                if (gcx < 0 || gcx > 127 || gcy < 0 || gcy > 127 || !mask[(gcy << 7) | gcx]) {
+                    return;
+                }
+            }
+        }
 
         ctx.save();
         ctx.textAlign = "center";
@@ -14647,9 +14546,10 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(game.vehicles)) {
-            for (const v of game.vehicles) {
-                if (v.isArmoredCashTruck && (v.cashBagsLeft || 0) > 0 && Math.hypot(px - v.x, py - v.y) < 145) {
+        const promptCashTrucks = game._armoredCashTrucks || game.vehicles;
+        if (Array.isArray(promptCashTrucks)) {
+            for (const v of promptCashTrucks) {
+                if (v && v.isArmoredCashTruck && (v.cashBagsLeft || 0) > 0 && Math.hypot(px - v.x, py - v.y) < 145) {
                     const scr = renderer.worldToScreen(v.x, v.y - 18, (v.z || 2.0) + 0.38);
                     const cashRem = v.cashBagsLeft * 2500;
                     ctx.font = "900 11px monospace";

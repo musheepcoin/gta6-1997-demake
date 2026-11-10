@@ -66,8 +66,12 @@ class RetroRenderer {
         this.charPortraitsReady = false;
         this.minimapZoomMode = 0; // 0 = Cruise (68 blocks), 1 = Wide (136 blocks), 2 = Full Island (256 blocks)
 
-        // Offscreen WebGL 3D Canvas for true perspective CityMesh + 3D SpriteBatch rendering
+        // Hardware-composited WebGL 3D Canvas mounted directly behind #game-canvas (eliminates full-screen GPU->2D copy on mobile daytime!)
         this.glCanvas = document.createElement("canvas");
+        this.glCanvas.id = "webgl-canvas";
+        if (this.canvas && this.canvas.parentNode) {
+            this.canvas.parentNode.insertBefore(this.glCanvas, this.canvas);
+        }
         this.gl = null;
         this.cityChunks = [];
         this.initWebGL();
@@ -194,6 +198,7 @@ class RetroRenderer {
             uniform float uWinLit; // fraction (0..1) of building windows that are lit right now (evolves through the night)
             uniform float uTime;
             uniform vec2 uSunDir;
+            uniform float uMobileFast;
 
             vec4 sampleOceanWater(float dayAmt) {
                 float idx = 698.0 + 25.0 + uWaterStep;
@@ -202,14 +207,23 @@ class RetroRenderer {
                 vec2 localUV = clamp(fract(vWorldPos.xz), vec2(0.5 / 64.0), vec2(63.5 / 64.0));
                 vec2 wUV = (vec2(col, row) + localUV) / vec2(16.0, 51.0);
                 vec3 texW = texture2D(uTex, wUV).rgb;
+                float beachDist = abs(vWorldPos.x - 483.5);
+                float shallowFactor = clamp(1.0 - beachDist / 18.0, 0.0, 1.0);
+                if (uMobileFast > 0.5) {
+                    float fastWave = sin(vWorldPos.x * 2.6 + vWorldPos.z * 1.4 + uTime * 2.0);
+                    vec3 deepFast = mix(vec3(0.09, 0.54, 0.68), vec3(0.20, 0.74, 0.84), clamp(0.5 + fastWave * 0.35, 0.0, 1.0));
+                    vec3 lagunaFast = mix(deepFast, vec3(0.16, 0.90, 0.86), shallowFactor * 0.68);
+                    vec3 rgbFast = mix(texW, lagunaFast, 0.76);
+                    float foamFast = max(0.0, fastWave - 0.65) * 2.2 * shallowFactor * (1.0 - uNightTint * 0.60);
+                    rgbFast = mix(rgbFast, vec3(0.92, 0.98, 1.0), clamp(foamFast, 0.0, 0.65));
+                    return vec4(rgbFast, 0.78);
+                }
                 float swell = sin(vWorldPos.x * 1.35 + vWorldPos.z * 0.95 + uTime * 1.4) * 0.5
                             + cos(vWorldPos.x * 2.70 - vWorldPos.z * 2.15 - uTime * 1.9) * 0.5;
                 float w1 = sin(vWorldPos.x * 5.4 + uTime * 2.3 + swell * 0.8) * cos(vWorldPos.z * 5.4 - uTime * 1.8);
                 float w2 = sin((vWorldPos.x + vWorldPos.z) * 3.9 - uTime * 2.7);
                 float caust = max(0.0, w1 * 0.65 + w2 * 0.35);
                 // Miami / Bahamas Shallow Turquoise Lagoon Gradation & Breaking Surf Rollers along Vice Beach
-                float beachDist = abs(vWorldPos.x - 483.5);
-                float shallowFactor = clamp(1.0 - beachDist / 18.0, 0.0, 1.0);
                 vec3 deepBase = mix(vec3(0.09, 0.54, 0.68), vec3(0.20, 0.74, 0.84), clamp(0.5 + swell * 0.38, 0.0, 1.0));
                 vec3 reefTurquoise = vec3(0.16, 0.90, 0.86);
                 vec3 lagunaBase = mix(deepBase, reefTurquoise, shallowFactor * 0.68);
@@ -249,18 +263,58 @@ class RetroRenderer {
             }
             vec3 asphaltSurface(vec3 src, float darkFamily) {
                 vec2 p = vWorldPos.xz;
+                vec2 lp = fract(p);
                 float mx = max(src.r, max(src.g, src.b));
                 float mn = min(src.r, min(src.g, src.b));
                 // Lane paint / curb stones are much brighter than tar: crisp mask from the blurry 64px texel
                 float paint = smoothstep(0.40, 0.50, mx);
                 bool yellow = (src.r - src.b) > 0.16;
+                vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
+
+                if (uMobileFast > 0.5) {
+                    float grainFast = aHash(floor(p * 32.0));
+                    vec3 colFast = base * (0.95 + grainFast * 0.09);
+                    vec3 paintFast = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.94));
+                    if (!yellow && (mx - mn) > 0.06) paintFast = src * (clamp(mx * 1.08, 0.0, 0.94) / max(mx, 0.01));
+                    float cwPaintFast = 0.0;
+                    if (vAnim > 5.45 && vAnim < 9.45) {
+                        float idx = floor((vAnim - 5.5) * 8.0 + 0.5);
+                        float curbMax = mod(floor(idx / 2.0), 2.0);
+                        float curbMin = mod(floor(idx / 4.0), 2.0);
+                        float cwDir   = floor(idx / 8.0);
+                        float along  = (cwDir < 0.5) ? lp.y : (cwDir < 1.5) ? (1.0 - lp.y) : (cwDir < 2.5) ? lp.x : (1.0 - lp.x);
+                        float across = (cwDir < 1.5) ? lp.x : lp.y;
+                        float acMin  = (curbMin > 0.5) ? 0.135 : 0.035;
+                        float acMax  = (curbMax > 0.5) ? 0.865 : 0.965;
+                        bool inCurbSide = (curbMin > 0.5 && across < 0.125) || (curbMax > 0.5 && across > 0.875);
+                        if (along < 0.52 && !yellow && !inCurbSide) paint = 0.0;
+                        if (!yellow && across > acMin && across < acMax) {
+                            float cwAlong = smoothstep(0.035, 0.050, along) * (1.0 - smoothstep(0.285, 0.300, along));
+                            float barPhase = fract(across * 4.0 + 0.12);
+                            float cwBar = smoothstep(0.22, 0.26, barPhase) * (1.0 - smoothstep(0.74, 0.78, barPhase));
+                            float edgePad = smoothstep(acMin, acMin + 0.025, across) * (1.0 - smoothstep(acMax - 0.025, acMax, across));
+                            float stopAlong = smoothstep(0.375, 0.388, along) * (1.0 - smoothstep(0.428, 0.440, along));
+                            float stopAcross = smoothstep(acMin + 0.02, acMin + 0.04, across) * (1.0 - smoothstep(acMax - 0.04, acMax - 0.02, across));
+                            cwPaintFast = max(cwAlong * cwBar * edgePad, stopAlong * stopAcross) * 0.82;
+                        }
+                    }
+                    vec3 outFast = mix(colFast, paintFast, paint);
+                    outFast = mix(outFast, vec3(0.75, 0.76, 0.74), cwPaintFast);
+                    if (vAnim > 9.5) {
+                        float bits = floor(vAnim - 10.0 + 0.5);
+                        if (mod(bits, 2.0) > 0.5)              outFast = junctionCurb(outFast, lp.y);
+                        if (mod(floor(bits / 2.0), 2.0) > 0.5) outFast = junctionCurb(outFast, 1.0 - lp.y);
+                        if (mod(floor(bits / 4.0), 2.0) > 0.5) outFast = junctionCurb(outFast, lp.x);
+                        if (mod(floor(bits / 8.0), 2.0) > 0.5) outFast = junctionCurb(outFast, 1.0 - lp.x);
+                    }
+                    return outFast;
+                }
 
                 // Large faded patches, medium mottling, fine aggregate grain (all continuous across tiles)
                 float big = aNoise(p * 0.45) * 0.6 + aNoise(p * 1.3 + 7.0) * 0.4;
                 float mid = aNoise(p * 4.0 + 13.0);
                 float grain = aHash(floor(p * 40.0));
                 float fine = aHash(floor(p * 96.0) + 19.0);
-                vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
                 vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
                 col *= 0.94 + grain * 0.05 + fine * 0.08;
                 col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);           // light aggregate stones
@@ -275,7 +329,6 @@ class RetroRenderer {
                 paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
 
                 // Subtle dual tire-rut wear along all traffic lanes
-                vec2 lp = fract(p);
                 float laneRutX = exp(-pow((lp.x - 0.32) * 5.5, 2.0)) + exp(-pow((lp.x - 0.68) * 5.5, 2.0));
                 float laneRutY = exp(-pow((lp.y - 0.32) * 5.5, 2.0)) + exp(-pow((lp.y - 0.68) * 5.5, 2.0));
                 col *= 1.0 - max(laneRutX, laneRutY) * 0.038 * (0.65 + mid * 0.35);
@@ -410,8 +463,8 @@ class RetroRenderer {
                         isSand = clamp((c.r - c.b - 0.14) * 6.5, 0.0, 1.0) * smoothstep(0.54, 0.76, c.r);
                         float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
                         if (isSand > 0.01) {
-                            c.rgb = mix(c.rgb, styleBeachSand(c.rgb), isSand);
-                        } else if (isGrass > 0.01) {
+                            if (uMobileFast < 0.5) c.rgb = mix(c.rgb, styleBeachSand(c.rgb), isSand);
+                        } else if (isGrass > 0.01 && uMobileFast < 0.5) {
                             float gWarp = sin(vWorldPos.z * 1.61 - vWorldPos.x * 0.97) * 0.75;
                             float g1 = sin(vWorldPos.x * 5.17 + vWorldPos.z * 3.43 + gWarp);
                             float g2 = cos(vWorldPos.x * 13.89 - vWorldPos.z * 9.23 + sin(vWorldPos.z * 2.71) * 0.6);
@@ -646,11 +699,15 @@ class RetroRenderer {
                                 float outerGutter = smoothstep(0.025, 0.075, edgeD);
                                 float paverJoint  = smoothstep(0.020, 0.052, subD);
                                 float paverBevel  = smoothstep(0.052, 0.085, subD) - smoothstep(0.085, 0.12, subD);
-                                float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.042;
-                                float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.024;
+                                float grainSum = 0.0;
+                                if (uMobileFast < 0.5) {
+                                    float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.042;
+                                    float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.024;
+                                    grainSum = fineGrain + medGrain;
+                                }
                                 // Directional solar rim highlight along sun-facing roof edges
                                 float sunEdgeRim = (1.0 - smoothstep(0.0, 0.14, rf.y)) * 0.045;
-                                c.rgb = (cleanRoof + fineGrain + medGrain + paverBevel * 0.025 + sunEdgeRim)
+                                c.rgb = (cleanRoof + grainSum + paverBevel * 0.025 + sunEdgeRim)
                                     * mix(0.84, 1.0, outerGutter)
                                     * mix(0.89, 1.0, paverJoint);
                             }
@@ -734,16 +791,18 @@ class RetroRenderer {
                     float pilaster = mix(0.91, 1.02, smoothstep(0.04, 0.12, min(wallHoriz, 1.0 - wallHoriz)));
                     float corniceLight = 1.0 + 0.08 * smoothstep(0.91, 0.97, storeyY) - 0.10 * (smoothstep(0.80, 0.86, storeyY) - smoothstep(0.86, 0.92, storeyY));
                     float baseAO = mix(0.82, 1.0, smoothstep(0.0, 0.30, storeyY)) * mix(0.80, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
-                    float stuccoGrain = (fract(sin(dot(floor(vec2(wallHoriz, storeyY) * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.032 * (1.0 - isGlass);
+                    if (uMobileFast < 0.5) {
+                        float stuccoGrain = (fract(sin(dot(floor(vec2(wallHoriz, storeyY) * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.032 * (1.0 - isGlass);
 
-                    // Daytime GTA 6 Parallax-Style Window Interior Depth (Venetian blinds/curtains) & Miami Sky Fresnel Glint
-                    vec3 roomId = floor(vWorldPos * vec3(2.0, 1.0, 2.0));
-                    float rSeed = fract(sin(dot(roomId, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-                    float blindLevel = 0.45 + 0.40 * rSeed;
-                    float inBlind = step(blindLevel, fract(storeyY * 2.0)) * step(0.35, rSeed);
-                    float slatWave = 0.88 + 0.12 * sin(storeyY * 96.0);
-                    vec3 blindCol = mix(vec3(0.76, 0.73, 0.67), vec3(0.54, 0.64, 0.72), step(0.68, rSeed)) * slatWave;
-                    c.rgb = mix(c.rgb + stuccoGrain, blindCol, isGlass * inBlind * 0.30 * dayAmt);
+                        // Daytime GTA 6 Parallax-Style Window Interior Depth (Venetian blinds/curtains) & Miami Sky Fresnel Glint
+                        vec3 roomId = floor(vWorldPos * vec3(2.0, 1.0, 2.0));
+                        float rSeed = fract(sin(dot(roomId, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+                        float blindLevel = 0.45 + 0.40 * rSeed;
+                        float inBlind = step(blindLevel, fract(storeyY * 2.0)) * step(0.35, rSeed);
+                        float slatWave = 0.88 + 0.12 * sin(storeyY * 96.0);
+                        vec3 blindCol = mix(vec3(0.76, 0.73, 0.67), vec3(0.54, 0.64, 0.72), step(0.68, rSeed)) * slatWave;
+                        c.rgb = mix(c.rgb + stuccoGrain, blindCol, isGlass * inBlind * 0.30 * dayAmt);
+                    }
 
                     vec3 skyGlint = vec3(0.11, 0.17, 0.24) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.32, 0.0, 1.0) * (0.35 + 0.65 * wallSunFactor);
                     vec3 sunGlassSpec = vec3(0.24, 0.20, 0.12) * isGlass * dayAmt * pow(wallSunFactor, 3.0);
@@ -843,6 +902,7 @@ class RetroRenderer {
             uniform float uNightTint;
             uniform float uSunsetTint;
             uniform vec2 uSunDir;
+            uniform float uMobileFast;
 
             float sHash(vec2 p) {
                 p = mod(p, 512.0);
@@ -918,19 +978,25 @@ class RetroRenderer {
                         if (dCurbPx < 0.0) discard;
 
                         vec2 p = vWorldPos.xz;
-                        float big   = sNoise(p * 0.45) * 0.6 + sNoise(p * 1.3 + 7.0) * 0.4;
-                        float mid   = sNoise(p * 4.0 + 13.0);
-                        float grain = sHash(floor(p * 40.0));
-                        float fine  = sHash(floor(p * 96.0) + 19.0);
                         float darkFamily = step(1.25, modeFlag);
                         vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
-                        vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
-                        col *= 0.94 + grain * 0.05 + fine * 0.08;
-                        col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);
-                        float tar = smoothstep(0.66, 0.80, sNoise(p * 0.7 + 31.0));
-                        col *= 1.0 - tar * 0.13;
-                        float seam = 1.0 - smoothstep(0.0, 0.022, abs(sNoise(p * 1.1 + 57.0) - 0.5));
-                        col *= 1.0 - seam * 0.12 * step(0.68, sNoise(p * 0.3 + 3.0));
+                        vec3 col;
+                        if (uMobileFast > 0.5) {
+                            float grainFast = sHash(floor(p * 32.0));
+                            col = base * (0.95 + grainFast * 0.09);
+                        } else {
+                            float big   = sNoise(p * 0.45) * 0.6 + sNoise(p * 1.3 + 7.0) * 0.4;
+                            float mid   = sNoise(p * 4.0 + 13.0);
+                            float grain = sHash(floor(p * 40.0));
+                            float fine  = sHash(floor(p * 96.0) + 19.0);
+                            col = base * (0.88 + big * 0.18 + mid * 0.07);
+                            col *= 0.94 + grain * 0.05 + fine * 0.08;
+                            col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);
+                            float tar = smoothstep(0.66, 0.80, sNoise(p * 0.7 + 31.0));
+                            col *= 1.0 - tar * 0.13;
+                            float seam = 1.0 - smoothstep(0.0, 0.022, abs(sNoise(p * 1.1 + 57.0) - 0.5));
+                            col *= 1.0 - seam * 0.12 * step(0.68, sNoise(p * 0.3 + 3.0));
+                        }
 
                         // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter + Continuous Worn Yellow Curb Line (matching cityFS)
                         if (dCurbPx < 2.0) {
@@ -941,9 +1007,13 @@ class RetroRenderer {
                             float gMix = (dCurbPx - 3.0) / 1.2;
                             col = mix(vec3(0.18, 0.21, 0.24), col, gMix);
                         } else if (modeFlag > 0.5 && dCurbPx >= 5.0 && dCurbPx < 7.0) {
-                            float yWear = clamp(0.68 + sNoise(p * 7.5 + 43.0) * 0.32 - step(0.72, sHash(floor(p * 36.0))) * 0.28, 0.22, 0.88);
-                            vec3 yPaint = vec3(0.95, 0.77, 0.20) * (0.90 + sNoise(p * 9.0 + 71.0) * 0.12);
-                            col = mix(col, yPaint, yWear);
+                            if (uMobileFast > 0.5) {
+                                col = vec3(0.88, 0.73, 0.25);
+                            } else {
+                                float yWear = clamp(0.68 + sNoise(p * 7.5 + 43.0) * 0.32 - step(0.72, sHash(floor(p * 36.0))) * 0.28, 0.22, 0.88);
+                                vec3 yPaint = vec3(0.95, 0.77, 0.20) * (0.90 + sNoise(p * 9.0 + 71.0) * 0.12);
+                                col = mix(col, yPaint, yWear);
+                            }
                         }
 
                         col = applyRoadLighting(col);
@@ -987,7 +1057,8 @@ class RetroRenderer {
             uSunsetTint: gl.getUniformLocation(this.cityProg, "uSunsetTint"),
             uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle"),
             uTime: gl.getUniformLocation(this.cityProg, "uTime"),
-            uSunDir: gl.getUniformLocation(this.cityProg, "uSunDir")
+            uSunDir: gl.getUniformLocation(this.cityProg, "uSunDir"),
+            uMobileFast: gl.getUniformLocation(this.cityProg, "uMobileFast")
         };
 
         // Default 1x1 neutral daylight AO/shadow texture (replaced by 512x512 ray-marched lightmap in buildCityMesh)
@@ -1009,13 +1080,18 @@ class RetroRenderer {
             uDayLightTex: gl.getUniformLocation(this.spriteProg, "uDayLightTex"),
             uNightTint: gl.getUniformLocation(this.spriteProg, "uNightTint"),
             uSunsetTint: gl.getUniformLocation(this.spriteProg, "uSunsetTint"),
-            uSunDir: gl.getUniformLocation(this.spriteProg, "uSunDir")
+            uSunDir: gl.getUniformLocation(this.spriteProg, "uSunDir"),
+            uMobileFast: gl.getUniformLocation(this.spriteProg, "uMobileFast")
         };
 
         // Dynamic vertex buffer for 3D SpriteBatch (9 floats per vertex: x, y_elev, z_south, u, v, r, g, b, a)
         this.spriteBuffer = gl.createBuffer();
         this.maxSprites = 12288;
-        this.spriteVerts = new Float32Array(this.maxSprites * 6 * 9);
+        if (!this.spriteVerts) {
+            this.spriteVerts = new Float32Array(this.maxSprites * 6 * 9);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.spriteBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.spriteVerts.byteLength, gl.DYNAMIC_DRAW);
         this.spriteCount = 0;
     }
 
@@ -1143,7 +1219,7 @@ class RetroRenderer {
             const cvs = document.createElement("canvas");
             cvs.width = W;
             cvs.height = H;
-            const ctx = cvs.getContext("2d");
+            const ctx = cvs.getContext("2d", { willReadFrequently: true });
             ctx.drawImage(img, 0, 0);
             const imgData = ctx.getImageData(0, 0, W, H);
             const d = imgData.data;
@@ -4493,7 +4569,7 @@ class RetroRenderer {
             const cvs = document.createElement("canvas");
             cvs.width = w;
             cvs.height = h;
-            const ctx = cvs.getContext("2d");
+            const ctx = cvs.getContext("2d", { willReadFrequently: true });
             ctx.drawImage(img, 0, 0);
 
             // 1. Make animated ocean water & seabed tiles (lid 41 at 431/585, lid 98 at 488, & aux 25..35 at 723..733) 100% seamlessly tileable across 64x64 borders
@@ -5104,8 +5180,8 @@ class RetroRenderer {
         let h = Math.max(1, Math.min(1600, window.innerHeight || 600));
         if (this.isMobileInit) {
             const maxDim = Math.max(w, h);
-            if (maxDim > 960) {
-                const scale = 960 / maxDim;
+            if (maxDim > 780) {
+                const scale = 780 / maxDim;
                 w = Math.max(320, Math.round(w * scale));
                 h = Math.max(240, Math.round(h * scale));
             }
@@ -5162,10 +5238,34 @@ class RetroRenderer {
         const waterV0 = waterRow / 51.0 + padV;
         const waterV1 = (waterRow + 1.0) / 51.0 - padV;
 
+        // Precompute per-cell water floor elevation once across 512x512 (eliminates 7M redundant getBlockIndex/getBlockInfo calls!)
+        const rawWaterFloor = new Float32Array(MAP_COLS * MAP_ROWS);
+        rawWaterFloor.fill(-999.0);
+        for (let wy = 0; wy < MAP_ROWS; wy++) {
+            const rowOff = wy * MAP_COLS;
+            for (let wx = 0; wx < MAP_COLS; wx++) {
+                for (let wz = 0; wz < 3; wz++) {
+                    const wBlkIdx = this.map.getBlockIndex(wx, wy, wz);
+                    if (wBlkIdx === 0) continue;
+                    const wb = this.map.getBlockInfo(wBlkIdx);
+                    if (wb && (wb.faces[4] === 41 || (wb.faces[4] >= 99 && wb.faces[4] <= 101))) {
+                        rawWaterFloor[rowOff + wx] = wz + 1.0 - RIVERBED_DEPTH;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!this._cityOpaqueBuf) this._cityOpaqueBuf = new Float32Array(131072);
+        if (!this._cityFlatBuf) this._cityFlatBuf = new Float32Array(65536);
+        if (!this._p24Scratch) this._p24Scratch = new Float32Array(24);
+        this._cityOpaqueLen = 0;
+        this._cityFlatLen = 0;
+
         for (let cy = 0; cy < NUM_CHUNKS; cy++) {
             for (let cx = 0; cx < NUM_CHUNKS; cx++) {
-                const opaqueVerts = [];
-                const flatVerts = [];
+                this._cityOpaqueLen = 0;
+                this._cityFlatLen = 0;
 
                 const x0 = cx * CHUNK_SIZE;
                 const y0 = cy * CHUNK_SIZE;
@@ -5173,41 +5273,42 @@ class RetroRenderer {
                 // 1. AddRiverbed (world_mesh.cpp lines 1016-1054):
                 // Emit a 3D sunken sandy seabed quad (y_elev - 0.42) under every water/shoreline cell and its 1-cell shore neighbors (kRiverbedPad = 1)
                 for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
+                    const nyMin = y > 0 ? y - 1 : 0;
+                    const nyMax = y + 1 < MAP_ROWS ? y + 1 : MAP_ROWS - 1;
                     for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
-                        let waterFloor = null;
-                        for (let dy = -1; dy <= 1 && waterFloor === null; dy++) {
-                            const ny = y + dy;
-                            if (ny < 0 || ny >= MAP_ROWS) continue;
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const nx = x + dx;
-                                if (nx < 0 || nx >= MAP_COLS) continue;
-                                for (let wz = 0; wz < 3; wz++) {
-                                    const wBlkIdx = this.map.getBlockIndex(nx, ny, wz);
-                                    if (wBlkIdx === 0) continue;
-                                    const wb = this.map.getBlockInfo(wBlkIdx);
-                                    if (wb && (wb.faces[4] === 41 || (wb.faces[4] >= 99 && wb.faces[4] <= 101))) {
-                                        waterFloor = wz + 1.0 - RIVERBED_DEPTH;
-                                        break;
-                                    }
+                        const nxMin = x > 0 ? x - 1 : 0;
+                        const nxMax = x + 1 < MAP_COLS ? x + 1 : MAP_COLS - 1;
+                        let waterFloor = -999.0;
+                        for (let ny = nyMin; ny <= nyMax && waterFloor < -900.0; ny++) {
+                            const rOff = ny * MAP_COLS;
+                            for (let nx = nxMin; nx <= nxMax; nx++) {
+                                const wf = rawWaterFloor[rOff + nx];
+                                if (wf > -900.0) {
+                                    waterFloor = wf;
+                                    break;
                                 }
-                                if (waterFloor !== null) break;
                             }
                         }
-                        if (waterFloor !== null) {
-                            // Two triangles forming the sunken 3D seabed quad at (x..x+1, waterFloor, y..y+1) with animType = 3.0
-                            opaqueVerts.push(
-                                x,     waterFloor, y,     bedU0, bedV0, 3.0,
-                                x,     waterFloor, y + 1, bedU0, bedV1, 3.0,
-                                x + 1, waterFloor, y,     bedU1, bedV0, 3.0,
-                                x + 1, waterFloor, y,     bedU1, bedV0, 3.0,
-                                x,     waterFloor, y + 1, bedU0, bedV1, 3.0,
-                                x + 1, waterFloor, y + 1, bedU1, bedV1, 3.0
-                            );
+                        if (waterFloor > -900.0) {
+                            if (this._cityOpaqueLen + 36 > this._cityOpaqueBuf.length) {
+                                const grown = new Float32Array(this._cityOpaqueBuf.length * 2);
+                                grown.set(this._cityOpaqueBuf);
+                                this._cityOpaqueBuf = grown;
+                            }
+                            const ob = this._cityOpaqueBuf;
+                            let o = this._cityOpaqueLen;
+                            ob[o] = x;     ob[o + 1] = waterFloor; ob[o + 2] = y;     ob[o + 3] = bedU0; ob[o + 4] = bedV0; ob[o + 5] = 3.0;
+                            ob[o + 6] = x; ob[o + 7] = waterFloor; ob[o + 8] = y + 1; ob[o + 9] = bedU0; ob[o + 10] = bedV1; ob[o + 11] = 3.0;
+                            ob[o + 12] = x + 1; ob[o + 13] = waterFloor; ob[o + 14] = y; ob[o + 15] = bedU1; ob[o + 16] = bedV0; ob[o + 17] = 3.0;
+                            ob[o + 18] = x + 1; ob[o + 19] = waterFloor; ob[o + 20] = y; ob[o + 21] = bedU1; ob[o + 22] = bedV0; ob[o + 23] = 3.0;
+                            ob[o + 24] = x;     ob[o + 25] = waterFloor; ob[o + 26] = y + 1; ob[o + 27] = bedU0; ob[o + 28] = bedV1; ob[o + 29] = 3.0;
+                            ob[o + 30] = x + 1; ob[o + 31] = waterFloor; ob[o + 32] = y + 1; ob[o + 33] = bedU1; ob[o + 34] = bedV1; ob[o + 35] = 3.0;
+                            this._cityOpaqueLen = o + 36;
                         }
                     }
                 }
 
-                // 2. Emit 3D Voxel Block Faces (routing animated water lids face===4 && tile===41 and shoreline lids 99..101 to flatVerts!)
+                // 2. Emit 3D Voxel Block Faces (routing animated water lids face===4 && tile===41 and shoreline lids 99..101 to flatBuf!)
                 for (let z = 0; z < MAP_LAYERS; z++) {
                     for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
                         for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
@@ -5220,24 +5321,31 @@ class RetroRenderer {
                                 if (b.faces[face] !== 0) {
                                     const lid = b.faces[4];
                                     const isWaterOrShoreLid = (face === 4 && (lid === 41 || (lid >= 99 && lid <= 101)));
-                                    const targetArr = (b.isFlat || isWaterOrShoreLid) ? flatVerts : opaqueVerts;
-                                    this.putBlockFace(targetArr, x, z, y, face, b, 0.0);
+                                    const useFlat = (b.isFlat || isWaterOrShoreLid);
+                                    this.putBlockFace(useFlat ? 1 : 0, x, z, y, face, b, 0.0);
                                 }
                             }
                         }
                     }
                 }
 
-                const totalFloats = opaqueVerts.length + flatVerts.length;
+                const opaqueLen = this._cityOpaqueLen;
+                const flatLen = this._cityFlatLen;
+                const totalFloats = opaqueLen + flatLen;
                 if (totalFloats === 0) continue;
 
-                const combined = new Float32Array(totalFloats);
-                combined.set(opaqueVerts, 0);
-                combined.set(flatVerts, opaqueVerts.length);
+                if (totalFloats > this._cityOpaqueBuf.length) {
+                    const grown = new Float32Array(Math.max(totalFloats, this._cityOpaqueBuf.length * 2));
+                    grown.set(this._cityOpaqueBuf.subarray(0, opaqueLen), 0);
+                    this._cityOpaqueBuf = grown;
+                }
+                if (flatLen > 0) {
+                    this._cityOpaqueBuf.set(this._cityFlatBuf.subarray(0, flatLen), opaqueLen);
+                }
 
                 const vbo = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-                gl.bufferData(gl.ARRAY_BUFFER, combined, gl.STATIC_DRAW);
+                gl.bufferData(gl.ARRAY_BUFFER, this._cityOpaqueBuf.subarray(0, totalFloats), gl.STATIC_DRAW);
 
                 this.cityChunks.push({
                     cx,
@@ -5247,12 +5355,14 @@ class RetroRenderer {
                     minY: y0,
                     maxY: y0 + CHUNK_SIZE,
                     vbo,
-                    opaqueCount: opaqueVerts.length / 6,
-                    flatOffset: opaqueVerts.length / 6,
-                    flatCount: flatVerts.length / 6
+                    opaqueCount: opaqueLen / 6,
+                    flatOffset: opaqueLen / 6,
+                    flatCount: flatLen / 6
                 });
             }
         }
+        this._cityOpaqueBuf = null;
+        this._cityFlatBuf = null;
 
         if (!skipAux) {
             // 2B. Build True 3D Volumetric Architectural Prefab Mesh (WorldObjectEngine)
@@ -5414,6 +5524,95 @@ class RetroRenderer {
         return Math.min(1.0, Math.max(ao * 0.55, shW * 0.68 + shE * 0.32));
     }
 
+    _meshIsRoadLid(lid) {
+        return lid === 1 || lid === 2 || lid === 24 || lid === 25 || lid === 74 || lid === 75 || lid === 80 || lid === 81 || lid === 82;
+    }
+
+    _meshWLid(cx, cy, y_elev) {
+        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS) return 41;
+        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+        if (!bi) return 41;
+        const nb = this.map.getBlockInfo(bi);
+        if (!nb) return 41;
+        const lid = nb.lid;
+        if (lid === 0 || lid === 41 || lid === 77 || (lid >= 99 && lid <= 101)) return 41;
+        if (this._meshIsRoadLid(lid)) return 41;
+        if (nb.w > 0 || nb.e > 0 || nb.n > 0 || nb.s > 0) return 41;
+        return lid;
+    }
+
+    _meshIsJuncBox(cx, cy, y_elev) {
+        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+        if (!bi) return false;
+        const nb = this.map.getBlockInfo(bi);
+        return Boolean(nb && nb.lid === 25);
+    }
+
+    _meshNonRoad(cx, cy, y_elev) {
+        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+        if (!bi) return false;
+        const nb = this.map.getBlockInfo(bi);
+        return Boolean(nb && nb.lid && !this._meshIsRoadLid(nb.lid));
+    }
+
+    _meshNLid(cx, cy, y_elev) {
+        const bi = this.map.getBlockIndex(cx, cy, y_elev);
+        if (!bi) return 10;
+        const nb = this.map.getBlockInfo(bi);
+        if (!nb) return 10;
+        const lid = nb.lid;
+        if (lid === 8 || lid === 9 || lid === 69 || (lid >= 98 && lid <= 101)) return lid;
+        return 10;
+    }
+
+    _emitParapetStripScalar(verts, sideTile, tiles, padU, yCop,
+        x0, z0, u0f, v0f,
+        x1, z1, u1f, v1f,
+        x2, z2, u2f, v2f,
+        x3, z3, u3f, v3f) {
+        const sAtlasIdx = (tiles.side_start || 0) + (sideTile % tiles.side_count);
+        const sCol = sAtlasIdx % 16;
+        const sRow = Math.floor(sAtlasIdx / 16);
+        const su0 = sCol / 16.0 + padU;
+        const su1 = (sCol + 1.0) / 16.0 - padU;
+        const svOuter = (sRow + 0.6 / 64.0) / 51.0;
+        const svInner = (sRow + 7.2 / 64.0) / 51.0;
+
+        const qu0 = u0f ? su1 : su0, qv0 = v0f ? svInner : svOuter;
+        const qu1 = u1f ? su1 : su0, qv1 = v1f ? svInner : svOuter;
+        const qu2 = u2f ? su1 : su0, qv2 = v2f ? svInner : svOuter;
+        const qu3 = u3f ? su1 : su0, qv3 = v3f ? svInner : svOuter;
+
+        if (typeof verts === "number") {
+            let buf = verts === 1 ? this._cityFlatBuf : this._cityOpaqueBuf;
+            let len = verts === 1 ? this._cityFlatLen : this._cityOpaqueLen;
+            if (len + 36 > buf.length) {
+                const grown = new Float32Array(buf.length * 2);
+                grown.set(buf);
+                if (verts === 1) this._cityFlatBuf = grown;
+                else this._cityOpaqueBuf = grown;
+                buf = grown;
+            }
+            buf[len]      = x0; buf[len + 1]  = yCop; buf[len + 2]  = z0; buf[len + 3]  = qu0; buf[len + 4]  = qv0; buf[len + 5]  = 0.0;
+            buf[len + 6]  = x2; buf[len + 7]  = yCop; buf[len + 8]  = z2; buf[len + 9]  = qu2; buf[len + 10] = qv2; buf[len + 11] = 0.0;
+            buf[len + 12] = x1; buf[len + 13] = yCop; buf[len + 14] = z1; buf[len + 15] = qu1; buf[len + 16] = qv1; buf[len + 17] = 0.0;
+            buf[len + 18] = x1; buf[len + 19] = yCop; buf[len + 20] = z1; buf[len + 21] = qu1; buf[len + 22] = qv1; buf[len + 23] = 0.0;
+            buf[len + 24] = x2; buf[len + 25] = yCop; buf[len + 26] = z2; buf[len + 27] = qu2; buf[len + 28] = qv2; buf[len + 29] = 0.0;
+            buf[len + 30] = x3; buf[len + 31] = yCop; buf[len + 32] = z3; buf[len + 33] = qu3; buf[len + 34] = qv3; buf[len + 35] = 0.0;
+            if (verts === 1) this._cityFlatLen = len + 36;
+            else this._cityOpaqueLen = len + 36;
+        } else {
+            verts.push(
+                x0, yCop, z0, qu0, qv0, 0.0,
+                x2, yCop, z2, qu2, qv2, 0.0,
+                x1, yCop, z1, qu1, qv1, 0.0,
+                x1, yCop, z1, qu1, qv1, 0.0,
+                x2, yCop, z2, qu2, qv2, 0.0,
+                x3, yCop, z3, qu3, qv3, 0.0
+            );
+        }
+    }
+
     putBlockFace(verts, x, y_elev, z_south, face, b, extraYOffset = 0.0) {
         const tileIdx = b.faces[face];
         if (tileIdx === 0) return;
@@ -5425,15 +5624,15 @@ class RetroRenderer {
         if (st >= 53 && st <= 61) {
             const lo = 0.25, hi = 0.75;
             switch (st) {
-                case 53: x1 = lo; break;                       // West slab
-                case 54: x0 = hi; break;                       // East slab
-                case 55: z1 = lo; break;                       // North slab
-                case 56: z0 = hi; break;                       // South slab
-                case 57: x1 = lo; z1 = lo; break;              // NW corner post
-                case 58: x0 = hi; z1 = lo; break;              // NE corner post
-                case 59: x0 = hi; z0 = hi; break;              // SE corner post
-                case 60: x1 = lo; z0 = hi; break;              // SW corner post
-                default: x0 = lo; x1 = hi; z0 = lo; z1 = hi; break; // 61: Centered pillar
+                case 53: x1 = lo; break;
+                case 54: x0 = hi; break;
+                case 55: z1 = lo; break;
+                case 56: z0 = hi; break;
+                case 57: x1 = lo; z1 = lo; break;
+                case 58: x0 = hi; z1 = lo; break;
+                case 59: x0 = hi; z0 = hi; break;
+                case 60: x1 = lo; z0 = hi; break;
+                default: x0 = lo; x1 = hi; z0 = lo; z1 = hi; break;
             }
         }
 
@@ -5442,162 +5641,127 @@ class RetroRenderer {
         const zN = z_south + z0;
         const zS = z_south + z1;
 
-        // 8 corners of the voxel block in 3D block coordinates:
-        // X: East [xW .. xE], Y: Elevation [y_elev .. y_elev+1], Z: South [zN .. zS]
-        const p = [
-            [xW, y_elev + 1.0, zN], // 0: Top-NW
-            [xE, y_elev + 1.0, zN], // 1: Top-NE
-            [xW, y_elev,       zN], // 2: Bot-NW
-            [xE, y_elev,       zN], // 3: Bot-NE
-            [xW, y_elev + 1.0, zS], // 4: Top-SW
-            [xE, y_elev + 1.0, zS], // 5: Top-SE
-            [xW, y_elev,       zS], // 6: Bot-SW
-            [xE, y_elev,       zS]  // 7: Bot-SE
-        ];
+        let py0 = y_elev + 1.0;
+        let py1 = y_elev + 1.0;
+        let py4 = y_elev + 1.0;
+        let py5 = y_elev + 1.0;
 
-        // 2. Ramp & Corner-Ramp vertex adjustments (GameMapHelpers.cpp + world_mesh.cpp AddCornerRampBlock)
         if (st > 0 && st < 45) {
             switch (st) {
-                case 1:
-                    p[0][1] -= 0.5; p[1][1] -= 0.5;
-                    p[4][1] -= 1.0; p[5][1] -= 1.0;
-                    break;
-                case 2:
-                    p[4][1] -= 0.5; p[5][1] -= 0.5;
-                    break;
-                case 3:
-                    p[0][1] -= 1.0; p[1][1] -= 1.0;
-                    p[4][1] -= 0.5; p[5][1] -= 0.5;
-                    break;
-                case 4:
-                    p[0][1] -= 0.5; p[1][1] -= 0.5;
-                    break;
-                case 5:
-                    p[0][1] -= 0.5; p[4][1] -= 0.5;
-                    p[1][1] -= 1.0; p[5][1] -= 1.0;
-                    break;
-                case 6:
-                    p[1][1] -= 0.5; p[5][1] -= 0.5;
-                    break;
-                case 7:
-                    p[0][1] -= 1.0; p[4][1] -= 1.0;
-                    p[1][1] -= 0.5; p[5][1] -= 0.5;
-                    break;
-                case 8:
-                    p[0][1] -= 0.5; p[4][1] -= 0.5;
-                    break;
+                case 1: py0 -= 0.5; py1 -= 0.5; py4 -= 1.0; py5 -= 1.0; break;
+                case 2: py4 -= 0.5; py5 -= 0.5; break;
+                case 3: py0 -= 1.0; py1 -= 1.0; py4 -= 0.5; py5 -= 0.5; break;
+                case 4: py0 -= 0.5; py1 -= 0.5; break;
+                case 5: py0 -= 0.5; py4 -= 0.5; py1 -= 1.0; py5 -= 1.0; break;
+                case 6: py1 -= 0.5; py5 -= 0.5; break;
+                case 7: py0 -= 1.0; py4 -= 1.0; py1 -= 0.5; py5 -= 0.5; break;
+                case 8: py0 -= 0.5; py4 -= 0.5; break;
                 case 9: case 10: case 11: case 12: case 13: case 14: case 15: case 16: {
                     const s = st - 9;
-                    p[0][1] -= 1.0 - (s + 1) * 0.125;
-                    p[1][1] -= 1.0 - (s + 1) * 0.125;
-                    p[4][1] -= 1.0 - s * 0.125;
-                    p[5][1] -= 1.0 - s * 0.125;
+                    const d01 = 1.0 - (s + 1) * 0.125;
+                    const d45 = 1.0 - s * 0.125;
+                    py0 -= d01; py1 -= d01; py4 -= d45; py5 -= d45;
                     break;
                 }
                 case 17: case 18: case 19: case 20: case 21: case 22: case 23: case 24: {
                     const s = st - 17;
-                    p[4][1] -= 1.0 - (s + 1) * 0.125;
-                    p[5][1] -= 1.0 - (s + 1) * 0.125;
-                    p[0][1] -= 1.0 - s * 0.125;
-                    p[1][1] -= 1.0 - s * 0.125;
+                    const d45 = 1.0 - (s + 1) * 0.125;
+                    const d01 = 1.0 - s * 0.125;
+                    py4 -= d45; py5 -= d45; py0 -= d01; py1 -= d01;
                     break;
                 }
                 case 25: case 26: case 27: case 28: case 29: case 30: case 31: case 32: {
                     const s = st - 25;
-                    p[0][1] -= 1.0 - (s + 1) * 0.125;
-                    p[4][1] -= 1.0 - (s + 1) * 0.125;
-                    p[1][1] -= 1.0 - s * 0.125;
-                    p[5][1] -= 1.0 - s * 0.125;
+                    const d04 = 1.0 - (s + 1) * 0.125;
+                    const d15 = 1.0 - s * 0.125;
+                    py0 -= d04; py4 -= d04; py1 -= d15; py5 -= d15;
                     break;
                 }
                 case 33: case 34: case 35: case 36: case 37: case 38: case 39: case 40: {
                     const s = st - 33;
-                    p[1][1] -= 1.0 - (s + 1) * 0.125;
-                    p[5][1] -= 1.0 - (s + 1) * 0.125;
-                    p[0][1] -= 1.0 - s * 0.125;
-                    p[4][1] -= 1.0 - s * 0.125;
+                    const d15 = 1.0 - (s + 1) * 0.125;
+                    const d04 = 1.0 - s * 0.125;
+                    py1 -= d15; py5 -= d15; py0 -= d04; py4 -= d04;
                     break;
                 }
-                case 41:
-                    p[4][1] -= 1.0; p[5][1] -= 1.0;
-                    break;
-                case 42:
-                    p[0][1] -= 1.0; p[1][1] -= 1.0;
-                    break;
-                case 43:
-                    p[1][1] -= 1.0; p[5][1] -= 1.0;
-                    break;
-                case 44:
-                    p[0][1] -= 1.0; p[4][1] -= 1.0;
-                    break;
+                case 41: py4 -= 1.0; py5 -= 1.0; break;
+                case 42: py0 -= 1.0; py1 -= 1.0; break;
+                case 43: py1 -= 1.0; py5 -= 1.0; break;
+                case 44: py0 -= 1.0; py4 -= 1.0; break;
             }
         } else if (st >= 49 && st <= 52) {
-            // AddCornerRampBlock (world_mesh.cpp lines 659-767): Single-corner chamfer ramps
-            if (st === 49) p[0][1] -= 1.0;      // NW corner drops
-            else if (st === 50) p[1][1] -= 1.0; // NE corner drops
-            else if (st === 51) p[4][1] -= 1.0; // SW corner drops
-            else if (st === 52) p[5][1] -= 1.0; // SE corner drops
+            if (st === 49) py0 -= 1.0;
+            else if (st === 50) py1 -= 1.0;
+            else if (st === 51) py4 -= 1.0;
+            else if (st === 52) py5 -= 1.0;
         }
 
-        // 3. Select quad corner vertex indices + AddDiagonalBlock (slopes 45..48 from world_mesh.cpp lines 572-641)
-        let qi;
+        let q0 = 0, q1 = 1, q2 = 4, q3 = 5;
         if (st >= 45 && st <= 48 && !b.isFlat) {
             if (st === 45) {
-                // Solid E & S, diagonal cut faces NW (NE -> SW)
                 if (face === 2) return;
-                if (face === 0) qi = [4, 1, 6, 3];
-                else if (face === 1) qi = [1, 5, 3, 7];
-                else if (face === 3) qi = [5, 4, 7, 6];
-                else qi = [1, 1, 4, 5]; // Triangular lid dropping NW
+                if (face === 0) { q0 = 4; q1 = 1; q2 = 6; q3 = 3; }
+                else if (face === 1) { q0 = 1; q1 = 5; q2 = 3; q3 = 7; }
+                else if (face === 3) { q0 = 5; q1 = 4; q2 = 7; q3 = 6; }
+                else { q0 = 1; q1 = 1; q2 = 4; q3 = 5; }
             } else if (st === 46) {
-                // Solid W & S, diagonal cut faces NE (NW -> SE)
                 if (face === 2) return;
-                if (face === 0) qi = [4, 0, 6, 2];
-                else if (face === 1) qi = [0, 5, 2, 7];
-                else if (face === 3) qi = [5, 4, 7, 6];
-                else qi = [0, 0, 4, 5]; // Triangular lid dropping NE
+                if (face === 0) { q0 = 4; q1 = 0; q2 = 6; q3 = 2; }
+                else if (face === 1) { q0 = 0; q1 = 5; q2 = 2; q3 = 7; }
+                else if (face === 3) { q0 = 5; q1 = 4; q2 = 7; q3 = 6; }
+                else { q0 = 0; q1 = 0; q2 = 4; q3 = 5; }
             } else if (st === 47) {
-                // Solid E & N, diagonal cut faces SW (NW -> SE)
                 if (face === 3) return;
-                if (face === 0) qi = [5, 0, 7, 2];
-                else if (face === 1) qi = [1, 5, 3, 7];
-                else if (face === 2) qi = [0, 1, 2, 3];
-                else qi = [0, 1, 5, 5]; // Triangular lid dropping SW
+                if (face === 0) { q0 = 5; q1 = 0; q2 = 7; q3 = 2; }
+                else if (face === 1) { q0 = 1; q1 = 5; q2 = 3; q3 = 7; }
+                else if (face === 2) { q0 = 0; q1 = 1; q2 = 2; q3 = 3; }
+                else { q0 = 0; q1 = 1; q2 = 5; q3 = 5; }
             } else {
-                // st === 48: Solid W & N, diagonal cut faces SE (NE -> SW)
                 if (face === 3) return;
-                if (face === 0) qi = [4, 0, 6, 2];
-                else if (face === 1) qi = [1, 4, 3, 6];
-                else if (face === 2) qi = [0, 1, 2, 3];
-                else qi = [0, 1, 4, 4]; // Triangular lid dropping SE
+                if (face === 0) { q0 = 4; q1 = 0; q2 = 6; q3 = 2; }
+                else if (face === 1) { q0 = 1; q1 = 4; q2 = 3; q3 = 6; }
+                else if (face === 2) { q0 = 0; q1 = 1; q2 = 2; q3 = 3; }
+                else { q0 = 0; q1 = 1; q2 = 4; q3 = 4; }
             }
         } else if (b.isFlat) {
-            if (face === 0) qi = [4, 0, 6, 2];      // W
-            else if (face === 1) qi = [0, 4, 2, 6]; // E drawn at W plane when flat
-            else if (face === 2) qi = [0, 1, 2, 3]; // N
-            else if (face === 3) qi = [0, 1, 2, 3]; // S drawn at N plane when flat
-            else qi = [0, 1, 4, 5];                 // Lid
+            if (face === 0) { q0 = 4; q1 = 0; q2 = 6; q3 = 2; }
+            else if (face === 1) { q0 = 0; q1 = 4; q2 = 2; q3 = 6; }
+            else if (face === 2 || face === 3) { q0 = 0; q1 = 1; q2 = 2; q3 = 3; }
+            else { q0 = 0; q1 = 1; q2 = 4; q3 = 5; }
         } else {
-            if (face === 0) qi = [4, 0, 6, 2];      // W
-            else if (face === 1) qi = [1, 5, 3, 7]; // E
-            else if (face === 2) qi = [0, 1, 2, 3]; // N
-            else if (face === 3) qi = [5, 4, 7, 6]; // S
-            else qi = [0, 1, 4, 5];                 // Lid
+            if (face === 0) { q0 = 4; q1 = 0; q2 = 6; q3 = 2; }
+            else if (face === 1) { q0 = 1; q1 = 5; q2 = 3; q3 = 7; }
+            else if (face === 2) { q0 = 0; q1 = 1; q2 = 2; q3 = 3; }
+            else if (face === 3) { q0 = 5; q1 = 4; q2 = 7; q3 = 6; }
+            else { q0 = 0; q1 = 1; q2 = 4; q3 = 5; }
         }
 
-        // Compute UV corner permutation (0:TL, 1:TR, 2:BL, 3:BR)
-        let uvIdx = [0, 1, 2, 3];
+        const p24 = this._p24Scratch || (this._p24Scratch = new Float32Array(24));
+        p24[0]  = xW; p24[1]  = py0;    p24[2]  = zN;
+        p24[3]  = xE; p24[4]  = py1;    p24[5]  = zN;
+        p24[6]  = xW; p24[7]  = y_elev; p24[8]  = zN;
+        p24[9]  = xE; p24[10] = y_elev; p24[11] = zN;
+        p24[12] = xW; p24[13] = py4;    p24[14] = zS;
+        p24[15] = xE; p24[16] = py5;    p24[17] = zS;
+        p24[18] = xW; p24[19] = y_elev; p24[20] = zS;
+        p24[21] = xE; p24[22] = y_elev; p24[23] = zS;
+
+        let uvi0 = 0, uvi1 = 1, uvi2 = 2, uvi3 = 3;
         if (face === 4 && b.lidRotation > 0) {
             const rot = b.lidRotation & 3;
             for (let r = 0; r < rot; r++) {
-                uvIdx = [uvIdx[2], uvIdx[0], uvIdx[3], uvIdx[1]];
+                const t0 = uvi2, t1 = uvi0, t2 = uvi3, t3 = uvi1;
+                uvi0 = t0; uvi1 = t1; uvi2 = t2; uvi3 = t3;
             }
         }
         if (b.flipLR) {
-            uvIdx = [uvIdx[1], uvIdx[0], uvIdx[3], uvIdx[2]];
+            const t0 = uvi1; uvi1 = uvi0; uvi0 = t0;
+            const t2 = uvi3; uvi3 = uvi2; uvi2 = t2;
         }
         if (b.flipTB) {
-            uvIdx = [uvIdx[2], uvIdx[3], uvIdx[0], uvIdx[1]];
+            const t0 = uvi2, t1 = uvi3;
+            uvi2 = uvi0; uvi3 = uvi1;
+            uvi0 = t0; uvi1 = t1;
         }
 
         // Compute atlas index in gta1_tiles.png (16 cols x 51 rows, 64x64 per tile)
@@ -5616,30 +5780,16 @@ class RetroRenderer {
             let effRemap = b.remap;
 
             if (effTileIdx === 41) {
-                animType = 1.0; // Animated water
-                // Non-orthogonal organic curved water basins, park lagoons & natural beach/coastline surf:
-                // Encode 8-neighbor non-water mask (N1|S2|W4|E8|NW16|NE32|SW64|SE128) + surrounding ground type.
+                animType = 1.0;
                 if (y_elev === 1 && this.map) {
-                    const wLid = (cx, cy) => {
-                        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS) return 41;
-                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
-                        if (!bi) return 41;
-                        const nb = this.map.getBlockInfo(bi);
-                        if (!nb) return 41;
-                        if (nb.lid === 0 || nb.lid === 41 || nb.lid === 77 || (nb.lid >= 99 && nb.lid <= 101)) return 41;
-                        // Ignore roads/bridges and any 3D structures with vertical side walls (wooden piers, barges, quays)
-                        if (nb.lid === 1 || nb.lid === 2 || nb.lid === 24 || nb.lid === 25 || nb.lid === 74 || nb.lid === 75 || nb.lid === 80 || nb.lid === 81 || nb.lid === 82) return 41;
-                        if (nb.w > 0 || nb.e > 0 || nb.n > 0 || nb.s > 0) return 41;
-                        return nb.lid;
-                    };
-                    const lN  = wLid(x, z_south - 1);
-                    const lS  = wLid(x, z_south + 1);
-                    const lW  = wLid(x - 1, z_south);
-                    const lE  = wLid(x + 1, z_south);
-                    const lNW = wLid(x - 1, z_south - 1);
-                    const lNE = wLid(x + 1, z_south - 1);
-                    const lSW = wLid(x - 1, z_south + 1);
-                    const lSE = wLid(x + 1, z_south + 1);
+                    const lN  = this._meshWLid(x, z_south - 1, y_elev);
+                    const lS  = this._meshWLid(x, z_south + 1, y_elev);
+                    const lW  = this._meshWLid(x - 1, z_south, y_elev);
+                    const lE  = this._meshWLid(x + 1, z_south, y_elev);
+                    const lNW = this._meshWLid(x - 1, z_south - 1, y_elev);
+                    const lNE = this._meshWLid(x + 1, z_south - 1, y_elev);
+                    const lSW = this._meshWLid(x - 1, z_south + 1, y_elev);
+                    const lSE = this._meshWLid(x + 1, z_south + 1, y_elev);
                     let bits = 0;
                     if (lN  !== 41) bits += 1;
                     if (lS  !== 41) bits += 2;
@@ -5650,106 +5800,69 @@ class RetroRenderer {
                     if (lSW !== 41) bits += 64;
                     if (lSE !== 41) bits += 128;
                     if (bits > 0) {
-                        const nbs = [lN, lS, lW, lE, lNW, lNE, lSW, lSE];
-                        const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
-                        const hasRoadNeighbor = nbs.some((l) => ROAD_LIDS.indexOf(l) >= 0);
-                        const hasPaveNeighbor = nbs.some((l) => l === 8 || l === 9 || l === 69);
-                        const hasLawnNeighbor = nbs.some((l) => l === 10);
+                        const hasRoadNeighbor =
+                            this._meshIsRoadLid(lN) || this._meshIsRoadLid(lS) || this._meshIsRoadLid(lW) || this._meshIsRoadLid(lE) ||
+                            this._meshIsRoadLid(lNW) || this._meshIsRoadLid(lNE) || this._meshIsRoadLid(lSW) || this._meshIsRoadLid(lSE);
+                        const hasPaveNeighbor =
+                            lN === 8 || lN === 9 || lN === 69 || lS === 8 || lS === 9 || lS === 69 ||
+                            lW === 8 || lW === 9 || lW === 69 || lE === 8 || lE === 9 || lE === 69 ||
+                            lNW === 8 || lNW === 9 || lNW === 69 || lNE === 8 || lNE === 9 || lNE === 69 ||
+                            lSW === 8 || lSW === 9 || lSW === 69 || lSE === 8 || lSE === 9 || lSE === 69;
+                        const hasLawnNeighbor = (lN === 10 || lS === 10 || lW === 10 || lE === 10 || lNW === 10 || lNE === 10 || lSW === 10 || lSE === 10);
                         const isOuterOceanCoast = (x >= 458 && z_south <= 370);
 
-                        // surType:
-                        // 0: Chiselled urban granite canal / seawall coping (clean stone boundary at roads & sidewalks)
-                        // 1: Coral promenade / travertine limestone coping (Star Island & resort pools)
-                        // 2: Park lawn lagoon / pond basin (Lummus Park & Lake Leonida natural edges)
-                        // 3: Atlantic ocean open surf (only outer eastern coastline)
                         let surType = 0;
-                        if (isOuterOceanCoast && !hasRoadNeighbor && !hasPaveNeighbor) {
-                            surType = 3;
-                        } else if (hasLawnNeighbor && !hasRoadNeighbor && !hasPaveNeighbor) {
-                            surType = 2;
-                        } else if (hasPaveNeighbor || nbs.indexOf(9) >= 0) {
-                            surType = 1;
-                        } else {
-                            surType = 0;
-                        }
+                        if (isOuterOceanCoast && !hasRoadNeighbor && !hasPaveNeighbor) surType = 3;
+                        else if (hasLawnNeighbor && !hasRoadNeighbor && !hasPaveNeighbor) surType = 2;
+                        else if (hasPaveNeighbor) surType = 1;
 
                         let paveBits = 0;
                         if (surType === 2) {
-                            const isPave = (l) => (l === 8 || l === 9 || l === 69 || ROAD_LIDS.indexOf(l) >= 0);
-                            if (isPave(lN))  paveBits += 1;
-                            if (isPave(lS))  paveBits += 2;
-                            if (isPave(lW))  paveBits += 4;
-                            if (isPave(lE))  paveBits += 8;
-                            if (isPave(lNW)) paveBits += 16;
-                            if (isPave(lNE)) paveBits += 32;
-                            if (isPave(lSW)) paveBits += 64;
-                            if (isPave(lSE)) paveBits += 128;
+                            if (lN === 8 || lN === 9 || lN === 69 || this._meshIsRoadLid(lN))   paveBits += 1;
+                            if (lS === 8 || lS === 9 || lS === 69 || this._meshIsRoadLid(lS))   paveBits += 2;
+                            if (lW === 8 || lW === 9 || lW === 69 || this._meshIsRoadLid(lW))   paveBits += 4;
+                            if (lE === 8 || lE === 9 || lE === 69 || this._meshIsRoadLid(lE))   paveBits += 8;
+                            if (lNW === 8 || lNW === 9 || lNW === 69 || this._meshIsRoadLid(lNW)) paveBits += 16;
+                            if (lNE === 8 || lNE === 9 || lNE === 69 || this._meshIsRoadLid(lNE)) paveBits += 32;
+                            if (lSW === 8 || lSW === 9 || lSW === 69 || this._meshIsRoadLid(lSW)) paveBits += 64;
+                            if (lSE === 8 || lSE === 9 || lSE === 69 || this._meshIsRoadLid(lSE)) paveBits += 128;
                         }
                         animType = 2000.0 + paveBits * 1024.0 + surType * 256.0 + bits;
                     }
                 }
             }
-            else if (effTileIdx === 22) animType = 2.0;                 // Animated rooftop fan
-            else if (effTileIdx >= 99 && effTileIdx <= 101) animType = 4.0; // Beach shoreline (composites sand + surf over animated water on single quad)
+            else if (effTileIdx === 22) animType = 2.0;
+            else if (effTileIdx >= 99 && effTileIdx <= 101) animType = 4.0;
             else if (!b.isFlat && effRemap === 0) {
-                // Asphalt road lids: shader replaces the 64px texel base with one seamless world-space
-                // asphalt surface (no visible tile squares at intersections) & keeps crisp lane paint.
                 const isLightRoad = (effTileIdx === 1 || effTileIdx === 24 || effTileIdx === 25 || effTileIdx === 74 || effTileIdx === 80);
                 const isDarkRoad  = (effTileIdx === 2 || effTileIdx === 75 || effTileIdx === 81 || effTileIdx === 82);
                 if (isLightRoad) animType = 5.0;
                 else if (isDarkRoad) animType = 5.25;
 
-                // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (stopLineMask === 1 adjacent to lid 25 junction box):
-                // Encode approach direction toward the junction box (0=N, 1=S, 2=W, 3=E), lateral sidewalk curb mask (curbMin, curbMax), & darkRoad bit:
                 if ((isLightRoad || isDarkRoad) && effTileIdx !== 25 && y_elev === 1 && this.map && this.map.stopLineMask && this.map.stopLineMask[z_south * MAP_COLS + x] === 1) {
-                    const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
-                    const isJuncBox = (cx, cy) => {
-                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
-                        if (!bi) return false;
-                        const nb = this.map.getBlockInfo(bi);
-                        return !!(nb && nb.lid === 25);
-                    };
-                    const nonRoad = (cx, cy) => {
-                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
-                        if (!bi) return false;
-                        const nb = this.map.getBlockInfo(bi);
-                        return !!(nb && nb.lid && ROAD_LIDS.indexOf(nb.lid) < 0);
-                    };
                     let cwDir = -1;
-                    if (isJuncBox(x, z_south - 1)) cwDir = 0;      // Junction is North (lp.y = 0 edge)
-                    else if (isJuncBox(x, z_south + 1)) cwDir = 1; // Junction is South (lp.y = 1 edge)
-                    else if (isJuncBox(x - 1, z_south)) cwDir = 2; // Junction is West  (lp.x = 0 edge)
-                    else if (isJuncBox(x + 1, z_south)) cwDir = 3; // Junction is East  (lp.x = 1 edge)
+                    if (this._meshIsJuncBox(x, z_south - 1, y_elev)) cwDir = 0;
+                    else if (this._meshIsJuncBox(x, z_south + 1, y_elev)) cwDir = 1;
+                    else if (this._meshIsJuncBox(x - 1, z_south, y_elev)) cwDir = 2;
+                    else if (this._meshIsJuncBox(x + 1, z_south, y_elev)) cwDir = 3;
                     if (cwDir >= 0) {
-                        const curbMin = (cwDir < 2) ? (nonRoad(x - 1, z_south) ? 1 : 0) : (nonRoad(x, z_south - 1) ? 1 : 0);
-                        const curbMax = (cwDir < 2) ? (nonRoad(x + 1, z_south) ? 1 : 0) : (nonRoad(x, z_south + 1) ? 1 : 0);
+                        const curbMin = (cwDir < 2) ? (this._meshNonRoad(x - 1, z_south, y_elev) ? 1 : 0) : (this._meshNonRoad(x, z_south - 1, y_elev) ? 1 : 0);
+                        const curbMax = (cwDir < 2) ? (this._meshNonRoad(x + 1, z_south, y_elev) ? 1 : 0) : (this._meshNonRoad(x, z_south + 1, y_elev) ? 1 : 0);
                         const darkBit = isDarkRoad ? 1 : 0;
                         const cwIdx = cwDir * 8 + curbMin * 4 + curbMax * 2 + darkBit;
                         animType = 5.5 + cwIdx * 0.125;
                     }
                 }
 
-                // Junction box tiles (lid 25) have no curb at all, so where a box side faces the pavement
-                // (T-junctions, box wider than the crossing road) bare asphalt bulged into the sidewalk like a
-                // pasted rectangle. Encode sides facing non-road blocks (10 + N1|S2|W4|E8) so the shader
-                // continues the curb, gutter & yellow edge line straight through the junction.
                 if (effTileIdx === 25 && this.map) {
-                    const ROAD_LIDS = [1, 2, 24, 25, 74, 75, 80, 81, 82];
-                    const nonRoad = (cx, cy) => {
-                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
-                        if (!bi) return false;
-                        const nb = this.map.getBlockInfo(bi);
-                        return !!(nb && nb.lid && ROAD_LIDS.indexOf(nb.lid) < 0);
-                    };
                     let bits = 0;
-                    if (nonRoad(x, z_south - 1)) bits += 1;
-                    if (nonRoad(x, z_south + 1)) bits += 2;
-                    if (nonRoad(x - 1, z_south)) bits += 4;
-                    if (nonRoad(x + 1, z_south)) bits += 8;
+                    if (this._meshNonRoad(x, z_south - 1, y_elev)) bits += 1;
+                    if (this._meshNonRoad(x, z_south + 1, y_elev)) bits += 2;
+                    if (this._meshNonRoad(x - 1, z_south, y_elev)) bits += 4;
+                    if (this._meshNonRoad(x + 1, z_south, y_elev)) bits += 8;
                     if (bits > 0) animType = 10.0 + bits;
                 }
-                // Coral promenade footpath (lid 9) meeting beach sand (lid 98..101) to the East:
-                // feather the eastern end of the stone footpath into the sand so it doesn't end in a hard vertical line.
+
                 if (effTileIdx === 9 && this.map) {
                     const eBi = this.map.getBlockIndex(x + 1, z_south, y_elev);
                     const eBlk = eBi ? this.map.getBlockInfo(eBi) : null;
@@ -5757,30 +5870,16 @@ class RetroRenderer {
                         animType = 28.0;
                     }
                 }
-                // Park & Lummus Park grass lawns (lid 10): encode 8-neighbor non-grass ground mask + surrounding
-                // surface family (0: coral promenade lid 9, 1: beach sand on East + promenade on N/S/W, 2: city sidewalk lid 8)
-                // so the shader rounds all 90° corners and curves straight lawn edges organically without tile seams.
+
                 if (effTileIdx === 10 && y_elev === 1 && this.map) {
-                    const nLid = (cx, cy) => {
-                        const bi = this.map.getBlockIndex(cx, cy, y_elev);
-                        if (!bi) return 10;
-                        const nb = this.map.getBlockInfo(bi);
-                        if (!nb) return 10;
-                        // Only treat open walkable ground (sidewalk lid 8, coral promenade lid 9/69, beach sand lid 98..101)
-                        // as surrounding non-grass terrain so walls, palms or 3D props never create false notches.
-                        if (nb.lid === 8 || nb.lid === 9 || nb.lid === 69 || (nb.lid >= 98 && nb.lid <= 101)) {
-                            return nb.lid;
-                        }
-                        return 10;
-                    };
-                    const lN  = nLid(x, z_south - 1);
-                    const lS  = nLid(x, z_south + 1);
-                    const lW  = nLid(x - 1, z_south);
-                    const lE  = nLid(x + 1, z_south);
-                    const lNW = nLid(x - 1, z_south - 1);
-                    const lNE = nLid(x + 1, z_south - 1);
-                    const lSW = nLid(x - 1, z_south + 1);
-                    const lSE = nLid(x + 1, z_south + 1);
+                    const lN  = this._meshNLid(x, z_south - 1, y_elev);
+                    const lS  = this._meshNLid(x, z_south + 1, y_elev);
+                    const lW  = this._meshNLid(x - 1, z_south, y_elev);
+                    const lE  = this._meshNLid(x + 1, z_south, y_elev);
+                    const lNW = this._meshNLid(x - 1, z_south - 1, y_elev);
+                    const lNE = this._meshNLid(x + 1, z_south - 1, y_elev);
+                    const lSW = this._meshNLid(x - 1, z_south + 1, y_elev);
+                    const lSE = this._meshNLid(x + 1, z_south + 1, y_elev);
 
                     let bits = 0;
                     if (lN  !== 10) bits += 1;
@@ -5793,14 +5892,16 @@ class RetroRenderer {
                     if (lSE !== 10) bits += 128;
 
                     if (bits > 0) {
-                        const isSandLid = (l) => (l >= 98 && l <= 101);
-                        const isCoralLid = (l) => (l === 9 || l === 69);
-                        let surType = 2; // city sidewalk (lid 8)
-                        if (isSandLid(lE) || isSandLid(lNE) || isSandLid(lSE)) {
-                            surType = 1; // beach sand on East, coral promenade on N/S/W
-                        } else if (isCoralLid(lN) || isCoralLid(lS) || isCoralLid(lW) || isCoralLid(lE) ||
-                                   isCoralLid(lNW) || isCoralLid(lNE) || isCoralLid(lSW) || isCoralLid(lSE) || x >= 215) {
-                            surType = 0; // coral promenade (lid 9)
+                        let surType = 2;
+                        if ((lE >= 98 && lE <= 101) || (lNE >= 98 && lNE <= 101) || (lSE >= 98 && lSE <= 101)) {
+                            surType = 1;
+                        } else if (
+                            lN === 9 || lN === 69 || lS === 9 || lS === 69 ||
+                            lW === 9 || lW === 69 || lE === 9 || lE === 69 ||
+                            lNW === 9 || lNW === 69 || lNE === 9 || lNE === 69 ||
+                            lSW === 9 || lSW === 69 || lSE === 9 || lSE === 69 || x >= 215
+                        ) {
+                            surType = 0;
                         }
                         animType = 30.0 + surType * 256.0 + bits;
                     }
@@ -5845,34 +5946,22 @@ class RetroRenderer {
         const v0 = row / 51.0 + padV;
         const v1 = (row + 1.0) / 51.0 - padV;
 
-        const baseUV = [
-            [u0, v0], // 0: TL
-            [u1, v0], // 1: TR
-            [u0, v1], // 2: BL
-            [u1, v1]  // 3: BR
-        ];
+        const cu0 = (uvi0 & 1) ? u1 : u0;
+        const cu1 = (uvi1 & 1) ? u1 : u0;
+        const cu2 = (uvi2 & 1) ? u1 : u0;
+        const cu3 = (uvi3 & 1) ? u1 : u0;
+        let cv0 = (uvi0 & 2) ? v1 : v0;
+        let cv1 = (uvi1 & 2) ? v1 : v0;
+        const cv2 = (uvi2 & 2) ? v1 : v0;
+        const cv3 = (uvi3 & 2) ? v1 : v0;
 
-        // 4. SlopedWallUvs (world_mesh.cpp lines 520-537):
-        // A wall shortened by a ramp crops the top of its tile rather than squashing the whole tile into a shorter quad!
-        const cornerUVs = [
-            [baseUV[uvIdx[0]][0], baseUV[uvIdx[0]][1]],
-            [baseUV[uvIdx[1]][0], baseUV[uvIdx[1]][1]],
-            [baseUV[uvIdx[2]][0], baseUV[uvIdx[2]][1]],
-            [baseUV[uvIdx[3]][0], baseUV[uvIdx[3]][1]]
-        ];
         if (face < 4 && st > 0 && st <= 52) {
-            const hTop0 = Math.max(0.0, Math.min(1.0, p[qi[0]][1] - y_elev));
-            const hTop1 = Math.max(0.0, Math.min(1.0, p[qi[1]][1] - y_elev));
-            if (hTop0 < 0.999) {
-                cornerUVs[0][1] = cornerUVs[2][1] + (cornerUVs[0][1] - cornerUVs[2][1]) * hTop0;
-            }
-            if (hTop1 < 0.999) {
-                cornerUVs[1][1] = cornerUVs[3][1] + (cornerUVs[1][1] - cornerUVs[3][1]) * hTop1;
-            }
+            const hTop0 = Math.max(0.0, Math.min(1.0, p24[q0 * 3 + 1] - y_elev));
+            const hTop1 = Math.max(0.0, Math.min(1.0, p24[q1 * 3 + 1] - y_elev));
+            if (hTop0 < 0.999) cv0 = cv2 + (cv0 - cv2) * hTop0;
+            if (hTop1 < 0.999) cv1 = cv3 + (cv1 - cv3) * hTop1;
         }
 
-        // 5. kFlatFaceOffset (world_mesh.cpp line 18):
-        // Nudge flat decal faces slightly along their outward normal to prevent Z-fighting on coincident wall/floor planes!
         let nOffX = 0.0, nOffY = extraYOffset || 0.0, nOffZ = 0.0;
         if (b.isFlat) {
             const kFlatFaceOffset = 0.003;
@@ -5883,13 +5972,39 @@ class RetroRenderer {
             else nOffY += kFlatFaceOffset;
         }
 
-        // Emit 2 triangles for quad: (0, 2, 1) and (1, 2, 3)
-        const triOrder = [0, 2, 1, 1, 2, 3];
-        for (let k = 0; k < 6; k++) {
-            const c = triOrder[k];
-            const pos = p[qi[c]];
-            const uv = cornerUVs[c];
-            verts.push(pos[0] + nOffX, pos[1] + nOffY, pos[2] + nOffZ, uv[0], uv[1], animType);
+        const o0 = q0 * 3, o1 = q1 * 3, o2 = q2 * 3, o3 = q3 * 3;
+        const vx0 = p24[o0] + nOffX, vy0 = p24[o0 + 1] + nOffY, vz0 = p24[o0 + 2] + nOffZ;
+        const vx1 = p24[o1] + nOffX, vy1 = p24[o1 + 1] + nOffY, vz1 = p24[o1 + 2] + nOffZ;
+        const vx2 = p24[o2] + nOffX, vy2 = p24[o2 + 1] + nOffY, vz2 = p24[o2 + 2] + nOffZ;
+        const vx3 = p24[o3] + nOffX, vy3 = p24[o3 + 1] + nOffY, vz3 = p24[o3 + 2] + nOffZ;
+
+        if (typeof verts === "number") {
+            let buf = verts === 1 ? this._cityFlatBuf : this._cityOpaqueBuf;
+            let len = verts === 1 ? this._cityFlatLen : this._cityOpaqueLen;
+            if (len + 36 > buf.length) {
+                const grown = new Float32Array(buf.length * 2);
+                grown.set(buf);
+                if (verts === 1) this._cityFlatBuf = grown;
+                else this._cityOpaqueBuf = grown;
+                buf = grown;
+            }
+            buf[len]      = vx0; buf[len + 1]  = vy0; buf[len + 2]  = vz0; buf[len + 3]  = cu0; buf[len + 4]  = cv0; buf[len + 5]  = animType;
+            buf[len + 6]  = vx2; buf[len + 7]  = vy2; buf[len + 8]  = vz2; buf[len + 9]  = cu2; buf[len + 10] = cv2; buf[len + 11] = animType;
+            buf[len + 12] = vx1; buf[len + 13] = vy1; buf[len + 14] = vz1; buf[len + 15] = cu1; buf[len + 16] = cv1; buf[len + 17] = animType;
+            buf[len + 18] = vx1; buf[len + 19] = vy1; buf[len + 20] = vz1; buf[len + 21] = cu1; buf[len + 22] = cv1; buf[len + 23] = animType;
+            buf[len + 24] = vx2; buf[len + 25] = vy2; buf[len + 26] = vz2; buf[len + 27] = cu2; buf[len + 28] = cv2; buf[len + 29] = animType;
+            buf[len + 30] = vx3; buf[len + 31] = vy3; buf[len + 32] = vz3; buf[len + 33] = cu3; buf[len + 34] = cv3; buf[len + 35] = animType;
+            if (verts === 1) this._cityFlatLen = len + 36;
+            else this._cityOpaqueLen = len + 36;
+        } else {
+            verts.push(
+                vx0, vy0, vz0, cu0, cv0, animType,
+                vx2, vy2, vz2, cu2, cv2, animType,
+                vx1, vy1, vz1, cu1, cv1, animType,
+                vx1, vy1, vz1, cu1, cv1, animType,
+                vx2, vy2, vz2, cu2, cv2, animType,
+                vx3, vy3, vz3, cu3, cv3, animType
+            );
         }
 
         // 6. 3D Mitered Outer Parapet Coping (bridges & piers only; building roofs use 100% 3ds Max roof textures without stretched neon bands!)
@@ -5901,58 +6016,40 @@ class RetroRenderer {
             if (hasW || hasE || hasN || hasS) {
                 const wPar = 0.095;
                 const yCop = y_elev + 1.003;
-                const emitParapetStrip = (sideTile, q0, q1, q2, q3) => {
-                    const sAtlasIdx = (tiles.side_start || 0) + (sideTile % tiles.side_count);
-                    const sCol = sAtlasIdx % 16;
-                    const sRow = Math.floor(sAtlasIdx / 16);
-                    const su0 = sCol / 16.0 + padU;
-                    const su1 = (sCol + 1.0) / 16.0 - padU;
-                    // Sample top sunlit Art Deco cornice (py=0.6) -> neon/frieze accent -> inner parapet shadow (py=7.2)
-                    const svOuter = (sRow + 0.6 / 64.0) / 51.0;
-                    const svInner = (sRow + 7.2 / 64.0) / 51.0;
-                    const qPos = [q0, q1, q2, q3];
-                    for (let k = 0; k < 6; k++) {
-                        const c = triOrder[k];
-                        const qp = qPos[c];
-                        const qu = qp[3] ? su1 : su0;
-                        const qv = qp[4] ? svInner : svOuter;
-                        verts.push(qp[0], qp[1], qp[2], qu, qv, 0.0);
-                    }
-                };
                 if (hasN) {
-                    emitParapetStrip(
-                        b.faces[2],
-                        [xW, yCop, zN, 0, 0],
-                        [xE, yCop, zN, 1, 0],
-                        [xW + (hasW ? wPar : 0.0), yCop, zN + wPar, 0, 1],
-                        [xE - (hasE ? wPar : 0.0), yCop, zN + wPar, 1, 1]
+                    this._emitParapetStripScalar(
+                        verts, b.faces[2], tiles, padU, yCop,
+                        xW, zN, 0, 0,
+                        xE, zN, 1, 0,
+                        xW + (hasW ? wPar : 0.0), zN + wPar, 0, 1,
+                        xE - (hasE ? wPar : 0.0), zN + wPar, 1, 1
                     );
                 }
                 if (hasS) {
-                    emitParapetStrip(
-                        b.faces[3],
-                        [xW + (hasW ? wPar : 0.0), yCop, zS - wPar, 0, 1],
-                        [xE - (hasE ? wPar : 0.0), yCop, zS - wPar, 1, 1],
-                        [xW, yCop, zS, 0, 0],
-                        [xE, yCop, zS, 1, 0]
+                    this._emitParapetStripScalar(
+                        verts, b.faces[3], tiles, padU, yCop,
+                        xW + (hasW ? wPar : 0.0), zS - wPar, 0, 1,
+                        xE - (hasE ? wPar : 0.0), zS - wPar, 1, 1,
+                        xW, zS, 0, 0,
+                        xE, zS, 1, 0
                     );
                 }
                 if (hasW) {
-                    emitParapetStrip(
-                        b.faces[0],
-                        [xW, yCop, zN, 0, 0],
-                        [xW + wPar, yCop, zN + (hasN ? wPar : 0.0), 0, 1],
-                        [xW, yCop, zS, 1, 0],
-                        [xW + wPar, yCop, zS - (hasS ? wPar : 0.0), 1, 1]
+                    this._emitParapetStripScalar(
+                        verts, b.faces[0], tiles, padU, yCop,
+                        xW, zN, 0, 0,
+                        xW + wPar, zN + (hasN ? wPar : 0.0), 0, 1,
+                        xW, zS, 1, 0,
+                        xW + wPar, zS - (hasS ? wPar : 0.0), 1, 1
                     );
                 }
                 if (hasE) {
-                    emitParapetStrip(
-                        b.faces[1],
-                        [xE - wPar, yCop, zN + (hasN ? wPar : 0.0), 0, 1],
-                        [xE, yCop, zN, 0, 0],
-                        [xE - wPar, yCop, zS - (hasS ? wPar : 0.0), 1, 1],
-                        [xE, yCop, zS, 1, 0]
+                    this._emitParapetStripScalar(
+                        verts, b.faces[1], tiles, padU, yCop,
+                        xE - wPar, zN + (hasN ? wPar : 0.0), 0, 1,
+                        xE, zN, 0, 0,
+                        xE - wPar, zS - (hasS ? wPar : 0.0), 1, 1,
+                        xE, zS, 1, 0
                     );
                 }
             }
@@ -6038,6 +6135,9 @@ class RetroRenderer {
         } else {
             this.spriteQueue.length = 0;
         }
+        if (!this.spritePool) {
+            this.spritePool = [];
+        }
     }
 
     pushSpriteQuad3D(
@@ -6059,26 +6159,36 @@ class RetroRenderer {
         pitchZ = 0
     ) {
         if (!this.spriteQueue) this.spriteQueue = [];
-        if (this.spriteQueue.length >= this.maxSprites) return;
-        this.spriteQueue.push({
-            xPx,
-            yPx,
-            zBlocks,
-            wPx,
-            hPx,
-            angleRad,
-            u0,
-            v0,
-            u1,
-            v1,
-            r,
-            g,
-            b,
-            a,
-            drawOrder,
-            pitchZ,
-            seq: this.spriteQueue.length
-        });
+        if (!this.spritePool) this.spritePool = [];
+        const seq = this.spriteQueue.length;
+        if (seq >= this.maxSprites) return;
+        let slot = this.spritePool[seq];
+        if (!slot) {
+            slot = {
+                xPx, yPx, zBlocks, wPx, hPx, angleRad,
+                u0, v0, u1, v1, r, g, b, a, drawOrder, pitchZ, seq
+            };
+            this.spritePool[seq] = slot;
+        } else {
+            slot.xPx = xPx;
+            slot.yPx = yPx;
+            slot.zBlocks = zBlocks;
+            slot.wPx = wPx;
+            slot.hPx = hPx;
+            slot.angleRad = angleRad;
+            slot.u0 = u0;
+            slot.v0 = v0;
+            slot.u1 = u1;
+            slot.v1 = v1;
+            slot.r = r;
+            slot.g = g;
+            slot.b = b;
+            slot.a = a;
+            slot.drawOrder = drawOrder;
+            slot.pitchZ = pitchZ;
+            slot.seq = seq;
+        }
+        this.spriteQueue.push(slot);
     }
 
     pushAtlasSprite3D(rect, xPx, yPx, zBlocks, angleRad = 0, scale = 1.0, drawOrder = 4, r = 1, g = 1, b = 1, a = 1, pitchZ = 0) {
@@ -6130,47 +6240,43 @@ class RetroRenderer {
             return lhs.seq - rhs.seq;
         });
 
-        const tri = [0, 2, 1, 1, 2, 3];
         const verts = this.spriteVerts;
         let offset = 0;
         const count = Math.min(this.maxSprites, this.spriteQueue.length);
+        const invTile = 1.0 / TILE_SIZE;
 
         for (let i = 0; i < count; i++) {
             const s = this.spriteQueue[i];
-            const cx = s.xPx / TILE_SIZE;
-            const cz = s.yPx / TILE_SIZE;
-            const hw = (s.wPx / TILE_SIZE) * 0.5;
-            const hh = (s.hPx / TILE_SIZE) * 0.5;
+            const cx = s.xPx * invTile;
+            const cz = s.yPx * invTile;
+            const hw = s.wPx * invTile * 0.5;
+            const hh = s.hPx * invTile * 0.5;
             const cosA = Math.cos(s.angleRad);
             const sinA = Math.sin(s.angleRad);
+            const hwCos = hw * cosA, hwSin = hw * sinA;
+            const hhCos = hh * cosA, hhSin = hh * sinA;
 
-            const lx0 = -hw, lx1 = hw, lx2 = -hw, lx3 = hw;
-            const lz0 = -hh, lz1 = -hh, lz2 = hh, lz3 = hh;
-            const lx = [lx0, lx1, lx2, lx3];
-            const lz = [lz0, lz1, lz2, lz3];
-            const uvs = [
-                [s.u0, s.v0],
-                [s.u1, s.v0],
-                [s.u0, s.v1],
-                [s.u1, s.v1]
-            ];
+            // 4 rotated corners without allocating arrays: 0=(-hw,-hh), 1=(hw,-hh), 2=(-hw,hh), 3=(hw,hh)
+            const wx0 = cx - hwCos + hhSin, wz0 = cz - hwSin - hhCos;
+            const wx1 = cx + hwCos + hhSin, wz1 = cz + hwSin - hhCos;
+            const wx2 = cx - hwCos - hhSin, wz2 = cz - hwSin + hhCos;
+            const wx3 = cx + hwCos - hhSin, wz3 = cz + hwSin + hhCos;
 
             const pZ = s.pitchZ || 0;
-            for (let k = 0; k < 6; k++) {
-                const idx = tri[k];
-                const wx = cx + lx[idx] * cosA - lz[idx] * sinA;
-                const wz = cz + lx[idx] * sinA + lz[idx] * cosA;
-                const cornerPitch = pZ !== 0 ? (lz[idx] > 0 ? pZ : -pZ) : 0;
-                verts[offset++] = wx;
-                verts[offset++] = s.zBlocks + cornerPitch;
-                verts[offset++] = wz;
-                verts[offset++] = uvs[idx][0];
-                verts[offset++] = uvs[idx][1];
-                verts[offset++] = s.r;
-                verts[offset++] = s.g;
-                verts[offset++] = s.b;
-                verts[offset++] = s.a;
-            }
+            const yTop = s.zBlocks - pZ;
+            const yBot = s.zBlocks + pZ;
+            const u0 = s.u0, v0 = s.v0, u1 = s.u1, v1 = s.v1;
+            const r = s.r, g = s.g, b = s.b, a = s.a;
+
+            // Triangle 1: (0, 2, 1)
+            verts[offset]     = wx0; verts[offset + 1] = yTop; verts[offset + 2] = wz0; verts[offset + 3] = u0; verts[offset + 4] = v0; verts[offset + 5] = r; verts[offset + 6] = g; verts[offset + 7] = b; verts[offset + 8] = a;
+            verts[offset + 9] = wx2; verts[offset + 10] = yBot; verts[offset + 11] = wz2; verts[offset + 12] = u0; verts[offset + 13] = v1; verts[offset + 14] = r; verts[offset + 15] = g; verts[offset + 16] = b; verts[offset + 17] = a;
+            verts[offset + 18] = wx1; verts[offset + 19] = yTop; verts[offset + 20] = wz1; verts[offset + 21] = u1; verts[offset + 22] = v0; verts[offset + 23] = r; verts[offset + 24] = g; verts[offset + 25] = b; verts[offset + 26] = a;
+            // Triangle 2: (1, 2, 3)
+            verts[offset + 27] = wx1; verts[offset + 28] = yTop; verts[offset + 29] = wz1; verts[offset + 30] = u1; verts[offset + 31] = v0; verts[offset + 32] = r; verts[offset + 33] = g; verts[offset + 34] = b; verts[offset + 35] = a;
+            verts[offset + 36] = wx2; verts[offset + 37] = yBot; verts[offset + 38] = wz2; verts[offset + 39] = u0; verts[offset + 40] = v1; verts[offset + 41] = r; verts[offset + 42] = g; verts[offset + 43] = b; verts[offset + 44] = a;
+            verts[offset + 45] = wx3; verts[offset + 46] = yBot; verts[offset + 47] = wz3; verts[offset + 48] = u1; verts[offset + 49] = v1; verts[offset + 50] = r; verts[offset + 51] = g; verts[offset + 52] = b; verts[offset + 53] = a;
+            offset += 54;
         }
         this.spriteCount = count;
     }
@@ -6191,6 +6297,9 @@ class RetroRenderer {
         if (this.spriteLocs.uSunDir !== null && this.spriteLocs.uSunDir !== undefined) {
             gl.uniform2f(this.spriteLocs.uSunDir, sunDirX, sunDirY);
         }
+        if (this.spriteLocs.uMobileFast !== null && this.spriteLocs.uMobileFast !== undefined) {
+            gl.uniform1f(this.spriteLocs.uMobileFast, this.isMobileInit ? 1.0 : 0.0);
+        }
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.spritesTex);
@@ -6204,10 +6313,10 @@ class RetroRenderer {
         }
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.spriteBuffer);
-        gl.bufferData(
+        gl.bufferSubData(
             gl.ARRAY_BUFFER,
-            this.spriteVerts.subarray(0, this.spriteCount * 6 * 9),
-            gl.DYNAMIC_DRAW
+            0,
+            this.spriteVerts.subarray(0, this.spriteCount * 54)
         );
 
         const stride = 9 * 4;
@@ -6349,19 +6458,28 @@ class RetroRenderer {
         }
 
         // 1. Render 3D WebGL CityMesh (or 3D WebGL Interior Room!) + 3D SpriteBatch into this.glCanvas
+        const needDaylightAtmo = !this.isMobileInit && (this.nightFactor || 0) < 0.72 && !this.nightMode && !game.activeInterior;
+        const needNightLight = ((this.nightFactor || 0) > 0.02 || (this.sunsetFactor || 0) > 0.04 || this.nightMode) && !game.activeInterior;
+        const glMountedBehind = Boolean(this.glCanvas && this.glCanvas.parentNode);
+
         if (!this.glLost) {
             this.renderWebGLScene(game, effectiveViewProj);
-            ctx.drawImage(this.glCanvas, 0, 0);
+            if (!glMountedBehind || needDaylightAtmo || needNightLight) {
+                ctx.drawImage(this.glCanvas, 0, 0);
+            } else {
+                // Zero-copy hardware compositing: #webgl-canvas renders directly behind transparent #game-canvas!
+                ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
         }
 
         // 2A. Daytime Ambient Florida Sunlight, Volumetric Sunbeams & Tropical Sky-Shadow Atmosphere
         // (On mobile, WebGL shaders already compute full directional sunlight & shadow maps in hardware, avoiding software 2D canvas full-screen blends)
-        if (!this.isMobileInit && (this.nightFactor || 0) < 0.72 && !this.nightMode && !game.activeInterior) {
+        if (needDaylightAtmo) {
             this.renderDaylightAtmosphere(ctx, game);
         }
 
         // 2B. Real Dynamic Day/Sunset/Night Lighting (Darkness Mask + Conical Headlights + Taillights + Streetlamps + Neon + Sirens)
-        if (((this.nightFactor || 0) > 0.02 || (this.sunsetFactor || 0) > 0.04 || this.nightMode) && !game.activeInterior) {
+        if (needNightLight) {
             this.renderNightLighting(ctx, game);
         }
 
@@ -6515,11 +6633,12 @@ class RetroRenderer {
             : (this.tilesTexNyc || this.tilesTex);
         if (!this.gta1Ready || !this.cmpReady || !activeTilesTex) return;
 
-        // Visible ground frustum in block units (with margin for tall z=6 skyscrapers)
+        // Visible ground frustum in block units (tightened to aspect ratio on portrait mobile screens to avoid drawing off-screen chunks)
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
-        const marginX = 14.0;
-        const marginY = 11.0;
+        const aspect = this.glCanvas.width / Math.max(1, this.glCanvas.height);
+        const marginX = this.isMobileInit ? Math.max(8.5, Math.min(13.0, 9.5 * aspect + 3.5)) : 14.0;
+        const marginY = this.isMobileInit ? 9.5 : 11.0;
         const minBX = camXBlocks - marginX;
         const maxBX = camXBlocks + marginX;
         const minBY = camYBlocks - marginY;
@@ -6531,6 +6650,9 @@ class RetroRenderer {
         gl.uniform1f(this.cityLocs.uWaterStep, Math.floor(this.time * 7.0) % 11);
         gl.uniform1f(this.cityLocs.uFanStep, Math.floor(this.time * 9.0) % 6);
         gl.uniform1f(this.cityLocs.uNightTint, nf);
+        if (this.cityLocs.uMobileFast !== null && this.cityLocs.uMobileFast !== undefined) {
+            gl.uniform1f(this.cityLocs.uMobileFast, this.isMobileInit ? 1.0 : 0.0);
+        }
         if (this.cityLocs.uWinLit) {
             gl.uniform1f(this.cityLocs.uWinLit, this.getWindowLitFactor(game));
         }
@@ -6735,10 +6857,10 @@ class RetroRenderer {
             shadowAlpha
         );
 
-        // 2. 3D Curved Ringed Coconut / Royal Palm Trunk rising from planter to crown (more rings on taller palms)
-        const segs = Math.max(3, Math.round(4 * hm));
+        // 2. 3D Curved Ringed Coconut / Royal Palm Trunk rising from planter to crown (single trunk quad on mobile to halve palm quad count)
+        const segs = this.isMobileInit ? 1 : Math.max(3, Math.round(4 * hm));
         for (let s = 0; s < segs; s++) {
-            const t = s / (segs - 1);
+            const t = segs > 1 ? (s / (segs - 1)) : 0.5;
             const tx = x + leanX * t;
             const ty = y + leanY * t;
             const tz = baseZ + 0.045 + t * 0.27 * hm;
@@ -6907,6 +7029,50 @@ class RetroRenderer {
         this.pushSolidQuad3D(ux + ca * 16, uy + sa * 16, bz + 0.022, 11, 1.3, knockAng - 0.42, 0.88, 0.90, 0.94, 0.88, SPRITE_DRAW_ORDER.GROUND_DECALS);
     }
 
+    _queryStaticChunkGrid(arr, xProp, yProp, minX, minY, maxX, maxY, indexProp = null) {
+        const out = this._spatialQueryOut || (this._spatialQueryOut = []);
+        out.length = 0;
+        if (!Array.isArray(arr) || arr.length === 0) return out;
+        if (!this._staticChunkGridMap) this._staticChunkGridMap = new WeakMap();
+        let grid = this._staticChunkGridMap.get(arr);
+        if (!grid) {
+            grid = new Array(1024);
+            for (let i = 0; i < arr.length; i++) {
+                const it = arr[i];
+                if (!it) continue;
+                if (indexProp && it[indexProp] === undefined) it[indexProp] = i;
+                const px = it[xProp] !== undefined ? it[xProp] : it.x;
+                const py = it[yProp] !== undefined ? it[yProp] : it.y;
+                if (typeof px !== "number" || typeof py !== "number") continue;
+                const cx = Math.max(0, Math.min(31, px >> 10));
+                const cy = Math.max(0, Math.min(31, py >> 10));
+                const k = (cy << 5) | cx;
+                let bucket = grid[k];
+                if (!bucket) {
+                    bucket = [];
+                    grid[k] = bucket;
+                }
+                bucket.push(it);
+            }
+            this._staticChunkGridMap.set(arr, grid);
+        }
+        const x0 = Math.max(0, minX >> 10);
+        const x1 = Math.min(31, maxX >> 10);
+        const y0 = Math.max(0, minY >> 10);
+        const y1 = Math.min(31, maxY >> 10);
+        for (let cy = y0; cy <= y1; cy++) {
+            const rowOff = cy << 5;
+            for (let cx = x0; cx <= x1; cx++) {
+                const bucket = grid[rowOff | cx];
+                if (!bucket) continue;
+                for (let j = 0; j < bucket.length; j++) {
+                    out.push(bucket[j]);
+                }
+            }
+        }
+        return out;
+    }
+
     renderViceBeachActivities3D(game, minX, minY, maxX, maxY, sunCos, sunSin, sunShadowAngle, sunShadowAlpha, nfGlobal) {
         if (!this.gta1Ready || !this.map) return;
         const objs = this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects;
@@ -6914,8 +7080,10 @@ class RetroRenderer {
 
         // 1. Sunbathing Bikini Women on Beach Towels & Resort Sun Loungers under 3D Striped Beach Umbrellas
         if (Array.isArray(this.map.beachSunbathers)) {
-            for (let i = 0; i < this.map.beachSunbathers.length; i++) {
-                const sb = this.map.beachSunbathers[i];
+            const sbVis = this._queryStaticChunkGrid(this.map.beachSunbathers, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_sbIdx");
+            for (let vi = 0; vi < sbVis.length; vi++) {
+                const sb = sbVis[vi];
+                const i = sb._sbIdx !== undefined ? sb._sbIdx : vi;
                 if (sb.x < minX - 48 || sb.x > maxX + 48 || sb.y < minY - 48 || sb.y > maxY + 48) continue;
                 const bz = sb.z || 2.0;
                 const ang = sb.angle || 0;
@@ -9889,7 +10057,9 @@ class RetroRenderer {
         }
         if (this.mapStyle === "VICE") {
             if (this.map.beachProps) {
-                for (const bp of this.map.beachProps) {
+                const bpVis = this._queryStaticChunkGrid(this.map.beachProps, "x", "y", minX, minY, maxX, maxY);
+                for (let vi = 0; vi < bpVis.length; vi++) {
+                    const bp = bpVis[vi];
                     if (bp.spr && bp.spr.startsWith("lifeguard_")) continue;
                     if (bp.x < minX || bp.x > maxX || bp.y < minY || bp.y > maxY) continue;
                     const bz = this.getEntityZ(bp, 0.04) + (bp.zOff || 0.03);
@@ -9897,7 +10067,9 @@ class RetroRenderer {
                 }
             }
             if (this.map.beachUmbrellas) {
-                for (const umb of this.map.beachUmbrellas) {
+                const umbVis = this._queryStaticChunkGrid(this.map.beachUmbrellas, "x", "y", minX, minY, maxX, maxY);
+                for (let vi = 0; vi < umbVis.length; vi++) {
+                    const umb = umbVis[vi];
                     if (umb.x < minX || umb.x > maxX || umb.y < minY || umb.y > maxY) continue;
                     const uz = this.getEntityZ(umb, 0.04);
                     if ((umb.wipeoutTimer || 0) > 0) {
@@ -9909,16 +10081,19 @@ class RetroRenderer {
             }
             this.renderViceBeachActivities3D(game, minX, minY, maxX, maxY, sunCos, sunSin, sunShadowAngle, sunShadowAlpha, nfGlobal);
             if (this.map.vicePalms) {
-                for (let pi = 0; pi < this.map.vicePalms.length; pi++) {
-                    const pm = this.map.vicePalms[pi];
+                const palmVis = this._queryStaticChunkGrid(this.map.vicePalms, "x", "y", minX, minY, maxX, maxY, "_palmIdx");
+                for (let vi = 0; vi < palmVis.length; vi++) {
+                    const pm = palmVis[vi];
                     if (pm.x < minX || pm.x > maxX || pm.y < minY || pm.y > maxY) continue;
-                    this.renderLeonidaFlora3D(pm, pi, sunShadowAngle, sunShadowAlpha, nfGlobal);
+                    this.renderLeonidaFlora3D(pm, pm._palmIdx !== undefined ? pm._palmIdx : vi, sunShadowAngle, sunShadowAlpha, nfGlobal);
                 }
             }
 
             // 7B. Deep-Dive Vice City Architectural Streetscape Props (Ocean Drive Café Parasol Sprites & Española Bistro Lights)
             if (Array.isArray(this.map.viceStreetDetails)) {
-                for (const vd of this.map.viceStreetDetails) {
+                const vdVis = this._queryStaticChunkGrid(this.map.viceStreetDetails, "x", "y", minX, minY, maxX, maxY);
+                for (let vi = 0; vi < vdVis.length; vi++) {
+                    const vd = vdVis[vi];
                     if (vd.x < minX || vd.x > maxX || vd.y < minY || vd.y > maxY) continue;
                     const vz = (vd.z !== undefined ? vd.z : 2.0);
                     if (vd.kind === "CAFE_TABLE") {
@@ -10023,7 +10198,9 @@ class RetroRenderer {
             }
         }
         if (this.map && Array.isArray(this.map.trees)) {
-            for (const tr of this.map.trees) {
+            const trVis = this._queryStaticChunkGrid(this.map.trees, "x", "y", minX, minY, maxX, maxY);
+            for (let vi = 0; vi < trVis.length; vi++) {
+                const tr = trVis[vi];
                 if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
                 this.batchObjectSprite3D("257", tr.x, tr.y, this.getEntityZ(tr, 0.12), 0, (tr.scale || 1.0), SPRITE_DRAW_ORDER.TREES);
             }
@@ -10033,7 +10210,9 @@ class RetroRenderer {
         if (this.map && Array.isArray(this.map.streetlights)) {
             const nf = nfGlobal;
             if (nf < 0.85) {
-                for (const sl of this.map.streetlights) {
+                const slVis = this._queryStaticChunkGrid(this.map.streetlights, "baseX", "baseY", minX, minY, maxX, maxY);
+                for (let vi = 0; vi < slVis.length; vi++) {
+                    const sl = slVis[vi];
                     if (sl.state === 2) continue;
                     if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
                     const sz = sl.z || 2.0;
@@ -10049,7 +10228,9 @@ class RetroRenderer {
             const nf = nfGlobal;
             if (nf < 0.85) {
                 const bollardShadowLen = sunShadowLen * 0.32;
-                for (const bl of this.map.parkBollardLights) {
+                const blVis = this._queryStaticChunkGrid(this.map.parkBollardLights, "x", "y", minX, minY, maxX, maxY);
+                for (let vi = 0; vi < blVis.length; vi++) {
+                    const bl = blVis[vi];
                     if (bl.state === 2) continue;
                     if (bl.x < minX || bl.x > maxX || bl.y < minY || bl.y > maxY) continue;
                     const sz = bl.z || 2.0;
@@ -10133,8 +10314,10 @@ class RetroRenderer {
         if (this.map && Array.isArray(this.map.curbParkingBays)) {
             const nf = nfGlobal;
             const meterShadowLen = sunShadowLen * 0.25;
-            for (let bi = 0; bi < this.map.curbParkingBays.length; bi++) {
-                const bay = this.map.curbParkingBays[bi];
+            const bayVis = this._queryStaticChunkGrid(this.map.curbParkingBays, "x", "y", minX - 80, minY - 80, maxX + 80, maxY + 80, "_bayIdx");
+            for (let vi = 0; vi < bayVis.length; vi++) {
+                const bay = bayVis[vi];
+                const bi = bay._bayIdx !== undefined ? bay._bayIdx : vi;
                 const scx = bay.stallCenterX !== undefined ? bay.stallCenterX : bay.x;
                 const scy = bay.stallCenterY !== undefined ? bay.stallCenterY : bay.y;
                 if (scx < minX - 56 || scx > maxX + 56 || scy < minY - 56 || scy > maxY + 56) continue;
@@ -10227,7 +10410,9 @@ class RetroRenderer {
         if (this.map && Array.isArray(this.map.trafficSignals)) {
             const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
             if (nf < 0.85) {
-                for (const ts of this.map.trafficSignals) {
+                const tsVis = this._queryStaticChunkGrid(this.map.trafficSignals, "baseX", "baseY", minX, minY, maxX, maxY);
+                for (let vi = 0; vi < tsVis.length; vi++) {
+                    const ts = tsVis[vi];
                     if (ts.state === 2) continue;
                     if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
                     const sz = ts.z || 2.0;
@@ -10411,7 +10596,7 @@ class RetroRenderer {
         const H = this.canvas.height;
         if (W <= 0 || H <= 0) return;
 
-        const scale = 0.5;
+        const scale = this.isMobileInit ? 0.35 : 0.5;
         const lw = Math.max(1, Math.floor(W * scale));
         const lh = Math.max(1, Math.floor(H * scale));
         if (!this.nightCanvas) {
@@ -10523,7 +10708,9 @@ class RetroRenderer {
 
         // 2. GTA 2 Style 3D Curb Streetlamps, Ocean Drive Neon Palms & Española Bistro Lights!
         if (this.map && Array.isArray(this.map.streetlights)) {
-            for (const sl of this.map.streetlights) {
+            const slNightVis = this._queryStaticChunkGrid(this.map.streetlights, "baseX", "baseY", this.camX - 960, this.camY - 720, this.camX + 960, this.camY + 720);
+            for (let vi = 0; vi < slNightVis.length; vi++) {
+                const sl = slNightVis[vi];
                 // Knocked-down streetlamps (state === 2) have their bulb smashed and emit no light!
                 if (sl.state === 2) continue;
                 // Damaged/bent streetlamps (state === 1) flicker intermittently!
@@ -10569,7 +10756,9 @@ class RetroRenderer {
         // 2A-bis. Low Park, Promenade & Villa Walkway Bollard Lights (this.map.parkBollardLights)
         //         Casts a compact, downward-directed warm landscape light pool right onto the adjacent grass & path
         if (this.map && Array.isArray(this.map.parkBollardLights)) {
-            for (const bl of this.map.parkBollardLights) {
+            const blNightVis = this._queryStaticChunkGrid(this.map.parkBollardLights, "x", "y", this.camX - 980, this.camY - 760, this.camX + 980, this.camY + 760);
+            for (let vi = 0; vi < blNightVis.length; vi++) {
+                const bl = blNightVis[vi];
                 if (bl.state === 2) continue;
                 if (Math.abs(bl.x - this.camX) > 960 || Math.abs(bl.y - this.camY) > 740) continue;
                 const sz = bl.z || 2.0;
@@ -10601,7 +10790,9 @@ class RetroRenderer {
 
         // 2B. Ocean Drive Serpentine Neon Wall & Española Way Bistro Light Strings
         if (this.map && Array.isArray(this.map.viceStreetDetails)) {
-            for (const vd of this.map.viceStreetDetails) {
+            const vdNightVis = this._queryStaticChunkGrid(this.map.viceStreetDetails, "x", "y", this.camX - 880, this.camY - 660, this.camX + 880, this.camY + 660);
+            for (let vi = 0; vi < vdNightVis.length; vi++) {
+                const vd = vdNightVis[vi];
                 if (vd.kind === "CAFE_TABLE") continue;
                 if (Math.abs(vd.x - this.camX) > 860 || Math.abs(vd.y - this.camY) > 640) continue;
                 const sc = this.worldToScreen(vd.x, vd.y, (vd.z || 2.0) + (vd.kind === "BISTRO_STRING" ? 0.50 : 0.08));
@@ -10646,7 +10837,9 @@ class RetroRenderer {
             const ph = ((game ? game.trafficLightTimer : this.time) || 0) % 12.0;
             const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
             const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
-            for (const ts of this.map.trafficSignals) {
+            const tsNightVis = this._queryStaticChunkGrid(this.map.trafficSignals, "baseX", "baseY", this.camX - 920, this.camY - 680, this.camX + 920, this.camY + 680);
+            for (let vi = 0; vi < tsNightVis.length; vi++) {
+                const ts = tsNightVis[vi];
                 if (ts.state === 2) continue;
                 if (ts.state === 1 && Math.sin(this.time * 28.0 + ts.baseX) <= -0.25) continue;
                 const effHX = ts.headX + (ts.state === 1 ? (ts.tiltDx || 0) : 0);
@@ -10677,6 +10870,7 @@ class RetroRenderer {
         // 3. Enterable Venue Neon Signs, Pay 'n' Sprays & Ringing Payphones (with GTA 2 LGHT blink/pulse jitter!)
         if (Array.isArray(this.map.interiors)) {
             for (const intr of this.map.interiors) {
+                if (Math.abs(intr.doorX - this.camX) > 960 || Math.abs(intr.doorY - this.camY) > 760) continue;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.12;
                 const sc = this.worldToScreen(intr.doorX, intr.doorY, dz);
                 if (sc.x < -180 || sc.x > W + 180 || sc.y < -180 || sc.y > H + 180) continue;
@@ -10924,9 +11118,11 @@ class RetroRenderer {
 
         // 8. Composite Pass 2: Soft Atmospheric Screen Bloom + High-Res Headlight Beams & Lens Flares
         if (lightInt > 0.02) {
-            ctx.globalCompositeOperation = "screen";
-            ctx.globalAlpha = 0.28 * nf;
-            ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+            if (!this.isMobileInit) {
+                ctx.globalCompositeOperation = "screen";
+                ctx.globalAlpha = 0.28 * nf;
+                ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+            }
 
             ctx.globalCompositeOperation = "lighter";
             ctx.globalAlpha = lightInt;
@@ -10945,14 +11141,19 @@ class RetroRenderer {
                 g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
                 ctx.fillStyle = g;
 
-                const layers = [
-                    { sp: c.spread * 1.14, wMult: 1.08, alpha: 0.14 },
-                    { sp: c.spread * 0.98, wMult: 1.00, alpha: 0.18 },
-                    { sp: c.spread * 0.82, wMult: 0.92, alpha: 0.20 },
-                    { sp: c.spread * 0.66, wMult: 0.82, alpha: 0.22 },
-                    { sp: c.spread * 0.48, wMult: 0.70, alpha: 0.20 },
-                    { sp: c.spread * 0.30, wMult: 0.54, alpha: 0.16 }
-                ];
+                const layers = this.isMobileInit
+                    ? [
+                        { sp: c.spread * 1.04, wMult: 1.02, alpha: 0.36 },
+                        { sp: c.spread * 0.56, wMult: 0.72, alpha: 0.42 }
+                    ]
+                    : [
+                        { sp: c.spread * 1.14, wMult: 1.08, alpha: 0.14 },
+                        { sp: c.spread * 0.98, wMult: 1.00, alpha: 0.18 },
+                        { sp: c.spread * 0.82, wMult: 0.92, alpha: 0.20 },
+                        { sp: c.spread * 0.66, wMult: 0.82, alpha: 0.22 },
+                        { sp: c.spread * 0.48, wMult: 0.70, alpha: 0.20 },
+                        { sp: c.spread * 0.30, wMult: 0.54, alpha: 0.16 }
+                    ];
                 for (const ly of layers) {
                     const w = bw * ly.wMult;
                     ctx.globalAlpha = lightInt * ly.alpha;
@@ -11010,6 +11211,16 @@ class RetroRenderer {
         ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        if (!this._promptWidthCache) this._promptWidthCache = new Map();
+        const measurePromptW = (str) => {
+            let w = this._promptWidthCache.get(str);
+            if (w === undefined) {
+                if (this._promptWidthCache.size > 512) this._promptWidthCache.clear();
+                w = ctx.measureText(str).width;
+                this._promptWidthCache.set(str, w);
+            }
+            return w;
+        };
 
         // 0. 3D Villa Heist Prompts (Laser Keypads, 3D Armored Cartel Vaults, Pier Speedboat Getaways & Escape Banner)
         if (this.map && this.map.objectEngine && typeof this.map.objectEngine.renderHeistPrompts === "function") {
@@ -11018,27 +11229,31 @@ class RetroRenderer {
 
         // 1. Glowing Enterable Venue Interior Door Badges (anchored at the physical door threshold)
         if (Array.isArray(this.map.interiors)) {
-            for (const intr of this.map.interiors) {
-                const fnv = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[intr.facing] || [0, 1];
+            for (let ii = 0; ii < this.map.interiors.length; ii++) {
+                const intr = this.map.interiors[ii];
+                if (Math.abs(p.x - intr.doorX) > 365 || Math.abs(p.y - intr.doorY) > 365) continue;
+                const fCode = intr.facing;
+                const fnvX = fCode === "E" ? 1 : (fCode === "W" ? -1 : 0);
+                const fnvY = fCode === "N" ? -1 : ((fCode === "E" || fCode === "W") ? 0 : 1);
                 const isPortico = !!intr.isEstatePortico;
-                const tcx = (intr.facing && !isPortico) ? (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorX;
-                const tcy = (intr.facing && !isPortico) ? (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorY;
-                const threshX = (intr.facing && !isPortico) ? (tcx - fnv[0] * 18) : intr.doorX;
-                const threshY = (intr.facing && !isPortico) ? (tcy - fnv[1] * 18) : intr.doorY;
+                const tcx = (fCode && !isPortico) ? (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorX;
+                const tcy = (fCode && !isPortico) ? (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5) : intr.doorY;
+                const threshX = (fCode && !isPortico) ? (tcx - fnvX * 18) : intr.doorX;
+                const threshY = (fCode && !isPortico) ? (tcy - fnvY * 18) : intr.doorY;
 
                 const dist = Math.hypot(p.x - threshX, p.y - threshY);
                 if (dist > 340) continue;
                 // Never draw a door badge when the player is on the opposite/back side of the 3D building facade
-                if (!isPortico && ((p.x - tcx) * fnv[0] + (p.y - tcy) * fnv[1]) < -TILE_SIZE * 0.52) continue;
+                if (!isPortico && ((p.x - tcx) * fnvX + (p.y - tcy) * fnvY) < -TILE_SIZE * 0.52) continue;
                 if (!isPortico && dist > 64 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, threshX, threshY, 2.0).hit) continue;
 
-                const labelX = (intr.facing && !isPortico) ? (tcx - fnv[0] * 12) : intr.doorX;
-                const labelY = (intr.facing && !isPortico) ? (tcy - fnv[1] * 12) : intr.doorY;
+                const labelX = (fCode && !isPortico) ? (tcx - fnvX * 12) : intr.doorX;
+                const labelY = (fCode && !isPortico) ? (tcy - fnvY * 12) : intr.doorY;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.04;
                 const sc = this.worldToScreen(labelX, labelY, dz);
                 const isClose = dist < 38;
                 const label = isClose ? `🚪 [E] ${intr.name}` : `🚪 ${intr.name}`;
-                const bw = Math.max(130, ctx.measureText(label).width + 18);
+                const bw = Math.max(130, measurePromptW(label) + 18);
                 const bh = 22;
                 const bx = Math.round(sc.x - bw * 0.5);
                 const by = Math.round(sc.y - bh * 0.5 + 2);
@@ -11055,14 +11270,16 @@ class RetroRenderer {
 
         // 2. Stunt Jump Ramp Labels when nearby
         if (Array.isArray(this.map.stuntRamps)) {
-            for (const ramp of this.map.stuntRamps) {
+            for (let ri = 0; ri < this.map.stuntRamps.length; ri++) {
+                const ramp = this.map.stuntRamps[ri];
+                if (Math.abs(p.x - ramp.x) > 195 || Math.abs(p.y - ramp.y) > 195) continue;
                 const dist = Math.hypot(p.x - ramp.x, p.y - ramp.y);
                 if (dist > 190) continue;
                 if (dist > 64 && this.map.traceSegment2D && this.map.traceSegment2D(p.x, p.y, ramp.x, ramp.y, 2.0).hit) continue;
                 const rz = this.map.getHeightAtPixel(ramp.x, ramp.y, 2.0) + 0.08;
                 const sc = this.worldToScreen(ramp.x, ramp.y, rz);
                 const label = `🔥 STUNT RAMP: ${ramp.name}`;
-                const bw = ctx.measureText(label).width + 14;
+                const bw = measurePromptW(label) + 14;
                 const bx = Math.round(sc.x - bw * 0.5);
                 const by = Math.round(sc.y - 9);
                 ctx.fillStyle = "rgba(24, 16, 6, 0.85)";
@@ -11080,20 +11297,50 @@ class RetroRenderer {
             let bestBoat = null;
             let bestBoatDist = 235;
             if (Array.isArray(game.vehicles)) {
-                for (const v of game.vehicles) {
-                    if (v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious)) continue;
-                    const d = Math.hypot(v.x - p.x, v.y - p.y);
-                    if (d < bestBoatDist) {
-                        bestBoatDist = d;
-                        const bName = v.specKey === "JETSKI" ? "JET-SKI" : (v.specKey === "AIRBOAT" ? "AIRBOAT" : "SPEEDBOAT");
-                        bestBoat = { x: v.x, y: v.y, z: Math.max(2.0, v.z || 2.0) + 0.14, name: bName, dist: d };
+                const gHead = game._vehGridHead;
+                const gNext = game._vehGridNext;
+                if (gHead && gNext) {
+                    const gx0 = Math.max(0, (p.x >> 8) - 1);
+                    const gx1 = Math.min(127, (p.x >> 8) + 1);
+                    const gy0 = Math.max(0, (p.y >> 8) - 1);
+                    const gy1 = Math.min(127, (p.y >> 8) + 1);
+                    for (let gy = gy0; gy <= gy1; gy++) {
+                        const rowOff = gy << 7;
+                        for (let gx = gx0; gx <= gx1; gx++) {
+                            for (let vi = gHead[rowOff | gx]; vi !== -1; vi = gNext[vi]) {
+                                const v = game.vehicles[vi];
+                                if (!v || v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious)) continue;
+                                const d = Math.hypot(v.x - p.x, v.y - p.y);
+                                if (d < bestBoatDist) {
+                                    bestBoatDist = d;
+                                    const bName = v.specKey === "JETSKI" ? "JET-SKI" : (v.specKey === "AIRBOAT" ? "AIRBOAT" : "SPEEDBOAT");
+                                    bestBoat = { x: v.x, y: v.y, z: Math.max(2.0, v.z || 2.0) + 0.14, name: bName, dist: d };
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for (const v of game.vehicles) {
+                        if (v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious)) continue;
+                        if (Math.abs(v.x - p.x) > 235 || Math.abs(v.y - p.y) > 235) continue;
+                        const d = Math.hypot(v.x - p.x, v.y - p.y);
+                        if (d < bestBoatDist) {
+                            bestBoatDist = d;
+                            const bName = v.specKey === "JETSKI" ? "JET-SKI" : (v.specKey === "AIRBOAT" ? "AIRBOAT" : "SPEEDBOAT");
+                            bestBoat = { x: v.x, y: v.y, z: Math.max(2.0, v.z || 2.0) + 0.14, name: bName, dist: d };
+                        }
                     }
                 }
             }
-            if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.instances)) {
-                for (const inst of this.map.objectEngine.instances) {
-                    if (!inst || !inst.dockBoat) continue;
-                    const db = inst.dockBoat;
+            const oe = this.map && this.map.objectEngine;
+            if (oe && Array.isArray(oe.instances)) {
+                if (!oe._dockBoatInsts || oe._dockBoatInstsSrcLen !== oe.instances.length) {
+                    oe._dockBoatInsts = oe.instances.filter((inst) => inst && inst.dockBoat);
+                    oe._dockBoatInstsSrcLen = oe.instances.length;
+                }
+                for (let di = 0; di < oe._dockBoatInsts.length; di++) {
+                    const db = oe._dockBoatInsts[di].dockBoat;
+                    if (Math.abs(db.worldX - p.x) > 300 || Math.abs(db.worldY - p.y) > 300) continue;
                     if (db._liveBoat && !db._liveBoat.destroyed) continue;
                     const d = Math.min(Math.hypot(db.worldX - p.x, db.worldY - p.y), Math.hypot(db.pierMidX - p.x, db.pierMidY - p.y));
                     if (d < bestBoatDist) {
@@ -11104,10 +11351,12 @@ class RetroRenderer {
                 }
             }
             if (this.map && Array.isArray(this.map.jetSkiers)) {
-                for (const js of this.map.jetSkiers) {
-                    if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
+                for (let ji = 0; ji < this.map.jetSkiers.length; ji++) {
+                    const js = this.map.jetSkiers[ji];
                     const jx = js._liveX !== undefined ? js._liveX : js.x;
                     const jy = js._liveY !== undefined ? js._liveY : js.y;
+                    if (Math.abs(jx - p.x) > 235 || Math.abs(jy - p.y) > 235) continue;
+                    if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
                     const d = Math.hypot(jx - p.x, jy - p.y);
                     if (d < bestBoatDist) {
                         bestBoatDist = d;
@@ -11116,10 +11365,12 @@ class RetroRenderer {
                 }
             }
             if (this.map && Array.isArray(this.map.evergladesAirboats)) {
-                for (const ab of this.map.evergladesAirboats) {
-                    if (ab._boardedVehicle && !ab._boardedVehicle.destroyed) continue;
+                for (let ai = 0; ai < this.map.evergladesAirboats.length; ai++) {
+                    const ab = this.map.evergladesAirboats[ai];
                     const ax = ab._liveX !== undefined ? ab._liveX : ab.x;
                     const ay = ab._liveY !== undefined ? ab._liveY : ab.y;
+                    if (Math.abs(ax - p.x) > 235 || Math.abs(ay - p.y) > 235) continue;
+                    if (ab._boardedVehicle && !ab._boardedVehicle.destroyed) continue;
                     const d = Math.hypot(ax - p.x, ay - p.y);
                     if (d < bestBoatDist) {
                         bestBoatDist = d;
@@ -11128,7 +11379,9 @@ class RetroRenderer {
                 }
             }
             if (this.map && Array.isArray(this.map.portTerminals)) {
-                for (const pt of this.map.portTerminals) {
+                for (let pi = 0; pi < this.map.portTerminals.length; pi++) {
+                    const pt = this.map.portTerminals[pi];
+                    if (Math.abs(pt.x - p.x) > 235 || Math.abs(pt.y - p.y) > 235) continue;
                     if ((pt.kind !== "SPEEDBOAT" && pt.kind !== "YACHT") || (pt._boardedVehicle && !pt._boardedVehicle.destroyed)) continue;
                     const d = Math.hypot(pt.x - p.x, pt.y - p.y);
                     if (d < bestBoatDist) {
@@ -11141,7 +11394,7 @@ class RetroRenderer {
                 const sc = this.worldToScreen(bestBoat.x, bestBoat.y, bestBoat.z);
                 const canBoardNow = bestBoat.dist <= 195;
                 const label = canBoardNow ? `🚤 [E] / [F] BOARD ${bestBoat.name}` : `🚤 ${bestBoat.name}`;
-                const bw = Math.max(142, ctx.measureText(label).width + 18);
+                const bw = Math.max(142, measurePromptW(label) + 18);
                 const bh = 22;
                 const bx = Math.round(sc.x - bw * 0.5);
                 const by = Math.round(sc.y - 26);
@@ -11160,12 +11413,20 @@ class RetroRenderer {
 
         // 2C. Street Interactive Props Prompt ([E] ATM, Retro Arcade Cabinet, Sprunk Soda Machine)
         if (!p.inVehicle && this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.interactiveProps)) {
+            const oe = this.map.objectEngine;
+            if (!oe._usableInteractProps || oe._usableInteractSrcLen !== oe.interactiveProps.length) {
+                oe._usableInteractProps = oe.interactiveProps.filter((pr) => {
+                    const s = String((pr && pr.spr) || "");
+                    return s.includes("atm") || s.includes("arcade") || s.includes("vending") || s.includes("soda");
+                });
+                oe._usableInteractSrcLen = oe.interactiveProps.length;
+            }
             let bestProp = null;
             let bestPropDist = 92;
-            for (const pr of this.map.objectEngine.interactiveProps) {
+            for (let i = 0; i < oe._usableInteractProps.length; i++) {
+                const pr = oe._usableInteractProps[i];
                 if (pr.broken || (pr.cooldown || 0) > 0) continue;
-                const s = String(pr.spr || "");
-                if (!s.includes("atm") && !s.includes("arcade") && !s.includes("vending") && !s.includes("soda")) continue;
+                if (Math.abs(pr.x - p.x) > 92 || Math.abs(pr.y - p.y) > 92) continue;
                 const d = Math.hypot(pr.x - p.x, pr.y - p.y);
                 if (d < bestPropDist) {
                     bestPropDist = d;
@@ -11178,7 +11439,7 @@ class RetroRenderer {
                 const pTitle = s.includes("atm")
                     ? "🏧 [E] SKIM ATM (+$350)"
                     : (s.includes("arcade") ? "🕹️ [E] PLAY ARCADE (+500 PTS)" : "🥤 [E] DRINK SODA (+25 HP)");
-                const bw = Math.max(138, ctx.measureText(pTitle).width + 16);
+                const bw = Math.max(138, measurePromptW(pTitle) + 16);
                 const bh = 20;
                 const bx = Math.round(sc.x - bw * 0.5);
                 const by = Math.round(sc.y - 22);
@@ -12819,14 +13080,106 @@ class RetroRenderer {
             ctx.translate(-px, -py);
         }
 
-        const rrect = (rx, ry, rw, rh, rad) => {
-            ctx.beginPath();
-            if (typeof ctx.roundRect === "function") {
-                ctx.roundRect(rx, ry, rw, rh, rad);
+        const rrectOn = (c, rx, ry, rw, rh, rad) => {
+            c.beginPath();
+            if (typeof c.roundRect === "function") {
+                c.roundRect(rx, ry, rw, rh, rad);
             } else {
-                ctx.rect(rx, ry, rw, rh);
+                c.rect(rx, ry, rw, rh);
             }
         };
+        const rrect = (rx, ry, rw, rh, rad) => rrectOn(ctx, rx, ry, rw, rh, rad);
+
+        const timeInfo = (game && typeof game.getTimePhaseInfo === "function")
+            ? game.getTimePhaseInfo()
+            : { icon: "☀️", dockLabel: "☀️ DAY [N]", phase: "DAY" };
+        const showColon = (Math.floor(this.time * 2.0) % 2) === 0;
+        const liveClockStr = (game && typeof game.getClockString === "function")
+            ? game.getClockString(showColon)
+            : "16:30";
+
+        // Fast cached offscreen pill path for mobile minimized Smartphone (~2 redraws/sec instead of 60 Hz gradients + clips!)
+        if (isMinimized && isMobile) {
+            const pillKey = `${pw}x${ph}:${timeInfo.icon}:${liveClockStr}`;
+            const cw = pw + 6;
+            const ch = ph + 6;
+            if (!this._minPhonePillCanvas || this._minPhonePillCanvas.width !== cw || this._minPhonePillCanvas.height !== ch) {
+                this._minPhonePillCanvas = document.createElement("canvas");
+                this._minPhonePillCanvas.width = cw;
+                this._minPhonePillCanvas.height = ch;
+                this._minPhonePillCtx = this._minPhonePillCanvas.getContext("2d");
+                this._minPhonePillKey = "";
+            }
+            if (this._minPhonePillKey !== pillKey && this._minPhonePillCtx) {
+                this._minPhonePillKey = pillKey;
+                const pc = this._minPhonePillCtx;
+                const ox = 3;
+                const oy = 3;
+                pc.clearRect(0, 0, cw, ch);
+                rrectOn(pc, ox, oy, pw, ph, 22);
+                pc.fillStyle = "#020617";
+                pc.fill();
+                pc.lineWidth = 2.5;
+                const fGrad = pc.createLinearGradient(ox, oy, ox + pw, oy + ph);
+                fGrad.addColorStop(0, "#94a3b8");
+                fGrad.addColorStop(0.5, "#475569");
+                fGrad.addColorStop(1, "#64748b");
+                pc.strokeStyle = fGrad;
+                pc.stroke();
+
+                const osx = ox + 5;
+                const osy = oy + 5;
+                const osw = pw - 10;
+                const osh = ph - 10;
+                rrectOn(pc, osx, osy, osw, osh, 18);
+                const wGrad = pc.createLinearGradient(osx, osy, osx, osy + osh);
+                wGrad.addColorStop(0, "#0b1120");
+                wGrad.addColorStop(0.55, "#111329");
+                wGrad.addColorStop(1, "#1b0e28");
+                pc.fillStyle = wGrad;
+                pc.fill();
+
+                pc.save();
+                rrectOn(pc, osx, osy, osw, osh, 18);
+                pc.clip();
+                pc.fillStyle = "#f8fafc";
+                pc.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                pc.textBaseline = "middle";
+                pc.fillText(`${timeInfo.icon} ${liveClockStr}`, osx + 8, osy + 10);
+
+                const sigX = osx + osw - 50;
+                const sigY = osy + 12.5;
+                for (let b = 0; b < 4; b++) {
+                    const bh = 3 + b * 1.6;
+                    pc.fillRect(sigX + b * 3.2, sigY - bh, 2.1, bh);
+                }
+                pc.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+                pc.fillText("5G", sigX + 15, osy + 10);
+
+                const batX = osx + osw - 22;
+                const batY = osy + 6.5;
+                pc.strokeStyle = "#cbd5e1";
+                pc.lineWidth = 1;
+                rrectOn(pc, batX, batY, 13, 6.5, 1.5);
+                pc.stroke();
+                pc.fillStyle = "#4ade80";
+                pc.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
+                pc.fillStyle = "#cbd5e1";
+                pc.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
+
+                pc.fillStyle = "#38bdf8";
+                pc.font = "bold 10px -apple-system, 'Segoe UI', sans-serif";
+                pc.fillText("📱 • 🎵 • 📍", osx + 7, osy + 20);
+                pc.restore();
+            }
+            ctx.drawImage(this._minPhonePillCanvas, px - 3, py - 3);
+            this.cheatButtons.push({ id: "TOGGLE_NIGHT", x: px + 9, y: py + 7, w: 68, h: 15 });
+            this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
+            this.renderPhoneGpsWidget(ctx, game, px, py + ph + 4, pw, 114, rrect);
+            applyPhoneScaleToButtons();
+            ctx.restore();
+            return;
+        }
 
         // 1. Physical Side Buttons (Left: Mute + Volume Up/Down, Right: Power Button)
         if (!isMinimized) {
@@ -12891,14 +13244,6 @@ class RetroRenderer {
             ctx.fill();
         }
 
-        // Live 24-Hour Clock & Time-of-Day Icon on left of Dynamic Island (Click to advance time phase [N])
-        const timeInfo = (game && typeof game.getTimePhaseInfo === "function")
-            ? game.getTimePhaseInfo()
-            : { icon: "☀️", dockLabel: "☀️ DAY [N]", phase: "DAY" };
-        const showColon = (Math.floor(this.time * 2.0) % 2) === 0;
-        const liveClockStr = (game && typeof game.getClockString === "function")
-            ? game.getClockString(showColon)
-            : "16:30";
         const staticClockStr = (game && typeof game.getClockString === "function")
             ? game.getClockString(true)
             : "16:30";
@@ -13067,7 +13412,14 @@ class RetroRenderer {
         const stLabel = (curSt && curSt.name) ? curSt.name : "VICE CITY FM • RADIO OST";
         ctx.fillText(`🎵 ${stLabel}`, musX + 26, musY + 10.5);
 
-        const volSlider = document.getElementById("yt-vol-slider");
+        if (!this._phoneDomEls) {
+            this._phoneDomEls = {
+                volSlider: document.getElementById("yt-vol-slider"),
+                senderEl: document.getElementById("pager-sender"),
+                pagerEl: document.getElementById("pager-text")
+            };
+        }
+        const volSlider = this._phoneDomEls.volSlider;
         const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (game.ytVolume || 28);
         ctx.fillStyle = "#cbd5e1";
         ctx.font = "bold 8.5px Consolas, monospace";
@@ -13126,15 +13478,22 @@ class RetroRenderer {
         ctx.arc(avX + 18, avY + 18, 2.8, 0, Math.PI * 2);
         ctx.fill();
 
-        const senderEl = document.getElementById("pager-sender");
+        const senderEl = this._phoneDomEls.senderEl;
         let contactName = "Jason Duval";
         if (senderEl && senderEl.textContent) {
-            const cleaned = senderEl.textContent
-                .replace(/📱|📟|SMARTPHONE|PAGER|BIPEUR\s*'97|BIPEUR|\(PARTNER\)/gi, "")
-                .replace(/^[\s/]+/, "")
-                .trim();
-            if (cleaned.toUpperCase().includes("LUCIA")) contactName = "Jason & Lucia";
-            else if (cleaned.length > 0 && !cleaned.toUpperCase().includes("JASON")) contactName = cleaned;
+            const rawSender = senderEl.textContent;
+            if (this._lastSenderRaw === rawSender && this._lastContactName) {
+                contactName = this._lastContactName;
+            } else {
+                const cleaned = rawSender
+                    .replace(/📱|📟|SMARTPHONE|PAGER|BIPEUR\s*'97|BIPEUR|\(PARTNER\)/gi, "")
+                    .replace(/^[\s/]+/, "")
+                    .trim();
+                if (cleaned.toUpperCase().includes("LUCIA")) contactName = "Jason & Lucia";
+                else if (cleaned.length > 0 && !cleaned.toUpperCase().includes("JASON")) contactName = cleaned;
+                this._lastSenderRaw = rawSender;
+                this._lastContactName = contactName;
+            }
         }
 
         ctx.fillStyle = "#f8fafc";
@@ -13166,8 +13525,8 @@ class RetroRenderer {
         ctx.textAlign = "left";
         this.cheatButtons.push({ id: "PHONE_ONLINE_BTN", x: mpBtnX, y: mpBtnY, w: mpBtnW, h: mpBtnH });
 
-        // Word-wrapped English SMS message body
-        const pagerEl = document.getElementById("pager-text");
+        // Word-wrapped English SMS message body (cached until message or width changes!)
+        const pagerEl = this._phoneDomEls.pagerEl;
         const rawMsg = pagerEl
             ? (pagerEl.textContent || "").trim()
             : "Welcome to Vice City! Use the GPS map above or press [M] to fast-travel anywhere.";
@@ -13175,24 +13534,30 @@ class RetroRenderer {
         ctx.fillStyle = "#e2e8f0";
         ctx.font = "9.5px -apple-system, 'Segoe UI', sans-serif";
         const maxLineW = smsW - 14;
-        const words = rawMsg.split(/\s+/);
-        const lines = [];
-        let curLine = "";
-        for (const w of words) {
-            const test = curLine ? `${curLine} ${w}` : w;
-            if (ctx.measureText(test).width > maxLineW && curLine) {
+        const smsCacheKey = `${maxLineW}:${rawMsg}`;
+        let lines = this._smsLinesCache;
+        if (!lines || this._smsCacheKey !== smsCacheKey) {
+            const words = rawMsg.split(/\s+/);
+            lines = [];
+            let curLine = "";
+            for (const w of words) {
+                const test = curLine ? `${curLine} ${w}` : w;
+                if (ctx.measureText(test).width > maxLineW && curLine) {
+                    lines.push(curLine);
+                    curLine = w;
+                    if (lines.length >= 3) break;
+                } else {
+                    curLine = test;
+                }
+            }
+            if (curLine && lines.length < 4) {
+                while (ctx.measureText(curLine).width > maxLineW && curLine.length > 6) {
+                    curLine = curLine.slice(0, -4) + "…";
+                }
                 lines.push(curLine);
-                curLine = w;
-                if (lines.length >= 3) break;
-            } else {
-                curLine = test;
             }
-        }
-        if (curLine && lines.length < 4) {
-            while (ctx.measureText(curLine).width > maxLineW && curLine.length > 6) {
-                curLine = curLine.slice(0, -4) + "…";
-            }
-            lines.push(curLine);
+            this._smsCacheKey = smsCacheKey;
+            this._smsLinesCache = lines;
         }
 
         let textY = smsY + 33;
@@ -13376,12 +13741,7 @@ class RetroRenderer {
         ctx.fillText("[M]", mBtnX + 5, gy + 10);
         this.cheatButtons.push({ id: "MINIMAP_FULLMAP", x: mBtnX, y: gy + 2, w: mBtnW, h: 15 });
 
-        // 2. Live GPS Map Image inside Smartphone
-        ctx.fillStyle = "#07101c";
-        ctx.fillRect(mx, my, mw, mh);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(srcImg, srcX, srcY, srcW, srcH, mx, my, mw, mh);
-
+        // 2. Live GPS Map Image inside Smartphone (cached at 10 Hz on mobile to eliminate 60 Hz 1024px resampling + 700-blip overdraw)
         this.cheatButtons.push({
             id: "MINIMAP_CANVAS",
             x: mx,
@@ -13394,174 +13754,223 @@ class RetroRenderer {
             viewWorldH
         });
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(mx, my, mw, mh);
-        ctx.clip();
-
-        const worldToMini = (wx, wy) => ({
-            x: mx + ((wx - viewWorldX) / viewWorldW) * mw,
-            y: my + ((wy - viewWorldY) / viewWorldH) * mh
-        });
-
-        // Pay 'n' Spray Shops
-        if (Array.isArray(this.map.payNSprays)) {
-            for (const pns of this.map.payNSprays) {
-                const pt = worldToMini(pns.x + pns.w * 0.5, pns.y + pns.h * 0.5);
-                if (pt.x < mx - 6 || pt.x > mx + mw + 6 || pt.y < my - 6 || pt.y > my + mh + 6) continue;
-                ctx.fillStyle = "#14532d";
-                ctx.fillRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
-                ctx.strokeStyle = "#39ff14";
-                ctx.lineWidth = 1;
-                ctx.strokeRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
-            }
-        }
-
-        // Enterable Venue Doors (Hank's Waffles, Clubs, Hotels, Shops, Mansions) when zoomed in
-        if (Array.isArray(this.map.interiors) && zoomMode < 2) {
-            for (const intr of this.map.interiors) {
-                const pt = worldToMini(intr.doorX, intr.doorY);
-                if (pt.x < mx - 4 || pt.x > mx + mw + 4 || pt.y < my - 4 || pt.y > my + mh + 4) continue;
-                ctx.fillStyle = intr.accent || "#f472b6";
-                ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
-                ctx.strokeStyle = "#090d16";
-                ctx.lineWidth = 0.8;
-                ctx.strokeRect(pt.x - 2, pt.y - 2, 4, 4);
-            }
-        }
-
-        // Nearby Vehicles, Cops & Ambient Crime Shootouts
-        if (Array.isArray(game.vehicles) && zoomMode < 2) {
-            const copFlash = Math.floor(this.time * 8) % 2 === 0;
-            for (const v of game.vehicles) {
-                if (v.destroyed || v === p.inVehicle) continue;
-                const pt = worldToMini(v.x, v.y);
-                if (pt.x < mx || pt.x > mx + mw || pt.y < my || pt.y > my + mh) continue;
-                if (v.driver === "AI_COP" || v.isPolice) {
-                    ctx.fillStyle = copFlash ? "#ef4444" : "#3b82f6";
-                    ctx.fillRect(pt.x - 2.5, pt.y - 2.5, 5, 5);
-                } else if (v.driver === "AI_CRIMINAL") {
-                    ctx.fillStyle = "#f97316";
-                    ctx.fillRect(pt.x - 2.5, pt.y - 2.5, 5, 5);
-                } else if (v.missionTag === "LANDMARK") {
-                    ctx.fillStyle = "#ffd13b";
-                    ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
-                }
-            }
-            if (Array.isArray(game.peds)) {
-                for (const ped of game.peds) {
-                    if (ped.dead) continue;
-                    if (ped.kind !== "CRIMINAL" && !(ped.kind === "COP" && ped.inCombat)) continue;
-                    const pt = worldToMini(ped.x, ped.y);
-                    if (pt.x < mx || pt.x > mx + mw || pt.y < my || pt.y > my + mh) continue;
-                    ctx.fillStyle = ped.kind === "CRIMINAL" ? "#f97316" : (copFlash ? "#ef4444" : "#3b82f6");
-                    ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
-                }
-            }
-        }
-
-        // Official Landmarks
         let nearestLm = null;
         let nearestDist = Infinity;
         if (Array.isArray(this.map.landmarks)) {
-            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
-            for (const lm of this.map.landmarks) {
+            for (let li = 0; li < this.map.landmarks.length; li++) {
+                const lm = this.map.landmarks[li];
                 const d = Math.hypot(lm.x - p.x, lm.y - p.y);
                 if (d < nearestDist) {
                     nearestDist = d;
                     nearestLm = lm;
                 }
-                const pt = worldToMini(lm.x, lm.y);
-                const inside = pt.x >= mx + 6 && pt.x <= mx + mw - 6 && pt.y >= my + 6 && pt.y <= my + mh - 6;
-                if (inside) {
-                    ctx.fillStyle = lm.visited ? "#39ff14" : (lm.color || "#ff2a85");
-                    ctx.fillRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
-                    ctx.strokeStyle = "#050811";
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
-                } else {
-                    const cx = Math.max(mx + 5, Math.min(mx + mw - 5, pt.x));
-                    const cy = Math.max(my + 5, Math.min(my + mh - 5, pt.y));
-                    ctx.fillStyle = lm.visited ? "#39ff14" : (lm.color || "#ff2a85");
-                    ctx.fillRect(cx - 2.5, cy - 2.5, 5, 5);
+            }
+        }
+
+        const useMobileMiniCache = Boolean(this.isMobileInit && mw > 0 && mh > 0);
+        let drawTargetCtx = ctx;
+        let ox = mx;
+        let oy = my;
+        let skipRedraw = false;
+
+        if (useMobileMiniCache) {
+            if (!this._gpsMiniCacheCanvas) {
+                this._gpsMiniCacheCanvas = document.createElement("canvas");
+            }
+            if (this._gpsMiniCacheCanvas.width !== mw || this._gpsMiniCacheCanvas.height !== mh) {
+                this._gpsMiniCacheCanvas.width = mw;
+                this._gpsMiniCacheCanvas.height = mh;
+                this._gpsMiniCacheTick = 0;
+            }
+            this._gpsMiniCacheTick = ((this._gpsMiniCacheTick || 0) + 1) % 6;
+            if (this._gpsMiniCacheTick !== 1 && this._gpsMiniLastZoom === zoomMode && this._gpsMiniCacheReady) {
+                skipRedraw = true;
+            } else {
+                this._gpsMiniLastZoom = zoomMode;
+                this._gpsMiniCacheReady = true;
+                drawTargetCtx = this._gpsMiniCacheCanvas.getContext("2d");
+                ox = 0;
+                oy = 0;
+            }
+        }
+
+        if (!skipRedraw) {
+            const mctx = drawTargetCtx;
+            mctx.save();
+            if (!useMobileMiniCache) {
+                mctx.beginPath();
+                mctx.rect(ox, oy, mw, mh);
+                mctx.clip();
+            }
+            mctx.fillStyle = "#07101c";
+            mctx.fillRect(ox, oy, mw, mh);
+            mctx.imageSmoothingEnabled = false;
+            mctx.drawImage(srcImg, srcX, srcY, srcW, srcH, ox, oy, mw, mh);
+
+            const invW = mw / viewWorldW;
+            const invH = mh / viewWorldH;
+
+            // Pay 'n' Spray Shops
+            if (Array.isArray(this.map.payNSprays)) {
+                for (let i = 0; i < this.map.payNSprays.length; i++) {
+                    const pns = this.map.payNSprays[i];
+                    const px = ox + (pns.x + pns.w * 0.5 - viewWorldX) * invW;
+                    const py = oy + (pns.y + pns.h * 0.5 - viewWorldY) * invH;
+                    if (px < ox - 6 || px > ox + mw + 6 || py < oy - 6 || py > oy + mh + 6) continue;
+                    mctx.fillStyle = "#14532d";
+                    mctx.fillRect(px - 3.5, py - 3.5, 7, 7);
+                    mctx.strokeStyle = "#39ff14";
+                    mctx.lineWidth = 1;
+                    mctx.strokeRect(px - 3.5, py - 3.5, 7, 7);
                 }
             }
-        }
 
-        // Active Mission Target Blip
-        const mTarget = game.missions ? game.missions.getTargetPosition() : null;
-        if (mTarget) {
-            const pt = worldToMini(mTarget.x, mTarget.y);
-            const cx = Math.max(mx + 5, Math.min(mx + mw - 5, pt.x));
-            const cy = Math.max(my + 5, Math.min(my + mh - 5, pt.y));
-            const pulse = 4 + Math.sin(this.time * 9) * 2;
-            ctx.strokeStyle = "#ff2a85";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
-        }
-
-        // Moored & Active Watercraft Blips on Smartphone GPS (Speedboats, Jet-Skis, Airboats)
-        if (Array.isArray(game.vehicles)) {
-            for (const v of game.vehicles) {
-                if (v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT")) continue;
-                const bpt = worldToMini(v.x, v.y);
-                if (bpt.x >= mx + 4 && bpt.x <= mx + mw - 4 && bpt.y >= my + 4 && bpt.y <= my + mh - 4) {
-                    ctx.save();
-                    ctx.translate(bpt.x, bpt.y);
-                    ctx.rotate(Math.PI * 0.25);
-                    ctx.fillStyle = "#00f0ff";
-                    ctx.fillRect(-2.6, -2.6, 5.2, 5.2);
-                    ctx.strokeStyle = "#050811";
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(-2.6, -2.6, 5.2, 5.2);
-                    ctx.restore();
+            // Enterable Venue Doors when zoomed in
+            if (!this.isMobileInit && Array.isArray(this.map.interiors) && zoomMode < 2) {
+                for (let i = 0; i < this.map.interiors.length; i++) {
+                    const intr = this.map.interiors[i];
+                    const px = ox + (intr.doorX - viewWorldX) * invW;
+                    const py = oy + (intr.doorY - viewWorldY) * invH;
+                    if (px < ox - 4 || px > ox + mw + 4 || py < oy - 4 || py > oy + mh + 4) continue;
+                    mctx.fillStyle = intr.accent || "#f472b6";
+                    mctx.fillRect(px - 2, py - 2, 4, 4);
+                    mctx.strokeStyle = "#090d16";
+                    mctx.lineWidth = 0.8;
+                    mctx.strokeRect(px - 2, py - 2, 4, 4);
                 }
             }
-        }
 
-        // Jason Partner Blip
-        if (game.jason) {
-            const jp = worldToMini(game.jason.x, game.jason.y);
-            ctx.fillStyle = "#00f0ff";
-            ctx.fillRect(jp.x - 2.5, jp.y - 2.5, 5, 5);
-        }
+            // Single-pass Cops, Criminals, Landmark Cars & Watercraft Blips (filters type BEFORE math!)
+            const copFlash = Math.floor(this.time * 8) % 2 === 0;
+            if (Array.isArray(game.vehicles)) {
+                for (let i = 0; i < game.vehicles.length; i++) {
+                    const v = game.vehicles[i];
+                    if (v.destroyed || v === p.inVehicle) continue;
+                    const isBoat = Boolean(v.waterOnly || v.specKey === "AIRBOAT");
+                    const isCop = Boolean(v.driver === "AI_COP" || v.isPolice);
+                    const isCrim = v.driver === "AI_CRIMINAL";
+                    const isLmVeh = v.missionTag === "LANDMARK";
+                    if (!isBoat && (zoomMode >= 2 || (!isCop && !isCrim && !isLmVeh))) continue;
 
-        // Online Multiplayer Remote Player Blips on Smartphone GPS
-        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
-            for (const rp of game.net.remotePlayers.values()) {
-                const rpt = worldToMini(rp.x, rp.y);
-                const rx = Math.max(mx + 4, Math.min(mx + mw - 4, rpt.x));
-                const ry = Math.max(my + 4, Math.min(my + mh - 4, rpt.y));
-                ctx.fillStyle = rp.color || "#00f0ff";
-                ctx.beginPath();
-                ctx.arc(rx, ry, 3.8, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                    const px = ox + (v.x - viewWorldX) * invW;
+                    const py = oy + (v.y - viewWorldY) * invH;
+                    if (px < ox || px > ox + mw || py < oy || py > oy + mh) continue;
+
+                    if (isBoat) {
+                        if (px >= ox + 4 && px <= ox + mw - 4 && py >= oy + 4 && py <= oy + mh - 4) {
+                            mctx.fillStyle = "#00f0ff";
+                            mctx.fillRect(px - 2.5, py - 2.5, 5, 5);
+                        }
+                    } else if (isCop) {
+                        mctx.fillStyle = copFlash ? "#ef4444" : "#3b82f6";
+                        mctx.fillRect(px - 2.5, py - 2.5, 5, 5);
+                    } else if (isCrim) {
+                        mctx.fillStyle = "#f97316";
+                        mctx.fillRect(px - 2.5, py - 2.5, 5, 5);
+                    } else if (isLmVeh) {
+                        mctx.fillStyle = "#ffd13b";
+                        mctx.fillRect(px - 2, py - 2, 4, 4);
+                    }
+                }
             }
+
+            if (zoomMode < 2 && Array.isArray(game.peds)) {
+                for (let i = 0; i < game.peds.length; i++) {
+                    const ped = game.peds[i];
+                    if (ped.dead) continue;
+                    if (ped.kind !== "CRIMINAL" && !(ped.kind === "COP" && ped.inCombat)) continue;
+                    const px = ox + (ped.x - viewWorldX) * invW;
+                    const py = oy + (ped.y - viewWorldY) * invH;
+                    if (px < ox || px > ox + mw || py < oy || py > oy + mh) continue;
+                    mctx.fillStyle = ped.kind === "CRIMINAL" ? "#f97316" : (copFlash ? "#ef4444" : "#3b82f6");
+                    mctx.fillRect(px - 2, py - 2, 4, 4);
+                }
+            }
+
+            // Official Landmarks
+            if (Array.isArray(this.map.landmarks)) {
+                for (let i = 0; i < this.map.landmarks.length; i++) {
+                    const lm = this.map.landmarks[i];
+                    const px = ox + (lm.x - viewWorldX) * invW;
+                    const py = oy + (lm.y - viewWorldY) * invH;
+                    const inside = px >= ox + 6 && px <= ox + mw - 6 && py >= oy + 6 && py <= oy + mh - 6;
+                    if (inside) {
+                        mctx.fillStyle = lm.visited ? "#39ff14" : (lm.color || "#ff2a85");
+                        mctx.fillRect(px - 3.5, py - 3.5, 7, 7);
+                        mctx.strokeStyle = "#050811";
+                        mctx.lineWidth = 1;
+                        mctx.strokeRect(px - 3.5, py - 3.5, 7, 7);
+                    } else {
+                        const cx = Math.max(ox + 5, Math.min(ox + mw - 5, px));
+                        const cy = Math.max(oy + 5, Math.min(oy + mh - 5, py));
+                        mctx.fillStyle = lm.visited ? "#39ff14" : (lm.color || "#ff2a85");
+                        mctx.fillRect(cx - 2.5, cy - 2.5, 5, 5);
+                    }
+                }
+            }
+
+            // Active Mission Target Blip
+            const mTarget = game.missions ? game.missions.getTargetPosition() : null;
+            if (mTarget) {
+                const px = ox + (mTarget.x - viewWorldX) * invW;
+                const py = oy + (mTarget.y - viewWorldY) * invH;
+                const cx = Math.max(ox + 5, Math.min(ox + mw - 5, px));
+                const cy = Math.max(oy + 5, Math.min(oy + mh - 5, py));
+                const pulse = 4 + Math.sin(this.time * 9) * 2;
+                mctx.strokeStyle = "#ff2a85";
+                mctx.lineWidth = 2;
+                mctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
+            }
+
+            // Jason Partner Blip
+            if (game.jason) {
+                const jx = ox + (game.jason.x - viewWorldX) * invW;
+                const jy = oy + (game.jason.y - viewWorldY) * invH;
+                mctx.fillStyle = "#00f0ff";
+                mctx.fillRect(jx - 2.5, jy - 2.5, 5, 5);
+            }
+
+            // Online Multiplayer Remote Player Blips on Smartphone GPS
+            if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+                for (const rp of game.net.remotePlayers.values()) {
+                    const rpx = ox + (rp.x - viewWorldX) * invW;
+                    const rpy = oy + (rp.y - viewWorldY) * invH;
+                    const rx = Math.max(ox + 4, Math.min(ox + mw - 4, rpx));
+                    const ry = Math.max(oy + 4, Math.min(oy + mh - 4, rpy));
+                    mctx.fillStyle = rp.color || "#00f0ff";
+                    mctx.beginPath();
+                    mctx.arc(rx, ry, 3.8, 0, Math.PI * 2);
+                    mctx.fill();
+                    mctx.strokeStyle = "#ffffff";
+                    mctx.lineWidth = 1;
+                    mctx.stroke();
+                }
+            }
+
+            // Player Pulsing Round Radar Blip
+            const ppx = ox + (p.x - viewWorldX) * invW;
+            const ppy = oy + (p.y - viewWorldY) * invH;
+            const beepPhase = (((this.time || 0) * 1.35) % 1.0 + 1.0) % 1.0;
+            const beepRad = Math.max(1.0, 4.5 + beepPhase * 9.5);
+            mctx.beginPath();
+            mctx.arc(ppx, ppy, beepRad, 0, Math.PI * 2);
+            mctx.strokeStyle = `rgba(0, 240, 255, ${(1.0 - beepPhase) * 0.78})`;
+            mctx.lineWidth = 1.6;
+            mctx.stroke();
+            mctx.beginPath();
+            mctx.arc(ppx, ppy, Math.max(1.5, 4.4 + Math.sin((this.time || 0) * 6.5) * 0.6), 0, Math.PI * 2);
+            mctx.fillStyle = "#ffffff";
+            mctx.fill();
+            mctx.strokeStyle = "#ff2a85";
+            mctx.lineWidth = 2.0;
+            mctx.stroke();
+
+            mctx.restore();
         }
 
-        // Player Pulsing Round Radar Blip
-        const pp = worldToMini(p.x, p.y);
-        const beepPhase = (this.time * 1.35) % 1.0;
-        const beepRad = 4.5 + beepPhase * 9.5;
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(pp.x, pp.y, beepRad, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0, 240, 255, ${(1.0 - beepPhase) * 0.78})`;
-        ctx.lineWidth = 1.6;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(pp.x, pp.y, 4.4 + Math.sin(this.time * 6.5) * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-        ctx.strokeStyle = "#ff2a85";
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.restore(); // End GPS map clip
+        if (useMobileMiniCache && this._gpsMiniCacheCanvas) {
+            ctx.drawImage(this._gpsMiniCacheCanvas, mx, my);
+        }
 
         // 3. Bottom GPS Landmark Navigation Bar
         const ftrY = my + mh;
@@ -14296,8 +14705,8 @@ class RetroRenderer {
         ctx.fill();
         ctx.restore();
 
-        const beepPhase = (this.time * 1.35) % 1.0;
-        const beepRad = 5.0 + beepPhase * 10.5;
+        const beepPhase = (((this.time || 0) * 1.35) % 1.0 + 1.0) % 1.0;
+        const beepRad = Math.max(1.0, 5.0 + beepPhase * 10.5);
         ctx.save();
         ctx.beginPath();
         ctx.arc(pp.x, pp.y, beepRad, 0, Math.PI * 2);
@@ -14305,7 +14714,7 @@ class RetroRenderer {
         ctx.lineWidth = 1.8;
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(pp.x, pp.y, 4.8 + Math.sin(this.time * 6.5) * 0.65, 0, Math.PI * 2);
+        ctx.arc(pp.x, pp.y, Math.max(1.5, 4.8 + Math.sin((this.time || 0) * 6.5) * 0.65), 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.strokeStyle = "#ff2a85";
@@ -14464,16 +14873,17 @@ class RetroRenderer {
         if (!rawImg) return;
         let srcImg = rawImg;
         if (useVice && this.map && this.map.objectEngine) {
-            if (!this.liveOverviewCanvas) {
+            const ovSz = this.isMobileInit ? 512 : 1024;
+            if (!this.liveOverviewCanvas || this.liveOverviewCanvas.width !== ovSz) {
                 this.liveOverviewCanvas = document.createElement("canvas");
-                this.liveOverviewCanvas.width = 1024;
-                this.liveOverviewCanvas.height = 1024;
+                this.liveOverviewCanvas.width = ovSz;
+                this.liveOverviewCanvas.height = ovSz;
             }
             const octx = this.liveOverviewCanvas.getContext("2d");
             octx.imageSmoothingEnabled = false;
-            octx.clearRect(0, 0, 1024, 1024);
-            octx.drawImage(rawImg, 0, 0, 1024, 1024);
-            this.map.objectEngine.paintOnOverviewCanvas(octx, 1024, 1024);
+            octx.clearRect(0, 0, ovSz, ovSz);
+            octx.drawImage(rawImg, 0, 0, ovSz, ovSz);
+            this.map.objectEngine.paintOnOverviewCanvas(octx, ovSz, ovSz);
             srcImg = this.liveOverviewCanvas;
         } else {
             this.liveOverviewCanvas = null;
@@ -14590,8 +15000,8 @@ class RetroRenderer {
 
         const lx = Math.round(game.player.x * sx);
         const ly = Math.round(game.player.y * sy);
-        const beepPhase = (this.time * 1.35) % 1.0;
-        const beepRad = 6.0 + beepPhase * 13.0;
+        const beepPhase = (((this.time || 0) * 1.35) % 1.0 + 1.0) % 1.0;
+        const beepRad = Math.max(1.0, 6.0 + beepPhase * 13.0);
         fctx.save();
         // Expanding radar ping ring ("bip léger")
         fctx.beginPath();

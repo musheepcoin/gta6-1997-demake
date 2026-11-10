@@ -277,10 +277,20 @@ class RetroAudioEngine {
         this.musicVolume = 0;
         this._unlockedBuffer = false;
 
-        // Preloaded Raw ArrayBuffers & Decoded WebAudio Buffers
+        // Preloaded Raw ArrayBuffers & Decoded WebAudio Buffers (lazy on-demand + throttled decode queue on mobile!)
+        this._isMobileAudio = typeof window !== "undefined" && Boolean(
+            (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+            Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 960
+        );
         this._rawArrayBuffers = {};
         this.buffers = {};
+        this._fetchingKeys = new Set();
         this._decodingKeys = new Set();
+        this._queuedDecodeKeys = new Set();
+        this._decodeQueue = [];
+        this._activeDecodeCount = 0;
+        this._failedKeys = new Set();
 
         // Multi-Layer Player Vehicle Engine State
         this._activeEngineClass = null;
@@ -324,50 +334,160 @@ class RetroAudioEngine {
 
         // Active one-shot voice pool (prevents WebAudio mixer overload / stuck buffer loops during heavy chaos)
         this._activeVoices = [];
-        this._maxActiveVoices = 14;
+        this._maxActiveVoices = this._isMobileAudio ? 8 : 14;
         this._sharedNoiseBuffer = null;
 
-        // Start fetching all vehicle audio files in the background right away
+        // Start fetching audio files (deferred & lazy on mobile so boot never freezes or bloats PCM RAM!)
         this._preloadRawAudioFiles();
+    }
+
+    _ensureKeyLoaded(key) {
+        if (!key || this.buffers[key] || this._failedKeys.has(key)) return;
+        if (this._rawArrayBuffers[key]) {
+            if (this.ctx) this._decodeKey(key);
+            return;
+        }
+        if (this._fetchingKeys.has(key) || this._decodingKeys.has(key)) return;
+        const url = VEHICLE_AUDIO_MANIFEST[key];
+        if (!url || typeof fetch !== "function") return;
+        this._fetchingKeys.add(key);
+        fetch(`${url}?v=101_23`)
+            .then((res) => (res.ok ? res.arrayBuffer() : null))
+            .then((buf) => {
+                this._fetchingKeys.delete(key);
+                if (!buf) {
+                    this._failedKeys.add(key);
+                    return;
+                }
+                this._rawArrayBuffers[key] = buf;
+                if (this.ctx) {
+                    this._decodeKey(key);
+                }
+            })
+            .catch(() => {
+                this._fetchingKeys.delete(key);
+                this._failedKeys.add(key);
+            });
     }
 
     _preloadRawAudioFiles() {
         if (typeof window === "undefined" || typeof fetch !== "function") return;
+        if (this._isMobileAudio) {
+            // On mobile, defer audio preloading until after WebGL textures & city mesh finish booting,
+            // and only preload a compact 16-clip core kit (2 at a time); all other 98 clips stream & decode on demand!
+            const mobileCoreKeys = [
+                "sedan_idle", "sedan_low", "sedan_mid", "sedan_high",
+                "moto_low", "car_door", "gta_car_door_open", "gta_car_door_close",
+                "crash_metal", "tire_skid_loop", "siren_police",
+                "gta_shot_pistol", "gta_shot_uzi", "gta_explosion",
+                "gta_pickup", "gta_scream_scared_1"
+            ];
+            setTimeout(() => {
+                let idx = 0;
+                const pumpMobileFetch = () => {
+                    while (this._fetchingKeys.size < 2 && idx < mobileCoreKeys.length) {
+                        const k = mobileCoreKeys[idx++];
+                        if ( !this.buffers[k] && !this._rawArrayBuffers[k] && !this._fetchingKeys.has(k) && VEHICLE_AUDIO_MANIFEST[k] ) {
+                            this._fetchingKeys.add(k);
+                            fetch(`${VEHICLE_AUDIO_MANIFEST[k]}?v=101_23`)
+                                .then((res) => (res.ok ? res.arrayBuffer() : null))
+                                .then((buf) => {
+                                    this._fetchingKeys.delete(k);
+                                    if (buf) {
+                                        this._rawArrayBuffers[k] = buf;
+                                        if (this.ctx) this._decodeKey(k);
+                                    } else {
+                                        this._failedKeys.add(k);
+                                    }
+                                    pumpMobileFetch();
+                                })
+                                .catch(() => {
+                                    this._fetchingKeys.delete(k);
+                                    this._failedKeys.add(k);
+                                    pumpMobileFetch();
+                                });
+                        }
+                    }
+                };
+                pumpMobileFetch();
+            }, 900);
+            return;
+        }
+
         for (const [key, url] of Object.entries(VEHICLE_AUDIO_MANIFEST)) {
+            this._fetchingKeys.add(key);
             fetch(`${url}?v=101_23`)
                 .then((res) => (res.ok ? res.arrayBuffer() : null))
                 .then((buf) => {
-                    if (!buf) return;
+                    this._fetchingKeys.delete(key);
+                    if (!buf) {
+                        this._failedKeys.add(key);
+                        return;
+                    }
                     this._rawArrayBuffers[key] = buf;
                     if (this.ctx) {
                         this._decodeKey(key);
                     }
                 })
-                .catch(() => {});
+                .catch(() => {
+                    this._fetchingKeys.delete(key);
+                    this._failedKeys.add(key);
+                });
         }
     }
 
     _decodeKey(key) {
-        if (!this.ctx || this.buffers[key] || this._decodingKeys.has(key)) return;
-        const raw = this._rawArrayBuffers[key];
-        if (!raw) return;
-        this._decodingKeys.add(key);
-        const copy = raw.slice(0);
-        this.ctx.decodeAudioData(
-            copy,
-            (audioBuf) => {
-                this.buffers[key] = audioBuf;
-                delete this._rawArrayBuffers[key];
+        if (!key || this.buffers[key] || this._failedKeys.has(key) || this._decodingKeys.has(key) || this._queuedDecodeKeys.has(key)) {
+            return;
+        }
+        if (!this._rawArrayBuffers[key]) {
+            this._ensureKeyLoaded(key);
+            return;
+        }
+        if (!this.ctx) return;
+        this._queuedDecodeKeys.add(key);
+        this._decodeQueue.push(key);
+        this._pumpDecodeQueue();
+    }
+
+    _pumpDecodeQueue() {
+        if (!this.ctx) return;
+        const maxConc = this._isMobileAudio ? 2 : 4;
+        while (this._activeDecodeCount < maxConc && this._decodeQueue.length > 0) {
+            const key = this._decodeQueue.shift();
+            this._queuedDecodeKeys.delete(key);
+            if (!key || this.buffers[key] || this._failedKeys.has(key) || this._decodingKeys.has(key)) continue;
+            const raw = this._rawArrayBuffers[key];
+            if (!raw) continue;
+            // Transfer ownership directly to decodeAudioData without raw.slice(0) memory duplication!
+            delete this._rawArrayBuffers[key];
+            this._decodingKeys.add(key);
+            this._activeDecodeCount++;
+            try {
+                this.ctx.decodeAudioData(
+                    raw,
+                    (audioBuf) => {
+                        this.buffers[key] = audioBuf;
+                        this._decodingKeys.delete(key);
+                        this._activeDecodeCount = Math.max(0, this._activeDecodeCount - 1);
+                        if ((key === "sedan_low" || key === "moto_low") && this.initialized) {
+                            this._ensureTrafficSampleLoops();
+                        }
+                        this._pumpDecodeQueue();
+                    },
+                    () => {
+                        this._failedKeys.add(key);
+                        this._decodingKeys.delete(key);
+                        this._activeDecodeCount = Math.max(0, this._activeDecodeCount - 1);
+                        this._pumpDecodeQueue();
+                    }
+                );
+            } catch (_e) {
+                this._failedKeys.add(key);
                 this._decodingKeys.delete(key);
-                // If traffic loop buffers just finished decoding, wire them up
-                if ((key === "sedan_low" || key === "moto_low") && this.initialized) {
-                    this._ensureTrafficSampleLoops();
-                }
-            },
-            () => {
-                this._decodingKeys.delete(key);
+                this._activeDecodeCount = Math.max(0, this._activeDecodeCount - 1);
             }
-        );
+        }
     }
 
     _decodeAllAvailable() {
@@ -752,15 +872,23 @@ class RetroAudioEngine {
 
     _ensureEngineLayers(vehClass) {
         if (!this.ctx || !this.engineMasterFilter) return false;
-        const specs = ENGINE_BANK_SPECS[vehClass] || ENGINE_BANK_SPECS.SEDAN;
-        // Check if all required buffers for this class are decoded
+        let specs = ENGINE_BANK_SPECS[vehClass] || ENGINE_BANK_SPECS.SEDAN;
+        let effClass = vehClass;
+        // Fallback to universal .wav PCM engine bank if .ogg Vorbis decode is unsupported on older iOS WebKit
+        if (specs.some((s) => this._failedKeys.has(s.key)) && vehClass !== "TRUCK") {
+            effClass = "TRUCK";
+            specs = ENGINE_BANK_SPECS.TRUCK;
+        }
+        // Trigger lazy fetch/decode for all required layers of this class at once
+        let allReady = true;
         for (const s of specs) {
             if (!this.buffers[s.key]) {
                 this._decodeKey(s.key);
-                return false;
+                allReady = false;
             }
         }
-        if (this._activeEngineClass === vehClass && this._engineLayers.length === specs.length) {
+        if (!allReady) return false;
+        if (this._activeEngineClass === effClass && this._engineLayers.length === specs.length) {
             return true;
         }
         this._stopEngineLayers();
@@ -781,7 +909,7 @@ class RetroAudioEngine {
                 gainNode
             });
         }
-        this._activeEngineClass = vehClass;
+        this._activeEngineClass = effClass;
         return true;
     }
 
@@ -849,6 +977,9 @@ class RetroAudioEngine {
     _updateSkidLoop(now, isDrifting, speedRatio) {
         if (!this.ctx) return;
         if (isDrifting && this.inVehicle && speedRatio > 0.18) {
+            if (!this._skidLoopNode && !this.buffers.tire_skid_loop) {
+                this._decodeKey("tire_skid_loop");
+            }
             if (!this._skidLoopNode && this.buffers.tire_skid_loop) {
                 try {
                     const src = this.ctx.createBufferSource();

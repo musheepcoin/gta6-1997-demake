@@ -3242,7 +3242,14 @@ class LeonidaGame {
 
         this.ytSeekOffset = 0;
 
-        this.ytMusicEnabled = true;
+        const isMobileDevice = typeof window !== "undefined" && (
+            window.innerWidth <= 960 ||
+            window.innerHeight <= 560 ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+        );
+        // On mobile phones, default YouTube background video stream to OFF so WebGL gets 100% CPU/GPU/decoder headroom
+        // (WebAudio engine SFX, horns, sirens & gunshots remain 100% active, and tapping MUSIC: ON lazy-boots the stream).
+        this.ytMusicEnabled = !isMobileDevice;
 
         this.ytVolume = 28;
 
@@ -3270,11 +3277,23 @@ class LeonidaGame {
 
         const iframe = document.getElementById("yt-player-iframe");
 
+        const led = document.getElementById("yt-radio-led");
 
+        const eq = document.getElementById("yt-eq");
+
+        if (!this.ytMusicEnabled) {
+            if (toggleBtn) {
+                toggleBtn.textContent = "🔇 MUSIC: OFF";
+                toggleBtn.classList.remove("yt-btn-active");
+                toggleBtn.classList.add("yt-btn-muted");
+            }
+            if (led) led.classList.add("paused");
+            if (eq) eq.classList.add("paused");
+        }
 
         const subscribeYtEvents = () => {
 
-            if (!iframe || !iframe.contentWindow) return;
+            if (!iframe || !iframe.contentWindow || !iframe.getAttribute("src")) return;
 
             try {
 
@@ -3372,9 +3391,52 @@ class LeonidaGame {
 
 
 
+        this._ensureYtIframeBooted = () => {
+            if (!iframe) return;
+            if (!iframe.getAttribute("src") && iframe.dataset && iframe.dataset.src) {
+                iframe.setAttribute("src", iframe.dataset.src);
+            }
+            if (typeof window !== "undefined" && !window._vc26YtApiLoaded) {
+                window._vc26YtApiLoaded = true;
+                const prevReady = window.onYouTubeIframeAPIReady;
+                window.onYouTubeIframeAPIReady = () => {
+                    if (typeof prevReady === "function") {
+                        try { prevReady(); } catch (_e) {}
+                    }
+                    try {
+                        if (window.YT && window.YT.Player) {
+                            this.ytPlayerInstance = new window.YT.Player("yt-player-iframe", {
+                                events: {
+                                    onReady: () => {
+                                        subscribeYtEvents();
+                                        if (this.ytMusicEnabled && !this.ytActuallyPlaying && !this._ytBuffering) {
+                                            this.sendYouTubeCommand("playVideo", []);
+                                        }
+                                    },
+                                    onStateChange: (ev) => {
+                                        if (ev && typeof ev.data === "number") {
+                                            handleYtStateChange(ev.data);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    } catch (_e) {}
+                };
+                try {
+                    const tag = document.createElement("script");
+                    tag.src = "https://www.youtube.com/iframe_api";
+                    tag.async = true;
+                    document.head.appendChild(tag);
+                } catch (_e) {}
+            }
+        };
+
         const tryAutoStart = (fromUserGesture = false) => {
 
             if (!this.ytMusicEnabled) return;
+
+            if (this._ensureYtIframeBooted) this._ensureYtIframeBooted();
 
             subscribeYtEvents();
 
@@ -3402,74 +3464,9 @@ class LeonidaGame {
 
 
 
-        // Load official YouTube IFrame API so YT.Player keeps widget channel & mobile media state synchronized
-
-        if (iframe && typeof window !== "undefined" && !window._vc26YtApiLoaded) {
-
-            window._vc26YtApiLoaded = true;
-
-            const prevReady = window.onYouTubeIframeAPIReady;
-
-            window.onYouTubeIframeAPIReady = () => {
-
-                if (typeof prevReady === "function") {
-
-                    try { prevReady(); } catch (_e) {}
-
-                }
-
-                try {
-
-                    if (window.YT && window.YT.Player) {
-
-                        this.ytPlayerInstance = new window.YT.Player("yt-player-iframe", {
-
-                            events: {
-
-                                onReady: () => {
-
-                                    subscribeYtEvents();
-
-                                    if (this.ytMusicEnabled && !this.ytActuallyPlaying && !this._ytBuffering) {
-
-                                        this.sendYouTubeCommand("playVideo", []);
-
-                                    }
-
-                                },
-
-                                onStateChange: (ev) => {
-
-                                    if (ev && typeof ev.data === "number") {
-
-                                        handleYtStateChange(ev.data);
-
-                                    }
-
-                                }
-
-                            }
-
-                        });
-
-                    }
-
-                } catch (_e) {}
-
-            };
-
-            try {
-
-                const tag = document.createElement("script");
-
-                tag.src = "https://www.youtube.com/iframe_api";
-
-                tag.async = true;
-
-                document.head.appendChild(tag);
-
-            } catch (_e) {}
-
+        // Boot YouTube IFrame API immediately on desktop; defer on mobile until user explicitly toggles Music ON
+        if (this.ytMusicEnabled) {
+            this._ensureYtIframeBooted();
         }
 
 
@@ -3701,6 +3698,8 @@ class LeonidaGame {
 
 
         if (this.ytMusicEnabled) {
+
+            if (this._ensureYtIframeBooted) this._ensureYtIframeBooted();
 
             const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
 
@@ -9214,54 +9213,97 @@ class LeonidaGame {
 
 
 
+    rebuildVehicleSpatialGrid() {
+        const n = this.vehicles ? this.vehicles.length : 0;
+        if (!this._vehGridHead) {
+            this._vehGridHead = new Int16Array(16384);
+        }
+        if (!this._vehGridNext || this._vehGridNext.length < Math.max(1024, n + 64)) {
+            this._vehGridNext = new Int16Array(Math.max(1024, n + 256));
+        }
+        const head = this._vehGridHead;
+        const next = this._vehGridNext;
+        head.fill(-1);
+        for (let i = 0; i < n; i++) {
+            const v = this.vehicles[i];
+            if (!v) continue;
+            const cx = Math.max(0, Math.min(127, v.x >> 8));
+            const cy = Math.max(0, Math.min(127, v.y >> 8));
+            const cell = (cy << 7) | cx;
+            next[i] = head[cell];
+            head[cell] = i;
+        }
+        this._vehGridCount = n;
+        this._vehGridLastVeh = n > 0 ? this.vehicles[n - 1] : null;
+    }
+
+    ensureVehicleSpatialGrid() {
+        const n = this.vehicles ? this.vehicles.length : 0;
+        const lastV = n > 0 ? this.vehicles[n - 1] : null;
+        if (!this._vehGridHead || this._vehGridCount !== n || this._vehGridLastVeh !== lastV) {
+            this.rebuildVehicleSpatialGrid();
+        }
+    }
+
     resolveCircleVehicleCollision(x, y, radius = 8.5, z = 2.0, ignoreVeh = null) {
         let hit = false;
         let curX = x;
         let curY = y;
         const rSq = radius * radius;
         const cache = this._stoppedVehCache;
-        if (cache) {
-            for (let i = 0; i < cache.length; i++) {
-                const vc = cache[i];
-                if (vc.v === ignoreVeh) continue;
-                const dx = curX - vc.x;
-                if (dx > 54 || dx < -54) continue;
-                const dy = curY - vc.y;
-                if (dy > 54 || dy < -54) continue;
-                if (vc.z !== undefined && z !== undefined && Math.abs(vc.z - z) > 0.85) continue;
+        const sHead = this._stoppedVehGridHead;
+        const sNext = this._stoppedVehGridNext;
+        if (cache && sHead && sNext) {
+            const cx0 = Math.max(0, (curX >> 8) - 1);
+            const cx1 = Math.min(127, (curX >> 8) + 1);
+            const cy0 = Math.max(0, (curY >> 8) - 1);
+            const cy1 = Math.min(127, (curY >> 8) + 1);
+            for (let cy = cy0; cy <= cy1; cy++) {
+                const rowOff = cy << 7;
+                for (let cx = cx0; cx <= cx1; cx++) {
+                    for (let idx = sHead[rowOff | cx]; idx !== -1; idx = sNext[idx]) {
+                        const vc = cache[idx];
+                        if (vc.v === ignoreVeh) continue;
+                        const dx = curX - vc.x;
+                        if (dx > 54 || dx < -54) continue;
+                        const dy = curY - vc.y;
+                        if (dy > 54 || dy < -54) continue;
+                        if (vc.z !== undefined && z !== undefined && Math.abs(vc.z - z) > 0.85) continue;
 
-                const cosA = vc.cosA;
-                const sinA = vc.sinA;
-                const localX = dx * cosA + dy * sinA;
-                const localY = -dx * sinA + dy * cosA;
-                const halfL = vc.halfL;
-                const halfW = vc.halfW;
+                        const cosA = vc.cosA;
+                        const sinA = vc.sinA;
+                        const localX = dx * cosA + dy * sinA;
+                        const localY = -dx * sinA + dy * cosA;
+                        const halfL = vc.halfL;
+                        const halfW = vc.halfW;
 
-                const clampedX = Math.max(-halfL, Math.min(halfL, localX));
-                const clampedY = Math.max(-halfW, Math.min(halfW, localY));
-                const ox = localX - clampedX;
-                const oy = localY - clampedY;
-                const distSq = ox * ox + oy * oy;
+                        const clampedX = Math.max(-halfL, Math.min(halfL, localX));
+                        const clampedY = Math.max(-halfW, Math.min(halfW, localY));
+                        const ox = localX - clampedX;
+                        const oy = localY - clampedY;
+                        const distSq = ox * ox + oy * oy;
 
-                if (distSq < rSq) {
-                    hit = true;
-                    let newLocalX = localX;
-                    let newLocalY = localY;
-                    if (distSq > 0.0001) {
-                        const dist = Math.sqrt(distSq);
-                        newLocalX = clampedX + (ox / dist) * radius;
-                        newLocalY = clampedY + (oy / dist) * radius;
-                    } else {
-                        const penL = halfL - Math.abs(localX);
-                        const penW = halfW - Math.abs(localY);
-                        if (penW <= penL) {
-                            newLocalY = (localY >= 0 ? 1 : -1) * (halfW + radius);
-                        } else {
-                            newLocalX = (localX >= 0 ? 1 : -1) * (halfL + radius);
+                        if (distSq < rSq) {
+                            hit = true;
+                            let newLocalX = localX;
+                            let newLocalY = localY;
+                            if (distSq > 0.0001) {
+                                const dist = Math.sqrt(distSq);
+                                newLocalX = clampedX + (ox / dist) * radius;
+                                newLocalY = clampedY + (oy / dist) * radius;
+                            } else {
+                                const penL = halfL - Math.abs(localX);
+                                const penW = halfW - Math.abs(localY);
+                                if (penW <= penL) {
+                                    newLocalY = (localY >= 0 ? 1 : -1) * (halfW + radius);
+                                } else {
+                                    newLocalX = (localX >= 0 ? 1 : -1) * (halfL + radius);
+                                }
+                            }
+                            curX = vc.x + newLocalX * cosA - newLocalY * sinA;
+                            curY = vc.y + newLocalX * sinA + newLocalY * cosA;
                         }
                     }
-                    curX = vc.x + newLocalX * cosA - newLocalY * sinA;
-                    curY = vc.y + newLocalX * sinA + newLocalY * cosA;
                 }
             }
             return { hit, x: curX, y: curY };
@@ -10898,18 +10940,24 @@ class LeonidaGame {
         }
 
         // Pre-filter active priority siren vehicles, hazard/speeding vehicles, and available taxis once per frame
-        // so per-AI-vehicle and per-pedestrian loops never iterate over 540+ parked cars!
+        // AND build the 128x128 (256px cell) vehicle spatial grid so AI radar & collisions never scan 580+ distant cars!
+        this.rebuildVehicleSpatialGrid();
         const hazardVehicles = this._hazardVehicles || (this._hazardVehicles = []);
         const prioritySirenVehicles = this._prioritySirenVehicles || (this._prioritySirenVehicles = []);
         const activeTaxis = this._activeTaxis || (this._activeTaxis = []);
         const movingOrCrosswalkVehicles = this._movingOrCrosswalkVehicles || (this._movingOrCrosswalkVehicles = []);
+        const armoredCashTrucks = this._armoredCashTrucks || (this._armoredCashTrucks = []);
         hazardVehicles.length = 0;
         prioritySirenVehicles.length = 0;
         activeTaxis.length = 0;
         movingOrCrosswalkVehicles.length = 0;
+        armoredCashTrucks.length = 0;
         for (let vi = 0; vi < this.vehicles.length; vi++) {
             const sv = this.vehicles[vi];
             if (!sv) continue;
+            if (sv.isArmoredCashTruck) {
+                armoredCashTrucks.push(sv);
+            }
             const svSpd = Math.abs(sv.speed || 0);
             const isBurningHazard = Boolean(
                 (sv.burnTimer || 0) > 0 ||
@@ -10955,13 +11003,20 @@ class LeonidaGame {
 
             if (isActiveThreatCar && vSpeed > 28) {
 
-                for (const ped of this.peds) {
+                for (let pi = 0; pi < this.peds.length; pi++) {
+
+                    const ped = this.peds[pi];
 
                     if (ped.dead) continue;
 
+                    const pdx = ped.x - v.x;
+                    if (pdx >= 25 || pdx <= -25) continue;
+                    const pdy = ped.y - v.y;
+                    if (pdy >= 25 || pdy <= -25) continue;
+
                     if (ped.kind === "COP" && v.driver === "AI_COP") continue;
 
-                    if (Math.hypot(ped.x - v.x, ped.y - v.y) < 25) {
+                    if (pdx * pdx + pdy * pdy < 625) {
 
                         if (isNonLethalWheeler) {
 
@@ -11100,7 +11155,15 @@ class LeonidaGame {
                     }
 
                     // Allow vehicles to plow through open-air street/beach animations, sunbathers, and parasols (non-lethal wheelers knock out instead of killing)!
-                    this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true, isNonLethalWheeler);
+                    if (
+                        v._lastWipeoutX === undefined ||
+                        Math.abs(v.x - v._lastWipeoutX) >= 6 ||
+                        Math.abs(v.y - v._lastWipeoutY) >= 6
+                    ) {
+                        v._lastWipeoutX = v.x;
+                        v._lastWipeoutY = v.y;
+                        this.checkAndWipeoutLivingEvents(v.x, v.y, 28, v.driver === "PLAYER", true, isNonLethalWheeler);
+                    }
                 }
 
             }
@@ -11157,60 +11220,60 @@ class LeonidaGame {
 
 
         // 2-Axle Rectangular Vehicle-to-Vehicle Collisions (Front/Rear Bumper Discs + PIT Spin Torque!)
-
+        // Rebuild 256px spatial grid after movement and query only the 3x3 cells around each active vehicle!
+        this.rebuildVehicleSpatialGrid();
+        const vHead = this._vehGridHead;
+        const vNext = this._vehGridNext;
+        if (!this._activePairVehicles) this._activePairVehicles = [];
+        const activeVehs = this._activePairVehicles;
+        activeVehs.length = 0;
         for (let i = 0; i < this.vehicles.length; i++) {
+            const v = this.vehicles[i];
+            if (v.driver || Math.abs(v.speed || 0) > 0.05 || Math.abs(v.vx || 0) > 0.05 || Math.abs(v.vy || 0) > 0.05) {
+                v._activePairIdx = activeVehs.length;
+                activeVehs.push(v);
+            } else {
+                v._activePairIdx = -1;
+            }
+        }
 
-            const a = this.vehicles[i];
-            const aActive = Boolean(a.driver || Math.abs(a.speed || 0) > 0.05 || Math.abs(a.vx || 0) > 0.05 || Math.abs(a.vy || 0) > 0.05);
+        for (let ai = 0; ai < activeVehs.length; ai++) {
 
-            for (let j = i + 1; j < this.vehicles.length; j++) {
+            const a = activeVehs[ai];
+            const aHalfL = (a.w || 48) * 0.26;
+            const aRad = Math.max(11, (a.h || 24) * 0.48);
+            const aCos = Math.cos(a.angle), aSin = Math.sin(a.angle);
+            const ax0 = a.x + aCos * aHalfL, ay0 = a.y + aSin * aHalfL;
+            const ax1 = a.x - aCos * aHalfL, ay1 = a.y - aSin * aHalfL;
+            const gx0 = Math.max(0, (a.x >> 8) - 1);
+            const gx1 = Math.min(127, (a.x >> 8) + 1);
+            const gy0 = Math.max(0, (a.y >> 8) - 1);
+            const gy1 = Math.min(127, (a.y >> 8) + 1);
+
+            for (let gy = gy0; gy <= gy1; gy++) {
+                const rowOff = gy << 7;
+                for (let gx = gx0; gx <= gx1; gx++) {
+                    for (let j = vHead[rowOff | gx]; j !== -1; j = vNext[j]) {
 
                 const b = this.vehicles[j];
-                if (!aActive && !b.driver && Math.abs(b.speed || 0) <= 0.05 && Math.abs(b.vx || 0) <= 0.05 && Math.abs(b.vy || 0) <= 0.05) continue;
-
-                if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
-
-                if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.85) continue;
+                if (a === b || (b._activePairIdx >= 0 && b._activePairIdx <= ai)) continue;
 
                 if (Math.abs(b.x - a.x) > 68 || Math.abs(b.y - a.y) > 68) continue;
 
+                if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.85) continue;
 
-
-                const aHalfL = (a.w || 48) * 0.26;
+                if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
 
                 const bHalfL = (b.w || 48) * 0.26;
-
-                const aRad = Math.max(11, (a.h || 24) * 0.48);
 
                 const bRad = Math.max(11, (b.h || 24) * 0.48);
 
                 const minDist = aRad + bRad;
-
-
-
-                const aCos = Math.cos(a.angle), aSin = Math.sin(a.angle);
+                const minDistSq = minDist * minDist;
 
                 const bCos = Math.cos(b.angle), bSin = Math.sin(b.angle);
-
-
-
-                const aPts = [
-
-                    { x: a.x + aCos * aHalfL, y: a.y + aSin * aHalfL, lever: 1 },
-
-                    { x: a.x - aCos * aHalfL, y: a.y - aSin * aHalfL, lever: -1 }
-
-                ];
-
-                const bPts = [
-
-                    { x: b.x + bCos * bHalfL, y: b.y + bSin * bHalfL, lever: 1 },
-
-                    { x: b.x - bCos * bHalfL, y: b.y - bSin * bHalfL, lever: -1 }
-
-                ];
-
-
+                const bx0 = b.x + bCos * bHalfL, by0 = b.y + bSin * bHalfL;
+                const bx1 = b.x - bCos * bHalfL, by1 = b.y - bSin * bHalfL;
 
                 let bestOverlap = 0;
 
@@ -11218,37 +11281,26 @@ class LeonidaGame {
 
                 let hitALever = 0, hitBLever = 0;
 
-
-
-                for (const pa of aPts) {
-
-                    for (const pb of bPts) {
-
-                        const dx = pb.x - pa.x;
-
-                        const dy = pb.y - pa.y;
-
-                        const d = Math.hypot(dx, dy);
-
-                        if (d > 0 && d < minDist && (minDist - d) > bestOverlap) {
-
-                            bestOverlap = minDist - d;
-
-                            bestNx = dx / d;
-
-                            bestNy = dy / d;
-
-                            hitALever = pa.lever;
-
-                            hitBLever = pb.lever;
-
+                for (let paIdx = 0; paIdx < 2; paIdx++) {
+                    const pax = paIdx === 0 ? ax0 : ax1;
+                    const pay = paIdx === 0 ? ay0 : ay1;
+                    const paLev = paIdx === 0 ? 1 : -1;
+                    for (let pbIdx = 0; pbIdx < 2; pbIdx++) {
+                        const dx = (pbIdx === 0 ? bx0 : bx1) - pax;
+                        const dy = (pbIdx === 0 ? by0 : by1) - pay;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 > 0 && d2 < minDistSq) {
+                            const d = Math.sqrt(d2);
+                            if ((minDist - d) > bestOverlap) {
+                                bestOverlap = minDist - d;
+                                bestNx = dx / d;
+                                bestNy = dy / d;
+                                hitALever = paLev;
+                                hitBLever = pbIdx === 0 ? 1 : -1;
+                            }
                         }
-
                     }
-
                 }
-
-
 
                 if (bestOverlap > 0) {
 
@@ -11549,6 +11601,8 @@ class LeonidaGame {
 
                 }
 
+                    }
+                }
             }
 
         }
@@ -11796,25 +11850,54 @@ class LeonidaGame {
 
 
         // 6. Pedestrians, GOURANGA Monk Chain, Alligators, Hostile Carjackers & VCPD Foot Officers Update
-        // Pre-cache stationary / slow / parked vehicle OBB transforms once per frame to eliminate thousands of trig/hypot calls in pedestrian feelers
+        // Pre-cache stationary / slow / parked vehicle OBB transforms + 128x128 spatial hash so pedestrian feelers check 0-2 cars instead of 545!
         if (!this._stoppedVehCache) this._stoppedVehCache = [];
         this._stoppedVehCache.length = 0;
-        for (let i = 0; i < this.vehicles.length; i++) {
+        if (!this._stoppedVehGridHead) this._stoppedVehGridHead = new Int16Array(16384);
+        const sHead = this._stoppedVehGridHead;
+        sHead.fill(-1);
+        const maxN = this.vehicles.length;
+        if (!this._stoppedVehGridNext || this._stoppedVehGridNext.length < Math.max(1024, maxN + 64)) {
+            this._stoppedVehGridNext = new Int16Array(Math.max(1024, maxN + 256));
+        }
+        const sNext = this._stoppedVehGridNext;
+        for (let i = 0; i < maxN; i++) {
             const v = this.vehicles[i];
             if (!v) continue;
             const vx = v.vx || 0;
             const vy = v.vy || 0;
             if (!v.destroyed && v.driver !== null && (vx * vx + vy * vy) > 3364) continue; // 58^2 = 3364
-            this._stoppedVehCache.push({
-                v,
-                x: v.x,
-                y: v.y,
-                z: v.z,
-                cosA: Math.cos(v.angle),
-                sinA: Math.sin(v.angle),
-                halfL: (v.w || 46) * 0.44,
-                halfW: (v.h || 22) * 0.42
-            });
+            let entry = v._obbCacheEntry;
+            if (!entry) {
+                entry = {
+                    v,
+                    x: v.x,
+                    y: v.y,
+                    z: v.z,
+                    cosA: Math.cos(v.angle),
+                    sinA: Math.sin(v.angle),
+                    halfL: (v.w || 46) * 0.44,
+                    halfW: (v.h || 22) * 0.42,
+                    ang: v.angle
+                };
+                v._obbCacheEntry = entry;
+            } else {
+                entry.x = v.x;
+                entry.y = v.y;
+                entry.z = v.z;
+                if (entry.ang !== v.angle) {
+                    entry.cosA = Math.cos(v.angle);
+                    entry.sinA = Math.sin(v.angle);
+                    entry.ang = v.angle;
+                }
+            }
+            const cIdx = this._stoppedVehCache.length;
+            this._stoppedVehCache.push(entry);
+            const cx = Math.max(0, Math.min(127, v.x >> 8));
+            const cy = Math.max(0, Math.min(127, v.y >> 8));
+            const cell = (cy << 7) | cx;
+            sNext[cIdx] = sHead[cell];
+            sHead[cell] = cIdx;
         }
 
         const isClientWorldSync = Boolean(
@@ -11949,7 +12032,52 @@ class LeonidaGame {
 
             }
 
-
+            // Off-screen calm civilian pedestrian 15 Hz LOD: smoothly advance inside current walkable tile on 3/4 frames,
+            // running full obstacle feelers, OBB vehicle collisions & shop scans at 15 Hz or whenever crossing a tile edge!
+            if (
+                ped.kind === "CIVILIAN" &&
+                !ped.missionTag &&
+                !ped.isLivingProp &&
+                (ped.burnTimer || 0) <= 0 &&
+                (ped.electroTimer || 0) <= 0 &&
+                (ped.drownTimer || 0) <= 0 &&
+                (ped.stunnedTimer || 0) <= 0 &&
+                (ped.panicTimer || 0) <= 0 &&
+                (ped.dodgeTimer || 0) <= 0 &&
+                (ped.slideCarTimer || 0) <= 0 &&
+                !ped.isCrossingRoad &&
+                !ped.waitingAtCrosswalk &&
+                !ped._boardingVeh &&
+                (Math.abs(ped.x - p.x) > 900 || Math.abs(ped.y - p.y) > 720)
+            ) {
+                const movedTeleport = ped._lastLodX === undefined || Math.abs(ped.x - ped._lastLodX) > 24 || Math.abs(ped.y - ped._lastLodY) > 24;
+                ped._farLodTick = (ped._farLodTick === undefined || movedTeleport) ? 0 : ((ped._farLodTick + 1) & 3);
+                ped._lastLodX = ped.x;
+                ped._lastLodY = ped.y;
+                if (ped._farLodTick !== 0) {
+                    if ((ped.socialTimer || 0) > 0) {
+                        ped.socialTimer = Math.max(0, ped.socialTimer - dt);
+                        continue;
+                    }
+                    if ((ped.hailingTaxiTimer || 0) <= 0 && ped.targetBx !== null && ped.targetBx !== undefined) {
+                        const walkSpd = ped.speed || 38;
+                        const nx = ped.x + Math.cos(ped.angle) * walkSpd * dt;
+                        const ny = ped.y + Math.sin(ped.angle) * walkSpd * dt;
+                        if (
+                            Math.floor(nx / TILE_SIZE) === Math.floor(ped.x / TILE_SIZE) &&
+                            Math.floor(ny / TILE_SIZE) === Math.floor(ped.y / TILE_SIZE)
+                        ) {
+                            ped.x = nx;
+                            ped.y = ny;
+                            ped._lastLodX = nx;
+                            ped._lastLodY = ny;
+                            ped.waypointTimer = (ped.waypointTimer || 0) + dt;
+                            ped._stuckCheckTimer = (ped._stuckCheckTimer || 0) + dt;
+                            continue;
+                        }
+                    }
+                }
+            }
 
             // 1997 GTA 1 Pedestrian::SetBurnEffectActive (Flamethrower burning pedestrians!)
             if ((ped.burnTimer || 0) > 0 && (ped.kind === "FIREMAN" || ped.g24Type === "g2_fireman")) {
@@ -15456,8 +15584,67 @@ class LeonidaGame {
         }
     }
 
+    _ensureWipeoutCellMask() {
+        if (this._wipeoutCellMask || !this.map || !Array.isArray(this.map.beachSunbathers)) {
+            return this._wipeoutCellMask;
+        }
+        const mask = new Uint8Array(128 * 128);
+        const markPt = (px, py, pad) => {
+            const x0 = Math.max(0, (px - pad) >> 8);
+            const x1 = Math.min(127, (px + pad) >> 8);
+            const y0 = Math.max(0, (py - pad) >> 8);
+            const y1 = Math.min(127, (py + pad) >> 8);
+            for (let cy = y0; cy <= y1; cy++) {
+                const rowOff = cy << 7;
+                for (let cx = x0; cx <= x1; cx++) {
+                    mask[rowOff | cx] = 1;
+                }
+            }
+        };
+        const m = this.map;
+        const lists = [
+            [m.beachSunbathers, 112],
+            [m.beachUmbrellas, 76],
+            [m.streetEvents, 86],
+            [m.streetTakeovers, 108],
+            [m.beachVolleyballCourts, 92],
+            [m.beachParties, 92],
+            [m.muscleBeachGyms, 86],
+            [m.wildernessCamps, 84],
+            [m.golfGreens, 82],
+            [m.industrialAndParkDetails && m.industrialAndParkDetails.bikerRallies, 98]
+        ];
+        for (let li = 0; li < lists.length; li++) {
+            const arr = lists[li][0];
+            const pad = lists[li][1];
+            if (!Array.isArray(arr)) continue;
+            for (let i = 0; i < arr.length; i++) {
+                const it = arr[i];
+                if (it && typeof it.x === "number") markPt(it.x, it.y, pad);
+            }
+        }
+        if (Array.isArray(m.viceStreetDetails)) {
+            for (let i = 0; i < m.viceStreetDetails.length; i++) {
+                const vd = m.viceStreetDetails[i];
+                if (vd && vd.kind === "CAFE_TABLE") markPt(vd.x, vd.y, 76);
+            }
+        }
+        this._wipeoutCellMask = mask;
+        return mask;
+    }
+
     checkAndWipeoutLivingEvents(hitX, hitY, hitRad = 28, byPlayer = true, isVehicleImpact = false, isNonLethal = false) {
         if (!this.map) return false;
+        if (hitRad <= 52) {
+            const mask = this._ensureWipeoutCellMask();
+            if (mask) {
+                const cx = hitX >> 8;
+                const cy = hitY >> 8;
+                if (cx < 0 || cx > 127 || cy < 0 || cy > 127 || !mask[(cy << 7) | cx]) {
+                    return false;
+                }
+            }
+        }
         let triggeredAny = false;
 
         const smashParasolFX = (ux, uy, knockAng) => {
@@ -15894,217 +16081,155 @@ class LeonidaGame {
 
 
     updateHud() {
-
         const p = this.player;
+        if (!this._hudEls) {
+            this._hudEls = {
+                hBar: document.getElementById("health-bar"),
+                aBar: document.getElementById("armor-bar"),
+                wEl: document.getElementById("weapon-display"),
+                ankleBadge: document.getElementById("ankle-status-badge"),
+                ankleLed: document.getElementById("ankle-led"),
+                heads: Array.from(document.querySelectorAll(".cop-head")),
+                vrBanner: document.getElementById("vehicle-radio-banner"),
+                cashEl: document.getElementById("cash-counter"),
+                multEl: document.getElementById("multiplier-badge"),
+                livesEl: document.getElementById("lives-badge"),
+                jailEl: document.getElementById("jail-free-badge"),
+                targetEl: document.getElementById("target-score-badge"),
+                objEl: document.getElementById("hud-objective-text"),
+                timerEl: document.getElementById("hud-mission-timer")
+            };
+            this._hudCache = {};
+        }
+        const els = this._hudEls;
+        const c = this._hudCache;
 
-        this.renderPortraits(this._lastPagerSpeaker || "JASON");
+        const speaker = this._lastPagerSpeaker || "JASON";
+        const portraitKey = `${p.charId || "LUCIA"}|${p.bandana ? 1 : 0}|${this.wantedLevel > 0 ? 1 : 0}|${speaker}`;
+        if (c.portraitKey !== portraitKey) {
+            c.portraitKey = portraitKey;
+            this.renderPortraits(speaker);
+        }
 
-
-
-        // Health & Armor bars
-
-        const hBar = document.getElementById("health-bar");
-
-        const aBar = document.getElementById("armor-bar");
-
-        if (hBar) hBar.style.width = `${Math.max(0, (p.hp / p.maxHp) * 100)}%`;
-
-        if (aBar) aBar.style.width = `${Math.max(0, (p.armor / p.maxArmor) * 100)}%`;
-
-
+        // Health & Armor bars (quantized to 0.5% to avoid 60 Hz style invalidations during gradual damage)
+        const hpStr = `${Math.max(0, Math.round((p.hp / p.maxHp) * 200) * 0.5)}%`;
+        const armStr = `${Math.max(0, Math.round((p.armor / p.maxArmor) * 200) * 0.5)}%`;
+        if (els.hBar && c.hpStr !== hpStr) {
+            c.hpStr = hpStr;
+            els.hBar.style.width = hpStr;
+        }
+        if (els.aBar && c.armStr !== armStr) {
+            c.armStr = armStr;
+            els.aBar.style.width = armStr;
+        }
 
         // Weapon & Ammo
-
-        const wEl = document.getElementById("weapon-display");
-
-        if (wEl) {
-
+        if (els.wEl) {
             const spec = WEAPON_SPECS[p.weapon];
-
             const ammoStr = p.ammo[p.weapon] === Infinity ? "∞" : p.ammo[p.weapon];
-
-            wEl.textContent = `${spec.name} [${ammoStr}]`;
-
+            const wTxt = `${spec.name} [${ammoStr}]`;
+            if (c.wTxt !== wTxt) {
+                c.wTxt = wTxt;
+                els.wEl.textContent = wTxt;
+            }
         }
-
-
 
         // Ankle Monitor Badge
-
-        const ankleBadge = document.getElementById("ankle-status-badge");
-
-        const ankleLed = document.getElementById("ankle-led");
-
-        if (ankleBadge && ankleLed) {
-
-            if (p.ankleScrambled) {
-
-                ankleBadge.textContent = "DOC: SCRAMBLED";
-
-                ankleBadge.classList.remove("violation");
-
-                ankleLed.classList.remove("alert");
-
-            } else if (this.wantedLevel > 0) {
-
-                ankleBadge.textContent = "DOC: VIOLATION!";
-
-                ankleBadge.classList.add("violation");
-
-                ankleLed.classList.add("alert");
-
+        const ankleMode = p.ankleScrambled ? 2 : (this.wantedLevel > 0 ? 1 : 0);
+        if (els.ankleBadge && els.ankleLed && c.ankleMode !== ankleMode) {
+            c.ankleMode = ankleMode;
+            if (ankleMode === 2) {
+                els.ankleBadge.textContent = "DOC: SCRAMBLED";
+                els.ankleBadge.classList.remove("violation");
+                els.ankleLed.classList.remove("alert");
+            } else if (ankleMode === 1) {
+                els.ankleBadge.textContent = "DOC: VIOLATION!";
+                els.ankleBadge.classList.add("violation");
+                els.ankleLed.classList.add("alert");
             } else {
-
-                ankleBadge.textContent = "DOC: TRACKED";
-
-                ankleBadge.classList.remove("violation");
-
-                ankleLed.classList.remove("alert");
-
+                els.ankleBadge.textContent = "DOC: TRACKED";
+                els.ankleBadge.classList.remove("violation");
+                els.ankleLed.classList.remove("alert");
             }
-
         }
-
-
 
         // Wanted Heads (1..6)
-
-        const heads = document.querySelectorAll(".cop-head");
-
-        heads.forEach((h, idx) => {
-
-            if (idx < this.wantedLevel) h.classList.add("active");
-
-            else h.classList.remove("active");
-
-        });
-
-
-
-        // Vehicle & Radio Banner (including Car Bomb status!)
-
-        const vrBanner = document.getElementById("vehicle-radio-banner");
-
-        if (vrBanner) {
-
-            if (p.inVehicle) {
-
-                const st = this.audio.getCurrentStation();
-
-                const bombTag = p.inVehicle.bombArmed
-
-                    ? `  •  💣 ARMED (${Math.ceil(p.inVehicle.bombTimer)}s)!`
-
-                    : (p.inVehicle.hasBomb ? "  •  💣 BOMB RIGGED [K]" : "  •  💣 [K] RIG BOMB");
-
-                vrBanner.style.display = "block";
-
-                vrBanner.textContent = `🚗 ${p.inVehicle.name}  •  📻 [R] ${st.name}${bombTag}`;
-
-            } else {
-
-                vrBanner.style.display = "none";
-
+        if (c.wantedLevel !== this.wantedLevel) {
+            c.wantedLevel = this.wantedLevel;
+            for (let idx = 0; idx < els.heads.length; idx++) {
+                if (idx < this.wantedLevel) els.heads[idx].classList.add("active");
+                else els.heads[idx].classList.remove("active");
             }
-
         }
 
-
-
-        // Cash, Multiplier, Lives, Get Out of Jail Free Cards & Chapter Target ($1,000,000)
-
-        const cashEl = document.getElementById("cash-counter");
-
-        const multEl = document.getElementById("multiplier-badge");
-
-        const livesEl = document.getElementById("lives-badge");
-
-        const jailEl = document.getElementById("jail-free-badge");
-
-        const targetEl = document.getElementById("target-score-badge");
-
-        if (cashEl) {
-
-            cashEl.textContent = "$" + String(this.cash).padStart(8, "0");
-
+        // Vehicle & Radio Banner
+        if (els.vrBanner) {
+            if (p.inVehicle) {
+                const st = this.audio.getCurrentStation();
+                const bombTag = p.inVehicle.bombArmed
+                    ? `  •  💣 ARMED (${Math.ceil(p.inVehicle.bombTimer)}s)!`
+                    : (p.inVehicle.hasBomb ? "  •  💣 BOMB RIGGED [K]" : "  •  💣 [K] RIG BOMB");
+                const vrTxt = `🚗 ${p.inVehicle.name}  •  📻 [R] ${st.name}${bombTag}`;
+                if (!c.vrVisible) {
+                    c.vrVisible = true;
+                    els.vrBanner.style.display = "block";
+                }
+                if (c.vrTxt !== vrTxt) {
+                    c.vrTxt = vrTxt;
+                    els.vrBanner.textContent = vrTxt;
+                }
+            } else if (c.vrVisible !== false) {
+                c.vrVisible = false;
+                els.vrBanner.style.display = "none";
+            }
         }
 
-        if (multEl) {
-
-            multEl.textContent = `x${this.multiplier}`;
-
+        // Cash, Multiplier, Lives, Jail Free & Target
+        const cashVal = Math.floor(this.cash);
+        if (els.cashEl && c.cashVal !== cashVal) {
+            c.cashVal = cashVal;
+            els.cashEl.textContent = "$" + String(cashVal).padStart(8, "0");
         }
-
-        if (livesEl) {
-
-            livesEl.textContent = `❤️x${this.lives}`;
-
+        if (els.multEl && c.multiplier !== this.multiplier) {
+            c.multiplier = this.multiplier;
+            els.multEl.textContent = `x${this.multiplier}`;
         }
-
-        if (jailEl) {
-
-            jailEl.textContent = `🃏 JAIL FREE: ${this.jailFreeCards}`;
-
-            jailEl.style.opacity = this.jailFreeCards > 0 ? "1" : "0.45";
-
+        if (els.livesEl && c.lives !== this.lives) {
+            c.lives = this.lives;
+            els.livesEl.textContent = `❤️x${this.lives}`;
         }
-
-        if (targetEl) {
-
-            targetEl.textContent = this.chapterCleared ? "🏆 $1M GOAL CLEARED!" : "GOAL: $1,000,000";
-
+        if (els.jailEl && c.jailFree !== this.jailFreeCards) {
+            c.jailFree = this.jailFreeCards;
+            els.jailEl.textContent = `🃏 JAIL FREE: ${this.jailFreeCards}`;
+            els.jailEl.style.opacity = this.jailFreeCards > 0 ? "1" : "0.45";
         }
-
-
+        if (els.targetEl && c.chapterCleared !== this.chapterCleared) {
+            c.chapterCleared = this.chapterCleared;
+            els.targetEl.textContent = this.chapterCleared ? "🏆 $1M GOAL CLEARED!" : "GOAL: $1,000,000";
+        }
 
         // Mission / Kill Frenzy Objective Mini Row
-
-        const objEl = document.getElementById("hud-objective-text");
-
-        const timerEl = document.getElementById("hud-mission-timer");
-
+        let objTxt = "FREE ROAM LEONIDA";
+        let timerTxt = "";
         if (this.killFrenzy) {
-
-            if (objEl) {
-
-                objEl.textContent = `💀 FRENZY: ${this.killFrenzy.kills}/${this.killFrenzy.targetKills} KILLS`;
-
-            }
-
-            if (timerEl) {
-
-                timerEl.textContent = `⏱️ ${Math.ceil(this.killFrenzy.timer)}s`;
-
-            }
-
+            objTxt = `💀 FRENZY: ${this.killFrenzy.kills}/${this.killFrenzy.targetKills} KILLS`;
+            timerTxt = `⏱️ ${Math.ceil(this.killFrenzy.timer)}s`;
         } else {
-
             const target = this.missions.getTargetPosition();
-
-            if (objEl) {
-
-                objEl.textContent = target ? target.label : "FREE ROAM LEONIDA";
-
+            if (target) objTxt = target.label;
+            const m = this.missions.activeMission;
+            if (m && m.timer !== null && m.timer !== undefined) {
+                timerTxt = `⏱️ ${Math.ceil(m.timer)}s`;
             }
-
-            if (timerEl) {
-
-                const m = this.missions.activeMission;
-
-                if (m && m.timer !== null && m.timer !== undefined) {
-
-                    timerEl.textContent = `⏱️ ${Math.ceil(m.timer)}s`;
-
-                } else {
-
-                    timerEl.textContent = "";
-
-                }
-
-            }
-
         }
-
+        if (els.objEl && c.objTxt !== objTxt) {
+            c.objTxt = objTxt;
+            els.objEl.textContent = objTxt;
+        }
+        if (els.timerEl && c.timerTxt !== timerTxt) {
+            c.timerTxt = timerTxt;
+            els.timerEl.textContent = timerTxt;
+        }
     }
 
 

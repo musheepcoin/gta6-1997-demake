@@ -44,10 +44,24 @@ html, body {
     touch-action: none;
 }
 
-#game-canvas {
+#webgl-canvas {
+    position: absolute;
+    inset: 0;
     display: block;
     width: 100%;
     height: 100%;
+    pointer-events: none;
+    image-rendering: pixelated;
+    z-index: 1;
+}
+
+#game-canvas {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: transparent;
     cursor: crosshair;
     image-rendering: pixelated;
     touch-action: none;
@@ -1352,7 +1366,7 @@ html, body {
     height: 10px;
 }
 
-/* Keep the audio stream engine strictly invisible to the eye while >=200x200 in-viewport and above canvas so mobile browsers never auto-pause it */
+/* Keep the audio stream engine strictly invisible behind #webgl-canvas so it never creates an extra compositor plane over WebGL */
 .yt-hidden-audio-engine {
     position: absolute;
     left: 0;
@@ -1362,7 +1376,7 @@ html, body {
     opacity: 1;
     pointer-events: none;
     overflow: hidden;
-    z-index: 12;
+    z-index: 0;
 }
 
 #yt-player-iframe {
@@ -1671,9 +1685,9 @@ body.touch-enabled #mobile-touch-controls {
     border-radius: 50%;
     background: radial-gradient(circle at 35% 35%, #ff65a3 0%, #ff2a85 60%, #9d174d 100%);
     border: 2px solid #ffffff;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.75);
-    transform: translate(0px, 0px);
-    transition: transform 0.04s linear;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.72);
+    transform: translate3d(0px, 0px, 0px);
+    will-change: transform;
     pointer-events: none;
 }
 
@@ -1869,13 +1883,22 @@ body.touch-enabled #mobile-touch-controls {
         max-height: 30dvh;
     }
 
-    /* 3. Online Multiplayer Chat Widget: Compact 1-Line Pill on Top-Right below Score on Mobile (Zero overlap with Smartphone!) */
+    /* 3. Online Multiplayer Chat Widget: Compact 1-Line Pill on Top-Right below Score on Mobile (Zero backdrop-filter GPU blur over WebGL!) */
     #mp-chat-widget {
         top: 40px;
         right: 8px;
         bottom: auto;
         width: min(310px, calc(100vw - 16px));
         z-index: 38;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+        background: rgba(8, 12, 22, 0.94);
+    }
+
+    #fullmap-modal {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 
     #mp-chat-widget.chat-collapsed {

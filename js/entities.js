@@ -1357,25 +1357,45 @@ class Vehicle {
             const mySpd = Math.abs(this.speed || 0);
 
             if (game && Array.isArray(game.vehicles)) {
-                for (const other of game.vehicles) {
-                    if (other === this) continue;
-                    if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
+                if (typeof game.ensureVehicleSpatialGrid === "function") game.ensureVehicleSpatialGrid();
+                const gHead = game._vehGridHead;
+                const gNext = game._vehGridNext;
+                const checkLaneVeh = (other) => {
+                    if (!other || other === this) return;
+                    if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) return;
                     const odx = other.x - laneCenterX;
                     const ody = other.y - laneCenterY;
+                    if (Math.abs(odx) > 190 || Math.abs(ody) > 190) return;
                     const longDist = odx * fx + ody * fy;
                     const latDist = Math.abs(odx * perpX + ody * perpY);
                     const halfLenSum = ((this.w || 48) + (other.w || 48)) * 0.5 + 14;
                     if (latDist < 28) {
                         if (longDist > -halfLenSum && longDist < 135) {
                             laneClear = false;
-                            break;
+                            return;
                         }
-                        // Rear-view mirror check: yield to fast cars or the player closing in from behind in the target lane
                         const otherSpd = Math.abs(other.speed || 0);
                         if (longDist <= -halfLenSum && longDist > -165 && (otherSpd > mySpd + 24 || (other.driver === "PLAYER" && otherSpd > 35))) {
                             laneClear = false;
-                            break;
                         }
+                    }
+                };
+                if (gHead && gNext) {
+                    const gx0 = Math.max(0, (laneCenterX >> 8) - 1);
+                    const gx1 = Math.min(127, (laneCenterX >> 8) + 1);
+                    const gy0 = Math.max(0, (laneCenterY >> 8) - 1);
+                    const gy1 = Math.min(127, (laneCenterY >> 8) + 1);
+                    for (let gy = gy0; gy <= gy1 && laneClear; gy++) {
+                        const rowOff = gy << 7;
+                        for (let gx = gx0; gx <= gx1 && laneClear; gx++) {
+                            for (let vi = gHead[rowOff | gx]; vi !== -1 && laneClear; vi = gNext[vi]) {
+                                checkLaneVeh(game.vehicles[vi]);
+                            }
+                        }
+                    }
+                } else {
+                    for (let vi = 0; vi < game.vehicles.length && laneClear; vi++) {
+                        checkLaneVeh(game.vehicles[vi]);
                     }
                 }
             }
@@ -1899,14 +1919,26 @@ class Vehicle {
         // 3B. "Don't Block the Box" Anti-Gridlock Rule:
         // Even on a GREEN light, if a same-direction car inside or just exiting the intersection box ahead is stopped (< 8px/s),
         // hold behind the stop line so we never trap cross-traffic when the signal changes!
+        const isFarOffScreenTraffic = Boolean(
+            !isPanicked &&
+            !sirenBehind &&
+            this.driver === "AI_TRAFFIC" &&
+            !this.towingVehicle &&
+            game &&
+            game.player &&
+            (Math.abs(this.x - game.player.x) > 1050 || Math.abs(this.y - game.player.y) > 850)
+        );
+        const runFullRadarNow = !isFarOffScreenTraffic || ((this._farRadarTick = (this._farRadarTick === undefined ? 0 : ((this._farRadarTick + 1) & 3))) === 0);
+
         let boxExitBlocked = false;
-        if (!isPanicked && !sirenBehind && isStopBlock && game && Array.isArray(game.vehicles)) {
+        if (!isPanicked && !sirenBehind && isStopBlock && runFullRadarNow && game && Array.isArray(game.vehicles)) {
             for (let vi = 0; vi < game.vehicles.length; vi++) {
                 const ov = game.vehicles[vi];
                 if (!ov || ov === this || ov.destroyed) continue;
-                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) continue;
                 const dx = ov.x - this.x;
                 const dy = ov.y - this.y;
+                if (Math.abs(dx) > 130 || Math.abs(dy) > 130) continue;
+                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) continue;
                 const fwd = dx * fx + dy * fy;
                 const lat = Math.abs(dx * rx + dy * ry);
                 if (fwd > 22 && fwd < 128 && lat < 20 && Math.cos(ov.angle - this.angle) > 0.65) {
@@ -1918,6 +1950,11 @@ class Vehicle {
                     }
                 }
             }
+            this._cachedBoxBlocked = boxExitBlocked;
+        } else if (isFarOffScreenTraffic && isStopBlock) {
+            boxExitBlocked = Boolean(this._cachedBoxBlocked);
+        } else {
+            this._cachedBoxBlocked = false;
         }
 
         if (!isPanicked && !sirenBehind && curBlk && (isStopBlock || isPreStopBlock) && (hasSignal || boxExitBlocked) && game) {
@@ -1980,15 +2017,22 @@ class Vehicle {
         let crossTrafficYield = false;
         const inIntersectionBox = (lidZ1 === 25);
 
-        if (game && Array.isArray(game.vehicles)) {
-            for (const other of game.vehicles) {
-                if (other === this || other === this.towingVehicle || other === this.towTarget) continue;
-                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
-                const dx = other.x - this.x;
-                const dy = other.y - this.y;
-                if (Math.abs(dx) > 240 || Math.abs(dy) > 240) continue;
-                const dist = Math.hypot(dx, dy);
-                if (dist > 240) continue;
+        if (!runFullRadarNow) {
+            closestBumperGap = this._cachedClosestGap !== undefined ? this._cachedClosestGap : 999;
+            closestEntity = this._cachedClosestEntity || null;
+            crossTrafficYield = Boolean(this._cachedCrossYield);
+        } else {
+            if (game && Array.isArray(game.vehicles)) {
+                if (typeof game.ensureVehicleSpatialGrid === "function") game.ensureVehicleSpatialGrid();
+                const gHead = game._vehGridHead;
+                const gNext = game._vehGridNext;
+                const checkOtherVeh = (other) => {
+                    if (!other || other === this || other === this.towingVehicle || other === this.towTarget) return;
+                    const dx = other.x - this.x;
+                    const dy = other.y - this.y;
+                    if (Math.abs(dx) > 240 || Math.abs(dy) > 240) return;
+                    if (dx * dx + dy * dy > 57600) return;
+                    if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) return;
 
                 const forwardDist = dx * fx + dy * fy;
                 const lateralDist = Math.abs(dx * rx + dy * ry);
@@ -2078,49 +2122,73 @@ class Vehicle {
                         }
                     }
                 }
-            }
-        }
-
-        // Check pedestrians or player on foot directly in front of car's bumper (and wider scan on zebra crosswalks!)
-        if (!isPanicked && game) {
-            const myFrontHalf = (this.w || 48) * 0.34 + 6;
-            if (game.player && !game.player.inVehicle && !game.player.dead) {
-                const dx = game.player.x - this.x;
-                const dy = game.player.y - this.y;
-                const forwardDist = dx * fx + dy * fy;
-                const lateralDist = Math.abs(dx * rx + dy * ry);
-                if (forwardDist > 6 && forwardDist < 68 && lateralDist < 18) {
-                    const gap = Math.max(0, forwardDist - myFrontHalf);
-                    if (gap < closestBumperGap) {
-                        closestBumperGap = gap;
-                        closestEntity = game.player;
-                        isPlayerBlocking = true;
+                };
+                if (gHead && gNext) {
+                    const gx0 = Math.max(0, (this.x >> 8) - 1);
+                    const gx1 = Math.min(127, (this.x >> 8) + 1);
+                    const gy0 = Math.max(0, (this.y >> 8) - 1);
+                    const gy1 = Math.min(127, (this.y >> 8) + 1);
+                    for (let gy = gy0; gy <= gy1; gy++) {
+                        const rowOff = gy << 7;
+                        for (let gx = gx0; gx <= gx1; gx++) {
+                            for (let vi = gHead[rowOff | gx]; vi !== -1; vi = gNext[vi]) {
+                                checkOtherVeh(game.vehicles[vi]);
+                            }
+                        }
+                    }
+                } else {
+                    for (let vi = 0; vi < game.vehicles.length; vi++) {
+                        checkOtherVeh(game.vehicles[vi]);
                     }
                 }
             }
-            if (Array.isArray(game.peds)) {
-                for (const ped of game.peds) {
-                    if (ped.dead) continue;
-                    const dx = ped.x - this.x;
-                    const dy = ped.y - this.y;
-                    if (Math.abs(dx) > 88 || Math.abs(dy) > 88) continue;
-                    const forwardDist = dx * fx + dy * fy;
-                    const lateralDist = Math.abs(dx * rx + dy * ry);
-                    const onZebraCrosswalk = Boolean(
-                        ped.isCrossingRoad ||
-                        (map && map.isStopLineBlock && map.isStopLineBlock(Math.floor(ped.x / TILE_SIZE), Math.floor(ped.y / TILE_SIZE)))
-                    );
-                    const maxFwd = (onZebraCrosswalk && !this.aiAggressive) ? 82 : 52;
-                    const maxLat = (onZebraCrosswalk && !this.aiAggressive) ? 26 : 14;
-                    if (forwardDist > 6 && forwardDist < maxFwd && lateralDist < maxLat) {
-                        const gap = Math.max(0, forwardDist - myFrontHalf);
-                        if (gap < closestBumperGap) {
-                            closestBumperGap = gap;
-                            closestEntity = ped;
+
+            // Check pedestrians or player on foot directly in front of car's bumper (and wider scan on zebra crosswalks!)
+            if (!isPanicked && game) {
+                const myFrontHalf = (this.w || 48) * 0.34 + 6;
+                if (game.player && !game.player.inVehicle && !game.player.dead) {
+                    const dx = game.player.x - this.x;
+                    const dy = game.player.y - this.y;
+                    if (Math.abs(dx) < 80 && Math.abs(dy) < 80) {
+                        const forwardDist = dx * fx + dy * fy;
+                        const lateralDist = Math.abs(dx * rx + dy * ry);
+                        if (forwardDist > 6 && forwardDist < 68 && lateralDist < 18) {
+                            const gap = Math.max(0, forwardDist - myFrontHalf);
+                            if (gap < closestBumperGap) {
+                                closestBumperGap = gap;
+                                closestEntity = game.player;
+                                isPlayerBlocking = true;
+                            }
+                        }
+                    }
+                }
+                if (Array.isArray(game.peds)) {
+                    for (const ped of game.peds) {
+                        if (ped.dead) continue;
+                        const dx = ped.x - this.x;
+                        const dy = ped.y - this.y;
+                        if (Math.abs(dx) > 88 || Math.abs(dy) > 88) continue;
+                        const forwardDist = dx * fx + dy * fy;
+                        const lateralDist = Math.abs(dx * rx + dy * ry);
+                        const onZebraCrosswalk = Boolean(
+                            ped.isCrossingRoad ||
+                            (map && map.isStopLineBlock && map.isStopLineBlock(Math.floor(ped.x / TILE_SIZE), Math.floor(ped.y / TILE_SIZE)))
+                        );
+                        const maxFwd = (onZebraCrosswalk && !this.aiAggressive) ? 82 : 52;
+                        const maxLat = (onZebraCrosswalk && !this.aiAggressive) ? 26 : 14;
+                        if (forwardDist > 6 && forwardDist < maxFwd && lateralDist < maxLat) {
+                            const gap = Math.max(0, forwardDist - myFrontHalf);
+                            if (gap < closestBumperGap) {
+                                closestBumperGap = gap;
+                                closestEntity = ped;
+                            }
                         }
                     }
                 }
             }
+            this._cachedClosestGap = closestBumperGap;
+            this._cachedClosestEntity = closestEntity;
+            this._cachedCrossYield = crossTrafficYield;
         }
 
         // 5. Smooth Forward-Only Speed Regulation (Maintains a clean 22px bumper-to-bumper gap at red lights!)
@@ -3195,16 +3263,45 @@ class Vehicle {
                     const bCos = Math.cos(this.angle), bSin = Math.sin(this.angle);
                     let rearClear = true;
                     if (game && Array.isArray(game.vehicles)) {
-                        for (const o of game.vehicles) {
-                            if (o === this || o === this.towingVehicle) continue;
-                            if (o.z !== undefined && Math.abs(o.z - (this.z !== undefined ? this.z : 2.0)) > 0.85) continue;
+                        const vHead = game._vehGridHead;
+                        const vNext = game._vehGridNext;
+                        const checkRear = (o) => {
+                            if (!o || o === this || o === this.towingVehicle) return false;
+                            if (o.z !== undefined && Math.abs(o.z - (this.z !== undefined ? this.z : 2.0)) > 0.85) return false;
                             const ox = o.x - this.x, oy = o.y - this.y;
+                            if (ox > 110 || ox < -110 || oy > 110 || oy < -110) return false;
                             const along = ox * bCos + oy * bSin;
                             const lat = Math.abs(-ox * bSin + oy * bCos);
                             const need = ((this.w || 48) + (o.w || 48)) * 0.5 + 10;
-                            if (along < 0 && along > -(need + 26) && lat < ((this.h || 24) + (o.h || 24)) * 0.5 + 4) {
-                                rearClear = false;
-                                break;
+                            return (along < 0 && along > -(need + 26) && lat < ((this.h || 24) + (o.h || 24)) * 0.5 + 4);
+                        };
+                        if (vHead && vNext) {
+                            const gcx = this.x >> 8;
+                            const gcy = this.y >> 8;
+                            const x0 = gcx > 0 ? gcx - 1 : 0;
+                            const x1 = gcx < 127 ? gcx + 1 : 127;
+                            const y0 = gcy > 0 ? gcy - 1 : 0;
+                            const y1 = gcy < 127 ? gcy + 1 : 127;
+                            for (let cy = y0; cy <= y1 && rearClear; cy++) {
+                                const rowOff = cy << 7;
+                                for (let cx = x0; cx <= x1; cx++) {
+                                    let idx = vHead[rowOff | cx];
+                                    while (idx !== -1) {
+                                        if (checkRear(game.vehicles[idx])) {
+                                            rearClear = false;
+                                            break;
+                                        }
+                                        idx = vNext[idx];
+                                    }
+                                    if (!rearClear) break;
+                                }
+                            }
+                        } else {
+                            for (const o of game.vehicles) {
+                                if (checkRear(o)) {
+                                    rearClear = false;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -3978,12 +4075,18 @@ class TrafficManager {
         this.game = game;
         this.lastGenCarsTime = 0;
         this.lastGenPedsTime = 0;
-        this.genCarsCooldown = 0.55;
-        this.genPedsCooldown = 0.20;
-        this.maxTrafficCars = 22;
-        this.maxTrafficPeds = 104;
-        this.carsMaxDistanceBlocks = 6; // mTrafficGenCarsMaxDistance
-        this.pedsMaxDistanceBlocks = 9; // mTrafficGenPedsMaxDistance
+        const isMobile = typeof window !== "undefined" && (
+            window.innerWidth <= 960 ||
+            window.innerHeight <= 560 ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+        );
+        this.isMobile = isMobile;
+        this.genCarsCooldown = isMobile ? 0.72 : 0.55;
+        this.genPedsCooldown = isMobile ? 0.55 : 0.20;
+        this.maxTrafficCars = isMobile ? 16 : 22;
+        this.maxTrafficPeds = isMobile ? 54 : 104;
+        this.carsMaxDistanceBlocks = isMobile ? 5 : 6; // mTrafficGenCarsMaxDistance
+        this.pedsMaxDistanceBlocks = isMobile ? 7 : 9; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
         this._trafficSeq = 1;
     }
@@ -4448,56 +4551,49 @@ class TrafficManager {
         }
         if (nearbyPeds >= this.maxTrafficPeds) return;
 
-        // Collect all valid sidewalk (PAWEMENT) and verified coastal beach sand tiles in outerRect.
-        // If nearby pedestrian density is below 58, also allow sidewalk/beach tiles near the screen edges (>= 185px from player)
-        // so Vice Beach, Ocean Drive, Downtown, Little Cuba, and Wynwood always feel packed like GTA 6 Trailer 1.
-        const allowEdgeOnScreen = nearbyPeds < 58;
+        const allowEdgeOnScreen = nearbyPeds < (this.isMobile ? 34 : 58);
         const px = refX !== null ? refX : (game.player ? game.player.x : 0);
         const py = refY !== null ? refY : (game.player ? game.player.y : 0);
-        const candidates = [];
-
-        for (let by = outerRect.minY; by <= outerRect.maxY; by++) {
-            for (let bx = outerRect.minX; bx <= outerRect.maxX; bx++) {
-                // Never spawn street pedestrians on VCIA Airport active runways/tarmac, Port Gellhorn Super-Speedway, SERA Space Center, Stadium pitch, or prison double-fence perimeter strips
-                if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
-                if (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) continue;
-                if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) continue;
-                if (bx >= 179 && bx <= 197 && by >= 164 && by <= 180) continue;
-                if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
-
-                const inScreen = this.isPointInRect(bx, by, onScreenArea);
-                if (inScreen && !allowEdgeOnScreen) continue;
-                const pedX = (bx + 0.5) * TILE_SIZE;
-                const pedY = (by + 0.5) * TILE_SIZE;
-                if (inScreen && Math.hypot(pedX - px, pedY - py) < 185) continue;
-
-                const nav = map.getNavigationBlock(bx, by, camZ);
-                if (!nav) continue;
-                const col = map.getColumn ? map.getColumn(bx, by) : null;
-                if (col && col.length > 1) continue; // skip solid building blocks
-                const lid = map.getTopTile ? map.getTopTile(bx, by) : 0;
-                if (lid === 69) continue; // tree planter box
-                if ((bx === 449 || bx === 450) && lid === 10) continue; // Lummus Park palm grass median
-
-                const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
-                const isSand = !!(map.coastalSandMask && map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);
-                if (
-                    nav.groundType === GROUND_TYPE.PAWEMENT ||
-                    isSand ||
-                    (nav.groundType === GROUND_TYPE.FIELD && inPrisonYard)
-                ) {
-                    candidates.push({ bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT, isSand, inPrisonYard });
-                }
-            }
-        }
-        if (candidates.length === 0) return;
-
         const dirs = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
-        const needed = Math.min(10, this.maxTrafficPeds - nearbyPeds);
+        const needed = Math.min(this.isMobile ? 6 : 10, this.maxTrafficPeds - nearbyPeds);
         let spawned = 0;
+        const spanX = Math.max(1, outerRect.maxX - outerRect.minX + 1);
+        const spanY = Math.max(1, outerRect.maxY - outerRect.minY + 1);
+        const maxProbes = this.isMobile ? 64 : 96;
 
-        for (let attempt = 0; attempt < 36 && spawned < needed; attempt++) {
-            const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        for (let attempt = 0; attempt < maxProbes && spawned < needed; attempt++) {
+            const bx = outerRect.minX + Math.floor(Math.random() * spanX);
+            const by = outerRect.minY + Math.floor(Math.random() * spanY);
+            if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
+            if (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) continue;
+            if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) continue;
+            if (bx >= 179 && bx <= 197 && by >= 164 && by <= 180) continue;
+            if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
+
+            const inScreen = this.isPointInRect(bx, by, onScreenArea);
+            if (inScreen && !allowEdgeOnScreen) continue;
+            const centerPedX = (bx + 0.5) * TILE_SIZE;
+            const centerPedY = (by + 0.5) * TILE_SIZE;
+            if (inScreen && Math.hypot(centerPedX - px, centerPedY - py) < 185) continue;
+
+            const nav = map.getNavigationBlock(bx, by, camZ);
+            if (!nav) continue;
+            const col = map.getColumn ? map.getColumn(bx, by) : null;
+            if (col && col.length > 1) continue;
+            const lid = map.getTopTile ? map.getTopTile(bx, by) : 0;
+            if (lid === 69) continue;
+            if ((bx === 449 || bx === 450) && lid === 10) continue;
+
+            const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
+            const isSand = !!(map.coastalSandMask && map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);
+            if (
+                nav.groundType !== GROUND_TYPE.PAWEMENT &&
+                !isSand &&
+                !(nav.groundType === GROUND_TYPE.FIELD && inPrisonYard)
+            ) {
+                continue;
+            }
+            const pick = { bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT, isSand, inPrisonYard };
             const pedX = (pick.bx + 0.25 + Math.random() * 0.5) * TILE_SIZE;
             const pedY = (pick.by + 0.25 + Math.random() * 0.5) * TILE_SIZE;
 

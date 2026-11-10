@@ -5594,6 +5594,35 @@ class LeonidaMap {
             return true;
         }
         if (Array.isArray(vehicles)) {
+            const g = typeof window !== "undefined" ? window.game : null;
+            if (g && vehicles === g.vehicles && g._vehGridHead && g._vehGridNext) {
+                const gHead = g._vehGridHead;
+                const gNext = g._vehGridNext;
+                const gx0 = Math.max(0, (cx >> 8) - 1);
+                const gx1 = Math.min(127, (cx >> 8) + 1);
+                const gy0 = Math.max(0, (cy >> 8) - 1);
+                const gy1 = Math.min(127, (cy >> 8) + 1);
+                for (let gy = gy0; gy <= gy1; gy++) {
+                    const rowOff = gy << 7;
+                    for (let gx = gx0; gx <= gx1; gx++) {
+                        for (let i = gHead[rowOff | gx]; i !== -1; i = gNext[i]) {
+                            const v = vehicles[i];
+                            if (!v || Math.abs(v.speed || 0) > 28) continue;
+                            const dx = cx - v.x;
+                            if (dx > 52 || dx < -52) continue;
+                            const dy = cy - v.y;
+                            if (dy > 52 || dy < -52) continue;
+                            if (dx * dx + dy * dy > 2704) continue;
+                            const cosA = Math.cos(v.angle || 0);
+                            const sinA = Math.sin(v.angle || 0);
+                            const lx = Math.abs(dx * cosA + dy * sinA);
+                            const ly = Math.abs(-dx * sinA + dy * cosA);
+                            if (lx < (v.w || 54) * 0.5 + 12 && ly < (v.h || 26) * 0.5 + 12) return true;
+                        }
+                    }
+                }
+                return false;
+            }
             for (let i = 0; i < vehicles.length; i++) {
                 const v = vehicles[i];
                 if (!v || Math.abs(v.speed || 0) > 28) continue;
@@ -5783,15 +5812,41 @@ class LeonidaMap {
                     if (Array.isArray(vehicles)) {
                         const cx = (tx + 0.5) * TILE_SIZE;
                         const cy = (ty + 0.5) * TILE_SIZE;
-                        for (let vi = 0; vi < vehicles.length; vi++) {
-                            const v = vehicles[vi];
-                            if (!v || v.destroyed) continue;
-                            if (Math.abs(v.x - cx) > 145 || Math.abs(v.y - cy) > 145) continue;
-                            const d = Math.hypot(v.x - cx, v.y - cy);
-                            const vSpd = Math.abs(v.speed || 0);
-                            if (d < 46 || (vSpd > 24 && d < 105) || (v.sirenActive && d < 145)) {
-                                roadTrafficClear = false;
-                                break;
+                        const g = typeof window !== "undefined" ? window.game : null;
+                        if (g && vehicles === g.vehicles && g._vehGridHead && g._vehGridNext) {
+                            const gHead = g._vehGridHead;
+                            const gNext = g._vehGridNext;
+                            const gx0 = Math.max(0, (cx >> 8) - 1);
+                            const gx1 = Math.min(127, (cx >> 8) + 1);
+                            const gy0 = Math.max(0, (cy >> 8) - 1);
+                            const gy1 = Math.min(127, (cy >> 8) + 1);
+                            for (let gy = gy0; gy <= gy1 && roadTrafficClear; gy++) {
+                                const rowOff = gy << 7;
+                                for (let gx = gx0; gx <= gx1 && roadTrafficClear; gx++) {
+                                    for (let vi = gHead[rowOff | gx]; vi !== -1; vi = gNext[vi]) {
+                                        const v = vehicles[vi];
+                                        if (!v || v.destroyed) continue;
+                                        if (Math.abs(v.x - cx) > 145 || Math.abs(v.y - cy) > 145) continue;
+                                        const d = Math.hypot(v.x - cx, v.y - cy);
+                                        const vSpd = Math.abs(v.speed || 0);
+                                        if (d < 46 || (vSpd > 24 && d < 105) || (v.sirenActive && d < 145)) {
+                                            roadTrafficClear = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            for (let vi = 0; vi < vehicles.length; vi++) {
+                                const v = vehicles[vi];
+                                if (!v || v.destroyed) continue;
+                                if (Math.abs(v.x - cx) > 145 || Math.abs(v.y - cy) > 145) continue;
+                                const d = Math.hypot(v.x - cx, v.y - cy);
+                                const vSpd = Math.abs(v.speed || 0);
+                                if (d < 46 || (vSpd > 24 && d < 105) || (v.sirenActive && d < 145)) {
+                                    roadTrafficClear = false;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -6677,53 +6732,76 @@ class LeonidaMap {
      * Keeps vehicle spawners clear of living animations WITHOUT placing any solid OBB wall around them!
      */
     isInsideLivingEventZone(x, y, extraMargin = 32) {
-        if (Array.isArray(this.streetEvents)) {
-            for (let i = 0; i < this.streetEvents.length; i++) {
-                const ev = this.streetEvents[i];
-                if (Math.hypot(x - ev.x, y - ev.y) < 34 + extraMargin) return true;
+        const srcSum =
+            (Array.isArray(this.streetEvents) ? this.streetEvents.length : 0) +
+            (Array.isArray(this.streetTakeovers) ? this.streetTakeovers.length : 0) +
+            (this.industrialAndParkDetails && Array.isArray(this.industrialAndParkDetails.bikerRallies) ? this.industrialAndParkDetails.bikerRallies.length : 0) +
+            (Array.isArray(this.beachParties) ? this.beachParties.length : 0) +
+            (Array.isArray(this.beachVolleyballCourts) ? this.beachVolleyballCourts.length : 0) +
+            (Array.isArray(this.muscleBeachGyms) ? this.muscleBeachGyms.length : 0) +
+            (Array.isArray(this.wildernessCamps) ? this.wildernessCamps.length : 0) +
+            (Array.isArray(this.golfGreens) ? this.golfGreens.length : 0);
+        if (srcSum === 0) return false;
+
+        if (!this._livingEventGrid || this._livingEventGridSum !== srcSum) {
+            const grid = new Map();
+            const addZone = (zx, zy, baseR) => {
+                const pad = baseR + 64;
+                const x0 = (zx - pad) >> 8;
+                const x1 = (zx + pad) >> 8;
+                const y0 = (zy - pad) >> 8;
+                const y1 = (zy + pad) >> 8;
+                const item = { x: zx, y: zy, r: baseR };
+                for (let cy = y0; cy <= y1; cy++) {
+                    for (let cx = x0; cx <= x1; cx++) {
+                        const key = (cx << 16) | (cy & 0xffff);
+                        let list = grid.get(key);
+                        if (!list) {
+                            list = [];
+                            grid.set(key, list);
+                        }
+                        list.push(item);
+                    }
+                }
+            };
+            if (Array.isArray(this.streetEvents)) {
+                for (let i = 0; i < this.streetEvents.length; i++) addZone(this.streetEvents[i].x, this.streetEvents[i].y, 34);
             }
+            if (Array.isArray(this.streetTakeovers)) {
+                for (let i = 0; i < this.streetTakeovers.length; i++) addZone(this.streetTakeovers[i].x, this.streetTakeovers[i].y, 46);
+            }
+            if (this.industrialAndParkDetails && Array.isArray(this.industrialAndParkDetails.bikerRallies)) {
+                const brs = this.industrialAndParkDetails.bikerRallies;
+                for (let i = 0; i < brs.length; i++) addZone(brs[i].x, brs[i].y, (brs[i].count || 4) * 10 + 18);
+            }
+            if (Array.isArray(this.beachParties)) {
+                for (let i = 0; i < this.beachParties.length; i++) addZone(this.beachParties[i].x, this.beachParties[i].y, 34);
+            }
+            if (Array.isArray(this.beachVolleyballCourts)) {
+                for (let i = 0; i < this.beachVolleyballCourts.length; i++) addZone(this.beachVolleyballCourts[i].x, this.beachVolleyballCourts[i].y, 36);
+            }
+            if (Array.isArray(this.muscleBeachGyms)) {
+                for (let i = 0; i < this.muscleBeachGyms.length; i++) addZone(this.muscleBeachGyms[i].x, this.muscleBeachGyms[i].y, 34);
+            }
+            if (Array.isArray(this.wildernessCamps)) {
+                for (let i = 0; i < this.wildernessCamps.length; i++) addZone(this.wildernessCamps[i].x, this.wildernessCamps[i].y, 34);
+            }
+            if (Array.isArray(this.golfGreens)) {
+                for (let i = 0; i < this.golfGreens.length; i++) addZone(this.golfGreens[i].x, this.golfGreens[i].y, 28);
+            }
+            this._livingEventGrid = grid;
+            this._livingEventGridSum = srcSum;
         }
-        if (Array.isArray(this.streetTakeovers)) {
-            for (let i = 0; i < this.streetTakeovers.length; i++) {
-                const st = this.streetTakeovers[i];
-                if (Math.hypot(x - st.x, y - st.y) < 46 + extraMargin) return true;
-            }
-        }
-        if (this.industrialAndParkDetails && Array.isArray(this.industrialAndParkDetails.bikerRallies)) {
-            for (let i = 0; i < this.industrialAndParkDetails.bikerRallies.length; i++) {
-                const br = this.industrialAndParkDetails.bikerRallies[i];
-                if (Math.hypot(x - br.x, y - br.y) < (br.count || 4) * 10 + 18 + extraMargin) return true;
-            }
-        }
-        if (Array.isArray(this.beachParties)) {
-            for (let i = 0; i < this.beachParties.length; i++) {
-                const bp = this.beachParties[i];
-                if (Math.hypot(x - bp.x, y - bp.y) < 34 + extraMargin) return true;
-            }
-        }
-        if (Array.isArray(this.beachVolleyballCourts)) {
-            for (let i = 0; i < this.beachVolleyballCourts.length; i++) {
-                const vc = this.beachVolleyballCourts[i];
-                if (Math.hypot(x - vc.x, y - vc.y) < 36 + extraMargin) return true;
-            }
-        }
-        if (Array.isArray(this.muscleBeachGyms)) {
-            for (let i = 0; i < this.muscleBeachGyms.length; i++) {
-                const gm = this.muscleBeachGyms[i];
-                if (Math.hypot(x - gm.x, y - gm.y) < 34 + extraMargin) return true;
-            }
-        }
-        if (Array.isArray(this.wildernessCamps)) {
-            for (let i = 0; i < this.wildernessCamps.length; i++) {
-                const cp = this.wildernessCamps[i];
-                if (Math.hypot(x - cp.x, y - cp.y) < 34 + extraMargin) return true;
-            }
-        }
-        if (Array.isArray(this.golfGreens)) {
-            for (let i = 0; i < this.golfGreens.length; i++) {
-                const gg = this.golfGreens[i];
-                if (Math.hypot(x - gg.x, y - gg.y) < 28 + extraMargin) return true;
-            }
+
+        const cellKey = ((x >> 8) << 16) | ((y >> 8) & 0xffff);
+        const bucket = this._livingEventGrid.get(cellKey);
+        if (!bucket) return false;
+        for (let i = 0; i < bucket.length; i++) {
+            const z = bucket[i];
+            const dx = x - z.x;
+            const dy = y - z.y;
+            const rad = z.r + extraMargin;
+            if (dx * dx + dy * dy < rad * rad) return true;
         }
         return false;
     }
