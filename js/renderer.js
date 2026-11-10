@@ -252,7 +252,7 @@ class RetroRenderer {
                 return web;
             }
 
-            vec4 sampleOceanWater(float dayAmt, float shoreBoost) {
+            vec4 sampleOceanWater(float dayAmt) {
                 vec2 p = vWorldPos.xz;
                 vec2 waveGrad;
                 float swell;
@@ -266,12 +266,12 @@ class RetroRenderer {
                 vec2 wUV = (vec2(col, row) + localUV) / vec2(16.0, 51.0);
                 vec3 texW = texture2D(uTex, wUV).rgb;
 
-                // S-curve Vice Beach coastal bathymetry + shoreBoost from canals, lagoons & shorelines
+                // Continuous world-space S-curve Vice Beach coastal bathymetry (zero per-tile jump across tile boundaries)
                 float shoreCurveX = 481.5 + 4.2 * sin(p.y * 0.021) + 2.4 * cos(p.y * 0.047);
                 float signedOffshore = p.x - shoreCurveX;
                 float coastDist = abs(signedOffshore);
-                float shallowFactor = max(shoreBoost, clamp(1.0 - coastDist / 19.0, 0.0, 1.0));
-                float deepAtlantic = clamp((signedOffshore - 10.0) / 28.0, 0.0, 1.0) * (1.0 - shoreBoost);
+                float shallowFactor = clamp(1.0 - coastDist / 19.0, 0.0, 1.0);
+                float deepAtlantic = clamp((signedOffshore - 10.0) / 28.0, 0.0, 1.0);
 
                 // Beer-Lambert Tropical Bathymetry: Deep Gulf Stream Sapphire -> Biscayne Azure -> Bahamas Reef Aquamarine
                 vec3 abyssSapphire = vec3(0.03, 0.30, 0.54);
@@ -502,7 +502,8 @@ class RetroRenderer {
                     vec3 caustLight = mix(vec3(0.18, 0.42, 0.40), vec3(0.42, 0.48, 0.32), bedCaust);
                     c.rgb = min(vec3(1.0), sandFloor * absorbTint + caustLight * bedCaust * (0.32 + 0.68 * dayAmt));
                 } else if (vAnim > 0.5 && vAnim < 1.5) {
-                    c = sampleOceanWater(dayAmt, 0.0);
+                    c = sampleOceanWater(dayAmt);
+                    waterCoverage = 1.0;
                 } else if ((vAnim > -0.5 && vAnim < 0.5) || isShoreTile || isRoad || isFootpathSandEdge || isCurvedLawn || isCurvedWater) {
                     float dWater = 10.0;
                     float waterBits = 0.0;
@@ -810,7 +811,7 @@ class RetroRenderer {
                     // For shoreline tiles (lid 99..101), composite the beach sand & white surf directly over the animated ocean water on the SAME quad!
                     if (isShoreTile && c.a < 0.999) {
                         float shoreAlpha = c.a;
-                        vec4 waterCol = sampleOceanWater(dayAmt, 1.0);
+                        vec4 waterCol = sampleOceanWater(dayAmt);
                         // Add organic cellular seafoam lace along the swash transition
                         float swashZone = shoreAlpha * (1.0 - shoreAlpha) * 4.0;
                         float lace = clamp(0.55 + 0.45 * sin(vWorldPos.x * 14.0 + vWorldPos.z * 11.0 + uTime * 2.8), 0.0, 1.0);
@@ -822,19 +823,20 @@ class RetroRenderer {
                     }
                     // For curved basins, ponds, canals & beaches (isCurvedWater), transition from shoreline into animated water!
                     if (isCurvedWater && dWater > 0.065) {
-                        float edgeShallowBoost = clamp(exp(-max(0.0, dWater - 0.10) * 2.8), 0.0, 1.0);
-                        vec4 waterCol = sampleOceanWater(dayAmt, edgeShallowBoost);
+                        vec4 waterCol = sampleOceanWater(dayAmt);
                         if (waterSurType > 2.5) {
                             // Natural beach & coastline surf shoreline: warm wet sand -> animated lacy white ocean surf foam -> turquoise shallows -> ocean
                             float tide = 0.028 * sin(uTime * 2.1 + vWorldPos.x * 0.55 + vWorldPos.z * 0.45) + 0.014 * cos(uTime * 3.4 - vWorldPos.z * 1.1);
                             float dSurf = dWater + tide;
-                            float shallowShelf = exp(-max(0.0, dSurf - 0.11) * 5.0);
+                            // Fade all edge shelf & foam terms smoothly to 0.0 before reaching the inner tile border (dSurf >= 0.44) so there is zero 1-tile seam!
+                            float innerFade = 1.0 - smoothstep(0.28, 0.44, dSurf);
+                            float shallowShelf = exp(-max(0.0, dSurf - 0.11) * 6.5) * innerFade;
                             float foamLace = 0.72 + 0.28 * sin(vWorldPos.x * 12.5 - vWorldPos.z * 10.5 + uTime * 2.9);
                             float foam1 = exp(-pow((dSurf - 0.118) / 0.028, 2.0)) * 0.88 * foamLace;
-                            float foam2 = exp(-pow((dSurf - 0.210) / 0.024, 2.0)) * 0.44 * foamLace;
-                            float foam3 = exp(-pow((dSurf - 0.315) / 0.020, 2.0)) * 0.22 * foamLace;
-                            float foam = clamp(foam1 + foam2 + foam3, 0.0, 0.94) * (0.42 + 0.58 * dayAmt);
-                            vec3 shallowCol = waterCol.rgb + vec3(0.08, 0.24, 0.23) * shallowShelf * (0.35 + 0.65 * dayAmt);
+                            float foam2 = exp(-pow((dSurf - 0.205) / 0.024, 2.0)) * 0.44 * foamLace;
+                            float foam3 = exp(-pow((dSurf - 0.295) / 0.020, 2.0)) * 0.22 * foamLace;
+                            float foam = clamp(foam1 + foam2 + foam3, 0.0, 0.94) * (0.42 + 0.58 * dayAmt) * innerFade;
+                            vec3 shallowCol = waterCol.rgb + vec3(0.07, 0.20, 0.19) * shallowShelf * (0.35 + 0.65 * dayAmt);
                             vec3 shoreWater = mix(min(vec3(1.0), shallowCol), vec3(0.95, 0.99, 1.0), foam);
                             float waterMix = smoothstep(0.090, 0.135, dSurf);
                             c.rgb = mix(c.rgb, shoreWater, waterMix);
@@ -842,13 +844,14 @@ class RetroRenderer {
                             waterCoverage = waterMix * (1.0 - foam * 0.75);
                         } else if (dWater > 0.125) {
                             // Enclosed urban basin / Venetian canal: submerged vertical stone wall shadow + emerald-turquoise shelf + dual meniscus ripple
-                            float wallShade = mix(0.60, 1.0, smoothstep(0.135, 0.28, dWater));
-                            float shallowShelf = exp(-max(0.0, dWater - 0.135) * 7.5);
+                            float innerFade = 1.0 - smoothstep(0.26, 0.42, dWater);
+                            float wallShade = mix(1.0, mix(0.60, 1.0, smoothstep(0.135, 0.28, dWater)), innerFade);
+                            float shallowShelf = exp(-max(0.0, dWater - 0.135) * 8.5) * innerFade;
                             float rippleWave = 0.5 + 0.5 * sin(dWater * 52.0 - uTime * 3.4 + sin(vWorldPos.x * 4.8 + vWorldPos.z * 4.8) * 1.5);
-                            float meniscus1 = exp(-pow((dWater - 0.148) / 0.017, 2.0)) * (0.58 + 0.42 * rippleWave);
-                            float meniscus2 = exp(-pow((dWater - 0.195) / 0.014, 2.0)) * 0.32 * rippleWave;
+                            float meniscus1 = exp(-pow((dWater - 0.148) / 0.017, 2.0)) * (0.58 + 0.42 * rippleWave) * innerFade;
+                            float meniscus2 = exp(-pow((dWater - 0.195) / 0.014, 2.0)) * 0.32 * rippleWave * innerFade;
                             vec3 basinWater = waterCol.rgb * wallShade
-                                + vec3(0.05, 0.20, 0.22) * shallowShelf * (0.35 + 0.65 * dayAmt)
+                                + vec3(0.05, 0.18, 0.20) * shallowShelf * (0.35 + 0.65 * dayAmt)
                                 + vec3(0.76, 0.93, 0.98) * (meniscus1 + meniscus2) * 0.45;
                             float waterMix = smoothstep(0.126, 0.144, dWater);
                             c.rgb = mix(c.rgb, min(vec3(1.0), basinWater), waterMix);
@@ -972,7 +975,15 @@ class RetroRenderer {
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!) + underwater LED glow for rooftop pools!
                         float isPoolNight = step(2.85, vWorldPos.y) * step(0.18, rawTexRgb.b - rawTexRgb.r) * step(0.12, rawTexRgb.g - rawTexRgb.r);
                         vec3 nightScale = mix(vec3(0.68, 0.73, 0.90), vec3(0.42, 0.54, 0.82), waterCoverage);
-                        nightRgb = mix(c.rgb * nightScale, c.rgb * vec3(0.78, 0.92, 1.05), isPoolNight * 0.85);
+                        vec3 baseNight = c.rgb * nightScale;
+                        if (waterCoverage > 0.01) {
+                            vec2 mGrad;
+                            float mSwell;
+                            float mCaust = evalWaterCaustics(vWorldPos.xz * 0.85, uTime * 0.8, mGrad, mSwell);
+                            vec3 neonWash = mix(vec3(0.14, 0.58, 0.88), vec3(0.76, 0.32, 0.68), 0.5 + 0.5 * sin(vWorldPos.z * 0.06 + vWorldPos.x * 0.04));
+                            baseNight += neonWash * pow(mCaust, 2.2) * 0.18 * waterCoverage;
+                        }
+                        nightRgb = mix(baseNight, c.rgb * vec3(0.78, 0.92, 1.05), isPoolNight * 0.85);
                     }
                     c.rgb = mix(c.rgb, nightRgb, nfAmt);
                 }
@@ -7468,30 +7479,8 @@ class RetroRenderer {
         }
 
         // =========================================================================
-        // 4B. ROLLING ATLANTIC SURF BREAKERS & WET-SAND SHIMMER + SAND CATCH GAMES / METAL-DETECTOR COMBERS
+        // 4B. SAND CATCH GAMES / METAL-DETECTOR COMBERS
         // =========================================================================
-        {
-            const surfXBase = 481.2 * TILE_SIZE;
-            if (surfXBase >= minX - 96 && surfXBase <= maxX + 96) {
-                const rSurfMin = Math.max(54, Math.floor((minY - 64) / TILE_SIZE));
-                const rSurfMax = Math.min(354, Math.ceil((maxY + 64) / TILE_SIZE));
-                for (let sr = rSurfMin; sr <= rSurfMax; sr += 2) {
-                    const sy = (sr + 0.5) * TILE_SIZE;
-                    const wavePhase = this.time * 1.85 + sr * 0.35;
-                    const surge = Math.sin(wavePhase);
-                    const crestX = surfXBase - surge * 11.0;
-                    const foamAlpha = 0.22 + (0.5 - 0.5 * surge) * 0.32;
-                    // Wet-sand turquoise reflection ribbon on the tideline
-                    this.pushSolidQuad3D(surfXBase - 6.0, sy, 2.008, 14.0, 62.0, 0, 0.42, 0.88, 0.96, 0.16, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    // Rolling white Atlantic surf breaker crest washing onto the sand
-                    this.pushSolidQuad3D(crestX, sy, 2.015, 5.5 + (1.0 - surge) * 2.5, 60.0, Math.sin(sr * 0.7) * 0.05, 0.94, 0.99, 1.00, foamAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    // Secondary offshore turquoise breaker line
-                    const outerPhase = this.time * 1.85 + sr * 0.35 - 1.35;
-                    const outerSurge = Math.sin(outerPhase);
-                    this.pushSolidQuad3D(surfXBase + 18.0 - outerSurge * 8.0, sy, 2.014, 3.8, 56.0, 0, 0.82, 0.98, 1.00, 0.26, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                }
-            }
-        }
         if (Array.isArray(this.map.beachCatchGames)) {
             for (let bi = 0; bi < this.map.beachCatchGames.length; bi++) {
                 const bg = this.map.beachCatchGames[bi];
