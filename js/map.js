@@ -2377,7 +2377,20 @@ class LeonidaMap {
             } else {
                 const sp = snapToVerifiedPed(rawX, rawY, 5, true);
                 if (!sp) continue;
-                if (this.streetEvents.some(other => Math.hypot(other.x - sp.x, other.y - sp.y) < 42)) continue;
+                if (ev.kind === "LITTLE_CUBA_CROWD") {
+                    const sc = Math.floor(sp.x / TILE_SIZE);
+                    const sr = Math.floor(sp.y / TILE_SIZE);
+                    const adjBld =
+                        this.surfaceGround[(sr - 1) * MAP_COLS + sc] === GROUND_TYPE.BUILDING ||
+                        this.surfaceGround[(sr + 1) * MAP_COLS + sc] === GROUND_TYPE.BUILDING ||
+                        this.surfaceGround[sr * MAP_COLS + (sc - 1)] === GROUND_TYPE.BUILDING ||
+                        this.surfaceGround[sr * MAP_COLS + (sc + 1)] === GROUND_TYPE.BUILDING;
+                    const nearRoadCorner =
+                        (this.surfaceGround[(sr - 1) * MAP_COLS + sc] === GROUND_TYPE.ROAD || this.surfaceGround[(sr + 1) * MAP_COLS + sc] === GROUND_TYPE.ROAD) &&
+                        (this.surfaceGround[sr * MAP_COLS + (sc - 1)] === GROUND_TYPE.ROAD || this.surfaceGround[sr * MAP_COLS + (sc + 1)] === GROUND_TYPE.ROAD);
+                    if (!adjBld || nearRoadCorner) continue;
+                }
+                if (this.streetEvents.some(other => Math.hypot(other.x - sp.x, other.y - sp.y) < 48)) continue;
                 this.streetEvents.push({ x: sp.x, y: sp.y, z: 2.0, kind: ev.kind, ang: ev.ang, seed: ei * 1.9 });
             }
         }
@@ -3824,30 +3837,49 @@ class LeonidaMap {
         }
 
         // Deep-Dive Vice City Architectural Streetscape Props:
-        // A. Ocean Drive Art Deco Sidewalk Café Terraces (West sidewalk directly in front of 3D Art Deco hotels)
-        // Placed strictly on rows r where (r % 8 === 3 || r % 8 === 5) so they are perfectly centered between
-        // the Royal Palms (which stand at r % 8 === 0) and verified clear of hotel entrance doors & street events.
-        for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r++) {
+        // A. Ocean Drive Art Deco Sidewalk Café Terraces (West sidewalk directly in front of continuous 3D Art Deco hotel facades)
+        // Placed strictly as coherent 2-table restaurant terraces on mid-block hotel fronts (never at building corners,
+        // crosswalks, payphones, hotel entrance doors, or the Hotel Dixon player spawn block r = 278..296!).
+        const cafePayphoneSpots = [
+            [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
+            [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 293.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 292.5 * TILE_SIZE],
+            [344.5 * TILE_SIZE, 171.5 * TILE_SIZE],
+            [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
+        ];
+        const isCleanHotelTerraceSpot = (tx, ty, rowCheck) => {
+            for (let dr = -2; dr <= 2; dr++) {
+                const rr = rowCheck + dr;
+                if (rr < 0 || rr >= MAP_ROWS) return false;
+                if (this.surfaceGround[rr * MAP_COLS + (oceanDriveW - 1)] !== GROUND_TYPE.BUILDING) return false;
+                if (Math.abs(dr) <= 1 && this.surfaceGround[rr * MAP_COLS + oceanDriveW] !== GROUND_TYPE.PAWEMENT) return false;
+                if (Math.abs(dr) <= 1 && this.getBlockInfo(oceanDriveW, rr, 1)?.lid === 69) return false;
+            }
+            if (cafePayphoneSpots.some(pp => Math.hypot(pp[0] - tx, pp[1] - ty) < 76)) return false;
+            if (this.interiors && this.interiors.some(i => Math.hypot(i.doorX - tx, i.doorY - ty) < 68)) return false;
+            if (this.vicePalms && this.vicePalms.some(p => Math.hypot(p.x - tx, p.y - ty) < 46)) return false;
+            if (this.streetlights && this.streetlights.some(l => Math.hypot((l.baseX || l.x) - tx, (l.baseY || l.y) - ty) < 44)) return false;
+            if (this.trafficSignals && this.trafficSignals.some(ts => Math.hypot((ts.baseX || ts.x) - tx, (ts.baseY || ts.y) - ty) < 48)) return false;
+            if (this.streetEvents && this.streetEvents.some(ev => Math.hypot(ev.x - tx, ev.y - ty) < 64)) return false;
+            if (this.pickups && this.pickups.some(pk => Math.hypot(pk.x - tx, pk.y - ty) < 52)) return false;
+            if (this.killFrenzies && this.killFrenzies.some(kf => Math.hypot(kf.x - tx, kf.y - ty) < 52)) return false;
+            return true;
+        };
+        for (let r = MAP_Y_256[44]; r <= MAP_Y_256[192]; r++) {
+            // Keep the Hotel Dixon / Player Spawn / Mission Payphone block (r = 278..296) 100% clear of sidewalk tables
+            if (r >= 278 && r <= 296) continue;
             const mod8 = ((r % 8) + 8) % 8;
-            if (mod8 !== 3 && mod8 !== 5) continue;
-            if (this.surfaceGround[r * MAP_COLS + oceanDriveW] !== GROUND_TYPE.PAWEMENT) continue;
-            // Only place café tables directly in front of actual 3D Ocean Drive buildings (never in front of parks or roads!)
-            if (this.surfaceGround[r * MAP_COLS + (oceanDriveW - 1)] !== GROUND_TYPE.BUILDING) continue;
-            if (this.getBlockInfo(oceanDriveW, r, 1)?.lid === 69) continue;
-            const tx = (oceanDriveW + 0.28) * TILE_SIZE;
-            const ty = (r + 0.5) * TILE_SIZE;
-            const nearDoor = this.interiors && this.interiors.some(i => Math.hypot(i.doorX - tx, i.doorY - ty) < 54);
-            const nearPalm = this.vicePalms && this.vicePalms.some(p => Math.hypot(p.x - tx, p.y - ty) < 44);
-            const nearLamp = this.streetlights && this.streetlights.some(l => Math.hypot(l.x - tx, l.y - ty) < 40);
-            const nearEvent = this.streetEvents && this.streetEvents.some(ev => Math.hypot(ev.x - tx, ev.y - ty) < 52);
-            if (nearDoor || nearPalm || nearLamp || nearEvent) continue;
-            this.viceStreetDetails.push({
-                kind: "CAFE_TABLE",
-                x: tx,
-                y: ty,
-                z: 2.0,
-                theme: ((r >> 1) % 2 === 0) ? "PINK" : "CYAN"
-            });
+            if (mod8 !== 3) continue;
+            const tx = (oceanDriveW + 0.42) * TILE_SIZE;
+            const ty1 = (r + 0.22) * TILE_SIZE;
+            const ty2 = (r + 1.08) * TILE_SIZE;
+            if (!isCleanHotelTerraceSpot(tx, ty1, r) || !isCleanHotelTerraceSpot(tx, ty2, r + 1)) continue;
+            const terraceTheme = (Math.floor(r / 8) % 2 === 0) ? "PINK" : "CYAN";
+            this.viceStreetDetails.push(
+                { kind: "CAFE_TABLE", x: tx, y: ty1, z: 2.0, theme: terraceTheme },
+                { kind: "CAFE_TABLE", x: tx, y: ty2, z: 2.0, theme: terraceTheme }
+            );
         }
 
         // B. Española Way Overhead Mediterranean Bistro Light Strings
@@ -3885,8 +3917,8 @@ class LeonidaMap {
             });
         }
 
-        // D. Ocean Drive Art Deco Hotel Valet Podiums & Little Cuba (Calle Ocho) Sidewalk Domino Tables
-        for (const rValet of [222, 244, 270, 286, 302, 316]) {
+        // D. Ocean Drive Art Deco Hotel Valet Podiums
+        for (const rValet of [222, 244, 270, 302, 316]) {
             if (this.surfaceGround[rValet * MAP_COLS + oceanDriveW] !== GROUND_TYPE.PAWEMENT) continue;
             this.viceStreetDetails.push({
                 kind: "VALET_PODIUM",
@@ -3895,17 +3927,6 @@ class LeonidaMap {
                 z: 2.0,
                 theme: (rValet % 4 === 0) ? "PINK" : "CYAN"
             });
-        }
-        for (const [dc, dr] of [[254, 244], [260, 244], [266, 244], [256, 260], [264, 260]]) {
-            if (this.surfaceGround[dr * MAP_COLS + dc] === GROUND_TYPE.PAWEMENT) {
-                this.viceStreetDetails.push({
-                    kind: "CUBA_DOMINO_TABLE",
-                    x: (dc + 0.5) * TILE_SIZE,
-                    y: (dr + 0.5) * TILE_SIZE,
-                    z: 2.0,
-                    theme: "AMBER"
-                });
-            }
         }
 
         // 16 Official GTA 6 (State of Leonida & Vice City) Bespoke Landmarks

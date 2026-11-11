@@ -10689,11 +10689,8 @@ class RetroRenderer {
                             pNorth,
                             pSouth,
                             vd.theme || "CYAN",
-                            hasUmb && !vdWiped
+                            false
                         );
-                        if (hasUmb && vdWiped) {
-                            this.renderSmashedParasol3D(umbSpr, vd.x - 10, vd.y, vz, vd.knockAng || 0, 0.84);
-                        }
                     } else if (vd.kind === "BISTRO_STRING") {
                         // Española Way overhead Mediterranean festive light cable & glowing bulbs
                         this.pushSolidQuad3D(vd.x, vd.y, vz + 0.50, 58, 1.8, 0, 0.18, 0.22, 0.28, 0.85, SPRITE_DRAW_ORDER.TREES);
