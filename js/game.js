@@ -10810,53 +10810,53 @@ class LeonidaGame {
                 if (!postWater.inWater) {
                     p.deepSeaDanger = 0;
                     p.swimStamina = Math.min(100, p.swimStamina + dt * 30.0);
-                } else if (postWater.distBlocks <= 4.5 || nearBoatRefuge) {
-                    // Safe coastal / lagoon / canal swimming zone
+                } else if (postWater.distBlocks <= 11.5 || nearBoatRefuge) {
+                    // Safe coastal / pier / lagoon / canal swimming zone (up to 11.5 blocks / ~740px from any shore or pier!)
                     p.deepSeaDanger = 0;
                     if (nowSwimming && this.input.sprint && p.isMoving) {
-                        p.swimStamina = Math.max(18, p.swimStamina - dt * 4.2);
+                        p.swimStamina = Math.max(25, p.swimStamina - dt * 3.0);
                     } else {
-                        p.swimStamina = Math.min(100, p.swimStamina + dt * 14.0);
+                        p.swimStamina = Math.min(100, p.swimStamina + dt * 18.0);
                     }
                 } else {
-                    // Deep Ocean / Haute Mer (> 4.5 blocks from nearest dry land!)
+                    // True Deep Ocean / Haute Mer (> 11.5 blocks from nearest beach, pier, or island!)
                     const moveCosToShore = p.isMoving
                         ? (Math.cos(p.angle) * p.shoreDirX + Math.sin(p.angle) * p.shoreDirY)
                         : 0;
                     const swimmingToShore = moveCosToShore > 0.32;
-                    const overDepth = Math.max(0, postWater.distBlocks - 4.5);
+                    const overDepth = Math.max(0, postWater.distBlocks - 11.5);
 
                     // Offshore riptide current pulls gently out to sea if not actively swimming back toward shore
                     if (!swimmingToShore) {
-                        const riptidePull = Math.min(22.0, 7.5 + overDepth * 2.5);
+                        const riptidePull = Math.min(18.0, 6.0 + overDepth * 2.0);
                         p.x -= p.shoreDirX * riptidePull * dt;
                         p.y -= p.shoreDirY * riptidePull * dt;
                     }
 
-                    const drainRate = (swimmingToShore ? 6.5 : 13.5) + overDepth * 3.2 + (this.input.sprint ? 4.5 : 0);
+                    const drainRate = (swimmingToShore ? 4.5 : 10.5) + overDepth * 2.5 + (this.input.sprint ? 3.5 : 0);
                     p.swimStamina = Math.max(0, p.swimStamina - drainRate * dt);
 
-                    if (postWater.distBlocks > 7.5 || p.swimStamina <= 0) {
-                        // Critical High-Seas Danger: Shark Attack & Exhaustion!
+                    if (postWater.distBlocks > 16.5 || p.swimStamina <= 0) {
+                        // Critical High-Seas Danger (> 16.5 blocks / > 1050px offshore or exhausted): Shark Attack!
                         p.deepSeaDanger = 2;
                         p._seaWarnCd = (p._seaWarnCd || 0) - dt;
                         if (p._seaWarnCd <= 0) {
                             p._seaWarnCd = 3.2;
                             this.showBanner("🦈 HIGH SEAS DANGER — SHARK ATTACK IN DEEP OCEAN! SWIM BACK TO SHORE!", 2.6);
                         }
-                        this.damagePlayer((14.0 + Math.min(18.0, overDepth * 2.8)) * dt);
+                        this.damagePlayer((12.0 + Math.min(16.0, overDepth * 2.2)) * dt);
                         p._sharkBiteCd = (p._sharkBiteCd || 0) - dt;
                         if (p._sharkBiteCd <= 0) {
-                            p._sharkBiteCd = 2.1;
+                            p._sharkBiteCd = 2.4;
                             p.sharkLungeTimer = 0.55;
                             if (this.audio && typeof this.audio.playWaterSplash === "function") {
                                 this.audio.playWaterSplash(1.0);
                             }
                             this.addFloatingText(p.x, p.y - 24, "🦈 SHARK BITE!", "#ff1e38");
-                            this.damagePlayer(20);
+                            this.damagePlayer(18);
                         }
                     } else {
-                        // Offshore Warning Zone (4.5 .. 7.5 blocks from shore): Shark circling & riptide draining stamina
+                        // Offshore Warning Zone (11.5 .. 16.5 blocks from shore): Shark circling & riptide draining stamina
                         p.deepSeaDanger = 1;
                         p._seaWarnCd = (p._seaWarnCd || 0) - dt;
                         if (p._seaWarnCd <= 0) {

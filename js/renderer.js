@@ -11605,7 +11605,7 @@ class RetroRenderer {
         }
 
         // 2B-Swim. Swimming Stamina & Deep-Ocean ("Haute Mer") Shark/Riptide Warning Pill
-        if (!p.inVehicle && (p.isSwimming || (p.swimStamina !== undefined && p.swimStamina < 98))) {
+        if (!p.inVehicle && ((p.deepSeaDanger || 0) > 0 || (p.swimStamina !== undefined && p.swimStamina < 95))) {
             const sc = this.worldToScreen(p.x, p.y, (p.z || 2.0) + 0.18);
             const stamPct = Math.max(0, Math.min(100, Math.round(p.swimStamina !== undefined ? p.swimStamina : 100)));
             const dangerLvl = p.deepSeaDanger || 0;
