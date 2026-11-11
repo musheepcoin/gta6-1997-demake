@@ -7822,9 +7822,11 @@ class WorldObjectEngine {
             const row = Math.floor(idx / 16);
             return [-20.0 - col, row];
         };
+        const chunkShift = (MAP_COLS >= 1024) ? 6 : 5;
+        const chunkTileSpan = 1 << chunkShift;
         const pushQuad3D = (p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a = 1.0) => {
-            const cx = Math.max(0, Math.min(15, p0[0] >> 5));
-            const cz = Math.max(0, Math.min(15, p0[2] >> 5));
+            const cx = Math.max(0, Math.min(15, p0[0] >> chunkShift));
+            const cz = Math.max(0, Math.min(15, p0[2] >> chunkShift));
             const bkt = chunkBuckets[(cz << 4) | cx];
             bkt.push(
                 p0[0], p0[1], p0[2], u0, v0, r, g, b, a,
@@ -12510,10 +12512,10 @@ class WorldObjectEngine {
                 this.staticChunks.push({
                     cx,
                     cz,
-                    minX: cx * 32 - 5,
-                    maxX: (cx + 1) * 32 + 5,
-                    minZ: cz * 32 - 5,
-                    maxZ: (cz + 1) * 32 + 5,
+                    minX: cx * chunkTileSpan - 5,
+                    maxX: (cx + 1) * chunkTileSpan + 5,
+                    minZ: cz * chunkTileSpan - 5,
+                    maxZ: (cz + 1) * chunkTileSpan + 5,
                     vbo,
                     count
                 });
