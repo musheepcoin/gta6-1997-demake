@@ -8502,38 +8502,149 @@ class WorldObjectEngine {
         }
 
         // ====================================================================
-        // F. COMPILE 3D CORRUGATED SHIPPING CONTAINERS & SEE-THROUGH PORT GANTRY CRANES
-        //    (Uses real alpha-cutout 3ds Max steel truss tiles S246, S250, S363 + MAT 6 containers)
+        // F. COMPILE 3D CORRUGATED SHIPPING CONTAINERS, 3D PANAMAX CONTAINER CARGO FREIGHTERS,
+        //    3D HARBOR LUXURY YACHTS & SEE-THROUGH PORT GANTRY CRANES
+        //    (Uses real alpha-cutout 3ds Max steel truss tiles S246, S250, S363 + MAT 5/6/7/9/10/11)
         // ====================================================================
         if (this.map && Array.isArray(this.map.portTerminals)) {
             const containerPalette = [
-                [0.80, 0.24, 0.20], // Hapag Weathered Crimson
-                [0.18, 0.52, 0.74], // Maersk Weathered Cyan-Blue
-                [0.20, 0.58, 0.36], // Evergreen Weathered Green
-                [0.86, 0.48, 0.16], // Hazard Rust-Orange
-                [0.26, 0.38, 0.64]  // Cosco Industrial Navy
+                [0.84, 0.22, 0.20], // Hapag Weathered Crimson
+                [0.18, 0.52, 0.78], // Maersk Weathered Cyan-Blue
+                [0.18, 0.62, 0.36], // Evergreen Weathered Green
+                [0.90, 0.54, 0.16], // Hazard Amber-Gold
+                [0.24, 0.38, 0.68], // Cosco Industrial Navy
+                [0.64, 0.26, 0.74]  // ONE Line Magenta-Violet
             ];
             for (let i = 0; i < this.map.portTerminals.length; i++) {
                 const pt = this.map.portTerminals[i];
-                if (pt.kind !== "CONTAINERS") continue;
                 const cosA = Math.cos(pt.ang || 0);
                 const sinA = Math.sin(pt.ang || 0);
                 const bz = pt.z || 2.0;
                 const sc = pt.scale || 1.2;
-                const cw = 54 * sc;
-                const cd = 22 * sc;
-                emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, cw + 18, cd * 2.4 + 16, bz, 0.44);
-                // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers (MAT 6 blends L63 steel ribs)
-                for (let row = -1; row <= 1; row += 2) {
-                    const oy = row * (cd * 0.55);
-                    const c1 = containerPalette[(i + (row > 0 ? 1 : 0)) % containerPalette.length];
-                    const c2 = containerPalette[(i + (row > 0 ? 3 : 2)) % containerPalette.length];
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz, bz + 0.24, c1, 6);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz + 0.245, bz + 0.48, c2, 6);
-                }
-                if (i % 2 === 0) {
-                    const c3 = containerPalette[(i + 4) % containerPalette.length];
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, cw, cd, bz + 0.485, bz + 0.72, c3, 6);
+
+                if (pt.kind === "CONTAINERS") {
+                    const cw = 54 * sc;
+                    const cd = 22 * sc;
+                    emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, cw + 18, cd * 2.4 + 16, bz, 0.44);
+                    // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers (MAT 6 blends L63 steel ribs)
+                    for (let row = -1; row <= 1; row += 2) {
+                        const oy = row * (cd * 0.55);
+                        const c1 = containerPalette[(i + (row > 0 ? 1 : 0)) % containerPalette.length];
+                        const c2 = containerPalette[(i + (row > 0 ? 3 : 2)) % containerPalette.length];
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz, bz + 0.24, c1, 6);
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, oy, cw, cd, bz + 0.245, bz + 0.48, c2, 6);
+                    }
+                    if (i % 2 === 0) {
+                        const c3 = containerPalette[(i + 4) % containerPalette.length];
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, cw, cd, bz + 0.485, bz + 0.72, c3, 6);
+                    }
+                } else if (pt.kind === "BARGE") {
+                    // --- TRUE 3D VOLUMETRIC PANAMAX CONTAINER FREIGHTER / CARGO SHIP ---
+                    const hullRed = [0.72, 0.19, 0.17];
+                    const hullDark = [0.15, 0.19, 0.25];
+                    const hullMid = [0.22, 0.27, 0.34];
+                    const deckGrey = [0.34, 0.38, 0.44];
+                    const bridgeWhite = [0.95, 0.97, 1.00];
+                    const bridgeGlass = [0.16, 0.58, 0.84];
+                    const funnelOrange = [0.94, 0.38, 0.14];
+
+                    // 1. Soft ocean contact shadow + turquoise/white waterline foam collar
+                    emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, 118 * sc, 44 * sc, bz, 0.46);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -6 * sc, 0, 96 * sc, 37.5 * sc, bz + 0.003, bz + 0.011, [0.78, 0.96, 1.00], 10);
+
+                    // 2. Anti-fouling red oxide waterline boot-top (bz+0.008 .. bz+0.068) + bulbous bow prow
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 35.0 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 27.0 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.5 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.5 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  54 * sc, 0,  5 * sc,  5.2 * sc, bz + 0.006, bz + 0.046, hullRed, 5);
+
+                    // 3. White Plimsoll waterline stripe + riveted dark navy-charcoal steel hull freeboard (bz+0.068 .. bz+0.23)
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82.4 * sc, 35.2 * sc, bz + 0.065, bz + 0.076, bridgeWhite, 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 34.2 * sc, bz + 0.074, bz + 0.225, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 26.5 * sc, bz + 0.074, bz + 0.240, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.0 * sc, bz + 0.074, bz + 0.255, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.0 * sc, bz + 0.074, bz + 0.270, hullDark, 5);
+
+                    // 4. Non-slip steel cargo hold weather deck + raised bow forecastle deck + Port/Starboard gunwale bulwark rails
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 80 * sc, 31.6 * sc, bz + 0.215, bz + 0.242, 177, 177, 71, deckGrey, false);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  39 * sc, 0, 16 * sc, 22.0 * sc, bz + 0.225, bz + 0.275, hullMid, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  47 * sc, 0,  9 * sc, 12.0 * sc, bz + 0.240, bz + 0.290, hullMid, 5);
+                    // Anchor windlass winches + hazard coaming on bow forecastle
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  41 * sc, -4.5 * sc, 5.5 * sc, 4.2 * sc, bz + 0.275, bz + 0.33, [0.92, 0.74, 0.16], 3);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  41 * sc,  4.5 * sc, 5.5 * sc, 4.2 * sc, bz + 0.275, bz + 0.33, [0.92, 0.74, 0.16], 3);
+                    const fMastX = pt.x + cosA * (49 * sc);
+                    const fMastY = pt.y + sinA * (49 * sc);
+                    emitCylinder3D(fMastX, fMastY, 0, 0, 1.4 * sc, 0.9 * sc, bz + 0.29, bz + 0.56, 6, bridgeWhite, 5, false);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  49 * sc, 0, 2.6 * sc, 2.6 * sc, bz + 0.56, bz + 0.60, [1.0, 0.98, 0.88], 10);
+
+                    for (const side of [-1, 1]) {
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 1.8 * sc, bz + 0.225, bz + 0.285, hullMid, 9);
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 2.0 * sc, bz + 0.285, bz + 0.302, [0.92, 0.74, 0.16], 3);
+                    }
+
+                    // 5. 3-Bay x 2-Row x Multi-Tier 3D Corrugated Intermodal Shipping Containers (MAT 6)
+                    const bayOffsets = [-11.5 * sc, 7.5 * sc, 26.5 * sc];
+                    const bayLen = 17.2 * sc;
+                    const rowWidth = 12.6 * sc;
+                    for (let bi = 0; bi < 3; bi++) {
+                        const bxOff = bayOffsets[bi];
+                        for (let ri = 0; ri < 2; ri++) {
+                            const byOff = (ri === 0 ? -7.0 : 7.0) * sc;
+                            const col1 = containerPalette[(i + bi * 2 + ri) % containerPalette.length];
+                            const col2 = containerPalette[(i + bi * 2 + ri + 2) % containerPalette.length];
+                            // Tier 1 & Tier 2 3D Corrugated Steel Containers
+                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.242, bz + 0.445, col1, 6);
+                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.450, bz + 0.645, col2, 6);
+                            // Tier 3 High-Cube Container on aft & center bays for authentic stepped Panamax cargo profile
+                            if (bi < 2 && ((i + bi + ri) % 3 !== 0)) {
+                                const col3 = containerPalette[(i + bi * 3 + ri + 4) % containerPalette.length];
+                                emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.650, bz + 0.835, col3, 6);
+                            }
+                        }
+                    }
+
+                    // 6. Aft 4-Story 3D White Superstructure, Panoramic Navigation Bridge, Wings & Smokestack Funnel
+                    // Tier 1 & 2 Crew & Officer Deckhouse
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -35.5 * sc, 0, 21 * sc, 28.5 * sc, bz + 0.242, bz + 0.46, 199, 86, 86, bridgeWhite, false);
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -36.5 * sc, 0, 17 * sc, 25.0 * sc, bz + 0.46,  bz + 0.64, 199, 86, 86, bridgeWhite, false);
+                    // Tier 3 Panoramic Navigation Bridge + Projecting Port & Starboard Bridge Wings (spanning full 36*sc beam!)
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 13.5 * sc, 35.5 * sc, bz + 0.64, bz + 0.77, bridgeGlass, 7);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 15.0 * sc, 36.5 * sc, bz + 0.77, bz + 0.82, bridgeWhite, 9);
+                    // Port (Red) & Starboard (Green) Bridge Wing Navigation Lights
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, -18.2 * sc, 3.2 * sc, 2.2 * sc, bz + 0.78, bz + 0.84, [1.0, 0.14, 0.18], 10);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc,  18.2 * sc, 3.2 * sc, 2.2 * sc, bz + 0.78, bz + 0.84, [0.14, 0.96, 0.42], 10);
+                    // Aft Safety-Orange Smokestack Funnel Casing + Black Soot Cap + Radar Mast
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -42.5 * sc, 0, 8.5 * sc, 11.0 * sc, bz + 0.64, bz + 0.92, funnelOrange, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -42.5 * sc, 0, 9.0 * sc, 11.5 * sc, bz + 0.92, bz + 0.97, [0.12, 0.14, 0.18], 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 3.2 * sc,  3.2 * sc, bz + 0.82, bz + 1.08, bridgeWhite, 4);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 2.6 * sc, 13.5 * sc, bz + 1.04, bz + 1.08, bridgeWhite, 9);
+                    // Twin Orange Free-Fall Lifeboats on Stern Quarters
+                    for (const side of [-1, 1]) {
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -44.5 * sc, side * 10.5 * sc, 8.0 * sc, 4.6 * sc, bz + 0.46, bz + 0.55, [0.98, 0.44, 0.10], 9);
+                    }
+                } else if (pt.kind === "YACHT") {
+                    // --- TRUE 3D VOLUMETRIC LUXURY MOTOR SUPERYACHT (Harbor Moored Yachts) ---
+                    const yWhite = [0.96, 0.98, 1.00];
+                    const yGlass = [0.14, 0.56, 0.80];
+                    const yTeak  = [0.84, 0.66, 0.44];
+                    emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, 98 * sc, 38 * sc, bz, 0.40);
+                    // Underwater Turquoise LED Halo + Stepped White Superyacht Hull & Flared Bow Prow
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, 88 * sc, 33 * sc, bz + 0.002, bz + 0.014, [0.12, 0.92, 0.96], 10);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -6 * sc, 0, 68 * sc, 29 * sc, bz + 0.012, bz + 0.17, yWhite, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 29 * sc, 0, 14 * sc, 21 * sc, bz + 0.016, bz + 0.18, yWhite, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 38 * sc, 0, 10 * sc, 12 * sc, bz + 0.024, bz + 0.19, yWhite, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 44 * sc, 0,  6 * sc,  6 * sc, bz + 0.032, bz + 0.20, yWhite, 5);
+                    // Teakwood Main Deck & Swim Platform + Panoramic Tinted-Glass Main Salon + Flybridge Sun Deck + Radar Arch
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -4 * sc, 0, 68 * sc, 26 * sc, bz + 0.16, bz + 0.20, 177, 177, 77, yTeak, false);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -38 * sc, 0, 8 * sc, 24 * sc, bz + 0.03, bz + 0.08, yTeak, 11);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -4 * sc, 0, 42 * sc, 21 * sc, bz + 0.20, bz + 0.36, yGlass, 7);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -5 * sc, 0, 44 * sc, 22 * sc, bz + 0.36, bz + 0.41, yWhite, 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -8 * sc, 0, 22 * sc, 16 * sc, bz + 0.41, bz + 0.52, yGlass, 7);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -12 * sc, 0, 9 * sc, 18 * sc, bz + 0.52, bz + 0.68, yWhite, 9);
+                    // Foredeck VIP Sun-Pads
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 24 * sc, -4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.98, 0.36, 0.72], 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 24 * sc,  4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.18, 0.88, 0.96], 9);
                 }
             }
         }
@@ -10075,19 +10186,22 @@ class WorldObjectEngine {
         if (this.map && Array.isArray(this.map.yachtParties)) {
             for (const yp of this.map.yachtParties) {
                 const bz = 2.02;
-                const yCos = Math.cos(yp.ang || 0);
-                const ySin = Math.sin(yp.ang || 0);
-                // Glowing Turquoise Underwater Hull LED Halo + Twin Sleek White Catamaran Pontoons
+                const yAng = yp.angle !== undefined ? yp.angle : (yp.ang || 0);
+                const yCos = Math.cos(yAng);
+                const ySin = Math.sin(yAng);
+                // Glowing Turquoise Underwater Hull LED Halo + Twin Sleek White Catamaran Pontoons & Tapered Bows
                 emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, 0, 96, 46, bz - 0.01, bz + 0.02, [0.12, 0.92, 0.96], 10);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, -14, 88, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0,  14, 88, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -2, -14, 84, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -2,  14, 84, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 42, -14, 10,  7, bz + 0.02, bz + 0.17, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 42,  14, 10,  7, bz + 0.02, bz + 0.17, [0.95, 0.97, 1.00], 5);
                 // Teakwood Main Party Deck Bridging the Catamaran Hulls (L77 planks)
-                emitTileBox3D(yp.x, yp.y, yCos, ySin, -2, 0, 78, 38, bz + 0.14, bz + 0.20, 177, 177, 77, [0.86, 0.70, 0.48], false);
+                emitTileBox3D(yp.x, yp.y, yCos, ySin, -2, 0, 80, 38, bz + 0.14, bz + 0.20, 177, 177, 77, [0.86, 0.70, 0.48], false);
                 // Panoramic Tinted-Glass Main Salon Cabin + White Flybridge Sun Deck
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 2, 0, 44, 26, bz + 0.20, bz + 0.38, [0.16, 0.56, 0.78], 7);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, 0, 48, 28, bz + 0.38, bz + 0.43, [0.96, 0.98, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, 0, 44, 26, bz + 0.20, bz + 0.38, [0.16, 0.56, 0.78], 7);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -1, 0, 48, 28, bz + 0.38, bz + 0.43, [0.96, 0.98, 1.00], 9);
                 // Swept Aerodynamic Radar Arch + DJ Booth & Neon Pink/Cyan Speaker Stacks on Foredeck
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -8, 0, 10, 24, bz + 0.43, bz + 0.62, [0.94, 0.96, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -10, 0, 10, 24, bz + 0.43, bz + 0.62, [0.94, 0.96, 1.00], 9);
                 emitSolidBox3D(yp.x, yp.y, yCos, ySin, 28, 0, 8, 16, bz + 0.20, bz + 0.32, [0.98, 0.28, 0.76], 10);
             }
         }

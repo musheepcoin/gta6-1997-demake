@@ -7779,35 +7779,31 @@ class RetroRenderer {
                 const yx = yp.x + cosA * bob;
                 const yy = yp.y + sinA * bob;
 
-                // White turquoise ocean foam wake + silhouette shadow around superyacht hull
+                // White turquoise ocean foam wake + silhouette shadow around 3D superyacht hull (3D hull & decks rendered by WorldObjectEngine)
                 const wakePulse = 1.06 + Math.sin(this.time * 2.6 + yi) * 0.04;
-                this.batchObjectSprite3D("luxury_yacht", yx, yy, bz + 0.012, ang, 1.04 * wakePulse, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.82, 0.97, 1.0, 0.36);
-                this.batchObjectSprite3D("luxury_yacht", yx + sunCos * 4, yy + sunSin * 4, bz + 0.016, ang, 1.04, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
+                this.batchObjectSprite3D("luxury_yacht", yx, yy, bz + 0.008, ang, 1.04 * wakePulse, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.82, 0.97, 1.0, 0.36);
 
-                // 3D Superyacht Hull & Teak Sun-Deck ("luxury_yacht", 96x38)
-                this.batchObjectSprite3D("luxury_yacht", yx, yy, bz + 0.028, ang, 1.04, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                // Live DJ Turntable Booth ("dj_turntable_deck") elevated on the 3D flybridge / foredeck
+                const djX = yp.x + cosA * 18.0;
+                const djY = yp.y + sinA * 18.0;
+                this.batchObjectSprite3D("dj_turntable_deck", djX, djY, bz + 0.44, ang, 0.82, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
-                // Live DJ Turntable Booth ("dj_turntable_deck") on the aft flybridge deck + pulsing neon beat ring
-                const djX = yx - cosA * 18.0;
-                const djY = yy - sinA * 18.0;
-                this.batchObjectSprite3D("dj_turntable_deck", djX, djY, bz + 0.042, ang, 0.82, SPRITE_DRAW_ORDER.PEDESTRIAN);
-
-                // 6 VIP Bikini & Vice Dancers on the bow sun-pads, flybridge, and stern jacuzzi deck!
+                // 6 VIP Bikini & Vice Dancers elevated on the 3D bow sun-pads (bz+0.23), 3D flybridge (bz+0.45), and 3D aft teak deck (bz+0.23)!
                 const deckOffsets = [
-                    { fwd: 22.0, lat: -6.5 },
-                    { fwd: 22.0, lat: 6.5 },
-                    { fwd: 8.0,  lat: -7.5 },
-                    { fwd: 8.0,  lat: 7.5 },
-                    { fwd: -26.0, lat: -5.5 },
-                    { fwd: -28.0, lat: 5.5 }
+                    { fwd: 28.0, lat: -8.5, dz: 0.23 },
+                    { fwd: 28.0, lat:  8.5, dz: 0.23 },
+                    { fwd:  4.0, lat: -7.5, dz: 0.45 },
+                    { fwd:  4.0, lat:  7.5, dz: 0.45 },
+                    { fwd: -28.0, lat: -8.5, dz: 0.23 },
+                    { fwd: -28.0, lat:  8.5, dz: 0.23 }
                 ];
                 for (let di = 0; di < deckOffsets.length; di++) {
                     const doff = deckOffsets[di];
-                    const dx = yx + cosA * doff.fwd - sinA * doff.lat;
-                    const dy = yy + sinA * doff.fwd + cosA * doff.lat;
+                    const dx = yp.x + cosA * doff.fwd - sinA * doff.lat;
+                    const dy = yp.y + sinA * doff.fwd + cosA * doff.lat;
                     const dFr = 50 + (Math.floor(this.time * 6.5 + di + yi) % 4);
                     const dPed = yachtDancers[(yi * 3 + di) % yachtDancers.length];
-                    this.batchPedSprite3D(dPed, dFr, dx, dy, bz + 0.052, ang + Math.sin(this.time * 3.2 + di) * 0.6, 1.02, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
+                    this.batchPedSprite3D(dPed, dFr, dx, dy, bz + doff.dz, ang + Math.sin(this.time * 3.2 + di) * 0.6, 1.02, false, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
                 }
 
                 // 2 Floating Inflatable Neon Pink Flamingo Pool Rings ("flamingo_float") drifting beside the yacht!
@@ -8544,16 +8540,16 @@ class RetroRenderer {
                 const bz = pt.z || 2.0;
                 const bob = Math.sin(this.time * 1.8 + pt.seed) * 0.008;
                 if (pt.kind === "BARGE") {
-                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.012, pt.ang, pt.scale * 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.92, 0.98, 0.28);
-                    this.batchObjectSprite3D("cargo_barge", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.32);
-                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.068 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                    // Animated ocean foam wake collar beneath the 3D Volumetric Panamax Container Ship (rendered by WorldObjectEngine)
+                    const wakeScale = pt.scale * (1.05 + Math.sin(this.time * 2.2 + pt.seed) * 0.025);
+                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.008, pt.ang, wakeScale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.30);
                 } else if (pt.kind === "CONTAINERS") {
                     // Ground shadow (true 3D multi-tiered shipping container stacks rendered by WorldObjectEngine)
                     this.batchObjectSprite3D("container_stack", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
                 } else if (pt.kind === "YACHT") {
-                    this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.012, pt.ang, pt.scale * 1.06, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.30);
-                    this.batchObjectSprite3D("luxury_yacht", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
-                    this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.062 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                    // Animated ocean foam wake collar beneath the 3D Volumetric Luxury Superyacht (rendered by WorldObjectEngine)
+                    const wakeScale = pt.scale * (1.06 + Math.sin(this.time * 2.4 + pt.seed) * 0.025);
+                    this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.008, pt.ang, wakeScale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.32);
                 } else if (pt.kind === "SPEEDBOAT") {
                     this.batchObjectSprite3D("speedboat_v8", pt.x, pt.y, bz + 0.012, pt.ang, pt.scale * 1.08, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.28);
                     this.batchObjectSprite3D("speedboat_v8", pt.x + sunCos * 4, pt.y + sunSin * 4, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
