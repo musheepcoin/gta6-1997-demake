@@ -5987,15 +5987,20 @@ class LeonidaMap {
         return pool[Math.min(pool.length - 1, 1 + Math.floor((normSeed - 0.82) * 5.5 * (pool.length - 1)))];
     }
 
-    // Checks whether a candidate tile (nx, ny) is obstructed by a 3D structure/prop OBB, living event zone, or stopped vehicle
+    // Checks whether a candidate tile (nx, ny) is completely obstructed by a 3D building/warehouse OBB or stopped vehicle.
+    // Small sidewalk props (payphones, benches at the tile edge, buskers) do NOT block the entire 64x64 tile because
+    // pedestrians automatically shift their lateral lane offset (±18..25px) around small props!
     isTileBlockedForPed(nx, ny, zBlocks = 2.0, vehicles = null) {
         const cx = (nx + 0.5) * TILE_SIZE;
         const cy = (ny + 0.5) * TILE_SIZE;
-        if (this.resolveCircleBuildingCollision(cx, cy, 15, zBlocks).hit) {
-            return true;
-        }
-        if (typeof this.isInsideLivingEventZone === "function" && this.isInsideLivingEventZone(cx, cy, 8)) {
-            return true;
+        if (this.resolveCircleBuildingCollision(cx, cy, 13, zBlocks).hit) {
+            const westBlocked = this.resolveCircleBuildingCollision(cx - 19, cy, 9, zBlocks).hit;
+            const eastBlocked = this.resolveCircleBuildingCollision(cx + 19, cy, 9, zBlocks).hit;
+            const northBlocked = this.resolveCircleBuildingCollision(cx, cy - 19, 9, zBlocks).hit;
+            const southBlocked = this.resolveCircleBuildingCollision(cx, cy + 19, 9, zBlocks).hit;
+            if ((westBlocked && eastBlocked) || (northBlocked && southBlocked)) {
+                return true;
+            }
         }
         if (Array.isArray(vehicles)) {
             const g = typeof window !== "undefined" ? window.game : null;

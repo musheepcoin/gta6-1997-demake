@@ -945,6 +945,9 @@ class LeonidaGame {
         ];
 
         starterPeds.forEach((sp, idx) => {
+            const initWalkSpd = sp.dead
+                ? 0
+                : (sp.isRollerblader ? (45 + (idx % 5)) : (sp.isChild ? (21 + (idx % 3)) : (22 + (idx % 5))));
 
             const pedObj = new Pedestrian({
 
@@ -958,7 +961,7 @@ class LeonidaGame {
 
                 angle: sp.a,
 
-                speed: sp.dead ? 0 : (sp.isRollerblader ? 66 : 36),
+                speed: initWalkSpd,
 
                 kind: sp.kind || "CIVILIAN",
 
@@ -983,6 +986,7 @@ class LeonidaGame {
                 targetBy: null
 
             });
+            pedObj.baseWalkSpeed = initWalkSpd || 24;
             if (sp.isRollerblader) pedObj.isRollerblader = true;
             if (sp.isChild || (sp.type && sp.type.startsWith("kid_"))) pedObj.isChild = true;
             this.peds.push(pedObj);
@@ -13912,7 +13916,7 @@ class LeonidaGame {
                 }
 
                 if (hasActiveLeader && (ped.hangoutTimer || 0) <= 0) {
-                    // Follower tracks its rotated formation slot beside/behind the leader
+                    // Follower tracks its smoothed formation slot beside/behind the leader without orbiting
                     ped.waitingAtCrosswalk = Boolean(leader.waitingAtCrosswalk);
                     ped.isCrossingRoad = Boolean(leader.isCrossingRoad);
                     ped._enteredRoadOnCrosswalk = Boolean(leader._enteredRoadOnCrosswalk);
@@ -13923,26 +13927,31 @@ class LeonidaGame {
                         ped.speed = 0;
                         ped.angle = leader.angle + Math.sin(performance.now() * 0.004 + (ped.turnSeed || 0)) * 0.18;
                     } else {
-                        const lCos = Math.cos(leader.angle);
-                        const lSin = Math.sin(leader.angle);
+                        const formAng = typeof leader._formAngle === "number" ? leader._formAngle : leader.angle;
+                        const lCos = Math.cos(formAng);
+                        const lSin = Math.sin(formAng);
                         const rPerpX = -lSin;
                         const rPerpY = lCos;
-                        const fwdOff = typeof ped.formationFwdOff === "number" ? ped.formationFwdOff : -3;
-                        const sideOff = typeof ped.formationSideOff === "number" ? ped.formationSideOff : 8;
+                        const fwdOff = typeof ped.formationFwdOff === "number" ? ped.formationFwdOff : -6;
+                        const sideOff = typeof ped.formationSideOff === "number" ? ped.formationSideOff : 10;
 
                         let slotX = leader.x + lCos * fwdOff + rPerpX * sideOff;
                         let slotY = leader.y + lSin * fwdOff + rPerpY * sideOff;
 
-                        // If the side-by-side slot is blocked by a road, water, building, or parked car, smoothly tuck single-file behind the leader!
+                        // If the side-by-side slot is blocked by a road, water, building, Lummus lawn, or parked car,
+                        // smoothly tuck single-file behind the leader at distinct per-member distances (14px, 28px)!
                         const sbx = Math.floor(slotX / TILE_SIZE);
                         const sby = Math.floor(slotY / TILE_SIZE);
+                        const lbx = Math.floor(leader.x / TILE_SIZE);
                         const sNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, pz) : null;
                         const slotOnRoad = sNav && sNav.groundType === GROUND_TYPE.ROAD && !leader.isCrossingRoad;
                         const slotOnWaterOrBld = !sNav || sNav.groundType === GROUND_TYPE.WATER || sNav.groundType === GROUND_TYPE.BUILDING;
+                        const slotOnLummusLawn = (sbx === 449 || sbx === 450) && sNav && sNav.lid === 10 && lbx !== 449 && lbx !== 450;
                         const slotHitBld = this.map.resolveCircleBuildingCollision(slotX, slotY, 8.0, pz).hit;
                         const slotHitVeh = this.resolveCircleVehicleCollision(slotX, slotY, 8.5, pz, null).hit;
-                        if (slotOnRoad || slotOnWaterOrBld || slotHitBld || slotHitVeh) {
-                            const tuckDist = ped.formationRole === "GROUP_FOLLOWER" && fwdOff < -8 ? 22 : 13;
+                        if (slotOnRoad || slotOnWaterOrBld || slotOnLummusLawn || slotHitBld || slotHitVeh) {
+                            const memberIdx = ped.formationMemberIndex || ((ped.formationRole === "GROUP_FOLLOWER" && fwdOff < -15) ? 2 : 1);
+                            const tuckDist = 14 * memberIdx;
                             slotX = leader.x - lCos * tuckDist;
                             slotY = leader.y - lSin * tuckDist;
                         }
@@ -13950,21 +13959,37 @@ class LeonidaGame {
                         const dxSlot = slotX - ped.x;
                         const dySlot = slotY - ped.y;
                         const distSlot = Math.hypot(dxSlot, dySlot);
-                        const leaderBase = leader.baseWalkSpeed || baseWalkSpd;
-                        const leaderMoveSpd = leader.speed > 1 ? Math.min(leader.speed, leaderBase * 1.32) : leaderBase;
-                        let followSpd = leaderMoveSpd;
-                        if (distSlot > 18) followSpd = leaderMoveSpd * 1.18;
-                        else if (distSlot > 7) followSpd = leaderMoveSpd * 1.07;
-                        else if (distSlot < 2.5) followSpd = leaderMoveSpd * 0.94;
+                        const fwdErr = dxSlot * lCos + dySlot * lSin;
+                        const latErr = dxSlot * rPerpX + dySlot * rPerpY;
 
-                        if (distSlot > 5.0) {
-                            const toSlotAngle = Math.atan2(dySlot, dxSlot);
-                            // Blend between pointing at the slot and matching leader's forward heading
-                            const blend = Math.min(1.0, distSlot / 18.0);
-                            const diff = Math.atan2(Math.sin(toSlotAngle - leader.angle), Math.cos(toSlotAngle - leader.angle));
-                            ped.angle = leader.angle + diff * blend;
+                        const leaderBase = leader.baseWalkSpeed || baseWalkSpd;
+                        const leaderMoveSpd = leader.speed > 1 ? Math.min(leader.speed, leaderBase * 1.25) : leaderBase;
+                        let followSpd = leaderMoveSpd;
+                        let targetAngle = formAng;
+
+                        if (fwdErr < -2.0) {
+                            // Follower is already ahead of its slot along the walking direction:
+                            // NEVER turn backwards (which causes circular orbiting); keep facing forward and slow down so the leader catches up!
+                            followSpd = leaderMoveSpd * Math.max(0.35, 1.0 + fwdErr / 18.0);
+                            const crabAng = Math.max(-0.42, Math.min(0.42, Math.atan2(latErr * 0.45, 16.0)));
+                            targetAngle = formAng + crabAng;
+                        } else if (distSlot > 4.0) {
+                            if (fwdErr > 14) followSpd = leaderMoveSpd * 1.18;
+                            else if (fwdErr > 5) followSpd = leaderMoveSpd * 1.08;
+                            const aimFwd = Math.max(12.0, fwdErr + 12.0);
+                            const aimLat = Math.max(-14.0, Math.min(14.0, latErr));
+                            targetAngle = Math.atan2(lSin * aimFwd + rPerpY * aimLat, lCos * aimFwd + rPerpX * aimLat);
                         } else {
-                            ped.angle = leader.angle;
+                            followSpd = leaderMoveSpd;
+                            targetAngle = leader.angle;
+                        }
+
+                        const angDelta = Math.atan2(Math.sin(targetAngle - ped.angle), Math.cos(targetAngle - ped.angle));
+                        const maxTurn = 6.5 * dt;
+                        if (Math.abs(angDelta) <= maxTurn) {
+                            ped.angle = targetAngle;
+                        } else {
+                            ped.angle += Math.sign(angDelta) * maxTurn;
                         }
 
                         ped.speed = followSpd;
@@ -14006,21 +14031,22 @@ class LeonidaGame {
                         ? (ped.targetBy + 0.5) * TILE_SIZE + (ped.targetOffY || 0)
                         : ped.y;
 
+                    const distToWp = Math.hypot(curTx - ped.x, curTy - ped.y);
                     const needTarget =
                         !isStandingStill &&
                         (ped.hailingTaxiTimer || 0) <= 0 &&
                         (
                             ped.targetBx === null ||
                             ped.targetBx === undefined ||
-                            ped.waypointTimer > 2.4 ||
-                            Math.hypot(curTx - ped.x, curTy - ped.y) < 14
+                            ped.waypointTimer > 4.5 ||
+                            distToWp < 16
                         );
 
                     if (needTarget) {
-                        const reachedTarget = ped.targetBx !== null && ped.targetBx !== undefined && Math.hypot(curTx - ped.x, curTy - ped.y) < 14;
+                        const reachedTarget = ped.targetBx !== null && ped.targetBx !== undefined && (distToWp < 16 || (bx === ped.targetBx && by === ped.targetBy));
                         const baseX = reachedTarget ? ped.targetBx : bx;
                         const baseY = reachedTarget ? ped.targetBy : by;
-                        if (reachedTarget) {
+                        if (reachedTarget || ped.waypointTimer > 4.5) {
                             ped._avoidBx = -1;
                             ped._avoidBy = -1;
                         }
@@ -14153,6 +14179,15 @@ class LeonidaGame {
                         } else {
                             ped.angle += Math.sign(angDelta) * maxTurn;
                         }
+                        if (ped.formationRole === "LEADER") {
+                            if (typeof ped._formAngle !== "number") {
+                                ped._formAngle = ped.angle;
+                            } else {
+                                const fDelta = Math.atan2(Math.sin(ped.angle - ped._formAngle), Math.cos(ped.angle - ped._formAngle));
+                                const maxF = 2.6 * dt;
+                                ped._formAngle += Math.abs(fDelta) <= maxF ? fDelta : Math.sign(fDelta) * maxF;
+                            }
+                        }
                     }
 
                     ped.x += Math.cos(ped.angle) * spd * dt;
@@ -14202,11 +14237,10 @@ class LeonidaGame {
 
                         ped.y = prevY;
 
-                        ped.angle += Math.PI * 0.75 + (Math.random() - 0.5) * 0.5;
-
-                        ped.targetBx = bx;
-
-                        ped.targetBy = by;
+                        if (!ped.formationLeader) {
+                            ped.targetBx = bx;
+                            ped.targetBy = by;
+                        }
 
                     }
 
@@ -14287,24 +14321,17 @@ class LeonidaGame {
 
                 ped.y = pCol.y;
 
-                if (ped.kind === "CIVILIAN") {
+                if (ped.kind === "CIVILIAN" && !ped.formationLeader) {
                     ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
                         ? ped.targetBx
                         : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
                     ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
                         ? ped.targetBy
                         : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
+                    ped.targetBx = null;
+                    ped.targetBy = null;
+                    ped.turnSeed = (ped.turnSeed || 1) + 2;
                 }
-
-                if (!ped.inCombat) {
-                    ped.angle += Math.PI + (Math.random() - 0.5) * 0.8;
-                }
-
-                ped.targetBx = null;
-
-                ped.targetBy = null;
-
-                ped.turnSeed = (ped.turnSeed || 1) + 2;
 
             }
 
@@ -14315,14 +14342,13 @@ class LeonidaGame {
                 if (vCol.hit) {
                     ped.x = vCol.x;
                     ped.y = vCol.y;
-                    if (ped.kind === "CIVILIAN" && !ped._boardingVeh) {
+                    if (ped.kind === "CIVILIAN" && !ped._boardingVeh && !ped.formationLeader) {
                         ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
                             ? ped.targetBx
                             : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
                         ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
                             ? ped.targetBy
                             : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
-                        ped.angle += Math.PI + (Math.random() - 0.5) * 0.8;
                         ped.targetBx = null;
                         ped.targetBy = null;
                         ped.turnSeed = (ped.turnSeed || 1) + 3;
@@ -14330,8 +14356,8 @@ class LeonidaGame {
                 }
             }
 
-            // Real-displacement anti-stuck watchdog: if any walking pedestrian moved < 7px over 0.50s,
-            // mark the tile ahead as blocked, nudge toward the center of the current walkable tile, and pick a clear direction!
+            // Real-displacement anti-stuck watchdog: if any walking pedestrian moved < 4.5px over 1.35s,
+            // nudge toward the center of the current walkable tile and pick a clear direction without random spinning!
             if (
                 !ped.dead &&
                 !ped.isLivingProp &&
@@ -14349,27 +14375,34 @@ class LeonidaGame {
                 if (ped._lastCheckX === undefined) {
                     ped._lastCheckX = ped.x;
                     ped._lastCheckY = ped.y;
-                } else if (ped._stuckCheckTimer >= 0.65) {
+                } else if (ped._stuckCheckTimer >= 1.35) {
                     const movedDist = Math.hypot(ped.x - ped._lastCheckX, ped.y - ped._lastCheckY);
                     ped._lastCheckX = ped.x;
                     ped._lastCheckY = ped.y;
                     ped._stuckCheckTimer = 0;
-                    if (movedDist < 4.0) {
-                        const cbx = Math.floor(ped.x / TILE_SIZE);
-                        const cby = Math.floor(ped.y / TILE_SIZE);
-                        ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
-                            ? ped.targetBx
-                            : Math.floor((ped.x + Math.cos(ped.angle) * 22) / TILE_SIZE);
-                        ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
-                            ? ped.targetBy
-                            : Math.floor((ped.y + Math.sin(ped.angle) * 22) / TILE_SIZE);
-                        ped.x += ((cbx + 0.5) * TILE_SIZE - ped.x) * 0.18;
-                        ped.y += ((cby + 0.5) * TILE_SIZE - ped.y) * 0.18;
-                        ped.angle += Math.PI * 0.8 + (Math.random() - 0.5) * 0.7;
-                        ped.targetBx = null;
-                        ped.targetBy = null;
-                        ped.waypointTimer = 0;
-                        ped.turnSeed = (ped.turnSeed || 1) + 3;
+                    if (movedDist < 4.5) {
+                        if (ped.formationLeader) {
+                            // If a follower is physically snagged on an obstacle while its leader moved ahead, detach cleanly so it walks around
+                            ped.formationLeader = null;
+                            ped.targetBx = null;
+                            ped.targetBy = null;
+                            ped.waypointTimer = 0;
+                        } else {
+                            const cbx = Math.floor(ped.x / TILE_SIZE);
+                            const cby = Math.floor(ped.y / TILE_SIZE);
+                            ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
+                                ? ped.targetBx
+                                : Math.floor((ped.x + Math.cos(ped.angle) * 22) / TILE_SIZE);
+                            ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
+                                ? ped.targetBy
+                                : Math.floor((ped.y + Math.sin(ped.angle) * 22) / TILE_SIZE);
+                            ped.x += ((cbx + 0.5) * TILE_SIZE - ped.x) * 0.22;
+                            ped.y += ((cby + 0.5) * TILE_SIZE - ped.y) * 0.22;
+                            ped.targetBx = null;
+                            ped.targetBy = null;
+                            ped.waypointTimer = 0;
+                            ped.turnSeed = (ped.turnSeed || 1) + 3;
+                        }
                     }
                 }
             }

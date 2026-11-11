@@ -4539,7 +4539,7 @@ class TrafficManager {
                     speed: famSpeed,
                     isChild: true,
                     formationRole: "FAMILY_CHILD",
-                    formationFwdOff: -9,
+                    formationFwdOff: -11,
                     formationSideOff: 10
                 }
             ];
@@ -4553,7 +4553,7 @@ class TrafficManager {
                     hp: 36,
                     speed: famSpeed,
                     formationRole: "GROUP_FOLLOWER",
-                    formationFwdOff: -18,
+                    formationFwdOff: -23,
                     formationSideOff: -4
                 });
             }
@@ -4610,7 +4610,7 @@ class TrafficManager {
                         hp: 38,
                         speed: grpSpeed,
                         formationRole: "GROUP_FOLLOWER",
-                        formationFwdOff: -10,
+                        formationFwdOff: -12,
                         formationSideOff: 11
                     },
                     {
@@ -4621,7 +4621,7 @@ class TrafficManager {
                         hp: 38,
                         speed: grpSpeed,
                         formationRole: "GROUP_FOLLOWER",
-                        formationFwdOff: -22,
+                        formationFwdOff: -25,
                         formationSideOff: -3
                     }
                 ]
@@ -4682,21 +4682,23 @@ class TrafficManager {
                 my = pedY + fSin * fwd + rPerpY * side;
             }
 
-            // If a companion slot lands on a road, water, building, or vehicle, tuck behind the leader or skip
+            // If a companion slot lands on a road, water, building, Lummus lawn, or vehicle, tuck behind the leader or skip
             if (m > 0) {
                 const mbx = Math.floor(mx / TILE_SIZE);
                 const mby = Math.floor(my / TILE_SIZE);
                 const mNav = map.getNavigationBlock ? map.getNavigationBlock(mbx, mby, pedZ) : null;
-                const badGround = !mNav || mNav.groundType === GROUND_TYPE.ROAD || mNav.groundType === GROUND_TYPE.WATER || mNav.groundType === GROUND_TYPE.BUILDING;
+                const onLummusLawn = (mbx === 449 || mbx === 450) && mNav && mNav.lid === 10 && bx !== 449 && bx !== 450;
+                const badGround = !mNav || mNav.groundType === GROUND_TYPE.ROAD || mNav.groundType === GROUND_TYPE.WATER || mNav.groundType === GROUND_TYPE.BUILDING || onLummusLawn;
                 const hitBld = typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(mx, my, 8.5, pedZ).hit;
                 const hitVeh = typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(mx, my, 9.5, pedZ).hit;
                 if (badGround || hitBld || hitVeh) {
-                    const tuckX = pedX - fCos * (12 * m);
-                    const tuckY = pedY - fSin * (12 * m);
+                    const tuckX = pedX - fCos * (14 * m);
+                    const tuckY = pedY - fSin * (14 * m);
                     const tbx = Math.floor(tuckX / TILE_SIZE);
                     const tby = Math.floor(tuckY / TILE_SIZE);
                     const tNav = map.getNavigationBlock ? map.getNavigationBlock(tbx, tby, pedZ) : null;
-                    const tuckBad = !tNav || tNav.groundType === GROUND_TYPE.ROAD || tNav.groundType === GROUND_TYPE.WATER || tNav.groundType === GROUND_TYPE.BUILDING ||
+                    const tuckOnLawn = (tbx === 449 || tby === 450) && tNav && tNav.lid === 10 && bx !== 449 && bx !== 450;
+                    const tuckBad = !tNav || tNav.groundType === GROUND_TYPE.ROAD || tNav.groundType === GROUND_TYPE.WATER || tNav.groundType === GROUND_TYPE.BUILDING || tuckOnLawn ||
                         (typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(tuckX, tuckY, 8.5, pedZ).hit) ||
                         (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(tuckX, tuckY, 9.5, pedZ).hit);
                     if (tuckBad) continue;
@@ -4726,6 +4728,8 @@ class TrafficManager {
             newPed.formationId = count > 1 ? formationId : 0;
             newPed.formationType = roster.type;
             newPed.formationRole = spec.formationRole || "SOLO";
+            newPed.formationMemberIndex = m;
+            newPed._formAngle = mAngle;
             newPed.formationFwdOff = spec.formationFwdOff || 0;
             newPed.formationSideOff = spec.formationSideOff || 0;
             if (roster.type === "HANGOUT_CIRCLE") {
