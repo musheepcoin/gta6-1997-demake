@@ -1818,6 +1818,67 @@ class RetroRenderer {
                     }
                 }
 
+                // 2A-2. Procedural 8-Frame Spinning Helicopter Main Rotor (540..547):
+                //       Replaces the 1997 8-bit opaque pitch-black bow-tie wedges with a crisp, translucent
+                //       4-blade spinning rotor disc (metallic blades, yellow safety tips, silver hub & soft motion blur).
+                for (let ri = 0; ri < 8; ri++) {
+                    const idStr = String(540 + ri);
+                    const rect = meta.sprites.objects[idStr];
+                    if (!Array.isArray(rect) || rect.length < 4) continue;
+                    const [sx, sy, sw, sh] = rect;
+                    const cx = sw * 0.5;
+                    const cy = sh * 0.5;
+                    const maxR = Math.min(sw, sh) * 0.47;
+                    const rotPhase = (ri / 8.0) * (Math.PI * 0.5);
+                    for (let ly = 0; ly < sh; ly++) {
+                        const dy = (ly + 0.5 - cy) / maxR;
+                        for (let lx = 0; lx < sw; lx++) {
+                            const dx = (lx + 0.5 - cx) / maxR;
+                            const p = ((sy + ly) * W + (sx + lx)) * 4;
+                            const rad = Math.hypot(dx, dy);
+                            if (rad > 0.98) {
+                                d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 0;
+                                continue;
+                            }
+                            if (rad < 0.13) {
+                                // Central titanium/chrome rotor mast hub dome
+                                const dome = 1.0 - rad / 0.13;
+                                d[p] = Math.round(165 + 75 * dome);
+                                d[p + 1] = Math.round(175 + 72 * dome);
+                                d[p + 2] = Math.round(190 + 62 * dome);
+                                d[p + 3] = 245;
+                                continue;
+                            }
+                            // 4-blade angular coordinates (modulo pi/2)
+                            let relAng = (Math.atan2(dy, dx) - rotPhase) % (Math.PI * 0.5);
+                            if (relAng < 0) relAng += Math.PI * 0.5;
+                            const bladeDist = Math.min(relAng, Math.PI * 0.5 - relAng) * rad;
+                            if (bladeDist < 0.048) {
+                                // Crisp spinning rotor blade arm with yellow high-vis safety tips
+                                if (rad > 0.83) {
+                                    d[p] = 250; d[p + 1] = 204; d[p + 2] = 21; d[p + 3] = 215;
+                                } else {
+                                    const sheen = 1.0 - bladeDist / 0.048;
+                                    d[p] = Math.round(188 + 48 * sheen);
+                                    d[p + 1] = Math.round(198 + 46 * sheen);
+                                    d[p + 2] = Math.round(212 + 38 * sheen);
+                                    d[p + 3] = 192;
+                                }
+                            } else if (relAng < 0.34) {
+                                // Soft translucent silver-blue motion-blur sweep trailing each blade (never black!)
+                                const trail = (1.0 - relAng / 0.34) * (0.45 + 0.55 * rad);
+                                const a = Math.round(26 + 44 * trail);
+                                d[p] = 210; d[p + 1] = 224; d[p + 2] = 238; d[p + 3] = a;
+                            } else if (rad > 0.91 && rad < 0.96) {
+                                // Subtle outer blade-tip vortex ring
+                                d[p] = 226; d[p + 1] = 236; d[p + 2] = 248; d[p + 3] = 38;
+                            } else {
+                                d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 0;
+                            }
+                        }
+                    }
+                }
+
                 // 2B. Smoke puffs (200..210), Sparks (219..223) & Explosion fireballs (242..249)
                 const effectRanges = [
                     [200, 210, false], // Smoke puffs
@@ -3016,6 +3077,39 @@ class RetroRenderer {
                     ctx.fill();
                     ctx.restore();
                     meta.sprites.objects["minigolf_windmill"] = [mgx, mgy, 36, 36];
+                }
+
+                // 6I-2. Soft Volumetric Helicopter & Watchtower Searchlight Ground Pool ("heli_searchlight", 64x64 at 1222, py3)
+                // Smooth radial + conical xenon spotlight pool with zero square edges!
+                {
+                    const slx = 1222, sly = py3, slw = 64, slh = 64;
+                    const slImg = ctx.createImageData(slw, slh);
+                    const sld = slImg.data;
+                    for (let y = 0; y < slh; y++) {
+                        const ny = (y + 0.5 - slh * 0.5) / (slh * 0.46);
+                        for (let x = 0; x < slw; x++) {
+                            const nx = (x + 0.5 - slw * 0.5) / (slw * 0.46);
+                            // Slightly elongated elliptical ground pool with soft conical taper toward source (-X)
+                            const ex = nx < 0 ? nx * 0.88 : nx * 1.04;
+                            const ey = ny * (nx < 0 ? (1.0 - nx * 0.18) : 1.0);
+                            const dist = Math.hypot(ex, ey);
+                            const idx = (y * slw + x) * 4;
+                            if (dist >= 1.0) {
+                                sld[idx] = 0; sld[idx + 1] = 0; sld[idx + 2] = 0; sld[idx + 3] = 0;
+                            } else {
+                                const falloff = Math.pow(1.0 - dist, 1.85);
+                                const core = Math.max(0.0, 1.0 - dist * 1.85);
+                                sld[idx] = Math.round(195 + 60 * core);
+                                sld[idx + 1] = Math.round(236 + 19 * core);
+                                sld[idx + 2] = 255;
+                                // Smooth alpha above WebGL discard threshold (0.08 * 255 = 21) inside the circle
+                                const a = Math.round(24 + 195 * falloff);
+                                sld[idx + 3] = dist > 0.94 ? Math.round(a * ((1.0 - dist) / 0.06)) : a;
+                            }
+                        }
+                    }
+                    ctx.putImageData(slImg, slx, sly);
+                    meta.sprites.objects["heli_searchlight"] = [slx, sly, slw, slh];
                 }
 
                 // 6J2. Crisp Pixel-Art 1997 GTA 1 / GTA 2 Electric Scooter ("veh_escooter", 18x34) & South Beach Cruiser Bicycle ("veh_bicycle", 20x42)
@@ -8171,10 +8265,6 @@ class RetroRenderer {
                 if (tw.x >= minX - 180 && tw.x <= maxX + 180 && tw.y >= minY - 180 && tw.y <= maxY + 180) {
                     const sAng = tw.baseAng + Math.sin(this.time * 1.15 + ti * 1.4) * 0.65;
                     this.batchPedSprite3D("g2_swat", 0, tw.x, tw.y, bz + 0.86, sAng, 1.18, false, SPRITE_DRAW_ORDER.HUD_ARROW);
-                    const beamX = tw.x + Math.cos(sAng) * 95;
-                    const beamY = tw.y + Math.sin(sAng) * 95;
-                    this.pushSolidQuad3D(beamX, beamY, bz + 0.022, 44, 44, sAng, 1.0, 0.95, 0.68, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(beamX, beamY, bz + 0.025, 22, 22, sAng, 1.0, 0.98, 0.82, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
             }
 
@@ -8388,17 +8478,6 @@ class RetroRenderer {
                     }
                 }
             }
-            if (Array.isArray(seraComp.towers)) {
-                for (let ti = 0; ti < seraComp.towers.length; ti++) {
-                    const tw = seraComp.towers[ti];
-                    if (tw.x < minX - 180 || tw.x > maxX + 180 || tw.y < minY - 180 || tw.y > maxY + 180) continue;
-                    const sAng = tw.baseAng + Math.sin(this.time * 0.85 + ti * 1.6) * 0.65;
-                    const beamX = tw.x + Math.cos(sAng) * 58;
-                    const beamY = tw.y + Math.sin(sAng) * 58;
-                    this.pushSolidQuad3D(beamX, beamY, bz + 0.022, 42, 42, sAng, 0.72, 0.92, 1.0, 0.24, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(beamX, beamY, bz + 0.025, 20, 20, sAng, 0.88, 0.97, 1.0, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                }
-            }
             if (Array.isArray(seraComp.patrolGuards)) {
                 for (let pi = 0; pi < seraComp.patrolGuards.length; pi++) {
                     const pg = seraComp.patrolGuards[pi];
@@ -8529,20 +8608,15 @@ class RetroRenderer {
                 const cs = Math.cos(hAng), sn = Math.sin(hAng);
                 const hz = ah.z || 4.55;
 
-                // Sweeping ground searchlight cone illuminating streets & rooftops below + helicopter shadow
-                const sSweep = hAng + Math.sin(this.time * 1.45 + hi) * 0.55;
-                const beamX = hx + Math.cos(sSweep) * 64.0;
-                const beamY = hy + Math.sin(sSweep) * 64.0;
-                this.pushSolidQuad3D(beamX, beamY, 2.022, 62.0, 62.0, sSweep, 0.85, 0.96, 1.0, 0.20, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(beamX, beamY, 2.025, 32.0, 32.0, sSweep, 0.98, 0.99, 1.0, 0.28, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Helicopter ground shadow (volumetric sweeping searchlight cone & pool rendered in renderNightLighting!)
                 this.batchObjectSprite3D("heli_vice", hx + sunCos * 38, hy + sunSin * 38, 2.02, hAng, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.26);
 
-                // Airborne Helicopter + Motion-Blurred Spinning Rotor (#540..#547) + Flashing Red/Blue Aviation Strobes
+                // Airborne Helicopter + Translucent Spinning Rotor (#540..#547) + Flashing Red/Blue Aviation Strobes
                 this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 1.18, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                 const rotSpr = String(540 + (Math.floor(this.time * 24.0 + hi * 3) % 8));
                 this.batchObjectSprite3D(rotSpr, hx + cs * 7.0, hy + sn * 7.0, hz + 0.05, hAng, 0.86, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                 const strobeRed = Math.sin(this.time * 9.0 + hi) >= 0;
-                this.pushSolidQuad3D(hx - cs * 14, hy - sn * 14, hz + 0.03, 6.5, 6.5, 0, strobeRed ? 1.0 : 0.18, strobeRed ? 0.16 : 0.65, strobeRed ? 0.20 : 1.0, 0.95, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.pushSolidQuad3D(hx - cs * 14, hy - sn * 14, hz + 0.03, 4.2, 4.2, 0, strobeRed ? 1.0 : 0.18, strobeRed ? 0.16 : 0.65, strobeRed ? 0.20 : 1.0, 0.92, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
             }
         }
         if (Array.isArray(this.map.seagullFlocks)) {
@@ -11246,6 +11320,130 @@ class RetroRenderer {
                     addLightPool(rScSiren.x, rScSiren.y, 128 * pxScale, "rgba(30, 165, 255, 0.96)", "rgba(10, 95, 235, 0.42)");
                     highResFlares.push({ x: rScSiren.x, y: rScSiren.y, r: 22 * pxScale, col: "rgba(45, 185, 255, 0.85)" });
                 }
+            }
+        }
+
+        // 5B. Aerial Searchlight Helicopters ("aerialSearchHelis") & Watchtower Volumetric Searchlight Cones!
+        if (this.map && Array.isArray(this.map.aerialSearchHelis)) {
+            for (let hi = 0; hi < this.map.aerialSearchHelis.length; hi++) {
+                const ah = this.map.aerialSearchHelis[hi];
+                const t = this.time * (ah.speed || 0.24) + ah.seed;
+                const hx = ah.cx + Math.cos(t) * ah.rx;
+                const hy = ah.cy + Math.sin(t) * ah.ry;
+                if (Math.abs(hx - this.camX) > 1080 || Math.abs(hy - this.camY) > 840) continue;
+                const vx = -Math.sin(t) * ah.rx;
+                const vy = Math.cos(t) * ah.ry;
+                const hAng = Math.atan2(vy, vx);
+                const cs = Math.cos(hAng), sn = Math.sin(hAng);
+                const hz = ah.z || 4.55;
+
+                const sSweep = hAng + Math.sin(this.time * 1.45 + hi) * 0.55;
+                const beamX = hx + Math.cos(sSweep) * 78.0;
+                const beamY = hy + Math.sin(sSweep) * 78.0;
+                const gz = this.map.getHeightAtPixel ? this.map.getHeightAtPixel(beamX, beamY, 2.0) : 2.0;
+
+                const nSc = this.worldToScreen(hx + cs * 16.0, hy + sn * 16.0, hz - 0.04);
+                const bSc = this.worldToScreen(beamX, beamY, gz + 0.04);
+                const tSc = this.worldToScreen(hx - cs * 14.0, hy - sn * 14.0, hz + 0.03);
+                if (bSc.x < -320 || bSc.x > W + 320 || bSc.y < -320 || bSc.y > H + 320) continue;
+
+                const hScale = (nSc.scale * H) / 128.0;
+                const bScale = (bSc.scale * H) / 128.0;
+
+                // Soft circular ground searchlight pool + helicopter fuselage visibility halo
+                addLightPool(bSc.x, bSc.y, 138 * bScale, "rgba(235, 248, 255, 0.96)", "rgba(130, 200, 255, 0.44)");
+                addLightPool(nSc.x, nSc.y, 46 * hScale, "rgba(195, 225, 255, 0.62)", "rgba(95, 145, 215, 0.22)");
+
+                // Volumetric xenon searchlight cone connecting helicopter nose turret down to the sweeping ground spot
+                const coneDx = bSc.x - nSc.x;
+                const coneDy = bSc.y - nSc.y;
+                const coneAng = Math.atan2(coneDy, coneDx);
+                const coneLen = Math.hypot(coneDx, coneDy) + 46 * bScale;
+                addHeadlightCone(
+                    nSc.x,
+                    nSc.y,
+                    coneAng,
+                    coneLen,
+                    0.28,
+                    3.2 * hScale,
+                    "rgba(235, 248, 255, 0.92)",
+                    "rgba(145, 210, 255, 0.42)"
+                );
+                highResCones.push({
+                    x: nSc.x,
+                    y: nSc.y,
+                    angle: coneAng,
+                    len: coneLen * 0.96,
+                    spread: 0.25,
+                    baseHalfW: 3.0 * hScale,
+                    col0: "rgba(220, 245, 255, 0.22)",
+                    col1: "rgba(135, 205, 255, 0.07)"
+                });
+
+                // Soft ground spot bloom + nose xenon gimbal flare + flashing red/blue tail aviation strobe
+                highResFlares.push({ x: bSc.x, y: bSc.y, r: 44 * bScale, col: "rgba(205, 240, 255, 0.30)" });
+                highResFlares.push({ x: nSc.x, y: nSc.y, r: 8.5 * hScale, col: "rgba(245, 252, 255, 0.95)" });
+                const strobeRed = Math.sin(this.time * 9.0 + hi) >= 0;
+                highResFlares.push({
+                    x: tSc.x,
+                    y: tSc.y,
+                    r: 14 * hScale,
+                    col: strobeRed ? "rgba(255, 45, 80, 0.85)" : "rgba(45, 185, 255, 0.85)"
+                });
+            }
+        }
+        if (this.map && this.map.prisonCompound && Array.isArray(this.map.prisonCompound.towers)) {
+            const bz = this.map.prisonCompound.z || 2.0;
+            for (let ti = 0; ti < this.map.prisonCompound.towers.length; ti++) {
+                const tw = this.map.prisonCompound.towers[ti];
+                if (Math.abs(tw.x - this.camX) > 980 || Math.abs(tw.y - this.camY) > 760) continue;
+                const sAng = tw.baseAng + Math.sin(this.time * 1.15 + ti * 1.4) * 0.65;
+                const beamX = tw.x + Math.cos(sAng) * 95;
+                const beamY = tw.y + Math.sin(sAng) * 95;
+                const tSc = this.worldToScreen(tw.x, tw.y, bz + 0.86);
+                const bSc = this.worldToScreen(beamX, beamY, bz + 0.02);
+                const bScale = (bSc.scale * H) / 128.0;
+                const coneAng = Math.atan2(bSc.y - tSc.y, bSc.x - tSc.x);
+                const coneLen = Math.hypot(bSc.x - tSc.x, bSc.y - tSc.y) + 34 * bScale;
+                addLightPool(bSc.x, bSc.y, 96 * bScale, "rgba(255, 244, 195, 0.90)", "rgba(235, 185, 85, 0.36)");
+                addHeadlightCone(tSc.x, tSc.y, coneAng, coneLen, 0.24, 2.5 * bScale, "rgba(255, 245, 200, 0.88)", "rgba(235, 190, 95, 0.36)");
+                highResCones.push({
+                    x: tSc.x,
+                    y: tSc.y,
+                    angle: coneAng,
+                    len: coneLen * 0.95,
+                    spread: 0.22,
+                    baseHalfW: 2.4 * bScale,
+                    col0: "rgba(255, 244, 195, 0.18)",
+                    col1: "rgba(235, 190, 95, 0.06)"
+                });
+            }
+        }
+        if (this.map && this.map.seraCompound && Array.isArray(this.map.seraCompound.towers)) {
+            const bz = this.map.seraCompound.z || 2.0;
+            for (let ti = 0; ti < this.map.seraCompound.towers.length; ti++) {
+                const tw = this.map.seraCompound.towers[ti];
+                if (Math.abs(tw.x - this.camX) > 980 || Math.abs(tw.y - this.camY) > 760) continue;
+                const sAng = tw.baseAng + Math.sin(this.time * 0.85 + ti * 1.6) * 0.65;
+                const beamX = tw.x + Math.cos(sAng) * 68;
+                const beamY = tw.y + Math.sin(sAng) * 68;
+                const tSc = this.worldToScreen(tw.x, tw.y, bz + 0.62);
+                const bSc = this.worldToScreen(beamX, beamY, bz + 0.02);
+                const bScale = (bSc.scale * H) / 128.0;
+                const coneAng = Math.atan2(bSc.y - tSc.y, bSc.x - tSc.x);
+                const coneLen = Math.hypot(bSc.x - tSc.x, bSc.y - tSc.y) + 32 * bScale;
+                addLightPool(bSc.x, bSc.y, 92 * bScale, "rgba(220, 245, 255, 0.90)", "rgba(120, 195, 255, 0.36)");
+                addHeadlightCone(tSc.x, tSc.y, coneAng, coneLen, 0.24, 2.5 * bScale, "rgba(225, 248, 255, 0.88)", "rgba(130, 200, 255, 0.36)");
+                highResCones.push({
+                    x: tSc.x,
+                    y: tSc.y,
+                    angle: coneAng,
+                    len: coneLen * 0.95,
+                    spread: 0.22,
+                    baseHalfW: 2.4 * bScale,
+                    col0: "rgba(220, 245, 255, 0.18)",
+                    col1: "rgba(130, 200, 255, 0.06)"
+                });
             }
         }
 
