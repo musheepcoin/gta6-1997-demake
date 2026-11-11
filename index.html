@@ -2,11 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>VICE CITY 26</title>
     <link rel="icon" href="data:,">
     <link rel="preload" as="image" href="assets/gta1/gta1_char_portraits.png?v=98_51" fetchpriority="high">
-    <link rel="stylesheet" href="css/style.css?v=101_58">
+    <link rel="stylesheet" href="css/style.css?v=101_67">
+    <script>
+        window.__VC26_BUILD = "101_67";
+        (function() {
+            try {
+                fetch(window.location.pathname + "?_cb=" + Date.now(), { cache: "no-store" })
+                    .then(function(r) { return r.text(); })
+                    .then(function(txt) {
+                        var m = txt && txt.match(/__VC26_BUILD\s*=\s*"([^"]+)"/);
+                        if (m && m[1] && m[1] !== window.__VC26_BUILD) {
+                            window.location.replace(window.location.pathname + "?v=" + m[1]);
+                        }
+                    }).catch(function() {});
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body>
     <div id="game-container">
@@ -399,14 +417,14 @@
     </div>
 
     <!-- Modular Zero-Dependency 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=101_66"></script>
-    <script src="js/interiors.js?v=101_66"></script>
-    <script src="js/object_engine.js?v=101_66"></script>
-    <script src="js/map.js?v=101_66"></script>
-    <script src="js/entities.js?v=101_66"></script>
-    <script src="js/missions.js?v=101_66"></script>
-    <script src="js/renderer.js?v=101_66"></script>
-    <script src="js/net.js?v=101_66"></script>
-    <script src="js/game.js?v=101_66"></script>
+    <script src="js/audio.js?v=101_67"></script>
+    <script src="js/interiors.js?v=101_67"></script>
+    <script src="js/object_engine.js?v=101_67"></script>
+    <script src="js/map.js?v=101_67"></script>
+    <script src="js/entities.js?v=101_67"></script>
+    <script src="js/missions.js?v=101_67"></script>
+    <script src="js/renderer.js?v=101_67"></script>
+    <script src="js/net.js?v=101_67"></script>
+    <script src="js/game.js?v=101_67"></script>
 </body>
 </html>

@@ -6851,7 +6851,7 @@ class RetroRenderer {
 
         // Dedicated True 3D Hardware Z-Buffered Interior Pass when inside any of the 14 building themes!
         if (game && game.activeInterior) {
-            gl.clearColor(0.02, 0.03, 0.07, 1.0);
+            gl.clearColor(0.32, 0.38, 0.34, 1.0);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             if (!this.gta1Ready || !this.cmpReady) return;
             if (this.map && this.map.objectEngine) {
@@ -12226,7 +12226,7 @@ class RetroRenderer {
         const rh = intr.h || 560;
         const t = intr.theme || "SHOP_CONVENIENCE";
         const facing = intr.facing || "S";
-        const key = `v5_${t}_${facing}_${rw}_${rh}`;
+        const key = `v6_${t}_${facing}_${rw}_${rh}`;
         if (this._interiorFloorTexCache[key]) {
             return this._interiorFloorTexCache[key];
         }
@@ -12256,6 +12256,16 @@ class RetroRenderer {
                 g.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
             }
         };
+        const labelR = (x, y, w, h, text, col = "#fde047", font = "bold 9px Consolas, monospace") => {
+            const r = trR(x, y, w, h);
+            g.save();
+            g.font = font;
+            g.fillStyle = col;
+            g.textAlign = "center";
+            g.textBaseline = "middle";
+            g.fillText(text, r.x + r.w * 0.5, r.y + r.h * 0.5);
+            g.restore();
+        };
 
         // 1. Primary multi-zone procedural pixel-art floor pattern across the entire room
         let mainPat = tex.marble_dark;
@@ -12270,77 +12280,180 @@ class RetroRenderer {
         g.fillStyle = mainPat;
         g.fillRect(0, 0, rw, rh);
 
-        // 2. Oriented Multi-Room Architectural Sub-Zones, Carpets, Rugs & Floor Markings
+        // 2. Oriented Multi-Room Architectural Sub-Zones, Carpets, Rugs & High-Detail Top-Down Furniture Surfaces (mapped onto 3D furniture tops via MAT 14!)
         if (t === "SHOP_GUN_SHOP") {
             // West Gunsmith & Kevlar Vault warm honey-oak plank floor
-            fillR(18, 56, 206, 358, tex.wood_oak, "#92400e", 1.5);
+            fillR(18, 56, 206, 358, tex.wood_oak, "#78350f", 1.5);
             // Center Showroom royal crimson tactical rug runner
-            fillR(266, 174, 224, 96, tex.carpet_royal, "#d97706", 2.0);
-            // East 4-Lane Live Firing Range concrete floor + yellow/black firing line + downrange distance stripes
-            fillR(532, 56, rw - 550, 358, tex.concrete_prison, "#ca8a04", 2.0);
-            fillR(540, 304, 250, 8, "#facc15");
-            for (let hx = 544; hx < 784; hx += 18) {
-                fillR(hx, 304, 9, 8, "#1e293b");
+            fillR(266, 174, 224, 96, tex.carpet_royal, "#f59e0b", 2.0);
+            labelR(266, 206, 224, 32, "★ AMMU-NATION ORDNANCE ★", "rgba(253, 224, 71, 0.55)", "bold 11px Consolas, monospace");
+
+            // Gunsmith Vault Safe (36, 68, 52, 32) & Hardwood Workbench (92, 68, 108, 28)
+            fillR(36, 68, 52, 32, "#334155", "#0f172a", 2.0);
+            fillR(42, 73, 40, 22, "#475569", "#fbbf24", 1.2);
+            labelR(36, 68, 52, 32, "SAFE", "#fde047", "bold 8px Consolas, monospace");
+            fillR(92, 68, 108, 28, tex.wood_mahogany, "#451a03", 2.0);
+            fillR(98, 72, 42, 18, "#1e40af", "#60a5fa", 1.0); // Blueprint mat on workbench
+            fillR(146, 74, 38, 6, "#94a3b8", "#0f172a", 1.0); // Disassembled rifle barrel
+            fillR(152, 82, 22, 6, "#f59e0b", "#78350f", 1.0); // Brass calipers
+
+            // South-West Tactical Kevlar Body Armor Rack (36, 352, 164, 28) — Detailed Police/SWAT Vests with Straps & Trauma Plates!
+            fillR(36, 352, 164, 28, "#334155", "#0f172a", 2.0);
+            for (let v = 0; v < 3; v++) {
+                const vx = 44 + v * 52;
+                fillR(vx, 354, 40, 24, "#0284c7", "#0f172a", 1.5); // Kevlar carrier body
+                fillR(vx + 10, 354, 20, 6, "#0f172a"); // Neck cutout collar
+                fillR(vx + 6, 361, 28, 13, "#1e293b", "#38bdf8", 1.0); // Ceramic trauma plate pouch
+                fillR(vx + 4, 355, 5, 22, "#facc15"); // High-vis shoulder strap L
+                fillR(vx + 31, 355, 5, 22, "#facc15"); // High-vis shoulder strap R
             }
-            // Downrange 10m and 25m range lines, lane numbers & spent brass casings
-            fillR(544, 218, 242, 2, "rgba(180, 83, 9, 0.45)");
-            fillR(544, 138, 242, 2, "rgba(180, 83, 9, 0.45)");
-            fillR(544, 62, 242, 24, "#92400e", "#78350f", 1.5); // Downrange sandtrap berm
+
+            // Center Showroom Illuminated Glass Weapon Showcase Counter (262, 128, 232, 28)
+            fillR(262, 128, 232, 28, "#1e293b", "#0f172a", 2.0);
+            for (let b = 0; b < 3; b++) {
+                const bx = 294 + b * 64;
+                fillR(bx, 131, 58, 22, "#7f1d1d", "#38bdf8", 1.5); // Velvet display bay under glass
+                fillR(bx + 8, 136, 26, 5, "#e2e8f0", "#0f172a", 1.0); // Displayed firearm barrel/receiver
+                fillR(bx + 6, 141, 10, 6, "#92400e"); // Wood grip/stock
+                fillR(bx + 38, 135, 14, 12, "#eab308", "#713f12", 1.0); // Brass ammo box
+            }
+            fillR(266, 131, 24, 22, "#ca8a04", "#0f172a", 1.5); // Brass POS cash register
+
+            // Center Military Surplus Stenciled Wood Slat Crates (258, 288, 86, 28 & 412, 288, 86, 28)
+            for (const rx of [258, 412]) {
+                fillR(rx, 288, 86, 28, "#4d7c0f", "#1a2e05", 2.0);
+                fillR(rx + 4, 292, 78, 6, "#3f6212", "#1a2e05", 1.0);
+                fillR(rx + 4, 300, 78, 6, "#3f6212", "#1a2e05", 1.0);
+                fillR(rx + 4, 308, 78, 6, "#3f6212", "#1a2e05", 1.0);
+                labelR(rx, 288, 86, 28, rx < 350 ? "SHOTGUN 12GA" : "MICRO-UZI 9MM", "#fef08a", "bold 8px Consolas, monospace");
+            }
+
+            // East 4-Lane Live Firing Range: Warm Concrete Floor + Hazard Firing Line + Distance Markers + Numbered Stalls
+            fillR(532, 56, rw - 550, 358, tex.concrete_prison, "#78350f", 2.0);
+            fillR(540, 304, 250, 8, "#facc15", "#0f172a", 1.0);
+            for (let hx = 544; hx < 784; hx += 18) {
+                fillR(hx, 304, 9, 8, "#0f172a");
+            }
+            fillR(548, 312, 236, 22, tex.wood_oak, "#451a03", 2.0); // Shooting booth wooden counter
+            fillR(544, 218, 242, 3, "rgba(234, 88, 12, 0.55)");
+            fillR(544, 138, 242, 3, "rgba(220, 38, 38, 0.55)");
+            fillR(544, 62, 242, 22, "#92400e", "#451a03", 2.0); // Sandbag bullet-trap berm
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
-                fillR(lx + 4, 268, 44, 26, "rgba(250, 204, 21, 0.16)", "rgba(180, 83, 9, 0.45)", 1.0);
+                if (lane > 0) {
+                    fillR(lx - 2, 64, 3, 240, "rgba(15, 23, 42, 0.35)");
+                }
+                fillR(lx + 6, 266, 42, 30, "rgba(254, 240, 138, 0.35)", "#b45309", 1.2);
+                labelR(lx + 6, 266, 42, 30, `L${lane + 1}`, "#78350f", "bold 10px Consolas, monospace");
+                fillR(lx + 8, 315, 16, 14, "#eab308", "#713f12", 1.0); // Ammo box on stall bench
+                fillR(lx + 30, 315, 14, 14, "#dc2626", "#0f172a", 1.0); // Ear defenders on stall bench
             }
-            for (let s = 0; s < 22; s++) {
+            for (let s = 0; s < 24; s++) {
                 const bx = 556 + ((s * 37) % 216);
-                const by = 336 + ((s * 19) % 34);
-                fillR(bx, by, 4, 2.5, "#ca8a04");
+                const by = 338 + ((s * 19) % 34);
+                fillR(bx, by, 4, 2.5, "#f59e0b");
             }
-            // South Security Vestibule travertine tile floor
-            fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#a8a29e", 1.0);
+
+            // South Security Vestibule travertine floor + Guard Desk (54, 468, 96, 30) & Ordnance Pallet (664, 468, 96, 30)
+            fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#78716c", 1.5);
+            fillR(348, 410, 124, 22, tex.wood_oak, "#0f172a", 2.0);
+            fillR(54, 468, 96, 30, tex.wood_mahogany, "#0f172a", 2.0);
+            fillR(62, 472, 32, 18, "#0284c7", "#e0f2fe", 1.2); // CCTV monitor screen
+            fillR(102, 474, 36, 14, "#e2e8f0", "#0f172a", 1.0); // Guard logbook
+            fillR(664, 468, 96, 30, "#4d7c0f", "#1a2e05", 2.0);
+            labelR(664, 468, 96, 30, "US ORDNANCE", "#fef08a", "bold 8px Consolas, monospace");
         } else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") {
             fillR(18, 56, rw - 36, 136, tex.kitchen_tile, "#64748b", 1.5);
+            const cookW = t === "DINER_PAWN" ? 384 : 480;
+            fillR(48, 62, cookW, 28, "#cbd5e1", "#0f172a", 2.0); // Stainless kitchen line
+            fillR(56, 66, 140, 20, "#334155", "#0f172a", 1.5); // Flattop griddle
+            fillR(212, 66, 110, 20, "#f59e0b", "#78350f", 1.5); // Golden deep-fryer vats
             if (t === "DINER_PAWN") {
+                fillR(56, 132, 376, 26, "#dc2626", "#0f172a", 2.0); // Diner counter
+                fillR(62, 136, 364, 18, "#f8fafc", "#94a3b8", 1.0);
+                for (const by of [256, 344]) {
+                    fillR(38, by, 118, 36, "#dc2626", "#7f1d1d", 2.0);
+                    fillR(54, by + 6, 86, 24, "#fef3c7", "#d97706", 1.2);
+                }
                 fillR(500, 56, rw - 518, rh - 74, tex.wood_mahogany, "#f97316", 1.5);
                 fillR(536, 254, 196, 72, tex.carpet_royal, "#fde047", 1.5);
+                fillR(536, 124, 210, 28, tex.wood_oak, "#0f172a", 2.0);
+                fillR(546, 346, 196, 32, "#334155", "#fbbf24", 2.0);
             } else {
+                fillR(220, 124, 180, 24, "#e2e8f0", "#475569", 2.0);
                 fillR(18, 208, 138, 216, tex.wood_oak, "#78350f", 1.5);
+                for (const by of [238, 338]) {
+                    fillR(36, by, 96, 42, "#dc2626", "#7f1d1d", 2.0);
+                    fillR(50, by + 8, 68, 26, "#fef3c7", "#d97706", 1.2);
+                }
+                for (const tx of [254, 402]) {
+                    for (const ty of [252, 354]) {
+                        fillR(tx, ty, 62, 46, "#fffbeb", "#b45309", 2.0);
+                        fillR(tx + 8, ty + 8, 46, 30, "#dc2626", "#fde047", 1.0);
+                    }
+                }
                 fillR(568, 208, rw - 586, 216, tex.wood_mahogany, "#fde047", 1.5);
                 fillR(354, 214, 112, 298, tex.carpet_royal, "#fbbf24", 1.5);
             }
         } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
             fillR(18, 56, 230, rh - 74, tex.wood_oak, "#92400e", 1.5);
             fillR(38, 86, 174, 176, tex.carpet_royal, "#fde047", 2.0);
+            // King Bed (28, 96, 118, 86) with quilted coverlet, gold runner & twin white pillows
+            fillR(28, 96, 118, 86, "#f8fafc", "#451a03", 2.0);
+            fillR(44, 104, 22, 30, "#ffffff", "#cbd5e1", 1.2);
+            fillR(44, 144, 22, 30, "#ffffff", "#cbd5e1", 1.2);
+            fillR(70, 100, 72, 78, "#db2777", "#831843", 1.5);
+            fillR(116, 100, 24, 78, "#fbbf24", "#92400e", 1.2);
             fillR(38, 306, 174, 188, tex.carpet_royal, "#f472b6", 1.5);
+            fillR(316, 178, 188, 30, tex.wood_mahogany, "#fbbf24", 2.0); // Concierge Desk
+            labelR(316, 178, 188, 30, "CONCIERGE DESK", "#fde047", "bold 9px Consolas, monospace");
             fillR(356, 208, 108, rh - 228, tex.carpet_royal, "#fbbf24", 2.0);
             fillR(564, 56, rw - 582, rh - 74, tex.marble_carrara, "#38bdf8", 1.5);
+            fillR(584, 112, 176, 28, tex.wood_mahogany, "#22d3ee", 2.0);
+            fillR(588, 344, 176, 112, "#e0f2fe", "#0284c7", 2.5);
+            fillR(600, 356, 152, 88, "#06b6d4", "#67e8f9", 1.5);
         } else if (t === "SHOP_CLOTHES") {
             fillR(18, 56, 224, rh - 74, tex.wood_oak, "#92400e", 1.5);
+            fillR(42, 122, 124, 28, tex.wood_mahogany, "#0f172a", 2.0);
+            fillR(42, 316, 124, 26, "#fbbf24", "#78350f", 2.0);
             fillR(338, 168, 144, 252, tex.carpet_royal, "#fde047", 2.0);
             fillR(578, 56, rw - 596, rh - 74, tex.wood_mahogany, "#f472b6", 1.5);
+            fillR(602, 118, 164, 28, "#38bdf8", "#0f172a", 2.0);
         } else if (t === "SHOP_CONVENIENCE") {
             fillR(18, 56, rw - 36, 130, tex.concrete_prison, "#475569", 1.5);
             fillR(18, 202, 210, 110, tex.gunmetal_plate, "#38bdf8", 1.5);
+            fillR(38, 232, 168, 28, "#0d9488", "#0f172a", 2.0); // Cashier counter
+            for (let ai = 0; ai < 3; ai++) {
+                const gx = 286 + ai * 112;
+                fillR(gx, 248, 42, 164, "#e2e8f0", "#0f172a", 2.0);
+                fillR(gx + 4, 254, 15, 152, ai === 0 ? "#ef4444" : (ai === 1 ? "#22c55e" : "#eab308"));
+                fillR(gx + 23, 254, 15, 152, ai === 0 ? "#3b82f6" : (ai === 1 ? "#f97316" : "#ec4899"));
+            }
             fillR(624, 186, rw - 642, rh - 204, tex.kitchen_tile, "#22d3ee", 1.5);
         } else if (t === "SHOP_BAR" || t === "NEON_CLUB" || t === "STRIP_CLUB" || t === "MALIBU_CLUB") {
             fillR(18, 56, 230, rh - 74, tex.carpet_royal, "#f472b6", 1.5);
             fillR(578, 56, rw - 596, rh - 74, tex.gunmetal_plate, "#fde047", 1.5);
             if (t === "SHOP_BAR") {
                 fillR(18, 262, 230, rh - 280, "#064e3b", "#fbbf24", 2.0);
+                fillR(58, 342, 132, 74, "#15803d", "#78350f", 4.0); // 8-Ball Pool Table felt
             } else {
                 fillR(288, 198, 244, 196, tex.wood_oak, "#e879f9", 2.0);
             }
         } else if (t === "MANSION") {
             fillR(18, 56, 240, rh - 74, tex.wood_mahogany, "#f97316", 1.5);
+            fillR(62, 122, 148, 34, tex.wood_oak, "#fbbf24", 2.0); // Scarface executive desk
             fillR(348, 148, 124, rh - 168, tex.carpet_royal, "#fde047", 2.5);
             fillR(572, 56, rw - 590, rh - 74, tex.terrazzo_deco, "#22d3ee", 1.5);
+            fillR(604, 338, 156, 108, "#06b6d4", "#e0f2fe", 2.5);
         } else if (t === "SPACE_BUNKER") {
             fillR(18, 56, 234, rh - 74, tex.concrete_prison, "#38bdf8", 1.5);
             fillR(580, 56, rw - 598, rh - 74, tex.kitchen_tile, "#39ff14", 1.5);
-            fillR(296, 168, 228, 236, "#0f172a", "#38bdf8", 2.0);
+            fillR(296, 168, 228, 236, "#1e293b", "#38bdf8", 2.0);
         } else if (t === "PRISON_BLOCK") {
             fillR(18, 56, 260, 152, tex.concrete_prison, "#f87171", 1.5);
             fillR(294, 56, 222, 152, tex.wood_mahogany, "#fde047", 1.5);
             fillR(532, 56, rw - 550, 152, tex.gunmetal_plate, "#38bdf8", 1.5);
+            fillR(312, 336, 196, 36, "#94a3b8", "#0f172a", 2.0);
         }
 
         // 3. Soft Perimeter Wall Ambient Occlusion Vignette on Floor (with clean doorway gap on active entrance wall)
