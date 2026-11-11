@@ -248,7 +248,7 @@ class MissionManager {
                 }
                 const craneDist = Math.min(
                     Math.hypot(p.x - mx256(171.5) * TILE_SIZE, p.y - my256(162.5) * TILE_SIZE),
-                    Math.hypot(p.x - 336.8 * TILE_SIZE, p.y - 304.8 * TILE_SIZE)
+                    Math.hypot(p.x - 333.2 * TILE_SIZE, p.y - 306.5 * TILE_SIZE)
                 );
                 if (p.inVehicle === m.targetCar && (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 95 || craneDist < 110)) {
                     this.completeMission(m.phone, "STAR ISLAND GRAND THEFT", 75000);

@@ -6888,13 +6888,16 @@ class WorldObjectEngine {
                 game.vehicles.push(av);
             }
 
-            // Spawn Drivable Industrial Freight Trucks, Flatbeds, Tankers & Harbor Patrol Boat in Port of Vice City loading bays
+            // Spawn Drivable Industrial Freight Trucks, Flatbeds, Tankers & Harbor Patrol Boat backed into Port of Vice City warehouse loading bays
             const portFleetSpecs = [
-                { id: "vport_flatbed_nw", spec: "FLATBED",   x: 334.0 * TILE_SIZE, y: 309.8 * TILE_SIZE, ang: 0 },
-                { id: "vport_truck_nw",   spec: "TRUCK",     x: 339.8 * TILE_SIZE, y: 309.8 * TILE_SIZE, ang: Math.PI },
-                { id: "vport_tanker_ne",  spec: "TANKER",    x: 350.8 * TILE_SIZE, y: 314.5 * TILE_SIZE, ang: 0 },
-                { id: "vport_box_sw",     spec: "BOX_TRUCK", x: 336.8 * TILE_SIZE, y: 321.2 * TILE_SIZE, ang: 0 },
-                { id: "vport_flatbed_se", spec: "FLATBED",   x: 351.8 * TILE_SIZE, y: 326.0 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_flatbed_nw", spec: "FLATBED",   x: 337.8 * TILE_SIZE, y: 304.6 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "vport_truck_nw",   spec: "TRUCK",     x: 340.2 * TILE_SIZE, y: 308.6 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_box_ne",     spec: "BOX_TRUCK", x: 347.4 * TILE_SIZE, y: 304.6 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "vport_tanker_ne",  spec: "TANKER",    x: 349.8 * TILE_SIZE, y: 313.6 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_box_sw",     spec: "BOX_TRUCK", x: 337.8 * TILE_SIZE, y: 322.6 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_truck_sw",   spec: "TRUCK",     x: 340.2 * TILE_SIZE, y: 328.8 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_flatbed_se", spec: "FLATBED",   x: 347.6 * TILE_SIZE, y: 326.4 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "vport_tanker_se",  spec: "TANKER",    x: 350.2 * TILE_SIZE, y: 329.8 * TILE_SIZE, ang: -Math.PI * 0.5 },
                 { id: "vport_boat_nw",    spec: "SPEEDBOAT", x: 327.6 * TILE_SIZE, y: 300.8 * TILE_SIZE, ang: Math.PI * 0.5 }
             ];
             for (const pf of portFleetSpecs) {
@@ -8725,78 +8728,134 @@ class WorldObjectEngine {
             }
 
             // 2. Port Authority Security Checkpoints, Guardhouse Booths, Boom Barriers & Overhead Entrance Portals
-            //    at North-West Terminal Entrance (c = 336.8, r = 299.6) & North-East Terminal Entrance (c = 351.2, r = 299.6)
-            for (const gateC of [336.8, 351.2]) {
+            //    at North-West Truck Access Lane (c = 335.2, r = 299.55) & North-East Truck Access Lane (c = 352.6, r = 299.55)
+            for (const gateC of [335.2, 352.6]) {
                 const gx = gateC * TILE_SIZE;
                 const gy = 299.55 * TILE_SIZE;
-                emitAOShadow3D(gx, gy, 1, 0, -44, 0, 46, 38, bz, 0.42);
-                // Armored Port Security Gatehouse Booth on West side of entrance lane (offX = -46)
-                emitTileBox3D(gx, gy, 1, 0, -46, 0, 32, 26, bz, bz + 0.22, 177, 86, 46, [0.92, 0.95, 0.99], true);
-                emitTileBox3D(gx, gy, 1, 0, -46, 0, 28, 22, bz + 0.22, bz + 0.42, 199, 199, 31, [0.94, 0.98, 1.00], false);
-                emitTileBox3D(gx, gy, 1, 0, -46, 0, 34, 28, bz + 0.42, bz + 0.48, 172, 173, 86, [0.16, 0.52, 0.90], false);
+                emitAOShadow3D(gx, gy, 1, 0, -40, 0, 42, 34, bz, 0.42);
+                // Armored Port Security Gatehouse Booth on West side of entrance lane (offX = -42)
+                emitTileBox3D(gx, gy, 1, 0, -42, 0, 28, 24, bz, bz + 0.22, 177, 86, 46, [0.92, 0.95, 0.99], true);
+                emitTileBox3D(gx, gy, 1, 0, -42, 0, 24, 20, bz + 0.22, bz + 0.42, 199, 199, 31, [0.94, 0.98, 1.00], false);
+                emitTileBox3D(gx, gy, 1, 0, -42, 0, 30, 26, bz + 0.42, bz + 0.48, 172, 173, 86, [0.16, 0.52, 0.90], false);
                 // Overhead S250 Steel Truss Terminal Entrance Portal (bz+1.10..1.26 — 100% clear for trucks!)
-                for (const pxOff of [-68, 68]) {
+                for (const pxOff of [-58, 58]) {
                     emitTileBox3D(gx, gy, 1, 0, pxOff, 0, 12, 12, bz, bz + 1.24, 363, 246, 64, [0.92, 0.95, 0.99], false);
                     emitSolidBox3D(gx, gy, 1, 0, pxOff, 0, 14, 14, bz, bz + 0.18, hazCol, 3);
                 }
-                emitTileBox3D(gx, gy, 1, 0, 0, 0, 148, 14, bz + 1.10, bz + 1.24, 250, 363, 64, [0.92, 0.95, 0.99], false);
-                emitSolidBox3D(gx, gy, 1, 0, 0, 0, 108, 9, bz + 1.24, bz + 1.46, [0.06, 0.38, 0.72], 5);
-                emitSolidBox3D(gx, gy, 1, 0, 0, 0, 112, 7, bz + 1.46, bz + 1.50, hazCol, 3);
+                emitTileBox3D(gx, gy, 1, 0, 0, 0, 128, 14, bz + 1.10, bz + 1.24, 250, 363, 64, [0.92, 0.95, 0.99], false);
+                emitSolidBox3D(gx, gy, 1, 0, 0, 0, 96, 9, bz + 1.24, bz + 1.46, [0.06, 0.38, 0.72], 5);
+                emitSolidBox3D(gx, gy, 1, 0, 0, 0, 100, 7, bz + 1.46, bz + 1.50, hazCol, 3);
             }
 
-            // 3. 3 Colossal 3D Corrugated Steel Port Bonded Customs Warehouses & Harbor Master Control Sheds
-            //    - Shed A (North-West Bonded Freight Warehouse at c = 336.8, r = 311.5 — right in the NW Terminal Yard!)
-            const shedAX = 336.8 * TILE_SIZE;
-            const shedAY = 311.5 * TILE_SIZE;
-            emitAOShadow3D(shedAX, shedAY, 1, 0, 0, 0, 356, 124, bz, 0.46);
-            emitTileBox3D(shedAX, shedAY, 1, 0, 0, 0, 336, 106, bz, bz + 0.10, 177, 177, 71, concCol, true);
-            emitTileBox3D(shedAX, shedAY, 1, 0, 0, 0, 326, 96, bz + 0.10, bz + 0.76, 86, 173, 86, [0.88, 0.92, 0.98], true);
-            emitSolidBox3D(shedAX, shedAY, 1, 0, 0, 0, 332, 102, bz + 0.76, bz + 0.84, [0.14, 0.44, 0.82], 5);
-            // 4 Recessed Roll-Up Truck Loading Bays on North Facade (offY = -48.5) + Cantilevered Loading Canopy & Hazard Bumpers
-            emitSolidBox3D(shedAX, shedAY, 1, 0, 0, -56, 316, 18, bz + 0.52, bz + 0.58, [0.94, 0.74, 0.16], 3);
-            for (const bayX of [-114, -38, 38, 114]) {
-                emitTileBox3D(shedAX, shedAY, 1, 0, bayX, -48.5, 48, 4, bz + 0.10, bz + 0.50, 173, 173, 33, [0.28, 0.32, 0.38], false);
-                emitSolidBox3D(shedAX, shedAY, 1, 0, bayX, -52.0, 52, 6, bz + 0.005, bz + 0.08, hazCol, 3);
-                // Painted yellow truck reversal guide lines extending North into the container yard
-                emitSolidBox3D(shedAX, shedAY, 1, 0, bayX - 24, -76, 2.5, 44, bz + 0.005, bz + 0.012, hazCol, 1);
-                emitSolidBox3D(shedAX, shedAY, 1, 0, bayX + 24, -76, 2.5, 44, bz + 0.005, bz + 0.012, hazCol, 1);
-            }
-            // Rooftop HVAC Units & Illuminated Port Logistics Signboards on Shed A
-            for (const hxOff of [-86, 0, 86]) {
-                emitTileBox3D(shedAX, shedAY, 1, 0, hxOff, 8, 36, 28, bz + 0.84, bz + 0.96, 172, 173, 31, [0.84, 0.88, 0.92], false);
-            }
-            emitBox3D(shedAX, shedAY, 1, 0, -76, -42, 118, 10, bz + 0.84, bz + 1.16, "ad_vice26", "ad_vice26", [1.0, 1.0, 1.0]);
-            emitBox3D(shedAX, shedAY, 1, 0,  76, -42, 118, 10, bz + 0.84, bz + 1.16, "ad_ecola",  "ad_ecola",  [1.0, 1.0, 1.0]);
+            // 3. 10 Colossal 3D Corrugated Steel Port Bonded Customs Warehouses, Transit Sheds & Harbor Master Control Complex
+            //    Coherent Maritime Masterplan: Waterfront Quays have Ship-to-Shore Cranes & Container Stacks;
+            //    Landside Blocks flanking Central Port Truck Avenue (c = 343..344) feature 10 pitched-roof 3D Freight Warehouses
+            //    with raised concrete loading docks, recessed roll-up truck doors, canopies, cargo pallets & backed-in semi-trucks!
+            const emitPortWarehouse3D = (c, r, w, d, wallCol, roofBaseCol, roofRidgeCol, bayDirs, signTex = null) => {
+                const wx = c * TILE_SIZE;
+                const wy = r * TILE_SIZE;
+                emitAOShadow3D(wx, wy, 1, 0, 0, 0, w + 24, d + 24, bz, 0.48);
+                // Raised reinforced-concrete warehouse foundation plinth
+                emitTileBox3D(wx, wy, 1, 0, 0, 0, w + 4, d + 4, bz, bz + 0.12, 177, 177, 71, concCol, true);
+                // Lower masonry/concrete industrial wainscot (S86) + Upper corrugated steel siding (S173) + Clerestory windows (S199)
+                emitTileBox3D(wx, wy, 1, 0, 0, 0, w, d, bz + 0.12, bz + 0.28, 86, 86, 86, [0.84, 0.86, 0.90], true);
+                emitTileBox3D(wx, wy, 1, 0, 0, 0, w - 2, d - 2, bz + 0.28, bz + 0.54, 173, 173, 86, wallCol, true);
+                emitTileBox3D(wx, wy, 1, 0, 0, 0, w - 2, d - 2, bz + 0.54, bz + 0.68, 199, 173, 86, [0.92, 0.96, 1.00], false);
+                // Authentic 3D Pitched Corrugated Metal Warehouse Roof ("roof_rusted_tin") + Raised Clerestory Skylight Monitor & Turbine Vents
+                const roofPitch = 0.24;
+                emitHippedRoof3D(wx, wy, 1, 0, 0, 0, w + 10, d + 10, bz + 0.68, roofPitch, "roof_rusted_tin", roofBaseCol, roofRidgeCol);
+                const monW = w * 0.66;
+                emitTileBox3D(wx, wy, 1, 0, 0, 0, monW, 18, bz + 0.68 + roofPitch * 0.78, bz + 0.68 + roofPitch + 0.05, 199, 173, 31, roofRidgeCol, false);
+                for (const vxOff of [-monW * 0.34, 0, monW * 0.34]) {
+                    emitCylinder3D(wx, wy, vxOff, 0, 5.5, 4.5, bz + 0.68 + roofPitch + 0.05, bz + 0.68 + roofPitch + 0.15, 8, [0.82, 0.86, 0.90], 5, true);
+                }
+                // Loading Dock Aprons, Cantilevered Rain Canopies, 4 Recessed Roll-Up Truck Doors, Hazard Bumpers & Cargo Pallets
+                const bayXOffsets = [-w * 0.34, -w * 0.115, w * 0.115, w * 0.34];
+                for (const dirY of bayDirs) {
+                    const wallY = dirY * (d * 0.5);
+                    const dockY = wallY + dirY * 8.0;
+                    // Extended concrete loading dock platform + yellow/black safety bumper beam
+                    emitTileBox3D(wx, wy, 1, 0, 0, dockY, w - 16, 16, bz, bz + 0.11, 177, 177, 71, concCol, false);
+                    emitSolidBox3D(wx, wy, 1, 0, 0, wallY + dirY * 16.5, w - 14, 3.5, bz + 0.01, bz + 0.10, hazCol, 3);
+                    // Cantilevered corrugated steel rain canopy over the 4 truck bays
+                    emitSolidBox3D(wx, wy, 1, 0, 0, wallY + dirY * 10.0, w - 20, 20, bz + 0.48, bz + 0.54, roofRidgeCol, 5);
+                    emitSolidBox3D(wx, wy, 1, 0, 0, wallY + dirY * 19.5, w - 18, 3.0, bz + 0.48, bz + 0.54, hazCol, 3);
+                    for (let bi = 0; bi < bayXOffsets.length; bi++) {
+                        const bxOff = bayXOffsets[bi];
+                        // Recessed dark steel roll-up truck bay door (S173)
+                        emitTileBox3D(wx, wy, 1, 0, bxOff, wallY + dirY * 0.8, 42, 4, bz + 0.11, bz + 0.47, 173, 173, 33, [0.26, 0.30, 0.36], false);
+                        // Painted yellow truck reversal guide stripes on the tarmac court
+                        emitSolidBox3D(wx, wy, 1, 0, bxOff - 21, wallY + dirY * 36.0, 2.2, 34, bz + 0.005, bz + 0.012, hazCol, 1);
+                        emitSolidBox3D(wx, wy, 1, 0, bxOff + 21, wallY + dirY * 36.0, 2.2, 34, bz + 0.005, bz + 0.012, hazCol, 1);
+                        // Stacked 3D wooden cargo crates & tarpaulin pallets on the loading dock between doors
+                        if (bi < bayXOffsets.length - 1) {
+                            const crateX = (bxOff + bayXOffsets[bi + 1]) * 0.5;
+                            emitTileBox3D(wx, wy, 1, 0, crateX, wallY + dirY * 8.5, 14, 11, bz + 0.11, bz + 0.25, 144, 144, 86, [0.82, 0.66, 0.44], false);
+                            if ((bi & 1) === 0) {
+                                emitSolidBox3D(wx, wy, 1, 0, crateX, wallY + dirY * 8.5, 13, 10, bz + 0.25, bz + 0.33, [0.16, 0.48, 0.84], 4);
+                            }
+                        }
+                    }
+                }
+                if (signTex) {
+                    const signSide = bayDirs[0] || 1;
+                    emitBox3D(wx, wy, 1, 0, 0, signSide * (d * 0.5 - 6), 116, 8, bz + 0.68, bz + 0.96, signTex, signTex, [1.0, 1.0, 1.0]);
+                }
+            };
 
-            //    - Shed B (North-East Harbor Master Control Tower & Port Logistics Building at c = 351.2, r = 316.5)
-            const shedBX = 351.2 * TILE_SIZE;
-            const shedBY = 316.5 * TILE_SIZE;
-            emitAOShadow3D(shedBX, shedBY, 1, 0, 0, 0, 294, 104, bz, 0.46);
-            emitTileBox3D(shedBX, shedBY, 1, 0, 0, 0, 272, 84, bz, bz + 0.68, 86, 199, 86, [0.92, 0.95, 0.99], true);
-            emitSolidBox3D(shedBX, shedBY, 1, 0, 0, 0, 278, 90, bz + 0.68, bz + 0.75, [0.86, 0.34, 0.18], 5);
-            for (const bayX of [-84, 0, 84]) {
-                emitTileBox3D(shedBX, shedBY, 1, 0, bayX, -42.5, 44, 4, bz + 0.06, bz + 0.46, 173, 173, 33, [0.28, 0.32, 0.38], false);
-            }
-            // Elevated 3D Harbor Master Glass Observation Tower & Marine Radar Mast on East Roof of Shed B
-            emitTileBox3D(shedBX, shedBY, 1, 0, 72, 0, 56, 52, bz + 0.75, bz + 1.32, 172, 173, 86, [0.90, 0.94, 0.98], false);
-            emitTileBox3D(shedBX, shedBY, 1, 0, 72, 0, 64, 60, bz + 1.32, bz + 1.66, 199, 199, 86, [0.94, 0.98, 1.00], false);
-            emitSolidBox3D(shedBX, shedBY, 1, 0, 72, 0, 70, 66, bz + 1.66, bz + 1.74, [0.14, 0.48, 0.86], 5);
-            emitCylinder3D(shedBX, shedBY, 72, 0, 3.6, 2.4, bz + 1.74, bz + 2.08, 10, [0.88, 0.92, 0.96], 5, true);
+            // --- NW BLOCK 1 (c = 331..342, r = 299..313): 2 Bonded Customs & Transit Freight Warehouses ---
+            // Warehouse #1: NW North Bonded Customs Warehouse (c = 339.0, r = 302.4) — loading bays facing South onto NW Truck Court
+            emitPortWarehouse3D(339.0, 302.4, 276, 124, [0.88, 0.92, 0.96], [0.46, 0.54, 0.64], [0.18, 0.44, 0.78], [1], "ad_vice26");
+            // Warehouse #2: NW South Transit Freight Shed (c = 339.0, r = 310.8) — loading bays facing North onto NW Truck Court
+            emitPortWarehouse3D(339.0, 310.8, 276, 124, [0.90, 0.88, 0.84], [0.62, 0.42, 0.30], [0.78, 0.34, 0.18], [-1], "ad_ecola");
 
-            //    - Shed C (South-West Stevedore & Heavy Rigging Freight Shed at c = 336.8, r = 318.8)
-            const shedCX = 336.8 * TILE_SIZE;
-            const shedCY = 318.8 * TILE_SIZE;
-            emitAOShadow3D(shedCX, shedCY, 1, 0, 0, 0, 334, 108, bz, 0.46);
-            emitTileBox3D(shedCX, shedCY, 1, 0, 0, 0, 312, 88, bz, bz + 0.68, 173, 86, 86, [0.86, 0.88, 0.92], true);
-            emitSolidBox3D(shedCX, shedCY, 1, 0, 0, 0, 318, 94, bz + 0.68, bz + 0.75, [0.90, 0.46, 0.16], 5);
-            for (const bayX of [-102, -34, 34, 102]) {
-                emitTileBox3D(shedCX, shedCY, 1, 0, bayX, 44.5, 44, 4, bz + 0.06, bz + 0.46, 173, 173, 33, [0.28, 0.32, 0.38], false);
-                emitSolidBox3D(shedCX, shedCY, 1, 0, bayX, 48.0, 48, 6, bz + 0.005, bz + 0.07, hazCol, 3);
+            // --- SW BLOCK 3 (c = 331..342, r = 316..333): 3 Heavy Rigging, Bulk Cargo & Marine Freight Warehouses ---
+            // Warehouse #3: SW North Stevedore & Heavy Rigging Warehouse (c = 339.0, r = 318.4)
+            emitPortWarehouse3D(339.0, 318.4, 276, 120, [0.84, 0.88, 0.92], [0.54, 0.46, 0.38], [0.84, 0.48, 0.16], [1], null);
+            // Warehouse #4: SW Central Bulk Cargo Distribution Warehouse (c = 339.0, r = 324.8) — double-sided loading bays (North & South!)
+            emitPortWarehouse3D(339.0, 324.8, 276, 124, [0.88, 0.91, 0.95], [0.42, 0.52, 0.58], [0.16, 0.52, 0.68], [-1, 1], "ad_sprunk");
+            // Warehouse #5: SW South Marine Parts & Free-Trade Shed (c = 339.0, r = 331.2)
+            emitPortWarehouse3D(339.0, 331.2, 276, 120, [0.90, 0.87, 0.82], [0.58, 0.40, 0.32], [0.72, 0.30, 0.20], [-1], null);
+
+            // --- NE BLOCK 2 (c = 345..358, r = 299..318): 2 Cold-Storage / Intermodal Warehouses + Harbor Master Control Tower ---
+            // Warehouse #6: NE North Refrigerated Cold-Storage Warehouse (c = 348.6, r = 302.4)
+            emitPortWarehouse3D(348.6, 302.4, 276, 124, [0.92, 0.96, 1.00], [0.48, 0.58, 0.68], [0.14, 0.48, 0.86], [1], "ad_shark");
+            // Warehouse #7: NE Central Intermodal Logistics Warehouse (c = 348.6, r = 309.4) — double-sided loading bays
+            emitPortWarehouse3D(348.6, 309.4, 276, 124, [0.86, 0.90, 0.94], [0.56, 0.44, 0.34], [0.82, 0.42, 0.18], [-1, 1], null);
+            // Building #8: NE South Port Authority Harbor Master Control Tower & Customs House (c = 348.6, r = 316.2)
+            emitPortWarehouse3D(348.6, 316.2, 276, 112, [0.92, 0.95, 0.99], [0.44, 0.52, 0.62], [0.14, 0.44, 0.82], [-1], null);
+            {
+                const hmx = 348.6 * TILE_SIZE;
+                const hmy = 316.2 * TILE_SIZE;
+                // Elevated 4-Story 3D Harbor Master Glass Observation Tower & Marine Radar Mast rising from East Wing of Building #8
+                emitTileBox3D(hmx, hmy, 1, 0, 74, 0, 58, 54, bz + 0.72, bz + 1.34, 172, 173, 86, [0.90, 0.94, 0.98], false);
+                emitTileBox3D(hmx, hmy, 1, 0, 74, 0, 68, 62, bz + 1.34, bz + 1.70, 199, 199, 86, [0.94, 0.98, 1.00], false);
+                emitSolidBox3D(hmx, hmy, 1, 0, 74, 0, 74, 68, bz + 1.70, bz + 1.78, [0.14, 0.48, 0.86], 5);
+                emitCylinder3D(hmx, hmy, 74, 0, 3.8, 2.4, bz + 1.78, bz + 2.14, 10, [0.88, 0.92, 0.96], 5, true);
+                emitSolidBox3D(hmx, hmy, 1, 0, 74, 0, 26, 4, bz + 2.12, bz + 2.18, hazCol, 5);
             }
 
-            // 4. 3D Magnetic Car-Crusher & Container-Handler Pedestal Base at crane_viceport (c = 336.8, r = 304.8)
-            const vcCraneX = 336.8 * TILE_SIZE + 2.5 * TILE_SIZE + 18;
-            const vcCraneY = 304.8 * TILE_SIZE + 1.2 * TILE_SIZE;
+            // --- SE BLOCK 4 (c = 345..360, r = 321..336): 2 Export / Bonded Warehouses + Twin Cylindrical Bulk Fuel Silos ---
+            // Warehouse #9: SE North Atlantic Export Warehouse (c = 348.8, r = 324.0)
+            emitPortWarehouse3D(348.8, 324.0, 280, 132, [0.88, 0.90, 0.94], [0.60, 0.42, 0.30], [0.80, 0.36, 0.18], [1], "ad_patriot");
+            // Warehouse #10: SE South Bonded Maritime Depot (c = 348.8, r = 332.2)
+            emitPortWarehouse3D(348.8, 332.2, 280, 132, [0.86, 0.90, 0.95], [0.46, 0.54, 0.62], [0.18, 0.46, 0.78], [-1], null);
+            // Twin 3D Cylindrical Bulk Fuel & Molasses Storage Silos (c = 353.0, r = 330.8 & r = 333.8) + Bund Wall & Overhead Pipe Bridge
+            for (const tankR of [330.8, 333.8]) {
+                const tx = 353.0 * TILE_SIZE;
+                const ty = tankR * TILE_SIZE;
+                emitAOShadow3D(tx, ty, 1, 0, 0, 0, 68, 68, bz, 0.44);
+                emitOctagonPad3D(tx, ty, 0, 0, 28, 28, 26, 26, 0.28, bz, bz + 0.10, concCol, hazCol, 3, 177, 71);
+                emitCylinder3D(tx, ty, 0, 0, 25.0, 25.0, bz + 0.10, bz + 1.06, 16, [0.90, 0.93, 0.97], 5, true);
+                emitCylinder3D(tx, ty, 0, 0, 25.4, 25.4, bz + 0.52, bz + 0.62, 16, [0.16, 0.48, 0.84], 5, true);
+                emitCylinder3D(tx, ty, 0, 0, 25.0, 10.0, bz + 1.06, bz + 1.20, 16, [0.84, 0.88, 0.92], 5, true);
+            }
+            // Overhead steel pipeline bridge connecting the two Bulk Storage Silos & Warehouse #10
+            emitTileBox3D(353.0 * TILE_SIZE, 332.3 * TILE_SIZE, 1, 0, 0, 0, 10, 196, bz + 0.88, bz + 0.98, 250, 363, 64, [0.86, 0.90, 0.94], false);
+
+            // 4. 3D Magnetic Car-Crusher & Container-Handler Pedestal Base at crane_viceport (c = 333.2, r = 306.5)
+            const vcCraneX = 333.2 * TILE_SIZE + 2.5 * TILE_SIZE + 18;
+            const vcCraneY = 306.5 * TILE_SIZE + 1.2 * TILE_SIZE;
             emitOctagonPad3D(vcCraneX, vcCraneY, 0, 0, 26, 26, 24, 24, 0.26, bz, bz + 0.12, concCol, hazCol, 3, 177, 71);
             emitTileBox3D(vcCraneX, vcCraneY, 1, 0, 0, 0, 28, 28, bz + 0.12, bz + 0.78, 246, 363, 64, [0.94, 0.76, 0.16], false);
 

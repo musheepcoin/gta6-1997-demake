@@ -1682,8 +1682,7 @@ class LeonidaGame {
 
                 if (Math.abs(bx - cBx) <= 1 && Math.abs(by - cBy) <= 1) continue;
 
-                // Exclude VCIA Airport tarmac, Port Gellhorn Super-Speedway, SERA Space Center, Stadium pitch and Prison perimeter double-fence strips
-
+                // Exclude VCIA Airport tarmac, Port Gellhorn Super-Speedway, SERA Space Center, Stadium pitch, Prison perimeter strips, and Vice Port interior warehouse/container yards
                 if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
 
                 if (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) continue;
@@ -1693,6 +1692,8 @@ class LeonidaGame {
                 if (bx >= 179 && bx <= 197 && by >= 164 && by <= 180) continue;
 
                 if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
+
+                if (bx >= 331 && bx <= 360 && by >= 299 && by <= 336 && bx !== 342 && bx !== 345) continue;
 
                 const nav = this.map.getNavigationBlock(bx, by, 2.0);
                 if (!nav) continue;

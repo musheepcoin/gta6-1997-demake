@@ -2629,34 +2629,34 @@ class LeonidaMap {
             { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 1.55 },
             { kind: "BARGE",      c: 139.5, r: 100.5, ang: -Math.PI * 0.5, scale: 1.45 },
             { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 1.45 },
-            // Vice Port Block 1 — North-West Intermodal Container Yard (c = 331..342, r = 299..313)
-            { kind: "CONTAINERS", c: 334.0, r: 302.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.8, r: 302.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 334.0, r: 305.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.8, r: 305.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 334.0, r: 308.0, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.8, r: 308.0, ang: 0,              scale: 1.25 },
-            // Vice Port Block 2 — North-East Deepwater Container Berth (c = 345..358, r = 299..318)
-            { kind: "CONTAINERS", c: 348.2, r: 302.4, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 353.2, r: 302.4, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 348.2, r: 306.8, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 353.2, r: 306.8, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 348.2, r: 311.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 353.2, r: 311.2, ang: 0,              scale: 1.25 },
-            // Vice Port Block 3 — South-West Heavy Cargo Yard (c = 331..342, r = 316..333)
-            { kind: "CONTAINERS", c: 334.0, r: 324.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.8, r: 324.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 334.0, r: 328.8, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.8, r: 328.8, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 334.0, r: 332.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.8, r: 332.2, ang: 0,              scale: 1.25 },
-            // Vice Port Block 4 — South-East Deepwater Container Berth (c = 345..360, r = 321..336)
-            { kind: "CONTAINERS", c: 348.8, r: 323.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 354.5, r: 323.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 348.8, r: 328.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 354.5, r: 328.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 348.8, r: 333.5, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 354.5, r: 333.5, ang: 0,              scale: 1.25 },
+            // Vice Port Block 1 — North-West Waterfront Quay Container Apron (aligned N-S behind NW Gantry Crane at c = 332..334)
+            { kind: "CONTAINERS", c: 332.2, r: 301.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 333.8, r: 301.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 332.2, r: 304.8, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 332.2, r: 310.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 333.8, r: 310.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 332.2, r: 312.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            // Vice Port Block 2 — North-East Deepwater Quay Container Apron (aligned N-S behind NE Gantry Crane at c = 354..356)
+            { kind: "CONTAINERS", c: 354.2, r: 301.8, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 356.2, r: 301.8, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 354.2, r: 305.0, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 354.2, r: 309.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 356.2, r: 309.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 354.2, r: 313.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            // Vice Port Block 3 — South-West Waterfront Quay Container Apron (aligned N-S behind SW Gantry Crane at c = 332..334)
+            { kind: "CONTAINERS", c: 332.2, r: 318.0, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 333.8, r: 318.0, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 332.2, r: 321.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 332.2, r: 325.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 333.8, r: 325.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 332.2, r: 329.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            // Vice Port Block 4 — South-East Deepwater Quay Container Apron (aligned N-S behind SE Gantry Crane at c = 356..358)
+            { kind: "CONTAINERS", c: 356.0, r: 322.8, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 358.0, r: 322.8, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 356.0, r: 326.2, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 356.0, r: 330.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 358.0, r: 330.5, ang: Math.PI * 0.5,  scale: 1.25 },
+            { kind: "CONTAINERS", c: 358.0, r: 334.2, ang: Math.PI * 0.5,  scale: 1.25 },
             // Port Gellhorn & Ambrosia Refinery Container Stacks
             { kind: "CONTAINERS", c: 58.5,  r: 204.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 58.5,  r: 212.5, ang: Math.PI * 0.5,  scale: 1.25 },
@@ -3253,10 +3253,19 @@ class LeonidaMap {
                 pushPropOBB(pt.x, pt.y, 27 * sc, 12 * sc, pt.ang);
             }
         }
-        // Solid collision hulls for Vice Port 3D Bonded Customs Warehouses & Harbor Master Operations Sheds
-        pushPropOBB(336.8 * TILE_SIZE, 311.5 * TILE_SIZE, 166, 52, 0); // Shed A (North-West Bonded Freight Warehouse)
-        pushPropOBB(351.2 * TILE_SIZE, 316.5 * TILE_SIZE, 138, 44, 0); // Shed B (North-East Harbor Master & Logistics Building)
-        pushPropOBB(336.8 * TILE_SIZE, 318.8 * TILE_SIZE, 158, 46, 0); // Shed C (South-West Stevedore & Heavy Rigging Shed)
+        // Solid collision hulls for all 10 Vice Port 3D Bonded Customs Warehouses, Harbor Master Tower & Bulk Fuel Silos
+        pushPropOBB(339.0 * TILE_SIZE, 302.4 * TILE_SIZE, 140, 64, 0); // Warehouse #1 (NW North Bonded Customs Warehouse)
+        pushPropOBB(339.0 * TILE_SIZE, 310.8 * TILE_SIZE, 140, 64, 0); // Warehouse #2 (NW South Transit Freight Shed)
+        pushPropOBB(339.0 * TILE_SIZE, 318.4 * TILE_SIZE, 140, 62, 0); // Warehouse #3 (SW North Heavy Rigging Warehouse)
+        pushPropOBB(339.0 * TILE_SIZE, 324.8 * TILE_SIZE, 140, 64, 0); // Warehouse #4 (SW Central Bulk Cargo Warehouse)
+        pushPropOBB(339.0 * TILE_SIZE, 331.2 * TILE_SIZE, 140, 62, 0); // Warehouse #5 (SW South Marine Parts Shed)
+        pushPropOBB(348.6 * TILE_SIZE, 302.4 * TILE_SIZE, 140, 64, 0); // Warehouse #6 (NE North Cold-Storage Warehouse)
+        pushPropOBB(348.6 * TILE_SIZE, 309.4 * TILE_SIZE, 140, 64, 0); // Warehouse #7 (NE Central Intermodal Logistics Warehouse)
+        pushPropOBB(348.6 * TILE_SIZE, 316.2 * TILE_SIZE, 140, 58, 0); // Building #8 (NE South Harbor Master Control Tower & Customs House)
+        pushPropOBB(348.8 * TILE_SIZE, 324.0 * TILE_SIZE, 142, 68, 0); // Warehouse #9 (SE North Atlantic Export Warehouse)
+        pushPropOBB(348.8 * TILE_SIZE, 332.2 * TILE_SIZE, 142, 68, 0); // Warehouse #10 (SE South Bonded Maritime Depot)
+        pushPropOBB(353.0 * TILE_SIZE, 330.8 * TILE_SIZE, 28,  28, 0); // SE Bulk Fuel / Molasses Storage Tank #1
+        pushPropOBB(353.0 * TILE_SIZE, 333.8 * TILE_SIZE, 28,  28, 0); // SE Bulk Fuel / Molasses Storage Tank #2
 
         // 18D. Moored Dodo Seaplanes, Superyacht Parties, Thatched Tiki Bars, Mini-Golf Windmill & Outlaw Biker Chopper Lineups
         for (const mp of this.mooredSeaplanes) {
@@ -6071,9 +6080,10 @@ class LeonidaMap {
             const nx = bx + c.dx;
             const ny = by + c.dy;
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
-            // Never allow sidewalk/beach pedestrians to walk into Port Gellhorn Super-Speedway or VCIA Airport tarmac
+            // Never allow sidewalk/beach pedestrians to walk into Port Gellhorn Super-Speedway, VCIA Airport tarmac, or Vice Port interior container/warehouse yards
             if (nx >= 26 && nx <= 87 && ny >= 149 && ny <= 200) continue;
             if (nx >= 64 && nx <= 165 && ny >= 299 && ny <= 368) continue;
+            if (nx >= 331 && nx <= 360 && ny >= 299 && ny <= 336 && nx !== 342 && nx !== 345) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
             if (!nb || nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) {
                 continue;
@@ -6506,8 +6516,8 @@ class LeonidaMap {
             {
                 id: "crane_viceport",
                 name: "VICE PORT CONTAINER CRANE",
-                x: 336.8 * TILE_SIZE,
-                y: 304.8 * TILE_SIZE,
+                x: 333.2 * TILE_SIZE,
+                y: 306.5 * TILE_SIZE,
                 w: 2.5 * TILE_SIZE,
                 h: 2.4 * TILE_SIZE,
                 armAngle: 0,

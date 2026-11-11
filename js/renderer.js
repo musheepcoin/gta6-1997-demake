@@ -8614,19 +8614,6 @@ class RetroRenderer {
                 } else if (pt.kind === "CONTAINERS") {
                     // Ground shadow (true 3D multi-tiered shipping container stacks rendered by WorldObjectEngine)
                     this.batchObjectSprite3D("container_stack", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
-                    // Active hard-hatted Port Stevedores / Dockworkers inspecting manifests & rigging twist-locks beside each container stack
-                    const wSeed = pt.seed || (i * 1.7);
-                    const walkT = this.time * 0.85 + wSeed;
-                    const patX = pt.x + Math.cos(pt.ang) * (Math.sin(walkT) * 26) - Math.sin(pt.ang) * 34;
-                    const patY = pt.y + Math.sin(pt.ang) * (Math.sin(walkT) * 26) + Math.cos(pt.ang) * 34;
-                    const patAng = pt.ang + (Math.cos(walkT) >= 0 ? 0 : Math.PI);
-                    const walkFr = Math.floor(this.time * 5.5 + i * 3) % 8;
-                    this.batchPedSprite3D((i % 2 === 0) ? "dockworker_yellow" : "dockworker_orange", walkFr, patX, patY, bz + 0.038, patAng, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    if (i % 2 === 0) {
-                        const fmX = pt.x - Math.cos(pt.ang) * 38 + Math.sin(pt.ang) * 28;
-                        const fmY = pt.y - Math.sin(pt.ang) * 38 - Math.cos(pt.ang) * 28;
-                        this.batchPedSprite3D("dockworker_orange", 0, fmX, fmY, bz + 0.038, pt.ang + 0.4, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    }
                 } else if (pt.kind === "YACHT") {
                     // Crisp dark water shadow + 100% opaque hull deck above water beneath the 3D Volumetric Luxury Superyacht
                     this.batchObjectSprite3D("luxury_yacht", pt.x + sunCos * 4, pt.y + sunSin * 4, bz + 0.014, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.34);
