@@ -4039,6 +4039,7 @@ class Pedestrian {
         if (
             this.waitingAtCrosswalk ||
             (this.socialTimer || 0) > 0 ||
+            (this.hangoutTimer || 0) > 0 ||
             ((this.hailingTaxiTimer || 0) > 0 && this._hailingTaxi && Math.abs(this._hailingTaxi.speed || 0) >= 12)
         ) {
             return PED_STATE.STANDING_STILL;
@@ -4266,6 +4267,485 @@ class TrafficManager {
             hp: 35,
             speed: gType === "vc_jogger" ? 50 : (35 + (r1 % 9))
         };
+    }
+
+    /* ========================================================================
+       REALISTIC PEDESTRIAN SOCIAL FORMATIONS (SOLO, COUPLE, FAMILY, FRIEND_GROUP, HANGOUT_CIRCLE)
+       Spawns cohesive social units together at creation time with shared formationId
+       and district-matched sprites.
+       ======================================================================== */
+    chooseFormationRoster(bx, by, isSand = false, inPrisonYard = false, map = null, seed = 0) {
+        const r = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
+        if (inPrisonYard) {
+            const single = (seed % 5 === 0)
+                ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 38 }
+                : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45, speed: 35 };
+            return { type: "SOLO", members: [single] };
+        }
+
+        const isBeach = isSand || (bx >= 452 && bx <= 484 && by >= 46 && by <= 375);
+        const isBoardwalk = (bx === 451 || bx === 452) && by >= 44 && by <= 362;
+        const isOceanDrive = bx >= 408 && bx <= 450 && by >= 40 && by <= 370;
+        const isCuba = bx >= 255 && bx <= 325 && by >= 215 && by <= 292;
+        const isWynwood = bx >= 165 && bx <= 265 && by >= 92 && by <= 212;
+        const isStarIsland = bx >= 328 && bx <= 407 && by >= 118 && by <= 215;
+        const isIndustrial =
+            (bx >= 328 && bx <= 363 && by >= 298 && by <= 338) ||
+            (bx >= 36 && bx <= 88 && by >= 201 && by <= 265) ||
+            (bx >= 138 && bx <= 168 && by >= 96 && by <= 132);
+
+        const roll = r % 100;
+        let formType = "SOLO";
+        if (isIndustrial) {
+            formType = roll < 52 ? "SOLO" : (roll < 82 ? "COUPLE" : "HANGOUT_CIRCLE");
+        } else if (isBoardwalk) {
+            formType = roll < 50 ? "SOLO" : (roll < 78 ? "COUPLE" : (roll < 92 ? "FRIEND_GROUP" : "FAMILY"));
+        } else {
+            // 44% SOLO, 24% COUPLE, 10% FAMILY, 14% FRIEND_GROUP, 8% HANGOUT_CIRCLE
+            if (roll < 44) formType = "SOLO";
+            else if (roll < 68) formType = "COUPLE";
+            else if (roll < 78) formType = "FAMILY";
+            else if (roll < 92) formType = "FRIEND_GROUP";
+            else formType = "HANGOUT_CIRCLE";
+        }
+
+        if (formType === "SOLO") {
+            return {
+                type: "SOLO",
+                members: [this.chooseDistrictPedSpec(bx, by, isSand, map, seed)]
+            };
+        }
+
+        if (formType === "COUPLE") {
+            let pairs;
+            if (isIndustrial) {
+                pairs = [
+                    ["dockworker_yellow", "dockworker_orange"],
+                    ["dockworker_yellow", "vc_sailor"]
+                ];
+            } else if (isBeach || isBoardwalk) {
+                pairs = [
+                    ["surfer_guy", "bikini_pink"],
+                    ["vc_bodybuilder", "bikini_cyan"],
+                    ["surfer_guy", "bikini_yellow"],
+                    ["vc_tourist", "bikini_white"],
+                    ["vc_jogger", "bikini_red"]
+                ];
+            } else if (isOceanDrive || isStarIsland) {
+                pairs = [
+                    ["vc_crockett", "bikini_pink"],
+                    ["vc_tommy", "bikini_white"],
+                    ["vc_tubbs", "g2_civ_pink"],
+                    ["vc_tourist", "bikini_cyan"],
+                    ["vc_hawaiian_red", "g2_civ_aqua"],
+                    ["surfer_guy", "bikini_yellow"]
+                ];
+            } else if (isCuba) {
+                pairs = [
+                    ["vc_cuban", "g2_civ_pink"],
+                    ["vc_cuban", "civ1"],
+                    ["vc_hawaiian_red", "g2_civ_aqua"]
+                ];
+            } else if (isWynwood) {
+                pairs = [
+                    ["vc_haitian", "g2_civ_pink"],
+                    ["gang", "g2_civ_aqua"],
+                    ["vc_cuban", "civ2"]
+                ];
+            } else {
+                pairs = [
+                    ["civ0", "g2_civ_pink"],
+                    ["vc_crockett", "g2_civ_aqua"],
+                    ["vc_tourist", "civ1"],
+                    ["vc_tommy", "bikini_white"],
+                    ["civ2", "civ3"]
+                ];
+            }
+            const pair = pairs[(r >> 3) % pairs.length];
+            const sharedSpeed = 34 + (r % 5);
+            const tag = isBeach ? "BEACH" : undefined;
+            return {
+                type: "COUPLE",
+                members: [
+                    {
+                        kind: "CIVILIAN",
+                        g24Type: pair[0],
+                        missionTag: tag,
+                        shirtColor: "#38bdf8",
+                        hp: 38,
+                        speed: sharedSpeed,
+                        formationRole: "LEADER",
+                        formationFwdOff: 0,
+                        formationSideOff: -6
+                    },
+                    {
+                        kind: "CIVILIAN",
+                        g24Type: pair[1],
+                        missionTag: tag,
+                        shirtColor: "#f472b6",
+                        hp: 36,
+                        speed: sharedSpeed,
+                        formationRole: "COUPLE_PARTNER",
+                        formationFwdOff: -2,
+                        formationSideOff: 8
+                    }
+                ]
+            };
+        }
+
+        if (formType === "FAMILY") {
+            const parentPool = (isBeach || isOceanDrive)
+                ? ["vc_tourist", "vc_hawaiian_red", "g2_civ_pink", "bikini_white"]
+                : (isCuba ? ["vc_cuban", "civ1"] : ["civ0", "civ1", "vc_tourist", "g2_civ_aqua"]);
+            const childPool = isBeach
+                ? ["kid_beach", "kid_girl_pink"]
+                : ["kid_boy_cap", "kid_girl_pink", "kid_beach"];
+            const parentType = parentPool[(r >> 3) % parentPool.length];
+            const childType = childPool[(r >> 5) % childPool.length];
+            const famSpeed = 33 + (r % 4);
+            const tag = isBeach ? "BEACH" : undefined;
+            const members = [
+                {
+                    kind: "CIVILIAN",
+                    g24Type: parentType,
+                    missionTag: tag,
+                    shirtColor: "#06b6d4",
+                    hp: 38,
+                    speed: famSpeed,
+                    formationRole: "LEADER",
+                    formationFwdOff: 0,
+                    formationSideOff: -5
+                },
+                {
+                    kind: "CIVILIAN",
+                    g24Type: childType,
+                    missionTag: tag,
+                    shirtColor: "#facc15",
+                    hp: 32,
+                    speed: famSpeed,
+                    isChild: true,
+                    formationRole: "FAMILY_CHILD",
+                    formationFwdOff: -6,
+                    formationSideOff: 7
+                }
+            ];
+            if ((r % 3) === 0) {
+                const secondParent = parentPool[((r >> 3) + 1) % parentPool.length];
+                members.push({
+                    kind: "CIVILIAN",
+                    g24Type: secondParent,
+                    missionTag: tag,
+                    shirtColor: "#f472b6",
+                    hp: 36,
+                    speed: famSpeed,
+                    formationRole: "GROUP_FOLLOWER",
+                    formationFwdOff: -12,
+                    formationSideOff: -3
+                });
+            }
+            return { type: "FAMILY", members };
+        }
+
+        if (formType === "FRIEND_GROUP") {
+            let trios;
+            if (isBeach || isBoardwalk) {
+                trios = [
+                    ["surfer_guy", "bikini_pink", "bikini_cyan"],
+                    ["bikini_yellow", "bikini_pink", "bikini_white"],
+                    ["vc_bodybuilder", "surfer_guy", "bikini_red"]
+                ];
+            } else if (isCuba) {
+                trios = [
+                    ["vc_cuban", "vc_cuban", "vc_hawaiian_red"],
+                    ["vc_cuban", "g2_civ_aqua", "civ1"]
+                ];
+            } else if (isWynwood) {
+                trios = [
+                    ["vc_haitian", "vc_haitian", "gang"],
+                    ["gang", "vc_cuban", "g2_civ_pink"]
+                ];
+            } else {
+                trios = [
+                    ["vc_tourist", "vc_hawaiian_red", "g2_civ_pink"],
+                    ["vc_crockett", "vc_tubbs", "vc_tommy"],
+                    ["civ0", "civ2", "g2_civ_aqua"]
+                ];
+            }
+            const trio = trios[(r >> 3) % trios.length];
+            const grpSpeed = 35 + (r % 5);
+            const tag = isBeach ? "BEACH" : undefined;
+            return {
+                type: "FRIEND_GROUP",
+                members: [
+                    {
+                        kind: "CIVILIAN",
+                        g24Type: trio[0],
+                        missionTag: tag,
+                        shirtColor: "#38bdf8",
+                        hp: 38,
+                        speed: grpSpeed,
+                        formationRole: "LEADER",
+                        formationFwdOff: 0,
+                        formationSideOff: -5
+                    },
+                    {
+                        kind: "CIVILIAN",
+                        g24Type: trio[1],
+                        missionTag: tag,
+                        shirtColor: "#f472b6",
+                        hp: 38,
+                        speed: grpSpeed,
+                        formationRole: "GROUP_FOLLOWER",
+                        formationFwdOff: -5,
+                        formationSideOff: 8
+                    },
+                    {
+                        kind: "CIVILIAN",
+                        g24Type: trio[2],
+                        missionTag: tag,
+                        shirtColor: "#a855f7",
+                        hp: 38,
+                        speed: grpSpeed,
+                        formationRole: "GROUP_FOLLOWER",
+                        formationFwdOff: -14,
+                        formationSideOff: -2
+                    }
+                ]
+            };
+        }
+
+        // HANGOUT_CIRCLE (2 or 3 people standing in a small circle chatting for 14..22s before walking together)
+        const count = (r % 3 === 0) ? 3 : 2;
+        const hangoutDuration = 14 + (r % 9);
+        const members = [];
+        for (let m = 0; m < count; m++) {
+            const spec = this.chooseDistrictPedSpec(bx, by, isSand, map, seed + m * 17);
+            if (spec.isChild || spec.isRollerblader || spec.g24Type === "vc_jogger") {
+                spec.g24Type = isBeach ? "bikini_pink" : (isIndustrial ? "dockworker_yellow" : "vc_tourist");
+                spec.isChild = false;
+                spec.isRollerblader = false;
+            }
+            spec.speed = 35;
+            spec.hangoutTimer = hangoutDuration;
+            spec.formationRole = m === 0 ? "LEADER" : (count === 2 ? "COUPLE_PARTNER" : "GROUP_FOLLOWER");
+            spec.formationFwdOff = m === 0 ? 0 : (m === 1 ? -3 : -13);
+            spec.formationSideOff = m === 0 ? -5 : (m === 1 ? 8 : -2);
+            members.push(spec);
+        }
+        return { type: "HANGOUT_CIRCLE", members };
+    }
+
+    spawnFormationAt(bx, by, pedX, pedY, pedZ, pedAngle, pedStep, isSand = false, inPrisonYard = false, seed = 0) {
+        const game = this.game;
+        const map = game.map;
+        const roster = this.chooseFormationRoster(bx, by, isSand, inPrisonYard, map, seed);
+        const formationId = ++TrafficManager._nextFormationId;
+        const fCos = Math.cos(pedAngle);
+        const fSin = Math.sin(pedAngle);
+        const rPerpX = -fSin;
+        const rPerpY = fCos;
+
+        let leaderPed = null;
+        let spawnedCount = 0;
+        const count = roster.members.length;
+
+        for (let m = 0; m < count; m++) {
+            const spec = roster.members[m];
+            let mx = pedX;
+            let my = pedY;
+            let mAngle = pedAngle;
+
+            if (roster.type === "HANGOUT_CIRCLE") {
+                const theta = pedAngle + (m * Math.PI * 2) / count;
+                const radius = count === 2 ? 9.5 : 11.0;
+                mx = pedX + Math.cos(theta) * radius;
+                my = pedY + Math.sin(theta) * radius;
+                mAngle = Math.atan2(pedY - my, pedX - mx);
+            } else if (m > 0) {
+                const fwd = spec.formationFwdOff || (-5 * m);
+                const side = spec.formationSideOff || (m === 1 ? 8 : -3);
+                mx = pedX + fCos * fwd + rPerpX * side;
+                my = pedY + fSin * fwd + rPerpY * side;
+            }
+
+            // If a companion slot lands on a road, water, building, or vehicle, tuck behind the leader or skip
+            if (m > 0) {
+                const mbx = Math.floor(mx / TILE_SIZE);
+                const mby = Math.floor(my / TILE_SIZE);
+                const mNav = map.getNavigationBlock ? map.getNavigationBlock(mbx, mby, pedZ) : null;
+                const badGround = !mNav || mNav.groundType === GROUND_TYPE.ROAD || mNav.groundType === GROUND_TYPE.WATER || mNav.groundType === GROUND_TYPE.BUILDING;
+                const hitBld = typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(mx, my, 8.5, pedZ).hit;
+                const hitVeh = typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(mx, my, 9.5, pedZ).hit;
+                if (badGround || hitBld || hitVeh) {
+                    const tuckX = pedX - fCos * (12 * m);
+                    const tuckY = pedY - fSin * (12 * m);
+                    const tbx = Math.floor(tuckX / TILE_SIZE);
+                    const tby = Math.floor(tuckY / TILE_SIZE);
+                    const tNav = map.getNavigationBlock ? map.getNavigationBlock(tbx, tby, pedZ) : null;
+                    const tuckBad = !tNav || tNav.groundType === GROUND_TYPE.ROAD || tNav.groundType === GROUND_TYPE.WATER || tNav.groundType === GROUND_TYPE.BUILDING ||
+                        (typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(tuckX, tuckY, 8.5, pedZ).hit) ||
+                        (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(tuckX, tuckY, 9.5, pedZ).hit);
+                    if (tuckBad) continue;
+                    mx = tuckX;
+                    my = tuckY;
+                }
+            }
+
+            const baseSpeed = spec.isRollerblader
+                ? (54 + Math.random() * 10)
+                : (spec.isChild ? (32 + Math.random() * 4) : (spec.speed || (35 + Math.random() * 8)));
+
+            const newPed = new Pedestrian({
+                x: mx,
+                y: my,
+                z: pedZ,
+                angle: mAngle,
+                speed: roster.type === "HANGOUT_CIRCLE" ? 0 : baseSpeed,
+                ...spec,
+                dead: false,
+                panicTimer: 0,
+                targetBx: pedStep ? pedStep.bx : null,
+                targetBy: pedStep ? pedStep.by : null,
+                turnSeed: (game.peds.length + seed + m + 1)
+            });
+            newPed.baseWalkSpeed = baseSpeed;
+            newPed.formationId = count > 1 ? formationId : 0;
+            newPed.formationType = roster.type;
+            newPed.formationRole = spec.formationRole || "SOLO";
+            newPed.formationFwdOff = spec.formationFwdOff || 0;
+            newPed.formationSideOff = spec.formationSideOff || 0;
+            if (roster.type === "HANGOUT_CIRCLE") {
+                newPed.hangoutTimer = spec.hangoutTimer || 16;
+                newPed.hangoutCenterX = pedX;
+                newPed.hangoutCenterY = pedY;
+                newPed.hangoutBaseAngle = mAngle;
+            }
+            if (spec.isRollerblader) newPed.isRollerblader = true;
+            if (spec.isChild) newPed.isChild = true;
+
+            if (m === 0) {
+                leaderPed = newPed;
+            } else if (leaderPed) {
+                newPed.formationLeader = leaderPed;
+            }
+            game.peds.push(newPed);
+            spawnedCount++;
+        }
+        return spawnedCount;
+    }
+
+    /* ========================================================================
+       CONTEXTUAL VICE PORT WORK TEAMS & GATE SECURITY (`missionTag: "PORT_CREW"`)
+       Places 5 purposeful 2-person dock crews & gate officers at the warehouse
+       loading courts, semi-trucks, and security gatehouses of Port of Vice City.
+       ======================================================================== */
+    ensureVicePortWorkCrews(refX, refY) {
+        const game = this.game;
+        const map = game.map;
+        if (!map || !map.cmpLoaded) return;
+        const rBx = Math.floor(refX / TILE_SIZE);
+        const rBy = Math.floor(refY / TILE_SIZE);
+        // Activate when within 28 blocks of Vice Port (c = 328..363, r = 298..338)
+        if (rBx < 300 || rBx > 390 || rBy < 270 || rBy > 366) return;
+
+        let activePortCrew = 0;
+        for (let i = 0; i < game.peds.length; i++) {
+            const p = game.peds[i];
+            if (!p.dead && p.missionTag === "PORT_CREW") activePortCrew++;
+        }
+        if (activePortCrew >= 6) return;
+
+        const portTeams = [
+            // 1. NW Warehouse Loading Court (between backed-in Flatbed & Box Truck)
+            {
+                cx: 338.8 * TILE_SIZE,
+                cy: 306.5 * TILE_SIZE,
+                members: [
+                    { g24Type: "dockworker_yellow", shirtColor: "#eab308", dx: -7, dy: 0, angle: 0 },
+                    { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 7, dy: 0, angle: Math.PI }
+                ]
+            },
+            // 2. NE Harbor Master & Cold-Storage Court (Customs Officer & Foreman inspecting manifest)
+            {
+                cx: 348.5 * TILE_SIZE,
+                cy: 306.2 * TILE_SIZE,
+                members: [
+                    { g24Type: "vc_sailor", shirtColor: "#38bdf8", dx: -7, dy: -2, angle: 0.25 },
+                    { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 7, dy: 2, angle: Math.PI + 0.25 }
+                ]
+            },
+            // 3. SW Heavy Rigging Court (Crane rigging crew)
+            {
+                cx: 339.2 * TILE_SIZE,
+                cy: 320.8 * TILE_SIZE,
+                members: [
+                    { g24Type: "dockworker_yellow", shirtColor: "#eab308", dx: -6, dy: -4, angle: 0.6 },
+                    { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 6, dy: 4, angle: -2.5 }
+                ]
+            },
+            // 4. SE Export & Fuel Tanker Depot (Tanker engineer & Sailor)
+            {
+                cx: 349.0 * TILE_SIZE,
+                cy: 328.0 * TILE_SIZE,
+                members: [
+                    { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: -7, dy: 0, angle: 0 },
+                    { g24Type: "vc_sailor", shirtColor: "#38bdf8", dx: 7, dy: 0, angle: Math.PI }
+                ]
+            },
+            // 5. North Entry Gatehouses Security Post
+            {
+                cx: 342.4 * TILE_SIZE,
+                cy: 300.4 * TILE_SIZE,
+                members: [
+                    { g24Type: "dockworker_yellow", shirtColor: "#eab308", dx: -6, dy: 0, angle: 0 },
+                    { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 6, dy: 0, angle: Math.PI }
+                ]
+            }
+        ];
+
+        for (let t = 0; t < portTeams.length; t++) {
+            const team = portTeams[t];
+            const nearExisting = game.peds.some((p) => !p.dead && Math.hypot(p.x - team.cx, p.y - team.cy) < 48);
+            if (nearExisting) continue;
+            const formId = ++TrafficManager._nextFormationId;
+            let leader = null;
+            for (let m = 0; m < team.members.length; m++) {
+                const spec = team.members[m];
+                const px = team.cx + spec.dx;
+                const py = team.cy + spec.dy;
+                const pz = map.getHeightAtPixel(px, py, 2.0);
+                const ped = new Pedestrian({
+                    x: px,
+                    y: py,
+                    z: pz,
+                    angle: spec.angle,
+                    speed: 0,
+                    kind: "CIVILIAN",
+                    g24Type: spec.g24Type,
+                    shirtColor: spec.shirtColor,
+                    missionTag: "PORT_CREW",
+                    hp: 48,
+                    dead: false,
+                    panicTimer: 0,
+                    targetBx: Math.floor(px / TILE_SIZE),
+                    targetBy: Math.floor(py / TILE_SIZE),
+                    turnSeed: 700 + t * 5 + m
+                });
+                ped.baseWalkSpeed = 34;
+                ped.formationId = formId;
+                ped.formationType = "HANGOUT_CIRCLE";
+                ped.formationRole = m === 0 ? "LEADER" : "COUPLE_PARTNER";
+                ped.formationFwdOff = m === 0 ? 0 : -3;
+                ped.formationSideOff = m === 0 ? -5 : 8;
+                ped.hangoutTimer = 999999; // Permanent contextual port work post unless startled
+                ped.hangoutCenterX = team.cx;
+                ped.hangoutCenterY = team.cy;
+                ped.hangoutBaseAngle = spec.angle;
+                if (m === 0) leader = ped;
+                else ped.formationLeader = leader;
+                game.peds.push(ped);
+            }
+        }
     }
 
     getAllHumanPlayerViewports() {
@@ -4585,6 +5065,7 @@ class TrafficManager {
         const allowEdgeOnScreen = nearbyPeds < (this.isMobile ? 34 : 58);
         const px = refX !== null ? refX : (game.player ? game.player.x : 0);
         const py = refY !== null ? refY : (game.player ? game.player.y : 0);
+        this.ensureVicePortWorkCrews(px, py);
         const dirs = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
         const needed = Math.min(this.isMobile ? 6 : 10, this.maxTrafficPeds - nearbyPeds);
         let spawned = 0;
@@ -4655,35 +5136,24 @@ class TrafficManager {
             const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];
             const pedStep = map.chooseNextSidewalkBlock ? map.chooseNextSidewalkBlock(pick.bx, pick.by, rawAngle, camZ, Math.random(), false) : null;
             const pedAngle = pedStep ? pedStep.angle : rawAngle;
-            const isPrisonGuard = pick.inPrisonYard && (attempt % 5 === 0);
             this._trafficSeq = (this._trafficSeq || 0) + 1;
-            const districtSpec = pick.inPrisonYard
-                ? (isPrisonGuard
-                    ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110 }
-                    : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45 })
-                : this.chooseDistrictPedSpec(pick.bx, pick.by, pick.isSand, map, this._trafficSeq + attempt);
-
-            const baseSpeed = districtSpec.isRollerblader ? (54 + Math.random() * 10) : (districtSpec.isChild ? (30 + Math.random() * 7) : (35 + Math.random() * 9));
-            const newPed = new Pedestrian({
-                x: pedX,
-                y: pedY,
-                z: pedZ,
-                angle: pedAngle,
-                speed: baseSpeed,
-                ...districtSpec,
-                dead: false,
-                panicTimer: 0,
-                targetBx: pedStep ? pedStep.bx : null,
-                targetBy: pedStep ? pedStep.by : null,
-                turnSeed: (game.peds.length + attempt + 1)
-            });
-            if (districtSpec.isRollerblader) newPed.isRollerblader = true;
-            if (districtSpec.isChild) newPed.isChild = true;
-            game.peds.push(newPed);
-            spawned++;
+            const added = this.spawnFormationAt(
+                pick.bx,
+                pick.by,
+                pedX,
+                pedY,
+                pedZ,
+                pedAngle,
+                pedStep,
+                pick.isSand,
+                pick.inPrisonYard,
+                this._trafficSeq + attempt
+            );
+            spawned += Math.max(1, added);
         }
     }
 }
+TrafficManager._nextFormationId = 1;
 
 window.CAR_DAMAGE_DELTA = CAR_DAMAGE_DELTA;
 window.CAR_TIRE = CAR_TIRE;
