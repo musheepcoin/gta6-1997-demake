@@ -18011,17 +18011,30 @@ class WorldObjectEngine {
             const py = game.interiorY || pose.spawnY || rh - 78;
             const pAng = (game.interiorAngle !== undefined ? game.interiorAngle : (p.angle || -Math.PI * 0.5));
             const isMoving = !!(p.isMoving || game._interiorMoveTarget);
-            const isFiring = !!(game.input && game.input.shoot && (p.fireTimer || 0) > 0);
-            const pFrame = renderer.getPedFrameIndex
-                ? renderer.getPedFrameIndex(p.weapon || "FIST", isMoving, isFiring, p.walkPhase || t)
-                : (isMoving ? (Math.floor((p.walkPhase || t) * 8.0) % 8) : 98);
+            const isAimingOrFiring = Boolean(
+                p.weapon &&
+                p.weapon !== "FIST" &&
+                ((game.input && game.input.shoot) || (p.weaponDrawnTimer || 0) > 0 || (p.muzzleTimer || 0) > 0)
+            );
+            const visualWeapon = isAimingOrFiring ? p.weapon : "FIST";
+            let pFrame;
+            if ((p.punchTimer || 0) > 0) {
+                const prog = Math.max(0, Math.min(1, 1.0 - p.punchTimer / 0.34));
+                pFrame = isMoving
+                    ? (181 + Math.min(7, Math.floor(prog * 8)))
+                    : (50 + Math.min(5, Math.floor(prog * 6)));
+            } else if (renderer.getPedFrameIndex) {
+                pFrame = renderer.getPedFrameIndex(visualWeapon, isMoving, Boolean(game.input && game.input.sprint), p.walkPhase || t);
+            } else {
+                pFrame = isMoving ? (Math.floor((p.walkPhase || t) * 8.0) % 8) : 98;
+            }
             const charRole = (p.pedType || (p.charId ? String(p.charId).toLowerCase() : "lucia"));
 
             // Pulsing cyan/pink player locator ring on floor
             const pRing = 20 + Math.sin(t * 6.0) * 2.0;
             renderer.pushSolidQuad3D(px, py, 2.012, pRing, pRing, t * 1.5, 0.96, 0.32, 0.72, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
-            renderer.batchPedSprite3D(charRole, pFrame, px, py, 2.058, pAng, 1.46, isFiring, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            renderer.batchPedSprite3D(charRole, pFrame, px, py, 2.058, pAng, 1.46, (p.muzzleTimer || 0) > 0, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
     }
 }

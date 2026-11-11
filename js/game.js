@@ -4654,6 +4654,13 @@ class LeonidaGame {
         this.interiorJasonX = pose.partnerX;
         this.interiorJasonY = pose.partnerY;
         this.interiorJasonAngle = pose.partnerAngle;
+        if (this.player) {
+            this.player.weaponDrawnTimer = 0;
+            this.player.muzzleTimer = 0;
+            this.player.punchTimer = 0;
+            this.player.isMoving = false;
+        }
+        this.input.shoot = false;
 
 
 
@@ -9873,6 +9880,9 @@ class LeonidaGame {
 
         // Live Indoor Weapon Firing & Ammu-Nation 4-Lane Firing Range Target Practice!
         p.fireTimer = Math.max(0, (p.fireTimer || 0) - dt);
+        p.weaponDrawnTimer = Math.max(0, (p.weaponDrawnTimer || 0) - dt);
+        p.muzzleTimer = Math.max(0, (p.muzzleTimer || 0) - dt);
+        p.punchTimer = Math.max(0, (p.punchTimer || 0) - dt);
         if (this.input.shoot && p.fireTimer <= 0) {
             const wKey = p.weapon || "FIST";
             const wDef = (typeof WEAPON_SPECS !== "undefined" && (WEAPON_SPECS[wKey] || WEAPON_SPECS.FIST)) || { fireRate: 0.25 };
@@ -9881,6 +9891,12 @@ class LeonidaGame {
                 this.updateHud();
             } else {
                 p.fireTimer = wDef.fireRate || 0.22;
+                if (wKey === "FIST") {
+                    p.punchTimer = 0.34;
+                } else {
+                    p.weaponDrawnTimer = 0.65;
+                    p.muzzleTimer = 0.09;
+                }
                 if (wKey !== "FIST" && !this.infiniteAmmo) {
                     p.ammo[wKey] = Math.max(0, (p.ammo[wKey] || 0) - 1);
                     this.updateHud();
