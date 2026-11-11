@@ -10772,6 +10772,7 @@ class LeonidaGame {
                 const nowSwimming = Boolean(postWater.inWater && postWater.distBlocks >= 0.36 && (p.jumpTimer || 0) <= 0.08);
                 p.isWading = Boolean(postWater.inWater && !nowSwimming);
                 p.isSwimming = nowSwimming;
+                p.inPool = Boolean(postWater.isPool);
                 p.waterOffshoreDist = postWater.inWater ? postWater.distBlocks : 0;
                 p.shoreDirX = postWater.shoreDirX || -1;
                 p.shoreDirY = postWater.shoreDirY || 0;

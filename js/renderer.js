@@ -9445,20 +9445,45 @@ class RetroRenderer {
 
         const jason = game.jason;
         if (jason && !jason.inVehicle) {
-            const jz = this.getEntityZ(jason, 0.045);
-            const jWeapon = jason.weaponKey || "FIST";
-            const frameIdx = this.getPedFrameIndex(jWeapon, Boolean(jason.isMoving), Boolean(jason.isRunning), jason.walkPhase || 0);
-            this.batchPedSprite3D(
-                jason.pedType || "jason",
-                frameIdx,
-                jason.x,
-                jason.y,
-                jz,
-                jason.angle,
-                pedScale * 1.10,
-                (jason.muzzleTimer || 0) > 0,
-                SPRITE_DRAW_ORDER.PEDESTRIAN
-            );
+            const jInPool = Boolean(this.map && this.map.isSwimmingPoolAt && this.map.isSwimmingPoolAt(jason.x, jason.y));
+            const jInWater = jInPool || Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(jason.x, jason.y));
+            if (jInWater) {
+                const jWaterZ = jInPool ? Math.max(2.038, (jason.z || 2.0) + 0.038) : 2.000;
+                const jSwimZ = jWaterZ + 0.018 + Math.sin(this.time * 3.8 + jason.x * 0.03) * 0.006;
+                const jRingProg = (this.time * (jason.isMoving ? 1.45 : 0.85)) % 1.0;
+                const jRingSize = 13 + jRingProg * 16;
+                this.pushSolidQuad3D(jason.x, jason.y, jWaterZ + 0.008, jRingSize, jRingSize, jason.angle || 0, 0.72, 0.96, 1.0, (1.0 - jRingProg) * 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const jStrokeFr = 50 + (Math.floor(this.time * (jason.isMoving ? 5.2 : 2.5)) % (jason.isMoving ? 6 : 2));
+                this.batchPedSprite3D(
+                    jason.pedType || "jason",
+                    jStrokeFr,
+                    jason.x,
+                    jason.y,
+                    jSwimZ,
+                    jason.angle,
+                    pedScale * 1.04,
+                    false,
+                    SPRITE_DRAW_ORDER.PEDESTRIAN,
+                    0.86,
+                    0.97,
+                    1.0
+                );
+            } else {
+                const jz = this.getEntityZ(jason, 0.045);
+                const jWeapon = jason.weaponKey || "FIST";
+                const frameIdx = this.getPedFrameIndex(jWeapon, Boolean(jason.isMoving), Boolean(jason.isRunning), jason.walkPhase || 0);
+                this.batchPedSprite3D(
+                    jason.pedType || "jason",
+                    frameIdx,
+                    jason.x,
+                    jason.y,
+                    jz,
+                    jason.angle,
+                    pedScale * 1.10,
+                    (jason.muzzleTimer || 0) > 0,
+                    SPRITE_DRAW_ORDER.PEDESTRIAN
+                );
+            }
         }
 
         // 4B. Online Multiplayer Remote Players & Rival Bots (On-Foot & In-Vehicle 3D Sync)
@@ -9526,7 +9551,8 @@ class RetroRenderer {
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
 
             if (p.isSwimming && !isJumpingOrSliding) {
-                const swimZ = 2.018 + Math.sin(this.time * 3.8 + p.x * 0.03) * 0.007;
+                const waterBaseZ = p.inPool ? Math.max(2.038, (p.z || 2.0) + 0.038) : 2.000;
+                const swimZ = waterBaseZ + 0.018 + Math.sin(this.time * 3.8 + p.x * 0.03) * 0.007;
                 const swPhase = p.swimPhase || (this.time * 4.2);
                 const cAng = Math.cos(p.angle);
                 const sAng = Math.sin(p.angle);
@@ -9539,8 +9565,8 @@ class RetroRenderer {
                     const ringProg = (this.time * (p.isMoving ? 1.55 : 0.85) + rk * 0.5) % 1.0;
                     const ringSize = (p.isMoving ? 15 : 12) + ringProg * (p.isMoving ? 20 : 12);
                     const ringAlpha = (1.0 - ringProg) * (p.isMoving ? 0.42 : 0.26);
-                    this.pushSolidQuad3D(p.x - cAng * ringProg * 6, p.y - sAng * ringProg * 6, 2.008, ringSize, ringSize, p.angle, 0.72, 0.96, 1.0, ringAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(p.x - cAng * ringProg * 6, p.y - sAng * ringProg * 6, 2.009, ringSize * 0.86, ringSize * 0.86, p.angle + 0.785, 0.92, 0.99, 1.0, ringAlpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(p.x - cAng * ringProg * 6, p.y - sAng * ringProg * 6, waterBaseZ + 0.008, ringSize, ringSize, p.angle, 0.72, 0.96, 1.0, ringAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(p.x - cAng * ringProg * 6, p.y - sAng * ringProg * 6, waterBaseZ + 0.009, ringSize * 0.86, ringSize * 0.86, p.angle + 0.785, 0.92, 0.99, 1.0, ringAlpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
 
                 // Alternating left/right arm-stroke & flutter-kick whitewater splashes when swimming
@@ -9549,12 +9575,12 @@ class RetroRenderer {
                     const strokeReach = 7.0 + Math.abs(Math.sin(swPhase)) * 5.5;
                     const spX = p.x + cAng * strokeReach + cpAng * armSide * 6.5;
                     const spY = p.y + sAng * strokeReach + spAng * armSide * 6.5;
-                    this.pushSolidQuad3D(spX, spY, 2.012, 7.5, 4.8, p.angle + armSide * 0.35, 0.94, 0.99, 1.0, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(spX, spY, waterBaseZ + 0.012, 7.5, 4.8, p.angle + armSide * 0.35, 0.94, 0.99, 1.0, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     // Trailing flutter-kick foam wake behind feet
                     const kickSide = Math.cos(swPhase * 2.0) * 3.8;
                     const kx = p.x - cAng * 10.5 + cpAng * kickSide;
                     const ky = p.y - sAng * 10.5 + spAng * kickSide;
-                    this.pushSolidQuad3D(kx, ky, 2.011, 8.5, 5.2, p.angle, 0.88, 0.98, 1.0, 0.56, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(kx, ky, waterBaseZ + 0.011, 8.5, 5.2, p.angle, 0.88, 0.98, 1.0, 0.56, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
 
                 // 3D Stalking Tiger/Bull Shark Dorsal Fin & Wake when in Deep Ocean Warning / Danger Zone!

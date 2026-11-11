@@ -6254,6 +6254,38 @@ class LeonidaMap {
         return this.surfaceGround[r * this.cols + c] === GROUND_TYPE.WATER;
     }
 
+    isSwimmingPoolAt(px, py) {
+        if (this.objectEngine && Array.isArray(this.objectEngine.instances)) {
+            for (let i = 0; i < this.objectEngine.instances.length; i++) {
+                const inst = this.objectEngine.instances[i];
+                if (!inst || !inst.pool) continue;
+                const dx = px - inst.x;
+                const dy = py - inst.y;
+                if (dx * dx + dy * dy > 28900) continue; // > 170px away from house center
+                const pl = inst.pool;
+                const pSc = pl.scale || 0.90;
+                const cosA = Math.cos(inst.ang || 0);
+                const sinA = Math.sin(inst.ang || 0);
+                const lx = dx * cosA + dy * sinA;
+                const ly = -dx * sinA + dy * cosA;
+                const wOffX = (pl.dx || 0) + 16 * pSc;
+                const wOffY = pl.dy || 0;
+                if (Math.abs(lx - wOffX) <= 52 * pSc && Math.abs(ly - wOffY) <= 32 * pSc) {
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(this.rooftopParties)) {
+            for (let i = 0; i < this.rooftopParties.length; i++) {
+                const rp = this.rooftopParties[i];
+                if (Math.abs(px - rp.x) <= 13 && Math.abs(py - rp.y) <= 13) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     getWaterOffshoreInfo(px, py) {
         const fx = px / TILE_SIZE;
         const fy = py / TILE_SIZE;
@@ -6263,6 +6295,9 @@ class LeonidaMap {
             return { inWater: true, distBlocks: 22.0, shoreDirX: -1, shoreDirY: 0, isOpenOcean: true };
         }
         if (this.surfaceGround[by * this.cols + bx] !== GROUND_TYPE.WATER) {
+            if (this.isSwimmingPoolAt(px, py)) {
+                return { inWater: true, distBlocks: 0.65, shoreDirX: 0, shoreDirY: -1, isOpenOcean: false, isPool: true };
+            }
             return { inWater: false, distBlocks: 0.0, shoreDirX: 0, shoreDirY: 0, isOpenOcean: false };
         }
         let bestDistSq = 9999.0;
