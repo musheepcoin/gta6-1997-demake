@@ -434,7 +434,7 @@ class LeonidaGame {
 
         const hour = (((this.worldMinutes % 1440) + 1440) % 1440) / 60.0;
 
-        let nextMins = 14 * 60;
+        let nextMins = 12 * 60 + 30;
 
         let banner = "☀️ LEONIDA DAYLIGHT";
 
@@ -442,15 +442,15 @@ class LeonidaGame {
 
 
 
-        if (hour >= 7.25 && hour < 17.5) {
+        if (hour >= 7.5 && hour < 17.5) {
 
-            nextMins = 18 * 60 + 45; // 18:45 Golden Sunset
+            nextMins = 18 * 60 + 30; // 18:30 Golden Sunset
 
             banner = "🌇 VICE CITY SUNSET";
 
             color = "#fb7185";
 
-        } else if (hour >= 17.5 && hour < 20.25) {
+        } else if (hour >= 17.5 && hour < 20.0) {
 
             nextMins = 22 * 60 + 30; // 22:30 Neon Night
 
@@ -458,17 +458,10 @@ class LeonidaGame {
 
             color = "#ff2a85";
 
-        } else if (hour >= 20.25 || hour < 5.25) {
-
-            nextMins = 6 * 60 + 25; // 06:25 Atlantic Sunrise
-
-            banner = "🌅 ATLANTIC SUNRISE";
-
-            color = "#f97316";
-
         } else {
 
-            nextMins = 14 * 60; // 14:00 Sunny Afternoon
+            // From Night or Dawn (hour >= 20.0 || hour < 7.5), jump straight back to bright 12:30 Sunny Daylight!
+            nextMins = 12 * 60 + 30;
 
             banner = "☀️ LEONIDA DAYLIGHT";
 
@@ -2626,6 +2619,10 @@ class LeonidaGame {
 
 
         this.canvas.addEventListener("mousedown", (e) => {
+
+            if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+                document.activeElement.blur();
+            }
 
             if (document.body && document.body.classList.contains("touch-enabled")) return;
 
@@ -10102,10 +10099,13 @@ class LeonidaGame {
 
 
         // Advance Live 24-Hour Smartphone Clock & Smooth Day / Sunset / Night / Sunrise Cycle
-
-        // (1.0 in-game minute per 1.0 real second = 24 real minutes for a full 24h cycle!)
-
-        this.worldMinutes = (this.worldMinutes + dt * 1.0 * (this.timeScale || 1.0)) % 1440;
+        // Keep daytime sessions in bright Florida sunlight (09:00..16:50) unless the player explicitly toggles Sunset/Night with [N]!
+        const prevHr = (((this.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+        this.worldMinutes = (this.worldMinutes + dt * 0.35 * (this.timeScale || 1.0)) % 1440;
+        const nextHr = (((this.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+        if (prevHr < 17.0 && nextHr >= 17.0) {
+            this.worldMinutes = 10 * 60;
+        }
 
         this.syncDayNightCycle();
 

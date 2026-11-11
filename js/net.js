@@ -1103,17 +1103,8 @@ class ViceNetworkManager {
         this.lastWorldSyncReceivedMs = performance.now();
         const g = this.game;
 
-        if (typeof pkt.wm === "number") {
-            const diffWm = pkt.wm - (g.worldMinutes || 720);
-            if (Math.abs(diffWm) > 1.5) {
-                g.worldMinutes = pkt.wm;
-            } else {
-                g.worldMinutes += diffWm * 0.25;
-            }
-            if (typeof g.syncDayNightCycle === "function") {
-                g.syncDayNightCycle();
-            }
-        }
+        // Never overwrite local g.worldMinutes from remote WORLD_SYNC packets so each player
+        // freely controls their own Day/Night mode ([N] / smartphone toggle) without being locked in night mode by a peer!
         if (typeof pkt.tl === "number") {
             g.trafficLightTimer = pkt.tl;
         }
