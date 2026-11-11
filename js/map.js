@@ -6254,6 +6254,67 @@ class LeonidaMap {
         return this.surfaceGround[r * this.cols + c] === GROUND_TYPE.WATER;
     }
 
+    getWaterOffshoreInfo(px, py) {
+        const fx = px / TILE_SIZE;
+        const fy = py / TILE_SIZE;
+        const bx = Math.floor(fx);
+        const by = Math.floor(fy);
+        if (by < 0 || by >= this.rows || bx < 0 || bx >= this.cols) {
+            return { inWater: true, distBlocks: 16.0, shoreDirX: -1, shoreDirY: 0, isOpenOcean: true };
+        }
+        if (this.surfaceGround[by * this.cols + bx] !== GROUND_TYPE.WATER) {
+            return { inWater: false, distBlocks: 0.0, shoreDirX: 0, shoreDirY: 0, isOpenOcean: false };
+        }
+        let bestDistSq = 999.0;
+        let bestDx = -1.0;
+        let bestDy = 0.0;
+        const maxR = 11;
+        for (let r = 1; r <= maxR; r++) {
+            if ((r - 1) * (r - 1) >= bestDistSq) break;
+            const yMin = Math.max(0, by - r);
+            const yMax = Math.min(this.rows - 1, by + r);
+            const xMin = Math.max(0, bx - r);
+            const xMax = Math.min(this.cols - 1, bx + r);
+            for (let ty = yMin; ty <= yMax; ty++) {
+                const rowOff = ty * this.cols;
+                const isTopOrBot = (ty === by - r || ty === by + r);
+                const stepX = isTopOrBot ? 1 : Math.max(1, 2 * r);
+                for (let tx = xMin; tx <= xMax; tx += stepX) {
+                    if (this.surfaceGround[rowOff + tx] !== GROUND_TYPE.WATER) {
+                        const clX = Math.max(tx, Math.min(fx, tx + 1.0));
+                        const clY = Math.max(ty, Math.min(fy, ty + 1.0));
+                        const dx = clX - fx;
+                        const dy = clY - fy;
+                        const dSq = dx * dx + dy * dy;
+                        if (dSq < bestDistSq) {
+                            bestDistSq = dSq;
+                            bestDx = (tx + 0.5) - fx;
+                            bestDy = (ty + 0.5) - fy;
+                        }
+                    }
+                }
+            }
+        }
+        let distBlocks = bestDistSq < 900.0 ? Math.sqrt(bestDistSq) : 12.5;
+        if (bestDistSq >= 900.0) {
+            bestDx = 256.0 - fx;
+            bestDy = 256.0 - fy;
+        }
+        const dirLen = Math.hypot(bestDx, bestDy) || 1.0;
+        const isOuterEdge = (fx >= 490.0 || fx <= 14.0 || fy >= 494.0 || fy <= 14.0);
+        if (isOuterEdge) {
+            const edgePen = Math.max(0, fx - 490.0, 14.0 - fx, fy - 494.0, 14.0 - fy);
+            distBlocks = Math.max(distBlocks, 4.6 + edgePen * 0.85);
+        }
+        return {
+            inWater: true,
+            distBlocks,
+            shoreDirX: bestDx / dirLen,
+            shoreDirY: bestDy / dirLen,
+            isOpenOcean: distBlocks > 4.5 || isOuterEdge
+        };
+    }
+
     isRoadAtPixel(px, py) {
         const c = Math.floor(px / TILE_SIZE);
         const r = Math.floor(py / TILE_SIZE);

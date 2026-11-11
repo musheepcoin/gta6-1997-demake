@@ -5402,10 +5402,10 @@ class LeonidaGame {
 
             if (this.map.getGroundTypeAt(exitX, exitY) === GROUND_TYPE.WATER) {
 
-                // Search nearby dry land (dock / shore / bridge) if exiting a boat or airboat near the coast
+                // If moored right beside a dock, beach, or pier (<= 76px), step onto dry land; otherwise dive into the water and swim!
                 let foundDry = null;
 
-                for (let r = 24; r <= 192 && !foundDry; r += 14) {
+                for (let r = 24; r <= 76 && !foundDry; r += 14) {
 
                     for (let a = 0; a < 16; a++) {
 
@@ -5429,17 +5429,29 @@ class LeonidaGame {
 
                 }
 
-                if (!foundDry) {
+                if (foundDry) {
 
-                    this.showBanner("CANNOT EXIT INTO DEEP WATER — DRIVE CLOSER TO SHORE OR DOCK!", 1.8);
+                    exitX = foundDry.x;
 
-                    return;
+                    exitY = foundDry.y;
+
+                } else {
+
+                    const sideAng = v.angle + (mySeat % 2 === 1 ? Math.PI * 0.5 : -Math.PI * 0.5);
+
+                    exitX = v.x + Math.cos(sideAng) * 28;
+
+                    exitY = v.y + Math.sin(sideAng) * 28;
+
+                    p.isSwimming = true;
+
+                    if (this.audio && typeof this.audio.playWaterSplash === "function") {
+
+                        this.audio.playWaterSplash(0.90);
+
+                    }
 
                 }
-
-                exitX = foundDry.x;
-
-                exitY = foundDry.y;
 
             }
 
@@ -8149,7 +8161,16 @@ class LeonidaGame {
 
             p.hp = 0;
 
-            this.triggerWastedOrBusted("WASTED!", "LUCIA FLATLINED — TRANSFERRED TO LEONIDA GENERAL HOSPITAL", "#ff1e38", "HOSPITAL");
+            const isSeaDeath = Boolean(p.isSwimming && (p.deepSeaDanger || 0) >= 1);
+
+            this.triggerWastedOrBusted(
+                "WASTED!",
+                isSeaDeath
+                    ? "SHARK ATTACK & RIPTIDE IN DEEP OCEAN — RESCUED BY VICE BEACH COAST GUARD"
+                    : "LUCIA FLATLINED — TRANSFERRED TO LEONIDA GENERAL HOSPITAL",
+                "#ff1e38",
+                "HOSPITAL"
+            );
 
         }
 
@@ -8371,6 +8392,16 @@ class LeonidaGame {
             p.vy = 0;
 
             p.isMoving = false;
+
+            p.isSwimming = false;
+
+            p.isWading = false;
+
+            p.swimStamina = 100;
+
+            p.deepSeaDanger = 0;
+
+            p.waterOffshoreDist = 0;
 
             p.respawnGraceUntil = performance.now() + 2000;
 
@@ -10514,11 +10545,27 @@ class LeonidaGame {
 
                 }
 
+                p.isSwimming = false;
+                p.isWading = false;
+                p.deepSeaDanger = 0;
+                p.waterOffshoreDist = 0;
+                p.swimStamina = Math.min(100, (p.swimStamina !== undefined ? p.swimStamina : 100) + dt * 32.0);
+
             } else {
 
                 const boostMult = (p.speedBoostTimer || 0) > 0 ? 1.28 : 1.0;
 
-                const walkSpeed = (this.input.sprint ? 195 : 138) * boostMult * (this.map.isWaterAtPixel(p.x, p.y) ? 0.55 : 1);
+                const preWaterInfo = (this.map && typeof this.map.getWaterOffshoreInfo === "function")
+                    ? this.map.getWaterOffshoreInfo(p.x, p.y)
+                    : { inWater: Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y)), distBlocks: 1.0, shoreDirX: -1, shoreDirY: 0 };
+
+                const isSwimmingPre = Boolean(preWaterInfo.inWater && preWaterInfo.distBlocks >= 0.36 && (p.jumpTimer || 0) <= 0.08);
+                p.swimPhase = (p.swimPhase || 0) + dt * (this.input.sprint ? 5.8 : 4.0) * (p.isMoving ? 1.0 : 0.45);
+                const swimStrokeSurge = isSwimmingPre ? (0.92 + 0.16 * Math.sin(p.swimPhase)) : 1.0;
+                const exhaustedMult = (isSwimmingPre && p.swimStamina !== undefined && p.swimStamina <= 5) ? 0.68 : 1.0;
+                const walkSpeed = isSwimmingPre
+                    ? ((this.input.sprint ? 128 : 92) * boostMult * swimStrokeSurge * exhaustedMult)
+                    : ((this.input.sprint ? 195 : 138) * boostMult * (preWaterInfo.inWater ? 0.82 : 1.0));
 
                 const manualInput = this.input.up || this.input.down || this.input.left || this.input.right;
 
@@ -10682,7 +10729,9 @@ class LeonidaGame {
 
 
 
-                const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0);
+                const canSwimIntoWater = (p.z || 2.0) <= 2.38 || (p.jumpTimer || 0) > 0 || Boolean(preWaterInfo.inWater);
+
+                const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0, canSwimIntoWater);
 
                 p.x = col.x;
 
@@ -10710,9 +10759,115 @@ class LeonidaGame {
 
                 }
 
-                p.z = (this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y))
+                const postWater = (this.map && typeof this.map.getWaterOffshoreInfo === "function")
+                    ? this.map.getWaterOffshoreInfo(p.x, p.y)
+                    : { inWater: Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y)), distBlocks: 1.0, shoreDirX: -1, shoreDirY: 0 };
+
+                p.z = postWater.inWater
                     ? Math.max(2.0, this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0, false))
                     : this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0);
+
+                // --- SWIMMING & DEEP OCEAN ("HAUTE MER") RIPTIDE / SHARK DANGER SYSTEM ---
+                const wasSwimming = Boolean(p.isSwimming);
+                const nowSwimming = Boolean(postWater.inWater && postWater.distBlocks >= 0.36 && (p.jumpTimer || 0) <= 0.08);
+                p.isWading = Boolean(postWater.inWater && !nowSwimming);
+                p.isSwimming = nowSwimming;
+                p.waterOffshoreDist = postWater.inWater ? postWater.distBlocks : 0;
+                p.shoreDirX = postWater.shoreDirX || -1;
+                p.shoreDirY = postWater.shoreDirY || 0;
+                if (p.swimStamina === undefined) p.swimStamina = 100;
+
+                if (nowSwimming && !wasSwimming) {
+                    if (this.audio && typeof this.audio.playWaterSplash === "function") {
+                        this.audio.playWaterSplash(0.85);
+                    }
+                    p._swimSplashCd = 0.38;
+                } else if (nowSwimming && p.isMoving) {
+                    p._swimSplashCd = (p._swimSplashCd || 0) - dt;
+                    if (p._swimSplashCd <= 0) {
+                        p._swimSplashCd = this.input.sprint ? 0.36 : 0.52;
+                        if (this.audio && typeof this.audio.playWaterSplash === "function") {
+                            this.audio.playWaterSplash(0.38);
+                        }
+                    }
+                }
+
+                // Check if an intact boat/jetski/airboat is right beside the swimmer (acts as a floating safety refuge within 88px)
+                let nearBoatRefuge = false;
+                if (nowSwimming && Array.isArray(this.vehicles)) {
+                    for (let vi = 0; vi < this.vehicles.length; vi++) {
+                        const bv = this.vehicles[vi];
+                        if (!bv || bv.destroyed) continue;
+                        if (bv.waterOnly || bv.specKey === "AIRBOAT" || bv.amphibious) {
+                            if (Math.hypot(bv.x - p.x, bv.y - p.y) <= 88) {
+                                nearBoatRefuge = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!postWater.inWater) {
+                    p.deepSeaDanger = 0;
+                    p.swimStamina = Math.min(100, p.swimStamina + dt * 30.0);
+                } else if (postWater.distBlocks <= 4.5 || nearBoatRefuge) {
+                    // Safe coastal / lagoon / canal swimming zone
+                    p.deepSeaDanger = 0;
+                    if (nowSwimming && this.input.sprint && p.isMoving) {
+                        p.swimStamina = Math.max(18, p.swimStamina - dt * 4.2);
+                    } else {
+                        p.swimStamina = Math.min(100, p.swimStamina + dt * 14.0);
+                    }
+                } else {
+                    // Deep Ocean / Haute Mer (> 4.5 blocks from nearest dry land!)
+                    const moveCosToShore = p.isMoving
+                        ? (Math.cos(p.angle) * p.shoreDirX + Math.sin(p.angle) * p.shoreDirY)
+                        : 0;
+                    const swimmingToShore = moveCosToShore > 0.32;
+                    const overDepth = Math.max(0, postWater.distBlocks - 4.5);
+
+                    // Offshore riptide current pulls gently out to sea if not actively swimming back toward shore
+                    if (!swimmingToShore) {
+                        const riptidePull = Math.min(22.0, 7.5 + overDepth * 2.5);
+                        p.x -= p.shoreDirX * riptidePull * dt;
+                        p.y -= p.shoreDirY * riptidePull * dt;
+                    }
+
+                    const drainRate = (swimmingToShore ? 6.5 : 13.5) + overDepth * 3.2 + (this.input.sprint ? 4.5 : 0);
+                    p.swimStamina = Math.max(0, p.swimStamina - drainRate * dt);
+
+                    if (postWater.distBlocks > 7.5 || p.swimStamina <= 0) {
+                        // Critical High-Seas Danger: Shark Attack & Exhaustion!
+                        p.deepSeaDanger = 2;
+                        p._seaWarnCd = (p._seaWarnCd || 0) - dt;
+                        if (p._seaWarnCd <= 0) {
+                            p._seaWarnCd = 3.2;
+                            this.showBanner("🦈 HIGH SEAS DANGER — SHARK ATTACK IN DEEP OCEAN! SWIM BACK TO SHORE!", 2.6);
+                        }
+                        this.damagePlayer((14.0 + Math.min(18.0, overDepth * 2.8)) * dt);
+                        p._sharkBiteCd = (p._sharkBiteCd || 0) - dt;
+                        if (p._sharkBiteCd <= 0) {
+                            p._sharkBiteCd = 2.1;
+                            p.sharkLungeTimer = 0.55;
+                            if (this.audio && typeof this.audio.playWaterSplash === "function") {
+                                this.audio.playWaterSplash(1.0);
+                            }
+                            this.addFloatingText(p.x, p.y - 24, "🦈 SHARK BITE!", "#ff1e38");
+                            this.damagePlayer(20);
+                        }
+                    } else {
+                        // Offshore Warning Zone (4.5 .. 7.5 blocks from shore): Shark circling & riptide draining stamina
+                        p.deepSeaDanger = 1;
+                        p._seaWarnCd = (p._seaWarnCd || 0) - dt;
+                        if (p._seaWarnCd <= 0) {
+                            p._seaWarnCd = 3.6;
+                            this.showBanner("⚠️ DEEP OCEAN WARNING — STRONG RIPTIDE & SHARK WATERS! DO NOT SWIM TOO FAR!", 2.6);
+                        }
+                    }
+                }
+                if ((p.sharkLungeTimer || 0) > 0) {
+                    p.sharkLungeTimer = Math.max(0, p.sharkLungeTimer - dt);
+                }
 
 
 
@@ -10766,7 +10921,7 @@ class LeonidaGame {
 
             }
 
-            if (this.input.shoot && p.shootCooldown <= 0) {
+            if (this.input.shoot && p.shootCooldown <= 0 && !p.isSwimming) {
 
                 const v = p.inVehicle;
 

@@ -9451,51 +9451,130 @@ class RetroRenderer {
             const jumpZ = p.jumpZOffset || 0;
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
 
-            let frameIdx;
-            if ((p.slideCarTimer || 0) > 0) {
-                // Authentic GTA 1 jump_onto_car / slide_on_car frames (91..96)
-                const prog = Math.max(0, Math.min(1, 1.0 - p.slideCarTimer / 0.42));
-                frameIdx = 91 + Math.min(5, Math.floor(prog * 6));
-            } else if ((p.exitAnimTimer || 0) > 0) {
-                // Authentic GTA 1 exit_bike frames (85..88) or exit_car frames (16..23)
-                const prog = Math.max(0, Math.min(1, 1.0 - p.exitAnimTimer / 0.36));
-                frameIdx = p.fromBike
-                    ? (85 + Math.min(3, Math.floor(prog * 4)))
-                    : (16 + Math.min(7, Math.floor(prog * 8)));
-            } else if ((p.punchTimer || 0) > 0) {
-                // Authentic GTA 1 punching_while_running (181..188) or punching_while_standing (50..55)
-                const prog = Math.max(0, Math.min(1, 1.0 - p.punchTimer / 0.34));
-                frameIdx = p.isMoving
-                    ? (181 + Math.min(7, Math.floor(prog * 8)))
-                    : (50 + Math.min(5, Math.floor(prog * 6)));
-            } else {
-                // Only draw weapon on Lucia's sprite while actively firing or briefly after firing; otherwise keep holstered ("FIST")!
-                const isAimingOrFiring = Boolean(
-                    p.weapon &&
-                    p.weapon !== "FIST" &&
-                    (game.input.shoot || (p.weaponDrawnTimer || 0) > 0 || (p.muzzleTimer || 0) > 0)
+            if (p.isSwimming && !isJumpingOrSliding) {
+                const swimZ = 2.018 + Math.sin(this.time * 3.8 + p.x * 0.03) * 0.007;
+                const swPhase = p.swimPhase || (this.time * 4.2);
+                const cAng = Math.cos(p.angle);
+                const sAng = Math.sin(p.angle);
+                const pAng = p.angle + Math.PI * 0.5;
+                const cpAng = Math.cos(pAng);
+                const spAng = Math.sin(pAng);
+
+                // Concentric turquoise & white foam swimming ripples around Lucia
+                for (let rk = 0; rk < 2; rk++) {
+                    const ringProg = (this.time * (p.isMoving ? 1.55 : 0.85) + rk * 0.5) % 1.0;
+                    const ringSize = (p.isMoving ? 15 : 12) + ringProg * (p.isMoving ? 20 : 12);
+                    const ringAlpha = (1.0 - ringProg) * (p.isMoving ? 0.42 : 0.26);
+                    this.pushSolidQuad3D(p.x - cAng * ringProg * 6, p.y - sAng * ringProg * 6, 2.008, ringSize, ringSize, p.angle, 0.72, 0.96, 1.0, ringAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(p.x - cAng * ringProg * 6, p.y - sAng * ringProg * 6, 2.009, ringSize * 0.86, ringSize * 0.86, p.angle + 0.785, 0.92, 0.99, 1.0, ringAlpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+
+                // Alternating left/right arm-stroke & flutter-kick whitewater splashes when swimming
+                if (p.isMoving) {
+                    const armSide = Math.sin(swPhase) >= 0 ? 1 : -1;
+                    const strokeReach = 7.0 + Math.abs(Math.sin(swPhase)) * 5.5;
+                    const spX = p.x + cAng * strokeReach + cpAng * armSide * 6.5;
+                    const spY = p.y + sAng * strokeReach + spAng * armSide * 6.5;
+                    this.pushSolidQuad3D(spX, spY, 2.012, 7.5, 4.8, p.angle + armSide * 0.35, 0.94, 0.99, 1.0, 0.68, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    // Trailing flutter-kick foam wake behind feet
+                    const kickSide = Math.cos(swPhase * 2.0) * 3.8;
+                    const kx = p.x - cAng * 10.5 + cpAng * kickSide;
+                    const ky = p.y - sAng * 10.5 + spAng * kickSide;
+                    this.pushSolidQuad3D(kx, ky, 2.011, 8.5, 5.2, p.angle, 0.88, 0.98, 1.0, 0.56, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+
+                // 3D Stalking Tiger/Bull Shark Dorsal Fin & Wake when in Deep Ocean Warning / Danger Zone!
+                if ((p.deepSeaDanger || 0) >= 1) {
+                    const isAttack = (p.deepSeaDanger || 0) >= 2;
+                    const orbitSpd = isAttack ? 3.4 : 1.75;
+                    const sharkOrbAng = this.time * orbitSpd;
+                    const lunge = (p.sharkLungeTimer || 0) > 0 ? (1.0 - (p.sharkLungeTimer / 0.55)) : 1.0;
+                    const orbitRad = isAttack
+                        ? ((p.sharkLungeTimer || 0) > 0 ? (8.0 + Math.sin(lunge * Math.PI) * 20.0) : (26.0 + Math.sin(this.time * 4.5) * 8.0))
+                        : 48.0;
+                    const shX = p.x + Math.cos(sharkOrbAng) * orbitRad;
+                    const shY = p.y + Math.sin(sharkOrbAng) * orbitRad;
+                    const shHeading = sharkOrbAng + Math.PI * 0.5 + (isAttack ? -0.28 : 0);
+                    const shCos = Math.cos(shHeading);
+                    const shSin = Math.sin(shHeading);
+
+                    // Submerged dark grey-blue shark body shadow + white V-wake + vertical 3D dorsal fin!
+                    this.pushSolidQuad3D(shX, shY, 2.006, 26.0, 9.5, shHeading, 0.08, 0.16, 0.24, 0.62, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(shX - shCos * 11, shY - shSin * 11, 2.007, 12.0, 3.6, shHeading + Math.sin(this.time * 12.0) * 0.35, 0.10, 0.19, 0.28, 0.58, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(shX - shCos * 4, shY - shSin * 4, 2.012, 16.0, 11.0, shHeading + 0.42, 0.90, 0.98, 1.0, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(shX, shY, 2.025, 11.0, 3.2, shHeading, 0.18, 0.24, 0.32, 0.96, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if ((p.sharkLungeTimer || 0) > 0) {
+                        this.pushSolidQuad3D(p.x, p.y, 2.014, 22.0, 22.0, this.time * 3.0, 0.92, 0.12, 0.18, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+
+                // Breaststroke / freestyle arm-stroke frame cycle (50..55) with rhythmic body sway
+                const strokeFrame = p.isMoving
+                    ? (50 + (Math.floor(swPhase * 1.6) % 6))
+                    : (50 + (Math.floor(this.time * 2.5) % 2));
+                const swimSway = p.isMoving ? Math.sin(swPhase) * 0.15 : Math.sin(this.time * 2.5) * 0.05;
+                const pCharScale = p.pedType === "bigsmoke" ? 1.12 : 1.06;
+                this.batchPedSprite3D(
+                    p.pedType || "lucia",
+                    strokeFrame,
+                    p.x,
+                    p.y,
+                    swimZ,
+                    p.angle + swimSway,
+                    pedScale * pCharScale,
+                    false,
+                    SPRITE_DRAW_ORDER.PEDESTRIAN,
+                    0.86,
+                    0.97,
+                    1.0
                 );
-                const visualWeapon = isAimingOrFiring ? p.weapon : "FIST";
-                frameIdx = this.getPedFrameIndex(
-                    visualWeapon,
-                    Boolean(p.isMoving || jumpZ > 0.02),
-                    Boolean(game.input.sprint || jumpZ > 0.02),
-                    p.walkPhase || 0
+            } else {
+                let frameIdx;
+                if ((p.slideCarTimer || 0) > 0) {
+                    // Authentic GTA 1 jump_onto_car / slide_on_car frames (91..96)
+                    const prog = Math.max(0, Math.min(1, 1.0 - p.slideCarTimer / 0.42));
+                    frameIdx = 91 + Math.min(5, Math.floor(prog * 6));
+                } else if ((p.exitAnimTimer || 0) > 0) {
+                    // Authentic GTA 1 exit_bike frames (85..88) or exit_car frames (16..23)
+                    const prog = Math.max(0, Math.min(1, 1.0 - p.exitAnimTimer / 0.36));
+                    frameIdx = p.fromBike
+                        ? (85 + Math.min(3, Math.floor(prog * 4)))
+                        : (16 + Math.min(7, Math.floor(prog * 8)));
+                } else if ((p.punchTimer || 0) > 0) {
+                    // Authentic GTA 1 punching_while_running (181..188) or punching_while_standing (50..55)
+                    const prog = Math.max(0, Math.min(1, 1.0 - p.punchTimer / 0.34));
+                    frameIdx = p.isMoving
+                        ? (181 + Math.min(7, Math.floor(prog * 8)))
+                        : (50 + Math.min(5, Math.floor(prog * 6)));
+                } else {
+                    // Only draw weapon on Lucia's sprite while actively firing or briefly after firing; otherwise keep holstered ("FIST")!
+                    const isAimingOrFiring = Boolean(
+                        p.weapon &&
+                        p.weapon !== "FIST" &&
+                        (game.input.shoot || (p.weaponDrawnTimer || 0) > 0 || (p.muzzleTimer || 0) > 0)
+                    );
+                    const visualWeapon = isAimingOrFiring ? p.weapon : "FIST";
+                    frameIdx = this.getPedFrameIndex(
+                        visualWeapon,
+                        Boolean(p.isMoving || jumpZ > 0.02),
+                        Boolean(game.input.sprint || jumpZ > 0.02),
+                        p.walkPhase || 0
+                    );
+                }
+
+                const pCharScale = p.pedType === "bigsmoke" ? 1.22 : 1.15;
+                this.batchPedSprite3D(
+                    p.pedType || "lucia",
+                    frameIdx,
+                    p.x,
+                    p.y,
+                    baseZ + jumpZ,
+                    p.angle,
+                    pedScale * pCharScale,
+                    (p.muzzleTimer || 0) > 0,
+                    isJumpingOrSliding ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.PEDESTRIAN
                 );
             }
-
-            const pCharScale = p.pedType === "bigsmoke" ? 1.22 : 1.15;
-            this.batchPedSprite3D(
-                p.pedType || "lucia",
-                frameIdx,
-                p.x,
-                p.y,
-                baseZ + jumpZ,
-                p.angle,
-                pedScale * pCharScale,
-                (p.muzzleTimer || 0) > 0,
-                isJumpingOrSliding ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.PEDESTRIAN
-            );
         }
 
         // 5. Authentic STYLE001.G24 Vehicles (1:1 1997 GTA 1 scale = 1.0 + Delta Doors & Crash Dents! — eSpriteDrawOrder_Car)
@@ -11523,6 +11602,45 @@ class RetroRenderer {
                     this.cheatButtons.push({ id: "BOARD_BOAT", x: bx, y: by, w: bw, h: bh });
                 }
             }
+        }
+
+        // 2B-Swim. Swimming Stamina & Deep-Ocean ("Haute Mer") Shark/Riptide Warning Pill
+        if (!p.inVehicle && (p.isSwimming || (p.swimStamina !== undefined && p.swimStamina < 98))) {
+            const sc = this.worldToScreen(p.x, p.y, (p.z || 2.0) + 0.18);
+            const stamPct = Math.max(0, Math.min(100, Math.round(p.swimStamina !== undefined ? p.swimStamina : 100)));
+            const dangerLvl = p.deepSeaDanger || 0;
+            const pulse = 0.5 + 0.5 * Math.sin(this.time * (dangerLvl >= 2 ? 12.0 : 6.5));
+            let sLabel = `🏊 SWIMMING — STAMINA ${stamPct}%`;
+            let borderCol = "#00f0ff";
+            let barCol = "#38bdf8";
+            let bgCol = "rgba(6, 42, 68, 0.90)";
+            if (dangerLvl >= 2) {
+                sLabel = `🦈 HIGH SEAS DANGER — SHARK ATTACK! SWIM TO SHORE!`;
+                borderCol = pulse > 0.5 ? "#ff1e38" : "#fde047";
+                barCol = "#ff1e38";
+                bgCol = "rgba(88, 10, 24, 0.94)";
+            } else if (dangerLvl === 1) {
+                sLabel = `⚠️ DEEP OCEAN RIPTIDE — TURN BACK! (${stamPct}%)`;
+                borderCol = pulse > 0.5 ? "#f97316" : "#fde047";
+                barCol = "#f97316";
+                bgCol = "rgba(68, 28, 8, 0.92)";
+            }
+            const bw = Math.max(168, measurePromptW(sLabel) + 20);
+            const bh = 26;
+            const bx = Math.round(sc.x - bw * 0.5);
+            const by = Math.round(sc.y + 24);
+            ctx.fillStyle = bgCol;
+            ctx.fillRect(bx, by, bw, bh);
+            ctx.strokeStyle = borderCol;
+            ctx.lineWidth = dangerLvl > 0 ? 2.0 : 1.4;
+            ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+            ctx.fillStyle = dangerLvl >= 2 ? "#fecdd3" : (dangerLvl === 1 ? "#fde047" : "#e0f2fe");
+            ctx.fillText(sLabel, sc.x, by + 9);
+            const innerW = bw - 14;
+            ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+            ctx.fillRect(bx + 7, by + 18, innerW, 4);
+            ctx.fillStyle = barCol;
+            ctx.fillRect(bx + 7, by + 18, Math.round(innerW * (stamPct / 100)), 4);
         }
 
         // 2C. Street Interactive Props Prompt ([E] ATM, Retro Arcade Cabinet, Sprunk Soda Machine)
