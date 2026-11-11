@@ -6623,9 +6623,11 @@ class RetroRenderer {
             const rh = intr.h || 530;
             const px = game.interiorX || rw * 0.5;
             const py = game.interiorY || rh - 78;
-            // Subtle 22% 3D perspective camera shift as the player walks across the rooms so 3D walls, lintels & columns reveal their depth!
-            const targetCamX = rw * 0.5 + (px - rw * 0.5) * 0.22;
-            const targetCamY = rh * 0.5 + 12 + (py - rh * 0.5) * 0.22;
+            // Track player smoothly at exterior GTA camera scale, softly clamped to the building footprint so adjacent rooms & exterior street remain framed
+            const marginX = Math.min(185, rw * 0.24);
+            const marginY = Math.min(145, rh * 0.25);
+            const targetCamX = Math.max(marginX, Math.min(rw - marginX, px));
+            const targetCamY = Math.max(marginY + 18, Math.min(rh - marginY + 12, py));
             if (!this._wasInInterior) {
                 this.camX = targetCamX;
                 this.camY = targetCamY;
@@ -6793,17 +6795,9 @@ class RetroRenderer {
         const fovyRad = (55.0 * Math.PI) / 180.0;
         const f = 1.0 / Math.tan(fovyRad * 0.5);
 
-        const rw = (intr && intr.w) || 780;
-        const rh = (intr && intr.h) || 530;
-        const rwBlocks = (rw + 96) / TILE_SIZE;
-        const rhBlocks = (rh + 96) / TILE_SIZE;
-
-        // Fit the 3D cutaway interior cleanly between the left Smartphone HUD and right Chat panel
-        const availFracW = W >= 1000 ? Math.max(0.54, (W - 470) / W) : 0.90;
-        const availFracH = Math.max(0.68, (H - 126) / H);
-        const distW = (rwBlocks * (f / aspect)) / (availFracW * 2.0);
-        const distH = (rhBlocks * f) / (availFracH * 2.0);
-        const distBlocks = Math.max(8.2, distW, distH);
+        // Match exterior GTA street camera scale (distBlocks ~ 6.85) so interior characters, weapons, furniture & tiles match the outdoor world 1:1!
+        const baseScale = W < 900 ? 7.35 : 6.85;
+        const distBlocks = Math.max(5.8, Math.min(9.2, baseScale + (this.zoomOffsetBlocks || 0) * 0.5));
 
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
@@ -12079,29 +12073,29 @@ class RetroRenderer {
             return ctx.createPattern(c, "repeat");
         };
 
-        // 1. Rich Mahogany Hardwood Planks (Tavern / Dive Bar / Mansion Office)
+        // 1. Warm Golden-Teak & Mahogany Planks (Tavern / Dive Bar / Mansion Office)
         tex.wood_mahogany = makePat(64, (x, y) => {
             const plankRow = Math.floor(y / 12);
             const ly = y % 12;
             const stagger = (plankRow % 2) * 32;
             const lx = (x + stagger) % 64;
-            if (ly === 0 || lx === 0) return [24, 11, 7]; // Dark plank bevel joint
-            const pTone = (hash(plankRow, 1, 11) - 0.5) * 14;
+            if (ly === 0 || lx === 0) return [58, 32, 18]; // Warm plank bevel joint
+            const pTone = (hash(plankRow, 1, 11) - 0.5) * 16;
             const grain = Math.sin(x * 0.35 + Math.sin(y * 0.7 + plankRow) * 2.2) * 8 + (hash(x, y, 2) - 0.5) * 9;
-            const highlight = ly === 1 ? 10 : (ly === 11 ? -8 : 0);
-            return [66 + pTone + grain + highlight, 34 + (pTone + grain) * 0.55 + highlight * 0.5, 21 + (pTone + grain) * 0.35];
+            const highlight = ly === 1 ? 12 : (ly === 11 ? -8 : 0);
+            return [142 + pTone + grain + highlight, 84 + (pTone + grain) * 0.65 + highlight * 0.5, 48 + (pTone + grain) * 0.42];
         });
 
-        // 2. Warm Honey-Oak Parquet Planks (Hotel Suites / Fitting Rooms / Stage)
+        // 2. Warm Sunlit Honey-Oak Parquet Planks (Hotel Suites / Fitting Rooms / Stage)
         tex.wood_oak = makePat(64, (x, y) => {
             const plankRow = Math.floor(y / 10);
             const ly = y % 10;
             const lx = (x + (plankRow % 2) * 28) % 56;
-            if (ly === 0 || lx === 0) return [52, 32, 16];
+            if (ly === 0 || lx === 0) return [92, 62, 34];
             const pTone = (hash(plankRow, 3, 7) - 0.5) * 16;
             const grain = Math.sin(x * 0.4 + Math.cos(y * 0.8) * 1.8) * 9 + (hash(x, y, 4) - 0.5) * 10;
             const bevel = ly === 1 ? 12 : (ly === 9 ? -9 : 0);
-            return [122 + pTone + grain + bevel, 82 + (pTone + grain) * 0.7 + bevel * 0.6, 46 + (pTone + grain) * 0.4];
+            return [184 + pTone + grain + bevel, 134 + (pTone + grain) * 0.72 + bevel * 0.6, 82 + (pTone + grain) * 0.45];
         });
 
         // 3. Retro 1980s Vice City Diner Beveled Checkerboard Tile (Terracotta / Cream)
@@ -12110,82 +12104,82 @@ class RetroRenderer {
             const ty = Math.floor(y / 32);
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [38, 28, 24]; // Grout line
+            if (lx === 0 || ly === 0) return [96, 82, 72]; // Warm grout line
             const isRed = (tx + ty) % 2 === 0;
-            const n = (hash(x, y, 9) - 0.5) * 12;
-            const bev = (lx === 1 || ly === 1) ? 16 : ((lx === 31 || ly === 31) ? -16 : 0);
+            const n = (hash(x, y, 9) - 0.5) * 10;
+            const bev = (lx === 1 || ly === 1) ? 14 : ((lx === 31 || ly === 31) ? -12 : 0);
             const spec = (lx > 4 && lx < 12 && ly > 4 && ly < 10) ? 8 : 0;
             if (isRed) {
-                return [154 + n + bev + spec, 48 + n * 0.5 + bev * 0.5 + spec, 34 + n * 0.4 + bev * 0.4];
+                return [188 + n + bev + spec, 76 + n * 0.5 + bev * 0.5 + spec, 56 + n * 0.4 + bev * 0.4];
             }
-            return [226 + n + bev + spec, 210 + n + bev + spec, 174 + n + bev * 0.7];
+            return [238 + n + bev + spec, 224 + n + bev + spec, 192 + n + bev * 0.7];
         });
 
         // 4. Commercial Stainless / Ceramic Kitchen Grid Tile (16x16)
         tex.kitchen_tile = makePat(64, (x, y) => {
             const lx = x % 16;
             const ly = y % 16;
-            if (lx === 0 || ly === 0) return [45, 55, 68]; // Dark grout
+            if (lx === 0 || ly === 0) return [118, 128, 138]; // Clean grout
             const n = (hash(x, y, 14) - 0.5) * 10;
-            const bev = (lx === 1 || ly === 1) ? 14 : ((lx === 15 || ly === 15) ? -12 : 0);
-            return [196 + n + bev, 206 + n + bev, 216 + n + bev];
+            const bev = (lx === 1 || ly === 1) ? 12 : ((lx === 15 || ly === 15) ? -10 : 0);
+            return [214 + n + bev, 222 + n + bev, 228 + n + bev];
         });
 
         // 5. Veined White Carrara Marble (Boutique / Star Island Mansion Foyer)
         tex.marble_carrara = makePat(64, (x, y) => {
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [138, 148, 162]; // Silver-gray marble grout
+            if (lx === 0 || ly === 0) return [156, 164, 174]; // Silver-gray marble grout
             const veinWave = Math.sin((x + y * 1.3) * 0.14 + Math.sin(x * 0.09 - y * 0.11) * 2.6);
             const vein = Math.pow(Math.max(0, 1 - Math.abs(veinWave) * 3.8), 2.2);
-            const n = (hash(x, y, 21) - 0.5) * 9;
-            const bev = (lx === 1 || ly === 1) ? 12 : ((lx === 31 || ly === 31) ? -11 : 0);
-            const base = 224 + n + bev - vein * 58;
-            return [base, base + 3, base + 9];
+            const n = (hash(x, y, 21) - 0.5) * 8;
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -9 : 0);
+            const base = 232 + n + bev - vein * 46;
+            return [base, base + 2, base + 6];
         });
 
-        // 6. Dark Obsidian & Gold-Veined Luxury Slate (Nightclubs / VIP Lounges)
+        // 6. Polished Vice City Lounge Slate & Terrazzo (Nightclubs / VIP Lounges)
         tex.marble_dark = makePat(64, (x, y) => {
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [14, 18, 28];
+            if (lx === 0 || ly === 0) return [64, 58, 78];
             const veinWave = Math.sin((x - y * 1.2) * 0.15 + Math.cos(x * 0.1 + y * 0.08) * 2.4);
             const vein = Math.pow(Math.max(0, 1 - Math.abs(veinWave) * 4.2), 2.0);
             const n = (hash(x, y, 33) - 0.5) * 8;
-            const bev = (lx === 1 || ly === 1) ? 9 : ((lx === 31 || ly === 31) ? -8 : 0);
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -8 : 0);
             return [
-                30 + n + bev + vein * 42,
-                26 + n + bev + vein * 28,
-                44 + n + bev + vein * 48
+                92 + n + bev + vein * 46,
+                84 + n + bev + vein * 34,
+                114 + n + bev + vein * 52
             ];
         });
 
-        // 7. South Beach Art Deco Terrazzo with Brass Inlay & Coral/Turquoise Chips (Hotels)
+        // 7. South Beach Sunlit Pastel Art Deco Terrazzo with Brass Inlay & Coral/Turquoise Chips (Hotels)
         tex.terrazzo_deco = makePat(64, (x, y) => {
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [184, 142, 62]; // Polished brass inlay strip!
+            if (lx === 0 || ly === 0) return [196, 158, 78]; // Polished brass inlay strip!
             const h = hash(Math.floor(x / 2), Math.floor(y / 2), 45);
             const n = (hash(x, y, 46) - 0.5) * 8;
-            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -10 : 0);
-            if (h > 0.90) return [236, 118, 146]; // Flamingo coral chip
-            if (h > 0.81) return [64, 208, 216];  // Ocean turquoise chip
-            if (h > 0.72) return [238, 212, 148]; // Cream quartz chip
-            return [54 + n + bev, 38 + n + bev, 64 + n + bev];
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -9 : 0);
+            if (h > 0.90) return [242, 118, 146]; // Flamingo coral chip
+            if (h > 0.81) return [56, 204, 214];  // Ocean turquoise chip
+            if (h > 0.72) return [246, 208, 116]; // Warm gold quartz chip
+            return [222 + n + bev, 210 + n + bev, 196 + n + bev];
         });
 
-        // 8. Tactical Diamond-Plate Gunmetal Steel (Ammu-Nation / Space Bunker / Armory)
+        // 8. Warm Vice City Sandstone / Travertine Showroom Tile (Ammu-Nation / Tactical Showroom)
         tex.gunmetal_plate = makePat(64, (x, y) => {
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [18, 22, 28];
+            if (lx === 0 || ly === 0) return [112, 104, 92]; // Warm travertine grout joint
             const cx = (x % 8) - 4;
             const cy = (y % 8) - 4;
-            const tread = (Math.abs(cx - cy) <= 1 && Math.abs(cx + cy) <= 3) || (Math.abs(cx + cy) <= 1 && Math.abs(cx - cy) <= 3);
+            const tread = (Math.abs(cx - cy) <= 1 && Math.abs(cx + cy) <= 3);
             const n = (hash(x, y, 55) - 0.5) * 9;
-            const bev = (lx === 1 || ly === 1) ? 11 : ((lx === 31 || ly === 31) ? -10 : 0);
-            const tBoost = tread ? 18 : 0;
-            return [44 + n + bev + tBoost, 50 + n + bev + tBoost, 58 + n + bev + tBoost];
+            const bev = (lx === 1 || ly === 1) ? 12 : ((lx === 31 || ly === 31) ? -10 : 0);
+            const tBoost = tread ? 8 : 0;
+            return [186 + n + bev + tBoost, 176 + n + bev + tBoost, 158 + n + bev + tBoost];
         });
 
         // 9. Supermarket Speckled Vinyl Composition Tile (24/7 Convenience Store)
@@ -12194,29 +12188,29 @@ class RetroRenderer {
             const ty = Math.floor(y / 32);
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [136, 146, 156];
-            const alt = (tx + ty) % 2 === 0 ? 0 : -12;
-            const sp = hash(x, y, 67) > 0.82 ? -18 : (hash(x, y, 68) > 0.85 ? 14 : 0);
-            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -10 : 0);
-            return [208 + alt + sp + bev, 216 + alt + sp + bev, 220 + alt + sp + bev];
+            if (lx === 0 || ly === 0) return [146, 156, 164];
+            const alt = (tx + ty) % 2 === 0 ? 0 : -10;
+            const sp = hash(x, y, 67) > 0.82 ? -14 : (hash(x, y, 68) > 0.85 ? 12 : 0);
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -9 : 0);
+            return [218 + alt + sp + bev, 224 + alt + sp + bev, 226 + alt + sp + bev];
         });
 
-        // 10. Woven Royal Crimson Velvet Carpet (Mansion / Hotel Runner / VIP Areas)
+        // 10. Woven Royal Crimson Velvet Carpet (Mansion / Hotel Runner / Showroom Rug)
         tex.carpet_royal = makePat(32, (x, y) => {
             const weave = ((x + y) % 2 === 0 ? 6 : -6) + Math.sin(x * 0.78) * 5 + Math.cos(y * 0.78) * 5;
-            const motif = (Math.abs((x % 16) - 8) + Math.abs((y % 16) - 8) === 5) ? 28 : 0;
+            const motif = (Math.abs((x % 16) - 8) + Math.abs((y % 16) - 8) === 5) ? 32 : 0;
             const n = (hash(x, y, 77) - 0.5) * 8;
-            return [128 + weave + motif + n, 24 + weave * 0.4 + motif * 0.75 + n, 38 + weave * 0.5 + motif * 0.25 + n];
+            return [162 + weave + motif + n, 38 + weave * 0.4 + motif * 0.75 + n, 48 + weave * 0.5 + motif * 0.25 + n];
         });
 
-        // 11. Weathered Cellblock Concrete Slab (Leonida State Penitentiary)
+        // 11. Warm Light Architectural Concrete / Limestone Slab (Vaults / Firing Range / Cellblock)
         tex.concrete_prison = makePat(64, (x, y) => {
             const lx = x % 32;
             const ly = y % 32;
-            if (lx === 0 || ly === 0) return [24, 26, 30];
-            const n = (hash(x, y, 88) - 0.5) * 14 + Math.sin(x * 0.21 + y * 0.17) * 5;
-            const bev = (lx === 1 || ly === 1) ? 8 : ((lx === 31 || ly === 31) ? -9 : 0);
-            return [58 + n + bev, 62 + n + bev, 68 + n + bev];
+            if (lx === 0 || ly === 0) return [104, 100, 94];
+            const n = (hash(x, y, 88) - 0.5) * 12 + Math.sin(x * 0.21 + y * 0.17) * 5;
+            const bev = (lx === 1 || ly === 1) ? 10 : ((lx === 31 || ly === 31) ? -9 : 0);
+            return [166 + n + bev, 162 + n + bev, 152 + n + bev];
         });
 
         this._interiorTextures = tex;
@@ -12232,7 +12226,7 @@ class RetroRenderer {
         const rh = intr.h || 560;
         const t = intr.theme || "SHOP_CONVENIENCE";
         const facing = intr.facing || "S";
-        const key = `v4_${t}_${facing}_${rw}_${rh}`;
+        const key = `v5_${t}_${facing}_${rw}_${rh}`;
         if (this._interiorFloorTexCache[key]) {
             return this._interiorFloorTexCache[key];
         }
@@ -12278,31 +12272,31 @@ class RetroRenderer {
 
         // 2. Oriented Multi-Room Architectural Sub-Zones, Carpets, Rugs & Floor Markings
         if (t === "SHOP_GUN_SHOP") {
-            // West Gunsmith & Kevlar Vault concrete floor
-            fillR(18, 56, 206, 358, tex.concrete_prison, "#475569", 1.5);
+            // West Gunsmith & Kevlar Vault warm honey-oak plank floor
+            fillR(18, 56, 206, 358, tex.wood_oak, "#92400e", 1.5);
             // Center Showroom royal crimson tactical rug runner
             fillR(266, 174, 224, 96, tex.carpet_royal, "#d97706", 2.0);
             // East 4-Lane Live Firing Range concrete floor + yellow/black firing line + downrange distance stripes
-            fillR(532, 56, rw - 550, 358, "#18181b", "#facc15", 2.0);
+            fillR(532, 56, rw - 550, 358, tex.concrete_prison, "#ca8a04", 2.0);
             fillR(540, 304, 250, 8, "#facc15");
             for (let hx = 544; hx < 784; hx += 18) {
-                fillR(hx, 304, 9, 8, "#090d16");
+                fillR(hx, 304, 9, 8, "#1e293b");
             }
             // Downrange 10m and 25m range lines, lane numbers & spent brass casings
-            fillR(544, 218, 242, 2, "rgba(250, 204, 21, 0.35)");
-            fillR(544, 138, 242, 2, "rgba(250, 204, 21, 0.35)");
-            fillR(544, 62, 242, 24, "#451a03", "#78350f", 1.5); // Downrange sandtrap berm
+            fillR(544, 218, 242, 2, "rgba(180, 83, 9, 0.45)");
+            fillR(544, 138, 242, 2, "rgba(180, 83, 9, 0.45)");
+            fillR(544, 62, 242, 24, "#92400e", "#78350f", 1.5); // Downrange sandtrap berm
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
-                fillR(lx + 4, 268, 44, 26, "rgba(250, 204, 21, 0.10)", "rgba(250, 204, 21, 0.35)", 1.0);
+                fillR(lx + 4, 268, 44, 26, "rgba(250, 204, 21, 0.16)", "rgba(180, 83, 9, 0.45)", 1.0);
             }
             for (let s = 0; s < 22; s++) {
                 const bx = 556 + ((s * 37) % 216);
                 const by = 336 + ((s * 19) % 34);
-                fillR(bx, by, 4, 2.5, "#fde047");
+                fillR(bx, by, 4, 2.5, "#ca8a04");
             }
-            // South Security Vestibule diamond-plate floor (no garish welcome mat)
-            fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#334155", 1.0);
+            // South Security Vestibule travertine tile floor
+            fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#a8a29e", 1.0);
         } else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") {
             fillR(18, 56, rw - 36, 136, tex.kitchen_tile, "#64748b", 1.5);
             if (t === "DINER_PAWN") {
@@ -12394,16 +12388,14 @@ class RetroRenderer {
             g.fillRect(rw - 52, 56, 34, rh - 74);
         }
 
-        // 4. Soft Contact Ambient Occlusion Halos around all Interior Partition Walls & Heavy Counters
+        // 4. Subtle Contact Ambient Occlusion around Interior Partition Walls & Counters (no dark black smudges!)
         if (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function") {
             const obs = window.ShopInteriors.getObstacles(intr);
             for (let i = 0; i < obs.length; i++) {
                 const ob = obs[i];
-                const pad = ob.isWall ? 10 : 7;
-                g.fillStyle = ob.isWall ? "rgba(0, 0, 0, 0.34)" : "rgba(0, 0, 0, 0.24)";
+                const pad = ob.isWall ? 6 : 4;
+                g.fillStyle = ob.isWall ? "rgba(0, 0, 0, 0.14)" : "rgba(0, 0, 0, 0.10)";
                 g.fillRect(ob.x - pad, ob.y - pad, ob.w + pad * 2, ob.h + pad * 2);
-                g.fillStyle = "rgba(0, 0, 0, 0.45)";
-                g.fillRect(ob.x - 3, ob.y - 3, ob.w + 6, ob.h + 6);
             }
         }
 
@@ -13227,28 +13219,26 @@ class RetroRenderer {
         ctx.arc(pScr.x, pScr.y, 92, 0, Math.PI * 2);
         ctx.fill();
 
-        // 2. 3D-Projected Top Cornice Architectural Header Banner
-        const topNW = this.worldToScreen(16, 40, 2.78);
-        const topNE = this.worldToScreen(rw - 16, 40, 2.78);
-        const banW = Math.max(380, Math.min(W - 360, Math.round(topNE.x - topNW.x)));
-        const banH = 42;
-        const banX = Math.round((topNW.x + topNE.x) * 0.5 - banW * 0.5);
-        const banY = Math.max(44, Math.min(110, Math.round(topNW.y - banH - 4)));
+        // 2. Top-Center GTA Arcade Venue Header Banner (pinned cleanly at top center of viewport)
+        const banW = Math.max(360, Math.min(540, W - 360));
+        const banH = 44;
+        const banX = Math.round(W * 0.5 - banW * 0.5);
+        const banY = 12;
 
-        ctx.fillStyle = "rgba(7, 11, 22, 0.92)";
+        ctx.fillStyle = "rgba(10, 15, 28, 0.92)";
         ctx.fillRect(banX, banY, banW, banH);
-        ctx.strokeStyle = intr.accent || "#00f0ff";
+        ctx.strokeStyle = intr.accent || "#facc15";
         ctx.lineWidth = 2.0;
         ctx.strokeRect(banX + 0.5, banY + 0.5, banW - 1, banH - 1);
 
-        ctx.font = "bold 15px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(intr.name, banX + banW * 0.5, banY + 15);
-        ctx.font = "bold 10px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = intr.accent || "#38bdf8";
-        ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 31);
+        ctx.font = "bold 16px Consolas, 'Courier New', monospace";
+        ctx.fillStyle = "#fde047";
+        ctx.fillText(intr.name, banX + banW * 0.5, banY + 16);
+        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 33);
 
-        // 3. 3D-Projected Interactive Station Badges (compact pill when far, expanded [E] card when near, with automatic overlap resolution!)
+        // 3. 3D-Projected Interactive Station Badges (Clean, legible GTA pills when visible, expanded [E] card when near!)
         const placedRects = [];
         const resolveLabelOverlap = (x, y, w, h) => {
             let cy = y;
@@ -13256,8 +13246,8 @@ class RetroRenderer {
                 let hit = false;
                 for (let i = 0; i < placedRects.length; i++) {
                     const r = placedRects[i];
-                    if (x < r.x + r.w + 4 && x + w + 4 > r.x && cy < r.y + r.h + 3 && cy + h + 3 > r.y) {
-                        cy = (cy <= r.y) ? (r.y - h - 4) : (r.y + r.h + 4);
+                    if (x < r.x + r.w + 6 && x + w + 6 > r.x && cy < r.y + r.h + 4 && cy + h + 4 > r.y) {
+                        cy = (cy <= r.y) ? (r.y - h - 5) : (r.y + r.h + 5);
                         hit = true;
                     }
                 }
@@ -13269,37 +13259,40 @@ class RetroRenderer {
 
         if (Array.isArray(intr.stations)) {
             for (const st of intr.stations) {
-                const stTop = this.worldToScreen(st.x, st.y, 2.24);
+                const stTop = this.worldToScreen(st.x, st.y, 2.26);
+                if (stTop.x < -80 || stTop.x > W + 80 || stTop.y < 50 || stTop.y > H + 40) continue;
                 const ready = (st.cooldown || 0) <= 0;
                 const distToPlayer = Math.hypot(px - st.x, py - st.y);
-                const isNear = distToPlayer < 64;
-                const stCol = ready ? (st.color || "#39ff14") : "#64748b";
+                const isNear = distToPlayer < 88;
+                const stCol = ready ? (st.color || "#39ff14") : "#94a3b8";
 
                 const cleanSub = String(st.sub || "").replace(/^\[E\]\s*/i, "");
-                ctx.font = isNear ? "bold 10px Consolas, 'Courier New', monospace" : "bold 8.5px Consolas, 'Courier New', monospace";
+                ctx.font = isNear ? "bold 13px Consolas, 'Courier New', monospace" : "bold 11px Consolas, 'Courier New', monospace";
                 const lblW = ctx.measureText(st.label).width;
-                const subTxt = ready ? `[E] CONFIRM • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`;
+                const subTxt = ready ? `[E] BUY / USE • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`;
+                ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
                 const subW = (isNear || !ready) ? ctx.measureText(subTxt).width : 0;
-                const bw = isNear ? Math.max(182, Math.round(Math.max(lblW, subW) + 22)) : Math.max(114, Math.round(lblW + 14));
-                const bh = (isNear || !ready) ? 29 : 16;
+                const bw = isNear ? Math.max(210, Math.round(Math.max(lblW, subW) + 26)) : Math.max(132, Math.round(lblW + 18));
+                const bh = (isNear || !ready) ? 36 : 22;
                 const bx = Math.round(stTop.x - bw * 0.5);
-                const rawBy = Math.round(stTop.y - bh - (isNear ? 10 : 3));
+                const rawBy = Math.round(stTop.y - bh - (isNear ? 14 : 6));
                 const by = resolveLabelOverlap(bx, rawBy, bw, bh);
 
-                ctx.fillStyle = isNear ? "rgba(6, 10, 22, 0.95)" : "rgba(8, 12, 24, 0.80)";
+                ctx.fillStyle = isNear ? "rgba(8, 13, 26, 0.96)" : "rgba(10, 16, 30, 0.88)";
                 ctx.fillRect(bx, by, bw, bh);
                 ctx.fillStyle = stCol;
-                ctx.fillRect(bx, by, 3, bh);
+                ctx.fillRect(bx, by, 4, bh);
                 ctx.strokeStyle = isNear && ready ? "#fde047" : stCol;
-                ctx.lineWidth = isNear ? 1.8 : 1.0;
+                ctx.lineWidth = isNear ? 2.2 : 1.4;
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
-                ctx.fillStyle = ready ? "#ffffff" : "#94a3b8";
-                ctx.fillText(st.label, bx + bw * 0.5 + 1, by + ((isNear || !ready) ? 9.5 : 8.5));
+                ctx.font = isNear ? "bold 13px Consolas, 'Courier New', monospace" : "bold 11px Consolas, 'Courier New', monospace";
+                ctx.fillStyle = ready ? "#ffffff" : "#cbd5e1";
+                ctx.fillText(st.label, bx + bw * 0.5 + 2, by + ((isNear || !ready) ? 11.5 : 11));
                 if (isNear || !ready) {
-                    ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
+                    ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
                     ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
-                    ctx.fillText(subTxt, bx + bw * 0.5 + 1, by + 20.5);
+                    ctx.fillText(subTxt, bx + bw * 0.5 + 2, by + 26);
                     if (isNear && ready && Array.isArray(this.cheatButtons)) {
                         this.cheatButtons.push({ id: "TRIGGER_STATION", x: bx, y: by, w: bw, h: bh, station: st });
                     }
@@ -13341,7 +13334,7 @@ class RetroRenderer {
             }
         }
 
-        // 4. 3D-Projected Venue NPC Role Labels, Proximity Speech Bubbles & Partner Tag
+        // 4. 3D-Projected Venue NPC Role Labels & Speech Bubbles (shown when near player or during hold-up so distant rooms stay clean!)
         if (Array.isArray(intr.npcs)) {
             for (let i = 0; i < intr.npcs.length; i++) {
                 const npc = intr.npcs[i];
@@ -13349,37 +13342,39 @@ class RetroRenderer {
                 const isDancing = !!(npc.dancing || npc.label === "DANCER" || npc.label === "CLUBBER");
                 const nx = npc.x + (isDancing ? Math.sin(this.time * 4.0 + i) * 7.5 : Math.sin(this.time * 1.4 + i * 2.1) * 1.4);
                 const ny = npc.y + (isDancing ? Math.cos(this.time * 4.0 + i) * 5.5 : Math.cos(this.time * 1.1 + i * 1.7) * 1.0);
-                const npcZ = (npc.z || 2.055) + 0.165;
-                const nScr = this.worldToScreen(nx, ny, npcZ);
-
-                ctx.font = "bold 8.5px Consolas, monospace";
-                const tw = ctx.measureText(npc.label).width + 10;
-                const tx = Math.round(nScr.x - tw * 0.5);
-                const ty = resolveLabelOverlap(tx, Math.round(nScr.y - 18), tw, 13);
-                ctx.fillStyle = "rgba(8, 12, 24, 0.86)";
-                ctx.fillRect(tx, ty, tw, 13);
-                ctx.strokeStyle = "rgba(148, 163, 184, 0.48)";
-                ctx.lineWidth = 1;
-                ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, 12);
-                ctx.fillStyle = "#e2e8f0";
-                ctx.fillText(npc.label, tx + tw * 0.5, ty + 6.5);
-
-                // Proximity 1997 Arcade Speech Bubble when player approaches NPC or during an armed hold-up!
                 const distNpc = Math.hypot(px - nx, py - ny);
                 const robbedLine = (npc._robbedTimer || 0) > 0 ? "🙌 DON'T SHOOT! TAKE WHATEVER YOU WANT!" : null;
-                const speech = robbedLine || (distNpc < 96 ? npc.dialog : null);
+                if (distNpc > 165 && !robbedLine) continue;
+
+                const npcZ = (npc.z || 2.055) + 0.175;
+                const nScr = this.worldToScreen(nx, ny, npcZ);
+
+                ctx.font = "bold 10.5px Consolas, monospace";
+                const tw = ctx.measureText(npc.label).width + 14;
+                const tx = Math.round(nScr.x - tw * 0.5);
+                const ty = resolveLabelOverlap(tx, Math.round(nScr.y - 22), tw, 17);
+                ctx.fillStyle = "rgba(8, 12, 24, 0.90)";
+                ctx.fillRect(tx, ty, tw, 17);
+                ctx.strokeStyle = "#fde047";
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, 16);
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(npc.label, tx + tw * 0.5, ty + 8.5);
+
+                // Proximity 1997 Arcade Speech Bubble when player approaches NPC or during an armed hold-up!
+                const speech = robbedLine || (distNpc < 110 ? npc.dialog : null);
                 if (speech) {
-                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-                    const sw = Math.min(340, ctx.measureText(speech).width + 16);
+                    ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+                    const sw = Math.min(380, ctx.measureText(speech).width + 18);
                     const sx = Math.max(14, Math.min(W - sw - 14, Math.round(nScr.x - sw * 0.5)));
-                    const sy = resolveLabelOverlap(sx, ty - 19, sw, 16);
-                    ctx.fillStyle = robbedLine ? "rgba(69, 10, 10, 0.94)" : "rgba(15, 23, 42, 0.94)";
-                    ctx.fillRect(sx, sy, sw, 16);
+                    const sy = resolveLabelOverlap(sx, ty - 23, sw, 20);
+                    ctx.fillStyle = robbedLine ? "rgba(69, 10, 10, 0.96)" : "rgba(15, 23, 42, 0.95)";
+                    ctx.fillRect(sx, sy, sw, 20);
                     ctx.strokeStyle = robbedLine ? "#ef4444" : (intr.accent || "#38bdf8");
-                    ctx.lineWidth = 1.2;
-                    ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 15);
-                    ctx.fillStyle = robbedLine ? "#fecaca" : "#fde047";
-                    ctx.fillText(speech, sx + sw * 0.5, sy + 8.5);
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 19);
+                    ctx.fillStyle = robbedLine ? "#fecaca" : "#ffffff";
+                    ctx.fillText(speech, sx + sw * 0.5, sy + 10);
                 }
             }
         }

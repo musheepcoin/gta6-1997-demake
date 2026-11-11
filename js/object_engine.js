@@ -17054,7 +17054,9 @@ class WorldObjectEngine {
             rawAoR(tr.x, tr.y, tr.w, tr.h, yElev, pad, alpha);
         };
 
-        // 3D Architectural Wall Box (World-Tiled MAT 12 sides + True Architectural Cutaway Top Section — no garish neon slabs!)
+        // 3D Architectural Wall Box textured with real gta1_tiles_vice.png masonry/stucco tiles & warm architectural stone cutaway cap
+        let wallSideTile = 177;
+        let wallTopCol = [0.88, 0.84, 0.76];
         const rawWallBoxR = (x, y, w, h, yBot, yTop, wallCol, crownCol) => {
             const x0 = x / TILE_SIZE;
             const x1 = (x + w) / TILE_SIZE;
@@ -17063,21 +17065,28 @@ class WorldObjectEngine {
             const [r, g, b] = wallCol;
             const tNW = [x0, yTop, z0], tNE = [x1, yTop, z0], tSW = [x0, yTop, z1], tSE = [x1, yTop, z1];
             const bNW = [x0, yBot, z0], bNE = [x1, yBot, z0], bSW = [x0, yBot, z1], bSE = [x1, yBot, z1];
-            pushMatQuad(tSW, tSE, bSW, bSE, 12, r, g, b, 1.0);
-            pushMatQuad(tNE, tNW, bNE, bNW, 12, r * 0.82, g * 0.84, b * 0.88, 1.0);
-            pushMatQuad(tNW, tSW, bNW, bSW, 12, r * 0.92, g * 0.93, b * 0.96, 1.0);
-            pushMatQuad(tSE, tNE, bSE, bNE, 12, r * 0.86, g * 0.88, b * 0.92, 1.0);
+            const [tu0, tv0, tu1, tv1] = getTileUV(wallSideTile);
+            pushQuad(tSW, tSE, bSW, bSE, tu0, tv0, tu1, tv1, r, g, b, 1.0);
+            pushQuad(tNE, tNW, bNE, bNW, tu0, tv0, tu1, tv1, r * 0.84, g * 0.85, b * 0.88, 1.0);
+            pushQuad(tNW, tSW, bNW, bSW, tu0, tv0, tu1, tv1, r * 0.94, g * 0.94, b * 0.96, 1.0);
+            pushQuad(tSE, tNE, bSE, bNE, tu0, tv0, tu1, tv1, r * 0.88, g * 0.89, b * 0.92, 1.0);
 
-            // Outer beveled plaster/brass cornice molding rim
+            // Warm architectural stone/wood cornice rim + gta1_tiles_vice.png paver cutaway top cap
             const cr = crownCol ? [
-                0.22 + crownCol[0] * 0.34,
-                0.26 + crownCol[1] * 0.34,
-                0.34 + crownCol[2] * 0.34
-            ] : [0.28, 0.34, 0.44];
+                0.55 + crownCol[0] * 0.42,
+                0.52 + crownCol[1] * 0.42,
+                0.48 + crownCol[2] * 0.42
+            ] : [0.82, 0.78, 0.70];
             rawBoxR(x - 1, y - 1, w + 2, h + 2, yTop, yTop + 0.012, cr, 9);
-            // Inset dark anthracite cutaway masonry/concrete structural core
-            if (w > 5 && h > 5) {
-                rawBoxR(x + 2, y + 2, w - 4, h - 4, yTop + 0.012, yTop + 0.020, [0.06, 0.08, 0.13], 9);
+            if (w > 4 && h > 4) {
+                const cx0 = (x + 2) / TILE_SIZE, cx1 = (x + w - 2) / TILE_SIZE;
+                const cz0 = (y + 2) / TILE_SIZE, cz1 = (y + h - 2) / TILE_SIZE;
+                const [wu, wv] = encLidWorldUV(8);
+                pushQuad(
+                    [cx0, yTop + 0.015, cz0], [cx1, yTop + 0.015, cz0],
+                    [cx0, yTop + 0.015, cz1], [cx1, yTop + 0.015, cz1],
+                    wu, wv, wu, wv, wallTopCol[0], wallTopCol[1], wallTopCol[2], 1.0
+                );
             }
         };
         const wallBoxR = (x, y, w, h, yBot, yTop, wallCol, crownCol) => {
@@ -17160,35 +17169,61 @@ class WorldObjectEngine {
 
         const accentRgb = hexToRgb(intr.accent || "#f472b6");
 
-        // 1. ARCHITECTURAL BASE CUTAWAY PLINTH & EXTERIOR SHELL SHADOW (y = 1.80..2.00)
-        rawBoxR(-18, 24, rw + 36, rh - 10, 1.80, 1.996, [0.05, 0.07, 0.13], 9);
-        rawBoxR(-6, 34, rw + 12, rh - 26, 1.92, 1.998, [0.12, 0.16, 0.24], 9);
+        // 1. EXTERIOR VICE CITY STREET, SIDEWALK PAVERS & TROPICAL GRASS SURROUNDING THE CUTAWAY BUILDING (y = 1.985..1.999)
+        const rawLidSlab = (x, y, w, h, yElev, lidIdx, col = [1, 1, 1]) => {
+            const x0 = x / TILE_SIZE, x1 = (x + w) / TILE_SIZE;
+            const z0 = y / TILE_SIZE, z1 = (y + h) / TILE_SIZE;
+            const [wu, wv] = encLidWorldUV(lidIdx);
+            pushQuad([x0, yElev, z0], [x1, yElev, z0], [x0, yElev, z1], [x1, yElev, z1], wu, wv, wu, wv, col[0], col[1], col[2], 1.0);
+        };
+        const extFacing = (intr && intr.facing) || "S";
+        // Outer Vice City tropical grass lawn surrounding the block
+        rawLidSlab(-640, -480, rw + 1280, rh + 960, 1.986, 4, [0.88, 0.94, 0.86]);
+        // Exterior Vice City paved concrete sidewalk apron around the building perimeter
+        rawLidSlab(-140, -100, rw + 280, rh + 220, 1.993, 8, [0.96, 0.94, 0.90]);
+        // Exterior Vice City asphalt road & yellow road markings along the active entrance facade
+        if (extFacing === "W") {
+            rawLidSlab(-460, -480, 320, rh + 960, 1.990, 19, [0.92, 0.92, 0.95]);
+            rawBoxR(-304, -480, 6, rh + 960, 1.991, 1.994, [0.96, 0.80, 0.18], 9);
+        } else if (extFacing === "E") {
+            rawLidSlab(rw + 140, -480, 320, rh + 960, 1.990, 19, [0.92, 0.92, 0.95]);
+            rawBoxR(rw + 296, -480, 6, rh + 960, 1.991, 1.994, [0.96, 0.80, 0.18], 9);
+        } else if (extFacing === "N") {
+            rawLidSlab(-640, -420, rw + 1280, 320, 1.990, 21, [0.92, 0.92, 0.95]);
+            rawBoxR(-640, -264, rw + 1280, 6, 1.991, 1.994, [0.96, 0.80, 0.18], 9);
+        } else {
+            rawLidSlab(-640, rh + 110, rw + 1280, 320, 1.990, 21, [0.92, 0.92, 0.95]);
+            rawBoxR(-640, rh + 266, rw + 1280, 6, 1.991, 1.994, [0.96, 0.80, 0.18], 9);
+        }
+        // Subtle building foundation curb & drop shadow on the exterior sidewalk
+        rawAoR(-8, 34, rw + 16, rh - 22, 1.995, 18, 0.35);
+        rawBoxR(-6, 36, rw + 12, rh - 26, 1.994, 2.000, [0.76, 0.72, 0.66], 9);
 
-        // Determine primary floor color & interior wall palette per theme
-        let mainFloorCol = [0.90, 0.88, 0.84];
-        let wallTint = [0.84, 0.86, 0.92];
+        // Determine primary floor color, gta1_tiles_vice.png wall tile & warm cutaway cap per theme
+        let mainFloorCol = [0.94, 0.92, 0.88];
+        let wallTint = [0.95, 0.92, 0.86];
         let wallCrownCol = accentRgb;
 
         if (theme === "SHOP_GUN_SHOP") {
-            mainFloorCol = [0.46, 0.50, 0.56]; wallTint = [0.42, 0.46, 0.54];
+            mainFloorCol = [0.88, 0.84, 0.76]; wallTint = [0.92, 0.86, 0.76]; wallSideTile = 199; wallTopCol = [0.84, 0.78, 0.68];
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
-            mainFloorCol = [0.92, 0.84, 0.72]; wallTint = [0.92, 0.86, 0.76];
+            mainFloorCol = [0.95, 0.88, 0.78]; wallTint = [0.96, 0.90, 0.82]; wallSideTile = 177; wallTopCol = [0.90, 0.76, 0.64];
         } else if (theme === "SHOP_HOTEL" || theme === "ART_DECO_HOTEL") {
-            mainFloorCol = [0.82, 0.74, 0.88]; wallTint = [0.90, 0.84, 0.94];
+            mainFloorCol = [0.94, 0.90, 0.88]; wallTint = [0.96, 0.92, 0.94]; wallSideTile = 86; wallTopCol = [0.92, 0.84, 0.86];
         } else if (theme === "SHOP_CLOTHES") {
-            mainFloorCol = [0.94, 0.92, 0.96]; wallTint = [0.94, 0.90, 0.96];
+            mainFloorCol = [0.96, 0.94, 0.96]; wallTint = [0.96, 0.94, 0.98]; wallSideTile = 86; wallTopCol = [0.92, 0.88, 0.94];
         } else if (theme === "SHOP_CONVENIENCE") {
-            mainFloorCol = [0.86, 0.92, 0.90]; wallTint = [0.84, 0.92, 0.90];
+            mainFloorCol = [0.92, 0.95, 0.94]; wallTint = [0.94, 0.96, 0.94]; wallSideTile = 177; wallTopCol = [0.86, 0.90, 0.88];
         } else if (theme === "SHOP_BAR") {
-            mainFloorCol = [0.62, 0.42, 0.28]; wallTint = [0.68, 0.48, 0.34];
+            mainFloorCol = [0.82, 0.64, 0.46]; wallTint = [0.88, 0.74, 0.60]; wallSideTile = 199; wallTopCol = [0.78, 0.62, 0.46];
         } else if (theme === "NEON_CLUB" || theme === "STRIP_CLUB" || theme === "MALIBU_CLUB") {
-            mainFloorCol = [0.28, 0.22, 0.42]; wallTint = [0.34, 0.26, 0.50];
+            mainFloorCol = [0.72, 0.66, 0.82]; wallTint = [0.82, 0.76, 0.90]; wallSideTile = 86; wallTopCol = [0.76, 0.68, 0.84];
         } else if (theme === "MANSION") {
-            mainFloorCol = [0.95, 0.91, 0.84]; wallTint = [0.94, 0.88, 0.78];
+            mainFloorCol = [0.96, 0.93, 0.86]; wallTint = [0.96, 0.92, 0.84]; wallSideTile = 86; wallTopCol = [0.92, 0.86, 0.74];
         } else if (theme === "SPACE_BUNKER") {
-            mainFloorCol = [0.54, 0.64, 0.76]; wallTint = [0.48, 0.58, 0.70];
+            mainFloorCol = [0.82, 0.86, 0.92]; wallTint = [0.84, 0.88, 0.94]; wallSideTile = 71; wallTopCol = [0.78, 0.84, 0.90];
         } else if (theme === "PRISON_BLOCK") {
-            mainFloorCol = [0.48, 0.52, 0.58]; wallTint = [0.52, 0.56, 0.62];
+            mainFloorCol = [0.78, 0.80, 0.84]; wallTint = [0.82, 0.84, 0.88]; wallSideTile = 199; wallTopCol = [0.76, 0.78, 0.82];
         }
 
         // 2. PRIMARY 3D FLOOR SLAB (y = 2.001, High-Res 1024x1024 Baked Multi-Zone Procedural Pixel-Art Floor MAT 14)
@@ -17272,97 +17307,75 @@ class WorldObjectEngine {
             }
         } else if (theme === "SHOP_GUN_SHOP") {
             // 1. North Showroom Illuminated Rifle Pegboard + Ammu-Nation 3D Billboard (x=262..494, y=56..68)
-            boxR(264, 56, 228, 10, 2.16, 2.60, [0.12, 0.16, 0.24], 9);
+            tileBoxR(264, 56, 228, 10, 2.12, 2.54, 199, 199, 8, [0.78, 0.62, 0.44]);
             for (let rIdx = 0; rIdx < 5; rIdx++) {
                 const rx = 274 + rIdx * 44;
-                boxR(rx, 60, 12, 6, 2.26, 2.34, [0.56, 0.30, 0.14], 11); // Wood rifle stock
-                boxR(rx + 12, 60, 22, 6, 2.27, 2.33, [0.68, 0.74, 0.82], 9); // Steel barrel/receiver
+                boxR(rx, 60, 12, 6, 2.24, 2.34, [0.64, 0.36, 0.16], 11); // Wood rifle stock
+                boxR(rx + 12, 60, 22, 6, 2.25, 2.33, [0.76, 0.82, 0.88], 9); // Steel barrel/receiver
             }
-            posterBoxR(302, 56, 152, 12, 2.36, 2.64, "ad_ammunation", [0.88, 0.18, 0.18]);
+            posterBoxR(302, 56, 152, 12, 2.34, 2.60, "ad_ammunation", [0.88, 0.18, 0.18]);
 
-            // 2. West Tactical Gunsmith Vault: Workbench, Heavy Safe & Kevlar Body Armor Rack
-            aoR(36, 68, 164, 26, 2.004, 8, 0.44);
-            boxR(36, 68, 52, 32, 2.00, 2.48, [0.16, 0.20, 0.28], 9); // Vault steel combination safe (beveled brushed steel)
-            boxR(40, 98, 44, 4, 2.04, 2.44, [0.28, 0.34, 0.44], 9);  // Recessed armored safe door
-            cyl(62, 102, 6, 6, 2.22, 2.26, 10, [0.96, 0.78, 0.20], 9, true);
-            boxR(92, 68, 108, 26, 2.00, 2.22, [0.22, 0.26, 0.34], 9); // Gunsmith workbench
-            boxR(90, 66, 112, 30, 2.22, 2.25, [0.58, 0.36, 0.18], 11); // Hardwood workbench top
-            boxR(112, 72, 28, 14, 2.25, 2.32, [0.42, 0.48, 0.56], 9); // Gunsmith steel vise
+            // 2. West Tactical Gunsmith Vault: Textured Workbench, Heavy Safe & Kevlar Body Armor Rack
+            aoR(36, 68, 164, 26, 2.004, 6, 0.22);
+            tileBoxR(36, 68, 52, 32, 2.00, 2.44, 71, 71, 8, [0.68, 0.74, 0.82]); // Vault steel combination safe
+            cyl(62, 102, 6, 6, 2.20, 2.26, 10, [0.98, 0.82, 0.22], 9, true);
+            tileBoxR(92, 68, 108, 28, 2.00, 2.24, 199, 199, 8, [0.84, 0.62, 0.38]); // Gunsmith hardwood workbench
+            boxR(112, 72, 28, 14, 2.24, 2.31, [0.58, 0.64, 0.72], 9); // Gunsmith steel vise
 
             // South-West Kevlar Body Armor Rack (x=36..200, y=352..380)
-            aoR(36, 352, 164, 28, 2.004, 8, 0.42);
-            boxR(36, 352, 164, 28, 2.00, 2.18, [0.16, 0.20, 0.28], 9);
+            aoR(36, 352, 164, 28, 2.004, 6, 0.22);
+            tileBoxR(36, 352, 164, 28, 2.00, 2.20, 199, 199, 8, [0.76, 0.68, 0.56]);
             for (let v = 0; v < 3; v++) {
                 const vx = 48 + v * 52;
-                boxR(vx, 356, 36, 20, 2.18, 2.42, [0.08, 0.52, 0.84], 9); // Kevlar carrier vest
-                boxR(vx + 6, 358, 24, 16, 2.22, 2.38, [0.10, 0.14, 0.22], 9); // Ballistic trauma plate
+                boxR(vx, 356, 36, 20, 2.20, 2.38, [0.14, 0.62, 0.94], 9); // Kevlar carrier vest
+                boxR(vx + 6, 358, 24, 16, 2.24, 2.36, [0.22, 0.28, 0.38], 9); // Ballistic trauma plate
             }
 
-            // 3. Center Showroom Illuminated Glass Weapon Showcase Counter (x=262..494, y=128..156)
-            aoR(262, 128, 232, 28, 2.004, 10, 0.46);
-            boxR(262, 128, 232, 28, 2.00, 2.15, [0.14, 0.18, 0.26], 9);
-            // Red velvet weapon liner inside the showcase
-            boxR(266, 132, 224, 20, 2.15, 2.18, [0.64, 0.10, 0.18], 9);
-            // 3D Pistols, Micro-SMGs, and Shotguns resting inside the glass showcase
-            for (let b = 0; b < 3; b++) {
-                const bx = 274 + b * 72;
-                boxR(bx, 136, 24, 6, 2.18, 2.21, [0.82, 0.86, 0.92], 9);
-                boxR(bx + 30, 136, 28, 6, 2.18, 2.21, [0.58, 0.32, 0.16], 11);
-                boxR(bx + 8, 144, 36, 5, 2.18, 2.20, [0.96, 0.78, 0.18], 9);
-            }
-            // Translucent cyan illuminated glass showcase hood + Cash Register
-            boxR(260, 126, 236, 32, 2.18, 2.24, [0.38, 0.88, 0.98], 10, 0.42);
-            boxR(266, 130, 28, 18, 2.24, 2.34, [0.20, 0.24, 0.32], 9);
+            // 3. Center Showroom Glass Weapon Showcase Counter (x=262..494, y=128..156)
+            aoR(262, 128, 232, 28, 2.004, 8, 0.24);
+            tileBoxR(262, 128, 232, 28, 2.00, 2.18, 199, 199, 8, [0.78, 0.56, 0.36]);
+            boxR(266, 132, 224, 20, 2.18, 2.20, [0.78, 0.14, 0.22], 9); // Crimson velvet display liner
+            boxR(260, 126, 236, 32, 2.20, 2.24, [0.56, 0.92, 1.0], 10, 0.34); // Clear glass counter top
+            boxR(266, 130, 26, 18, 2.24, 2.34, [0.88, 0.76, 0.26], 9); // Brass cash register
 
-            // 4. Center Showroom Military Surplus Crate Islands (x=258..344 & x=412..498, y=288..316 — wide 68px center aisle!)
+            // 4. Center Showroom Military Surplus Crate Islands (x=258..344 & x=412..498, y=288..316)
             for (const rx of [258, 412]) {
-                aoR(rx, 288, 86, 28, 2.004, 8, 0.42);
-                boxR(rx, 288, 86, 28, 2.00, 2.24, [0.26, 0.36, 0.18], 11); // Olive-drab wood slat crate
-                boxR(rx + 4, 292, 78, 20, 2.24, 2.28, [0.46, 0.32, 0.16], 11);
-                boxR(rx + 12, 295, 62, 14, 2.28, 2.33, [0.92, 0.44, 0.12], 9); // Ordnance warhead case
+                aoR(rx, 288, 86, 28, 2.004, 6, 0.22);
+                tileBoxR(rx, 288, 86, 28, 2.00, 2.22, 199, 199, 8, [0.58, 0.68, 0.42]); // Olive-drab wood slat crate
+                boxR(rx + 6, 292, 74, 20, 2.22, 2.26, [0.74, 0.54, 0.32], 11);
             }
 
-            // 5. Entrance Security Vestibule Framed Bulletproof Guard Window (x=350..470, y=410..434) + Vestibule Guard Desk & Ordnance Crates
-            boxR(348, 410, 124, 24, 2.18, 2.23, [0.18, 0.24, 0.32], 9);       // Armored steel window sill
-            boxR(350, 411, 120, 22, 2.23, 2.52, [0.32, 0.88, 0.98], 10, 0.82); // Glowing bulletproof ballistic glass
-            boxR(348, 410, 124, 24, 2.52, 2.57, [0.22, 0.28, 0.38], 9);       // Overhead steel window frame lintel
-            aoR(54, 468, 96, 30, 2.004, 8, 0.42);
-            boxR(54, 468, 96, 30, 2.00, 2.22, [0.20, 0.26, 0.34], 9); // Vestibule Range Officer security desk
-            boxR(52, 466, 100, 34, 2.22, 2.25, [0.58, 0.36, 0.18], 11);
-            boxR(64, 472, 26, 16, 2.25, 2.38, [0.22, 0.88, 0.98], 10); // Security CCTV monitor
-            aoR(664, 468, 96, 30, 2.004, 8, 0.42);
-            boxR(664, 468, 96, 30, 2.00, 2.24, [0.26, 0.36, 0.18], 11); // Vestibule olive-drab ammo pallet
-            cyl(684, 452, 11, 11, 2.00, 2.28, 10, [0.84, 0.64, 0.18], 9, true); // Brass 5.56mm ammo drum
-            cyl(712, 452, 11, 11, 2.00, 2.28, 10, [0.24, 0.34, 0.18], 9, true);
+            // 5. Entrance Security Vestibule Guard Counter & Ordnance Crates (no tall roof-blocking lintel!)
+            tileBoxR(348, 410, 124, 22, 2.00, 2.22, 199, 199, 8, [0.78, 0.72, 0.64]); // Low pass-through security counter
+            boxR(352, 413, 116, 16, 2.22, 2.32, [0.48, 0.90, 0.98], 10, 0.45);
+            aoR(54, 468, 96, 30, 2.004, 6, 0.22);
+            tileBoxR(54, 468, 96, 30, 2.00, 2.22, 199, 199, 8, [0.82, 0.62, 0.40]); // Vestibule Range Officer desk
+            boxR(64, 472, 26, 16, 2.22, 2.34, [0.22, 0.88, 0.98], 10); // Security CCTV monitor
+            aoR(664, 468, 96, 30, 2.004, 6, 0.22);
+            tileBoxR(664, 468, 96, 30, 2.00, 2.22, 199, 199, 8, [0.62, 0.70, 0.46]); // Vestibule olive-drab ammo pallet
+            cyl(684, 452, 11, 11, 2.00, 2.26, 10, [0.92, 0.74, 0.24], 9, true);
+            cyl(712, 452, 11, 11, 2.00, 2.26, 10, [0.48, 0.58, 0.36], 9, true);
 
-            // 6. East 4-Lane Live Indoor Firing Range (Shooting booths at y=312..334, stall dividers y=282..334, targets at y=86!)
-            aoR(548, 312, 236, 22, 2.004, 8, 0.44);
-            boxR(548, 312, 236, 22, 2.00, 2.20, [0.18, 0.22, 0.30], 9);
-            boxR(546, 310, 240, 26, 2.20, 2.24, [0.58, 0.36, 0.18], 11); // Shooting booth bench top
-            // Downrange Angled Sandtrap Berm (x=544..788, y=62..82) + Overhead Target Carrier Crossbeam
-            boxR(544, 62, 244, 20, 2.00, 2.18, [0.44, 0.28, 0.14], 11);
-            boxR(548, 86, 236, 4, 2.44, 2.48, [0.36, 0.42, 0.50], 9);
+            // 6. East 4-Lane Live Indoor Firing Range (Open top-down view — no overhead ceiling bars!)
+            aoR(548, 312, 236, 22, 2.004, 6, 0.22);
+            tileBoxR(548, 312, 236, 22, 2.00, 2.22, 199, 199, 8, [0.84, 0.64, 0.42]); // Shooting booth bench
+            tileBoxR(544, 62, 244, 20, 2.00, 2.20, 199, 199, 8, [0.76, 0.56, 0.36]); // Downrange sandtrap berm
             const hitTimers = (intr && intr._targetHitTimers) || [];
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
                 const hitFlash = (hitTimers[lane] || 0) > 0;
-                // Overhead target pulley rail per lane (subtle ceiling cable at z = 2.46..2.48)
-                boxR(lx + 26, 86, 3, 226, 2.46, 2.48, [0.26, 0.32, 0.40], 9);
                 // Red acoustic shooting earmuffs & brass ammo box on each booth counter
-                cyl(lx + 26, 322, 5, 5, 2.24, 2.29, 8, [0.92, 0.16, 0.20], 9, true);
-                boxR(lx + 8, 316, 12, 10, 2.24, 2.29, [0.94, 0.78, 0.20], 9);
-                // Compact ballistic stall dividers flanking each shooting booth (y=282..334 — leaves downrange lanes 100% open!)
+                cyl(lx + 26, 322, 5, 5, 2.22, 2.28, 8, [0.92, 0.18, 0.22], 9, true);
+                boxR(lx + 8, 316, 12, 10, 2.22, 2.28, [0.96, 0.80, 0.22], 9);
                 if (lane > 0) {
-                    boxR(lx - 3, 282, 6, 52, 2.00, 2.28, [0.22, 0.26, 0.34], 9);
-                    boxR(lx - 2, 284, 4, 48, 2.28, 2.46, [0.38, 0.86, 0.98], 10, 0.65);
+                    boxR(lx - 3, 284, 6, 48, 2.00, 2.32, [0.72, 0.76, 0.82], 9);
                 }
-                // Crisp symmetric bullseye target hanging at y=86 ( concentric rings span full thickness so S/N/E/W views never split!)
                 const targY = Math.round(86 + Math.sin(t * 2.0 + lane * 1.4) * 3);
-                const sheetCol = hitFlash ? [1.0, 0.92, 0.28] : [0.96, 0.95, 0.90];
-                const ringCol = hitFlash ? [0.22, 1.0, 0.36] : [0.92, 0.16, 0.20];
-                boxR(lx + 12, targY, 30, 4, 2.10, 2.44, sheetCol, hitFlash ? 10 : 9);
-                boxR(lx + 18, targY - 1, 18, 6, 2.18, 2.36, ringCol, 10);
-                boxR(lx + 23, targY - 2, 8, 8, 2.24, 2.30, [0.98, 0.84, 0.16], 10);
+                const sheetCol = hitFlash ? [1.0, 0.92, 0.28] : [0.98, 0.96, 0.92];
+                const ringCol = hitFlash ? [0.22, 1.0, 0.36] : [0.92, 0.18, 0.22];
+                boxR(lx + 12, targY, 30, 6, 2.06, 2.38, sheetCol, hitFlash ? 10 : 9);
+                boxR(lx + 18, targY - 1, 18, 8, 2.14, 2.32, ringCol, 10);
+                boxR(lx + 23, targY - 2, 8, 10, 2.20, 2.28, [0.98, 0.84, 0.16], 10);
             }
         } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
             const cookW = theme === "DINER_PAWN" ? 384 : 480;
@@ -17651,7 +17664,7 @@ class WorldObjectEngine {
             boxR(612, 344, 144, 36, 2.00, 2.38, [0.22, 0.28, 0.38], 9);
         }
 
-        // 4. 3D INTERIOR PARTITION WALLS & OVERHEAD DOORWAY LINTELS (Supports BOTH Vertical & Horizontal Doorways!)
+        // 4. 3D INTERIOR PARTITION WALLS & OPEN TOP-DOWN DOORWAY THRESHOLDS (Doorways stay 100% open from above!)
         const obsProvider = window.ShopInteriors || window.Interiors;
         const obsList = (obsProvider && typeof obsProvider.getObstacles === "function")
             ? obsProvider.getObstacles(intr)
@@ -17660,10 +17673,10 @@ class WorldObjectEngine {
             const ob = obsList[i];
             if (!ob.isWall) continue;
 
-            rawAoR(ob.x, ob.y, ob.w, ob.h, 2.004, 8, 0.40);
-            rawWallBoxR(ob.x, ob.y, ob.w, ob.h, 2.00, 2.54, wallTint, wallCrownCol);
+            rawAoR(ob.x, ob.y, ob.w, ob.h, 2.004, 6, 0.24);
+            rawWallBoxR(ob.x, ob.y, ob.w, ob.h, 2.00, 2.42, wallTint, wallCrownCol);
 
-            // Connect consecutive collinear partition segments (Vertical OR Horizontal) with a 3D Overhead Doorway Lintel & Jamb Pillars!
+            // Connect consecutive collinear partition segments with a flush brass/stone floor threshold strip & doorjamb pillars (NO overhead roof lintel blocking top-down view!)
             for (let j = i + 1; j < obsList.length; j++) {
                 const ob2 = obsList[j];
                 if (!ob2.isWall) continue;
@@ -17674,10 +17687,9 @@ class WorldObjectEngine {
                     if (gap >= 36 && gap <= 190) {
                         const wx = Math.round((ob.x + ob2.x) * 0.5);
                         const ww = Math.max(ob.w, ob2.w);
-                        rawWallBoxR(wx, topY, ww, gap, 2.42, 2.54, wallTint, wallCrownCol);
-                        rawBoxR(wx + 2, topY, Math.max(4, ww - 4), gap, 2.001, 2.008, [0.14, 0.18, 0.26], 9);
-                        rawCyl(wx + ww * 0.5, topY + 2, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
-                        rawCyl(wx + ww * 0.5, botY - 2, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
+                        rawBoxR(wx + 2, topY, Math.max(4, ww - 4), gap, 2.001, 2.006, [0.78, 0.68, 0.48], 9);
+                        rawCyl(wx + ww * 0.5, topY + 2, 4, 4, 2.00, 2.44, 10, [0.84, 0.74, 0.54], 9, true);
+                        rawCyl(wx + ww * 0.5, botY - 2, 4, 4, 2.00, 2.44, 10, [0.84, 0.74, 0.54], 9, true);
                     }
                 } else if (ob.h <= 30 && ob2.h <= 30 && Math.abs(ob.y - ob2.y) <= 6) {
                     const leftX = Math.min(ob.x + ob.w, ob2.x + ob2.w);
@@ -17686,10 +17698,9 @@ class WorldObjectEngine {
                     if (gap >= 36 && gap <= 190) {
                         const wy = Math.round((ob.y + ob2.y) * 0.5);
                         const wh = Math.max(ob.h, ob2.h);
-                        rawWallBoxR(leftX, wy, gap, wh, 2.42, 2.54, wallTint, wallCrownCol);
-                        rawBoxR(leftX, wy + 2, gap, Math.max(4, wh - 4), 2.001, 2.008, [0.14, 0.18, 0.26], 9);
-                        rawCyl(leftX + 2, wy + wh * 0.5, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
-                        rawCyl(rightX - 2, wy + wh * 0.5, 4, 4, 2.00, 2.42, 10, [0.28, 0.34, 0.44], 9, true);
+                        rawBoxR(leftX, wy + 2, gap, Math.max(4, wh - 4), 2.001, 2.006, [0.78, 0.68, 0.48], 9);
+                        rawCyl(leftX + 2, wy + wh * 0.5, 4, 4, 2.00, 2.44, 10, [0.84, 0.74, 0.54], 9, true);
+                        rawCyl(rightX - 2, wy + wh * 0.5, 4, 4, 2.00, 2.44, 10, [0.84, 0.74, 0.54], 9, true);
                     }
                 }
             }
@@ -17838,8 +17849,24 @@ class WorldObjectEngine {
             return { x, y, angle: ang };
         };
 
-        // 1. Theme-Specific 3D Props (Jacuzzi Flamingo Float, Sizzling Kitchen Steam, Boutique Mannequins)
-        if (theme === "SHOP_HOTEL" || theme === "ART_DECO_HOTEL") {
+        // 1. Exterior Vice City Sidewalk Palm Trees & Theme-Specific 3D Props
+        for (const [epx, epy] of [[-78, 86], [-78, rh - 64], [rw + 78, 86], [rw + 78, rh - 64]]) {
+            renderer.batchObjectSprite3D("palm_tree", epx, epy, 2.18, (epx + epy) * 0.01, 0.95, SPRITE_DRAW_ORDER.TREE);
+        }
+        if (theme === "SHOP_GUN_SHOP") {
+            // Actual GTA 1 weapon sprites displayed on the Center Showroom glass counter, North rifle wall & Surplus crates!
+            for (const [wspr, wx, wy, wz, wang, wsc] of [
+                ["pistol", 296, 142, 2.25, 0.2, 1.32],
+                ["uzi", 378, 142, 2.25, -0.15, 1.32],
+                ["shotgun", 456, 142, 2.25, 0.08, 1.40],
+                ["shotgun", 312, 66, 2.34, 0.0, 1.35],
+                ["rocket", 442, 66, 2.34, 0.0, 1.35],
+                ["armor", 118, 366, 2.40, 0.0, 1.30]
+            ]) {
+                const wp = trPt(wx, wy, wang);
+                renderer.batchObjectSprite3D(wspr, wp.x, wp.y, wz, wp.angle, wsc, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            }
+        } else if (theme === "SHOP_HOTEL" || theme === "ART_DECO_HOTEL") {
             const fp = trPt(665 + Math.sin(t * 2.0) * 8, 400 + Math.cos(t * 1.6) * 6);
             renderer.batchObjectSprite3D("flamingo_float", fp.x, fp.y, 2.16, t * 0.45, 0.82, SPRITE_DRAW_ORDER.MAP_OBJECT);
         } else if (theme === "MANSION") {
@@ -17870,13 +17897,13 @@ class WorldObjectEngine {
             const st = stations[i];
             const ready = (st.cooldown || 0) <= 0;
             const distSt = Math.hypot(pInX - st.x, pInY - st.y);
-            const isNearSt = distSt < 64;
+            const isNearSt = distSt < 88;
             if (ready) {
-                const ringSz = isNearSt ? (34 + Math.sin(t * 7.5) * 4.0) : (24 + Math.sin(t * 3.5 + i) * 2.0);
-                const rCol = isNearSt ? [1.0, 0.88, 0.22, 0.52] : [0.22, 0.88, 0.98, 0.22];
+                const ringSz = isNearSt ? (38 + Math.sin(t * 7.5) * 4.0) : (28 + Math.sin(t * 3.5 + i) * 2.0);
+                const rCol = isNearSt ? [1.0, 0.88, 0.22, 0.55] : [0.98, 0.82, 0.24, 0.28];
                 renderer.pushSolidQuad3D(st.x, st.y, 2.011, ringSz, ringSz, t * (isNearSt ? 2.2 : 0.8) + i, rCol[0], rCol[1], rCol[2], rCol[3], SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
-            const bobZ = 2.14 + Math.sin(t * 4.2 + i) * 0.025;
+            const bobZ = 2.15 + Math.sin(t * 4.2 + i) * 0.025;
             const spinA = t * 2.4 + i;
             let iconSpr = null;
             if (st.action === "BUY_PISTOL") iconSpr = "pistol";
@@ -17888,7 +17915,7 @@ class WorldObjectEngine {
             else if (st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH" || st.action === "EXPORT_CAR") iconSpr = "briefcase";
 
             if (iconSpr && ready) {
-                renderer.batchObjectSprite3D(iconSpr, st.x, st.y, bobZ, spinA, isNearSt ? 1.28 : 1.15, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                renderer.batchObjectSprite3D(iconSpr, st.x, st.y, bobZ, spinA, isNearSt ? 1.65 : 1.45, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         }
 
