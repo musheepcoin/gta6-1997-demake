@@ -19,8 +19,8 @@ class MissionManager {
                 rewardCash: 25000,
                 name: "SOUTH BEACH LIQUOR HOLD-UP",
                 briefing: "MISSION 1 (TRUST?): Hold up South Beach Liquor on Ocean Drive with Jason, then lose VCPD at Vice Customs!",
-                x: 443.5 * TILE_SIZE,
-                y: 285.5 * TILE_SIZE,
+                x: mx512(443.5) * TILE_SIZE,
+                y: my512(285.5) * TILE_SIZE,
                 completed: false
             },
             {
@@ -31,8 +31,8 @@ class MissionManager {
                 rewardCash: 45000,
                 name: "VICE BEACH PIER CONTRABAND",
                 briefing: "MISSION 2 (CONTRABAND): Collect 3 contraband crates on Vice Beach & Ocean Pier, then deliver to Hotel Dixon!",
-                x: 448.5 * TILE_SIZE,
-                y: 293.5 * TILE_SIZE,
+                x: mx512(448.5) * TILE_SIZE,
+                y: my512(293.5) * TILE_SIZE,
                 completed: false
             },
             {
@@ -43,8 +43,8 @@ class MissionManager {
                 rewardCash: 75000,
                 name: "STAR ISLAND CHEETAH BOOST",
                 briefing: "MISSION 3 (CHEETAH BOOST): Steal the VIP Grotti Cheetah on Star Island and deliver it to Vice Port Crane!",
-                x: 344.5 * TILE_SIZE,
-                y: 171.5 * TILE_SIZE,
+                x: mx512(344.5) * TILE_SIZE,
+                y: my512(171.5) * TILE_SIZE,
                 completed: false
             },
             {
@@ -55,8 +55,8 @@ class MissionManager {
                 rewardCash: 150000,
                 name: "DOC ANKLE MONITOR OVERRIDE",
                 briefing: "MISSION 4 (THE BIG SCORE): Ambush the Armored Van in Port Gellhorn, then hack the DOC Relay at VCIA Airport!",
-                x: 68.5 * TILE_SIZE,
-                y: 187.5 * TILE_SIZE,
+                x: mx512(68.5) * TILE_SIZE,
+                y: my512(187.5) * TILE_SIZE,
                 completed: false
             }
         ];
@@ -137,7 +137,7 @@ class MissionManager {
                 "REGISTER CLEARED! VCPD cruisers incoming! Drive to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave (or change outfits) to lose the heat!",
                 true
             );
-            m.targetPos = { x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
+            m.targetPos = { x: mx512(435.5) * TILE_SIZE, y: my512(287.7) * TILE_SIZE };
             m.objectiveLabel = "RESPRAY AT VICE CUSTOMS (COLLINS AVE)";
         }
     }
@@ -184,7 +184,7 @@ class MissionManager {
                         "REGISTER CLEARED ($15,000)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
                         true
                     );
-                    m.targetPos = { x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
+                    m.targetPos = { x: mx512(435.5) * TILE_SIZE, y: my512(287.7) * TILE_SIZE };
                     m.objectiveLabel = "RESPRAY AT VICE CUSTOMS (COLLINS AVE)";
                 }
             } else if (m.stage === 2) {
@@ -248,7 +248,7 @@ class MissionManager {
                 }
                 const craneDist = Math.min(
                     Math.hypot(p.x - mx256(171.5) * TILE_SIZE, p.y - my256(162.5) * TILE_SIZE),
-                    Math.hypot(p.x - 333.2 * TILE_SIZE, p.y - 306.5 * TILE_SIZE)
+                    Math.hypot(p.x - mx512(333.2) * TILE_SIZE, p.y - my512(306.5) * TILE_SIZE)
                 );
                 if (p.inVehicle === m.targetCar && (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 95 || craneDist < 110)) {
                     this.completeMission(m.phone, "STAR ISLAND GRAND THEFT", 75000);
@@ -264,7 +264,7 @@ class MissionManager {
                     m.stage = 2;
                     g.addCash(50000, "ARMORED VAULT LOOT!");
                     g.setWantedLevel(Math.max(g.wantedLevel, 4));
-                    m.targetPos = { x: 128.0 * TILE_SIZE, y: 297.5 * TILE_SIZE };
+                    m.targetPos = { x: mx512(128.0) * TILE_SIZE, y: my512(297.5) * TILE_SIZE };
                     m.objectiveLabel = "HACK DOC RELAY AT VCIA AIRPORT";
                     g.sendPager(
                         "LUCIA & JASON",
@@ -353,8 +353,8 @@ class MissionManager {
             );
             g.showBigBanner("CHEETAH BOOST", "STEAL THE VIP CHEETAH ON STAR ISLAND", "#00f0ff", 2.4);
         } else if (phone.missionId === "M4_ANKLE_OVERRIDE") {
-            const bx = 70.5 * TILE_SIZE;
-            const by = 213.5 * TILE_SIZE;
+            const bx = mx512(70.5) * TILE_SIZE;
+            const by = my512(213.5) * TILE_SIZE;
             const brinks = new Vehicle("mission_brinks", "BRINKS_TRUCK", bx, by, 0);
             brinks.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(bx, by, 4.0) : 2.0;
             brinks.missionTag = "ARMORED_TARGET";

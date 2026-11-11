@@ -721,7 +721,7 @@ class RetroRenderer {
 
                     // Daytime 3D Building Cast Shadows, Building-Foot Ambient Occlusion & Warm Florida Sunlight vs. Cool Sky Shade
                     if (dayAmt > 0.01 && c.a > 0.02) {
-                        vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
+                        vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 1024.0);
                         float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
                         float sandMask = clamp(isSand + step(0.82, min(c.r, min(c.g, c.b))), 0.0, 1.0);
                         float bldAO = lm.g * onGround * (1.0 - sandMask * 0.88);
@@ -1039,7 +1039,7 @@ class RetroRenderer {
             vec3 applyRoadLighting(vec3 col) {
                 float dayAmt = clamp(1.0 - uNightTint * 1.15, 0.0, 1.0);
                 if (dayAmt > 0.01) {
-                    vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
+                    vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 1024.0);
                     float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
                     float bldAO = lm.g * onGround * 0.22;
                     float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
@@ -5738,12 +5738,13 @@ class RetroRenderer {
             [-1, -1], [1, -1], [-1, 1], [1, 1]
         ];
 
+        const lmScale = M / LRES;
         for (let ty = 0; ty < LRES; ty++) {
-            const wy = ty + 0.5;
-            const cy = Math.min(M - 1, Math.max(0, ty));
+            const wy = (ty + 0.5) * lmScale;
+            const cy = Math.min(M - 1, Math.max(0, Math.floor(wy)));
             for (let tx = 0; tx < LRES; tx++) {
-                const wx = tx + 0.5;
-                const cx = Math.min(M - 1, Math.max(0, tx));
+                const wx = (tx + 0.5) * lmScale;
+                const cx = Math.min(M - 1, Math.max(0, Math.floor(wx)));
                 const idx = ty * LRES + tx;
                 const baseElev = colTopElev[cy * M + cx];
                 rawElev[idx] = baseElev;
@@ -5833,8 +5834,8 @@ class RetroRenderer {
 
     getDayShadeAtPixel(xPx, yPx) {
         if (!this.dayShadowMap) return 0.0;
-        const tx = Math.min(511, Math.max(0, Math.floor(xPx / TILE_SIZE)));
-        const ty = Math.min(511, Math.max(0, Math.floor(yPx / TILE_SIZE)));
+        const tx = Math.min(511, Math.max(0, Math.floor((xPx / WORLD_W) * 512)));
+        const ty = Math.min(511, Math.max(0, Math.floor((yPx / WORLD_H) * 512)));
         const off = (ty * 512 + tx) * 4;
         const ao = this.dayShadowMap[off + 1] / 255.0;
         const shE = this.dayShadowMap[off + 2] / 255.0;
@@ -8124,7 +8125,7 @@ class RetroRenderer {
                         [null, "bikini_yellow"]
                     ];
                     const pair = benchPairs[ei % benchPairs.length];
-                    const benchAng = ev.ang !== undefined ? ev.ang : ((ev.x < 450 * TILE_SIZE) ? Math.PI : 0);
+                    const benchAng = ev.ang !== undefined ? ev.ang : ((ev.x < mx512(450) * TILE_SIZE) ? Math.PI : 0);
                     let pA = evWiped ? null : pair[0];
                     let pB = evWiped ? null : pair[1];
                     if (game && game.player && game.player.isSitting && game.player.sittingProp === ev) {
@@ -8345,13 +8346,13 @@ class RetroRenderer {
 
             // 10.5 Outdoor Prison Weightlifting Benches ("gym_bench") & Lifters in Central Plaza (r=97..101) & Upper Exercise Lawn (r=108..114)
             const prisonGymBenches = [
-                { x: 58.6 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: 0 },
-                { x: 65.4 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: Math.PI },
-                { x: 59.2 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
-                { x: 62.0 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
-                { x: 64.8 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
-                { x: 60.5 * TILE_SIZE, y: 113.5 * TILE_SIZE, ang: Math.PI },
-                { x: 63.5 * TILE_SIZE, y: 113.5 * TILE_SIZE, ang: Math.PI }
+                { x: mx512(58.6) * TILE_SIZE, y: my512(99.2) * TILE_SIZE,  ang: 0 },
+                { x: mx512(65.4) * TILE_SIZE, y: my512(99.2) * TILE_SIZE,  ang: Math.PI },
+                { x: mx512(59.2) * TILE_SIZE, y: my512(109.5) * TILE_SIZE, ang: 0 },
+                { x: mx512(62.0) * TILE_SIZE, y: my512(109.5) * TILE_SIZE, ang: 0 },
+                { x: mx512(64.8) * TILE_SIZE, y: my512(109.5) * TILE_SIZE, ang: 0 },
+                { x: mx512(60.5) * TILE_SIZE, y: my512(113.5) * TILE_SIZE, ang: Math.PI },
+                { x: mx512(63.5) * TILE_SIZE, y: my512(113.5) * TILE_SIZE, ang: Math.PI }
             ];
             for (let bi = 0; bi < prisonGymBenches.length; bi++) {
                 const gb = prisonGymBenches[bi];
@@ -8365,20 +8366,20 @@ class RetroRenderer {
             // 10.6 Orange-Jumpsuit Prisoners ("g2_prisoner") across North Cellblock Walkways (r=80..95), Central Roll-Call Plaza (r=96..102) & Upper Exercise Lawn (r=105..115)
             const yardGroups = [
                 // North Reception & Cellblock Walkways (r = 79..94)
-                { x: 58.5 * TILE_SIZE, y: 81.0 * TILE_SIZE, rx: 18, ry: 36, spd: 1.1, seed: 0.4 },
-                { x: 65.5 * TILE_SIZE, y: 81.0 * TILE_SIZE, rx: 18, ry: 36, spd: 1.2, seed: 1.7 },
-                { x: 58.3 * TILE_SIZE, y: 89.5 * TILE_SIZE, rx: 14, ry: 48, spd: 1.0, seed: 2.9 },
-                { x: 65.7 * TILE_SIZE, y: 89.5 * TILE_SIZE, rx: 14, ry: 48, spd: 1.1, seed: 4.1 },
+                { x: mx512(58.5) * TILE_SIZE, y: my512(81.0) * TILE_SIZE, rx: 18, ry: 36, spd: 1.1, seed: 0.4 },
+                { x: mx512(65.5) * TILE_SIZE, y: my512(81.0) * TILE_SIZE, rx: 18, ry: 36, spd: 1.2, seed: 1.7 },
+                { x: mx512(58.3) * TILE_SIZE, y: my512(89.5) * TILE_SIZE, rx: 14, ry: 48, spd: 1.0, seed: 2.9 },
+                { x: mx512(65.7) * TILE_SIZE, y: my512(89.5) * TILE_SIZE, rx: 14, ry: 48, spd: 1.1, seed: 4.1 },
                 // Central Roll-Call Plaza (r = 96.5..102.0 — directly visible in upper yard!)
-                { x: 60.2 * TILE_SIZE, y: 97.5 * TILE_SIZE, rx: 32, ry: 14, spd: 1.3, seed: 0.8 },
-                { x: 63.8 * TILE_SIZE, y: 97.5 * TILE_SIZE, rx: 32, ry: 14, spd: 1.2, seed: 2.2 },
-                { x: 61.0 * TILE_SIZE, y: 101.2 * TILE_SIZE, rx: 36, ry: 12, spd: 1.1, seed: 3.5 },
-                { x: 64.2 * TILE_SIZE, y: 101.2 * TILE_SIZE, rx: 36, ry: 12, spd: 1.4, seed: 5.0 },
+                { x: mx512(60.2) * TILE_SIZE, y: my512(97.5) * TILE_SIZE, rx: 32, ry: 14, spd: 1.3, seed: 0.8 },
+                { x: mx512(63.8) * TILE_SIZE, y: my512(97.5) * TILE_SIZE, rx: 32, ry: 14, spd: 1.2, seed: 2.2 },
+                { x: mx512(61.0) * TILE_SIZE, y: my512(101.2) * TILE_SIZE, rx: 36, ry: 12, spd: 1.1, seed: 3.5 },
+                { x: mx512(64.2) * TILE_SIZE, y: my512(101.2) * TILE_SIZE, rx: 36, ry: 12, spd: 1.4, seed: 5.0 },
                 // Upper-Middle Grass Exercise Lawn (r = 105.5..115.0 — directly visible in middle yard!)
-                { x: 58.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, rx: 28, ry: 22, spd: 1.2, seed: 1.1 },
-                { x: 65.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, rx: 28, ry: 22, spd: 1.3, seed: 2.6 },
-                { x: 58.6 * TILE_SIZE, y: 112.0 * TILE_SIZE, rx: 24, ry: 34, spd: 1.1, seed: 3.9 },
-                { x: 66.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, rx: 24, ry: 34, spd: 1.2, seed: 5.4 }
+                { x: mx512(58.8) * TILE_SIZE, y: my512(106.5) * TILE_SIZE, rx: 28, ry: 22, spd: 1.2, seed: 1.1 },
+                { x: mx512(65.8) * TILE_SIZE, y: my512(106.5) * TILE_SIZE, rx: 28, ry: 22, spd: 1.3, seed: 2.6 },
+                { x: mx512(58.6) * TILE_SIZE, y: my512(112.0) * TILE_SIZE, rx: 24, ry: 34, spd: 1.1, seed: 3.9 },
+                { x: mx512(66.0) * TILE_SIZE, y: my512(112.0) * TILE_SIZE, rx: 24, ry: 34, spd: 1.2, seed: 5.4 }
             ];
             for (let yi = 0; yi < yardGroups.length; yi++) {
                 const yg = yardGroups[yi];
@@ -8431,7 +8432,7 @@ class RetroRenderer {
             }
 
             // 10.8 South Yard Fight Ring (c=61.5, r=141.5): 2 Prisoners Brawling surrounded by Cheering Orange-Jumpsuit Inmates
-            const fightX = 62.0 * TILE_SIZE, fightY = 141.5 * TILE_SIZE;
+            const fightX = mx512(62.0) * TILE_SIZE, fightY = my512(141.5) * TILE_SIZE;
             if (fightX >= minX - 160 && fightX <= maxX + 160 && fightY >= minY - 160 && fightY <= maxY + 160) {
                 const fAng = this.time * 2.4;
                 const fFr = 50 + (Math.floor(this.time * 8.0) % 4);
@@ -8445,11 +8446,11 @@ class RetroRenderer {
 
             // 10.9 Armed Correctional Officers ("police" & "g2_swat") patrolling inside the prison yard
             const guardPatrols = [
-                { x: 66.8 * TILE_SIZE, y: 96.5 * TILE_SIZE,  dx: 0,  dy: 45, seed: 0.3 },
-                { x: 57.6 * TILE_SIZE, y: 103.5 * TILE_SIZE, dx: 35, dy: 0,  seed: 1.6 },
-                { x: 66.8 * TILE_SIZE, y: 112.0 * TILE_SIZE, dx: 0,  dy: 55, seed: 2.9 },
-                { x: 57.8 * TILE_SIZE, y: 124.0 * TILE_SIZE, dx: 0,  dy: 55, seed: 4.2 },
-                { x: 66.5 * TILE_SIZE, y: 138.0 * TILE_SIZE, dx: 0,  dy: 45, seed: 5.5 }
+                { x: mx512(66.8) * TILE_SIZE, y: my512(96.5) * TILE_SIZE,  dx: 0,  dy: 45, seed: 0.3 },
+                { x: mx512(57.6) * TILE_SIZE, y: my512(103.5) * TILE_SIZE, dx: 35, dy: 0,  seed: 1.6 },
+                { x: mx512(66.8) * TILE_SIZE, y: my512(112.0) * TILE_SIZE, dx: 0,  dy: 55, seed: 2.9 },
+                { x: mx512(57.8) * TILE_SIZE, y: my512(124.0) * TILE_SIZE, dx: 0,  dy: 55, seed: 4.2 },
+                { x: mx512(66.5) * TILE_SIZE, y: my512(138.0) * TILE_SIZE, dx: 0,  dy: 45, seed: 5.5 }
             ];
             for (let gi = 0; gi < guardPatrols.length; gi++) {
                 const gp = guardPatrols[gi];
@@ -9495,10 +9496,10 @@ class RetroRenderer {
             const pby = Math.floor(ped.y / TILE_SIZE);
             const isPrisonZone =
                 ped.missionTag === "PRISONER" ||
-                (pbx >= 56 && pbx <= 68 && pby >= 76 && pby <= 146);
+                (ix512(pbx) >= 56 && ix512(pbx) <= 68 && iy512(pby) >= 76 && iy512(pby) <= 146);
             const isBeachZone =
                 ped.missionTag === "BEACH" ||
-                ped.x >= 452.0 * TILE_SIZE ||
+                ped.x >= mx512(452.0) * TILE_SIZE ||
                 (this.map && this.map.coastalSandMask && this.map.coastalSandMask[pby * MAP_COLS + pbx] === 1) ||
                 (pbx >= MAP_X_256[182] && pbx <= MAP_X_256[195] && pby >= MAP_Y_256[98] && pby <= MAP_Y_256[128]);
 

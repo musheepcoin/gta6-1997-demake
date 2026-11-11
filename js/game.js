@@ -707,9 +707,9 @@ class LeonidaGame {
 
         parked.forEach((p, idx) => {
 
-            let vx = (p.raw512 ? p.c : mx256(p.c)) * TILE_SIZE;
+            let vx = (p.raw512 ? mx512(p.c) : mx256(p.c)) * TILE_SIZE;
 
-            let vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
+            let vy = (p.raw512 ? my512(p.r) : my256(p.r)) * TILE_SIZE;
 
             // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed vehicle
             for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
@@ -953,9 +953,9 @@ class LeonidaGame {
 
                 id: `ped_init_${idx}`,
 
-                x: (sp.raw512 ? sp.c : mx256(sp.c)) * TILE_SIZE,
+                x: (sp.raw512 ? mx512(sp.c) : mx256(sp.c)) * TILE_SIZE,
 
-                y: (sp.raw512 ? sp.r : my256(sp.r)) * TILE_SIZE,
+                y: (sp.raw512 ? my512(sp.r) : my256(sp.r)) * TILE_SIZE,
 
                 z: 2.0,
 
@@ -1153,9 +1153,9 @@ class LeonidaGame {
 
                 const by = Math.floor(sc.y);
 
-                if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
+                if (bx < 2 || bx >= MAP_COLS - 2 || by < 2 || by >= MAP_ROWS - 2) continue;
 
-                if (this.map.surfaceGround && this.map.surfaceGround[by * 512 + bx] !== GROUND_TYPE.ROAD) continue;
+                if (this.map.surfaceGround && this.map.surfaceGround[by * MAP_COLS + bx] !== GROUND_TYPE.ROAD) continue;
 
                 if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
 
@@ -2147,13 +2147,13 @@ class LeonidaGame {
         // Walk strictly along paved Lummus Park walkways:
         // xA = col 448.5 (East Curbside Coral Promenade), xB = col 451.5 (Oceanfront Boardwalk Promenade),
         // yTop = row 280.6 & yBottom = row 294.6 (paved Lummus Park crosswalks where y % 14 < 2, completely off the green grass!)
-        const xA = 448.5 * TILE_SIZE;
+        const xA = mx512(448.5) * TILE_SIZE;
 
-        const xB = 451.5 * TILE_SIZE;
+        const xB = mx512(451.5) * TILE_SIZE;
 
-        const yTop = 280.6 * TILE_SIZE;
+        const yTop = my512(280.6) * TILE_SIZE;
 
-        const yBottom = 294.6 * TILE_SIZE;
+        const yBottom = my512(294.6) * TILE_SIZE;
 
         const segTop = xB - xA;
 
@@ -9380,7 +9380,7 @@ class LeonidaGame {
     rebuildVehicleSpatialGrid() {
         const n = this.vehicles ? this.vehicles.length : 0;
         if (!this._vehGridHead) {
-            this._vehGridHead = new Int16Array(16384);
+            this._vehGridHead = new Int16Array(65536);
         }
         if (!this._vehGridNext || this._vehGridNext.length < Math.max(1024, n + 64)) {
             this._vehGridNext = new Int16Array(Math.max(1024, n + 256));
@@ -9391,9 +9391,9 @@ class LeonidaGame {
         for (let i = 0; i < n; i++) {
             const v = this.vehicles[i];
             if (!v) continue;
-            const cx = Math.max(0, Math.min(127, v.x >> 8));
-            const cy = Math.max(0, Math.min(127, v.y >> 8));
-            const cell = (cy << 7) | cx;
+            const cx = Math.max(0, Math.min(255, v.x >> 8));
+            const cy = Math.max(0, Math.min(255, v.y >> 8));
+            const cell = (cy << 8) | cx;
             next[i] = head[cell];
             head[cell] = i;
         }
@@ -9419,11 +9419,11 @@ class LeonidaGame {
         const sNext = this._stoppedVehGridNext;
         if (cache && sHead && sNext) {
             const cx0 = Math.max(0, (curX >> 8) - 1);
-            const cx1 = Math.min(127, (curX >> 8) + 1);
+            const cx1 = Math.min(255, (curX >> 8) + 1);
             const cy0 = Math.max(0, (curY >> 8) - 1);
-            const cy1 = Math.min(127, (curY >> 8) + 1);
+            const cy1 = Math.min(255, (curY >> 8) + 1);
             for (let cy = cy0; cy <= cy1; cy++) {
-                const rowOff = cy << 7;
+                const rowOff = cy << 8;
                 for (let cx = cx0; cx <= cx1; cx++) {
                     for (let idx = sHead[rowOff | cx]; idx !== -1; idx = sNext[idx]) {
                         const vc = cache[idx];
@@ -11573,12 +11573,12 @@ class LeonidaGame {
             const ax0 = a.x + aCos * aHalfL, ay0 = a.y + aSin * aHalfL;
             const ax1 = a.x - aCos * aHalfL, ay1 = a.y - aSin * aHalfL;
             const gx0 = Math.max(0, (a.x >> 8) - 1);
-            const gx1 = Math.min(127, (a.x >> 8) + 1);
+            const gx1 = Math.min(255, (a.x >> 8) + 1);
             const gy0 = Math.max(0, (a.y >> 8) - 1);
-            const gy1 = Math.min(127, (a.y >> 8) + 1);
+            const gy1 = Math.min(255, (a.y >> 8) + 1);
 
             for (let gy = gy0; gy <= gy1; gy++) {
-                const rowOff = gy << 7;
+                const rowOff = gy << 8;
                 for (let gx = gx0; gx <= gx1; gx++) {
                     for (let j = vHead[rowOff | gx]; j !== -1; j = vNext[j]) {
 
@@ -12182,7 +12182,7 @@ class LeonidaGame {
         // Pre-cache stationary / slow / parked vehicle OBB transforms + 128x128 spatial hash so pedestrian feelers check 0-2 cars instead of 545!
         if (!this._stoppedVehCache) this._stoppedVehCache = [];
         this._stoppedVehCache.length = 0;
-        if (!this._stoppedVehGridHead) this._stoppedVehGridHead = new Int16Array(16384);
+        if (!this._stoppedVehGridHead) this._stoppedVehGridHead = new Int16Array(65536);
         const sHead = this._stoppedVehGridHead;
         sHead.fill(-1);
         const maxN = this.vehicles.length;
@@ -12222,9 +12222,9 @@ class LeonidaGame {
             }
             const cIdx = this._stoppedVehCache.length;
             this._stoppedVehCache.push(entry);
-            const cx = Math.max(0, Math.min(127, v.x >> 8));
-            const cy = Math.max(0, Math.min(127, v.y >> 8));
-            const cell = (cy << 7) | cx;
+            const cx = Math.max(0, Math.min(255, v.x >> 8));
+            const cy = Math.max(0, Math.min(255, v.y >> 8));
+            const cell = (cy << 8) | cx;
             sNext[cIdx] = sHead[cell];
             sHead[cell] = cIdx;
         }
@@ -12620,7 +12620,7 @@ class LeonidaGame {
 
                 }
 
-                const minGx = 55 * TILE_SIZE, maxGx = 180 * TILE_SIZE, minGy = 385 * TILE_SIZE, maxGy = 475 * TILE_SIZE;
+                const minGx = mx512(55) * TILE_SIZE, maxGx = mx512(180) * TILE_SIZE, minGy = my512(385) * TILE_SIZE, maxGy = my512(475) * TILE_SIZE;
 
                 if (ped.x < minGx || ped.x > maxGx || ped.y < minGy || ped.y > maxGy) {
 
@@ -14402,11 +14402,11 @@ class LeonidaGame {
 
                 const isPrisonInmateOrGuard = (ped.missionTag === "PRISONER" || ped.missionTag === "PRISON_GUARD" || ped.g24Type === "g2_prisoner");
 
-                const newInPrison = (newBx >= 56 && newBx <= 68 && newBy >= 76 && newBy <= 146);
+                const newInPrison = (newBx >= MAP_X_512[56] && newBx <= MAP_X_512[68] && newBy >= MAP_Y_512[76] && newBy <= MAP_Y_512[146]);
 
                 if (isPrisonInmateOrGuard) {
 
-                    const minPx = 57.15 * TILE_SIZE, maxPx = 67.85 * TILE_SIZE, minPy = 77.15 * TILE_SIZE, maxPy = 145.65 * TILE_SIZE;
+                    const minPx = mx512(57.15) * TILE_SIZE, maxPx = mx512(67.85) * TILE_SIZE, minPy = my512(77.15) * TILE_SIZE, maxPy = my512(145.65) * TILE_SIZE;
 
                     if (ped.x < minPx || ped.x > maxPx || ped.y < minPy || ped.y > maxPy) {
 
@@ -16097,14 +16097,14 @@ class LeonidaGame {
         if (this._wipeoutCellMask || !this.map || !Array.isArray(this.map.beachSunbathers)) {
             return this._wipeoutCellMask;
         }
-        const mask = new Uint8Array(128 * 128);
+        const mask = new Uint8Array(256 * 256);
         const markPt = (px, py, pad) => {
             const x0 = Math.max(0, (px - pad) >> 8);
-            const x1 = Math.min(127, (px + pad) >> 8);
+            const x1 = Math.min(255, (px + pad) >> 8);
             const y0 = Math.max(0, (py - pad) >> 8);
-            const y1 = Math.min(127, (py + pad) >> 8);
+            const y1 = Math.min(255, (py + pad) >> 8);
             for (let cy = y0; cy <= y1; cy++) {
-                const rowOff = cy << 7;
+                const rowOff = cy << 8;
                 for (let cx = x0; cx <= x1; cx++) {
                     mask[rowOff | cx] = 1;
                 }
@@ -16149,7 +16149,7 @@ class LeonidaGame {
             if (mask) {
                 const cx = hitX >> 8;
                 const cy = hitY >> 8;
-                if (cx < 0 || cx > 127 || cy < 0 || cy > 127 || !mask[(cy << 7) | cx]) {
+                if (cx < 0 || cx > 255 || cy < 0 || cy > 255 || !mask[(cy << 8) | cx]) {
                     return false;
                 }
             }

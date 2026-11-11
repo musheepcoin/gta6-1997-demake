@@ -1382,11 +1382,11 @@ class Vehicle {
                 };
                 if (gHead && gNext) {
                     const gx0 = Math.max(0, (laneCenterX >> 8) - 1);
-                    const gx1 = Math.min(127, (laneCenterX >> 8) + 1);
+                    const gx1 = Math.min(255, (laneCenterX >> 8) + 1);
                     const gy0 = Math.max(0, (laneCenterY >> 8) - 1);
-                    const gy1 = Math.min(127, (laneCenterY >> 8) + 1);
+                    const gy1 = Math.min(255, (laneCenterY >> 8) + 1);
                     for (let gy = gy0; gy <= gy1 && laneClear; gy++) {
-                        const rowOff = gy << 7;
+                        const rowOff = gy << 8;
                         for (let gx = gx0; gx <= gx1 && laneClear; gx++) {
                             for (let vi = gHead[rowOff | gx]; vi !== -1 && laneClear; vi = gNext[vi]) {
                                 checkLaneVeh(game.vehicles[vi]);
@@ -2125,11 +2125,11 @@ class Vehicle {
                 };
                 if (gHead && gNext) {
                     const gx0 = Math.max(0, (this.x >> 8) - 1);
-                    const gx1 = Math.min(127, (this.x >> 8) + 1);
+                    const gx1 = Math.min(255, (this.x >> 8) + 1);
                     const gy0 = Math.max(0, (this.y >> 8) - 1);
-                    const gy1 = Math.min(127, (this.y >> 8) + 1);
+                    const gy1 = Math.min(255, (this.y >> 8) + 1);
                     for (let gy = gy0; gy <= gy1; gy++) {
-                        const rowOff = gy << 7;
+                        const rowOff = gy << 8;
                         for (let gx = gx0; gx <= gx1; gx++) {
                             for (let vi = gHead[rowOff | gx]; vi !== -1; vi = gNext[vi]) {
                                 checkOtherVeh(game.vehicles[vi]);
@@ -3279,11 +3279,11 @@ class Vehicle {
                             const gcx = this.x >> 8;
                             const gcy = this.y >> 8;
                             const x0 = gcx > 0 ? gcx - 1 : 0;
-                            const x1 = gcx < 127 ? gcx + 1 : 127;
+                            const x1 = gcx < 255 ? gcx + 1 : 255;
                             const y0 = gcy > 0 ? gcy - 1 : 0;
-                            const y1 = gcy < 127 ? gcy + 1 : 127;
+                            const y1 = gcy < 255 ? gcy + 1 : 255;
                             for (let cy = y0; cy <= y1 && rearClear; cy++) {
-                                const rowOff = cy << 7;
+                                const rowOff = cy << 8;
                                 for (let cx = x0; cx <= x1; cx++) {
                                     let idx = vHead[rowOff | cx];
                                     while (idx !== -1) {
@@ -4100,7 +4100,9 @@ class TrafficManager {
         this._trafficSeq = 1;
     }
 
-    chooseDistrictPedSpec(bx, by, isSand = false, map = null, seed = 0) {
+    chooseDistrictPedSpec(bx1024, by1024, isSand = false, map = null, seed = 0) {
+        const bx = typeof ix512 === "function" ? Math.round(ix512(bx1024)) : bx1024;
+        const by = typeof iy512 === "function" ? Math.round(iy512(by1024)) : by1024;
         const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
         if (inPrisonYard) {
             if ((seed % 5) === 0) {
@@ -4363,8 +4365,10 @@ class TrafficManager {
        Spawns cohesive social units together at creation time with shared formationId
        and district-matched sprites.
        ======================================================================== */
-    chooseFormationRoster(bx, by, isSand = false, inPrisonYard = false, map = null, seed = 0) {
-        const r = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
+    chooseFormationRoster(bx1024, by1024, isSand = false, inPrisonYard = false, map = null, seed = 0) {
+        const bx = typeof ix512 === "function" ? Math.round(ix512(bx1024)) : bx1024;
+        const by = typeof iy512 === "function" ? Math.round(iy512(by1024)) : by1024;
+        const r = ((bx1024 * 73856093) ^ (by1024 * 19349663) ^ (seed * 83492791)) >>> 0;
         if (inPrisonYard) {
             const single = (seed % 5 === 0)
                 ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 26 }
@@ -4403,7 +4407,7 @@ class TrafficManager {
         if (formType === "SOLO") {
             return {
                 type: "SOLO",
-                members: [this.chooseDistrictPedSpec(bx, by, isSand, map, seed)]
+                members: [this.chooseDistrictPedSpec(bx1024, by1024, isSand, map, seed)]
             };
         }
 
@@ -4633,7 +4637,7 @@ class TrafficManager {
         const hangoutDuration = 14 + (r % 9);
         const members = [];
         for (let m = 0; m < count; m++) {
-            const spec = this.chooseDistrictPedSpec(bx, by, isSand, map, seed + m * 17);
+            const spec = this.chooseDistrictPedSpec(bx1024, by1024, isSand, map, seed + m * 17);
             if (spec.isChild || spec.isRollerblader || spec.g24Type === "vc_jogger") {
                 spec.g24Type = isBeach ? "bikini_pink" : (isIndustrial ? "dockworker_yellow" : "vc_tourist");
                 spec.isChild = false;
@@ -4687,7 +4691,7 @@ class TrafficManager {
                 const mbx = Math.floor(mx / TILE_SIZE);
                 const mby = Math.floor(my / TILE_SIZE);
                 const mNav = map.getNavigationBlock ? map.getNavigationBlock(mbx, mby, pedZ) : null;
-                const onLummusLawn = (mbx === 449 || mbx === 450) && mNav && mNav.lid === 10 && bx !== 449 && bx !== 450;
+                const onLummusLawn = (mbx === MAP_X_512[449] || mbx === MAP_X_512[450]) && mNav && mNav.lid === 10 && bx !== MAP_X_512[449] && bx !== MAP_X_512[450];
                 const badGround = !mNav || mNav.groundType === GROUND_TYPE.ROAD || mNav.groundType === GROUND_TYPE.WATER || mNav.groundType === GROUND_TYPE.BUILDING || onLummusLawn;
                 const hitBld = typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(mx, my, 8.5, pedZ).hit;
                 const hitVeh = typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(mx, my, 9.5, pedZ).hit;
@@ -4697,7 +4701,7 @@ class TrafficManager {
                     const tbx = Math.floor(tuckX / TILE_SIZE);
                     const tby = Math.floor(tuckY / TILE_SIZE);
                     const tNav = map.getNavigationBlock ? map.getNavigationBlock(tbx, tby, pedZ) : null;
-                    const tuckOnLawn = (tbx === 449 || tby === 450) && tNav && tNav.lid === 10 && bx !== 449 && bx !== 450;
+                    const tuckOnLawn = (tbx === MAP_X_512[449] || tbx === MAP_X_512[450]) && tNav && tNav.lid === 10 && bx !== MAP_X_512[449] && bx !== MAP_X_512[450];
                     const tuckBad = !tNav || tNav.groundType === GROUND_TYPE.ROAD || tNav.groundType === GROUND_TYPE.WATER || tNav.groundType === GROUND_TYPE.BUILDING || tuckOnLawn ||
                         (typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(tuckX, tuckY, 8.5, pedZ).hit) ||
                         (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(tuckX, tuckY, 9.5, pedZ).hit);
@@ -4763,8 +4767,8 @@ class TrafficManager {
         const game = this.game;
         const map = game.map;
         if (!map || !map.cmpLoaded) return;
-        const rBx = Math.floor(refX / TILE_SIZE);
-        const rBy = Math.floor(refY / TILE_SIZE);
+        const rBx = ix512(Math.floor(refX / TILE_SIZE));
+        const rBy = iy512(Math.floor(refY / TILE_SIZE));
         // Activate when within 28 blocks of Vice Port (c = 328..363, r = 298..338)
         if (rBx < 300 || rBx > 390 || rBy < 270 || rBy > 366) return;
 
@@ -4778,8 +4782,8 @@ class TrafficManager {
         const portTeams = [
             // 1. NW Warehouse Loading Court (between backed-in Flatbed & Box Truck)
             {
-                cx: 338.8 * TILE_SIZE,
-                cy: 306.5 * TILE_SIZE,
+                cx: mx512(338.8) * TILE_SIZE,
+                cy: my512(306.5) * TILE_SIZE,
                 members: [
                     { g24Type: "dockworker_yellow", shirtColor: "#eab308", dx: -7, dy: 0, angle: 0 },
                     { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 7, dy: 0, angle: Math.PI }
@@ -4787,8 +4791,8 @@ class TrafficManager {
             },
             // 2. NE Harbor Master & Cold-Storage Court (Customs Officer & Foreman inspecting manifest)
             {
-                cx: 348.5 * TILE_SIZE,
-                cy: 306.2 * TILE_SIZE,
+                cx: mx512(348.5) * TILE_SIZE,
+                cy: my512(306.2) * TILE_SIZE,
                 members: [
                     { g24Type: "vc_sailor", shirtColor: "#38bdf8", dx: -7, dy: -2, angle: 0.25 },
                     { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 7, dy: 2, angle: Math.PI + 0.25 }
@@ -4796,8 +4800,8 @@ class TrafficManager {
             },
             // 3. SW Heavy Rigging Court (Crane rigging crew)
             {
-                cx: 339.2 * TILE_SIZE,
-                cy: 320.8 * TILE_SIZE,
+                cx: mx512(339.2) * TILE_SIZE,
+                cy: my512(320.8) * TILE_SIZE,
                 members: [
                     { g24Type: "dockworker_yellow", shirtColor: "#eab308", dx: -6, dy: -4, angle: 0.6 },
                     { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 6, dy: 4, angle: -2.5 }
@@ -4805,8 +4809,8 @@ class TrafficManager {
             },
             // 4. SE Export & Fuel Tanker Depot (Tanker engineer & Sailor)
             {
-                cx: 349.0 * TILE_SIZE,
-                cy: 328.0 * TILE_SIZE,
+                cx: mx512(349.0) * TILE_SIZE,
+                cy: my512(328.0) * TILE_SIZE,
                 members: [
                     { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: -7, dy: 0, angle: 0 },
                     { g24Type: "vc_sailor", shirtColor: "#38bdf8", dx: 7, dy: 0, angle: Math.PI }
@@ -4814,8 +4818,8 @@ class TrafficManager {
             },
             // 5. North Entry Gatehouses Security Post
             {
-                cx: 342.4 * TILE_SIZE,
-                cy: 300.4 * TILE_SIZE,
+                cx: mx512(342.4) * TILE_SIZE,
+                cy: my512(300.4) * TILE_SIZE,
                 members: [
                     { g24Type: "dockworker_yellow", shirtColor: "#eab308", dx: -6, dy: 0, angle: 0 },
                     { g24Type: "dockworker_orange", shirtColor: "#f97316", dx: 6, dy: 0, angle: Math.PI }
