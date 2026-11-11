@@ -4389,16 +4389,15 @@ class TrafficManager {
         const roll = r % 100;
         let formType = "SOLO";
         if (isIndustrial || isSpaceport) {
-            formType = roll < 52 ? "SOLO" : (roll < 82 ? "COUPLE" : "HANGOUT_CIRCLE");
+            formType = roll < 68 ? "SOLO" : "COUPLE";
         } else if (isBoardwalk) {
-            formType = roll < 50 ? "SOLO" : (roll < 78 ? "COUPLE" : (roll < 92 ? "FRIEND_GROUP" : "FAMILY"));
+            formType = roll < 62 ? "SOLO" : (roll < 86 ? "COUPLE" : (roll < 95 ? "FRIEND_GROUP" : "FAMILY"));
         } else {
-            // 44% SOLO, 24% COUPLE, 10% FAMILY, 14% FRIEND_GROUP, 8% HANGOUT_CIRCLE
-            if (roll < 44) formType = "SOLO";
-            else if (roll < 68) formType = "COUPLE";
-            else if (roll < 78) formType = "FAMILY";
-            else if (roll < 92) formType = "FRIEND_GROUP";
-            else formType = "HANGOUT_CIRCLE";
+            // 60% SOLO, 24% COUPLE, 8% FAMILY, 8% FRIEND_GROUP (all walking naturally along the sidewalk — no frozen hangout clusters!)
+            if (roll < 60) formType = "SOLO";
+            else if (roll < 84) formType = "COUPLE";
+            else if (roll < 92) formType = "FAMILY";
+            else formType = "FRIEND_GROUP";
         }
 
         if (formType === "SOLO") {
@@ -4501,8 +4500,8 @@ class TrafficManager {
                         hp: 36,
                         speed: sharedSpeed,
                         formationRole: "COUPLE_PARTNER",
-                        formationFwdOff: -2,
-                        formationSideOff: 8
+                        formationFwdOff: -6,
+                        formationSideOff: 11
                     }
                 ]
             };
@@ -4529,7 +4528,7 @@ class TrafficManager {
                     speed: famSpeed,
                     formationRole: "LEADER",
                     formationFwdOff: 0,
-                    formationSideOff: -5
+                    formationSideOff: -6
                 },
                 {
                     kind: "CIVILIAN",
@@ -4540,8 +4539,8 @@ class TrafficManager {
                     speed: famSpeed,
                     isChild: true,
                     formationRole: "FAMILY_CHILD",
-                    formationFwdOff: -6,
-                    formationSideOff: 7
+                    formationFwdOff: -9,
+                    formationSideOff: 10
                 }
             ];
             if ((r % 3) === 0) {
@@ -4554,8 +4553,8 @@ class TrafficManager {
                     hp: 36,
                     speed: famSpeed,
                     formationRole: "GROUP_FOLLOWER",
-                    formationFwdOff: -12,
-                    formationSideOff: -3
+                    formationFwdOff: -18,
+                    formationSideOff: -4
                 });
             }
             return { type: "FAMILY", members };
@@ -4601,7 +4600,7 @@ class TrafficManager {
                         speed: grpSpeed,
                         formationRole: "LEADER",
                         formationFwdOff: 0,
-                        formationSideOff: -5
+                        formationSideOff: -6
                     },
                     {
                         kind: "CIVILIAN",
@@ -4611,8 +4610,8 @@ class TrafficManager {
                         hp: 38,
                         speed: grpSpeed,
                         formationRole: "GROUP_FOLLOWER",
-                        formationFwdOff: -5,
-                        formationSideOff: 8
+                        formationFwdOff: -10,
+                        formationSideOff: 11
                     },
                     {
                         kind: "CIVILIAN",
@@ -4622,8 +4621,8 @@ class TrafficManager {
                         hp: 38,
                         speed: grpSpeed,
                         formationRole: "GROUP_FOLLOWER",
-                        formationFwdOff: -14,
-                        formationSideOff: -2
+                        formationFwdOff: -22,
+                        formationSideOff: -3
                     }
                 ]
             };

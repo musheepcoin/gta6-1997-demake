@@ -9519,40 +9519,6 @@ class RetroRenderer {
 
             this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
 
-            // Top-down 3D Held Props & Sidewalk Activity Visuals (Surfboards, Briefcases, Shopping Bags, Clipboards & Camera Flash)
-            if (!ped.dead && (ped.panicTimer || 0) <= 0) {
-                const pCos = Math.cos(ped.angle);
-                const pSin = Math.sin(ped.angle);
-                const rPerpX = -pSin;
-                const rPerpY = pCos;
-                const propX = ped.x + pCos * 1.5 + rPerpX * 6.0;
-                const propY = ped.y + pSin * 1.5 + rPerpY * 6.0;
-                if (ped.carryProp === "SURFBOARD") {
-                    const sbKeys = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow"];
-                    const sbKey = sbKeys[Math.abs(Math.floor((ped.animSeed || 0) * 100)) % 3];
-                    this.batchObjectSprite3D(sbKey, propX, propY, pz + 0.014, ped.angle, 0.44, pedDrawOrder);
-                } else if (ped.carryProp === "BRIEFCASE") {
-                    this.pushSolidQuad3D(propX, propY, pz + 0.012, 4.8, 2.2, ped.angle, 0.16, 0.14, 0.12, 0.96, pedDrawOrder);
-                    this.pushSolidQuad3D(propX, propY, pz + 0.015, 1.6, 0.9, ped.angle, 0.85, 0.72, 0.25, 0.95, pedDrawOrder);
-                } else if (ped.carryProp === "SHOPPING_BAG") {
-                    const isPinkBag = (Math.abs(Math.floor((ped.animSeed || 0) * 100)) % 2) === 0;
-                    this.pushSolidQuad3D(propX, propY, pz + 0.012, 4.2, 2.8, ped.angle, isPinkBag ? 0.98 : 0.15, isPinkBag ? 0.32 : 0.88, isPinkBag ? 0.72 : 0.96, 0.95, pedDrawOrder);
-                } else if (ped.carryProp === "CLIPBOARD") {
-                    const cbX = ped.x + pCos * 4.6 + rPerpX * 3.8;
-                    const cbY = ped.y + pSin * 4.6 + rPerpY * 3.8;
-                    this.pushSolidQuad3D(cbX, cbY, pz + 0.014, 3.8, 3.0, ped.angle, 0.78, 0.56, 0.28, 0.96, pedDrawOrder);
-                    this.pushSolidQuad3D(cbX, cbY, pz + 0.016, 2.8, 2.2, ped.angle, 0.96, 0.98, 1.0, 0.96, pedDrawOrder);
-                }
-                if ((ped.activityTimer || 0) > 0 && ped.activityKind === "PHOTO") {
-                    const flashPulse = Math.sin(this.time * 9.5 + (ped.animSeed || 0) * 20);
-                    if (flashPulse > 0.72) {
-                        const fx = ped.x + pCos * 8.5;
-                        const fy = ped.y + pSin * 8.5;
-                        this.pushSolidQuad3D(fx, fy, pz + 0.024, 6.5, 6.5, this.time * 3.0, 1.0, 0.98, 0.78, 0.92, SPRITE_DRAW_ORDER.HUD_ARROW);
-                    }
-                }
-            }
-
             // VCFD On-Foot Firefighter brass hose nozzle + coupled yellow canvas supply line to his Fire Engine!
             if (ped.kind === "FIREMAN") {
                 const ft = ped.homeFireTruck;

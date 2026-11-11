@@ -13975,44 +13975,9 @@ class LeonidaGame {
                         ped.waypointTimer = 0;
                     }
                 } else {
-                    // 4C) Autonomous Sidewalk Micro-Activities (Tourists snapping photos & Shoppers pausing at storefronts)
-                    if ((ped.activityCooldown || 0) > 0) {
-                        ped.activityCooldown = Math.max(0, ped.activityCooldown - dt);
-                    }
-                    if ((ped.activityTimer || 0) > 0) {
-                        ped.activityTimer = Math.max(0, ped.activityTimer - dt);
-                        const actBaseA = typeof ped.activityBaseAngle === "number" ? ped.activityBaseAngle : ped.angle;
-                        ped.angle = actBaseA + Math.sin(performance.now() * 0.0028 + (ped.turnSeed || 0)) * 0.16;
-                    } else if (
-                        ped.kind === "CIVILIAN" &&
-                        !ped.isChild &&
-                        !ped.isRollerblader &&
-                        !ped.missionTag &&
-                        !ped.formationId &&
-                        (ped.panicTimer || 0) <= 0 &&
-                        !ped.isCrossingRoad &&
-                        !ped.waitingAtCrosswalk &&
-                        (ped.hailingTaxiTimer || 0) <= 0 &&
-                        (ped.activityCooldown || 0) <= 0 &&
-                        curNavPre &&
-                        curNavPre.groundType === GROUND_TYPE.PAWEMENT &&
-                        (ped.personality === "TOURIST" || ped.personality === "SHOPPER" || ped.carryProp === "CAMERA" || ped.carryProp === "SHOPPING_BAG") &&
-                        Math.random() < dt * 0.045
-                    ) {
-                        ped.activityKind = (ped.personality === "TOURIST" || ped.carryProp === "CAMERA") ? "PHOTO" : "WINDOW_SHOP";
-                        ped.activityTimer = 3.2 + Math.random() * 1.6;
-                        ped.activityCooldown = 24.0 + Math.random() * 14.0;
-                        ped.activityBaseAngle = ped.angle + (Math.random() < 0.5 ? Math.PI * 0.5 : -Math.PI * 0.5);
-                        if (Math.abs(ped.x - this.player.x) < 380 && Math.abs(ped.y - this.player.y) < 280) {
-                            const actLabel = ped.activityKind === "PHOTO" ? "📸 *CLICK*" : "🛍️ NICE!";
-                            this.addFloatingText(ped.x, ped.y - 18, actLabel, "#f8fafc");
-                        }
-                    }
-
                     const isStandingStill = Boolean(
                         ped.waitingAtCrosswalk ||
                         (ped.hangoutTimer || 0) > 0 ||
-                        (ped.activityTimer || 0) > 0 ||
                         ((ped.hailingTaxiTimer || 0) > 0 && ped._hailingTaxi && Math.abs(ped._hailingTaxi.speed || 0) >= 12)
                     );
 
