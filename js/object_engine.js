@@ -351,8 +351,14 @@ class WorldObjectEngine {
                 { id: "cape_leonida_lh", x: 464.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, seed: 2.4 }
             ],
             gantryCranes: [
-                { x: 359.4 * TILE_SIZE, y: 322.8 * TILE_SIZE, z: 2.0, ang: 0 },
-                { x: 359.4 * TILE_SIZE, y: 335.4 * TILE_SIZE, z: 2.0, ang: 0 },
+                // Port of Vice City — 6 Ship-to-Shore Hammerhead Gantry Cranes across West & East Deepwater Quays
+                { x: 331.6 * TILE_SIZE, y: 305.5 * TILE_SIZE, z: 2.0, ang: Math.PI }, // NW Berth #1 (right where player arrives!)
+                { x: 331.6 * TILE_SIZE, y: 324.5 * TILE_SIZE, z: 2.0, ang: Math.PI }, // SW Berth #2
+                { x: 357.2 * TILE_SIZE, y: 304.0 * TILE_SIZE, z: 2.0, ang: 0 },       // NE Berth #3
+                { x: 357.2 * TILE_SIZE, y: 312.5 * TILE_SIZE, z: 2.0, ang: 0 },       // NE Berth #4
+                { x: 359.2 * TILE_SIZE, y: 324.0 * TILE_SIZE, z: 2.0, ang: 0 },       // SE Berth #5
+                { x: 359.2 * TILE_SIZE, y: 333.5 * TILE_SIZE, z: 2.0, ang: 0 },       // SE Berth #6
+                // Port Gellhorn Industrial Docks — 2 West-Quay Hammerhead Gantry Cranes
                 { x: 57.2 * TILE_SIZE,  y: 208.5 * TILE_SIZE, z: 2.0, ang: Math.PI },
                 { x: 57.2 * TILE_SIZE,  y: 243.5 * TILE_SIZE, z: 2.0, ang: Math.PI }
             ],
@@ -6881,6 +6887,24 @@ class WorldObjectEngine {
                 av.lastCashHitHp = av.hp;
                 game.vehicles.push(av);
             }
+
+            // Spawn Drivable Industrial Freight Trucks, Flatbeds, Tankers & Harbor Patrol Boat in Port of Vice City loading bays
+            const portFleetSpecs = [
+                { id: "vport_flatbed_nw", spec: "FLATBED",   x: 334.0 * TILE_SIZE, y: 309.8 * TILE_SIZE, ang: 0 },
+                { id: "vport_truck_nw",   spec: "TRUCK",     x: 339.8 * TILE_SIZE, y: 309.8 * TILE_SIZE, ang: Math.PI },
+                { id: "vport_tanker_ne",  spec: "TANKER",    x: 350.8 * TILE_SIZE, y: 314.5 * TILE_SIZE, ang: 0 },
+                { id: "vport_box_sw",     spec: "BOX_TRUCK", x: 336.8 * TILE_SIZE, y: 321.2 * TILE_SIZE, ang: 0 },
+                { id: "vport_flatbed_se", spec: "FLATBED",   x: 351.8 * TILE_SIZE, y: 326.0 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_boat_nw",    spec: "SPEEDBOAT", x: 327.6 * TILE_SIZE, y: 300.8 * TILE_SIZE, ang: Math.PI * 0.5 }
+            ];
+            for (const pf of portFleetSpecs) {
+                if (game.vehicles.some(v => Math.hypot(v.x - pf.x, v.y - pf.y) < 36)) continue;
+                const pv = new Vehicle(pf.id, pf.spec, pf.x, pf.y, pf.ang);
+                pv.z = 2.0;
+                pv.missionTag = "LANDMARK";
+                pv.isEstateCar = true;
+                game.vehicles.push(pv);
+            }
         }
     }
 
@@ -8526,6 +8550,13 @@ class WorldObjectEngine {
                     const cw = 54 * sc;
                     const cd = 22 * sc;
                     emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, cw + 18, cd * 2.4 + 16, bz, 0.44);
+                    // Painted Yellow Intermodal Container Stacking Bay Frame & Corner Twist-Lock Pads on Concrete Tarmac
+                    const bayW = cw + 10;
+                    const bayD = cd * 2.1 + 10;
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, -bayD * 0.5, bayW, 2.6, bz + 0.005, bz + 0.012, [0.96, 0.80, 0.16], 1);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0,  bayD * 0.5, bayW, 2.6, bz + 0.005, bz + 0.012, [0.96, 0.80, 0.16], 1);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -bayW * 0.5, 0, 2.6, bayD, bz + 0.005, bz + 0.012, [0.96, 0.80, 0.16], 1);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  bayW * 0.5, 0, 2.6, bayD, bz + 0.005, bz + 0.012, [0.96, 0.80, 0.16], 1);
                     // Side-by-side 2x2 + 1 top 3D corrugated steel shipping containers (MAT 6 blends L63 steel ribs)
                     for (let row = -1; row <= 1; row += 2) {
                         const oy = row * (cd * 0.55);
@@ -8652,6 +8683,136 @@ class WorldObjectEngine {
                 emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108,  8, 2.5, 2.5, bz + 0.78, bz + 1.64, steel, 1);
                 emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 28, 16, bz + 0.70, bz + 0.78, [0.94, 0.74, 0.14], 3);
                 emitSolidBox3D(gc.x, gc.y, cosA, sinA, 108, 0, 24, 56, bz + 0.44, bz + 0.70, [0.18, 0.52, 0.74], 6);
+                // Heavy Steel Gantry Crane Rail Tracks embedded flush in the Concrete Quay Apron under the portal legs
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA, -34, 0, 4.5, 168, bz + 0.005, bz + 0.015, [0.32, 0.36, 0.42], 3);
+                emitSolidBox3D(gc.x, gc.y, cosA, sinA,  34, 0, 4.5, 168, bz + 0.005, bz + 0.015, [0.32, 0.36, 0.42], 3);
+            }
+        }
+
+        // ====================================================================
+        // F.2: PORT OF VICE CITY ("VICE PORT", c = 329..360, r = 299..336)
+        //      3D DEEPWATER QUAY WALLS, MARINE BOLLARDS, PORT SECURITY GATEHOUSES,
+        //      3 BONDED FREIGHT WAREHOUSES, HARBOR MASTER CONTROL TOWER,
+        //      MAGNETIC CRANE PAD & 6 HIGH-MAST PORT FLOODLIGHT TOWERS
+        // ====================================================================
+        {
+            const bz = 2.0;
+            const concCol = [0.84, 0.86, 0.90];
+            const hazCol = [0.96, 0.78, 0.16];
+            const bollardIron = [0.18, 0.20, 0.24];
+
+            // 1. Continuous 3D Reinforced Concrete Deepwater Quay Bullnose Curbs, Rubber Ship Fenders & Marine Mooring Bollards
+            const quaySpans = [
+                { c: 329.06, r0: 300.0, r1: 335.5, side: -1 }, // West Deepwater Ship Channel Quay
+                { c: 358.92, r0: 299.2, r1: 318.8, side:  1 }, // North-East Deepwater Container Berth Quay
+                { c: 360.92, r0: 321.2, r1: 336.8, side:  1 }  // South-East Deepwater Container Berth Quay
+            ];
+            for (const qs of quaySpans) {
+                const qx = qs.c * TILE_SIZE;
+                const y0 = qs.r0 * TILE_SIZE;
+                const y1 = qs.r1 * TILE_SIZE;
+                const qLen = y1 - y0;
+                const qMidY = (y0 + y1) * 0.5;
+                // Deepwater concrete seawall fascia descending to water level (1.96..2.06) + yellow/black hazard bullnose coping
+                emitTileBox3D(qx, qMidY, 1, 0, 0, 0, 10, qLen, 1.96, bz + 0.06, 177, 177, 71, concCol, false);
+                emitSolidBox3D(qx, qMidY, 1, 0, -qs.side * 3.5, 0, 4.5, qLen, bz + 0.005, bz + 0.022, hazCol, 3);
+                // Cast-iron T-head marine mooring bollards & black rubber dock fenders every 3 tiles (192px)
+                for (let py = y0 + 48; py <= y1 - 48; py += 192) {
+                    emitCylinder3D(qx, py, -qs.side * 2.0, 0, 3.8, 3.2, bz + 0.06, bz + 0.16, 8, bollardIron, 5, true);
+                    emitCylinder3D(qx, py, -qs.side * 2.0, 0, 5.2, 5.2, bz + 0.14, bz + 0.18, 8, hazCol, 5, true);
+                    emitSolidBox3D(qx, py, 1, 0, qs.side * 5.5, 0, 4.0, 26.0, 1.98, bz + 0.05, bollardIron, 5);
+                }
+            }
+
+            // 2. Port Authority Security Checkpoints, Guardhouse Booths, Boom Barriers & Overhead Entrance Portals
+            //    at North-West Terminal Entrance (c = 336.8, r = 299.6) & North-East Terminal Entrance (c = 351.2, r = 299.6)
+            for (const gateC of [336.8, 351.2]) {
+                const gx = gateC * TILE_SIZE;
+                const gy = 299.55 * TILE_SIZE;
+                emitAOShadow3D(gx, gy, 1, 0, -44, 0, 46, 38, bz, 0.42);
+                // Armored Port Security Gatehouse Booth on West side of entrance lane (offX = -46)
+                emitTileBox3D(gx, gy, 1, 0, -46, 0, 32, 26, bz, bz + 0.22, 177, 86, 46, [0.92, 0.95, 0.99], true);
+                emitTileBox3D(gx, gy, 1, 0, -46, 0, 28, 22, bz + 0.22, bz + 0.42, 199, 199, 31, [0.94, 0.98, 1.00], false);
+                emitTileBox3D(gx, gy, 1, 0, -46, 0, 34, 28, bz + 0.42, bz + 0.48, 172, 173, 86, [0.16, 0.52, 0.90], false);
+                // Overhead S250 Steel Truss Terminal Entrance Portal (bz+1.10..1.26 — 100% clear for trucks!)
+                for (const pxOff of [-68, 68]) {
+                    emitTileBox3D(gx, gy, 1, 0, pxOff, 0, 12, 12, bz, bz + 1.24, 363, 246, 64, [0.92, 0.95, 0.99], false);
+                    emitSolidBox3D(gx, gy, 1, 0, pxOff, 0, 14, 14, bz, bz + 0.18, hazCol, 3);
+                }
+                emitTileBox3D(gx, gy, 1, 0, 0, 0, 148, 14, bz + 1.10, bz + 1.24, 250, 363, 64, [0.92, 0.95, 0.99], false);
+                emitSolidBox3D(gx, gy, 1, 0, 0, 0, 108, 9, bz + 1.24, bz + 1.46, [0.06, 0.38, 0.72], 5);
+                emitSolidBox3D(gx, gy, 1, 0, 0, 0, 112, 7, bz + 1.46, bz + 1.50, hazCol, 3);
+            }
+
+            // 3. 3 Colossal 3D Corrugated Steel Port Bonded Customs Warehouses & Harbor Master Control Sheds
+            //    - Shed A (North-West Bonded Freight Warehouse at c = 336.8, r = 311.5 — right in the NW Terminal Yard!)
+            const shedAX = 336.8 * TILE_SIZE;
+            const shedAY = 311.5 * TILE_SIZE;
+            emitAOShadow3D(shedAX, shedAY, 1, 0, 0, 0, 356, 124, bz, 0.46);
+            emitTileBox3D(shedAX, shedAY, 1, 0, 0, 0, 336, 106, bz, bz + 0.10, 177, 177, 71, concCol, true);
+            emitTileBox3D(shedAX, shedAY, 1, 0, 0, 0, 326, 96, bz + 0.10, bz + 0.76, 86, 173, 86, [0.88, 0.92, 0.98], true);
+            emitSolidBox3D(shedAX, shedAY, 1, 0, 0, 0, 332, 102, bz + 0.76, bz + 0.84, [0.14, 0.44, 0.82], 5);
+            // 4 Recessed Roll-Up Truck Loading Bays on North Facade (offY = -48.5) + Cantilevered Loading Canopy & Hazard Bumpers
+            emitSolidBox3D(shedAX, shedAY, 1, 0, 0, -56, 316, 18, bz + 0.52, bz + 0.58, [0.94, 0.74, 0.16], 3);
+            for (const bayX of [-114, -38, 38, 114]) {
+                emitTileBox3D(shedAX, shedAY, 1, 0, bayX, -48.5, 48, 4, bz + 0.10, bz + 0.50, 173, 173, 33, [0.28, 0.32, 0.38], false);
+                emitSolidBox3D(shedAX, shedAY, 1, 0, bayX, -52.0, 52, 6, bz + 0.005, bz + 0.08, hazCol, 3);
+                // Painted yellow truck reversal guide lines extending North into the container yard
+                emitSolidBox3D(shedAX, shedAY, 1, 0, bayX - 24, -76, 2.5, 44, bz + 0.005, bz + 0.012, hazCol, 1);
+                emitSolidBox3D(shedAX, shedAY, 1, 0, bayX + 24, -76, 2.5, 44, bz + 0.005, bz + 0.012, hazCol, 1);
+            }
+            // Rooftop HVAC Units & Illuminated Port Logistics Signboards on Shed A
+            for (const hxOff of [-86, 0, 86]) {
+                emitTileBox3D(shedAX, shedAY, 1, 0, hxOff, 8, 36, 28, bz + 0.84, bz + 0.96, 172, 173, 31, [0.84, 0.88, 0.92], false);
+            }
+            emitBox3D(shedAX, shedAY, 1, 0, -76, -42, 118, 10, bz + 0.84, bz + 1.16, "ad_vice26", "ad_vice26", [1.0, 1.0, 1.0]);
+            emitBox3D(shedAX, shedAY, 1, 0,  76, -42, 118, 10, bz + 0.84, bz + 1.16, "ad_ecola",  "ad_ecola",  [1.0, 1.0, 1.0]);
+
+            //    - Shed B (North-East Harbor Master Control Tower & Port Logistics Building at c = 351.2, r = 316.5)
+            const shedBX = 351.2 * TILE_SIZE;
+            const shedBY = 316.5 * TILE_SIZE;
+            emitAOShadow3D(shedBX, shedBY, 1, 0, 0, 0, 294, 104, bz, 0.46);
+            emitTileBox3D(shedBX, shedBY, 1, 0, 0, 0, 272, 84, bz, bz + 0.68, 86, 199, 86, [0.92, 0.95, 0.99], true);
+            emitSolidBox3D(shedBX, shedBY, 1, 0, 0, 0, 278, 90, bz + 0.68, bz + 0.75, [0.86, 0.34, 0.18], 5);
+            for (const bayX of [-84, 0, 84]) {
+                emitTileBox3D(shedBX, shedBY, 1, 0, bayX, -42.5, 44, 4, bz + 0.06, bz + 0.46, 173, 173, 33, [0.28, 0.32, 0.38], false);
+            }
+            // Elevated 3D Harbor Master Glass Observation Tower & Marine Radar Mast on East Roof of Shed B
+            emitTileBox3D(shedBX, shedBY, 1, 0, 72, 0, 56, 52, bz + 0.75, bz + 1.32, 172, 173, 86, [0.90, 0.94, 0.98], false);
+            emitTileBox3D(shedBX, shedBY, 1, 0, 72, 0, 64, 60, bz + 1.32, bz + 1.66, 199, 199, 86, [0.94, 0.98, 1.00], false);
+            emitSolidBox3D(shedBX, shedBY, 1, 0, 72, 0, 70, 66, bz + 1.66, bz + 1.74, [0.14, 0.48, 0.86], 5);
+            emitCylinder3D(shedBX, shedBY, 72, 0, 3.6, 2.4, bz + 1.74, bz + 2.08, 10, [0.88, 0.92, 0.96], 5, true);
+
+            //    - Shed C (South-West Stevedore & Heavy Rigging Freight Shed at c = 336.8, r = 318.8)
+            const shedCX = 336.8 * TILE_SIZE;
+            const shedCY = 318.8 * TILE_SIZE;
+            emitAOShadow3D(shedCX, shedCY, 1, 0, 0, 0, 334, 108, bz, 0.46);
+            emitTileBox3D(shedCX, shedCY, 1, 0, 0, 0, 312, 88, bz, bz + 0.68, 173, 86, 86, [0.86, 0.88, 0.92], true);
+            emitSolidBox3D(shedCX, shedCY, 1, 0, 0, 0, 318, 94, bz + 0.68, bz + 0.75, [0.90, 0.46, 0.16], 5);
+            for (const bayX of [-102, -34, 34, 102]) {
+                emitTileBox3D(shedCX, shedCY, 1, 0, bayX, 44.5, 44, 4, bz + 0.06, bz + 0.46, 173, 173, 33, [0.28, 0.32, 0.38], false);
+                emitSolidBox3D(shedCX, shedCY, 1, 0, bayX, 48.0, 48, 6, bz + 0.005, bz + 0.07, hazCol, 3);
+            }
+
+            // 4. 3D Magnetic Car-Crusher & Container-Handler Pedestal Base at crane_viceport (c = 336.8, r = 304.8)
+            const vcCraneX = 336.8 * TILE_SIZE + 2.5 * TILE_SIZE + 18;
+            const vcCraneY = 304.8 * TILE_SIZE + 1.2 * TILE_SIZE;
+            emitOctagonPad3D(vcCraneX, vcCraneY, 0, 0, 26, 26, 24, 24, 0.26, bz, bz + 0.12, concCol, hazCol, 3, 177, 71);
+            emitTileBox3D(vcCraneX, vcCraneY, 1, 0, 0, 0, 28, 28, bz + 0.12, bz + 0.78, 246, 363, 64, [0.94, 0.76, 0.16], false);
+
+            // 5. 6 Towering 3D Open-Lattice High-Mast Port Floodlight Towers illuminating the Vice Port Container Yards
+            const portFloodTowers = [
+                [331.8, 300.2,  1], [341.8, 300.2,  1],
+                [346.0, 300.2,  1], [357.2, 300.2,  1],
+                [331.8, 332.8, -1], [346.0, 335.2, -1]
+            ];
+            for (const [fc, fr, fDirY] of portFloodTowers) {
+                const fx = fc * TILE_SIZE;
+                const fy = fr * TILE_SIZE;
+                emitTileBox3D(fx, fy, 1, 0, 0, 0, 16, 16, bz, bz + 0.20, 177, 177, 71, concCol, false);
+                emitSolidBox3D(fx, fy, 1, 0, 0, 0, 14, 14, bz + 0.20, bz + 0.28, hazCol, 3);
+                emitTileBox3D(fx, fy, 1, 0, 0, 0, 10, 10, bz + 0.28, bz + 1.76, 363, 246, 64, [0.90, 0.93, 0.98], false);
+                emitSolidBox3D(fx, fy, 1, 0, 0, fDirY * 4, 34, 8, bz + 1.76, bz + 1.88, [0.98, 0.96, 0.88], 7);
             }
         }
 
@@ -9853,8 +10014,8 @@ class WorldObjectEngine {
                         // E-W bridge over N-S water channel: emit dark under-bridge drop shadow on the water (z = 2.006)
                         emitAOShadow3D(cx, cy, 1, 0, 0, 0, TILE_SIZE + 2.0, TILE_SIZE + 18.0, 2.0, 0.44);
 
-                        const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0);
-                        const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0);
+                        const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0 && sg[(r - 1) * MAP_COLS + c] !== GROUND_TYPE.ROAD);
+                        const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0 && sg[(r + 1) * MAP_COLS + c] !== GROUND_TYPE.ROAD);
                         const nearWestBank = (bm[idx - 1] === 0);
                         const nearEastBank = (bm[idx + 1] === 0);
 
@@ -9886,8 +10047,8 @@ class WorldObjectEngine {
                         // N-S bridge over E-W water channel: emit dark under-bridge drop shadow on the water (z = 2.006)
                         emitAOShadow3D(cx, cy, 1, 0, 0, 0, TILE_SIZE + 18.0, TILE_SIZE + 2.0, 2.0, 0.44);
 
-                        const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0);
-                        const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0);
+                        const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0 && sg[idx - 1] !== GROUND_TYPE.ROAD);
+                        const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0 && sg[idx + 1] !== GROUND_TYPE.ROAD);
                         const nearNorthBank = (bm[(r - 1) * MAP_COLS + c] === 0);
                         const nearSouthBank = (bm[(r + 1) * MAP_COLS + c] === 0);
 
@@ -9913,8 +10074,8 @@ class WorldObjectEngine {
                         }
                     } else if (rType === 1) {
                         // 2A) Sloped E-W Bridge Approach Ramp Wing-Walls & Retaining Parapets
-                        const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0);
-                        const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0);
+                        const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0 && sg[(r - 1) * MAP_COLS + c] !== GROUND_TYPE.ROAD);
+                        const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0 && sg[(r + 1) * MAP_COLS + c] !== GROUND_TYPE.ROAD);
                         const zW = 2.0 + this.map.bridgeCornerNW[idx];
                         const zE = 2.0 + this.map.bridgeCornerNE[idx];
                         for (const side of [-1, 1]) {
@@ -9930,8 +10091,8 @@ class WorldObjectEngine {
                         }
                     } else if (rType === 2) {
                         // 2B) Sloped N-S Bridge Approach Ramp Wing-Walls & Retaining Parapets
-                        const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0);
-                        const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0);
+                        const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0 && sg[idx - 1] !== GROUND_TYPE.ROAD);
+                        const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0 && sg[idx + 1] !== GROUND_TYPE.ROAD);
                         const zN = 2.0 + this.map.bridgeCornerNW[idx];
                         const zS = 2.0 + this.map.bridgeCornerSW[idx];
                         for (const side of [-1, 1]) {

@@ -4232,7 +4232,27 @@ class TrafficManager {
             };
         }
 
-        // 8. Downtown Vice City, Vice Port, Port Gellhorn & Mainland
+        // 7B. Port of Vice City (bx = 328..363, by = 298..338), Port Gellhorn Docks (bx = 36..88, by = 201..265) & Allied Sugar Refinery (bx = 138..168, by = 96..132)
+        if (
+            (bx >= 328 && bx <= 363 && by >= 298 && by <= 338) ||
+            (bx >= 36 && bx <= 88 && by >= 201 && by <= 265) ||
+            (bx >= 138 && bx <= 168 && by >= 96 && by <= 132)
+        ) {
+            const portWorkerPool = [
+                "dockworker_yellow", "dockworker_orange", "dockworker_yellow", "dockworker_orange",
+                "dockworker_yellow", "dockworker_orange", "vc_sailor", "g2_fireman"
+            ];
+            const gType = pickFrom(portWorkerPool);
+            return {
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: gType === "dockworker_orange" ? "#f97316" : "#eab308",
+                hp: 45,
+                speed: 35 + (r1 % 7)
+            };
+        }
+
+        // 8. Downtown Vice City & Mainland
         const cityPool = [
             "civ0", "civ1", "civ2", "civ3", "vc_tourist", "vc_jogger",
             "vc_crockett", "vc_tubbs", "vc_hawaiian_red", "g2_civ_aqua",

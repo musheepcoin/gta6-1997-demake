@@ -1294,7 +1294,9 @@ class RetroRenderer {
                 [966, 2422, 322], [4, 2426, 374], [446, 2426, 520], [1288, 2426, 292],
                 [966, 2448, 322], [4, 2452, 962], [1288, 2452, 292], [966, 2474, 322],
                 [1181, 2647, 863], [370, 2661, 811], [1181, 2673, 863], [4, 2757, 422],
-                [1519, 2774, 260]
+                [1519, 2774, 260], [1220, 3311, 824], [1320, 3460, 724], [1320, 3486, 724],
+                [1320, 3512, 724], [1320, 3538, 724], [1744, 3580, 300], [1744, 3606, 300],
+                [1744, 3632, 300], [1744, 3658, 300], [1266, 4042, 778], [1266, 4068, 778]
             ];
             const g2Layout = [];
             if (g2SrcFrames) {
@@ -2146,7 +2148,19 @@ class RetroRenderer {
                                 ly >= 1 && ly < sh - 1 &&
                                 fireHelmetDist <= 3.30
                             );
-                            if (a < 16 && !inSwatHelmetDome && !inFireHelmetDome) {
+                            const isDockworker = arch && (arch.key === "dockworker_yellow" || arch.key === "dockworker_orange");
+                            const hardhatDist = Math.hypot(dx * 0.94, (dy - 0.14) * 0.92);
+                            const inHardhatDome = (
+                                !isXray &&
+                                isDockworker &&
+                                hCnt >= 3 &&
+                                ent.fk !== "42" &&
+                                ent.fk !== "53" &&
+                                lx >= 1 && lx < sw - 1 &&
+                                ly >= 1 && ly < sh - 1 &&
+                                hardhatDist <= 3.08
+                            );
+                            if (a < 16 && !inSwatHelmetDome && !inFireHelmetDome && !inHardhatDome) {
                                 d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
                                 continue;
                             }
@@ -2241,6 +2255,47 @@ class RetroRenderer {
                                 continue;
                             }
 
+                            if (inHardhatDome) {
+                                // OSHA Port Stevedore / Dockworker Industrial Safety Hardhat (molded center ridge, brim & front bill visor)
+                                const isOrangeWorker = arch.key === "dockworker_orange";
+                                const isOuterRim = hardhatDist > 2.58;
+                                const isFrontBill = (dy >= 1.25 && dy <= 2.75 && Math.abs(dx) <= 1.85);
+                                const isCenterRidge = (Math.abs(dx) <= 0.48 && dy >= -2.1 && dy <= 1.15);
+                                const domeSpec = Math.max(0, 1.0 - Math.hypot((dx + 0.38) * 0.42, (dy + 0.42) * 0.42));
+                                if (isOuterRim) {
+                                    // Dark-rimmed hardhat gutter edge
+                                    d[dp] = isOrangeWorker ? 180 : 161;
+                                    d[dp + 1] = isOrangeWorker ? 83 : 98;
+                                    d[dp + 2] = isOrangeWorker ? 9 : 7;
+                                    d[dp + 3] = 255;
+                                } else if (isFrontBill) {
+                                    // Projecting front sun/impact bill visor
+                                    d[dp] = isOrangeWorker ? 234 : 234;
+                                    d[dp + 1] = isOrangeWorker ? 88 : 179;
+                                    d[dp + 2] = isOrangeWorker ? 12 : 8;
+                                    d[dp + 3] = 255;
+                                } else if (isCenterRidge) {
+                                    // Raised molded reinforcement crown rib (safety orange on white helmet, bright lemon-white on yellow helmet)
+                                    d[dp] = isOrangeWorker ? 255 : 254;
+                                    d[dp + 1] = isOrangeWorker ? 115 : 240;
+                                    d[dp + 2] = isOrangeWorker ? 24 : 118;
+                                    d[dp + 3] = 255;
+                                } else if (isOrangeWorker) {
+                                    // Crisp Port Foreman white polymer hardhat dome
+                                    d[dp] = clamp8(226 + domeSpec * 28);
+                                    d[dp + 1] = clamp8(232 + domeSpec * 22);
+                                    d[dp + 2] = clamp8(240 + domeSpec * 15);
+                                    d[dp + 3] = 255;
+                                } else {
+                                    // Classic OSHA high-visibility yellow stevedore hardhat dome
+                                    d[dp] = clamp8(228 + domeSpec * 27);
+                                    d[dp + 1] = clamp8(184 + domeSpec * 52);
+                                    d[dp + 2] = clamp8(12 + domeSpec * 32);
+                                    d[dp + 3] = 255;
+                                }
+                                continue;
+                            }
+
                             let col = null;
                             let shade = 1.0;
                             if (isShirt) {
@@ -2280,6 +2335,21 @@ class RetroRenderer {
                                         shade = 1.12;
                                     } else {
                                         col = [44, 40, 38]; // Charcoal/bunker Nomex turnout coat
+                                    }
+                                } else if (isDockworker) {
+                                    // Port Stevedore / Dockworker: High-visibility fluorescent safety vest with silver/yellow X-stripes over rugged work sleeves
+                                    const isOrangeWorker = arch.key === "dockworker_orange";
+                                    if (ax >= 2.85) {
+                                        // Rolled-up navy/chambray work shirt sleeves
+                                        col = isOrangeWorker ? [58, 72, 94] : [30, 58, 128];
+                                    } else if (Math.abs(ax - 1.35) <= 0.52 || (ly + 1) % 4 === 0) {
+                                        // 3M Scotchlite silver-white / neon-yellow reflective safety harness stripes
+                                        col = isOrangeWorker ? [253, 234, 78] : [241, 245, 249];
+                                        shade = 1.14;
+                                    } else {
+                                        // Fluorescent lime-yellow or safety-orange stevedore vest
+                                        col = isOrangeWorker ? [255, 102, 18] : [226, 252, 36];
+                                        shade = 1.06;
                                     }
                                 } else {
                                     col = arch.shirt;
@@ -2347,6 +2417,10 @@ class RetroRenderer {
                                     // Fireproof golden-tan Kevlar firefighter gauntlets & Nomex hood
                                     col = [217, 166, 46];
                                     shade = 0.98;
+                                } else if (isDockworker && dist > 3.1) {
+                                    // Heavy-duty leather stevedore rigging gloves on hands
+                                    col = [196, 154, 94];
+                                    shade = 0.96;
                                 } else {
                                     shade = Math.max(0.6, Math.min(1.2, r / 175));
                                     col = arch.skin;
@@ -8540,6 +8614,19 @@ class RetroRenderer {
                 } else if (pt.kind === "CONTAINERS") {
                     // Ground shadow (true 3D multi-tiered shipping container stacks rendered by WorldObjectEngine)
                     this.batchObjectSprite3D("container_stack", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
+                    // Active hard-hatted Port Stevedores / Dockworkers inspecting manifests & rigging twist-locks beside each container stack
+                    const wSeed = pt.seed || (i * 1.7);
+                    const walkT = this.time * 0.85 + wSeed;
+                    const patX = pt.x + Math.cos(pt.ang) * (Math.sin(walkT) * 26) - Math.sin(pt.ang) * 34;
+                    const patY = pt.y + Math.sin(pt.ang) * (Math.sin(walkT) * 26) + Math.cos(pt.ang) * 34;
+                    const patAng = pt.ang + (Math.cos(walkT) >= 0 ? 0 : Math.PI);
+                    const walkFr = Math.floor(this.time * 5.5 + i * 3) % 8;
+                    this.batchPedSprite3D((i % 2 === 0) ? "dockworker_yellow" : "dockworker_orange", walkFr, patX, patY, bz + 0.038, patAng, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (i % 2 === 0) {
+                        const fmX = pt.x - Math.cos(pt.ang) * 38 + Math.sin(pt.ang) * 28;
+                        const fmY = pt.y - Math.sin(pt.ang) * 38 - Math.cos(pt.ang) * 28;
+                        this.batchPedSprite3D("dockworker_orange", 0, fmX, fmY, bz + 0.038, pt.ang + 0.4, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 } else if (pt.kind === "YACHT") {
                     // Crisp dark water shadow + 100% opaque hull deck above water beneath the 3D Volumetric Luxury Superyacht
                     this.batchObjectSprite3D("luxury_yacht", pt.x + sunCos * 4, pt.y + sunSin * 4, bz + 0.014, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.34);
@@ -8944,7 +9031,10 @@ class RetroRenderer {
             { key: "kid_boy_cap",     shirt: [254, 218, 42],  shirt2: [28, 212, 242],  pants: [48, 112, 224],  sleeves: "short", legs: "shorts", hairMode: "helmet", helmet: [242, 44, 64],  skin: SK.light, pattern: "stripes" },
             { key: "kid_girl_pink",   shirt: [255, 78, 174],  shirt2: [250, 250, 252], pants: [44, 224, 218],  sleeves: "short", legs: "shorts", hair: H.blond,  skin: SK.light, pattern: "stripes" },
             { key: "kid_skater",      shirt: [56, 238, 132],  shirt2: [168, 85, 247],  pants: KHAKI,           sleeves: "short", legs: "shorts", hairMode: "helmet", helmet: [24, 214, 242], skin: SK.tan,   pattern: "hawaiian", shirt3: [254, 224, 68] },
-            { key: "kid_beach",       shirt: [36, 218, 238],  shirt2: [255, 114, 62],  pants: [255, 92, 74],   sleeves: "tank",  legs: "shorts", hair: H.brown,  skin: SK.tan,   pattern: "stripes" }
+            { key: "kid_beach",       shirt: [36, 218, 238],  shirt2: [255, 114, 62],  pants: [255, 92, 74],   sleeves: "tank",  legs: "shorts", hair: H.brown,  skin: SK.tan,   pattern: "stripes" },
+            // --- Port of Vice City & Port Gellhorn Hard-Hatted Stevedores / Dockworkers ---
+            { key: "dockworker_yellow", shirt: [226, 252, 36], shirt2: [241, 245, 249], pants: [38, 68, 126],  sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [250, 204, 21], skin: SK.tan,   pattern: "hivis" },
+            { key: "dockworker_orange", shirt: [255, 102, 18], shirt2: [253, 234, 78],  pants: [44, 54, 72],   sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [248, 250, 252], skin: SK.light, pattern: "hivis" }
         ];
         return this._g2Archs;
     }

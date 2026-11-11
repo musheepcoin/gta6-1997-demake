@@ -391,7 +391,12 @@ class LeonidaMap {
         const stonePaverBoxes = [
             [458, 480, 22, 44],
             [457, 466, 132, 136],
-            [197, 201, 475, 478]
+            [197, 201, 475, 478],
+            // Port of Vice City ("VICE PORT") heavy-duty concrete intermodal dockyard blocks (clearing generic apartment buildings & coral/grass patches while preserving all port roads!)
+            [331, 342, 299, 313],
+            [331, 342, 316, 333],
+            [345, 358, 299, 318],
+            [345, 360, 321, 336]
         ];
         for (const [x0, x1, y0, y1] of stonePaverBoxes) {
             for (let x = x0; x <= x1; x++) {
@@ -795,7 +800,7 @@ class LeonidaMap {
                 this.surfaceGround[r * MAP_COLS + c] = surfGt;
 
                 // Open ground tiles store their visible lid at z = 1 and their navigation groundType at z = 2 (with lid = 0)
-                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200);
+                const isInsidePrisonOrAirport = (c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200) || (c >= 328 && c <= 362 && r >= 299 && r <= 337) || (c >= 55 && c <= 85 && r >= 202 && r <= 262);
                 const blkZ1 = this.getBlockInfo(c, r, 1);
                 const blkZ2 = this.getBlockInfo(c, r, 2);
                 if (blkZ1 && blkZ1.lid === 69) {
@@ -842,78 +847,73 @@ class LeonidaMap {
             if (cc < 0 || cc >= MAP_COLS || rr < 0 || rr >= MAP_ROWS) return false;
             return this.surfaceGround[rr * MAP_COLS + cc] === GROUND_TYPE.WATER;
         };
-        const isDeckCandidateRC = (cc, rr) => {
+        const isRoadTileRC = (cc, rr) => {
             if (cc < 0 || cc >= MAP_COLS || rr < 0 || rr >= MAP_ROWS) return false;
             const ii = rr * MAP_COLS + cc;
-            if (this.surfaceLayer[ii] > 2) return false;
-            const gt = this.surfaceGround[ii];
-            if (gt === GROUND_TYPE.ROAD) return true;
-            if (gt === GROUND_TYPE.PAWEMENT) {
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        if (dx === 0 && dy === 0) continue;
-                        const nc = cc + dx, nr = rr + dy;
-                        if (nc >= 0 && nc < MAP_COLS && nr >= 0 && nr < MAP_ROWS) {
-                            if (this.surfaceGround[nr * MAP_COLS + nc] === GROUND_TYPE.ROAD) return true;
-                        }
-                    }
-                }
-            }
-            return false;
+            return this.surfaceLayer[ii] <= 2 && this.surfaceGround[ii] === GROUND_TYPE.ROAD;
         };
+        const isDeckCandidateRC = (cc, rr) => isRoadTileRC(cc, rr);
 
-        // 1A) E-W bridges spanning over N-S water channels (water above AND below within 1..5 tiles)
+        // 1A) E-W bridges spanning over N-S water channels (water above AND below within 1..5 road tiles)
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
-                if (!isDeckCandidateRC(c, r)) continue;
+                if (!isRoadTileRC(c, r)) continue;
                 let topWater = false;
+                let topCrossRoad = false;
                 for (let dr = 1; dr <= 5; dr++) {
                     const rr = r - dr;
                     if (rr < 0) break;
                     if (isWaterTileRC(c, rr)) { topWater = true; break; }
-                    if (!isDeckCandidateRC(c, rr)) break;
+                    if (!isRoadTileRC(c, rr)) break;
+                    if (dr === 5) topCrossRoad = true;
                 }
-                if (!topWater) continue;
+                if (!topWater || topCrossRoad) continue;
                 let botWater = false;
+                let botCrossRoad = false;
                 for (let dr = 1; dr <= 5; dr++) {
                     const rr = r + dr;
                     if (rr >= MAP_ROWS) break;
                     if (isWaterTileRC(c, rr)) { botWater = true; break; }
-                    if (!isDeckCandidateRC(c, rr)) break;
+                    if (!isRoadTileRC(c, rr)) break;
+                    if (dr === 5) botCrossRoad = true;
                 }
-                if (topWater && botWater) {
+                if (topWater && botWater && !botCrossRoad) {
                     this.bridgeMask[r * MAP_COLS + c] = 1;
                 }
             }
         }
 
-        // 1B) N-S bridges spanning over E-W water channels (water left AND right within 1..5 tiles)
+        // 1B) N-S bridges spanning over E-W water channels (water left AND right within 1..5 road tiles)
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
                 const idx = r * MAP_COLS + c;
-                if (this.bridgeMask[idx] !== 0 || !isDeckCandidateRC(c, r)) continue;
+                if (this.bridgeMask[idx] !== 0 || !isRoadTileRC(c, r)) continue;
                 let leftWater = false;
+                let leftCrossRoad = false;
                 for (let dc = 1; dc <= 5; dc++) {
                     const cc = c - dc;
                     if (cc < 0) break;
                     if (isWaterTileRC(cc, r)) { leftWater = true; break; }
-                    if (!isDeckCandidateRC(cc, r)) break;
+                    if (!isRoadTileRC(cc, r)) break;
+                    if (dc === 5) leftCrossRoad = true;
                 }
-                if (!leftWater) continue;
+                if (!leftWater || leftCrossRoad) continue;
                 let rightWater = false;
+                let rightCrossRoad = false;
                 for (let dc = 1; dc <= 5; dc++) {
                     const cc = c + dc;
                     if (cc >= MAP_COLS) break;
                     if (isWaterTileRC(cc, r)) { rightWater = true; break; }
-                    if (!isDeckCandidateRC(cc, r)) break;
+                    if (!isRoadTileRC(cc, r)) break;
+                    if (dc === 5) rightCrossRoad = true;
                 }
-                if (leftWater && rightWater) {
+                if (leftWater && rightWater && !rightCrossRoad) {
                     this.bridgeMask[idx] = 2;
                 }
             }
         }
 
-        // Prune isolated 1-tile false positives that aren't part of a bridge deck
+        // Prune isolated 1-tile false positives AND ensure cross-street T-junctions/intersections stay at ground level (bridgeMask = 0)
         for (let pass = 0; pass < 2; pass++) {
             for (let r = 2; r < MAP_ROWS - 2; r++) {
                 for (let c = 2; c < MAP_COLS - 2; c++) {
@@ -921,17 +921,75 @@ class LeonidaMap {
                     const bm = this.bridgeMask[idx];
                     if (bm === 1) {
                         const hasEW = this.bridgeMask[idx - 1] === 1 || this.bridgeMask[idx + 1] === 1;
-                        const hasRoadNS = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD ||
-                                          this.surfaceGround[(r + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
-                        if (!hasEW && !hasRoadNS) this.bridgeMask[idx] = 0;
+                        if (!hasEW) this.bridgeMask[idx] = 0;
                     } else if (bm === 2) {
                         const hasNS = this.bridgeMask[(r - 1) * MAP_COLS + c] === 2 || this.bridgeMask[(r + 1) * MAP_COLS + c] === 2;
-                        const hasRoadEW = this.surfaceGround[idx - 1] === GROUND_TYPE.ROAD ||
-                                          this.surfaceGround[idx + 1] === GROUND_TYPE.ROAD;
-                        if (!hasNS && !hasRoadEW) this.bridgeMask[idx] = 0;
+                        if (!hasNS) this.bridgeMask[idx] = 0;
                     }
                 }
             }
+        }
+
+        // Helper: check if an E-W road column `cc` at row `rr` is part of a N-S cross-street intersection
+        // (i.e. has ROAD tiles extending North or South beyond the E-W highway band)
+        const isEWCrossStreetJunction = (cc, rr) => {
+            let rTop = rr;
+            while (rTop > 1 && isRoadTileRC(cc, rTop - 1) && (rr - (rTop - 1)) <= 4) rTop--;
+            let rBot = rr;
+            while (rBot < MAP_ROWS - 2 && isRoadTileRC(cc, rBot + 1) && ((rBot + 1) - rr) <= 4) rBot++;
+            return isRoadTileRC(cc, rTop - 1) || isRoadTileRC(cc, rBot + 1) || (rBot - rTop + 1) > 4;
+        };
+        // Helper: check if a N-S road row `rr` at col `cc` is part of an E-W cross-street intersection
+        const isNSCrossStreetJunction = (cc, rr) => {
+            let cLeft = cc;
+            while (cLeft > 1 && isRoadTileRC(cLeft - 1, rr) && (cc - (cLeft - 1)) <= 4) cLeft--;
+            let cRight = cc;
+            while (cRight < MAP_COLS - 2 && isRoadTileRC(cRight + 1, rr) && ((cRight + 1) - cc) <= 4) cRight++;
+            return isRoadTileRC(cLeft - 1, rr) || isRoadTileRC(cRight + 1, rr) || (cRight - cLeft + 1) > 4;
+        };
+
+        // Pre-pass: If the land abutment immediately adjacent to a bridge end is a perpendicular cross-street
+        // (e.g. MacArthur Causeway c=328 meeting West Port Road c=329..330), convert the last 2 bridge tiles
+        // BEFORE the cross-street into the sloped approach ramp so the cross-street intersection stays 100% flat!
+        const ewRetreatCols = [];
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            for (let c = 2; c < MAP_COLS - 2; c++) {
+                const idx = r * MAP_COLS + c;
+                if (this.bridgeMask[idx] !== 1) continue;
+                // West end of E-W bridge meeting a N-S cross-street at c-1
+                if (this.bridgeMask[idx - 1] === 0 && isRoadTileRC(c - 1, r) && isEWCrossStreetJunction(c - 1, r)) {
+                    ewRetreatCols.push({ c, r, dir: -1 });
+                }
+                // East end of E-W bridge meeting a N-S cross-street at c+1
+                if (this.bridgeMask[idx + 1] === 0 && isRoadTileRC(c + 1, r) && isEWCrossStreetJunction(c + 1, r)) {
+                    ewRetreatCols.push({ c, r, dir: 1 });
+                }
+            }
+        }
+        for (const rt of ewRetreatCols) {
+            const idxEdge = rt.r * MAP_COLS + rt.c;
+            const idxInner = rt.r * MAP_COLS + (rt.c - rt.dir);
+            this.bridgeMask[idxEdge] = 0;
+            if (this.bridgeMask[idxInner] === 1) this.bridgeMask[idxInner] = 0;
+        }
+        const nsRetreatRows = [];
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            for (let c = 2; c < MAP_COLS - 2; c++) {
+                const idx = r * MAP_COLS + c;
+                if (this.bridgeMask[idx] !== 2) continue;
+                if (this.bridgeMask[(r - 1) * MAP_COLS + c] === 0 && isRoadTileRC(c, r - 1) && isNSCrossStreetJunction(c, r - 1)) {
+                    nsRetreatRows.push({ c, r, dir: -1 });
+                }
+                if (this.bridgeMask[(r + 1) * MAP_COLS + c] === 0 && isRoadTileRC(c, r + 1) && isNSCrossStreetJunction(c, r + 1)) {
+                    nsRetreatRows.push({ c, r, dir: 1 });
+                }
+            }
+        }
+        for (const rt of nsRetreatRows) {
+            const idxEdge = rt.r * MAP_COLS + rt.c;
+            const idxInner = (rt.r - rt.dir) * MAP_COLS + rt.c;
+            this.bridgeMask[idxEdge] = 0;
+            if (this.bridgeMask[idxInner] === 2) this.bridgeMask[idxInner] = 0;
         }
 
         // Set full bridge elevation (+0.36) on all overwater bridge deck tiles
@@ -944,16 +1002,17 @@ class LeonidaMap {
             }
         }
 
-        // 2A) Build smooth 1-to-2-tile E-W approach ramps at the West & East land ends of every E-W bridge
+        // 2A) Build smooth 1-to-2-tile E-W approach ramps at the West & East ends of every E-W bridge
+        //     (Never placing ramp tiles inside a perpendicular N-S cross-street intersection!)
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
                 const idx = r * MAP_COLS + c;
                 if (this.bridgeMask[idx] !== 1) continue;
-                // West abutment (c-1 is land deck candidate)
-                if (this.bridgeMask[idx - 1] === 0 && isDeckCandidateRC(c - 1, r)) {
+                // West abutment (c-1 is non-junction road deck candidate)
+                if (this.bridgeMask[idx - 1] === 0 && isDeckCandidateRC(c - 1, r) && !isEWCrossStreetJunction(c - 1, r)) {
                     const idx1 = idx - 1;
                     const idx2 = idx - 2;
-                    const canTwoTile = c >= 3 && this.bridgeMask[idx2] === 0 && isDeckCandidateRC(c - 2, r);
+                    const canTwoTile = c >= 3 && this.bridgeMask[idx2] === 0 && isDeckCandidateRC(c - 2, r) && !isEWCrossStreetJunction(c - 2, r);
                     this.bridgeRampMask[idx1] = 1;
                     if (canTwoTile) {
                         this.bridgeRampMask[idx2] = 1;
@@ -972,11 +1031,11 @@ class LeonidaMap {
                         this.bridgeCornerSE[idx1] = Math.max(this.bridgeCornerSE[idx1], BRIDGE_ELEV);
                     }
                 }
-                // East abutment (c+1 is land deck candidate)
-                if (this.bridgeMask[idx + 1] === 0 && isDeckCandidateRC(c + 1, r)) {
+                // East abutment (c+1 is non-junction road deck candidate)
+                if (this.bridgeMask[idx + 1] === 0 && isDeckCandidateRC(c + 1, r) && !isEWCrossStreetJunction(c + 1, r)) {
                     const idx1 = idx + 1;
                     const idx2 = idx + 2;
-                    const canTwoTile = c <= MAP_COLS - 4 && this.bridgeMask[idx2] === 0 && isDeckCandidateRC(c + 2, r);
+                    const canTwoTile = c <= MAP_COLS - 4 && this.bridgeMask[idx2] === 0 && isDeckCandidateRC(c + 2, r) && !isEWCrossStreetJunction(c + 2, r);
                     this.bridgeRampMask[idx1] = 1;
                     if (canTwoTile) {
                         this.bridgeRampMask[idx2] = 1;
@@ -998,16 +1057,17 @@ class LeonidaMap {
             }
         }
 
-        // 2B) Build smooth 1-to-2-tile N-S approach ramps at the North & South land ends of every N-S bridge
+        // 2B) Build smooth 1-to-2-tile N-S approach ramps at the North & South ends of every N-S bridge
+        //     (Never placing ramp tiles inside a perpendicular E-W cross-street intersection!)
         for (let r = 2; r < MAP_ROWS - 2; r++) {
             for (let c = 2; c < MAP_COLS - 2; c++) {
                 const idx = r * MAP_COLS + c;
                 if (this.bridgeMask[idx] !== 2) continue;
-                // North abutment (r-1 is land deck candidate)
+                // North abutment (r-1 is non-junction road deck candidate)
                 const idxN1 = (r - 1) * MAP_COLS + c;
-                if (this.bridgeMask[idxN1] === 0 && isDeckCandidateRC(c, r - 1)) {
+                if (this.bridgeMask[idxN1] === 0 && isDeckCandidateRC(c, r - 1) && !isNSCrossStreetJunction(c, r - 1)) {
                     const idxN2 = (r - 2) * MAP_COLS + c;
-                    const canTwoTile = r >= 3 && this.bridgeMask[idxN2] === 0 && isDeckCandidateRC(c, r - 2);
+                    const canTwoTile = r >= 3 && this.bridgeMask[idxN2] === 0 && isDeckCandidateRC(c, r - 2) && !isNSCrossStreetJunction(c, r - 2);
                     this.bridgeRampMask[idxN1] = 2;
                     if (canTwoTile) {
                         this.bridgeRampMask[idxN2] = 2;
@@ -1026,11 +1086,11 @@ class LeonidaMap {
                         this.bridgeCornerSE[idxN1] = Math.max(this.bridgeCornerSE[idxN1], BRIDGE_ELEV);
                     }
                 }
-                // South abutment (r+1 is land deck candidate)
+                // South abutment (r+1 is non-junction road deck candidate)
                 const idxS1 = (r + 1) * MAP_COLS + c;
-                if (this.bridgeMask[idxS1] === 0 && isDeckCandidateRC(c, r + 1)) {
+                if (this.bridgeMask[idxS1] === 0 && isDeckCandidateRC(c, r + 1) && !isNSCrossStreetJunction(c, r + 1)) {
                     const idxS2 = (r + 2) * MAP_COLS + c;
-                    const canTwoTile = r <= MAP_ROWS - 4 && this.bridgeMask[idxS2] === 0 && isDeckCandidateRC(c, r + 2);
+                    const canTwoTile = r <= MAP_ROWS - 4 && this.bridgeMask[idxS2] === 0 && isDeckCandidateRC(c, r + 2) && !isNSCrossStreetJunction(c, r + 2);
                     this.bridgeRampMask[idxS1] = 2;
                     if (canTwoTile) {
                         this.bridgeRampMask[idxS2] = 2;
@@ -1082,8 +1142,8 @@ class LeonidaMap {
                     this.coastalSandMask[idx] = 1;
                 }
 
-                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, Vice City Mambas Stadium, SERA Space Center, or Port Gellhorn Super-Speedway
-                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200)) {
+                // Never plant flora inside Leonida State Penitentiary, VCIA Airport active runways/tarmac, Vice City Mambas Stadium, SERA Space Center, Port Gellhorn Super-Speedway, or Vice Port / Port Gellhorn Industrial Docks
+                if ((c >= 55 && c <= 69 && r >= 75 && r <= 147) || (c >= 64 && c <= 166 && r >= 299 && r <= 369) || (c >= 179 && c <= 197 && r >= 164 && r <= 180) || (c >= 458 && c <= 481 && r >= 21 && r <= 45) || (c >= 26 && c <= 87 && r >= 149 && r <= 200) || (c >= 328 && c <= 362 && r >= 299 && r <= 337) || (c >= 55 && c <= 85 && r >= 202 && r <= 262)) {
                     continue;
                 }
 
@@ -2558,20 +2618,46 @@ class LeonidaMap {
 
         // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
         this.portTerminals = [
-            // Deepwater Container Barges & Freighters (100% in clean open water gt=1)
-            { kind: "BARGE",      c: 360.5, r: 302.5, ang: 0,              scale: 1.55 },
-            { kind: "BARGE",      c: 362.5, r: 323.2, ang: Math.PI,        scale: 1.55 },
-            { kind: "BARGE",      c: 362.5, r: 335.2, ang: 0,              scale: 1.60 },
+            // Deepwater Panamax Container Freighters moored parallel to West & East Quays (100% in clean open water gt=1)
+            { kind: "BARGE",      c: 325.8, r: 306.5, ang: -Math.PI * 0.5, scale: 1.55 }, // Vice Port West Berth #1 (right beside NW Terminal Yard!)
+            { kind: "BARGE",      c: 325.8, r: 324.5, ang: -Math.PI * 0.5, scale: 1.55 }, // Vice Port West Berth #2 (beside SW Terminal Yard)
+            { kind: "BARGE",      c: 361.5, r: 308.0, ang: -Math.PI * 0.5, scale: 1.60 }, // Vice Port North-East Berth #3
+            { kind: "BARGE",      c: 363.2, r: 324.0, ang: -Math.PI * 0.5, scale: 1.55 }, // Vice Port South-East Berth #4
+            { kind: "BARGE",      c: 363.2, r: 334.0, ang:  Math.PI * 0.5, scale: 1.60 }, // Vice Port South-East Berth #5
             { kind: "BARGE",      c: 15.0,  r: 186.5, ang: Math.PI,        scale: 1.50 },
             { kind: "BARGE",      c: 38.0,  r: 209.5, ang: 0,              scale: 1.55 },
             { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 1.55 },
             { kind: "BARGE",      c: 139.5, r: 100.5, ang: -Math.PI * 0.5, scale: 1.45 },
             { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 1.45 },
-            // Quayside Intermodal Container Stacks (aligned with 3D Gantry Cranes on the waterfront quay!)
-            { kind: "CONTAINERS", c: 355.5, r: 323.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 355.5, r: 335.2, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 334.5, r: 332.8, ang: 0,              scale: 1.25 },
-            { kind: "CONTAINERS", c: 339.0, r: 332.8, ang: 0,              scale: 1.25 },
+            // Vice Port Block 1 — North-West Intermodal Container Yard (c = 331..342, r = 299..313)
+            { kind: "CONTAINERS", c: 334.0, r: 302.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.8, r: 302.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 334.0, r: 305.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.8, r: 305.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 334.0, r: 308.0, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.8, r: 308.0, ang: 0,              scale: 1.25 },
+            // Vice Port Block 2 — North-East Deepwater Container Berth (c = 345..358, r = 299..318)
+            { kind: "CONTAINERS", c: 348.2, r: 302.4, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 353.2, r: 302.4, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 348.2, r: 306.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 353.2, r: 306.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 348.2, r: 311.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 353.2, r: 311.2, ang: 0,              scale: 1.25 },
+            // Vice Port Block 3 — South-West Heavy Cargo Yard (c = 331..342, r = 316..333)
+            { kind: "CONTAINERS", c: 334.0, r: 324.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.8, r: 324.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 334.0, r: 328.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.8, r: 328.8, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 334.0, r: 332.2, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 339.8, r: 332.2, ang: 0,              scale: 1.25 },
+            // Vice Port Block 4 — South-East Deepwater Container Berth (c = 345..360, r = 321..336)
+            { kind: "CONTAINERS", c: 348.8, r: 323.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 354.5, r: 323.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 348.8, r: 328.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 354.5, r: 328.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 348.8, r: 333.5, ang: 0,              scale: 1.25 },
+            { kind: "CONTAINERS", c: 354.5, r: 333.5, ang: 0,              scale: 1.25 },
+            // Port Gellhorn & Ambrosia Refinery Container Stacks
             { kind: "CONTAINERS", c: 58.5,  r: 204.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 58.5,  r: 212.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 58.5,  r: 244.5, ang: Math.PI * 0.5,  scale: 1.25 },
@@ -2579,8 +2665,7 @@ class LeonidaMap {
             { kind: "CONTAINERS", c: 79.5,  r: 242.5, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 151.5, r: 107.5, ang: Math.PI * 0.5,  scale: 1.20 },
             { kind: "CONTAINERS", c: 152.5, r: 114.5, ang: Math.PI * 0.5,  scale: 1.20 },
-            // Moored Harbor Yachts beside piers (the speedboats moored next to them are now drivable SPEEDBOAT vehicles spawned in game.js)
-            { kind: "YACHT",      c: 325.0, r: 305.0, ang: -Math.PI * 0.5, scale: 1.30 },
+            // Moored Harbor Yachts beside island piers (the speedboats moored next to them are drivable SPEEDBOAT vehicles spawned in game.js)
             { kind: "YACHT",      c: 105.5, r: 105.2, ang: Math.PI,        scale: 1.25 },
             { kind: "YACHT",      c: 373.5, r: 116.0, ang: 0,              scale: 1.30 },
             { kind: "YACHT",      c: 379.5, r: 208.0, ang: 0,              scale: 1.30 },
@@ -3155,11 +3240,11 @@ class LeonidaMap {
             pushPropOBB(tw.x, tw.y, 17, 17, 0);
         }
 
-        // 18C. Port Terminals (Intermodal Container Stacks, Cargo Barges, Moored Yachts & Speedboats)
+        // 18C. Port Terminals (Intermodal Container Stacks, Cargo Barges, Moored Yachts, Speedboats & 3D Port Customs Freight Warehouses)
         for (const pt of this.portTerminals) {
             const sc = pt.scale || 1.0;
             if (pt.kind === "CONTAINERS") {
-                pushPropOBB(pt.x, pt.y, 19 * sc, 8.5 * sc, pt.ang);
+                pushPropOBB(pt.x, pt.y, 26 * sc, 11 * sc, pt.ang);
             } else if (pt.kind === "BARGE") {
                 pushPropOBB(pt.x, pt.y, 53 * sc, 17 * sc, pt.ang);
             } else if (pt.kind === "YACHT") {
@@ -3168,6 +3253,10 @@ class LeonidaMap {
                 pushPropOBB(pt.x, pt.y, 27 * sc, 12 * sc, pt.ang);
             }
         }
+        // Solid collision hulls for Vice Port 3D Bonded Customs Warehouses & Harbor Master Operations Sheds
+        pushPropOBB(336.8 * TILE_SIZE, 311.5 * TILE_SIZE, 166, 52, 0); // Shed A (North-West Bonded Freight Warehouse)
+        pushPropOBB(351.2 * TILE_SIZE, 316.5 * TILE_SIZE, 138, 44, 0); // Shed B (North-East Harbor Master & Logistics Building)
+        pushPropOBB(336.8 * TILE_SIZE, 318.8 * TILE_SIZE, 158, 46, 0); // Shed C (South-West Stevedore & Heavy Rigging Shed)
 
         // 18D. Moored Dodo Seaplanes, Superyacht Parties, Thatched Tiki Bars, Mini-Golf Windmill & Outlaw Biker Chopper Lineups
         for (const mp of this.mooredSeaplanes) {
@@ -6417,8 +6506,8 @@ class LeonidaMap {
             {
                 id: "crane_viceport",
                 name: "VICE PORT CONTAINER CRANE",
-                x: mx256(171.5) * TILE_SIZE,
-                y: my256(162.5) * TILE_SIZE,
+                x: 336.8 * TILE_SIZE,
+                y: 304.8 * TILE_SIZE,
                 w: 2.5 * TILE_SIZE,
                 h: 2.4 * TILE_SIZE,
                 armAngle: 0,
@@ -6976,18 +7065,19 @@ class LeonidaMap {
                             isWaterOrBridgeBarrier = true;
                         }
                         // 2) Elevated Bridge & Approach Ramp Parapet Guardrails:
-                        //    When on an E-W bridge/ramp (1), block N/S sides that aren't part of the bridge/ramp.
-                        //    When on a N-S bridge/ramp (2), block E/W sides that aren't part of the bridge/ramp.
+                        //    When on an E-W bridge/ramp (1), block N/S sides that aren't part of the bridge/ramp (and aren't an intersecting road).
+                        //    When on a N-S bridge/ramp (2), block E/W sides that aren't part of the bridge/ramp (and aren't an intersecting road).
+                        const isRoadToRoad = (curGround === GROUND_TYPE.ROAD && nbGround === GROUND_TYPE.ROAD);
                         const activeSpanType = curBridge || curRamp;
                         if (activeSpanType === 1) {
-                            if (nbGround === GROUND_TYPE.WATER || (dy !== 0 && nbBridge === 0 && nbRamp === 0)) {
+                            if (nbGround === GROUND_TYPE.WATER || (!isRoadToRoad && dy !== 0 && nbBridge === 0 && nbRamp === 0)) {
                                 isWaterOrBridgeBarrier = true;
                             }
                         } else if (activeSpanType === 2) {
-                            if (nbGround === GROUND_TYPE.WATER || (dx !== 0 && nbBridge === 0 && nbRamp === 0)) {
+                            if (nbGround === GROUND_TYPE.WATER || (!isRoadToRoad && dx !== 0 && nbBridge === 0 && nbRamp === 0)) {
                                 isWaterOrBridgeBarrier = true;
                             }
-                        } else {
+                        } else if (!isRoadToRoad) {
                             // 3) On lower ground (docks, boardwalks, beaches) next to a bridge or ramp:
                             //    block walking sideways through the concrete retaining wall of the bridge/ramp!
                             const nbSpanType = nbBridge || nbRamp;
