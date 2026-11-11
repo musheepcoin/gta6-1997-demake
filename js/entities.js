@@ -4088,7 +4088,7 @@ class TrafficManager {
         this.genCarsCooldown = isMobile ? 0.72 : 0.55;
         this.genPedsCooldown = isMobile ? 0.55 : 0.20;
         this.maxTrafficCars = isMobile ? 16 : 22;
-        this.maxTrafficPeds = isMobile ? 54 : 104;
+        this.maxTrafficPeds = isMobile ? 32 : 48;
         this.carsMaxDistanceBlocks = isMobile ? 5 : 6; // mTrafficGenCarsMaxDistance
         this.pedsMaxDistanceBlocks = isMobile ? 7 : 9; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
@@ -4539,10 +4539,10 @@ class TrafficManager {
             if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
-            // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway or Vice Port interior container/warehouse yards
+            // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway or Port of Vice City industrial zone
             if ((ped.kind === "CIVILIAN" || ped.kind === "CRIMINAL") && (
                 (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) ||
-                (bx >= 331 && bx <= 360 && by >= 300 && by <= 336 && bx !== 342 && bx !== 345)
+                (bx >= 328 && bx <= 363 && by >= 298 && by <= 338)
             )) {
                 game.peds.splice(i, 1);
                 continue;
@@ -4600,12 +4600,7 @@ class TrafficManager {
             if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) continue;
             if (bx >= 179 && bx <= 197 && by >= 164 && by <= 180) continue;
             if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
-            // Vice Port: never spawn random pedestrians inside warehouse/container yards; allow at most 4 dockworkers along the central truck avenue curb (c = 342, 345)
-            const inVicePort = (bx >= 328 && bx <= 363 && by >= 298 && by <= 338);
-            if (inVicePort) {
-                if (vicePortPeds >= 4) continue;
-                if (bx >= 331 && bx <= 360 && by >= 299 && by <= 336 && bx !== 342 && bx !== 345) continue;
-            }
+            if (bx >= 328 && bx <= 363 && by >= 298 && by <= 338) continue;
 
             const inScreen = this.isPointInRect(bx, by, onScreenArea);
             if (inScreen && !allowEdgeOnScreen) continue;
@@ -4634,10 +4629,9 @@ class TrafficManager {
             const pedX = (pick.bx + 0.25 + Math.random() * 0.5) * TILE_SIZE;
             const pedY = (pick.by + 0.25 + Math.random() * 0.5) * TILE_SIZE;
 
-            const minPedGap = inVicePort ? 180 : 22;
             let tooClose = false;
             for (const other of game.peds) {
-                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < minPedGap) {
+                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 84) {
                     tooClose = true;
                     break;
                 }
@@ -4686,7 +4680,6 @@ class TrafficManager {
             if (districtSpec.isRollerblader) newPed.isRollerblader = true;
             if (districtSpec.isChild) newPed.isChild = true;
             game.peds.push(newPed);
-            if (inVicePort) vicePortPeds++;
             spawned++;
         }
     }

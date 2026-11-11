@@ -10445,7 +10445,7 @@ class RetroRenderer {
                 const baseY = cr.y + cr.h * 0.5;
                 const swing = cr.crushingVehicle ? cr.armAngle : Math.sin(this.time * 1.4) * 0.25;
                 this.batchObjectSprite3D("410", baseX, baseY, cz, 0, 1.15, SPRITE_DRAW_ORDER.TREES);
-                this.batchObjectSprite3D("260", cr.x + cr.w * 0.55, baseY, cz + 0.15, swing, 1.15, SPRITE_DRAW_ORDER.TREES);
+                this.batchObjectSprite3D("260", baseX - 16, baseY, cz + 0.15, swing, 1.15, SPRITE_DRAW_ORDER.TREES);
             }
         }
 

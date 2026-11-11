@@ -1640,9 +1640,11 @@ class LeonidaGame {
 
 
 
-    populateNearbySidewalks(centerX, centerY, targetCount = 96, radiusBlocks = 14) {
+    populateNearbySidewalks(centerX, centerY, targetCount = 28, radiusBlocks = 14) {
 
         if (!this.map || !this.map.cmpLoaded) return;
+
+        targetCount = Math.min(targetCount, 28);
 
         const cBx = Math.floor(centerX / TILE_SIZE);
 
@@ -1658,22 +1660,6 @@ class LeonidaGame {
 
 
 
-        let existing = 0;
-
-        for (const ped of this.peds) {
-
-            if (!ped.dead && Math.abs(ped.x - centerX) <= radiusBlocks * TILE_SIZE && Math.abs(ped.y - centerY) <= radiusBlocks * TILE_SIZE) {
-
-                existing++;
-
-            }
-
-        }
-
-        if (existing >= targetCount) return;
-
-
-
         const candidates = [];
 
         for (let by = minY; by <= maxY; by++) {
@@ -1682,7 +1668,7 @@ class LeonidaGame {
 
                 if (Math.abs(bx - cBx) <= 1 && Math.abs(by - cBy) <= 1) continue;
 
-                // Exclude VCIA Airport tarmac, Port Gellhorn Super-Speedway, SERA Space Center, Stadium pitch, Prison perimeter strips, and Vice Port interior warehouse/container yards
+                // Exclude VCIA Airport tarmac, Port Gellhorn Super-Speedway, SERA Space Center, Stadium pitch, Prison perimeter strips, and Port of Vice City industrial zone
                 if (bx >= 64 && bx <= 165 && by >= 299 && by <= 368) continue;
 
                 if (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) continue;
@@ -1693,7 +1679,7 @@ class LeonidaGame {
 
                 if (bx >= 56 && bx <= 68 && by >= 76 && by <= 146 && (bx === 56 || bx === 68 || by === 76 || by === 146)) continue;
 
-                if (bx >= 331 && bx <= 360 && by >= 299 && by <= 336 && bx !== 342 && bx !== 345) continue;
+                if (bx >= 328 && bx <= 363 && by >= 298 && by <= 338) continue;
 
                 const nav = this.map.getNavigationBlock(bx, by, 2.0);
                 if (!nav) continue;
@@ -1718,13 +1704,30 @@ class LeonidaGame {
 
         if (candidates.length === 0) return;
 
+        // Scale maximum pedestrian count to available sidewalk tiles so narrow corridors never get overcrowded
+        const cappedTarget = Math.min(targetCount, Math.max(4, Math.floor(candidates.length * 0.16)));
+
+        let existing = 0;
+
+        for (const ped of this.peds) {
+
+            if (!ped.dead && Math.abs(ped.x - centerX) <= radiusBlocks * TILE_SIZE && Math.abs(ped.y - centerY) <= radiusBlocks * TILE_SIZE) {
+
+                existing++;
+
+            }
+
+        }
+
+        if (existing >= cappedTarget) return;
+
 
 
         const civTypes = ["civ0", "civ1", "civ2", "civ3", "gang"];
 
         const dirs = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
 
-        const needed = targetCount - existing;
+        const needed = cappedTarget - existing;
 
         let spawned = 0;
 
@@ -1742,7 +1745,7 @@ class LeonidaGame {
 
             for (const other of this.peds) {
 
-                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 22) {
+                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 84) {
 
                     tooClose = true;
 
@@ -13795,85 +13798,12 @@ class LeonidaGame {
                     }
                 }
 
-                // 4) Social Sidewalk Micro-Interactions, Couple/Friend Walking Cohesion & Storefront Window-Shopping
-                if (ped.groupPartner && (ped.groupPartner.dead || (ped.groupPartner.panicTimer || 0) > 0 || (ped.panicTimer || 0) > 0 || Math.hypot(ped.groupPartner.x - ped.x, ped.groupPartner.y - ped.y) > 58)) {
-                    ped.groupPartner = null;
-                }
-                if ((ped.socialTimer || 0) > 0) {
-                    ped.socialTimer = Math.max(0, ped.socialTimer - dt);
-                    if (typeof ped.socialAngle === "number") {
-                        ped.angle = ped.socialAngle + Math.sin(performance.now() * 0.003 + (ped.turnSeed || 0)) * 0.12;
-                    }
-                } else if (
-                    ped.kind === "CIVILIAN" &&
-                    !ped.missionTag &&
-                    (ped.panicTimer || 0) <= 0 &&
-                    !ped.isCrossingRoad &&
-                    !ped.waitingAtCrosswalk &&
-                    (ped.hailingTaxiTimer || 0) <= 0 &&
-                    (ped.socialCooldown || 0) <= 0 &&
-                    curNavPre &&
-                    curNavPre.groundType === GROUND_TYPE.PAWEMENT &&
-                    ((ped.turnSeed || 0) % 13 === 0)
-                ) {
-                    // Check if another calm civilian is passing nearby on the same sidewalk to chat briefly or walk together as a pair!
-                    let interacted = false;
-                    for (let pj = 0; pj < this.peds.length; pj++) {
-                        const otherPed = this.peds[pj];
-                        if (!otherPed || otherPed === ped || otherPed.dead || otherPed.kind !== "CIVILIAN" || otherPed.missionTag) continue;
-                        if ((otherPed.panicTimer || 0) > 0 || otherPed.isCrossingRoad || (otherPed.socialCooldown || 0) > 0) continue;
-                        const distP = Math.hypot(otherPed.x - ped.x, otherPed.y - ped.y);
-                        if (distP > 15 && distP < 34) {
-                            const sameDir = Math.cos((otherPed.angle || 0) - (ped.angle || 0)) > 0.80;
-                            if (sameDir && !ped.groupPartner && !otherPed.groupPartner) {
-                                ped.groupPartner = otherPed;
-                                ped.groupSide = -1;
-                                otherPed.groupPartner = ped;
-                                otherPed.groupSide = 1;
-                                otherPed.speed = ped.speed;
-                                ped.socialCooldown = 24.0;
-                                otherPed.socialCooldown = 24.0;
-                                interacted = true;
-                                break;
-                            }
-                            const chatDur = 2.6 + Math.random() * 1.4;
-                            ped.socialTimer = chatDur;
-                            ped.socialCooldown = 28.0;
-                            ped.socialAngle = Math.atan2(otherPed.y - ped.y, otherPed.x - ped.x);
-                            otherPed.socialTimer = chatDur;
-                            otherPed.socialCooldown = 28.0;
-                            otherPed.socialAngle = Math.atan2(ped.y - otherPed.y, ped.x - otherPed.x);
-                            if ((ped._shoutCooldown || 0) <= 0 && Math.random() < 0.35) {
-                                ped._shoutCooldown = 8.0;
-                                this.addFloatingText(ped.x, ped.y - 20, "💬", "#e2e8f0");
-                            }
-                            interacted = true;
-                            break;
-                        }
-                    }
-                    // Storefront Window-Shopping & Street Vending Machine Stops
-                    if (!interacted && Array.isArray(this.map.interiors)) {
-                        for (let si = 0; si < this.map.interiors.length; si++) {
-                            const shop = this.map.interiors[si];
-                            if (!shop || typeof shop.x !== "number") continue;
-                            const dShop = Math.hypot(shop.x - ped.x, shop.y - ped.y);
-                            if (dShop > 14 && dShop < 40) {
-                                ped.socialTimer = 2.8 + Math.random() * 1.4;
-                                ped.socialCooldown = 32.0;
-                                ped.socialAngle = Math.atan2(shop.y - ped.y, shop.x - ped.x);
-                                if ((ped._shoutCooldown || 0) <= 0 && Math.random() < 0.35) {
-                                    ped._shoutCooldown = 9.0;
-                                    this.addFloatingText(ped.x, ped.y - 20, "🛍️", "#f472b6");
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
+                // 4) Clean Sidewalk Walking (no mid-sidewalk clustering or group-lock traffic jams)
+                ped.groupPartner = null;
+                ped.socialTimer = 0;
 
                 const isStandingStill = Boolean(
                     ped.waitingAtCrosswalk ||
-                    (ped.socialTimer || 0) > 0 ||
                     ((ped.hailingTaxiTimer || 0) > 0 && ped._hailingTaxi && Math.abs(ped._hailingTaxi.speed || 0) >= 12)
                 );
 
@@ -13907,12 +13837,12 @@ class LeonidaGame {
                     (
                         ped.targetBx === null ||
                         ped.targetBx === undefined ||
-                        ped.waypointTimer > 2.2 ||
-                        Math.hypot(curTx - ped.x, curTy - ped.y) < 18
+                        ped.waypointTimer > 2.4 ||
+                        Math.hypot(curTx - ped.x, curTy - ped.y) < 14
                     );
 
                 if (needTarget) {
-                    const reachedTarget = ped.targetBx !== null && ped.targetBx !== undefined && Math.hypot(curTx - ped.x, curTy - ped.y) < 18;
+                    const reachedTarget = ped.targetBx !== null && ped.targetBx !== undefined && Math.hypot(curTx - ped.x, curTy - ped.y) < 14;
                     const baseX = reachedTarget ? ped.targetBx : bx;
                     const baseY = reachedTarget ? ped.targetBy : by;
                     if (reachedTarget) {
@@ -13921,27 +13851,7 @@ class LeonidaGame {
                     }
                     ped.turnSeed = (ped.turnSeed || 1) + 1;
 
-                    // If walking as a cohesive pair (`groupPartner` with `groupSide > 0`) and partner already chose a nearby sidewalk block, follow partner side-by-side!
-                    const partner = ped.groupPartner;
-                    if (
-                        partner &&
-                        !partner.dead &&
-                        (ped.groupSide || 0) > 0 &&
-                        !partner.isCrossingRoad &&
-                        typeof partner.targetBx === "number" &&
-                        typeof partner.targetBy === "number" &&
-                        Math.abs(partner.targetBx - baseX) <= 1 &&
-                        Math.abs(partner.targetBy - baseY) <= 1
-                    ) {
-                        ped.targetBx = partner.targetBx;
-                        ped.targetBy = partner.targetBy;
-                        ped.angle = partner.angle;
-                        ped.waypointTimer = 0;
-                        const pPerpX = -Math.sin(partner.angle || 0);
-                        const pPerpY = Math.cos(partner.angle || 0);
-                        ped.targetOffX = (partner.targetOffX || 0) + pPerpX * 10;
-                        ped.targetOffY = (partner.targetOffY || 0) + pPerpY * 10;
-                    } else {
+                    {
                         const navContext = {
                             isCrossingRoad: Boolean(ped.isCrossingRoad),
                             crossDirX: ped.crossDirX || 0,
@@ -13992,8 +13902,11 @@ class LeonidaGame {
                         ped.targetBy = nextStep.by;
                         ped.angle = nextStep.angle;
                         ped.waypointTimer = 0;
-                        ped.targetOffX = 0;
-                        ped.targetOffY = 0;
+                        // Subtle right-hand sidewalk lane offset (9px) so opposing pedestrians pass each other smoothly without head-on collisions!
+                        const rightPerpX = -Math.sin(nextStep.angle);
+                        const rightPerpY = Math.cos(nextStep.angle);
+                        ped.targetOffX = rightPerpX * 9.0;
+                        ped.targetOffY = rightPerpY * 9.0;
 
                         const centerTx = (ped.targetBx + 0.5) * TILE_SIZE;
                         const centerTy = (ped.targetBy + 0.5) * TILE_SIZE;
@@ -14015,7 +13928,7 @@ class LeonidaGame {
                         ) {
                             const perpX = -Math.sin(nextStep.angle);
                             const perpY = Math.cos(nextStep.angle);
-                            for (const lat of [18, -18, 25, -25]) {
+                            for (const lat of [0, 18, -18, 25, -25]) {
                                 const candX = centerTx + perpX * lat;
                                 const candY = centerTy + perpY * lat;
                                 const cbx = Math.floor(candX / TILE_SIZE);
@@ -14046,7 +13959,13 @@ class LeonidaGame {
                 } else if (!isStandingStill && (ped.hailingTaxiTimer || 0) <= 0 && ped.targetBx !== null && ped.targetBx !== undefined) {
                     const tx = (ped.targetBx + 0.5) * TILE_SIZE + (ped.targetOffX || 0);
                     const ty = (ped.targetBy + 0.5) * TILE_SIZE + (ped.targetOffY || 0);
-                    ped.angle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
+                    // Authentic 1997 GTA 1 AiCharacterController::ContinueWalkToWaypoint:
+                    // Calm sidewalk pedestrians walk straight toward their verified sidewalk tile waypoint without erratic raycast swerving!
+                    if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && !ped._boardingVeh) {
+                        ped.angle = Math.atan2(ty - ped.y, tx - ped.x);
+                    } else {
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
+                    }
                 }
 
                 ped.x += Math.cos(ped.angle) * spd * dt;
@@ -14275,7 +14194,7 @@ class LeonidaGame {
 
                 const dist2 = dx * dx + dy * dy;
 
-                const minDist = 15.5; // 15.5px separation diameter for dense sidewalks without pushing onto roads
+                const minDist = 11.0; // 11.0px separation diameter so passing pedestrians on 2-way sidewalks never block or shove each other
 
                 if (dist2 < minDist * minDist && dist2 > 0.001) {
 
