@@ -4112,16 +4112,45 @@ class TrafficManager {
         const r1 = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
         const pickFrom = (arr) => arr[r1 % arr.length];
 
+        const decoratePedSpec = (spec) => {
+            const gt = spec.g24Type || "civ0";
+            if (!spec.carryProp && !spec.isRollerblader && !spec.isChild) {
+                if (gt === "surfer_guy" && (r1 % 3) === 0) {
+                    spec.carryProp = "SURFBOARD";
+                } else if ((gt === "g2_zaibatsu" || gt === "g2_yakuza" || gt === "g2_civ_greysuit") && (r1 % 2) === 0) {
+                    spec.carryProp = "BRIEFCASE";
+                } else if ((gt === "g2_scientist" || gt === "dockworker_orange") && (r1 % 2) === 0) {
+                    spec.carryProp = "CLIPBOARD";
+                } else if ((gt === "g2_civ_pink" || gt === "g2_civ_lilac" || gt === "g2_civ_burgundy") && (r1 % 3) === 0) {
+                    spec.carryProp = "SHOPPING_BAG";
+                } else if ((gt === "vc_tourist" || gt === "vc_hawaiian_red") && (r1 % 3) === 0) {
+                    spec.carryProp = "CAMERA";
+                }
+            }
+            if (!spec.personality) {
+                if (gt === "g2_russian" || gt === "vc_haitian" || gt === "vc_cuban" || gt === "gang" || gt === "g2_mugger" || gt === "g2_redneck_red") {
+                    spec.personality = (r1 % 3) === 0 ? "BRAVE" : "STREET";
+                } else if (gt === "vc_tourist" || gt === "vc_hawaiian_red" || spec.carryProp === "CAMERA") {
+                    spec.personality = "TOURIST";
+                } else if (spec.carryProp === "SHOPPING_BAG" || gt === "g2_civ_pink" || gt === "g2_civ_lilac") {
+                    spec.personality = "SHOPPER";
+                } else {
+                    spec.personality = "CAUTIOUS";
+                }
+            }
+            return spec;
+        };
+
         // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Surfers & Bodybuilders
         if (isSand || (bx >= 452 && bx <= 484 && by >= 46 && by <= 375)) {
             const beachPool = [
                 "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
                 "surfer_guy", "surfer_guy", "vc_bodybuilder", "vc_jogger", "vc_tourist",
-                "bikini_pink", "bikini_cyan", "kid_beach", "kid_girl_pink"
+                "g2_civ_blueshorts", "g2_civ_yellowtee", "kid_beach", "kid_girl_pink"
             ];
             const gType = pickFrom(beachPool);
             const isChild = gType.startsWith("kid_");
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 missionTag: "BEACH",
@@ -4129,19 +4158,35 @@ class TrafficManager {
                 hp: 35,
                 speed: (gType === "vc_jogger") ? (38 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 5))),
                 isChild
-            };
+            });
+        }
+
+        // 1B. SERA Spaceport & Cape Leonida Launch Complex (bx >= 415, by <= 45)
+        if (bx >= 415 && by <= 45) {
+            const spaceportPool = [
+                "g2_scientist", "g2_scientist", "g2_zaibatsu", "dockworker_orange",
+                "dockworker_yellow", "g2_civ_greysuit", "vc_tourist"
+            ];
+            const gType = pickFrom(spaceportPool);
+            return decoratePedSpec({
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#e2e8f0",
+                hp: 42,
+                speed: 23 + (r1 % 5)
+            });
         }
 
         // 2. Lummus Park Oceanfront Boardwalk (c = 451..452): Rollerbladers, Joggers & Beach Promenaders
         if ((bx === 451 || bx === 452) && by >= 44 && by <= 362) {
             const skatePool = [
                 "vc_jogger", "bikini_cyan", "bikini_pink", "g2_civ_pink",
-                "g2_civ_aqua", "vc_tourist", "kid_skater", "bikini_yellow", "surfer_guy"
+                "g2_civ_aqua", "g2_civ_blueshorts", "vc_tourist", "kid_skater", "bikini_yellow", "surfer_guy"
             ];
             const gType = pickFrom(skatePool);
             const isRollerblader = (r1 % 10) < 6 || gType === "kid_skater";
             const isChild = gType.startsWith("kid_");
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#00f0ff",
@@ -4149,7 +4194,7 @@ class TrafficManager {
                 speed: isRollerblader ? (45 + (r1 % 7)) : (gType === "vc_jogger" ? (38 + (r1 % 5)) : (23 + (r1 % 5))),
                 isRollerblader,
                 isChild
-            };
+            });
         }
 
         // 3. Ocean Drive, Lummus Curbside, South Beach & Española Way (bx = 408..450, by = 40..370)
@@ -4157,12 +4202,13 @@ class TrafficManager {
             const oceanDrivePool = [
                 "vc_tourist", "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
                 "surfer_guy", "vc_jogger", "vc_bodybuilder", "vc_hawaiian_red", "vc_crockett", "vc_tubbs",
-                "vc_tommy", "g2_civ_aqua", "g2_civ_pink", "civ0", "civ1", "civ2", "civ3", "kid_boy_cap", "kid_girl_pink"
+                "vc_tommy", "g2_civ_aqua", "g2_civ_pink", "g2_civ_lilac", "g2_civ_yellowtee",
+                "g2_civ_redtee", "g2_civ_blueshorts", "g2_elvis", "kid_boy_cap", "kid_girl_pink"
             ];
             const gType = pickFrom(oceanDrivePool);
             const isRollerblader = (bx === 448 && (r1 % 6) === 0);
             const isChild = gType.startsWith("kid_");
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#ff2a85",
@@ -4170,71 +4216,74 @@ class TrafficManager {
                 speed: isRollerblader ? 46 : (gType === "vc_jogger" ? (38 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 6)))),
                 isRollerblader,
                 isChild
-            };
+            });
         }
 
         // 4. Little Cuba / Calle Ocho (bx = 255..325, by = 215..292)
         if (bx >= 255 && bx <= 325 && by >= 215 && by <= 292) {
             const cubaPool = [
                 "vc_cuban", "vc_cuban", "vc_cuban", "vc_hawaiian_red",
-                "vc_tourist", "g2_civ_aqua", "civ0", "civ1", "civ2", "civ3"
+                "vc_tourist", "g2_civ_aqua", "g2_civ_redtee", "g2_civ_yellowtee",
+                "g2_civ_burgundy", "g2_civ_granny", "civ0", "civ1"
             ];
             const gType = pickFrom(cubaPool);
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#f59e0b",
                 hp: 38,
-                speed: 22 + (r1 % 6)
-            };
+                speed: gType === "g2_civ_granny" ? 19 : (22 + (r1 % 6))
+            });
         }
 
         // 5. Wynwood Walls, Little Haiti & Club Jack of Hearts (bx = 165..265, by = 92..212)
         if (bx >= 165 && bx <= 265 && by >= 92 && by <= 212) {
             const wynwoodPool = [
                 "vc_haitian", "vc_haitian", "vc_cuban", "gang",
-                "vc_tourist", "g2_civ_pink", "g2_civ_aqua", "civ1", "civ2", "civ3"
+                "g2_russian", "vc_tourist", "g2_civ_pink", "g2_civ_lilac",
+                "g2_civ_redtee", "g2_civ_darkgreen", "civ1", "civ2"
             ];
             const gType = pickFrom(wynwoodPool);
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#a855f7",
                 hp: 38,
                 speed: 22 + (r1 % 6)
-            };
+            });
         }
 
         // 6. Star Island & Venetian Isles Luxury Archipelago (bx = 328..407, by = 118..215)
         if (bx >= 328 && bx <= 407 && by >= 118 && by <= 215) {
             const starPool = [
                 "bikini_white", "bikini_pink", "bikini_cyan", "vc_crockett",
-                "vc_tubbs", "vc_tommy", "vc_tourist", "vc_jogger", "g2_civ_aqua", "g2_civ_pink"
+                "vc_tubbs", "vc_tommy", "vc_tourist", "vc_jogger", "vc_sailor",
+                "g2_zaibatsu", "g2_civ_aqua", "g2_civ_pink", "g2_civ_lilac"
             ];
             const gType = pickFrom(starPool);
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#38bdf8",
                 hp: 35,
                 speed: gType === "vc_jogger" ? (38 + (r1 % 5)) : (23 + (r1 % 5))
-            };
+            });
         }
 
         // 7. Leonida Keys Tropical Islands (by >= 400)
         if (by >= 400) {
             const keysPool = [
-                "vc_tourist", "surfer_guy", "bikini_cyan", "bikini_yellow",
-                "bikini_pink", "vc_hawaiian_red", "civ0", "civ2", "g2_civ_aqua"
+                "vc_tourist", "surfer_guy", "vc_sailor", "bikini_cyan", "bikini_yellow",
+                "bikini_pink", "vc_hawaiian_red", "g2_civ_blueshorts", "g2_civ_yellowtee", "g2_civ_aqua"
             ];
             const gType = pickFrom(keysPool);
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#2dd4bf",
                 hp: 35,
                 speed: 22 + (r1 % 6)
-            };
+            });
         }
 
         // 7B. Port of Vice City (bx = 328..363, by = 298..338), Port Gellhorn Docks (bx = 36..88, by = 201..265) & Allied Sugar Refinery (bx = 138..168, by = 96..132)
@@ -4248,29 +4297,65 @@ class TrafficManager {
                 "dockworker_yellow", "dockworker_orange", "dockworker_yellow", "vc_sailor"
             ];
             const gType = pickFrom(portWorkerPool);
-            return {
+            return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: gType === "dockworker_orange" ? "#f97316" : "#eab308",
                 hp: 45,
                 speed: 23 + (r1 % 5)
-            };
+            });
         }
 
-        // 8. Downtown Vice City & Mainland
+        // 7C. Port Gellhorn Town, Thrillbilly Mud Park, Grassrivers & Mount Kalaga Frontier (bx <= 155)
+        if (bx <= 155) {
+            const frontierPool = [
+                "g2_redneck_red", "g2_redneck_blond", "g2_redneck_red", "g2_russian",
+                "dockworker_yellow", "vc_sailor", "g2_civ_blueshorts", "g2_civ_darkgreen",
+                "g2_civ_redtee", "vc_tourist"
+            ];
+            const gType = pickFrom(frontierPool);
+            return decoratePedSpec({
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#d97706",
+                hp: 42,
+                speed: 22 + (r1 % 6)
+            });
+        }
+
+        // 7D. Downtown Financial & Civic High-Rise District (bx = 265..345, by = 105..214)
+        if (bx >= 265 && bx <= 345 && by >= 105 && by <= 214) {
+            const downtownExecPool = [
+                "g2_zaibatsu", "g2_yakuza", "g2_civ_greysuit", "g2_civ_burgundy",
+                "g2_civ_lilac", "vc_crockett", "vc_tubbs", "vc_tourist",
+                "vc_jogger", "g2_civ_aqua", "g2_civ_pink", "civ0", "civ2"
+            ];
+            const gType = pickFrom(downtownExecPool);
+            return decoratePedSpec({
+                kind: "CIVILIAN",
+                g24Type: gType,
+                shirtColor: "#475569",
+                hp: 38,
+                speed: gType === "vc_jogger" ? (38 + (r1 % 5)) : (23 + (r1 % 5))
+            });
+        }
+
+        // 8. General Vice City Mainland & Boulevards
         const cityPool = [
             "civ0", "civ1", "civ2", "civ3", "vc_tourist", "vc_jogger",
             "vc_crockett", "vc_tubbs", "vc_hawaiian_red", "g2_civ_aqua",
-            "g2_civ_pink", "vc_cuban", "vc_haitian", "gang"
+            "g2_civ_pink", "g2_civ_redtee", "g2_civ_blueshorts", "g2_civ_yellowtee",
+            "g2_civ_lilac", "g2_civ_burgundy", "g2_civ_greysuit", "g2_civ_darkgreen",
+            "vc_cuban", "vc_haitian"
         ];
         const gType = pickFrom(cityPool);
-        return {
+        return decoratePedSpec({
             kind: "CIVILIAN",
             g24Type: gType,
             shirtColor: "#06b6d4",
             hp: 35,
             speed: gType === "vc_jogger" ? (38 + (r1 % 5)) : (22 + (r1 % 6))
-        };
+        });
     }
 
     /* ========================================================================
@@ -4288,11 +4373,14 @@ class TrafficManager {
         }
 
         const isBeach = isSand || (bx >= 452 && bx <= 484 && by >= 46 && by <= 375);
+        const isSpaceport = bx >= 415 && by <= 45;
         const isBoardwalk = (bx === 451 || bx === 452) && by >= 44 && by <= 362;
         const isOceanDrive = bx >= 408 && bx <= 450 && by >= 40 && by <= 370;
         const isCuba = bx >= 255 && bx <= 325 && by >= 215 && by <= 292;
         const isWynwood = bx >= 165 && bx <= 265 && by >= 92 && by <= 212;
         const isStarIsland = bx >= 328 && bx <= 407 && by >= 118 && by <= 215;
+        const isDowntown = bx >= 265 && bx <= 345 && by >= 105 && by <= 214;
+        const isFrontier = bx <= 155;
         const isIndustrial =
             (bx >= 328 && bx <= 363 && by >= 298 && by <= 338) ||
             (bx >= 36 && bx <= 88 && by >= 201 && by <= 265) ||
@@ -4300,7 +4388,7 @@ class TrafficManager {
 
         const roll = r % 100;
         let formType = "SOLO";
-        if (isIndustrial) {
+        if (isIndustrial || isSpaceport) {
             formType = roll < 52 ? "SOLO" : (roll < 82 ? "COUPLE" : "HANGOUT_CIRCLE");
         } else if (isBoardwalk) {
             formType = roll < 50 ? "SOLO" : (roll < 78 ? "COUPLE" : (roll < 92 ? "FRIEND_GROUP" : "FAMILY"));
@@ -4322,7 +4410,13 @@ class TrafficManager {
 
         if (formType === "COUPLE") {
             let pairs;
-            if (isIndustrial) {
+            if (isSpaceport) {
+                pairs = [
+                    ["g2_scientist", "g2_scientist"],
+                    ["g2_zaibatsu", "g2_scientist"],
+                    ["dockworker_orange", "dockworker_yellow"]
+                ];
+            } else if (isIndustrial) {
                 pairs = [
                     ["dockworker_yellow", "dockworker_orange"],
                     ["dockworker_yellow", "vc_sailor"]
@@ -4333,7 +4427,8 @@ class TrafficManager {
                     ["vc_bodybuilder", "bikini_cyan"],
                     ["surfer_guy", "bikini_yellow"],
                     ["vc_tourist", "bikini_white"],
-                    ["vc_jogger", "bikini_red"]
+                    ["vc_jogger", "bikini_red"],
+                    ["g2_civ_blueshorts", "bikini_pink"]
                 ];
             } else if (isOceanDrive || isStarIsland) {
                 pairs = [
@@ -4342,27 +4437,43 @@ class TrafficManager {
                     ["vc_tubbs", "g2_civ_pink"],
                     ["vc_tourist", "bikini_cyan"],
                     ["vc_hawaiian_red", "g2_civ_aqua"],
-                    ["surfer_guy", "bikini_yellow"]
+                    ["surfer_guy", "bikini_yellow"],
+                    ["g2_civ_lilac", "g2_civ_yellowtee"]
                 ];
             } else if (isCuba) {
                 pairs = [
                     ["vc_cuban", "g2_civ_pink"],
-                    ["vc_cuban", "civ1"],
-                    ["vc_hawaiian_red", "g2_civ_aqua"]
+                    ["vc_cuban", "g2_civ_burgundy"],
+                    ["vc_hawaiian_red", "g2_civ_aqua"],
+                    ["vc_cuban", "g2_civ_granny"]
                 ];
             } else if (isWynwood) {
                 pairs = [
                     ["vc_haitian", "g2_civ_pink"],
-                    ["gang", "g2_civ_aqua"],
+                    ["gang", "g2_civ_lilac"],
+                    ["g2_russian", "g2_civ_redtee"],
                     ["vc_cuban", "civ2"]
+                ];
+            } else if (isFrontier) {
+                pairs = [
+                    ["g2_redneck_red", "g2_redneck_blond"],
+                    ["g2_russian", "g2_redneck_red"],
+                    ["dockworker_yellow", "g2_civ_blueshorts"]
+                ];
+            } else if (isDowntown) {
+                pairs = [
+                    ["g2_zaibatsu", "g2_civ_greysuit"],
+                    ["g2_yakuza", "g2_civ_lilac"],
+                    ["vc_crockett", "vc_tubbs"],
+                    ["g2_civ_greysuit", "g2_civ_burgundy"]
                 ];
             } else {
                 pairs = [
                     ["civ0", "g2_civ_pink"],
                     ["vc_crockett", "g2_civ_aqua"],
-                    ["vc_tourist", "civ1"],
+                    ["vc_tourist", "g2_civ_lilac"],
                     ["vc_tommy", "bikini_white"],
-                    ["civ2", "civ3"]
+                    ["g2_civ_redtee", "g2_civ_yellowtee"]
                 ];
             }
             const pair = pairs[(r >> 3) % pairs.length];
@@ -4626,6 +4737,8 @@ class TrafficManager {
             }
             if (spec.isRollerblader) newPed.isRollerblader = true;
             if (spec.isChild) newPed.isChild = true;
+            if (spec.carryProp) newPed.carryProp = spec.carryProp;
+            if (spec.personality) newPed.personality = spec.personality;
 
             if (m === 0) {
                 leaderPed = newPed;
@@ -4745,6 +4858,7 @@ class TrafficManager {
                 ped.hangoutCenterX = team.cx;
                 ped.hangoutCenterY = team.cy;
                 ped.hangoutBaseAngle = spec.angle;
+                if (spec.g24Type === "dockworker_orange") ped.carryProp = "CLIPBOARD";
                 if (m === 0) leader = ped;
                 else ped.formationLeader = leader;
                 game.peds.push(ped);

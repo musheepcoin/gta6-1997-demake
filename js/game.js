@@ -13665,10 +13665,59 @@ class LeonidaGame {
                     }
                 }
 
+                // 1B) Player Aimed Firearm Threat & Vehicle Horn Reaction
+                if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && !this.insideInterior) {
+                    const pl = this.player;
+                    if (pl && !pl.inVehicle && pl.weapon && pl.weapon !== "FIST" && (this.input.shoot || (pl.weaponDrawnTimer || 0) > 0.25)) {
+                        const dxP = ped.x - pl.x;
+                        const dyP = ped.y - pl.y;
+                        const distP = Math.hypot(dxP, dyP);
+                        if (distP > 10 && distP < 135) {
+                            const toPedAng = Math.atan2(dyP, dxP);
+                            const angDiff = Math.abs(Math.atan2(Math.sin(toPedAng - pl.angle), Math.cos(toPedAng - pl.angle)));
+                            if (angDiff < 0.42) {
+                                ped.activityTimer = 0;
+                                ped.hangoutTimer = 0;
+                                if (ped.personality === "BRAVE" && !ped.isChild && !ped.missionTag) {
+                                    ped.kind = "HOSTILE";
+                                    ped.baseWalkSpeed = 34;
+                                    if ((ped._shoutCooldown || 0) <= 0) {
+                                        ped._shoutCooldown = 6.0;
+                                        this.addFloatingText(ped.x, ped.y - 20, "👊 BIG MISTAKE!", "#ef4444");
+                                    }
+                                } else {
+                                    ped.panicTimer = 4.2;
+                                    ped.threatX = pl.x;
+                                    ped.threatY = pl.y;
+                                    if ((ped._shoutCooldown || 0) <= 0) {
+                                        ped._shoutCooldown = 5.5;
+                                        this.addFloatingText(ped.x, ped.y - 20, Math.random() < 0.5 ? "🙌 DON'T SHOOT!" : "😱 HE'S GOT A GUN!", "#fde047");
+                                    }
+                                }
+                            }
+                        }
+                    } else if (pl && pl.inVehicle && this.input && this.input.horn) {
+                        const dxV = ped.x - pl.inVehicle.x;
+                        const dyV = ped.y - pl.inVehicle.y;
+                        const distV = Math.hypot(dxV, dyV);
+                        if (distV < 105 && (ped._shoutCooldown || 0) <= 0) {
+                            ped._shoutCooldown = 6.5;
+                            if (distV < 58) {
+                                ped.dodgeTimer = 0.45;
+                                ped.dodgeAngle = Math.atan2(dyV, dxV);
+                            }
+                            if (Math.random() < 0.35) {
+                                this.addFloatingText(ped.x, ped.y - 20, Math.random() < 0.5 ? "📢 WATCH IT!" : "🚕 EASY PAL!", "#fde047");
+                            }
+                        }
+                    }
+                }
+
                 // Cancel calm states if panicked
                 if ((ped.panicTimer || 0) > 0) {
                     ped.waitingAtCrosswalk = false;
                     ped.socialTimer = 0;
+                    ped.activityTimer = 0;
                     if (ped._hailingTaxi && ped._hailingTaxi.aiPassengerTarget === ped) {
                         ped._hailingTaxi.aiPassengerTarget = null;
                     }
@@ -13933,9 +13982,44 @@ class LeonidaGame {
                         ped.waypointTimer = 0;
                     }
                 } else {
+                    // 4C) Autonomous Sidewalk Micro-Activities (Tourists snapping photos & Shoppers pausing at storefronts)
+                    if ((ped.activityCooldown || 0) > 0) {
+                        ped.activityCooldown = Math.max(0, ped.activityCooldown - dt);
+                    }
+                    if ((ped.activityTimer || 0) > 0) {
+                        ped.activityTimer = Math.max(0, ped.activityTimer - dt);
+                        const actBaseA = typeof ped.activityBaseAngle === "number" ? ped.activityBaseAngle : ped.angle;
+                        ped.angle = actBaseA + Math.sin(performance.now() * 0.0028 + (ped.turnSeed || 0)) * 0.16;
+                    } else if (
+                        ped.kind === "CIVILIAN" &&
+                        !ped.isChild &&
+                        !ped.isRollerblader &&
+                        !ped.missionTag &&
+                        !ped.formationId &&
+                        (ped.panicTimer || 0) <= 0 &&
+                        !ped.isCrossingRoad &&
+                        !ped.waitingAtCrosswalk &&
+                        (ped.hailingTaxiTimer || 0) <= 0 &&
+                        (ped.activityCooldown || 0) <= 0 &&
+                        curNavPre &&
+                        curNavPre.groundType === GROUND_TYPE.PAWEMENT &&
+                        (ped.personality === "TOURIST" || ped.personality === "SHOPPER" || ped.carryProp === "CAMERA" || ped.carryProp === "SHOPPING_BAG") &&
+                        Math.random() < dt * 0.045
+                    ) {
+                        ped.activityKind = (ped.personality === "TOURIST" || ped.carryProp === "CAMERA") ? "PHOTO" : "WINDOW_SHOP";
+                        ped.activityTimer = 3.2 + Math.random() * 1.6;
+                        ped.activityCooldown = 24.0 + Math.random() * 14.0;
+                        ped.activityBaseAngle = ped.angle + (Math.random() < 0.5 ? Math.PI * 0.5 : -Math.PI * 0.5);
+                        if (Math.abs(ped.x - this.player.x) < 380 && Math.abs(ped.y - this.player.y) < 280) {
+                            const actLabel = ped.activityKind === "PHOTO" ? "📸 *CLICK*" : "🛍️ NICE!";
+                            this.addFloatingText(ped.x, ped.y - 18, actLabel, "#f8fafc");
+                        }
+                    }
+
                     const isStandingStill = Boolean(
                         ped.waitingAtCrosswalk ||
                         (ped.hangoutTimer || 0) > 0 ||
+                        (ped.activityTimer || 0) > 0 ||
                         ((ped.hailingTaxiTimer || 0) > 0 && ped._hailingTaxi && Math.abs(ped._hailingTaxi.speed || 0) >= 12)
                     );
 
@@ -14033,9 +14117,8 @@ class LeonidaGame {
 
                             ped.targetBx = nextStep.bx;
                             ped.targetBy = nextStep.by;
-                            ped.angle = nextStep.angle;
                             ped.waypointTimer = 0;
-                            // Subtle right-hand sidewalk lane offset (9px, or 5px for a formation leader so their partner fits alongside)
+                            // Subtle right-hand sidewalk lane offset (9px, or 4px for a formation leader so their partner fits alongside)
                             const rightPerpX = -Math.sin(nextStep.angle);
                             const rightPerpY = Math.cos(nextStep.angle);
                             const laneOff = ped.formationRole === "LEADER" ? 4.0 : 9.0;
@@ -14083,8 +14166,9 @@ class LeonidaGame {
                         }
                     }
 
+                    let desiredAngle = ped.angle;
                     if ((ped.dodgeTimer || 0) > 0 && typeof ped.dodgeAngle === "number") {
-                        ped.angle = this.steerPedWithObstacleFeelers(
+                        desiredAngle = this.steerPedWithObstacleFeelers(
                             ped,
                             ped.x + Math.cos(ped.dodgeAngle) * 44,
                             ped.y + Math.sin(ped.dodgeAngle) * 44,
@@ -14096,14 +14180,51 @@ class LeonidaGame {
                         // Authentic 1997 GTA 1 AiCharacterController::ContinueWalkToWaypoint:
                         // Calm sidewalk pedestrians walk straight toward their verified sidewalk tile waypoint without erratic raycast swerving!
                         if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && !ped._boardingVeh) {
-                            ped.angle = Math.atan2(ty - ped.y, tx - ped.x);
+                            desiredAngle = Math.atan2(ty - ped.y, tx - ped.x);
                         } else {
-                            ped.angle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
+                            desiredAngle = this.steerPedWithObstacleFeelers(ped, tx, ty, ped._boardingVeh || null);
+                        }
+                    }
+
+                    if (!isStandingStill) {
+                        const angDelta = Math.atan2(Math.sin(desiredAngle - ped.angle), Math.cos(desiredAngle - ped.angle));
+                        const turnRate = ((ped.panicTimer || 0) > 0 || (ped.dodgeTimer || 0) > 0) ? 12.0 : 7.5;
+                        const maxTurn = turnRate * dt;
+                        if (Math.abs(angDelta) <= maxTurn) {
+                            ped.angle = desiredAngle;
+                        } else {
+                            ped.angle += Math.sign(angDelta) * maxTurn;
                         }
                     }
 
                     ped.x += Math.cos(ped.angle) * spd * dt;
                     ped.y += Math.sin(ped.angle) * spd * dt;
+                }
+
+                // 4D) Soft Pedestrian-to-Pedestrian Personal Space Separation (prevents opposing walkers from clipping through each other)
+                if ((ped.speed || 0) > 1 && !ped.isCrossingRoad) {
+                    for (let oj = 0; oj < this.peds.length; oj++) {
+                        const other = this.peds[oj];
+                        if (!other || other === ped || other.dead) continue;
+                        if (ped.formationId && other.formationId === ped.formationId) continue;
+                        const dxO = ped.x - other.x;
+                        const dyO = ped.y - other.y;
+                        if (Math.abs(dxO) > 13 || Math.abs(dyO) > 13) continue;
+                        const dO = Math.hypot(dxO, dyO);
+                        if (dO > 0.5 && dO < 12.5) {
+                            const push = (12.5 - dO) * 2.2 * dt;
+                            const nx = ped.x + (dxO / dO) * push;
+                            const ny = ped.y + (dyO / dO) * push;
+                            const nbx = Math.floor(nx / TILE_SIZE);
+                            const nby = Math.floor(ny / TILE_SIZE);
+                            const nNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(nbx, nby, pz) : null;
+                            if (nNav && (nNav.groundType === GROUND_TYPE.PAWEMENT || nNav.groundType === GROUND_TYPE.FIELD)) {
+                                ped.x = nx;
+                                ped.y = ny;
+                            }
+                            break;
+                        }
+                    }
                 }
 
                 // Keep normal walking civilians strictly on PAWEMENT/FIELD sidewalks (unless actively crossing a zebra crosswalk!)
