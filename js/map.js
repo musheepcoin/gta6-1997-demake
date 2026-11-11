@@ -806,30 +806,25 @@ class LeonidaMap {
 
                     const isHotelDixonCenter = (tiley === dixonY0 && tilex === dixonX0);
                     const isOceanDrivePenthouse = (tilex >= oceanPentMinX && tilex <= oceanPentMaxX && tilez >= 4);
-                    // Enforce at least 18 tiles minimum spacing between any two rooftop pools so a building never has multiple pools!
-                    const tooCloseToExistingPool = this.rooftopParties.some(
-                        (rp) => Math.hypot(rp.x / TILE_SIZE - (tilex + 0.5), rp.y / TILE_SIZE - (tiley + 0.5)) < 18.0
-                    );
-
-                    if (isHotelDixonCenter && !tooCloseToExistingPool) {
-                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, blk.remap);
-                        this.rooftopParties.push({
-                            x: (tilex + 0.5) * TILE_SIZE,
-                            y: (tiley + 0.5) * TILE_SIZE,
-                            z: tilez + 1.0,
-                            isHotelDixon: true,
-                            seed: tilex * 13 + tiley * 7
-                        });
-                    } else if (!tooCloseToExistingPool && (isOceanDrivePenthouse ? ((tilex * 7 + tiley * 13) % 11 === 0) : ((tilex * 11 + tiley * 17) % 29 === 0))) {
-                        this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, blk.remap);
-                        this.rooftopParties.push({
-                            x: (tilex + 0.5) * TILE_SIZE,
-                            y: (tiley + 0.5) * TILE_SIZE,
-                            z: tilez + 1.0,
-                            isHotelDixon: false,
-                            seed: tilex * 13 + tiley * 7
-                        });
-                    } else if ((tilex * 5 + tiley * 9) % 19 === 0) {
+                    const wantsPool = isHotelDixonCenter || (isOceanDrivePenthouse ? ((tilex * 7 + tiley * 13) % 11 === 0) : ((tilex * 11 + tiley * 17) % 29 === 0));
+                    if (wantsPool) {
+                        // Enforce at least 18 tiles minimum spacing between any two rooftop pools so a building never has multiple pools!
+                        const tooCloseToExistingPool = this.rooftopParties.some(
+                            (rp) => Math.hypot(rp.x / TILE_SIZE - (tilex + 0.5), rp.y / TILE_SIZE - (tiley + 0.5)) < 18.0
+                        );
+                        if (!tooCloseToExistingPool) {
+                            this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 35, blk.remap);
+                            this.rooftopParties.push({
+                                x: (tilex + 0.5) * TILE_SIZE,
+                                y: (tiley + 0.5) * TILE_SIZE,
+                                z: tilez + 1.0,
+                                isHotelDixon: isHotelDixonCenter,
+                                seed: tilex * 13 + tiley * 7
+                            });
+                            continue;
+                        }
+                    }
+                    if ((tilex * 5 + tiley * 9) % 19 === 0) {
                         // Occasional glass skylight atrium (lid 31) without any pool or float
                         this.voxelGrid[gIdx] = getRoofVariantIdx(blkIdx, 31, blk.remap);
                     }
@@ -842,6 +837,7 @@ class LeonidaMap {
         // Build 2D surface lookup table & tree planter list (Lid 69)
         this.mapStyle = this.mapStyle || "VICE";
         this.coastalSandMask = new Uint8Array(MAP_ROWS * MAP_COLS);
+        this.floraOccupiedTile = new Uint8Array(MAP_ROWS * MAP_COLS);
         this.trees = [];
         this.vicePalms = [];
         this.beachUmbrellas = [];
@@ -883,12 +879,23 @@ class LeonidaMap {
                     this.voxelGrid[gIdx1] = getRoofVariantIdx(origIdx1, targetPaverLid, blkZ1.remap || 0);
 
                     const planterHash = (((c * 92837111) ^ (r * 689287499) ^ ((c * r) * 283927)) >>> 0) % 100;
-                    const planterX = (c + 0.5) * TILE_SIZE;
-                    const planterY = (r + 0.5) * TILE_SIZE;
-                    const tooCloseTree = this.trees.some(tr => Math.hypot(tr.x - planterX, tr.y - planterY) < 96.0);
-                    const keepPlanter = !isInsidePrisonOrAirport && !tooCloseTree && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28);
-                    if (keepPlanter) {
-                        this.trees.push({ x: planterX, y: planterY, z: 2.0, scale: 1.0 });
+                    if (!isInsidePrisonOrAirport && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28)) {
+                        let tooCloseTree = false;
+                        for (let dr = -1; dr <= 1 && !tooCloseTree; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                const nr = r + dr, nc = c + dc;
+                                if (nr >= 0 && nr < MAP_ROWS && nc >= 0 && nc < MAP_COLS && this.floraOccupiedTile[nr * MAP_COLS + nc]) {
+                                    tooCloseTree = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!tooCloseTree) {
+                            const planterX = (c + 0.5) * TILE_SIZE;
+                            const planterY = (r + 0.5) * TILE_SIZE;
+                            this.trees.push({ x: planterX, y: planterY, z: 2.0, scale: 1.0 });
+                            this.floraOccupiedTile[r * MAP_COLS + c] = 1;
+                        }
                     }
                 }
             }
@@ -1341,7 +1348,7 @@ class LeonidaMap {
                     }
                 }
                 // 8) Bayfront Park & Downtown Urban Parks (c=210..245, r=40..85, gt==FIELD)
-                else if (c >= 210 && c <= 245 && r >= 40 && r <= 85 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
+                else if (c512 >= 210 && c512 <= 245 && r512 >= 40 && r512 <= 85 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
                     if (seed % 10 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
                     else if (seed % 10 === 1) { chosenKind = "bougainvillea_bush"; scaleMul = 0.95 + hs1 * 0.35; }
                     else if (seed % 10 === 2) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
@@ -1349,18 +1356,25 @@ class LeonidaMap {
                     else if (seed % 10 === 4) { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; }
                 }
                 // 9) General mainland fields / countryside / North Vice Shores (NEVER beach sand!)
-                else if (surfGt === GROUND_TYPE.FIELD && !adjRoad && c < 453 && blkZ1.lid !== 98 && blkZ1.lid !== 99 && blkZ1.lid !== 100 && blkZ1.lid !== 101) {
-                    if (seed % 22 === 0) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
-                    else if (seed % 24 === 0) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
-                    else if (seed % 26 === 0) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
-                    else if (seed % 30 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
+                else if (surfGt === GROUND_TYPE.FIELD && !adjRoad && c512 < 453 && blkZ1.lid !== 98 && blkZ1.lid !== 99 && blkZ1.lid !== 100 && blkZ1.lid !== 101) {
+                    if (seed % 44 === 0) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 48 === 0) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
+                    else if (seed % 52 === 0) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
+                    else if (seed % 60 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
                 }
 
                 if (chosenKind) {
-                    const tooCloseFlora =
-                        (Array.isArray(this.trees) && this.trees.some(tr => Math.hypot(tr.x - posX, tr.y - posY) < 58.0)) ||
-                        (Array.isArray(this.vicePalms) && this.vicePalms.some(pm => Math.hypot(pm.x - posX, pm.y - posY) < 54.0));
+                    let tooCloseFlora = false;
+                    for (let dr = -1; dr <= 1 && !tooCloseFlora; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (this.floraOccupiedTile[(r + dr) * MAP_COLS + (c + dc)]) {
+                                tooCloseFlora = true;
+                                break;
+                            }
+                        }
+                    }
                     if (!tooCloseFlora) {
+                        this.floraOccupiedTile[idx] = 1;
                         this.vicePalms.push({
                             kind: chosenKind,
                             x: posX,
@@ -3772,14 +3786,11 @@ class LeonidaMap {
                 }
             }
             // Never place a bollard light underneath or close to any palm tree or sidewalk tree!
-            if (Array.isArray(this.vicePalms)) {
-                for (let i = 0; i < this.vicePalms.length; i++) {
-                    if (Math.hypot(this.vicePalms[i].x - bx, this.vicePalms[i].y - by) < 54) return false;
-                }
-            }
-            if (Array.isArray(this.trees)) {
-                for (let i = 0; i < this.trees.length; i++) {
-                    if (Math.hypot(this.trees[i].x - bx, this.trees[i].y - by) < 52) return false;
+            if (this.floraOccupiedTile) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (this.floraOccupiedTile[(tr + dr) * MAP_COLS + (tc + dc)]) return false;
+                    }
                 }
             }
             if (Array.isArray(this.tikiBars)) {
@@ -4061,10 +4072,49 @@ class LeonidaMap {
 
         // 17. Filter this.vicePalms so flora never spawns inside volleyball courts, sunbathers, ramps, gym equipment or road/water tiles
         if (this.vicePalms && this.vicePalms.length > 0) {
+            const noFloraMask = new Uint8Array(MAP_ROWS * MAP_COLS);
+            const markNoFloraTile = (wx, wy, radTiles = 0) => {
+                const tc = Math.floor(wx / TILE_SIZE);
+                const tr = Math.floor(wy / TILE_SIZE);
+                for (let dr = -radTiles; dr <= radTiles; dr++) {
+                    const rr = tr + dr;
+                    if (rr < 0 || rr >= MAP_ROWS) continue;
+                    for (let dc = -radTiles; dc <= radTiles; dc++) {
+                        const cc = tc + dc;
+                        if (cc >= 0 && cc < MAP_COLS) noFloraMask[rr * MAP_COLS + cc] = 1;
+                    }
+                }
+            };
+            if (Array.isArray(this.streetlights)) {
+                for (let i = 0; i < this.streetlights.length; i++) markNoFloraTile(this.streetlights[i].baseX, this.streetlights[i].baseY, 0);
+            }
+            if (Array.isArray(this.trafficSignals)) {
+                for (let i = 0; i < this.trafficSignals.length; i++) markNoFloraTile(this.trafficSignals[i].baseX, this.trafficSignals[i].baseY, 0);
+            }
+            if (Array.isArray(this.curbParkingStrips)) {
+                for (let i = 0; i < this.curbParkingStrips.length; i++) {
+                    const st = this.curbParkingStrips[i];
+                    if (st.c >= 0 && st.c < MAP_COLS) {
+                        const r0 = Math.max(0, st.r0 - 1), r1 = Math.min(MAP_ROWS - 1, st.r1 + 1);
+                        for (let rr = r0; rr <= r1; rr++) noFloraMask[rr * MAP_COLS + st.c] = 1;
+                    }
+                }
+            }
+            if (Array.isArray(this.surfaceParkingLots)) {
+                for (let i = 0; i < this.surfaceParkingLots.length; i++) {
+                    const lot = this.surfaceParkingLots[i];
+                    const r0 = Math.max(0, lot.asphaltMinY), r1 = Math.min(MAP_ROWS - 1, lot.asphaltMaxY);
+                    const c0 = Math.max(0, lot.asphaltMinX), c1 = Math.min(MAP_COLS - 1, lot.asphaltMaxX);
+                    for (let rr = r0; rr <= r1; rr++) {
+                        for (let cc = c0; cc <= c1; cc++) noFloraMask[rr * MAP_COLS + cc] = 1;
+                    }
+                }
+            }
             this.vicePalms = this.vicePalms.filter(pm => {
                 const c = Math.floor(pm.x / TILE_SIZE);
                 const r = Math.floor(pm.y / TILE_SIZE);
                 if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
+                    if (noFloraMask[r * MAP_COLS + c]) return false;
                     const gt = this.surfaceGround[r * MAP_COLS + c];
                     if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
                     // STRICT BEACH SAND BAN: Never allow any tree or shrub on open Atlantic sand (c >= 454) or beach sand blocks
@@ -4162,10 +4212,6 @@ class LeonidaMap {
                     if (dx * dx + dy * dy < 58 * 58) return false;
                 }
                 if ((ix512(c) >= 179 && ix512(c) <= 197 && iy512(r) >= 164 && iy512(r) <= 180) || (ix512(c) >= 458 && ix512(c) <= 481 && iy512(r) >= 21 && iy512(r) <= 45) || (ix512(c) >= 26 && ix512(c) <= 87 && iy512(r) >= 149 && iy512(r) <= 200)) return false;
-                if (Array.isArray(this.streetlights) && this.streetlights.some(sl => Math.hypot(sl.baseX - pm.x, sl.baseY - pm.y) < 24)) return false;
-                if (Array.isArray(this.trafficSignals) && this.trafficSignals.some(ts => Math.hypot(ts.baseX - pm.x, ts.baseY - pm.y) < 24)) return false;
-                if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (pm.y >= st.yMin - 18 && pm.y <= st.yMax + 18)))) return false;
-                if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                 return true;
             });
 
@@ -4182,11 +4228,8 @@ class LeonidaMap {
                     const c = Math.floor(tr.x / TILE_SIZE);
                     const r = Math.floor(tr.y / TILE_SIZE);
                     if ((ix512(c) >= 179 && ix512(c) <= 197 && iy512(r) >= 164 && iy512(r) <= 180) || (ix512(c) >= 458 && ix512(c) <= 481 && iy512(r) >= 21 && iy512(r) <= 45) || (ix512(c) >= 26 && ix512(c) <= 87 && iy512(r) >= 149 && iy512(r) <= 200)) return false;
-                    if (Array.isArray(this.streetlights) && this.streetlights.some(sl => Math.hypot(sl.baseX - tr.x, sl.baseY - tr.y) < 24)) return false;
-                    if (Array.isArray(this.trafficSignals) && this.trafficSignals.some(ts => Math.hypot(ts.baseX - tr.x, ts.baseY - tr.y) < 24)) return false;
-                    if (Array.isArray(this.curbParkingStrips) && this.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 && r <= st.r1) || (tr.y >= st.yMin - 18 && tr.y <= st.yMax + 18)))) return false;
-                    if (Array.isArray(this.surfaceParkingLots) && this.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) return false;
                     if (c >= 0 && c < MAP_COLS && r >= 0 && r < MAP_ROWS) {
+                        if (noFloraMask[r * MAP_COLS + c]) return false;
                         const gt = this.surfaceGround[r * MAP_COLS + c];
                         if (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.WATER || gt === GROUND_TYPE.BUILDING) return false;
                     }
@@ -4378,14 +4421,16 @@ class LeonidaMap {
                     if (Math.hypot(this.parkBollardLights[i].x - px, this.parkBollardLights[i].y - py) < 34) return false;
                 }
             }
-            if (Array.isArray(this.vicePalms)) {
-                for (let i = 0; i < this.vicePalms.length; i++) {
-                    if (Math.hypot(this.vicePalms[i].x - px, this.vicePalms[i].y - py) < 36) return false;
-                }
-            }
-            if (Array.isArray(this.trees)) {
-                for (let i = 0; i < this.trees.length; i++) {
-                    if (Math.hypot(this.trees[i].x - px, this.trees[i].y - py) < 36) return false;
+            if (this.floraOccupiedTile) {
+                const tc = Math.floor(px / TILE_SIZE);
+                const tr = Math.floor(py / TILE_SIZE);
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const rr = tr + dr, cc = tc + dc;
+                        if (rr >= 0 && rr < MAP_ROWS && cc >= 0 && cc < MAP_COLS && this.floraOccupiedTile[rr * MAP_COLS + cc]) {
+                            return false;
+                        }
+                    }
                 }
             }
             if (Array.isArray(this.viceStreetDetails)) {
@@ -4760,7 +4805,7 @@ class LeonidaMap {
                         const backGt = this.surfaceGround[backIdx];
                         const backSz = this.surfaceLayer[backIdx] || 2;
                         const isWideSidewalk = (backGt === GROUND_TYPE.PAWEMENT || backGt === GROUND_TYPE.FIELD) && backSz === 2;
-                        const isUrbanCommercialBlock = (c >= 175 && c <= 274 && backGt === GROUND_TYPE.BUILDING);
+                        const isUrbanCommercialBlock = (ix512(c) >= 175 && ix512(c) <= 274 && backGt === GROUND_TYPE.BUILDING);
                         if (!isWideSidewalk && !isUrbanCommercialBlock) return false;
                     }
                     // Never carve a curbside parking bay on the immediate corner tile next to a cross-street or T-junction (keeps traffic signals & crosswalk corners 100% clear)
@@ -4788,7 +4833,7 @@ class LeonidaMap {
                     continue;
                 }
                 const runStart = r;
-                while (r <= 372 && isEligibleRow(r)) {
+                while (r <= MAP_Y_512[372] && isEligibleRow(r)) {
                     r++;
                 }
                 const runEnd = r - 1;

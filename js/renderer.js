@@ -5264,62 +5264,65 @@ class RetroRenderer {
                                 enhancedSprites.height = 1;
                             }
                         }
-                    } catch (err) {
-                        console.error("Stage 2 (Sprites atlas) error:", err);
-                    }
-
-                    setTimeout(() => {
-                        try {
-                            this.loadProgress = 6;
-                            this.loadStageLabel = "DECODING LEONIDA 3D MAP...";
-                            updateStartModalButton(false);
-                            this.map.mapStyle = this.mapStyle;
-                            this.map.loadCmpBinary(mapBinBuffer, this.gta1Meta ? this.gta1Meta.districts : null);
-                            mapBinBuffer = null;
                         } catch (err) {
-                            console.error("Stage 3 (loadCmpBinary) error:", err);
+                            console.error("Stage 2 (Sprites atlas) error:", err);
                         }
+                        this.loadProgress = 6;
+                        this.loadStageLabel = "DECODING LEONIDA 3D MAP...";
+                        updateStartModalButton(false);
 
                         setTimeout(() => {
                             try {
-                                this.loadProgress = 7;
-                                this.loadStageLabel = "BUILDING 3D CITY MESH...";
-                                updateStartModalButton(false);
-                                this.buildCityMesh(true);
+                                this.map.mapStyle = this.mapStyle;
+                                this.map.loadCmpBinary(mapBinBuffer, this.gta1Meta ? this.gta1Meta.districts : null);
+                                mapBinBuffer = null;
                             } catch (err) {
-                                console.error("Stage 4 (buildCityMesh) error:", err);
+                                console.error("Stage 3 (loadCmpBinary) error:", err);
                             }
+                            this.loadProgress = 7;
+                            this.loadStageLabel = "BUILDING 3D CITY MESH...";
+                            updateStartModalButton(false);
 
                             setTimeout(() => {
                                 try {
-                                    this.loadStageLabel = "BUILDING 3D PROPS & LANDMARKS...";
-                                    if (this.gl && this.map && this.map.objectEngine) {
-                                        this.map.objectEngine.buildStatic3DMesh(this.gl, this);
-                                    }
+                                    this.buildCityMesh(true);
                                 } catch (err) {
-                                    console.error("Stage 5A (Static3DMesh) error:", err);
+                                    console.error("Stage 4 (buildCityMesh) error:", err);
                                 }
+                                this.loadStageLabel = "BUILDING 3D PROPS & LANDMARKS...";
+                                updateStartModalButton(false);
 
                                 setTimeout(() => {
                                     try {
-                                        this.loadStageLabel = "BAKING SOLAR SHADOWS...";
-                                        this.buildDayLightTexture();
+                                        if (this.gl && this.map && this.map.objectEngine) {
+                                            this.map.objectEngine.buildStatic3DMesh(this.gl, this);
+                                        }
                                     } catch (err) {
-                                        console.error("Stage 5B (DayLightTex) error:", err);
+                                        console.error("Stage 5A (Static3DMesh) error:", err);
                                     }
+                                    this.loadStageLabel = "BAKING SOLAR SHADOWS...";
+                                    updateStartModalButton(false);
 
                                     setTimeout(() => {
                                         try {
-                                            this.loadStageLabel = "BAKING RADAR & SPAWNING TRAFFIC...";
-                                            this.bakeRadarBackground();
+                                            this.buildDayLightTexture();
                                         } catch (err) {
-                                            console.error("Stage 5C (bakeRadarBackground) error:", err);
+                                            console.error("Stage 5B (DayLightTex) error:", err);
                                         }
+                                        this.loadStageLabel = "BAKING RADAR & SPAWNING TRAFFIC...";
+                                        updateStartModalButton(false);
 
-                                        this.loadProgress = 8;
-                                        this.gta1Ready = true;
-                                        this.cmpReady = true;
-                                        updateStartModalButton(true);
+                                        setTimeout(() => {
+                                            try {
+                                                this.bakeRadarBackground();
+                                            } catch (err) {
+                                                console.error("Stage 5C (bakeRadarBackground) error:", err);
+                                            }
+
+                                            this.loadProgress = 8;
+                                            this.gta1Ready = true;
+                                            this.cmpReady = true;
+                                            updateStartModalButton(true);
 
                                         setTimeout(() => {
                                             if (window.game && typeof window.game.onCmpLoaded === "function") {
@@ -6137,7 +6140,7 @@ class RetroRenderer {
                             lNW === 8 || lNW === 9 || lNW === 69 || lNE === 8 || lNE === 9 || lNE === 69 ||
                             lSW === 8 || lSW === 9 || lSW === 69 || lSE === 8 || lSE === 9 || lSE === 69;
                         const hasLawnNeighbor = (lN === 10 || lS === 10 || lW === 10 || lE === 10 || lNW === 10 || lNE === 10 || lSW === 10 || lSE === 10);
-                        const isOuterOceanCoast = (x >= 458 && z_south <= 370);
+                        const isOuterOceanCoast = (ix512(x) >= 458 && iy512(z_south) <= 370);
 
                         let surType = 0;
                         if (isOuterOceanCoast && !hasRoadNeighbor && !hasPaveNeighbor) surType = 3;
@@ -6227,7 +6230,7 @@ class RetroRenderer {
                             lN === 9 || lN === 69 || lS === 9 || lS === 69 ||
                             lW === 9 || lW === 69 || lE === 9 || lE === 69 ||
                             lNW === 9 || lNW === 69 || lNE === 9 || lNE === 69 ||
-                            lSW === 9 || lSW === 69 || lSE === 9 || lSE === 69 || x >= 215
+                            lSW === 9 || lSW === 69 || lSE === 9 || lSE === 69 || ix512(x) >= 215
                         ) {
                             surType = 0;
                         }

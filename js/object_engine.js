@@ -1055,8 +1055,8 @@ class WorldObjectEngine {
                             map.surfaceGround[idx] === GROUND_TYPE.BUILDING ||
                             (isUrbanPavedVilla && map.surfaceGround[idx] === GROUND_TYPE.FIELD)
                         ) {
-                            const refC = isUrbanPavedVilla ? (c >= 420 ? 448 : 178) : 339;
-                            const refR = isUrbanPavedVilla ? (c >= 420 ? 286 : 170) : 165;
+                            const refC = isUrbanPavedVilla ? (ix512(c) >= 420 ? MAP_X_512[448] : MAP_X_512[178]) : MAP_X_512[339];
+                            const refR = isUrbanPavedVilla ? (ix512(c) >= 420 ? MAP_Y_512[286] : MAP_Y_512[170]) : MAP_Y_512[165];
                             for (let z = 0; z < MAP_LAYERS; z++) {
                                 map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
                                     map.voxelGrid[(z * MAP_ROWS + refR) * M + refC];
@@ -1075,8 +1075,8 @@ class WorldObjectEngine {
                         for (let c = fMinC; c <= fMaxC; c++) {
                             const idx = r * M + c;
                             if (map.surfaceGround[idx] === GROUND_TYPE.FIELD) {
-                                const refC = c >= 420 ? 448 : 178;
-                                const refR = c >= 420 ? 286 : 170;
+                                const refC = ix512(c) >= 420 ? MAP_X_512[448] : MAP_X_512[178];
+                                const refR = ix512(c) >= 420 ? MAP_Y_512[286] : MAP_Y_512[170];
                                 for (let z = 0; z < MAP_LAYERS; z++) {
                                     map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
                                         map.voxelGrid[(z * MAP_ROWS + refR) * M + refC];
@@ -6695,10 +6695,10 @@ class WorldObjectEngine {
             }
         }
         // Inject 3D Octagonal Vice City Mambas Stadium Bowl & 4 Corner Spires into solar shadow map
-        for (let r = 164; r <= 180; r++) {
-            for (let c = 179; c <= 197; c++) {
-                const dx = Math.abs(c - 188);
-                const dy = Math.abs(r - 172);
+        for (let r = MAP_Y_512[164]; r <= MAP_Y_512[180]; r++) {
+            for (let c = MAP_X_512[179]; c <= MAP_X_512[197]; c++) {
+                const dx = Math.abs(ix512(c) - 188);
+                const dy = Math.abs(iy512(r) - 172);
                 if (dx <= 6 && dy <= 5) continue; // Open emerald pitch
                 if (dx + dy >= 16) continue;      // Chamfered outer octagonal corners
                 const idx = r * M + c;
@@ -6706,7 +6706,7 @@ class WorldObjectEngine {
             }
         }
         for (const [sc, sr] of [[180, 165], [196, 165], [180, 179], [196, 179]]) {
-            stampTower((sc + 0.5) * TILE_SIZE, (sr + 0.5) * TILE_SIZE, 0, 4.65);
+            stampTower((MAP_X_512[sc] + 0.5) * TILE_SIZE, (MAP_Y_512[sr] + 0.5) * TILE_SIZE, 0, 4.65);
         }
         if (Array.isArray(this.rooftopSuperstructures)) {
             for (let i = 0; i < this.rooftopSuperstructures.length; i++) {
@@ -11650,9 +11650,9 @@ class WorldObjectEngine {
                 const bldgId = bldgIdGrid[rStart * M + cStart] || 1;
                 const hash = (((bldgId * 2654435761) ^ 0x9E3779B9) >>> 0);
 
-                const isBeachArtDeco = (midC >= 365);
-                const isDowntown = (midC >= 235 && midC < 365 && midR >= 145 && midR <= 315);
-                const isLatinOrUrban = (midC >= 170 && midC < 285 && midR >= 70 && midR < 315);
+                const isBeachArtDeco = (ix512(midC) >= 365);
+                const isDowntown = (ix512(midC) >= 235 && ix512(midC) < 365 && iy512(midR) >= 145 && iy512(midR) <= 315);
+                const isLatinOrUrban = (ix512(midC) >= 170 && ix512(midC) < 285 && iy512(midR) >= 70 && iy512(midR) < 315);
 
                 // Edge center in pixels (inset 3.2px onto the roof so parapet sits flush along the outer wall)
                 const isHorizontal = (dirY !== 0);
@@ -11867,7 +11867,7 @@ class WorldObjectEngine {
             for (let c = 5; c < M - 5; c++) {
                 for (const dirX of [-1, 1]) {
                     // Skip East face of c=442 where Section 20A already builds custom Ocean Drive details
-                    if (c === 442 && dirX === 1) continue;
+                    if (c === MAP_X_512[442] && dirX === 1) continue;
                     let r = 5;
                     while (r < MAP_ROWS - 5) {
                         const z = bTopZ[r * M + c];
