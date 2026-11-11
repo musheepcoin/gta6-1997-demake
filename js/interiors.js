@@ -474,8 +474,8 @@
 
     // Snap a target (c, r, preferredFacing) to the closest real sidewalk-against-building wall interface
     function snapDoorToBuildingFacade(map, targetC, targetR, preferredFacing, maxRad = 18) {
-        const cols = map.cols || MAP_COLS;
-        const rows = map.rows || MAP_ROWS;
+        const cols = 512;
+        const rows = 512;
         const ground = map.surfaceGround;
         const surfZ = map.surfaceLayer;
         if (!ground) return null;
@@ -587,11 +587,9 @@
             const tpl = SHOP_TEMPLATES[spec.tpl];
             if (!tpl) continue;
 
-            const sc512 = typeof mx512 === "function" ? Math.round(mx512(spec.c)) : spec.c;
-            const sr512 = typeof my512 === "function" ? Math.round(my512(spec.r)) : spec.r;
-            const snapped = snapDoorToBuildingFacade(map, sc512, sr512, spec.facing, 20);
-            const finalC = snapped ? snapped.c : sc512;
-            const finalR = snapped ? snapped.r : sr512;
+            const snapped = snapDoorToBuildingFacade(map, spec.c, spec.r, spec.facing, 20);
+            const finalC = snapped ? snapped.c : spec.c;
+            const finalR = snapped ? snapped.r : spec.r;
             const finalFacing = snapped ? snapped.facing : spec.facing;
 
             // Avoid overlapping an existing door on the exact same tile

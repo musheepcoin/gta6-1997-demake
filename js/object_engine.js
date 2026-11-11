@@ -897,30 +897,6 @@ class WorldObjectEngine {
             { name: "ATLANTIC TRENCH GOLD DREDGE PLATFORM",   x: 488.5 * TILE_SIZE, y: 396.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "CAPE CANAVERAL BOOSTER RECOVERY BARGE",  x: 492.5 * TILE_SIZE, y: 96.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
         ];
-        // Remap all 512-space pixel coordinates initialized on WorldObjectEngine to 1024x1024 Leonida space
-        if (typeof px512 === "function" && typeof py512 === "function") {
-            const xKeys512 = new Set(["x", "consoleX", "vabX", "payloadX", "gateX", "splashX", "centerX", "pitX", "westGateX", "eastGateX", "jumpX", "roadX", "clearX", "doorX", "capsuleX"]);
-            const yKeys512 = new Set(["y", "consoleY", "vabY", "payloadY", "gateY", "splashY", "centerY", "pitY", "westGateY", "eastGateY", "jumpY", "roadY", "clearY", "doorY", "capsuleY"]);
-            const seenObjs = new Set();
-            const remap512Obj = (obj) => {
-                if (!obj || typeof obj !== "object" || obj === this.map || seenObjs.has(obj)) return;
-                seenObjs.add(obj);
-                if (Array.isArray(obj)) {
-                    for (let i = 0; i < obj.length; i++) remap512Obj(obj[i]);
-                    return;
-                }
-                for (const k of Object.keys(obj)) {
-                    const v = obj[k];
-                    if (typeof v === "number") {
-                        if (xKeys512.has(k)) obj[k] = px512(v);
-                        else if (yKeys512.has(k)) obj[k] = py512(v);
-                    } else if (v && typeof v === "object") {
-                        remap512Obj(v);
-                    }
-                }
-            };
-            remap512Obj(this);
-        }
         this.miniGolfCooldown = 0;
         this.cameraFlashTimer = 0;
         this.meshVbo = null;
@@ -1055,8 +1031,8 @@ class WorldObjectEngine {
                             map.surfaceGround[idx] === GROUND_TYPE.BUILDING ||
                             (isUrbanPavedVilla && map.surfaceGround[idx] === GROUND_TYPE.FIELD)
                         ) {
-                            const refC = isUrbanPavedVilla ? (ix512(c) >= 420 ? MAP_X_512[448] : MAP_X_512[178]) : MAP_X_512[339];
-                            const refR = isUrbanPavedVilla ? (ix512(c) >= 420 ? MAP_Y_512[286] : MAP_Y_512[170]) : MAP_Y_512[165];
+                            const refC = isUrbanPavedVilla ? (c >= 420 ? 448 : 178) : 339;
+                            const refR = isUrbanPavedVilla ? (c >= 420 ? 286 : 170) : 165;
                             for (let z = 0; z < MAP_LAYERS; z++) {
                                 map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
                                     map.voxelGrid[(z * MAP_ROWS + refR) * M + refC];
@@ -1075,8 +1051,8 @@ class WorldObjectEngine {
                         for (let c = fMinC; c <= fMaxC; c++) {
                             const idx = r * M + c;
                             if (map.surfaceGround[idx] === GROUND_TYPE.FIELD) {
-                                const refC = ix512(c) >= 420 ? MAP_X_512[448] : MAP_X_512[178];
-                                const refR = ix512(c) >= 420 ? MAP_Y_512[286] : MAP_Y_512[170];
+                                const refC = c >= 420 ? 448 : 178;
+                                const refR = c >= 420 ? 286 : 170;
                                 for (let z = 0; z < MAP_LAYERS; z++) {
                                     map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
                                         map.voxelGrid[(z * MAP_ROWS + refR) * M + refC];
@@ -1227,7 +1203,7 @@ class WorldObjectEngine {
         const clearZones = [];
         if (this.landmarks3D) {
             if (this.landmarks3D.launchpad) {
-                clearZones.push({ x: mx512(469.0) * TILE_SIZE, y: my512(33.5) * TILE_SIZE, r: 780 });
+                clearZones.push({ x: 469.0 * TILE_SIZE, y: 33.5 * TILE_SIZE, r: 780 });
             }
             if (this.landmarks3D.ferrisWheel) {
                 clearZones.push({ x: this.landmarks3D.ferrisWheel.x, y: this.landmarks3D.ferrisWheel.y, r: 165 });
@@ -1260,7 +1236,7 @@ class WorldObjectEngine {
                 clearZones.push({ x: this.landmarks3D.thrillbillyArena.x, y: this.landmarks3D.thrillbillyArena.y, r: 195 });
             }
             if (this.landmarks3D.gellhornSpeedway) {
-                clearZones.push({ x: mx512(57.0) * TILE_SIZE, y: my512(174.5) * TILE_SIZE, r: 1750 });
+                clearZones.push({ x: 57.0 * TILE_SIZE, y: 174.5 * TILE_SIZE, r: 1750 });
             }
             if (this.landmarks3D.wynwoodWalls) {
                 const ww = this.landmarks3D.wynwoodWalls;
@@ -1273,7 +1249,7 @@ class WorldObjectEngine {
                             if (map.surfaceGround[idx] === GROUND_TYPE.BUILDING && map.voxelGrid) {
                                 for (let z = 0; z < MAP_LAYERS; z++) {
                                     map.voxelGrid[(z * MAP_ROWS + r) * M + c] =
-                                        map.voxelGrid[(z * MAP_ROWS + MAP_Y_512[165]) * M + MAP_X_512[339]];
+                                        map.voxelGrid[(z * MAP_ROWS + 165) * M + 339];
                                 }
                                 map.surfaceGround[idx] = GROUND_TYPE.PAWEMENT;
                                 map.surfaceLayer[idx] = 2;
@@ -1973,12 +1949,12 @@ class WorldObjectEngine {
             }
         }
         for (const [px, py] of [
-            [mx512(443.5) * TILE_SIZE, my512(285.5) * TILE_SIZE],
-            [mx512(443.5) * TILE_SIZE, my512(284.5) * TILE_SIZE],
-            [mx512(448.5) * TILE_SIZE, my512(293.5) * TILE_SIZE],
-            [mx512(448.5) * TILE_SIZE, my512(292.5) * TILE_SIZE],
-            [mx512(344.5) * TILE_SIZE, my512(171.5) * TILE_SIZE],
-            [mx512(68.5) * TILE_SIZE, my512(187.5) * TILE_SIZE]
+            [443.5 * TILE_SIZE, 285.5 * TILE_SIZE],
+            [443.5 * TILE_SIZE, 284.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 293.5 * TILE_SIZE],
+            [448.5 * TILE_SIZE, 292.5 * TILE_SIZE],
+            [344.5 * TILE_SIZE, 171.5 * TILE_SIZE],
+            [68.5 * TILE_SIZE, 187.5 * TILE_SIZE]
         ]) {
             clearZones.push({ x: px, y: py, r: 58 });
         }
@@ -5802,8 +5778,8 @@ class WorldObjectEngine {
                         if (lp) {
                             rl.capsuleActive = true;
                             rl.capsuleAlt = 3.4;
-                            rl.capsuleX = lp.splashX || (mx512(473.5) * TILE_SIZE);
-                            rl.capsuleY = lp.splashY || (my512(35.0) * TILE_SIZE);
+                            rl.capsuleX = lp.splashX || (473.5 * TILE_SIZE);
+                            rl.capsuleY = lp.splashY || (35.0 * TILE_SIZE);
                             if (Array.isArray(game.floatingTexts)) {
                                 game.floatingTexts.push({
                                     x: rl.capsuleX,
@@ -6561,10 +6537,10 @@ class WorldObjectEngine {
                     continue;
                 }
                 if (
-                    Math.hypot(mx512(443.5) * TILE_SIZE - px, my512(285.5) * TILE_SIZE - py) < 56 ||
-                    Math.hypot(mx512(448.5) * TILE_SIZE - px, my512(293.5) * TILE_SIZE - py) < 56 ||
-                    Math.hypot(mx512(344.5) * TILE_SIZE - px, my512(171.5) * TILE_SIZE - py) < 56 ||
-                    Math.hypot(mx512(68.5) * TILE_SIZE - px, my512(187.5) * TILE_SIZE - py) < 56
+                    Math.hypot(443.5 * TILE_SIZE - px, 285.5 * TILE_SIZE - py) < 56 ||
+                    Math.hypot(448.5 * TILE_SIZE - px, 293.5 * TILE_SIZE - py) < 56 ||
+                    Math.hypot(344.5 * TILE_SIZE - px, 171.5 * TILE_SIZE - py) < 56 ||
+                    Math.hypot(68.5 * TILE_SIZE - px, 187.5 * TILE_SIZE - py) < 56
                 ) {
                     continue;
                 }
@@ -6695,10 +6671,10 @@ class WorldObjectEngine {
             }
         }
         // Inject 3D Octagonal Vice City Mambas Stadium Bowl & 4 Corner Spires into solar shadow map
-        for (let r = MAP_Y_512[164]; r <= MAP_Y_512[180]; r++) {
-            for (let c = MAP_X_512[179]; c <= MAP_X_512[197]; c++) {
-                const dx = Math.abs(ix512(c) - 188);
-                const dy = Math.abs(iy512(r) - 172);
+        for (let r = 164; r <= 180; r++) {
+            for (let c = 179; c <= 197; c++) {
+                const dx = Math.abs(c - 188);
+                const dy = Math.abs(r - 172);
                 if (dx <= 6 && dy <= 5) continue; // Open emerald pitch
                 if (dx + dy >= 16) continue;      // Chamfered outer octagonal corners
                 const idx = r * M + c;
@@ -6706,7 +6682,7 @@ class WorldObjectEngine {
             }
         }
         for (const [sc, sr] of [[180, 165], [196, 165], [180, 179], [196, 179]]) {
-            stampTower((MAP_X_512[sc] + 0.5) * TILE_SIZE, (MAP_Y_512[sr] + 0.5) * TILE_SIZE, 0, 4.65);
+            stampTower((sc + 0.5) * TILE_SIZE, (sr + 0.5) * TILE_SIZE, 0, 4.65);
         }
         if (Array.isArray(this.rooftopSuperstructures)) {
             for (let i = 0; i < this.rooftopSuperstructures.length; i++) {
@@ -6897,9 +6873,9 @@ class WorldObjectEngine {
         // Spawn 3 Interactive GTA 6 "Grupo Seguro" Armored Cash Trucks ($15,000 Vault Payload each!)
         if (typeof Vehicle === "function") {
             const armoredSpecs = [
-                { id: "armored_ocean_dr",  x: mx512(445.5) * TILE_SIZE, y: my512(222.0) * TILE_SIZE, ang: Math.PI * 0.5 },
-                { id: "armored_downtown",  x: mx512(285.5) * TILE_SIZE, y: my512(250.0) * TILE_SIZE, ang: Math.PI * 0.5 },
-                { id: "armored_vice_port", x: mx512(342.55) * TILE_SIZE, y: my512(327.5) * TILE_SIZE, ang: Math.PI * 0.5 }
+                { id: "armored_ocean_dr",  x: 445.5 * TILE_SIZE, y: 222.0 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "armored_downtown",  x: 285.5 * TILE_SIZE, y: 250.0 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "armored_vice_port", x: 342.55 * TILE_SIZE, y: 327.5 * TILE_SIZE, ang: Math.PI * 0.5 }
             ];
             for (const as of armoredSpecs) {
                 if (game.vehicles.some(v => Math.hypot(v.x - as.x, v.y - as.y) < 36)) continue;
@@ -6914,15 +6890,15 @@ class WorldObjectEngine {
 
             // Spawn Drivable Industrial Freight Trucks, Flatbeds, Tankers & Harbor Patrol Boat backed into Port of Vice City warehouse loading bays
             const portFleetSpecs = [
-                { id: "vport_flatbed_nw", spec: "FLATBED",   x: mx512(337.8) * TILE_SIZE, y: my512(304.6) * TILE_SIZE, ang: Math.PI * 0.5 },
-                { id: "vport_truck_nw",   spec: "TRUCK",     x: mx512(340.2) * TILE_SIZE, y: my512(308.6) * TILE_SIZE, ang: -Math.PI * 0.5 },
-                { id: "vport_box_ne",     spec: "BOX_TRUCK", x: mx512(347.4) * TILE_SIZE, y: my512(304.6) * TILE_SIZE, ang: Math.PI * 0.5 },
-                { id: "vport_tanker_ne",  spec: "TANKER",    x: mx512(349.8) * TILE_SIZE, y: my512(313.6) * TILE_SIZE, ang: -Math.PI * 0.5 },
-                { id: "vport_box_sw",     spec: "BOX_TRUCK", x: mx512(337.8) * TILE_SIZE, y: my512(322.6) * TILE_SIZE, ang: -Math.PI * 0.5 },
-                { id: "vport_truck_sw",   spec: "TRUCK",     x: mx512(340.2) * TILE_SIZE, y: my512(328.8) * TILE_SIZE, ang: -Math.PI * 0.5 },
-                { id: "vport_flatbed_se", spec: "FLATBED",   x: mx512(347.6) * TILE_SIZE, y: my512(326.4) * TILE_SIZE, ang: Math.PI * 0.5 },
-                { id: "vport_tanker_se",  spec: "TANKER",    x: mx512(350.2) * TILE_SIZE, y: my512(329.8) * TILE_SIZE, ang: -Math.PI * 0.5 },
-                { id: "vport_boat_nw",    spec: "SPEEDBOAT", x: mx512(327.6) * TILE_SIZE, y: my512(300.8) * TILE_SIZE, ang: Math.PI * 0.5 }
+                { id: "vport_flatbed_nw", spec: "FLATBED",   x: 337.8 * TILE_SIZE, y: 304.6 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "vport_truck_nw",   spec: "TRUCK",     x: 340.2 * TILE_SIZE, y: 308.6 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_box_ne",     spec: "BOX_TRUCK", x: 347.4 * TILE_SIZE, y: 304.6 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "vport_tanker_ne",  spec: "TANKER",    x: 349.8 * TILE_SIZE, y: 313.6 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_box_sw",     spec: "BOX_TRUCK", x: 337.8 * TILE_SIZE, y: 322.6 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_truck_sw",   spec: "TRUCK",     x: 340.2 * TILE_SIZE, y: 328.8 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_flatbed_se", spec: "FLATBED",   x: 347.6 * TILE_SIZE, y: 326.4 * TILE_SIZE, ang: Math.PI * 0.5 },
+                { id: "vport_tanker_se",  spec: "TANKER",    x: 350.2 * TILE_SIZE, y: 329.8 * TILE_SIZE, ang: -Math.PI * 0.5 },
+                { id: "vport_boat_nw",    spec: "SPEEDBOAT", x: 327.6 * TILE_SIZE, y: 300.8 * TILE_SIZE, ang: Math.PI * 0.5 }
             ];
             for (const pf of portFleetSpecs) {
                 if (game.vehicles.some(v => Math.hypot(v.x - pf.x, v.y - pf.y) < 36)) continue;
@@ -6944,9 +6920,9 @@ class WorldObjectEngine {
         const grid = new Map();
         const addItem = (px, py, bucketKey, item) => {
             if (typeof px !== "number" || typeof py !== "number") return;
-            const cx = Math.max(0, Math.min(255, px >> 8));
-            const cy = Math.max(0, Math.min(255, py >> 8));
-            const k = (cy << 8) | cx;
+            const cx = Math.max(0, Math.min(127, px >> 8));
+            const cy = Math.max(0, Math.min(127, py >> 8));
+            const k = (cy << 7) | cx;
             let cell = grid.get(k);
             if (!cell) {
                 cell = { iProps: [], sProps: [], lights: [], bollards: [], signals: [] };
@@ -7175,13 +7151,13 @@ class WorldObjectEngine {
         const gcx = pCar.x >> 8;
         const gcy = pCar.y >> 8;
         const x0 = Math.max(0, gcx - 1);
-        const x1 = Math.min(255, gcx + 1);
+        const x1 = Math.min(127, gcx + 1);
         const y0 = Math.max(0, gcy - 1);
-        const y1 = Math.min(255, gcy + 1);
+        const y1 = Math.min(127, gcy + 1);
 
         // Step B: Query ONLY the 3x3 256px cells around pCar (~2-8 nearby props instead of 5,500+!)
         for (let gy = y0; gy <= y1; gy++) {
-            const rowOff = gy << 8;
+            const rowOff = gy << 7;
             for (let gx = x0; gx <= x1; gx++) {
                 const cell = grid.get(rowOff | gx);
                 if (!cell) continue;
@@ -7721,7 +7697,7 @@ class WorldObjectEngine {
                         vec3 rawTex = c.rgb;
                         float dayAmt = clamp(1.0 - max(0.0, uNightTint) * 1.15, 0.0, 1.0);
                         if (dayAmt > 0.01) {
-                            vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 1024.0);
+                            vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                             float onGround = clamp(2.65 - vWorldPos.y, 0.0, 1.0);
                             float bldAO = lm.g * onGround * 0.55;
                             float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
@@ -7822,11 +7798,9 @@ class WorldObjectEngine {
             const row = Math.floor(idx / 16);
             return [-20.0 - col, row];
         };
-        const chunkShift = (MAP_COLS >= 1024) ? 6 : 5;
-        const chunkTileSpan = 1 << chunkShift;
         const pushQuad3D = (p0, p1, p2, p3, u0, v0, u1, v1, r, g, b, a = 1.0) => {
-            const cx = Math.max(0, Math.min(15, p0[0] >> chunkShift));
-            const cz = Math.max(0, Math.min(15, p0[2] >> chunkShift));
+            const cx = Math.max(0, Math.min(15, p0[0] >> 5));
+            const cz = Math.max(0, Math.min(15, p0[2] >> 5));
             const bkt = chunkBuckets[(cz << 4) | cx];
             bkt.push(
                 p0[0], p0[1], p0[2], u0, v0, r, g, b, a,
@@ -8737,9 +8711,9 @@ class WorldObjectEngine {
                 { c: 360.92, r0: 321.2, r1: 336.8, side:  1 }  // South-East Deepwater Container Berth Quay
             ];
             for (const qs of quaySpans) {
-                const qx = mx512(qs.c) * TILE_SIZE;
-                const y0 = my512(qs.r0) * TILE_SIZE;
-                const y1 = my512(qs.r1) * TILE_SIZE;
+                const qx = qs.c * TILE_SIZE;
+                const y0 = qs.r0 * TILE_SIZE;
+                const y1 = qs.r1 * TILE_SIZE;
                 const qLen = y1 - y0;
                 const qMidY = (y0 + y1) * 0.5;
                 // Deepwater concrete seawall fascia descending to water level (1.96..2.06) + yellow/black hazard bullnose coping
@@ -8756,8 +8730,8 @@ class WorldObjectEngine {
             // 2. Port Authority Security Checkpoints, Guardhouse Booths, Boom Barriers & Overhead Entrance Portals
             //    at North-West Truck Access Lane (c = 335.2, r = 299.55) & North-East Truck Access Lane (c = 352.6, r = 299.55)
             for (const gateC of [335.2, 352.6]) {
-                const gx = mx512(gateC) * TILE_SIZE;
-                const gy = my512(299.55) * TILE_SIZE;
+                const gx = gateC * TILE_SIZE;
+                const gy = 299.55 * TILE_SIZE;
                 emitAOShadow3D(gx, gy, 1, 0, -40, 0, 42, 34, bz, 0.42);
                 // Armored Port Security Gatehouse Booth on West side of entrance lane (offX = -42)
                 emitTileBox3D(gx, gy, 1, 0, -42, 0, 28, 24, bz, bz + 0.22, 177, 86, 46, [0.92, 0.95, 0.99], true);
@@ -8778,8 +8752,8 @@ class WorldObjectEngine {
             //    Landside Blocks flanking Central Port Truck Avenue (c = 343..344) feature 10 pitched-roof 3D Freight Warehouses
             //    with raised concrete loading docks, recessed roll-up truck doors, canopies, cargo pallets & backed-in semi-trucks!
             const emitPortWarehouse3D = (c, r, w, d, wallCol, roofBaseCol, roofRidgeCol, bayDirs, signTex = null) => {
-                const wx = mx512(c) * TILE_SIZE;
-                const wy = my512(r) * TILE_SIZE;
+                const wx = c * TILE_SIZE;
+                const wy = r * TILE_SIZE;
                 emitAOShadow3D(wx, wy, 1, 0, 0, 0, w + 24, d + 24, bz, 0.48);
                 // Raised reinforced-concrete warehouse foundation plinth
                 emitTileBox3D(wx, wy, 1, 0, 0, 0, w + 4, d + 4, bz, bz + 0.12, 177, 177, 71, concCol, true);
@@ -8851,8 +8825,8 @@ class WorldObjectEngine {
             // Building #8: NE South Port Authority Harbor Master Control Tower & Customs House (c = 348.6, r = 316.2)
             emitPortWarehouse3D(348.6, 316.2, 276, 112, [0.92, 0.95, 0.99], [0.44, 0.52, 0.62], [0.14, 0.44, 0.82], [-1], null);
             {
-                const hmx = mx512(348.6) * TILE_SIZE;
-                const hmy = my512(316.2) * TILE_SIZE;
+                const hmx = 348.6 * TILE_SIZE;
+                const hmy = 316.2 * TILE_SIZE;
                 // Elevated 4-Story 3D Harbor Master Glass Observation Tower & Marine Radar Mast rising from East Wing of Building #8
                 emitTileBox3D(hmx, hmy, 1, 0, 74, 0, 58, 54, bz + 0.72, bz + 1.34, 172, 173, 86, [0.90, 0.94, 0.98], false);
                 emitTileBox3D(hmx, hmy, 1, 0, 74, 0, 68, 62, bz + 1.34, bz + 1.70, 199, 199, 86, [0.94, 0.98, 1.00], false);
@@ -8868,8 +8842,8 @@ class WorldObjectEngine {
             emitPortWarehouse3D(348.8, 332.2, 280, 132, [0.86, 0.90, 0.95], [0.46, 0.54, 0.62], [0.18, 0.46, 0.78], [-1], null);
             // Twin 3D Cylindrical Bulk Fuel & Molasses Storage Silos (c = 353.0, r = 330.8 & r = 333.8) + Bund Wall & Overhead Pipe Bridge
             for (const tankR of [330.8, 333.8]) {
-                const tx = mx512(353.0) * TILE_SIZE;
-                const ty = my512(tankR) * TILE_SIZE;
+                const tx = 353.0 * TILE_SIZE;
+                const ty = tankR * TILE_SIZE;
                 emitAOShadow3D(tx, ty, 1, 0, 0, 0, 68, 68, bz, 0.44);
                 emitOctagonPad3D(tx, ty, 0, 0, 28, 28, 26, 26, 0.28, bz, bz + 0.10, concCol, hazCol, 3, 177, 71);
                 emitCylinder3D(tx, ty, 0, 0, 25.0, 25.0, bz + 0.10, bz + 1.06, 16, [0.90, 0.93, 0.97], 5, true);
@@ -8877,11 +8851,11 @@ class WorldObjectEngine {
                 emitCylinder3D(tx, ty, 0, 0, 25.0, 10.0, bz + 1.06, bz + 1.20, 16, [0.84, 0.88, 0.92], 5, true);
             }
             // Overhead steel pipeline bridge connecting the two Bulk Storage Silos & Warehouse #10
-            emitTileBox3D(mx512(353.0) * TILE_SIZE, my512(332.3) * TILE_SIZE, 1, 0, 0, 0, 10, 196, bz + 0.88, bz + 0.98, 250, 363, 64, [0.86, 0.90, 0.94], false);
+            emitTileBox3D(353.0 * TILE_SIZE, 332.3 * TILE_SIZE, 1, 0, 0, 0, 10, 196, bz + 0.88, bz + 0.98, 250, 363, 64, [0.86, 0.90, 0.94], false);
 
             // 4. 3D Magnetic Car-Crusher & Container-Handler Pedestal Base at crane_viceport (c = 333.2, r = 306.5)
-            const vcCraneX = mx512(333.2) * TILE_SIZE + 2.5 * TILE_SIZE + 18;
-            const vcCraneY = my512(306.5) * TILE_SIZE + 1.2 * TILE_SIZE;
+            const vcCraneX = 333.2 * TILE_SIZE + 2.5 * TILE_SIZE + 18;
+            const vcCraneY = 306.5 * TILE_SIZE + 1.2 * TILE_SIZE;
             emitOctagonPad3D(vcCraneX, vcCraneY, 0, 0, 26, 26, 24, 24, 0.26, bz, bz + 0.12, concCol, hazCol, 3, 177, 71);
             emitTileBox3D(vcCraneX, vcCraneY, 1, 0, 0, 0, 28, 28, bz + 0.12, bz + 0.78, 246, 363, 64, [0.94, 0.76, 0.16], false);
 
@@ -8892,8 +8866,8 @@ class WorldObjectEngine {
                 [331.8, 332.8, -1], [346.0, 335.2, -1]
             ];
             for (const [fc, fr, fDirY] of portFloodTowers) {
-                const fx = mx512(fc) * TILE_SIZE;
-                const fy = my512(fr) * TILE_SIZE;
+                const fx = fc * TILE_SIZE;
+                const fy = fr * TILE_SIZE;
                 emitTileBox3D(fx, fy, 1, 0, 0, 0, 16, 16, bz, bz + 0.20, 177, 177, 71, concCol, false);
                 emitSolidBox3D(fx, fy, 1, 0, 0, 0, 14, 14, bz + 0.20, bz + 0.28, hazCol, 3);
                 emitTileBox3D(fx, fy, 1, 0, 0, 0, 10, 10, bz + 0.28, bz + 1.76, 363, 246, 64, [0.90, 0.93, 0.98], false);
@@ -8913,10 +8887,10 @@ class WorldObjectEngine {
         if (this.landmarks3D && this.landmarks3D.launchpad) {
             const lp = this.landmarks3D.launchpad;
             const bz = lp.z || 2.0;
-            const vabX = lp.vabX || (mx512(463.5) * TILE_SIZE);
-            const vabY = lp.vabY || (my512(26.2) * TILE_SIZE);
-            const payX = lp.payloadX || (mx512(463.5) * TILE_SIZE);
-            const payY = lp.payloadY || (my512(38.8) * TILE_SIZE);
+            const vabX = lp.vabX || (463.5 * TILE_SIZE);
+            const vabY = lp.vabY || (26.2 * TILE_SIZE);
+            const payX = lp.payloadX || (463.5 * TILE_SIZE);
+            const payY = lp.payloadY || (38.8 * TILE_SIZE);
 
             // ----------------------------------------------------------------
             // G.1: COLOSSAL 3D VEHICLE ASSEMBLY BUILDING (VAB) & MISSION CONTROL
@@ -8950,27 +8924,27 @@ class WorldObjectEngine {
             // G.2: HEAVY TWIN STEEL CRAWLERWAY TRACKS & ENTRY ROADWAY
             // ----------------------------------------------------------------
             // West Checkpoint Entry Roadway (c = 458.8 .. 463.5 at r = 35.0)
-            const entryMidX = mx512(461.1) * TILE_SIZE;
+            const entryMidX = 461.1 * TILE_SIZE;
             emitTileBox3D(entryMidX, lp.y, 1, 0, 0, 0, 310, 82, bz, bz + 0.045, 177, 177, 87, [0.90, 0.92, 0.96], true);
             emitSolidBox3D(entryMidX, lp.y, 1, 0, 0, -38, 306, 4.5, bz + 0.045, bz + 0.085, [0.94, 0.74, 0.14], 3);
             emitSolidBox3D(entryMidX, lp.y, 1, 0, 0,  38, 306, 4.5, bz + 0.045, bz + 0.085, [0.94, 0.74, 0.14], 3);
             // Main East-West Crawlerway Track Bed from VAB Junction (463.5) to Launch Pad 39A (473.0) at r = 35.0
-            const cwMidX = mx512(467.4) * TILE_SIZE;
+            const cwMidX = 467.4 * TILE_SIZE;
             emitTileBox3D(cwMidX, lp.y, 1, 0, 0, 0, 516, 78, bz, bz + 0.06, 177, 177, 87, [0.92, 0.94, 0.98], true);
             emitTileBox3D(cwMidX, lp.y, 1, 0, 0, -18, 508, 13, bz + 0.06, bz + 0.095, 173, 173, 33, [0.88, 0.90, 0.94], false);
             emitTileBox3D(cwMidX, lp.y, 1, 0, 0,  18, 508, 13, bz + 0.06, bz + 0.095, 173, 173, 33, [0.88, 0.90, 0.94], false);
             emitSolidBox3D(cwMidX, lp.y, 1, 0, 0, -36, 508, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
             emitSolidBox3D(cwMidX, lp.y, 1, 0, 0,  36, 508, 5, bz + 0.06, bz + 0.11, [0.94, 0.74, 0.14], 3);
             // North-South Crawlerway Spur connecting VAB East High-Bay Rollout Apron to Main Crawlerway
-            emitTileBox3D(vabX, my512(31.8) * TILE_SIZE, 1, 0, 0, 0, 78, 340, bz, bz + 0.055, 177, 177, 87, [0.92, 0.94, 0.98], true);
-            emitTileBox3D(vabX, my512(31.8) * TILE_SIZE, 1, 0, -18, 0, 12, 332, bz + 0.055, bz + 0.09, 173, 173, 33, [0.88, 0.90, 0.94], false);
-            emitTileBox3D(vabX, my512(31.8) * TILE_SIZE, 1, 0,  18, 0, 12, 332, bz + 0.055, bz + 0.09, 173, 173, 33, [0.88, 0.90, 0.94], false);
+            emitTileBox3D(vabX, 31.8 * TILE_SIZE, 1, 0, 0, 0, 78, 340, bz, bz + 0.055, 177, 177, 87, [0.92, 0.94, 0.98], true);
+            emitTileBox3D(vabX, 31.8 * TILE_SIZE, 1, 0, -18, 0, 12, 332, bz + 0.055, bz + 0.09, 173, 173, 33, [0.88, 0.90, 0.94], false);
+            emitTileBox3D(vabX, 31.8 * TILE_SIZE, 1, 0,  18, 0, 12, 332, bz + 0.055, bz + 0.09, 173, 173, 33, [0.88, 0.90, 0.94], false);
 
             // ----------------------------------------------------------------
             // G.3: 3D LAUNCH CONTROL CENTER (LCC) BUNKER & IGNITION CONSOLE
             // ----------------------------------------------------------------
             const lccX = lp.consoleX;
-            const lccY = my512(32.0) * TILE_SIZE;
+            const lccY = 32.0 * TILE_SIZE;
             emitAOShadow3D(lccX, lccY, 1, 0, 0, 0, 108, 72, bz, 0.44);
             emitTileBox3D(lccX, lccY, 1, 0, 0, 0, 86, 52, bz, bz + 0.26, 177, 86, 46, [0.96, 0.98, 1.00], true);
             emitTileBox3D(lccX, lccY, 1, 0, 0, 0, 80, 46, bz + 0.26, bz + 0.50, 199, 86, 86, [0.98, 0.99, 1.00], false);
@@ -9124,11 +9098,11 @@ class WorldObjectEngine {
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
             const bz = fw.z || 2.0;
-            const pierStartX = mx512(454.0) * TILE_SIZE;
-            const pierEndX   = mx512(477.0) * TILE_SIZE;
+            const pierStartX = 454.0 * TILE_SIZE;
+            const pierEndX   = 477.0 * TILE_SIZE;
             const pierMidX   = (pierStartX + pierEndX) * 0.5;
             const pierLen    = pierEndX - pierStartX;
-            const pierY      = my512(195.0) * TILE_SIZE;
+            const pierY      = 195.0 * TILE_SIZE;
 
             // 1. West Entrance Coral-to-Timber Threshold Apron (at x=454.0, seamlessly joining the c=453 Lummus Park Boardwalk!)
             emitTileBox3D(pierStartX + 6, pierY, 1, 0, 0, 0, 16, 252, bz, bz + 0.016, 177, 177, 9, [0.98, 0.94, 0.90], true);
@@ -9702,8 +9676,8 @@ class WorldObjectEngine {
         if (this.landmarks3D && this.landmarks3D.gellhornSpeedway) {
             const gs = this.landmarks3D.gellhornSpeedway;
             const bz = gs.z || 2.0;
-            const cx = gs.centerX || (mx512(57.0) * TILE_SIZE);
-            const cy = gs.centerY || (my512(174.5) * TILE_SIZE);
+            const cx = gs.centerX || (57.0 * TILE_SIZE);
+            const cy = gs.centerY || (174.5 * TILE_SIZE);
             const rx = gs.rx || (24.5 * TILE_SIZE);
             const ry = gs.ry || (17.5 * TILE_SIZE);
             const trackW = 248;
@@ -9801,7 +9775,7 @@ class WorldObjectEngine {
             emitBox3D(cx, cy + 1314, 1, 0, 0, -24, 124, 10, bz + 2.06, bz + 2.38, "ad_ecola", "ad_ecola", [0.96, 0.20, 0.20]);
 
             // D. Massive Infield Paved Pit Lane Apron, Pit Wall, 6-Bay Pit Crew Garage, Victory Lane Podium & VIP Helipad
-            const garY = my512(173.5) * TILE_SIZE;
+            const garY = 173.5 * TILE_SIZE;
             emitAOShadow3D(cx, garY, 1, 0, 0, 14, 420, 142, bz, 0.42);
             // Paved Pit Lane Apron & 6 Red/Yellow Pit Crew Box Markings at gs.pitY (179.5 * TILE_SIZE)
             emitTileBox3D(cx, gs.pitY, 1, 0, 0, 0, 620, 96, bz, bz + 0.022, 177, 177, 87, [0.84, 0.86, 0.90], false);
@@ -9831,9 +9805,9 @@ class WorldObjectEngine {
             // F. HANK'S WAFFLES DINER & UNCLE JACK'S PAWN / LIQUOR (c = 66..75, r = 206..210, Door at 70.5, 211.5)
             //    Directly across the South Speedway Highway (r = 201..202):
             //    1) South Storefront Orange/Yellow Diner Awning & Dual Marquee Signboards over the entrance at (70.5, 211.0)
-            const hwDoorX = mx512(70.5) * TILE_SIZE;
-            const hwSouthWallY = my512(211.0) * TILE_SIZE;
-            const hwNorthWallY = my512(206.0) * TILE_SIZE;
+            const hwDoorX = 70.5 * TILE_SIZE;
+            const hwSouthWallY = 211.0 * TILE_SIZE;
+            const hwNorthWallY = 206.0 * TILE_SIZE;
             emitSolidBox3D(hwDoorX, hwSouthWallY + 12, 1, 0,    0, 0, 240, 26, 2.44, 2.54, [0.94, 0.38, 0.08], 5);
             emitSolidBox3D(hwDoorX, hwSouthWallY + 12, 1, 0,    0, 0, 246, 28, 2.54, 2.60, [0.98, 0.82, 0.16], 5);
             emitBox3D(hwDoorX, hwSouthWallY + 6, 1, 0, -58, 0, 108, 10, 2.60, 3.04, "ad_hanks_waffles", "ad_hanks_waffles", [1.0, 1.0, 1.0]);
@@ -9848,8 +9822,8 @@ class WorldObjectEngine {
                 emitSolidBox3D(hwDoorX, ryBillboard, 1, 0,  68, 0, 130, 16, 4.78, 4.86, [0.22, 0.96, 0.32], 5);
             }
             //    3) Tall 3D Roadside Diner Pylon Sign at the Corner of Speedway South Hwy & Gellhorn Ave (64.8, 204.2)
-            const pylX = mx512(64.8) * TILE_SIZE;
-            const pylY = my512(204.2) * TILE_SIZE;
+            const pylX = 64.8 * TILE_SIZE;
+            const pylY = 204.2 * TILE_SIZE;
             emitTileBox3D(pylX, pylY, 1, 0, 0, 0, 22, 22, 2.00, 2.22, 177, 177, 71, [0.88, 0.90, 0.94], true);
             emitSolidBox3D(pylX, pylY, 1, 0, 0, 0, 10, 10, 2.22, 3.10, [0.94, 0.38, 0.08], 3);
             emitBox3D(pylX, pylY, 1, 0, 0, 0, 92, 14, 3.10, 3.60, "ad_hanks_waffles", "ad_hanks_waffles", [1.0, 1.0, 1.0]);
@@ -9923,8 +9897,8 @@ class WorldObjectEngine {
             const decoTeal = [0.22, 0.78, 0.74];
 
             // --- (1) STAR ISLAND NORTH CHANNEL 3D THROUGH-TRUSS & ART DECO BASCULE BRIDGE (c=346.0, r=147.2..156.8) ---
-            const snX = mx512(346.0) * TILE_SIZE;
-            const snY = my512(152.0) * TILE_SIZE;
+            const snX = 346.0 * TILE_SIZE;
+            const snY = 152.0 * TILE_SIZE;
             const snLen = 9.4 * TILE_SIZE; // 601.6px overwater span (r=147.3..156.7)
             for (const sideX of [-74, 74]) {
                 // 5 Marine Cylindrical Concrete Pilings + Pier Caps in Biscayne Bay along each outer edge
@@ -9955,7 +9929,7 @@ class WorldObjectEngine {
             }
 
             // --- (2) NORTH PRAWN ISLAND CHANNEL 3D STEEL TRUSS BRIDGE (c=346.0, r=77.2..82.8) ---
-            const pnY = my512(80.0) * TILE_SIZE;
+            const pnY = 80.0 * TILE_SIZE;
             const pnLen = 5.4 * TILE_SIZE; // 345.6px overwater span
             for (const sideX of [-74, 74]) {
                 for (const pyOff of [-110, 0, 110]) {
@@ -9971,14 +9945,14 @@ class WorldObjectEngine {
             }
 
             // --- (3) GRAND VICE CITY NORTH BRIDGE (LINKS / JULIA TUTTLE 3D CABLE-STAYED SUSPENSION CAUSEWAY, r=72..75, c=298..418) ---
-            const nbY = my512(74.0) * TILE_SIZE;
+            const nbY = 74.0 * TILE_SIZE;
             const nbSpans = [
                 { c0: 298.5, c1: 342.5 }, // West Biscayne Bay Span (2,816px)
                 { c0: 349.5, c1: 417.5 }  // East Biscayne Bay Span (4,352px)
             ];
             for (const sp of nbSpans) {
-                const x0 = mx512(sp.c0) * TILE_SIZE;
-                const x1 = mx512(sp.c1) * TILE_SIZE;
+                const x0 = sp.c0 * TILE_SIZE;
+                const x1 = sp.c1 * TILE_SIZE;
                 const spanW = x1 - x0;
                 const midX = (x0 + x1) * 0.5;
                 for (const sideY of [-136, 136]) {
@@ -9993,7 +9967,7 @@ class WorldObjectEngine {
             }
 
             // 3 Monumental Twin-Tower Cable-Stayed H-Pylons on the Grand North Bridge (c=320.5 West, c=368.0 Mid-East, c=398.0 Far-East)
-            const northBridgePylons = [mx512(320.5) * TILE_SIZE, mx512(368.0) * TILE_SIZE, mx512(398.0) * TILE_SIZE];
+            const northBridgePylons = [320.5 * TILE_SIZE, 368.0 * TILE_SIZE, 398.0 * TILE_SIZE];
             for (let pi = 0; pi < northBridgePylons.length; pi++) {
                 const px = northBridgePylons[pi];
                 const isCenterTower = (pi === 1);
@@ -10044,17 +10018,17 @@ class WorldObjectEngine {
             }
 
             // --- (4) STAR ISLAND / VENETIAN CAUSEWAY WEST & EAST PORTAL BRIDGES (r=172..175, c=308..323 & c=367..417) ---
-            const vcY = my512(174.0) * TILE_SIZE;
+            const vcY = 174.0 * TILE_SIZE;
             const vcSpans = [
                 { c0: 308.0, c1: 323.5, towerC: 315.5 }, // West Star Island Causeway Channel
                 { c0: 367.0, c1: 417.5, towerC: 392.0 }  // East Star Island Causeway Channel
             ];
             for (const vs of vcSpans) {
-                const x0 = mx512(vs.c0) * TILE_SIZE;
-                const x1 = mx512(vs.c1) * TILE_SIZE;
+                const x0 = vs.c0 * TILE_SIZE;
+                const x1 = vs.c1 * TILE_SIZE;
                 const spanW = x1 - x0;
                 const midX = (x0 + x1) * 0.5;
-                const tx = mx512(vs.towerC) * TILE_SIZE;
+                const tx = vs.towerC * TILE_SIZE;
                 for (const sideY of [-136, 136]) {
                     emitTileBox3D(midX, vcY, 1, 0, 0, sideY, spanW, 10, bz, bz + 0.16, 177, 177, 71, decoCream, false);
                     emitTileBox3D(midX, vcY, 1, 0, 0, sideY, spanW, 8, bz + 0.16, bz + 0.32, 250, 250, 64, steelCol, false);
@@ -10224,10 +10198,10 @@ class WorldObjectEngine {
 
             let oceanBldgGroup = 0;
             let prevHadBldg = false;
-            for (let r = MAP_Y_512[44]; r <= MAP_Y_512[358]; r++) {
+            for (let r = 44; r <= 358; r++) {
                 // Check if c=442 has a tall Art Deco hotel building block (z=2..3+)
-                const b2 = this.map.getBlockInfo(MAP_X_512[442], r, 2);
-                const b3 = this.map.getBlockInfo(MAP_X_512[442], r, 3);
+                const b2 = this.map.getBlockInfo(442, r, 2);
+                const b3 = this.map.getBlockInfo(442, r, 3);
                 if (!b2 || !b2.lid || !b3 || !b3.lid) {
                     prevHadBldg = false;
                     continue;
@@ -10238,10 +10212,10 @@ class WorldObjectEngine {
                 }
                 let topZ = 4.0;
                 for (let zTest = 4; zTest <= 5; zTest++) {
-                    const bt = this.map.getBlockInfo(MAP_X_512[442], r, zTest);
+                    const bt = this.map.getBlockInfo(442, r, zTest);
                     if (bt && bt.lid > 0) topZ = zTest + 1.0;
                 }
-                const facadeX = mx512(443.0) * TILE_SIZE;
+                const facadeX = 443.0 * TILE_SIZE;
                 const rowY = (r + 0.5) * TILE_SIZE;
                 const trimCol = stoneTrimPal[oceanBldgGroup % stoneTrimPal.length];
                 const capCol  = copingMetalPal[oceanBldgGroup % copingMetalPal.length];
@@ -11652,9 +11626,9 @@ class WorldObjectEngine {
                 const bldgId = bldgIdGrid[rStart * M + cStart] || 1;
                 const hash = (((bldgId * 2654435761) ^ 0x9E3779B9) >>> 0);
 
-                const isBeachArtDeco = (ix512(midC) >= 365);
-                const isDowntown = (ix512(midC) >= 235 && ix512(midC) < 365 && iy512(midR) >= 145 && iy512(midR) <= 315);
-                const isLatinOrUrban = (ix512(midC) >= 170 && ix512(midC) < 285 && iy512(midR) >= 70 && iy512(midR) < 315);
+                const isBeachArtDeco = (midC >= 365);
+                const isDowntown = (midC >= 235 && midC < 365 && midR >= 145 && midR <= 315);
+                const isLatinOrUrban = (midC >= 170 && midC < 285 && midR >= 70 && midR < 315);
 
                 // Edge center in pixels (inset 3.2px onto the roof so parapet sits flush along the outer wall)
                 const isHorizontal = (dirY !== 0);
@@ -11869,7 +11843,7 @@ class WorldObjectEngine {
             for (let c = 5; c < M - 5; c++) {
                 for (const dirX of [-1, 1]) {
                     // Skip East face of c=442 where Section 20A already builds custom Ocean Drive details
-                    if (c === MAP_X_512[442] && dirX === 1) continue;
+                    if (c === 442 && dirX === 1) continue;
                     let r = 5;
                     while (r < MAP_ROWS - 5) {
                         const z = bTopZ[r * M + c];
@@ -12138,7 +12112,7 @@ class WorldObjectEngine {
             if (surfGtGrid) {
                 for (let r = 20; r < MAP_ROWS - 20; r += 2) {
                     for (let c = 20; c < M - 20; c += 2) {
-                        const isInsideRestricted = (ix512(c) >= 52 && ix512(c) <= 72 && iy512(r) >= 72 && iy512(r) <= 150) || (ix512(c) >= 60 && ix512(c) <= 170 && iy512(r) >= 294 && iy512(r) <= 372);
+                        const isInsideRestricted = (c >= 52 && c <= 72 && r >= 72 && r <= 150) || (c >= 60 && c <= 170 && r >= 294 && r <= 372);
                         if (isInsideRestricted) continue;
 
                         // Require a 5x2 open grass verge (GROUND_TYPE.FIELD) with zero buildings and zero custom prefabs
@@ -12198,8 +12172,8 @@ class WorldObjectEngine {
 
             // Dedicated Leonida State Penitentiary Rooftop Helipad at (62.0, 90.5, z = 5.0)
             {
-                const pHx = mx512(62.0) * TILE_SIZE;
-                const pHy = my512(90.5) * TILE_SIZE;
+                const pHx = 62.0 * TILE_SIZE;
+                const pHy = 90.5 * TILE_SIZE;
                 const pTopY = 5.0;
                 emitAOShadow3D(pHx, pHy, 1, 0, 0, 0, 96, 96, pTopY, 0.40);
                 emitOctagonPad3D(pHx, pHy, 0, 0, 42, 42, 39, 39, 0.28, pTopY, pTopY + 0.08, [0.88, 0.90, 0.94], [0.76, 0.80, 0.86], 2, 177, 71);
@@ -12212,8 +12186,8 @@ class WorldObjectEngine {
                     emitSolidBox3D(pHx, pHy, 1, 0, lx, ly, 4.5, 4.5, pTopY + 0.08, pTopY + 0.13, [0.20, 0.98, 0.52], 10);
                 }
                 this.rooftopSuperstructures.push({ x: pHx, y: pHy, radTiles: 1, topElev: pTopY + 0.20 });
-                for (let rr = MAP_Y_512[88]; rr <= MAP_Y_512[93]; rr++) {
-                    for (let cc = MAP_X_512[59]; cc <= MAP_X_512[64]; cc++) {
+                for (let rr = 88; rr <= 93; rr++) {
+                    for (let cc = 59; cc <= 64; cc++) {
                         roofUsed[rr * M + cc] = 1;
                     }
                 }
@@ -12512,10 +12486,10 @@ class WorldObjectEngine {
                 this.staticChunks.push({
                     cx,
                     cz,
-                    minX: cx * chunkTileSpan - 5,
-                    maxX: (cx + 1) * chunkTileSpan + 5,
-                    minZ: cz * chunkTileSpan - 5,
-                    maxZ: (cz + 1) * chunkTileSpan + 5,
+                    minX: cx * 32 - 5,
+                    maxX: (cx + 1) * 32 + 5,
+                    minZ: cz * 32 - 5,
+                    maxZ: (cz + 1) * 32 + 5,
                     vbo,
                     count
                 });
@@ -12928,8 +12902,8 @@ class WorldObjectEngine {
 
                 // D. Parachuting & Splashed-Down 3D Conical Orion Crew Capsule (+$50,000 Lunar Payload!)
                 if (rl.capsuleActive) {
-                    const cxCap = rl.capsuleX || (mx512(473.5) * TILE_SIZE);
-                    const cyCap = rl.capsuleY || (my512(35.0) * TILE_SIZE);
+                    const cxCap = rl.capsuleX || (473.5 * TILE_SIZE);
+                    const cyCap = rl.capsuleY || (35.0 * TILE_SIZE);
                     const bob = (rl.capsuleAlt <= 0) ? Math.sin(t * 3.2) * 0.015 : 0;
                     const cBase = 2.02 + (rl.capsuleAlt || 0) + bob;
                     // Inflatable NASA Orange Recovery Flotation Collar + Scorched Heatshield Base + Conical Crew Module
@@ -14853,15 +14827,15 @@ class WorldObjectEngine {
     _ensurePromptCellMask() {
         if (this._promptCellMask) return this._promptCellMask;
         if (!this.map || !Array.isArray(this.heistTargets)) return null;
-        const mask = new Uint8Array(256 * 256);
+        const mask = new Uint8Array(128 * 128);
         const markPt = (px, py, pad = 215) => {
             if (typeof px !== "number" || typeof py !== "number") return;
             const x0 = Math.max(0, (px - pad) >> 8);
-            const x1 = Math.min(255, (px + pad) >> 8);
+            const x1 = Math.min(127, (px + pad) >> 8);
             const y0 = Math.max(0, (py - pad) >> 8);
-            const y1 = Math.min(255, (py + pad) >> 8);
+            const y1 = Math.min(127, (py + pad) >> 8);
             for (let cy = y0; cy <= y1; cy++) {
-                const rowOff = cy << 8;
+                const rowOff = cy << 7;
                 for (let cx = x0; cx <= x1; cx++) {
                     mask[rowOff | cx] = 1;
                 }
@@ -14958,7 +14932,7 @@ class WorldObjectEngine {
             if (mask) {
                 const gcx = px >> 8;
                 const gcy = py >> 8;
-                if (gcx < 0 || gcx > 255 || gcy < 0 || gcy > 255 || !mask[(gcy << 8) | gcx]) {
+                if (gcx < 0 || gcx > 127 || gcy < 0 || gcy > 127 || !mask[(gcy << 7) | gcx]) {
                     return;
                 }
             }
@@ -16509,10 +16483,10 @@ class WorldObjectEngine {
             [389, 403, 205, 209]
         ];
         for (const [x0, x1, y0, y1] of clearedLawns) {
-            const rx = MAP_X_512[x0] * TILE_SIZE * sx;
-            const ry = MAP_Y_512[y0] * TILE_SIZE * sy;
-            const rw = (MAP_X_512[x1] - MAP_X_512[x0] + 1) * TILE_SIZE * sx;
-            const rh = (MAP_Y_512[y1] - MAP_Y_512[y0] + 1) * TILE_SIZE * sy;
+            const rx = x0 * TILE_SIZE * sx;
+            const ry = y0 * TILE_SIZE * sy;
+            const rw = (x1 - x0 + 1) * TILE_SIZE * sx;
+            const rh = (y1 - y0 + 1) * TILE_SIZE * sy;
             ctx.fillRect(rx, ry, rw, rh);
         }
 
@@ -16524,11 +16498,11 @@ class WorldObjectEngine {
             [197, 201, 475, 478]  // Key West Lighthouse Plaza
         ];
         for (const [x0, x1, y0, y1] of pavedStonePlazas) {
-            ctx.fillRect(MAP_X_512[x0] * TILE_SIZE * sx, MAP_Y_512[y0] * TILE_SIZE * sy, (MAP_X_512[x1] - MAP_X_512[x0] + 1) * TILE_SIZE * sx, (MAP_Y_512[y1] - MAP_Y_512[y0] + 1) * TILE_SIZE * sy);
+            ctx.fillRect(x0 * TILE_SIZE * sx, y0 * TILE_SIZE * sy, (x1 - x0 + 1) * TILE_SIZE * sx, (y1 - y0 + 1) * TILE_SIZE * sy);
         }
         // Vice Beach Pier Wooden Boardwalk (c = 454..476, r = 193..196)
         ctx.fillStyle = "#b88655";
-        ctx.fillRect(MAP_X_512[454] * TILE_SIZE * sx, MAP_Y_512[193] * TILE_SIZE * sy, 23 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
+        ctx.fillRect(454 * TILE_SIZE * sx, 193 * TILE_SIZE * sy, 23 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
 
         // Vice City Mambas 3D Octagonal Football Stadium (c = 179..197, r = 164..180)
         if (this.mambasStadium) {
@@ -16536,7 +16510,7 @@ class WorldObjectEngine {
             const mcy = this.mambasStadium.y * sy;
             // Coral concourse plaza
             ctx.fillStyle = "#d8c0ba";
-            ctx.fillRect(MAP_X_512[179] * TILE_SIZE * sx, MAP_Y_512[164] * TILE_SIZE * sy, 19 * TILE_SIZE * sx, 17 * TILE_SIZE * sy);
+            ctx.fillRect(179 * TILE_SIZE * sx, 164 * TILE_SIZE * sy, 19 * TILE_SIZE * sx, 17 * TILE_SIZE * sy);
             // Outer 3D stadium bowl & teal canopy ring
             ctx.fillStyle = "#0d9488";
             ctx.fillRect(mcx - 540 * sx, mcy - 440 * sy, 1080 * sx, 880 * sy);
@@ -16607,18 +16581,18 @@ class WorldObjectEngine {
         if (lm.gellhornSpeedway) {
             // West Coast Golden Sand Beach (c = 22..25, r = 149..200, preserving wooden pier at r = 179..181)
             ctx.fillStyle = "#ecd28e";
-            ctx.fillRect(MAP_X_512[22] * TILE_SIZE * sx, MAP_Y_512[149] * TILE_SIZE * sy, 4 * TILE_SIZE * sx, 30 * TILE_SIZE * sy);
-            ctx.fillRect(MAP_X_512[22] * TILE_SIZE * sx, MAP_Y_512[182] * TILE_SIZE * sy, 4 * TILE_SIZE * sx, 19 * TILE_SIZE * sy);
+            ctx.fillRect(22 * TILE_SIZE * sx, 149 * TILE_SIZE * sy, 4 * TILE_SIZE * sx, 30 * TILE_SIZE * sy);
+            ctx.fillRect(22 * TILE_SIZE * sx, 182 * TILE_SIZE * sy, 4 * TILE_SIZE * sx, 19 * TILE_SIZE * sy);
             // Perimeter Highways around Super-Speedway (North y=147..148, East x=88..89, South y=201..202)
             ctx.fillStyle = "#4b4f56";
-            ctx.fillRect(MAP_X_512[52] * TILE_SIZE * sx, MAP_Y_512[147] * TILE_SIZE * sy, 38 * TILE_SIZE * sx, 2 * TILE_SIZE * sy);
-            ctx.fillRect(MAP_X_512[88] * TILE_SIZE * sx, MAP_Y_512[147] * TILE_SIZE * sy, 2 * TILE_SIZE * sx, 56 * TILE_SIZE * sy);
-            ctx.fillRect(MAP_X_512[52] * TILE_SIZE * sx, MAP_Y_512[201] * TILE_SIZE * sy, 38 * TILE_SIZE * sx, 2 * TILE_SIZE * sy);
+            ctx.fillRect(52 * TILE_SIZE * sx, 147 * TILE_SIZE * sy, 38 * TILE_SIZE * sx, 2 * TILE_SIZE * sy);
+            ctx.fillRect(88 * TILE_SIZE * sx, 147 * TILE_SIZE * sy, 2 * TILE_SIZE * sx, 56 * TILE_SIZE * sy);
+            ctx.fillRect(52 * TILE_SIZE * sx, 201 * TILE_SIZE * sy, 38 * TILE_SIZE * sx, 2 * TILE_SIZE * sy);
             // Paved Super-Speedway Paddock Concourse (c = 26..87, r = 149..200)
             ctx.fillStyle = "#d3cabd";
-            ctx.fillRect(MAP_X_512[26] * TILE_SIZE * sx, MAP_Y_512[149] * TILE_SIZE * sy, 62 * TILE_SIZE * sx, 52 * TILE_SIZE * sy);
-            const gcx = (lm.gellhornSpeedway.centerX || (mx512(57.0) * TILE_SIZE)) * sx;
-            const gcy = (lm.gellhornSpeedway.centerY || (my512(174.5) * TILE_SIZE)) * sy;
+            ctx.fillRect(26 * TILE_SIZE * sx, 149 * TILE_SIZE * sy, 62 * TILE_SIZE * sx, 52 * TILE_SIZE * sy);
+            const gcx = (lm.gellhornSpeedway.centerX || (57.0 * TILE_SIZE)) * sx;
+            const gcy = (lm.gellhornSpeedway.centerY || (174.5 * TILE_SIZE)) * sy;
             const grx = (lm.gellhornSpeedway.rx || (24.5 * TILE_SIZE)) * sx;
             const gry = (lm.gellhornSpeedway.ry || (17.5 * TILE_SIZE)) * sy;
             // Emerald Turf Infield + Paved Pit Lane Apron
@@ -16627,7 +16601,7 @@ class WorldObjectEngine {
             ctx.ellipse(gcx, gcy, grx * 0.88, gry * 0.85, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = "#cbd5e1";
-            ctx.fillRect(MAP_X_512[44] * TILE_SIZE * sx, MAP_Y_512[169] * TILE_SIZE * sy, 27 * TILE_SIZE * sx, 14 * TILE_SIZE * sy);
+            ctx.fillRect(44 * TILE_SIZE * sx, 169 * TILE_SIZE * sy, 27 * TILE_SIZE * sx, 14 * TILE_SIZE * sy);
             // Outer FIA Red/White Curbs & 248px Banked Asphalt Super-Oval
             ctx.strokeStyle = "#ef4444";
             ctx.lineWidth = Math.max(4.5, 292 * sx);
@@ -16647,9 +16621,9 @@ class WorldObjectEngine {
             ctx.fillRect(gcx - 190 * sx, gcy - 96 * sy, 380 * sx, 68 * sy);
             // Hank's Waffles & Uncle Jack's Pawn / Liquor Commercial Block (c = 66..75, r = 206..210)
             ctx.fillStyle = "#ea580c";
-            ctx.fillRect(MAP_X_512[66] * TILE_SIZE * sx, MAP_Y_512[206] * TILE_SIZE * sy, 10 * TILE_SIZE * sx, 5 * TILE_SIZE * sy);
+            ctx.fillRect(66 * TILE_SIZE * sx, 206 * TILE_SIZE * sy, 10 * TILE_SIZE * sx, 5 * TILE_SIZE * sy);
             ctx.fillStyle = "#fde047";
-            ctx.fillRect(MAP_X_512[67] * TILE_SIZE * sx, MAP_Y_512[207] * TILE_SIZE * sy, 8 * TILE_SIZE * sx, 3 * TILE_SIZE * sy);
+            ctx.fillRect(67 * TILE_SIZE * sx, 207 * TILE_SIZE * sy, 8 * TILE_SIZE * sx, 3 * TILE_SIZE * sy);
         }
         if (lm.wynwoodWalls) {
             ctx.fillStyle = "#ec4899";
