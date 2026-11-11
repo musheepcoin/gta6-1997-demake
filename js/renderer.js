@@ -7773,9 +7773,9 @@ class RetroRenderer {
                 const yx = yp.x + cosA * bob;
                 const yy = yp.y + sinA * bob;
 
-                // White turquoise ocean foam wake + silhouette shadow around 3D superyacht hull (3D hull & decks rendered by WorldObjectEngine)
-                const wakePulse = 1.06 + Math.sin(this.time * 2.6 + yi) * 0.04;
-                this.batchObjectSprite3D("luxury_yacht", yx, yy, bz + 0.008, ang, 1.04 * wakePulse, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.82, 0.97, 1.0, 0.36);
+                // Contact shadow + crisp 100% opaque base hull deck above water (3D hull & decks rendered by WorldObjectEngine)
+                this.batchObjectSprite3D("luxury_yacht", yx + sunCos * 4, yy + sunSin * 4, bz + 0.014, ang, 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.34);
+                this.batchObjectSprite3D("luxury_yacht", yx, yy, bz + 0.045, ang, 1.0, SPRITE_DRAW_ORDER.CAR);
 
                 // Live DJ Turntable Booth ("dj_turntable_deck") elevated on the 3D flybridge / foredeck
                 const djX = yp.x + cosA * 18.0;
@@ -8534,16 +8534,16 @@ class RetroRenderer {
                 const bz = pt.z || 2.0;
                 const bob = Math.sin(this.time * 1.8 + pt.seed) * 0.008;
                 if (pt.kind === "BARGE") {
-                    // Animated ocean foam wake collar beneath the 3D Volumetric Panamax Container Ship (rendered by WorldObjectEngine)
-                    const wakeScale = pt.scale * (1.05 + Math.sin(this.time * 2.2 + pt.seed) * 0.025);
-                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.008, pt.ang, wakeScale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.30);
+                    // Crisp dark water shadow + 100% opaque hull deck above water beneath the 3D Volumetric Panamax Container Ship
+                    this.batchObjectSprite3D("cargo_barge", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.014, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
+                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.045, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
                 } else if (pt.kind === "CONTAINERS") {
                     // Ground shadow (true 3D multi-tiered shipping container stacks rendered by WorldObjectEngine)
                     this.batchObjectSprite3D("container_stack", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
                 } else if (pt.kind === "YACHT") {
-                    // Animated ocean foam wake collar beneath the 3D Volumetric Luxury Superyacht (rendered by WorldObjectEngine)
-                    const wakeScale = pt.scale * (1.06 + Math.sin(this.time * 2.4 + pt.seed) * 0.025);
-                    this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.008, pt.ang, wakeScale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.32);
+                    // Crisp dark water shadow + 100% opaque hull deck above water beneath the 3D Volumetric Luxury Superyacht
+                    this.batchObjectSprite3D("luxury_yacht", pt.x + sunCos * 4, pt.y + sunSin * 4, bz + 0.014, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.34);
+                    this.batchObjectSprite3D("luxury_yacht", pt.x, pt.y, bz + 0.045 + bob, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
                 } else if (pt.kind === "SPEEDBOAT") {
                     this.batchObjectSprite3D("speedboat_v8", pt.x, pt.y, bz + 0.012, pt.ang, pt.scale * 1.08, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.94, 1.0, 0.28);
                     this.batchObjectSprite3D("speedboat_v8", pt.x + sunCos * 4, pt.y + sunSin * 4, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);

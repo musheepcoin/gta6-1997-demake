@@ -8548,23 +8548,22 @@ class WorldObjectEngine {
                     const bridgeGlass = [0.16, 0.58, 0.84];
                     const funnelOrange = [0.94, 0.38, 0.14];
 
-                    // 1. Soft ocean contact shadow + turquoise/white waterline foam collar
+                    // 1. Soft ocean contact shadow + crisp elevated waterline hull above water surface (bz + 0.046)
                     emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, 118 * sc, 44 * sc, bz, 0.46);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -6 * sc, 0, 96 * sc, 37.5 * sc, bz + 0.003, bz + 0.011, [0.78, 0.96, 1.00], 10);
 
-                    // 2. Anti-fouling red oxide waterline boot-top (bz+0.008 .. bz+0.068) + bulbous bow prow
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 35.0 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 27.0 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.5 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.5 * sc, bz + 0.008, bz + 0.068, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  54 * sc, 0,  5 * sc,  5.2 * sc, bz + 0.006, bz + 0.046, hullRed, 5);
+                    // 2. Anti-fouling red oxide waterline boot-top (bz+0.046 .. bz+0.095) + bulbous bow prow
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 35.0 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 27.0 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.5 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.5 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  54 * sc, 0,  5 * sc,  5.2 * sc, bz + 0.046, bz + 0.082, hullRed, 5);
 
-                    // 3. White Plimsoll waterline stripe + riveted dark navy-charcoal steel hull freeboard (bz+0.068 .. bz+0.23)
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82.4 * sc, 35.2 * sc, bz + 0.065, bz + 0.076, bridgeWhite, 9);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 34.2 * sc, bz + 0.074, bz + 0.225, hullDark, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 26.5 * sc, bz + 0.074, bz + 0.240, hullDark, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.0 * sc, bz + 0.074, bz + 0.255, hullDark, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.0 * sc, bz + 0.074, bz + 0.270, hullDark, 5);
+                    // 3. White Plimsoll waterline stripe + riveted dark navy-charcoal steel hull freeboard (bz+0.095 .. bz+0.24)
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82.4 * sc, 35.2 * sc, bz + 0.092, bz + 0.104, bridgeWhite, 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 34.2 * sc, bz + 0.102, bz + 0.235, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 26.5 * sc, bz + 0.102, bz + 0.248, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.0 * sc, bz + 0.102, bz + 0.262, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.0 * sc, bz + 0.102, bz + 0.276, hullDark, 5);
 
                     // 4. Non-slip steel cargo hold weather deck + raised bow forecastle deck + Port/Starboard gunwale bulwark rails
                     emitTileBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 80 * sc, 31.6 * sc, bz + 0.215, bz + 0.242, 177, 177, 71, deckGrey, false);
@@ -8623,28 +8622,6 @@ class WorldObjectEngine {
                     for (const side of [-1, 1]) {
                         emitSolidBox3D(pt.x, pt.y, cosA, sinA, -44.5 * sc, side * 10.5 * sc, 8.0 * sc, 4.6 * sc, bz + 0.46, bz + 0.55, [0.98, 0.44, 0.10], 9);
                     }
-                } else if (pt.kind === "YACHT") {
-                    // --- TRUE 3D VOLUMETRIC LUXURY MOTOR SUPERYACHT (Harbor Moored Yachts) ---
-                    const yWhite = [0.96, 0.98, 1.00];
-                    const yGlass = [0.14, 0.56, 0.80];
-                    const yTeak  = [0.84, 0.66, 0.44];
-                    emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, 98 * sc, 38 * sc, bz, 0.40);
-                    // Underwater Turquoise LED Halo + Stepped White Superyacht Hull & Flared Bow Prow
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 0, 0, 88 * sc, 33 * sc, bz + 0.002, bz + 0.014, [0.12, 0.92, 0.96], 10);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -6 * sc, 0, 68 * sc, 29 * sc, bz + 0.012, bz + 0.17, yWhite, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 29 * sc, 0, 14 * sc, 21 * sc, bz + 0.016, bz + 0.18, yWhite, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 38 * sc, 0, 10 * sc, 12 * sc, bz + 0.024, bz + 0.19, yWhite, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 44 * sc, 0,  6 * sc,  6 * sc, bz + 0.032, bz + 0.20, yWhite, 5);
-                    // Teakwood Main Deck & Swim Platform + Panoramic Tinted-Glass Main Salon + Flybridge Sun Deck + Radar Arch
-                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -4 * sc, 0, 68 * sc, 26 * sc, bz + 0.16, bz + 0.20, 177, 177, 77, yTeak, false);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -38 * sc, 0, 8 * sc, 24 * sc, bz + 0.03, bz + 0.08, yTeak, 11);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -4 * sc, 0, 42 * sc, 21 * sc, bz + 0.20, bz + 0.36, yGlass, 7);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -5 * sc, 0, 44 * sc, 22 * sc, bz + 0.36, bz + 0.41, yWhite, 9);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -8 * sc, 0, 22 * sc, 16 * sc, bz + 0.41, bz + 0.52, yGlass, 7);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -12 * sc, 0, 9 * sc, 18 * sc, bz + 0.52, bz + 0.68, yWhite, 9);
-                    // Foredeck VIP Sun-Pads
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 24 * sc, -4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.98, 0.36, 0.72], 9);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, 24 * sc,  4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.18, 0.88, 0.96], 9);
                 }
             }
         }
@@ -9874,7 +9851,7 @@ class WorldObjectEngine {
                     // 1) Overwater Bridge Deck Tile (z = 2.36)
                     if (bType === 1) {
                         // E-W bridge over N-S water channel: emit dark under-bridge drop shadow on the water (z = 2.006)
-                        pushShadowQuad(cx, cy, 1, 0, 0, 0, TILE_SIZE + 2.0, TILE_SIZE + 18.0, 2.006, 0.44);
+                        emitAOShadow3D(cx, cy, 1, 0, 0, 0, TILE_SIZE + 2.0, TILE_SIZE + 18.0, 2.0, 0.44);
 
                         const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0);
                         const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0);
@@ -9907,7 +9884,7 @@ class WorldObjectEngine {
                         }
                     } else if (bType === 2) {
                         // N-S bridge over E-W water channel: emit dark under-bridge drop shadow on the water (z = 2.006)
-                        pushShadowQuad(cx, cy, 1, 0, 0, 0, TILE_SIZE + 18.0, TILE_SIZE + 2.0, 2.006, 0.44);
+                        emitAOShadow3D(cx, cy, 1, 0, 0, 0, TILE_SIZE + 18.0, TILE_SIZE + 2.0, 2.0, 0.44);
 
                         const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0);
                         const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0);
@@ -10185,16 +10162,16 @@ class WorldObjectEngine {
         // 22B. GTA 6 TRAILER 1 (0:41 "DADBODSQUAD"): 3D MULTI-DECK LUXURY CATAMARAN & SUPERYACHT PARTIES
         if (this.map && Array.isArray(this.map.yachtParties)) {
             for (const yp of this.map.yachtParties) {
-                const bz = 2.02;
+                const bz = 2.048;
                 const yAng = yp.angle !== undefined ? yp.angle : (yp.ang || 0);
                 const yCos = Math.cos(yAng);
                 const ySin = Math.sin(yAng);
-                // Glowing Turquoise Underwater Hull LED Halo + Twin Sleek White Catamaran Pontoons & Tapered Bows
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 0, 0, 96, 46, bz - 0.01, bz + 0.02, [0.12, 0.92, 0.96], 10);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -2, -14, 84, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -2,  14, 84, 12, bz + 0.01, bz + 0.16, [0.95, 0.97, 1.00], 5);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 42, -14, 10,  7, bz + 0.02, bz + 0.17, [0.95, 0.97, 1.00], 5);
-                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 42,  14, 10,  7, bz + 0.02, bz + 0.17, [0.95, 0.97, 1.00], 5);
+                emitAOShadow3D(yp.x, yp.y, yCos, ySin, 0, 0, 98, 44, 2.0, 0.38);
+                // Twin Sleek White Catamaran Pontoons & Tapered Bows above water surface
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -2, -14, 84, 12, bz, bz + 0.14, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, -2,  14, 84, 12, bz, bz + 0.14, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 42, -14, 10,  7, bz + 0.01, bz + 0.15, [0.95, 0.97, 1.00], 5);
+                emitSolidBox3D(yp.x, yp.y, yCos, ySin, 42,  14, 10,  7, bz + 0.01, bz + 0.15, [0.95, 0.97, 1.00], 5);
                 // Teakwood Main Party Deck Bridging the Catamaran Hulls (L77 planks)
                 emitTileBox3D(yp.x, yp.y, yCos, ySin, -2, 0, 80, 38, bz + 0.14, bz + 0.20, 177, 177, 77, [0.86, 0.70, 0.48], false);
                 // Panoramic Tinted-Glass Main Salon Cabin + White Flybridge Sun Deck
@@ -12771,6 +12748,37 @@ class WorldObjectEngine {
                         emitDynBox(sx, mg.y + 19, 1, 0, 0, 0, 7, 4, syElev - 0.03, syElev + 0.03, [0.98, 0.92, 0.68], 1.0, 4);
                     }
                 }
+            }
+        }
+
+        // 2B. Harbor Moored 3D Luxury Superyachts (this.map.portTerminals kind === "YACHT", hides cleanly if boarded!)
+        if (this.map && Array.isArray(this.map.portTerminals)) {
+            for (let i = 0; i < this.map.portTerminals.length; i++) {
+                const pt = this.map.portTerminals[i];
+                if (pt.kind !== "YACHT") continue;
+                if (pt._boardedVehicle && !pt._boardedVehicle.destroyed) continue;
+                if (pt.x < minX - 160 || pt.x > maxX + 160 || pt.y < minY - 160 || pt.y > maxY + 160) continue;
+                const sc = pt.scale || 1.0;
+                const cosA = Math.cos(pt.ang || 0);
+                const sinA = Math.sin(pt.ang || 0);
+                const bz = (pt.z || 2.0) + Math.sin(t * 1.8 + (pt.seed || i)) * 0.008;
+                const yWhite = [0.96, 0.98, 1.00];
+                const yGlass = [0.14, 0.56, 0.80];
+                const yTeak  = [0.84, 0.66, 0.44];
+                // Stepped White Superyacht Hull & Flared Bow Prow above water surface
+                emitDynBox(pt.x, pt.y, cosA, sinA, -6 * sc, 0, 68 * sc, 29 * sc, bz + 0.048, bz + 0.17, yWhite, 1.0, 5);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 29 * sc, 0, 14 * sc, 21 * sc, bz + 0.048, bz + 0.18, yWhite, 1.0, 5);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 38 * sc, 0, 10 * sc, 12 * sc, bz + 0.048, bz + 0.19, yWhite, 1.0, 5);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 44 * sc, 0,  6 * sc,  6 * sc, bz + 0.048, bz + 0.20, yWhite, 1.0, 5);
+                // Teakwood Main Deck & Swim Platform + Panoramic Tinted-Glass Main Salon + Flybridge Sun Deck + Radar Arch
+                emitDynBox(pt.x, pt.y, cosA, sinA, -4 * sc, 0, 68 * sc, 26 * sc, bz + 0.16, bz + 0.20, yTeak, 1.0, 11);
+                emitDynBox(pt.x, pt.y, cosA, sinA, -38 * sc, 0, 8 * sc, 24 * sc, bz + 0.048, bz + 0.09, yTeak, 1.0, 11);
+                emitDynBox(pt.x, pt.y, cosA, sinA, -4 * sc, 0, 42 * sc, 21 * sc, bz + 0.20, bz + 0.36, yGlass, 1.0, 7);
+                emitDynBox(pt.x, pt.y, cosA, sinA, -5 * sc, 0, 44 * sc, 22 * sc, bz + 0.36, bz + 0.41, yWhite, 1.0, 9);
+                emitDynBox(pt.x, pt.y, cosA, sinA, -8 * sc, 0, 22 * sc, 16 * sc, bz + 0.41, bz + 0.52, yGlass, 1.0, 7);
+                emitDynBox(pt.x, pt.y, cosA, sinA, -12 * sc, 0, 9 * sc, 18 * sc, bz + 0.52, bz + 0.68, yWhite, 1.0, 9);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 24 * sc, -4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.98, 0.36, 0.72], 1.0, 9);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 24 * sc,  4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.18, 0.88, 0.96], 1.0, 9);
             }
         }
 
