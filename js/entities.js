@@ -3992,7 +3992,11 @@ class Pedestrian {
         this.y = props.y || 0;
         this.z = props.z !== undefined ? props.z : 2.0;
         this.angle = props.angle || 0;
-        this.speed = props.speed !== undefined ? props.speed : 36;
+        const initWalkSpd = props.baseWalkSpeed !== undefined
+            ? props.baseWalkSpeed
+            : (props.speed !== undefined && props.speed > 0 && props.speed < 60 ? props.speed : 24);
+        this.baseWalkSpeed = initWalkSpd;
+        this.speed = props.speed !== undefined ? props.speed : initWalkSpd;
         this.kind = props.kind || "CIVILIAN"; // CIVILIAN, COP, MONK, HOSTILE, GATOR
         this.g24Type = props.g24Type || null;
         this.g2Remapped = Boolean(props.g2Remapped);
@@ -4100,9 +4104,9 @@ class TrafficManager {
         const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
         if (inPrisonYard) {
             if ((seed % 5) === 0) {
-                return { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 38 };
+                return { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 26 };
             }
-            return { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45, speed: 35 };
+            return { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45, speed: 23 };
         }
 
         const r1 = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
@@ -4123,7 +4127,7 @@ class TrafficManager {
                 missionTag: "BEACH",
                 shirtColor: "#f472b6",
                 hp: 35,
-                speed: (gType === "vc_jogger") ? 52 : (isChild ? 34 : (34 + (r1 % 8))),
+                speed: (gType === "vc_jogger") ? (38 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 5))),
                 isChild
             };
         }
@@ -4142,7 +4146,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: "#00f0ff",
                 hp: 35,
-                speed: isRollerblader ? (60 + (r1 % 9)) : (37 + (r1 % 7)),
+                speed: isRollerblader ? (45 + (r1 % 7)) : (gType === "vc_jogger" ? (38 + (r1 % 5)) : (23 + (r1 % 5))),
                 isRollerblader,
                 isChild
             };
@@ -4163,7 +4167,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: "#ff2a85",
                 hp: 35,
-                speed: isRollerblader ? 62 : (gType === "vc_jogger" ? 50 : (35 + (r1 % 9))),
+                speed: isRollerblader ? 46 : (gType === "vc_jogger" ? (38 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 6)))),
                 isRollerblader,
                 isChild
             };
@@ -4181,7 +4185,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: "#f59e0b",
                 hp: 38,
-                speed: 35 + (r1 % 8)
+                speed: 22 + (r1 % 6)
             };
         }
 
@@ -4197,7 +4201,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: "#a855f7",
                 hp: 38,
-                speed: 35 + (r1 % 9)
+                speed: 22 + (r1 % 6)
             };
         }
 
@@ -4213,7 +4217,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: "#38bdf8",
                 hp: 35,
-                speed: gType === "vc_jogger" ? 50 : (36 + (r1 % 8))
+                speed: gType === "vc_jogger" ? (38 + (r1 % 5)) : (23 + (r1 % 5))
             };
         }
 
@@ -4229,7 +4233,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: "#2dd4bf",
                 hp: 35,
-                speed: 35 + (r1 % 8)
+                speed: 22 + (r1 % 6)
             };
         }
 
@@ -4249,7 +4253,7 @@ class TrafficManager {
                 g24Type: gType,
                 shirtColor: gType === "dockworker_orange" ? "#f97316" : "#eab308",
                 hp: 45,
-                speed: 35 + (r1 % 7)
+                speed: 23 + (r1 % 5)
             };
         }
 
@@ -4265,7 +4269,7 @@ class TrafficManager {
             g24Type: gType,
             shirtColor: "#06b6d4",
             hp: 35,
-            speed: gType === "vc_jogger" ? 50 : (35 + (r1 % 9))
+            speed: gType === "vc_jogger" ? (38 + (r1 % 5)) : (22 + (r1 % 6))
         };
     }
 
@@ -4278,8 +4282,8 @@ class TrafficManager {
         const r = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
         if (inPrisonYard) {
             const single = (seed % 5 === 0)
-                ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 38 }
-                : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45, speed: 35 };
+                ? { kind: "COP", g24Type: "police", missionTag: "PRISON_GUARD", copWeapon: "SHOTGUN", shirtColor: "#1e3a8a", hp: 110, speed: 26 }
+                : { kind: "CIVILIAN", g24Type: "g2_prisoner", g2Remapped: true, missionTag: "PRISONER", shirtColor: "#ff6608", hp: 45, speed: 23 };
             return { type: "SOLO", members: [single] };
         }
 
@@ -4362,7 +4366,7 @@ class TrafficManager {
                 ];
             }
             const pair = pairs[(r >> 3) % pairs.length];
-            const sharedSpeed = 34 + (r % 5);
+            const sharedSpeed = 23 + (r % 4);
             const tag = isBeach ? "BEACH" : undefined;
             return {
                 type: "COUPLE",
@@ -4402,7 +4406,7 @@ class TrafficManager {
                 : ["kid_boy_cap", "kid_girl_pink", "kid_beach"];
             const parentType = parentPool[(r >> 3) % parentPool.length];
             const childType = childPool[(r >> 5) % childPool.length];
-            const famSpeed = 33 + (r % 4);
+            const famSpeed = 22 + (r % 3);
             const tag = isBeach ? "BEACH" : undefined;
             const members = [
                 {
@@ -4472,7 +4476,7 @@ class TrafficManager {
                 ];
             }
             const trio = trios[(r >> 3) % trios.length];
-            const grpSpeed = 35 + (r % 5);
+            const grpSpeed = 23 + (r % 4);
             const tag = isBeach ? "BEACH" : undefined;
             return {
                 type: "FRIEND_GROUP",
@@ -4525,7 +4529,7 @@ class TrafficManager {
                 spec.isChild = false;
                 spec.isRollerblader = false;
             }
-            spec.speed = 35;
+            spec.speed = 24;
             spec.hangoutTimer = hangoutDuration;
             spec.formationRole = m === 0 ? "LEADER" : (count === 2 ? "COUPLE_PARTNER" : "GROUP_FOLLOWER");
             spec.formationFwdOff = m === 0 ? 0 : (m === 1 ? -3 : -13);
@@ -4592,8 +4596,8 @@ class TrafficManager {
             }
 
             const baseSpeed = spec.isRollerblader
-                ? (54 + Math.random() * 10)
-                : (spec.isChild ? (32 + Math.random() * 4) : (spec.speed || (35 + Math.random() * 8)));
+                ? (45 + Math.random() * 6)
+                : (spec.isChild ? (21 + Math.random() * 3) : (spec.speed || (22 + Math.random() * 5)));
 
             const newPed = new Pedestrian({
                 x: mx,
@@ -4731,7 +4735,7 @@ class TrafficManager {
                     targetBy: Math.floor(py / TILE_SIZE),
                     turnSeed: 700 + t * 5 + m
                 });
-                ped.baseWalkSpeed = 34;
+                ped.baseWalkSpeed = 24;
                 ped.formationId = formId;
                 ped.formationType = "HANGOUT_CIRCLE";
                 ped.formationRole = m === 0 ? "LEADER" : "COUPLE_PARTNER";

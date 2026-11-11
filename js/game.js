@@ -6188,7 +6188,9 @@ class LeonidaGame {
 
             angle: fleeAngle,
 
-            speed: fightsBack ? 90 : 86,
+            baseWalkSpeed: 24,
+
+            speed: fightsBack ? 86 : 24,
 
             kind: fightsBack ? "HOSTILE" : "CIVILIAN",
 
@@ -6240,12 +6242,14 @@ class LeonidaGame {
         vehicle.doorOpenTimer = 0.48;
         const civTypes = ["civ1", "civ2", "civ3", "civ4"];
         const shirtPalette = ["#38bdf8", "#f472b6", "#34d399", "#fbbf24", "#a78bfa", "#f87171"];
+        const walkSpd = 23 + Math.random() * 4;
         this.peds.push(new Pedestrian({
             x: spawnX,
             y: spawnY,
             z: vz,
             angle: Math.atan2(ry, rx),
-            speed: 35 + Math.random() * 7,
+            baseWalkSpeed: walkSpd,
+            speed: walkSpd,
             kind: "CIVILIAN",
             g24Type: civTypes[Math.floor(Math.random() * civTypes.length)],
             shirtColor: shirtPalette[Math.floor(Math.random() * shirtPalette.length)],
@@ -12645,8 +12649,8 @@ class LeonidaGame {
                         ped.y += Math.sin(ped.angle) * 76 * dt;
                     } else {
                         // Routine VCPD foot patrol when no wanted player or active criminal is nearby
-                        ped.x += Math.cos(ped.angle) * 42 * dt;
-                        ped.y += Math.sin(ped.angle) * 42 * dt;
+                        ped.x += Math.cos(ped.angle) * 26 * dt;
+                        ped.y += Math.sin(ped.angle) * 26 * dt;
                         if (Math.random() < 0.015) ped.angle += (Math.random() - 0.5) * 1.2;
                     }
 
@@ -13517,12 +13521,8 @@ class LeonidaGame {
 
 
 
-                // Opportunistic Vice City street thief: gang members / muggers walking near an abandoned unlocked road car steal it and drive off!
-                const isStreetThiefType =
-                    ped.g24Type === "g2_mugger" ||
-                    ped.g24Type === "gang" ||
-                    ped.g24Type === "vc_haitian" ||
-                    ped.g24Type === "vc_cuban";
+                // Opportunistic Vice City street thief: only dedicated muggers walking near an abandoned unlocked road car steal it and drive off!
+                const isStreetThiefType = ped.g24Type === "g2_mugger";
                 let pursuingStealCar = false;
                 if (isStreetThiefType && (ped.burnTimer || 0) <= 0 && !ped.isLivingProp) {
                     let stealTarget = null;
@@ -13583,7 +13583,12 @@ class LeonidaGame {
                     ped.taxiHailCooldown = Math.max(0, ped.taxiHailCooldown - dt);
                 }
 
-                const baseWalkSpd = ped.kind === "COP" ? 38 : (ped.speed || 36);
+                if (!ped.baseWalkSpeed || ped.baseWalkSpeed <= 0 || ped.baseWalkSpeed > 54) {
+                    ped.baseWalkSpeed = ped.isRollerblader
+                        ? 46
+                        : (ped.g24Type === "vc_jogger" ? 39 : (ped.isChild ? 22 : 24));
+                }
+                const baseWalkSpd = ped.kind === "COP" ? 26 : ped.baseWalkSpeed;
                 const bx = Math.floor(ped.x / TILE_SIZE);
                 const by = Math.floor(ped.y / TILE_SIZE);
                 const pz = ped.z !== undefined ? ped.z : 2.0;
@@ -13840,7 +13845,7 @@ class LeonidaGame {
                         ped._chatBubbleCooldown = Math.max(0, ped._chatBubbleCooldown - dt);
                     }
                     if (ped.hangoutTimer <= 0) {
-                        ped.speed = ped.baseWalkSpeed || 35;
+                        ped.speed = ped.baseWalkSpeed || 24;
                     }
                 }
 
@@ -13858,7 +13863,7 @@ class LeonidaGame {
                         leaderDist > 96
                     ) {
                         ped.formationLeader = null;
-                        ped.speed = ped.baseWalkSpeed || 35;
+                        ped.speed = ped.baseWalkSpeed || 24;
                     } else {
                         hasActiveLeader = true;
                     }
@@ -13903,11 +13908,12 @@ class LeonidaGame {
                         const dxSlot = slotX - ped.x;
                         const dySlot = slotY - ped.y;
                         const distSlot = Math.hypot(dxSlot, dySlot);
-                        const leaderMoveSpd = leader.speed > 1 ? leader.speed : (leader.baseWalkSpeed || baseWalkSpd);
+                        const leaderBase = leader.baseWalkSpeed || baseWalkSpd;
+                        const leaderMoveSpd = leader.speed > 1 ? Math.min(leader.speed, leaderBase * 1.32) : leaderBase;
                         let followSpd = leaderMoveSpd;
-                        if (distSlot > 18) followSpd = leaderMoveSpd * 1.28;
-                        else if (distSlot > 7) followSpd = leaderMoveSpd * 1.10;
-                        else if (distSlot < 2.5) followSpd = leaderMoveSpd * 0.92;
+                        if (distSlot > 18) followSpd = leaderMoveSpd * 1.18;
+                        else if (distSlot > 7) followSpd = leaderMoveSpd * 1.07;
+                        else if (distSlot < 2.5) followSpd = leaderMoveSpd * 0.94;
 
                         if (distSlot > 5.0) {
                             const toSlotAngle = Math.atan2(dySlot, dxSlot);
@@ -13941,12 +13947,12 @@ class LeonidaGame {
                     const spd = isStandingStill
                         ? 0
                         : ((ped.burnTimer || 0) > 0
-                            ? 105
+                            ? 86
                             : ((ped.dodgeTimer || 0) > 0
-                                ? 96
+                                ? 76
                                 : (ped.panicTimer > 0
-                                    ? 82
-                                    : (hurryOnCrosswalk ? baseWalkSpd * 1.55 : (ped.isCrossingRoad ? baseWalkSpd * 1.22 : baseWalkSpd)))));
+                                    ? 68
+                                    : (hurryOnCrosswalk ? baseWalkSpd * 1.30 : (ped.isCrossingRoad ? baseWalkSpd * 1.14 : baseWalkSpd)))));
                     ped.speed = spd;
 
                     ped.waypointTimer = (ped.waypointTimer || 0) + (isStandingStill ? 0 : dt);
@@ -14264,12 +14270,12 @@ class LeonidaGame {
                 if (ped._lastCheckX === undefined) {
                     ped._lastCheckX = ped.x;
                     ped._lastCheckY = ped.y;
-                } else if (ped._stuckCheckTimer >= 0.50) {
+                } else if (ped._stuckCheckTimer >= 0.65) {
                     const movedDist = Math.hypot(ped.x - ped._lastCheckX, ped.y - ped._lastCheckY);
                     ped._lastCheckX = ped.x;
                     ped._lastCheckY = ped.y;
                     ped._stuckCheckTimer = 0;
-                    if (movedDist < 7.0) {
+                    if (movedDist < 4.0) {
                         const cbx = Math.floor(ped.x / TILE_SIZE);
                         const cby = Math.floor(ped.y / TILE_SIZE);
                         ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined

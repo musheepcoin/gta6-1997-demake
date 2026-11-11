@@ -9427,30 +9427,31 @@ class RetroRenderer {
                     ? (85 + Math.min(3, Math.floor(prog * 4)))
                     : (16 + Math.min(7, Math.floor(prog * 8)));
             } else if (ped.kind === "MONK") {
-                const walkPhase = this.time * 1.6 + (ped.monkIndex || 0) * 0.25;
+                const walkPhase = this.time * 1.25 + (ped.monkIndex || 0) * 0.25;
                 frameIdx = this.getPedFrameIndex("FIST", true, false, walkPhase);
             } else if (ped.kind === "COP") {
-                const walkPhase = this.time * 1.8 + ped.animSeed;
                 const copActive = (game.wantedLevel || 0) > 0 || Boolean(ped.inCombat);
+                const walkPhase = this.time * (copActive ? 1.85 : 1.18) + ped.animSeed;
                 const copWeapon = copActive ? (ped.copWeapon || "PISTOL") : "FIST";
                 frameIdx = this.getPedFrameIndex(copWeapon, ped.speed > 0, copActive, walkPhase);
             } else if (ped.kind === "FIREMAN") {
-                const walkPhase = this.time * 1.9 + ped.animSeed;
+                const walkPhase = this.time * 1.7 + ped.animSeed;
                 const spraying = Boolean(ped.sprayingHose);
                 // Use the two-handed aiming frames (136..143 / 152) — they are baked into the recolored g2 atlas,
                 // unlike the flamethrower frames (118..134) which would fall back to the raw green/blue civilian base
                 frameIdx = this.getPedFrameIndex(spraying ? "UZI" : "FIST", ped.speed > 0 && !spraying, spraying, walkPhase);
             } else if (ped.kind === "CRIMINAL" || ped.isAlertedGuard) {
-                const walkPhase = this.time * 2.1 + ped.animSeed;
+                const walkPhase = this.time * 1.85 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex(ped.copWeapon || (ped.isAlertedGuard ? "PISTOL" : "UZI"), ped.speed > 0, true, walkPhase);
             } else if (ped.kind === "HOSTILE") {
-                const walkPhase = this.time * 2.2 + ped.animSeed;
+                const walkPhase = this.time * 1.95 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex("FIST", true, true, walkPhase);
             } else {
-                const isRunning = (ped.panicTimer || 0) > 0 || (ped.burnTimer || 0) > 0;
-                const stepMult = isChildPed ? 1.35 : 1.0;
-                const walkPhase = this.time * (isRunning ? 2.4 : 1.5) * stepMult + ped.animSeed;
-                frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0, isRunning, walkPhase);
+                const isRunning = (ped.panicTimer || 0) > 0 || (ped.burnTimer || 0) > 0 || (ped.dodgeTimer || 0) > 0;
+                const isJoggerOrSkate = ped.isRollerblader || pedType === "vc_jogger";
+                const stepMult = isChildPed ? 1.22 : (isJoggerOrSkate ? 1.38 : 1.0);
+                const walkPhase = this.time * (isRunning ? 2.1 : 1.12) * stepMult + ped.animSeed;
+                frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0.5, isRunning, walkPhase);
             }
 
             let pr = 1.0, pg = 1.0, pb = 1.0;
