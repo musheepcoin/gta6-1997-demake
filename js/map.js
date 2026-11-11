@@ -1402,11 +1402,11 @@ class LeonidaMap {
 
         // Populate Official GTA 6 S-Curving Vice Beach Lifeguard Towers, Volleyball Courts, Star Island Pool & Neon Marquees!
         // Note: West Beach stands placed at x = 453.6 * TILE_SIZE (right beside Lummus Park so they are visible from Ocean Drive!)
-        this.beachProps = [
-            {
+        {
         const mx256 = mx256_512;
         const my256 = my256_512;
-        // 1. Vice Beach Lifeguard Stands (both West Beach beside Lummus Park at x=453.6 & East Shoreline near the Atlantic surf!)
+        this.beachProps = [
+            // 1. Vice Beach Lifeguard Stands (both West Beach beside Lummus Park at x=453.6 & East Shoreline near the Atlantic surf!)
             { spr: "lifeguard_neon",   x: mx256(238.8) * TILE_SIZE, y: my256(36.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_tower",  x: 453.6 * TILE_SIZE,        y: my256(44.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },
             { spr: "lifeguard_neon",   x: mx256(238.8) * TILE_SIZE, y: my256(62.5) * TILE_SIZE,  z: 2.0, scale: 1.12, angle: 0 },

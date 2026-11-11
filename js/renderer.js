@@ -5420,7 +5420,7 @@ class RetroRenderer {
             checkReady();
         }, 5, true);
 
-        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=100_71", () => {
+        loadImageWithRetry(this.viceOverviewImg, "assets/gta1/vice_cmp_overview.png?v=101_86", () => {
             this.viceOverviewReady = true;
             this.bakeRadarBackground();
         }, 5, true);
@@ -5432,14 +5432,14 @@ class RetroRenderer {
             }, 5, true);
         }
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=99_72", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=101_86", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
             })
             .catch((err) => console.error("Failed to load gta1_meta.json:", err));
 
-        fetchWithRetry("assets/gta1/gta1_map.bin?v=99_41", true)
+        fetchWithRetry("assets/gta1/gta1_map.bin?v=101_86", true)
             .then((buf) => {
                 mapBinBuffer = buf;
                 checkReady();
@@ -5517,8 +5517,8 @@ class RetroRenderer {
         }
         this.cityChunks = [];
 
-        const CHUNK_SIZE = 16;
-        const NUM_CHUNKS = Math.ceil(MAP_COLS / CHUNK_SIZE); // 32 * 16 = 512
+        const CHUNK_SIZE = 32;
+        const NUM_CHUNKS = Math.ceil(MAP_COLS / CHUNK_SIZE); // 32 * 32 = 1024
         const RIVERBED_DEPTH = 0.42; // kDefaultRiverbedDepth from world_mesh.cpp
 
         // Compute UV bounds for golden sandy seabed tile (lid 98 in 16x51 tile atlas)
