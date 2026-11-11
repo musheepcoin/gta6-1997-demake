@@ -8306,7 +8306,32 @@ class LeonidaGame {
         }
 
         p.dead = true;
+        p.deathType = targetType;
         p.respawnGraceUntil = performance.now() + 4500;
+
+        if (p.isSitting) {
+            p.isSitting = false;
+            p.sittingProp = null;
+        }
+        if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+            const c = this.map.resolveCircleBuildingCollision(p.x, p.y, 12, p.z || 2.0);
+            p.x = c.x;
+            p.y = c.y;
+        }
+        if (targetType !== "POLICE") {
+            for (let i = 0; i < 10; i++) {
+                this.particles.push({
+                    x: p.x,
+                    y: p.y,
+                    vx: (Math.random() - 0.5) * 95,
+                    vy: (Math.random() - 0.5) * 95,
+                    size: 4.2,
+                    color: "#dc2626",
+                    life: 0.50,
+                    maxLife: 0.50
+                });
+            }
+        }
 
         if (p.inVehicle) {
 
@@ -8463,6 +8488,7 @@ class LeonidaGame {
         setTimeout(() => {
 
             p.dead = false;
+            p.deathType = null;
 
             p.hp = 100;
 

@@ -9803,7 +9803,22 @@ class RetroRenderer {
             const jumpZ = p.jumpZOffset || 0;
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
 
-            if (p.isSwimming && !isJumpingOrSliding) {
+            if (p.dead && p.deathType !== "POLICE") {
+                const corpseZ = this.getEntityZ(p, 0.025);
+                const pCharScale = p.pedType === "bigsmoke" ? 1.36 : 1.30;
+                this.batchObjectSprite3D("444", p.x, p.y, corpseZ, p.angle || 0, 1.0, SPRITE_DRAW_ORDER.CORPSE);
+                this.batchPedSprite3D(
+                    p.pedType || "lucia",
+                    42,
+                    p.x,
+                    p.y,
+                    corpseZ + 0.005,
+                    p.angle || 0,
+                    pCharScale,
+                    false,
+                    SPRITE_DRAW_ORDER.CORPSE
+                );
+            } else if (p.isSwimming && !isJumpingOrSliding) {
                 const waterBaseZ = p.inPool ? Math.max(2.038, (p.z || 2.0) + 0.038) : 2.000;
                 const swimZ = waterBaseZ + 0.018 + Math.sin(this.time * 3.8 + p.x * 0.03) * 0.007;
                 const swPhase = p.swimPhase || (this.time * 4.2);
