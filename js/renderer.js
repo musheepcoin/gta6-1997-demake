@@ -5539,9 +5539,23 @@ class RetroRenderer {
                 }
 
                 // 2. Emit 3D Voxel Block Faces (routing animated water lids face===4 && tile===41 and shoreline lids 99..101 to flatBuf!)
+                const underBridgeWaterBlk = {
+                    faces: [0, 0, 0, 0, 41],
+                    groundType: 1,
+                    slopeType: 0,
+                    isFlat: true,
+                    flipTopBottomFaces: false,
+                    remap: 0,
+                    rot: 0
+                };
                 for (let z = 0; z < MAP_LAYERS; z++) {
                     for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
                         for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
+                            // Emit continuous animated water channel at z=1 (py=2.00) underneath every elevated bridge tile (py=2.36)!
+                            if (z === 1 && this.map.bridgeMask && this.map.bridgeMask[y * MAP_COLS + x] > 0) {
+                                this.putBlockFace(1, x, 1, y, 4, underBridgeWaterBlk, 0.0);
+                            }
+
                             const blkIdx = this.map.getBlockIndex(x, y, z);
                             if (blkIdx === 0) continue;
                             const b = this.map.getBlockInfo(blkIdx);
@@ -5875,6 +5889,15 @@ class RetroRenderer {
         let py1 = y_elev + 1.0;
         let py4 = y_elev + 1.0;
         let py5 = y_elev + 1.0;
+
+        // Apply 3D bridge deck elevation (+0.36) and sloped approach ramp corner heights to road/sidewalk surface tiles (y_elev === 1, non-water)
+        if (y_elev === 1 && b.faces[4] !== 41 && this.map && this.map.bridgeCornerNW) {
+            const cellIdx = z_south * MAP_COLS + x;
+            py0 += this.map.bridgeCornerNW[cellIdx];
+            py1 += this.map.bridgeCornerNE[cellIdx];
+            py4 += this.map.bridgeCornerSW[cellIdx];
+            py5 += this.map.bridgeCornerSE[cellIdx];
+        }
 
         if (st > 0 && st < 45) {
             switch (st) {
@@ -7815,15 +7838,34 @@ class RetroRenderer {
                 const cosA = Math.cos(jAng);
                 const sinA = Math.sin(jAng);
 
-                // High-speed white V-spray water wake behind jet-ski
-                for (let wk = 1; wk <= 3; wk++) {
-                    const wx = jx - cosA * (10 + wk * 7);
-                    const wy = jy - sinA * (10 + wk * 7);
-                    this.pushSolidQuad3D(wx, wy, bz + 0.014, 10 + wk * 3, 6 + wk * 2.5, jAng, 0.90, 0.98, 1.0, 0.52 - wk * 0.12, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // High-speed white V-spray water wake behind jet-ski or canal speedboat
+                const isBoat = Boolean(js.isSpeedboat);
+                const wakeSteps = isBoat ? 4 : 3;
+                for (let wk = 1; wk <= wakeSteps; wk++) {
+                    const wx = jx - cosA * ((isBoat ? 18 : 10) + wk * (isBoat ? 9 : 7));
+                    const wy = jy - sinA * ((isBoat ? 18 : 10) + wk * (isBoat ? 9 : 7));
+                    this.pushSolidQuad3D(
+                        wx,
+                        wy,
+                        bz + 0.014,
+                        (isBoat ? 14 : 10) + wk * (isBoat ? 4 : 3),
+                        (isBoat ? 10 : 6) + wk * (isBoat ? 3.2 : 2.5),
+                        jAng,
+                        0.90,
+                        0.98,
+                        1.0,
+                        0.52 - wk * 0.11,
+                        SPRITE_DRAW_ORDER.TIRE_MARKS
+                    );
                 }
-                // Neon Vice WaveRunner ("jetski_neon") + Rider seated astride saddle (frame 84)
-                this.batchObjectSprite3D("jetski_neon", jx, jy, bz + 0.026, jAng, 1.02, SPRITE_DRAW_ORDER.CAR);
-                this.batchPedSprite3D(js.ped || "surfer_guy", 84, jx - cosA * 2.0, jy - sinA * 2.0, bz + 0.040, jAng, 1.02, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                if (isBoat) {
+                    this.batchObjectSprite3D("boat_speedboat", jx, jy, bz + 0.026, jAng, 0.94, SPRITE_DRAW_ORDER.CAR);
+                    this.batchPedSprite3D(js.ped || "surfer_guy", 84, jx - cosA * 4.0, jy - sinA * 4.0, bz + 0.040, jAng, 0.96, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                } else {
+                    // Neon Vice WaveRunner ("jetski_neon") + Rider seated astride saddle (frame 84)
+                    this.batchObjectSprite3D("jetski_neon", jx, jy, bz + 0.026, jAng, 1.02, SPRITE_DRAW_ORDER.CAR);
+                    this.batchPedSprite3D(js.ped || "surfer_guy", 84, jx - cosA * 2.0, jy - sinA * 2.0, bz + 0.040, jAng, 1.02, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                }
             }
         }
 
@@ -9846,9 +9888,9 @@ class RetroRenderer {
             }
 
             // A2. Miami / Vice City Custom Neon Underglow for Sports Cars, Convertibles, Muscle Cars & Neon E-Scooters!
-            // A1b. High-Fidelity 3D V-Shaped Diverging Wake, Prop Wash & Hydro-Roostertail Plume behind Boats on Water
+            // A1b. High-Fidelity 3D V-Shaped Diverging Wake, Prop Wash & Hydro-Roostertail Plume behind Boats on Water (including under bridges!)
             if (!v.destroyed && (v.waterOnly || v.specKey === "AIRBOAT") &&
-                this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) {
+                this.map && (this.map.isBoatNavigableWater ? this.map.isBoatNavigableWater(v.x, v.y) : (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)))) {
                 const rawSpd = Math.hypot(v.vx || 0, v.vy || 0);
                 if (rawSpd > 22) {
                     const wSpd = Math.min(1, rawSpd / 360);

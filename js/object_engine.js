@@ -9578,7 +9578,7 @@ class WorldObjectEngine {
         //      (3) Grand Vice City North Bridge / Links & Julia Tuttle Cable-Stayed Suspension Causeway (r=72..75, c=298..418)
         //      (4) Star Island / Venetian Causeway West & East Portal Bridges (r=172..175, c=308..323 & c=367..417)
         {
-            const bz = 2.0;
+            const bz = 2.36;
             const concCol = [0.84, 0.86, 0.90];
             const steelCol = [0.74, 0.80, 0.88];
             const darkSteel = [0.46, 0.52, 0.60];
@@ -9734,6 +9734,131 @@ class WorldObjectEngine {
                 }
                 emitTileBox3D(tx, vcY, 1, 0, 0, 0, 18, 292, bz + 1.24, bz + 1.40, 250, 363, 64, steelCol, false);
                 emitSolidBox3D(tx, vcY, 1, 0, 0, 0, 20, 268, bz + 1.38, bz + 1.44, neonCyan, 7);
+            }
+        }
+
+        // 19C. UNIVERSAL 3D BRIDGE RELIEF, BOX-GIRDERS, PARAPET GUARDRAILS, SLOPED RAMP WING-WALLS, PILINGS & WATER DROP SHADOWS
+        //      Automatically adds unmistakable 3D elevation depth, side fascia girders, Jersey barriers, steel top rails,
+        //      ramp transition expansion joints, bank-side cylindrical piers, and dark under-bridge water shadows to ALL map bridges!
+        if (this.map && this.map.bridgeMask && this.map.bridgeRampMask) {
+            const bm = this.map.bridgeMask;
+            const rm = this.map.bridgeRampMask;
+            const sg = this.map.surfaceGround;
+            const girderCol = [0.68, 0.72, 0.78];
+            const parapetCol = [0.88, 0.90, 0.94];
+            const railSteel = [0.76, 0.82, 0.90];
+            const hazardGold = [0.96, 0.78, 0.18];
+            const jointDark = [0.22, 0.25, 0.30];
+
+            for (let r = 2; r < MAP_ROWS - 2; r++) {
+                for (let c = 2; c < MAP_COLS - 2; c++) {
+                    const idx = r * MAP_COLS + c;
+                    const bType = bm[idx];
+                    const rType = rm[idx];
+                    if (bType === 0 && rType === 0) continue;
+
+                    const cx = (c + 0.5) * TILE_SIZE;
+                    const cy = (r + 0.5) * TILE_SIZE;
+
+                    // 1) Overwater Bridge Deck Tile (z = 2.36)
+                    if (bType === 1) {
+                        // E-W bridge over N-S water channel: emit dark under-bridge drop shadow on the water (z = 2.006)
+                        pushShadowQuad(cx, cy, 1, 0, 0, 0, TILE_SIZE + 2.0, TILE_SIZE + 18.0, 2.006, 0.44);
+
+                        const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0);
+                        const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0);
+                        const nearWestBank = (bm[idx - 1] === 0);
+                        const nearEastBank = (bm[idx + 1] === 0);
+
+                        for (const side of [-1, 1]) {
+                            if ((side === -1 && !isNorthEdge) || (side === 1 && !isSouthEdge)) continue;
+                            const sy = side * (TILE_SIZE * 0.5 - 3.5);
+                            // Deep 3D Precast Concrete Side Box-Girder Fascia (z = 2.10 .. 2.36) visible below the bridge deck
+                            emitTileBox3D(cx, cy, 1, 0, 0, sy + side * 3.0, TILE_SIZE + 1.0, 8.5, 2.10, 2.36, 177, 177, 71, girderCol, false);
+                            // Raised Concrete Jersey Parapet Wall (z = 2.36 .. 2.50) + Steel Top Handrail (z = 2.50 .. 2.58)
+                            emitTileBox3D(cx, cy, 1, 0, 0, sy, TILE_SIZE + 1.0, 7.5, 2.36, 2.50, 177, 177, 71, parapetCol, false);
+                            emitSolidBox3D(cx, cy, 1, 0, 0, sy, TILE_SIZE + 1.0, 3.6, 2.52, 2.57, railSteel, 3);
+                            for (const postX of [-16, 16]) {
+                                emitSolidBox3D(cx, cy, 1, 0, postX, sy, 3.2, 4.2, 2.48, 2.58, railSteel, 3);
+                            }
+                            // Cylindrical concrete support pilings in the water near the left/right riverbanks (leaving center navigation channel 100% open for boats!)
+                            if (nearWestBank || nearEastBank) {
+                                const pileX = nearWestBank ? -14 : 14;
+                                emitCylinder3D(cx, cy, pileX, sy + side * 2.0, 5.2, 4.6, 1.98, 2.14, 8, girderCol, 2, false);
+                            }
+                        }
+                        // Steel expansion joint strip & yellow-black abutment markers at the bridge-to-ramp transition
+                        if (nearWestBank || nearEastBank) {
+                            const jx = nearWestBank ? (-TILE_SIZE * 0.5 + 2.5) : (TILE_SIZE * 0.5 - 2.5);
+                            emitSolidBox3D(cx, cy, 1, 0, jx, 0, 4.5, TILE_SIZE, 2.362, 2.372, jointDark, 3);
+                            if (isNorthEdge) emitSolidBox3D(cx, cy, 1, 0, jx, -TILE_SIZE * 0.5 + 4, 8, 9, 2.36, 2.62, hazardGold, 2);
+                            if (isSouthEdge) emitSolidBox3D(cx, cy, 1, 0, jx,  TILE_SIZE * 0.5 - 4, 8, 9, 2.36, 2.62, hazardGold, 2);
+                        }
+                    } else if (bType === 2) {
+                        // N-S bridge over E-W water channel: emit dark under-bridge drop shadow on the water (z = 2.006)
+                        pushShadowQuad(cx, cy, 1, 0, 0, 0, TILE_SIZE + 18.0, TILE_SIZE + 2.0, 2.006, 0.44);
+
+                        const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0);
+                        const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0);
+                        const nearNorthBank = (bm[(r - 1) * MAP_COLS + c] === 0);
+                        const nearSouthBank = (bm[(r + 1) * MAP_COLS + c] === 0);
+
+                        for (const side of [-1, 1]) {
+                            if ((side === -1 && !isWestEdge) || (side === 1 && !isEastEdge)) continue;
+                            const sx = side * (TILE_SIZE * 0.5 - 3.5);
+                            emitTileBox3D(cx, cy, 1, 0, sx + side * 3.0, 0, 8.5, TILE_SIZE + 1.0, 2.10, 2.36, 177, 177, 71, girderCol, false);
+                            emitTileBox3D(cx, cy, 1, 0, sx, 0, 7.5, TILE_SIZE + 1.0, 2.36, 2.50, 177, 177, 71, parapetCol, false);
+                            emitSolidBox3D(cx, cy, 1, 0, sx, 0, 3.6, TILE_SIZE + 1.0, 2.52, 2.57, railSteel, 3);
+                            for (const postY of [-16, 16]) {
+                                emitSolidBox3D(cx, cy, 1, 0, sx, postY, 4.2, 3.2, 2.48, 2.58, railSteel, 3);
+                            }
+                            if (nearNorthBank || nearSouthBank) {
+                                const pileY = nearNorthBank ? -14 : 14;
+                                emitCylinder3D(cx, cy, sx + side * 2.0, pileY, 5.2, 4.6, 1.98, 2.14, 8, girderCol, 2, false);
+                            }
+                        }
+                        if (nearNorthBank || nearSouthBank) {
+                            const jy = nearNorthBank ? (-TILE_SIZE * 0.5 + 2.5) : (TILE_SIZE * 0.5 - 2.5);
+                            emitSolidBox3D(cx, cy, 1, 0, 0, jy, TILE_SIZE, 4.5, 2.362, 2.372, jointDark, 3);
+                            if (isWestEdge) emitSolidBox3D(cx, cy, 1, 0, -TILE_SIZE * 0.5 + 4, jy, 9, 8, 2.36, 2.62, hazardGold, 2);
+                            if (isEastEdge) emitSolidBox3D(cx, cy, 1, 0,  TILE_SIZE * 0.5 - 4, jy, 9, 8, 2.36, 2.62, hazardGold, 2);
+                        }
+                    } else if (rType === 1) {
+                        // 2A) Sloped E-W Bridge Approach Ramp Wing-Walls & Retaining Parapets
+                        const isNorthEdge = (bm[(r - 1) * MAP_COLS + c] === 0 && rm[(r - 1) * MAP_COLS + c] === 0);
+                        const isSouthEdge = (bm[(r + 1) * MAP_COLS + c] === 0 && rm[(r + 1) * MAP_COLS + c] === 0);
+                        const zW = 2.0 + this.map.bridgeCornerNW[idx];
+                        const zE = 2.0 + this.map.bridgeCornerNE[idx];
+                        for (const side of [-1, 1]) {
+                            if ((side === -1 && !isNorthEdge) || (side === 1 && !isSouthEdge)) continue;
+                            const sy = side * (TILE_SIZE * 0.5 - 3.5);
+                            for (let s = 0; s < 2; s++) {
+                                const tMid = (s + 0.5) * 0.5;
+                                const segZ = zW + (zE - zW) * tMid;
+                                const segX = (s === 0 ? -0.25 : 0.25) * TILE_SIZE;
+                                emitTileBox3D(cx, cy, 1, 0, segX, sy, TILE_SIZE * 0.52, 7.5, 2.00, segZ + 0.13, 177, 177, 71, parapetCol, false);
+                                emitSolidBox3D(cx, cy, 1, 0, segX, sy, TILE_SIZE * 0.52, 3.6, segZ + 0.14, segZ + 0.19, railSteel, 3);
+                            }
+                        }
+                    } else if (rType === 2) {
+                        // 2B) Sloped N-S Bridge Approach Ramp Wing-Walls & Retaining Parapets
+                        const isWestEdge = (bm[idx - 1] === 0 && rm[idx - 1] === 0);
+                        const isEastEdge = (bm[idx + 1] === 0 && rm[idx + 1] === 0);
+                        const zN = 2.0 + this.map.bridgeCornerNW[idx];
+                        const zS = 2.0 + this.map.bridgeCornerSW[idx];
+                        for (const side of [-1, 1]) {
+                            if ((side === -1 && !isWestEdge) || (side === 1 && !isEastEdge)) continue;
+                            const sx = side * (TILE_SIZE * 0.5 - 3.5);
+                            for (let s = 0; s < 2; s++) {
+                                const tMid = (s + 0.5) * 0.5;
+                                const segZ = zN + (zS - zN) * tMid;
+                                const segY = (s === 0 ? -0.25 : 0.25) * TILE_SIZE;
+                                emitTileBox3D(cx, cy, 1, 0, sx, segY, 7.5, TILE_SIZE * 0.52, 2.00, segZ + 0.13, 177, 177, 71, parapetCol, false);
+                                emitSolidBox3D(cx, cy, 1, 0, sx, segY, 3.6, TILE_SIZE * 0.52, segZ + 0.14, segZ + 0.19, railSteel, 3);
+                            }
+                        }
+                    }
+                }
             }
         }
 

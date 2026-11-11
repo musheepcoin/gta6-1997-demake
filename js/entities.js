@@ -3580,15 +3580,17 @@ class Vehicle {
         this.x += this.vx * dt;
         this.y += this.vy * dt;
 
-        // Water-only craft (jet-ski, speedboat): the hull runs aground on beaches, docks & quays
+        // Water-only craft (jet-ski, speedboat): the hull runs aground on beaches, docks & quays,
+        // but passes freely through the water channel underneath elevated bridges (`isBoatNavigableWater`)!
         if (this.waterOnly && map.isWaterAtPixel) {
+            const isNavWater = (px, py) => map.isBoatNavigableWater ? map.isBoatNavigableWater(px, py) : map.isWaterAtPixel(px, py);
             const dirSign = (this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle)) >= 0 ? 1 : -1;
             const bowX = this.x + Math.cos(this.angle) * (this.w || 40) * 0.36 * dirSign;
             const bowY = this.y + Math.sin(this.angle) * (this.w || 40) * 0.36 * dirSign;
             const preBowX = preMoveX + Math.cos(this.angle) * (this.w || 40) * 0.36 * dirSign;
             const preBowY = preMoveY + Math.sin(this.angle) * (this.w || 40) * 0.36 * dirSign;
-            const centerHitLand = !map.isWaterAtPixel(this.x, this.y) && map.isWaterAtPixel(preMoveX, preMoveY);
-            const bowHitLand = !map.isWaterAtPixel(bowX, bowY) && map.isWaterAtPixel(preBowX, preBowY);
+            const centerHitLand = !isNavWater(this.x, this.y) && isNavWater(preMoveX, preMoveY);
+            const bowHitLand = !isNavWater(bowX, bowY) && isNavWater(preBowX, preBowY);
             if (centerHitLand || bowHitLand) {
                 const impact = Math.hypot(this.vx, this.vy);
                 this.x = preMoveX;
@@ -3604,7 +3606,7 @@ class Vehicle {
                         game.audio.playCarCrash(Math.min(1.2, (impact - 140) / 160));
                     }
                 }
-            } else if (this.driver === "PLAYER" && !map.isWaterAtPixel(this.x, this.y)) {
+            } else if (this.driver === "PLAYER" && !isNavWater(this.x, this.y)) {
                 // If a moored/spawned boat center slightly overlaps a pier/shore tile, slide it smoothly into adjacent water
                 for (let rad = 8; rad <= 48; rad += 8) {
                     let pushed = false;
@@ -3612,7 +3614,7 @@ class Vehicle {
                         const ang = a * Math.PI * 0.25;
                         const tx = this.x + Math.cos(ang) * rad;
                         const ty = this.y + Math.sin(ang) * rad;
-                        if (map.isWaterAtPixel(tx, ty)) {
+                        if (isNavWater(tx, ty)) {
                             this.x = tx;
                             this.y = ty;
                             pushed = true;
@@ -3626,6 +3628,7 @@ class Vehicle {
 
         // Building & Seawall/Bridge Guardrail collision check (uses lateral half-width so long buses/limos don't clip adjacent lane walls)
         const curZ = this.z !== undefined ? this.z : 2.0;
+        const isUnderBridgeWaterCraft = Boolean(this.waterOnly || this.specKey === "AIRBOAT");
         const wallRad = this.driver === "PLAYER"
             ? Math.min(22, Math.max(12, (this.h || 24) * 0.52))
             : Math.min(18, Math.max(11, (this.h || 24) * 0.45));
@@ -3634,7 +3637,8 @@ class Vehicle {
             this.y,
             wallRad,
             curZ,
-            Boolean(this.amphibious || this.waterOnly || (this.stuntAirTimer || 0) > 0)
+            Boolean(this.amphibious || this.waterOnly || (this.stuntAirTimer || 0) > 0),
+            isUnderBridgeWaterCraft
         );
         if (col.hit) {
             const impact = Math.hypot(this.vx, this.vy);

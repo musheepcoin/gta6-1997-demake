@@ -9299,7 +9299,7 @@ class LeonidaGame {
                         if (dx > 54 || dx < -54) continue;
                         const dy = curY - vc.y;
                         if (dy > 54 || dy < -54) continue;
-                        if (vc.z !== undefined && z !== undefined && Math.abs(vc.z - z) > 0.85) continue;
+                        if (vc.z !== undefined && z !== undefined && Math.abs(vc.z - z) > 0.24) continue;
 
                         const cosA = vc.cosA;
                         const sinA = vc.sinA;
@@ -9343,7 +9343,7 @@ class LeonidaGame {
         for (let i = 0; i < this.vehicles.length; i++) {
             const v = this.vehicles[i];
             if (!v || v === ignoreVeh) continue;
-            if (v.z !== undefined && z !== undefined && Math.abs(v.z - z) > 0.85) continue;
+            if (v.z !== undefined && z !== undefined && Math.abs(v.z - z) > 0.24) continue;
             const dx = curX - v.x;
             const dy = curY - v.y;
             if (Math.abs(dx) > 54 || Math.abs(dy) > 54) continue;
@@ -10556,7 +10556,7 @@ class LeonidaGame {
                 const boostMult = (p.speedBoostTimer || 0) > 0 ? 1.28 : 1.0;
 
                 const preWaterInfo = (this.map && typeof this.map.getWaterOffshoreInfo === "function")
-                    ? this.map.getWaterOffshoreInfo(p.x, p.y)
+                    ? this.map.getWaterOffshoreInfo(p.x, p.y, Boolean(p.isSwimming))
                     : { inWater: Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y)), distBlocks: 1.0, shoreDirX: -1, shoreDirY: 0 };
 
                 const isSwimmingPre = Boolean(preWaterInfo.inWater && preWaterInfo.distBlocks >= 0.36 && (p.jumpTimer || 0) <= 0.08);
@@ -10729,9 +10729,10 @@ class LeonidaGame {
 
 
 
+                const isUnderBridgeSwimmer = Boolean(p.isSwimming || preWaterInfo.underBridge);
                 const canSwimIntoWater = (p.z || 2.0) <= 2.38 || (p.jumpTimer || 0) > 0 || Boolean(preWaterInfo.inWater);
 
-                const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0, canSwimIntoWater);
+                const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0, canSwimIntoWater, isUnderBridgeSwimmer);
 
                 p.x = col.x;
 
@@ -10760,7 +10761,7 @@ class LeonidaGame {
                 }
 
                 const postWater = (this.map && typeof this.map.getWaterOffshoreInfo === "function")
-                    ? this.map.getWaterOffshoreInfo(p.x, p.y)
+                    ? this.map.getWaterOffshoreInfo(p.x, p.y, isUnderBridgeSwimmer)
                     : { inWater: Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y)), distBlocks: 1.0, shoreDirX: -1, shoreDirY: 0 };
 
                 p.z = postWater.inWater
@@ -11169,6 +11170,7 @@ class LeonidaGame {
                     if (pdx >= 25 || pdx <= -25) continue;
                     const pdy = ped.y - v.y;
                     if (pdy >= 25 || pdy <= -25) continue;
+                    if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
 
                     if (ped.kind === "COP" && v.driver === "AI_COP") continue;
 
@@ -11348,7 +11350,7 @@ class LeonidaGame {
 
             ) {
 
-                if (Math.hypot(p.x - v.x, p.y - v.y) < 22) {
+                if ((v.z === undefined || p.z === undefined || Math.abs(v.z - p.z) <= 0.24) && Math.hypot(p.x - v.x, p.y - v.y) < 22) {
 
                     p.hitByCarCooldown = 0.85;
 
@@ -11416,7 +11418,9 @@ class LeonidaGame {
 
                 if (Math.abs(b.x - a.x) > 68 || Math.abs(b.y - a.y) > 68) continue;
 
-                if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.85) continue;
+                if (Boolean(a.waterOnly) !== Boolean(b.waterOnly)) continue;
+
+                if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.24) continue;
 
                 if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
 

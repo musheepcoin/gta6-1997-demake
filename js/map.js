@@ -826,6 +826,241 @@ class LeonidaMap {
             }
         }
 
+        // --- 3D ELEVATED OVERWATER BRIDGES & SMOOTH APPROACH RAMPS ---
+        // Detect all overwater road/sidewalk bridge spans (`bridgeMask`: 1 = E-W bridge over N-S water, 2 = N-S bridge over E-W water)
+        // and 2-tile sloped approach ramps (`bridgeRampMask`) at each land abutment, with per-tile corner heights (`+0.36` blocks = 2.36z).
+        const totalMapCells = MAP_ROWS * MAP_COLS;
+        this.bridgeMask = new Uint8Array(totalMapCells);
+        this.bridgeRampMask = new Uint8Array(totalMapCells);
+        this.bridgeCornerNW = new Float32Array(totalMapCells);
+        this.bridgeCornerNE = new Float32Array(totalMapCells);
+        this.bridgeCornerSW = new Float32Array(totalMapCells);
+        this.bridgeCornerSE = new Float32Array(totalMapCells);
+        const BRIDGE_ELEV = 0.36;
+
+        const isWaterTileRC = (cc, rr) => {
+            if (cc < 0 || cc >= MAP_COLS || rr < 0 || rr >= MAP_ROWS) return false;
+            return this.surfaceGround[rr * MAP_COLS + cc] === GROUND_TYPE.WATER;
+        };
+        const isDeckCandidateRC = (cc, rr) => {
+            if (cc < 0 || cc >= MAP_COLS || rr < 0 || rr >= MAP_ROWS) return false;
+            const ii = rr * MAP_COLS + cc;
+            if (this.surfaceLayer[ii] > 2) return false;
+            const gt = this.surfaceGround[ii];
+            if (gt === GROUND_TYPE.ROAD) return true;
+            if (gt === GROUND_TYPE.PAWEMENT) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nc = cc + dx, nr = rr + dy;
+                        if (nc >= 0 && nc < MAP_COLS && nr >= 0 && nr < MAP_ROWS) {
+                            if (this.surfaceGround[nr * MAP_COLS + nc] === GROUND_TYPE.ROAD) return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        };
+
+        // 1A) E-W bridges spanning over N-S water channels (water above AND below within 1..5 tiles)
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            for (let c = 2; c < MAP_COLS - 2; c++) {
+                if (!isDeckCandidateRC(c, r)) continue;
+                let topWater = false;
+                for (let dr = 1; dr <= 5; dr++) {
+                    const rr = r - dr;
+                    if (rr < 0) break;
+                    if (isWaterTileRC(c, rr)) { topWater = true; break; }
+                    if (!isDeckCandidateRC(c, rr)) break;
+                }
+                if (!topWater) continue;
+                let botWater = false;
+                for (let dr = 1; dr <= 5; dr++) {
+                    const rr = r + dr;
+                    if (rr >= MAP_ROWS) break;
+                    if (isWaterTileRC(c, rr)) { botWater = true; break; }
+                    if (!isDeckCandidateRC(c, rr)) break;
+                }
+                if (topWater && botWater) {
+                    this.bridgeMask[r * MAP_COLS + c] = 1;
+                }
+            }
+        }
+
+        // 1B) N-S bridges spanning over E-W water channels (water left AND right within 1..5 tiles)
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            for (let c = 2; c < MAP_COLS - 2; c++) {
+                const idx = r * MAP_COLS + c;
+                if (this.bridgeMask[idx] !== 0 || !isDeckCandidateRC(c, r)) continue;
+                let leftWater = false;
+                for (let dc = 1; dc <= 5; dc++) {
+                    const cc = c - dc;
+                    if (cc < 0) break;
+                    if (isWaterTileRC(cc, r)) { leftWater = true; break; }
+                    if (!isDeckCandidateRC(cc, r)) break;
+                }
+                if (!leftWater) continue;
+                let rightWater = false;
+                for (let dc = 1; dc <= 5; dc++) {
+                    const cc = c + dc;
+                    if (cc >= MAP_COLS) break;
+                    if (isWaterTileRC(cc, r)) { rightWater = true; break; }
+                    if (!isDeckCandidateRC(cc, r)) break;
+                }
+                if (leftWater && rightWater) {
+                    this.bridgeMask[idx] = 2;
+                }
+            }
+        }
+
+        // Prune isolated 1-tile false positives that aren't part of a bridge deck
+        for (let pass = 0; pass < 2; pass++) {
+            for (let r = 2; r < MAP_ROWS - 2; r++) {
+                for (let c = 2; c < MAP_COLS - 2; c++) {
+                    const idx = r * MAP_COLS + c;
+                    const bm = this.bridgeMask[idx];
+                    if (bm === 1) {
+                        const hasEW = this.bridgeMask[idx - 1] === 1 || this.bridgeMask[idx + 1] === 1;
+                        const hasRoadNS = this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.ROAD ||
+                                          this.surfaceGround[(r + 1) * MAP_COLS + c] === GROUND_TYPE.ROAD;
+                        if (!hasEW && !hasRoadNS) this.bridgeMask[idx] = 0;
+                    } else if (bm === 2) {
+                        const hasNS = this.bridgeMask[(r - 1) * MAP_COLS + c] === 2 || this.bridgeMask[(r + 1) * MAP_COLS + c] === 2;
+                        const hasRoadEW = this.surfaceGround[idx - 1] === GROUND_TYPE.ROAD ||
+                                          this.surfaceGround[idx + 1] === GROUND_TYPE.ROAD;
+                        if (!hasNS && !hasRoadEW) this.bridgeMask[idx] = 0;
+                    }
+                }
+            }
+        }
+
+        // Set full bridge elevation (+0.36) on all overwater bridge deck tiles
+        for (let i = 0; i < totalMapCells; i++) {
+            if (this.bridgeMask[i] > 0) {
+                this.bridgeCornerNW[i] = BRIDGE_ELEV;
+                this.bridgeCornerNE[i] = BRIDGE_ELEV;
+                this.bridgeCornerSW[i] = BRIDGE_ELEV;
+                this.bridgeCornerSE[i] = BRIDGE_ELEV;
+            }
+        }
+
+        // 2A) Build smooth 1-to-2-tile E-W approach ramps at the West & East land ends of every E-W bridge
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            for (let c = 2; c < MAP_COLS - 2; c++) {
+                const idx = r * MAP_COLS + c;
+                if (this.bridgeMask[idx] !== 1) continue;
+                // West abutment (c-1 is land deck candidate)
+                if (this.bridgeMask[idx - 1] === 0 && isDeckCandidateRC(c - 1, r)) {
+                    const idx1 = idx - 1;
+                    const idx2 = idx - 2;
+                    const canTwoTile = c >= 3 && this.bridgeMask[idx2] === 0 && isDeckCandidateRC(c - 2, r);
+                    this.bridgeRampMask[idx1] = 1;
+                    if (canTwoTile) {
+                        this.bridgeRampMask[idx2] = 1;
+                        this.bridgeCornerNW[idx2] = Math.max(this.bridgeCornerNW[idx2], 0.0);
+                        this.bridgeCornerSW[idx2] = Math.max(this.bridgeCornerSW[idx2], 0.0);
+                        this.bridgeCornerNE[idx2] = Math.max(this.bridgeCornerNE[idx2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSE[idx2] = Math.max(this.bridgeCornerSE[idx2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNW[idx1] = Math.max(this.bridgeCornerNW[idx1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSW[idx1] = Math.max(this.bridgeCornerSW[idx1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNE[idx1] = Math.max(this.bridgeCornerNE[idx1], BRIDGE_ELEV);
+                        this.bridgeCornerSE[idx1] = Math.max(this.bridgeCornerSE[idx1], BRIDGE_ELEV);
+                    } else {
+                        this.bridgeCornerNW[idx1] = Math.max(this.bridgeCornerNW[idx1], 0.0);
+                        this.bridgeCornerSW[idx1] = Math.max(this.bridgeCornerSW[idx1], 0.0);
+                        this.bridgeCornerNE[idx1] = Math.max(this.bridgeCornerNE[idx1], BRIDGE_ELEV);
+                        this.bridgeCornerSE[idx1] = Math.max(this.bridgeCornerSE[idx1], BRIDGE_ELEV);
+                    }
+                }
+                // East abutment (c+1 is land deck candidate)
+                if (this.bridgeMask[idx + 1] === 0 && isDeckCandidateRC(c + 1, r)) {
+                    const idx1 = idx + 1;
+                    const idx2 = idx + 2;
+                    const canTwoTile = c <= MAP_COLS - 4 && this.bridgeMask[idx2] === 0 && isDeckCandidateRC(c + 2, r);
+                    this.bridgeRampMask[idx1] = 1;
+                    if (canTwoTile) {
+                        this.bridgeRampMask[idx2] = 1;
+                        this.bridgeCornerNW[idx1] = Math.max(this.bridgeCornerNW[idx1], BRIDGE_ELEV);
+                        this.bridgeCornerSW[idx1] = Math.max(this.bridgeCornerSW[idx1], BRIDGE_ELEV);
+                        this.bridgeCornerNE[idx1] = Math.max(this.bridgeCornerNE[idx1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSE[idx1] = Math.max(this.bridgeCornerSE[idx1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNW[idx2] = Math.max(this.bridgeCornerNW[idx2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSW[idx2] = Math.max(this.bridgeCornerSW[idx2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNE[idx2] = Math.max(this.bridgeCornerNE[idx2], 0.0);
+                        this.bridgeCornerSE[idx2] = Math.max(this.bridgeCornerSE[idx2], 0.0);
+                    } else {
+                        this.bridgeCornerNW[idx1] = Math.max(this.bridgeCornerNW[idx1], BRIDGE_ELEV);
+                        this.bridgeCornerSW[idx1] = Math.max(this.bridgeCornerSW[idx1], BRIDGE_ELEV);
+                        this.bridgeCornerNE[idx1] = Math.max(this.bridgeCornerNE[idx1], 0.0);
+                        this.bridgeCornerSE[idx1] = Math.max(this.bridgeCornerSE[idx1], 0.0);
+                    }
+                }
+            }
+        }
+
+        // 2B) Build smooth 1-to-2-tile N-S approach ramps at the North & South land ends of every N-S bridge
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            for (let c = 2; c < MAP_COLS - 2; c++) {
+                const idx = r * MAP_COLS + c;
+                if (this.bridgeMask[idx] !== 2) continue;
+                // North abutment (r-1 is land deck candidate)
+                const idxN1 = (r - 1) * MAP_COLS + c;
+                if (this.bridgeMask[idxN1] === 0 && isDeckCandidateRC(c, r - 1)) {
+                    const idxN2 = (r - 2) * MAP_COLS + c;
+                    const canTwoTile = r >= 3 && this.bridgeMask[idxN2] === 0 && isDeckCandidateRC(c, r - 2);
+                    this.bridgeRampMask[idxN1] = 2;
+                    if (canTwoTile) {
+                        this.bridgeRampMask[idxN2] = 2;
+                        this.bridgeCornerNW[idxN2] = Math.max(this.bridgeCornerNW[idxN2], 0.0);
+                        this.bridgeCornerNE[idxN2] = Math.max(this.bridgeCornerNE[idxN2], 0.0);
+                        this.bridgeCornerSW[idxN2] = Math.max(this.bridgeCornerSW[idxN2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSE[idxN2] = Math.max(this.bridgeCornerSE[idxN2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNW[idxN1] = Math.max(this.bridgeCornerNW[idxN1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNE[idxN1] = Math.max(this.bridgeCornerNE[idxN1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSW[idxN1] = Math.max(this.bridgeCornerSW[idxN1], BRIDGE_ELEV);
+                        this.bridgeCornerSE[idxN1] = Math.max(this.bridgeCornerSE[idxN1], BRIDGE_ELEV);
+                    } else {
+                        this.bridgeCornerNW[idxN1] = Math.max(this.bridgeCornerNW[idxN1], 0.0);
+                        this.bridgeCornerNE[idxN1] = Math.max(this.bridgeCornerNE[idxN1], 0.0);
+                        this.bridgeCornerSW[idxN1] = Math.max(this.bridgeCornerSW[idxN1], BRIDGE_ELEV);
+                        this.bridgeCornerSE[idxN1] = Math.max(this.bridgeCornerSE[idxN1], BRIDGE_ELEV);
+                    }
+                }
+                // South abutment (r+1 is land deck candidate)
+                const idxS1 = (r + 1) * MAP_COLS + c;
+                if (this.bridgeMask[idxS1] === 0 && isDeckCandidateRC(c, r + 1)) {
+                    const idxS2 = (r + 2) * MAP_COLS + c;
+                    const canTwoTile = r <= MAP_ROWS - 4 && this.bridgeMask[idxS2] === 0 && isDeckCandidateRC(c, r + 2);
+                    this.bridgeRampMask[idxS1] = 2;
+                    if (canTwoTile) {
+                        this.bridgeRampMask[idxS2] = 2;
+                        this.bridgeCornerNW[idxS1] = Math.max(this.bridgeCornerNW[idxS1], BRIDGE_ELEV);
+                        this.bridgeCornerNE[idxS1] = Math.max(this.bridgeCornerNE[idxS1], BRIDGE_ELEV);
+                        this.bridgeCornerSW[idxS1] = Math.max(this.bridgeCornerSW[idxS1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSE[idxS1] = Math.max(this.bridgeCornerSE[idxS1], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNW[idxS2] = Math.max(this.bridgeCornerNW[idxS2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerNE[idxS2] = Math.max(this.bridgeCornerNE[idxS2], BRIDGE_ELEV * 0.5);
+                        this.bridgeCornerSW[idxS2] = Math.max(this.bridgeCornerSW[idxS2], 0.0);
+                        this.bridgeCornerSE[idxS2] = Math.max(this.bridgeCornerSE[idxS2], 0.0);
+                    } else {
+                        this.bridgeCornerNW[idxS1] = Math.max(this.bridgeCornerNW[idxS1], BRIDGE_ELEV);
+                        this.bridgeCornerNE[idxS1] = Math.max(this.bridgeCornerNE[idxS1], BRIDGE_ELEV);
+                        this.bridgeCornerSW[idxS1] = Math.max(this.bridgeCornerSW[idxS1], 0.0);
+                        this.bridgeCornerSE[idxS1] = Math.max(this.bridgeCornerSE[idxS1], 0.0);
+                    }
+                }
+            }
+        }
+
+        // Remove any first-pass planter trees that landed on a bridge or bridge ramp
+        this.trees = this.trees.filter((tr) => {
+            const tc = Math.floor(tr.x / TILE_SIZE);
+            const trw = Math.floor(tr.y / TILE_SIZE);
+            if (tc < 0 || tc >= MAP_COLS || trw < 0 || trw >= MAP_ROWS) return true;
+            const tidx = trw * MAP_COLS + tc;
+            return this.bridgeMask[tidx] === 0 && this.bridgeRampMask[tidx] === 0;
+        });
+
         // Second pass: Identify true sand tiles (lid 98..101) & place Vice City / GTA 6 Leonida diverse flora
         // (10 distinct species: palm_tree, fan_palm, swamp_cypress, mangrove, banyan_tree, live_oak,
         //  bougainvillea_bush, sea_grape, tropical_shrub, sawgrass_clump) coherently distributed across
@@ -911,12 +1146,14 @@ class LeonidaMap {
                     }
                     // c=451: ZERO TREES! 100% open paved oceanfront boardwalk for rollerblading & walking!
                 }
-                // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road — never inside boulevard parking bays!)
+                // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road — never inside boulevard parking bays or on bridges!)
                 else if (
                     (blkZ1.lid === 69 || (blkZ1.lid === 8 && adjRoad)) &&
                     (surfGt === GROUND_TYPE.PAWEMENT || surfGt === GROUND_TYPE.FIELD) &&
                     c < 443 &&
-                    (!this.boulevardParkingEsplanadeMask || !this.boulevardParkingEsplanadeMask[idx])
+                    (!this.boulevardParkingEsplanadeMask || !this.boulevardParkingEsplanadeMask[idx]) &&
+                    (!this.bridgeMask || this.bridgeMask[idx] === 0) &&
+                    (!this.bridgeRampMask || this.bridgeRampMask[idx] === 0)
                 ) {
                     if (seed % 28 === 0) {
                         chosenKind = "palm_tree";
@@ -1827,6 +2064,65 @@ class LeonidaMap {
                     speed: rj.speed,
                     ped: jetPeds[ji % jetPeds.length],
                     seed: ji * 2.1
+                });
+            }
+        }
+
+        // Spawn autonomous Canal/River Speedboats & Jet-Skis cruising directly underneath overwater bridges!
+        if (this.bridgeMask) {
+            const bridgeChannelPoints = [];
+            for (let r = 8; r < MAP_ROWS - 8; r++) {
+                for (let c = 8; c < MAP_COLS - 8; c++) {
+                    const bm = this.bridgeMask[r * MAP_COLS + c];
+                    if (bm === 1) {
+                        // E-W bridge over N-S water channel: verify open water north & south of the bridge
+                        if (this.surfaceGround[(r - 1) * MAP_COLS + c] === GROUND_TYPE.WATER &&
+                            this.bridgeMask[r * MAP_COLS + (c - 1)] === 1 &&
+                            this.bridgeMask[r * MAP_COLS + (c + 1)] === 1) {
+                            let hSpan = 1;
+                            while (r + hSpan < MAP_ROWS - 4 && this.bridgeMask[(r + hSpan) * MAP_COLS + c] === 1) hSpan++;
+                            if (this.surfaceGround[(r + hSpan) * MAP_COLS + c] === GROUND_TYPE.WATER &&
+                                this.surfaceGround[(r - 3) * MAP_COLS + c] === GROUND_TYPE.WATER &&
+                                this.surfaceGround[(r + hSpan + 2) * MAP_COLS + c] === GROUND_TYPE.WATER) {
+                                const midX = (c + 0.5) * TILE_SIZE;
+                                const midY = (r + hSpan * 0.5) * TILE_SIZE;
+                                if (!bridgeChannelPoints.some(p => Math.hypot(p.x - midX, p.y - midY) < 9.5 * TILE_SIZE)) {
+                                    bridgeChannelPoints.push({ x: midX, y: midY, rx: 14, ry: (hSpan * 0.5 + 3.2) * TILE_SIZE });
+                                }
+                            }
+                        }
+                    } else if (bm === 2) {
+                        // N-S bridge over E-W water channel: verify open water west & east of the bridge
+                        if (this.surfaceGround[r * MAP_COLS + (c - 1)] === GROUND_TYPE.WATER &&
+                            this.bridgeMask[(r - 1) * MAP_COLS + c] === 2 &&
+                            this.bridgeMask[(r + 1) * MAP_COLS + c] === 2) {
+                            let wSpan = 1;
+                            while (c + wSpan < MAP_COLS - 4 && this.bridgeMask[r * MAP_COLS + (c + wSpan)] === 2) wSpan++;
+                            if (this.surfaceGround[r * MAP_COLS + (c + wSpan)] === GROUND_TYPE.WATER &&
+                                this.surfaceGround[r * MAP_COLS + (c - 3)] === GROUND_TYPE.WATER &&
+                                this.surfaceGround[r * MAP_COLS + (c + wSpan + 2)] === GROUND_TYPE.WATER) {
+                                const midX = (c + wSpan * 0.5) * TILE_SIZE;
+                                const midY = (r + 0.5) * TILE_SIZE;
+                                if (!bridgeChannelPoints.some(p => Math.hypot(p.x - midX, p.y - midY) < 9.5 * TILE_SIZE)) {
+                                    bridgeChannelPoints.push({ x: midX, y: midY, rx: (wSpan * 0.5 + 3.2) * TILE_SIZE, ry: 14 });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (let bi = 0; bi < bridgeChannelPoints.length; bi++) {
+                const bp = bridgeChannelPoints[bi];
+                this.jetSkiers.push({
+                    x: bp.x,
+                    y: bp.y,
+                    z: 2.0,
+                    rx: bp.rx,
+                    ry: bp.ry,
+                    speed: 0.72 + (bi % 3) * 0.14,
+                    ped: jetPeds[bi % jetPeds.length],
+                    isSpeedboat: (bi % 2 === 0),
+                    seed: bi * 1.85 + 0.7
                 });
             }
         }
@@ -6011,12 +6307,41 @@ class LeonidaMap {
        EXACT 3D HEIGHT AT POSITION (GameMapManager::GetHeightAtPosition)
        Returns height in block units (0.0 .. 6.0; multiply by 4.0 for meters)
        ======================================================================== */
+    getBridgeElevationOffset(px, py) {
+        if (!this.bridgeMask || !this.bridgeRampMask) return 0.0;
+        const mapX = px / TILE_SIZE;
+        const mapY = py / TILE_SIZE;
+        const bx = Math.floor(mapX);
+        const by = Math.floor(mapY);
+        if (bx < 0 || bx >= MAP_COLS || by < 0 || by >= MAP_ROWS) return 0.0;
+        const idx = by * MAP_COLS + bx;
+        if (this.bridgeMask[idx] > 0) return 0.36;
+        if (this.bridgeRampMask[idx] > 0) {
+            const fx = Math.max(0.0, Math.min(1.0, mapX - bx));
+            const fy = Math.max(0.0, Math.min(1.0, mapY - by));
+            const nw = this.bridgeCornerNW[idx];
+            const ne = this.bridgeCornerNE[idx];
+            const sw = this.bridgeCornerSW[idx];
+            const se = this.bridgeCornerSE[idx];
+            const top = nw + (ne - nw) * fx;
+            const bot = sw + (se - sw) * fx;
+            return top + (bot - top) * fy;
+        }
+        return 0.0;
+    }
+
     getHeightAtPixel(px, py, currentZBlocks = 4.5, excludeWater = true) {
         if (!this.cmpLoaded) return 2.0;
         const mapX = px / TILE_SIZE;
         const mapY = py / TILE_SIZE;
         const bx = Math.max(0, Math.min(MAP_COLS - 1, Math.floor(mapX)));
         const by = Math.max(0, Math.min(MAP_ROWS - 1, Math.floor(mapY)));
+        const idx = by * MAP_COLS + bx;
+
+        // Boats and swimmers passing underneath an overwater bridge stay on the water surface (z = 2.0)
+        if (!excludeWater && this.bridgeMask && this.bridgeMask[idx] > 0) {
+            return 2.0;
+        }
 
         let layer = Math.max(0, Math.min(MAP_LAYERS - 1, Math.floor(currentZBlocks + 0.15)));
         let currentHeight = layer;
@@ -6038,6 +6363,9 @@ class LeonidaMap {
                 continue;
             }
             break;
+        }
+        if (excludeWater && currentHeight <= 2.05) {
+            currentHeight += this.getBridgeElevationOffset(px, py);
         }
         return Math.max(0.0, currentHeight);
     }
@@ -6254,6 +6582,15 @@ class LeonidaMap {
         return this.surfaceGround[r * this.cols + c] === GROUND_TYPE.WATER;
     }
 
+    isBoatNavigableWater(px, py) {
+        const c = Math.floor(px / TILE_SIZE);
+        const r = Math.floor(py / TILE_SIZE);
+        if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return true;
+        const idx = r * this.cols + c;
+        if (this.surfaceGround[idx] === GROUND_TYPE.WATER) return true;
+        return Boolean(this.bridgeMask && this.bridgeMask[idx] > 0);
+    }
+
     isSwimmingPoolAt(px, py) {
         if (this.objectEngine && Array.isArray(this.objectEngine.instances)) {
             for (let i = 0; i < this.objectEngine.instances.length; i++) {
@@ -6286,7 +6623,7 @@ class LeonidaMap {
         return false;
     }
 
-    getWaterOffshoreInfo(px, py) {
+    getWaterOffshoreInfo(px, py, allowUnderBridge = false) {
         const fx = px / TILE_SIZE;
         const fy = py / TILE_SIZE;
         const bx = Math.floor(fx);
@@ -6294,7 +6631,11 @@ class LeonidaMap {
         if (by < 0 || by >= this.rows || bx < 0 || bx >= this.cols) {
             return { inWater: true, distBlocks: 22.0, shoreDirX: -1, shoreDirY: 0, isOpenOcean: true };
         }
-        if (this.surfaceGround[by * this.cols + bx] !== GROUND_TYPE.WATER) {
+        const idx = by * this.cols + bx;
+        if (this.surfaceGround[idx] !== GROUND_TYPE.WATER) {
+            if (allowUnderBridge && this.bridgeMask && this.bridgeMask[idx] > 0) {
+                return { inWater: true, distBlocks: 1.15, shoreDirX: 0, shoreDirY: -1, isOpenOcean: false, underBridge: true };
+            }
             if (this.isSwimmingPoolAt(px, py)) {
                 return { inWater: true, distBlocks: 0.65, shoreDirX: 0, shoreDirY: -1, isOpenOcean: false, isPool: true };
             }
@@ -6591,7 +6932,7 @@ class LeonidaMap {
        Checks solid building blocks AND blocks non-amphibious entities from
        crossing from roads, bridges, or sidewalks into WATER tiles.
        ======================================================================== */
-    resolveCircleBuildingCollision(x, y, radius, currentZBlocks = null, isAmphibious = false) {
+    resolveCircleBuildingCollision(x, y, radius, currentZBlocks = null, isAmphibious = false, isUnderBridgeWater = false) {
         let nx = x;
         let ny = y;
         let hit = false;
@@ -6599,9 +6940,15 @@ class LeonidaMap {
         if (this.cmpLoaded) {
             const cx = Math.floor(nx / TILE_SIZE);
             const cy = Math.floor(ny / TILE_SIZE);
+            const curClampedX = Math.max(0, Math.min(MAP_COLS - 1, cx));
+            const curClampedY = Math.max(0, Math.min(MAP_ROWS - 1, cy));
+            const curIdx = curClampedY * MAP_COLS + curClampedX;
+            const curGround = this.surfaceGround[curIdx];
+            const curBridge = this.bridgeMask ? this.bridgeMask[curIdx] : 0;
+            const curRamp = this.bridgeRampMask ? this.bridgeRampMask[curIdx] : 0;
             const baseZ = currentZBlocks !== null
                 ? Math.max(1, Math.min(MAP_LAYERS - 1, Math.floor(currentZBlocks + 0.25)))
-                : (this.surfaceLayer[Math.max(0, Math.min(MAP_ROWS - 1, cy)) * MAP_COLS + Math.max(0, Math.min(MAP_COLS - 1, cx))] || 2);
+                : (this.surfaceLayer[curIdx] || 2);
 
             for (let dy = -1; dy <= 1; dy++) {
                 for (let dx = -1; dx <= 1; dx++) {
@@ -6609,11 +6956,51 @@ class LeonidaMap {
                     const ty = cy + dy;
                     if (tx < 0 || tx >= MAP_COLS || ty < 0 || ty >= MAP_ROWS) continue;
 
+                    const nbIdx = ty * MAP_COLS + tx;
+                    const nbGround = this.surfaceGround[nbIdx];
+                    const nbBridge = this.bridgeMask ? this.bridgeMask[nbIdx] : 0;
+                    const nbRamp = this.bridgeRampMask ? this.bridgeRampMask[nbIdx] : 0;
                     const blk = this.getBlockInfo(tx, ty, baseZ);
                     const isSolidBuilding = (blk.groundType === GROUND_TYPE.BUILDING && blk.slopeType === 0);
-                    const isWaterBarrier = !isAmphibious && (this.surfaceGround[ty * MAP_COLS + tx] === GROUND_TYPE.WATER);
-                    // Solid obstacle if 3D building OR water barrier (guardrail/seawall/shoreline) for non-amphibious entities
-                    if (isSolidBuilding || isWaterBarrier) {
+
+                    let isWaterOrBridgeBarrier = false;
+                    if (isUnderBridgeWater) {
+                        // Boats & swimmers in the water channel underneath bridges pass freely under bridgeMask > 0,
+                        // but are blocked by non-water, non-bridge land tiles (riverbanks, bridge abutments, docks)
+                        if (!isAmphibious && nbGround !== GROUND_TYPE.WATER && nbBridge === 0) {
+                            isWaterOrBridgeBarrier = true;
+                        }
+                    } else {
+                        // 1) Standard water barrier for non-amphibious entities OR any entity on an asphalt ROAD tile (seawall)
+                        if (nbGround === GROUND_TYPE.WATER && (!isAmphibious || curGround === GROUND_TYPE.ROAD)) {
+                            isWaterOrBridgeBarrier = true;
+                        }
+                        // 2) Elevated Bridge & Approach Ramp Parapet Guardrails:
+                        //    When on an E-W bridge/ramp (1), block N/S sides that aren't part of the bridge/ramp.
+                        //    When on a N-S bridge/ramp (2), block E/W sides that aren't part of the bridge/ramp.
+                        const activeSpanType = curBridge || curRamp;
+                        if (activeSpanType === 1) {
+                            if (nbGround === GROUND_TYPE.WATER || (dy !== 0 && nbBridge === 0 && nbRamp === 0)) {
+                                isWaterOrBridgeBarrier = true;
+                            }
+                        } else if (activeSpanType === 2) {
+                            if (nbGround === GROUND_TYPE.WATER || (dx !== 0 && nbBridge === 0 && nbRamp === 0)) {
+                                isWaterOrBridgeBarrier = true;
+                            }
+                        } else {
+                            // 3) On lower ground (docks, boardwalks, beaches) next to a bridge or ramp:
+                            //    block walking sideways through the concrete retaining wall of the bridge/ramp!
+                            const nbSpanType = nbBridge || nbRamp;
+                            if (nbSpanType === 1 && dy !== 0) {
+                                isWaterOrBridgeBarrier = true;
+                            } else if (nbSpanType === 2 && dx !== 0) {
+                                isWaterOrBridgeBarrier = true;
+                            }
+                        }
+                    }
+
+                    // Solid obstacle if 3D building OR water/bridge parapet barrier
+                    if (isSolidBuilding || isWaterOrBridgeBarrier) {
                         const bx = tx * TILE_SIZE;
                         const by = ty * TILE_SIZE;
                         const closestX = Math.max(bx, Math.min(nx, bx + TILE_SIZE));
