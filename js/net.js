@@ -1093,8 +1093,7 @@ class ViceNetworkManager {
             t: "WORLD_SYNC",
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
-            vehs,
-            peds
+            vehs
         });
     }
 
@@ -1213,77 +1212,8 @@ class ViceNetworkManager {
             return "CIVILIAN";
         };
 
-        if (Array.isArray(pkt.peds) && typeof Pedestrian === "function") {
-            const existingPeds = new Map();
-            for (const pd of g.peds) {
-                existingPeds.set(pd.id, pd);
-            }
-            const seenPedIds = new Set();
-
-            for (const row of pkt.peds) {
-                if (!Array.isArray(row) || row.length < 10) continue;
-                const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag, copWeapon] = row;
-                seenPedIds.add(id);
-                let pd = existingPeds.get(id);
-                const kindStr = codeToKind(kindCode);
-                if (!pd) {
-                    pd = new Pedestrian({
-                        id,
-                        x,
-                        y,
-                        z,
-                        angle: a,
-                        speed: spd,
-                        kind: kindStr,
-                        g24Type: g24Type || "civ0",
-                        missionTag: missionTag || null,
-                        copWeapon: copWeapon || null,
-                        hp,
-                        dead: Boolean(flags & 1)
-                    });
-                    pd.netTargetX = x;
-                    pd.netTargetY = y;
-                    pd.netTargetZ = z;
-                    pd.netTargetAngle = a;
-                    g.peds.push(pd);
-                } else {
-                    pd.netTargetX = x;
-                    pd.netTargetY = y;
-                    pd.netTargetZ = z;
-                    pd.netTargetAngle = a;
-                    pd.speed = spd;
-                    pd.kind = kindStr;
-                    pd.g24Type = g24Type || pd.g24Type;
-                    if (copWeapon) pd.copWeapon = copWeapon;
-                    // The host only learns about our hits through PED_KILL, so its snapshot hp is always
-                    // >= ours: keep the lower value or multi-hit kills would be healed back every 100 ms.
-                    pd.hp = Number.isFinite(pd.hp) ? Math.min(pd.hp, hp) : hp;
-                    const wasDead = pd.dead;
-                    const nowDead = Boolean(flags & 1);
-                    if (!wasDead && nowDead) {
-                        g.killPed(pd, false, true);
-                    } else if (nowDead) {
-                        pd.dead = true;
-                    }
-                    // (a ped we killed locally stays dead even if the host has not processed PED_KILL yet)
-                    pd.panicTimer = (flags & 2) ? Math.max(pd.panicTimer || 0, 0.5) : 0;
-                    pd.stunnedTimer = (flags & 4) ? Math.max(pd.stunnedTimer || 0, 0.35) : 0;
-                    pd.burnTimer = (flags & 8) ? Math.max(pd.burnTimer || 0, 0.5) : 0;
-                    pd.electroTimer = (flags & 16) ? Math.max(pd.electroTimer || 0, 0.4) : 0;
-                    pd.drownTimer = (flags & 32) ? Math.max(pd.drownTimer || 0, 0.4) : 0;
-                    if ((flags & 64) && (pd.exitAnimTimer || 0) <= 0) pd.exitAnimTimer = 0.28;
-                    if (flags & 128) pd.muzzleTimer = Math.max(pd.muzzleTimer || 0, 0.09);
-                    pd.inCombat = Boolean(flags & 256);
-                }
-            }
-
-            for (let i = g.peds.length - 1; i >= 0; i--) {
-                const pd = g.peds[i];
-                if (!seenPedIds.has(pd.id)) {
-                    g.peds.splice(i, 1);
-                }
-            }
-        }
+        // Ambient sidewalk pedestrians & formations are simulated locally around each player's own camera
+        // so a remote host in another district never wipes out or starves local sidewalk population!
     }
 
     /* ========================================================================

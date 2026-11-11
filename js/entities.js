@@ -4091,9 +4091,9 @@ class TrafficManager {
         );
         this.isMobile = isMobile;
         this.genCarsCooldown = isMobile ? 0.72 : 0.55;
-        this.genPedsCooldown = isMobile ? 0.55 : 0.20;
+        this.genPedsCooldown = isMobile ? 0.32 : 0.12;
         this.maxTrafficCars = isMobile ? 16 : 22;
-        this.maxTrafficPeds = isMobile ? 32 : 48;
+        this.maxTrafficPeds = isMobile ? 68 : 110;
         this.carsMaxDistanceBlocks = isMobile ? 5 : 6; // mTrafficGenCarsMaxDistance
         this.pedsMaxDistanceBlocks = isMobile ? 7 : 9; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
@@ -4901,14 +4901,12 @@ class TrafficManager {
 
     updateTraffic(dt) {
         const game = this.game;
-        if (
+        const isClientSync = Boolean(
             game &&
             game.net &&
             typeof game.net.isClientWorldSyncActive === "function" &&
             game.net.isClientWorldSyncActive()
-        ) {
-            return;
-        }
+        );
 
         this.lastGenCarsTime += dt;
         this.lastGenPedsTime += dt;
@@ -4919,7 +4917,7 @@ class TrafficManager {
         const viewports = this.getAllHumanPlayerViewports();
         const vp = viewports[this._spawnPlayerCursor % viewports.length];
 
-        if (this.lastGenCarsTime >= this.genCarsCooldown) {
+        if (!isClientSync && this.lastGenCarsTime >= this.genCarsCooldown) {
             this.lastGenCarsTime = 0;
             this.removeOffscreenCars(viewports);
             this.generateTrafficCars(vp.area, vp.z);
@@ -4927,10 +4925,9 @@ class TrafficManager {
 
         if (this.lastGenPedsTime >= this.genPedsCooldown) {
             this.lastGenPedsTime = 0;
-            this._spawnPlayerCursor = (this._spawnPlayerCursor + 1) % Math.max(1, viewports.length);
-            const pedVp = viewports[this._spawnPlayerCursor % viewports.length];
-            this.removeOffscreenPeds(viewports);
-            this.generateTrafficPeds(pedVp.area, pedVp.z, pedVp.x, pedVp.y);
+            const localVp = viewports[0];
+            this.removeOffscreenPeds([localVp]);
+            this.generateTrafficPeds(localVp.area, localVp.z, localVp.x, localVp.y);
         }
     }
 
@@ -5180,16 +5177,16 @@ class TrafficManager {
         }
         if (nearbyPeds >= this.maxTrafficPeds) return;
 
-        const allowEdgeOnScreen = nearbyPeds < (this.isMobile ? 34 : 58);
+        const allowEdgeOnScreen = nearbyPeds < (this.isMobile ? 56 : 92);
         const px = refX !== null ? refX : (game.player ? game.player.x : 0);
         const py = refY !== null ? refY : (game.player ? game.player.y : 0);
         this.ensureVicePortWorkCrews(px, py);
         const dirs = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
-        const needed = Math.min(this.isMobile ? 6 : 10, this.maxTrafficPeds - nearbyPeds);
+        const needed = Math.min(this.isMobile ? 10 : 18, this.maxTrafficPeds - nearbyPeds);
         let spawned = 0;
         const spanX = Math.max(1, outerRect.maxX - outerRect.minX + 1);
         const spanY = Math.max(1, outerRect.maxY - outerRect.minY + 1);
-        const maxProbes = this.isMobile ? 64 : 96;
+        const maxProbes = this.isMobile ? 84 : 140;
 
         for (let attempt = 0; attempt < maxProbes && spawned < needed; attempt++) {
             const bx = outerRect.minX + Math.floor(Math.random() * spanX);
@@ -5205,7 +5202,7 @@ class TrafficManager {
             if (inScreen && !allowEdgeOnScreen) continue;
             const centerPedX = (bx + 0.5) * TILE_SIZE;
             const centerPedY = (by + 0.5) * TILE_SIZE;
-            if (inScreen && Math.hypot(centerPedX - px, centerPedY - py) < 185) continue;
+            if (inScreen && Math.hypot(centerPedX - px, centerPedY - py) < 135) continue;
 
             const nav = map.getNavigationBlock(bx, by, camZ);
             if (!nav) continue;
@@ -5230,7 +5227,7 @@ class TrafficManager {
 
             let tooClose = false;
             for (const other of game.peds) {
-                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 84) {
+                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 34) {
                     tooClose = true;
                     break;
                 }

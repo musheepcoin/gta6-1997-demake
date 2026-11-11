@@ -1633,11 +1633,11 @@ class LeonidaGame {
 
 
 
-    populateNearbySidewalks(centerX, centerY, targetCount = 28, radiusBlocks = 14) {
+    populateNearbySidewalks(centerX, centerY, targetCount = 72, radiusBlocks = 14) {
 
         if (!this.map || !this.map.cmpLoaded) return;
 
-        targetCount = Math.min(targetCount, 28);
+        targetCount = Math.min(targetCount, 88);
 
         const cBx = Math.floor(centerX / TILE_SIZE);
 
@@ -1702,7 +1702,7 @@ class LeonidaGame {
         if (candidates.length === 0) return;
 
         // Scale maximum pedestrian count to available sidewalk tiles so narrow corridors never get overcrowded
-        const cappedTarget = Math.min(targetCount, Math.max(4, Math.floor(candidates.length * 0.16)));
+        const cappedTarget = Math.min(targetCount, Math.max(18, Math.floor(candidates.length * 0.65)));
 
         let existing = 0;
 
@@ -1730,7 +1730,7 @@ class LeonidaGame {
 
 
 
-        for (let i = 0; i < needed * 4 && spawned < needed; i++) {
+        for (let i = 0; i < needed * 6 && spawned < needed; i++) {
 
             const pick = candidates[Math.floor(Math.random() * candidates.length)];
 
@@ -1742,7 +1742,7 @@ class LeonidaGame {
 
             for (const other of this.peds) {
 
-                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 84) {
+                if (!other.dead && Math.hypot(other.x - px, other.y - py) < 32) {
 
                     tooClose = true;
 
@@ -12081,15 +12081,8 @@ class LeonidaGame {
             sHead[cell] = cIdx;
         }
 
-        const isClientWorldSync = Boolean(
-
-            this.net &&
-
-            typeof this.net.isClientWorldSyncActive === "function" &&
-
-            this.net.isClientWorldSyncActive()
-
-        );
+        // Ambient pedestrians and their social formations always simulate locally at 60 FPS around the player!
+        const isClientWorldSync = false;
 
         for (const ped of this.peds) {
 
