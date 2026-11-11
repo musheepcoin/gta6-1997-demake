@@ -3243,6 +3243,16 @@ class LeonidaGame {
     initYouTubeRadio() {
 
         this.ytSeekOffset = 0;
+        this.ytRadioFallbackIds = [
+            "0l8BuoAJ3qw", // GTA 6 Radio Mix | Retro 80s EDM & Miami Club Vibes
+            "AHiRDCD1hPc", // 80s Retro Synthwave MIX — Miami Vice 80s Retrowave
+            "GK0Le-u0Uho", // GTA 6 INSPIRED | Vice City Night Race 80s Synthwave Mix
+            "crbk0SQAHg0", // Vice City Night Drive 1 Hour 80s Synthwave & Outrun Mix
+            "zeKyGp2CJ2A", // GTA 6 RADIO 1 Hour Vice City Driving Music Mix
+            "TE8tvtpXvsQ"  // GTA 1 (1997) Full Official Soundtrack
+        ];
+        this.ytCurrentVideoId = "0l8BuoAJ3qw";
+        this._ytErrorFailoverIdx = 0;
 
         const isMobileDevice = typeof window !== "undefined" && (
             window.innerWidth <= 960 ||
@@ -3393,6 +3403,20 @@ class LeonidaGame {
 
 
 
+        const handleYtError = (_errCode) => {
+            this.ytActuallyPlaying = false;
+            this._ytBuffering = false;
+            if (!Array.isArray(this.ytRadioFallbackIds) || this.ytRadioFallbackIds.length === 0) return;
+            this._ytErrorFailoverIdx = ((this._ytErrorFailoverIdx || 0) + 1) % this.ytRadioFallbackIds.length;
+            const nextVid = this.ytRadioFallbackIds[this._ytErrorFailoverIdx];
+            if (!nextVid || nextVid === this.ytCurrentVideoId) return;
+            this.ytCurrentVideoId = nextVid;
+            if (this.ytMusicEnabled) {
+                this.sendYouTubeCommand("loadVideoById", [nextVid, this.ytSeekOffset || 0]);
+                this.sendYouTubeCommand("playVideo", []);
+            }
+        };
+
         this._ensureYtIframeBooted = () => {
             if (!iframe) return;
             if (!iframe.getAttribute("src") && iframe.dataset && iframe.dataset.src) {
@@ -3419,6 +3443,9 @@ class LeonidaGame {
                                         if (ev && typeof ev.data === "number") {
                                             handleYtStateChange(ev.data);
                                         }
+                                    },
+                                    onError: (ev) => {
+                                        handleYtError(ev ? ev.data : 150);
                                     }
                                 }
                             });
@@ -3488,6 +3515,12 @@ class LeonidaGame {
                 if (msg.event === "onReady") {
 
                     subscribeYtEvents();
+
+                } else if (msg.event === "onError") {
+
+                    handleYtError(msg.info);
+
+                    return;
 
                 }
 
@@ -3805,15 +3838,22 @@ class LeonidaGame {
 
         }
 
-        this.sendYouTubeCommand("seekTo", [this.ytSeekOffset, true]);
+        const st = (this.audio && typeof this.audio.cycleStation === "function")
+            ? this.audio.cycleStation()
+            : null;
+        const titleEl = document.getElementById("yt-radio-title");
+        if (titleEl && st && st.name) {
+            titleEl.textContent = `📻 ${st.name}`;
+        }
+
+        if (st && st.videoId && st.videoId !== this.ytCurrentVideoId) {
+            this.ytCurrentVideoId = st.videoId;
+            this.sendYouTubeCommand("loadVideoById", [st.videoId, this.ytSeekOffset]);
+        } else {
+            this.sendYouTubeCommand("seekTo", [this.ytSeekOffset, true]);
+        }
 
         this.sendYouTubeCommand("playVideo", []);
-
-        if (this.audio) {
-
-            this.audio.playBeep(680, 0.04, "square", 0.04);
-
-        }
 
     }
 
