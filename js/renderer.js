@@ -8021,76 +8021,66 @@ class RetroRenderer {
                     if (!evWiped) {
                         const sway = Math.sin(this.time * 2.2 + ei) * 0.14;
                         // DJ behind turntables
-                        this.batchPedSprite3D("vc_haitian", 98, ev.x, ev.y - 28, bz + 0.040, Math.PI * 0.5 + sway, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_haitian", 98, ev.x, ev.y - 28, bz + 0.040, Math.PI * 0.5 + sway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         // Breakdancer grooving in center of graffiti mat
                         const spinAng = this.time * 4.2 + ei;
-                        this.batchPedSprite3D("vc_cuban", Math.floor(this.time * 6.0 + ei) % 8, ev.x, ev.y + 2, bz + 0.038, spinAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_cuban", Math.floor(this.time * 6.0 + ei) % 8, ev.x, ev.y + 2, bz + 0.038, spinAng, 1.26, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         // Well-spaced upright spectators on left & right
-                        this.batchPedSprite3D("g2_civ_aqua", 98, ev.x - 24, ev.y + 6, bz + 0.038, sway, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.batchPedSprite3D("bikini_pink", 98, ev.x + 24, ev.y + 6, bz + 0.038, Math.PI - sway, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("g2_civ_aqua", 98, ev.x - 26, ev.y + 6, bz + 0.038, sway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_pink", 98, ev.x + 26, ev.y + 6, bz + 0.038, Math.PI - sway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
-                    // Ocean Drive Art Deco Sidewalk Bistro Table & 2 Seated Patrons on 3D Chairs!
+                    // Ocean Drive Art Deco Sidewalk Bistro Table & Seated Patrons on 3D Chairs (aligned N-S along building facade)
                     if (!evWiped) {
-                        const westPeds = ["bikini_pink", "vc_crockett", "bikini_cyan", "vc_tommy"];
-                        const eastPeds = ["vc_tourist", "bikini_cyan", "vc_crockett", "bikini_pink"];
+                        const northPeds = ["bikini_pink", "vc_crockett", "bikini_cyan", "vc_tommy"];
+                        const southPeds = ["vc_tourist", "bikini_cyan", "vc_crockett", "bikini_pink"];
                         this.renderBistroTableScene3D(
                             ev.x,
                             ev.y,
                             bz,
-                            westPeds[ei % westPeds.length],
-                            eastPeds[ei % eastPeds.length],
+                            northPeds[ei % northPeds.length],
+                            southPeds[ei % southPeds.length],
                             (ei % 2 === 0) ? "PINK" : "CYAN",
                             false
                         );
                     }
                 } else if (ev.kind === "CLUB_VIP_LINE") {
-                    // Velvet-rope VIP stanchions + Bouncer + Nightclub VIPs waiting in a clean single-file queue
-                    this.pushSolidQuad3D(ev.x - 9, ev.y + 4, bz + 0.045, 2.2, 28.0, 0, 0.85, 0.12, 0.28, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    for (const syOff of [-10, 4, 18]) {
-                        this.pushSolidQuad3D(ev.x - 9, ev.y + syOff, bz + 0.06, 3.4, 3.4, 0, 0.96, 0.80, 0.22, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Velvet-rope VIP stanchions + Bouncer + Nightclub VIPs waiting in a clean single-file queue along building facade
+                    this.pushSolidQuad3D(ev.x - 10, ev.y + 6, bz + 0.045, 2.4, 34.0, 0, 0.85, 0.12, 0.28, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    for (const syOff of [-11, 6, 23]) {
+                        this.pushSolidQuad3D(ev.x - 10, ev.y + syOff, bz + 0.06, 3.8, 3.8, 0, 0.96, 0.80, 0.22, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     }
                     if (!evWiped) {
                         const qSway = Math.sin(this.time * 1.4 + ei) * 0.08;
-                        this.batchPedSprite3D("vc_bodybuilder", 98, ev.x, ev.y - 20, bz + 0.040, Math.PI * 0.5, 1.10, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.batchPedSprite3D("bikini_red", 98, ev.x - 2, ev.y - 4, bz + 0.038, -Math.PI * 0.5 + qSway, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.batchPedSprite3D("vc_tubbs", 98, ev.x + 2, ev.y + 10, bz + 0.038, -Math.PI * 0.5 - qSway, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.batchPedSprite3D("bikini_pink", 98, ev.x - 1, ev.y + 24, bz + 0.038, -Math.PI * 0.5 + qSway, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_bodybuilder", 98, ev.x, ev.y - 22, bz + 0.040, Math.PI * 0.5, 1.30, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_red", 98, ev.x - 2, ev.y - 4, bz + 0.038, -Math.PI * 0.5 + qSway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tubbs", 98, ev.x + 2, ev.y + 13, bz + 0.038, -Math.PI * 0.5 - qSway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_pink", 98, ev.x - 1, ev.y + 30, bz + 0.038, -Math.PI * 0.5 + qSway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else if (ev.kind === "LITTLE_CUBA_CROWD") {
-                    // Little Cuba Calle Ocho Sidewalk Domino Table & Seated Guayabera Players on 3D Wooden Stools!
-                    this.pushSolidQuad3D(ev.x + sunCos * 4.5, ev.y + sunSin * 4.5, bz + 0.014, 14, 14, 0, 0.04, 0.06, 0.10, 0.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    if (!evWiped) {
-                        this.renderSeatedPed3D("vc_cuban", ev.x - 12.5, ev.y, bz + 0.036, 0, "STOOL_WOOD", 1.04);
-                        this.renderSeatedPed3D("vc_hawaiian_red", ev.x + 12.5, ev.y, bz + 0.036, Math.PI, "STOOL_WOOD", 1.04);
-                        this.renderSeatedPed3D("g2_civ_granny", ev.x, ev.y - 12.5, bz + 0.036, Math.PI * 0.5, "STOOL_WOOD", 1.02);
-                    }
-                    // Mahogany Domino Table + Green Felt Top + Ivory Domino Tiles overlapping players' laps
-                    this.pushSolidQuad3D(ev.x, ev.y, bz + 0.048, 12.0, 12.0, 0, 0.48, 0.25, 0.12, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(ev.x, ev.y, bz + 0.052, 9.2, 9.2, 0, 0.14, 0.56, 0.30, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(ev.x - 1.5, ev.y - 0.8, bz + 0.056, 2.3, 1.3, 0.4, 0.97, 0.96, 0.90, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    this.pushSolidQuad3D(ev.x + 1.5, ev.y + 1.0, bz + 0.056, 2.3, 1.3, -0.3, 0.97, 0.96, 0.90, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Little Cuba Calle Ocho Sidewalk 1:1 Domino Table & Seated Guayabera Players on 3D Wooden Stools!
+                    this.renderDominoTableScene3D(ev.x, ev.y, bz, evWiped);
                 } else if (ev.kind === "BEACH_SOCIAL_CIRCLE") {
-                    // Beach Lounge Chairs & Cooler Social Spot on Golden Sand
-                    this.batchObjectSprite3D("beach_cooler", ev.x, ev.y, bz + 0.026, 0.25, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    this.batchObjectSprite3D("beach_ball", ev.x + 15, ev.y + 6, bz + 0.026, this.time * 0.3 + ei, 0.78, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Beach Lounge Chairs & Cooler Social Spot on Golden Sand (1:1 scale)
+                    this.batchObjectSprite3D("beach_cooler", ev.x, ev.y + 2, bz + 0.026, 0.25, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.batchObjectSprite3D("beach_ball", ev.x + 17, ev.y + 9, bz + 0.026, this.time * 0.3 + ei, 0.82, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     if (!evWiped) {
-                        this.renderSeatedPed3D("bikini_pink", ev.x - 13.0, ev.y - 2.0, bz + 0.036, 0.15, "BISTRO_PINK", 1.04);
-                        this.renderSeatedPed3D("surfer_guy", ev.x + 13.0, ev.y - 2.0, bz + 0.036, Math.PI - 0.15, "BISTRO_CYAN", 1.04);
-                        this.batchPedSprite3D("bikini_cyan", 98, ev.x, ev.y - 16.0, bz + 0.038, Math.PI * 0.5 + Math.sin(this.time * 1.4 + ei) * 0.10, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.renderSeatedPed3D("bikini_pink", ev.x - 18.0, ev.y - 2.0, bz + 0.036, 0.15, "BISTRO_PINK", 1.0);
+                        this.renderSeatedPed3D("surfer_guy", ev.x + 18.0, ev.y - 2.0, bz + 0.036, Math.PI - 0.15, "BISTRO_CYAN", 1.0);
+                        this.batchPedSprite3D("bikini_cyan", 98, ev.x, ev.y - 19.0, bz + 0.038, Math.PI * 0.5 + Math.sin(this.time * 1.4 + ei) * 0.10, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else if (ev.kind === "BOARDWALK_IGUANA_ACT") {
                     // Official GTA 6 Vice Beach Boardwalk Screenshot: Shirtless Florida Local with Green Iguana on Shoulder + Tourists Snapping Photos!
                     if (!evWiped) {
                         const handlerAng = Math.sin(this.time * 1.2 + ei) * 0.28;
-                        this.batchPedSprite3D("surfer_guy", 98, ev.x, ev.y, bz + 0.038, handlerAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("surfer_guy", 98, ev.x, ev.y, bz + 0.038, handlerAng, 1.28, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         // Bright Emerald-Green Leonida Iguana perched on shoulder
-                        const igX = ev.x + Math.cos(handlerAng + 1.2) * 4.2;
-                        const igY = ev.y + Math.sin(handlerAng + 1.2) * 4.2;
-                        this.batchObjectSprite3D("gator_3d", igX, igY, bz + 0.062, handlerAng + Math.sin(this.time * 2.4 + ei) * 0.15, 0.42, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN, 0.25, 0.96, 0.38, 0.98);
+                        const igX = ev.x + Math.cos(handlerAng + 1.2) * 5.0;
+                        const igY = ev.y + Math.sin(handlerAng + 1.2) * 5.0;
+                        this.batchObjectSprite3D("gator_3d", igX, igY, bz + 0.062, handlerAng + Math.sin(this.time * 2.4 + ei) * 0.15, 0.44, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN, 0.25, 0.96, 0.38, 0.98);
                         // Two Boardwalk Tourists standing at a natural distance admiring & snapping photos
-                        this.batchPedSprite3D("vc_tourist", 98, ev.x - 16, ev.y - 9, bz + 0.038, 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.batchPedSprite3D("bikini_pink", 98, ev.x + 16, ev.y + 9, bz + 0.038, -2.6, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tourist", 98, ev.x - 18, ev.y - 11, bz + 0.038, 0.5, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_pink", 98, ev.x + 18, ev.y + 11, bz + 0.038, -2.6, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else if (ev.kind === "BOARDWALK_ROLLERBLADERS") {
                     // Official GTA 6 Vice Beach Boardwalk Screenshot: Neon 90s/2026 Rollerblade Duo weaving along the palm promenade!
@@ -8099,38 +8089,39 @@ class RetroRenderer {
                         for (let si = -1; si <= 1; si += 2) {
                             const phase = skateT + (si > 0 ? 0.65 : 0.0);
                             const sy = ev.y + Math.sin(phase) * 24.0;
-                            const sx = ev.x + si * 7.5 + Math.cos(phase * 2.0) * 4.5;
+                            const sx = ev.x + si * 8.5 + Math.cos(phase * 2.0) * 4.5;
                             const vy = Math.cos(phase) * 24.0;
                             const vx = -Math.sin(phase * 2.0) * 9.0;
                             const sAng = Math.atan2(vy, vx);
                             const sFr = Math.floor(this.time * 8.0 + si + ei) % 8;
                             // Neon pink/cyan rollerblade wheel glow under feet + skater ped
-                            this.pushSolidQuad3D(sx, sy, bz + 0.018, 8.5, 5.5, sAng, si < 0 ? 0.98 : 0.18, si < 0 ? 0.28 : 0.92, 0.96, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                            this.batchPedSprite3D(si < 0 ? "bikini_pink" : "vc_jogger", sFr, sx, sy, bz + 0.040, sAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                            this.pushSolidQuad3D(sx, sy, bz + 0.018, 9.5, 6.0, sAng, si < 0 ? 0.98 : 0.18, si < 0 ? 0.28 : 0.92, 0.96, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                            this.batchPedSprite3D(si < 0 ? "bikini_pink" : "vc_jogger", sFr, sx, sy, bz + 0.040, sAng, 1.26, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         }
                     }
                 } else if (ev.kind === "BOARDWALK_BUSKER") {
-                    // Vice Beach Boardwalk Street Musician / Busker with Open Guitar Case, Boombox & Seated Bench Listeners!
-                    this.batchObjectSprite3D("beach_boombox", ev.x - 10, ev.y - 8, bz + 0.026, 0.3, 0.94, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    // Vice Beach Boardwalk Street Musician / Busker tucked along the West grass edge with Open Guitar Case, Boombox & Listeners
+                    this.batchObjectSprite3D("beach_boombox", ev.x - 10, ev.y - 9, bz + 0.026, 0.3, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     // Open velvet-lined guitar case with green dollar bills on the pavement
-                    this.pushSolidQuad3D(ev.x + 6, ev.y - 6, bz + 0.018, 9.0, 5.5, 0.2, 0.14, 0.16, 0.22, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(ev.x + 6, ev.y - 6, bz + 0.022, 6.5, 3.8, 0.2, 0.22, 0.88, 0.44, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(ev.x + 6, ev.y - 5, bz + 0.018, 9.5, 6.0, 0.2, 0.14, 0.16, 0.22, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(ev.x + 6, ev.y - 5, bz + 0.022, 7.0, 4.0, 0.2, 0.22, 0.88, 0.44, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
                     if (!evWiped) {
                         const buskSway = Math.sin(this.time * 2.8 + ei) * 0.16;
-                        this.batchPedSprite3D("vc_hawaiian_red", 98, ev.x - 2, ev.y - 14, bz + 0.038, Math.PI * 0.5 + buskSway, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.renderParkBenchScene3D(ev.x, ev.y + 12, bz, -Math.PI * 0.5, "bikini_cyan", "vc_tourist");
+                        this.batchPedSprite3D("vc_hawaiian_red", 98, ev.x - 2, ev.y - 16, bz + 0.038, Math.PI * 0.5 + buskSway, 1.26, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_cyan", 98, ev.x + 12, ev.y + 10, bz + 0.038, -Math.PI * 0.65 - buskSway * 0.4, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else {
-                    // Ocean Drive & Lummus Park 3D Wooden-Slat Promenade Bench with Seated Pedestrians!
+                    // Lummus Park & Oceanfront Boardwalk 1:1 Scale 3D Wooden-Slat Promenade Bench (backed flush against the park lawn!)
                     if (!evWiped) {
                         const benchPairs = [
                             ["bikini_pink", "vc_crockett"],
                             ["vc_tourist", "bikini_cyan"],
-                            ["vc_tommy", "bikini_yellow"],
-                            ["g2_civ_aqua", "bikini_red"]
+                            ["vc_tommy", null],
+                            ["g2_civ_aqua", "bikini_red"],
+                            [null, "bikini_yellow"]
                         ];
                         const pair = benchPairs[ei % benchPairs.length];
-                        const benchAng = (ei % 2 === 0) ? 0 : Math.PI;
+                        const benchAng = ev.ang !== undefined ? ev.ang : ((ev.x < 450 * TILE_SIZE) ? Math.PI : 0);
                         this.renderParkBenchScene3D(ev.x, ev.y, bz, benchAng, pair[0], pair[1]);
                     }
                 }
@@ -8150,7 +8141,7 @@ class RetroRenderer {
                 this.batchObjectSprite3D(ci % 2 === 0 ? "camp_tent_green" : "camp_tent_orange", cp.x - 18, cp.y - 10, bz + 0.025, 0.3, 1.05, SPRITE_DRAW_ORDER.MAP_OBJECT);
                 this.batchObjectSprite3D(ci % 2 === 0 ? "camp_tent_orange" : "camp_tent_green", cp.x + 18, cp.y - 8, bz + 0.025, -0.35, 1.02, SPRITE_DRAW_ORDER.MAP_OBJECT);
                 this.batchObjectSprite3D("campfire_ring", cp.x, cp.y + 8, bz + 0.020, 0, 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.batchObjectSprite3D("beach_cooler", cp.x - 14, cp.y + 12, bz + 0.028, 0.2, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.batchObjectSprite3D("beach_cooler", cp.x - 16, cp.y + 12, bz + 0.028, 0.2, 0.92, SPRITE_DRAW_ORDER.MAP_OBJECT);
 
                 // Live flickering 3D campfire flame (sprites 234..241) inside the stone ring!
                 const fireFr = 234 + (Math.floor(this.time * 12 + ci * 3) % 8);
@@ -8158,8 +8149,8 @@ class RetroRenderer {
 
                 if (!((cp.wipeoutTimer || 0) > 0)) {
                     // Campers seated on wooden camp stools warming by the campfire
-                    this.renderSeatedPed3D("g2_redneck_blond", cp.x + 14, cp.y + 9, bz + 0.036, Math.PI, "STOOL_WOOD", 1.04);
-                    this.renderSeatedPed3D("vc_tourist", cp.x - 2, cp.y + 22, bz + 0.036, -Math.PI * 0.5, "STOOL_WOOD", 1.04);
+                    this.renderSeatedPed3D("g2_redneck_blond", cp.x + 18, cp.y + 9, bz + 0.036, Math.PI, "STOOL_WOOD", 1.0);
+                    this.renderSeatedPed3D("vc_tourist", cp.x - 1, cp.y + 26, bz + 0.036, -Math.PI * 0.5, "STOOL_WOOD", 1.0);
                 }
             }
         }
@@ -9063,82 +9054,104 @@ class RetroRenderer {
         const sunSin = this._curSunSin !== undefined ? this._curSunSin : 0.62;
         const shAlpha = (this._curSunShadowAlpha !== undefined ? this._curSunShadowAlpha : 0.28) * 0.95;
 
-        // 1. 3D Chair / Stool / Lounge Seat Base & Elevated Backrest behind shoulders
+        // 1. 1:1 Scale 3D Chair / Stool Base & Elevated Backrest (sized for 22px-wide pedestrians at TILE_SIZE = 64)
         if (seatStyle !== "BENCH_SLOT") {
-            const seatX = x - ca * 1.2;
-            const seatY = y - sa * 1.2;
-            this.pushSolidQuad3D(seatX + sunCos * 3.0, seatY + sunSin * 3.0, zBlocks - 0.022, 8.8, 9.2, angle, 0.02, 0.03, 0.06, shAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            const seatX = x - ca * 1.5;
+            const seatY = y - sa * 1.5;
+            this.pushSolidQuad3D(seatX + sunCos * 3.6, seatY + sunSin * 3.6, zBlocks - 0.022, 13.0, 14.5, angle, 0.02, 0.03, 0.06, shAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
             if (seatStyle === "STOOL_WOOD") {
-                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.008, 7.6, 7.6, angle, 0.44, 0.24, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.004, 6.0, 6.0, angle, 0.64, 0.38, 0.20, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.008, 11.4, 11.4, angle, 0.44, 0.24, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.004, 9.0, 9.0, angle, 0.66, 0.40, 0.20, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
             } else {
                 const isPink = seatStyle === "BISTRO_PINK";
                 const cR = isPink ? 0.96 : 0.22;
                 const cG = isPink ? 0.44 : 0.86;
                 const cB = isPink ? 0.72 : 0.92;
                 // White Art Deco chair frame + pastel seat cushion
-                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.009, 8.4, 9.0, angle, 0.95, 0.94, 0.90, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.005, 6.8, 7.4, angle, cR, cG, cB, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                // Left & right chair armrests
+                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.009, 12.4, 14.6, angle, 0.95, 0.94, 0.90, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(seatX, seatY, zBlocks - 0.005, 10.0, 12.2, angle, cR, cG, cB, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                // Left & right chair armrests outside shoulders
                 for (const side of [-1, 1]) {
-                    const ax = x + ca * 0.4 - sa * (side * 4.4);
-                    const ay = y + sa * 0.4 + ca * (side * 4.4);
-                    this.pushSolidQuad3D(ax, ay, zBlocks + 0.014, 5.8, 1.5, angle, 0.94, 0.92, 0.88, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    const ax = x + ca * 0.5 - sa * (side * 6.8);
+                    const ay = y + sa * 0.5 + ca * (side * 6.8);
+                    this.pushSolidQuad3D(ax, ay, zBlocks + 0.014, 7.8, 2.0, angle, 0.94, 0.92, 0.88, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 }
                 // Elevated 3D Chair Backrest behind the seated NPC's shoulders
-                const backX = x - ca * 4.6;
-                const backY = y - sa * 4.6;
-                this.pushSolidQuad3D(backX, backY, zBlocks + 0.026, 2.5, 9.4, angle, 0.96, 0.95, 0.92, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.pushSolidQuad3D(backX, backY, zBlocks + 0.030, 1.7, 7.6, angle, cR, cG, cB, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                const backX = x - ca * 6.4;
+                const backY = y - sa * 6.4;
+                this.pushSolidQuad3D(backX, backY, zBlocks + 0.026, 3.2, 15.0, angle, 0.96, 0.95, 0.92, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                this.pushSolidQuad3D(backX, backY, zBlocks + 0.030, 2.2, 12.4, angle, cR, cG, cB, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
 
-        // 2. Seated Bent Knees / Lap & Shoes extending forward (+ca, +sa) so top-down silhouette clearly reads as sitting
+        // 2. Seated Bent Thighs/Knees & Shoes extending forward (+ca, +sa) at 1:1 pedestrian scale
         const isDarkPants = (pedType.includes("crockett") || pedType.includes("tubbs") || pedType.includes("cuban") || pedType.includes("tommy"));
         const legR = isDarkPants ? 0.22 : 0.78;
         const legG = isDarkPants ? 0.28 : 0.56;
         const legB = isDarkPants ? 0.42 : 0.44;
         for (const side of [-1, 1]) {
-            const kx = x + ca * 3.8 - sa * (side * 2.1);
-            const ky = y + sa * 3.8 + ca * (side * 2.1);
-            this.pushSolidQuad3D(kx, ky, zBlocks - 0.003, 4.4, 2.3, angle, legR, legG, legB, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
-            const fx = x + ca * 5.8 - sa * (side * 2.1);
-            const fy = y + sa * 5.8 + ca * (side * 2.1);
-            this.pushSolidQuad3D(fx, fy, zBlocks - 0.004, 2.1, 2.1, angle, 0.94, 0.95, 0.98, 0.96, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            const kx = x + ca * 5.0 - sa * (side * 2.8);
+            const ky = y + sa * 5.0 + ca * (side * 2.8);
+            this.pushSolidQuad3D(kx, ky, zBlocks - 0.003, 6.0, 3.2, angle, legR, legG, legB, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            const fx = x + ca * 8.0 - sa * (side * 2.8);
+            const fy = y + sa * 8.0 + ca * (side * 2.8);
+            this.pushSolidQuad3D(fx, fy, zBlocks - 0.004, 2.8, 2.8, angle, 0.94, 0.95, 0.98, 0.96, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
 
-        // 3. Calm Upright Seated Torso & Head (frame 98) with subtle conversational head turn
-        const headSway = Math.sin(this.time * 1.35 + x * 0.07 + y * 0.05) * 0.08;
-        this.batchPedSprite3D(pedType, 98, x, y, zBlocks + 0.006, angle + headSway, scale * 0.94, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        // 3. Calm Upright Seated Torso & Head (frame 98) at 1:1 pedestrian scale (1.26 matches walking peds at 1.34)
+        const headSway = Math.sin(this.time * 1.35 + x * 0.07 + y * 0.05) * 0.07;
+        this.batchPedSprite3D(pedType, 98, x, y, zBlocks + 0.006, angle + headSway, scale * 1.26, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
     }
 
-    renderBistroTableScene3D(x, y, zBlocks, pedWest, pedEast, theme = "CYAN", withUmbrella = false) {
+    renderBistroTableScene3D(x, y, zBlocks, pedNorth, pedSouth, theme = "CYAN", withUmbrella = false) {
         const sunCos = this._curSunCos !== undefined ? this._curSunCos : 0.78;
         const sunSin = this._curSunSin !== undefined ? this._curSunSin : 0.62;
         const shAlpha = (this._curSunShadowAlpha !== undefined ? this._curSunShadowAlpha : 0.28) * 1.05;
         const isPink = theme === "PINK";
+        const cR = isPink ? 0.96 : 0.24;
+        const cG = isPink ? 0.46 : 0.88;
+        const cB = isPink ? 0.74 : 0.94;
 
-        // 1. Seated Patrons on West & East 3D Bistro Chairs facing each other across the table
-        if (pedWest) {
-            this.renderSeatedPed3D(pedWest, x - 13.0, y, zBlocks + 0.036, 0, isPink ? "BISTRO_PINK" : "BISTRO_CYAN", 1.04);
+        // 1. North & South 3D Bistro Chairs (aligned parallel to the building facade so sidewalks stay wide open!)
+        if (pedNorth) {
+            this.renderSeatedPed3D(pedNorth, x, y - 18.0, zBlocks + 0.036, Math.PI * 0.5, isPink ? "BISTRO_PINK" : "BISTRO_CYAN", 1.0);
+        } else {
+            const ny = y - 16.2;
+            this.pushSolidQuad3D(x + sunCos * 3.2, ny + sunSin * 3.2, zBlocks + 0.014, 14.2, 12.0, 0, 0.02, 0.03, 0.06, shAlpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            this.pushSolidQuad3D(x, ny, zBlocks + 0.027, 14.0, 11.8, 0, 0.95, 0.94, 0.90, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushSolidQuad3D(x, ny, zBlocks + 0.031, 11.6, 9.4, 0, cR, cG, cB, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushSolidQuad3D(x, ny - 5.2, zBlocks + 0.052, 14.4, 3.0, 0, 0.96, 0.95, 0.92, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
-        if (pedEast) {
-            this.renderSeatedPed3D(pedEast, x + 13.0, y, zBlocks + 0.036, Math.PI, isPink ? "BISTRO_CYAN" : "BISTRO_PINK", 1.04);
+        if (pedSouth) {
+            this.renderSeatedPed3D(pedSouth, x, y + 18.0, zBlocks + 0.036, -Math.PI * 0.5, isPink ? "BISTRO_CYAN" : "BISTRO_PINK", 1.0);
+        } else {
+            const sy = y + 16.2;
+            this.pushSolidQuad3D(x + sunCos * 3.2, sy + sunSin * 3.2, zBlocks + 0.014, 14.2, 12.0, 0, 0.02, 0.03, 0.06, shAlpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            this.pushSolidQuad3D(x, sy, zBlocks + 0.027, 14.0, 11.8, 0, 0.95, 0.94, 0.90, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushSolidQuad3D(x, sy, zBlocks + 0.031, 11.6, 9.4, 0, cR, cG, cB, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushSolidQuad3D(x, sy + 5.2, zBlocks + 0.052, 14.4, 3.0, 0, 0.96, 0.95, 0.92, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
 
-        // 2. 3D Art Deco Bistro Table (cast shadow + central pedestal + elevated white/pastel tabletop overlapping laps + 2 tropical drinks)
-        this.pushSolidQuad3D(x + sunCos * 4.2, y + sunSin * 4.2, zBlocks + 0.014, 13.5, 13.5, 0.785, 0.02, 0.03, 0.06, shAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-        this.pushSolidQuad3D(x, y, zBlocks + 0.026, 4.2, 4.2, 0, 0.25, 0.28, 0.34, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
-        this.pushSolidQuad3D(x, y, zBlocks + 0.048, 12.2, 12.2, 0, 0.97, 0.96, 0.93, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-        this.pushSolidQuad3D(x, y, zBlocks + 0.051, 9.6, 9.6, 0, isPink ? 0.96 : 0.24, isPink ? 0.48 : 0.88, isPink ? 0.76 : 0.94, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-        this.pushSolidQuad3D(x, y, zBlocks + 0.054, 7.4, 7.4, 0, 0.99, 0.98, 0.96, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-        // Cocktail glasses & espresso cups on the table
-        this.pushSolidQuad3D(x - 2.6, y - 1.4, zBlocks + 0.058, 2.3, 2.3, 0, 0.98, 0.26, 0.66, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-        this.pushSolidQuad3D(x + 2.6, y + 1.4, zBlocks + 0.058, 2.3, 2.3, 0, 0.16, 0.94, 0.88, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        // 2. 1:1 Scale 20px Round 3D Art Deco Bistro Table (octagonal dual-quad silhouette + pedestal + cocktails)
+        for (const rAng of [0, 0.7854]) {
+            this.pushSolidQuad3D(x + sunCos * 4.8, y + sunSin * 4.8, zBlocks + 0.014, 18.2, 18.2, rAng, 0.02, 0.03, 0.06, shAlpha * 0.75, SPRITE_DRAW_ORDER.TIRE_MARKS);
+        }
+        this.pushSolidQuad3D(x, y, zBlocks + 0.026, 6.4, 6.4, 0, 0.24, 0.27, 0.33, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+        for (const rAng of [0, 0.7854]) {
+            this.pushSolidQuad3D(x, y, zBlocks + 0.048, 17.6, 17.6, rAng, 0.97, 0.96, 0.93, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            this.pushSolidQuad3D(x, y, zBlocks + 0.051, 14.6, 14.6, rAng, cR, cG, cB, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            this.pushSolidQuad3D(x, y, zBlocks + 0.054, 11.4, 11.4, rAng, 0.99, 0.98, 0.96, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        }
+        // Coasters & tropical cocktail glasses on the tabletop
+        this.pushSolidQuad3D(x - 2.4, y - 3.6, zBlocks + 0.056, 3.8, 3.8, 0, 0.92, 0.90, 0.86, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x - 2.4, y - 3.6, zBlocks + 0.059, 2.5, 2.5, 0, 0.98, 0.26, 0.66, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x + 2.4, y + 3.6, zBlocks + 0.056, 3.8, 3.8, 0, 0.92, 0.90, 0.86, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x + 2.4, y + 3.6, zBlocks + 0.059, 2.5, 2.5, 0, 0.16, 0.94, 0.88, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
         if (withUmbrella) {
             const umbSpr = isPink ? "umbrella_pink" : "umbrella_cyan";
-            this.batchObjectSprite3D(umbSpr, x, y, zBlocks + 0.095, (y * 0.03) % 6.28, 0.78, SPRITE_DRAW_ORDER.TREES);
+            // Offset umbrella slightly toward the West building side so the tabletop & patrons remain clearly visible!
+            this.batchObjectSprite3D(umbSpr, x - 7.5, y, zBlocks + 0.095, (y * 0.03) % 6.28, 0.84, SPRITE_DRAW_ORDER.TREES);
         }
     }
 
@@ -9149,34 +9162,63 @@ class RetroRenderer {
         const sunSin = this._curSunSin !== undefined ? this._curSunSin : 0.62;
         const shAlpha = (this._curSunShadowAlpha !== undefined ? this._curSunShadowAlpha : 0.28) * 1.05;
 
-        // 1. 3D Wooden-Slat & Cast-Iron Promenade Park Bench (oriented facing `angle`)
-        this.pushSolidQuad3D(x + sunCos * 3.8, y + sunSin * 3.8, zBlocks + 0.014, 9.0, 23.5, angle, 0.02, 0.03, 0.06, shAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-        // Warm teak wooden seat slats
-        this.pushSolidQuad3D(x - ca * 0.8, y - sa * 0.8, zBlocks + 0.026, 7.6, 22.0, angle, 0.56, 0.34, 0.16, 0.99, SPRITE_DRAW_ORDER.MAP_OBJECT);
-        this.pushSolidQuad3D(x - ca * 0.6, y - sa * 0.6, zBlocks + 0.029, 5.4, 20.8, angle, 0.72, 0.46, 0.22, 0.99, SPRITE_DRAW_ORDER.MAP_OBJECT);
-        // Dark cast-iron armrests at both ends & center divider
-        for (const latOff of [-10.2, 0, 10.2]) {
+        // 1. 1:1 Scale (14px deep x 42px long) 3D Teak-Slat & Cast-Iron Promenade Park Bench (oriented facing `angle`)
+        this.pushSolidQuad3D(x + sunCos * 4.5, y + sunSin * 4.5, zBlocks + 0.014, 15.0, 44.0, angle, 0.02, 0.03, 0.06, shAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+        // Dark cast-iron bench base frame
+        this.pushSolidQuad3D(x - ca * 0.6, y - sa * 0.6, zBlocks + 0.025, 13.4, 42.0, angle, 0.16, 0.19, 0.24, 0.99, SPRITE_DRAW_ORDER.MAP_OBJECT);
+        // 3 distinct horizontal warm teak wooden seat planks
+        for (const slatOff of [-3.8, -0.2, 3.4]) {
+            const sx = x + ca * slatOff;
+            const sy = y + sa * slatOff;
+            const isMid = Math.abs(slatOff) < 1.0;
+            this.pushSolidQuad3D(sx, sy, zBlocks + 0.029, 3.1, 40.2, angle, isMid ? 0.76 : 0.70, isMid ? 0.49 : 0.44, isMid ? 0.24 : 0.20, 0.99, SPRITE_DRAW_ORDER.MAP_OBJECT);
+        }
+        // Dark cast-iron armrests at both ends (-19.8, +19.8) & center divider (0)
+        for (const latOff of [-19.8, 0, 19.8]) {
             const ax = x - sa * latOff;
             const ay = y + ca * latOff;
-            this.pushSolidQuad3D(ax, ay, zBlocks + 0.036, 7.8, 1.8, angle, 0.16, 0.19, 0.24, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+            this.pushSolidQuad3D(ax, ay, zBlocks + 0.038, 13.8, 2.6, angle, 0.15, 0.18, 0.23, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
         }
         // Elevated 3D Wooden Backrest Beam behind the seated pedestrians' shoulders
-        const backX = x - ca * 4.2;
-        const backY = y - sa * 4.2;
-        this.pushSolidQuad3D(backX, backY, zBlocks + 0.058, 2.6, 22.4, angle, 0.48, 0.28, 0.13, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
-        this.pushSolidQuad3D(backX, backY, zBlocks + 0.062, 1.8, 21.0, angle, 0.68, 0.42, 0.20, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        const backX = x - ca * 6.8;
+        const backY = y - sa * 6.8;
+        this.pushSolidQuad3D(backX, backY, zBlocks + 0.058, 3.8, 42.4, angle, 0.46, 0.27, 0.12, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(backX, backY, zBlocks + 0.062, 2.4, 40.6, angle, 0.72, 0.45, 0.21, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
 
-        // 2. One or Two Pedestrians calmly seated side-by-side on the bench
+        // 2. One or Two Full-Scale Pedestrians calmly seated side-by-side on the 42px bench (spaced 21.2px apart!)
         if (pedA) {
-            const pAx = x - sa * (-5.4);
-            const pAy = y + ca * (-5.4);
-            this.renderSeatedPed3D(pedA, pAx, pAy, zBlocks + 0.036, angle + 0.08, "BENCH_SLOT", 1.04);
+            const pAx = x - sa * (-10.6);
+            const pAy = y + ca * (-10.6);
+            this.renderSeatedPed3D(pedA, pAx, pAy, zBlocks + 0.036, angle + 0.06, "BENCH_SLOT", 1.0);
         }
         if (pedB) {
-            const pBx = x - sa * 5.4;
-            const pBy = y + ca * 5.4;
-            this.renderSeatedPed3D(pedB, pBx, pBy, zBlocks + 0.036, angle - 0.08, "BENCH_SLOT", 1.04);
+            const pBx = x - sa * 10.6;
+            const pBy = y + ca * 10.6;
+            this.renderSeatedPed3D(pedB, pBx, pBy, zBlocks + 0.036, angle - 0.06, "BENCH_SLOT", 1.0);
         }
+    }
+
+    renderDominoTableScene3D(x, y, zBlocks, wiped = false) {
+        const sunCos = this._curSunCos !== undefined ? this._curSunCos : 0.78;
+        const sunSin = this._curSunSin !== undefined ? this._curSunSin : 0.62;
+        const shAlpha = (this._curSunShadowAlpha !== undefined ? this._curSunShadowAlpha : 0.28) * 1.05;
+
+        this.pushSolidQuad3D(x + sunCos * 5.0, y + sunSin * 5.0, zBlocks + 0.014, 21.5, 21.5, 0, 0.02, 0.03, 0.06, shAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+        if (!wiped) {
+            this.renderSeatedPed3D("vc_cuban", x - 17.5, y, zBlocks + 0.036, 0, "STOOL_WOOD", 1.0);
+            this.renderSeatedPed3D("vc_hawaiian_red", x + 17.5, y, zBlocks + 0.036, Math.PI, "STOOL_WOOD", 1.0);
+            this.renderSeatedPed3D("g2_civ_granny", x, y - 17.5, zBlocks + 0.036, Math.PI * 0.5, "STOOL_WOOD", 1.0);
+        }
+        // Empty South wooden stool
+        this.pushSolidQuad3D(x, y + 16.0, zBlocks + 0.028, 11.2, 11.2, 0, 0.44, 0.24, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+        this.pushSolidQuad3D(x, y + 16.0, zBlocks + 0.032, 8.8, 8.8, 0, 0.66, 0.40, 0.20, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+
+        // 1:1 Scale 20x20px Mahogany Domino Table + Recessed Emerald-Green Felt Top + Ivory Domino Tiles
+        this.pushSolidQuad3D(x, y, zBlocks + 0.048, 20.0, 20.0, 0, 0.46, 0.24, 0.11, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x, y, zBlocks + 0.052, 15.6, 15.6, 0, 0.12, 0.54, 0.28, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x - 2.6, y - 1.4, zBlocks + 0.056, 3.4, 1.9, 0.35, 0.97, 0.96, 0.90, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x + 0.4, y + 0.2, zBlocks + 0.056, 3.4, 1.9, -0.20, 0.97, 0.96, 0.90, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
+        this.pushSolidQuad3D(x + 3.0, y + 2.0, zBlocks + 0.056, 3.4, 1.9, 0.55, 0.97, 0.96, 0.90, 0.99, SPRITE_DRAW_ORDER.PEDESTRIAN);
     }
 
     batchWorldSprites3D(game, minX, minY, maxX, maxY) {
@@ -10590,24 +10632,24 @@ class RetroRenderer {
                     if (vd.kind === "CAFE_TABLE") {
                         const umbSpr = vd.theme === "PINK" ? "umbrella_pink" : "umbrella_cyan";
                         if ((vd.wipeoutTimer || 0) > 0) {
-                            this.renderSmashedParasol3D(umbSpr, vd.x, vd.y, vz, vd.knockAng || 0, 0.78);
+                            this.renderSmashedParasol3D(umbSpr, vd.x, vd.y, vz, vd.knockAng || 0, 0.84);
                         } else {
-                            const tblHash = Math.abs(Math.round(vd.x * 0.04 + vd.y * 0.03));
-                            if ((tblHash % 3) === 0) {
-                                const westPeds = ["bikini_pink", "vc_crockett", "vc_tourist", "bikini_cyan"];
-                                const eastPeds = ["vc_tommy", "bikini_cyan", "bikini_pink", "g2_civ_aqua"];
-                                this.renderBistroTableScene3D(
-                                    vd.x,
-                                    vd.y,
-                                    vz,
-                                    westPeds[tblHash % westPeds.length],
-                                    eastPeds[tblHash % eastPeds.length],
-                                    vd.theme || "CYAN",
-                                    true
-                                );
-                            } else {
-                                this.renderBistroTableScene3D(vd.x, vd.y, vz, null, null, vd.theme || "CYAN", true);
-                            }
+                            const tblHash = Math.abs(Math.round(vd.y / 64));
+                            const northPeds = ["bikini_pink", "vc_crockett", "vc_tourist", "bikini_cyan"];
+                            const southPeds = ["vc_tommy", "bikini_cyan", "bikini_pink", "g2_civ_aqua"];
+                            const hasUmb = (tblHash % 2) === 0;
+                            const seatMode = tblHash % 3;
+                            const pNorth = seatMode <= 1 ? northPeds[tblHash % northPeds.length] : null;
+                            const pSouth = seatMode === 0 ? southPeds[tblHash % southPeds.length] : null;
+                            this.renderBistroTableScene3D(
+                                vd.x,
+                                vd.y,
+                                vz,
+                                pNorth,
+                                pSouth,
+                                vd.theme || "CYAN",
+                                hasUmb
+                            );
                         }
                     } else if (vd.kind === "BISTRO_STRING") {
                         // Española Way overhead Mediterranean festive light cable & glowing bulbs
@@ -10687,18 +10729,8 @@ class RetroRenderer {
                         this.pushSolidQuad3D(vd.x, vd.y, vz + 0.06, 7.5, 9.5, 0, 0.94, 0.91, 0.86, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
                         this.pushSolidQuad3D(vd.x, vd.y, vz + 0.11, 5.5, 7.5, 0, isPink ? 0.96 : 0.22, isPink ? 0.36 : 0.86, isPink ? 0.68 : 0.94, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
                     } else if (vd.kind === "CUBA_DOMINO_TABLE") {
-                        // Little Cuba (Calle Ocho / Maximo Gomez Domino Park) Sidewalk Domino Table & Seated Guayabera Players
-                        this.pushSolidQuad3D(vd.x + sunCos * 5.0, vd.y + sunSin * 5.0, vz + 0.003, 14, 14, 0, 0.04, 0.06, 0.10, sunShadowAlpha * 0.45, SPRITE_DRAW_ORDER.SKIDMARKS);
-                        this.renderSeatedPed3D("vc_cuban", vd.x - 12.0, vd.y, vz + 0.036, 0, "STOOL_WOOD", 1.02);
-                        this.renderSeatedPed3D("vc_hawaiian_red", vd.x + 12.0, vd.y, vz + 0.036, Math.PI, "STOOL_WOOD", 1.02);
-                        // North & South empty wooden stools
-                        this.pushSolidQuad3D(vd.x, vd.y - 8.8, vz + 0.04, 4.2, 4.2, 0, 0.62, 0.36, 0.18, 0.96, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                        this.pushSolidQuad3D(vd.x, vd.y + 8.8, vz + 0.04, 4.2, 4.2, 0, 0.62, 0.36, 0.18, 0.96, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                        // Mahogany wood table frame + green felt tabletop + miniature ivory domino tiles
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.055, 11.5, 11.5, 0, 0.48, 0.25, 0.12, 0.99, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.065, 8.8, 8.8, 0, 0.14, 0.54, 0.30, 0.99, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                        this.pushSolidQuad3D(vd.x - 1.4, vd.y - 0.8, vz + 0.072, 2.2, 1.2, 0.4, 0.96, 0.95, 0.88, 0.99, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                        this.pushSolidQuad3D(vd.x + 1.5, vd.y + 1.0, vz + 0.072, 2.2, 1.2, -0.3, 0.96, 0.95, 0.88, 0.99, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        // Little Cuba (Calle Ocho / Maximo Gomez Domino Park) 1:1 Scale Sidewalk Domino Table & Seated Guayabera Players
+                        this.renderDominoTableScene3D(vd.x, vd.y, vz, (vd.wipeoutTimer || 0) > 0);
                     }
                 }
             }

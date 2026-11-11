@@ -2247,7 +2247,7 @@ class LeonidaMap {
             });
         }
 
-        // 5) Wynwood Walls Street-Art Breakdance Cyphers, Ocean Drive Livestreamers, Sidewalk Social Groups, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles ("streetEvents")
+        // 5) Wynwood Walls Street-Art Breakdance Cyphers, Lummus Park Promenade Benches, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles ("streetEvents")
         this.streetEvents = [];
         const rawStreetEvents = [
             // Wynwood & Little Haiti Street-Art Mural + DJ Booth + Breakdancers
@@ -2259,52 +2259,41 @@ class LeonidaMap {
             { c: 274.5,        r: 171.5,       kind: "WYNWOOD_CYPHER" },
             { c: 295.5,        r: 185.5,       kind: "WYNWOOD_CYPHER" },
             { c: 311.5,        r: 173.5,       kind: "WYNWOOD_CYPHER" },
-            // Ocean Drive & South Beach Social-Media Influencer Ring-Light Livestreamers (GTA 6 Trailer 1!)
-            { c: mx256(218.4), r: my256(88.5),  kind: "INFLUENCER_STREAM" },
-            { c: mx256(218.4), r: my256(112.5), kind: "INFLUENCER_STREAM" },
-            { c: mx256(218.4), r: 222.5,        kind: "INFLUENCER_STREAM" },
-            { c: mx256(218.4), r: my256(138.5), kind: "INFLUENCER_STREAM" },
-            { c: mx256(218.4), r: my256(162.5), kind: "INFLUENCER_STREAM" },
-            { c: mx256(204.5), r: my256(119.5), kind: "INFLUENCER_STREAM" },
-            { c: 448.5,        r: 238.5,        kind: "INFLUENCER_STREAM" },
-            { c: 448.5,        r: 266.5,        kind: "INFLUENCER_STREAM" },
-            { c: 448.5,        r: 296.5,        kind: "INFLUENCER_STREAM" },
-            { c: 443.5,        r: 248.5,        kind: "INFLUENCER_STREAM" },
-            // Ocean Drive & Lummus Park Sidewalk Social Groups (GTA 6 Trailer 1 0:38-0:44 packed neon strip!)
-            { c: 443.5, r: 196.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 204.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 212.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 218.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 226.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 232.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 240.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 246.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 254.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 260.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 270.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 276.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 284.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 290.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 300.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 308.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 443.5, r: 316.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 448.5, r: 324.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 451.5, r: 215.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 451.5, r: 235.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 451.5, r: 255.5, kind: "OCEAN_DRIVE_CROWD" },
-            { c: 451.5, r: 285.5, kind: "OCEAN_DRIVE_CROWD" },
-            // Club VIP Velvet-Rope Queues & Bouncers (Ocean Drive, Collins Ave & Downtown Vice Nightclubs)
-            { c: 443.5, r: 220.5, kind: "CLUB_VIP_LINE" },
-            { c: 443.5, r: 262.5, kind: "CLUB_VIP_LINE" },
-            { c: 443.5, r: 292.5, kind: "CLUB_VIP_LINE" },
-            { c: 423.5, r: 228.5, kind: "CLUB_VIP_LINE" },
-            { c: 423.5, r: 274.5, kind: "CLUB_VIP_LINE" },
-            { c: 431.5, r: 244.5, kind: "CLUB_VIP_LINE" },
-            { c: 431.5, r: 286.5, kind: "CLUB_VIP_LINE" },
-            { c: 285.5, r: 212.5, kind: "CLUB_VIP_LINE" },
-            { c: 299.5, r: 226.5, kind: "CLUB_VIP_LINE" },
-            { c: 318.5, r: 214.5, kind: "CLUB_VIP_LINE" },
-            // Little Cuba Calle Ocho Sidewalk Domino & Cafecito Crowds
+            // Lummus Park Promenade Benches (c = 448.84 backed flush against c = 449 grass lawn, facing West Math.PI; r % 8 === 0 between Royal Palms!)
+            { c: 448.84, r: 168.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 184.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 208.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 224.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 240.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 256.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 272.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 288.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 304.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 320.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            { c: 448.84, r: 336.5, kind: "PROMENADE_BENCH", ang: Math.PI, exactPos: true, grassCol: 449 },
+            // Oceanfront Boardwalk Benches (c = 451.16 backed flush against c = 450 grass lawn, facing East 0 toward the beach & ocean; r % 8 === 4!)
+            { c: 451.16, r: 172.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 188.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 212.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 228.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 244.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 260.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 276.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 292.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 308.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            { c: 451.16, r: 324.5, kind: "PROMENADE_BENCH", ang: 0, exactPos: true, grassCol: 450 },
+            // Club VIP Velvet-Rope Queues & Bouncers (tucked along building facades on Ocean Drive, Collins Ave & Downtown Vice Nightclubs)
+            { c: 443.24, r: 220.5, kind: "CLUB_VIP_LINE", exactPos: true },
+            { c: 443.24, r: 262.5, kind: "CLUB_VIP_LINE", exactPos: true },
+            { c: 443.24, r: 292.5, kind: "CLUB_VIP_LINE", exactPos: true },
+            { c: 423.24, r: 228.5, kind: "CLUB_VIP_LINE" },
+            { c: 423.24, r: 274.5, kind: "CLUB_VIP_LINE" },
+            { c: 431.24, r: 244.5, kind: "CLUB_VIP_LINE" },
+            { c: 431.24, r: 286.5, kind: "CLUB_VIP_LINE" },
+            { c: 285.24, r: 212.5, kind: "CLUB_VIP_LINE" },
+            { c: 299.24, r: 226.5, kind: "CLUB_VIP_LINE" },
+            { c: 318.24, r: 214.5, kind: "CLUB_VIP_LINE" },
+            // Little Cuba Calle Ocho Domino Park Tables
             { c: 280.5, r: 252.5, kind: "LITTLE_CUBA_CROWD" },
             { c: 290.5, r: 256.5, kind: "LITTLE_CUBA_CROWD" },
             { c: 299.5, r: 252.5, kind: "LITTLE_CUBA_CROWD" },
@@ -2349,18 +2338,17 @@ class LeonidaMap {
             { c: 471.8, r: 308.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
             { c: 469.5, r: 324.5, kind: "BEACH_SOCIAL_CIRCLE", onSand: true },
             // Official GTA 6 Vice Beach Boardwalk Screenshot: Florida Man with Green Iguana on Shoulder & Tourists Snapping Photos!
-            { c: 451.5, r: 208.5, kind: "BOARDWALK_IGUANA_ACT" },
-            { c: 451.5, r: 246.5, kind: "BOARDWALK_IGUANA_ACT" },
-            { c: 451.5, r: 274.5, kind: "BOARDWALK_IGUANA_ACT" },
-            { c: 448.5, r: 282.5, kind: "BOARDWALK_IGUANA_ACT" },
-            { c: 451.5, r: 306.5, kind: "BOARDWALK_IGUANA_ACT" },
-            // Official GTA 6 Vice Beach Boardwalk Rollerbladers & Street Buskers (Neon Roller-Skaters & Acoustic Guitar Performers!)
-            { c: 451.5, r: 192.5, kind: "BOARDWALK_ROLLERBLADERS" },
-            { c: 451.5, r: 220.5, kind: "BOARDWALK_BUSKER" },
-            { c: 451.5, r: 238.5, kind: "BOARDWALK_ROLLERBLADERS" },
-            { c: 451.5, r: 262.5, kind: "BOARDWALK_BUSKER" },
-            { c: 451.5, r: 292.5, kind: "BOARDWALK_ROLLERBLADERS" },
-            { c: 451.5, r: 318.5, kind: "BOARDWALK_BUSKER" }
+            { c: 451.28, r: 206.5, kind: "BOARDWALK_IGUANA_ACT", exactPos: true },
+            { c: 451.28, r: 250.5, kind: "BOARDWALK_IGUANA_ACT", exactPos: true },
+            { c: 451.28, r: 282.5, kind: "BOARDWALK_IGUANA_ACT", exactPos: true },
+            { c: 451.28, r: 314.5, kind: "BOARDWALK_IGUANA_ACT", exactPos: true },
+            // Official GTA 6 Vice Beach Boardwalk Rollerbladers & Street Buskers
+            { c: 451.55, r: 192.5, kind: "BOARDWALK_ROLLERBLADERS", exactPos: true },
+            { c: 451.24, r: 220.5, kind: "BOARDWALK_BUSKER", exactPos: true },
+            { c: 451.55, r: 238.5, kind: "BOARDWALK_ROLLERBLADERS", exactPos: true },
+            { c: 451.24, r: 266.5, kind: "BOARDWALK_BUSKER", exactPos: true },
+            { c: 451.55, r: 298.5, kind: "BOARDWALK_ROLLERBLADERS", exactPos: true },
+            { c: 451.24, r: 332.5, kind: "BOARDWALK_BUSKER", exactPos: true }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];
@@ -2375,11 +2363,22 @@ class LeonidaMap {
                 if (this.beachSunbathers.some(sb => Math.hypot(sb.x - spSand.x, sb.y - spSand.y) < 38)) continue;
                 if (this.streetEvents.some(other => Math.hypot(other.x - spSand.x, other.y - spSand.y) < 42)) continue;
                 this.streetEvents.push({ x: spSand.x, y: spSand.y, z: 2.0, kind: ev.kind, seed: ei * 1.9 });
+            } else if (ev.exactPos) {
+                const c0 = Math.floor(ev.c);
+                const r0 = Math.floor(ev.r);
+                if (!isSafePedTile(c0, r0, true)) continue;
+                if (ev.grassCol !== undefined) {
+                    const gBlk = this.getBlockInfo(ev.grassCol, r0, 1);
+                    if (!gBlk || gBlk.lid !== 10) continue;
+                }
+                if (Array.isArray(this.vicePalms) && this.vicePalms.some(pm => Math.hypot(pm.x - rawX, pm.y - rawY) < 44)) continue;
+                if (this.streetEvents.some(other => Math.hypot(other.x - rawX, other.y - rawY) < 48)) continue;
+                this.streetEvents.push({ x: rawX, y: rawY, z: 2.0, kind: ev.kind, ang: ev.ang, seed: ei * 1.9 });
             } else {
                 const sp = snapToVerifiedPed(rawX, rawY, 5, true);
                 if (!sp) continue;
                 if (this.streetEvents.some(other => Math.hypot(other.x - sp.x, other.y - sp.y) < 42)) continue;
-                this.streetEvents.push({ x: sp.x, y: sp.y, z: 2.0, kind: ev.kind, seed: ei * 1.9 });
+                this.streetEvents.push({ x: sp.x, y: sp.y, z: 2.0, kind: ev.kind, ang: ev.ang, seed: ei * 1.9 });
             }
         }
 
@@ -3825,16 +3824,27 @@ class LeonidaMap {
         }
 
         // Deep-Dive Vice City Architectural Streetscape Props:
-        // A. Ocean Drive Art Deco Sidewalk Café Parasols (West sidewalk directly in front of 3D Art Deco hotels)
-        for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r += 3) {
+        // A. Ocean Drive Art Deco Sidewalk Café Terraces (West sidewalk directly in front of 3D Art Deco hotels)
+        // Placed strictly on rows r where (r % 8 === 3 || r % 8 === 5) so they are perfectly centered between
+        // the Royal Palms (which stand at r % 8 === 0) and verified clear of hotel entrance doors & street events.
+        for (let r = MAP_Y_256[42]; r <= MAP_Y_256[194]; r++) {
+            const mod8 = ((r % 8) + 8) % 8;
+            if (mod8 !== 3 && mod8 !== 5) continue;
             if (this.surfaceGround[r * MAP_COLS + oceanDriveW] !== GROUND_TYPE.PAWEMENT) continue;
-            // Only place café parasols directly in front of actual 3D Ocean Drive buildings (never in front of parks or roads!)
+            // Only place café tables directly in front of actual 3D Ocean Drive buildings (never in front of parks or roads!)
             if (this.surfaceGround[r * MAP_COLS + (oceanDriveW - 1)] !== GROUND_TYPE.BUILDING) continue;
             if (this.getBlockInfo(oceanDriveW, r, 1)?.lid === 69) continue;
+            const tx = (oceanDriveW + 0.28) * TILE_SIZE;
+            const ty = (r + 0.5) * TILE_SIZE;
+            const nearDoor = this.interiors && this.interiors.some(i => Math.hypot(i.doorX - tx, i.doorY - ty) < 54);
+            const nearPalm = this.vicePalms && this.vicePalms.some(p => Math.hypot(p.x - tx, p.y - ty) < 44);
+            const nearLamp = this.streetlights && this.streetlights.some(l => Math.hypot(l.x - tx, l.y - ty) < 40);
+            const nearEvent = this.streetEvents && this.streetEvents.some(ev => Math.hypot(ev.x - tx, ev.y - ty) < 52);
+            if (nearDoor || nearPalm || nearLamp || nearEvent) continue;
             this.viceStreetDetails.push({
                 kind: "CAFE_TABLE",
-                x: (oceanDriveW + 0.22) * TILE_SIZE,
-                y: (r + 0.5) * TILE_SIZE,
+                x: tx,
+                y: ty,
                 z: 2.0,
                 theme: ((r >> 1) % 2 === 0) ? "PINK" : "CYAN"
             });
