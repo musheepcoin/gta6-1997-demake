@@ -8030,20 +8030,24 @@ class RetroRenderer {
                         this.batchPedSprite3D("bikini_pink", 98, ev.x + 26, ev.y + 6, bz + 0.038, Math.PI - sway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
-                    // Ocean Drive Art Deco Sidewalk Bistro Table & Seated Patrons on 3D Chairs (aligned N-S along building facade)
-                    if (!evWiped) {
-                        const northPeds = ["bikini_pink", "vc_crockett", "bikini_cyan", "vc_tommy"];
-                        const southPeds = ["vc_tourist", "bikini_cyan", "vc_crockett", "bikini_pink"];
-                        this.renderBistroTableScene3D(
-                            ev.x,
-                            ev.y,
-                            bz,
-                            northPeds[ei % northPeds.length],
-                            southPeds[ei % southPeds.length],
-                            (ei % 2 === 0) ? "PINK" : "CYAN",
-                            false
-                        );
+                    // Ocean Drive Art Deco Sidewalk Bistro Table & Seated Patrons on 3D Chairs (table & chairs stay permanently on map!)
+                    const northPeds = ["bikini_pink", "vc_crockett", "bikini_cyan", "vc_tommy"];
+                    const southPeds = ["vc_tourist", "bikini_cyan", "vc_crockett", "bikini_pink"];
+                    let pNorth = evWiped ? null : northPeds[ei % northPeds.length];
+                    let pSouth = evWiped ? null : southPeds[ei % southPeds.length];
+                    if (game && game.player && game.player.isSitting && game.player.sittingProp === ev) {
+                        if (game.player.sittingSeat === 0) pNorth = null;
+                        else pSouth = null;
                     }
+                    this.renderBistroTableScene3D(
+                        ev.x,
+                        ev.y,
+                        bz,
+                        pNorth,
+                        pSouth,
+                        (ei % 2 === 0) ? "PINK" : "CYAN",
+                        false
+                    );
                 } else if (ev.kind === "CLUB_VIP_LINE") {
                     // Velvet-rope VIP stanchions + Bouncer + Nightclub VIPs waiting in a clean single-file queue along building facade
                     this.pushSolidQuad3D(ev.x - 10, ev.y + 6, bz + 0.045, 2.4, 34.0, 0, 0.85, 0.12, 0.28, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
@@ -8111,19 +8115,23 @@ class RetroRenderer {
                         this.batchPedSprite3D("bikini_cyan", 98, ev.x + 12, ev.y + 10, bz + 0.038, -Math.PI * 0.65 - buskSway * 0.4, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 } else {
-                    // Lummus Park & Oceanfront Boardwalk 1:1 Scale 3D Wooden-Slat Promenade Bench (backed flush against the park lawn!)
-                    if (!evWiped) {
-                        const benchPairs = [
-                            ["bikini_pink", "vc_crockett"],
-                            ["vc_tourist", "bikini_cyan"],
-                            ["vc_tommy", null],
-                            ["g2_civ_aqua", "bikini_red"],
-                            [null, "bikini_yellow"]
-                        ];
-                        const pair = benchPairs[ei % benchPairs.length];
-                        const benchAng = ev.ang !== undefined ? ev.ang : ((ev.x < 450 * TILE_SIZE) ? Math.PI : 0);
-                        this.renderParkBenchScene3D(ev.x, ev.y, bz, benchAng, pair[0], pair[1]);
+                    // Lummus Park & Oceanfront Boardwalk 1:1 Scale 3D Wooden-Slat Promenade Bench (permanent map furniture — never disappears!)
+                    const benchPairs = [
+                        ["bikini_pink", "vc_crockett"],
+                        ["vc_tourist", "bikini_cyan"],
+                        ["vc_tommy", null],
+                        ["g2_civ_aqua", "bikini_red"],
+                        [null, "bikini_yellow"]
+                    ];
+                    const pair = benchPairs[ei % benchPairs.length];
+                    const benchAng = ev.ang !== undefined ? ev.ang : ((ev.x < 450 * TILE_SIZE) ? Math.PI : 0);
+                    let pA = evWiped ? null : pair[0];
+                    let pB = evWiped ? null : pair[1];
+                    if (game && game.player && game.player.isSitting && game.player.sittingProp === ev) {
+                        if (game.player.sittingSeat === 0) pA = null;
+                        else pB = null;
                     }
+                    this.renderParkBenchScene3D(ev.x, ev.y, bz, benchAng, pA, pB);
                 }
             }
         }
@@ -9868,6 +9876,17 @@ class RetroRenderer {
                     0.97,
                     1.0
                 );
+            } else if (p.isSitting && !isJumpingOrSliding) {
+                const pCharScale = p.pedType === "bigsmoke" ? 1.08 : 1.02;
+                this.renderSeatedPed3D(
+                    p.pedType || "lucia",
+                    p.x,
+                    p.y,
+                    baseZ - 0.014,
+                    p.angle,
+                    "BENCH_SLOT",
+                    pCharScale
+                );
             } else {
                 let frameIdx;
                 if ((p.slideCarTimer || 0) > 0) {
@@ -10631,25 +10650,29 @@ class RetroRenderer {
                     const vz = (vd.z !== undefined ? vd.z : 2.0);
                     if (vd.kind === "CAFE_TABLE") {
                         const umbSpr = vd.theme === "PINK" ? "umbrella_pink" : "umbrella_cyan";
-                        if ((vd.wipeoutTimer || 0) > 0) {
-                            this.renderSmashedParasol3D(umbSpr, vd.x, vd.y, vz, vd.knockAng || 0, 0.84);
-                        } else {
-                            const tblHash = Math.abs(Math.round(vd.y / 64));
-                            const northPeds = ["bikini_pink", "vc_crockett", "vc_tourist", "bikini_cyan"];
-                            const southPeds = ["vc_tommy", "bikini_cyan", "bikini_pink", "g2_civ_aqua"];
-                            const hasUmb = (tblHash % 2) === 0;
-                            const seatMode = tblHash % 3;
-                            const pNorth = seatMode <= 1 ? northPeds[tblHash % northPeds.length] : null;
-                            const pSouth = seatMode === 0 ? southPeds[tblHash % southPeds.length] : null;
-                            this.renderBistroTableScene3D(
-                                vd.x,
-                                vd.y,
-                                vz,
-                                pNorth,
-                                pSouth,
-                                vd.theme || "CYAN",
-                                hasUmb
-                            );
+                        const vdWiped = (vd.wipeoutTimer || 0) > 0;
+                        const tblHash = Math.abs(Math.round(vd.y / 64));
+                        const northPeds = ["bikini_pink", "vc_crockett", "vc_tourist", "bikini_cyan"];
+                        const southPeds = ["vc_tommy", "bikini_cyan", "bikini_pink", "g2_civ_aqua"];
+                        const hasUmb = (tblHash % 2) === 0;
+                        const seatMode = tblHash % 3;
+                        let pNorth = (!vdWiped && seatMode <= 1) ? northPeds[tblHash % northPeds.length] : null;
+                        let pSouth = (!vdWiped && seatMode === 0) ? southPeds[tblHash % southPeds.length] : null;
+                        if (game && game.player && game.player.isSitting && game.player.sittingProp === vd) {
+                            if (game.player.sittingSeat === 0) pNorth = null;
+                            else pSouth = null;
+                        }
+                        this.renderBistroTableScene3D(
+                            vd.x,
+                            vd.y,
+                            vz,
+                            pNorth,
+                            pSouth,
+                            vd.theme || "CYAN",
+                            hasUmb && !vdWiped
+                        );
+                        if (hasUmb && vdWiped) {
+                            this.renderSmashedParasol3D(umbSpr, vd.x - 10, vd.y, vz, vd.knockAng || 0, 0.84);
                         }
                     } else if (vd.kind === "BISTRO_STRING") {
                         // Española Way overhead Mediterranean festive light cable & glowing bulbs

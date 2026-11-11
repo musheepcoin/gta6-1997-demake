@@ -5367,6 +5367,81 @@ class LeonidaGame {
 
         }
 
+        // Sit down or stand up from a 3D Park Bench or Sidewalk Bistro Chair ([F] / [E] / [Enter])
+        if (!p.inVehicle && p.isSitting) {
+            p.isSitting = false;
+            p.sittingProp = null;
+            p.x += Math.cos(p.angle) * 11;
+            p.y += Math.sin(p.angle) * 11;
+            return;
+        }
+        if (!p.inVehicle && !p.isSitting && this.map) {
+            let nearVeh = false;
+            for (const v of this.vehicles) {
+                if (!v.destroyed && Math.hypot(v.x - p.x, v.y - p.y) < 36) { nearVeh = true; break; }
+            }
+            if (!nearVeh) {
+                let bestProp = null, bestDist = 32, bestSeat = 0, bestX = p.x, bestY = p.y, bestAng = p.angle;
+                if (Array.isArray(this.map.streetEvents)) {
+                    for (let i = 0; i < this.map.streetEvents.length; i++) {
+                        const ev = this.map.streetEvents[i];
+                        if (ev.kind === "PROMENADE_BENCH") {
+                            const d = Math.hypot(ev.x - p.x, ev.y - p.y);
+                            if (d < bestDist) {
+                                const bAng = ev.angle !== undefined ? ev.angle : 0;
+                                const ca = Math.cos(bAng), sa = Math.sin(bAng);
+                                const s0x = ev.x + ca * 1.4 - sa * (-10.6), s0y = ev.y + sa * 1.4 + ca * (-10.6);
+                                const s1x = ev.x + ca * 1.4 - sa * 10.6, s1y = ev.y + sa * 1.4 + ca * 10.6;
+                                const d0 = Math.hypot(s0x - p.x, s0y - p.y), d1 = Math.hypot(s1x - p.x, s1y - p.y);
+                                bestDist = d; bestProp = ev;
+                                if (d0 <= d1) { bestSeat = 0; bestX = s0x; bestY = s0y; }
+                                else { bestSeat = 1; bestX = s1x; bestY = s1y; }
+                                bestAng = bAng;
+                            }
+                        } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
+                            const d = Math.hypot(ev.x - p.x, ev.y - p.y);
+                            if (d < bestDist) {
+                                const s0y = ev.y - 18.0, s1y = ev.y + 18.0;
+                                const d0 = Math.hypot(ev.x - p.x, s0y - p.y), d1 = Math.hypot(ev.x - p.x, s1y - p.y);
+                                bestDist = d; bestProp = ev; bestX = ev.x;
+                                if (d0 <= d1) { bestSeat = 0; bestY = s0y; bestAng = Math.PI * 0.5; }
+                                else { bestSeat = 1; bestY = s1y; bestAng = -Math.PI * 0.5; }
+                            }
+                        }
+                    }
+                }
+                if (Array.isArray(this.map.viceStreetDetails)) {
+                    for (let i = 0; i < this.map.viceStreetDetails.length; i++) {
+                        const vd = this.map.viceStreetDetails[i];
+                        if (vd.kind !== "CAFE_TABLE") continue;
+                        const d = Math.hypot(vd.x - p.x, vd.y - p.y);
+                        if (d < bestDist) {
+                            const s0y = vd.y - 18.0, s1y = vd.y + 18.0;
+                            const d0 = Math.hypot(vd.x - p.x, s0y - p.y), d1 = Math.hypot(vd.x - p.x, s1y - p.y);
+                            bestDist = d; bestProp = vd; bestX = vd.x;
+                            if (d0 <= d1) { bestSeat = 0; bestY = s0y; bestAng = Math.PI * 0.5; }
+                            else { bestSeat = 1; bestY = s1y; bestAng = -Math.PI * 0.5; }
+                        }
+                    }
+                }
+                if (bestProp) {
+                    p.isSitting = true;
+                    p.sittingProp = bestProp;
+                    p.sittingSeat = bestSeat;
+                    p.x = bestX;
+                    p.y = bestY;
+                    p.angle = bestAng;
+                    p.vx = 0;
+                    p.vy = 0;
+                    this.floatingTexts.push({
+                        text: bestProp.kind === "PROMENADE_BENCH" ? "🪑 SITTING ON BENCH — [F] OR MOVE TO STAND" : "☕ SITTING AT CAFE — [F] OR MOVE TO STAND",
+                        x: p.x, y: p.y - 20, color: "#38bdf8", life: 2.2
+                    });
+                    return;
+                }
+            }
+        }
+
 
 
         // Exit current vehicle (with classic GTA 1 open door animation & exit_car ped frames 16..23!)
@@ -10593,6 +10668,17 @@ class LeonidaGame {
                     : ((this.input.sprint ? 195 : 138) * boostMult * (preWaterInfo.inWater ? 0.82 : 1.0));
 
                 const manualInput = this.input.up || this.input.down || this.input.left || this.input.right;
+
+                if (p.isSitting) {
+                    p.hp = Math.min(p.maxHp || 100, (p.hp || 100) + dt * 2.5);
+                    const joyMoved = this.input.joyActive && (Math.abs(this.input.joyX) > 0.15 || Math.abs(this.input.joyY) > 0.15);
+                    if (manualInput || joyMoved || (p.jumpTimer || 0) > 0 || this.input.shoot) {
+                        p.isSitting = false;
+                        p.sittingProp = null;
+                        p.x += Math.cos(p.angle) * 10;
+                        p.y += Math.sin(p.angle) * 10;
+                    }
+                }
 
                 if (manualInput) {
 
@@ -16158,24 +16244,53 @@ class LeonidaGame {
             }
         }
         if (Array.isArray(this.map.viceStreetDetails)) {
+            const cafePairs = [
+                ["bikini_pink", "vc_crockett"],
+                ["vc_tourist", "bikini_cyan"],
+                ["vc_cuban", "g2_civ_pink"],
+                ["vc_hawaiian_red", "bikini_yellow"]
+            ];
             for (let i = 0; i < this.map.viceStreetDetails.length; i++) {
                 const vd = this.map.viceStreetDetails[i];
                 if (vd.kind !== "CAFE_TABLE" || (vd.wipeoutTimer || 0) > 0) continue;
                 if (Math.abs(vd.x - hitX) > umbCull || Math.abs(vd.y - hitY) > umbCull) continue;
-                if (Math.hypot(vd.x - hitX, vd.y - hitY) < hitRad + 16) {
-                    vd.wipeoutTimer = 45.0;
+                if (Math.hypot(vd.x - hitX, vd.y - hitY) < hitRad + 22) {
+                    const tblHash = Math.abs(Math.round(vd.y / 64));
+                    const pair = cafePairs[tblHash % cafePairs.length];
+                    const seatMode = tblHash % 3;
+                    const pSittingHere = this.player && this.player.isSitting && this.player.sittingProp === vd;
+                    const pNorth = (seatMode !== 2 && !(pSittingHere && this.player.sittingSeat === 0)) ? pair[0] : null;
+                    const pSouth = (seatMode !== 1 && !(pSittingHere && this.player.sittingSeat === 1)) ? pair[1] : null;
+                    const members = [];
+                    if (pNorth) members.push({ ped: pNorth, x: vd.x, y: vd.y - 18.0 });
+                    if (pSouth) members.push({ ped: pSouth, x: vd.x, y: vd.y + 18.0 });
+                    if (members.length > 0) {
+                        spawnScenePeds(vd, members, null);
+                    } else {
+                        vd.wipeoutTimer = 45.0;
+                    }
                     vd.knockAng = Math.atan2(vd.y - hitY, vd.x - hitX);
                     smashParasolFX(vd.x, vd.y, vd.knockAng);
                 }
             }
         }
 
-        // 1. Street Events (Wynwood Breakdance Cyphers, Ocean Drive Livestreamers, Sidewalk Social Groups, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles)
+        // 1. Street Events (Wynwood Breakdance Cyphers, Ocean Drive Bistro Tables, Park Benches, Club VIP Lines, Little Cuba Domino Crowds & Beach Social Circles)
         if (Array.isArray(this.map.streetEvents)) {
+            const benchPairs = [
+                ["bikini_pink", "vc_crockett"],
+                ["vc_tourist", "bikini_cyan"],
+                ["vc_tommy", null],
+                ["g2_civ_aqua", "bikini_red"],
+                [null, "bikini_yellow"]
+            ];
+            const northPeds = ["bikini_pink", "vc_tourist", "g2_civ_aqua", "bikini_red"];
+            const southPeds = ["vc_crockett", "bikini_cyan", "vc_tommy", "bikini_yellow"];
             for (let i = 0; i < this.map.streetEvents.length; i++) {
                 const ev = this.map.streetEvents[i];
                 if ((ev.wipeoutTimer || 0) > 0) continue;
                 if (Math.hypot(ev.x - hitX, ev.y - hitY) < hitRad + 26) {
+                    const pSittingHere = this.player && this.player.isSitting && this.player.sittingProp === ev;
                     if (ev.kind === "WYNWOOD_CYPHER") {
                         spawnScenePeds(ev, [
                             { ped: "vc_cuban", x: ev.x, y: ev.y + 1 },
@@ -16186,12 +16301,18 @@ class LeonidaGame {
                             { ped: "g2_civ_pink", x: ev.x + 14, y: ev.y - 18 }
                         ], "💥 CYPHER CRASHED!");
                     } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
-                        spawnScenePeds(ev, [
-                            { ped: "bikini_pink", x: ev.x - 9, y: ev.y - 7 },
-                            { ped: "vc_crockett", x: ev.x + 9, y: ev.y - 6 },
-                            { ped: "bikini_cyan", x: ev.x - 8, y: ev.y + 8 },
-                            { ped: "vc_tourist", x: ev.x + 8, y: ev.y + 7 }
-                        ], "🍹 OCEAN DRIVE CROWD SCATTERED!");
+                        const members = [];
+                        if (!(pSittingHere && this.player.sittingSeat === 0)) {
+                            members.push({ ped: northPeds[i % northPeds.length], x: ev.x, y: ev.y - 18.0 });
+                        }
+                        if (!(pSittingHere && this.player.sittingSeat === 1)) {
+                            members.push({ ped: southPeds[i % southPeds.length], x: ev.x, y: ev.y + 18.0 });
+                        }
+                        if (members.length > 0) {
+                            spawnScenePeds(ev, members, null);
+                        } else {
+                            ev.wipeoutTimer = 45.0;
+                        }
                     } else if (ev.kind === "CLUB_VIP_LINE") {
                         spawnScenePeds(ev, [
                             { ped: "vc_bodybuilder", x: ev.x, y: ev.y - 18 },
@@ -16202,26 +16323,57 @@ class LeonidaGame {
                         ], "🥂 VIP CLUB LINE CRASHED!");
                     } else if (ev.kind === "LITTLE_CUBA_CROWD") {
                         spawnScenePeds(ev, [
-                            { ped: "vc_cuban", x: ev.x - 10, y: ev.y - 6 },
-                            { ped: "vc_hawaiian_red", x: ev.x + 10, y: ev.y - 6 },
-                            { ped: "vc_cuban", x: ev.x - 8, y: ev.y + 9 },
-                            { ped: "g2_civ_pink", x: ev.x + 9, y: ev.y + 8 }
-                        ], "☕ CALLE OCHO GATHERING SCATTERED!");
+                            { ped: "vc_cuban", x: ev.x - 17.5, y: ev.y },
+                            { ped: "vc_hawaiian_red", x: ev.x + 17.5, y: ev.y },
+                            { ped: "g2_civ_granny", x: ev.x, y: ev.y - 17.5 }
+                        ], "☕ CALLE OCHO DOMINO TABLE SCATTERED!");
                     } else if (ev.kind === "BEACH_SOCIAL_CIRCLE") {
                         spawnScenePeds(ev, [
-                            { ped: "bikini_pink", x: ev.x - 10, y: ev.y - 8 },
-                            { ped: "surfer_guy", x: ev.x + 10, y: ev.y - 7 },
-                            { ped: "bikini_cyan", x: ev.x - 9, y: ev.y + 9 },
-                            { ped: "bikini_yellow", x: ev.x + 9, y: ev.y + 8 },
-                            { ped: "vc_bodybuilder", x: ev.x, y: ev.y - 13 }
+                            { ped: "bikini_pink", x: ev.x - 18, y: ev.y - 2 },
+                            { ped: "surfer_guy", x: ev.x + 18, y: ev.y - 2 },
+                            { ped: "bikini_cyan", x: ev.x, y: ev.y - 19 }
                         ], "🏖️ BEACH PARTY CIRCLE SCATTERED!", true);
-                    } else {
+                    } else if (ev.kind === "BOARDWALK_IGUANA_ACT") {
                         spawnScenePeds(ev, [
-                            { ped: "bikini_pink", x: ev.x + 6, y: ev.y },
-                            { ped: "vc_tourist", x: ev.x - 19, y: ev.y },
-                            { ped: "vc_crockett", x: ev.x + 4, y: ev.y - 14 },
-                            { ped: "bikini_cyan", x: ev.x + 16, y: ev.y + 10 }
-                        ], "📱 LIVESTREAM PHOTOBOMBED!");
+                            { ped: "surfer_guy", x: ev.x, y: ev.y },
+                            { ped: "vc_tourist", x: ev.x - 18, y: ev.y - 11 },
+                            { ped: "bikini_pink", x: ev.x + 18, y: ev.y + 11 }
+                        ], null);
+                    } else if (ev.kind === "BOARDWALK_ROLLERBLADERS") {
+                        spawnScenePeds(ev, [
+                            { ped: "bikini_pink", x: ev.x - 8, y: ev.y },
+                            { ped: "vc_jogger", x: ev.x + 8, y: ev.y }
+                        ], null);
+                    } else if (ev.kind === "BOARDWALK_BUSKER") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_hawaiian_red", x: ev.x - 2, y: ev.y - 16 },
+                            { ped: "bikini_cyan", x: ev.x + 12, y: ev.y + 10 }
+                        ], null);
+                    } else {
+                        // PROMENADE_BENCH: spawn only the exact 1 or 2 seated NPCs on that bench!
+                        const pair = benchPairs[i % benchPairs.length];
+                        const bAng = ev.angle !== undefined ? ev.angle : 0;
+                        const ca = Math.cos(bAng), sa = Math.sin(bAng);
+                        const members = [];
+                        if (pair[0] && !(pSittingHere && this.player.sittingSeat === 0)) {
+                            members.push({
+                                ped: pair[0],
+                                x: ev.x + ca * 1.4 - sa * (-10.6),
+                                y: ev.y + sa * 1.4 + ca * (-10.6)
+                            });
+                        }
+                        if (pair[1] && !(pSittingHere && this.player.sittingSeat === 1)) {
+                            members.push({
+                                ped: pair[1],
+                                x: ev.x + ca * 1.4 - sa * 10.6,
+                                y: ev.y + sa * 1.4 + ca * 10.6
+                            });
+                        }
+                        if (members.length > 0) {
+                            spawnScenePeds(ev, members, null);
+                        } else {
+                            ev.wipeoutTimer = 45.0;
+                        }
                     }
                 }
             }
