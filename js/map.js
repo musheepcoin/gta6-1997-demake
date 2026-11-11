@@ -7039,6 +7039,59 @@ class LeonidaMap {
             this.fenceSpanGrid = grid;
             this._fenceGridCount = spanList.length;
         }
+
+        const evCount = (Array.isArray(this.streetEvents) ? this.streetEvents.length : 0) +
+                        (Array.isArray(this.viceStreetDetails) ? this.viceStreetDetails.length : 0);
+        if (evCount > 0 && (this._furnGridCount !== evCount || !this.furnitureBoxGrid)) {
+            const grid = new Map();
+            const pad = 28;
+            const addFurnBox = (bb) => {
+                const gx0 = Math.floor((bb.minX - pad) / 128);
+                const gx1 = Math.floor((bb.maxX + pad) / 128);
+                const gy0 = Math.floor((bb.minY - pad) / 128);
+                const gy1 = Math.floor((bb.maxY + pad) / 128);
+                for (let gy = gy0; gy <= gy1; gy++) {
+                    for (let gx = gx0; gx <= gx1; gx++) {
+                        const key = (gx << 16) | (gy & 0xffff);
+                        let cell = grid.get(key);
+                        if (!cell) {
+                            cell = [];
+                            grid.set(key, cell);
+                        }
+                        cell.push(bb);
+                    }
+                }
+            };
+            if (Array.isArray(this.streetEvents)) {
+                for (let i = 0; i < this.streetEvents.length; i++) {
+                    const ev = this.streetEvents[i];
+                    if (!ev) continue;
+                    if (ev.kind === "PROMENADE_BENCH") {
+                        const ang = ev.angle !== undefined ? ev.angle : 0;
+                        const cosA = Math.cos(ang), sinA = Math.sin(ang);
+                        const cx = ev.x - cosA * 1.0, cy = ev.y - sinA * 1.0;
+                        const hw = 6.5, hh = 21.0;
+                        const extX = Math.abs(cosA) * hw + Math.abs(sinA) * hh;
+                        const extY = Math.abs(sinA) * hw + Math.abs(cosA) * hh;
+                        addFurnBox({ cx, cy, hw, hh, cosA, sinA, minX: cx - extX, maxX: cx + extX, minY: cy - extY, maxY: cy + extY, propRef: ev });
+                    } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
+                        addFurnBox({ minX: ev.x - 8.5, maxX: ev.x + 8.5, minY: ev.y - 21.0, maxY: ev.y + 21.0, propRef: ev });
+                    } else if (ev.kind === "LITTLE_CUBA_CROWD") {
+                        addFurnBox({ minX: ev.x - 14.5, maxX: ev.x + 14.5, minY: ev.y - 14.5, maxY: ev.y + 14.5, propRef: ev });
+                    }
+                }
+            }
+            if (Array.isArray(this.viceStreetDetails)) {
+                for (let i = 0; i < this.viceStreetDetails.length; i++) {
+                    const vd = this.viceStreetDetails[i];
+                    if (vd && vd.kind === "CAFE_TABLE") {
+                        addFurnBox({ minX: vd.x - 8.5, maxX: vd.x + 8.5, minY: vd.y - 21.0, maxY: vd.y + 21.0, propRef: vd });
+                    }
+                }
+            }
+            this.furnitureBoxGrid = grid;
+            this._furnGridCount = evCount;
+        }
     }
 
     /* ========================================================================
@@ -7144,14 +7197,18 @@ class LeonidaMap {
             this.ensureBarrierSpatialGrids();
             const cellKey = (Math.floor(nx / 128) << 16) | (Math.floor(ny / 128) & 0xffff);
 
-            // Physical collision against Solid Security Barrier Boxes (O(1) spatial cell lookup!)
+            // Physical collision against Solid Security Barrier Boxes & Street Furniture (Park Benches, Bistro Tables, Domino Tables)
             const cellBoxes = this.barrierBoxGrid ? this.barrierBoxGrid.get(cellKey) : null;
-            if (cellBoxes) {
+            const furnBoxes = (radius >= 6 && this.furnitureBoxGrid) ? this.furnitureBoxGrid.get(cellKey) : null;
+            if (cellBoxes || furnBoxes) {
                 for (let pass = 0; pass < 2; pass++) {
-                    for (let i = 0; i < cellBoxes.length; i++) {
-                        const bb = cellBoxes[i];
-                        if (bb.vehiclesOnly && radius < 11.5) continue;
-                        if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
+                    for (let listIdx = 0; listIdx < 2; listIdx++) {
+                        const activeList = listIdx === 0 ? cellBoxes : furnBoxes;
+                        if (!activeList) continue;
+                        for (let i = 0; i < activeList.length; i++) {
+                            const bb = activeList[i];
+                            if (bb.vehiclesOnly && radius < 11.5) continue;
+                            if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
 
                         if (bb.cx !== undefined) {
                             const relX = nx - bb.cx;
@@ -7212,6 +7269,7 @@ class LeonidaMap {
                                     else ny = bb.maxY + radius;
                                 }
                             }
+                        }
                         }
                     }
                 }

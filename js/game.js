@@ -5369,10 +5369,23 @@ class LeonidaGame {
 
         // Sit down or stand up from a 3D Park Bench or Sidewalk Bistro Chair ([F] / [E] / [Enter])
         if (!p.inVehicle && p.isSitting) {
+            const prop = p.sittingProp;
+            const seat = p.sittingSeat || 0;
             p.isSitting = false;
             p.sittingProp = null;
-            p.x += Math.cos(p.angle) * 11;
-            p.y += Math.sin(p.angle) * 11;
+            if (prop && prop.kind === "PROMENADE_BENCH") {
+                const bAng = prop.angle !== undefined ? prop.angle : 0;
+                const ca = Math.cos(bAng), sa = Math.sin(bAng);
+                const lat = seat === 0 ? -10.6 : 10.6;
+                p.x = prop.x + ca * 18.5 - sa * lat;
+                p.y = prop.y + sa * 18.5 + ca * lat;
+            } else if (prop) {
+                p.x = prop.x + 20.0;
+                p.y = prop.y + (seat === 0 ? -16.5 : 16.5);
+            } else {
+                p.x += Math.cos(p.angle) * 16;
+                p.y += Math.sin(p.angle) * 16;
+            }
             return;
         }
         if (!p.inVehicle && !p.isSitting && this.map) {
@@ -5381,7 +5394,7 @@ class LeonidaGame {
                 if (!v.destroyed && Math.hypot(v.x - p.x, v.y - p.y) < 36) { nearVeh = true; break; }
             }
             if (!nearVeh) {
-                let bestProp = null, bestDist = 32, bestSeat = 0, bestX = p.x, bestY = p.y, bestAng = p.angle;
+                let bestProp = null, bestDist = 38, bestSeat = 0, bestX = p.x, bestY = p.y, bestAng = p.angle;
                 if (Array.isArray(this.map.streetEvents)) {
                     for (let i = 0; i < this.map.streetEvents.length; i++) {
                         const ev = this.map.streetEvents[i];
@@ -8045,6 +8058,12 @@ class LeonidaGame {
 
         ped.dead = true;
 
+        if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+            const c = this.map.resolveCircleBuildingCollision(ped.x, ped.y, 12, ped.z || 2.0);
+            ped.x = c.x;
+            ped.y = c.y;
+        }
+
         ped.burnTimer = 0;
 
         ped.electroTimer = 0;
@@ -10673,10 +10692,23 @@ class LeonidaGame {
                     p.hp = Math.min(p.maxHp || 100, (p.hp || 100) + dt * 2.5);
                     const joyMoved = this.input.joyActive && (Math.abs(this.input.joyX) > 0.15 || Math.abs(this.input.joyY) > 0.15);
                     if (manualInput || joyMoved || (p.jumpTimer || 0) > 0 || this.input.shoot) {
+                        const prop = p.sittingProp;
+                        const seat = p.sittingSeat || 0;
                         p.isSitting = false;
                         p.sittingProp = null;
-                        p.x += Math.cos(p.angle) * 10;
-                        p.y += Math.sin(p.angle) * 10;
+                        if (prop && prop.kind === "PROMENADE_BENCH") {
+                            const bAng = prop.angle !== undefined ? prop.angle : 0;
+                            const ca = Math.cos(bAng), sa = Math.sin(bAng);
+                            const lat = seat === 0 ? -10.6 : 10.6;
+                            p.x = prop.x + ca * 18.5 - sa * lat;
+                            p.y = prop.y + sa * 18.5 + ca * lat;
+                        } else if (prop) {
+                            p.x = prop.x + 20.0;
+                            p.y = prop.y + (seat === 0 ? -16.5 : 16.5);
+                        } else {
+                            p.x += Math.cos(p.angle) * 16;
+                            p.y += Math.sin(p.angle) * 16;
+                        }
                     }
                 }
 
@@ -10843,11 +10875,11 @@ class LeonidaGame {
                 const isUnderBridgeSwimmer = Boolean(p.isSwimming || preWaterInfo.underBridge);
                 const canSwimIntoWater = (p.z || 2.0) <= 2.38 || (p.jumpTimer || 0) > 0 || Boolean(preWaterInfo.inWater);
 
-                const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0, canSwimIntoWater, isUnderBridgeSwimmer);
-
-                p.x = col.x;
-
-                p.y = col.y;
+                if (!p.isSitting) {
+                    const col = this.map.resolveCircleBuildingCollision(p.x, p.y, 11, p.z || 2.0, canSwimIntoWater, isUnderBridgeSwimmer);
+                    p.x = col.x;
+                    p.y = col.y;
+                }
 
 
 
@@ -16152,7 +16184,9 @@ class LeonidaGame {
                     turnSeed: i + 17
                 });
                 this.peds.push(ped);
-                const d = Math.hypot(m.x - hitX, m.y - hitY);
+                const checkX = m.seatX !== undefined ? m.seatX : m.x;
+                const checkY = m.seatY !== undefined ? m.seatY : m.y;
+                const d = Math.hypot(checkX - hitX, checkY - hitY);
                 if (d <= hitRad + 18 || (!requireDirectHit && i === 0 && killedCount === 0)) {
                     if (isNonLethal) {
                         ped.stunnedTimer = 1.65;
@@ -16262,8 +16296,8 @@ class LeonidaGame {
                     const pNorth = (seatMode !== 2 && !(pSittingHere && this.player.sittingSeat === 0)) ? pair[0] : null;
                     const pSouth = (seatMode !== 1 && !(pSittingHere && this.player.sittingSeat === 1)) ? pair[1] : null;
                     const members = [];
-                    if (pNorth) members.push({ ped: pNorth, x: vd.x, y: vd.y - 18.0 });
-                    if (pSouth) members.push({ ped: pSouth, x: vd.x, y: vd.y + 18.0 });
+                    if (pNorth) members.push({ ped: pNorth, x: vd.x + 19.5, y: vd.y - 18.0, seatX: vd.x, seatY: vd.y - 18.0 });
+                    if (pSouth) members.push({ ped: pSouth, x: vd.x + 19.5, y: vd.y + 18.0, seatX: vd.x, seatY: vd.y + 18.0 });
                     if (members.length > 0) {
                         spawnScenePeds(vd, members, null);
                     } else {
@@ -16303,10 +16337,10 @@ class LeonidaGame {
                     } else if (ev.kind === "OCEAN_DRIVE_CROWD") {
                         const members = [];
                         if (!(pSittingHere && this.player.sittingSeat === 0)) {
-                            members.push({ ped: northPeds[i % northPeds.length], x: ev.x, y: ev.y - 18.0 });
+                            members.push({ ped: northPeds[i % northPeds.length], x: ev.x + 19.5, y: ev.y - 18.0, seatX: ev.x, seatY: ev.y - 18.0 });
                         }
                         if (!(pSittingHere && this.player.sittingSeat === 1)) {
-                            members.push({ ped: southPeds[i % southPeds.length], x: ev.x, y: ev.y + 18.0 });
+                            members.push({ ped: southPeds[i % southPeds.length], x: ev.x + 19.5, y: ev.y + 18.0, seatX: ev.x, seatY: ev.y + 18.0 });
                         }
                         if (members.length > 0) {
                             spawnScenePeds(ev, members, null);
@@ -16323,9 +16357,9 @@ class LeonidaGame {
                         ], "🥂 VIP CLUB LINE CRASHED!");
                     } else if (ev.kind === "LITTLE_CUBA_CROWD") {
                         spawnScenePeds(ev, [
-                            { ped: "vc_cuban", x: ev.x - 17.5, y: ev.y },
-                            { ped: "vc_hawaiian_red", x: ev.x + 17.5, y: ev.y },
-                            { ped: "g2_civ_granny", x: ev.x, y: ev.y - 17.5 }
+                            { ped: "vc_cuban", x: ev.x - 24.5, y: ev.y, seatX: ev.x - 17.5, seatY: ev.y },
+                            { ped: "vc_hawaiian_red", x: ev.x + 24.5, y: ev.y, seatX: ev.x + 17.5, seatY: ev.y },
+                            { ped: "g2_civ_granny", x: ev.x, y: ev.y - 24.5, seatX: ev.x, seatY: ev.y - 17.5 }
                         ], "☕ CALLE OCHO DOMINO TABLE SCATTERED!");
                     } else if (ev.kind === "BEACH_SOCIAL_CIRCLE") {
                         spawnScenePeds(ev, [
@@ -16350,7 +16384,7 @@ class LeonidaGame {
                             { ped: "bikini_cyan", x: ev.x + 12, y: ev.y + 10 }
                         ], null);
                     } else {
-                        // PROMENADE_BENCH: spawn only the exact 1 or 2 seated NPCs on that bench!
+                        // PROMENADE_BENCH: spawn only the exact 1 or 2 seated NPCs falling forward in front of the bench!
                         const pair = benchPairs[i % benchPairs.length];
                         const bAng = ev.angle !== undefined ? ev.angle : 0;
                         const ca = Math.cos(bAng), sa = Math.sin(bAng);
@@ -16358,15 +16392,19 @@ class LeonidaGame {
                         if (pair[0] && !(pSittingHere && this.player.sittingSeat === 0)) {
                             members.push({
                                 ped: pair[0],
-                                x: ev.x + ca * 1.4 - sa * (-10.6),
-                                y: ev.y + sa * 1.4 + ca * (-10.6)
+                                x: ev.x + ca * 18.5 - sa * (-10.6),
+                                y: ev.y + sa * 18.5 + ca * (-10.6),
+                                seatX: ev.x + ca * 1.4 - sa * (-10.6),
+                                seatY: ev.y + sa * 1.4 + ca * (-10.6)
                             });
                         }
                         if (pair[1] && !(pSittingHere && this.player.sittingSeat === 1)) {
                             members.push({
                                 ped: pair[1],
-                                x: ev.x + ca * 1.4 - sa * 10.6,
-                                y: ev.y + sa * 1.4 + ca * 10.6
+                                x: ev.x + ca * 18.5 - sa * 10.6,
+                                y: ev.y + sa * 18.5 + ca * 10.6,
+                                seatX: ev.x + ca * 1.4 - sa * 10.6,
+                                seatY: ev.y + sa * 1.4 + ca * 10.6
                             });
                         }
                         if (members.length > 0) {

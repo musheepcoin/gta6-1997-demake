@@ -9216,6 +9216,11 @@ class RetroRenderer {
             this.renderSeatedPed3D("vc_cuban", x - 17.5, y, zBlocks + 0.036, 0, "STOOL_WOOD", 1.0);
             this.renderSeatedPed3D("vc_hawaiian_red", x + 17.5, y, zBlocks + 0.036, Math.PI, "STOOL_WOOD", 1.0);
             this.renderSeatedPed3D("g2_civ_granny", x, y - 17.5, zBlocks + 0.036, Math.PI * 0.5, "STOOL_WOOD", 1.0);
+        } else {
+            for (const [sx, sy] of [[x - 16.0, y], [x + 16.0, y], [x, y - 16.0]]) {
+                this.pushSolidQuad3D(sx, sy, zBlocks + 0.028, 11.2, 11.2, 0, 0.44, 0.24, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                this.pushSolidQuad3D(sx, sy, zBlocks + 0.032, 8.8, 8.8, 0, 0.66, 0.40, 0.20, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            }
         }
         // Empty South wooden stool
         this.pushSolidQuad3D(x, y + 16.0, zBlocks + 0.028, 11.2, 11.2, 0, 0.44, 0.24, 0.12, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
