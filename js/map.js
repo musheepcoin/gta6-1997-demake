@@ -3375,7 +3375,7 @@ class LeonidaMap {
                             const laneDirs = this.getAllowedRoadDirections(tc2, tr2, 2.0);
                             if (laneDirs.some((d) => d.dx === travelX && d.dy === travelY)) approachK.push(k);
                         }
-                        if (approachK.length === 0 && lastLaneK > 0) approachK.push(1); // unmarked leg: keep a single head on the nearest lane
+                        if (approachK.length === 0) continue; // this leg only flows AWAY from the junction (one-way): no signal needed here
                         if (approachK.length > 2) approachK.length = 2;                  // never more than a double signal
                         const maxK = approachK.length ? approachK[approachK.length - 1] : 1;
                         const armReach = Math.max(24.0, maxK * TILE_SIZE - 18.0 + 24.0);
