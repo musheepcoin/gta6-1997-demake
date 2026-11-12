@@ -3226,14 +3226,15 @@ class LeonidaGame {
 
         this.ytSeekOffset = 0;
         this.ytRadioFallbackIds = [
-            "0l8BuoAJ3qw", // GTA 6 Radio Mix | Retro 80s EDM & Miami Club Vibes
-            "AHiRDCD1hPc", // 80s Retro Synthwave MIX — Miami Vice 80s Retrowave
-            "GK0Le-u0Uho", // GTA 6 INSPIRED | Vice City Night Race 80s Synthwave Mix
-            "crbk0SQAHg0", // Vice City Night Drive 1 Hour 80s Synthwave & Outrun Mix
-            "zeKyGp2CJ2A", // GTA 6 RADIO 1 Hour Vice City Driving Music Mix
-            "TE8tvtpXvsQ"  // GTA 1 (1997) Full Official Soundtrack
+            "Nl7r0rL38nU", // EVERY GTA 6 SONG — The ULTIMATE Radio Soundtrack (Primary)
+            "0l8BuoAJ3qw", // Fallback if accessed via raw IP 127.0.0.1
+            "AHiRDCD1hPc",
+            "GK0Le-u0Uho",
+            "crbk0SQAHg0",
+            "zeKyGp2CJ2A",
+            "TE8tvtpXvsQ"
         ];
-        this.ytCurrentVideoId = "0l8BuoAJ3qw";
+        this.ytCurrentVideoId = "Nl7r0rL38nU";
         this._ytErrorFailoverIdx = 0;
 
         const isMobileDevice = typeof window !== "undefined" && (
@@ -3570,25 +3571,20 @@ class LeonidaGame {
 
             const nowMs = performance.now();
 
-            if (!this.ytActuallyPlaying && !this._ytBuffering) {
+            // Clear stale pre-gesture buffering state if it stalled waiting for user interaction
+            if (this._ytBuffering && !this.ytActuallyPlaying && (nowMs - (this._lastYtProgressMs || 0) > 2500)) {
+                this._ytBuffering = false;
+            }
 
-                if (nowMs - (this._lastYtKickMs || 0) > 1200) {
+            if (!this._ytGestureUnlocked || (!this.ytActuallyPlaying && !this._ytBuffering)) {
+
+                if (nowMs - (this._lastYtKickMs || 0) > 900) {
 
                     this._lastYtKickMs = nowMs;
 
                     tryAutoStart(true);
 
                 }
-
-            } else if (!this._ytGestureUnlocked) {
-
-                this._ytGestureUnlocked = true;
-
-                const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
-
-                this.sendYouTubeCommand("unMute", []);
-
-                this.sendYouTubeCommand("setVolume", [vol]);
 
             }
 
@@ -3644,6 +3640,10 @@ class LeonidaGame {
 
                     this.audio.resume();
 
+                }
+
+                if (this._ytBuffering && !this.ytActuallyPlaying && (performance.now() - (this._lastYtProgressMs || 0) > 4000)) {
+                    this._ytBuffering = false;
                 }
 
                 if (!this.ytActuallyPlaying && !this._ytBuffering) {

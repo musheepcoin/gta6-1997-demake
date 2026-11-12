@@ -262,12 +262,12 @@ class RetroAudioEngine {
         this.muted = false;
         this.initialized = false;
 
-        // Radio Station Metadata (YouTube Soundtrack Only — verified embeddable streams)
+        // Radio Station Metadata (YouTube Soundtrack — Nl7r0rL38nU primary)
         this.stations = [
-            { name: "FLASH FM LEONIDA 97.1", genre: "Vice Outrun Synthwave", bpm: 124, videoId: "0l8BuoAJ3qw" },
-            { name: "CALIENTE 98.3 MIAMI", genre: "Leonida Urban & Driving Beats", bpm: 118, videoId: "zeKyGp2CJ2A" },
-            { name: "OCEAN DRIVE BOOGIE 101.9", genre: "Miami Vice 80s Synthwave", bpm: 120, videoId: "AHiRDCD1hPc" },
-            { name: "GELLHORN GARAGE 104.5", genre: "90s GTA 1 Big Beat & Synth-Rock", bpm: 132, videoId: "TE8tvtpXvsQ" }
+            { name: "FLASH FM LEONIDA 97.1", genre: "Vice Outrun Synthwave", bpm: 124, videoId: "Nl7r0rL38nU" },
+            { name: "CALIENTE 98.3 MIAMI", genre: "Leonida Latin Electro-Bass", bpm: 118, videoId: "Nl7r0rL38nU" },
+            { name: "OCEAN DRIVE BOOGIE 101.9", genre: "Sunset Coast Italo-Disco", bpm: 120, videoId: "Nl7r0rL38nU" },
+            { name: "GELLHORN GARAGE 104.5", genre: "90s GTA 1 Big Beat & Synth-Rock", bpm: 132, videoId: "Nl7r0rL38nU" }
         ];
 
         this.currentStationIdx = 0;
