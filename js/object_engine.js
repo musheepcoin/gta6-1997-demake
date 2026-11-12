@@ -8619,7 +8619,7 @@ class WorldObjectEngine {
                     const bridgeWhite = [0.95, 0.97, 1.00];
                     const bridgeGlass = [0.16, 0.58, 0.84];
                     const funnelOrange = [0.94, 0.38, 0.14];
-                    const vs = 1 + Math.max(0, sc - 1.5) * 0.14; // taller superstructure on larger ships
+                    const vs = 1 + Math.max(0, sc - 1.5) * 0.22; // taller superstructure on larger ships
 
                     // 1. Soft ocean contact shadow + crisp elevated waterline hull above water surface (bz + 0.046 * vs)
                     emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, 118 * sc, 44 * sc, bz, 0.46);
@@ -8655,23 +8655,26 @@ class WorldObjectEngine {
                         emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 2.0 * sc, bz + 0.285 * vs, bz + 0.302 * vs, [0.92, 0.74, 0.16], 3);
                     }
 
-                    // 5. 3-Bay x 2-Row x Multi-Tier 3D Corrugated Intermodal Shipping Containers (MAT 6)
-                    const bayOffsets = [-11.5 * sc, 7.5 * sc, 26.5 * sc];
-                    const bayLen = 17.2 * sc;
-                    const rowWidth = 12.6 * sc;
-                    for (let bi = 0; bi < 3; bi++) {
-                        const bxOff = bayOffsets[bi];
-                        for (let ri = 0; ri < 2; ri++) {
-                            const byOff = (ri === 0 ? -7.0 : 7.0) * sc;
-                            const col1 = containerPalette[(i + bi * 2 + ri) % containerPalette.length];
-                            const col2 = containerPalette[(i + bi * 2 + ri + 2) % containerPalette.length];
-                            // Tier 1 & Tier 2 3D Corrugated Steel Containers
-                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.242 * vs, bz + 0.445 * vs, col1, 6);
-                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.450 * vs, bz + 0.645 * vs, col2, 6);
-                            // Tier 3 High-Cube Container on aft & center bays for authentic stepped Panamax cargo profile
-                            if (bi < 2 && ((i + bi + ri) % 3 !== 0)) {
-                                const col3 = containerPalette[(i + bi * 3 + ri + 4) % containerPalette.length];
-                                emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.650 * vs, bz + 0.835 * vs, col3, 6);
+                    // 5. Cargo holds loaded with the SAME container size as the quay stacks (54x22 px * 1.25), stacked 2..4 tiers high
+                    const cLen = 54 * 1.25;            // identical to land CONTAINERS (cw)
+                    const cWid = 22 * 1.25;            // identical to land CONTAINERS (cd)
+                    const tierH = 0.24;                // identical to land tier height
+                    const zoneAft = -20 * sc, zoneFore = 30 * sc;
+                    const nBays = Math.max(1, Math.floor((zoneFore - zoneAft) / (cLen + 2)));
+                    const nRows = Math.max(1, Math.floor((30 * sc - 14) / (cWid + 1.5)));
+                    const bayPitch = (zoneFore - zoneAft) / nBays;
+                    const rowPitch = cWid + 1.5;
+                    const deckZ = bz + 0.242 * vs;
+                    for (let bi = 0; bi < nBays; bi++) {
+                        const bxOff = zoneAft + (bi + 0.5) * bayPitch;
+                        const maxTiers = bi < nBays - 1 ? 4 : 3; // stacks step down toward the bow
+                        for (let ri = 0; ri < nRows; ri++) {
+                            const byOff = (ri - (nRows - 1) * 0.5) * rowPitch;
+                            const edgeLow = (ri === 0 || ri === nRows - 1) ? 1 : 0; // outer rows slightly lower
+                            const tiers = Math.max(2, maxTiers - edgeLow - ((i + bi * 2 + ri * 3) % 2));
+                            for (let ti = 0; ti < tiers; ti++) {
+                                const colT = containerPalette[(i + bi * 2 + ri + ti * 3) % containerPalette.length];
+                                emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, cLen, cWid, deckZ + ti * (tierH + 0.005), deckZ + ti * (tierH + 0.005) + tierH, colT, 6);
                             }
                         }
                     }
