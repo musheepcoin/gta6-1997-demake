@@ -5477,18 +5477,13 @@ class LeonidaMap {
             console.warn("Shop interior generation failed:", e);
         }
 
-        // 10 High-Flying Unique Stunt Jump Ramps across Vice City & Leonida!
+        // 5 Iconic, Strategically Positioned Unique Stunt Jump Ramps across Vice City & Leonida!
         this.stuntRamps = [
-            { id: "RAMP_OCEAN_SOUTH", name: "OCEAN DRIVE PROMENADE JUMP", x: 448.5 * TILE_SIZE, y: 292.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_OCEAN_MID", name: "LUMMUS PARK BEACH LAUNCH", x: 448.5 * TILE_SIZE, y: 265.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_MACARTHUR", name: "MACARTHUR CAUSEWAY BAY JUMP", x: 356.0 * TILE_SIZE, y: 297.5 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_VENETIAN", name: "VENETIAN ISLAND CANAL JUMP", x: 356.0 * TILE_SIZE, y: 176.5 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_JULIA_TUTTLE", name: "NORTH BAY SUPERJUMP", x: 356.0 * TILE_SIZE, y: 75.0 * TILE_SIZE, angle: 0 },
-            { id: "RAMP_DOWNTOWN", name: "DOWNTOWN BAYFRONT LAUNCH", x: 285.5 * TILE_SIZE, y: 261.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_STADIUM", name: "MAMBAS STADIUM BOWL JUMP", x: 188.5 * TILE_SIZE, y: 188.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_SPEEDWAY", name: "PORT GELLHORN SUPER-SPEEDWAY RAMP", x: 84.2 * TILE_SIZE, y: 174.5 * TILE_SIZE, angle: Math.PI },
-            { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET RAMP", x: 90.5 * TILE_SIZE, y: 297.0 * TILE_SIZE, angle: -Math.PI * 0.5 },
-            { id: "RAMP_KEYS", name: "LEONIDA KEYS BROKEN BRIDGE JUMP", x: 202.0 * TILE_SIZE, y: 480.5 * TILE_SIZE, angle: Math.PI }
+            { id: "RAMP_PIER", name: "VICE PIER OCEAN LAUNCH", x: 475.6 * TILE_SIZE, y: 196.15 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_STADIUM", name: "MAMBAS FIELD-GOAL SUPERJUMP", x: 188.5 * TILE_SIZE, y: 169.4 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_AIRPORT", name: "VCIA RUNWAY JET OVERPASS JUMP", x: 110.5 * TILE_SIZE, y: 302.5 * TILE_SIZE, angle: -Math.PI * 0.5 },
+            { id: "RAMP_KEYS", name: "SEVEN MILE BROKEN BRIDGE JUMP", x: 201.2 * TILE_SIZE, y: 478.6 * TILE_SIZE, angle: 0 },
+            { id: "RAMP_SPEEDWAY", name: "GELLHORN SPEEDWAY INFIELD LAUNCH", x: 57.0 * TILE_SIZE, y: 162.5 * TILE_SIZE, angle: 0 }
         ];
         return landmarksList;
     }

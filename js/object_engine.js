@@ -314,7 +314,7 @@ class WorldObjectEngine {
             },
             wynwoodWalls: { x: 189.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0 },
             lakeLeonidaOutpost: { x: 125.5 * TILE_SIZE, y: 103.0 * TILE_SIZE, z: 2.0 },
-            sevenMileOldSpan: { x: 202.0 * TILE_SIZE, y: 478.6 * TILE_SIZE, z: 2.0, jumpX: 202.0 * TILE_SIZE, jumpY: 480.5 * TILE_SIZE, cooldown: 0 },
+            sevenMileOldSpan: { x: 202.0 * TILE_SIZE, y: 478.6 * TILE_SIZE, z: 2.0, jumpX: 201.2 * TILE_SIZE, jumpY: 478.6 * TILE_SIZE, cooldown: 0 },
             // GTA 6 Trailer 1, Trailer 2 & 70 Official Screenshots Iconic Landmarks:
             briansBoatyard: { x: 216.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             rustyAnchorBar: { x: 225.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
@@ -545,12 +545,7 @@ class WorldObjectEngine {
             { name: "OCEAN BEACH EMERALD REEF SCUBA BUOY",    x: 492.5 * TILE_SIZE, y: 256.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 3.2 },
             { name: "STAR ISLAND SUNKEN YACHT CORAL DIVE",    x: 362.5 * TILE_SIZE, y: 182.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 4.6 }
         ];
-        this.dirtBikeStuntRamps = [
-            { name: "PORT GELLHORN MOTOCROSS SUPER-RAMP",     x: 78.5 * TILE_SIZE,  y: 224.5 * TILE_SIZE, z: 2.0, ang: 0,             cooldown: 0 },
-            { name: "MOUNT KALAGA CANYON RIDGE JUMP",         x: 122.5 * TILE_SIZE, y: 24.5 * TILE_SIZE,  z: 2.0, ang: 0,             cooldown: 0 },
-            { name: "AMBROSIA SUGAR MILL DIRT-BIKE RAMP",     x: 154.5 * TILE_SIZE, y: 124.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, cooldown: 0 },
-            { name: "VICE BEACH SOUTH JETTY DUNE RAMP",       x: 468.5 * TILE_SIZE, y: 344.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,cooldown: 0 }
-        ];
+        this.dirtBikeStuntRamps = [];
         // 16. Official GTA 6 Vice Beach Surfboard / Paddleboard Rental Shacks & Offshore Jet-Ski Slalom Course Gates (Loop 9)
         this.surfShacks = [
             { name: "NORTH VICE BEACH SURF & PADDLE SHACK",   x: 465.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
@@ -640,11 +635,7 @@ class WorldObjectEngine {
             { name: "LITTLE HAITI KOMPA DRUM STAGE",          x: 224.5 * TILE_SIZE, y: 116.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         // 23. Official GTA 6 Thrillbilly / Port Gellhorn Monster-Truck Car-Crush Arenas & Keys Shark-Cage Charters (Loop 16)
-        this.monsterCrushPads = [
-            { name: "THRILLBILLY MUD PARK MONSTER CRUSH",     x: 90.5 * TILE_SIZE,  y: 458.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "PORT GELLHORN DERBY CRUSH ARENA",        x: 64.5 * TILE_SIZE,  y: 194.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "AMBROSIA JUNKYARD CAR-CRUSH RAMP",       x: 156.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
-        ];
+        this.monsterCrushPads = [];
         this.sharkCageCharters = [
             { name: "KEY LENTO TIGER SHARK CAGE DIVE",        x: 254.5 * TILE_SIZE, y: 494.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 0.5 },
             { name: "SEVEN MILE GREAT WHITE CAGE CHARTER",    x: 168.5 * TILE_SIZE, y: 492.5 * TILE_SIZE, z: 2.0, cooldown: 0, seed: 2.2 },

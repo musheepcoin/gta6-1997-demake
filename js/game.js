@@ -10612,21 +10612,23 @@ class LeonidaGame {
 
                     const vSpd = Math.hypot(v.vx, v.vy);
 
-                    if (vSpd > 125) {
+                    if (vSpd > 95) {
 
                         for (const ramp of this.map.stuntRamps) {
 
-                            if (Math.hypot(v.x - ramp.x, v.y - ramp.y) < 46) {
+                            if (Math.hypot(v.x - ramp.x, v.y - ramp.y) < 48) {
+                                const align = (v.vx * Math.cos(ramp.angle || 0) + v.vy * Math.sin(ramp.angle || 0)) / Math.max(1, vSpd);
+                                if (align < 0.30) continue;
 
-                                v.stuntMaxTime = Math.min(1.45, Math.max(0.95, vSpd / 280));
+                                v.stuntMaxTime = Math.min(1.50, Math.max(0.95, vSpd / 260));
 
                                 v.stuntAirTimer = v.stuntMaxTime;
 
                                 v.lastRampName = ramp.name;
 
-                                v.vx *= 1.22;
+                                v.vx *= 1.24;
 
-                                v.vy *= 1.22;
+                                v.vy *= 1.24;
 
                                 this.audio.playBeep(520, 0.12, "sawtooth", 0.08);
 
