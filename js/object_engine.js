@@ -8619,39 +8619,40 @@ class WorldObjectEngine {
                     const bridgeWhite = [0.95, 0.97, 1.00];
                     const bridgeGlass = [0.16, 0.58, 0.84];
                     const funnelOrange = [0.94, 0.38, 0.14];
+                    const vs = 1 + Math.max(0, sc - 1.5) * 0.14; // taller superstructure on larger ships
 
-                    // 1. Soft ocean contact shadow + crisp elevated waterline hull above water surface (bz + 0.046)
+                    // 1. Soft ocean contact shadow + crisp elevated waterline hull above water surface (bz + 0.046 * vs)
                     emitAOShadow3D(pt.x, pt.y, cosA, sinA, 0, 0, 118 * sc, 44 * sc, bz, 0.46);
 
                     // 2. Anti-fouling red oxide waterline boot-top (bz+0.046 .. bz+0.095) + bulbous bow prow
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 35.0 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 27.0 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.5 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.5 * sc, bz + 0.046, bz + 0.095, hullRed, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  54 * sc, 0,  5 * sc,  5.2 * sc, bz + 0.046, bz + 0.082, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 35.0 * sc, bz + 0.046 * vs, bz + 0.095 * vs, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 27.0 * sc, bz + 0.046 * vs, bz + 0.095 * vs, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.5 * sc, bz + 0.046 * vs, bz + 0.095 * vs, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.5 * sc, bz + 0.046 * vs, bz + 0.095 * vs, hullRed, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  54 * sc, 0,  5 * sc,  5.2 * sc, bz + 0.046 * vs, bz + 0.082 * vs, hullRed, 5);
 
                     // 3. White Plimsoll waterline stripe + riveted dark navy-charcoal steel hull freeboard (bz+0.095 .. bz+0.24)
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82.4 * sc, 35.2 * sc, bz + 0.092, bz + 0.104, bridgeWhite, 9);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 34.2 * sc, bz + 0.102, bz + 0.235, hullDark, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 26.5 * sc, bz + 0.102, bz + 0.248, hullDark, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.0 * sc, bz + 0.102, bz + 0.262, hullDark, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.0 * sc, bz + 0.102, bz + 0.276, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82.4 * sc, 35.2 * sc, bz + 0.092 * vs, bz + 0.104 * vs, bridgeWhite, 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 82 * sc, 34.2 * sc, bz + 0.102 * vs, bz + 0.235 * vs, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  35 * sc, 0, 14 * sc, 26.5 * sc, bz + 0.102 * vs, bz + 0.248 * vs, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  44 * sc, 0, 10 * sc, 17.0 * sc, bz + 0.102 * vs, bz + 0.262 * vs, hullDark, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  50 * sc, 0,  7 * sc,  9.0 * sc, bz + 0.102 * vs, bz + 0.276 * vs, hullDark, 5);
 
                     // 4. Non-slip steel cargo hold weather deck + raised bow forecastle deck + Port/Starboard gunwale bulwark rails
-                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 80 * sc, 31.6 * sc, bz + 0.215, bz + 0.242, 177, 177, 71, deckGrey, false);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  39 * sc, 0, 16 * sc, 22.0 * sc, bz + 0.225, bz + 0.275, hullMid, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  47 * sc, 0,  9 * sc, 12.0 * sc, bz + 0.240, bz + 0.290, hullMid, 5);
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, 0, 80 * sc, 31.6 * sc, bz + 0.215 * vs, bz + 0.242 * vs, 177, 177, 71, deckGrey, false);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  39 * sc, 0, 16 * sc, 22.0 * sc, bz + 0.225 * vs, bz + 0.275 * vs, hullMid, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  47 * sc, 0,  9 * sc, 12.0 * sc, bz + 0.240 * vs, bz + 0.290 * vs, hullMid, 5);
                     // Anchor windlass winches + hazard coaming on bow forecastle
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  41 * sc, -4.5 * sc, 5.5 * sc, 4.2 * sc, bz + 0.275, bz + 0.33, [0.92, 0.74, 0.16], 3);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  41 * sc,  4.5 * sc, 5.5 * sc, 4.2 * sc, bz + 0.275, bz + 0.33, [0.92, 0.74, 0.16], 3);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  41 * sc, -4.5 * sc, 5.5 * sc, 4.2 * sc, bz + 0.275 * vs, bz + 0.33 * vs, [0.92, 0.74, 0.16], 3);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  41 * sc,  4.5 * sc, 5.5 * sc, 4.2 * sc, bz + 0.275 * vs, bz + 0.33 * vs, [0.92, 0.74, 0.16], 3);
                     const fMastX = pt.x + cosA * (49 * sc);
                     const fMastY = pt.y + sinA * (49 * sc);
-                    emitCylinder3D(fMastX, fMastY, 0, 0, 1.4 * sc, 0.9 * sc, bz + 0.29, bz + 0.56, 6, bridgeWhite, 5, false);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  49 * sc, 0, 2.6 * sc, 2.6 * sc, bz + 0.56, bz + 0.60, [1.0, 0.98, 0.88], 10);
+                    emitCylinder3D(fMastX, fMastY, 0, 0, 1.4 * sc, 0.9 * sc, bz + 0.29 * vs, bz + 0.56 * vs, 6, bridgeWhite, 5, false);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA,  49 * sc, 0, 2.6 * sc, 2.6 * sc, bz + 0.56 * vs, bz + 0.60 * vs, [1.0, 0.98, 0.88], 10);
 
                     for (const side of [-1, 1]) {
-                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 1.8 * sc, bz + 0.225, bz + 0.285, hullMid, 9);
-                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 2.0 * sc, bz + 0.285, bz + 0.302, [0.92, 0.74, 0.16], 3);
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 1.8 * sc, bz + 0.225 * vs, bz + 0.285 * vs, hullMid, 9);
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -10 * sc, side * 16.3 * sc, 80 * sc, 2.0 * sc, bz + 0.285 * vs, bz + 0.302 * vs, [0.92, 0.74, 0.16], 3);
                     }
 
                     // 5. 3-Bay x 2-Row x Multi-Tier 3D Corrugated Intermodal Shipping Containers (MAT 6)
@@ -8665,34 +8666,34 @@ class WorldObjectEngine {
                             const col1 = containerPalette[(i + bi * 2 + ri) % containerPalette.length];
                             const col2 = containerPalette[(i + bi * 2 + ri + 2) % containerPalette.length];
                             // Tier 1 & Tier 2 3D Corrugated Steel Containers
-                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.242, bz + 0.445, col1, 6);
-                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.450, bz + 0.645, col2, 6);
+                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.242 * vs, bz + 0.445 * vs, col1, 6);
+                            emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.450 * vs, bz + 0.645 * vs, col2, 6);
                             // Tier 3 High-Cube Container on aft & center bays for authentic stepped Panamax cargo profile
                             if (bi < 2 && ((i + bi + ri) % 3 !== 0)) {
                                 const col3 = containerPalette[(i + bi * 3 + ri + 4) % containerPalette.length];
-                                emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.650, bz + 0.835, col3, 6);
+                                emitSolidBox3D(pt.x, pt.y, cosA, sinA, bxOff, byOff, bayLen, rowWidth, bz + 0.650 * vs, bz + 0.835 * vs, col3, 6);
                             }
                         }
                     }
 
                     // 6. Aft 4-Story 3D White Superstructure, Panoramic Navigation Bridge, Wings & Smokestack Funnel
                     // Tier 1 & 2 Crew & Officer Deckhouse
-                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -35.5 * sc, 0, 21 * sc, 28.5 * sc, bz + 0.242, bz + 0.46, 199, 86, 86, bridgeWhite, false);
-                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -36.5 * sc, 0, 17 * sc, 25.0 * sc, bz + 0.46,  bz + 0.64, 199, 86, 86, bridgeWhite, false);
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -35.5 * sc, 0, 21 * sc, 28.5 * sc, bz + 0.242 * vs, bz + 0.46 * vs, 199, 86, 86, bridgeWhite, false);
+                    emitTileBox3D(pt.x, pt.y, cosA, sinA, -36.5 * sc, 0, 17 * sc, 25.0 * sc, bz + 0.46 * vs,  bz + 0.64 * vs, 199, 86, 86, bridgeWhite, false);
                     // Tier 3 Panoramic Navigation Bridge + Projecting Port & Starboard Bridge Wings (spanning full 36*sc beam!)
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 13.5 * sc, 35.5 * sc, bz + 0.64, bz + 0.77, bridgeGlass, 7);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 15.0 * sc, 36.5 * sc, bz + 0.77, bz + 0.82, bridgeWhite, 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 13.5 * sc, 35.5 * sc, bz + 0.64 * vs, bz + 0.77 * vs, bridgeGlass, 7);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 15.0 * sc, 36.5 * sc, bz + 0.77 * vs, bz + 0.82 * vs, bridgeWhite, 9);
                     // Port (Red) & Starboard (Green) Bridge Wing Navigation Lights
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, -18.2 * sc, 3.2 * sc, 2.2 * sc, bz + 0.78, bz + 0.84, [1.0, 0.14, 0.18], 10);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc,  18.2 * sc, 3.2 * sc, 2.2 * sc, bz + 0.78, bz + 0.84, [0.14, 0.96, 0.42], 10);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, -18.2 * sc, 3.2 * sc, 2.2 * sc, bz + 0.78 * vs, bz + 0.84 * vs, [1.0, 0.14, 0.18], 10);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc,  18.2 * sc, 3.2 * sc, 2.2 * sc, bz + 0.78 * vs, bz + 0.84 * vs, [0.14, 0.96, 0.42], 10);
                     // Aft Safety-Orange Smokestack Funnel Casing + Black Soot Cap + Radar Mast
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -42.5 * sc, 0, 8.5 * sc, 11.0 * sc, bz + 0.64, bz + 0.92, funnelOrange, 5);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -42.5 * sc, 0, 9.0 * sc, 11.5 * sc, bz + 0.92, bz + 0.97, [0.12, 0.14, 0.18], 9);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 3.2 * sc,  3.2 * sc, bz + 0.82, bz + 1.08, bridgeWhite, 4);
-                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 2.6 * sc, 13.5 * sc, bz + 1.04, bz + 1.08, bridgeWhite, 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -42.5 * sc, 0, 8.5 * sc, 11.0 * sc, bz + 0.64 * vs, bz + 0.92 * vs, funnelOrange, 5);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -42.5 * sc, 0, 9.0 * sc, 11.5 * sc, bz + 0.92 * vs, bz + 0.97 * vs, [0.12, 0.14, 0.18], 9);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 3.2 * sc,  3.2 * sc, bz + 0.82 * vs, bz + 1.08 * vs, bridgeWhite, 4);
+                    emitSolidBox3D(pt.x, pt.y, cosA, sinA, -34.5 * sc, 0, 2.6 * sc, 13.5 * sc, bz + 1.04 * vs, bz + 1.08 * vs, bridgeWhite, 9);
                     // Twin Orange Free-Fall Lifeboats on Stern Quarters
                     for (const side of [-1, 1]) {
-                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -44.5 * sc, side * 10.5 * sc, 8.0 * sc, 4.6 * sc, bz + 0.46, bz + 0.55, [0.98, 0.44, 0.10], 9);
+                        emitSolidBox3D(pt.x, pt.y, cosA, sinA, -44.5 * sc, side * 10.5 * sc, 8.0 * sc, 4.6 * sc, bz + 0.46 * vs, bz + 0.55 * vs, [0.98, 0.44, 0.10], 9);
                     }
                 }
             }

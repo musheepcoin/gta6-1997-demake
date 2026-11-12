@@ -8826,8 +8826,7 @@ class RetroRenderer {
                 const bob = Math.sin(this.time * 1.8 + pt.seed) * 0.008;
                 if (pt.kind === "BARGE") {
                     // Crisp dark water shadow + 100% opaque hull deck above water beneath the 3D Volumetric Panamax Container Ship
-                    this.batchObjectSprite3D("cargo_barge", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.014, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);
-                    this.batchObjectSprite3D("cargo_barge", pt.x, pt.y, bz + 0.045, pt.ang, pt.scale, SPRITE_DRAW_ORDER.CAR);
+                    // 3D ship hull, AO shadow and superstructure are rendered by WorldObjectEngine (flat sprite removed: it did not scale with the larger hull)
                 } else if (pt.kind === "CONTAINERS") {
                     // Ground shadow (true 3D multi-tiered shipping container stacks rendered by WorldObjectEngine)
                     this.batchObjectSprite3D("container_stack", pt.x + sunCos * 5, pt.y + sunSin * 5, bz + 0.016, pt.ang, pt.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.36);

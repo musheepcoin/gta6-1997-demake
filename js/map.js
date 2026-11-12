@@ -2515,16 +2515,16 @@ class LeonidaMap {
         // 11) Vice Port, Port Gellhorn, Ambrosia Refinery & Island Marina Cargo Barges, Containers & Boats ("portTerminals")
         this.portTerminals = [
             // Deepwater Panamax Container Freighters moored parallel to West & East Quays (100% in clean open water gt=1)
-            { kind: "BARGE",      c: 325.8, r: 306.5, ang: -Math.PI * 0.5, scale: 1.55 }, // Vice Port West Berth #1 (right beside NW Terminal Yard!)
-            { kind: "BARGE",      c: 325.8, r: 324.5, ang: -Math.PI * 0.5, scale: 1.55 }, // Vice Port West Berth #2 (beside SW Terminal Yard)
-            { kind: "BARGE",      c: 361.5, r: 308.0, ang: -Math.PI * 0.5, scale: 1.60 }, // Vice Port North-East Berth #3
-            { kind: "BARGE",      c: 363.2, r: 324.0, ang: -Math.PI * 0.5, scale: 1.55 }, // Vice Port South-East Berth #4
-            { kind: "BARGE",      c: 363.2, r: 334.0, ang:  Math.PI * 0.5, scale: 1.60 }, // Vice Port South-East Berth #5
-            { kind: "BARGE",      c: 15.0,  r: 186.5, ang: Math.PI,        scale: 1.50 },
-            { kind: "BARGE",      c: 38.0,  r: 209.5, ang: 0,              scale: 1.55 },
-            { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 1.55 },
-            { kind: "BARGE",      c: 139.5, r: 100.5, ang: -Math.PI * 0.5, scale: 1.45 },
-            { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 1.45 },
+            // Panamax-class liners are now drawn at true port scale (~9 tiles long, ~3 tiles beam) and sit flush against the quay walls
+            { kind: "BARGE",      c: 326.9, r: 307.0, ang: -Math.PI * 0.5, scale: 5.5 }, // Vice Port West Berth #1 (aligned with NW gantry crane)
+            { kind: "BARGE",      c: 326.9, r: 326.0, ang: -Math.PI * 0.5, scale: 5.5 }, // Vice Port West Berth #2 (aligned with SW gantry cranes)
+            { kind: "BARGE",      c: 361.0, r: 309.0, ang: -Math.PI * 0.5, scale: 5.5 }, // Vice Port North-East Berth #3 (quay r=299..319)
+            { kind: "BARGE",      c: 363.0, r: 329.0, ang:  Math.PI * 0.5, scale: 5.5 }, // Vice Port South-East Berth #4 (quay r=321..337)
+            { kind: "BARGE",      c: 15.0,  r: 186.5, ang: Math.PI,        scale: 5.0 },
+            { kind: "BARGE",      c: 38.0,  r: 209.5, ang: 0,              scale: 5.0 },
+            { kind: "BARGE",      c: 38.0,  r: 253.5, ang: Math.PI,        scale: 5.0 },
+            { kind: "BARGE",      c: 139.5, r: 100.5, ang: -Math.PI * 0.5, scale: 3.0 },
+            { kind: "BARGE",      c: 137.0, r: 125.0, ang: Math.PI * 0.5,  scale: 3.0 },
             // Vice Port Block 1 — North-West Waterfront Quay Container Apron (aligned N-S behind NW Gantry Crane at c = 332..334)
             { kind: "CONTAINERS", c: 332.2, r: 301.2, ang: Math.PI * 0.5,  scale: 1.25 },
             { kind: "CONTAINERS", c: 333.8, r: 301.2, ang: Math.PI * 0.5,  scale: 1.25 },
