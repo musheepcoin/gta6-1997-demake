@@ -3358,13 +3358,37 @@ class LeonidaMap {
                         const headX = baseX + dirX * 32.0;
                         const headY = baseY + dirY * 32.0;
                         const armAngle = isNS ? (dcCorner > 0 ? 0 : Math.PI) : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
+                        // Mast-arm span: count consecutive street tiles the arm crosses (2-lane road = 2 tiles, wider = more)
+                        let spanTiles = 0;
+                        for (let k = 1; k <= 6; k++) {
+                            const tc2 = c + dirX * k, tr2 = r + dirY * k;
+                            if (this.surfaceGround[tr2 * MAP_COLS + tc2] === GROUND_TYPE.ROAD) spanTiles++;
+                            else break;
+                        }
+                        spanTiles = Math.max(1, spanTiles);
+                        const roadW = spanTiles * TILE_SIZE;
+                        const armReach = 14.0 + roadW * 0.88;
+                        // Face = direction the lenses look (toward approaching traffic on the road leg)
+                        const faceX = isNS ? 0 : dcCorner;
+                        const faceY = isNS ? drCorner : 0;
+                        // One hanging 3-lens head per ~lane (min 1, max 3), centred over each lane
+                        const nHeads = Math.max(1, Math.min(3, Math.round(spanTiles * 1.0 + 0.0)));
+                        const heads = [];
+                        for (let hI = 0; hI < nHeads; hI++) {
+                            const off = 14.0 + roadW * ((hI + 0.5) / nHeads) * 0.88;
+                            heads.push({ x: baseX + dirX * off, y: baseY + dirY * off });
+                        }
                         this.trafficSignals.push({
                             c,
                             r,
                             baseX,
                             baseY,
-                            headX,
-                            headY,
+                            headX: heads[0].x,
+                            headY: heads[0].y,
+                            heads,
+                            armReach,
+                            faceX,
+                            faceY,
                             dirX,
                             dirY,
                             z: surfZ,

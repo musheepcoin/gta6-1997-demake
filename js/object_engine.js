@@ -13445,71 +13445,50 @@ class WorldObjectEngine {
                 const zDrop = isDamaged ? 0.065 : 0.0;
                 const topPoleX = ts.baseX + tDx;
                 const topPoleY = ts.baseY + tDy;
-                const effHeadX = ts.headX + tDx;
-                const effHeadY = ts.headY + tDy;
                 const armCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle);
                 const armSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle);
-                const armLen = Math.max(18, Math.hypot(effHeadX - topPoleX, effHeadY - topPoleY) + 4.0);
-                const midX = (topPoleX + effHeadX) * 0.5;
-                const midY = (topPoleY + effHeadY) * 0.5;
+                const reach = ts.armReach || 40.0;
+                const heads = ts.heads || [{ x: ts.headX, y: ts.headY }];
                 const st = ts.axis === "NS" ? nsState : ewState;
+                const blkPole = [0.07, 0.08, 0.10];
+                const armZ = bz + 0.80 - zDrop;
 
-                // 1. 2-Tier Heavy Octagonal Steel Corner Mast Foundation (MAT 9)
-                emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.4, 4.8, bz, bz + 0.09, 8, baseCol, 9, true);
-                emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 4.0, 3.2, bz + 0.09, bz + 0.18, 8, poleCol, 9, true);
-
-                // 2. Continuous 3D Vertical Gantry Mast Column + Yellow Pedestrian Crosswalk Call-Button Box
+                // 1. Black steel octagonal foundation + tall tapered mast pole (like real 2-lane mast-arm signals)
+                emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.4, 4.6, bz, bz + 0.10, 8, blkPole, 9, true);
                 if (isDamaged) {
-                    emitDynBox(ts.baseX + tDx * 0.25, ts.baseY + tDy * 0.25, armCos, armSin, 0, 0, 4.4, 4.4, bz + 0.17, bz + 0.38 - zDrop * 0.5, poleCol, 1.0, 9);
-                    emitDynBox(ts.baseX + tDx * 0.28, ts.baseY + tDy * 0.28, armCos, armSin, 0, 0, 5.4, 5.4, bz + 0.22, bz + 0.28, ywCol, 1.0, 9);
-                    emitDynBox(ts.baseX + tDx * 0.75, ts.baseY + tDy * 0.75, armCos, armSin, 0, 0, 3.8, 3.8, bz + 0.36 - zDrop * 0.5, bz + 0.60 - zDrop, poleCol, 1.0, 9);
+                    emitDynBox(ts.baseX + tDx * 0.4, ts.baseY + tDy * 0.4, armCos, armSin, 0, 0, 3.6, 3.6, bz + 0.10, bz + 0.45, blkPole, 1.0, 9);
+                    emitDynBox(ts.baseX + tDx * 0.85, ts.baseY + tDy * 0.85, armCos, armSin, 0, 0, 3.0, 3.0, bz + 0.45, armZ, blkPole, 1.0, 9);
                 } else {
-                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 2.6, 2.1, bz + 0.18, bz + 0.60, 8, poleCol, 9, true);
-                    emitDynBox(ts.baseX, ts.baseY, armCos, armSin, 0, 0, 5.4, 5.4, bz + 0.22, bz + 0.28, ywCol, 1.0, 9);
+                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 3.0, 2.2, bz + 0.10, armZ, 8, blkPole, 9, true);
                 }
 
-                // 3. 3D Diagonal Gusset Brace + Overhanging Horizontal Cantilever Mast Arm reaching over the road lane
-                emitDynBox(
-                    topPoleX + armCos * 6.0,
-                    topPoleY + armSin * 6.0,
-                    armCos,
-                    armSin,
-                    0,
-                    0,
-                    12.0,
-                    2.4,
-                    bz + 0.49 - zDrop,
-                    bz + 0.57 - zDrop,
-                    baseCol,
-                    1.0,
-                    9
-                );
-                emitDynBox(midX, midY, armCos, armSin, 0, 0, armLen, 3.5, bz + 0.565 - zDrop, bz + 0.60 - zDrop, poleCol, 1.0, 9);
+                // 2. Long horizontal mast arm reaching over the whole road, with a thin upper truss rail
+                const armMidX = topPoleX + armCos * reach * 0.5;
+                const armMidY = topPoleY + armSin * reach * 0.5;
+                emitDynBox(armMidX, armMidY, armCos, armSin, 0, 0, reach, 2.8, armZ - 0.03, armZ + 0.015, blkPole, 1.0, 9);
+                emitDynBox(armMidX, armMidY, armCos, armSin, 0, 0, reach * 0.92, 1.4, armZ + 0.015, armZ + 0.045, blkPole, 1.0, 9);
+                emitDynBox(topPoleX + armCos * 8.0, topPoleY + armSin * 8.0, armCos, armSin, 0, 0, 14.0, 2.0, armZ - 0.10, armZ - 0.06, blkPole, 1.0, 9);
 
-                // 4. Authentic 3D Volumetric Miami / Florida 3-Lens Traffic Signal Box ([ RED | AMBER | GREEN ])
-                // Florida Highway-Yellow 3D reflective casing + matte black 3-compartment interior box
-                emitDynBox(effHeadX, effHeadY, armCos, armSin, 0, 0, 25.0, 11.0, bz + 0.552 - zDrop, bz + 0.602 - zDrop, ywCol, 1.0, 9);
-                emitDynBox(effHeadX, effHeadY, armCos, armSin, 0, 0, 21.6, 8.2, bz + 0.558 - zDrop, bz + 0.610 - zDrop, blkCol, 1.0, 9);
-
-                // 3 Circular/Square Signal Bays along the housing: Red (+6.8 tip), Amber (0.0 mid), Green (-6.8 inner)
-                const redX = effHeadX + armCos * 6.8, redY = effHeadY + armSin * 6.8;
-                const ambX = effHeadX,                ambY = effHeadY;
-                const grnX = effHeadX - armCos * 6.8, grnY = effHeadY - armSin * 6.8;
-
-                // Visor hoods & dark unlit lens glass for all 3 bays
-                emitDynBox(redX, redY, armCos, armSin, 0, 0, 5.6, 5.6, bz + 0.606 - zDrop, bz + 0.616 - zDrop, [0.28, 0.05, 0.07], 1.0, 9);
-                emitDynBox(ambX, ambY, armCos, armSin, 0, 0, 5.6, 5.6, bz + 0.606 - zDrop, bz + 0.616 - zDrop, [0.28, 0.18, 0.04], 1.0, 9);
-                emitDynBox(grnX, grnY, armCos, armSin, 0, 0, 5.6, 5.6, bz + 0.606 - zDrop, bz + 0.616 - zDrop, [0.04, 0.25, 0.12], 1.0, 9);
-
-                // Active Emissive 3D Signal Lens (flickers when the gantry is damaged/bent!)
+                // 3. One hanging vertical 3-lens signal head per lane (RED top / AMBER / GREEN bottom), facing approaching traffic
+                const fX = ts.faceX || 0, fY = ts.faceY || 0;
+                const fSign = ((-armSin) * fX + armCos * fY) >= 0 ? 1 : -1;
                 const lensOn = !isDamaged || Math.sin(t * 28.0 + ts.baseX) > -0.25;
-                if (lensOn) {
-                    if (st === "RED") {
-                        emitDynBox(redX, redY, armCos, armSin, 0, 0, 4.8, 4.8, bz + 0.612 - zDrop, bz + 0.626 - zDrop, [1.0, 0.14, 0.20], 1.0, 10);
-                    } else if (st === "AMBER") {
-                        emitDynBox(ambX, ambY, armCos, armSin, 0, 0, 4.8, 4.8, bz + 0.612 - zDrop, bz + 0.626 - zDrop, [1.0, 0.76, 0.08], 1.0, 10);
-                    } else {
-                        emitDynBox(grnX, grnY, armCos, armSin, 0, 0, 4.8, 4.8, bz + 0.612 - zDrop, bz + 0.626 - zDrop, [0.08, 0.98, 0.42], 1.0, 10);
+                const headTop = armZ - 0.03;
+                const headBot = headTop - 0.27;
+                for (let hi = 0; hi < heads.length; hi++) {
+                    const hx = heads[hi].x + tDx, hy = heads[hi].y + tDy;
+                    // hanger stem + black housing + backplate
+                    emitDynBox(hx, hy, armCos, armSin, 0, 0, 2.0, 2.0, headTop, headTop + 0.03, blkPole, 1.0, 9);
+                    emitDynBox(hx, hy, armCos, armSin, 0, 0, 7.0, 6.4, headBot, headTop, blkPole, 1.0, 9);
+                    emitDynBox(hx, hy, armCos, armSin, 0, fSign * 3.4, 10.0, 0.8, headBot - 0.02, headTop + 0.02, [0.04, 0.05, 0.06], 1.0, 9);
+                    const lensY = fSign * 3.9;
+                    const zs = [headTop - 0.045, headTop - 0.135, headTop - 0.225];
+                    const dark = [[0.28, 0.05, 0.07], [0.28, 0.18, 0.04], [0.04, 0.25, 0.12]];
+                    const lit = [[1.0, 0.14, 0.20], [1.0, 0.76, 0.08], [0.08, 0.98, 0.42]];
+                    const act = st === "RED" ? 0 : (st === "AMBER" ? 1 : 2);
+                    for (let li = 0; li < 3; li++) {
+                        const on = (li === act) && lensOn;
+                        emitDynBox(hx, hy, armCos, armSin, 0, lensY, 4.8, 0.7, zs[li] - 0.035, zs[li] + 0.035, on ? lit[li] : dark[li], 1.0, on ? 10 : 9);
                     }
                 }
             }

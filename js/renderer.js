@@ -11670,27 +11670,27 @@ class RetroRenderer {
                 const ts = tsNightVis[vi];
                 if (ts.state === 2) continue;
                 if (ts.state === 1 && Math.sin(this.time * 28.0 + ts.baseX) <= -0.25) continue;
-                const effHX = ts.headX + (ts.state === 1 ? (ts.tiltDx || 0) : 0);
-                const effHY = ts.headY + (ts.state === 1 ? (ts.tiltDy || 0) : 0);
-                if (Math.abs(effHX - this.camX) > 880 || Math.abs(effHY - this.camY) > 640) continue;
+                const tdx = ts.state === 1 ? (ts.tiltDx || 0) : 0;
+                const tdy = ts.state === 1 ? (ts.tiltDy || 0) : 0;
+                if (Math.abs(ts.headX + tdx - this.camX) > 880 || Math.abs(ts.headY + tdy - this.camY) > 640) continue;
                 const sz = ts.z || 2.0;
                 const zDrop = ts.state === 1 ? 0.065 : 0.0;
                 const st = ts.axis === "NS" ? nsState : ewState;
-                const dx = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle);
-                const dy = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle);
-                const lensOff = st === "RED" ? 6.8 : (st === "AMBER" ? 0.0 : -6.8);
-                const lx = effHX + dx * lensOff;
-                const ly = effHY + dy * lensOff;
-                const hSc = this.worldToScreen(lx, ly, sz + 0.61 - zDrop);
-                if (hSc.x < -140 || hSc.x > W + 140 || hSc.y < -140 || hSc.y > H + 140) continue;
-                const pxScale = (hSc.scale * H) / 128.0;
-                // Small soft cutout right over the signal housing so the 3-lens box stays sharp at night without shining like a streetlamp
-                if (st === "GREEN") {
-                    addLightPool(hSc.x, hSc.y, 18 * pxScale, "rgba(40, 255, 115, 0.55)", "rgba(0, 180, 65, 0.14)");
-                } else if (st === "AMBER") {
-                    addLightPool(hSc.x, hSc.y, 18 * pxScale, "rgba(255, 190, 40, 0.55)", "rgba(215, 110, 0, 0.14)");
-                } else {
-                    addLightPool(hSc.x, hSc.y, 18 * pxScale, "rgba(255, 50, 75, 0.55)", "rgba(205, 10, 35, 0.14)");
+                const hl = ts.heads || [{ x: ts.headX, y: ts.headY }];
+                const lensZ = sz + 0.80 - zDrop - 0.03 - (st === "RED" ? 0.045 : (st === "AMBER" ? 0.135 : 0.225));
+                for (let hi = 0; hi < hl.length; hi++) {
+                    const lx = hl[hi].x + tdx + (ts.faceX || 0) * 4.0;
+                    const ly = hl[hi].y + tdy + (ts.faceY || 0) * 4.0;
+                    const hSc = this.worldToScreen(lx, ly, lensZ);
+                    if (hSc.x < -140 || hSc.x > W + 140 || hSc.y < -140 || hSc.y > H + 140) continue;
+                    const pxScale = (hSc.scale * H) / 128.0;
+                    if (st === "GREEN") {
+                        addLightPool(hSc.x, hSc.y, 18 * pxScale, "rgba(40, 255, 115, 0.55)", "rgba(0, 180, 65, 0.14)");
+                    } else if (st === "AMBER") {
+                        addLightPool(hSc.x, hSc.y, 18 * pxScale, "rgba(255, 190, 40, 0.55)", "rgba(215, 110, 0, 0.14)");
+                    } else {
+                        addLightPool(hSc.x, hSc.y, 18 * pxScale, "rgba(255, 50, 75, 0.55)", "rgba(205, 10, 35, 0.14)");
+                    }
                 }
             }
         }
