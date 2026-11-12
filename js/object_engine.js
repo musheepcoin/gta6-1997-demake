@@ -7674,10 +7674,18 @@ class WorldObjectEngine {
                         float texMod = 0.90 + dot(stoneTex, vec3(0.333)) * 0.16;
                         vec3 altCol = c.rgb * (checker > 0.5 ? 1.04 : 0.84) * texMod + grain * 0.45;
                         c.rgb = mix(darkInk * 1.4, altCol, mix(0.55, 1.0, grout));
-                    } else {
+                    } else if (matId < 14.5) {
                         // MAT 14: High-Resolution 1024x1024 Baked Multi-Zone Procedural Pixel-Art Interior Floor (bound to uDayLightTex!)
                         vec4 floorTex = texture2D(uDayLightTex, puv);
                         c.rgb = floorTex.rgb * vColor.rgb + grain * 0.25;
+                        c.a = vColor.a;
+                    } else {
+                        // MAT 15: Spanish Mediterranean Barrel-Tile Terracotta Clay Roof (scalloped barrel ribs + course shadows)
+                        float rib = sin((vWorldPos.x + vWorldPos.z) * 37.699) * 0.055;
+                        float course = fract(puv.y * 6.0);
+                        float courseStep = smoothstep(0.0, 0.18, course) * (1.0 - 0.18 * step(0.86, course));
+                        float tileVar = (hash21(floor(vWorldPos.xz * 8.0)) - 0.5) * 0.06;
+                        c.rgb = (vColor.rgb + rib + tileVar + grain * 0.5) * courseStep;
                         c.a = vColor.a;
                     }
                 } else {
@@ -7993,6 +8001,45 @@ class WorldObjectEngine {
                 const uv0 = encodeMatUV(matId, s / segs, 0.05);
                 const uv1 = encodeMatUV(matId, (s + 1) / segs, 0.05);
                 pushTri3D(apex, b0, b1, uvApex, uv0, uv1, Math.min(1, r * shade), Math.min(1, g * shade), Math.min(1, b * shade), 1.0);
+            }
+        };
+
+        // True 3D 4-Slope Pitched Mediterranean Terracotta Hipped Roof with Overhanging Eave Fascia & Ridge Cap
+        const emitMediterraneanHippedRoof3D = (cxPx, cyPx, wPx, dPx, yBot, yTop, roofCol, eaveCol) => {
+            // 1) Crisp overhanging eave cornice fascia
+            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, wPx + 5.0, dPx + 5.0, yBot, yBot + 0.045, eaveCol, 1);
+
+            const hw = (wPx + 3.0) * 0.5;
+            const hd = (dPx + 3.0) * 0.5;
+            const yEave = yBot + 0.045;
+            // Ridge length along the longer axis (or pyramid apex if square)
+            const ridgeHalfW = wPx > dPx ? Math.max(4.0, (wPx - dPx) * 0.5) : 0.0;
+            const ridgeHalfD = dPx > wPx ? Math.max(4.0, (dPx - wPx) * 0.5) : 0.0;
+
+            const bNW = toWorld(cxPx, cyPx, 1, 0, -hw, -hd, yEave);
+            const bNE = toWorld(cxPx, cyPx, 1, 0,  hw, -hd, yEave);
+            const bSW = toWorld(cxPx, cyPx, 1, 0, -hw,  hd, yEave);
+            const bSE = toWorld(cxPx, cyPx, 1, 0,  hw,  hd, yEave);
+
+            const tNW = toWorld(cxPx, cyPx, 1, 0, -ridgeHalfW, -ridgeHalfD, yTop);
+            const tNE = toWorld(cxPx, cyPx, 1, 0,  ridgeHalfW, -ridgeHalfD, yTop);
+            const tSW = toWorld(cxPx, cyPx, 1, 0, -ridgeHalfW,  ridgeHalfD, yTop);
+            const tSE = toWorld(cxPx, cyPx, 1, 0,  ridgeHalfW,  ridgeHalfD, yTop);
+
+            const [r, g, b] = roofCol;
+            // South slope (sunlit front), North slope (shaded back), West slope (warm), East slope (mid)
+            pushMatQuad3D(tSW, tSE, bSW, bSE, 15, Math.min(1, r * 1.07), Math.min(1, g * 1.06), Math.min(1, b * 1.04), 1.0);
+            pushMatQuad3D(tNE, tNW, bNE, bNW, 15, r * 0.80, g * 0.81, b * 0.84, 1.0);
+            pushMatQuad3D(tNW, tSW, bNW, bSW, 15, Math.min(1, r * 0.98), Math.min(1, g * 0.97), Math.min(1, b * 0.96), 1.0);
+            pushMatQuad3D(tSE, tNE, bSE, bNE, 15, r * 0.88, g * 0.88, b * 0.90, 1.0);
+
+            // Terracotta ridge cap beam at the roof crest
+            if (ridgeHalfW > 2.0) {
+                emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, ridgeHalfW * 2.0 + 4.0, 5.5, yTop - 0.025, yTop + 0.032, [Math.min(1, r * 1.12), Math.min(1, g * 1.08), Math.min(1, b * 1.05)], 1);
+            } else if (ridgeHalfD > 2.0) {
+                emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 5.5, ridgeHalfD * 2.0 + 4.0, yTop - 0.025, yTop + 0.032, [Math.min(1, r * 1.12), Math.min(1, g * 1.08), Math.min(1, b * 1.05)], 1);
+            } else {
+                emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 6.0, 6.0, yTop - 0.025, yTop + 0.035, eaveCol, 1);
             }
         };
 
@@ -11544,64 +11591,65 @@ class WorldObjectEngine {
                 for (let c = 4; c < M - 4; c++) {
                     if (customMask[rOff + c]) continue;
                     for (let z = MAP_LAYERS - 1; z >= 2; z--) {
-                        const blk = this.map.getBlockInfo(c, r, z);
-                        if (blk && blk.groundType === GROUND_TYPE.BUILDING && blk.lid > 0 && !blk.slopeType) {
+                        const bi = this.map.getBlockIndex(c, r, z);
+                        if (!bi) continue;
+                        const blk = this.map.getBlockInfo(bi);
+                        if (blk && blk.groundType === GROUND_TYPE.BUILDING && !blk.isFlat && !blk.slopeType && blk.faces[4] > 0 && blk.faces[4] !== 41) {
                             bTopZ[rOff + c] = z + 1; // Top elevation in block units (3..6)
-                            bTopLid[rOff + c] = blk.lid;
+                            bTopLid[rOff + c] = blk.faces[4];
                             break;
                         }
                     }
                 }
             }
 
-            // Assign a single unified Building ID (connected component) to every contiguous building footprint
-            // so all 4 walls and all roof tiers of a building share one coherent architectural material palette!
-            const bldgIdGrid = new Int32Array(MAP_ROWS * M);
-            const bfsQueue = new Int32Array(MAP_ROWS * M);
-            let nextBldgId = 1;
-            for (let r = 4; r < MAP_ROWS - 4; r++) {
-                const rOff = r * M;
-                for (let c = 4; c < M - 4; c++) {
-                    const startIdx = rOff + c;
-                    if (bTopZ[startIdx] < 3 || bldgIdGrid[startIdx] !== 0) continue;
-                    const curId = nextBldgId++;
-                    bldgIdGrid[startIdx] = curId;
-                    let qHead = 0, qTail = 0;
-                    bfsQueue[qTail++] = startIdx;
-                    while (qHead < qTail) {
-                        const cur = bfsQueue[qHead++];
-                        const cr = (cur / M) | 0;
-                        const cc = cur - cr * M;
-                        const n0 = cur - 1, n1 = cur + 1, n2 = cur - M, n3 = cur + M;
-                        if (cc > 4 && bTopZ[n0] >= 3 && bldgIdGrid[n0] === 0) { bldgIdGrid[n0] = curId; bfsQueue[qTail++] = n0; }
-                        if (cc < M - 5 && bTopZ[n1] >= 3 && bldgIdGrid[n1] === 0) { bldgIdGrid[n1] = curId; bfsQueue[qTail++] = n1; }
-                        if (cr > 4 && bTopZ[n2] >= 3 && bldgIdGrid[n2] === 0) { bldgIdGrid[n2] = curId; bfsQueue[qTail++] = n2; }
-                        if (cr < MAP_ROWS - 5 && bTopZ[n3] >= 3 && bldgIdGrid[n3] === 0) { bldgIdGrid[n3] = curId; bfsQueue[qTail++] = n3; }
-                    }
-                }
-            }
+            // Reuse the synchronized Building Wing IDs (bldgIdGrid) & 12 Architectural Styles (bldgStyleGrid)
+            // computed in Renderer.buildCityMesh so 3D parapets, crowns, balconies, awnings & roofs match 100%!
+            const bldgIdGrid = (this.map && this.map.bldgIdGrid) ? this.map.bldgIdGrid : new Int32Array(MAP_ROWS * M);
+            const bldgStyleGrid = (this.map && this.map.bldgStyleGrid) ? this.map.bldgStyleGrid : new Uint8Array(MAP_ROWS * M);
 
-            // Realistic GTA 6 Architectural Material Palettes (Limestone, Travertine, Precast Concrete, Dark Bronze & Canvas)
+            // 12 GTA 6 / Vice City Architectural Palettes (indexed 0..11 by bldgStyleGrid)
             const stoneWallPal = [
-                [0.90, 0.87, 0.81], // Warm Ivory Limestone
-                [0.85, 0.80, 0.73], // Travertine Sand
-                [0.78, 0.79, 0.81], // Precast Architectural Concrete
-                [0.82, 0.74, 0.66], // Warm Coral Stone
-                [0.72, 0.75, 0.79]  // Slate-Gray Concrete
+                [0.93, 0.72, 0.78], // 0: Flamingo Rose Art Deco
+                [0.55, 0.84, 0.85], // 1: Seafoam Turquoise Art Deco
+                [0.95, 0.87, 0.63], // 2: Sunlit Butter Yellow / Mediterranean
+                [0.67, 0.79, 0.93], // 3: Sky Periwinkle Art Deco
+                [0.94, 0.95, 0.97], // 4: Crisp White Modernist Condo
+                [0.94, 0.75, 0.65], // 5: Warm Coral-Peach Tropical Revival
+                [0.70, 0.89, 0.77], // 6: Tropical Mint / Key Lime Art Deco
+                [0.20, 0.38, 0.48], // 7: Deep Teal-Sapphire Glass Curtain-Wall Tower
+                [0.91, 0.88, 0.80], // 8: Warm Ivory Coquina / Classical Limestone
+                [0.84, 0.55, 0.43], // 9: Havana Terracotta / Red-Ochre Masonry
+                [0.83, 0.75, 0.91], // 10: South Beach Lavender / Lilac Deco
+                [0.74, 0.78, 0.83]  // 11: Sleek Silver-Precast Modernist High-Rise
             ];
             const copingCapPal = [
-                [0.28, 0.31, 0.36], // Dark Anodized Bronze Coping
-                [0.38, 0.41, 0.46], // Brushed Architectural Steel
-                [0.66, 0.62, 0.56], // Weathered Travertine Cap
-                [0.58, 0.36, 0.28], // Terracotta Stone Coping
-                [0.22, 0.25, 0.30]  // Charcoal Metal Coping
+                [0.97, 0.97, 0.99], // 0: Crisp White Deco Trim
+                [0.97, 0.98, 0.99], // 1: Crisp White Deco Trim
+                [0.74, 0.44, 0.33], // 2: Spanish Terracotta Coping
+                [0.24, 0.56, 0.88], // 3: Azure Blue Deco Band
+                [0.82, 0.86, 0.90], // 4: Brushed Aluminum Condo Coping
+                [0.76, 0.44, 0.34], // 5: Warm Terracotta Coping
+                [0.96, 0.97, 0.98], // 6: Crisp White Deco Trim
+                [0.48, 0.60, 0.68], // 7: Anodized Teal-Steel Mullion Cap
+                [0.66, 0.60, 0.52], // 8: Weathered Travertine Cap
+                [0.93, 0.89, 0.81], // 9: Cream Limestone Lintel Cap
+                [0.46, 0.82, 0.86], // 10: Aqua Deco Accent Cap
+                [0.34, 0.40, 0.46]  // 11: Charcoal Steel Coping
             ];
             const awningPal = [
-                [0.16, 0.28, 0.42], // Deep Navy Canvas
-                [0.52, 0.20, 0.22], // Classic Burgundy Canvas
-                [0.18, 0.36, 0.28], // Forest Green Canvas
-                [0.24, 0.27, 0.32], // Charcoal Slate Canvas
-                [0.64, 0.34, 0.24]  // Warm Terracotta Canvas
+                [0.24, 0.58, 0.88], // 0: Vibrant Sky-Blue Canvas
+                [0.16, 0.74, 0.76], // 1: Tropical Turquoise Canvas
+                [0.92, 0.78, 0.24], // 2: Sunlit Butter-Yellow Canvas
+                [0.20, 0.50, 0.84], // 3: Royal Azure Canvas
+                [0.22, 0.62, 0.78], // 4: Coastal Cerulean Canvas
+                [0.88, 0.44, 0.36], // 5: Warm Coral-Terracotta Canvas
+                [0.18, 0.62, 0.44], // 6: Emerald Palm Canvas
+                [0.18, 0.32, 0.44], // 7: Deep Slate-Blue Canopy
+                [0.58, 0.24, 0.26], // 8: Classic Burgundy Canvas
+                [0.74, 0.36, 0.24], // 9: Havana Terracotta Canvas
+                [0.88, 0.48, 0.68], // 10: Flamingo Rose Canvas
+                [0.24, 0.30, 0.38]  // 11: Architectural Charcoal Canopy
             ];
             const bladeAdKeys = [
                 "ad_vice26", "ad_hotel_dixon", "ad_vice_neon", "ad_ocean_drive",
@@ -11617,18 +11665,80 @@ class WorldObjectEngine {
                 return false;
             };
 
+            // Pre-reserve rooftop tiles where a 3D Pitched Mediterranean Hipped Roof will be built
+            // so we can tailor parapet heights and prevent flat-roof equipment from spawning inside pitched roofs!
+            const roofUsed = new Uint8Array(MAP_ROWS * M);
+            const pitchedRoofBuildings = [];
+            const visitedPitchedIds = new Set();
+            for (let r = 6; r < MAP_ROWS - 6; r++) {
+                const rOff = r * M;
+                for (let c = 6; c < M - 6; c++) {
+                    const idx0 = rOff + c;
+                    const z = bTopZ[idx0];
+                    if (z !== 3 && z !== 4) continue;
+                    const bId = bldgIdGrid[idx0];
+                    if (!bId || visitedPitchedIds.has(bId)) continue;
+                    visitedPitchedIds.add(bId);
+                    const bStyle = bldgStyleGrid[idx0] || 0;
+                    // Select Mediterranean / Tropical low-rise buildings (Style 2 Butter Yellow, Style 5 Coral, Style 9 Terracotta, or selected Style 8 Limestone)
+                    const isMedStyle = (bStyle === 2 || bStyle === 5 || bStyle === 9 || (bStyle === 8 && (bId % 3 === 0)));
+                    if (!isMedStyle) continue;
+                    if ((bId % 2) !== 0 && bStyle !== 2) continue;
+
+                    // Compute bounding box of this building wing (cMin..cMax, rMin..rMax) and verify it is a clean rectangular slab
+                    let cMin = c, cMax = c, rMin = r, rMax = r, cellCount = 0, hasSpecial = false;
+                    for (let rr = Math.max(4, r - 5); rr <= Math.min(MAP_ROWS - 5, r + 5); rr++) {
+                        for (let cc = Math.max(4, c - 5); cc <= Math.min(M - 5, c + 5); cc++) {
+                            const k = rr * M + cc;
+                            if (bldgIdGrid[k] === bId) {
+                                if (cc < cMin) cMin = cc;
+                                if (cc > cMax) cMax = cc;
+                                if (rr < rMin) rMin = rr;
+                                if (rr > rMax) rMax = rr;
+                                cellCount++;
+                                const lid = bTopLid[k];
+                                if (lid === 22 || lid === 35 || lid === 31 || customMask[k]) hasSpecial = true;
+                            }
+                        }
+                    }
+                    const wT = cMax - cMin + 1;
+                    const dT = rMax - rMin + 1;
+                    if (hasSpecial || wT < 2 || dT < 2 || wT > 5 || dT > 5 || cellCount !== wT * dT) continue;
+                    // Skip if any adjacent neighbor is taller (so hipped roof never clips into a higher tower wall)
+                    let adjTaller = false;
+                    for (let rr = rMin - 1; rr <= rMax + 1 && !adjTaller; rr++) {
+                        for (let cc = cMin - 1; cc <= cMax + 1; cc++) {
+                            if (bTopZ[rr * M + cc] > z) { adjTaller = true; break; }
+                        }
+                    }
+                    if (adjTaller) continue;
+
+                    pitchedRoofBuildings.push({ cMin, cMax, rMin, rMax, z, bStyle, bId });
+                    for (let rr = rMin - 1; rr <= rMax + 1; rr++) {
+                        for (let cc = cMin - 1; cc <= cMax + 1; cc++) {
+                            roofUsed[rr * M + cc] = 2; // 2 = pitched Mediterranean roof
+                        }
+                    }
+                }
+            }
+
             // Helper to emit a merged 3D parapet wall + district crown + street-facing facade architecture
             // dirX, dirY is the outward normal of the building edge: N=(0,-1), S=(0,1), W=(-1,0), E=(1,0)
             const emitBuildingEdgeSpan = (cStart, cEnd, rStart, rEnd, topY, dirX, dirY, adjGroundIsSidewalk) => {
                 const spanTiles = Math.max(cEnd - cStart + 1, rEnd - rStart + 1);
                 const midC = (cStart + cEnd + 1) * 0.5;
                 const midR = (rStart + rEnd + 1) * 0.5;
-                const bldgId = bldgIdGrid[rStart * M + cStart] || 1;
+                const sampleIdx = rStart * M + cStart;
+                const bldgId = bldgIdGrid[sampleIdx] || 1;
+                const bStyle = bldgStyleGrid[sampleIdx] || 0;
+                const hasPitchedRoof = (roofUsed[sampleIdx] === 2);
                 const hash = (((bldgId * 2654435761) ^ 0x9E3779B9) >>> 0);
 
-                const isBeachArtDeco = (midC >= 365);
-                const isDowntown = (midC >= 235 && midC < 365 && midR >= 145 && midR <= 315);
-                const isLatinOrUrban = (midC >= 170 && midC < 285 && midR >= 70 && midR < 315);
+                const isBeachArtDeco = (midC >= 355);
+                const isDowntown = (midC >= 235 && midC < 355 && midR >= 140 && midR <= 320);
+                const isLatinOrUrban = (midC >= 165 && midC < 285 && midR >= 70 && midR < 330);
+                const isModernCondo = (bStyle === 4 || bStyle === 11);
+                const isCurtainTower = (bStyle === 7);
 
                 // Edge center in pixels (inset 3.2px onto the roof so parapet sits flush along the outer wall)
                 const isHorizontal = (dirY !== 0);
@@ -11642,119 +11752,185 @@ class WorldObjectEngine {
                 const wPx = isHorizontal ? spanPx : 6.4;
                 const dPx = isHorizontal ? 6.4 : spanPx;
 
-                // 1) Unified 3D Perimeter Parapet Wall & Architectural Coping Ledge + Inner Roof Deck AO Shadow Skirt
-                const parapetH = isDowntown ? 0.105 : (isBeachArtDeco ? 0.095 : 0.082);
-                const wallCol = stoneWallPal[hash % stoneWallPal.length];
-                const capCol  = copingCapPal[hash % copingCapPal.length];
-                const baseMat = isDowntown ? 2 : 1;
+                const wallCol = stoneWallPal[bStyle % stoneWallPal.length];
+                const capCol  = copingCapPal[bStyle % copingCapPal.length];
+                const baseMat = (isDowntown || isModernCondo) ? 2 : 1;
 
-                emitAOShadow3D(
-                    edgeX - dirX * 5.0,
-                    edgeY - dirY * 5.0,
-                    1, 0, 0, 0,
-                    isHorizontal ? spanPx : 14.0,
-                    isHorizontal ? 14.0 : spanPx,
-                    topY,
-                    0.28
-                );
-                emitSolidBox3D(edgeX, edgeY, 1, 0, 0, 0, wPx, dPx, topY, topY + parapetH, wallCol, baseMat);
+                // 1) Unified 3D Perimeter Parapet Wall & Architectural Coping Ledge (skipped if building has a 3D Pitched Terracotta Roof!)
+                if (!hasPitchedRoof) {
+                    const parapetH = isDowntown ? 0.105 : (isBeachArtDeco ? 0.098 : 0.084);
+                    emitAOShadow3D(
+                        edgeX - dirX * 5.0,
+                        edgeY - dirY * 5.0,
+                        1, 0, 0, 0,
+                        isHorizontal ? spanPx : 14.0,
+                        isHorizontal ? 14.0 : spanPx,
+                        topY,
+                        0.28
+                    );
+                    emitSolidBox3D(edgeX, edgeY, 1, 0, 0, 0, wPx, dPx, topY, topY + parapetH, wallCol, baseMat);
 
-                // Top architectural stone/bronze coping cap & stepped limestone ziggurat crown
-                if (isBeachArtDeco) {
-                    emitSolidBox3D(
-                        edgeX, edgeY, 1, 0, 0, 0,
-                        isHorizontal ? spanPx + 1.5 : 7.6,
-                        isHorizontal ? 7.6 : spanPx + 1.5,
-                        topY + parapetH, topY + parapetH + 0.032,
-                        capCol, 2
-                    );
-                    // Stepped Art Deco Limestone Ziggurat central pediment on spans >= 2 tiles
-                    if (spanTiles >= 2) {
-                        const crownW = Math.min(spanPx * 0.54, 132.0);
-                        const crownW2 = Math.min(spanPx * 0.30, 74.0);
+                    // Top architectural stone/white/bronze coping cap & stepped Art Deco ziggurat crown
+                    if (isBeachArtDeco && !isModernCondo && !isCurtainTower) {
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
-                            isHorizontal ? crownW : 8.2,
-                            isHorizontal ? 8.2 : crownW,
-                            topY + parapetH + 0.03, topY + parapetH + 0.15,
-                            wallCol, 1
+                            isHorizontal ? spanPx + 1.6 : 7.8,
+                            isHorizontal ? 7.8 : spanPx + 1.6,
+                            topY + parapetH, topY + parapetH + 0.034,
+                            capCol, 1
                         );
+                        // Stepped Art Deco Pastel + Crisp White Ziggurat central pediment on spans >= 2 tiles
+                        if (spanTiles >= 2) {
+                            const crownW = Math.min(spanPx * 0.56, 136.0);
+                            const crownW2 = Math.min(spanPx * 0.32, 78.0);
+                            emitSolidBox3D(
+                                edgeX, edgeY, 1, 0, 0, 0,
+                                isHorizontal ? crownW : 8.4,
+                                isHorizontal ? 8.4 : crownW,
+                                topY + parapetH + 0.034, topY + parapetH + 0.16,
+                                wallCol, 1
+                            );
+                            emitSolidBox3D(
+                                edgeX, edgeY, 1, 0, 0, 0,
+                                isHorizontal ? crownW2 : 9.0,
+                                isHorizontal ? 9.0 : crownW2,
+                                topY + parapetH + 0.16, topY + parapetH + 0.25,
+                                capCol, 1
+                            );
+                        }
+                    } else if ((isDowntown || isModernCondo || isCurtainTower) && topY >= 4.0) {
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
-                            isHorizontal ? crownW2 : 8.8,
-                            isHorizontal ? 8.8 : crownW2,
-                            topY + parapetH + 0.15, topY + parapetH + 0.24,
-                            capCol, 2
-                        );
-                    }
-                } else if (isDowntown && topY >= 4.0) {
-                    emitSolidBox3D(
-                        edgeX, edgeY, 1, 0, 0, 0,
-                        isHorizontal ? spanPx + 1.6 : 7.8,
-                        isHorizontal ? 7.8 : spanPx + 1.6,
-                        topY + parapetH, topY + parapetH + 0.036,
-                        capCol, 5
-                    );
-                    if (spanTiles >= 3 && (hash % 2 === 0)) {
-                        const finSpan = Math.min(spanPx * 0.48, 124.0);
-                        emitSolidBox3D(
-                            edgeX, edgeY, 1, 0, 0, 0,
-                            isHorizontal ? finSpan : 8.4,
-                            isHorizontal ? 8.4 : finSpan,
-                            topY + parapetH + 0.036, topY + parapetH + 0.18,
-                            [0.22, 0.30, 0.38], 7
-                        );
-                        emitSolidBox3D(
-                            edgeX, edgeY, 1, 0, 0, 0,
-                            isHorizontal ? finSpan + 2.0 : 9.0,
-                            isHorizontal ? 9.0 : finSpan + 2.0,
-                            topY + parapetH + 0.18, topY + parapetH + 0.22,
+                            isHorizontal ? spanPx + 1.6 : 7.8,
+                            isHorizontal ? 7.8 : spanPx + 1.6,
+                            topY + parapetH, topY + parapetH + 0.038,
                             capCol, 5
                         );
-                    }
-                } else {
-                    const urbanCap = isLatinOrUrban ? [0.64, 0.38, 0.28] : capCol;
-                    emitSolidBox3D(
-                        edgeX, edgeY, 1, 0, 0, 0,
-                        isHorizontal ? spanPx + 1.4 : 7.6,
-                        isHorizontal ? 7.6 : spanPx + 1.4,
-                        topY + parapetH, topY + parapetH + 0.028,
-                        urbanCap, isLatinOrUrban ? 1 : 2
-                    );
-                    if (isLatinOrUrban && spanTiles >= 3 && (hash % 2 === 0)) {
-                        const pedW = Math.min(spanPx * 0.42, 96.0);
+                        if (spanTiles >= 3 && (hash % 2 === 0)) {
+                            const finSpan = Math.min(spanPx * 0.50, 128.0);
+                            emitSolidBox3D(
+                                edgeX, edgeY, 1, 0, 0, 0,
+                                isHorizontal ? finSpan : 8.4,
+                                isHorizontal ? 8.4 : finSpan,
+                                topY + parapetH + 0.038, topY + parapetH + 0.18,
+                                isCurtainTower ? [0.16, 0.34, 0.44] : [0.22, 0.32, 0.40], 7
+                            );
+                            emitSolidBox3D(
+                                edgeX, edgeY, 1, 0, 0, 0,
+                                isHorizontal ? finSpan + 2.0 : 9.0,
+                                isHorizontal ? 9.0 : finSpan + 2.0,
+                                topY + parapetH + 0.18, topY + parapetH + 0.22,
+                                capCol, 5
+                            );
+                        }
+                    } else {
                         emitSolidBox3D(
                             edgeX, edgeY, 1, 0, 0, 0,
-                            isHorizontal ? pedW : 7.8,
-                            isHorizontal ? 7.8 : pedW,
-                            topY + parapetH + 0.028, topY + parapetH + 0.14,
-                            wallCol, 1
+                            isHorizontal ? spanPx + 1.4 : 7.6,
+                            isHorizontal ? 7.6 : spanPx + 1.4,
+                            topY + parapetH, topY + parapetH + 0.030,
+                            capCol, isLatinOrUrban ? 1 : 2
+                        );
+                        if (isLatinOrUrban && spanTiles >= 3 && (hash % 2 === 0)) {
+                            const pedW = Math.min(spanPx * 0.44, 98.0);
+                            emitSolidBox3D(
+                                edgeX, edgeY, 1, 0, 0, 0,
+                                isHorizontal ? pedW : 7.8,
+                                isHorizontal ? 7.8 : pedW,
+                                topY + parapetH + 0.030, topY + parapetH + 0.15,
+                                wallCol, 1
+                            );
+                        }
+                    }
+                }
+
+                // 2) Street-Facing & Outer Facade 3D Architectural Details (Wrap-Around Condo Balconies, Eyebrow Ledges, Vertical Pilasters & Colorful Awnings)
+                const wallFaceX = edgeX + dirX * 3.2;
+                const wallFaceY = edgeY + dirY * 3.2;
+
+                // 2A) Modernist White / Silver High-Rise Condo Continuous Wrap-Around Horizontal Balconies (like the white towers in the reference screenshots!)
+                if (isModernCondo && topY >= 4.0 && spanTiles >= 2) {
+                    const balcSpan = Math.max(48.0, spanPx - 6.0);
+                    for (let zFl = 2.95; zFl <= topY - 0.65; zFl += 1.0) {
+                        // Crisp white cantilevered balcony floor slab
+                        emitSolidBox3D(
+                            wallFaceX + dirX * 4.8,
+                            wallFaceY + dirY * 4.8,
+                            1, 0, 0, 0,
+                            isHorizontal ? balcSpan : 10.2,
+                            isHorizontal ? 10.2 : balcSpan,
+                            zFl, zFl + 0.052,
+                            [0.95, 0.96, 0.98],
+                            1
+                        );
+                        // Continuous dark smoked-glass balcony balustrade railing
+                        emitSolidBox3D(
+                            wallFaceX + dirX * 8.8,
+                            wallFaceY + dirY * 8.8,
+                            1, 0, 0, 0,
+                            isHorizontal ? balcSpan : 2.2,
+                            isHorizontal ? 2.2 : balcSpan,
+                            zFl + 0.052, zFl + 0.155,
+                            [0.20, 0.32, 0.42],
+                            7
                         );
                     }
                 }
 
-                // 2) Street-Facing 3D Architectural Facade Details (Limestone Eyebrow Ledges, Smoked Glass Balconies, Canvas Awnings & Blade Signs)
                 if (!adjGroundIsSidewalk || spanTiles < 2) return;
 
-                const wallFaceX = edgeX + dirX * 3.2;
-                const wallFaceY = edgeY + dirY * 3.2;
-
-                // 2A) Upper-Storey Horizontal Limestone/Concrete Window "Eyebrow" Sun-Ledges & Cantilevered Balconies
-                if (topY >= 4.0 && (isBeachArtDeco || isDowntown)) {
-                    const ledgeSpan = Math.max(48.0, spanPx - 16.0);
-                    for (let zFl = 3.0; zFl <= topY - 0.8; zFl += 1.0) {
+                // 2B) Street-Facing Vertical Art Deco White Pilaster Fins & Horizontal Eyebrow Sun-Ledges
+                if (!isModernCondo && !isCurtainTower && (isBeachArtDeco || isLatinOrUrban)) {
+                    const pilCol = [0.96, 0.97, 0.99];
+                    for (let ti = 0; ti <= spanTiles; ti++) {
+                        const offAlong = (ti - spanTiles * 0.5) * TILE_SIZE;
+                        const px = wallFaceX + (isHorizontal ? offAlong : dirX * 1.8);
+                        const py = wallFaceY + (isHorizontal ? dirY * 1.8 : offAlong);
                         emitSolidBox3D(
-                            wallFaceX + dirX * 2.4,
-                            wallFaceY + dirY * 2.4,
-                            1, 0, 0, 0,
-                            isHorizontal ? ledgeSpan : 4.8,
-                            isHorizontal ? 4.8 : ledgeSpan,
-                            zFl - 0.06, zFl - 0.01,
-                            wallCol,
-                            isDowntown ? 2 : 1
+                            px, py, 1, 0, 0, 0,
+                            isHorizontal ? 5.2 : 4.2,
+                            isHorizontal ? 4.2 : 5.2,
+                            2.04, topY + (hasPitchedRoof ? 0.0 : 0.08),
+                            pilCol, 1
                         );
                     }
-                    // 3D Cantilevered Smoked-Glass Resort / Condo Balconies on spans >= 3 tiles
+                    // Horizontal two-tone Art Deco spandrel frieze band above the ground-floor storefronts (z = 2.74..2.86)
+                    const friezeSpan = Math.max(48.0, spanPx - 4.0);
+                    emitSolidBox3D(
+                        wallFaceX + dirX * 2.2,
+                        wallFaceY + dirY * 2.2,
+                        1, 0, 0, 0,
+                        isHorizontal ? friezeSpan : 4.6,
+                        isHorizontal ? 4.6 : friezeSpan,
+                        2.74, 2.81,
+                        pilCol, 1
+                    );
+                    emitSolidBox3D(
+                        wallFaceX + dirX * 2.5,
+                        wallFaceY + dirY * 2.5,
+                        1, 0, 0, 0,
+                        isHorizontal ? friezeSpan : 5.0,
+                        isHorizontal ? 5.0 : friezeSpan,
+                        2.81, 2.86,
+                        capCol, 1
+                    );
+                }
+
+                if (!isModernCondo && topY >= 4.0 && (isBeachArtDeco || isDowntown)) {
+                    const ledgeSpan = Math.max(48.0, spanPx - 12.0);
+                    for (let zFl = 3.0; zFl <= topY - 0.8; zFl += 1.0) {
+                        emitSolidBox3D(
+                            wallFaceX + dirX * 2.6,
+                            wallFaceY + dirY * 2.6,
+                            1, 0, 0, 0,
+                            isHorizontal ? ledgeSpan : 5.2,
+                            isHorizontal ? 5.2 : ledgeSpan,
+                            zFl - 0.06, zFl - 0.01,
+                            [0.96, 0.96, 0.98],
+                            1
+                        );
+                    }
+                    // 3D Cantilevered Smoked-Glass Resort Balconies on spans >= 3 tiles
                     if (spanTiles >= 3 && (hash % 3 !== 0)) {
                         const balcCount = Math.min(3, Math.floor(spanTiles / 2));
                         for (let bi = 0; bi < balcCount; bi++) {
@@ -11764,48 +11940,51 @@ class WorldObjectEngine {
                             const bw = isHorizontal ? 44.0 : 10.4;
                             const bd = isHorizontal ? 10.4 : 44.0;
                             const bzFloor = (topY >= 5.0 && (bi % 2 === 1)) ? 3.92 : 2.92;
-                            // Concrete balcony deck slab + dark smoked architectural glass balustrade
-                            emitSolidBox3D(bx, by, 1, 0, 0, 0, bw, bd, bzFloor, bzFloor + 0.045, wallCol, 2);
+                            emitSolidBox3D(bx, by, 1, 0, 0, 0, bw, bd, bzFloor, bzFloor + 0.045, [0.95, 0.96, 0.98], 1);
                             emitSolidBox3D(
                                 bx + dirX * 3.8, by + dirY * 3.8, 1, 0, 0, 0,
                                 isHorizontal ? bw : 2.2,
                                 isHorizontal ? 2.2 : bd,
                                 bzFloor + 0.045, bzFloor + 0.135,
-                                [0.22, 0.32, 0.40], 7
+                                [0.22, 0.34, 0.44], 7
                             );
                         }
                     }
                 }
 
-                // 2B) Street-Level Cantilevered Storefront Canopy / Architectural Canvas Awning (at z = 2.38..2.48, clear of interior doors)
-                if ((hash % 3 !== 2) && !isNearDoor(wallFaceX, wallFaceY)) {
-                    const awnSpan = Math.min(spanPx - 20.0, 116.0);
-                    if (awnSpan >= 44.0) {
-                        const awnCol = awningPal[hash % awningPal.length];
-                        const trimCol = [0.90, 0.88, 0.84];
-                        const ax = wallFaceX + dirX * 8.0;
-                        const ay = wallFaceY + dirY * 8.0;
-                        emitSolidBox3D(
-                            ax, ay, 1, 0, 0, 0,
-                            isHorizontal ? awnSpan : 16.0,
-                            isHorizontal ? 16.0 : awnSpan,
-                            2.39, 2.47,
-                            awnCol,
-                            1
-                        );
-                        emitSolidBox3D(
-                            wallFaceX + dirX * 15.8,
-                            wallFaceY + dirY * 15.8,
-                            1, 0, 0, 0,
-                            isHorizontal ? awnSpan + 1.0 : 2.4,
-                            isHorizontal ? 2.4 : awnSpan + 1.0,
-                            2.36, 2.41,
-                            trimCol,
-                            1
-                        );
+                // 2C) Street-Level Multi-Bay Storefront Canvas Awnings (Sky Blue, Butter Yellow, Turquoise, Coral, Emerald — clear of interior doors)
+                if (!isCurtainTower && !isNearDoor(wallFaceX, wallFaceY)) {
+                    const awnCol = awningPal[bStyle % awningPal.length];
+                    const trimCol = [0.97, 0.97, 0.99];
+                    const bayCount = Math.min(3, Math.max(1, Math.floor(spanTiles / 1.5)));
+                    const baySpan = Math.min(52.0, (spanPx - 16.0) / bayCount - 6.0);
+                    if (baySpan >= 28.0) {
+                        for (let bi = 0; bi < bayCount; bi++) {
+                            const frac = (bi + 0.5) / bayCount - 0.5;
+                            const offA = frac * (spanPx - 12.0);
+                            const ax = wallFaceX + (isHorizontal ? offA : dirX * 8.2);
+                            const ay = wallFaceY + (isHorizontal ? dirY * 8.2 : offA);
+                            emitSolidBox3D(
+                                ax, ay, 1, 0, 0, 0,
+                                isHorizontal ? baySpan : 16.0,
+                                isHorizontal ? 16.0 : baySpan,
+                                2.39, 2.47,
+                                awnCol,
+                                1
+                            );
+                            emitSolidBox3D(
+                                wallFaceX + (isHorizontal ? offA : dirX * 15.8),
+                                wallFaceY + (isHorizontal ? dirY * 15.8 : offA),
+                                1, 0, 0, 0,
+                                isHorizontal ? baySpan + 1.2 : 2.4,
+                                isHorizontal ? 2.4 : baySpan + 1.2,
+                                2.36, 2.41,
+                                trimCol,
+                                1
+                            );
+                        }
                     }
                 }
-
             };
 
             // Pass 29A: Scan & merge contiguous North and South building roof edges along each row r
@@ -11869,8 +12048,32 @@ class WorldObjectEngine {
                 }
             }
 
+            // Pass 29B-2: Emit 3D Pitched 4-Slope Mediterranean Terracotta Hipped Roofs on Selected 2–3 Story Buildings!
+            const terracottaPal = [
+                [0.74, 0.43, 0.31], // Classic Spanish Terracotta Clay
+                [0.79, 0.48, 0.35], // Sunlit Coral-Terracotta Clay
+                [0.67, 0.38, 0.28], // Weathered Havana Red-Brown Clay
+                [0.76, 0.46, 0.33]  // Warm Mediterranean Mission Tile
+            ];
+            for (let pi = 0; pi < pitchedRoofBuildings.length; pi++) {
+                const pb = pitchedRoofBuildings[pi];
+                const wPx = (pb.cMax - pb.cMin + 1) * TILE_SIZE;
+                const dPx = (pb.rMax - pb.rMin + 1) * TILE_SIZE;
+                const cxPx = ((pb.cMin + pb.cMax + 1) * 0.5) * TILE_SIZE;
+                const cyPx = ((pb.rMin + pb.rMax + 1) * 0.5) * TILE_SIZE;
+                const roofH = Math.min(0.62, 0.34 + Math.min(pb.cMax - pb.cMin + 1, pb.rMax - pb.rMin + 1) * 0.08);
+                const tCol = terracottaPal[pb.bId % terracottaPal.length];
+                const eaveCol = [0.96, 0.94, 0.88];
+                emitMediterraneanHippedRoof3D(cxPx, cyPx, wPx, dPx, pb.z, pb.z + roofH, tCol, eaveCol);
+                this.rooftopSuperstructures.push({
+                    x: cxPx,
+                    y: cyPx,
+                    radTiles: Math.max(1, Math.floor(Math.min(pb.cMax - pb.cMin + 1, pb.rMax - pb.rMin + 1) * 0.5)),
+                    topElev: pb.z + roofH
+                });
+            }
+
             // Pass 29C: Scan Flat Building Rooftop Plateaus & Highway Verges for Monumental 3D Mega-Billboards & Superstructures
-            const roofUsed = new Uint8Array(MAP_ROWS * M);
             // Pre-reserve all rooftop ventilation fans (lid 22), rooftop swimming pools (lid 35), and glass skylights (lid 31)
             // with a 3x3 safety margin so no 3D helipad, penthouse, billboard, or HVAC unit ever sits on top of a roof vent or pool!
             for (let r = 2; r < MAP_ROWS - 2; r++) {
@@ -12286,9 +12489,9 @@ class WorldObjectEngine {
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.85 });
                         }
                     } else if (isBeachArtDeco) {
-                        const bId = bldgIdGrid[idx00] || 1;
-                        const wallCol = stoneWallPal[bId % stoneWallPal.length];
-                        const capCol = copingCapPal[bId % copingCapPal.length];
+                        const bStyle = bldgStyleGrid[idx00] || 0;
+                        const wallCol = stoneWallPal[bStyle % stoneWallPal.length];
+                        const capCol = copingCapPal[bStyle % copingCapPal.length];
                         if (rHash % 2 === 0) {
                             // ARCHETYPE 2A: South Beach Rooftop Infinity Plunge Pool, Cabana Daybeds & Sky-Lounge Bar (GTA 6 Trailer 1 0:37)
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 96, 84, topY, 0.38);
@@ -12302,20 +12505,21 @@ class WorldObjectEngine {
                                 emitSolidBox3D(cxPx, cyPx, 1, 0, 6, dby, 12, 16, topY + 0.07, topY + 0.13, [0.97, 0.97, 0.99], 1);
                                 emitSolidBox3D(cxPx, cyPx, 1, 0, 6, dby - 5, 10, 4, topY + 0.13, topY + 0.16, [0.18, 0.88, 0.94], 7);
                             }
-                            // Architectural Limestone Rooftop Lounge, Backlit Neon Sky-Bar & Teak Wood Louvered Pergola (at offX = +24)
+                            // Architectural Pastel Art Deco Rooftop Lounge, Backlit Neon Sky-Bar & Teak Wood Louvered Pergola (at offX = +24)
                             emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 18, 48, topY + 0.07, topY + 0.38, wallCol, 1);
                             emitSolidBox3D(cxPx, cyPx, 1, 0, 15, 0, 3.5, 34, topY + 0.07, topY + 0.22, [0.98, 0.28, 0.76], 10);
                             emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 24, 54, topY + 0.38, topY + 0.44, [0.62, 0.42, 0.26], 11);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 14, 32, topY + 0.44, topY + 0.56, capCol, 2);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 24, 0, 14, 32, topY + 0.44, topY + 0.56, capCol, 1);
                             this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.56 });
                         } else {
-                            // ARCHETYPE 2B: Art Deco Stepped Limestone Elevator Cupola & Skylight Atrium
+                            // ARCHETYPE 2B: Art Deco Stepped Pastel & White Elevator Penthouse Cupola & Skylight Atrium
                             emitAOShadow3D(cxPx, cyPx, 1, 0, 0, 0, 88, 88, topY, 0.40);
-                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 68, 68, topY, topY + 0.32, 86, 199, 31, wallCol, false);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 72, 72, topY + 0.32, topY + 0.37, capCol, 2);
-                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 44, 44, topY + 0.37, topY + 0.56, wallCol, 1);
-                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.56, topY + 0.72, 8, capCol, 5, true);
-                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.72 });
+                            emitTileBox3D(cxPx, cyPx, 1, 0, 0, 0, 68, 68, topY, topY + 0.34, 86, 199, 31, wallCol, false);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 72, 72, topY + 0.34, topY + 0.39, capCol, 1);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 44, 44, topY + 0.39, topY + 0.58, wallCol, 1);
+                            emitSolidBox3D(cxPx, cyPx, 1, 0, 0, 0, 48, 48, topY + 0.58, topY + 0.63, capCol, 1);
+                            emitCylinder3D(cxPx, cyPx, 0, 0, 12.0, 10.5, topY + 0.63, topY + 0.76, 8, capCol, 5, true);
+                            this.rooftopSuperstructures.push({ x: cxPx, y: cyPx, radTiles: 1, topElev: topY + 0.76 });
                         }
                     } else if (isUrbanBrick && (rHash % 2 === 0)) {
                         // ARCHETYPE 3: Classic Urban Wooden Rooftop Water Tank on Steel Truss Legs + Brick Stair Bulkhead
@@ -12370,10 +12574,12 @@ class WorldObjectEngine {
                     // Decorate ~25% of landmark building blocks consistently per building
                     if ((bId & 3) !== 0) continue;
 
-                    const isBeachArtDeco = (c >= 365);
-                    const isDowntown = (c >= 235 && c < 365 && r >= 145 && r <= 315);
-                    const wallCol = stoneWallPal[bId % stoneWallPal.length];
-                    const capCol  = copingCapPal[bId % copingCapPal.length];
+                    const isBeachArtDeco = (c >= 355);
+                    const isDowntown = (c >= 235 && c < 355 && r >= 140 && r <= 320);
+                    const bStyle = bldgStyleGrid[rOff + c] || 0;
+                    const wallCol = stoneWallPal[bStyle % stoneWallPal.length];
+                    const capCol  = copingCapPal[bStyle % copingCapPal.length];
+                    if (roofUsed[rOff + c] === 2) continue;
 
                     for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
                         const nzX = bTopZ[rOff + (c + dx)];

@@ -471,6 +471,82 @@ class RetroRenderer {
                 float m = max(a.x, a.y);
                 return (m > 0.0001) ? (m * pow(pow(a.x / m, p) + pow(a.y / m, p), 1.0 / p)) : 0.0;
             }
+            // 12 GTA 6 / Vice City Architectural Building Palettes (Pastel Art Deco, Mediterranean Terracotta, Modernist Condo, Curtain-Wall Glass)
+            void getBuildingStyleColors(float styleId, out vec3 wallCol, out vec3 trimCol, out vec3 roofCol, out vec3 accentCol) {
+                if (styleId < 0.5) {
+                    // 0: Flamingo Rose Art Deco + Crisp White Trim + Warm Coral-Terracotta Roof
+                    wallCol   = vec3(0.93, 0.72, 0.78);
+                    trimCol   = vec3(0.96, 0.96, 0.98);
+                    roofCol   = vec3(0.81, 0.58, 0.49);
+                    accentCol = vec3(0.46, 0.84, 0.86);
+                } else if (styleId < 1.5) {
+                    // 1: Seafoam Turquoise Art Deco + Crisp White Trim + Cool Architectural Concrete Roof
+                    wallCol   = vec3(0.55, 0.84, 0.85);
+                    trimCol   = vec3(0.96, 0.97, 0.99);
+                    roofCol   = vec3(0.79, 0.81, 0.83);
+                    accentCol = vec3(0.94, 0.72, 0.78);
+                } else if (styleId < 2.5) {
+                    // 2: Sunlit Butter Yellow / Mediterranean Revival + Ivory Trim + Spanish Terracotta Clay Roof
+                    wallCol   = vec3(0.95, 0.87, 0.63);
+                    trimCol   = vec3(0.96, 0.94, 0.88);
+                    roofCol   = vec3(0.73, 0.45, 0.34);
+                    accentCol = vec3(0.86, 0.64, 0.28);
+                } else if (styleId < 3.5) {
+                    // 3: Sky Periwinkle / Powder Blue Art Deco + White Mullions + Azure Band + Slate Roof
+                    wallCol   = vec3(0.67, 0.79, 0.93);
+                    trimCol   = vec3(0.96, 0.97, 0.99);
+                    roofCol   = vec3(0.72, 0.75, 0.80);
+                    accentCol = vec3(0.22, 0.56, 0.88);
+                } else if (styleId < 4.5) {
+                    // 4: Crisp White Modernist Condo / Resort + Smoked Glass + Cool-White Elastomeric Roof
+                    wallCol   = vec3(0.93, 0.95, 0.97);
+                    trimCol   = vec3(0.98, 0.98, 1.00);
+                    roofCol   = vec3(0.85, 0.87, 0.89);
+                    accentCol = vec3(0.32, 0.68, 0.82);
+                } else if (styleId < 5.5) {
+                    // 5: Warm Coral-Peach Tropical Revival + Cream Trim + Sandstone Travertine Roof
+                    wallCol   = vec3(0.94, 0.75, 0.65);
+                    trimCol   = vec3(0.96, 0.93, 0.87);
+                    roofCol   = vec3(0.83, 0.74, 0.64);
+                    accentCol = vec3(0.76, 0.44, 0.34);
+                } else if (styleId < 6.5) {
+                    // 6: Tropical Mint / Key Lime Art Deco + Crisp White Trim + Warm Travertine Roof
+                    wallCol   = vec3(0.70, 0.89, 0.77);
+                    trimCol   = vec3(0.96, 0.97, 0.98);
+                    roofCol   = vec3(0.81, 0.79, 0.73);
+                    accentCol = vec3(0.24, 0.68, 0.52);
+                } else if (styleId < 7.5) {
+                    // 7: Reflective Deep Teal-Sapphire Glass Curtain-Wall Office Tower + Dark Slate Roof
+                    wallCol   = vec3(0.18, 0.36, 0.46);
+                    trimCol   = vec3(0.56, 0.68, 0.74);
+                    roofCol   = vec3(0.46, 0.51, 0.56);
+                    accentCol = vec3(0.24, 0.58, 0.72);
+                } else if (styleId < 8.5) {
+                    // 8: Warm Ivory Coquina / Classical Limestone + Travertine Roof
+                    wallCol   = vec3(0.91, 0.88, 0.80);
+                    trimCol   = vec3(0.96, 0.94, 0.89);
+                    roofCol   = vec3(0.77, 0.73, 0.66);
+                    accentCol = vec3(0.66, 0.58, 0.48);
+                } else if (styleId < 9.5) {
+                    // 9: Havana Terracotta / Red-Ochre Masonry + Cream Lintels + Weathered Clay Roof
+                    wallCol   = vec3(0.84, 0.55, 0.43);
+                    trimCol   = vec3(0.93, 0.89, 0.81);
+                    roofCol   = vec3(0.65, 0.42, 0.33);
+                    accentCol = vec3(0.74, 0.38, 0.28);
+                } else if (styleId < 10.5) {
+                    // 10: South Beach Lavender / Lilac Deco + Crisp White Trim + Warm Coral-Sand Roof
+                    wallCol   = vec3(0.83, 0.75, 0.91);
+                    trimCol   = vec3(0.96, 0.97, 0.99);
+                    roofCol   = vec3(0.80, 0.69, 0.62);
+                    accentCol = vec3(0.46, 0.82, 0.86);
+                } else {
+                    // 11: Sleek Silver-Precast Modernist High-Rise + Cool Precast Slate Roof
+                    wallCol   = vec3(0.74, 0.78, 0.83);
+                    trimCol   = vec3(0.88, 0.91, 0.94);
+                    roofCol   = vec3(0.62, 0.66, 0.70);
+                    accentCol = vec3(0.30, 0.44, 0.56);
+                }
+            }
 
             void main() {
                 if (uNightTint < -0.5 && vAnim >= -0.5) discard;
@@ -741,19 +817,18 @@ class RetroRenderer {
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
                         float isElevatedRoof = step(2.85, vWorldPos.y);
                         if (isElevatedRoof > 0.5 && waterCoverage < 0.05) {
-                            // Preserve turquoise rooftop swimming pools (lid 35), but replace all blurry 1997
-                            // diamond-checkerboard / purple / yellow roof tiles with a crisp procedural GTA 6 architectural roof deck!
+                            // Preserve turquoise rooftop swimming pools (lid 35), and style all building roofs
+                            // with their per-building GTA 6 architectural roof palette (Terracotta, Coral, Travertine, Cool-White Condo, or Slate)!
                             float isPoolRoof = step(0.18, c.b - c.r) * step(0.12, c.g - c.r);
                             if (isPoolRoof < 0.5) {
                                 float roofLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                                float tierSeed = fract(floor(vWorldPos.y + 0.1) * 0.37);
-                                vec3 archDeckBase = mix(
-                                    vec3(0.76, 0.74, 0.69), // Warm architectural travertine/concrete slab
-                                    vec3(0.64, 0.66, 0.69), // Weathered precast slate-concrete membrane
-                                    tierSeed
-                                );
-                                // Keep only 14% of underlying tile luminance so the blurry 1997 2x2 diamonds & pink/yellow tints vanish
-                                vec3 cleanRoof = archDeckBase * (0.90 + 0.14 * (roofLum - 0.5));
+                                float rStyle = floor(clamp(vAnim, 0.0, 0.45) * 40.0 + 0.5);
+                                vec3 bWallCol, bTrimCol, bRoofCol, bAccentCol;
+                                getBuildingStyleColors(rStyle, bWallCol, bTrimCol, bRoofCol, bAccentCol);
+
+                                float tierSeed = fract(floor(vWorldPos.y + 0.1) * 0.37 + rStyle * 0.13);
+                                vec3 archDeckBase = bRoofCol * (0.96 + 0.08 * (tierSeed - 0.5));
+                                vec3 cleanRoof = archDeckBase * (0.91 + 0.14 * (roofLum - 0.5));
                                 vec2 rf = fract(vWorldPos.xz);
                                 vec2 subRf = fract(vWorldPos.xz * 2.0);
                                 float edgeD = min(min(rf.x, 1.0 - rf.x), min(rf.y, 1.0 - rf.y));
@@ -763,15 +838,25 @@ class RetroRenderer {
                                 float paverBevel  = smoothstep(0.052, 0.085, subD) - smoothstep(0.085, 0.12, subD);
                                 float grainSum = 0.0;
                                 if (uMobileFast < 0.5) {
-                                    float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.042;
-                                    float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.024;
+                                    float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.040;
+                                    float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.022;
                                     grainSum = fineGrain + medGrain;
+                                    // Mediterranean clay barrel-tile roof ripple on terracotta/coral roof styles (0, 2, 5, 9)
+                                    if (abs(rStyle - 2.0) < 0.4 || abs(rStyle - 9.0) < 0.4 || abs(rStyle - 0.0) < 0.4) {
+                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.024 + step(0.84, fract(vWorldPos.z * 4.0)) * (-0.032);
+                                        grainSum += clayRib;
+                                    }
                                 }
+                                // Crisp outer parapet coping border tinted toward the building's facade/trim color
+                                float copingBand = 1.0 - smoothstep(0.055, 0.095, edgeD);
+                                vec3 copingTint = mix(bWallCol, bTrimCol, 0.55);
+                                cleanRoof = mix(cleanRoof, copingTint, copingBand * 0.52);
+
                                 // Directional solar rim highlight along sun-facing roof edges
                                 float sunEdgeRim = (1.0 - smoothstep(0.0, 0.14, rf.y)) * 0.045;
                                 c.rgb = (cleanRoof + grainSum + paverBevel * 0.025 + sunEdgeRim)
                                     * mix(0.84, 1.0, outerGutter)
-                                    * mix(0.89, 1.0, paverJoint);
+                                    * mix(0.90, 1.0, paverJoint);
                             } else {
                                 // Luxury Miami Art Deco Rooftop & Resort Swimming Pool (lid 35):
                                 // Travertine perimeter coping rim, cobalt ceramic waterline trim, mosaic tile floor & animated solar caustics!
@@ -859,41 +944,99 @@ class RetroRenderer {
                     }
                 }
 
-                // 2. 3D Cardinal Wall Normals, GTA 6 Architectural Facade Relief, Parallax Window Depth & Ground-Contact AO
+                // 2. 3D Cardinal Wall Normals, GTA 6 Per-Building Architectural Facade Palettes, Crisp Window Frames & Ground-Contact AO
                 if (vAnim < -0.5) {
+                    float rawWall = floor(-vAnim - 1.0 + 0.5);
+                    float faceDir = mod(rawWall, 4.0);
+                    float bStyle  = floor(rawWall * 0.25 + 0.01);
+
                     vec2 wallNormal = vec2(0.0, 1.0);
-                    if (vAnim > -1.5) wallNormal = vec2(-1.0, 0.0);      // West wall (-1.0)
-                    else if (vAnim > -2.5) wallNormal = vec2(1.0, 0.0);  // East wall (-2.0)
-                    else if (vAnim > -3.5) wallNormal = vec2(0.0, -1.0); // North wall (-3.0)
-                    else wallNormal = vec2(0.0, 1.0);                    // South wall (-4.0)
+                    if (faceDir < 0.5) wallNormal = vec2(-1.0, 0.0);      // West wall (0)
+                    else if (faceDir < 1.5) wallNormal = vec2(1.0, 0.0);  // East wall (1)
+                    else if (faceDir < 2.5) wallNormal = vec2(0.0, -1.0); // North wall (2)
+                    else wallNormal = vec2(0.0, 1.0);                     // South wall (3)
 
                     float sunDot = dot(wallNormal, uSunDir);
                     float wallSunFactor = clamp(sunDot * 0.5 + 0.5, 0.0, 1.0);
                     vec3 wallDayTint = mix(vec3(0.68, 0.77, 0.91), vec3(1.18, 1.10, 0.93), wallSunFactor);
                     vec3 wallShade = mix(vec3(1.0 + sunDot * 0.06), wallDayTint, dayAmt);
 
-                    // Eliminate any synthwave purple / magenta / hot-pink / neon-cyan hue on vertical building walls
+                    vec3 bWallCol, bTrimCol, bRoofCol, bAccentCol;
+                    getBuildingStyleColors(bStyle, bWallCol, bTrimCol, bRoofCol, bAccentCol);
+
+                    float isEW = step(faceDir, 1.5);
+                    float wallAlong = mix(vWorldPos.x, vWorldPos.z, isEW);
+                    float tileU = fract(wallAlong);
+                    float storeyY = fract(vWorldPos.y);
                     float wallLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-                    float isGlass = clamp((c.b - c.r - 0.04) * 4.5, 0.0, 1.0);
+                    float texGlass = clamp((c.b - c.r - 0.03) * 4.5, 0.0, 1.0);
+
+                    // Procedural GTA 6 Architectural Facade & Window Grid combined with 3ds Max tile relief
+                    float procGlass = 0.0;
+                    float winFrame = 0.0;
+                    float decoBand = 0.0;
+                    float isCurtainWall = step(6.6, bStyle) * step(bStyle, 7.4);
+                    float isModernCondo = (step(3.6, bStyle) * step(bStyle, 4.4)) + step(10.6, bStyle);
+
+                    if (isCurtainWall > 0.5) {
+                        // Style 7: Deep Teal-Sapphire Reflective Curtain-Wall Office Tower with Brushed Metallic Mullions
+                        float paneX = abs(fract(tileU * 4.0) - 0.5);
+                        float inPaneX = step(paneX, 0.41);
+                        float inPaneY = step(0.10, storeyY) * step(storeyY, 0.86);
+                        procGlass = inPaneX * inPaneY;
+                        winFrame = (1.0 - procGlass) * step(0.05, storeyY) * step(storeyY, 0.92);
+                    } else if (isModernCondo > 0.5) {
+                        // Styles 4 & 11: Crisp White / Silver Modernist High-Rise Condo with Continuous Horizontal Slab Bands & Smoked Glass Bays
+                        float bayX = abs(fract(tileU * 2.0) - 0.5);
+                        float inBayX = step(bayX, 0.39);
+                        float inBayY = step(0.20, storeyY) * step(storeyY, 0.78);
+                        float balcRail = step(0.35, storeyY) * step(storeyY, 0.39);
+                        procGlass = inBayX * inBayY * (1.0 - balcRail);
+                        winFrame = (step( storeyY, 0.20) + step(0.78, storeyY) + balcRail * inBayX);
+                    } else {
+                        // Art Deco, Mediterranean Revival & Classic Masonry Styles (0, 1, 2, 3, 5, 6, 8, 9, 10):
+                        // 2 recessed window bays per tile with crisp white/cream 3D window frames, sills, casement muntin & horizontal Art Deco spandrel bands!
+                        float bayU = fract(tileU * 2.0);
+                        float bayDX = abs(bayU - 0.5);
+                        float inWinX = step(bayDX, 0.27);
+                        float inWinY = step(0.25, storeyY) * step(storeyY, 0.73);
+                        float muntin = step(bayDX, 0.024) + step(abs(storeyY - 0.50), 0.022);
+                        procGlass = inWinX * inWinY * clamp(1.0 - muntin, 0.0, 1.0);
+
+                        float outerFrame = step(bayDX, 0.33) * step(0.19, storeyY) * step(storeyY, 0.78) * (1.0 - inWinX * inWinY);
+                        float innerMuntin = inWinX * inWinY * clamp(muntin, 0.0, 1.0);
+                        float topCornice = step(0.85, storeyY) * step(storeyY, 0.94);
+                        float outerPilaster = step(min(tileU, 1.0 - tileU), 0.085);
+                        winFrame = clamp(outerFrame + innerMuntin + topCornice + outerPilaster * 0.75, 0.0, 1.0);
+
+                        // Two-tone Art Deco horizontal accent frieze stripe under the cornice & above ground-floor storefronts
+                        float isDecoStyle = 1.0 - (step(7.6, bStyle) * step(bStyle, 9.4));
+                        decoBand = isDecoStyle * (step(0.79, storeyY) * step(storeyY, 0.84) + step(vWorldPos.y, 3.02) * step(0.74, storeyY) * step(storeyY, 0.82));
+                    }
+
+                    float isGlass = max(texGlass * 0.75, procGlass);
                     winGlassMask = isGlass;
-                    float purpleTint = clamp((min(c.r, c.b) - c.g + 0.02) * 4.5, 0.0, 1.0) * (1.0 - isGlass);
-                    vec3 stoneNeutral = vec3(wallLum * 1.04, wallLum * 0.99, wallLum * 0.92);
-                    c.rgb = mix(c.rgb, stoneNeutral, purpleTint);
-                    // Compress excessive masonry saturation so brick/stucco stays grounded and architectural
-                    vec3 masonryClean = mix(stoneNeutral, c.rgb, 0.62);
-                    c.rgb = mix(masonryClean, c.rgb, isGlass);
-                    // Deepen window glass into realistic dark architectural tinted glass
-                    vec3 archGlass = vec3(0.18, 0.27, 0.36) + vec3(0.18, 0.24, 0.30) * clamp(wallLum, 0.0, 0.85);
-                    c.rgb = mix(c.rgb, archGlass, isGlass * 0.72);
+
+                    // Colorize stucco/stone masonry with the building's signature Vice City palette while preserving 3ds Max relief
+                    float stuccoRelief = clamp(0.76 + (wallLum - 0.5) * 0.42, 0.58, 1.12);
+                    vec3 wallMasonry = bWallCol * stuccoRelief;
+                    wallMasonry = mix(wallMasonry, bTrimCol * (0.92 + wallLum * 0.10), clamp(winFrame, 0.0, 1.0));
+                    wallMasonry = mix(wallMasonry, bAccentCol * 0.95, clamp(decoBand * (1.0 - isGlass), 0.0, 1.0));
+
+                    // Deepen window glass into realistic dark architectural tinted glass (deep teal-sapphire on curtain-wall towers)
+                    vec3 glassBase = (isCurtainWall > 0.5)
+                        ? vec3(0.10, 0.25, 0.35)
+                        : vec3(0.13, 0.20, 0.28);
+                    vec3 archGlass = glassBase + vec3(0.10, 0.15, 0.20) * clamp(wallLum, 0.0, 0.75) * (1.0 - procGlass * 0.5);
+                    c.rgb = mix(wallMasonry, archGlass, isGlass);
 
                     // Storey Cornice Ledge Highlight, Under-Eyebrow Shadow, Vertical Pilaster Fluting, Micro-Stucco Grain & Plinth AO
-                    float storeyY = fract(vWorldPos.y);
                     float wallHoriz = fract(vWorldPos.x + vWorldPos.z);
-                    float pilaster = mix(0.91, 1.02, smoothstep(0.04, 0.12, min(wallHoriz, 1.0 - wallHoriz)));
-                    float corniceLight = 1.0 + 0.08 * smoothstep(0.91, 0.97, storeyY) - 0.10 * (smoothstep(0.80, 0.86, storeyY) - smoothstep(0.86, 0.92, storeyY));
-                    float baseAO = mix(0.82, 1.0, smoothstep(0.0, 0.30, storeyY)) * mix(0.80, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
+                    float pilaster = mix(0.92, 1.03, smoothstep(0.04, 0.12, min(wallHoriz, 1.0 - wallHoriz)));
+                    float corniceLight = 1.0 + 0.08 * smoothstep(0.90, 0.96, storeyY) - 0.09 * (smoothstep(0.79, 0.85, storeyY) - smoothstep(0.85, 0.91, storeyY));
+                    float baseAO = mix(0.84, 1.0, smoothstep(0.0, 0.28, storeyY)) * mix(0.82, 1.0, smoothstep(2.0, 2.55, vWorldPos.y));
                     if (uMobileFast < 0.5) {
-                        float stuccoGrain = (fract(sin(dot(floor(vec2(wallHoriz, storeyY) * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.032 * (1.0 - isGlass);
+                        float stuccoGrain = (fract(sin(dot(floor(vec2(wallHoriz, storeyY) * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.028 * (1.0 - isGlass);
 
                         // Daytime GTA 6 Parallax-Style Window Interior Depth (Venetian blinds/curtains) & Miami Sky Fresnel Glint
                         vec3 roomId = floor(vWorldPos * vec3(2.0, 1.0, 2.0));
@@ -901,11 +1044,11 @@ class RetroRenderer {
                         float blindLevel = 0.45 + 0.40 * rSeed;
                         float inBlind = step(blindLevel, fract(storeyY * 2.0)) * step(0.35, rSeed);
                         float slatWave = 0.88 + 0.12 * sin(storeyY * 96.0);
-                        vec3 blindCol = mix(vec3(0.76, 0.73, 0.67), vec3(0.54, 0.64, 0.72), step(0.68, rSeed)) * slatWave;
-                        c.rgb = mix(c.rgb + stuccoGrain, blindCol, isGlass * inBlind * 0.30 * dayAmt);
+                        vec3 blindCol = mix(vec3(0.78, 0.75, 0.69), vec3(0.56, 0.68, 0.76), step(0.62, rSeed)) * slatWave;
+                        c.rgb = mix(c.rgb + stuccoGrain, blindCol, isGlass * inBlind * 0.32 * dayAmt);
                     }
 
-                    vec3 skyGlint = vec3(0.11, 0.17, 0.24) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.32, 0.0, 1.0) * (0.35 + 0.65 * wallSunFactor);
+                    vec3 skyGlint = vec3(0.13, 0.20, 0.28) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.32, 0.0, 1.0) * (0.35 + 0.65 * wallSunFactor);
                     vec3 sunGlassSpec = vec3(0.24, 0.20, 0.12) * isGlass * dayAmt * pow(wallSunFactor, 3.0);
                     c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO * pilaster * corniceLight + skyGlint + sunGlassSpec);
                 }
@@ -921,10 +1064,12 @@ class RetroRenderer {
                     vec3 nightRgb = c.rgb;
                     if (vAnim < -0.5) {
                         // Deterministic wall-face room hash: even at peak night (uWinLit=0.92), at most ~35% of windows light up (~65% stay dark!)
-                        float isEW = step(-2.5, vAnim); // 1.0 for West(-1)/East(-2), 0.0 for North(-3)/South(-4)
+                        float rawWallN = floor(-vAnim - 1.0 + 0.5);
+                        float faceDirN = mod(rawWallN, 4.0);
+                        float isEW = step(faceDirN, 1.5); // 1.0 for West(0)/East(1), 0.0 for North(2)/South(3)
                         float wallAlong = mix(vWorldPos.x, vWorldPos.z, isEW);
                         float wallFixed = floor(mix(vWorldPos.z, vWorldPos.x, isEW) + 0.5);
-                        float faceIdx = floor(-vAnim + 0.5);
+                        float faceIdx = faceDirN + 1.0;
                         vec3 roomCell = vec3(floor(wallAlong * 2.0), floor(vWorldPos.y * 2.0), wallFixed * 4.0 + faceIdx);
                         float roomHash = fract(sin(dot(roomCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
                         float activeQuota = uWinLit * 0.38;
@@ -5558,6 +5703,88 @@ class RetroRenderer {
             }
         }
 
+        // Precompute per-building wing connected components & district-aware GTA 6 Architectural Style IDs (0..11)
+        // Shared between CityMesh (walls & roofs) and WorldObjectEngine (3D parapets, crowns, balconies, awnings & pitched roofs)!
+        const M = MAP_COLS;
+        const bTopZ = new Uint8Array(MAP_ROWS * M);
+        for (let r = 0; r < MAP_ROWS; r++) {
+            const rOff = r * M;
+            for (let c = 0; c < M; c++) {
+                for (let z = 5; z >= 2; z--) {
+                    const bi = this.map.getBlockIndex(c, r, z);
+                    if (!bi) continue;
+                    const blk = this.map.getBlockInfo(bi);
+                    if (blk && blk.groundType === GROUND_TYPE.BUILDING && !blk.isFlat && !blk.slopeType && blk.faces[4] > 0 && blk.faces[4] !== 41) {
+                        bTopZ[rOff + c] = z + 1;
+                        break;
+                    }
+                }
+            }
+        }
+        const bldgIdGrid = new Int32Array(MAP_ROWS * M);
+        const bldgStyleGrid = new Uint8Array(MAP_ROWS * M);
+        const bfsQ = new Int32Array(MAP_ROWS * M);
+        let nextBldgId = 1;
+        const beachLowPal = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 0, 1, 2, 3, 4, 5];
+        const beachHighPal = [4, 0, 1, 7, 3, 4, 10, 5, 4, 1];
+        const downtownPal = [7, 4, 11, 8, 3, 7, 4, 1, 11, 8];
+        const latinPal = [9, 2, 5, 1, 6, 8, 0, 9, 2, 3];
+        const urbanPal = [8, 9, 11, 2, 4, 5, 3, 7, 8, 1];
+
+        for (let r = 2; r < MAP_ROWS - 2; r++) {
+            const rOff = r * M;
+            for (let c = 2; c < M - 2; c++) {
+                const startIdx = rOff + c;
+                const z0 = bTopZ[startIdx];
+                if (z0 < 3 || bldgIdGrid[startIdx] !== 0) continue;
+                const curId = nextBldgId++;
+                bldgIdGrid[startIdx] = curId;
+                let qHead = 0, qTail = 0;
+                bfsQ[qTail++] = startIdx;
+                let neighborUsedMask = 0;
+                // Bound each same-elevation building wing to at most 5x5 tiles so side-by-side buildings on the same block get distinct styles!
+                while (qHead < qTail) {
+                    const cur = bfsQ[qHead++];
+                    const cr = (cur / M) | 0;
+                    const cc = cur - cr * M;
+                    const nIndices = [cur - 1, cur + 1, cur - M, cur + M];
+                    for (let ni = 0; ni < 4; ni++) {
+                        const nIdx = nIndices[ni];
+                        const nr = (nIdx / M) | 0;
+                        const nc = nIdx - nr * M;
+                        if (nc <= 1 || nc >= M - 2 || nr <= 1 || nr >= MAP_ROWS - 2) continue;
+                        if (bldgIdGrid[nIdx] !== 0 && bldgIdGrid[nIdx] !== curId) {
+                            neighborUsedMask |= (1 << bldgStyleGrid[nIdx]);
+                        } else if (bldgIdGrid[nIdx] === 0 && bTopZ[nIdx] === z0 && Math.abs(nc - c) < 5 && Math.abs(nr - r) < 5) {
+                            bldgIdGrid[nIdx] = curId;
+                            bfsQ[qTail++] = nIdx;
+                        }
+                    }
+                }
+                const isBeach = (c >= 355);
+                const isDowntown = (c >= 235 && c < 355 && r >= 140 && r <= 320);
+                const isLatin = (c >= 165 && c < 285 && r >= 70 && r < 330);
+                const pal = isBeach
+                    ? (z0 >= 5 ? beachHighPal : beachLowPal)
+                    : (isDowntown ? downtownPal : (isLatin ? latinPal : urbanPal));
+                let h = (((curId * 2654435761) ^ (c * 73856093) ^ (r * 19349663)) >>> 0);
+                let chosenStyle = pal[h % pal.length];
+                for (let attempt = 0; attempt < pal.length; attempt++) {
+                    const cand = pal[(h + attempt) % pal.length];
+                    if ((neighborUsedMask & (1 << cand)) === 0) {
+                        chosenStyle = cand;
+                        break;
+                    }
+                }
+                for (let qi = 0; qi < qTail; qi++) {
+                    bldgStyleGrid[bfsQ[qi]] = chosenStyle;
+                }
+            }
+        }
+        this.map.bldgIdGrid = bldgIdGrid;
+        this.map.bldgStyleGrid = bldgStyleGrid;
+        this.map.bldgTopZGrid = bTopZ;
+
         if (!this._cityOpaqueBuf) this._cityOpaqueBuf = new Float32Array(131072);
         if (!this._cityFlatBuf) this._cityFlatBuf = new Float32Array(65536);
         if (!this._p24Scratch) this._p24Scratch = new Float32Array(24);
@@ -5881,7 +6108,7 @@ class RetroRenderer {
         return 10;
     }
 
-    _emitParapetStripScalar(verts, sideTile, tiles, padU, yCop,
+    _emitParapetStripScalar(verts, sideTile, tiles, padU, yCop, animPar,
         x0, z0, u0f, v0f,
         x1, z1, u1f, v1f,
         x2, z2, u2f, v2f,
@@ -5909,22 +6136,22 @@ class RetroRenderer {
                 else this._cityOpaqueBuf = grown;
                 buf = grown;
             }
-            buf[len]      = x0; buf[len + 1]  = yCop; buf[len + 2]  = z0; buf[len + 3]  = qu0; buf[len + 4]  = qv0; buf[len + 5]  = 0.0;
-            buf[len + 6]  = x2; buf[len + 7]  = yCop; buf[len + 8]  = z2; buf[len + 9]  = qu2; buf[len + 10] = qv2; buf[len + 11] = 0.0;
-            buf[len + 12] = x1; buf[len + 13] = yCop; buf[len + 14] = z1; buf[len + 15] = qu1; buf[len + 16] = qv1; buf[len + 17] = 0.0;
-            buf[len + 18] = x1; buf[len + 19] = yCop; buf[len + 20] = z1; buf[len + 21] = qu1; buf[len + 22] = qv1; buf[len + 23] = 0.0;
-            buf[len + 24] = x2; buf[len + 25] = yCop; buf[len + 26] = z2; buf[len + 27] = qu2; buf[len + 28] = qv2; buf[len + 29] = 0.0;
-            buf[len + 30] = x3; buf[len + 31] = yCop; buf[len + 32] = z3; buf[len + 33] = qu3; buf[len + 34] = qv3; buf[len + 35] = 0.0;
+            buf[len]      = x0; buf[len + 1]  = yCop; buf[len + 2]  = z0; buf[len + 3]  = qu0; buf[len + 4]  = qv0; buf[len + 5]  = animPar;
+            buf[len + 6]  = x2; buf[len + 7]  = yCop; buf[len + 8]  = z2; buf[len + 9]  = qu2; buf[len + 10] = qv2; buf[len + 11] = animPar;
+            buf[len + 12] = x1; buf[len + 13] = yCop; buf[len + 14] = z1; buf[len + 15] = qu1; buf[len + 16] = qv1; buf[len + 17] = animPar;
+            buf[len + 18] = x1; buf[len + 19] = yCop; buf[len + 20] = z1; buf[len + 21] = qu1; buf[len + 22] = qv1; buf[len + 23] = animPar;
+            buf[len + 24] = x2; buf[len + 25] = yCop; buf[len + 26] = z2; buf[len + 27] = qu2; buf[len + 28] = qv2; buf[len + 29] = animPar;
+            buf[len + 30] = x3; buf[len + 31] = yCop; buf[len + 32] = z3; buf[len + 33] = qu3; buf[len + 34] = qv3; buf[len + 35] = animPar;
             if (verts === 1) this._cityFlatLen = len + 36;
             else this._cityOpaqueLen = len + 36;
         } else {
             verts.push(
-                x0, yCop, z0, qu0, qv0, 0.0,
-                x2, yCop, z2, qu2, qv2, 0.0,
-                x1, yCop, z1, qu1, qv1, 0.0,
-                x1, yCop, z1, qu1, qv1, 0.0,
-                x2, yCop, z2, qu2, qv2, 0.0,
-                x3, yCop, z3, qu3, qv3, 0.0
+                x0, yCop, z0, qu0, qv0, animPar,
+                x2, yCop, z2, qu2, qv2, animPar,
+                x1, yCop, z1, qu1, qv1, animPar,
+                x1, yCop, z1, qu1, qv1, animPar,
+                x2, yCop, z2, qu2, qv2, animPar,
+                x3, yCop, z3, qu3, qv3, animPar
             );
         }
     }
@@ -6093,10 +6320,25 @@ class RetroRenderer {
         const tiles = this.gta1Meta.tiles;
         let atlasIdx = 0;
         let animType = 0.0;
+        let bStyle = 0;
+        if (this.map && this.map.bldgStyleGrid) {
+            const cellIdx = z_south * MAP_COLS + x;
+            if (this.map.bldgIdGrid && this.map.bldgIdGrid[cellIdx] > 0) {
+                bStyle = this.map.bldgStyleGrid[cellIdx];
+            } else if (face < 4) {
+                const nx = face === 0 ? x - 1 : (face === 1 ? x + 1 : x);
+                const nz = face === 2 ? z_south - 1 : (face === 3 ? z_south + 1 : z_south);
+                if (nx >= 0 && nx < MAP_COLS && nz >= 0 && nz < MAP_ROWS) {
+                    bStyle = this.map.bldgStyleGrid[nz * MAP_COLS + nx] || 0;
+                }
+            } else {
+                bStyle = this.map.bldgStyleGrid[cellIdx] || 0;
+            }
+        }
 
         if (face < 4) {
-            // Side face (0..194) — encode cardinal wall direction (-1:W, -2:E, -3:N, -4:S) for 3D solar shading & emissive windows!
-            animType = -(face + 1.0);
+            // Side face (0..194) — encode cardinal wall direction (0:W, 1:E, 2:N, 3:S) + per-building Architectural Style ID (0..11)!
+            animType = -((face + 1.0) + bStyle * 4.0);
             const base = b.isFlat ? (tiles.side_flat_start || 195) : (tiles.side_start || 0);
             atlasIdx = base + (tileIdx % tiles.side_count);
         } else {
@@ -6239,8 +6481,11 @@ class RetroRenderer {
                 }
             }
 
-            // Guarantee all BUILDING roof lids (except pools 35/22) use a remastered GTA 6 roof deck tile
-            if (b.groundType === 4 && effTileIdx !== 35 && effTileIdx !== 22) {
+            // Guarantee all elevated BUILDING roof lids (y_elev >= 2, except pools 35/22) use a remastered GTA 6 roof deck tile + per-building roof style!
+            if (y_elev >= 2 && !b.isFlat && b.groundType === GROUND_TYPE.BUILDING && effTileIdx !== 35 && effTileIdx !== 22 && effTileIdx !== 41) {
+                if (animType === 0.0) {
+                    animType = bStyle * 0.025;
+                }
                 const isKnownCleanRoof = (
                     (effTileIdx >= 14 && effTileIdx <= 18) ||
                     (effTileIdx >= 29 && effTileIdx <= 34) ||
@@ -6338,8 +6583,8 @@ class RetroRenderer {
             );
         }
 
-        // 6. 3D Mitered Outer Parapet Coping (bridges & piers only; building roofs use 100% 3ds Max roof textures without stretched neon bands!)
-        if (face === 4 && st === 0 && !b.isFlat && y_elev >= 2 && b.groundType === 4 && tileIdx !== 41 && tileIdx !== 22) {
+        // 6. 3D Mitered Outer Parapet Coping
+        if (face === 4 && st === 0 && !b.isFlat && y_elev >= 2 && b.groundType === GROUND_TYPE.BUILDING && tileIdx !== 41 && tileIdx !== 22) {
             const hasW = b.faces[0] > 0;
             const hasE = b.faces[1] > 0;
             const hasN = b.faces[2] > 0;
@@ -6347,9 +6592,10 @@ class RetroRenderer {
             if (hasW || hasE || hasN || hasS) {
                 const wPar = 0.095;
                 const yCop = y_elev + 1.003;
+                const animPar = bStyle * 0.025;
                 if (hasN) {
                     this._emitParapetStripScalar(
-                        verts, b.faces[2], tiles, padU, yCop,
+                        verts, b.faces[2], tiles, padU, yCop, animPar,
                         xW, zN, 0, 0,
                         xE, zN, 1, 0,
                         xW + (hasW ? wPar : 0.0), zN + wPar, 0, 1,
@@ -6358,7 +6604,7 @@ class RetroRenderer {
                 }
                 if (hasS) {
                     this._emitParapetStripScalar(
-                        verts, b.faces[3], tiles, padU, yCop,
+                        verts, b.faces[3], tiles, padU, yCop, animPar,
                         xW + (hasW ? wPar : 0.0), zS - wPar, 0, 1,
                         xE - (hasE ? wPar : 0.0), zS - wPar, 1, 1,
                         xW, zS, 0, 0,
@@ -6367,7 +6613,7 @@ class RetroRenderer {
                 }
                 if (hasW) {
                     this._emitParapetStripScalar(
-                        verts, b.faces[0], tiles, padU, yCop,
+                        verts, b.faces[0], tiles, padU, yCop, animPar,
                         xW, zN, 0, 0,
                         xW + wPar, zN + (hasN ? wPar : 0.0), 0, 1,
                         xW, zS, 1, 0,
@@ -6376,7 +6622,7 @@ class RetroRenderer {
                 }
                 if (hasE) {
                     this._emitParapetStripScalar(
-                        verts, b.faces[1], tiles, padU, yCop,
+                        verts, b.faces[1], tiles, padU, yCop, animPar,
                         xE - wPar, zN + (hasN ? wPar : 0.0), 0, 1,
                         xE, zN, 0, 0,
                         xE - wPar, zS - (hasS ? wPar : 0.0), 1, 1,
