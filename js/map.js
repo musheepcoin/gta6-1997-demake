@@ -3343,27 +3343,30 @@ class LeonidaMap {
                 if (isUrbanSignalZone && roadCount === 2 && (eIsActiveRoad || wIsActiveRoad) && (sIsActiveRoad || nIsActiveRoad)) {
                     const dcCorner = eIsActiveRoad ? 1 : -1;
                     const drCorner = sIsActiveRoad ? 1 : -1;
-                    // NW/NE corner (sRoad) -> 1 NS signal; SW/SE corner (nRoad) -> 1 EW signal
-                    const isNS = sIsActiveRoad;
+                    // RIGHT-HAND RULE: each junction corner carries the signal of the leg whose approaching traffic has that corner on its RIGHT:
+                    //   NW corner -> north leg (southbound)   NE corner -> east leg (westbound)
+                    //   SE corner -> south leg (northbound)   SW corner -> west leg (eastbound)
+                    const isNS = dcCorner * drCorner === 1;
                     const axis = isNS ? "NS" : "EW";
+                    const travelX = isNS ? 0 : dcCorner;   // direction approaching traffic is moving (toward the junction)
+                    const travelY = isNS ? drCorner : 0;
                     const tooClose = this.trafficSignals.some(
-                        ts => ts.axis === axis && Math.abs(ts.c - c) < 7 && Math.abs(ts.r - r) < 6
+                        ts => ts.travelX === travelX && ts.travelY === travelY && Math.abs(ts.c - c) < 7 && Math.abs(ts.r - r) < 7
                     );
                     if (!tooClose) {
                         const surfZ = this.surfaceLayer[idx] || 2.0;
                         const baseX = (c + 0.5) * TILE_SIZE + dcCorner * 18.0;
                         const baseY = (r + 0.5) * TILE_SIZE + drCorner * 18.0;
+                        // Mast arm reaches from the pole across the leg (perpendicular to the direction of travel)
                         const dirX = isNS ? dcCorner : 0;
                         const dirY = isNS ? 0 : drCorner;
                         const headX = baseX + dirX * 32.0;
                         const headY = baseY + dirY * 32.0;
-                        const armAngle = isNS ? (dcCorner > 0 ? 0 : Math.PI) : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
+                        const armAngle = Math.atan2(dirY, dirX);
                         // Mast-arm span: count consecutive street tiles the arm crosses (2-lane road = 2 tiles, wider = more)
                         // Signal heads exist ONLY over the lanes whose traffic APPROACHES the junction (never over the opposing lane
                         // of a two-way street). A 2-way street (1 lane each way) therefore gets a single head; a one-way 2-lane
                         // street gets a double signal. Parking bays / esplanade tiles are never counted.
-                        const travelX = isNS ? 0 : dcCorner;   // direction approaching traffic is moving (toward the junction)
-                        const travelY = isNS ? drCorner : 0;
                         const approachK = [];
                         let lastLaneK = 0;
                         for (let k = 1; k <= 6; k++) {
@@ -3398,6 +3401,8 @@ class LeonidaMap {
                             armReach,
                             faceX,
                             faceY,
+                            travelX,
+                            travelY,
                             dirX,
                             dirY,
                             z: surfZ,
