@@ -4142,7 +4142,7 @@ class TrafficManager {
         };
 
         // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Surfers & Bodybuilders
-        if (isSand || (bx >= 452 && bx <= 484 && by >= 46 && by <= 375)) {
+        if ((isSand && bx >= 465) || (bx >= 465 && bx <= 484 && by >= 46 && by <= 375)) {
             const beachPool = [
                 "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
                 "surfer_guy", "surfer_guy", "vc_bodybuilder", "vc_jogger", "vc_tourist",
@@ -4177,14 +4177,14 @@ class TrafficManager {
             });
         }
 
-        // 2. Lummus Park Oceanfront Boardwalk (c = 451..452): Rollerbladers, Joggers & Beach Promenaders
-        if ((bx === 451 || bx === 452) && by >= 44 && by <= 362) {
+        // 2. Lummus Park Ocean Drive Promenade (c = 448) & Winding Sand Trail / Walkovers (c = 449..464): Rollerbladers, Joggers & Beach Promenaders
+        if ((bx === 448 || (bx >= 449 && bx <= 464 && isSand)) && by >= 44 && by <= 362) {
             const skatePool = [
                 "vc_jogger", "bikini_cyan", "bikini_pink", "g2_civ_pink",
                 "g2_civ_aqua", "g2_civ_blueshorts", "vc_tourist", "kid_skater", "bikini_yellow", "surfer_guy"
             ];
             const gType = pickFrom(skatePool);
-            const isRollerblader = (r1 % 10) < 6 || gType === "kid_skater";
+            const isRollerblader = bx === 448 && ((r1 % 10) < 6 || gType === "kid_skater");
             const isChild = gType.startsWith("kid_");
             return decoratePedSpec({
                 kind: "CIVILIAN",
@@ -4372,9 +4372,9 @@ class TrafficManager {
             return { type: "SOLO", members: [single] };
         }
 
-        const isBeach = isSand || (bx >= 452 && bx <= 484 && by >= 46 && by <= 375);
+        const isBeach = (isSand && bx >= 465) || (bx >= 465 && bx <= 484 && by >= 46 && by <= 375);
         const isSpaceport = bx >= 415 && by <= 45;
-        const isBoardwalk = (bx === 451 || bx === 452) && by >= 44 && by <= 362;
+        const isBoardwalk = (bx === 448 || (bx >= 449 && bx <= 464 && isSand)) && by >= 44 && by <= 362;
         const isOceanDrive = bx >= 408 && bx <= 450 && by >= 40 && by <= 370;
         const isCuba = bx >= 255 && bx <= 325 && by >= 215 && by <= 292;
         const isWynwood = bx >= 165 && bx <= 265 && by >= 92 && by <= 212;
@@ -4475,7 +4475,7 @@ class TrafficManager {
                     ["g2_civ_redtee", "g2_civ_yellowtee"]
                 ];
             }
-            const pair = pairs[(r >> 3) % pairs.length];
+            const pair = pairs[(r >>> 3) % pairs.length];
             const sharedSpeed = 23 + (r % 4);
             const tag = isBeach ? "BEACH" : undefined;
             return {
@@ -4514,8 +4514,8 @@ class TrafficManager {
             const childPool = isBeach
                 ? ["kid_beach", "kid_girl_pink"]
                 : ["kid_boy_cap", "kid_girl_pink", "kid_beach"];
-            const parentType = parentPool[(r >> 3) % parentPool.length];
-            const childType = childPool[(r >> 5) % childPool.length];
+            const parentType = parentPool[(r >>> 3) % parentPool.length];
+            const childType = childPool[(r >>> 5) % childPool.length];
             const famSpeed = 22 + (r % 3);
             const tag = isBeach ? "BEACH" : undefined;
             const members = [
@@ -4544,7 +4544,7 @@ class TrafficManager {
                 }
             ];
             if ((r % 3) === 0) {
-                const secondParent = parentPool[((r >> 3) + 1) % parentPool.length];
+                const secondParent = parentPool[((r >>> 3) + 1) % parentPool.length];
                 members.push({
                     kind: "CIVILIAN",
                     g24Type: secondParent,
@@ -4585,7 +4585,7 @@ class TrafficManager {
                     ["civ0", "civ2", "g2_civ_aqua"]
                 ];
             }
-            const trio = trios[(r >> 3) % trios.length];
+            const trio = trios[(r >>> 3) % trios.length];
             const grpSpeed = 23 + (r % 4);
             const tag = isBeach ? "BEACH" : undefined;
             return {
@@ -4687,7 +4687,7 @@ class TrafficManager {
                 const mbx = Math.floor(mx / TILE_SIZE);
                 const mby = Math.floor(my / TILE_SIZE);
                 const mNav = map.getNavigationBlock ? map.getNavigationBlock(mbx, mby, pedZ) : null;
-                const onLummusLawn = (mbx === 449 || mbx === 450) && mNav && mNav.lid === 10 && bx !== 449 && bx !== 450;
+                const onLummusLawn = (mbx >= 449 && mbx <= 464) && mNav && mNav.lid === 10 && !(bx >= 449 && bx <= 464);
                 const badGround = !mNav || mNav.groundType === GROUND_TYPE.ROAD || mNav.groundType === GROUND_TYPE.WATER || mNav.groundType === GROUND_TYPE.BUILDING || onLummusLawn;
                 const hitBld = typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(mx, my, 8.5, pedZ).hit;
                 const hitVeh = typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(mx, my, 9.5, pedZ).hit;
@@ -4697,7 +4697,7 @@ class TrafficManager {
                     const tbx = Math.floor(tuckX / TILE_SIZE);
                     const tby = Math.floor(tuckY / TILE_SIZE);
                     const tNav = map.getNavigationBlock ? map.getNavigationBlock(tbx, tby, pedZ) : null;
-                    const tuckOnLawn = (tbx === 449 || tby === 450) && tNav && tNav.lid === 10 && bx !== 449 && bx !== 450;
+                    const tuckOnLawn = (tbx >= 449 && tbx <= 464) && tNav && tNav.lid === 10 && !(bx >= 449 && bx <= 464);
                     const tuckBad = !tNav || tNav.groundType === GROUND_TYPE.ROAD || tNav.groundType === GROUND_TYPE.WATER || tNav.groundType === GROUND_TYPE.BUILDING || tuckOnLawn ||
                         (typeof map.resolveCircleBuildingCollision === "function" && map.resolveCircleBuildingCollision(tuckX, tuckY, 8.5, pedZ).hit) ||
                         (typeof game.resolveCircleVehicleCollision === "function" && game.resolveCircleVehicleCollision(tuckX, tuckY, 9.5, pedZ).hit);
@@ -5211,9 +5211,9 @@ class TrafficManager {
             if (!nav) continue;
             const col = map.getColumn ? map.getColumn(bx, by) : null;
             if (col && col.length > 1) continue;
-            const lid = map.getTopTile ? map.getTopTile(bx, by) : 0;
+            const lid = map.getBlockInfo ? (map.getBlockInfo(bx, by, 1)?.lid || 0) : 0;
             if (lid === 69) continue;
-            if ((bx === 449 || bx === 450) && lid === 10) continue;
+            if (bx >= 449 && bx <= 464 && lid === 10) continue;
 
             const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
             const isSand = !!(map.coastalSandMask && map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);

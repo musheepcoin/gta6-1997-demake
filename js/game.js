@@ -563,9 +563,9 @@ class LeonidaGame {
 
             // --- B. S-Curving Vice Beach Sand & South Wooden Pier (off-road on beach sand & water) ---
 
-            { spec: "MONSTER_BUGGY", c: 463.5, r: 280.5, raw512: true, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "MONSTER_BUGGY", c: 468.5, r: 280.5, raw512: true, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
 
-            { spec: "GATOR_4X4", c: 464.5, r: 300.0, raw512: true, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "GATOR_4X4", c: 468.5, r: 300.0, raw512: true, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK" },
 
             { spec: "AIRBOAT", c: 250.5, r: 154.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
@@ -665,7 +665,7 @@ class LeonidaGame {
 
             { spec: "AIRBOAT", c: 145.0, r: 412.0, a: 0.0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "GATOR_4X4", c: 465.5, r: 219.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "GATOR_4X4", c: 468.5, r: 219.0, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "MONSTER_BUGGY", c: 468.5, r: 274.0, a: -Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
@@ -794,17 +794,17 @@ class LeonidaGame {
 
             { c: 221.5, r: 158.2, a: Math.PI * 0.5, type: "vc_tubbs" },
 
-            // Lummus Park Oceanfront Boardwalk Rollerbladers & Kids (c = 451.5 raw512, gliding along the beach promenade!)
-            { c: 451.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "vc_jogger",     isRollerblader: true },
-            { c: 451.5, r: 225.2, raw512: true, a: Math.PI * 0.5,  type: "kid_skater",    isRollerblader: true, isChild: true },
-            { c: 451.5, r: 228.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   isRollerblader: true },
-            { c: 451.5, r: 231.5, raw512: true, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true },
-            { c: 451.5, r: 234.0, raw512: true, a: Math.PI * 0.5,  type: "g2_civ_pink",   isRollerblader: true },
-            { c: 451.5, r: 237.2, raw512: true, a: Math.PI * 0.5,  type: "kid_boy_cap",   isChild: true },
-            { c: 451.5, r: 240.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist",    isRollerblader: true },
-            { c: 451.5, r: 243.5, raw512: true, a: -Math.PI * 0.5, type: "kid_beach",     isChild: true },
-            { c: 451.5, r: 246.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   isRollerblader: true },
-            { c: 451.5, r: 252.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_aqua",   isRollerblader: true },
+            // Lummus Park Ocean Drive East Promenade Rollerbladers & Kids (c = 448.5 raw512, gliding along the Ocean Drive promenade!)
+            { c: 448.5, r: 222.0, raw512: true, a: Math.PI * 0.5,  type: "vc_jogger",     isRollerblader: true },
+            { c: 448.5, r: 225.2, raw512: true, a: Math.PI * 0.5,  type: "kid_skater",    isRollerblader: true, isChild: true },
+            { c: 448.5, r: 228.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   isRollerblader: true },
+            { c: 448.5, r: 231.5, raw512: true, a: -Math.PI * 0.5, type: "kid_girl_pink", isChild: true },
+            { c: 448.5, r: 234.0, raw512: true, a: Math.PI * 0.5,  type: "g2_civ_pink",   isRollerblader: true },
+            { c: 448.5, r: 237.2, raw512: true, a: Math.PI * 0.5,  type: "kid_boy_cap",   isChild: true },
+            { c: 448.5, r: 240.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist",    isRollerblader: true },
+            { c: 448.5, r: 243.5, raw512: true, a: -Math.PI * 0.5, type: "kid_beach",     isChild: true },
+            { c: 448.5, r: 246.0, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   isRollerblader: true },
+            { c: 448.5, r: 252.5, raw512: true, a: -Math.PI * 0.5, type: "g2_civ_aqua",   isRollerblader: true },
 
             // Ocean Drive & Lummus Park Kids / Teenagers with families
             { c: 213.5, r: 146.2, a: Math.PI * 0.5,  type: "kid_boy_cap",   isChild: true },
@@ -888,33 +888,17 @@ class LeonidaGame {
 
             { c: 353.5, r: 168.5, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH", raw512: true },
 
-            // Extra GTA 6 Trailer 1 High-Density Vice Beach Strollers (raw512 c = 453.5..467.5, r = 212..330)
-            { c: 454.5, r: 214.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   missionTag: "BEACH" },
-            { c: 458.5, r: 217.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
-            { c: 462.5, r: 220.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
-            { c: 465.5, r: 223.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
-            { c: 455.5, r: 226.5, raw512: true, a: Math.PI * 0.5,  type: "vc_bodybuilder",missionTag: "BEACH" },
-            { c: 459.5, r: 229.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_red",    missionTag: "BEACH" },
-            { c: 463.5, r: 232.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
-            { c: 454.5, r: 235.5, raw512: true, a: -Math.PI * 0.5, type: "vc_jogger",     missionTag: "BEACH" },
-            { c: 458.5, r: 238.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   missionTag: "BEACH" },
-            { c: 462.5, r: 241.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
-            { c: 466.5, r: 244.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
-            { c: 455.5, r: 247.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
-            { c: 460.5, r: 251.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_red",    missionTag: "BEACH" },
-            { c: 464.5, r: 255.5, raw512: true, a: -Math.PI * 0.5, type: "vc_tourist",    missionTag: "BEACH" },
-            { c: 456.5, r: 259.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
-            { c: 461.5, r: 263.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_pink",   missionTag: "BEACH" },
-            { c: 465.5, r: 267.5, raw512: true, a: Math.PI * 0.5,  type: "surfer_guy",    missionTag: "BEACH" },
-            { c: 454.5, r: 271.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_cyan",   missionTag: "BEACH" },
-            { c: 459.5, r: 275.5, raw512: true, a: Math.PI * 0.5,  type: "vc_bodybuilder",missionTag: "BEACH" },
-            { c: 463.5, r: 279.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
-            { c: 455.5, r: 292.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_red",    missionTag: "BEACH" },
-            { c: 460.5, r: 296.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_pink",   missionTag: "BEACH" },
-            { c: 464.5, r: 302.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
-            { c: 457.5, r: 308.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
-            { c: 462.5, r: 314.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
-            { c: 456.5, r: 320.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            // Open Vice Beach Golden-Sand Strollers East of the Coastal Dunes (raw512 c = 468.5..475.5, r = 214..320)
+            { c: 468.5, r: 216.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   missionTag: "BEACH" },
+            { c: 472.5, r: 224.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
+            { c: 469.5, r: 233.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_cyan",   missionTag: "BEACH" },
+            { c: 474.5, r: 242.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_yellow", missionTag: "BEACH" },
+            { c: 468.5, r: 252.5, raw512: true, a: Math.PI * 0.5,  type: "vc_bodybuilder",missionTag: "BEACH" },
+            { c: 473.5, r: 262.5, raw512: true, a: -Math.PI * 0.5, type: "bikini_red",    missionTag: "BEACH" },
+            { c: 470.5, r: 274.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_white",  missionTag: "BEACH" },
+            { c: 474.5, r: 294.5, raw512: true, a: -Math.PI * 0.5, type: "vc_jogger",     missionTag: "BEACH" },
+            { c: 469.5, r: 306.5, raw512: true, a: Math.PI * 0.5,  type: "bikini_pink",   missionTag: "BEACH" },
+            { c: 472.5, r: 318.5, raw512: true, a: -Math.PI * 0.5, type: "surfer_guy",    missionTag: "BEACH" },
 
             // Extra Ocean Drive Sidewalk Crowd (c = 443.5 West Art Deco Hotel Sidewalk & c = 448.5 East Lummus Park Sidewalk)
             { c: 443.5, r: 218.5, raw512: true, a: Math.PI * 0.5,  type: "vc_tourist" },
@@ -1353,8 +1337,8 @@ class LeonidaGame {
 
                                 const cbx = bx + dx;
                                 const cby = by + dy;
-                                // Never shift parked cars onto narrow Ocean Drive sidewalks (col 443, 448, 451) or restricted compounds
-                                if (cbx === 443 || cbx === 448 || cbx === 451 || (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(cbx, cby))) continue;
+                                // Never shift parked cars onto narrow Ocean Drive sidewalks or Lummus Park / Coastal Dune belts
+                                if (cbx === 443 || (cbx >= 448 && cbx <= 464) || (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(cbx, cby))) continue;
 
                                 const nb = this.map.getNavigationBlock(cbx, cby, v.z);
 
@@ -1682,9 +1666,9 @@ class LeonidaGame {
                 if (!nav) continue;
                 const col = this.map.getColumn ? this.map.getColumn(bx, by) : null;
                 if (col && col.length > 1) continue;
-                const lid = this.map.getTopTile ? this.map.getTopTile(bx, by) : 0;
+                const lid = this.map.getBlockInfo ? (this.map.getBlockInfo(bx, by, 1)?.lid || 0) : 0;
                 if (lid === 69) continue; // tree planter
-                if ((bx === 449 || bx === 450) && lid === 10) continue; // Lummus Park palm grass strip
+                if (bx >= 449 && bx <= 464 && lid === 10) continue; // Lummus Park & Coastal Dune palm grass belts
 
                 const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
                 const isSand = !!(this.map.coastalSandMask && this.map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);
@@ -2144,16 +2128,14 @@ class LeonidaGame {
 
     getMonkTrackPosition(s) {
 
-        // Walk strictly along paved Lummus Park walkways:
-        // xA = col 448.5 (East Curbside Coral Promenade), xB = col 451.5 (Oceanfront Boardwalk Promenade),
-        // yTop = row 280.6 & yBottom = row 294.6 (paved Lummus Park crosswalks where y % 14 < 2, completely off the green grass!)
+        // Walk strictly along Lummus Park Ocean Drive Promenade (448.5) & Winding Sand Trail (454.5) via walkovers (276.5 & 318.5):
         const xA = 448.5 * TILE_SIZE;
 
-        const xB = 451.5 * TILE_SIZE;
+        const xB = 454.5 * TILE_SIZE;
 
-        const yTop = 280.6 * TILE_SIZE;
+        const yTop = 276.5 * TILE_SIZE;
 
-        const yBottom = 294.6 * TILE_SIZE;
+        const yBottom = 318.5 * TILE_SIZE;
 
         const segTop = xB - xA;
 
@@ -6662,7 +6644,7 @@ class LeonidaGame {
 
                     const flid = this.map.getBlockInfo ? (this.map.getBlockInfo(fbx, fby, 1)?.lid || 0) : 0;
 
-                    if (fbx >= 449 && fbx <= 450 && fby >= 42 && fby <= 362 && flid === 10) {
+                    if (fbx >= 449 && fbx <= 464 && fby >= 42 && fby <= 362 && flid === 10) {
 
                         score -= 42;
 
@@ -14130,7 +14112,7 @@ class LeonidaGame {
                         const sNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, pz) : null;
                         const slotOnRoad = sNav && sNav.groundType === GROUND_TYPE.ROAD && !leader.isCrossingRoad;
                         const slotOnWaterOrBld = !sNav || sNav.groundType === GROUND_TYPE.WATER || sNav.groundType === GROUND_TYPE.BUILDING;
-                        const slotOnLummusLawn = (sbx === 449 || sbx === 450) && sNav && sNav.lid === 10 && lbx !== 449 && lbx !== 450;
+                        const slotOnLummusLawn = (sbx >= 449 && sbx <= 464) && sNav && sNav.lid === 10 && !(lbx >= 449 && lbx <= 464);
                         const slotHitBld = this.map.resolveCircleBuildingCollision(slotX, slotY, 8.0, pz).hit;
                         const slotHitVeh = this.resolveCircleVehicleCollision(slotX, slotY, 8.5, pz, null).hit;
                         if (slotOnRoad || slotOnWaterOrBld || slotOnLummusLawn || slotHitBld || slotHitVeh) {

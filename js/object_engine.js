@@ -493,7 +493,7 @@ class WorldObjectEngine {
             { name: "LITTLE CUBA CAFECITO & CROQUETAS", x: 281.5 * TILE_SIZE, y: 248.5 * TILE_SIZE, z: 2.0, ang: 0,             ad: "ad_mambos_latin", tint: [0.98, 0.78, 0.22] },
             { name: "HANK'S WAFFLES EXPRESS DINER TRUCK", x: 72.5 * TILE_SIZE,  y: 204.5 * TILE_SIZE, z: 2.0, ang: 0,           ad: "ad_ecola",        tint: [0.96, 0.42, 0.18] },
             { name: "TISHA-WOCKA FLEA MARKET TACOS",    x: 191.5 * TILE_SIZE, y: 133.5 * TILE_SIZE, z: 2.0, ang: Math.PI * 0.5, ad: "ad_sprunk",       tint: [0.22, 0.88, 0.64] },
-            { name: "VICE BEACH AÇAÍ & GELATO CRUISER", x: 451.5 * TILE_SIZE, y: 226.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,ad: "ad_vice26",       tint: [0.98, 0.36, 0.78] }
+            { name: "VICE BEACH AÇAÍ & GELATO CRUISER", x: 448.5 * TILE_SIZE, y: 226.5 * TILE_SIZE, z: 2.0, ang: -Math.PI * 0.5,ad: "ad_vice26",       tint: [0.98, 0.36, 0.78] }
         ];
         // 12. Official GTA 6 Vice-Dale / Crosstown Tisha-Wocka Open-Air Flea Market & Little Cuba Cafecito Ventanitas
         this.tishaWockaMarket = {
@@ -511,9 +511,9 @@ class WorldObjectEngine {
         // 13. Official GTA 6 Vice Beach Pier & Ocean Drive Ice-Cream / Gelato Carts & Port Gellhorn / Keys Billiards Pool Tables
         this.iceCreamCarts = [
             { name: "CHERRY POPPER VICE PIER GELATO",  x: 452.5 * TILE_SIZE, y: 195.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "LUMMUS PARK TROPICAL SORBET CART",x: 451.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "SOUTH BEACH ART DECO GELATO",     x: 451.5 * TILE_SIZE, y: 268.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "OCEAN BEACH SUNSET AÇAÍ CART",    x: 451.5 * TILE_SIZE, y: 302.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+            { name: "LUMMUS PARK TROPICAL SORBET CART",x: 448.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH BEACH ART DECO GELATO",     x: 448.5 * TILE_SIZE, y: 268.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "OCEAN BEACH SUNSET AÇAÍ CART",    x: 448.5 * TILE_SIZE, y: 302.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         this.poolTables = [
             { name: "PORT GELLHORN 8-BALL HUSTLE TABLE", x: 75.5 * TILE_SIZE,  y: 204.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
@@ -529,7 +529,7 @@ class WorldObjectEngine {
             { name: "MOUNT KALAGA CANYON TROUT OVERLOOK",    x: 136.5 * TILE_SIZE, y: 26.2 * TILE_SIZE,  z: 2.0, ang: Math.PI * 0.5,  cooldown: 0 }
         ];
         this.streetBasketballCourts = [
-            { name: "LUMMUS PARK BEACHFRONT HOOPS",          x: 451.5 * TILE_SIZE, y: 214.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS PARK BEACHFRONT HOOPS",          x: 466.5 * TILE_SIZE, y: 214.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "LITTLE HAITI COMMUNITY BLACKTOP",       x: 221.5 * TILE_SIZE, y: 111.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "CROSSTOWN WYNWOOD STREETBALL COURT",    x: 186.5 * TILE_SIZE, y: 131.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
@@ -631,12 +631,12 @@ class WorldObjectEngine {
         // 22. Official GTA 6 Vice Pier Carnival High-Striker Games & Live Latin Salsa / Conga Street Bands (Loop 15)
         this.pierCarnivalGames = [
             { name: "VICE PIER HIGH-STRIKER CARNIVAL BOOTH",  x: 466.5 * TILE_SIZE, y: 194.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "NORTH BOARDWALK RING-TOSS CARNIVAL",     x: 451.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "SOUTH POINTE BOARDWALK PRIZE BOOTH",     x: 451.5 * TILE_SIZE, y: 312.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+            { name: "NORTH BOARDWALK RING-TOSS CARNIVAL",     x: 448.5 * TILE_SIZE, y: 134.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE BOARDWALK PRIZE BOOTH",     x: 448.5 * TILE_SIZE, y: 312.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         this.latinStreetBands = [
             { name: "CALLE OCHO SALSA & CONGA PAVILION",      x: 276.5 * TILE_SIZE, y: 248.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "LUMMUS PARK TROPICAL BRASS BAND",        x: 451.5 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS PARK TROPICAL BRASS BAND",        x: 448.5 * TILE_SIZE, y: 254.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "LITTLE HAITI KOMPA DRUM STAGE",          x: 224.5 * TILE_SIZE, y: 116.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         // 23. Official GTA 6 Thrillbilly / Port Gellhorn Monster-Truck Car-Crush Arenas & Keys Shark-Cage Charters (Loop 16)
@@ -681,7 +681,7 @@ class WorldObjectEngine {
             { name: "SOUTH POINTE JETTY RESCUE STATION",      x: 474.5 * TILE_SIZE, y: 342.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         this.rollerDiscoRinks = [
-            { name: "LUMMUS PARK NEON ROLLER-DISCO RINK",     x: 451.5 * TILE_SIZE, y: 232.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS PARK NEON ROLLER-DISCO RINK",     x: 448.5 * TILE_SIZE, y: 232.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "WYNWOOD RETRO ROLLER-BOOGIE RINK",       x: 188.5 * TILE_SIZE, y: 136.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "SOUTH POINTE SUNSET ROLLER RINK",        x: 443.5 * TILE_SIZE, y: 346.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
@@ -698,7 +698,7 @@ class WorldObjectEngine {
         ];
         // 28. Official GTA 6 SERA Space Center Rocket Viewing Bleachers & Racing Catamaran Charter Docks (Loop 21)
         this.spaceViewingStands = [
-            { name: "SERA CAPE VIP LAUNCH BLEACHERS",         x: 454.5 * TILE_SIZE, y: 48.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
+            { name: "SERA CAPE VIP LAUNCH BLEACHERS",         x: 458.5 * TILE_SIZE, y: 48.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
             { name: "NORTH BEACH ROCKET TRACKING DECK",       x: 466.5 * TILE_SIZE, y: 68.5 * TILE_SIZE,  z: 2.0, cooldown: 0 },
             { name: "CAPE OBSERVATION TELEMETRY DISH",        x: 448.5 * TILE_SIZE, y: 36.5 * TILE_SIZE,  z: 2.0, cooldown: 0 }
         ];
@@ -744,11 +744,11 @@ class WorldObjectEngine {
         this.blockPartyStages = [
             { name: "WYNWOOD NEON BLOCK-PARTY SOUNDSTAGE",    x: 194.5 * TILE_SIZE, y: 132.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "LITTLE HAITI CARIBBEAN SOUND-SYSTEM",    x: 226.5 * TILE_SIZE, y: 104.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "SOUTH BEACH PROMENADE DJ STAGE",         x: 451.5 * TILE_SIZE, y: 286.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
+            { name: "SOUTH BEACH PROMENADE DJ STAGE",         x: 448.5 * TILE_SIZE, y: 286.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         this.coconutSmoothieBars = [
-            { name: "LUMMUS BOARDWALK COCONUT & ACAI BAR",    x: 451.5 * TILE_SIZE, y: 178.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "SOUTH POINTE TROPICAL SMOOTHIE HUT",     x: 451.5 * TILE_SIZE, y: 324.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS BOARDWALK COCONUT & ACAI BAR",    x: 448.5 * TILE_SIZE, y: 178.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE TROPICAL SMOOTHIE HUT",     x: 448.5 * TILE_SIZE, y: 324.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "KEY WEST SUNSET COCONUT STAND",          x: 224.5 * TILE_SIZE, y: 476.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         // 33. Official GTA 6 Mount Kalaga Gold-Panning Camps & VIP Armored Courier Drops (Loop 26)
@@ -764,8 +764,8 @@ class WorldObjectEngine {
         ];
         // 34. Official GTA 6 Vice Beach Sunset Yoga Decks & Little Cuba Domino Park Pavilions (Loop 27)
         this.beachYogaDecks = [
-            { name: "LUMMUS PARK SUNRISE YOGA PAVILION",      x: 454.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "SOUTH POINTE OCEANFRONT PILATES DECK",   x: 454.5 * TILE_SIZE, y: 334.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "LUMMUS PARK SUNRISE YOGA PAVILION",      x: 466.5 * TILE_SIZE, y: 224.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "SOUTH POINTE OCEANFRONT PILATES DECK",   x: 466.5 * TILE_SIZE, y: 334.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "STAR ISLAND ZEN LOTUS SANCTUARY",        x: 364.5 * TILE_SIZE, y: 162.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         this.dominoParkTables = [
@@ -16490,19 +16490,62 @@ class WorldObjectEngine {
             ctx.fillRect(rx, ry, rw, rh);
         }
 
+        // Reconstructed East Coast Beachfront on GPS / Overview Map:
+        // Ocean Drive East Promenade (x=448) + Wide Lummus Park + Winding Sand Trail + Vegetated Coastal Dune Belt + Open Vice Beach
+        for (let ry = 46; ry <= 71; ry++) {
+            // North Beach sidewalk (458) + Coastal Dune belt (459..463) + Open Beach sand (464..476)
+            ctx.fillStyle = "#d6cfc2";
+            ctx.fillRect(458 * TILE_SIZE * sx, ry * TILE_SIZE * sy, 1 * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+            const isWalkN = (ry === 58 || ry === 59);
+            ctx.fillStyle = isWalkN ? "#ecd28e" : "#248f40";
+            ctx.fillRect(459 * TILE_SIZE * sx, ry * TILE_SIZE * sy, 5 * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+        }
+        for (let ry = 76; ry <= 362; ry++) {
+            // Clean Ocean Drive East T-junction curb & promenade (x=447..448)
+            ctx.fillStyle = "#d6cfc2";
+            ctx.fillRect(447 * TILE_SIZE * sx, ry * TILE_SIZE * sy, 2 * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+            const rawTrailW = Math.round(454.5 + Math.sin(ry * 0.075) * 1.15 + Math.cos(ry * 0.038 + 0.8) * 0.65);
+            const rawDuneE  = Math.round(462.4 + Math.sin(ry * 0.065 + 1.4) * 1.25 + Math.cos(ry * 0.11) * 0.65);
+            const duneE = ry >= 344 ? Math.min(rawDuneE, 461 - Math.floor((ry - 344) * 0.45)) : rawDuneE;
+            const trailW = Math.min(rawTrailW, duneE - 4);
+            const isWalkover = (
+                (ry >= 96 && ry <= 97) ||
+                (ry >= 132 && ry <= 136) ||
+                (ry >= 162 && ry <= 163) ||
+                (ry >= 193 && ry <= 196) ||
+                (ry >= 232 && ry <= 233) ||
+                (ry >= 276 && ry <= 277) ||
+                (ry >= 318 && ry <= 319)
+            );
+            if (isWalkover) {
+                ctx.fillStyle = "#ecd28e";
+                ctx.fillRect(449 * TILE_SIZE * sx, ry * TILE_SIZE * sy, (duneE - 448) * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+            } else {
+                // 1. Wide West Lummus Park Green Lawn (449 .. trailW - 1)
+                ctx.fillStyle = "#248f40";
+                ctx.fillRect(449 * TILE_SIZE * sx, ry * TILE_SIZE * sy, (trailW - 449) * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+                // 2. Winding 2-tile Sandy Beach Trail (trailW .. trailW + 1)
+                ctx.fillStyle = "#ecd28e";
+                ctx.fillRect(trailW * TILE_SIZE * sx, ry * TILE_SIZE * sy, 2 * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+                // 3. Vegetated Coastal Sand Dune Belt (trailW + 2 .. duneE)
+                ctx.fillStyle = "#1f7a37";
+                ctx.fillRect((trailW + 2) * TILE_SIZE * sx, ry * TILE_SIZE * sy, (duneE - trailW - 1) * TILE_SIZE * sx, (TILE_SIZE + 1) * sy);
+            }
+        }
+
         // Paved Landmark Plazas & Boardwalk Compounds on GPS / Overview Map
         ctx.fillStyle = "#e6dcc5";
         const pavedStonePlazas = [
             [458, 480, 22, 44],   // SERA Cape Canaveral Spaceport Compound
-            [457, 466, 132, 136], // Cape Leonida Lighthouse Plaza
+            [448, 466, 132, 136], // Cape Leonida Lighthouse Plaza
             [197, 201, 475, 478]  // Key West Lighthouse Plaza
         ];
         for (const [x0, x1, y0, y1] of pavedStonePlazas) {
             ctx.fillRect(x0 * TILE_SIZE * sx, y0 * TILE_SIZE * sy, (x1 - x0 + 1) * TILE_SIZE * sx, (y1 - y0 + 1) * TILE_SIZE * sy);
         }
-        // Vice Beach Pier Wooden Boardwalk (c = 454..476, r = 193..196)
+        // Vice Beach Pier Wooden Boardwalk (c = 449..476, r = 193..196)
         ctx.fillStyle = "#b88655";
-        ctx.fillRect(454 * TILE_SIZE * sx, 193 * TILE_SIZE * sy, 23 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
+        ctx.fillRect(449 * TILE_SIZE * sx, 193 * TILE_SIZE * sy, 28 * TILE_SIZE * sx, 4 * TILE_SIZE * sy);
 
         // Vice City Mambas 3D Octagonal Football Stadium (c = 179..197, r = 164..180)
         if (this.mambasStadium) {

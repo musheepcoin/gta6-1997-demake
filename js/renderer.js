@@ -608,17 +608,15 @@ class RetroRenderer {
                             float dLawn = min(dCard, dCorner) + tuft;
 
                             if (dLawn < 0.08) {
-                                vec3 paveCol = sampleLidTile(surType > 1.5 ? 8.0 : 9.0);
+                                vec3 paveCol = sampleLidTile((surType > 1.5 || p.x >= 423.0) ? 8.0 : 9.0);
                                 vec3 outsideCol = paveCol;
                                 float outSandMask = 0.0;
                                 if (surType > 0.5 && surType < 1.5) {
-                                    // East side borders beach sand (lid 98), N/S/W border coral promenade (lid 9)
-                                    float drift = coastalSandDrift(p) + (aNoise(p * 9.0 + 17.0) - 0.5) * 0.06;
-                                    float eastSand = smoothstep(1.0 - drift - 0.10, 1.0 - drift + 0.03, lp.x);
-                                    if (dE < min(dN, dS) + 0.06) eastSand = 1.0;
+                                    // Grass bordering beach sand (lid 98): 100% golden sand on N/S/E/W, except West sidewalk curb at x=449
+                                    float sandWeight = (p.x >= 450.0) ? 1.0 : ((bW && dW < min(dN, dS) - 0.02) ? 0.0 : 1.0);
                                     vec3 sandCol = styleBeachSand(sampleLidTile(98.0));
-                                    outsideCol = mix(paveCol, sandCol, eastSand);
-                                    outSandMask = eastSand;
+                                    outsideCol = mix(paveCol, sandCol, sandWeight);
+                                    outSandMask = sandWeight;
                                 }
                                 // Soft grass-edge contact shadow / soil border on stone pavers & lush edge ring on turf
                                 float edgeShade = mix(0.84, 1.0, smoothstep(-0.004, -0.038, dLawn));
@@ -6190,7 +6188,7 @@ class RetroRenderer {
                     if (bits > 0) animType = 10.0 + bits;
                 }
 
-                if (effTileIdx === 9 && this.map) {
+                if ((effTileIdx === 8 || effTileIdx === 9) && this.map) {
                     const eBi = this.map.getBlockIndex(x + 1, z_south, y_elev);
                     const eBlk = eBi ? this.map.getBlockInfo(eBi) : null;
                     if (eBlk && eBlk.lid >= 98 && eBlk.lid <= 101) {
@@ -6220,7 +6218,13 @@ class RetroRenderer {
 
                     if (bits > 0) {
                         let surType = 2;
-                        if ((lE >= 98 && lE <= 101) || (lNE >= 98 && lNE <= 101) || (lSE >= 98 && lSE <= 101)) {
+                        const adjSand = (
+                            (lN >= 98 && lN <= 101) || (lS >= 98 && lS <= 101) ||
+                            (lW >= 98 && lW <= 101) || (lE >= 98 && lE <= 101) ||
+                            (lNW >= 98 && lNW <= 101) || (lNE >= 98 && lNE <= 101) ||
+                            (lSW >= 98 && lSW <= 101) || (lSE >= 98 && lSE <= 101)
+                        );
+                        if (adjSand) {
                             surType = 1;
                         } else if (
                             lN === 9 || lN === 69 || lS === 9 || lS === 69 ||
