@@ -1,3 +1,22 @@
+// Slides a car back along its (axis-aligned) heading until neither its centre nor its nose is on a zebra crosswalk / stop-line tile
+// or inside the junction box, so no vehicle ever waits ON a pedestrian crossing under the signal heads.
+function nudgeVehicleOffCrosswalk(map, v) {
+    if (!map || !map.stopLineMask || !map.getBlockInfo || !v) return;
+    const hdx = Math.round(Math.cos(v.angle || 0)), hdy = Math.round(Math.sin(v.angle || 0));
+    if (hdx * hdy !== 0 || (hdx === 0 && hdy === 0)) return;
+    for (let back = 0; back < 3; back++) {
+        const ct = Math.floor(v.x / TILE_SIZE), cr = Math.floor(v.y / TILE_SIZE);
+        const nt = Math.floor((v.x + hdx * 30) / TILE_SIZE), nr = Math.floor((v.y + hdy * 30) / TILE_SIZE);
+        const onCross = map.stopLineMask[cr * MAP_COLS + ct] === 1 || map.stopLineMask[nr * MAP_COLS + nt] === 1 ||
+            map.getBlockInfo(ct, cr, 1).lid === 25 || map.getBlockInfo(nt, nr, 1).lid === 25;
+        if (!onCross) return;
+        const bt = Math.floor((v.x - hdx * TILE_SIZE) / TILE_SIZE), br = Math.floor((v.y - hdy * TILE_SIZE) / TILE_SIZE);
+        if (map.surfaceGround[br * MAP_COLS + bt] !== GROUND_TYPE.ROAD) return;
+        v.x -= hdx * TILE_SIZE;
+        v.y -= hdy * TILE_SIZE;
+    }
+}
+
 /* ============================================================================
 
    GRAND THEFT AUTO: LEONIDA '97 — CORE GAME ENGINE & LOOP
@@ -711,6 +730,25 @@ class LeonidaGame {
 
             let vy = (p.raw512 ? p.r : my256(p.r)) * TILE_SIZE;
 
+            // No spawned car (parked or moving AI traffic) may sit ON a zebra crosswalk / stop-line tile or inside the junction box:
+            // slide it back (up to 3 tiles) along its heading so it waits BEFORE the pedestrian crossing.
+            if (this.map && this.map.stopLineMask && this.map.getBlockInfo && !p.wrecked) {
+                const hdx = Math.round(Math.cos(p.a || 0)), hdy = Math.round(Math.sin(p.a || 0));
+                if (hdx * hdy === 0 && (hdx !== 0 || hdy !== 0)) {
+                    for (let back = 0; back < 3; back++) {
+                        const ct = Math.floor(vx / TILE_SIZE), cr = Math.floor(vy / TILE_SIZE);
+                        const nt = Math.floor((vx + hdx * 30) / TILE_SIZE), nr = Math.floor((vy + hdy * 30) / TILE_SIZE);
+                        const onCross = this.map.stopLineMask[cr * MAP_COLS + ct] === 1 || this.map.stopLineMask[nr * MAP_COLS + nt] === 1 ||
+                            this.map.getBlockInfo(ct, cr, 1).lid === 25 || this.map.getBlockInfo(nt, nr, 1).lid === 25;
+                        if (!onCross) break;
+                        const bt = Math.floor((vx - hdx * TILE_SIZE) / TILE_SIZE), br = Math.floor((vy - hdy * TILE_SIZE) / TILE_SIZE);
+                        if (this.map.surfaceGround[br * MAP_COLS + bt] !== GROUND_TYPE.ROAD) break;
+                        vx -= hdx * TILE_SIZE;
+                        vy -= hdy * TILE_SIZE;
+                    }
+                }
+            }
+
             // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed vehicle
             for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
                 const overlap = this.vehicles.some((other) => Math.hypot(other.x - vx, other.y - vy) < 68);
@@ -1282,6 +1320,8 @@ class LeonidaGame {
                 v.y = (by + 0.5) * TILE_SIZE;
 
                 v.angle = this.map.getAlignedRoadAngle(bx, by, v.angle, v.z);
+
+                nudgeVehicleOffCrosswalk(this.map, v);
 
                 // Ensure no two AI_TRAFFIC vehicles snap onto the exact same road tile at startup
                 for (let shiftTry = 0; shiftTry < 8; shiftTry++) {

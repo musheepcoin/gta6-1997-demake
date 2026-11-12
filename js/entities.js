@@ -1967,10 +1967,13 @@ class Vehicle {
                 // so longer vehicles (bus 88px, limo 90px, tanker 92px...) must stop proportionally further back
                 // (half of the extra length) instead of sticking far out into the junction.
                 const lenExtra = Math.max(0, (this.w || 48) * 0.5 - 24);
-                const stopDist = 56 + lenExtra;
+                // The stop-line tile (lid 24) holds the zebra crosswalk: cars hold BEFORE it (extra 66px = one crosswalk tile + margin),
+                // never with their nose or body on the pedestrian crossing / under the signal heads.
+                const CROSSWALK_CLEAR = 66;
+                const stopDist = 56 + lenExtra + CROSSWALK_CLEAR;
                 // For long vehicles the stop point lies inside the previous (pre-stop) block: estimate the distance along the lane
                 const distToStopRef = isStopBlock ? distToTargetCenter : (distToTargetCenter + TILE_SIZE);
-                const longCarStopsInPreBlock = isPreStopBlock && lenExtra > 6 && distToStopRef <= stopDist + 70;
+                const longCarStopsInPreBlock = isPreStopBlock && distToStopRef <= stopDist + 70;
                 if (isPreStopBlock && !longCarStopsInPreBlock) {
                     if (this.speed > 92) {
                         desiredThrottle = 0;
@@ -1981,7 +1984,7 @@ class Vehicle {
                     } else {
                         desiredThrottle = Math.min(desiredThrottle, 0.32);
                     }
-                } else if (isStopBlock || longCarStopsInPreBlock) {
+                } else if ((isStopBlock || longCarStopsInPreBlock) && !(isStopBlock && distToStopRef < stopDist - 40 && Math.abs(this.speed) > 40)) {
                     this.aiState = "STOPPED_LIGHT";
                     if (distToStopRef > stopDist + 4) {
                         const rollSpd = Math.max(0, (distToStopRef - (stopDist - 2)) * 2.0);
