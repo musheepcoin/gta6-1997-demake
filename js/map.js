@@ -3359,29 +3359,34 @@ class LeonidaMap {
                         const headY = baseY + dirY * 32.0;
                         const armAngle = isNS ? (dcCorner > 0 ? 0 : Math.PI) : (drCorner > 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
                         // Mast-arm span: count consecutive street tiles the arm crosses (2-lane road = 2 tiles, wider = more)
-                        // Only count ACTIVE travel lanes (never recessed parking bays / esplanade tiles) and cap at 2 lanes:
-                        // every mast arm carries exactly 2 signal heads, one per lane of the approach (double signals).
-                        let spanTiles = 0;
+                        // Signal heads exist ONLY over the lanes whose traffic APPROACHES the junction (never over the opposing lane
+                        // of a two-way street). A 2-way street (1 lane each way) therefore gets a single head; a one-way 2-lane
+                        // street gets a double signal. Parking bays / esplanade tiles are never counted.
+                        const travelX = isNS ? 0 : dcCorner;   // direction approaching traffic is moving (toward the junction)
+                        const travelY = isNS ? drCorner : 0;
+                        const approachK = [];
+                        let lastLaneK = 0;
                         for (let k = 1; k <= 6; k++) {
                             const tc2 = c + dirX * k, tr2 = r + dirY * k;
                             const isLane = this.surfaceGround[tr2 * MAP_COLS + tc2] === GROUND_TYPE.ROAD &&
                                 this.voxelGrid[(2 * MAP_ROWS + tr2) * MAP_COLS + tc2] !== this.roadParkingNavIdx;
-                            if (isLane) spanTiles++;
-                            else break;
+                            if (!isLane) break;
+                            lastLaneK = k;
+                            const laneDirs = this.getAllowedRoadDirections(tc2, tr2, 2.0);
+                            if (laneDirs.some((d) => d.dx === travelX && d.dy === travelY)) approachK.push(k);
                         }
-                        spanTiles = Math.max(1, Math.min(2, spanTiles));
-                        const roadW = spanTiles * TILE_SIZE;
-                        const armReach = 14.0 + roadW * 0.92;
-                        // Face = direction the lenses look (toward approaching traffic on the road leg)
-                        const faceX = isNS ? 0 : dcCorner;
-                        const faceY = isNS ? drCorner : 0;
-                        // Double signal: 1 head per lane (2 lanes => 2 heads, centred over each lane)
-                        const nHeads = spanTiles;
-                        const heads = [];
-                        for (let hI = 0; hI < nHeads; hI++) {
-                            const off = 14.0 + roadW * ((hI + 0.5) / nHeads) * 0.92;
-                            heads.push({ x: baseX + dirX * off, y: baseY + dirY * off });
-                        }
+                        if (approachK.length === 0 && lastLaneK > 0) approachK.push(1); // unmarked leg: keep a single head on the nearest lane
+                        if (approachK.length > 2) approachK.length = 2;                  // never more than a double signal
+                        const maxK = approachK.length ? approachK[approachK.length - 1] : 1;
+                        const armReach = Math.max(24.0, maxK * TILE_SIZE - 18.0 + 24.0);
+                        // Lenses look toward the approaching traffic (opposite of its travel direction)
+                        const faceX = -travelX;
+                        const faceY = -travelY;
+                        const heads = approachK.map((k) => ({
+                            x: baseX + dirX * (k * TILE_SIZE - 18.0),
+                            y: baseY + dirY * (k * TILE_SIZE - 18.0)
+                        }));
+                        if (heads.length === 0) heads.push({ x: baseX + dirX * 46.0, y: baseY + dirY * 46.0 });
                         this.trafficSignals.push({
                             c,
                             r,
