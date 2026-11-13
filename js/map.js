@@ -6081,9 +6081,11 @@ class LeonidaMap {
         //       step onto the zebra crosswalk and cross straight to the opposite sidewalk!
         //     - If the vehicle light is GREEN (DON'T WALK phase) or a car is passing through, the pedestrian can stop at the curb
         //       and wait for the light to change (`isWaitingAtCurb: true`), glancing left and right before crossing!
-        if (!isPanic && !onRoadNow && navContext && navContext.allowCrosswalk && normSeed > 0.60) {
+        const forceCross = navContext && navContext.forceCrossDir ? navContext.forceCrossDir : null;
+        if (!isPanic && !onRoadNow && navContext && navContext.allowCrosswalk && (normSeed > 0.60 || forceCross)) {
             for (const rDir of roadDirs) {
-                if (rDir.isUturn || rDir.blocked) continue;
+                if ((rDir.isUturn && !(navContext.forceCrossDir)) || rDir.blocked) continue;
+                if (navContext.forceCrossDir && (rDir.dx !== navContext.forceCrossDir.dx || rDir.dy !== navContext.forceCrossDir.dy)) continue;
                 if (!this.isStopLineBlock(rDir.bx, rDir.by)) continue;
                 // Walking horizontally (dx !== 0) crosses a North/South road -> safe when NS light is RED (!nsGreen)
                 // Walking vertically (dy !== 0) crosses an East/West road -> safe when EW light is RED (!ewGreen)
@@ -6168,7 +6170,7 @@ class LeonidaMap {
                             crossDestBx: oppositeSidewalk.bx,
                             crossDestBy: oppositeSidewalk.by
                         };
-                    } else if (normSeed > 0.70) {
+                    } else if (normSeed > 0.70 || forceCross) {
                         return {
                             dx: 0,
                             dy: 0,

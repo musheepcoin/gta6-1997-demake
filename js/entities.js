@@ -5148,6 +5148,14 @@ class TrafficManager {
                 game.peds.splice(i, 1);
                 continue;
             }
+            // Civilians that PedNav found trapped in a tiny walled pocket vanish as soon as nobody is looking
+            if (ped.kind === "CIVILIAN" && ped._navTrapped) {
+                const watched = vps.some((vp) => this.isPointInRect(bx, by, this.expandRect(vp.area, 1)));
+                if (!watched) {
+                    game.peds.splice(i, 1);
+                    continue;
+                }
+            }
             if (ped.kind === "CIVILIAN") {
                 const nearAnyPlayer = outerRects.some((r) => this.isPointInRect(bx, by, r));
                 if (!nearAnyPlayer) {
@@ -5217,6 +5225,8 @@ class TrafficManager {
             const lid = map.getBlockInfo ? (map.getBlockInfo(bx, by, 1)?.lid || 0) : 0;
             if (lid === 69) continue;
             if (bx >= 449 && bx <= 464 && lid === 10) continue;
+            // Never spawn inside a tiny enclosed sidewalk pocket (they could only pace back and forth)
+            if (typeof PedNav !== "undefined" && !PedNav.isGoodSpawnTile(game, bx, by, camZ)) continue;
 
             const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
             const isSand = !!(map.coastalSandMask && map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);

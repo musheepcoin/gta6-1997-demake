@@ -13723,6 +13723,22 @@ class LeonidaGame {
                 // (AiCharacterController.cpp lines 250-365): Pedestrians stay strictly on PAWEMENT / FIELD blocks!
 
                 if (ped.panicTimer > 0) ped.panicTimer = Math.max(0, ped.panicTimer - dt);
+                // Habituation: a pedestrian who has been scared for 9+ continuous seconds calms down (and ignores lingering
+                // hazards such as a parked damaged car) for 18s instead of fleeing back and forth forever.
+                if ((ped._panicCalmCooldown || 0) > 0) ped._panicCalmCooldown = Math.max(0, ped._panicCalmCooldown - dt);
+                if (ped.panicTimer > 0 && ped.kind === "CIVILIAN") {
+                    ped._panicRun = (ped._panicRun || 0) + dt;
+                    if (ped._panicRun > 9.0) {
+                        ped.panicTimer = 0;
+                        ped._panicRun = 0;
+                        ped._panicCalmCooldown = 18.0;
+                        ped._panicInherited = false;
+                        ped.targetBx = null;
+                        ped.targetBy = null;
+                    }
+                } else {
+                    ped._panicRun = 0;
+                }
 
 
 
@@ -13814,7 +13830,7 @@ class LeonidaGame {
                             (v.burnTimer || 0) > 0 ||
                             (!v.destroyed && typeof v.hp === "number" && v.hp <= 42 && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER")
                         );
-                        if (isBurningCar && Math.hypot(dx, dy) < 130) {
+                        if (isBurningCar && Math.hypot(dx, dy) < 130 && (ped._panicCalmCooldown || 0) <= 0) {
                             ped.panicTimer = Math.max(ped.panicTimer || 0, 4.5);
                             ped.threatX = v.x;
                             ped.threatY = v.y;
@@ -13854,7 +13870,7 @@ class LeonidaGame {
                             }
                             ped.dodgeTimer = 0.68;
                             ped.dodgeAngle = dodgeAng;
-                            ped.panicTimer = Math.max(ped.panicTimer || 0, 2.8);
+                            if ((ped._panicCalmCooldown || 0) <= 0) ped.panicTimer = Math.max(ped.panicTimer || 0, 2.8);
                             ped.threatX = v.x;
                             ped.threatY = v.y;
                             ped.isCrossingRoad = false;
@@ -14058,20 +14074,28 @@ class LeonidaGame {
                 ped.groupPartner = null;
                 ped.socialTimer = 0;
 
-                // Propagate panic across members of the same formationId and break formation if threatened
+                // Propagate panic across members of the same formationId and break formation if threatened.
+                // ONLY a freshly-scared member (own event: gunfire / car / fire) spreads panic; members who merely INHERITED the panic
+                // never re-spread it (otherwise a group re-panicked itself forever, running in circles).
+                if ((ped.panicTimer || 0) <= 0) {
+                    ped._panicInherited = false;
+                }
                 if (ped.formationId && ((ped.panicTimer || 0) > 0 || (ped.dodgeTimer || 0) > 0 || (ped.burnTimer || 0) > 0)) {
                     const panicId = ped.formationId;
                     ped.hangoutTimer = 0;
                     ped.formationLeader = null;
-                    for (let fi = 0; fi < this.peds.length; fi++) {
-                        const fm = this.peds[fi];
-                        if (fm && !fm.dead && fm.formationId === panicId) {
-                            fm.hangoutTimer = 0;
-                            fm.formationLeader = null;
-                            if ((fm.panicTimer || 0) <= 0) {
-                                fm.panicTimer = 3.8;
-                                fm.threatX = ped.threatX ?? ped.x;
-                                fm.threatY = ped.threatY ?? ped.y;
+                    if (!ped._panicInherited) {
+                        for (let fi = 0; fi < this.peds.length; fi++) {
+                            const fm = this.peds[fi];
+                            if (fm && !fm.dead && fm !== ped && fm.formationId === panicId) {
+                                fm.hangoutTimer = 0;
+                                fm.formationLeader = null;
+                                if ((fm.panicTimer || 0) <= 0 && (fm._panicCalmCooldown || 0) <= 0) {
+                                    fm.panicTimer = 2.6;
+                                    fm._panicInherited = true;
+                                    fm.threatX = ped.threatX ?? ped.x;
+                                    fm.threatY = ped.threatY ?? ped.y;
+                                }
                             }
                         }
                     }
@@ -14273,7 +14297,12 @@ class LeonidaGame {
                             };
 
                             // Choose next sidewalk block while avoiding 3D structures, Lummus Park grass, stopped vehicles, and threats
-                            const nextStep = this.map.chooseNextSidewalkBlock(
+                            // Purposeful PedNav path-following first (far destinations, signalised crossings, flee routes); legacy tile walker as fallback
+                            let nextStep = null;
+                            if (ped.kind === "CIVILIAN" && !ped.isCrossingRoad && typeof PedNav !== "undefined") {
+                                nextStep = PedNav.nextStep(this, ped, baseX, baseY, pz, navContext, reachedTarget);
+                            }
+                            if (!nextStep) nextStep = this.map.chooseNextSidewalkBlock(
                                 baseX,
                                 baseY,
                                 ped.angle,
