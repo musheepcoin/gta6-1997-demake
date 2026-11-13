@@ -7175,13 +7175,27 @@ class RetroRenderer {
 
         // Dedicated True 3D Hardware Z-Buffered Interior Pass when inside any of the 14 building themes!
         if (game && game.activeInterior) {
-            gl.clearColor(0.32, 0.38, 0.34, 1.0);
+            // Beyond the street the backdrop follows the time of day too (day -> sunset -> night)
+            const nfI = Math.max(0, Math.min(1, this.nightFactor || 0));
+            const sfI = Math.max(0, Math.min(1, this.sunsetFactor || 0));
+            gl.clearColor(
+                (0.32 * (1 - nfI) + 0.03 * nfI) + sfI * 0.10,
+                (0.38 * (1 - nfI) + 0.04 * nfI) - sfI * 0.06,
+                (0.34 * (1 - nfI) + 0.08 * nfI) - sfI * 0.04,
+                1.0
+            );
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             if (!this.gta1Ready || !this.cmpReady) return;
             if (this.map && this.map.objectEngine) {
                 this.map.objectEngine.renderInterior3DMesh(gl, this, game, viewProj);
+                // Outside props (palms, parked cars) use the real day / sunset / night grading; the room itself stays indoor-lit
+                const hrI = (typeof game.worldMinutes === "number") ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0 : 12.0;
+                const azI = ((hrI - 6.0) / 12.0) * Math.PI;
                 this.beginSpriteBatch();
-                this.map.objectEngine.batchInteriorSprites3D(this, game);
+                this.map.objectEngine.batchInteriorSprites3D(this, game, "EXT");
+                this.flushSpriteBatch(viewProj, Math.max(0, Math.min(1, this.nightFactor || 0)), Math.max(0, Math.min(1, this.sunsetFactor || 0)), Math.cos(azI), Math.max(0.25, Math.sin(azI)));
+                this.beginSpriteBatch();
+                this.map.objectEngine.batchInteriorSprites3D(this, game, "INT");
                 this.flushSpriteBatch(viewProj);
             }
             return;

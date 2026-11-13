@@ -7490,6 +7490,7 @@ class WorldObjectEngine {
             uniform float uNightTint;
             uniform float uWinLit;
             uniform float uSunsetTint;
+            uniform float uExtMode;
 
             float hash21(vec2 p) {
                 p = fract(p * vec2(123.34, 456.21));
@@ -7696,7 +7697,7 @@ class WorldObjectEngine {
                         vec3 rawTex = c.rgb;
                         float dayAmt = clamp(1.0 - max(0.0, uNightTint) * 1.15, 0.0, 1.0);
                         if (dayAmt > 0.01) {
-                            vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
+                            vec4 lm = (uExtMode > 0.5) ? vec4(0.0) : texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                             float onGround = clamp(2.65 - vWorldPos.y, 0.0, 1.0);
                             float bldAO = lm.g * onGround * 0.55;
                             float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
@@ -7738,6 +7739,10 @@ class WorldObjectEngine {
                             vec3 nightRgb = mix(darkWall, warmGlow, litMask);
                             c.rgb = mix(c.rgb, nightRgb, nfAmt);
                         }
+                        if (uExtMode > 0.5) {
+                            // Street / sidewalk / lawn seen outside an interior: cool moonlit blue at night (on top of the dark wall grading)
+                            c.rgb = mix(c.rgb, c.rgb * vec3(0.46, 0.56, 0.90), clamp(uNightTint, 0.0, 1.0));
+                        }
                     }
                 }
                 gl_FragColor = c;
@@ -7755,7 +7760,8 @@ class WorldObjectEngine {
             uSunDir: gl.getUniformLocation(this.meshProg, "uSunDir"),
             uNightTint: gl.getUniformLocation(this.meshProg, "uNightTint"),
             uWinLit: gl.getUniformLocation(this.meshProg, "uWinLit"),
-            uSunsetTint: gl.getUniformLocation(this.meshProg, "uSunsetTint")
+            uSunsetTint: gl.getUniformLocation(this.meshProg, "uSunsetTint"),
+            uExtMode: gl.getUniformLocation(this.meshProg, "uExtMode")
         };
     }
 
@@ -17647,6 +17653,7 @@ class WorldObjectEngine {
         // Subtle building foundation curb & drop shadow on the exterior sidewalk
         rawAoR(-8, 34, rw + 16, rh - 22, 1.995, 18, 0.35);
         rawBoxR(-6, 36, rw + 12, rh - 26, 1.994, 2.000, [0.76, 0.72, 0.66], 9);
+        const exteriorVertCount = iVerts.length; // everything above this index is OUTSIDE the building (lit by the real time of day)
 
         // Determine primary floor color, gta1_tiles_vice.png wall tile & warm cutaway cap per theme
         let mainFloorCol = [0.94, 0.92, 0.88];
@@ -18142,11 +18149,33 @@ class WorldObjectEngine {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        gl.drawArrays(gl.TRIANGLES, 0, iVerts.length / 9);
+        // PASS 1 - exterior (street, sidewalk, lawn): real time-of-day grading (day / sunset / night)
+        const extN = Math.min(iVerts.length, exteriorVertCount) / 9;
+        if (extN > 0) {
+            const nfE = Math.max(0, Math.min(1, renderer.nightFactor || 0));
+            const sfE = Math.max(0, Math.min(1, renderer.sunsetFactor || 0));
+            gl.uniform1f(this.meshLocs.uNightTint, nfE);
+            gl.uniform1f(this.meshLocs.uSunsetTint, sfE);
+            if (this.meshLocs.uExtMode) gl.uniform1f(this.meshLocs.uExtMode, 1.0);
+            if (this.meshLocs.uWinLit) gl.uniform1f(this.meshLocs.uWinLit, typeof renderer.getWindowLitFactor === "function" ? renderer.getWindowLitFactor(game) : 0.0);
+            if (this.meshLocs.uSunDir) {
+                const hrE = (typeof game.worldMinutes === "number") ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0 : 12.0;
+                const azE = ((hrE - 6.0) / 12.0) * Math.PI;
+                gl.uniform2f(this.meshLocs.uSunDir, Math.cos(azE), Math.max(0.25, Math.sin(azE)));
+            }
+            gl.drawArrays(gl.TRIANGLES, 0, extN);
+        }
+        // PASS 2 - the building interior keeps its dedicated indoor studio lighting
+        gl.uniform1f(this.meshLocs.uNightTint, 0.0);
+        gl.uniform1f(this.meshLocs.uSunsetTint, -1.0);
+        if (this.meshLocs.uExtMode) gl.uniform1f(this.meshLocs.uExtMode, 0.0);
+        if (this.meshLocs.uSunDir) gl.uniform2f(this.meshLocs.uSunDir, 0.45, 0.88);
+        const totalN = iVerts.length / 9;
+        if (totalN > extN) gl.drawArrays(gl.TRIANGLES, extN, totalN - extN);
         gl.activeTexture(gl.TEXTURE0);
     }
 
-    batchInteriorSprites3D(renderer, game) {
+    batchInteriorSprites3D(renderer, game, phase = "ALL") {
         if (!renderer || !game || !game.activeInterior) return;
         const intr = game.activeInterior;
         const rw = intr.w || 820;
@@ -18160,28 +18189,36 @@ class WorldObjectEngine {
             return { x, y, angle: ang };
         };
 
-        // 1. Exterior Vice City Sidewalk Palm Trees, Parked Cars & Theme-Specific 3D Props
+        // 1. Exterior Vice City Sidewalk Palm Trees, Parked Cars & Theme-Specific 3D Props (phase EXT = outside, drawn with the real time of day)
+        if (phase !== "INT") {
+        const exNf = Math.max(0, Math.min(1, renderer.nightFactor || 0));
+        const exSf = Math.max(0, Math.min(1, renderer.sunsetFactor || 0));
+        const exR = Math.min(1, (1 - 0.58 * exNf) * (1 + 0.10 * exSf));
+        const exG = (1 - 0.50 * exNf) * (1 - 0.05 * exSf);
+        const exB = (1 - 0.22 * exNf) * (1 - 0.08 * exSf);
         for (const [epx, epy] of [
             [-92, 74], [-92, 280], [-92, rh - 54],
             [rw + 92, 74], [rw + 92, 280], [rw + 92, rh - 54],
             [180, -68], [rw - 180, -68], [180, rh + 86], [rw - 180, rh + 86]
         ]) {
-            renderer.batchObjectSprite3D("palm_tree", epx, epy, 2.18, (epx + epy) * 0.01, 0.92, SPRITE_DRAW_ORDER.TREE);
+            renderer.batchObjectSprite3D("palm_tree", epx, epy, 2.18, (epx + epy) * 0.01, 0.92, SPRITE_DRAW_ORDER.TREE, exR, exG, exB, 1.0);
         }
         const extFacing = (intr && intr.facing) || "S";
         if (extFacing === "W") {
-            renderer.batchObjectSprite3D("car_infernus", -260, 120, 2.02, Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR);
-            renderer.batchObjectSprite3D("car_banshee", -430, rh - 140, 2.02, -Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR);
+            renderer.batchObjectSprite3D("car_infernus", -260, 120, 2.02, Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
+            renderer.batchObjectSprite3D("car_banshee", -430, rh - 140, 2.02, -Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
         } else if (extFacing === "E") {
-            renderer.batchObjectSprite3D("car_infernus", rw + 260, 120, 2.02, Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR);
-            renderer.batchObjectSprite3D("car_banshee", rw + 430, rh - 140, 2.02, -Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR);
+            renderer.batchObjectSprite3D("car_infernus", rw + 260, 120, 2.02, Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
+            renderer.batchObjectSprite3D("car_banshee", rw + 430, rh - 140, 2.02, -Math.PI * 0.5, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
         } else if (extFacing === "N") {
-            renderer.batchObjectSprite3D("car_infernus", 180, -220, 2.02, 0.0, 0.95, SPRITE_DRAW_ORDER.CAR);
-            renderer.batchObjectSprite3D("car_banshee", rw - 180, -390, 2.02, Math.PI, 0.95, SPRITE_DRAW_ORDER.CAR);
+            renderer.batchObjectSprite3D("car_infernus", 180, -220, 2.02, 0.0, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
+            renderer.batchObjectSprite3D("car_banshee", rw - 180, -390, 2.02, Math.PI, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
         } else {
-            renderer.batchObjectSprite3D("car_infernus", 180, rh + 240, 2.02, 0.0, 0.95, SPRITE_DRAW_ORDER.CAR);
-            renderer.batchObjectSprite3D("car_banshee", rw - 180, rh + 400, 2.02, Math.PI, 0.95, SPRITE_DRAW_ORDER.CAR);
+            renderer.batchObjectSprite3D("car_infernus", 180, rh + 240, 2.02, 0.0, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
+            renderer.batchObjectSprite3D("car_banshee", rw - 180, rh + 400, 2.02, Math.PI, 0.95, SPRITE_DRAW_ORDER.CAR, exR, exG, exB, 1.0);
         }
+        }
+        if (phase === "EXT") return;
         if (theme === "SHOP_GUN_SHOP") {
             // Actual GTA 1 weapon sprites displayed on the Center Showroom glass counter & North rifle wall!
             for (const [wspr, wx, wy, wz, wang, wsc] of [
