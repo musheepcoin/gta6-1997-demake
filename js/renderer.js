@@ -9926,15 +9926,49 @@ class RetroRenderer {
             this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
 
             // VCFD On-Foot Firefighter brass hose nozzle + coupled yellow canvas supply line to his Fire Engine!
+            // The hose is ONE continuous line from the truck's rear hose bed to the firefighter (never cut by distance):
+            // 4 x 50 ft (15 m) couplings = 200 ft (61 m) attack line = ~780 px at this map's scale (a car is ~54 px = 4.5 m).
             if (ped.kind === "FIREMAN") {
                 const ft = ped.homeFireTruck;
                 if (ft && !ft.destroyed) {
-                    const dFt = Math.hypot(ft.x - ped.x, ft.y - ped.y);
-                    if (dFt > 18 && dFt < 240) {
-                        const midX = (ped.x + ft.x) * 0.5;
-                        const midY = (ped.y + ft.y) * 0.5;
-                        const hAng = Math.atan2(ped.y - ft.y, ped.x - ft.x);
-                        this.pushSolidQuad3D(midX, midY, pz - 0.015, dFt, 2.4, hAng, 0.92, 0.78, 0.16, 0.88, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    const HOSE_LEN_PX = 780;
+                    const SECTION_PX = HOSE_LEN_PX / 4; // 50 ft sections
+                    const fcos = Math.cos(ft.angle || 0), fsin = Math.sin(ft.angle || 0);
+                    // Hose bed / discharge at the rear-right of the engine body
+                    const hx0 = ft.x - fcos * ((ft.w || 66) * 0.5) - fsin * 5;
+                    const hy0 = ft.y - fsin * ((ft.w || 66) * 0.5) + fcos * 5;
+                    const ddx = ped.x - hx0, ddy = ped.y - hy0;
+                    const dFt = Math.hypot(ddx, ddy);
+                    if (dFt > 20 && dFt < HOSE_LEN_PX + 160) {
+                        const ux = ddx / dFt, uy = ddy / dFt;
+                        const px0 = -uy, py0 = ux;
+                        // Slack: the hose lies in a gentle curve whose bow shrinks as the line is pulled taut
+                        const slack = Math.max(0, HOSE_LEN_PX - dFt);
+                        const amp = Math.min(34, 0.42 * Math.sqrt(dFt * slack * 0.08)) * (((ped.animSeed || 0) * 1000 | 0) % 2 === 0 ? 1 : -1);
+                        const segs = Math.max(6, Math.ceil(dFt / 42));
+                        let prevX = hx0, prevY = hy0;
+                        let acc = 0;
+                        let nextCoupling = SECTION_PX;
+                        for (let si = 1; si <= segs; si++) {
+                            const tt = si / segs;
+                            const bow = Math.sin(tt * Math.PI) * amp;
+                            const cx = hx0 + ddx * tt + px0 * bow;
+                            const cy = hy0 + ddy * tt + py0 * bow;
+                            const sl = Math.hypot(cx - prevX, cy - prevY);
+                            if (sl > 0.01) {
+                                const sAng = Math.atan2(cy - prevY, cx - prevX);
+                                this.pushSolidQuad3D((prevX + cx) * 0.5, (prevY + cy) * 0.5, pz - 0.015, sl + 1.2, 2.6, sAng, 0.92, 0.78, 0.16, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                                // Dark canvas edge so the line reads against pale concrete
+                                this.pushSolidQuad3D((prevX + cx) * 0.5, (prevY + cy) * 0.5, pz - 0.0155, sl + 1.2, 3.6, sAng, 0.38, 0.30, 0.08, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                                acc += sl;
+                                while (acc >= nextCoupling) {
+                                    // Brass Storz coupling every 50 ft
+                                    this.pushSolidQuad3D(cx, cy, pz - 0.013, 4.6, 4.2, sAng, 0.82, 0.62, 0.14, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                                    nextCoupling += SECTION_PX;
+                                }
+                            }
+                            prevX = cx; prevY = cy;
+                        }
                     }
                 }
                 if (ped.sprayingHose) {

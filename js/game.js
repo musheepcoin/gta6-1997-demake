@@ -13664,6 +13664,16 @@ class LeonidaGame {
 
                 }
 
+                // Hose tether: 200 ft (~780 px) of attack line - the firefighter can never be pulled beyond its length
+                {
+                    const tdx = ped.x - ft.x, tdy = ped.y - ft.y;
+                    const tdist = Math.hypot(tdx, tdy);
+                    if (tdist > 770) {
+                        ped.x = ft.x + (tdx / tdist) * 770;
+                        ped.y = ft.y + (tdy / tdist) * 770;
+                    }
+                }
+
             } else {
 
                 // Private Estate Security / Villa Bodyguard AI:
