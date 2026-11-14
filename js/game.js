@@ -6371,6 +6371,58 @@ class LeonidaGame {
 
     }
 
+    // Called when a city bus / tour coach has pulled over at the curb: nearby calm pedestrians on the sidewalk side
+    // walk to the front door and board (up to 4), so the stop lasts long enough for the farthest one to arrive.
+    boardBusPassengers(bus) {
+        if (!bus || bus.destroyed || !Array.isArray(this.peds)) return 0;
+        const cosA = Math.cos(bus.angle || 0), sinA = Math.sin(bus.angle || 0);
+        const rx = -sinA, ry = cosA;
+        const halfLen = (bus.w || 88) * 0.5;
+        // Front door on the right-hand (sidewalk) side
+        const doorX = bus.x + cosA * halfLen * 0.42 + rx * ((bus.h || 30) * 0.5 + 6);
+        const doorY = bus.y + sinA * halfLen * 0.42 + ry * ((bus.h || 30) * 0.5 + 6);
+        const cand = [];
+        for (const ped of this.peds) {
+            if (!ped || ped.dead || ped.kind !== "CIVILIAN" || ped._boardingBus || ped._boardingVeh || ped._hailingTaxi) continue;
+            if ((ped.panicTimer || 0) > 0 || (ped.burnTimer || 0) > 0 || ped.missionTag || ped.isLivingProp || ped.isChild) continue;
+            if (ped.isCrossingRoad || ped.waitingAtCrosswalk || ped.formationLeader) continue;
+            const dx = ped.x - doorX, dy = ped.y - doorY;
+            const d = Math.hypot(dx, dy);
+            if (d > 230 || d < 4) continue;
+            // Must be on the sidewalk side of the bus (right-hand), not across the road
+            const side = (ped.x - bus.x) * rx + (ped.y - bus.y) * ry;
+            if (side < 10) continue;
+            const nav = this.map.getNavigationBlock ? this.map.getNavigationBlock(Math.floor(ped.x / TILE_SIZE), Math.floor(ped.y / TILE_SIZE), ped.z || 2.0) : null;
+            if (!nav || (nav.groundType !== GROUND_TYPE.PAWEMENT && nav.groundType !== GROUND_TYPE.FIELD)) continue;
+            cand.push({ ped, d });
+        }
+        cand.sort((a, b) => a.d - b.d);
+        let boarders = 0, maxArrive = 0;
+        for (let i = 0; i < cand.length && boarders < 4; i++) {
+            if (Math.random() > 0.8) continue;
+            const { ped, d } = cand[i];
+            ped._boardingBus = bus;
+            ped._busDoorX = doorX;
+            ped._busDoorY = doorY;
+            ped._busBoardTimer = 12.0;
+            ped.waitingAtCrosswalk = false;
+            ped.hangoutTimer = 0;
+            ped.socialTimer = 0;
+            ped.targetBx = null;
+            ped.targetBy = null;
+            const spd = (ped.baseWalkSpeed || 24) * 1.35;
+            maxArrive = Math.max(maxArrive, d / spd);
+            boarders++;
+        }
+        if (boarders > 0) {
+            // Keep the doors open long enough for the farthest passenger to arrive
+            bus.aiPassengerStopTimer = Math.max(bus.aiPassengerStopTimer || 0, Math.min(12.5, maxArrive + 1.6));
+            bus.doorOpenSide = 1;
+            bus.doorOpenTimer = 0.5;
+        }
+        return boarders;
+    }
+
     spawnAlightingPassenger(vehicle) {
         if (!vehicle || vehicle.destroyed || !Array.isArray(this.peds) || this.peds.length >= 135) return;
         const vz = vehicle.z !== undefined ? vehicle.z : 2.0;
@@ -13956,6 +14008,39 @@ class LeonidaGame {
                     ped.hailingTaxiTimer = 0;
                 }
 
+                // Boarding a stopped city bus: walk to its front door, then climb aboard (the bus keeps its doors open for us)
+                if (ped._boardingBus) {
+                    const bus = ped._boardingBus;
+                    ped._busBoardTimer = (ped._busBoardTimer || 0) - dt;
+                    const busGone = !bus || bus.destroyed || Math.abs(bus.speed || 0) > 26 || ped._busBoardTimer <= 0 || (ped.panicTimer || 0) > 0;
+                    if (busGone) {
+                        ped._boardingBus = null;
+                        ped.targetBx = null;
+                        ped.targetBy = null;
+                    } else {
+                        const bcos = Math.cos(bus.angle || 0), bsin = Math.sin(bus.angle || 0);
+                        const hw = (bus.w || 88) * 0.5;
+                        const dX = bus.x + bcos * hw * 0.42 + (-bsin) * ((bus.h || 30) * 0.5 + 6);
+                        const dY = bus.y + bsin * hw * 0.42 + bcos * ((bus.h || 30) * 0.5 + 6);
+                        const dd = Math.hypot(dX - ped.x, dY - ped.y);
+                        if (dd < 17) {
+                            bus.doorOpenSide = 1;
+                            bus.doorOpenTimer = 0.45;
+                            ped._boardedVehicle = true;
+                            ped.dead = true;
+                            continue;
+                        }
+                        const walkSp = (ped.baseWalkSpeed || 24) * 1.35;
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, dX, dY, bus);
+                        ped.speed = walkSp;
+                        ped.x += Math.cos(ped.angle) * walkSp * dt;
+                        ped.y += Math.sin(ped.angle) * walkSp * dt;
+                        ped.waypointTimer = 0;
+                        const bCol = this.map.resolveCircleBuildingCollision(ped.x, ped.y, 8, ped.z || 2.0);
+                        if (bCol.hit) { ped.x = bCol.x; ped.y = bCol.y; }
+                        continue;
+                    }
+                }
                 const curNavPre = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;
                 if (ped.isCrossingRoad && curNavPre && (curNavPre.groundType === GROUND_TYPE.PAWEMENT || curNavPre.groundType === GROUND_TYPE.FIELD)) {
                     // If we already stepped onto at least one road tile and now reached the opposite sidewalk, finish crossing!

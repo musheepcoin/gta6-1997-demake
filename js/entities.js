@@ -1738,11 +1738,17 @@ class Vehicle {
                         this.aiPassengerDropPending = false;
                         game.spawnAlightingPassenger(this);
                     }
+                    // Buses / tour coaches: waiting pedestrians walk to the front door and climb aboard during the stop
+                    if (!this.aiBoardingStarted && (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH") && game && typeof game.boardBusPassengers === "function") {
+                        this.aiBoardingStarted = true;
+                        game.boardBusPassengers(this);
+                    }
                 }
                 if ((this.aiPassengerStopTimer || 0) > 0) {
                     this.aiPassengerStopTimer = Math.max(0, this.aiPassengerStopTimer - dt);
                     if (this.aiPassengerStopTimer <= 0) {
                         this.aiPassengerStopCooldown = 28.0;
+                        this.aiBoardingStarted = false;
                     }
                 }
             }
