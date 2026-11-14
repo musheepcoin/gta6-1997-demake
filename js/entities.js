@@ -1485,16 +1485,38 @@ class Vehicle {
             const rearY = this.y - rSin * ((this.w || 48) * 0.5 + 12);
             if (map.resolveCircleBuildingCollision && map.resolveCircleBuildingCollision(rearX, rearY, 12, curZ).hit) rearBlocked = true;
             if (!rearBlocked && game && Array.isArray(game.vehicles)) {
-                for (const o of game.vehicles) {
-                    if (o === this || o === this.towingVehicle) continue;
-                    if (o.z !== undefined && Math.abs(o.z - curZ) > 0.85) continue;
+                const checkRearVeh = (o) => {
+                    if (!o || o === this || o === this.towingVehicle) return false;
+                    if (o.z !== undefined && Math.abs(o.z - curZ) > 0.85) return false;
                     const ox = o.x - this.x, oy = o.y - this.y;
                     const along = ox * rCos + oy * rSin;
                     const lat = Math.abs(-ox * rSin + oy * rCos);
                     const need = ((this.w || 48) + (o.w || 48)) * 0.5 + 6;
-                    if (along < 0 && along > -need && lat < ((this.h || 24) + (o.h || 24)) * 0.5) {
-                        rearBlocked = true;
-                        break;
+                    return (along < 0 && along > -need && lat < ((this.h || 24) + (o.h || 24)) * 0.5);
+                };
+                if (game._vehGridHead && game._vehGridNext) {
+                    const gCols = game._vehGridCols || 64;
+                    const gRows = game._vehGridRows || 64;
+                    const gx0 = Math.floor(this.x / 256);
+                    const gy0 = Math.floor(this.y / 256);
+                    for (let gy = Math.max(0, gy0 - 1); gy <= Math.min(gRows - 1, gy0 + 1) && !rearBlocked; gy++) {
+                        const rowOff = gy * gCols;
+                        for (let gx = Math.max(0, gx0 - 1); gx <= Math.min(gCols - 1, gx0 + 1); gx++) {
+                            for (let vi = game._vehGridHead[rowOff + gx]; vi !== -1; vi = game._vehGridNext[vi]) {
+                                if (checkRearVeh(game.vehicles[vi])) {
+                                    rearBlocked = true;
+                                    break;
+                                }
+                            }
+                            if (rearBlocked) break;
+                        }
+                    }
+                } else {
+                    for (const o of game.vehicles) {
+                        if (checkRearVeh(o)) {
+                            rearBlocked = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -1623,12 +1645,33 @@ class Vehicle {
                     const alongBay = (bay.y - this.y) * this.aiChosenDir.dy;
                     if (alongBay < 4 || alongBay > 115) continue;
                     let stallFree = true;
-                    for (let vi = 0; vi < game.vehicles.length; vi++) {
-                        const ov = game.vehicles[vi];
-                        if (!ov || ov === this) continue;
-                        if (Math.hypot(ov.x - bay.x, ov.y - bay.y) < 54) {
-                            stallFree = false;
-                            break;
+                    if (game._vehGridHead && game._vehGridNext) {
+                        const gCols = game._vehGridCols || 64;
+                        const gRows = game._vehGridRows || 64;
+                        const gx0 = Math.floor(bay.x / 256);
+                        const gy0 = Math.floor(bay.y / 256);
+                        for (let gy = Math.max(0, gy0 - 1); gy <= Math.min(gRows - 1, gy0 + 1) && stallFree; gy++) {
+                            const rowOff = gy * gCols;
+                            for (let gx = Math.max(0, gx0 - 1); gx <= Math.min(gCols - 1, gx0 + 1); gx++) {
+                                for (let vi = game._vehGridHead[rowOff + gx]; vi !== -1; vi = game._vehGridNext[vi]) {
+                                    const ov = game.vehicles[vi];
+                                    if (!ov || ov === this) continue;
+                                    if (Math.hypot(ov.x - bay.x, ov.y - bay.y) < 54) {
+                                        stallFree = false;
+                                        break;
+                                    }
+                                }
+                                if (!stallFree) break;
+                            }
+                        }
+                    } else {
+                        for (let vi = 0; vi < game.vehicles.length; vi++) {
+                            const ov = game.vehicles[vi];
+                            if (!ov || ov === this) continue;
+                            if (Math.hypot(ov.x - bay.x, ov.y - bay.y) < 54) {
+                                stallFree = false;
+                                break;
+                            }
                         }
                     }
                     if (stallFree) {
@@ -2509,9 +2552,9 @@ class Vehicle {
         let sameLaneLeadGap = 9999;
         let sameLaneLeadSpd = 0;
         if (game && Array.isArray(game.vehicles)) {
-            for (const other of game.vehicles) {
-                if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
-                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
+            const inspectLead = (other) => {
+                if (!other || other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") return;
+                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) return;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
                 const fDist = dx * fx + dy * fy;
@@ -2529,6 +2572,24 @@ class Vehicle {
                     if (!changed && bumperGap < 68) {
                         this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 1.35);
                     }
+                }
+            };
+            if (game._vehGridHead && game._vehGridNext) {
+                const gCols = game._vehGridCols || 64;
+                const gRows = game._vehGridRows || 64;
+                const gx0 = Math.floor(this.x / 256);
+                const gy0 = Math.floor(this.y / 256);
+                for (let gy = Math.max(0, gy0 - 1); gy <= Math.min(gRows - 1, gy0 + 1); gy++) {
+                    const rowOff = gy * gCols;
+                    for (let gx = Math.max(0, gx0 - 1); gx <= Math.min(gCols - 1, gx0 + 1); gx++) {
+                        for (let vi = game._vehGridHead[rowOff + gx]; vi !== -1; vi = game._vehGridNext[vi]) {
+                            inspectLead(game.vehicles[vi]);
+                        }
+                    }
+                }
+            } else {
+                for (const other of game.vehicles) {
+                    inspectLead(other);
                 }
             }
         }
@@ -2755,6 +2816,37 @@ class Vehicle {
         const probeFar = myFrontHalf + 58;
         let frontBlockedClose = false;
 
+        // Pre-collect nearby vehicles once via the 256px spatial hash grid instead of scanning all 636 vehicles per feeler!
+        const nearbyVehs = [];
+        const maxProbeReach = probeFar + 48;
+        if (game && Array.isArray(game.vehicles)) {
+            if (game._vehGridHead && game._vehGridNext) {
+                const gCols = game._vehGridCols || 64;
+                const gRows = game._vehGridRows || 64;
+                const gx0 = Math.floor(this.x / 256);
+                const gy0 = Math.floor(this.y / 256);
+                for (let gy = Math.max(0, gy0 - 1); gy <= Math.min(gRows - 1, gy0 + 1); gy++) {
+                    const rowOff = gy * gCols;
+                    for (let gx = Math.max(0, gx0 - 1); gx <= Math.min(gCols - 1, gx0 + 1); gx++) {
+                        for (let vi = game._vehGridHead[rowOff + gx]; vi !== -1; vi = game._vehGridNext[vi]) {
+                            const other = game.vehicles[vi];
+                            if (!other || other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
+                            if (Math.abs(other.x - this.x) <= maxProbeReach && Math.abs(other.y - this.y) <= maxProbeReach) {
+                                nearbyVehs.push(other);
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (const other of game.vehicles) {
+                    if (!other || other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
+                    if (Math.abs(other.x - this.x) <= maxProbeReach && Math.abs(other.y - this.y) <= maxProbeReach) {
+                        nearbyVehs.push(other);
+                    }
+                }
+            }
+        }
+
         for (const off of candidateOffsets) {
             const candAng = this.angle + off;
             const alignDiff = Math.abs(this.normalizeAngle(directAngle - candAng));
@@ -2784,18 +2876,16 @@ class Vehicle {
             }
 
             // Penalize feelers that collide with civilian/wrecked vehicles so police, ambulances & tow trucks weave around traffic!
-            if (game && Array.isArray(game.vehicles)) {
-                for (const other of game.vehicles) {
-                    if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
-                    const oRad = Math.max(26, (other.w || 62) * 0.36);
-                    const d1 = Math.hypot(other.x - p1x, other.y - p1y);
-                    const d2 = Math.hypot(other.x - p2x, other.y - p2y);
-                    if (d1 < oRad) {
-                        score -= 36;
-                        if (off === 0) frontBlockedClose = true;
-                    } else if (d2 < oRad) {
-                        score -= 20;
-                    }
+            for (let vi = 0; vi < nearbyVehs.length; vi++) {
+                const other = nearbyVehs[vi];
+                const oRad = Math.max(26, (other.w || 62) * 0.36);
+                const d1 = Math.hypot(other.x - p1x, other.y - p1y);
+                const d2 = Math.hypot(other.x - p2x, other.y - p2y);
+                if (d1 < oRad) {
+                    score -= 36;
+                    if (off === 0) frontBlockedClose = true;
+                } else if (d2 < oRad) {
+                    score -= 20;
                 }
             }
 

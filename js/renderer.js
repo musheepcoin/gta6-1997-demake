@@ -1101,7 +1101,7 @@ class RetroRenderer {
                             gl_FragColor = vec4(windowGlow * litMask, 1.0);
                             return;
                         }
-                        vec3 wallDark = c.rgb * vec3(0.45, 0.53, 0.78);
+                        vec3 wallDark = c.rgb * vec3(0.32, 0.39, 0.60);
                         nightRgb = mix(wallDark, windowGlow, litMask);
                     } else if (vAnim > 0.5 && vAnim < 1.5) {
                         // Ocean / Bay / Lake water at night: deep nocturnal sapphire-navy with soft moonlight wave sheen!
@@ -1109,15 +1109,15 @@ class RetroRenderer {
                         float mSwell;
                         float mCaust = evalWaterCaustics(vWorldPos.xz * 0.85, uTime * 0.8, mGrad, mSwell);
                         vec3 neonWash = mix(vec3(0.14, 0.58, 0.88), vec3(0.76, 0.32, 0.68), 0.5 + 0.5 * sin(vWorldPos.z * 0.06 + vWorldPos.x * 0.04));
-                        nightRgb = c.rgb * vec3(0.42, 0.54, 0.82) + neonWash * pow(mCaust, 2.2) * 0.18;
+                        nightRgb = c.rgb * vec3(0.34, 0.45, 0.72) + neonWash * pow(mCaust, 2.2) * 0.18;
                     } else if (vAnim > 2.5 && vAnim < 3.5) {
                         // Sunken seabed at night
-                        nightRgb = c.rgb * vec3(0.35, 0.47, 0.72);
+                        nightRgb = c.rgb * vec3(0.28, 0.38, 0.62);
                     } else {
                         // Horizontal ground (roads, sidewalks, golden beach sand, grass, rooftops) & hybrid water-edge tiles:
                         // Cool nocturnal moonlight base (darkened & lit dynamically by renderNightLighting!) + underwater LED glow for rooftop pools!
                         float isPoolNight = step(2.85, vWorldPos.y) * step(0.18, rawTexRgb.b - rawTexRgb.r) * step(0.12, rawTexRgb.g - rawTexRgb.r);
-                        vec3 nightScale = mix(vec3(0.68, 0.73, 0.90), vec3(0.42, 0.54, 0.82), waterCoverage);
+                        vec3 nightScale = mix(vec3(0.48, 0.54, 0.72), vec3(0.34, 0.45, 0.72), waterCoverage);
                         vec3 baseNight = c.rgb * nightScale;
                         if (waterCoverage > 0.01) {
                             vec2 mGrad;
@@ -1200,8 +1200,8 @@ class RetroRenderer {
                     col = mix(col, min(vec3(1.0), sunsetCol), uSunsetTint * 0.65);
                 }
                 if (uNightTint > 0.01) {
-                    float nfAmt = clamp(uNightTint * 1.35, 0.0, 0.72);
-                    col = mix(col, col * vec3(0.68, 0.73, 0.90), nfAmt);
+                    float nfAmt = clamp(uNightTint * 1.25, 0.0, 0.85);
+                    col = mix(col, col * vec3(0.52, 0.58, 0.76), nfAmt);
                 }
                 return col;
             }
@@ -7479,7 +7479,8 @@ class RetroRenderer {
     /* ========================================================================
        5. MAIN RENDER ENTRYPOINT
        ======================================================================== */
-    render(game, dt) {
+    render(game, dt = 0.016) {
+        dt = (typeof dt === "number" && dt > 0 && dt < 0.5) ? dt : 0.016;
         this.time += dt;
         if (dt > 0.001 && dt < 0.25) {
             this.lastFrameDt = dt;
@@ -7602,7 +7603,7 @@ class RetroRenderer {
 
         if (!this.glLost) {
             this.renderWebGLScene(game, effectiveViewProj);
-            if (!glMountedBehind || needDaylightAtmo || needNightLight) {
+            if (!glMountedBehind || this._force2DComposite) {
                 ctx.drawImage(this.glCanvas, 0, 0);
             } else {
                 // Zero-copy hardware compositing: #webgl-canvas renders directly behind transparent #game-canvas!
@@ -12037,52 +12038,26 @@ class RetroRenderer {
 
         ctx.save();
 
-        // 1. Directional Soft-Light Solar Grading (boosts golden warmth in sunlit areas & cool tropical azure in shadows without greying out dark asphalt!)
-        ctx.globalCompositeOperation = "soft-light";
-        const toneGrad = ctx.createLinearGradient(sunX, 0, W - sunX, H);
-        toneGrad.addColorStop(0.0, `rgba(255, 224, 132, ${(0.22 * dayInt).toFixed(3)})`);
-        toneGrad.addColorStop(0.55, `rgba(255, 236, 178, ${(0.10 * dayInt).toFixed(3)})`);
-        toneGrad.addColorStop(1.0, `rgba(56, 148, 225, ${(0.08 * dayInt).toFixed(3)})`);
-        ctx.fillStyle = toneGrad;
-        ctx.fillRect(0, 0, W, H);
-
-        // 2. Crisp Golden Florida Solar Corona & Corner Rim Glow (tighter radius near the sun horizon so roads in the center stay deep & contrasty)
-        ctx.globalCompositeOperation = "screen";
-        const sunGrad = ctx.createRadialGradient(sunX, sunY, maxDim * 0.02, sunX, sunY, maxDim * 0.68);
-        sunGrad.addColorStop(0.0, `rgba(255, 246, 200, ${(0.20 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(0.28, `rgba(255, 222, 142, ${(0.09 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(0.62, `rgba(255, 198, 112, ${(0.025 * dayInt).toFixed(3)})`);
-        sunGrad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-        ctx.fillStyle = sunGrad;
-        ctx.fillRect(0, 0, W, H);
-
-        // 3. Feathered Elliptical Volumetric Sunbeams (100% radial-gradient feathered edges — zero hard polygon lines!)
-        ctx.globalCompositeOperation = "lighter";
-        const baseRayAngle = Math.atan2(H * 0.85, W * 0.50 - sunX);
-        const camPhase = (this.camX * 0.0020 + this.camY * 0.0015);
-        for (let i = 0; i < 4; i++) {
-            const rayWave = 0.72 + 0.28 * Math.sin(this.time * 0.80 + camPhase + i * 1.57);
-            const ang = baseRayAngle + (i - 1.5) * 0.14;
-            const lenR = maxDim * 0.62;
-            const widR = W * (0.08 + (i % 2) * 0.022);
-
-            ctx.save();
-            ctx.translate(sunX, sunY);
-            ctx.rotate(ang);
-            ctx.scale(lenR, widR);
-
-            const rg = ctx.createRadialGradient(0.48, 0.0, 0.02, 0.48, 0.0, 0.62);
-            const a0 = (0.016 * dayInt * rayWave).toFixed(4);
-            const a1 = (0.006 * dayInt * rayWave).toFixed(4);
-            rg.addColorStop(0.0, `rgba(255, 244, 198, ${a0})`);
-            rg.addColorStop(0.50, `rgba(255, 224, 154, ${a1})`);
-            rg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-            ctx.fillStyle = rg;
-            ctx.beginPath();
-            ctx.arc(0.48, 0.0, 0.62, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+        // Crisp Golden Florida Solar Corona & Corner Rim Glow (WebGL shaders already compute full-screen directional sunlight & shadow maps in hardware!)
+        if (!this._sunCoronaStamp) {
+            const sc = document.createElement("canvas");
+            sc.width = 96;
+            sc.height = 96;
+            const sctx = sc.getContext("2d");
+            const sg = sctx.createRadialGradient(48, 0, 2, 48, 0, 92);
+            sg.addColorStop(0.0, "rgba(255, 246, 200, 1.0)");
+            sg.addColorStop(0.32, "rgba(255, 222, 142, 0.42)");
+            sg.addColorStop(0.68, "rgba(255, 198, 112, 0.12)");
+            sg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            sctx.fillStyle = sg;
+            sctx.fillRect(0, 0, 96, 96);
+            this._sunCoronaStamp = sc;
         }
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.14 * dayInt;
+        const coronaR = maxDim * 0.48;
+        ctx.drawImage(this._sunCoronaStamp, sunX - coronaR * 0.5, 0, coronaR, coronaR * 0.65);
+        ctx.globalAlpha = 1.0;
 
         ctx.restore();
     }
@@ -12096,7 +12071,7 @@ class RetroRenderer {
         const H = this.canvas.height;
         if (W <= 0 || H <= 0) return;
 
-        const scale = this.isMobileInit ? 0.35 : 0.5;
+        const scale = 0.25;
         const lw = Math.max(1, Math.floor(W * scale));
         const lh = Math.max(1, Math.floor(H * scale));
         if (!this.nightCanvas) {
@@ -12148,6 +12123,53 @@ class RetroRenderer {
             return stamp;
         };
 
+        if (!this._coneStampCache) {
+            this._coneStampCache = new Map();
+        }
+        const getConeStamp = (key, innerCol, midCol) => {
+            let stamp = this._coneStampCache.get(key);
+            if (!stamp) {
+                stamp = document.createElement("canvas");
+                stamp.width = 128;
+                stamp.height = 96;
+                const sctx = stamp.getContext("2d");
+                const x0 = 8;
+                const y0 = 48;
+                const len = 112;
+                const bw = 6.0;
+                const spreadRad = 0.32;
+                const g = sctx.createLinearGradient(x0, y0, x0 + len, y0);
+                g.addColorStop(0.0, innerCol);
+                g.addColorStop(0.48, midCol);
+                g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+                sctx.fillStyle = g;
+                const layers = [
+                    { sp: spreadRad * 1.15, wMult: 1.10, alpha: 0.14 },
+                    { sp: spreadRad * 1.00, wMult: 1.02, alpha: 0.18 },
+                    { sp: spreadRad * 0.85, wMult: 0.94, alpha: 0.22 },
+                    { sp: spreadRad * 0.70, wMult: 0.84, alpha: 0.24 },
+                    { sp: spreadRad * 0.52, wMult: 0.72, alpha: 0.24 },
+                    { sp: spreadRad * 0.34, wMult: 0.56, alpha: 0.20 }
+                ];
+                for (const ly of layers) {
+                    const w = bw * ly.wMult;
+                    sctx.globalAlpha = ly.alpha;
+                    sctx.beginPath();
+                    sctx.moveTo(x0, y0 - w);
+                    sctx.arc(x0, y0, len, -ly.sp, ly.sp);
+                    sctx.lineTo(x0, y0 + w);
+                    sctx.closePath();
+                    sctx.fill();
+                }
+                this._coneStampCache.set(key, stamp);
+            }
+            return stamp;
+        };
+
+        const useAlphaCutout = true;
+        const nightPools = [];
+        const nightCones = [];
+
         const addLightPool = (sx, sy, radPx, innerCol, midCol) => {
             const x = sx * scale;
             const y = sy * scale;
@@ -12158,7 +12180,11 @@ class RetroRenderer {
                 [0.05, 0.48, midCol],
                 [0.05, 1.0, "rgba(0, 0, 0, 0)"]
             ]);
-            lctx.drawImage(stamp, x - r, y - r, r * 2, r * 2);
+            if (useAlphaCutout) {
+                nightPools.push({ x, y, r, stamp });
+            } else {
+                lctx.drawImage(stamp, x - r, y - r, r * 2, r * 2);
+            }
         };
 
         const addHeadlightCone = (sx, sy, angle, lenPx, spreadRad, baseHalfWPx, innerCol, midCol) => {
@@ -12168,38 +12194,16 @@ class RetroRenderer {
             const bw = Math.max(1.5, (baseHalfWPx || 2.0) * scale);
             const cosA = Math.cos(angle);
             const sinA = Math.sin(angle);
-            const nx = -sinA;
-            const ny = cosA;
-            const x1 = x0 + cosA * len;
-            const y1 = y0 + sinA * len;
-
-            const g = lctx.createLinearGradient(x0, y0, x1, y1);
-            g.addColorStop(0.0, innerCol);
-            g.addColorStop(0.45, midCol);
-            g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-            lctx.fillStyle = g;
-
-            // Draw smooth feathered wide-base trapezoidal fan layers so the beam starts across both headlights with soft, band-free side edges
-            const layers = [
-                { sp: spreadRad * 1.15, wMult: 1.10, alpha: 0.14 },
-                { sp: spreadRad * 1.00, wMult: 1.02, alpha: 0.18 },
-                { sp: spreadRad * 0.85, wMult: 0.94, alpha: 0.22 },
-                { sp: spreadRad * 0.70, wMult: 0.84, alpha: 0.24 },
-                { sp: spreadRad * 0.52, wMult: 0.72, alpha: 0.24 },
-                { sp: spreadRad * 0.34, wMult: 0.56, alpha: 0.20 }
-            ];
-            const prevAlpha = lctx.globalAlpha;
-            for (const ly of layers) {
-                const w = bw * ly.wMult;
-                lctx.globalAlpha = prevAlpha * ly.alpha;
-                lctx.beginPath();
-                lctx.moveTo(x0 - nx * w, y0 - ny * w);
-                lctx.arc(x0, y0, len, angle - ly.sp, angle + ly.sp);
-                lctx.lineTo(x0 + nx * w, y0 + ny * w);
-                lctx.closePath();
-                lctx.fill();
+            const stamp = getConeStamp(`cone|${innerCol}|${midCol}`, innerCol, midCol);
+            if (useAlphaCutout) {
+                nightCones.push({ x: x0, y: y0, cosA, sinA, len, spread: spreadRad, bw, stamp });
+            } else {
+                const scX = len / 112.0;
+                const scY = Math.max(bw / 6.0, (len * spreadRad) / (112.0 * 0.32));
+                lctx.setTransform(cosA * scX, sinA * scX, -sinA * scY, cosA * scY, x0, y0);
+                lctx.drawImage(stamp, -8, -48, 128, 96);
+                lctx.setTransform(1, 0, 0, 1, 0, 0);
             }
-            lctx.globalAlpha = prevAlpha;
         };
 
         // Collect crisp flares (streetlamp bulbs, dual headlight bulbs, red taillights) for the high-res pass
@@ -12784,27 +12788,87 @@ class RetroRenderer {
             }
         }
 
-        lctx.restore();
+        if (useAlphaCutout) {
+            // Zero-readback hardware compositing path:
+            // 1) Fill offscreen nightCanvas with nocturnal ambient darkness veil
+            // 2) Punch smooth soft alpha cutouts (destination-out) where streetlights, neon & headlights illuminate the WebGL scene
+            // 3) Stamp additive colored light pools & cones (lighter) onto nightCanvas and composite over transparent #game-canvas!
+            const darkAlpha = Math.min(0.46, nf * 0.42 + sf * 0.12);
+            const veilR = Math.round(6 * nf + 36 * sf * (1.0 - nf));
+            const veilG = Math.round(10 * nf + 14 * sf * (1.0 - nf));
+            const veilB = Math.round(24 * nf + 32 * sf * (1.0 - nf));
+            lctx.setTransform(1, 0, 0, 1, 0, 0);
+            lctx.clearRect(0, 0, lw, lh);
+            lctx.globalCompositeOperation = "source-over";
+            lctx.globalAlpha = 1.0;
+            lctx.fillStyle = `rgba(${veilR}, ${veilG}, ${veilB}, ${darkAlpha.toFixed(3)})`;
+            lctx.fillRect(0, 0, lw, lh);
 
-        // 7. Composite Pass 1: Multiply Darkness & Light Mask over WebGL 3D Scene
-        ctx.save();
-        ctx.imageSmoothingEnabled = true;
-        ctx.globalCompositeOperation = "multiply";
-        ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+            if (lightInt > 0.01) {
+                lctx.globalCompositeOperation = "destination-out";
+                lctx.globalAlpha = Math.min(1.0, lightInt * 0.94);
+                const cutoutPoolStamp = getLightStamp("cutout|pool", [
+                    [0.05, 0.0, "rgba(0, 0, 0, 0.96)"],
+                    [0.05, 0.52, "rgba(0, 0, 0, 0.50)"],
+                    [0.05, 1.0, "rgba(0, 0, 0, 0)"]
+                ]);
+                for (let i = 0; i < nightPools.length; i++) {
+                    const p = nightPools[i];
+                    lctx.drawImage(cutoutPoolStamp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+                }
+                const cutoutConeStamp = getConeStamp("cutout|cone", "rgba(0, 0, 0, 0.96)", "rgba(0, 0, 0, 0.52)");
+                for (let i = 0; i < nightCones.length; i++) {
+                    const c = nightCones[i];
+                    const scX = c.len / 112.0;
+                    const scY = Math.max(c.bw / 6.0, (c.len * c.spread) / (112.0 * 0.32));
+                    lctx.setTransform(c.cosA * scX, c.sinA * scX, -c.sinA * scY, c.cosA * scY, c.x, c.y);
+                    lctx.drawImage(cutoutConeStamp, -8, -48, 128, 96);
+                }
+                lctx.setTransform(1, 0, 0, 1, 0, 0);
 
-        // 7B. Stamp True 3D Depth-Tested Emissive Window Textures (Buildings & Houses) onto the darkened scene using "screen"
-        // (black glCanvas pixels are a 100% no-op so roads/roofs/cars are untouched, while lit 3D windows stay razor-sharp!)
-        // Skip the second full-city WebGL pass on mobile so mobile GPUs only draw the 3D city mesh once per frame.
-        if (!this.isMobileInit && !this.glLost && this._lastViewProj && this.renderEmissiveWindowsWebGL(game, this._lastViewProj)) {
-            ctx.globalCompositeOperation = "screen";
-            ctx.globalAlpha = Math.min(0.92, nf * 1.08);
-            ctx.drawImage(this.glCanvas, 0, 0, W, H);
+                lctx.globalCompositeOperation = "lighter";
+                lctx.globalAlpha = lightInt * 0.36;
+                for (let i = 0; i < nightPools.length; i++) {
+                    const p = nightPools[i];
+                    lctx.drawImage(p.stamp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+                }
+                lctx.globalAlpha = lightInt * 0.34;
+                for (let i = 0; i < nightCones.length; i++) {
+                    const c = nightCones[i];
+                    const scX = c.len / 112.0;
+                    const scY = Math.max(c.bw / 6.0, (c.len * c.spread) / (112.0 * 0.32));
+                    lctx.setTransform(c.cosA * scX, c.sinA * scX, -c.sinA * scY, c.cosA * scY, c.x, c.y);
+                    lctx.drawImage(c.stamp, -8, -48, 128, 96);
+                }
+                lctx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+            lctx.restore();
+
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            ctx.globalCompositeOperation = "source-over";
             ctx.globalAlpha = 1.0;
+            ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+        } else {
+            lctx.restore();
+
+            // 7. Fallback Multiply Composite when 2D canvas holds the full scene
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            ctx.globalCompositeOperation = "multiply";
+            ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+
+            if (!this.isMobileInit && !this.glLost && this._lastViewProj && this.renderEmissiveWindowsWebGL(game, this._lastViewProj)) {
+                ctx.globalCompositeOperation = "screen";
+                ctx.globalAlpha = Math.min(0.92, nf * 1.08);
+                ctx.drawImage(this.glCanvas, 0, 0, W, H);
+                ctx.globalAlpha = 1.0;
+            }
         }
 
-        // 8. Composite Pass 2: Soft Atmospheric Screen Bloom + High-Res Headlight Beams & Lens Flares
+        // 8. Composite Pass 2: High-Res Headlight Beams & Lens Flares via Pre-Baked Stamps
         if (lightInt > 0.02) {
-            if (!this.isMobileInit) {
+            if (!useAlphaCutout && !this.isMobileInit) {
                 ctx.globalCompositeOperation = "screen";
                 ctx.globalAlpha = 0.28 * nf;
                 ctx.drawImage(this.nightCanvas, 0, 0, W, H);
@@ -12816,41 +12880,14 @@ class RetroRenderer {
             for (const c of highResCones) {
                 const cosA = Math.cos(c.angle);
                 const sinA = Math.sin(c.angle);
-                const nx = -sinA;
-                const ny = cosA;
-                const x1 = c.x + cosA * c.len;
-                const y1 = c.y + sinA * c.len;
                 const bw = Math.max(1.5, c.baseHalfW || 2.0);
-                const g = ctx.createLinearGradient(c.x, c.y, x1, y1);
-                g.addColorStop(0.0, c.col0);
-                g.addColorStop(0.55, c.col1);
-                g.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-                ctx.fillStyle = g;
-
-                const layers = this.isMobileInit
-                    ? [
-                        { sp: c.spread * 1.04, wMult: 1.02, alpha: 0.36 },
-                        { sp: c.spread * 0.56, wMult: 0.72, alpha: 0.42 }
-                    ]
-                    : [
-                        { sp: c.spread * 1.14, wMult: 1.08, alpha: 0.14 },
-                        { sp: c.spread * 0.98, wMult: 1.00, alpha: 0.18 },
-                        { sp: c.spread * 0.82, wMult: 0.92, alpha: 0.20 },
-                        { sp: c.spread * 0.66, wMult: 0.82, alpha: 0.22 },
-                        { sp: c.spread * 0.48, wMult: 0.70, alpha: 0.20 },
-                        { sp: c.spread * 0.30, wMult: 0.54, alpha: 0.16 }
-                    ];
-                for (const ly of layers) {
-                    const w = bw * ly.wMult;
-                    ctx.globalAlpha = lightInt * ly.alpha;
-                    ctx.beginPath();
-                    ctx.moveTo(c.x - nx * w, c.y - ny * w);
-                    ctx.arc(c.x, c.y, c.len, c.angle - ly.sp, c.angle + ly.sp);
-                    ctx.lineTo(c.x + nx * w, c.y + ny * w);
-                    ctx.closePath();
-                    ctx.fill();
-                }
+                const stamp = getConeStamp(`hicone|${c.col0}|${c.col1}`, c.col0, c.col1);
+                const scX = c.len / 112.0;
+                const scY = Math.max(bw / 6.0, (c.len * c.spread) / (112.0 * 0.32));
+                ctx.setTransform(cosA * scX, sinA * scX, -sinA * scY, cosA * scY, c.x, c.y);
+                ctx.drawImage(stamp, -8, -48, 128, 96);
             }
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.globalAlpha = lightInt;
 
             for (const f of highResFlares) {
@@ -12986,14 +13023,16 @@ class RetroRenderer {
                 const gHead = game._vehGridHead;
                 const gNext = game._vehGridNext;
                 if (gHead && gNext) {
+                    const gCols = game._vehGridCols || 64;
+                    const gRows = game._vehGridRows || 64;
                     const gx0 = Math.max(0, (p.x >> 8) - 1);
-                    const gx1 = Math.min(127, (p.x >> 8) + 1);
+                    const gx1 = Math.min(gCols - 1, (p.x >> 8) + 1);
                     const gy0 = Math.max(0, (p.y >> 8) - 1);
-                    const gy1 = Math.min(127, (p.y >> 8) + 1);
+                    const gy1 = Math.min(gRows - 1, (p.y >> 8) + 1);
                     for (let gy = gy0; gy <= gy1; gy++) {
-                        const rowOff = gy << 7;
+                        const rowOff = gy * gCols;
                         for (let gx = gx0; gx <= gx1; gx++) {
-                            for (let vi = gHead[rowOff | gx]; vi !== -1; vi = gNext[vi]) {
+                            for (let vi = gHead[rowOff + gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
                                 const v = game.vehicles[vi];
                                 if (!v || v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious)) continue;
                                 const d = Math.hypot(v.x - p.x, v.y - p.y);
@@ -15020,101 +15059,142 @@ class RetroRenderer {
             return;
         }
 
-        // 1. Physical Side Buttons (Left: Mute + Volume Up/Down, Right: Power Button)
-        if (!isMinimized) {
-            ctx.fillStyle = "#64748b";
-            rrect(px - 2.5, py + 38, 3, 10, 1.5);
-            ctx.fill();
-            rrect(px - 2.5, py + 56, 3, 20, 1.5);
-            ctx.fill();
-            rrect(px - 2.5, py + 80, 3, 20, 1.5);
-            ctx.fill();
-            rrect(px + pw - 0.5, py + 64, 3, 26, 1.5);
-            ctx.fill();
-        }
-
-        // 2. Outer Brushed Titanium Frame (Vertical Smartphone Chassis)
-        rrect(px, py, pw, ph, 22);
-        ctx.fillStyle = "#020617";
-        ctx.fill();
-        ctx.lineWidth = 2.5;
-        const frameGrad = ctx.createLinearGradient(px, py, px + pw, py + ph);
-        frameGrad.addColorStop(0, "#94a3b8");
-        frameGrad.addColorStop(0.5, "#475569");
-        frameGrad.addColorStop(1, "#64748b");
-        ctx.strokeStyle = frameGrad;
-        ctx.stroke();
-
-        // 3. Inner OLED Screen Wallpaper
         const sx = px + 5;
         const sy = py + 5;
         const sw = pw - 10; // 214
         const sh = ph - 10; // 378
-        rrect(sx, sy, sw, sh, 18);
-        const wallGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
-        wallGrad.addColorStop(0, "#0b1120");
-        wallGrad.addColorStop(0.55, "#111329");
-        wallGrad.addColorStop(1, "#1b0e28");
-        ctx.fillStyle = wallGrad;
-        ctx.fill();
-
-        // Clip everything inside the rounded OLED screen
-        ctx.save();
-        rrect(sx, sy, sw, sh, 18);
-        ctx.clip();
-
-        // 4. Top Status Bar: "09:41" Clock + Dynamic Island Notch + Cellular Bars & Battery
         const notchW = 56;
         const notchH = 11;
         const notchX = sx + (sw - notchW) * 0.5;
         const notchY = sy + 4;
-        if (!(isMobile && isMinimized)) {
-            rrect(notchX, notchY, notchW, notchH, 5.5);
-            ctx.fillStyle = "#000000";
-            ctx.fill();
-            // Front camera lens inside Dynamic Island
-            ctx.fillStyle = "#0f172a";
-            ctx.beginPath();
-            ctx.arc(notchX + notchW - 9, notchY + notchH * 0.5, 2.6, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = "#38bdf8";
-            ctx.beginPath();
-            ctx.arc(notchX + notchW - 9.5, notchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
-            ctx.fill();
-        }
 
-        const staticClockStr = (game && typeof game.getClockString === "function")
-            ? game.getClockString(true)
-            : "16:30";
+        if (!isMinimized) {
+            const bw = pw + 8;
+            const bh = ph + 8;
+            if (!this._phoneBezelCanvas || this._phoneBezelCanvas.width !== bw || this._phoneBezelCanvas.height !== bh) {
+                const bc = document.createElement("canvas");
+                bc.width = bw;
+                bc.height = bh;
+                const bctx = bc.getContext("2d");
+                const ox = 4;
+                const oy = 4;
+                bctx.fillStyle = "#64748b";
+                rrectOn(bctx, ox - 2.5, oy + 38, 3, 10, 1.5); bctx.fill();
+                rrectOn(bctx, ox - 2.5, oy + 56, 3, 20, 1.5); bctx.fill();
+                rrectOn(bctx, ox - 2.5, oy + 80, 3, 20, 1.5); bctx.fill();
+                rrectOn(bctx, ox + pw - 0.5, oy + 64, 3, 26, 1.5); bctx.fill();
+
+                rrectOn(bctx, ox, oy, pw, ph, 22);
+                bctx.fillStyle = "#020617";
+                bctx.fill();
+                bctx.lineWidth = 2.5;
+                const frameGrad = bctx.createLinearGradient(ox, oy, ox + pw, oy + ph);
+                frameGrad.addColorStop(0, "#94a3b8");
+                frameGrad.addColorStop(0.5, "#475569");
+                frameGrad.addColorStop(1, "#64748b");
+                bctx.strokeStyle = frameGrad;
+                bctx.stroke();
+
+                const osx = ox + 5;
+                const osy = oy + 5;
+                rrectOn(bctx, osx, osy, sw, sh, 18);
+                const wallGrad = bctx.createLinearGradient(osx, osy, osx, osy + sh);
+                wallGrad.addColorStop(0, "#0b1120");
+                wallGrad.addColorStop(0.55, "#111329");
+                wallGrad.addColorStop(1, "#1b0e28");
+                bctx.fillStyle = wallGrad;
+                bctx.fill();
+
+                const onotchX = osx + (sw - notchW) * 0.5;
+                const onotchY = osy + 4;
+                rrectOn(bctx, onotchX, onotchY, notchW, notchH, 5.5);
+                bctx.fillStyle = "#000000";
+                bctx.fill();
+                bctx.fillStyle = "#0f172a";
+                bctx.beginPath();
+                bctx.arc(onotchX + notchW - 9, onotchY + notchH * 0.5, 2.6, 0, Math.PI * 2);
+                bctx.fill();
+                bctx.fillStyle = "#38bdf8";
+                bctx.beginPath();
+                bctx.arc(onotchX + notchW - 9.5, onotchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
+                bctx.fill();
+
+                const sigX = osx + sw - 50;
+                const sigY = osy + 12.5;
+                bctx.fillStyle = "#f8fafc";
+                for (let b = 0; b < 4; b++) {
+                    const bbh = 3 + b * 1.6;
+                    bctx.fillRect(sigX + b * 3.2, sigY - bbh, 2.1, bbh);
+                }
+                bctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+                bctx.textBaseline = "middle";
+                bctx.fillText("5G", sigX + 15, osy + 10);
+
+                const batX = osx + sw - 22;
+                const batY = osy + 6.5;
+                bctx.strokeStyle = "#cbd5e1";
+                bctx.lineWidth = 1;
+                rrectOn(bctx, batX, batY, 13, 6.5, 1.5);
+                bctx.stroke();
+                bctx.fillStyle = "#4ade80";
+                bctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
+                bctx.fillStyle = "#cbd5e1";
+                bctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
+
+                this._phoneBezelCanvas = bc;
+            }
+            ctx.drawImage(this._phoneBezelCanvas, px - 4, py - 4);
+            ctx.save();
+        } else {
+            // Minimized desktop smartphone pill
+            rrect(px, py, pw, ph, 22);
+            ctx.fillStyle = "#020617";
+            ctx.fill();
+            ctx.lineWidth = 2.5;
+            const frameGrad = ctx.createLinearGradient(px, py, px + pw, py + ph);
+            frameGrad.addColorStop(0, "#94a3b8");
+            frameGrad.addColorStop(0.5, "#475569");
+            frameGrad.addColorStop(1, "#64748b");
+            ctx.strokeStyle = frameGrad;
+            ctx.stroke();
+
+            rrect(sx, sy, sw, sh, 18);
+            const wallGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
+            wallGrad.addColorStop(0, "#0b1120");
+            wallGrad.addColorStop(0.55, "#111329");
+            wallGrad.addColorStop(1, "#1b0e28");
+            ctx.fillStyle = wallGrad;
+            ctx.fill();
+            ctx.save();
+
+            const sigX = sx + sw - 50;
+            const sigY = sy + 12.5;
+            ctx.fillStyle = "#f8fafc";
+            for (let b = 0; b < 4; b++) {
+                const bh = 3 + b * 1.6;
+                ctx.fillRect(sigX + b * 3.2, sigY - bh, 2.1, bh);
+            }
+            ctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.textBaseline = "middle";
+            ctx.fillText("5G", sigX + 15, sy + 10);
+
+            const batX = sx + sw - 22;
+            const batY = sy + 6.5;
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.lineWidth = 1;
+            rrect(batX, batY, 13, 6.5, 1.5);
+            ctx.stroke();
+            ctx.fillStyle = "#4ade80";
+            ctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
+        }
 
         ctx.fillStyle = "#f8fafc";
         ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
         ctx.fillText(`${timeInfo.icon} ${liveClockStr}`, sx + 8, sy + 10);
         this.cheatButtons.push({ id: "TOGGLE_NIGHT", x: sx + 4, y: sy + 2, w: 68, h: 15 });
-
-        // Cellular Signal Bars + 5G + Battery on right of Dynamic Island
-        const sigX = sx + sw - 50;
-        const sigY = sy + 12.5;
-        ctx.fillStyle = "#f8fafc";
-        for (let b = 0; b < 4; b++) {
-            const bh = 3 + b * 1.6;
-            ctx.fillRect(sigX + b * 3.2, sigY - bh, 2.1, bh);
-        }
-        ctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
-        ctx.fillText("5G", sigX + 15, sy + 10);
-
-        // Battery Icon
-        const batX = sx + sw - 22;
-        const batY = sy + 6.5;
-        ctx.strokeStyle = "#cbd5e1";
-        ctx.lineWidth = 1;
-        rrect(batX, batY, 13, 6.5, 1.5);
-        ctx.stroke();
-        ctx.fillStyle = "#4ade80";
-        ctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
-        ctx.fillStyle = "#cbd5e1";
-        ctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
 
         if (isMinimized) {
             ctx.fillStyle = "#38bdf8";
@@ -15606,7 +15686,7 @@ class RetroRenderer {
             }
         }
 
-        const useMobileMiniCache = Boolean(this.isMobileInit && mw > 0 && mh > 0);
+        const useMobileMiniCache = Boolean(mw > 0 && mh > 0);
         let drawTargetCtx = ctx;
         let ox = mx;
         let oy = my;
@@ -15621,7 +15701,8 @@ class RetroRenderer {
                 this._gpsMiniCacheCanvas.height = mh;
                 this._gpsMiniCacheTick = 0;
             }
-            this._gpsMiniCacheTick = ((this._gpsMiniCacheTick || 0) + 1) % 6;
+            const refreshStride = this.isMobileInit ? 6 : 3;
+            this._gpsMiniCacheTick = ((this._gpsMiniCacheTick || 0) + 1) % refreshStride;
             if (this._gpsMiniCacheTick !== 1 && this._gpsMiniLastZoom === zoomMode && this._gpsMiniCacheReady) {
                 skipRedraw = true;
             } else {

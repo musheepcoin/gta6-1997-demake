@@ -9660,7 +9660,11 @@ class LeonidaGame {
 
         if (!p || p.dead || this.activeInterior) return;
 
-
+        // Throttle the full-city towing scan to 2 Hz (every 0.5s) instead of scanning 636 vehicles every frame
+        this._towScanAccum = (this._towScanAccum || 0) + dt;
+        if (this._towScanAccum < 0.5) return;
+        const scanDt = this._towScanAccum;
+        this._towScanAccum = 0;
 
         // Scan for a wrecked or abandoned vehicle blocking a road near the player (75px < dist < 760px)
 
@@ -9774,7 +9778,7 @@ class LeonidaGame {
 
 
 
-        this.towDispatchTimer = (this.towDispatchTimer || 0) + dt;
+        this.towDispatchTimer = (this.towDispatchTimer || 0) + scanDt;
 
         if (this.towDispatchTimer < 6.0) return;
 
@@ -14648,32 +14652,6 @@ class LeonidaGame {
                     ped.y += Math.sin(ped.angle) * spd * dt;
                 }
 
-                // 4D) Soft Pedestrian-to-Pedestrian Personal Space Separation (prevents opposing walkers from clipping through each other)
-                if ((ped.speed || 0) > 1 && !ped.isCrossingRoad) {
-                    for (let oj = 0; oj < this.peds.length; oj++) {
-                        const other = this.peds[oj];
-                        if (!other || other === ped || other.dead) continue;
-                        if (ped.formationId && other.formationId === ped.formationId) continue;
-                        const dxO = ped.x - other.x;
-                        const dyO = ped.y - other.y;
-                        if (Math.abs(dxO) > 13 || Math.abs(dyO) > 13) continue;
-                        const dO = Math.hypot(dxO, dyO);
-                        if (dO > 0.5 && dO < 12.5) {
-                            const push = (12.5 - dO) * 2.2 * dt;
-                            const nx = ped.x + (dxO / dO) * push;
-                            const ny = ped.y + (dyO / dO) * push;
-                            const nbx = Math.floor(nx / TILE_SIZE);
-                            const nby = Math.floor(ny / TILE_SIZE);
-                            const nNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(nbx, nby, pz) : null;
-                            if (nNav && (nNav.groundType === GROUND_TYPE.PAWEMENT || nNav.groundType === GROUND_TYPE.FIELD)) {
-                                ped.x = nx;
-                                ped.y = ny;
-                            }
-                            break;
-                        }
-                    }
-                }
-
                 // Keep normal walking civilians strictly on PAWEMENT/FIELD sidewalks (unless actively crossing a zebra crosswalk!)
                 const curNav = this.map.getNavigationBlock ? this.map.getNavigationBlock(bx, by, pz) : null;
 
@@ -15358,13 +15336,18 @@ class LeonidaGame {
 
 
 
-        // 7B. 911 Emergency Ambulance Dispatch: Automatically dispatches a MEDIC_AMBULANCE when casualties occur nearby!
+        // 7B. 911 Emergency Ambulance & Fire Department Dispatch (throttled to 4 Hz = 0.25s intervals)
 
         if (!isClientWorldSync) {
 
             if (this.medicDispatchCooldown > 0) {
                 this.medicDispatchCooldown = Math.max(0, this.medicDispatchCooldown - dt);
             }
+            this.fireDispatchCooldown = Math.max(0, (this.fireDispatchCooldown || 0) - dt);
+            this._emergScanAccum = (this._emergScanAccum || 0) + dt;
+            if (this._emergScanAccum >= 0.25) {
+                const emergDt = this._emergScanAccum;
+                this._emergScanAccum = 0;
 
             let casualtyNearPlayer = null;
 
@@ -15420,7 +15403,7 @@ class LeonidaGame {
 
                 if (!medicNearCasualty) {
 
-                    this.medicDispatchTimer = (this.medicDispatchTimer || 0) + dt;
+                    this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
 
                     if (this.medicDispatchTimer > 14.0) {
 
@@ -15541,7 +15524,6 @@ class LeonidaGame {
             }
 
             // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK) for Burning Cars & Unextinguished Burning Wrecks
-            this.fireDispatchCooldown = Math.max(0, (this.fireDispatchCooldown || 0) - dt);
             let burningVehNearPlayer = null;
             for (const v of this.vehicles) {
                 if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
@@ -15569,7 +15551,7 @@ class LeonidaGame {
                     }
                 }
                 if (!fireTruckNearTarget) {
-                    this.fireDispatchTimer = (this.fireDispatchTimer || 0) + dt;
+                    this.fireDispatchTimer = (this.fireDispatchTimer || 0) + emergDt;
                     if (this.fireDispatchTimer > 12.0) {
                         this.fireDispatchTimer = 8.0; // retry ~4s later if road candidate busy
                         const baseBx = Math.floor(burningVehNearPlayer.x / TILE_SIZE);
@@ -15627,6 +15609,7 @@ class LeonidaGame {
                 }
             } else {
                 this.fireDispatchTimer = 0;
+            }
             }
 
             // 7c. Ambient Random Street Crime & Police Intervention Events (Independent of Player)
@@ -16375,11 +16358,12 @@ class LeonidaGame {
 
         let nearestSirenType = "POLICE";
 
-        for (let i = 0; i < this.vehicles.length; i++) {
+        const audioVehList = this._activePairVehicles || this.vehicles;
+        for (let i = 0; i < audioVehList.length; i++) {
 
-            const v = this.vehicles[i];
+            const v = audioVehList[i];
 
-            if (v.destroyed) continue;
+            if (!v || v.destroyed) continue;
 
             const dx = v.x - p.x;
 
