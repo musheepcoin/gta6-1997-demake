@@ -662,7 +662,7 @@ class LeonidaGame {
 
             { spec: "SUPERBIKE", c: 124.5, r: 301.5, a: Math.PI * 0.5, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
-            { spec: "PICKUP_TRUCK", c: 58.0, r: 212.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
+            { spec: "PICKUP_TRUCK", c: 76.5, r: 453.5, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "AIRBOAT", c: 86.0, r: 402.0, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
 

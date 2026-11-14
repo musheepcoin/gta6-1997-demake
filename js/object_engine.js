@@ -723,7 +723,7 @@ class WorldObjectEngine {
         // 31. Official GTA 6 Racing Pit-Stop Overhaul Bays & Keys Spiny-Lobster Trap Buoys (Loop 24)
         this.derbyPitGarages = [
             { name: "PORT GELLHORN SPEEDWAY PIT LANE",        x: 88.5 * TILE_SIZE,  y: 178.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { name: "THRILLBILLY MUD PARK TIRE & NITRO PIT",  x: 82.5 * TILE_SIZE,  y: 456.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { name: "THRILLBILLY MUD PARK TIRE & NITRO PIT",  x: 78.5 * TILE_SIZE,  y: 453.4 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "AMBROSIA DRAG-STRIP TUNER PIT",          x: 150.5 * TILE_SIZE, y: 128.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         this.lobsterTrapBuoys = [
@@ -16804,6 +16804,30 @@ class WorldObjectEngine {
             ctx.fillRect((lm.grassriversOutpost.x - 18) * sx, (lm.grassriversOutpost.y - 12) * sy, 36 * sx, 160 * sy);
         }
         if (lm.thrillbillyArena) {
+            if (this.map && this.map.getBlockInfo && this.map.surfaceGround) {
+                for (let ry = 452; ry <= 474; ry++) {
+                    for (let cx = 66; cx <= 114; cx++) {
+                        const gt = this.map.surfaceGround[ry * MAP_COLS + cx];
+                        const blk1 = this.map.getBlockInfo(cx, ry, 1);
+                        const lid1 = blk1 ? blk1.lid : 0;
+                        const col = this.map.getColumn ? this.map.getColumn(cx, ry) : null;
+                        if (col && col.length > 2) {
+                            ctx.fillStyle = "#cbd5e1";
+                        } else if (gt === GROUND_TYPE.WATER || (lid1 >= 344 && lid1 <= 360)) {
+                            ctx.fillStyle = "#38bdf8";
+                        } else if (gt === GROUND_TYPE.ROAD) {
+                            ctx.fillStyle = "#4b4f56";
+                        } else if (gt === GROUND_TYPE.PAWEMENT) {
+                            ctx.fillStyle = "#d6cfc2";
+                        } else if ((lid1 >= 98 && lid1 <= 101) || (lid1 >= 488 && lid1 <= 495) || (this.map.coastalSandMask && this.map.coastalSandMask[ry * MAP_COLS + cx] === 1)) {
+                            ctx.fillStyle = "#ecd28e";
+                        } else {
+                            ctx.fillStyle = "#2f9541";
+                        }
+                        ctx.fillRect(cx * TILE_SIZE * sx, ry * TILE_SIZE * sy, (TILE_SIZE + 1) * sx, (TILE_SIZE + 1) * sy);
+                    }
+                }
+            }
             ctx.fillStyle = "#f97316";
             ctx.fillRect((lm.thrillbillyArena.x - 78) * sx, (lm.thrillbillyArena.y - 48) * sy, 156 * sx, 96 * sy);
         }

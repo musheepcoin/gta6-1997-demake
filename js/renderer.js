@@ -9565,36 +9565,6 @@ class RetroRenderer {
                     this.batchObjectSprite3D(dustSpr, cx - Math.cos(cAng) * 20, cy - Math.sin(cAng) * 20, bz + 0.045, this.time * 3, 0.58, SPRITE_DRAW_ORDER.EXPLOSION);
                 }
             }
-            const mp = tr.mudPark;
-            if (mp && mp.cxE >= minX - 950 && mp.cxW <= maxX + 950 && mp.cy >= minY - 720 && mp.cy <= maxY + 720) {
-                const bz = mp.z || 2.0;
-                for (let ti = 0; ti < mp.trucks.length; ti++) {
-                    const t = this.time * 1.05 + ti * (Math.PI * 0.5);
-                    const onEastLoop = (Math.floor((t / (Math.PI * 2)) * 2) % 2) === 1;
-                    const loopCx = onEastLoop ? mp.cxE : mp.cxW;
-                    const dir = onEastLoop ? -1 : 1;
-                    const angT = t * dir;
-                    const tx = loopCx + Math.cos(angT) * mp.rx;
-                    const ty = mp.cy + Math.sin(angT) * mp.ry;
-                    const vx = -Math.sin(angT) * mp.rx * dir;
-                    const vy = Math.cos(angT) * mp.ry * dir;
-                    const tAng = Math.atan2(vy, vx);
-                    const vRect = getVehRect(mp.trucks[ti], ti + 2);
-                    if (vRect) {
-                        this.pushSolidQuad3D(tx + sunCos * 5, ty + sunSin * 5, bz + 0.018, 42, 22, tAng, 0.02, 0.03, 0.06, 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushAtlasSprite3D(vRect, tx, ty, bz + 0.056, tAng - Math.PI * 0.5, 1.08, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
-                    }
-                    // Mud splash spray behind monster mudder tires
-                    const bx = tx - Math.cos(tAng) * 22, by = ty - Math.sin(tAng) * 22;
-                    this.pushSolidQuad3D(bx, by, bz + 0.032, 14, 12, tAng, 0.55, 0.38, 0.22, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                }
-                // Cheering Thrillbilly Mud Park spectators along the track berm
-                for (let si = 0; si < 6; si++) {
-                    const sx = mp.cxW - 180 + si * 210;
-                    const sy = mp.cy + ((si % 2 === 0) ? -650 : 650);
-                    this.batchPedSprite3D((si % 3 === 0) ? "bikini_red" : ((si % 2 === 0) ? "g2_redneck_blond" : "g2_redneck_red"), 98, sx, sy, bz + 0.038, (si % 2 === 0) ? Math.PI * 0.5 : -Math.PI * 0.5, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                }
-            }
         }
 
         // 16) Leonida Keys, Ocean Drive & Little Cuba Thatched Tiki Bars & String-Light Café Terraces ("tiki_hut_roof", "cafe_table_umb")

@@ -2673,7 +2673,7 @@ class LeonidaMap {
                 cars: ["0", "1", "4", "6", "13", "14"]
             },
             mudPark: {
-                cxW: 78.0 * TILE_SIZE,
+                disabled: true, cxW: 78.0 * TILE_SIZE,
                 cxE: 102.0 * TILE_SIZE,
                 cy:  464.0 * TILE_SIZE,
                 rx:  10.0 * TILE_SIZE,
@@ -5576,6 +5576,7 @@ class LeonidaMap {
         if (bx >= 458 && bx <= 481 && by >= 21 && by <= 45) return true;
         // Port Gellhorn International Super-Speedway Complex (c = 26..87, r = 149..200)
         if (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) return true;
+        if (bx >= 74 && bx <= 86 && by >= 452 && by <= 468) return true;
         return false;
     }
 
