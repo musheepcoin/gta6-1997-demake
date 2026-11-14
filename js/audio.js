@@ -49,6 +49,15 @@ const VEHICLE_AUDIO_MANIFEST = {
     tank_rev: "assets/sfx/vehicles/tank_rev.wav",
     tank_start: "assets/sfx/vehicles/tank_start.wav",
     tank_tracks: "assets/sfx/vehicles/tank_tracks.wav",
+    tank_turret_loop: "assets/sfx/vehicles/tank_turret_loop.wav",
+
+    // Authentic GTA Bicycle (Pedal Chain, Freewheel Hub Ratchet & Brass Rotary Bell), E-Scooter & Police Chopper Loops
+    bike_pedal_loop: "assets/sfx/vehicles/bike_pedal_loop.wav",
+    bike_coast_loop: "assets/sfx/vehicles/bike_coast_loop.wav",
+    bike_bell: "assets/sfx/vehicles/bike_bell.wav",
+    scooter_loop: "assets/sfx/vehicles/scooter_loop.wav",
+    scooter_horn: "assets/sfx/vehicles/scooter_horn.wav",
+    heli_rotor_loop: "assets/sfx/vehicles/heli_rotor_loop.wav",
 
     // Authentic GTA 1 Boat Engine (STYLE001.G24 eVehicleClass_Boat mEngine=12 / LEVEL001.SDT #57) & Marine Watercraft Loops
     gta_boat_engine: "assets/sfx/vehicles/gta_boat_engine.wav",
@@ -233,9 +242,17 @@ const ENGINE_BANK_SPECS = {
         { key: "truck_rev", center: 0.72, width: 0.70, baseRate: 0.78, rateSpan: 0.46, gain: 0.19 }
     ],
     TANK: [
-        { key: "tank_idle", center: 0.0, width: 0.50, baseRate: 0.92, rateSpan: 0.24, gain: 0.18 },
-        { key: "tank_rev", center: 0.68, width: 0.68, baseRate: 0.78, rateSpan: 0.44, gain: 0.20 },
-        { key: "tank_tracks", center: 0.56, width: 0.75, baseRate: 0.75, rateSpan: 0.55, gain: 0.16 }
+        { key: "tank_idle", center: 0.0, width: 0.56, baseRate: 0.92, rateSpan: 0.24, gain: 0.20 },
+        { key: "tank_rev", center: 0.68, width: 0.72, baseRate: 0.80, rateSpan: 0.44, gain: 0.22 },
+        { key: "tank_tracks", center: 0.56, width: 0.75, baseRate: 0.78, rateSpan: 0.58, gain: 0.19 },
+        { key: "tank_turret_loop", center: 0.50, width: 0.90, baseRate: 0.90, rateSpan: 0.35, gain: 0.16 }
+    ],
+    BICYCLE: [
+        { key: "bike_pedal_loop", center: 0.50, width: 0.90, baseRate: 0.82, rateSpan: 0.56, gain: 0.21 },
+        { key: "bike_coast_loop", center: 0.50, width: 0.90, baseRate: 0.76, rateSpan: 0.74, gain: 0.20 }
+    ],
+    ESCOOTER: [
+        { key: "scooter_loop", center: 0.50, width: 0.95, baseRate: 0.74, rateSpan: 0.78, gain: 0.19 }
     ],
     BOAT: [
         { key: "boat_idle", center: 0.0, width: 0.56, baseRate: 0.90, rateSpan: 0.28, gain: 0.17 },
@@ -279,9 +296,8 @@ class RetroAudioEngine {
 
         // Preloaded Raw ArrayBuffers & Decoded WebAudio Buffers (lazy on-demand + throttled decode queue on mobile!)
         this._isMobileAudio = typeof window !== "undefined" && Boolean(
-            (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) ||
-            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
-            Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 960
+            (typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")) ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 820)
         );
         this._rawArrayBuffers = {};
         this.buffers = {};
@@ -351,7 +367,7 @@ class RetroAudioEngine {
         const url = VEHICLE_AUDIO_MANIFEST[key];
         if (!url || typeof fetch !== "function") return;
         this._fetchingKeys.add(key);
-        fetch(`${url}?v=101_23`)
+        fetch(`${url}?v=101_118`)
             .then((res) => (res.ok ? res.arrayBuffer() : null))
             .then((buf) => {
                 this._fetchingKeys.delete(key);
@@ -389,7 +405,7 @@ class RetroAudioEngine {
                         const k = mobileCoreKeys[idx++];
                         if ( !this.buffers[k] && !this._rawArrayBuffers[k] && !this._fetchingKeys.has(k) && VEHICLE_AUDIO_MANIFEST[k] ) {
                             this._fetchingKeys.add(k);
-                            fetch(`${VEHICLE_AUDIO_MANIFEST[k]}?v=101_23`)
+                            fetch(`${VEHICLE_AUDIO_MANIFEST[k]}?v=101_118`)
                                 .then((res) => (res.ok ? res.arrayBuffer() : null))
                                 .then((buf) => {
                                     this._fetchingKeys.delete(k);
@@ -416,7 +432,7 @@ class RetroAudioEngine {
 
         for (const [key, url] of Object.entries(VEHICLE_AUDIO_MANIFEST)) {
             this._fetchingKeys.add(key);
-            fetch(`${url}?v=101_23`)
+            fetch(`${url}?v=101_118`)
                 .then((res) => (res.ok ? res.arrayBuffer() : null))
                 .then((buf) => {
                     this._fetchingKeys.delete(key);
@@ -545,6 +561,7 @@ class RetroAudioEngine {
             case "CITY_BUS":
             case "TOUR_COACH":
             case "FLATBED_TRUCK":
+            case "TOW_TRUCK":
             case "TANKER_RIG":
             case "SWAT_ENFORCER":
             case "BRINKS_TRUCK":
@@ -836,6 +853,21 @@ class RetroAudioEngine {
             this._sirenNode = null;
             this._activeSirenKey = null;
         }
+        if (this._heliLoopNode) {
+            try {
+                this._heliLoopNode.stop();
+                this._heliLoopNode.disconnect();
+            } catch (_e) {}
+            this._heliLoopNode = null;
+        }
+        if (this._heliLoopGain) {
+            try {
+                this._heliLoopGain.gain.cancelScheduledValues(now);
+                this._heliLoopGain.gain.setValueAtTime(0.0, now);
+                this._heliLoopGain.disconnect();
+            } catch (_e) {}
+            this._heliLoopGain = null;
+        }
         for (const gainNode of [this.engineMasterGain, this.sirenGain, this.trafficGain, this.oceanGain, this.cityHumGain]) {
             if (gainNode && gainNode.gain) {
                 try {
@@ -1010,6 +1042,44 @@ class RetroAudioEngine {
         }
     }
 
+    _updateHeliLoop(now, heliDist, heliDoppler = 1.0) {
+        if (!this.ctx) return;
+        if (heliDist !== undefined && heliDist < 940) {
+            if (!this._heliLoopNode && !this.buffers.heli_rotor_loop) {
+                this._decodeKey("heli_rotor_loop");
+            }
+            if (!this._heliLoopNode && this.buffers.heli_rotor_loop) {
+                try {
+                    const src = this.ctx.createBufferSource();
+                    src.buffer = this.buffers.heli_rotor_loop;
+                    src.loop = true;
+                    const g = this.ctx.createGain();
+                    g.gain.setValueAtTime(0.005, now);
+                    src.connect(g);
+                    g.connect(this.sfxOut());
+                    src.start(now);
+                    this._heliLoopNode = src;
+                    this._heliLoopGain = g;
+                } catch (_e) {}
+            }
+            if (this._heliLoopNode && this._heliLoopGain) {
+                const prox = Math.pow(Math.max(0, 1 - heliDist / 940), 1.32);
+                const targetGain = prox * (this.inVehicle ? 0.105 : 0.140);
+                const rate = Math.max(0.86, Math.min(1.16, heliDoppler || 1.0));
+                this._setParamSmooth(this._heliLoopGain.gain, targetGain, 0.25);
+                this._setParamSmooth(this._heliLoopNode.playbackRate, rate, 0.25);
+            }
+        } else if (this._heliLoopNode) {
+            try {
+                this._heliLoopNode.stop();
+                this._heliLoopNode.disconnect();
+                if (this._heliLoopGain) this._heliLoopGain.disconnect();
+            } catch (_e) {}
+            this._heliLoopNode = null;
+            this._heliLoopGain = null;
+        }
+    }
+
     _tickMusicScheduler() {
         // Synthesized WebAudio music disabled: game uses the YouTube soundtrack only
     }
@@ -1048,40 +1118,65 @@ class RetroAudioEngine {
             const speedNorm = Math.min(1.0, absSpeed / maxSpd);
             const throttle = state.vehicleThrottle !== undefined ? state.vehicleThrottle : (absSpeed > this._prevAbsSpeed + 0.5 ? 1 : 0);
 
-            // BICYCLE & ELECTRIC SCOOTER: Zero combustion engine noise!
+            // BICYCLE & ELECTRIC SCOOTER: Sampled multi-layer pedal/freewheel & brushless motor loops!
             if (vehClass === "BICYCLE" || vehClass === "ESCOOTER") {
-                if (this._engineLayers.length > 0) {
-                    this._stopEngineLayers();
-                }
-                if (this.engineMasterGain) {
-                    this.engineMasterGain.gain.cancelScheduledValues(now);
-                    this.engineMasterGain.gain.setValueAtTime(0.0, now);
-                }
                 this._updateSkidLoop(now, false, 0);
-
-                if (vehClass === "BICYCLE" && absSpeed > 14) {
-                    // Authentic Beach Cruiser Bicycle sound: soft pedal chain swish when pedaling, crisp freewheel ratchet ticks when coasting!
-                    this._bikeTickTimer = (this._bikeTickTimer || 0) - dt;
-                    const tickInterval = throttle > 0
-                        ? Math.max(0.18, 0.42 - speedNorm * 0.22)
-                        : Math.max(0.055, 0.14 - speedNorm * 0.08);
-                    if (this._bikeTickTimer <= 0) {
-                        this._bikeTickTimer = tickInterval;
-                        if (throttle > 0) {
-                            // Subtle pedal chain cadence swish
-                            this.playBandNoise(0.032, 2600 + speedNorm * 800, 2.4, 0.011);
-                        } else if (absSpeed > 24) {
-                            // Crisp metallic freewheel hub ratchet click while coasting
-                            this.playBandNoise(0.012, 4400, 4.2, 0.009);
-                        }
+                if (this._ensureEngineLayers(vehClass)) {
+                    if (this.engineMasterFilter && this.engineMasterGain) {
+                        const filterHz = vehClass === "BICYCLE" ? 4200 : (1450 + speedNorm * 1650);
+                        this._setParamSmooth(this.engineMasterFilter.frequency, filterHz, 0.30);
+                        const masterVol = absSpeed > 8 ? (0.38 + speedNorm * 0.16) : 0.0;
+                        this._setParamSmooth(this.engineMasterGain.gain, masterVol, 0.28);
                     }
-                } else if (vehClass === "ESCOOTER" && absSpeed > 14) {
-                    // Subtle modern electric brushless hub motor hum (quiet high-tech sine pulse)
-                    this._scooterHumTimer = (this._scooterHumTimer || 0) - dt;
-                    if (this._scooterHumTimer <= 0) {
-                        this._scooterHumTimer = 0.075;
-                        const humFreq = 310 + speedNorm * 440 + (throttle > 0 ? 45 : 0);
-                        this.playBeep(humFreq, 0.085, "sine", 0.0085 * Math.min(1.0, speedNorm * 1.3));
+                    for (const layer of this._engineLayers) {
+                        const s = layer.spec;
+                        let w = 0;
+                        let rate = s.baseRate + speedNorm * s.rateSpan;
+                        if (s.key === "bike_pedal_loop") {
+                            w = (absSpeed > 10 && throttle > 0)
+                                ? Math.min(1.0, absSpeed / 110) * (0.72 + 0.28 * speedNorm)
+                                : 0.0;
+                            rate = s.baseRate + speedNorm * s.rateSpan + (throttle > 0 ? 0.06 : 0);
+                        } else if (s.key === "bike_coast_loop") {
+                            if (absSpeed > 14 && throttle <= 0) {
+                                w = Math.min(1.0, absSpeed / 125);
+                            } else if (absSpeed > 12) {
+                                w = 0.22 * Math.min(1.0, absSpeed / 150);
+                            }
+                            rate = s.baseRate + speedNorm * s.rateSpan;
+                        } else if (s.key === "scooter_loop") {
+                            w = absSpeed > 8
+                                ? Math.min(1.0, absSpeed / 105) * (throttle > 0 ? 1.0 : 0.65)
+                                : 0.0;
+                            rate = s.baseRate + speedNorm * s.rateSpan + (throttle > 0 ? 0.08 : 0);
+                        }
+                        this._setParamSmooth(layer.gainNode.gain, w * s.gain, 0.28);
+                        this._setParamSmooth(layer.src.playbackRate, Math.max(0.58, Math.min(1.75, rate)), 0.28);
+                    }
+                } else {
+                    if (this.engineMasterGain) {
+                        this.engineMasterGain.gain.setValueAtTime(0.0, now);
+                    }
+                    if (vehClass === "BICYCLE" && absSpeed > 14) {
+                        this._bikeTickTimer = (this._bikeTickTimer || 0) - dt;
+                        const tickInterval = throttle > 0
+                            ? Math.max(0.18, 0.42 - speedNorm * 0.22)
+                            : Math.max(0.055, 0.14 - speedNorm * 0.08);
+                        if (this._bikeTickTimer <= 0) {
+                            this._bikeTickTimer = tickInterval;
+                            if (throttle > 0) {
+                                this.playBandNoise(0.032, 2600 + speedNorm * 800, 2.4, 0.011);
+                            } else if (absSpeed > 24) {
+                                this.playBandNoise(0.012, 4400, 4.2, 0.009);
+                            }
+                        }
+                    } else if (vehClass === "ESCOOTER" && absSpeed > 14) {
+                        this._scooterHumTimer = (this._scooterHumTimer || 0) - dt;
+                        if (this._scooterHumTimer <= 0) {
+                            this._scooterHumTimer = 0.075;
+                            const humFreq = 310 + speedNorm * 440 + (throttle > 0 ? 45 : 0);
+                            this.playBeep(humFreq, 0.085, "sine", 0.0085 * Math.min(1.0, speedNorm * 1.3));
+                        }
                     }
                 }
 
@@ -1128,13 +1223,13 @@ class RetroAudioEngine {
                 }
             }
 
-            // Heavy Truck / Bus Air Brake Hiss when braking hard to a stop & Reverse Warning Beep
-            if (vehClass === "TRUCK") {
-                if (this._prevAbsSpeed > 65 && absSpeed < 18 && this._airBrakeCooldown <= 0) {
+            // Heavy Truck / Bus / Panzer Tank Air-Hydraulic Brake Release & Reverse Warning Beep
+            if (vehClass === "TRUCK" || vehClass === "TANK") {
+                if (this._prevAbsSpeed > 55 && absSpeed < 18 && this._airBrakeCooldown <= 0) {
                     this._airBrakeCooldown = 2.4;
-                    this.playSample("air_brake", 0.095, 0.96 + Math.random() * 0.08);
+                    this.playSample("air_brake", 0.095, vehClass === "TANK" ? 0.84 : (0.96 + Math.random() * 0.08));
                 }
-                if (rawSpeed < -14) {
+                if (vehClass === "TRUCK" && rawSpeed < -14) {
                     this._reverseBeepTimer -= dt;
                     if (this._reverseBeepTimer <= 0) {
                         this._reverseBeepTimer = 0.92;
@@ -1167,11 +1262,17 @@ class RetroAudioEngine {
 
             if (this._ensureEngineLayers(vehClass)) {
                 const rpm = this._smoothedRpm;
+                const turretSpin = Math.min(1.0, (state.turretSpinSpeed || 0) / 1.8);
                 for (const layer of this._engineLayers) {
                     const s = layer.spec;
                     let w = 0;
+                    let rate = s.baseRate + rpm * s.rateSpan * (this._shiftDipTimer > 0 ? 0.90 : 1.0);
                     if (s.key === "tank_tracks") {
-                        w = Math.min(1.0, absSpeed / 95);
+                        w = Math.min(1.0, absSpeed / 85);
+                        rate = s.baseRate + speedNorm * s.rateSpan;
+                    } else if (s.key === "tank_turret_loop") {
+                        w = turretSpin > 0.05 ? (0.35 + 0.65 * turretSpin) : 0.0;
+                        rate = s.baseRate + turretSpin * s.rateSpan;
                     } else if (s.key === "boat_water_loop") {
                         w = Math.min(1.0, absSpeed / 120);
                     } else {
@@ -1181,7 +1282,6 @@ class RetroAudioEngine {
                         w = Math.sin(w * Math.PI * 0.5);
                     }
                     const layerGain = w * s.gain;
-                    const rate = s.baseRate + rpm * s.rateSpan * (this._shiftDipTimer > 0 ? 0.90 : 1.0);
                     this._setParamSmooth(layer.gainNode.gain, layerGain, 0.30);
                     this._setParamSmooth(layer.src.playbackRate, Math.max(0.55, Math.min(1.65, rate)), 0.30);
                 }
@@ -1230,6 +1330,9 @@ class RetroAudioEngine {
             }
             this.sirenGain.gain.value = 0.0;
         }
+
+        // 2B. 6-Star VCPD Police Pursuit Helicopter Rotor & Turbine Loop
+        this._updateHeliLoop(now, state.nearestHeliDist, state.heliDoppler || 1.0);
 
         // 3. Spatial AI Traffic Pass-By Sample Loop (with Doppler shift & motorcycle vs car engine!)
         if (this.trafficGain && this.trafficFilter) {
@@ -1338,6 +1441,15 @@ class RetroAudioEngine {
             if (!ok) {
                 this.playBandNoise(0.09, 3200, 2.2, 0.035);
                 this.playBeep(1180, 0.07, "sawtooth", 0.025);
+            }
+            return;
+        }
+        if (weaponType === "TANK_CANNON") {
+            const ok = this.playSample("cannon_blast", 0.165, 0.95 + Math.random() * 0.08, 1.65);
+            this.playSample("explosion_modern", 0.105, 0.78 + Math.random() * 0.08, 0.85);
+            if (!ok) {
+                this.playSample("gta_shot_rocket", 0.135, 0.82, 0.85);
+                this.playNoise(0.38, 280, 0.095);
             }
             return;
         }
@@ -1474,25 +1586,29 @@ class RetroAudioEngine {
 
         const vehClass = this.getVehicleAudioClass(specKey);
 
-        // Authentic Bicycle Handlebar Bell ("DRING-DRING!") & Electric Scooter Piezo Beep!
+        // Authentic Bicycle Handlebar Brass Rotary Bell ("BRRING-BRRING!") & Electric Scooter Dual Piezo Horn!
         if (vehClass === "BICYCLE" || specKey === "BMX_BIKE") {
-            this.playBeep(2420, 0.11, "sine", 0.065);
-            this.playBeep(3630, 0.08, "triangle", 0.032);
-            setTimeout(() => {
-                if (this.ctx && !this.muted) {
-                    this.playBeep(2680, 0.14, "sine", 0.070);
-                    this.playBeep(4020, 0.10, "triangle", 0.035);
-                }
-            }, 85);
+            if (!this.playSample("bike_bell", 0.135, 0.97 + Math.random() * 0.06, 0.88)) {
+                this.playBeep(2420, 0.11, "sine", 0.065);
+                this.playBeep(3630, 0.08, "triangle", 0.032);
+                setTimeout(() => {
+                    if (this.ctx && !this.muted) {
+                        this.playBeep(2680, 0.14, "sine", 0.070);
+                        this.playBeep(4020, 0.10, "triangle", 0.035);
+                    }
+                }, 85);
+            }
             return;
         }
         if (vehClass === "ESCOOTER" || specKey === "E_SCOOTER") {
-            this.playBeep(1580, 0.065, "triangle", 0.055);
-            setTimeout(() => {
-                if (this.ctx && !this.muted) {
-                    this.playBeep(1580, 0.075, "triangle", 0.055);
-                }
-            }, 80);
+            if (!this.playSample("scooter_horn", 0.120, 0.98 + Math.random() * 0.05, 0.44)) {
+                this.playBeep(1580, 0.065, "triangle", 0.055);
+                setTimeout(() => {
+                    if (this.ctx && !this.muted) {
+                        this.playBeep(1580, 0.075, "triangle", 0.055);
+                    }
+                }, 80);
+            }
             return;
         }
 

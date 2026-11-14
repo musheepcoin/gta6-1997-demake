@@ -8695,12 +8695,12 @@ class LeonidaGame {
 
 
 
-    fireWeapon(shooterX, shooterY, angle, weaponKey, isPlayer = true, fromJason = false, npcFaction = null) {
+    fireWeapon(shooterX, shooterY, angle, weaponKey, isPlayer = true, fromJason = false, npcFaction = null, audioWeaponOverride = null) {
 
         const spec = WEAPON_SPECS[weaponKey] || WEAPON_SPECS.PISTOL;
 
         if (isPlayer || !this.player || Math.hypot(shooterX - this.player.x, shooterY - this.player.y) < 560) {
-            this.audio.playShot(weaponKey);
+            this.audio.playShot(audioWeaponOverride || weaponKey);
         }
 
 
@@ -10610,13 +10610,18 @@ class LeonidaGame {
                 const hasRemoteGunner = occList.some((o) => !o.isLocal && o.seat === 1);
 
                 if (v.hasTurret && (mySeat === 1 || (mySeat === 0 && !hasRemoteGunner))) {
-
-                    v.turretAngle = (this.input.joyActive && typeof this.input.joyAngle === "number")
-
+                    const prevTurretAng = typeof v.turretAngle === "number" ? v.turretAngle : v.angle;
+                    const nextTurretAng = (this.input.joyActive && typeof this.input.joyAngle === "number")
                         ? this.input.joyAngle
-
                         : (useMouseAim ? mouseAimAngle : v.angle);
-
+                    let tDiff = nextTurretAng - prevTurretAng;
+                    while (tDiff > Math.PI) tDiff -= Math.PI * 2;
+                    while (tDiff < -Math.PI) tDiff += Math.PI * 2;
+                    const instSpin = Math.abs(tDiff) / Math.max(0.008, dt);
+                    v.turretSpinSpeed = (v.turretSpinSpeed || 0) * 0.65 + Math.min(4.0, instSpin) * 0.35;
+                    v.turretAngle = nextTurretAng;
+                } else if (v.hasTurret) {
+                    v.turretSpinSpeed = (v.turretSpinSpeed || 0) * 0.7;
                 }
 
 
@@ -11366,7 +11371,7 @@ class LeonidaGame {
 
                     const fireAng = controlsTankTurret ? (v.turretAngle || shotAngle) : shotAngle;
 
-                    this.fireWeapon(p.x, p.y, fireAng, activeWep, true, false);
+                    this.fireWeapon(p.x, p.y, fireAng, activeWep, true, false, null, controlsTankTurret ? "TANK_CANNON" : null);
 
                     this.updateHud();
 
@@ -16456,6 +16461,13 @@ class LeonidaGame {
 
 
 
+        const nearestHeliDist = this.policeHeli
+            ? Math.hypot(this.policeHeli.x - p.x, this.policeHeli.y - p.y)
+            : 9999;
+        const heliDoppler = (this.policeHeli && nearestHeliDist < 940)
+            ? (1.0 + Math.sin((this.policeHeli.orbitAngle || 0) * 2.0) * 0.045)
+            : 1.0;
+
         this.audio.update(dt, {
 
             inVehicle: Boolean(pVeh),
@@ -16470,6 +16482,8 @@ class LeonidaGame {
 
             vehicleDrifting: Boolean(pVeh && pVeh.drifting),
 
+            turretSpinSpeed: pVeh ? (pVeh.turretSpinSpeed || 0) : 0,
+
             playerSirenActive: Boolean(pVeh && pVeh.sirenActive),
 
             wantedLevel: this.wantedLevel,
@@ -16479,6 +16493,10 @@ class LeonidaGame {
             nearestSirenDist,
 
             nearestSirenType: (pVeh && pVeh.sirenActive) ? playerSirenType : nearestSirenType,
+
+            nearestHeliDist,
+
+            heliDoppler,
 
             nearestTrafficDist,
 
