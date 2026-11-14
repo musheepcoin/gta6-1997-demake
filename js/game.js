@@ -15164,23 +15164,24 @@ class LeonidaGame {
 
             }
 
-            // 6-Star VCPD Police Pursuit Helicopter: actively follows the player and orbits / circles around them!
+            // 6-Star VCPD Police Pursuit Helicopter: high-altitude wide standoff orbit around the player!
             if (tWanted >= 6) {
                 const targetEnt = p.inVehicle || p;
                 if (!this.policeHeli) {
                     const initAng = Math.random() * Math.PI * 2;
                     this.policeHeli = {
-                        x: targetEnt.x + Math.cos(initAng) * 340,
-                        y: targetEnt.y + Math.sin(initAng) * 340,
-                        z: 3.25,
+                        x: targetEnt.x + Math.cos(initAng) * 380,
+                        y: targetEnt.y + Math.sin(initAng) * 320,
+                        z: 3.68,
                         cx: targetEnt.x,
                         cy: targetEnt.y,
                         orbitAngle: initAng,
-                        orbitRadius: 72,
+                        orbitRx: 136,
+                        orbitRy: 98,
                         angle: initAng + Math.PI * 0.5,
                         searchX: targetEnt.x,
                         searchY: targetEnt.y,
-                        burstTimer: 2.0,
+                        burstTimer: 2.4,
                         burstShotsLeft: 0,
                         burstShotDelay: 0,
                         muzzleTimer: 0,
@@ -15190,48 +15191,51 @@ class LeonidaGame {
                 }
                 const heli = this.policeHeli;
                 heli.departing = false;
-                heli.cx += (targetEnt.x - heli.cx) * Math.min(1, dt * 4.5);
-                heli.cy += (targetEnt.y - heli.cy) * Math.min(1, dt * 4.5);
-                const orbitOmega = 1.22; // ~5.1s per full 360° circle around the player
+                // Smooth standoff tracking inertia so the chopper doesn't glue rigidly to the player's bumper
+                heli.cx += (targetEnt.x - heli.cx) * Math.min(1, dt * 2.1);
+                heli.cy += (targetEnt.y - heli.cy) * Math.min(1, dt * 2.1);
+                const orbitOmega = 0.48; // ~13.1s per wide 360° observation orbit
                 heli.orbitAngle = (heli.orbitAngle || 0) + orbitOmega * dt;
-                const rad = (heli.orbitRadius || 72) + Math.sin(heli.orbitAngle * 2.0) * 6.0;
-                const desX = heli.cx + Math.cos(heli.orbitAngle) * rad;
-                const desY = heli.cy + Math.sin(heli.orbitAngle) * rad;
+                const wobble = 1.0 + Math.sin(heli.orbitAngle * 2.0) * 0.06;
+                const rx = (heli.orbitRx || 136) * wobble;
+                const ry = (heli.orbitRy || 98) * wobble;
+                const desX = heli.cx + Math.cos(heli.orbitAngle) * rx;
+                const desY = heli.cy + Math.sin(heli.orbitAngle) * ry;
                 const dx = desX - heli.x;
                 const dy = desY - heli.y;
                 const distToSlot = Math.hypot(dx, dy);
-                const maxStep = 410 * dt;
+                const maxStep = 380 * dt;
                 let vx, vy;
                 if (distToSlot > maxStep) {
-                    vx = (dx / distToSlot) * 410;
-                    vy = (dy / distToSlot) * 410;
+                    vx = (dx / distToSlot) * 380;
+                    vy = (dy / distToSlot) * 380;
                     heli.x += (dx / distToSlot) * maxStep;
                     heli.y += (dy / distToSlot) * maxStep;
                 } else {
                     heli.x = desX;
                     heli.y = desY;
-                    vx = -Math.sin(heli.orbitAngle) * rad * orbitOmega + (targetEnt.vx || 0);
-                    vy = Math.cos(heli.orbitAngle) * rad * orbitOmega + (targetEnt.vy || 0);
+                    vx = -Math.sin(heli.orbitAngle) * rx * orbitOmega + (targetEnt.vx || 0) * 0.45;
+                    vy = Math.cos(heli.orbitAngle) * ry * orbitOmega + (targetEnt.vy || 0) * 0.45;
                 }
                 const tangentAng = Math.atan2(vy, vx);
                 const toPlayerAng = Math.atan2(targetEnt.y - heli.y, targetEnt.x - heli.x);
                 const desiredAng = Math.atan2(
-                    Math.sin(tangentAng) * 0.76 + Math.sin(toPlayerAng) * 0.24,
-                    Math.cos(tangentAng) * 0.76 + Math.cos(toPlayerAng) * 0.24
+                    Math.sin(tangentAng) * 0.88 + Math.sin(toPlayerAng) * 0.12,
+                    Math.cos(tangentAng) * 0.88 + Math.cos(toPlayerAng) * 0.12
                 );
                 let angDiff = desiredAng - (heli.angle || 0);
                 while (angDiff > Math.PI) angDiff -= Math.PI * 2;
                 while (angDiff < -Math.PI) angDiff += Math.PI * 2;
-                heli.angle = (heli.angle || 0) + angDiff * Math.min(1, dt * 8.0);
-                heli.z = 3.25 + Math.sin(performance.now() * 0.0045) * 0.05;
-                heli.searchX += (targetEnt.x - (heli.searchX ?? targetEnt.x)) * Math.min(1, dt * 10.0);
-                heli.searchY += (targetEnt.y - (heli.searchY ?? targetEnt.y)) * Math.min(1, dt * 10.0);
+                heli.angle = (heli.angle || 0) + angDiff * Math.min(1, dt * 5.5);
+                heli.z = 3.68 + Math.sin(performance.now() * 0.0035) * 0.05;
+                heli.searchX += (targetEnt.x - (heli.searchX ?? targetEnt.x)) * Math.min(1, dt * 6.5);
+                heli.searchY += (targetEnt.y - (heli.searchY ?? targetEnt.y)) * Math.min(1, dt * 6.5);
 
                 const dHeli = Math.hypot(targetEnt.x - heli.x, targetEnt.y - heli.y);
                 if (!this.activeInterior && dHeli < nearestCopDist) {
                     nearestCopDist = dHeli;
                 }
-                if (!this.activeInterior && !p.dead && dHeli < 240) {
+                if (!this.activeInterior && !p.dead && dHeli < 340) {
                     heli.burstTimer = (heli.burstTimer || 0) - dt;
                     if (heli.burstTimer <= 0 && (heli.burstShotsLeft || 0) <= 0) {
                         heli.burstShotsLeft = 3;
