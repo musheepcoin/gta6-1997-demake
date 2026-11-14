@@ -1970,6 +1970,104 @@ class WorldObjectEngine {
             );
         }
 
+        // Register Solid 3D OBB Collision Hulls for Thrillbilly Stunt Arena, Landmarks & 3D World Booths/Stages
+        if (Array.isArray(map.securityBarrierBoxes)) {
+            const pushWorldOBB = (cx, cy, hw, hh, ang = 0, pedsOnly = false) => {
+                if (typeof cx !== "number" || typeof cy !== "number") return;
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+                const ex = Math.abs(cosA) * hw + Math.abs(sinA) * hh;
+                const ey = Math.abs(sinA) * hw + Math.abs(cosA) * hh;
+                map.securityBarrierBoxes.push({
+                    cx,
+                    cy,
+                    hw,
+                    hh,
+                    cosA,
+                    sinA,
+                    pedsOnly: Boolean(pedsOnly),
+                    minX: cx - ex,
+                    maxX: cx + ex,
+                    minY: cy - ey,
+                    maxY: cy + ey
+                });
+            };
+            const lm = this.landmarks3D || {};
+            if (lm.thrillbillyArena) {
+                const tb = lm.thrillbillyArena;
+                // A. North Entrance Archway Pillars & Center Announcer Podium (offY = -126)
+                pushWorldOBB(tb.x - 54, tb.y - 126, 8, 8, 0);
+                pushWorldOBB(tb.x + 54, tb.y - 126, 8, 8, 0);
+                pushWorldOBB(tb.x,      tb.y - 126, 11, 8, 0);
+                // B. South 3-Tier Stepped Wooden Spectator Bleachers (offY = +134, 152x38 px)
+                pushWorldOBB(tb.x,      tb.y + 134, 76, 19, 0);
+                // C. Centerpiece Flaming Hoop Steel Scaffold Pillars (offY = -36 & +36)
+                pushWorldOBB(tb.x,      tb.y - 36, 6, 6, 0);
+                pushWorldOBB(tb.x,      tb.y + 36, 6, 6, 0);
+                // D. Twin Opposing 3D Sloped Monster Launch Ramps (offX = -78 & +78, 52x32 px)
+                for (const dir of [-1, 1]) {
+                    const rx = tb.x + dir * 78;
+                    pushWorldOBB(rx, tb.y - 16, 26, 2.5, 0);
+                    pushWorldOBB(rx, tb.y + 16, 26, 2.5, 0);
+                    pushWorldOBB(rx, tb.y,      26, 16,  0, true); // Solid on foot so player/peds never clip through wood ramp
+                }
+            }
+            if (Array.isArray(map.stuntRamps)) {
+                for (const sr of map.stuntRamps) {
+                    pushWorldOBB(sr.x, sr.y, 24, 15, sr.angle || 0, true);
+                }
+            }
+            if (lm.wynwoodWalls) {
+                pushWorldOBB(lm.wynwoodWalls.x - 46, lm.wynwoodWalls.y - 18, 6, 6, 0);
+                pushWorldOBB(lm.wynwoodWalls.x + 46, lm.wynwoodWalls.y - 18, 6, 6, 0);
+            }
+            if (lm.lakeLeonidaOutpost) {
+                pushWorldOBB(lm.lakeLeonidaOutpost.x - 28, lm.lakeLeonidaOutpost.y - 12, 32, 24, 0);
+                pushWorldOBB(lm.lakeLeonidaOutpost.x + 36, lm.lakeLeonidaOutpost.y - 12, 11, 11, 0);
+            }
+            if (lm.briansBoatyard) {
+                pushWorldOBB(lm.briansBoatyard.x, lm.briansBoatyard.y, 36, 20, 0);
+            }
+            if (lm.rustyAnchorBar) {
+                pushWorldOBB(lm.rustyAnchorBar.x - 6, lm.rustyAnchorBar.y - 4, 22, 14, 0);
+                pushWorldOBB(lm.rustyAnchorBar.x + 18, lm.rustyAnchorBar.y + 8, 12, 7, 0);
+            }
+            if (lm.jackOfHearts) {
+                pushWorldOBB(lm.jackOfHearts.x - 28, lm.jackOfHearts.y - 10, 6, 6, 0);
+                pushWorldOBB(lm.jackOfHearts.x + 28, lm.jackOfHearts.y - 10, 6, 6, 0);
+            }
+            if (lm.calHamptonOutpost) {
+                pushWorldOBB(lm.calHamptonOutpost.x - 10, lm.calHamptonOutpost.y - 4, 16, 11, 0);
+                pushWorldOBB(lm.calHamptonOutpost.x + 16, lm.calHamptonOutpost.y - 8, 6, 6, 0);
+            }
+            const addArrayOBBs = (arr, hw, hh) => {
+                if (!Array.isArray(arr)) return;
+                for (const item of arr) {
+                    pushWorldOBB(item.x, item.y, hw, hh, item.ang || 0);
+                }
+            };
+            addArrayOBBs(this.derbyPitGarages, 19, 12);
+            addArrayOBBs(this.blockPartyStages, 19, 11);
+            addArrayOBBs(this.coconutSmoothieBars, 11, 8);
+            addArrayOBBs(this.tarotNeonBooths, 11, 9);
+            addArrayOBBs(this.beachBoxingRings, 18, 18);
+            addArrayOBBs(this.kalagaLookoutTowers, 13, 13);
+            addArrayOBBs(this.beachCabanaLounges, 15, 11);
+            addArrayOBBs(this.beachRescueStations, 15, 11);
+            addArrayOBBs(this.gulfSunsetTikiClubs, 18, 12);
+            addArrayOBBs(this.citrusOrchardStands, 14, 9);
+            addArrayOBBs(this.gatorWrestlingRodeos, 18, 18);
+            addArrayOBBs(this.stiltsvilleOutposts, 16, 12);
+            addArrayOBBs(this.hangarBlackMarkets, 16, 9);
+            addArrayOBBs(this.botanicalGlasshouses, 17, 11);
+            addArrayOBBs(this.driveInScreens, 21, 5);
+            addArrayOBBs(this.oysterRawBars, 10, 7);
+            addArrayOBBs(this.kalagaZiplineTowers, 11, 11);
+            addArrayOBBs(this.neonArcadePavilions, 11, 7);
+            addArrayOBBs(this.dominoParkTables, 8, 8);
+            map.barrierBoxGrid = null;
+        }
+
         this.registerEstateInteriors();
         this.initVillaHeists();
     }
@@ -14138,8 +14236,6 @@ class WorldObjectEngine {
         if (this.landmarks3D && this.landmarks3D.thrillbillyArena) {
             const tb = this.landmarks3D.thrillbillyArena;
             if (tb.x >= minX - 200 && tb.x <= maxX + 200 && tb.y >= minY - 200 && tb.y <= maxY + 200) {
-                const rSz = 46 + Math.sin(renderer.time * 6.0) * 5.0;
-                renderer.pushSolidQuad3D(tb.x, tb.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.48, 0.12, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 renderer.pushSolidQuad3D(tb.x, tb.y - 126, 2.03, 28, 28, renderer.time * 1.2, 0.98, 0.78, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }

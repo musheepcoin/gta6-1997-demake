@@ -6388,6 +6388,11 @@ class LeonidaMap {
         }
         if (excludeWater && currentHeight <= 2.05) {
             currentHeight += this.getBridgeElevationOffset(px, py);
+            const tbX = 82.0 * TILE_SIZE, tbY = 455.0 * TILE_SIZE;
+            if (Math.abs(py - tbY) <= 16.0) {
+                if (px >= tbX - 104 && px <= tbX - 52) currentHeight += ((px - (tbX - 104)) / 52.0) * 0.30;
+                else if (px >= tbX + 52 && px <= tbX + 104) currentHeight += (((tbX + 104) - px) / 52.0) * 0.30;
+            }
         }
         return Math.max(0.0, currentHeight);
     }
@@ -7122,6 +7127,7 @@ class LeonidaMap {
                         for (let i = 0; i < activeList.length; i++) {
                             const bb = activeList[i];
                             if (bb.vehiclesOnly && radius < 11.5) continue;
+                            if (bb.pedsOnly && radius >= 11.5) continue;
                             if (nx + radius < bb.minX || nx - radius > bb.maxX || ny + radius < bb.minY || ny - radius > bb.maxY) continue;
 
                         if (bb.cx !== undefined) {
