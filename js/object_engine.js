@@ -7158,6 +7158,10 @@ class WorldObjectEngine {
                         sl.timer = 0;
                         sl.tiltDx = 0;
                         sl.tiltDy = 0;
+                        sl.fallenX = sl.baseX;
+                        sl.fallenY = sl.baseY;
+                        sl.fallVx = 0;
+                        sl.fallVy = 0;
                     }
                 }
                 if (sl.state !== 2 && !(sl.hitCooldown > 0)) {
@@ -7206,6 +7210,10 @@ class WorldObjectEngine {
                         ts.timer = 0;
                         ts.tiltDx = 0;
                         ts.tiltDy = 0;
+                        ts.fallenX = ts.baseX;
+                        ts.fallenY = ts.baseY;
+                        ts.fallVx = 0;
+                        ts.fallVy = 0;
                     }
                 }
                 if (ts.state !== 2 && !(ts.hitCooldown > 0)) {
@@ -7387,18 +7395,18 @@ class WorldObjectEngine {
                                     pCar.vy || Math.sin(pCar.angle),
                                     pCar.vx || Math.cos(pCar.angle)
                                 );
-                                if (isHeavyVeh) {
+                                if (isHeavyVeh || (sl.state === 1 && carSpd > 58) || carSpd > 125) {
                                     sl.state = 2;
                                     sl.timer = 0;
                                     sl.hitCooldown = 0.8;
                                     actLights.add(sl);
                                     sl.fallAngle = impAng;
-                                    sl.fallenX = sl.baseX + Math.cos(impAng) * 14;
-                                    sl.fallenY = sl.baseY + Math.sin(impAng) * 14;
-                                    const launchSpd = Math.min(250, Math.max(90, carSpd * 1.12));
+                                    sl.fallenX = sl.baseX + Math.cos(impAng) * 18;
+                                    sl.fallenY = sl.baseY + Math.sin(impAng) * 18;
+                                    const launchSpd = Math.min(55, Math.max(18, carSpd * 0.24));
                                     sl.fallVx = Math.cos(impAng) * launchSpd;
                                     sl.fallVy = Math.sin(impAng) * launchSpd;
-                                    sl.fallVang = (Math.random() - 0.5) * 8.5;
+                                    sl.fallVang = (Math.random() - 0.5) * 1.1;
                                     pCar.vx *= 0.90;
                                     pCar.vy *= 0.90;
                                     pCar.crashCooldown = 0.45;
@@ -7496,18 +7504,18 @@ class WorldObjectEngine {
                                     pCar.vy || Math.sin(pCar.angle),
                                     pCar.vx || Math.cos(pCar.angle)
                                 );
-                                if (isHeavyVeh) {
+                                if (isHeavyVeh || (ts.state === 1 && carSpd > 62) || carSpd > 130) {
                                     ts.state = 2;
                                     ts.timer = 0;
                                     ts.hitCooldown = 0.8;
                                     actSignals.add(ts);
                                     ts.fallAngle = impAng;
-                                    ts.fallenX = ts.baseX + Math.cos(impAng) * 16;
-                                    ts.fallenY = ts.baseY + Math.sin(impAng) * 16;
-                                    const launchSpd = Math.min(255, Math.max(95, carSpd * 1.12));
+                                    ts.fallenX = ts.baseX + Math.cos(impAng) * 4.5;
+                                    ts.fallenY = ts.baseY + Math.sin(impAng) * 4.5;
+                                    const launchSpd = Math.min(44, Math.max(12, carSpd * 0.20));
                                     ts.fallVx = Math.cos(impAng) * launchSpd;
                                     ts.fallVy = Math.sin(impAng) * launchSpd;
-                                    ts.fallVang = (Math.random() - 0.5) * 8.0;
+                                    ts.fallVang = (Math.random() - 0.5) * 0.75;
                                     pCar.vx *= 0.90;
                                     pCar.vy *= 0.90;
                                     pCar.crashCooldown = 0.45;
@@ -13387,18 +13395,45 @@ class WorldObjectEngine {
                 const hoodCol = isDeco ? [0.64, 0.70, 0.80] : [0.38, 0.43, 0.50];
 
                 // State 2: Knocked-down / Uprooted 3D Streetlamp lying on the ground ("défoncé")
+                //          Uses the exact 3D octagonal pedestal stump, tapered pole, cantilever arm & cobra-head luminaire!
                 if (sl.state === 2) {
-                    const fx = sl.fallenX ?? sl.baseX;
-                    const fy = sl.fallenY ?? sl.baseY;
-                    const fAng = sl.fallAngle || 0;
+                    const origArmCos = Math.cos(sl.armAngle || 0);
+                    const origArmSin = Math.sin(sl.armAngle || 0);
+                    const fx = sl.fallenX ?? (sl.baseX + origArmCos * 4.5);
+                    const fy = sl.fallenY ?? (sl.baseY + origArmSin * 4.5);
+                    const fAng = sl.fallAngle !== undefined ? sl.fallAngle : (sl.armAngle || 0);
                     const fCos = Math.cos(fAng);
                     const fSin = Math.sin(fAng);
-                    // Sheared cast-iron anchor flange at curb
-                    emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 4.4, 3.8, bz, bz + 0.04, 8, [0.24, 0.27, 0.32], 9, true);
-                    // Toppled 3D steel pole shaft lying on the street
-                    emitDynBox(fx, fy, fCos, fSin, 0, 0, 36.0, 3.2, bz, bz + 0.05, poleCol, 1.0, 9);
-                    // Detached / bent cantilever arm & shattered cobra-head luminaire hood at the tip
-                    emitDynBox(fx, fy, fCos, fSin, 17.5, 2.5, 11.0, 6.2, bz, bz + 0.06, hoodCol, 1.0, 9);
+                    const poleLen = 34.0;
+                    const topX = fx + fCos * poleLen;
+                    const topY = fy + fSin * poleLen;
+                    // 1. Sheared cast-iron anchor flange at curb + fractured inner pipe core
+                    emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 4.6, 4.0, bz, bz + 0.048, 8, baseCol, 9, true);
+                    emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 2.4, 2.0, bz + 0.048, bz + 0.072, 8, [0.24, 0.27, 0.32], 9, true);
+                    // 2. Toppled 3D tapered steel pole shaft extending from fractured base (fx,fy) to pole tip (topX,topY)
+                    emitDynBox(fx + fCos * (poleLen * 0.26), fy + fSin * (poleLen * 0.26), fCos, fSin, 0, 0, poleLen * 0.54, 3.6, bz + 0.008, bz + 0.056, poleCol, 1.0, 9);
+                    emitDynBox(fx + fCos * (poleLen * 0.75), fy + fSin * (poleLen * 0.75), fCos, fSin, 0, 0, poleLen * 0.52, 2.8, bz + 0.008, bz + 0.048, poleCol, 1.0, 9);
+                    if (isDeco) {
+                        const decoCol = (i % 2 === 0) ? [0.16, 0.44, 0.48] : [0.48, 0.18, 0.38];
+                        emitDynBox(fx + fCos * (poleLen * 0.62), fy + fSin * (poleLen * 0.62), fCos, fSin, 0, 0, 5.2, 3.4, bz + 0.010, bz + 0.054, decoCol, 1.0, 9);
+                    }
+                    // 3. Cantilever mast arm + diagonal gusset + cobra-head luminaire hood & dark shattered lens at the pole tip
+                    const armLen = Math.max(12, Math.hypot((sl.headX || sl.baseX) - sl.baseX, (sl.headY || sl.baseY) - sl.baseY) + 3.0);
+                    const dotFA = fCos * origArmCos + fSin * origArmSin;
+                    let aCos = origArmCos;
+                    let aSin = origArmSin;
+                    if (Math.abs(dotFA) > 0.75) {
+                        const crossSign = (fCos * origArmSin - fSin * origArmCos) >= 0 ? 1 : -1;
+                        const bentAng = fAng + crossSign * 0.85;
+                        aCos = Math.cos(bentAng);
+                        aSin = Math.sin(bentAng);
+                    }
+                    const headX = topX + aCos * (armLen - 2.0);
+                    const headY = topY + aSin * (armLen - 2.0);
+                    emitDynBox(topX + aCos * 4.2 - fCos * 2.2, topY + aSin * 4.2 - fSin * 2.2, aCos, aSin, 0, 0, 8.5, 1.8, bz + 0.010, bz + 0.042, baseCol, 1.0, 9);
+                    emitDynBox((topX + headX) * 0.5, (topY + headY) * 0.5, aCos, aSin, 0, 0, armLen, 2.4, bz + 0.010, bz + 0.046, poleCol, 1.0, 9);
+                    emitDynBox(headX, headY, aCos, aSin, 0, 0, 11.2, 6.4, bz + 0.010, bz + 0.056, hoodCol, 1.0, 9);
+                    emitDynBox(headX, headY, aCos, aSin, 0.5, 0, 8.2, 4.6, bz + 0.050, bz + 0.062, [0.42, 0.44, 0.40], 1.0, 9);
                     continue;
                 }
 
@@ -13524,26 +13559,71 @@ class WorldObjectEngine {
                 const ts = this.map.trafficSignals[i];
                 if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
                 const bz = ts.z || 2.0;
-                const poleCol = [0.44, 0.49, 0.57];
-                const baseCol = [0.28, 0.32, 0.38];
-                const ywCol = [0.96, 0.75, 0.12];
-                const blkCol = [0.10, 0.12, 0.16];
+                const blkPole = [0.07, 0.08, 0.10];
+                const reach = ts.armReach || 40.0;
+                const heads = ts.heads || [{ x: ts.headX, y: ts.headY }];
+                const origArmCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle || 0);
+                const origArmSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle || 0);
 
-                // State 2: Knocked-down / Uprooted 3D Traffic Signal Gantry lying flat on the street ("défoncé")
+                // State 2: Knocked-down / Uprooted 3D Mast-Arm Traffic Signal Gantry lying flat on the street
+                //          Uses the EXACT same 3D black steel mast pole, truss arm & multi-head 3-lens housings as the intact model!
                 if (ts.state === 2) {
-                    const fx = ts.fallenX ?? ts.baseX;
-                    const fy = ts.fallenY ?? ts.baseY;
-                    const fAng = ts.fallAngle || 0;
+                    const fx = ts.fallenX ?? (ts.baseX + origArmCos * 5.0);
+                    const fy = ts.fallenY ?? (ts.baseY + origArmSin * 5.0);
+                    const fAng = ts.fallAngle !== undefined ? ts.fallAngle : Math.atan2(origArmSin, origArmCos);
                     const fCos = Math.cos(fAng);
                     const fSin = Math.sin(fAng);
-                    // Sheared cast-steel corner foundation flange
-                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.2, 4.4, bz, bz + 0.045, 8, [0.22, 0.25, 0.30], 9, true);
-                    // Toppled 3D heavy gantry mast pole lying on the street
-                    emitDynBox(fx, fy, fCos, fSin, 0, 0, 40.0, 3.8, bz, bz + 0.055, poleCol, 1.0, 9);
-                    // Bent cantilever mast arm + smashed Florida Highway-Yellow 3-lens signal box
-                    emitDynBox(fx, fy, fCos, fSin, 16.0, 5.0, 22.0, 3.2, bz, bz + 0.05, poleCol, 1.0, 9);
-                    emitDynBox(fx, fy, fCos, fSin, 20.0, 8.5, 24.0, 10.6, bz, bz + 0.075, ywCol, 1.0, 9);
-                    emitDynBox(fx, fy, fCos, fSin, 20.0, 8.5, 20.8, 7.8, bz + 0.05, bz + 0.082, blkCol, 1.0, 9);
+
+                    // 1. Sheared black steel octagonal corner foundation stump + fractured inner steel pipe core
+                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.4, 4.6, bz, bz + 0.055, 8, blkPole, 9, true);
+                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 2.8, 2.4, bz + 0.055, bz + 0.082, 8, [0.24, 0.27, 0.33], 9, true);
+
+                    // 2. Toppled 3D tapered black steel mast pole shaft (28px long = exact 0.70-block vertical mast height)
+                    const poleLen = 28.0;
+                    const topX = fx + fCos * poleLen;
+                    const topY = fy + fSin * poleLen;
+                    emitDynBox(fx + fCos * (poleLen * 0.26), fy + fSin * (poleLen * 0.26), fCos, fSin, 0, 0, poleLen * 0.54, 4.2, bz + 0.008, bz + 0.064, blkPole, 1.0, 9);
+                    emitDynBox(fx + fCos * (poleLen * 0.75), fy + fSin * (poleLen * 0.75), fCos, fSin, 0, 0, poleLen * 0.52, 3.1, bz + 0.008, bz + 0.052, blkPole, 1.0, 9);
+
+                    // 3. Fallen horizontal mast arm & upper truss rail extending from the pole tip (topX, topY)
+                    //    Preserve the L-shaped gantry geometry on the ground even if knocked along the arm axis
+                    const dotFA = fCos * origArmCos + fSin * origArmSin;
+                    let aCos = origArmCos;
+                    let aSin = origArmSin;
+                    if (Math.abs(dotFA) > 0.72) {
+                        const crossSign = (fCos * origArmSin - fSin * origArmCos) >= 0 ? 1 : -1;
+                        const bentAng = fAng + crossSign * 1.34;
+                        aCos = Math.cos(bentAng);
+                        aSin = Math.sin(bentAng);
+                    }
+                    const armMidX = topX + aCos * (reach * 0.5);
+                    const armMidY = topY + aSin * (reach * 0.5);
+                    // Main mast arm tube + upper truss rail (lying sideways beside the main arm) + corner gusset bracket
+                    emitDynBox(armMidX, armMidY, aCos, aSin, 0, 0, reach, 2.8, bz + 0.010, bz + 0.050, blkPole, 1.0, 9);
+                    emitDynBox(armMidX + fCos * 2.3, armMidY + fSin * 2.3, aCos, aSin, 0, 0, reach * 0.92, 1.4, bz + 0.012, bz + 0.040, blkPole, 1.0, 9);
+                    emitDynBox(topX + aCos * 7.0 - fCos * 2.6, topY + aSin * 7.0 - fSin * 2.6, aCos, aSin, 0, 0, 13.0, 2.0, bz + 0.010, bz + 0.044, blkPole, 1.0, 9);
+
+                    // 4. Fallen 3-lens black signal heads (1 or 2 heads matching ts.heads) with dark backplates & shattered Red/Amber/Green lenses
+                    const darkLenses = [[0.34, 0.06, 0.08], [0.34, 0.22, 0.05], [0.05, 0.30, 0.14]];
+                    for (let hi = 0; hi < heads.length; hi++) {
+                        const rawDist = Math.hypot((heads[hi].x - ts.baseX), (heads[hi].y - ts.baseY));
+                        const dArm = rawDist > 8.0 ? Math.min(reach - 3.0, rawDist) : (reach * (hi === 0 ? 0.56 : 0.88));
+                        const mountX = topX + aCos * dArm;
+                        const mountY = topY + aSin * dArm;
+                        const hx = mountX - fCos * 4.8;
+                        const hy = mountY - fSin * 4.8;
+                        // Hanger stem + black backplate + black 3-lens housing lying flat on the pavement
+                        emitDynBox(mountX - fCos * 1.4, mountY - fSin * 1.4, fCos, fSin, 0, 0, 2.8, 1.8, bz + 0.012, bz + 0.042, blkPole, 1.0, 9);
+                        emitDynBox(hx, hy, fCos, fSin, 0, 0, 13.4, 8.0, bz + 0.008, bz + 0.028, [0.04, 0.05, 0.06], 1.0, 9);
+                        emitDynBox(hx, hy, fCos, fSin, 0, 0, 11.6, 5.8, bz + 0.020, bz + 0.062, blkPole, 1.0, 9);
+                        // 3 dark/shattered signal lenses (Red / Amber / Green) along the fallen housing
+                        const lensOffsets = [3.4, 0.0, -3.4];
+                        for (let li = 0; li < 3; li++) {
+                            const lx = hx + fCos * lensOffsets[li];
+                            const ly = hy + fSin * lensOffsets[li];
+                            emitDynBox(lx, ly, fCos, fSin, 0, 0, 2.9, 3.8, bz + 0.056, bz + 0.070, darkLenses[li], 1.0, 9);
+                        }
+                    }
                     continue;
                 }
 
@@ -13553,12 +13633,9 @@ class WorldObjectEngine {
                 const zDrop = isDamaged ? 0.065 : 0.0;
                 const topPoleX = ts.baseX + tDx;
                 const topPoleY = ts.baseY + tDy;
-                const armCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle);
-                const armSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle);
-                const reach = ts.armReach || 40.0;
-                const heads = ts.heads || [{ x: ts.headX, y: ts.headY }];
+                const armCos = origArmCos;
+                const armSin = origArmSin;
                 const st = ts.axis === "NS" ? nsState : ewState;
-                const blkPole = [0.07, 0.08, 0.10];
                 const armZ = bz + 0.80 - zDrop;
 
                 // 1. Black steel octagonal foundation + tall tapered mast pole (like real 2-lane mast-arm signals)
