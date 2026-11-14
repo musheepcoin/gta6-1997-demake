@@ -645,12 +645,12 @@ const VEHICLE_SPECS = {
         grip: 0.90,
         driftGrip: 0.96,
         maxHp: 440,
-        color: "#0b3d2c",
+        color: "#0f172a",
         secondaryColor: "#f8fafc",
-        stripeColor: "#eab308",
+        stripeColor: "#0d9488",
         bodyStyle: "CRUISER",
         isPolice: true,
-        useBaseOnly: true,
+        useBaseOnly: false,
         amphibious: false
     },
     SWAT_ENFORCER: {
@@ -908,9 +908,34 @@ class Vehicle {
             idHash = (idHash * 31 + idStr.charCodeAt(i)) | 0;
         }
         const paletteSlot = Math.abs(idHash) % 6;
-        this.remapIdx = (this.useBaseOnly || this.isPolice || this.isEmergency || this.isTank || this.amphibious)
-            ? -1
-            : (paletteSlot === 5 ? -1 : paletteSlot);
+        if (specKey === "VCPD_CRUISER") {
+            this.remapIdx = Math.abs(idHash) % 5;
+            const vcpdFleetNames = [
+                "VCPD PANDA INTERCEPTOR",
+                "VICE-DADE CHARGER PURSUIT",
+                "VICE-DADE TAURUS INTERCEPTOR",
+                "VICE-DADE POLICE SUV",
+                "VCPD UNMARKED STANIER"
+            ];
+            const vcpdFleetColors = [
+                { c: "#0f172a", s: "#f8fafc", st: "#0d9488" },
+                { c: "#0f766e", s: "#f8fafc", st: "#eab308" },
+                { c: "#f8fafc", s: "#10b981", st: "#eab308" },
+                { c: "#0f766e", s: "#f8fafc", st: "#eab308" },
+                { c: "#0f172a", s: "#1e293b", st: "#64748b" }
+            ];
+            this.name = vcpdFleetNames[this.remapIdx] || this.name;
+            const fc = vcpdFleetColors[this.remapIdx];
+            if (fc) {
+                this.color = fc.c;
+                this.secondaryColor = fc.s;
+                this.stripeColor = fc.st;
+            }
+        } else {
+            this.remapIdx = (this.useBaseOnly || this.isPolice || this.isEmergency || this.isTank || this.amphibious)
+                ? -1
+                : (paletteSlot === 5 ? -1 : paletteSlot);
+        }
         // The armored cash van shares sprite 76 with the SWAT van: never show the blue/white police base livery on it
         if (specKey === "BRINKS_TRUCK") this.remapIdx = 1;
 
