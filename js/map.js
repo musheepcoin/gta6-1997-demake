@@ -5890,6 +5890,14 @@ class LeonidaMap {
     isTileBlockedForPed(nx, ny, zBlocks = 2.0, vehicles = null) {
         const cx = (nx + 0.5) * TILE_SIZE;
         const cy = (ny + 0.5) * TILE_SIZE;
+        // Swimming pools are never walkable: a tile that any part of a pool overlaps is closed to pedestrians
+        if (this.isSwimmingPoolAt(cx, cy) ||
+            this.isSwimmingPoolAt(cx - 24, cy - 24) || this.isSwimmingPoolAt(cx + 24, cy - 24) ||
+            this.isSwimmingPoolAt(cx - 24, cy + 24) || this.isSwimmingPoolAt(cx + 24, cy + 24) ||
+            this.isSwimmingPoolAt(cx - 26, cy) || this.isSwimmingPoolAt(cx + 26, cy) ||
+            this.isSwimmingPoolAt(cx, cy - 26) || this.isSwimmingPoolAt(cx, cy + 26)) {
+            return true;
+        }
         if (this.resolveCircleBuildingCollision(cx, cy, 13, zBlocks).hit) {
             const westBlocked = this.resolveCircleBuildingCollision(cx - 19, cy, 9, zBlocks).hit;
             const eastBlocked = this.resolveCircleBuildingCollision(cx + 19, cy, 9, zBlocks).hit;
@@ -6606,8 +6614,14 @@ class LeonidaMap {
 
     isSwimmingPoolAt(px, py) {
         if (this.objectEngine && Array.isArray(this.objectEngine.instances)) {
-            for (let i = 0; i < this.objectEngine.instances.length; i++) {
-                const inst = this.objectEngine.instances[i];
+            // Cache the (few) villa instances that own a pool: this is queried per pedestrian per frame
+            if (!this._poolInstCache || this._poolInstCacheLen !== this.objectEngine.instances.length) {
+                this._poolInstCache = this.objectEngine.instances.filter((q) => q && q.pool);
+                this._poolInstCacheLen = this.objectEngine.instances.length;
+            }
+            const poolInsts = this._poolInstCache;
+            for (let i = 0; i < poolInsts.length; i++) {
+                const inst = poolInsts[i];
                 if (!inst || !inst.pool) continue;
                 const dx = px - inst.x;
                 const dy = py - inst.y;

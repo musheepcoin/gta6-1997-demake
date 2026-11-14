@@ -14629,6 +14629,30 @@ class LeonidaGame {
 
 
 
+            // Pedestrians never wade through a villa swimming pool: step out to the nearest dry deck tile
+            if (!ped.dead && !ped.isLivingProp && !ped.missionTag && ped.kind !== "GATOR" && typeof this.map.isSwimmingPoolAt === "function" && this.map.isSwimmingPoolAt(ped.x, ped.y)) {
+                let escaped = false;
+                for (let rr = 8; rr <= 110 && !escaped; rr += 6) {
+                    for (let kk = 0; kk < 12; kk++) {
+                        const ca = (kk / 12) * Math.PI * 2;
+                        const cx2 = ped.x + Math.cos(ca) * rr;
+                        const cy2 = ped.y + Math.sin(ca) * rr;
+                        if (this.map.isSwimmingPoolAt(cx2, cy2)) continue;
+                        if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(cx2, cy2)) continue;
+                        const nb2 = this.map.getNavigationBlock(Math.floor(cx2 / TILE_SIZE), Math.floor(cy2 / TILE_SIZE), ped.z || 2.0);
+                        if (!nb2 || (nb2.groundType !== GROUND_TYPE.PAWEMENT && nb2.groundType !== GROUND_TYPE.FIELD)) continue;
+                        if (this.map.resolveCircleBuildingCollision(cx2, cy2, 8, ped.z || 2.0).hit) continue;
+                        ped.x = cx2;
+                        ped.y = cy2;
+                        escaped = true;
+                        break;
+                    }
+                }
+                ped.targetBx = null;
+                ped.targetBy = null;
+                if (ped._navPath) ped._navPath = null;
+            }
+
             if (ped.kind !== "GATOR" && this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) {
 
                 ped.x = prevX;
