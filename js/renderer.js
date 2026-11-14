@@ -9937,37 +9937,29 @@ class RetroRenderer {
                     // Hose bed / discharge at the rear-right of the engine body
                     const hx0 = ft.x - fcos * ((ft.w || 66) * 0.5) - fsin * 5;
                     const hy0 = ft.y - fsin * ((ft.w || 66) * 0.5) + fcos * 5;
-                    const ddx = ped.x - hx0, ddy = ped.y - hy0;
-                    const dFt = Math.hypot(ddx, ddy);
-                    if (dFt > 20 && dFt < HOSE_LEN_PX + 160) {
-                        const ux = ddx / dFt, uy = ddy / dFt;
-                        const px0 = -uy, py0 = ux;
-                        // Slack: the hose lies in a gentle curve whose bow shrinks as the line is pulled taut
-                        const slack = Math.max(0, HOSE_LEN_PX - dFt);
-                        const amp = Math.min(34, 0.42 * Math.sqrt(dFt * slack * 0.08)) * (((ped.animSeed || 0) * 1000 | 0) % 2 === 0 ? 1 : -1);
-                        const segs = Math.max(6, Math.ceil(dFt / 42));
-                        let prevX = hx0, prevY = hy0;
+                    const trail = (ped._hoseTrail && ped._hoseTrail.truck === ft) ? ped._hoseTrail : null;
+                    // Polyline = hose bed -> every point the firefighter walked -> his hands (falls back to a straight run)
+                    const pts = trail ? trail.concat([{ x: ped.x, y: ped.y }]) : [{ x: hx0, y: hy0 }, { x: ped.x, y: ped.y }];
+                    let total = 0;
+                    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+                    if (total > 20 && total < HOSE_LEN_PX + 200) {
                         let acc = 0;
                         let nextCoupling = SECTION_PX;
-                        for (let si = 1; si <= segs; si++) {
-                            const tt = si / segs;
-                            const bow = Math.sin(tt * Math.PI) * amp;
-                            const cx = hx0 + ddx * tt + px0 * bow;
-                            const cy = hy0 + ddy * tt + py0 * bow;
-                            const sl = Math.hypot(cx - prevX, cy - prevY);
-                            if (sl > 0.01) {
-                                const sAng = Math.atan2(cy - prevY, cx - prevX);
-                                this.pushSolidQuad3D((prevX + cx) * 0.5, (prevY + cy) * 0.5, pz - 0.015, sl + 1.2, 2.6, sAng, 0.92, 0.78, 0.16, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                                // Dark canvas edge so the line reads against pale concrete
-                                this.pushSolidQuad3D((prevX + cx) * 0.5, (prevY + cy) * 0.5, pz - 0.0155, sl + 1.2, 3.6, sAng, 0.38, 0.30, 0.08, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                                acc += sl;
-                                while (acc >= nextCoupling) {
-                                    // Brass Storz coupling every 50 ft
-                                    this.pushSolidQuad3D(cx, cy, pz - 0.013, 4.6, 4.2, sAng, 0.82, 0.62, 0.14, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                                    nextCoupling += SECTION_PX;
-                                }
+                        for (let i = 1; i < pts.length; i++) {
+                            const sx = pts[i - 1].x, sy = pts[i - 1].y, ex = pts[i].x, ey = pts[i].y;
+                            const sl = Math.hypot(ex - sx, ey - sy);
+                            if (sl < 0.05) continue;
+                            const sAng = Math.atan2(ey - sy, ex - sx);
+                            this.pushSolidQuad3D((sx + ex) * 0.5, (sy + ey) * 0.5, pz - 0.015, sl + 1.4, 2.6, sAng, 0.92, 0.78, 0.16, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                            this.pushSolidQuad3D((sx + ex) * 0.5, (sy + ey) * 0.5, pz - 0.0155, sl + 1.4, 3.6, sAng, 0.38, 0.30, 0.08, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                            acc += sl;
+                            while (acc >= nextCoupling) {
+                                // Brass Storz coupling every 50 ft
+                                const back = acc - nextCoupling;
+                                const cpx = ex - Math.cos(sAng) * back, cpy = ey - Math.sin(sAng) * back;
+                                this.pushSolidQuad3D(cpx, cpy, pz - 0.013, 4.6, 4.2, sAng, 0.82, 0.62, 0.14, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                                nextCoupling += SECTION_PX;
                             }
-                            prevX = cx; prevY = cy;
                         }
                     }
                 }

@@ -471,5 +471,103 @@ const PedNav = (function () {
         return good;
     }
 
-    return { nextStep, stats, getNav, isGoodSpawnTile };
+    // Free-roaming route (firefighters, paramedics...): A* over every non-building / non-water tile so the walker goes AROUND
+    // buildings instead of grinding against them. Returns a pixel waypoint to steer to, or null (= use direct steering).
+    function routeWaypoint(game, ped, tx, ty) {
+        const map = game.map;
+        if (!map || !map.getNavigationBlock) return null;
+        const z = ped.z !== undefined ? ped.z : 2.0;
+        const now = game.trafficLightTimer || 0;
+        const sx = Math.floor(ped.x / TILE_SIZE), sy = Math.floor(ped.y / TILE_SIZE);
+        const gx = Math.floor(tx / TILE_SIZE), gy = Math.floor(ty / TILE_SIZE);
+        let rt = ped._route;
+        const stale = !rt || now - rt.t > 1.8 || Math.hypot(rt.tx - tx, rt.ty - ty) > 70 || rt.idx >= rt.pts.length;
+        if (stale) {
+            const ok = (x, y) => {
+                if (x < 2 || y < 2 || x >= MAP_COLS - 2 || y >= MAP_ROWS - 2) return false;
+                const nb = map.getNavigationBlock(x, y, z);
+                if (!nb) return false;
+                if (nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) return false;
+                if (map.isTileBlockedForPed && map.isTileBlockedForPed(x, y, z, null)) return false;
+                return true;
+            };
+            const isBld = (bx, by) => {
+                if (bx < 0 || by < 0 || bx >= MAP_COLS || by >= MAP_ROWS) return true;
+                const nb = map.getNavigationBlock(bx, by, z);
+                return !nb || nb.groundType === GROUND_TYPE.BUILDING;
+            };
+            const bldPenalty = (bx, by) => {
+                let p = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if ((dx || dy) && isBld(bx + dx, by + dy)) {
+                            p = Math.max(p, (dx === 0 || dy === 0) ? 0.65 : 0.32);
+                        }
+                    }
+                }
+                return p;
+            };
+            const startKey = sy * MAP_COLS + sx, goalKey = gy * MAP_COLS + gx;
+            const g = new Map([[startKey, 0]]);
+            const parent = new Map();
+            const open = [[Math.abs(gx - sx) + Math.abs(gy - sy), startKey]];
+            let found = -1, expanded = 0;
+            while (open.length && expanded < 6000) {
+                // tiny binary-less min search: open list stays small for these distances
+                let bi = 0;
+                for (let i = 1; i < open.length; i++) if (open[i][0] < open[bi][0]) bi = i;
+                const [, key] = open.splice(bi, 1)[0];
+                expanded++;
+                const x = key % MAP_COLS, y = (key / MAP_COLS) | 0;
+                if (Math.abs(x - gx) + Math.abs(y - gy) <= 1) { found = key; break; }
+                const gc = g.get(key);
+                for (let ci = 0; ci < 4; ci++) {
+                    const nx = x + CARD[ci].dx, ny = y + CARD[ci].dy;
+                    const nk = ny * MAP_COLS + nx;
+                    const nc = gc + 1 + bldPenalty(nx, ny);
+                    if (nc > 110) continue;
+                    const og = g.get(nk);
+                    if (og !== undefined && og <= nc) continue;
+                    if (!ok(nx, ny)) continue;
+                    g.set(nk, nc);
+                    parent.set(nk, key);
+                    open.push([nc + Math.abs(gx - nx) + Math.abs(gy - ny), nk]);
+                }
+            }
+            const pts = [];
+            if (found >= 0) {
+                let k = found;
+                let guard = 0;
+                while (k !== undefined && k !== startKey && guard++ < 400) {
+                    const tx0 = k % MAP_COLS, ty0 = (k / MAP_COLS) | 0;
+                    // Push waypoint toward the outer (curb) side of the sidewalk, away from adjacent/diagonal building walls
+                    let ox = 0, oy = 0;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            if ((dx || dy) && isBld(tx0 + dx, ty0 + dy)) {
+                                ox -= dx;
+                                oy -= dy;
+                            }
+                        }
+                    }
+                    const olen = Math.hypot(ox, oy);
+                    const shift = olen > 0 ? 18 / olen : 0;
+                    pts.push({
+                        x: (tx0 + 0.5) * TILE_SIZE + ox * shift,
+                        y: (ty0 + 0.5) * TILE_SIZE + oy * shift
+                    });
+                    k = parent.get(k);
+                }
+                pts.reverse();
+            }
+            rt = { pts, idx: 0, t: now, tx, ty };
+            ped._route = rt;
+        }
+        if (!rt.pts.length) return null;
+        // Advance past reached waypoints strictly in order (no corner-cutting across building walls/awnings!)
+        while (rt.idx < rt.pts.length - 1 && Math.hypot(rt.pts[rt.idx].x - ped.x, rt.pts[rt.idx].y - ped.y) < 14) rt.idx++;
+        return rt.pts[rt.idx];
+    }
+
+    return { nextStep, stats, getNav, isGoodSpawnTile, routeWaypoint };
 })();

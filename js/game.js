@@ -6561,11 +6561,26 @@ class LeonidaGame {
 
         const sideSign = (toFireX * rightX + toFireY * rightY) >= 0 ? 1 : -1;
 
-        const doorX = fireTruck.x + rightX * sideSign * 26;
+        let doorX = fireTruck.x + rightX * sideSign * 26;
 
-        const doorY = fireTruck.y + rightY * sideSign * 26;
+        let doorY = fireTruck.y + rightY * sideSign * 26;
 
         const vz = fireTruck.z !== undefined ? fireTruck.z : 2.0;
+
+        if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+            if (this.map.resolveCircleBuildingCollision(doorX, doorY, 10, vz).hit) {
+                const altX = fireTruck.x - rightX * sideSign * 26;
+                const altY = fireTruck.y - rightY * sideSign * 26;
+                if (!this.map.resolveCircleBuildingCollision(altX, altY, 10, vz).hit) {
+                    doorX = altX;
+                    doorY = altY;
+                } else {
+                    const c = this.map.resolveCircleBuildingCollision(doorX, doorY, 10, vz);
+                    doorX = c.x;
+                    doorY = c.y;
+                }
+            }
+        }
 
 
 
@@ -13323,7 +13338,8 @@ class LeonidaGame {
 
                         } else {
 
-                            ped.angle = this.steerPedWithObstacleFeelers(ped, targetCorpse.x, targetCorpse.y);
+                            const mdWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function") ? PedNav.routeWaypoint(this, ped, targetCorpse.x, targetCorpse.y) : null;
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, mdWp ? mdWp.x : targetCorpse.x, mdWp ? mdWp.y : targetCorpse.y);
 
                         }
 
@@ -13414,7 +13430,8 @@ class LeonidaGame {
 
                     }
 
-                    ped.angle = this.steerPedWithObstacleFeelers(ped, amb.x, amb.y, amb);
+                    const mdBackWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function") ? PedNav.routeWaypoint(this, ped, amb.x, amb.y) : null;
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, mdBackWp ? mdBackWp.x : amb.x, mdBackWp ? mdBackWp.y : amb.y, amb);
 
                     ped.x += Math.cos(ped.angle) * 98 * dt;
 
@@ -13498,7 +13515,9 @@ class LeonidaGame {
 
                 if (targetFire && ped.firemanOutTimer < 30.0) {
 
-                    if (bestDist < 128) {
+                    const hasFireLOS = !this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, targetFire.x, targetFire.y, ped.z || 2.0).hit;
+
+                    if (bestDist < 128 && hasFireLOS) {
 
                         ped.angle = Math.atan2(targetFire.y - ped.y, targetFire.x - ped.x);
 
@@ -13646,7 +13665,8 @@ class LeonidaGame {
 
                         } else {
 
-                            ped.angle = this.steerPedWithObstacleFeelers(ped, targetFire.x, targetFire.y, isPedTarget ? null : targetFire);
+                            const fmWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function") ? PedNav.routeWaypoint(this, ped, targetFire.x, targetFire.y) : null;
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, fmWp ? fmWp.x : targetFire.x, fmWp ? fmWp.y : targetFire.y, isPedTarget ? null : targetFire);
 
                         }
 
@@ -13708,7 +13728,8 @@ class LeonidaGame {
 
                     }
 
-                    ped.angle = this.steerPedWithObstacleFeelers(ped, ft.x, ft.y, ft);
+                    const fmBackWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function") ? PedNav.routeWaypoint(this, ped, ft.x, ft.y) : null;
+                    ped.angle = this.steerPedWithObstacleFeelers(ped, fmBackWp ? fmBackWp.x : ft.x, fmBackWp ? fmBackWp.y : ft.y, ft);
 
                     ped.x += Math.cos(ped.angle) * 98 * dt;
 
@@ -13716,13 +13737,54 @@ class LeonidaGame {
 
                 }
 
-                // Hose tether: 200 ft (~780 px) of attack line - the firefighter can never be pulled beyond its length
+                // Resolve building collision before recording the hose trail so hose vertices always stay clear of walls/corners
+                const fmBldCol = this.map.resolveCircleBuildingCollision(ped.x, ped.y, 10, ped.z || 2.0);
+                if (fmBldCol.hit) {
+                    ped.x = fmBldCol.x;
+                    ped.y = fmBldCol.y;
+                }
+
+                // The attack line lies on the ground exactly where the firefighter WALKED (it can never cut through a building),
+                // is reeled back in when he retraces his steps, and is limited to 200 ft (~780 px) of hose.
                 {
-                    const tdx = ped.x - ft.x, tdy = ped.y - ft.y;
-                    const tdist = Math.hypot(tdx, tdy);
-                    if (tdist > 770) {
-                        ped.x = ft.x + (tdx / tdist) * 770;
-                        ped.y = ft.y + (tdy / tdist) * 770;
+                    const HOSE_MAX_PX = 770;
+                    const fcosT = Math.cos(ft.angle || 0), fsinT = Math.sin(ft.angle || 0);
+                    let bedX = ft.x - fcosT * ((ft.w || 66) * 0.5) - fsinT * 5;
+                    let bedY = ft.y - fsinT * ((ft.w || 66) * 0.5) + fcosT * 5;
+                    const bedCol = this.map.resolveCircleBuildingCollision(bedX, bedY, 8, ped.z || 2.0);
+                    if (bedCol.hit) {
+                        bedX = bedCol.x;
+                        bedY = bedCol.y;
+                    }
+                    let trail = ped._hoseTrail;
+                    if (!trail || trail.truck !== ft) {
+                        trail = [{ x: bedX, y: bedY }];
+                        trail.truck = ft;
+                        ped._hoseTrail = trail;
+                    }
+                    trail[0].x = bedX;
+                    trail[0].y = bedY;
+                    // Reel in: stepping back onto an earlier part of the hose retracts everything beyond it (only if unobstructed)
+                    for (let ti = trail.length - 3; ti >= Math.max(0, trail.length - 45); ti--) {
+                        if (Math.hypot(ped.x - trail[ti].x, ped.y - trail[ti].y) < 13 &&
+                            (!this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, trail[ti].x, trail[ti].y, ped.z || 2.0).hit)) {
+                            trail.length = ti + 1;
+                            break;
+                        }
+                    }
+                    const lastP = trail[trail.length - 1];
+                    if (Math.hypot(ped.x - lastP.x, ped.y - lastP.y) > 8) {
+                        // Length of hose already laid out (+ the new bit up to the firefighter)
+                        let laid = 0;
+                        for (let ti = 1; ti < trail.length; ti++) laid += Math.hypot(trail[ti].x - trail[ti - 1].x, trail[ti].y - trail[ti - 1].y);
+                        laid += Math.hypot(ped.x - lastP.x, ped.y - lastP.y);
+                        if (laid > HOSE_MAX_PX) {
+                            // Out of hose: he is pulled up short on the spot where the line ends
+                            ped.x = lastP.x;
+                            ped.y = lastP.y;
+                        } else {
+                            trail.push({ x: ped.x, y: ped.y });
+                        }
                     }
                 }
 
