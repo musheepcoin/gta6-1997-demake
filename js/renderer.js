@@ -4508,6 +4508,7 @@ class RetroRenderer {
                     if (Array.isArray(meta.sprites.vehicles)) {
                         const ve73 = meta.sprites.vehicles.find(ve => String(ve.spr_idx) === "73");
                         if (ve73) {
+                            ve73.base = [1442, 130, 52, 64]; // Default base = White & Green Vice-Dade Taurus Interceptor
                             ve73.remaps = [
                                 [1334, 130, 52, 64],
                                 [1388, 130, 52, 64],
@@ -9431,6 +9432,45 @@ class RetroRenderer {
                 this.pushSolidQuad3D(hx - cs * 14, hy - sn * 14, hz + 0.03, 4.2, 4.2, 0, strobeRed ? 1.0 : 0.18, strobeRed ? 0.16 : 0.65, strobeRed ? 0.20 : 1.0, 0.92, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
             }
         }
+        // 13C) 6-Star VCPD Police Pursuit Helicopter Orbiting / Circling Around the Player!
+        if (game && game.policeHeli) {
+            const ph = game.policeHeli;
+            const hx = ph.x;
+            const hy = ph.y;
+            if (hx >= minX - 320 && hx <= maxX + 320 && hy >= minY - 320 && hy <= maxY + 320) {
+                const hAng = ph.angle || 0;
+                const cs = Math.cos(hAng), sn = Math.sin(hAng);
+                const hz = ph.z || 3.25;
+                const sx = ph.searchX !== undefined ? ph.searchX : hx;
+                const sy = ph.searchY !== undefined ? ph.searchY : hy;
+                const gz = this.map && this.map.getHeightAtPixel ? this.map.getHeightAtPixel(sx, sy, 2.0) : 2.0;
+
+                // 1) Tactical Searchlight Ground Spot locked onto the player
+                if (!ph.departing) {
+                    this.batchObjectSprite3D("heli_searchlight", sx, sy, gz + 0.018, this.time * 0.8, 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.92, 1.0, 0.24);
+                }
+
+                // 2) Helicopter Ground Shadow
+                this.batchObjectSprite3D("heli_vice", hx + sunCos * 24, hy + sunSin * 24, 2.02, hAng, 1.22, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
+
+                // 3) Airborne VCPD Pursuit Helicopter + Fast-Spinning Rotor (#540..#547)
+                this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 1.26, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                const rotSpr = String(540 + (Math.floor(this.time * 28.0) % 8));
+                this.batchObjectSprite3D(rotSpr, hx + cs * 7.5, hy + sn * 7.5, hz + 0.05, hAng, 0.94, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+
+                // 4) Alternating Red & Blue VCPD Police Aviation Strobe Beacons (Nose + Tail)
+                const strobeFlip = Math.floor(this.time * 10.0) % 2 === 0;
+                this.pushSolidQuad3D(hx + cs * 14, hy + sn * 14, hz + 0.035, 4.6, 4.6, hAng, strobeFlip ? 1.0 : 0.12, strobeFlip ? 0.14 : 0.58, strobeFlip ? 0.18 : 1.0, 0.96, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.pushSolidQuad3D(hx - cs * 16, hy - sn * 16, hz + 0.035, 4.6, 4.6, hAng, strobeFlip ? 0.12 : 1.0, strobeFlip ? 0.58 : 0.14, strobeFlip ? 1.0 : 0.18, 0.96, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+
+                // 5) Door-Gunner Muzzle Flash when firing burst
+                if ((ph.muzzleTimer || 0) > 0 && this.gta1Meta.sprites.objects["234"]) {
+                    const sideX = hx - sn * 8.0;
+                    const sideY = hy + cs * 8.0;
+                    this.batchObjectSprite3D("234", sideX, sideY, hz - 0.02, hAng + Math.PI * 0.5, 0.65, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                }
+            }
+        }
         if (Array.isArray(this.map.seagullFlocks)) {
             const pRef = game && game.player;
             for (let fi = 0; fi < this.map.seagullFlocks.length; fi++) {
@@ -12519,6 +12559,66 @@ class RetroRenderer {
                     r: 14 * hScale,
                     col: strobeRed ? "rgba(255, 45, 80, 0.85)" : "rgba(45, 185, 255, 0.85)"
                 });
+            }
+        }
+        // 5B-2. 6-Star VCPD Pursuit Helicopter Volumetric Searchlight Cone & Red/Blue Aerial Strobe Flares!
+        if (game && game.policeHeli) {
+            const ph = game.policeHeli;
+            const hx = ph.x;
+            const hy = ph.y;
+            if (Math.abs(hx - this.camX) <= 1080 && Math.abs(hy - this.camY) <= 840) {
+                const hAng = ph.angle || 0;
+                const cs = Math.cos(hAng), sn = Math.sin(hAng);
+                const hz = ph.z || 3.25;
+                const beamX = ph.searchX !== undefined ? ph.searchX : hx;
+                const beamY = ph.searchY !== undefined ? ph.searchY : hy;
+                const gz = this.map && this.map.getHeightAtPixel ? this.map.getHeightAtPixel(beamX, beamY, 2.0) : 2.0;
+
+                const nSc = this.worldToScreen(hx + cs * 16.0, hy + sn * 16.0, hz - 0.04);
+                const bSc = this.worldToScreen(beamX, beamY, gz + 0.04);
+                const tSc = this.worldToScreen(hx - cs * 14.0, hy - sn * 14.0, hz + 0.03);
+                if (bSc.x >= -320 && bSc.x <= W + 320 && bSc.y >= -320 && bSc.y <= H + 320) {
+                    const hScale = (nSc.scale * H) / 128.0;
+                    const bScale = (bSc.scale * H) / 128.0;
+
+                    addLightPool(bSc.x, bSc.y, 118 * bScale, "rgba(225, 244, 255, 0.65)", "rgba(120, 195, 255, 0.28)");
+                    addLightPool(nSc.x, nSc.y, 58 * hScale, "rgba(215, 238, 255, 0.78)", "rgba(95, 145, 215, 0.30)");
+
+                    const coneDx = bSc.x - nSc.x;
+                    const coneDy = bSc.y - nSc.y;
+                    const coneAng = Math.atan2(coneDy, coneDx);
+                    const coneLen = Math.hypot(coneDx, coneDy) + 36 * bScale;
+                    addHeadlightCone(
+                        nSc.x,
+                        nSc.y,
+                        coneAng,
+                        coneLen,
+                        0.26,
+                        3.2 * hScale,
+                        "rgba(225, 244, 255, 0.72)",
+                        "rgba(135, 200, 255, 0.32)"
+                    );
+                    highResCones.push({
+                        x: nSc.x,
+                        y: nSc.y,
+                        angle: coneAng,
+                        len: coneLen * 0.96,
+                        spread: 0.24,
+                        baseHalfW: 3.0 * hScale,
+                        col0: "rgba(215, 242, 255, 0.16)",
+                        col1: "rgba(135, 205, 255, 0.05)"
+                    });
+
+                    highResFlares.push({ x: bSc.x, y: bSc.y, r: 34 * bScale, col: "rgba(195, 235, 255, 0.18)" });
+                    highResFlares.push({ x: nSc.x, y: nSc.y, r: 8.5 * hScale, col: "rgba(245, 252, 255, 0.92)" });
+                    const strobeRed = Math.floor(this.time * 10.0) % 2 === 0;
+                    highResFlares.push({
+                        x: tSc.x,
+                        y: tSc.y,
+                        r: 18 * hScale,
+                        col: strobeRed ? "rgba(255, 45, 80, 0.90)" : "rgba(45, 185, 255, 0.90)"
+                    });
+                }
             }
         }
         if (this.map && this.map.prisonCompound && Array.isArray(this.map.prisonCompound.towers)) {
@@ -15865,7 +15965,8 @@ class RetroRenderer {
                 let h = 0;
                 const s = String(v.id || "0");
                 for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-                rIdx = Math.abs(h) % 5;
+                const fleetRoll = Math.abs((h ^ Math.imul(Math.round(v.x || 0), 73856093) ^ Math.imul(Math.round(v.y || 0), 19349663))) % 100;
+                rIdx = fleetRoll < 36 ? 2 : (fleetRoll < 68 ? 1 : (fleetRoll < 86 ? 3 : (fleetRoll < 95 ? 0 : 4)));
             }
             return { sprId: "73", useBaseObject: false, remapIdx: rIdx, isConvertible: false, isTank: false };
         }
@@ -16290,6 +16391,16 @@ class RetroRenderer {
                 } else if (v.missionTag === "LANDMARK") {
                     ctx.fillStyle = "#ffd13b";
                     ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+                }
+            }
+            if (game.policeHeli) {
+                const hpt = worldToMini(game.policeHeli.x, game.policeHeli.y);
+                if (hpt.x >= mx && hpt.x <= mx + mw && hpt.y >= my && hpt.y <= my + mh) {
+                    ctx.fillStyle = copFlash ? "#38bdf8" : "#ef4444";
+                    ctx.fillRect(hpt.x - 3.5, hpt.y - 3.5, 7, 7);
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(hpt.x - 3.5, hpt.y - 3.5, 7, 7);
                 }
             }
         }

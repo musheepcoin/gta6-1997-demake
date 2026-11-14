@@ -9164,7 +9164,7 @@ class LeonidaGame {
 
                 const latOff = (i === 0 ? 1 : -1) * 10;
 
-                const copSpec = (i === 1 && Math.random() < 0.4) ? "SWAT_ENFORCER" : "VCPD_CRUISER";
+                const copSpec = (i === 1 && (this.wantedLevel || 0) >= 4 && Math.random() < 0.22) ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
                 const copCar = new Vehicle(
 
@@ -9266,7 +9266,7 @@ class LeonidaGame {
 
 
 
-            const copSpec = Math.random() < 0.38 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
+            const copSpec = ((this.wantedLevel || 0) >= 4 && Math.random() < 0.22) ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
             const copCar = new Vehicle(`amb_heist_copcar_${nowId}`, copSpec, x - fwdX * 190 - sideX * 10, y - fwdY * 190 - sideY * 10, roadAng - 0.22);
 
@@ -14959,6 +14959,8 @@ class LeonidaGame {
 
         let activeCopCars = 0;
 
+        let activeSwatCars = 0;
+
         let activeFootCopsNear = 0;
 
         for (const v of this.vehicles) {
@@ -14966,6 +14968,8 @@ class LeonidaGame {
             if (v.isPolice && !v.destroyed && v.driver === "AI_COP") {
 
                 activeCopCars++;
+
+                if (v.specKey === "SWAT_ENFORCER") activeSwatCars++;
 
                 const d = Math.hypot(v.x - p.x, v.y - p.y);
 
@@ -15063,7 +15067,9 @@ class LeonidaGame {
 
                             : toPlayerAng;
 
-                        const specKey = tWanted >= 4 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
+                        // SWAT only appears at >= 4*, and even then regular VCPD cruisers remain the majority (~78% regular police, max 1 active SWAT van)
+                        const useSwat = tWanted >= 4 && activeSwatCars < 1 && Math.random() < (tWanted >= 5 ? 0.25 : 0.20);
+                        const specKey = useSwat ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
                         const copCar = new Vehicle(`cop_${Date.now()}_${attempt}`, specKey, sx, sy, roadAng);
 
@@ -15107,7 +15113,8 @@ class LeonidaGame {
 
                 if (this.map.isRoadAtPixel(rbX, rbY) && !(this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(rbBx, rbBy))) {
 
-                    const rbSpec = tWanted >= 4 ? "SWAT_ENFORCER" : "VCPD_CRUISER";
+                    const rbIsSwat = tWanted >= 4 && activeSwatCars < 1 && Math.random() < 0.25;
+                    const rbSpec = rbIsSwat ? "SWAT_ENFORCER" : "VCPD_CRUISER";
 
                     const rbCar = new Vehicle(`rb_${Date.now()}`, rbSpec, rbX, rbY, (spawnTarget.angle || 0) + Math.PI * 0.5);
 
@@ -15131,17 +15138,17 @@ class LeonidaGame {
 
                             kind: "COP",
 
-                            g24Type: tWanted >= 4 ? "g2_swat" : "police",
+                            g24Type: rbIsSwat ? "g2_swat" : "police",
 
-                            isSwat: tWanted >= 4,
+                            isSwat: rbIsSwat,
 
-                            shirtColor: tWanted >= 4 ? "#1e293b" : "#1e3a8a",
+                            shirtColor: rbIsSwat ? "#1e293b" : "#1e3a8a",
 
                             hp: 115,
 
                             maxHp: 115,
 
-                            copWeapon: tWanted >= 4 ? "SHOTGUN" : "UZI",
+                            copWeapon: rbIsSwat ? "SHOTGUN" : "UZI",
 
                             dead: false,
 
@@ -15157,6 +15164,110 @@ class LeonidaGame {
 
             }
 
+            // 6-Star VCPD Police Pursuit Helicopter: actively follows the player and orbits / circles around them!
+            if (tWanted >= 6) {
+                const targetEnt = p.inVehicle || p;
+                if (!this.policeHeli) {
+                    const initAng = Math.random() * Math.PI * 2;
+                    this.policeHeli = {
+                        x: targetEnt.x + Math.cos(initAng) * 340,
+                        y: targetEnt.y + Math.sin(initAng) * 340,
+                        z: 3.25,
+                        cx: targetEnt.x,
+                        cy: targetEnt.y,
+                        orbitAngle: initAng,
+                        orbitRadius: 72,
+                        angle: initAng + Math.PI * 0.5,
+                        searchX: targetEnt.x,
+                        searchY: targetEnt.y,
+                        burstTimer: 2.0,
+                        burstShotsLeft: 0,
+                        burstShotDelay: 0,
+                        muzzleTimer: 0,
+                        departing: false
+                    };
+                    this.addFloatingText(targetEnt.x, targetEnt.y - 32, "🚁 VCPD CHOPPER IN PURSUIT!", "#38bdf8");
+                }
+                const heli = this.policeHeli;
+                heli.departing = false;
+                heli.cx += (targetEnt.x - heli.cx) * Math.min(1, dt * 4.5);
+                heli.cy += (targetEnt.y - heli.cy) * Math.min(1, dt * 4.5);
+                const orbitOmega = 1.22; // ~5.1s per full 360° circle around the player
+                heli.orbitAngle = (heli.orbitAngle || 0) + orbitOmega * dt;
+                const rad = (heli.orbitRadius || 72) + Math.sin(heli.orbitAngle * 2.0) * 6.0;
+                const desX = heli.cx + Math.cos(heli.orbitAngle) * rad;
+                const desY = heli.cy + Math.sin(heli.orbitAngle) * rad;
+                const dx = desX - heli.x;
+                const dy = desY - heli.y;
+                const distToSlot = Math.hypot(dx, dy);
+                const maxStep = 410 * dt;
+                let vx, vy;
+                if (distToSlot > maxStep) {
+                    vx = (dx / distToSlot) * 410;
+                    vy = (dy / distToSlot) * 410;
+                    heli.x += (dx / distToSlot) * maxStep;
+                    heli.y += (dy / distToSlot) * maxStep;
+                } else {
+                    heli.x = desX;
+                    heli.y = desY;
+                    vx = -Math.sin(heli.orbitAngle) * rad * orbitOmega + (targetEnt.vx || 0);
+                    vy = Math.cos(heli.orbitAngle) * rad * orbitOmega + (targetEnt.vy || 0);
+                }
+                const tangentAng = Math.atan2(vy, vx);
+                const toPlayerAng = Math.atan2(targetEnt.y - heli.y, targetEnt.x - heli.x);
+                const desiredAng = Math.atan2(
+                    Math.sin(tangentAng) * 0.76 + Math.sin(toPlayerAng) * 0.24,
+                    Math.cos(tangentAng) * 0.76 + Math.cos(toPlayerAng) * 0.24
+                );
+                let angDiff = desiredAng - (heli.angle || 0);
+                while (angDiff > Math.PI) angDiff -= Math.PI * 2;
+                while (angDiff < -Math.PI) angDiff += Math.PI * 2;
+                heli.angle = (heli.angle || 0) + angDiff * Math.min(1, dt * 8.0);
+                heli.z = 3.25 + Math.sin(performance.now() * 0.0045) * 0.05;
+                heli.searchX += (targetEnt.x - (heli.searchX ?? targetEnt.x)) * Math.min(1, dt * 10.0);
+                heli.searchY += (targetEnt.y - (heli.searchY ?? targetEnt.y)) * Math.min(1, dt * 10.0);
+
+                const dHeli = Math.hypot(targetEnt.x - heli.x, targetEnt.y - heli.y);
+                if (!this.activeInterior && dHeli < nearestCopDist) {
+                    nearestCopDist = dHeli;
+                }
+                if (!this.activeInterior && !p.dead && dHeli < 240) {
+                    heli.burstTimer = (heli.burstTimer || 0) - dt;
+                    if (heli.burstTimer <= 0 && (heli.burstShotsLeft || 0) <= 0) {
+                        heli.burstShotsLeft = 3;
+                        heli.burstShotDelay = 0;
+                        heli.burstTimer = 2.6 + Math.random() * 1.2;
+                    }
+                    if ((heli.burstShotsLeft || 0) > 0) {
+                        heli.burstShotDelay = (heli.burstShotDelay || 0) - dt;
+                        if (heli.burstShotDelay <= 0) {
+                            heli.burstShotsLeft--;
+                            heli.burstShotDelay = 0.14;
+                            heli.muzzleTimer = 0.09;
+                            const aimAng = Math.atan2(targetEnt.y - heli.y, targetEnt.x - heli.x) + (Math.random() - 0.5) * 0.18;
+                            this.fireWeapon(heli.x, heli.y, aimAng, "UZI", false, false, "COP");
+                        }
+                    }
+                }
+                if ((heli.muzzleTimer || 0) > 0) heli.muzzleTimer = Math.max(0, heli.muzzleTimer - dt);
+            } else if (this.policeHeli) {
+                const heli = this.policeHeli;
+                heli.departing = true;
+                heli.x += Math.cos(heli.angle || 0) * 320 * dt;
+                heli.y += Math.sin(heli.angle || 0) * 320 * dt;
+                if (Math.hypot(heli.x - p.x, heli.y - p.y) > 850) {
+                    this.policeHeli = null;
+                }
+            }
+
+        } else if (this.policeHeli) {
+            const heli = this.policeHeli;
+            heli.departing = true;
+            heli.x += Math.cos(heli.angle || 0) * 320 * dt;
+            heli.y += Math.sin(heli.angle || 0) * 320 * dt;
+            if (Math.hypot(heli.x - p.x, heli.y - p.y) > 850) {
+                this.policeHeli = null;
+            }
         }
 
 

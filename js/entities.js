@@ -909,7 +909,11 @@ class Vehicle {
         }
         const paletteSlot = Math.abs(idHash) % 6;
         if (specKey === "VCPD_CRUISER") {
-            this.remapIdx = Math.abs(idHash) % 5;
+            // Vice-Dade / VCPD Fleet Distribution:
+            // - 86% White & Green / Teal cruisers (the standard Leonida / Vice-Dade fleet: remaps 1, 2, 3)
+            // - 14% Rare Black cruisers (9% remap 0 Black & White Panda, 5% remap 4 All-Black Unmarked Slicktop)
+            const fleetRoll = Math.abs((idHash ^ Math.imul(Math.round(x || 0), 73856093) ^ Math.imul(Math.round(y || 0), 19349663))) % 100;
+            this.remapIdx = fleetRoll < 36 ? 2 : (fleetRoll < 68 ? 1 : (fleetRoll < 86 ? 3 : (fleetRoll < 95 ? 0 : 4)));
             const vcpdFleetNames = [
                 "VCPD PANDA INTERCEPTOR",
                 "VICE-DADE CHARGER PURSUIT",
