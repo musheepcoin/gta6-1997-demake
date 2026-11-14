@@ -4258,12 +4258,12 @@ class TrafficManager {
             return spec;
         };
 
-        // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Surfers & Bodybuilders
-        if ((isSand && bx >= 465) || (bx >= 465 && bx <= 484 && by >= 46 && by <= 375)) {
+        // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Shirtless Surfers & Bodybuilders
+        if (isSand || (bx >= 450 && bx <= 484 && by >= 46 && by <= 375)) {
             const beachPool = [
                 "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
-                "surfer_guy", "surfer_guy", "vc_bodybuilder", "vc_jogger", "vc_tourist",
-                "g2_civ_blueshorts", "g2_civ_yellowtee", "kid_beach", "kid_girl_pink"
+                "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
+                "vc_bodybuilder", "vc_jogger", "kid_beach", "kid_girl_pink"
             ];
             const gType = pickFrom(beachPool);
             const isChild = gType.startsWith("kid_");
@@ -4294,11 +4294,12 @@ class TrafficManager {
             });
         }
 
-        // 2. Lummus Park Ocean Drive Promenade (c = 448) & Winding Sand Trail / Walkovers (c = 449..464): Rollerbladers, Joggers & Beach Promenaders
-        if ((bx === 448 || (bx >= 449 && bx <= 464 && isSand)) && by >= 44 && by <= 362) {
+        // 2. Lummus Park Ocean Drive Promenade (c = 447..464): Rollerbladers, Shirtless Joggers & Bikini Promenaders
+        if (bx >= 447 && bx <= 464 && by >= 44 && by <= 362) {
             const skatePool = [
-                "vc_jogger", "bikini_cyan", "bikini_pink", "g2_civ_pink",
-                "g2_civ_aqua", "g2_civ_blueshorts", "vc_tourist", "kid_skater", "bikini_yellow", "surfer_guy"
+                "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
+                "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
+                "vc_jogger", "vc_bodybuilder", "kid_skater"
             ];
             const gType = pickFrom(skatePool);
             const isRollerblader = bx === 448 && ((r1 % 10) < 6 || gType === "kid_skater");
@@ -4317,10 +4318,11 @@ class TrafficManager {
         // 3. Ocean Drive, Lummus Curbside, South Beach & Española Way (bx = 408..450, by = 40..370)
         if (bx >= 408 && bx <= 450 && by >= 40 && by <= 370) {
             const oceanDrivePool = [
-                "vc_tourist", "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
-                "surfer_guy", "vc_jogger", "vc_bodybuilder", "vc_hawaiian_red", "vc_crockett", "vc_tubbs",
-                "vc_tommy", "g2_civ_aqua", "g2_civ_pink", "g2_civ_lilac", "g2_civ_yellowtee",
-                "g2_civ_redtee", "g2_civ_blueshorts", "g2_elvis", "kid_boy_cap", "kid_girl_pink"
+                "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
+                "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
+                "vc_jogger", "vc_bodybuilder", "vc_tourist", "g2_civ_blueshorts",
+                "g2_civ_yellowtee", "g2_civ_redtee", "vc_tommy", "vc_crockett",
+                "kid_beach", "kid_girl_pink"
             ];
             const gType = pickFrom(oceanDrivePool);
             const isRollerblader = (bx === 448 && (r1 % 6) === 0);
@@ -4489,9 +4491,9 @@ class TrafficManager {
             return { type: "SOLO", members: [single] };
         }
 
-        const isBeach = (isSand && bx >= 465) || (bx >= 465 && bx <= 484 && by >= 46 && by <= 375);
+        const isBeach = isSand || (bx >= 450 && bx <= 484 && by >= 46 && by <= 375);
         const isSpaceport = bx >= 415 && by <= 45;
-        const isBoardwalk = (bx === 448 || (bx >= 449 && bx <= 464 && isSand)) && by >= 44 && by <= 362;
+        const isBoardwalk = (bx >= 447 && bx <= 464) && by >= 44 && by <= 362;
         const isOceanDrive = bx >= 408 && bx <= 450 && by >= 40 && by <= 370;
         const isCuba = bx >= 255 && bx <= 325 && by >= 215 && by <= 292;
         const isWynwood = bx >= 165 && bx <= 265 && by >= 92 && by <= 212;
@@ -4540,21 +4542,21 @@ class TrafficManager {
             } else if (isBeach || isBoardwalk) {
                 pairs = [
                     ["surfer_guy", "bikini_pink"],
-                    ["vc_bodybuilder", "bikini_cyan"],
-                    ["surfer_guy", "bikini_yellow"],
-                    ["vc_tourist", "bikini_white"],
-                    ["vc_jogger", "bikini_red"],
-                    ["g2_civ_blueshorts", "bikini_pink"]
+                    ["beach_guy_red", "bikini_cyan"],
+                    ["beach_guy_yellow", "bikini_yellow"],
+                    ["beach_guy_lime", "bikini_white"],
+                    ["vc_bodybuilder", "bikini_red"],
+                    ["vc_jogger", "bikini_pink"]
                 ];
             } else if (isOceanDrive || isStarIsland) {
                 pairs = [
-                    ["vc_crockett", "bikini_pink"],
-                    ["vc_tommy", "bikini_white"],
-                    ["vc_tubbs", "g2_civ_pink"],
-                    ["vc_tourist", "bikini_cyan"],
-                    ["vc_hawaiian_red", "g2_civ_aqua"],
-                    ["surfer_guy", "bikini_yellow"],
-                    ["g2_civ_lilac", "g2_civ_yellowtee"]
+                    ["surfer_guy", "bikini_pink"],
+                    ["beach_guy_red", "bikini_white"],
+                    ["beach_guy_yellow", "bikini_cyan"],
+                    ["beach_guy_lime", "bikini_yellow"],
+                    ["vc_bodybuilder", "bikini_red"],
+                    ["vc_tourist", "bikini_pink"],
+                    ["vc_crockett", "bikini_cyan"]
                 ];
             } else if (isCuba) {
                 pairs = [
@@ -4625,8 +4627,8 @@ class TrafficManager {
         }
 
         if (formType === "FAMILY") {
-            const parentPool = (isBeach || isOceanDrive)
-                ? ["vc_tourist", "vc_hawaiian_red", "g2_civ_pink", "bikini_white"]
+            const parentPool = (isBeach || isBoardwalk || isOceanDrive)
+                ? ["surfer_guy", "beach_guy_red", "beach_guy_yellow", "bikini_pink", "bikini_cyan", "bikini_white"]
                 : (isCuba ? ["vc_cuban", "civ1"] : ["civ0", "civ1", "vc_tourist", "g2_civ_aqua"]);
             const childPool = isBeach
                 ? ["kid_beach", "kid_girl_pink"]
@@ -4679,11 +4681,12 @@ class TrafficManager {
 
         if (formType === "FRIEND_GROUP") {
             let trios;
-            if (isBeach || isBoardwalk) {
+            if (isBeach || isBoardwalk || isOceanDrive) {
                 trios = [
                     ["surfer_guy", "bikini_pink", "bikini_cyan"],
                     ["bikini_yellow", "bikini_pink", "bikini_white"],
-                    ["vc_bodybuilder", "surfer_guy", "bikini_red"]
+                    ["beach_guy_red", "beach_guy_yellow", "bikini_red"],
+                    ["vc_bodybuilder", "beach_guy_lime", "bikini_cyan"]
                 ];
             } else if (isCuba) {
                 trios = [

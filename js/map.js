@@ -1418,17 +1418,17 @@ class LeonidaMap {
         // 3A. Live Animated 3D Beach Volleyball Courts (placed on the open beach sand East of the Coastal Dunes, x = 467.5..470.5)
         this.beachVolleyballCourts = [
             { x: 468.0 * TILE_SIZE,        y: 88.5 * TILE_SIZE,         z: 2.0, p0: "bikini_pink",   p1: "bikini_yellow", p2: "bikini_cyan",  p3: "surfer_guy" },
-            { x: 467.5 * TILE_SIZE,        y: 152.5 * TILE_SIZE,        z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
-            { x: 468.5 * TILE_SIZE,        y: 206.5 * TILE_SIZE,        z: 2.0, p0: "bikini_cyan",   p1: "bikini_pink",   p2: "bikini_yellow",p3: "surfer_guy" },
+            { x: 467.5 * TILE_SIZE,        y: 152.5 * TILE_SIZE,        z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "beach_guy_red" },
+            { x: 468.5 * TILE_SIZE,        y: 206.5 * TILE_SIZE,        z: 2.0, p0: "bikini_cyan",   p1: "bikini_pink",   p2: "bikini_yellow",p3: "beach_guy_yellow" },
             { x: 470.5 * TILE_SIZE,        y: 234.5 * TILE_SIZE,        z: 2.0, p0: "bikini_pink",   p1: "bikini_yellow", p2: "surfer_guy",   p3: "bikini_cyan" },
-            { x: 469.5 * TILE_SIZE,        y: 264.5 * TILE_SIZE,        z: 2.0, p0: "bikini_cyan",   p1: "bikini_red",    p2: "bikini_white", p3: "surfer_guy" },
-            { x: 468.5 * TILE_SIZE,        y: 294.5 * TILE_SIZE,        z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_cyan",  p3: "surfer_guy" },
+            { x: 469.5 * TILE_SIZE,        y: 264.5 * TILE_SIZE,        z: 2.0, p0: "bikini_cyan",   p1: "bikini_red",    p2: "bikini_white", p3: "beach_guy_lime" },
+            { x: 468.5 * TILE_SIZE,        y: 294.5 * TILE_SIZE,        z: 2.0, p0: "bikini_yellow", p1: "bikini_pink",   p2: "bikini_cyan",  p3: "beach_guy_red" },
             { x: 467.5 * TILE_SIZE,        y: 324.5 * TILE_SIZE,        z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "surfer_guy",   p3: "bikini_pink" },
             // West Coast Beach & Southern Keys Volleyball Courts
             { x: mx256(18.5) * TILE_SIZE,  y: my256(48.5) * TILE_SIZE,  z: 2.0, p0: "bikini_pink",   p1: "bikini_cyan",   p2: "bikini_yellow",p3: "surfer_guy" },
-            { x: mx256(15.5) * TILE_SIZE,  y: my256(96.5) * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "surfer_guy" },
-            { x: mx256(16.5) * TILE_SIZE,  y: my256(168.5) * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_yellow", p2: "bikini_red",   p3: "surfer_guy" },
-            { x: mx256(74.5) * TILE_SIZE,  y: my256(217.5) * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_white",  p2: "bikini_cyan",  p3: "surfer_guy" }
+            { x: mx256(15.5) * TILE_SIZE,  y: my256(96.5) * TILE_SIZE,  z: 2.0, p0: "bikini_red",    p1: "bikini_white",  p2: "bikini_pink",  p3: "beach_guy_red" },
+            { x: mx256(16.5) * TILE_SIZE,  y: my256(168.5) * TILE_SIZE, z: 2.0, p0: "bikini_cyan",   p1: "bikini_yellow", p2: "bikini_red",   p3: "beach_guy_yellow" },
+            { x: mx256(74.5) * TILE_SIZE,  y: my256(217.5) * TILE_SIZE, z: 2.0, p0: "bikini_pink",   p1: "bikini_white",  p2: "bikini_cyan",  p3: "beach_guy_lime" }
         ];
 
         // 3B. Beach Aerobics & Retro Boombox Dance Parties on the Open Sand East of the Coastal Dunes
@@ -1453,7 +1453,8 @@ class LeonidaMap {
         // with natural spacing so the golden sand beach looks realistic and uncluttered!
         this.beachSunbathers = [];
         const bikiniPool = ["bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white"];
-        const standFriendPool = ["surfer_guy", "bikini_pink", "vc_bodybuilder", "bikini_cyan", "vc_jogger", "bikini_yellow", "vc_tourist", "bikini_red"];
+        const surferPool = ["surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime"];
+        const standFriendPool = ["surfer_guy", "bikini_pink", "beach_guy_red", "bikini_cyan", "vc_bodybuilder", "bikini_yellow", "beach_guy_yellow", "bikini_red", "beach_guy_lime", "bikini_white"];
         const towelPool = ["beach_towel_pink", "beach_towel_cyan", "beach_towel_yellow", "beach_towel_coral", "beach_lounger"];
         const umbPool = ["umbrella_pink", "umbrella_cyan", "umbrella_yellow"];
         const sidePropPool = ["surfboard_pink", "surfboard_cyan", "surfboard_yellow", "beach_ball", "sandcastle", "beach_cooler"];
@@ -1473,7 +1474,7 @@ class LeonidaMap {
                 angle: ((i % 2) === 0 ? -0.10 : 0.14),
                 pedType: bikiniPool[(i + 2) % bikiniPool.length],
                 towelSpr: towelPool[(i + 4) % towelPool.length],
-                friendPedType: (i % 3 === 1) ? "surfer_guy" : bikiniPool[(i + 3) % bikiniPool.length],
+                friendPedType: (i % 2 === 1) ? surferPool[i % surferPool.length] : bikiniPool[(i + 3) % bikiniPool.length],
                 friendTowelSpr: towelPool[(i + 1) % towelPool.length],
                 standingFriendType: (i % 2 === 0) ? standFriendPool[(i + 4) % standFriendPool.length] : null,
                 umbSpr: umbPool[(i + 2) % umbPool.length],

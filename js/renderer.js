@@ -2064,17 +2064,21 @@ class RetroRenderer {
                 }
             }
 
-            // 2B. Synthesize 6 Top-Down Vice Beach Pedestrian Archetypes (5 Bikini Women + 1 Shirtless Surfer)
-            //     into the dedicated atlas band (y = origH + 4 .. origH + 165) and register in meta.sprites.peds!
+            // 2B. Synthesize 9 Top-Down Vice Beach Pedestrian Archetypes (5 Bikini Women + 4 Shirtless Men in Boardshorts)
+            //     into the dedicated atlas band (y = origH + 4 .. origH + 238) and register in meta.sprites.peds!
+            const beachCustomRectKeys = new Set();
             if (meta.sprites.peds && meta.sprites.peds.lucia) {
                 const srcLucia = meta.sprites.peds.lucia;
                 const beachArchetypes = [
-                    { key: "bikini_pink",   bik: [255, 42, 138],  hair: [252, 211, 38],  skin: [232, 162, 114], isSurfer: false },
-                    { key: "bikini_cyan",   bik: [6, 218, 246],   hair: [118, 56, 22],   skin: [222, 148, 100], isSurfer: false },
-                    { key: "bikini_yellow", bik: [250, 204, 21],  hair: [204, 42, 36],   skin: [238, 168, 122], isSurfer: false },
-                    { key: "bikini_red",    bik: [239, 52, 52],   hair: [28, 26, 36],    skin: [216, 140, 92],  isSurfer: false },
-                    { key: "bikini_white",  bik: [248, 250, 252], hair: [234, 179, 14],  skin: [206, 132, 84],  isSurfer: false },
-                    { key: "surfer_guy",    bik: [6, 192, 224],   hair: [218, 168, 72],  skin: [218, 142, 94],  isSurfer: true  }
+                    { key: "bikini_pink",      bik: [255, 42, 138],  hair: [252, 211, 38],  skin: [232, 162, 114], isSurfer: false },
+                    { key: "bikini_cyan",      bik: [6, 218, 246],   hair: [118, 56, 22],   skin: [222, 148, 100], isSurfer: false },
+                    { key: "bikini_yellow",    bik: [250, 204, 21],  hair: [204, 42, 36],   skin: [238, 168, 122], isSurfer: false },
+                    { key: "bikini_red",       bik: [239, 52, 52],   hair: [28, 26, 36],    skin: [210, 134, 88],  isSurfer: false },
+                    { key: "bikini_white",     bik: [248, 250, 252], hair: [234, 179, 14],  skin: [176, 108, 68],  isSurfer: false },
+                    { key: "surfer_guy",       bik: [6, 198, 232],   stripe: [255, 108, 42],  hair: [232, 184, 68],  skin: [222, 146, 96],  isSurfer: true },
+                    { key: "beach_guy_red",    bik: [238, 44, 54],   stripe: [248, 250, 252], hair: [32, 28, 36],    skin: [214, 138, 90],  isSurfer: true },
+                    { key: "beach_guy_yellow", bik: [250, 208, 24],  stripe: [28, 148, 238],  hair: [108, 58, 28],   skin: [230, 158, 110], isSurfer: true },
+                    { key: "beach_guy_lime",   bik: [52, 228, 118],  stripe: [18, 212, 246],  hair: [24, 24, 30],    skin: [164, 98, 62],   isSurfer: true }
                 ];
                 const coreFrames = [
                     "0", "1", "2", "3", "4", "5", "6", "7",
@@ -2087,21 +2091,24 @@ class RetroRenderer {
                 for (let ai = 0; ai < beachArchetypes.length; ai++) {
                     const arch = beachArchetypes[ai];
                     const dstFrames = { ...srcLucia };
-                    const rowY = origH + 4 + ai * 26;
+                    const baseX = ai < 6 ? 4 : (ai === 6 ? 326 : (ai === 7 ? 1116 : 4));
+                    const rowY = ai < 6 ? (origH + 4 + ai * 26) : (ai < 8 ? 3750 : 4062);
 
                     for (let fi = 0; fi < coreFrames.length; fi++) {
                         const fKey = coreFrames[fi];
                         const srcRect = srcLucia[fKey] || srcLucia["98"];
                         if (!Array.isArray(srcRect) || srcRect.length < 4) continue;
                         const [sx, sy, sw, sh] = srcRect;
-                        const dx0 = 4 + fi * 26;
+                        const dx0 = baseX + fi * 26;
                         const dy0 = rowY;
                         if (dx0 + sw >= W || dy0 + sh >= H) continue;
 
-                        // Pass 1: find head/hair center (hx, hy) for this frame so clothing regions track walking/pose frames accurately!
+                        // Pass 1: find head/hair center (hx, hy) strictly inside the head region so dark boots at y<=7 / y>=18 never skew (hx, hy)!
                         let hxSum = 0, hySum = 0, hCnt = 0;
-                        for (let ly = 0; ly < sh; ly++) {
-                            for (let lx = 0; lx < sw; lx++) {
+                        const yMinH = fKey === "42" ? 3 : 10;
+                        const yMaxH = fKey === "42" ? 8 : 15;
+                        for (let ly = yMinH; ly <= yMaxH && ly < sh; ly++) {
+                            for (let lx = 6; lx <= 16 && lx < sw; lx++) {
                                 const sp = ((sy + ly) * W + (sx + lx)) * 4;
                                 if (d[sp + 3] < 16) continue;
                                 const r = d[sp], g = d[sp + 1], b = d[sp + 2];
@@ -2113,7 +2120,7 @@ class RetroRenderer {
                             }
                         }
                         const hx = hCnt > 0 ? hxSum / hCnt : (sw - 1) * 0.5;
-                        const hy = hCnt > 0 ? hySum / hCnt : (sh - 1) * 0.5;
+                        const hy = hCnt > 0 ? hySum / hCnt : (fKey === "42" ? 6.0 : 12.2);
 
                         for (let ly = 0; ly < sh; ly++) {
                             for (let lx = 0; lx < sw; lx++) {
@@ -2128,35 +2135,35 @@ class RetroRenderer {
                                 const g = d[sp + 1];
                                 const b = d[sp + 2];
 
+                                const dx = lx - hx;
+                                const dy = ly - hy;
+                                const ax = Math.abs(dx);
+                                const dist = Math.hypot(dx, dy);
+
+                                // For shirtless male beachgoers, trim Lucia's long ponytail pixels (dy > 1.9) so he has a clean short male cut
+                                if (arch.isSurfer && fKey !== "42" && dy > 1.9 && dy < 4.5 && ax <= 1.8 && r < 78 && g < 78 && b < 86) {
+                                    d[dp] = 0; d[dp + 1] = 0; d[dp + 2] = 0; d[dp + 3] = 0;
+                                    continue;
+                                }
+
                                 const isPerim =
                                     lx === 0 || lx === sw - 1 || ly === 0 || ly === sh - 1 ||
                                     d[sp - 4 + 3] < 16 || d[sp + 4 + 3] < 16 ||
                                     d[sp - W * 4 + 3] < 16 || d[sp + W * 4 + 3] < 16;
 
-                                if (isPerim && r < 95 && g < 95 && b < 105) {
-                                    d[dp] = (r * 0.78) | 0;
-                                    d[dp + 1] = (g * 0.78) | 0;
-                                    d[dp + 2] = (b * 0.82) | 0;
-                                    d[dp + 3] = 255;
-                                    continue;
-                                }
+                                const isHeadHair = (!isPerim && r < 78 && g < 78 && b < 86 && dist <= 3.6 && dy >= -2.5 && dy <= (arch.isSurfer ? 1.9 : 3.2));
+                                const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 176.0;
+                                const shade = Math.max(0.82, Math.min(1.18, lum));
 
-                                const isPinkTop = (r > 145 && r > g + 32 && b > 55);
-                                const isBlueJeans = (b > r + 12 && b > 60);
-                                const isDarkHair = (!isPerim && r < 76 && g < 76 && b < 84);
-                                const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 182.0;
-                                const shade = Math.max(0.78, Math.min(1.24, lum));
-                                const dx = lx - hx;
-                                const dy = ly - hy;
-                                const dist = Math.hypot(dx, dy);
+                                // Default every body pixel (shoulders, back, arms, waist, legs, and bare feet!) to sun-tanned skin
+                                const bodyGlow = (dy >= -2.2 && dy <= 2.2 && ax <= 3.6) ? 1.05 : 1.0;
+                                let nr = Math.round(arch.skin[0] * shade * bodyGlow);
+                                let ng = Math.round(arch.skin[1] * shade * bodyGlow);
+                                let nb = Math.round(arch.skin[2] * shade * bodyGlow);
 
-                                let nr = Math.round(arch.skin[0] * shade);
-                                let ng = Math.round(arch.skin[1] * shade);
-                                let nb = Math.round(arch.skin[2] * shade);
-
-                                if (isDarkHair) {
-                                    const dome = Math.max(0, 1.0 - Math.hypot(dx * 0.28, dy * 0.28));
-                                    const hMult = 0.84 + 0.36 * dome;
+                                if (isHeadHair) {
+                                    const dome = Math.max(0, 1.0 - Math.hypot(dx * 0.30, dy * 0.30));
+                                    const hMult = 0.85 + 0.35 * dome;
                                     nr = Math.round(arch.hair[0] * hMult);
                                     ng = Math.round(arch.hair[1] * hMult);
                                     nb = Math.round(arch.hair[2] * hMult);
@@ -2165,38 +2172,76 @@ class RetroRenderer {
                                         ng = lx === 11 ? 189 : 24;
                                         nb = lx === 11 ? 248 : 38;
                                     }
-                                } else if (arch.isSurfer) {
-                                    // Surfer / Miami Beach guy: open tropical unbuttoned shirt trim on outer torso + vibrant striped boardshorts!
-                                    if (isPinkTop && Math.abs(dx) >= 2.2 && Math.abs(dx) <= 4.4) {
-                                        nr = Math.round(arch.bik[0] * shade);
-                                        ng = Math.round(arch.bik[1] * shade);
-                                        nb = Math.round(arch.bik[2] * shade);
-                                    } else if (isBlueJeans && dist <= 6.8) {
-                                        const isStripe = (Math.abs(dx) >= 2.6);
-                                        nr = Math.round((isStripe ? 252 : arch.bik[0]) * shade);
-                                        ng = Math.round((isStripe ? 118 : arch.bik[1]) * shade);
-                                        nb = Math.round((isStripe ? 34  : arch.bik[2]) * shade);
-                                    }
                                 } else if (fKey === "42") {
-                                    const inBikiniTop = (ly >= 9 && ly <= 11 && lx >= 8 && lx <= 15 && (isPinkTop || isBlueJeans));
-                                    const inBikiniBot = ((ly === 14 || ly === 15) && lx >= 8 && lx <= 15 && (isPinkTop || isBlueJeans));
-                                    if (inBikiniTop || inBikiniBot) {
-                                        const cupSpec = (inBikiniTop && (lx === 10 || lx === 13)) ? 1.14 : 1.0;
+                                    // Lying flat on beach towel (head at ly=5..7, torso at ly=9..13, hips/shorts at ly=14..17, bare legs/feet at ly=18..23)
+                                    if (arch.isSurfer) {
+                                        if (ly >= 14 && ly <= 18 && lx >= 8 && lx <= 15) {
+                                            const isWaistband = (ly === 14);
+                                            const isStripe = (lx === 8 || lx === 15);
+                                            const sCol = arch.stripe || [255, 118, 34];
+                                            nr = Math.round((isWaistband ? 245 : (isStripe ? sCol[0] : arch.bik[0])) * shade);
+                                            ng = Math.round((isWaistband ? 248 : (isStripe ? sCol[1] : arch.bik[1])) * shade);
+                                            nb = Math.round((isWaistband ? 252 : (isStripe ? sCol[2] : arch.bik[2])) * shade);
+                                        }
+                                    } else {
+                                        const inBikiniCups = (ly >= 10 && ly <= 11 && ((lx >= 8 && lx <= 10) || (lx >= 13 && lx <= 15)));
+                                        const inBikiniBrief = ((ly === 14 || ly === 15) && lx >= 8 && lx <= 15);
+                                        if (inBikiniCups || inBikiniBrief) {
+                                            const cupSpec = (inBikiniCups && (lx === 9 || lx === 14)) ? 1.15 : 1.04;
+                                            nr = Math.round(arch.bik[0] * shade * cupSpec);
+                                            ng = Math.round(arch.bik[1] * shade * cupSpec);
+                                            nb = Math.round(arch.bik[2] * shade * cupSpec);
+                                        } else if (ly === 12 && (lx === 11 || lx === 12)) {
+                                            // Subtle tanned navel/midriff contour between bikini top and bottom
+                                            nr = Math.round(arch.skin[0] * 0.86);
+                                            ng = Math.round(arch.skin[1] * 0.84);
+                                            nb = Math.round(arch.skin[2] * 0.82);
+                                        }
+                                    }
+                                } else if (arch.isSurfer) {
+                                    // SHIRTLESS MAN IN BOARDSHORTS ("torse nu et en short"):
+                                    // 100% bare tanned chest, shoulders, back & arms (-2.2 <= dy <= 2.5);
+                                    // Boardshorts strictly on rear hip (-4.6 <= dy <= -2.3) & front stepping thigh (2.6 <= dy <= 4.8);
+                                    // Bare tanned lower legs & bare feet beyond dy < -4.6 or dy > 4.8!
+                                    const inRearShorts = (dy >= -4.6 && dy <= -2.3 && ax <= 2.9);
+                                    const inFrontShorts = (dy >= 2.6 && dy <= 4.8 && ax <= 2.8);
+                                    if (inRearShorts || inFrontShorts) {
+                                        const isWaistband = (dy >= -2.9 && dy <= -2.3 && ax <= 2.6);
+                                        const isSideStripe = (ax >= 2.2);
+                                        const sCol = arch.stripe || [255, 118, 34];
+                                        nr = Math.round((isWaistband ? 244 : (isSideStripe ? sCol[0] : arch.bik[0])) * shade);
+                                        ng = Math.round((isWaistband ? 246 : (isSideStripe ? sCol[1] : arch.bik[1])) * shade);
+                                        nb = Math.round((isWaistband ? 250 : (isSideStripe ? sCol[2] : arch.bik[2])) * shade);
+                                    } else if (dy >= -1.8 && dy <= 1.8 && ax <= 3.8) {
+                                        // Muscular bare chest/shoulder highlight
+                                        const pecBoost = (dy >= 0.4 && dy <= 1.6 && ax >= 0.6 && ax <= 2.4) ? 1.09 : 1.03;
+                                        nr = Math.round(arch.skin[0] * shade * pecBoost);
+                                        ng = Math.round(arch.skin[1] * shade * pecBoost);
+                                        nb = Math.round(arch.skin[2] * shade * pecBoost);
+                                    }
+                                } else {
+                                    // BIKINI WOMAN (Standing / Walking / Rollerblading):
+                                    // Bare tanned shoulders, arms, upper/lower back (-2.3 < dy < 0.6), and bare legs/feet!
+                                    // Two distinct front bikini bra cups in front of the head (0.6 <= dy <= 2.1, 0.65 <= ax <= 2.75) with bare cleavage gap (ax < 0.65)
+                                    // + compact bikini bottom brief at the hips (-3.6 <= dy <= -2.4, ax <= 2.2)!
+                                    const inBraCups = (dy >= 0.6 && dy <= 2.1 && ax >= 0.65 && ax <= 2.75);
+                                    const inBackTie = (dy >= 0.3 && dy < 0.6 && ax >= 0.9 && ax <= 1.6);
+                                    const inBikiniBrief =
+                                        (dy >= -3.6 && dy <= -2.4 && ax <= 2.2) ||
+                                        (dy >= 2.4 && dy <= 3.3 && ax <= 2.0 && b > r + 10);
+                                    if (inBraCups || inBackTie || inBikiniBrief) {
+                                        const cupSpec = (inBraCups && ax >= 1.1 && ax <= 2.1 && dy >= 0.9 && dy <= 1.7) ? 1.16 : 1.04;
                                         nr = Math.round(arch.bik[0] * shade * cupSpec);
                                         ng = Math.round(arch.bik[1] * shade * cupSpec);
                                         nb = Math.round(arch.bik[2] * shade * cupSpec);
                                     }
-                                } else {
-                                    // Standing / Walking / Rollerblading Bikini & Beachwear Woman:
-                                    // Clearly visible Two-Piece Bikini Top across torso (`Math.abs(dx) <= 4.0`) + Matching Bottom/Shorts (`dist <= 5.6`) + Bare Tanned Arms & Legs!
-                                    const inTop = isPinkTop && Math.abs(dx) <= 4.0;
-                                    const inBot = isBlueJeans && dist <= 5.6;
-                                    if (inTop || inBot) {
-                                        const cupBoost = inTop ? 1.12 : 1.02;
-                                        nr = Math.round(arch.bik[0] * shade * cupBoost);
-                                        ng = Math.round(arch.bik[1] * shade * cupBoost);
-                                        nb = Math.round(arch.bik[2] * shade * cupBoost);
-                                    }
+                                }
+
+                                if (isPerim) {
+                                    // Warm bronze/skin-toned contour (never pitch-black boots or heavy dark outline)
+                                    nr = Math.round(nr * 0.78);
+                                    ng = Math.round(ng * 0.76);
+                                    nb = Math.round(nb * 0.76);
                                 }
 
                                 d[dp] = Math.min(255, Math.max(0, nr));
@@ -2206,6 +2251,7 @@ class RetroRenderer {
                             }
                         }
                         dstFrames[fKey] = [dx0, dy0, sw, sh];
+                        beachCustomRectKeys.add(dx0 + "," + dy0 + "," + sw + "," + sh);
                     }
                     meta.sprites.peds[arch.key] = dstFrames;
                 }
@@ -2514,6 +2560,14 @@ class RetroRenderer {
                                 shade = Math.max(0.48, Math.min(1.35, b / 102));
                                 const ax = Math.abs(dx);
                                 if (
+                                    arch.sleeves === "bare" &&
+                                    ((ent.fk !== "42" && ent.fk !== "53" && dy >= -0.6 && dy <= 2.2 && ax <= 2.5) ||
+                                     (ent.fk === "42" && ly <= 13))
+                                ) {
+                                    // Shirtless chest in front of head (civ0 encodes front chest as blue) -> bare skin!
+                                    col = arch.skin;
+                                    shade = Math.max(0.76, Math.min(1.18, shade * 1.05));
+                                } else if (
                                     arch.pattern === "jacket" &&
                                     ent.fk !== "42" &&
                                     ent.fk !== "53" &&
@@ -2524,9 +2578,14 @@ class RetroRenderer {
                                     // Front chest V-lapel dress shirt opening in front of head (civ0 encodes front chest as blue)
                                     col = arch.shirt2;
                                     shade = Math.max(0.78, Math.min(1.18, shade * 1.05));
-                                } else if (arch.legs === "shorts" && dist > 5.8) {
+                                } else if (
+                                    arch.legs === "shorts" &&
+                                    ((ent.fk === "42" && ly >= 17) ||
+                                     (ent.fk !== "42" && (dist > 4.0 || dy < -3.5 || dy > 3.9)))
+                                ) {
+                                    // Above-the-knee shorts -> bare tanned calves & shins!
                                     col = arch.skin;
-                                    shade = Math.max(0.70, Math.min(1.15, shade));
+                                    shade = Math.max(0.74, Math.min(1.16, shade));
                                 } else if (arch.key === "g2_fireman") {
                                     if (dist > 5.2 && dist < 6.7) {
                                         col = [234, 255, 56]; // High-vis reflective cuff band on bunker pants
@@ -2568,6 +2627,10 @@ class RetroRenderer {
                                     shade = Math.max(0.6, Math.min(1.2, r / 175));
                                     col = arch.skin;
                                 }
+                            } else if (arch.sleeves === "bare" && arch.legs === "shorts" && dist > 3.6 && r >= 22) {
+                                // Barefoot beach bodybuilders/runners on sand: convert civ0's dark brown shoe pixels at leg tips to bare tanned feet
+                                col = arch.skin;
+                                shade = 0.90;
                             }
 
                             if (col) {
@@ -2597,8 +2660,9 @@ class RetroRenderer {
             // Many synthesized archetypes share the SAME atlas rects with their source (e.g. beach peds reuse Lucia's
             // weapon frames, GTA 2 remaps reuse civ0's), so shade each unique atlas rect only ONCE — shading the same
             // pixels repeatedly over-darkens/discolors them (Lucia changing color while shooting).
+            // Also pre-seed `beachCustomRectKeys` so custom beach bikini/surfer sprites keep their exact sun-tanned pixel art!
             if (meta.sprites.peds) {
-                const shadedRects = new Set();
+                const shadedRects = new Set(beachCustomRectKeys);
                 for (const roleKey of Object.keys(meta.sprites.peds)) {
                     const roleFrames = meta.sprites.peds[roleKey];
                     if (!roleFrames) continue;
@@ -9722,16 +9786,16 @@ class RetroRenderer {
             { key: "vc_tommy",        shirt: [28, 192, 232],  shirt2: [24, 138, 82],   shirt3: [248, 248, 240], pants: JEANS,          sleeves: "short", legs: "pants",  hair: H.black, skin: SK.tan,   pattern: "hawaiian" },
             { key: "vc_crockett",     shirt: [246, 244, 240], shirt2: [255, 112, 182], pants: [246, 244, 240], sleeves: "long",  legs: "pants",  hair: H.blond, skin: SK.tan,   pattern: "jacket" },
             { key: "vc_tubbs",        shirt: [88, 148, 196],  shirt2: [48, 232, 242],  pants: [88, 148, 196],  sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "jacket" },
-            { key: "vc_jogger",       shirt: [255, 52, 164],  shirt2: [36, 232, 248],  pants: [36, 220, 242],  sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.tan,   pattern: "stripes" },
+            { key: "vc_jogger",       shirt: [255, 52, 164],  shirt2: [36, 232, 248],  pants: [36, 220, 242],  sleeves: "bare",  legs: "shorts", hair: H.blond, skin: SK.tan,   pattern: "stripes" },
             { key: "vc_sailor",       shirt: [248, 248, 252], shirt2: [32, 188, 224],  pants: [242, 62, 82],   sleeves: "short", legs: "shorts", hair: H.auburn,skin: SK.light, pattern: "stripes" },
             { key: "vc_cuban",        shirt: [246, 244, 232], shirt2: [52, 198, 168],  shirt3: [252, 204, 56], pants: [42, 48, 62],    sleeves: "short", legs: "pants",  hair: H.black, skin: SK.brown, pattern: "jacket" },
             { key: "vc_haitian",      shirt: [238, 48, 72],   shirt2: [38, 128, 236],  pants: JEANS,           sleeves: "short", legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "jacket" },
-            { key: "vc_bodybuilder",  shirt: [252, 214, 38],  shirt2: [255, 68, 148],  pants: [232, 48, 68],   sleeves: "tank",  legs: "shorts", hair: H.blond, skin: SK.brown, pattern: "stripes" },
+            { key: "vc_bodybuilder",  shirt: [252, 214, 38],  shirt2: [255, 68, 148],  pants: [232, 48, 68],   sleeves: "bare",  legs: "shorts", hair: H.blond, skin: SK.brown, pattern: "stripes" },
             // --- Miami Kids & Teenagers (rendered at 0.74x child scale) ---
             { key: "kid_boy_cap",     shirt: [254, 218, 42],  shirt2: [28, 212, 242],  pants: [48, 112, 224],  sleeves: "short", legs: "shorts", hairMode: "helmet", helmet: [242, 44, 64],  skin: SK.light, pattern: "stripes" },
-            { key: "kid_girl_pink",   shirt: [255, 78, 174],  shirt2: [250, 250, 252], pants: [44, 224, 218],  sleeves: "short", legs: "shorts", hair: H.blond,  skin: SK.light, pattern: "stripes" },
+            { key: "kid_girl_pink",   shirt: [255, 78, 174],  shirt2: [250, 250, 252], pants: [44, 224, 218],  sleeves: "bare",  legs: "shorts", hair: H.blond,  skin: SK.light, pattern: "stripes" },
             { key: "kid_skater",      shirt: [56, 238, 132],  shirt2: [168, 85, 247],  pants: KHAKI,           sleeves: "short", legs: "shorts", hairMode: "helmet", helmet: [24, 214, 242], skin: SK.tan,   pattern: "hawaiian", shirt3: [254, 224, 68] },
-            { key: "kid_beach",       shirt: [36, 218, 238],  shirt2: [255, 114, 62],  pants: [255, 92, 74],   sleeves: "tank",  legs: "shorts", hair: H.brown,  skin: SK.tan,   pattern: "stripes" },
+            { key: "kid_beach",       shirt: [36, 218, 238],  shirt2: [255, 114, 62],  pants: [255, 92, 74],   sleeves: "bare",  legs: "shorts", hair: H.brown,  skin: SK.tan,   pattern: "stripes" },
             // --- Port of Vice City & Port Gellhorn Hard-Hatted Stevedores / Dockworkers ---
             { key: "dockworker_yellow", shirt: [226, 252, 36], shirt2: [241, 245, 249], pants: [38, 68, 126],  sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [250, 204, 21], skin: SK.tan,   pattern: "hivis" },
             { key: "dockworker_orange", shirt: [255, 102, 18], shirt2: [253, 234, 78],  pants: [44, 54, 72],   sleeves: "long",  legs: "pants",  hairMode: "helmet", helmet: [248, 250, 252], skin: SK.light, pattern: "hivis" }
@@ -10264,8 +10328,9 @@ class RetroRenderer {
             } else if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
                 const beachPool = [
                     "bikini_pink", "bikini_cyan", "bikini_yellow",
-                    "bikini_red", "bikini_white", "surfer_guy",
-                    "vc_tommy", "vc_hawaiian_red", "vc_jogger", "vc_tourist"
+                    "bikini_red", "bikini_white",
+                    "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
+                    "vc_bodybuilder", "vc_jogger"
                 ];
                 const bh = Math.abs(Math.floor((ped.turnSeed || 1) * 17 + ped.animSeed * 313)) % beachPool.length;
                 pedType = beachPool[bh];
