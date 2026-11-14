@@ -4476,28 +4476,28 @@ class RetroRenderer {
                     ctx.putImageData(buildVcpdCruiserState("SIREN_0"), 1658, 130);
                     ctx.putImageData(buildVcpdCruiserState("SIREN_1"), 1712, 130);
 
-                    // Paint Dedicated Slicktop Detective Visor/Bullbar Siren States (sirensSlicktop[0..1] at y = 3470)
-                    ctx.putImageData(buildVcpdCruiserState("SIREN_SLICKTOP_0"), 1320, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("SIREN_SLICKTOP_1"), 1374, 3470);
+                    // Paint Dedicated Slicktop Detective Visor/Bullbar Siren States (sirensSlicktop[0..1] at y = 4032)
+                    ctx.putImageData(buildVcpdCruiserState("SIREN_SLICKTOP_0"), 1320, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("SIREN_SLICKTOP_1"), 1374, 4032);
 
                     // Paint 4 Progressive Door-Swing States:
                     // - Vice-Dade White/Gold Doors (doors[0..3] at y = 130)
-                    // - Unmarked Black Detective Doors (doorsBlack[0..3] at y = 3470)
-                    // - VCPD Panda White/Black Doors (doorsPanda[0..3] at y = 3470)
+                    // - Unmarked Black Detective Doors (doorsBlack[0..3] at y = 4032)
+                    // - VCPD Panda White/Black Doors (doorsPanda[0..3] at y = 4032)
                     ctx.putImageData(buildVcpdCruiserState("DOOR_0"), 1766, 130);
                     ctx.putImageData(buildVcpdCruiserState("DOOR_1"), 1820, 130);
                     ctx.putImageData(buildVcpdCruiserState("DOOR_2"), 1874, 130);
                     ctx.putImageData(buildVcpdCruiserState("DOOR_3"), 1928, 130);
 
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_0"), 1428, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_1"), 1482, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_2"), 1536, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_3"), 1590, 3470);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_0"), 1428, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_1"), 1482, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_2"), 1536, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_BLACK_3"), 1590, 4032);
 
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_0"), 1644, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_1"), 1698, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_2"), 1752, 3470);
-                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_3"), 1806, 3470);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_0"), 1644, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_1"), 1698, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_2"), 1752, 4032);
+                    ctx.putImageData(buildVcpdCruiserState("DOOR_PANDA_3"), 1806, 4032);
 
                     // Paint 3 Localized Multi-Variant Crash Damage States (front, rear, heavy)
                     ctx.putImageData(buildVcpdCruiserState("DMG_FRONT"), 1982, 130);
@@ -4517,22 +4517,137 @@ class RetroRenderer {
                             ];
                             ve73.wreck = [1604, 130, 52, 64];
                             ve73.sirensSlicktop = [
-                                [1320, 3470, 52, 64],
-                                [1374, 3470, 52, 64]
+                                [1320, 4032, 52, 64],
+                                [1374, 4032, 52, 64]
                             ];
                             ve73.doorsBlack = [
-                                [1428, 3470, 52, 64],
-                                [1482, 3470, 52, 64],
-                                [1536, 3470, 52, 64],
-                                [1590, 3470, 52, 64]
+                                [1428, 4032, 52, 64],
+                                [1482, 4032, 52, 64],
+                                [1536, 4032, 52, 64],
+                                [1590, 4032, 52, 64]
                             ];
                             ve73.doorsPanda = [
-                                [1644, 3470, 52, 64],
-                                [1698, 3470, 52, 64],
-                                [1752, 3470, 52, 64],
-                                [1806, 3470, 52, 64]
+                                [1644, 4032, 52, 64],
+                                [1698, 4032, 52, 64],
+                                [1752, 4032, 52, 64],
+                                [1806, 4032, 52, 64]
                             ];
                         }
+                    }
+
+                    // Paint 2 Dedicated Kneeling Paramedic CPR / First-Aid Sprite Frames ("kneel_0" & "kneel_1", 24x24)
+                    // at [1870, 4036, 24, 24] and [1898, 4036, 24, 24] (facing South +Y):
+                    // - Bent white-trouser knees & black EMS boots tucked behind (y = 2..9)
+                    // - Hunched-forward white EMS uniform shirt with red paramedic cross on back (y = 8..15)
+                    // - Bowed head looking down at patient (y = 12..17)
+                    // - Extended forearms & blue-gloved hands performing chest compressions / holding paddles (y = 15..22)
+                    const buildMedicKneelFrame = (pressStage) => {
+                        const kw = 24, kh = 24;
+                        const kid = ctx.createImageData(kw, kh);
+                        const kpx = kid.data;
+                        const setK = (x, y, r, g, b, a = 255) => {
+                            if (x < 0 || x >= kw || y < 0 || y >= kh) return;
+                            const i = (y * kw + x) * 4;
+                            kpx[i] = r; kpx[i + 1] = g; kpx[i + 2] = b; kpx[i + 3] = a;
+                        };
+                        // 1) Tucked Black EMS Boots (y = 2..4) & Bent Kneeling White-Trouser Legs (y = 4..9)
+                        for (let y = 2; y <= 9; y++) {
+                            for (const legX of [[7, 10], [13, 16]]) {
+                                for (let x = legX[0]; x <= legX[1]; x++) {
+                                    const isEdge = (x === legX[0] || x === legX[1] || y === 2);
+                                    if (y <= 4) {
+                                        setK(x, y, isEdge ? 12 : 28, isEdge ? 16 : 36, isEdge ? 24 : 52);
+                                    } else {
+                                        const isFold = (y === 6 || y === 8);
+                                        setK(x, y, isEdge ? 30 : (isFold ? 198 : 234), isEdge ? 41 : (isFold ? 208 : 240), isEdge ? 59 : (isFold ? 222 : 248));
+                                    }
+                                }
+                            }
+                        }
+                        // 2) Hunched-Forward White EMS Shirt Torso with Red Paramedic Cross on Back (y = 8..15, x = 6..17)
+                        const shiftY = pressStage === 0 ? 1 : 0; // leans 1px further forward on compression downstroke
+                        for (let y = 8 + shiftY; y <= 15 + shiftY; y++) {
+                            const ry = y - shiftY;
+                            const halfW = (ry === 8 || ry === 15) ? 5 : 6;
+                            const x0 = Math.round(11.5 - halfW);
+                            const x1 = Math.round(11.5 + halfW);
+                            for (let x = x0; x <= x1; x++) {
+                                const isEdge = (x === x0 || x === x1 || ry === 8 || ry === 15);
+                                const isRedCross = (
+                                    ((x === 11 || x === 12) && ry >= 9 && ry <= 13) ||
+                                    ((ry === 10 || ry === 11) && x >= 9 && x <= 14)
+                                );
+                                const isHiVisShoulder = (ry === 13 || ry === 14) && (x === x0 + 1 || x === x1 - 1);
+                                if (isEdge) {
+                                    setK(x, y, 22, 30, 46);
+                                } else if (isRedCross || isHiVisShoulder) {
+                                    setK(x, y, 226, 34, 44);
+                                } else {
+                                    const dome = 1.0 - Math.abs(x - 11.5) / 7.0;
+                                    const w = Math.round(226 + 28 * dome);
+                                    setK(x, y, w, w + 1, Math.min(255, w + 4));
+                                }
+                            }
+                        }
+                        // 3) Extended Forearms & Blue Nitrile-Gloved Hands Performing CPR / Defibrillation (y = 14..22)
+                        if (pressStage === 0) {
+                            // Downstroke: Both forearms converging to clasped blue-gloved hands pressing patient's chest (x = 9..14, y = 19..22)
+                            for (let y = 15; y <= 22; y++) {
+                                const t = (y - 15) / 7.0;
+                                const lArmX = Math.round(7 + t * 3.0);
+                                const rArmX = Math.round(16 - t * 3.0);
+                                for (const ax of [lArmX, lArmX + 1, rArmX - 1, rArmX]) {
+                                    if (y >= 20) {
+                                        // Bright cyan-blue surgical/nitrile paramedic gloves clasped together
+                                        setK(ax, y, 14, 165, 233);
+                                    } else {
+                                        // Bare forearm skin
+                                        setK(ax, y, 236, 184, 146);
+                                    }
+                                }
+                            }
+                            // Dark outline around clasped gloved hands
+                            for (let x = 9; x <= 14; x++) setK(x, 23, 15, 23, 42);
+                        } else {
+                            // Upstroke: Forearms apart holding white/red defibrillator paddles over chest (y = 15..21)
+                            for (let y = 15; y <= 21; y++) {
+                                for (const side of [-1, 1]) {
+                                    const cx = side < 0 ? 7 : 15;
+                                    for (let dx = 0; dx <= 1; dx++) {
+                                        if (y >= 19) {
+                                            // White/red defibrillator paddle + blue glove
+                                            setK(cx + dx, y, y === 21 ? 226 : 14, y === 21 ? 34 : 165, y === 21 ? 44 : 233);
+                                        } else {
+                                            setK(cx + dx, y, 236, 184, 146);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // 4) Bowed Paramedic Head Looking Down at Patient (y = 12..17, x = 9..14)
+                        for (let y = 12 + shiftY; y <= 17 + shiftY; y++) {
+                            const ry = y - shiftY;
+                            for (let x = 9; x <= 14; x++) {
+                                const d = Math.hypot(x - 11.5, ry - 14.5);
+                                if (d > 3.1) continue;
+                                if (d > 2.25) {
+                                    setK(x, y, 20, 24, 34);
+                                } else if (ry <= 15) {
+                                    // Brown hair crown bowed forward
+                                    setK(x, y, 96, 58, 30);
+                                } else {
+                                    // Forehead / nose tip looking down at patient
+                                    setK(x, y, 240, 192, 156);
+                                }
+                            }
+                        }
+                        return kid;
+                    };
+                    ctx.putImageData(buildMedicKneelFrame(0), 1870, 4036);
+                    ctx.putImageData(buildMedicKneelFrame(1), 1898, 4036);
+                    if (meta.sprites.peds && meta.sprites.peds["g2_medic"]) {
+                        meta.sprites.peds["g2_medic"]["kneel_0"] = [1870, 4036, 24, 24];
+                        meta.sprites.peds["g2_medic"]["kneel_1"] = [1898, 4036, 24, 24];
                     }
                 }
 
@@ -10051,7 +10166,7 @@ class RetroRenderer {
 
         // 3. Dead Pedestrians & Blood Pools (Sprite 444 + Frame 42 — eSpriteDrawOrder_Corpse)
         for (const ped of game.peds) {
-            if (!ped.dead) continue;
+            if (!ped.dead || ped._boardedVehicle) continue;
             if (ped.x < minX || ped.x > maxX || ped.y < minY || ped.y > maxY) continue;
             if (ped.deathKind === "DROWNED") continue; // sank below the surface
             if (ped.deathRenderT === undefined) ped.deathRenderT = this.time;
@@ -10207,6 +10322,14 @@ class RetroRenderer {
                 // Use the two-handed aiming frames (136..143 / 152) — they are baked into the recolored g2 atlas,
                 // unlike the flamethrower frames (118..134) which would fall back to the raw green/blue civilian base
                 frameIdx = this.getPedFrameIndex(spraying ? "UZI" : "FIST", ped.speed > 0 && !spraying, spraying, walkPhase);
+            } else if (ped.kind === "MEDIC") {
+                const isKneeling = Boolean(ped.isKneelingMedic || (ped.healTimer || 0) > 0);
+                if (isKneeling) {
+                    frameIdx = (Math.floor(this.time * 5.6) % 2 === 0) ? "kneel_0" : "kneel_1";
+                } else {
+                    const walkPhase = this.time * 1.65 + ped.animSeed;
+                    frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0.5, true, walkPhase);
+                }
             } else if (ped.kind === "CRIMINAL" || ped.isAlertedGuard) {
                 const walkPhase = this.time * 1.85 + ped.animSeed;
                 frameIdx = this.getPedFrameIndex(ped.copWeapon || (ped.isAlertedGuard ? "PISTOL" : "UZI"), ped.speed > 0, true, walkPhase);
@@ -10284,7 +10407,43 @@ class RetroRenderer {
                 this.pushSolidQuad3D(ped.x + skateSwayX + skSin * 3.2, ped.y + skateSwayY - skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
-            this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
+            if (ped.kind === "MEDIC" && (ped.isKneelingMedic || (ped.healTimer || 0) > 0)) {
+                const mCos = Math.cos(ped.angle);
+                const mSin = Math.sin(ped.angle);
+                const cprPress = 0.5 + 0.5 * Math.sin(this.time * 17.5);
+                const cprLunge = cprPress * 2.2;
+                const kneelZ = pz - 0.016 - cprPress * 0.004;
+                const kneelScale = thisPedScale * (0.90 - cprPress * 0.05);
+
+                // Tucked-back bent knees & EMS black boots behind the kneeling paramedic
+                for (const side of [-1, 1]) {
+                    const kx = ped.x - mCos * 4.8 + (-mSin * side) * 3.8;
+                    const ky = ped.y - mSin * 4.8 + (mCos * side) * 3.8;
+                    this.pushSolidQuad3D(kx, ky, pz - 0.022, 5.2, 3.0, ped.angle, 0.86, 0.90, 0.95, 0.96, pedDrawOrder);
+                    const bx = ped.x - mCos * 7.6 + (-mSin * side) * 3.9;
+                    const by = ped.y - mSin * 7.6 + (mCos * side) * 3.9;
+                    this.pushSolidQuad3D(bx, by, pz - 0.024, 3.2, 2.6, ped.angle, 0.10, 0.12, 0.15, 0.98, pedDrawOrder);
+                }
+
+                // Red & White EMS First-Aid Trauma Bag placed on the ground beside the paramedic's knee
+                const bagX = ped.x - mSin * 9.8 - mCos * 1.2;
+                const bagY = ped.y + mCos * 9.8 - mSin * 1.2;
+                const bagAng = ped.angle + 0.25;
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.024, 7.6, 5.4, bagAng, 0.05, 0.06, 0.08, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.018, 6.8, 4.6, bagAng, 0.86, 0.14, 0.16, 0.98, pedDrawOrder);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.016, 3.4, 1.2, bagAng, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.016, 1.2, 3.4, bagAng, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+
+                // Rhythmic CPR / Defibrillator medical pulse ring over the patient's chest
+                const patX = (ped.healingPatient && ped.healingPatient.x != null) ? ped.healingPatient.x : (ped.x + mCos * 12.5);
+                const patY = (ped.healingPatient && ped.healingPatient.y != null) ? ped.healingPatient.y : (ped.y + mSin * 12.5);
+                const pulseR = 6.0 + cprPress * 6.5;
+                this.pushSolidQuad3D(patX, patY, pz - 0.019, pulseR, pulseR, this.time * 2.0, 0.18, 0.88, 0.98, (1.0 - cprPress * 0.65) * 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                this.batchPedSprite3D(pedType, frameIdx, ped.x + mCos * cprLunge, ped.y + mSin * cprLunge, kneelZ, ped.angle, kneelScale, false, pedDrawOrder, pr, pg, pb);
+            } else {
+                this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
+            }
 
             // VCFD On-Foot Firefighter brass hose nozzle + coupled yellow canvas supply line to his Fire Engine!
             // The hose is ONE continuous line from the truck's rear hose bed to the firefighter (never cut by distance):

@@ -13252,6 +13252,16 @@ class LeonidaGame {
 
                         ped.angle = Math.atan2(targetCorpse.y - ped.y, targetCorpse.x - ped.x);
 
+                        // Step right up to the patient's chest (~12.5px) before kneeling down so the paramedic's hands reach the torso
+                        if (bestDist > 13.0) {
+                            const stepIn = Math.min(bestDist - 12.5, 76 * dt);
+                            ped.x += Math.cos(ped.angle) * stepIn;
+                            ped.y += Math.sin(ped.angle) * stepIn;
+                        }
+                        ped.speed = 0;
+                        ped.isKneelingMedic = true;
+                        ped.healingPatient = targetCorpse;
+
                         ped.healTimer = (ped.healTimer || 0) + dt;
 
                         ped.medicStuckTimer = 0;
@@ -13315,6 +13325,9 @@ class LeonidaGame {
                     } else {
 
                         ped.healTimer = 0;
+                        ped.isKneelingMedic = false;
+                        ped.healingPatient = null;
+                        ped.speed = 96;
 
                         if (ped.medicTarget !== targetCorpse) {
 
@@ -13386,6 +13399,9 @@ class LeonidaGame {
                 } else {
 
                     // Jog back to the ambulance (carrying a criminal corpse if any) and load / climb in!
+                    ped.isKneelingMedic = false;
+                    ped.healingPatient = null;
+                    ped.speed = 96;
 
                     ped._boardingVeh = amb;
 
