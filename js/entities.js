@@ -29,7 +29,7 @@ const VEHICLE_SPECS = {
         name: "SUPERBIKE 900 RR",
         sprId: "966",
         riderSprId: "975",
-        w: 40,
+        w: 42,
         h: 16,
         maxSpeed: 515,
         accel: 490,
@@ -48,8 +48,8 @@ const VEHICLE_SPECS = {
     E_SCOOTER: {
         name: "MIAMI NEON E-SCOOTER",
         sprId: "veh_escooter",
-        w: 30,
-        h: 14,
+        w: 36,
+        h: 16,
         maxSpeed: 285,
         accel: 360,
         turnSpeed: 5.25,
@@ -68,8 +68,8 @@ const VEHICLE_SPECS = {
     BMX_BIKE: {
         name: "SOUTH BEACH CRUISER BIKE",
         sprId: "veh_bicycle",
-        w: 34,
-        h: 14,
+        w: 42,
+        h: 16,
         maxSpeed: 265,
         accel: 335,
         turnSpeed: 4.95,
@@ -90,8 +90,8 @@ const VEHICLE_SPECS = {
     TULIP_MUSCLE: {
         name: "DECLASSE TULIP CONVERTIBLE",
         sprId: "57",
-        w: 50,
-        h: 25,
+        w: 58,
+        h: 28,
         maxSpeed: 395,
         accel: 315,
         turnSpeed: 3.15,
@@ -107,8 +107,8 @@ const VEHICLE_SPECS = {
     MINT_STALLION: {
         name: "JUGULAR / STALLION GT",
         sprId: "82",
-        w: 48,
-        h: 24,
+        w: 62,
+        h: 28,
         maxSpeed: 415,
         accel: 330,
         turnSpeed: 3.2,
@@ -124,8 +124,8 @@ const VEHICLE_SPECS = {
     SILVER_ROADSTER: {
         name: "THUNDERBIRD ROADSTER",
         sprId: "67",
-        w: 50,
-        h: 24,
+        w: 63,
+        h: 29,
         maxSpeed: 375,
         accel: 290,
         turnSpeed: 3.05,
@@ -141,8 +141,8 @@ const VEHICLE_SPECS = {
     CHALLENGER_RT: {
         name: "BRAVADO CHALLENGER R/T",
         sprId: "72",
-        w: 52,
-        h: 25,
+        w: 63,
+        h: 29,
         maxSpeed: 425,
         accel: 350,
         turnSpeed: 3.2,
@@ -158,8 +158,8 @@ const VEHICLE_SPECS = {
     FJORD_FASTBACK: {
         name: "VAPID FJORD FASTBACK",
         sprId: "78",
-        w: 50,
-        h: 24,
+        w: 64,
+        h: 29,
         maxSpeed: 410,
         accel: 335,
         turnSpeed: 3.15,
@@ -177,8 +177,8 @@ const VEHICLE_SPECS = {
     VICE_CHEETAH: {
         name: "ITALI GTB / CHEETAH",
         sprId: "59",
-        w: 50,
-        h: 24,
+        w: 60,
+        h: 28,
         maxSpeed: 465,
         accel: 380,
         turnSpeed: 3.45,
@@ -194,8 +194,8 @@ const VEHICLE_SPECS = {
     BANSHEE_GT: {
         name: "BEAST GTS / VIPER BANSHEE",
         sprId: "60",
-        w: 48,
-        h: 24,
+        w: 63,
+        h: 28,
         maxSpeed: 455,
         accel: 370,
         turnSpeed: 3.35,
@@ -211,8 +211,8 @@ const VEHICLE_SPECS = {
     PENETRATOR_GT: {
         name: "PENETRATOR COUNTACH V12",
         sprId: "61",
-        w: 50,
-        h: 25,
+        w: 62,
+        h: 30,
         maxSpeed: 480,
         accel: 395,
         turnSpeed: 3.5,
@@ -228,8 +228,8 @@ const VEHICLE_SPECS = {
     PORKA_TURBO: {
         name: "PORKA 911 TURBO CABRIO",
         sprId: "70",
-        w: 48,
-        h: 24,
+        w: 62,
+        h: 29,
         maxSpeed: 450,
         accel: 365,
         turnSpeed: 3.45,
@@ -246,8 +246,8 @@ const VEHICLE_SPECS = {
     COSSIE_RS: {
         name: "COSSIE RALLY RS",
         sprId: "71",
-        w: 48,
-        h: 24,
+        w: 64,
+        h: 29,
         maxSpeed: 440,
         accel: 360,
         turnSpeed: 3.4,
@@ -263,8 +263,8 @@ const VEHICLE_SPECS = {
     STINGER_CABRIO: {
         name: "STINGER SPYDER CABRIO",
         sprId: "74",
-        w: 48,
-        h: 24,
+        w: 60,
+        h: 28,
         maxSpeed: 455,
         accel: 370,
         turnSpeed: 3.4,
@@ -281,8 +281,8 @@ const VEHICLE_SPECS = {
     TURISMO_CABRIO: {
         name: "ROADSTER GT SPYDER",
         sprId: "75",
-        w: 48,
-        h: 24,
+        w: 62,
+        h: 28,
         maxSpeed: 460,
         accel: 375,
         turnSpeed: 3.45,
@@ -301,8 +301,8 @@ const VEHICLE_SPECS = {
     VICE_CAB: {
         name: "KAUFMAN YELLOW CAB",
         sprId: "66",
-        w: 48,
-        h: 24,
+        w: 64,
+        h: 29,
         maxSpeed: 375,
         accel: 295,
         turnSpeed: 3.15,
@@ -319,8 +319,8 @@ const VEHICLE_SPECS = {
     REGAL_SEDAN: {
         name: "REGAL LUXURY SEDAN",
         sprId: "63",
-        w: 50,
-        h: 24,
+        w: 64,
+        h: 28,
         maxSpeed: 370,
         accel: 285,
         turnSpeed: 3.0,
@@ -336,8 +336,8 @@ const VEHICLE_SPECS = {
     BEETLE_BUG: {
         name: "BF WEEVIL / BUG COMPACT",
         sprId: "65",
-        w: 44,
-        h: 22,
+        w: 62,
+        h: 28,
         maxSpeed: 350,
         accel: 280,
         turnSpeed: 3.35,
@@ -353,8 +353,8 @@ const VEHICLE_SPECS = {
     MUNDANO_WAGON: {
         name: "MUNDANO STATION WAGON",
         sprId: "81",
-        w: 52,
-        h: 24,
+        w: 64,
+        h: 28,
         maxSpeed: 360,
         accel: 275,
         turnSpeed: 2.95,
@@ -370,8 +370,8 @@ const VEHICLE_SPECS = {
     LELAND_SEDAN: {
         name: "ALBANY LELAND SEDAN",
         sprId: "69",
-        w: 50,
-        h: 23,
+        w: 62,
+        h: 29,
         maxSpeed: 355,
         accel: 270,
         turnSpeed: 2.95,
@@ -406,8 +406,8 @@ const VEHICLE_SPECS = {
     MONSTER_BUGGY: {
         name: "MONSTER DUNE BUGGY 4X4",
         sprId: "56",
-        w: 52,
-        h: 28,
+        w: 64,
+        h: 32,
         maxSpeed: 395,
         accel: 335,
         turnSpeed: 3.15,
@@ -423,8 +423,8 @@ const VEHICLE_SPECS = {
     GATOR_4X4: {
         name: "GRASSRIVERS RANCHER 4X4",
         sprId: "62",
-        w: 50,
-        h: 25,
+        w: 60,
+        h: 27,
         maxSpeed: 365,
         accel: 295,
         turnSpeed: 2.95,
@@ -441,8 +441,8 @@ const VEHICLE_SPECS = {
     PICKUP_TRUCK: {
         name: "VAPID BISON PICKUP",
         sprId: "64",
-        w: 52,
-        h: 26,
+        w: 64,
+        h: 29,
         maxSpeed: 365,
         accel: 290,
         turnSpeed: 2.9,
@@ -458,8 +458,8 @@ const VEHICLE_SPECS = {
     CAMPER_PICKUP: {
         name: "SANDKING CAMPER 4X4",
         sprId: "77",
-        w: 54,
-        h: 26,
+        w: 64,
+        h: 31,
         maxSpeed: 355,
         accel: 280,
         turnSpeed: 2.85,
@@ -475,8 +475,8 @@ const VEHICLE_SPECS = {
     BRINKS_TRUCK: {
         name: "GRUPO SECURO ARMORED VAN",
         sprId: "76",
-        w: 56,
-        h: 27,
+        w: 64,
+        h: 29,
         maxSpeed: 325,
         accel: 240,
         turnSpeed: 2.5,
@@ -492,8 +492,8 @@ const VEHICLE_SPECS = {
     BOXVILLE_VAN: {
         name: "BOXVILLE CARGO VAN",
         sprId: "79",
-        w: 58,
-        h: 28,
+        w: 70,
+        h: 30,
         maxSpeed: 325,
         accel: 235,
         turnSpeed: 2.45,
@@ -509,8 +509,8 @@ const VEHICLE_SPECS = {
     HOTDOG_VAN: {
         name: "BEACH HOT-DOG / ICE-CREAM VAN",
         sprId: "68",
-        w: 56,
-        h: 28,
+        w: 64,
+        h: 29,
         maxSpeed: 330,
         accel: 245,
         turnSpeed: 2.55,
@@ -528,8 +528,8 @@ const VEHICLE_SPECS = {
     CITY_BUS: {
         name: "LEONIDA TRANSIT CITY BUS",
         sprId: "50",
-        w: 88,
-        h: 28,
+        w: 120,
+        h: 32,
         maxSpeed: 315,
         accel: 215,
         turnSpeed: 2.15,
@@ -546,8 +546,8 @@ const VEHICLE_SPECS = {
     FLATBED_TRUCK: {
         name: "INDUSTRIAL CARGO RIG",
         sprId: "55",
-        w: 90,
-        h: 28,
+        w: 128,
+        h: 34,
         maxSpeed: 325,
         accel: 225,
         turnSpeed: 2.35,
@@ -563,7 +563,7 @@ const VEHICLE_SPECS = {
     TOW_TRUCK: {
         name: "VCPD IMPOUND WRECKER",
         sprId: "veh_tow_truck",
-        w: 62,
+        w: 64,
         h: 28,
         maxSpeed: 295,
         accel: 220,
@@ -582,8 +582,8 @@ const VEHICLE_SPECS = {
     TOUR_COACH: {
         name: "LEONIDA SCHOOL BUS",
         sprId: "53",
-        w: 88,
-        h: 28,
+        w: 100,
+        h: 32,
         maxSpeed: 335,
         accel: 230,
         turnSpeed: 2.2,
@@ -600,8 +600,8 @@ const VEHICLE_SPECS = {
     TANKER_RIG: {
         name: "RON OIL HEAVY TANKER",
         sprId: "54",
-        w: 92,
-        h: 30,
+        w: 126,
+        h: 34,
         maxSpeed: 310,
         accel: 210,
         turnSpeed: 2.05,
@@ -618,8 +618,8 @@ const VEHICLE_SPECS = {
     STRETCH_LIMO: {
         name: "VICE VIP STRETCH LIMOUSINE",
         sprId: "51",
-        w: 90,
-        h: 25,
+        w: 111,
+        h: 29,
         maxSpeed: 380,
         accel: 280,
         turnSpeed: 2.35,
@@ -637,8 +637,8 @@ const VEHICLE_SPECS = {
     VCPD_CRUISER: {
         name: "VCPD INTERCEPTOR",
         sprId: "73",
-        w: 48,
-        h: 24,
+        w: 63,
+        h: 29,
         maxSpeed: 405,
         accel: 325,
         turnSpeed: 3.20,
@@ -656,8 +656,8 @@ const VEHICLE_SPECS = {
     SWAT_ENFORCER: {
         name: "VCPD SWAT ENFORCER",
         sprId: "76",
-        w: 58,
-        h: 28,
+        w: 64,
+        h: 29,
         maxSpeed: 355,
         accel: 275,
         turnSpeed: 2.60,
@@ -740,8 +740,8 @@ const VEHICLE_SPECS = {
     MEDIC_AMBULANCE: {
         name: "LEONIDA MEDIC AMBULANCE",
         sprId: "58",
-        w: 54,
-        h: 26,
+        w: 95,
+        h: 30,
         maxSpeed: 375,
         accel: 285,
         turnSpeed: 2.85,
@@ -759,8 +759,8 @@ const VEHICLE_SPECS = {
     FIRE_TRUCK: {
         name: "LEONIDA FD FIRE ENGINE",
         sprId: "52",
-        w: 62,
-        h: 28,
+        w: 118,
+        h: 34,
         maxSpeed: 345,
         accel: 255,
         turnSpeed: 2.35,
@@ -778,8 +778,8 @@ const VEHICLE_SPECS = {
     PANZER_TANK: {
         name: "PANZER RHINO TANK",
         sprId: "940",
-        w: 58,
-        h: 32,
+        w: 85,
+        h: 36,
         maxSpeed: 245,
         accel: 230,
         turnSpeed: 2.45,
@@ -1972,11 +1972,11 @@ class Vehicle {
                 if (!ov || ov === this || ov.destroyed) continue;
                 const dx = ov.x - this.x;
                 const dy = ov.y - this.y;
-                if (Math.abs(dx) > 130 || Math.abs(dy) > 130) continue;
+                if (Math.abs(dx) > 170 || Math.abs(dy) > 170) continue;
                 if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) continue;
                 const fwd = dx * fx + dy * fy;
                 const lat = Math.abs(dx * rx + dy * ry);
-                if (fwd > 22 && fwd < 128 && lat < 20 && Math.cos(ov.angle - this.angle) > 0.65) {
+                if (fwd > 22 && fwd < 165 && lat < 22 && Math.cos(ov.angle - this.angle) > 0.65) {
                     const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
                     const ovLid = map.getBlockInfo ? map.getBlockInfo(Math.floor(ov.x / TILE_SIZE), Math.floor(ov.y / TILE_SIZE), 1).lid : 0;
                     if (ovSpd < 8 && ovLid === 25) {
@@ -1998,10 +1998,10 @@ class Vehicle {
             const nsRed = isNSLane && typeof game.isNSGreen === "function" && !game.isNSGreen();
             const ewRed = isEWLane && typeof game.isEWGreen === "function" && !game.isEWGreen();
             if (nsRed || ewRed || boxExitBlocked) {
-                // The stop line is measured for the car's CENTER: a standard car (~48px) stops with its nose at the line,
-                // so longer vehicles (bus 88px, limo 90px, tanker 92px...) must stop proportionally further back
+                // The stop line is measured for the car's CENTER: a standard car (~62px sprite) stops with its nose at the line,
+                // so longer vehicles (bus 120px, fire truck 118px, limo 111px, tanker 126px...) must stop proportionally further back
                 // (half of the extra length) instead of sticking far out into the junction.
-                const lenExtra = Math.max(0, (this.w || 48) * 0.5 - 24);
+                const lenExtra = Math.max(0, (this.w || 62) * 0.5 - 31);
                 // The stop-line tile (lid 24) holds the zebra crosswalk: cars hold BEFORE it (extra 66px = one crosswalk tile + margin),
                 // never with their nose or body on the pedestrian crossing / under the signal heads.
                 const CROSSWALK_CLEAR = 66;
@@ -2068,8 +2068,8 @@ class Vehicle {
                     if (!other || other === this || other === this.towingVehicle || other === this.towTarget) return;
                     const dx = other.x - this.x;
                     const dy = other.y - this.y;
-                    if (Math.abs(dx) > 240 || Math.abs(dy) > 240) return;
-                    if (dx * dx + dy * dy > 57600) return;
+                    if (Math.abs(dx) > 320 || Math.abs(dy) > 320) return;
+                    if (dx * dx + dy * dy > 102400) return;
                     if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) return;
 
                 const forwardDist = dx * fx + dy * fy;
@@ -2077,7 +2077,7 @@ class Vehicle {
                 const cosDiff = Math.cos(other.angle - this.angle);
 
                 // B. Same-Direction Vehicle OR Stationary Wreck/Abandoned Car Ahead in Same Lane:
-                // Strictly maintain true bumper-to-bumper gap (half of our length + half of lead car's length)
+                // Strictly maintain true sprite-length bumper-to-bumper gap (half of our rendered length + half of lead car's rendered length)
                 // Exception: when a motorcycle is actively lane-splitting (`this.aiFilteringQueue`), narrow lateral corridor to 10px so it can filter past stopped cars!
                 const isStationaryObstacle = Boolean(other.destroyed || other.driver === null);
                 const filteringPastThis = Boolean(
@@ -2086,10 +2086,18 @@ class Vehicle {
                     !other.isMotorcycle &&
                     Math.abs(other.speed || 0) < 10
                 );
-                const halfWidthSum = filteringPastThis ? 10 : ((this.h + (other.h || 24)) * 0.46 + 4);
-                const halfLengthSum = ((this.w || 48) + (other.w || 48)) * 0.50;
-                if ((cosDiff > 0.45 || isStationaryObstacle) && forwardDist > 4 && lateralDist < halfWidthSum) {
-                    const bumperGap = Math.max(0, forwardDist - halfLengthSum);
+                const inTurnOrShift = Boolean(
+                    (this.aiChosenDir && this.aiChosenDir.isTurn) ||
+                    this.aiLaneShiftTimer > 0 ||
+                    (other.aiChosenDir && other.aiChosenDir.isTurn) ||
+                    other.aiLaneShiftTimer > 0
+                );
+                const halfWidthSum = filteringPastThis
+                    ? 10
+                    : Math.min(inTurnOrShift ? 31 : 27, (this.h + (other.h || 28)) * 0.43 + 2);
+                const halfLengthSum = ((this.w || 62) + (other.w || 62)) * 0.50;
+                if ((cosDiff > 0.42 || isStationaryObstacle) && forwardDist > 0 && lateralDist < halfWidthSum) {
+                    const bumperGap = forwardDist - halfLengthSum;
                     if (bumperGap < closestBumperGap) {
                         closestBumperGap = bumperGap;
                         closestEntity = other;
@@ -2183,15 +2191,16 @@ class Vehicle {
 
             // Check pedestrians or player on foot directly in front of car's bumper (and wider scan on zebra crosswalks!)
             if (!isPanicked && game) {
-                const myFrontHalf = (this.w || 48) * 0.34 + 6;
+                const myFrontHalf = (this.w || 62) * 0.46 + 6;
+                const extraFrontReach = Math.max(0, myFrontHalf - 28);
                 if (game.player && !game.player.inVehicle && !game.player.dead) {
                     const dx = game.player.x - this.x;
                     const dy = game.player.y - this.y;
-                    if (Math.abs(dx) < 80 && Math.abs(dy) < 80) {
+                    if (Math.abs(dx) < 96 + extraFrontReach && Math.abs(dy) < 96 + extraFrontReach) {
                         const forwardDist = dx * fx + dy * fy;
                         const lateralDist = Math.abs(dx * rx + dy * ry);
-                        if (forwardDist > 6 && forwardDist < 68 && lateralDist < 18) {
-                            const gap = Math.max(0, forwardDist - myFrontHalf);
+                        if (forwardDist > 6 && forwardDist < 72 + extraFrontReach && lateralDist < 18) {
+                            const gap = forwardDist - myFrontHalf;
                             if (gap < closestBumperGap) {
                                 closestBumperGap = gap;
                                 closestEntity = game.player;
@@ -2205,17 +2214,17 @@ class Vehicle {
                         if (ped.dead) continue;
                         const dx = ped.x - this.x;
                         const dy = ped.y - this.y;
-                        if (Math.abs(dx) > 88 || Math.abs(dy) > 88) continue;
+                        if (Math.abs(dx) > 96 + extraFrontReach || Math.abs(dy) > 96 + extraFrontReach) continue;
                         const forwardDist = dx * fx + dy * fy;
                         const lateralDist = Math.abs(dx * rx + dy * ry);
                         const onZebraCrosswalk = Boolean(
                             ped.isCrossingRoad ||
                             (map && map.isStopLineBlock && map.isStopLineBlock(Math.floor(ped.x / TILE_SIZE), Math.floor(ped.y / TILE_SIZE)))
                         );
-                        const maxFwd = (onZebraCrosswalk && !this.aiAggressive) ? 82 : 52;
-                        const maxLat = (onZebraCrosswalk && !this.aiAggressive) ? 26 : 14;
+                        const maxFwd = ((onZebraCrosswalk && !this.aiAggressive) ? 84 : 56) + extraFrontReach;
+                        const maxLat = (onZebraCrosswalk && !this.aiAggressive) ? 26 : 15;
                         if (forwardDist > 6 && forwardDist < maxFwd && lateralDist < maxLat) {
-                            const gap = Math.max(0, forwardDist - myFrontHalf);
+                            const gap = forwardDist - myFrontHalf;
                             if (gap < closestBumperGap) {
                                 closestBumperGap = gap;
                                 closestEntity = ped;
@@ -2229,8 +2238,10 @@ class Vehicle {
             this._cachedCrossYield = crossTrafficYield;
         }
 
-        // 5. Smooth Forward-Only Speed Regulation (Maintains a clean 22px bumper-to-bumper gap at red lights!)
-        const minStopGap = 22;
+        // 5. Smooth Forward-Only Speed Regulation (Maintains a realistic sprite-length-aware bumper-to-bumper cushion!)
+        const involvesLongVeh = Boolean((this.w || 62) >= 75 || (closestEntity && (closestEntity.w || 62) >= 75));
+        const minStopGap = this.isMotorcycle ? 18 : (involvesLongVeh ? 32 : 26);
+        const followHorizon = Math.max(155, minStopGap + Math.max(0, this.speed || 0) * (this.isHeavyVehicle ? 0.90 : 0.72) + 48);
         if (sirenYield || crossTrafficYield) {
             this.aiState = sirenYield ? "YIELD_SIREN" : "FOLLOWING";
             desiredThrottle = 0;
@@ -2238,7 +2249,7 @@ class Vehicle {
             this.vx *= brakeMult;
             this.vy *= brakeMult;
             this.speed *= brakeMult;
-        } else if (closestEntity && closestBumperGap < 110) {
+        } else if (closestEntity && closestBumperGap < followHorizon) {
             const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
             const isDeadOrAbandonedObstacle = Boolean(
                 closestEntity.destroyed ||
@@ -2255,7 +2266,7 @@ class Vehicle {
                 obstacleSpeed < myDesiredCruiseSpd * 0.78 &&
                 (this.isMotorcycle || this.aiAggressive || (this.aiCruiseFactor || 0.5) >= 0.50 || closestEntity.isHeavyVehicle)
             );
-            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 98 && this.aiLaneChangeCooldown <= 0) {
+            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 112 && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
             // Motorcycle Lane-Splitting / Queue Filtering at Red Lights & Traffic Queues:
@@ -2267,7 +2278,7 @@ class Vehicle {
                 closestEntity.w &&
                 !closestEntity.isMotorcycle &&
                 obstacleSpeed < 10 &&
-                closestBumperGap < 68 &&
+                closestBumperGap < 72 &&
                 (!isStopBlock || distToTargetCenter > 68) &&
                 (!this.aiChosenDir || !this.aiChosenDir.isTurn)
             ) {
@@ -2291,7 +2302,7 @@ class Vehicle {
             }
             // Never wait forever behind a destroyed wreck or abandoned driverless car (or when hauling a wreck as AI_TOW):
             // actively steer around the pileup using 9-feeler obstacle bypass!
-            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 58) {
+            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 64) {
                 const lookX = tx + (this.aiChosenDir ? (this.aiChosenDir.dx || 0) * TILE_SIZE * 0.95 : 0);
                 const lookY = ty + (this.aiChosenDir ? (this.aiChosenDir.dy || 0) * TILE_SIZE * 0.95 : 0);
                 const bypassAng = Math.atan2(lookY - this.y, lookX - this.x);
@@ -2299,7 +2310,7 @@ class Vehicle {
             }
             // If a Tow Truck hauling a vehicle (or a car clearing the way for a siren) is still blocked by a stopped car on a 2-lane street,
             // shift laterally around the stopped obstacle instead of waiting forever!
-            if (isStationaryCar && closestBumperGap < 56 && (this.driver === "AI_TOW" || sirenBehind)) {
+            if (isStationaryCar && closestBumperGap < 62 && (this.driver === "AI_TOW" || sirenBehind)) {
                 const bypassSide = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? 1 : -1;
                 const testX = this.x + rx * bypassSide * 24;
                 const testY = this.y + ry * bypassSide * 24;
@@ -2312,16 +2323,16 @@ class Vehicle {
                 }
             }
             this.aiState = "FOLLOWING";
-            if (closestBumperGap < 46 && (isPlayerBlocking || (closestEntity && closestEntity.kind === "CIVILIAN"))) {
+            if (closestBumperGap < 50 && (isPlayerBlocking || (closestEntity && closestEntity.kind === "CIVILIAN"))) {
                 this.aiFlashHeadlightsTimer = Math.max(this.aiFlashHeadlightsTimer || 0, 0.85);
             }
             if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
-                const brakeMult = Math.pow(0.002, dt);
+                const brakeMult = Math.pow(0.0008, dt);
                 this.vx *= brakeMult;
                 this.vy *= brakeMult;
                 this.speed *= brakeMult;
-                if (Math.abs(this.speed) < 28 || closestBumperGap <= minStopGap - 2) {
+                if (Math.abs(this.speed) < 34 || closestBumperGap <= minStopGap - 1) {
                     this.vx = 0;
                     this.vy = 0;
                     this.speed = 0;
@@ -2334,18 +2345,27 @@ class Vehicle {
                     }
                 }
             } else {
-                // Proportional closing speed: rolls smoothly up to the 22px bumper gap and brakes early so it never rear-ends stopped cars!
-                const targetSpd = obstacleSpeed * 0.90 + (closestBumperGap - minStopGap) * 1.35;
+                // Proportional closing speed: smoothly matches lead vehicle speed and brakes early based on cushion!
+                const gapMargin = Math.max(0, closestBumperGap - minStopGap);
+                const closingGain = this.isHeavyVehicle ? 1.05 : 1.25;
+                const targetSpd = obstacleSpeed * 0.92 + gapMargin * closingGain;
                 if (this.speed > targetSpd) {
                     desiredThrottle = 0;
-                    const slowMult = Math.pow(0.03, dt);
+                    const decelStrength = gapMargin < 24 ? 0.002 : (gapMargin < 48 ? 0.012 : 0.035);
+                    const slowMult = Math.pow(decelStrength, dt);
                     this.vx *= slowMult;
                     this.vy *= slowMult;
                     this.speed *= slowMult;
+                    if (gapMargin < 18 && this.speed > targetSpd + 10) {
+                        const clampSpd = Math.max(obstacleSpeed, targetSpd);
+                        this.speed = clampSpd;
+                        this.vx = fx * clampSpd;
+                        this.vy = fy * clampSpd;
+                    }
                 } else if (this.speed < targetSpd - 6) {
-                    desiredThrottle = Math.min(this.aiCruiseFactor, 0.42);
+                    desiredThrottle = Math.min(this.aiCruiseFactor, gapMargin < 28 ? 0.24 : 0.42);
                 } else {
-                    desiredThrottle = 0.14;
+                    desiredThrottle = gapMargin < 22 ? 0.06 : 0.14;
                 }
             }
         }
@@ -2485,6 +2505,8 @@ class Vehicle {
         const fy = Math.sin(this.angle);
         const rx = -fy;
         const ry = fx;
+        let sameLaneLeadGap = 9999;
+        let sameLaneLeadSpd = 0;
         if (game && Array.isArray(game.vehicles)) {
             for (const other of game.vehicles) {
                 if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
@@ -2493,14 +2515,19 @@ class Vehicle {
                 const dy = other.y - this.y;
                 const fDist = dx * fx + dy * fy;
                 const lDist = Math.abs(dx * rx + dy * ry);
-                if (fDist > 8 && fDist < 112 && lDist < 24) {
+                const halfLenSum = ((this.w || 62) + (other.w || 62)) * 0.50;
+                const bumperGap = fDist - halfLenSum;
+                if (fDist > 6 && bumperGap < 96 && lDist < 24) {
+                    if (bumperGap < sameLaneLeadGap) {
+                        sameLaneLeadGap = bumperGap;
+                        sameLaneLeadSpd = Math.max(0, other.speed || 0);
+                    }
                     const changed = this.aiLaneChangeCooldown <= 0
                         ? this.tryAdjacentLaneChange(bx, by, curZ, map, game)
                         : false;
-                    if (!changed && fDist < 88) {
+                    if (!changed && bumperGap < 68) {
                         this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 1.35);
                     }
-                    break;
                 }
             }
         }
@@ -2517,6 +2544,9 @@ class Vehicle {
         const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
         let steer = Math.max(-1, Math.min(1, angleDiff * 2.75));
         let throttle = maxThrottle;
+        if (sameLaneLeadGap < 26) {
+            throttle = this.speed > sameLaneLeadSpd + 8 ? -0.45 : 0;
+        }
 
         const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
         if (!this.aiChosenDir.isTurn && Math.abs(laneAngleDiff) < 0.40) {
@@ -2719,6 +2749,10 @@ class Vehicle {
         const candidateOffsets = [-1.25, -0.90, -0.56, -0.26, 0, 0.26, 0.56, 0.90, 1.25];
         let bestOffset = 0;
         let bestScore = -9999;
+        const myFrontHalf = (this.w || 62) * 0.50;
+        const probeNear = myFrontHalf + 18;
+        const probeFar = myFrontHalf + 58;
+        let frontBlockedClose = false;
 
         for (const off of candidateOffsets) {
             const candAng = this.angle + off;
@@ -2727,10 +2761,10 @@ class Vehicle {
 
             const cCos = Math.cos(candAng);
             const cSin = Math.sin(candAng);
-            const p1x = this.x + cCos * 44;
-            const p1y = this.y + cSin * 44;
-            const p2x = this.x + cCos * 88;
-            const p2y = this.y + cSin * 88;
+            const p1x = this.x + cCos * probeNear;
+            const p1y = this.y + cSin * probeNear;
+            const p2x = this.x + cCos * probeFar;
+            const p2y = this.y + cSin * probeFar;
 
             if (map.resolveCircleBuildingCollision(p1x, p1y, 16, curZ).hit) {
                 score -= 55;
@@ -2752,10 +2786,15 @@ class Vehicle {
             if (game && Array.isArray(game.vehicles)) {
                 for (const other of game.vehicles) {
                     if (other === this || other === this.towingVehicle || other === this.towTarget || other.driver === "PLAYER") continue;
+                    const oRad = Math.max(26, (other.w || 62) * 0.36);
                     const d1 = Math.hypot(other.x - p1x, other.y - p1y);
                     const d2 = Math.hypot(other.x - p2x, other.y - p2y);
-                    if (d1 < 30) score -= 32;
-                    else if (d2 < 30) score -= 18;
+                    if (d1 < oRad) {
+                        score -= 36;
+                        if (off === 0) frontBlockedClose = true;
+                    } else if (d2 < oRad) {
+                        score -= 20;
+                    }
                 }
             }
 
@@ -2768,7 +2807,10 @@ class Vehicle {
         const chosenAngle = bestScore < -35 ? directAngle : (this.angle + bestOffset);
         const diff = this.normalizeAngle(chosenAngle - this.angle);
         const steer = Math.max(-1, Math.min(1, diff * 2.9));
-        const throttle = Math.abs(diff) > 0.75 && this.speed > 175 ? 0.35 : maxThrottle;
+        let throttle = Math.abs(diff) > 0.75 && this.speed > 175 ? 0.35 : maxThrottle;
+        if (frontBlockedClose && Math.abs(bestOffset) < 0.20 && this.speed > 65) {
+            throttle = -0.35;
+        }
 
         if (Math.abs(this.speed) < 15) {
             this.aiStuckTimer += dt;
@@ -3617,6 +3659,43 @@ class Vehicle {
         const preMoveY = this.y;
         this.x += this.vx * dt;
         this.y += this.vy * dt;
+
+        // Hard longitudinal anti-overlap safety clamp for AI traffic:
+        // Ensures an AI vehicle never creeps into or phases through the rear bumper of its lead vehicle!
+        if (
+            this.driver &&
+            this.driver !== "PLAYER" &&
+            this.driver !== "REMOTE" &&
+            this.driver !== "AI_COP" &&
+            !this.waterOnly &&
+            (this.speed || 0) > 0 &&
+            this._cachedClosestEntity &&
+            this._cachedClosestEntity.w &&
+            !this._cachedClosestEntity.waterOnly &&
+            this._cachedClosestEntity !== this.towingVehicle &&
+            this._cachedClosestEntity !== this.towTarget
+        ) {
+            const lead = this._cachedClosestEntity;
+            const cfx = Math.cos(this.angle);
+            const cfy = Math.sin(this.angle);
+            const dx = lead.x - this.x;
+            const dy = lead.y - this.y;
+            const fDist = dx * cfx + dy * cfy;
+            const lDist = Math.abs(-dx * cfy + dy * cfx);
+            const latTol = Math.min(27, ((this.h || 28) + (lead.h || 28)) * 0.43);
+            const minCenterDist = ((this.w || 62) + (lead.w || 62)) * 0.50 + (this.isMotorcycle ? 12 : 18);
+            if (fDist > 4 && fDist < minCenterDist && lDist < latTol) {
+                const pushBack = minCenterDist - fDist;
+                this.x -= cfx * pushBack;
+                this.y -= cfy * pushBack;
+                const capSpd = Math.max(0, (lead.speed || 0) * 0.90);
+                if (this.speed > capSpd) {
+                    this.speed = capSpd;
+                    this.vx = cfx * capSpd;
+                    this.vy = cfy * capSpd;
+                }
+            }
+        }
 
         // Water-only craft (jet-ski, speedboat): the hull runs aground on beaches, docks & quays,
         // but passes freely through the water channel underneath elevated bridges (`isBoatNavigableWater`)!

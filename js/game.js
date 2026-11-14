@@ -1325,7 +1325,7 @@ class LeonidaGame {
 
                 // Ensure no two AI_TRAFFIC vehicles snap onto the exact same road tile at startup
                 for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
-                    const hitOther = this.vehicles.some((other) => other !== v && Math.hypot(other.x - v.x, other.y - v.y) < 62);
+                    const hitOther = this.vehicles.some((other) => other !== v && Math.hypot(other.x - v.x, other.y - v.y) < ((v.w || 62) + (other.w || 62)) * 0.52 + 24);
                     if (!hitOther) break;
                     const fwdX = Math.cos(v.angle);
                     const fwdY = Math.sin(v.angle);
@@ -11144,7 +11144,9 @@ class LeonidaGame {
                         p._seaWarnCd = (p._seaWarnCd || 0) - dt;
                         if (p._seaWarnCd <= 0) {
                             p._seaWarnCd = 3.2;
-                            this.showBanner("🦈 HIGH SEAS DANGER — SHARK ATTACK IN DEEP OCEAN! SWIM BACK TO SHORE!", 2.6);
+                            if (typeof this.showCenterBanner === "function") {
+                                this.showCenterBanner("🦈 HIGH SEAS DANGER — SHARK ATTACK IN DEEP OCEAN! SWIM BACK TO SHORE!", 2.6);
+                            }
                         }
                         this.damagePlayer((12.0 + Math.min(16.0, overDepth * 2.2)) * dt);
                         p._sharkBiteCd = (p._sharkBiteCd || 0) - dt;
@@ -11163,7 +11165,9 @@ class LeonidaGame {
                         p._seaWarnCd = (p._seaWarnCd || 0) - dt;
                         if (p._seaWarnCd <= 0) {
                             p._seaWarnCd = 3.6;
-                            this.showBanner("⚠️ DEEP OCEAN WARNING — STRONG RIPTIDE & SHARK WATERS! DO NOT SWIM TOO FAR!", 2.6);
+                            if (typeof this.showCenterBanner === "function") {
+                                this.showCenterBanner("⚠️ DEEP OCEAN WARNING — STRONG RIPTIDE & SHARK WATERS! DO NOT SWIM TOO FAR!", 2.6);
+                            }
                         }
                     }
                 }
@@ -11698,11 +11702,12 @@ class LeonidaGame {
         for (let ai = 0; ai < activeVehs.length; ai++) {
 
             const a = activeVehs[ai];
-            const aHalfL = (a.w || 48) * 0.26;
-            const aRad = Math.max(11, (a.h || 24) * 0.48);
+            const aRad = Math.max(10, Math.min(16, (a.h || 28) * 0.45));
+            const aHalfL = Math.max(0, (a.w || 62) * 0.50 - aRad);
             const aCos = Math.cos(a.angle), aSin = Math.sin(a.angle);
             const ax0 = a.x + aCos * aHalfL, ay0 = a.y + aSin * aHalfL;
-            const ax1 = a.x - aCos * aHalfL, ay1 = a.y - aSin * aHalfL;
+            const ax1 = a.x, ay1 = a.y;
+            const ax2 = a.x - aCos * aHalfL, ay2 = a.y - aSin * aHalfL;
             const gx0 = Math.max(0, (a.x >> 8) - 1);
             const gx1 = Math.min(127, (a.x >> 8) + 1);
             const gy0 = Math.max(0, (a.y >> 8) - 1);
@@ -11716,7 +11721,8 @@ class LeonidaGame {
                 const b = this.vehicles[j];
                 if (a === b || (b._activePairIdx >= 0 && b._activePairIdx <= ai)) continue;
 
-                if (Math.abs(b.x - a.x) > 68 || Math.abs(b.y - a.y) > 68) continue;
+                const maxReach = ((a.w || 62) + (b.w || 62)) * 0.52 + 16;
+                if (Math.abs(b.x - a.x) > maxReach || Math.abs(b.y - a.y) > maxReach) continue;
 
                 if (Boolean(a.waterOnly) !== Boolean(b.waterOnly)) continue;
 
@@ -11724,16 +11730,17 @@ class LeonidaGame {
 
                 if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
 
-                const bHalfL = (b.w || 48) * 0.26;
+                const bRad = Math.max(10, Math.min(16, (b.h || 28) * 0.45));
 
-                const bRad = Math.max(11, (b.h || 24) * 0.48);
+                const bHalfL = Math.max(0, (b.w || 62) * 0.50 - bRad);
 
                 const minDist = aRad + bRad;
                 const minDistSq = minDist * minDist;
 
                 const bCos = Math.cos(b.angle), bSin = Math.sin(b.angle);
                 const bx0 = b.x + bCos * bHalfL, by0 = b.y + bSin * bHalfL;
-                const bx1 = b.x - bCos * bHalfL, by1 = b.y - bSin * bHalfL;
+                const bx1 = b.x, by1 = b.y;
+                const bx2 = b.x - bCos * bHalfL, by2 = b.y - bSin * bHalfL;
 
                 let bestOverlap = 0;
 
@@ -11741,13 +11748,15 @@ class LeonidaGame {
 
                 let hitALever = 0, hitBLever = 0;
 
-                for (let paIdx = 0; paIdx < 2; paIdx++) {
-                    const pax = paIdx === 0 ? ax0 : ax1;
-                    const pay = paIdx === 0 ? ay0 : ay1;
-                    const paLev = paIdx === 0 ? 1 : -1;
-                    for (let pbIdx = 0; pbIdx < 2; pbIdx++) {
-                        const dx = (pbIdx === 0 ? bx0 : bx1) - pax;
-                        const dy = (pbIdx === 0 ? by0 : by1) - pay;
+                for (let paIdx = 0; paIdx < 3; paIdx++) {
+                    const pax = paIdx === 0 ? ax0 : (paIdx === 1 ? ax1 : ax2);
+                    const pay = paIdx === 0 ? ay0 : (paIdx === 1 ? ay1 : ay2);
+                    const paLev = paIdx === 0 ? 1 : (paIdx === 1 ? 0 : -1);
+                    for (let pbIdx = 0; pbIdx < 3; pbIdx++) {
+                        const pbx = pbIdx === 0 ? bx0 : (pbIdx === 1 ? bx1 : bx2);
+                        const pby = pbIdx === 0 ? by0 : (pbIdx === 1 ? by1 : by2);
+                        const dx = pbx - pax;
+                        const dy = pby - pay;
                         const d2 = dx * dx + dy * dy;
                         if (d2 > 0 && d2 < minDistSq) {
                             const d = Math.sqrt(d2);
@@ -11756,7 +11765,7 @@ class LeonidaGame {
                                 bestNx = dx / d;
                                 bestNy = dy / d;
                                 hitALever = paLev;
-                                hitBLever = pbIdx === 0 ? 1 : -1;
+                                hitBLever = pbIdx === 0 ? 1 : (pbIdx === 1 ? 0 : -1);
                             }
                         }
                     }
@@ -11836,14 +11845,6 @@ class LeonidaGame {
 
                         (!b.destroyed && b.driver === "AI_CRIMINAL") ||
 
-                        (!a.destroyed && a.driver === "AI_TOW") ||
-
-                        (!b.destroyed && b.driver === "AI_TOW") ||
-
-                        (!a.destroyed && a.driver === "AI_EMERGENCY" && a.sirenActive) ||
-
-                        (!b.destroyed && b.driver === "AI_EMERGENCY" && b.sirenActive) ||
-
                         (((!a.destroyed && a.driver === "AI_COP") || (!b.destroyed && b.driver === "AI_COP")) && (this.wantedLevel > 0 || a.sirenActive || b.sirenActive));
 
 
@@ -11865,36 +11866,74 @@ class LeonidaGame {
 
                     if ((!involvesPlayerOrActiveCop && !wreckShove && !slidingWrecks) || (a.destroyed && b.destroyed && !slidingWrecks)) {
 
-                        // AI-vs-AI traffic: only enforce longitudinal spacing between same-direction vehicles;
+                        // AI-vs-AI traffic: enforce clean longitudinal separation along each vehicle's driving axis
+                        // so AI vehicles never overlap or phase through each other (in-lane or when turning/crossing)!
 
-                        // never push AI cars laterally out of their lane or wedge crossing AI cars inside an intersection!
+                        if (!a.destroyed && !b.destroyed) {
 
-                        if (!a.destroyed && !b.destroyed && Math.cos(a.angle - b.angle) > 0.65) {
+                            if (Math.cos(a.angle - b.angle) > 0.45) {
 
-                            const proj = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
+                                const proj = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
 
-                            const rear = proj >= 0 ? a : b;
+                                const rear = proj >= 0 ? a : b;
 
-                            const front = proj >= 0 ? b : a;
+                                const front = proj >= 0 ? b : a;
 
-                            const rCos = Math.cos(rear.angle);
+                                const rCos = Math.cos(rear.angle);
 
-                            const rSin = Math.sin(rear.angle);
+                                const rSin = Math.sin(rear.angle);
 
-                            rear.x -= rCos * bestOverlap;
+                                const sep = bestOverlap + 2.0;
 
-                            rear.y -= rSin * bestOverlap;
+                                rear.x -= rCos * sep;
 
-                            const frontSpd = Math.max(0, Math.hypot(front.vx, front.vy) * 0.85);
+                                rear.y -= rSin * sep;
 
-                            const rearSpd = Math.min(Math.hypot(rear.vx, rear.vy), frontSpd);
+                                const frontSpd = Math.max(0, Math.hypot(front.vx, front.vy) * 0.85);
 
-                            rear.vx = rCos * rearSpd;
+                                const rearSpd = Math.min(Math.hypot(rear.vx, rear.vy), frontSpd);
 
-                            rear.vy = rSin * rearSpd;
+                                rear.vx = rCos * rearSpd;
 
-                            rear.speed = rearSpd;
+                                rear.vy = rSin * rearSpd;
 
+                                rear.speed = rearSpd;
+
+                            } else {
+
+                                // Crossing or turning AI vehicles: back the impinging vehicle along its own heading and stop it
+                                let imp = null;
+                                if (hitALever > 0 && hitBLever <= 0 && a.driver) imp = a;
+                                else if (hitBLever > 0 && hitALever <= 0 && b.driver) imp = b;
+                                else if (a.driver && !b.driver) imp = a;
+                                else if (b.driver && !a.driver) imp = b;
+                                else imp = (aSpdW >= bSpdW) ? a : b;
+
+                                const iCos = Math.cos(imp.angle);
+                                const iSin = Math.sin(imp.angle);
+                                const sep = bestOverlap + 2.0;
+                                const otherVeh = imp === a ? b : a;
+                                const toOther = (otherVeh.x - imp.x) * iCos + (otherVeh.y - imp.y) * iSin;
+                                const backSign = toOther >= 0 ? -1 : 1;
+                                imp.x += iCos * sep * backSign;
+                                imp.y += iSin * sep * backSign;
+                                imp.vx = 0;
+                                imp.vy = 0;
+                                imp.speed = 0;
+
+                            }
+
+                        } else if (liveCar && !liveCar.destroyed) {
+                            const lCos = Math.cos(liveCar.angle);
+                            const lSin = Math.sin(liveCar.angle);
+                            const sep = bestOverlap + 2.0;
+                            const toWreck = (wreckCar.x - liveCar.x) * lCos + (wreckCar.y - liveCar.y) * lSin;
+                            const backSign = toWreck >= 0 ? -1 : 1;
+                            liveCar.x += lCos * sep * backSign;
+                            liveCar.y += lSin * sep * backSign;
+                            liveCar.vx = 0;
+                            liveCar.vy = 0;
+                            liveCar.speed = 0;
                         }
 
                         a.angularVelocity = 0;
