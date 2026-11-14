@@ -7347,9 +7347,13 @@ class RetroRenderer {
     sortAndBuildSpriteBatch() {
         if (!this.spriteQueue || this.spriteQueue.length === 0) {
             this.spriteCount = 0;
+            this.skySpriteStartIdx = 0;
             return;
         }
         this.spriteQueue.sort((lhs, rhs) => {
+            const lSky = lhs.drawOrder >= 14 ? 1 : 0;
+            const rSky = rhs.drawOrder >= 14 ? 1 : 0;
+            if (lSky !== rSky) return lSky - rSky;
             const lh = Math.round(lhs.zBlocks * 2.0);
             const rh = Math.round(rhs.zBlocks * 2.0);
             if (lh !== rh) return lh - rh;
@@ -7362,9 +7366,13 @@ class RetroRenderer {
         let offset = 0;
         const count = Math.min(this.maxSprites, this.spriteQueue.length);
         const invTile = 1.0 / TILE_SIZE;
+        let skyStart = count;
 
         for (let i = 0; i < count; i++) {
             const s = this.spriteQueue[i];
+            if (skyStart === count && s.drawOrder >= 14) {
+                skyStart = i;
+            }
             const cx = s.xPx * invTile;
             const cz = s.yPx * invTile;
             const hw = s.wPx * invTile * 0.5;
@@ -7397,6 +7405,7 @@ class RetroRenderer {
             offset += 54;
         }
         this.spriteCount = count;
+        this.skySpriteStartIdx = skyStart;
     }
 
     flushSpriteBatch(viewProj, nf = 0.0, sf = 0.0, sunDirX = 0.0, sunDirY = 1.0) {
@@ -7445,15 +7454,24 @@ class RetroRenderer {
         gl.enableVertexAttribArray(this.spriteLocs.aColor);
         gl.vertexAttribPointer(this.spriteLocs.aColor, 4, gl.FLOAT, false, stride, 20);
 
-        // Depth test enabled so 3D buildings/bridges occlude sprites below/behind them,
-        // while depthMask(false) allows overlapping sprites (shadows, drivers, turrets, sirens) to layer cleanly!
+        // Pass 1: World & ground sprites (drawOrder < 14) depth-tested against 3D buildings & bridges
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
         gl.depthMask(false);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        gl.drawArrays(gl.TRIANGLES, 0, this.spriteCount * 6);
+        const skyStart = this.skySpriteStartIdx !== undefined ? this.skySpriteStartIdx : this.spriteCount;
+        if (skyStart > 0) {
+            gl.drawArrays(gl.TRIANGLES, 0, skyStart * 6);
+        }
+
+        // Pass 2: High-altitude Sky Aircraft & HUD arrows (drawOrder >= 14) rendered above all 3D rooftops without building depth-clipping!
+        if (skyStart < this.spriteCount) {
+            gl.disable(gl.DEPTH_TEST);
+            gl.drawArrays(gl.TRIANGLES, skyStart * 6, (this.spriteCount - skyStart) * 6);
+            gl.enable(gl.DEPTH_TEST);
+        }
 
         gl.depthMask(true);
     }
@@ -9447,17 +9465,18 @@ class RetroRenderer {
 
                 // Ground shadow cast on the beach/water below (z = 2.02)
                 this.batchObjectSprite3D("dodo_seaplane", px + sunCos * 42, py + sunSin * 42, 2.02, ang, 1.24, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.26);
-                // High-altitude Dodo Tow Plane + spinning nose propeller
-                this.batchObjectSprite3D("dodo_seaplane", px, py, pz, ang, 1.24, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                // High-altitude Dodo Tow Plane + spinning nose propeller (SKY_AIRCRAFT pass above all buildings)
+                const skyOrder = SPRITE_DRAW_ORDER.SKY_AIRCRAFT || 16;
+                this.batchObjectSprite3D("dodo_seaplane", px, py, pz, ang, 1.24, skyOrder);
                 const propSpan = 16.0 * Math.abs(Math.cos(this.time * 28.0 + i));
-                this.pushSolidQuad3D(px + cs * 36, py + sn * 36, pz + 0.01, 2.6, 3.0 + propSpan, ang, 0.92, 0.96, 1.0, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.pushSolidQuad3D(px + cs * 36, py + sn * 36, pz + 0.01, 2.6, 3.0 + propSpan, ang, 0.92, 0.96, 1.0, 0.85, skyOrder);
                 // Trailing GTA Satirical Aerial Banner ("NINE 1 NINE", "Pißwasser", "Sprunk", "eCola") fluttering behind the tail!
                 const flutter = Math.sin(this.time * 7.5 + i) * 0.06;
                 const banX = px - cs * 96, banY = py - sn * 96;
                 const skyAds = ["sky_banner_919", "ad_pisswasser", "ad_sprunk", "ad_ecola"];
                 const skyAdKey = skyAds[i % skyAds.length];
                 const skyAdScale = skyAdKey === "sky_banner_919" ? 1.18 : 0.72;
-                this.batchObjectSprite3D(skyAdKey, banX, banY, pz - 0.02, ang + flutter, skyAdScale, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.batchObjectSprite3D(skyAdKey, banX, banY, pz - 0.02, ang + flutter, skyAdScale, skyOrder);
             }
         }
         const mPlanes = this.map.mooredSeaplanes;
@@ -9473,6 +9492,8 @@ class RetroRenderer {
 
         // 13B) GTA 6 Trailer 1 (0:44) VCPD & News Aerial Searchlight Helicopters ("aerialSearchHelis") & Coastal Seagull Flocks ("seagullFlocks")
         if (Array.isArray(this.map.aerialSearchHelis)) {
+            const skyOrder = SPRITE_DRAW_ORDER.SKY_AIRCRAFT || 16;
+            const camElev = this.currentCamElev || (this.camZBlocks + this.followHeightBlocks);
             for (let hi = 0; hi < this.map.aerialSearchHelis.length; hi++) {
                 const ah = this.map.aerialSearchHelis[hi];
                 const t = this.time * (ah.speed || 0.24) + ah.seed;
@@ -9484,27 +9505,33 @@ class RetroRenderer {
                 const hAng = Math.atan2(vy, vx);
                 const cs = Math.cos(hAng), sn = Math.sin(hAng);
                 const hz = ah.z || 4.55;
+                const altComp = Math.max(0.42, Math.min(1.0, (camElev - hz) / Math.max(1.5, camElev - 3.55)));
+                const shOff = 26.0 * altComp;
 
-                // Helicopter ground shadow (volumetric sweeping searchlight cone & pool rendered in renderNightLighting!)
-                this.batchObjectSprite3D("heli_vice", hx + sunCos * 38, hy + sunSin * 38, 2.02, hAng, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.26);
+                // Helicopter ground/rooftop shadow (volumetric sweeping searchlight cone & pool rendered in renderNightLighting!)
+                this.batchObjectSprite3D("heli_vice", hx + sunCos * shOff, hy + sunSin * shOff, hz - 0.01, hAng, 0.78 * altComp, skyOrder, 0.02, 0.03, 0.06, 0.22);
 
-                // Airborne Helicopter + Translucent Spinning Rotor (#540..#547) + Flashing Red/Blue Aviation Strobes
-                this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 1.18, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                // Airborne Helicopter + Translucent Spinning Rotor (#540..#547) + Flashing Red/Blue Aviation Strobes in SKY_AIRCRAFT pass
+                this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 0.92 * altComp, skyOrder);
                 const rotSpr = String(540 + (Math.floor(this.time * 24.0 + hi * 3) % 8));
-                this.batchObjectSprite3D(rotSpr, hx + cs * 7.0, hy + sn * 7.0, hz + 0.05, hAng, 0.86, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.batchObjectSprite3D(rotSpr, hx + cs * 5.8 * altComp, hy + sn * 5.8 * altComp, hz + 0.03, hAng, 0.68 * altComp, skyOrder);
                 const strobeRed = Math.sin(this.time * 9.0 + hi) >= 0;
-                this.pushSolidQuad3D(hx - cs * 14, hy - sn * 14, hz + 0.03, 4.2, 4.2, 0, strobeRed ? 1.0 : 0.18, strobeRed ? 0.16 : 0.65, strobeRed ? 0.20 : 1.0, 0.92, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.pushSolidQuad3D(hx - cs * 13 * altComp, hy - sn * 13 * altComp, hz + 0.02, 3.6 * altComp, 3.6 * altComp, 0, strobeRed ? 1.0 : 0.18, strobeRed ? 0.16 : 0.65, strobeRed ? 0.20 : 1.0, 0.92, skyOrder);
             }
         }
-        // 13C) 6-Star VCPD Police Pursuit Helicopter Orbiting / Circling Around the Player!
+        // 13C) 6-Star VCPD Police Pursuit Helicopter Orbiting / Circling High Above the Rooftops!
         if (game && game.policeHeli) {
             const ph = game.policeHeli;
             const hx = ph.x;
             const hy = ph.y;
-            if (hx >= minX - 420 && hx <= maxX + 420 && hy >= minY - 420 && hy <= maxY + 420) {
+            if (hx >= minX - 480 && hx <= maxX + 480 && hy >= minY - 480 && hy <= maxY + 480) {
+                const skyOrder = SPRITE_DRAW_ORDER.SKY_AIRCRAFT || 16;
                 const hAng = ph.angle || 0;
                 const cs = Math.cos(hAng), sn = Math.sin(hAng);
-                const hz = ph.z || 3.68;
+                const hz = ph.z || 4.55;
+                const camElev = this.currentCamElev || (this.camZBlocks + this.followHeightBlocks);
+                // Perspective scale compensation so raising hz above tall buildings keeps the chopper crisp & high-altitude on screen
+                const altComp = Math.max(0.38, Math.min(1.0, (camElev - hz) / Math.max(1.5, camElev - 3.55)));
                 const sx = ph.searchX !== undefined ? ph.searchX : hx;
                 const sy = ph.searchY !== undefined ? ph.searchY : hy;
                 const gz = this.map && this.map.getHeightAtPixel ? this.map.getHeightAtPixel(sx, sy, 2.0) : 2.0;
@@ -9514,24 +9541,26 @@ class RetroRenderer {
                     this.batchObjectSprite3D("heli_searchlight", sx, sy, gz + 0.018, this.time * 0.8, 1.12, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.72, 0.92, 1.0, 0.24);
                 }
 
-                // 2) High-Altitude Helicopter Ground Shadow (distant offset + softer penumbra)
-                this.batchObjectSprite3D("heli_vice", hx + sunCos * 38, hy + sunSin * 38, 2.02, hAng, 1.08, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.22);
+                // 2) High-Altitude Helicopter Shadow (casts onto both streets AND building rooftops at a constant solar offset!)
+                const shOff = 26.0 * altComp;
+                this.batchObjectSprite3D("heli_vice", hx + sunCos * shOff, hy + sunSin * shOff, hz - 0.01, hAng, 0.78 * altComp, skyOrder, 0.02, 0.03, 0.06, 0.22);
 
-                // 3) Airborne VCPD Pursuit Helicopter at elevated altitude (z = 3.68) + Fast-Spinning Rotor (#540..#547)
-                this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 0.96, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                // 3) Airborne VCPD Pursuit Helicopter in SKY_AIRCRAFT layer (above all 3D rooftops) + Fast-Spinning Rotor (#540..#547)
+                this.batchObjectSprite3D("heli_vice", hx, hy, hz, hAng, 0.88 * altComp, skyOrder);
                 const rotSpr = String(540 + (Math.floor(this.time * 28.0) % 8));
-                this.batchObjectSprite3D(rotSpr, hx + cs * 5.8, hy + sn * 5.8, hz + 0.05, hAng, 0.72, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                this.batchObjectSprite3D(rotSpr, hx + cs * (5.5 * altComp), hy + sn * (5.5 * altComp), hz + 0.03, hAng, 0.68 * altComp, skyOrder);
 
                 // 4) Alternating Red & Blue VCPD Police Aviation Strobe Beacons (Nose + Tail)
                 const strobeFlip = Math.floor(this.time * 10.0) % 2 === 0;
-                this.pushSolidQuad3D(hx + cs * 11, hy + sn * 11, hz + 0.035, 3.6, 3.6, hAng, strobeFlip ? 1.0 : 0.12, strobeFlip ? 0.14 : 0.58, strobeFlip ? 0.18 : 1.0, 0.96, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
-                this.pushSolidQuad3D(hx - cs * 13, hy - sn * 13, hz + 0.035, 3.6, 3.6, hAng, strobeFlip ? 0.12 : 1.0, strobeFlip ? 0.58 : 0.14, strobeFlip ? 1.0 : 0.18, 0.96, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                const stSz = 3.4 * altComp;
+                this.pushSolidQuad3D(hx + cs * (11.0 * altComp), hy + sn * (11.0 * altComp), hz + 0.02, stSz, stSz, hAng, strobeFlip ? 1.0 : 0.12, strobeFlip ? 0.14 : 0.58, strobeFlip ? 0.18 : 1.0, 0.96, skyOrder);
+                this.pushSolidQuad3D(hx - cs * (13.0 * altComp), hy - sn * (13.0 * altComp), hz + 0.02, stSz, stSz, hAng, strobeFlip ? 0.12 : 1.0, strobeFlip ? 0.58 : 0.14, strobeFlip ? 1.0 : 0.18, 0.96, skyOrder);
 
                 // 5) Door-Gunner Muzzle Flash when firing burst
                 if ((ph.muzzleTimer || 0) > 0 && this.gta1Meta.sprites.objects["234"]) {
-                    const sideX = hx - sn * 6.5;
-                    const sideY = hy + cs * 6.5;
-                    this.batchObjectSprite3D("234", sideX, sideY, hz - 0.02, hAng + Math.PI * 0.5, 0.52, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
+                    const sideX = hx - sn * (6.2 * altComp);
+                    const sideY = hy + cs * (6.2 * altComp);
+                    this.batchObjectSprite3D("234", sideX, sideY, hz - 0.01, hAng + Math.PI * 0.5, 0.48 * altComp, skyOrder);
                 }
             }
         }
@@ -12604,14 +12633,16 @@ class RetroRenderer {
             if (Math.abs(hx - this.camX) <= 1080 && Math.abs(hy - this.camY) <= 840) {
                 const hAng = ph.angle || 0;
                 const cs = Math.cos(hAng), sn = Math.sin(hAng);
-                const hz = ph.z || 3.68;
+                const hz = ph.z || 4.55;
+                const camElev = this.currentCamElev || (this.camZBlocks + this.followHeightBlocks);
+                const altComp = Math.max(0.38, Math.min(1.0, (camElev - hz) / Math.max(1.5, camElev - 3.55)));
                 const beamX = ph.searchX !== undefined ? ph.searchX : hx;
                 const beamY = ph.searchY !== undefined ? ph.searchY : hy;
                 const gz = this.map && this.map.getHeightAtPixel ? this.map.getHeightAtPixel(beamX, beamY, 2.0) : 2.0;
 
-                const nSc = this.worldToScreen(hx + cs * 16.0, hy + sn * 16.0, hz - 0.04);
+                const nSc = this.worldToScreen(hx + cs * (12.0 * altComp), hy + sn * (12.0 * altComp), hz - 0.02);
                 const bSc = this.worldToScreen(beamX, beamY, gz + 0.04);
-                const tSc = this.worldToScreen(hx - cs * 14.0, hy - sn * 14.0, hz + 0.03);
+                const tSc = this.worldToScreen(hx - cs * (13.0 * altComp), hy - sn * (13.0 * altComp), hz + 0.02);
                 if (bSc.x >= -320 && bSc.x <= W + 320 && bSc.y >= -320 && bSc.y <= H + 320) {
                     const hScale = (nSc.scale * H) / 128.0;
                     const bScale = (bSc.scale * H) / 128.0;

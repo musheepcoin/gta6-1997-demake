@@ -15214,14 +15214,14 @@ class LeonidaGame {
                 if (!this.policeHeli) {
                     const initAng = Math.random() * Math.PI * 2;
                     this.policeHeli = {
-                        x: targetEnt.x + Math.cos(initAng) * 380,
-                        y: targetEnt.y + Math.sin(initAng) * 320,
-                        z: 3.68,
+                        x: targetEnt.x + Math.cos(initAng) * 340,
+                        y: targetEnt.y + Math.sin(initAng) * 280,
+                        z: 3.88,
                         cx: targetEnt.x,
                         cy: targetEnt.y,
                         orbitAngle: initAng,
-                        orbitRx: 136,
-                        orbitRy: 98,
+                        orbitRx: 128,
+                        orbitRy: 94,
                         angle: initAng + Math.PI * 0.5,
                         searchX: targetEnt.x,
                         searchY: targetEnt.y,
@@ -15241,8 +15241,8 @@ class LeonidaGame {
                 const orbitOmega = 0.48; // ~13.1s per wide 360° observation orbit
                 heli.orbitAngle = (heli.orbitAngle || 0) + orbitOmega * dt;
                 const wobble = 1.0 + Math.sin(heli.orbitAngle * 2.0) * 0.06;
-                const rx = (heli.orbitRx || 136) * wobble;
-                const ry = (heli.orbitRy || 98) * wobble;
+                const rx = (heli.orbitRx || 128) * wobble;
+                const ry = (heli.orbitRy || 94) * wobble;
                 const desX = heli.cx + Math.cos(heli.orbitAngle) * rx;
                 const desY = heli.cy + Math.sin(heli.orbitAngle) * ry;
                 const dx = desX - heli.x;
@@ -15271,7 +15271,19 @@ class LeonidaGame {
                 while (angDiff > Math.PI) angDiff -= Math.PI * 2;
                 while (angDiff < -Math.PI) angDiff += Math.PI * 2;
                 heli.angle = (heli.angle || 0) + angDiff * Math.min(1, dt * 5.5);
-                heli.z = 3.68 + Math.sin(performance.now() * 0.0035) * 0.05;
+                // Dynamic rooftop-clearing radar altimeter: sample nearby building heights and climb smoothly when passing over buildings!
+                let localRoofZ = 2.0;
+                if (this.map && typeof this.map.getHeightAtPixel === "function") {
+                    const probes = [
+                        [0, 0], [44, 0], [-44, 0], [0, 44], [0, -44]
+                    ];
+                    for (let pi = 0; pi < probes.length; pi++) {
+                        const pz = this.map.getHeightAtPixel(heli.x + probes[pi][0], heli.y + probes[pi][1], 6.0, true);
+                        if (pz > localRoofZ) localRoofZ = pz;
+                    }
+                }
+                const targetAltZ = (localRoofZ > 2.5 ? 4.12 : 3.88) + Math.sin(performance.now() * 0.0035) * 0.04;
+                heli.z = (heli.z || 3.88) + (targetAltZ - (heli.z || 3.88)) * Math.min(1, dt * 3.5);
                 heli.searchX += (targetEnt.x - (heli.searchX ?? targetEnt.x)) * Math.min(1, dt * 6.5);
                 heli.searchY += (targetEnt.y - (heli.searchY ?? targetEnt.y)) * Math.min(1, dt * 6.5);
 

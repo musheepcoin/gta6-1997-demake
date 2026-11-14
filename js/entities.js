@@ -865,7 +865,8 @@ const SPRITE_DRAW_ORDER = Object.freeze({
     ROOF_LIGHTS: 12,
     EXPLOSION: 13,
     HUD_ARROW: 14,
-    FOREGROUND: 15
+    FOREGROUND: 15,
+    SKY_AIRCRAFT: 16
 });
 
 class Vehicle {
