@@ -15092,183 +15092,206 @@ class RetroRenderer {
         const notchX = sx + (sw - notchW) * 0.5;
         const notchY = sy + 4;
 
+        // Helper to draw authentic stepped pixel-art cards/buttons (2px pixel corners + top specular highlight + bottom shadow)
+        const drawPixelBox = (c, x, y, w, h, fillCol, borderCol, topHiCol = null, btmShadeCol = null, step = 2) => {
+            const ix = Math.round(x);
+            const iy = Math.round(y);
+            const iw = Math.round(w);
+            const ih = Math.round(h);
+            // Outer pixel border with stepped corners
+            c.fillStyle = borderCol;
+            c.fillRect(ix + step, iy, iw - step * 2, ih);
+            c.fillRect(ix, iy + step, iw, ih - step * 2);
+            if (step >= 2) {
+                c.fillRect(ix + 1, iy + 1, iw - 2, ih - 2);
+            }
+            // Inner fill
+            c.fillStyle = fillCol;
+            c.fillRect(ix + step, iy + 1, iw - step * 2, ih - 2);
+            c.fillRect(ix + 1, iy + step, iw - 2, ih - step * 2);
+            // Top pixel specular highlight
+            if (topHiCol) {
+                c.fillStyle = topHiCol;
+                c.fillRect(ix + step, iy + 1, iw - step * 2, 1);
+            }
+            // Bottom pixel bevel shadow
+            if (btmShadeCol) {
+                c.fillStyle = btmShadeCol;
+                c.fillRect(ix + step, iy + ih - 2, iw - step * 2, 1);
+            }
+        };
+
         if (!isMinimized) {
             const bw = pw + 8;
-            const bh = ph + 14;
+            const bh = ph + 8;
             if (!this._phoneBezelCanvas || this._phoneBezelCanvas.width !== bw || this._phoneBezelCanvas.height !== bh) {
                 const bc = document.createElement("canvas");
                 bc.width = bw;
                 bc.height = bh;
                 const bctx = bc.getContext("2d");
+                bctx.imageSmoothingEnabled = false;
                 const ox = 4;
-                const oy = 10;
+                const oy = 4;
 
-                // Top-right stubby cellular mobile phone antenna
-                rrectOn(bctx, ox + pw - 28, 1, 13, 11, 3);
-                bctx.fillStyle = "#111622";
-                bctx.fill();
-                bctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
-                bctx.lineWidth = 1.2;
-                bctx.stroke();
-                bctx.fillStyle = "#39ff14";
-                bctx.fillRect(ox + pw - 23, 3, 3, 2);
+                // 2026 Titanium Smartphone Side Buttons (Action button + Vol Up/Down + Power button in crisp pixel blocks)
+                bctx.fillStyle = "#64748b";
+                bctx.fillRect(ox - 2, oy + 38, 2, 10);
+                bctx.fillRect(ox - 2, oy + 56, 2, 20);
+                bctx.fillRect(ox - 2, oy + 80, 2, 20);
+                bctx.fillRect(ox + pw, oy + 64, 2, 26);
+                bctx.fillStyle = "#94a3b8";
+                bctx.fillRect(ox - 2, oy + 38, 1, 9);
+                bctx.fillRect(ox - 2, oy + 56, 1, 19);
+                bctx.fillRect(ox - 2, oy + 80, 1, 19);
+                bctx.fillRect(ox + pw + 1, oy + 64, 1, 25);
 
-                // Side tactile buttons / grip ribs on mobile phone casing
-                bctx.fillStyle = "#273042";
-                bctx.strokeStyle = "rgba(250, 204, 21, 0.45)";
-                bctx.lineWidth = 1;
-                rrectOn(bctx, ox - 2.5, oy + 36, 3, 12, 1); bctx.fill(); bctx.stroke();
-                rrectOn(bctx, ox - 2.5, oy + 54, 3, 20, 1); bctx.fill(); bctx.stroke();
-                rrectOn(bctx, ox - 2.5, oy + 78, 3, 20, 1); bctx.fill(); bctx.stroke();
-                rrectOn(bctx, ox + pw - 0.5, oy + 62, 3, 26, 1); bctx.fill(); bctx.stroke();
+                // Stepped Pixel-Art 2026 Borderless Smartphone Titanium Chassis (No antenna!)
+                const drawSteppedPhoneRect = (c, rx, ry, rw, rh, col, corner = 6) => {
+                    c.fillStyle = col;
+                    c.fillRect(rx + corner, ry, rw - corner * 2, rh);
+                    c.fillRect(rx + 4, ry + 1, rw - 8, rh - 2);
+                    c.fillRect(rx + 2, ry + 2, rw - 4, rh - 4);
+                    c.fillRect(rx + 1, ry + 4, rw - 2, rh - 8);
+                    c.fillRect(rx, ry + corner, rw, rh - corner * 2);
+                };
 
-                // Rugged 90s / GTA Cellular Handset Chassis (Charcoal + Beveled Gold Rim)
-                rrectOn(bctx, ox, oy, pw, ph, 14);
-                const bodyGrad = bctx.createLinearGradient(ox, oy, ox + pw, oy + ph);
-                bodyGrad.addColorStop(0, "#1c2333");
-                bodyGrad.addColorStop(0.5, "#0f141f");
-                bodyGrad.addColorStop(1, "#182030");
-                bctx.fillStyle = bodyGrad;
-                bctx.fill();
-                bctx.lineWidth = 2.2;
-                const frameGrad = bctx.createLinearGradient(ox, oy, ox + pw, oy + ph);
-                frameGrad.addColorStop(0, "#fde047");
-                frameGrad.addColorStop(0.45, "#ca8a04");
-                frameGrad.addColorStop(1, "#eab308");
-                bctx.strokeStyle = frameGrad;
-                bctx.stroke();
+                // Outer dark pixel outline + Titanium bezel + Specular pixel rim
+                drawSteppedPhoneRect(bctx, ox - 1, oy - 1, pw + 2, ph + 2, "#020617", 7);
+                drawSteppedPhoneRect(bctx, ox, oy, pw, ph, "#64748b", 6);
+                drawSteppedPhoneRect(bctx, ox + 1, oy + 1, pw - 2, ph - 2, "#334155", 6);
+                drawSteppedPhoneRect(bctx, ox + 2, oy + 2, pw - 4, ph - 4, "#090d16", 5);
+                // Top-left titanium pixel highlight
+                bctx.fillStyle = "#cbd5e1";
+                bctx.fillRect(ox + 7, oy, pw - 14, 1);
+                bctx.fillRect(ox, oy + 7, 1, ph - 14);
 
-                // Inner metallic bezel trim
-                rrectOn(bctx, ox + 2.5, oy + 2.5, pw - 5, ph - 5, 12);
-                bctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
-                bctx.lineWidth = 1;
-                bctx.stroke();
-
-                // Recessed Dark CRT LCD Screen
+                // 2026 Edge-to-Edge OLED Screen with Pixel-Dithered Vice City 26 Sunset Wallpaper
                 const osx = ox + 5;
                 const osy = oy + 5;
-                rrectOn(bctx, osx, osy, sw, sh, 9);
-                const wallGrad = bctx.createLinearGradient(osx, osy, osx, osy + sh);
-                wallGrad.addColorStop(0, "#070b12");
-                wallGrad.addColorStop(0.6, "#090f1a");
-                wallGrad.addColorStop(1, "#060911");
-                bctx.fillStyle = wallGrad;
-                bctx.fill();
-                bctx.strokeStyle = "rgba(250, 204, 21, 0.35)";
-                bctx.lineWidth = 1;
-                bctx.stroke();
+                drawSteppedPhoneRect(bctx, osx, osy, sw, sh, "#0d1226", 4);
 
-                // Subtle CRT horizontal scanlines inside screen
-                bctx.fillStyle = "rgba(0, 0, 0, 0.22)";
-                for (let syLine = osy + 2; syLine < osy + sh - 2; syLine += 3) {
-                    bctx.fillRect(osx + 2, syLine, sw - 4, 1);
+                const bands = [
+                    { y0: 0,    y1: 0.28, c0: "#0c1328", c1: "#131836" },
+                    { y0: 0.28, y1: 0.58, c0: "#131836", c1: "#1e1642" },
+                    { y0: 0.58, y1: 0.84, c0: "#1e1642", c1: "#2d1448" },
+                    { y0: 0.84, y1: 1.00, c0: "#2d1448", c1: "#3d134c" }
+                ];
+                for (let pyRow = 4; pyRow < sh - 4; pyRow += 2) {
+                    const t = pyRow / sh;
+                    let band = bands[bands.length - 1];
+                    for (let bi = 0; bi < bands.length; bi++) {
+                        if (t <= bands[bi].y1) { band = bands[bi]; break; }
+                    }
+                    const localT = (t - band.y0) / Math.max(0.01, band.y1 - band.y0);
+                    bctx.fillStyle = localT < 0.5 ? band.c0 : band.c1;
+                    bctx.fillRect(osx + 2, osy + pyRow, sw - 4, 2);
+                    // Pixel dither transition band
+                    if (localT >= 0.38 && localT <= 0.62) {
+                        bctx.fillStyle = band.c1;
+                        const offset = ((pyRow >> 1) & 1) * 2;
+                        for (let pxCol = osx + 2 + offset; pxCol < osx + sw - 4; pxCol += 4) {
+                            bctx.fillRect(pxCol, osy + pyRow, 2, 2);
+                        }
+                    }
                 }
 
-                // Classic cellular earpiece speaker grille + status LED at top-center
-                const onotchX = osx + (sw - notchW) * 0.5;
-                const onotchY = osy + 3.5;
-                rrectOn(bctx, onotchX, onotchY, notchW, notchH, 3);
-                bctx.fillStyle = "#04070d";
-                bctx.fill();
-                bctx.strokeStyle = "rgba(250, 204, 21, 0.38)";
-                bctx.lineWidth = 0.9;
-                bctx.stroke();
-                bctx.fillStyle = "#334155";
-                for (let slot = 0; slot < 5; slot++) {
-                    bctx.fillRect(onotchX + 9 + slot * 6.5, onotchY + 4, 4, 3);
-                }
-                bctx.fillStyle = "#39ff14";
-                bctx.fillRect(onotchX + notchW - 8, onotchY + 4, 3, 3);
+                // 2026 Pixel-Art Dynamic Island (Centered Pill Notch + Camera Lens + Privacy Pixel)
+                const onotchX = Math.round(osx + (sw - notchW) * 0.5);
+                const onotchY = osy + 3;
+                drawPixelBox(bctx, onotchX, onotchY, notchW, notchH, "#020617", "#1e293b", null, null, 2);
+                // Pixel camera housing + cyan lens reflection + active green mic/cam dot
+                bctx.fillStyle = "#0f172a";
+                bctx.fillRect(onotchX + notchW - 13, onotchY + 3, 5, 5);
+                bctx.fillStyle = "#38bdf8";
+                bctx.fillRect(onotchX + notchW - 12, onotchY + 4, 2, 2);
+                bctx.fillStyle = "#4ade80";
+                bctx.fillRect(onotchX + 7, onotchY + 4, 3, 3);
 
-                // Retro CELL signal bars + segmented battery icon
-                const sigX = osx + sw - 54;
-                const sigY = osy + 12.5;
-                bctx.fillStyle = "#39ff14";
+                // 2026 Pixel-Art Status Bar: 4-Bar Signal + "5G" + Pixel Battery
+                const sigX = osx + sw - 52;
+                const sigY = osy + 12;
+                bctx.fillStyle = "#f8fafc";
                 for (let b = 0; b < 4; b++) {
-                    const bbh = 3 + b * 1.6;
-                    bctx.fillRect(sigX + b * 3.2, sigY - bbh, 2.2, bbh);
+                    const bbh = 3 + b * 2;
+                    bctx.fillRect(sigX + b * 3, sigY - bbh, 2, bbh);
                 }
-                bctx.fillStyle = "#fde047";
-                bctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
+                bctx.fillStyle = "#38bdf8";
+                bctx.font = "bold 8px Consolas, 'Courier New', monospace";
                 bctx.textBaseline = "middle";
-                bctx.fillText("CELL", sigX + 14, osy + 9.5);
+                bctx.fillText("5G", sigX + 14, osy + 9);
 
-                const batX = osx + sw - 19;
-                const batY = osy + 6;
-                bctx.strokeStyle = "#facc15";
-                bctx.lineWidth = 1;
-                rrectOn(bctx, batX, batY, 13, 6.5, 1);
-                bctx.stroke();
-                bctx.fillStyle = "#39ff14";
-                bctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
-                bctx.fillStyle = "#facc15";
-                bctx.fillRect(batX + 13.5, batY + 2, 1.3, 2.5);
+                const batX = osx + sw - 21;
+                const batY = osy + 5;
+                bctx.fillStyle = "#cbd5e1";
+                bctx.fillRect(batX, batY, 13, 7);
+                bctx.fillStyle = "#090d16";
+                bctx.fillRect(batX + 1, batY + 1, 11, 5);
+                bctx.fillStyle = "#4ade80";
+                bctx.fillRect(batX + 2, batY + 2, 8, 3);
+                bctx.fillStyle = "#cbd5e1";
+                bctx.fillRect(batX + 13, batY + 2, 2, 3);
 
                 this._phoneBezelCanvas = bc;
             }
-            ctx.drawImage(this._phoneBezelCanvas, px - 4, py - 10);
+            ctx.drawImage(this._phoneBezelCanvas, px - 4, py - 4);
             ctx.save();
         } else {
-            // Minimized retro cellular phone header bar
-            rrect(px + pw - 28, py - 6, 12, 7, 2);
-            ctx.fillStyle = "#111622";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            rrect(px, py, pw, ph, 10);
-            ctx.fillStyle = "#111622";
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "#eab308";
-            ctx.stroke();
-
-            rrect(sx, sy, sw, sh, 7);
-            ctx.fillStyle = "#070b12";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(250, 204, 21, 0.35)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            // Minimized 2026 Pixel-Art Smartphone Pill
+            drawPixelBox(ctx, px, py, pw, ph, "#0f172a", "#475569", "#94a3b8", "#020617", 3);
+            drawPixelBox(ctx, sx, sy, sw, sh, "#131836", "#1e293b", "#38bdf8", null, 2);
             ctx.save();
 
-            const sigX = sx + sw - 54;
-            const sigY = sy + 12.5;
-            ctx.fillStyle = "#39ff14";
+            const sigX = sx + sw - 52;
+            const sigY = sy + 12;
+            ctx.fillStyle = "#f8fafc";
             for (let b = 0; b < 4; b++) {
-                const bh = 3 + b * 1.6;
-                ctx.fillRect(sigX + b * 3.2, sigY - bh, 2.2, bh);
+                const bh = 3 + b * 2;
+                ctx.fillRect(sigX + b * 3, sigY - bh, 2, bh);
             }
-            ctx.fillStyle = "#fde047";
-            ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
             ctx.textBaseline = "middle";
-            ctx.fillText("CELL", sigX + 14, sy + 9.5);
+            ctx.fillText("5G", sigX + 14, sy + 9);
 
-            const batX = sx + sw - 19;
-            const batY = sy + 6;
-            ctx.strokeStyle = "#facc15";
-            ctx.lineWidth = 1;
-            rrect(batX, batY, 13, 6.5, 1);
-            ctx.stroke();
-            ctx.fillStyle = "#39ff14";
-            ctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
-            ctx.fillStyle = "#facc15";
-            ctx.fillRect(batX + 13.5, batY + 2, 1.3, 2.5);
+            const batX = sx + sw - 21;
+            const batY = sy + 5;
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect(batX, batY, 13, 7);
+            ctx.fillStyle = "#090d16";
+            ctx.fillRect(batX + 1, batY + 1, 11, 5);
+            ctx.fillStyle = "#4ade80";
+            ctx.fillRect(batX + 2, batY + 2, 8, 3);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect(batX + 13, batY + 2, 2, 3);
         }
 
-        ctx.fillStyle = "#fde047";
-        ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+        // Pixel-Art Sun/Moon Icon + 2026 Status Bar Clock
+        const isNightClock = timeInfo.phase !== "DAY";
+        const clkIconX = sx + 7;
+        const clkIconY = sy + 5;
+        if (isNightClock) {
+            ctx.fillStyle = "#38bdf8";
+            ctx.fillRect(clkIconX + 1, clkIconY + 1, 5, 6);
+            ctx.fillStyle = "#0d1226";
+            ctx.fillRect(clkIconX + 3, clkIconY + 1, 4, 4);
+        } else {
+            ctx.fillStyle = "#fde047";
+            ctx.fillRect(clkIconX + 1, clkIconY + 1, 6, 6);
+            ctx.fillStyle = "#f59e0b";
+            ctx.fillRect(clkIconX + 2, clkIconY + 2, 4, 4);
+        }
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 9px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
-        ctx.fillText(`${timeInfo.icon} ${liveClockStr}`, sx + 6, sy + 9.5);
+        ctx.fillText(liveClockStr, sx + 17, sy + 9);
         this.cheatButtons.push({ id: "TOGGLE_NIGHT", x: sx + 4, y: sy + 2, w: 68, h: 15 });
 
         if (isMinimized) {
-            ctx.fillStyle = "#39ff14";
-            ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
-            ctx.fillText(isMobile ? "📱 • 🎵 • 📍" : "🧭 GPS • 🎵 FM • 📍 PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+            ctx.fillText(isMobile ? "MAPS • MUSIC • DM" : "MAPS 26 • MUSIC • PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
             this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
             ctx.restore();
-            // On mobile/minimized mode, render a compact live GPS mini-radar directly below the pill so the player always has a live radar!
             const miniRadarH = isMobile ? 114 : 0;
             if (miniRadarH > 0) {
                 this.renderPhoneGpsWidget(ctx, game, px, py + ph + 4, pw, miniRadarH, rrect);
@@ -15278,44 +15301,52 @@ class RetroRenderer {
             return;
         }
 
-        // Tap top-right of status bar or earpiece grille to minimize the Mobile Phone on mobile/desktop
+        // Tap top-right of status bar or Dynamic Island to minimize the Smartphone
         this.cheatButtons.push({ id: "MINIMIZE_PHONE", x: notchX, y: sy + 1, w: sx + sw - notchX, h: 16 });
 
         // ====================================================================
-        // WIDGET 1 (TOP OF PHONE): LIVE GPS MAP OR 16 FAST-TRAVEL PLACES GRID
+        // WIDGET 1 (TOP OF 2026 SMARTPHONE): LIVE MAPS 26 OR FAST-TRAVEL APP
         // ====================================================================
         const gpsTopY = sy + 18;
         if (!isPlacesApp) {
             this.renderPhoneGpsWidget(ctx, game, sx + 6, gpsTopY, sw - 12, 174, rrect);
         } else {
-            // 16 Fast-Travel Landmarks Grid inside the Mobile Phone
+            // 16 Fast-Travel Landmarks Grid inside the 2026 Pixel-Art Smartphone
             const hdrH = 19;
-            rrect(sx + 6, gpsTopY, sw - 12, hdrH, 3);
-            ctx.fillStyle = "rgba(9, 13, 22, 0.95)";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            drawPixelBox(ctx, sx + 6, gpsTopY, sw - 12, hdrH, "#0f172a", "#0284c7", "#38bdf8", "#020617", 2);
 
             const visitedCount = Array.isArray(this.map.landmarks)
                 ? this.map.landmarks.filter((lm) => lm.visited).length
                 : 0;
             const totalLm = Array.isArray(this.map.landmarks) ? this.map.landmarks.length : 16;
 
-            ctx.fillStyle = "#fde047";
-            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-            ctx.fillText(`📍 FAST TRAVEL (${visitedCount}/${totalLm})`, sx + 11, gpsTopY + 10);
+            // Pixel Pin Icon
+            ctx.fillStyle = "#ff2a85";
+            ctx.fillRect(sx + 11, gpsTopY + 5, 5, 5);
+            ctx.fillRect(sx + 12, gpsTopY + 10, 3, 3);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(sx + 13, gpsTopY + 6, 1, 2);
+
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+            ctx.fillText(`MAPS 26 • FAST TRAVEL (${visitedCount}/${totalLm})`, sx + 20, gpsTopY + 10);
 
             const drawPhoneAppBtn = (id, label, bx, by, bw, bh = 17, highlight = false, extra = null) => {
-                rrect(bx, by, bw, bh, 3);
-                ctx.fillStyle = highlight ? "rgba(66, 32, 6, 0.85)" : "rgba(15, 21, 33, 0.94)";
-                ctx.fill();
-                ctx.strokeStyle = highlight ? "#facc15" : "rgba(148, 163, 184, 0.42)";
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.fillStyle = highlight ? "#fde047" : "#e2e8f0";
-                ctx.font = "bold 8.4px Consolas, 'Courier New', monospace";
-                ctx.fillText(label, bx + 4, by + bh * 0.5 + 0.5);
+                drawPixelBox(
+                    ctx,
+                    bx,
+                    by,
+                    bw,
+                    bh,
+                    highlight ? "#2e1038" : "#111827",
+                    highlight ? "#ff2a85" : "#1e3a5f",
+                    highlight ? "#f472b6" : "#38bdf8",
+                    "#020617",
+                    2
+                );
+                ctx.fillStyle = highlight ? "#fde047" : "#f1f5f9";
+                ctx.font = "bold 8.2px Consolas, 'Courier New', monospace";
+                ctx.fillText(label, bx + 5, by + bh * 0.5 + 0.5);
                 this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: bh, ...(extra || {}) });
             };
 
@@ -15370,35 +15401,31 @@ class RetroRenderer {
         }
 
         // ====================================================================
-        // WIDGET 2 (MIDDLE OF PHONE): BUILT-IN VICE CITY FM MUSIC PLAYER
+        // WIDGET 2 (MIDDLE OF 2026 SMARTPHONE): VICE MUSIC 26 STREAMING CARD
         // ====================================================================
         const musX = sx + 6;
         const musY = sy + 196;
         const musW = sw - 12;
         const musH = 44;
 
-        rrect(musX, musY, musW, musH, 4);
-        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.52)";
-        ctx.lineWidth = 1.1;
-        ctx.stroke();
+        drawPixelBox(ctx, musX, musY, musW, musH, "#14112b", "#db2777", "#f472b6", "#070612", 2);
 
         const isPlaying = game.ytMusicEnabled !== false;
-        // Equalizer bars + Radio Station title
+        // Pixel-Art Mini Album Cover + Equalizer Bars (Spotify 2026 style)
+        drawPixelBox(ctx, musX + 5, musY + 4, 16, 14, "#2e1042", "#00f0ff", null, null, 1);
         ctx.fillStyle = isPlaying ? "#39ff14" : "#64748b";
         for (let b = 0; b < 4; b++) {
             const eqH = isPlaying
-                ? (3 + Math.abs(Math.sin(this.time * 7 + b * 1.4)) * 9)
+                ? Math.round(3 + Math.abs(Math.sin(this.time * 7 + b * 1.4)) * 7)
                 : 3;
-            ctx.fillRect(musX + 8 + b * 3.5, musY + 15 - eqH, 2.2, eqH);
+            ctx.fillRect(musX + 7 + b * 3, musY + 16 - eqH, 2, eqH);
         }
 
-        ctx.fillStyle = "#fde047";
-        ctx.font = "bold 8.6px Consolas, 'Courier New', monospace";
+        ctx.fillStyle = "#00f0ff";
+        ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
         const curSt = (game.audio && typeof game.audio.getCurrentStation === "function") ? game.audio.getCurrentStation() : null;
-        const stLabel = (curSt && curSt.name) ? curSt.name : "VICE CITY FM • RADIO OST";
-        ctx.fillText(stLabel.slice(0, 22), musX + 24, musY + 10.5);
+        const stLabel = (curSt && curSt.name) ? curSt.name : "VICE CITY FM • OST";
+        ctx.fillText(stLabel.slice(0, 21), musX + 25, musY + 10.5);
 
         if (!this._phoneDomEls) {
             this._phoneDomEls = {
@@ -15409,20 +15436,15 @@ class RetroRenderer {
         }
         const volSlider = this._phoneDomEls.volSlider;
         const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (game.ytVolume || 28);
-        ctx.fillStyle = "#39ff14";
-        ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
-        ctx.fillText(`${curVol}%`, musX + musW - 25, musY + 10.5);
+        ctx.fillStyle = "#f472b6";
+        ctx.font = "bold 8px Consolas, 'Courier New', monospace";
+        ctx.fillText(`${curVol}%`, musX + musW - 24, musY + 10.5);
 
-        // Music Control Buttons Row inside the widget: [ON/OFF] [NEXT (R)] [VOL -] [VOL +]
-        const drawMusBtn = (id, label, bx, by, bw, activeColor = null, borderCol = null) => {
-            rrect(bx, by, bw, 18, 3);
-            ctx.fillStyle = activeColor || "rgba(20, 27, 42, 0.95)";
-            ctx.fill();
-            ctx.strokeStyle = borderCol || (activeColor ? "#39ff14" : "rgba(250, 204, 21, 0.48)");
-            ctx.lineWidth = 1;
-            ctx.stroke();
+        // Pixel-Art 2026 Media Control Pills: [PLAY/ON] [NEXT (R)] [VOL -] [VOL +]
+        const drawMusBtn = (id, label, bx, by, bw, fillCol, borderCol, topHi) => {
+            drawPixelBox(ctx, bx, by, bw, 18, fillCol, borderCol, topHi, "#020617", 2);
             ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 8.2px Consolas, 'Courier New', monospace";
+            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.fillText(label, bx + bw * 0.5, by + 9.5);
             ctx.textAlign = "left";
@@ -15432,37 +15454,35 @@ class RetroRenderer {
         const btnY = musY + 21;
         drawMusBtn(
             "PHONE_MUSIC_TOGGLE",
-            isPlaying ? "🔊 MUSIC: ON" : "🔇 MUSIC: OFF",
-            musX + 6,
+            isPlaying ? "▶ MUSIC: ON" : "❚❚ MUSIC: OFF",
+            musX + 5,
             btnY,
-            78,
-            isPlaying ? "rgba(20, 83, 45, 0.72)" : "rgba(127, 29, 29, 0.72)",
-            isPlaying ? "#39ff14" : "#f87171"
+            79,
+            isPlaying ? "#064e3b" : "#450a0a",
+            isPlaying ? "#10b981" : "#ef4444",
+            isPlaying ? "#34d399" : "#f87171"
         );
-        drawMusBtn("PHONE_MUSIC_SKIP", "⏭ NEXT [R]", musX + 88, btnY, 60);
-        drawMusBtn("PHONE_VOL_DOWN", "🔉-", musX + 152, btnY, 22);
-        drawMusBtn("PHONE_VOL_UP", "🔊+", musX + 176, btnY, 22);
+        drawMusBtn("PHONE_MUSIC_SKIP", "⏭ NEXT [R]", musX + 87, btnY, 61, "#1e1b4b", "#38bdf8", "#7dd3fc");
+        drawMusBtn("PHONE_VOL_DOWN", "VOL-", musX + 151, btnY, 23, "#1e293b", "#64748b", "#94a3b8");
+        drawMusBtn("PHONE_VOL_UP", "VOL+", musX + 176, btnY, 21, "#1e293b", "#64748b", "#94a3b8");
 
         // ====================================================================
-        // WIDGET 3 (BOTTOM OF PHONE): JASON DUVAL PAGER / SMS CARD
+        // WIDGET 3 (BOTTOM OF 2026 SMARTPHONE): VICENET 5G DM / SOCIAL APP
         // ====================================================================
         const smsX = sx + 6;
         const smsY = sy + 244;
         const smsW = sw - 12;
         const smsH = 92;
 
-        rrect(smsX, smsY, smsW, smsH, 4);
-        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.48)";
-        ctx.lineWidth = 1.1;
-        ctx.stroke();
+        drawPixelBox(ctx, smsX, smsY, smsW, smsH, "#0d1527", "#0284c7", "#38bdf8", "#020617", 2);
 
-        // Jason Pixel Avatar + Green Online Dot
+        // Jason Pixel Avatar + Pixel Green 5G Online Dot
         const avX = smsX + 6;
         const avY = smsY + 5;
         this.drawPixelPortraitRect(ctx, avX, avY, 20, 20, "JASON");
-        ctx.fillStyle = "#39ff14";
+        ctx.fillStyle = "#090d16";
+        ctx.fillRect(avX + 15, avY + 15, 6, 6);
+        ctx.fillStyle = "#4ade80";
         ctx.fillRect(avX + 16, avY + 16, 4, 4);
 
         const senderEl = this._phoneDomEls.senderEl;
@@ -15483,44 +15503,61 @@ class RetroRenderer {
             }
         }
 
-        ctx.fillStyle = "#fde047";
+        ctx.fillStyle = "#f8fafc";
         ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-        ctx.fillText(contactName.toUpperCase().slice(0, 14), avX + 24, smsY + 10.5);
-        ctx.fillStyle = "#39ff14";
+        ctx.fillText(contactName.slice(0, 14), avX + 24, smsY + 10);
+        ctx.fillStyle = "#38bdf8";
         ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
-        ctx.fillText("PAGER • SMS LINK", avX + 24, smsY + 20);
+        ctx.fillText("5G • ViceNet DM", avX + 24, smsY + 19.5);
 
-        // Interactive Online P2P Multiplayer Pill Button [O]
+        // Interactive 2026 Online Multiplayer Pill Button [O]
         const mpCount = (game && game.net && typeof game.net.getPlayerCount === "function")
             ? game.net.getPlayerCount()
             : 1;
-        const mpLabel = `${mpCount}P ONLINE [O]`;
-        const mpBtnW = 66;
+        const mpLabel = `🌐 ${mpCount}P LIVE [O]`;
+        const mpBtnW = 68;
         const mpBtnH = 15;
         const mpBtnX = smsX + smsW - mpBtnW - 4;
         const mpBtnY = smsY + 5;
-        rrect(mpBtnX, mpBtnY, mpBtnW, mpBtnH, 3);
-        ctx.fillStyle = mpCount > 1 ? "rgba(20, 83, 45, 0.72)" : "rgba(20, 27, 42, 0.95)";
-        ctx.fill();
-        ctx.strokeStyle = mpCount > 1 ? "#39ff14" : "rgba(250, 204, 21, 0.52)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = mpCount > 1 ? "#39ff14" : "#fde047";
+        drawPixelBox(
+            ctx,
+            mpBtnX,
+            mpBtnY,
+            mpBtnW,
+            mpBtnH,
+            mpCount > 1 ? "#083344" : "#1e293b",
+            mpCount > 1 ? "#00f0ff" : "#38bdf8",
+            "#7dd3fc",
+            "#020617",
+            2
+        );
+        ctx.fillStyle = mpCount > 1 ? "#00f0ff" : "#f1f5f9";
         ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
         ctx.textAlign = "center";
         ctx.fillText(mpLabel, mpBtnX + mpBtnW * 0.5, mpBtnY + mpBtnH * 0.5 + 0.5);
         ctx.textAlign = "left";
         this.cheatButtons.push({ id: "PHONE_ONLINE_BTN", x: mpBtnX, y: mpBtnY, w: mpBtnW, h: mpBtnH });
 
-        // Word-wrapped English SMS message body (cached until message or width changes!)
+        // 2026 Pixel-Art DM Speech Bubble containing the message text
+        const bubX = smsX + 6;
+        const bubY = smsY + 26;
+        const bubW = smsW - 12;
+        const bubH = 36;
+        drawPixelBox(ctx, bubX, bubY, bubW, bubH, "#172542", "#1d4ed8", "#3b82f6", "#0b1324", 2);
+        // Pixel speech bubble tail pointing up to Jason's avatar
+        ctx.fillStyle = "#1d4ed8";
+        ctx.fillRect(avX + 8, bubY - 2, 4, 2);
+        ctx.fillStyle = "#172542";
+        ctx.fillRect(avX + 9, bubY - 1, 2, 2);
+
         const pagerEl = this._phoneDomEls.pagerEl;
         const rawMsg = pagerEl
             ? (pagerEl.textContent || "").trim()
-            : "Welcome to Vice City! Use the GPS map above or press [M] to fast-travel anywhere.";
+            : "Welcome to Vice City 26! Use Maps above or press [M] to fast-travel anywhere.";
 
-        ctx.fillStyle = "#e2e8f0";
-        ctx.font = "8.8px Consolas, 'Courier New', monospace";
-        const maxLineW = smsW - 14;
+        ctx.fillStyle = "#f1f5f9";
+        ctx.font = "8.6px Consolas, 'Courier New', monospace";
+        const maxLineW = bubW - 10;
         const smsCacheKey = `${maxLineW}:${rawMsg}`;
         let lines = this._smsLinesCache;
         if (!lines || this._smsCacheKey !== smsCacheKey) {
@@ -15547,14 +15584,14 @@ class RetroRenderer {
             this._smsLinesCache = lines;
         }
 
-        let textY = smsY + 33;
+        let textY = bubY + 11.5;
         const maxLines = Math.min(2, lines.length);
         for (let i = 0; i < maxLines; i++) {
-            ctx.fillText(lines[i], smsX + 7, textY);
+            ctx.fillText(lines[i], bubX + 5, textY);
             textY += 12.5;
         }
 
-        // Interactive Mobile Phone Mission Launcher Bar inside Messages Card
+        // Interactive 2026 Smartphone Mission Launcher Bar inside DM Card
         const mBarY = smsY + smsH - 24;
         const mBarH = 19;
         const activeM = game && game.missions ? game.missions.activeMission : null;
@@ -15565,23 +15602,14 @@ class RetroRenderer {
         if (activeM) {
             const abortW = 54;
             const statW = smsW - abortW - 14;
-            rrect(smsX + 6, mBarY, statW, mBarH, 3);
-            ctx.fillStyle = "rgba(66, 32, 6, 0.82)";
-            ctx.fill();
-            ctx.strokeStyle = "#facc15";
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            drawPixelBox(ctx, smsX + 6, mBarY, statW, mBarH, "#3b0764", "#ff2a85", "#f472b6", "#1e0536", 2);
             ctx.fillStyle = "#fde047";
             ctx.font = "bold 8px Consolas, 'Courier New', monospace";
             const objShort = String(activeM.objectiveLabel || activeM.title || "ACTIVE MISSION").slice(0, 20);
             ctx.fillText(`🎯 ${objShort}`, smsX + 10, mBarY + mBarH * 0.5 + 0.5);
 
             const abX = smsX + 8 + statW;
-            rrect(abX, mBarY, abortW, mBarH, 3);
-            ctx.fillStyle = "rgba(127, 29, 29, 0.9)";
-            ctx.fill();
-            ctx.strokeStyle = "#f87171";
-            ctx.stroke();
+            drawPixelBox(ctx, abX, mBarY, abortW, mBarH, "#7f1d1d", "#ef4444", "#f87171", "#450a0a", 2);
             ctx.fillStyle = "#ffffff";
             ctx.textAlign = "center";
             ctx.fillText("✖ ABORT", abX + abortW * 0.5, mBarY + mBarH * 0.5 + 0.5);
@@ -15590,13 +15618,19 @@ class RetroRenderer {
         } else if (selPhone) {
             const nextW = 24;
             const startW = smsW - nextW - 14;
-            rrect(smsX + 6, mBarY, startW, mBarH, 3);
-            ctx.fillStyle = selPhone.completed ? "rgba(30, 41, 59, 0.9)" : "rgba(20, 83, 45, 0.82)";
-            ctx.fill();
-            ctx.strokeStyle = selPhone.completed ? "#facc15" : "#39ff14";
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            ctx.fillStyle = selPhone.completed ? "#fde047" : "#f8fafc";
+            drawPixelBox(
+                ctx,
+                smsX + 6,
+                mBarY,
+                startW,
+                mBarH,
+                selPhone.completed ? "#1e3a8a" : "#065f46",
+                selPhone.completed ? "#38bdf8" : "#10b981",
+                selPhone.completed ? "#7dd3fc" : "#34d399",
+                "#020617",
+                2
+            );
+            ctx.fillStyle = "#f8fafc";
             ctx.font = "bold 8.1px Consolas, 'Courier New', monospace";
             const btnTitle = selPhone.shortTitle || "MISSION";
             const prefix = selPhone.completed ? "🔄 REPLAY " : "▶ START ";
@@ -15604,13 +15638,8 @@ class RetroRenderer {
             this.cheatButtons.push({ id: "PHONE_MISSION_START", x: smsX + 6, y: mBarY, w: startW, h: mBarH });
 
             const nxX = smsX + 8 + startW;
-            rrect(nxX, mBarY, nextW, mBarH, 3);
-            ctx.fillStyle = "rgba(20, 27, 42, 0.95)";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(250, 204, 21, 0.58)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.fillStyle = "#fde047";
+            drawPixelBox(ctx, nxX, mBarY, nextW, mBarH, "#1e293b", "#38bdf8", "#7dd3fc", "#020617", 2);
+            ctx.fillStyle = "#38bdf8";
             ctx.textAlign = "center";
             ctx.fillText("⏭", nxX + nextW * 0.5, mBarY + mBarH * 0.5 + 0.5);
             ctx.textAlign = "left";
@@ -15618,28 +15647,18 @@ class RetroRenderer {
         }
 
         // ====================================================================
-        // 5. BOTTOM MOBILE PHONE KEYPAD DOCK (🧭 GPS MAP | 📍 PLACES [C] | ☀️ DAY [N])
+        // 5. BOTTOM 2026 FLOATING GLASS APP DOCK (MAPS 26 | PLACES [C] | DAY [N])
         // ====================================================================
         const dockY = sy + sh - 32;
         const dockH = 21;
-        rrect(sx + 6, dockY, sw - 12, dockH, 4);
-        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.45)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        drawPixelBox(ctx, sx + 6, dockY, sw - 12, dockH, "#0f172a", "#334155", "#475569", "#020617", 2);
 
         const tabW = Math.floor((sw - 18) / 3);
         const drawDockTab = (id, label, tx, active) => {
             if (active) {
-                rrect(tx, dockY + 2, tabW, dockH - 4, 3);
-                ctx.fillStyle = "rgba(250, 204, 21, 0.18)";
-                ctx.fill();
-                ctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
-                ctx.lineWidth = 0.9;
-                ctx.stroke();
+                drawPixelBox(ctx, tx, dockY + 2, tabW, dockH - 4, "#0369a1", "#38bdf8", "#7dd3fc", "#0c4a6e", 2);
             }
-            ctx.fillStyle = active ? "#fde047" : "#cbd5e1";
+            ctx.fillStyle = active ? "#ffffff" : "#94a3b8";
             ctx.font = "bold 8px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.fillText(label, tx + tabW * 0.5, dockY + dockH * 0.5 + 0.5);
@@ -15647,14 +15666,16 @@ class RetroRenderer {
             this.cheatButtons.push({ id, x: tx, y: dockY, w: tabW, h: dockH });
         };
 
-        drawDockTab("PHONE_TAB_MSG", "🧭 GPS MAP", sx + 7, !isPlacesApp);
+        drawDockTab("PHONE_TAB_MSG", "🧭 MAPS 26", sx + 7, !isPlacesApp);
         drawDockTab("TOGGLE_COLLAPSE", "📍 PLACES [C]", sx + 9 + tabW, isPlacesApp);
         drawDockTab("TOGGLE_NIGHT", timeInfo.dockLabel || "☀️ DAY [N]", sx + 11 + tabW * 2, timeInfo.phase !== "DAY");
 
-        // 6. Bottom Retro Cellular Microphone Grille / Minimize Bar
-        rrect(sx + (sw - 64) * 0.5, sy + sh - 7.5, 64, 4, 2);
-        ctx.fillStyle = "rgba(250, 204, 21, 0.55)";
-        ctx.fill();
+        // 6. Bottom 2026 White Pixel Home Indicator Pill (Tap to minimize phone)
+        const homeX = Math.round(sx + (sw - 62) * 0.5);
+        const homeY = Math.round(sy + sh - 6);
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillRect(homeX + 1, homeY, 60, 3);
+        ctx.fillRect(homeX, homeY + 1, 62, 1);
         this.cheatButtons.push({ id: "MINIMIZE_PHONE", x: sx + (sw - 90) * 0.5, y: sy + sh - 11, w: 90, h: 11 });
 
         applyPhoneScaleToButtons();
@@ -15685,8 +15706,7 @@ class RetroRenderer {
         const viewWorldH = spanBlocks * TILE_SIZE;
 
         let viewWorldX = p.x - viewWorldW * 0.5;
-        let viewWorldY = p.y - viewWorldY_offset(viewWorldH);
-        function viewWorldY_offset(h) { return h * 0.5; }
+        let viewWorldY = p.y - viewWorldH * 0.5;
         viewWorldX = Math.max(0, Math.min(worldW - viewWorldW, viewWorldX));
         viewWorldY = Math.max(0, Math.min(worldH - viewWorldH, viewWorldY));
 
@@ -15699,42 +15719,47 @@ class RetroRenderer {
 
         ctx.save();
 
-        // 1. GPS Header Bar (District Name + [1x] + [M] Full Map)
-        rrect(gx, gy, gw, gh, 4);
-        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.58)";
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+        const drawPxBtn = (x, y, w, h, fillCol, borderCol, topHi) => {
+            const ix = Math.round(x), iy = Math.round(y), iw = Math.round(w), ih = Math.round(h);
+            ctx.fillStyle = borderCol;
+            ctx.fillRect(ix + 1, iy, iw - 2, ih);
+            ctx.fillRect(ix, iy + 1, iw, ih - 2);
+            ctx.fillStyle = fillCol;
+            ctx.fillRect(ix + 1, iy + 1, iw - 2, ih - 2);
+            if (topHi) {
+                ctx.fillStyle = topHi;
+                ctx.fillRect(ix + 1, iy + 1, iw - 2, 1);
+            }
+        };
 
-        ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+        // 1. 2026 Maps App Pixel Frame (District Name + [1x] + [M] Full Map)
+        drawPxBtn(gx, gy, gw, gh, "#090f1d", "#0284c7", "#38bdf8");
+
+        // Pixel-Art Location Pin Sprite
+        ctx.fillStyle = "#00f0ff";
+        ctx.fillRect(gx + 6, gy + 5, 5, 5);
+        ctx.fillRect(gx + 7, gy + 10, 3, 3);
+        ctx.fillStyle = "#090f1d";
+        ctx.fillRect(gx + 8, gy + 6, 1, 2);
+
+        ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
         const distName = (game.currentDistrict || "VICE CITY").toUpperCase();
-        ctx.fillStyle = "#fde047";
-        ctx.fillText(`🧭 ${distName.slice(0, 14)}`, gx + 5, gy + 10);
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillText(distName.slice(0, 15), gx + 14, gy + 10);
 
         const zoomLabels = ["1x", "2x", "ALL"];
         const zBtnW = 28;
         const zBtnX = gx + gw - 62;
-        rrect(zBtnX, gy + 2, zBtnW, 15, 2.5);
-        ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = "#fde047";
+        drawPxBtn(zBtnX, gy + 2, zBtnW, 15, "#0369a1", "#38bdf8", "#7dd3fc");
+        ctx.fillStyle = "#ffffff";
         ctx.fillText(zoomLabels[zoomMode], zBtnX + 4, gy + 10);
         this.cheatButtons.push({ id: "MINIMAP_ZOOM", x: zBtnX, y: gy + 2, w: zBtnW, h: 15 });
 
         const mBtnW = 30;
         const mBtnX = gx + gw - 32;
-        rrect(mBtnX, gy + 2, mBtnW, 15, 2.5);
-        ctx.fillStyle = "rgba(66, 32, 6, 0.92)";
-        ctx.fill();
-        ctx.strokeStyle = "#facc15";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = "#fde047";
+        drawPxBtn(mBtnX, gy + 2, mBtnW, 15, "#be185d", "#ff2a85", "#f472b6");
+        ctx.fillStyle = "#ffffff";
         ctx.fillText("[M]", mBtnX + 5, gy + 10);
         this.cheatButtons.push({ id: "MINIMAP_FULLMAP", x: mBtnX, y: gy + 2, w: mBtnW, h: 15 });
 
@@ -15970,11 +15995,12 @@ class RetroRenderer {
             ctx.drawImage(this._gpsMiniCacheCanvas, mx, my);
         }
 
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.42)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+        // Pixel-art divider lines top/bottom of GPS map canvas
+        ctx.fillStyle = "#0284c7";
+        ctx.fillRect(mx, my, mw, 1);
+        ctx.fillRect(mx, my + mh - 1, mw, 1);
 
-        // 3. Bottom GPS Landmark Navigation Bar
+        // 3. Bottom 2026 GPS Landmark Navigation Bar
         const ftrY = my + mh;
         if (nearestLm) {
             const distMeters = Math.round(nearestDist / 16);
@@ -15992,8 +16018,8 @@ class RetroRenderer {
             }
 
             const nearShort = nearestLm.short || nearestLm.shortName || "LANDMARK";
-            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+            ctx.fillStyle = "#38bdf8";
             const statusTxt = distMeters < 35
                 ? `★ AT ${nearShort}`
                 : `📍 ${nearShort} (${distMeters}m ${dirStr})`;
@@ -16001,13 +16027,8 @@ class RetroRenderer {
 
             const goW = 34;
             const goX = gx + gw - goW - 3;
-            rrect(goX, ftrY + 2, goW, 14, 2.5);
-            ctx.fillStyle = "rgba(20, 83, 45, 0.92)";
-            ctx.fill();
-            ctx.strokeStyle = "#39ff14";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.fillStyle = "#39ff14";
+            drawPxBtn(goX, ftrY + 2, goW, 14, "#059669", "#10b981", "#34d399");
+            ctx.fillStyle = "#ffffff";
             ctx.fillText("GO►", goX + 5, ftrY + 10);
 
             this.cheatButtons.push({
