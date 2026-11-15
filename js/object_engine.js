@@ -7240,7 +7240,7 @@ class WorldObjectEngine {
         const heavySet = this._heavyPropSpecSet || (this._heavyPropSpecSet = new Set([
             "PANZER_TANK", "FIRE_TRUCK", "CITY_BUS", "TOUR_COACH", "TANKER_RIG",
             "FLATBED_TRUCK", "BRINKS_TRUCK", "SWAT_ENFORCER", "BOXVILLE_VAN",
-            "HOTDOG_VAN", "MEDIC_AMBULANCE", "MONSTER_BUGGY", "GATOR_4X4",
+            "HOTDOG_VAN", "MEDIC_AMBULANCE", "TOW_TRUCK", "MONSTER_BUGGY", "GATOR_4X4",
             "PICKUP_TRUCK", "CAMPER_PICKUP"
         ]));
         const isHeavyVeh = Boolean(!isTwoWheeler && (pCar.crushesCars || heavySet.has(pCar.specKey)));
@@ -7395,7 +7395,7 @@ class WorldObjectEngine {
                                     pCar.vy || Math.sin(pCar.angle),
                                     pCar.vx || Math.cos(pCar.angle)
                                 );
-                                if (isHeavyVeh || (sl.state === 1 && carSpd > 58) || carSpd > 125) {
+                                if (isHeavyVeh) {
                                     sl.state = 2;
                                     sl.timer = 0;
                                     sl.hitCooldown = 0.8;
@@ -7504,7 +7504,7 @@ class WorldObjectEngine {
                                     pCar.vy || Math.sin(pCar.angle),
                                     pCar.vx || Math.cos(pCar.angle)
                                 );
-                                if (isHeavyVeh || (ts.state === 1 && carSpd > 62) || carSpd > 130) {
+                                if (isHeavyVeh) {
                                     ts.state = 2;
                                     ts.timer = 0;
                                     ts.hitCooldown = 0.8;
