@@ -12251,30 +12251,36 @@ class LeonidaGame {
 
                     }
 
-                } else {
+                } else if (Math.abs(p.x - cr.x) < 900 && Math.abs(p.y - cr.y) < 900) {
 
-                    // Look for any unoccupied non-destroyed vehicle parked inside the crane pad
-
-                    for (const v of this.vehicles) {
-
-                        if (!v.destroyed && v.driver === null && v !== p.inVehicle) {
-
-                            if (v.x > cr.x && v.x < cr.x + cr.w && v.y > cr.y && v.y < cr.y + cr.h) {
-
-                                cr.crushingVehicle = v;
-
-                                cr.crushProgress = 0.01;
-
-                                this.audio.playBeep(520, 0.1, "sawtooth", 0.08);
-
-                                this.addFloatingText(v.x, v.y - 24, "🏗️ MAGNETIC CRANE LOCKED!", "#ffd13b");
-
-                                break;
-
+                    // Look for any unoccupied non-destroyed vehicle parked inside the crane pad via spatial grid
+                    const vHead = this._vehGridHead;
+                    const vNext = this._vehGridNext;
+                    if (vHead && vNext) {
+                        const cx0 = Math.max(0, cr.x >> 8);
+                        const cx1 = Math.min(127, (cr.x + cr.w) >> 8);
+                        const cy0 = Math.max(0, cr.y >> 8);
+                        const cy1 = Math.min(127, (cr.y + cr.h) >> 8);
+                        let foundCraneVeh = false;
+                        for (let cy = cy0; cy <= cy1 && !foundCraneVeh; cy++) {
+                            const rowOff = cy << 7;
+                            for (let cx = cx0; cx <= cx1; cx++) {
+                                for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
+                                    const v = this.vehicles[vi];
+                                    if (v && !v.destroyed && v.driver === null && v !== p.inVehicle) {
+                                        if (v.x > cr.x && v.x < cr.x + cr.w && v.y > cr.y && v.y < cr.y + cr.h) {
+                                            cr.crushingVehicle = v;
+                                            cr.crushProgress = 0.01;
+                                            this.audio.playBeep(520, 0.1, "sawtooth", 0.08);
+                                            this.addFloatingText(v.x, v.y - 24, "🏗️ MAGNETIC CRANE LOCKED!", "#ffd13b");
+                                            foundCraneVeh = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (foundCraneVeh) break;
                             }
-
                         }
-
                     }
 
                 }
@@ -12936,17 +12942,32 @@ class LeonidaGame {
                     let returnCar = null;
                     let bestCarDist = 420;
                     if (ped.missionTag !== "PRISON_GUARD") {
-                        for (const v of this.vehicles) {
-                            if (
-                                !v.destroyed &&
-                                v.driver === null &&
-                                !v.towedByTruck &&
-                                (v.isPolice || v.wasCriminalCar)
-                            ) {
-                                const d = Math.hypot(v.x - ped.x, v.y - ped.y);
-                                if (d < bestCarDist) {
-                                    bestCarDist = d;
-                                    returnCar = v;
+                        const vHead = this._vehGridHead;
+                        const vNext = this._vehGridNext;
+                        if (vHead && vNext) {
+                            const cx0 = Math.max(0, (ped.x >> 8) - 2);
+                            const cx1 = Math.min(127, (ped.x >> 8) + 2);
+                            const cy0 = Math.max(0, (ped.y >> 8) - 2);
+                            const cy1 = Math.min(127, (ped.y >> 8) + 2);
+                            for (let cy = cy0; cy <= cy1; cy++) {
+                                const rowOff = cy << 7;
+                                for (let cx = cx0; cx <= cx1; cx++) {
+                                    for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
+                                        const v = this.vehicles[vi];
+                                        if (
+                                            v &&
+                                            !v.destroyed &&
+                                            v.driver === null &&
+                                            !v.towedByTruck &&
+                                            (v.isPolice || v.wasCriminalCar)
+                                        ) {
+                                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                                            if (d < bestCarDist) {
+                                                bestCarDist = d;
+                                                returnCar = v;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -13002,22 +13023,28 @@ class LeonidaGame {
 
                 }
 
-                for (const cv of this.vehicles) {
-
-                    if (!cv.destroyed && cv.driver === "AI_COP") {
-
-                        const d = Math.hypot(cv.x - ped.x, cv.y - ped.y);
-
-                        if (d < bestCopDist) {
-
-                            bestCopDist = d;
-
-                            crimTarget = { x: cv.x, y: cv.y, vx: cv.vx || 0, vy: cv.vy || 0 };
-
+                if (this._vehGridHead && this._vehGridNext) {
+                    const vHead = this._vehGridHead;
+                    const vNext = this._vehGridNext;
+                    const cx0 = Math.max(0, (ped.x >> 8) - 2);
+                    const cx1 = Math.min(127, (ped.x >> 8) + 2);
+                    const cy0 = Math.max(0, (ped.y >> 8) - 2);
+                    const cy1 = Math.min(127, (ped.y >> 8) + 2);
+                    for (let cy = cy0; cy <= cy1; cy++) {
+                        const rowOff = cy << 7;
+                        for (let cx = cx0; cx <= cx1; cx++) {
+                            for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
+                                const cv = this.vehicles[vi];
+                                if (cv && !cv.destroyed && cv.driver === "AI_COP") {
+                                    const d = Math.hypot(cv.x - ped.x, cv.y - ped.y);
+                                    if (d < bestCopDist) {
+                                        bestCopDist = d;
+                                        crimTarget = { x: cv.x, y: cv.y, vx: cv.vx || 0, vy: cv.vy || 0 };
+                                    }
+                                }
+                            }
                         }
-
                     }
-
                 }
 
                 if (ped.attackedByPlayer && p && !p.dead) {
@@ -13117,24 +13144,37 @@ class LeonidaGame {
                     }
                     let getawayCar = null;
                     let bestCarDist = 380;
-                    if ((ped.noBoardTimer || 0) <= 0) {
-                        for (const v of this.vehicles) {
-                            if (
-                                !v.destroyed &&
-                                v.driver === null &&
-                                !v.criminalBailedOut &&
-                                !v.criminalDeployDone &&
-                                !v.wasCriminalCar &&
-                                !v.isPolice &&
-                                v.hp > v.maxHp * 0.65 &&
-                                !v.towedByTruck &&
-                                !v.missionTag &&
-                                !v.isEstateCar
-                            ) {
-                                const d = Math.hypot(v.x - ped.x, v.y - ped.y);
-                                if (d < bestCarDist) {
-                                    bestCarDist = d;
-                                    getawayCar = v;
+                    if ((ped.noBoardTimer || 0) <= 0 && this._vehGridHead && this._vehGridNext) {
+                        const vHead = this._vehGridHead;
+                        const vNext = this._vehGridNext;
+                        const cx0 = Math.max(0, (ped.x >> 8) - 2);
+                        const cx1 = Math.min(127, (ped.x >> 8) + 2);
+                        const cy0 = Math.max(0, (ped.y >> 8) - 2);
+                        const cy1 = Math.min(127, (ped.y >> 8) + 2);
+                        for (let cy = cy0; cy <= cy1; cy++) {
+                            const rowOff = cy << 7;
+                            for (let cx = cx0; cx <= cx1; cx++) {
+                                for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
+                                    const v = this.vehicles[vi];
+                                    if (
+                                        v &&
+                                        !v.destroyed &&
+                                        v.driver === null &&
+                                        !v.criminalBailedOut &&
+                                        !v.criminalDeployDone &&
+                                        !v.wasCriminalCar &&
+                                        !v.isPolice &&
+                                        v.hp > v.maxHp * 0.65 &&
+                                        !v.towedByTruck &&
+                                        !v.missionTag &&
+                                        !v.isEstateCar
+                                    ) {
+                                        const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                                        if (d < bestCarDist) {
+                                            bestCarDist = d;
+                                            getawayCar = v;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -13936,23 +13976,38 @@ class LeonidaGame {
                 if (isStreetThiefType && (ped.burnTimer || 0) <= 0 && !ped.isLivingProp) {
                     let stealTarget = null;
                     let bestStealDist = 115;
-                    for (const v of this.vehicles) {
-                        if (
-                            !v.destroyed &&
-                            v.driver === null &&
-                            !v.towedByTruck &&
-                            !v.isStaticParked &&
-                            !v.isEstateCar &&
-                            !v.missionTag &&
-                            !v.isPolice &&
-                            !v.isEmergency &&
-                            (v.abandonedTimer || 0) > 18.0 &&
-                            Math.hypot(v.x - p.x, v.y - p.y) > 95
-                        ) {
-                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
-                            if (d < bestStealDist) {
-                                bestStealDist = d;
-                                stealTarget = v;
+                    if (this._vehGridHead && this._vehGridNext) {
+                        const vHead = this._vehGridHead;
+                        const vNext = this._vehGridNext;
+                        const cx0 = Math.max(0, (ped.x >> 8) - 1);
+                        const cx1 = Math.min(127, (ped.x >> 8) + 1);
+                        const cy0 = Math.max(0, (ped.y >> 8) - 1);
+                        const cy1 = Math.min(127, (ped.y >> 8) + 1);
+                        for (let cy = cy0; cy <= cy1; cy++) {
+                            const rowOff = cy << 7;
+                            for (let cx = cx0; cx <= cx1; cx++) {
+                                for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
+                                    const v = this.vehicles[vi];
+                                    if (
+                                        v &&
+                                        !v.destroyed &&
+                                        v.driver === null &&
+                                        !v.towedByTruck &&
+                                        !v.isStaticParked &&
+                                        !v.isEstateCar &&
+                                        !v.missionTag &&
+                                        !v.isPolice &&
+                                        !v.isEmergency &&
+                                        (v.abandonedTimer || 0) > 18.0 &&
+                                        Math.hypot(v.x - p.x, v.y - p.y) > 95
+                                    ) {
+                                        const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                                        if (d < bestStealDist) {
+                                            bestStealDist = d;
+                                            stealTarget = v;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -14903,6 +14958,12 @@ class LeonidaGame {
 
                 const p2 = nearPeds[j];
 
+                const dx = p1.x - p2.x;
+                if (dx >= 11.0 || dx <= -11.0) continue;
+
+                const dy = p1.y - p2.y;
+                if (dy >= 11.0 || dy <= -11.0) continue;
+
                 // Members of the same cohesive formation (couples, families, friend groups, hangout circles) never repel each other unless panicked
                 if (
                     p1.formationId &&
@@ -14912,10 +14973,6 @@ class LeonidaGame {
                 ) {
                     continue;
                 }
-
-                const dx = p1.x - p2.x;
-
-                const dy = p1.y - p2.y;
 
                 const dist2 = dx * dx + dy * dy;
 

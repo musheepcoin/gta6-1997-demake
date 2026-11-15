@@ -7281,10 +7281,15 @@ class RetroRenderer {
         const seq = this.spriteQueue.length;
         if (seq >= this.maxSprites) return;
         let slot = this.spritePool[seq];
+        const sortKey = ((drawOrder >= 14 ? 1 : 0) * 1e9) +
+            (Math.round(zBlocks * 2.0) * 1e6) +
+            (drawOrder * 1e4) +
+            (zBlocks * 100.0) +
+            (seq * 1e-4);
         if (!slot) {
             slot = {
                 xPx, yPx, zBlocks, wPx, hPx, angleRad,
-                u0, v0, u1, v1, r, g, b, a, drawOrder, pitchZ, seq
+                u0, v0, u1, v1, r, g, b, a, drawOrder, pitchZ, seq, sortKey
             };
             this.spritePool[seq] = slot;
         } else {
@@ -7305,6 +7310,7 @@ class RetroRenderer {
             slot.drawOrder = drawOrder;
             slot.pitchZ = pitchZ;
             slot.seq = seq;
+            slot.sortKey = sortKey;
         }
         this.spriteQueue.push(slot);
     }
@@ -7350,17 +7356,7 @@ class RetroRenderer {
             this.skySpriteStartIdx = 0;
             return;
         }
-        this.spriteQueue.sort((lhs, rhs) => {
-            const lSky = lhs.drawOrder >= 14 ? 1 : 0;
-            const rSky = rhs.drawOrder >= 14 ? 1 : 0;
-            if (lSky !== rSky) return lSky - rSky;
-            const lh = Math.round(lhs.zBlocks * 2.0);
-            const rh = Math.round(rhs.zBlocks * 2.0);
-            if (lh !== rh) return lh - rh;
-            if (lhs.drawOrder !== rhs.drawOrder) return lhs.drawOrder - rhs.drawOrder;
-            if (lhs.zBlocks !== rhs.zBlocks) return lhs.zBlocks - rhs.zBlocks;
-            return lhs.seq - rhs.seq;
-        });
+        this.spriteQueue.sort((lhs, rhs) => lhs.sortKey - rhs.sortKey);
 
         const verts = this.spriteVerts;
         let offset = 0;
@@ -7612,7 +7608,6 @@ class RetroRenderer {
         }
 
         // 2A. Daytime Ambient Florida Sunlight, Volumetric Sunbeams & Tropical Sky-Shadow Atmosphere
-        // (On mobile, WebGL shaders already compute full directional sunlight & shadow maps in hardware, avoiding software 2D canvas full-screen blends)
         if (needDaylightAtmo) {
             this.renderDaylightAtmosphere(ctx, game);
         }
@@ -10168,7 +10163,9 @@ class RetroRenderer {
             }
         }
 
-        for (const pk of this.map.pickups) {
+        const visPickups = this._queryStaticChunkGrid(this.map.pickups, "x", "y", minX, minY, maxX, maxY);
+        for (let pi = 0; pi < visPickups.length; pi++) {
+            const pk = visPickups[pi];
             if (pk.respawnTimer > 0) continue;
             if (pk.x < minX || pk.x > maxX || pk.y < minY || pk.y > maxY) continue;
             const anim8 = Math.floor(this.time * 10 + pk.x * 0.05) % 8;
@@ -12033,10 +12030,7 @@ class RetroRenderer {
         // Sun positioned above top-left / top-right horizon depending on time of day (06:00 East -> 12:00 South -> 18:00 West)
         const dayProgress = Math.max(0, Math.min(1, (clockHr - 6.0) / 12.0));
         const sunX = W * (0.82 - dayProgress * 0.64);
-        const sunY = -H * 0.10;
         const maxDim = Math.hypot(W, H);
-
-        ctx.save();
 
         // Crisp Golden Florida Solar Corona & Corner Rim Glow (WebGL shaders already compute full-screen directional sunlight & shadow maps in hardware!)
         if (!this._sunCoronaStamp) {
@@ -12053,12 +12047,12 @@ class RetroRenderer {
             sctx.fillRect(0, 0, 96, 96);
             this._sunCoronaStamp = sc;
         }
+        const coronaR = maxDim * 0.48;
+        ctx.save();
         ctx.globalCompositeOperation = "lighter";
         ctx.globalAlpha = 0.14 * dayInt;
-        const coronaR = maxDim * 0.48;
         ctx.drawImage(this._sunCoronaStamp, sunX - coronaR * 0.5, 0, coronaR, coronaR * 0.65);
         ctx.globalAlpha = 1.0;
-
         ctx.restore();
     }
 
@@ -12827,12 +12821,12 @@ class RetroRenderer {
                 lctx.setTransform(1, 0, 0, 1, 0, 0);
 
                 lctx.globalCompositeOperation = "lighter";
-                lctx.globalAlpha = lightInt * 0.36;
+                lctx.globalAlpha = Math.min(1.0, lightInt * 0.56);
                 for (let i = 0; i < nightPools.length; i++) {
                     const p = nightPools[i];
                     lctx.drawImage(p.stamp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
                 }
-                lctx.globalAlpha = lightInt * 0.34;
+                lctx.globalAlpha = Math.min(1.0, lightInt * 0.58);
                 for (let i = 0; i < nightCones.length; i++) {
                     const c = nightCones[i];
                     const scX = c.len / 112.0;
@@ -12841,6 +12835,24 @@ class RetroRenderer {
                     lctx.drawImage(c.stamp, -8, -48, 128, 96);
                 }
                 lctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                if (lightInt > 0.02) {
+                    lctx.globalAlpha = lightInt;
+                    for (let i = 0; i < highResFlares.length; i++) {
+                        const f = highResFlares[i];
+                        if (f.isLampHalo) continue;
+                        const fx = f.x * scale;
+                        const fy = f.y * scale;
+                        const r = Math.max(1.5, f.r * scale);
+                        const stamp = getLightStamp(`flare|${f.col}`, [
+                            [0.08, 0.0, "rgba(255, 252, 235, 0.92)"],
+                            [0.08, 0.32, f.col],
+                            [0.08, 0.68, f.col.replace(/[\d.]+\)$/, "0.18)")],
+                            [0.08, 1.0, "rgba(0, 0, 0, 0)"]
+                        ]);
+                        lctx.drawImage(stamp, fx - r, fy - r, r * 2, r * 2);
+                    }
+                }
             }
             lctx.restore();
 
@@ -12849,6 +12861,8 @@ class RetroRenderer {
             ctx.globalCompositeOperation = "source-over";
             ctx.globalAlpha = 1.0;
             ctx.drawImage(this.nightCanvas, 0, 0, W, H);
+            ctx.restore();
+            return;
         } else {
             lctx.restore();
 
@@ -13023,16 +13037,14 @@ class RetroRenderer {
                 const gHead = game._vehGridHead;
                 const gNext = game._vehGridNext;
                 if (gHead && gNext) {
-                    const gCols = game._vehGridCols || 64;
-                    const gRows = game._vehGridRows || 64;
                     const gx0 = Math.max(0, (p.x >> 8) - 1);
-                    const gx1 = Math.min(gCols - 1, (p.x >> 8) + 1);
+                    const gx1 = Math.min(127, (p.x >> 8) + 1);
                     const gy0 = Math.max(0, (p.y >> 8) - 1);
-                    const gy1 = Math.min(gRows - 1, (p.y >> 8) + 1);
+                    const gy1 = Math.min(127, (p.y >> 8) + 1);
                     for (let gy = gy0; gy <= gy1; gy++) {
-                        const rowOff = gy * gCols;
+                        const rowOff = gy << 7;
                         for (let gx = gx0; gx <= gx1; gx++) {
-                            for (let vi = gHead[rowOff + gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
+                            for (let vi = gHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
                                 const v = game.vehicles[vi];
                                 if (!v || v.destroyed || !(v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious)) continue;
                                 const d = Math.hypot(v.x - p.x, v.y - p.y);
@@ -16223,54 +16235,70 @@ class RetroRenderer {
         const livesX = scoreX - 6 - livesW;
         this.drawGta1FontString(ctx, "MISSMUL2", livesStr, livesX, scoreY + 13 * s, s, "left");
 
-        // A2. TOP-RIGHT ALL-TIME BEST SCORES MINI-TABLE (Below Score Counter)
+        // A2. TOP-RIGHT ALL-TIME BEST SCORES MINI-TABLE (Below Score Counter — cached offscreen unless score/name changes!)
         if (!isPhonePortrait && typeof game.getAllTimeHighScores === "function") {
-            const topScores = game.getAllTimeHighScores().slice(0, 3);
-            if (topScores.length > 0) {
-                const lbW = isCompact ? 176 : 196;
-                const rowH = isCompact ? 13 : 14;
-                const lbH = 18 + topScores.length * rowH + 4;
-                const lbX = W - lbW - 14;
-                const lbY = Math.round(scoreY + 26 * s + 4);
-                const myName = String((game.net && game.net.playerName) || (game.player && game.player.nickname) || "").trim().toUpperCase();
+            const lbW = isCompact ? 176 : 196;
+            const rowH = isCompact ? 13 : 14;
+            const lbH = 18 + 3 * rowH + 4;
+            const lbX = W - lbW - 14;
+            const lbY = Math.round(scoreY + 26 * s + 4);
+            const myName = String((game.net && game.net.playerName) || (game.player && game.player.nickname) || "").trim().toUpperCase();
+            const lbCacheKey = `${lbW}x${lbH}|${scoreStr}|${myName}`;
 
-                ctx.save();
-                ctx.fillStyle = "rgba(9, 13, 22, 0.82)";
-                ctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                if (typeof ctx.roundRect === "function") {
-                    ctx.roundRect(lbX, lbY, lbW, lbH, 5);
-                } else {
-                    ctx.rect(lbX, lbY, lbW, lbH);
+            if (!this._lbHudCanvas || this._lbHudCacheKey !== lbCacheKey) {
+                const topScores = game.getAllTimeHighScores().slice(0, 3);
+                if (topScores.length > 0) {
+                    if (!this._lbHudCanvas) {
+                        this._lbHudCanvas = document.createElement("canvas");
+                    }
+                    if (this._lbHudCanvas.width !== lbW + 4 || this._lbHudCanvas.height !== lbH + 4) {
+                        this._lbHudCanvas.width = lbW + 4;
+                        this._lbHudCanvas.height = lbH + 4;
+                    }
+                    const lctx = this._lbHudCanvas.getContext("2d");
+                    lctx.clearRect(0, 0, lbW + 4, lbH + 4);
+                    const ox = 2;
+                    const oy = 2;
+                    lctx.fillStyle = "rgba(9, 13, 22, 0.82)";
+                    lctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
+                    lctx.lineWidth = 1.2;
+                    lctx.beginPath();
+                    if (typeof lctx.roundRect === "function") {
+                        lctx.roundRect(ox, oy, lbW, lbH, 5);
+                    } else {
+                        lctx.rect(ox, oy, lbW, lbH);
+                    }
+                    lctx.fill();
+                    lctx.stroke();
+
+                    lctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                    lctx.textBaseline = "middle";
+                    lctx.textAlign = "left";
+                    lctx.fillStyle = "#facc15";
+                    lctx.fillText("🏆 ALL-TIME BEST SCORES", ox + 7, oy + 10);
+
+                    const medals = ["#1", "#2", "#3"];
+                    for (let i = 0; i < topScores.length; i++) {
+                        const item = topScores[i];
+                        const ry = oy + 20 + i * rowH + 3;
+                        const isSelf = myName && String(item.name).toUpperCase() === myName;
+                        lctx.font = "bold 10px Consolas, 'Courier New', monospace";
+                        lctx.textAlign = "left";
+                        lctx.fillStyle = i === 0 ? "#fde047" : (i === 1 ? "#cbd5e1" : "#f59e0b");
+                        lctx.fillText(medals[i], ox + 7, ry);
+
+                        lctx.fillStyle = isSelf ? "#ff2a85" : (item.color || "#f8fafc");
+                        lctx.fillText(String(item.name || "PLAYER").slice(0, 11), ox + 26, ry);
+
+                        lctx.textAlign = "right";
+                        lctx.fillStyle = "#39ff14";
+                        lctx.fillText(`$${Number(item.score || 0).toLocaleString()}`, ox + lbW - 7, ry);
+                    }
+                    this._lbHudCacheKey = lbCacheKey;
                 }
-                ctx.fill();
-                ctx.stroke();
-
-                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
-                ctx.textBaseline = "middle";
-                ctx.textAlign = "left";
-                ctx.fillStyle = "#facc15";
-                ctx.fillText("🏆 ALL-TIME BEST SCORES", lbX + 7, lbY + 10);
-
-                const medals = ["#1", "#2", "#3"];
-                for (let i = 0; i < topScores.length; i++) {
-                    const item = topScores[i];
-                    const ry = lbY + 20 + i * rowH + 3;
-                    const isSelf = myName && String(item.name).toUpperCase() === myName;
-                    ctx.font = "bold 10px Consolas, 'Courier New', monospace";
-                    ctx.textAlign = "left";
-                    ctx.fillStyle = i === 0 ? "#fde047" : (i === 1 ? "#cbd5e1" : "#f59e0b");
-                    ctx.fillText(medals[i], lbX + 7, ry);
-
-                    ctx.fillStyle = isSelf ? "#ff2a85" : (item.color || "#f8fafc");
-                    ctx.fillText(String(item.name || "PLAYER").slice(0, 11), lbX + 26, ry);
-
-                    ctx.textAlign = "right";
-                    ctx.fillStyle = "#39ff14";
-                    ctx.fillText(`$${Number(item.score || 0).toLocaleString()}`, lbX + lbW - 7, ry);
-                }
-                ctx.restore();
+            }
+            if (this._lbHudCanvas && this._lbHudCacheKey === lbCacheKey) {
+                ctx.drawImage(this._lbHudCanvas, lbX - 2, lbY - 2);
             }
         }
 
@@ -16379,9 +16407,16 @@ class RetroRenderer {
         }
 
         // D. CENTER SCREEN BIG MESSAGE (BIG1.FON: "WASTED", "BUSTED", "GOURANGA!")
-        const bigOverlay = document.getElementById("big-status-overlay");
-        const bigTitleEl = document.getElementById("big-status-title");
-        const bigSubEl = document.getElementById("big-status-sub");
+        if (!this._hudDomEls) {
+            this._hudDomEls = {
+                bigOverlay: document.getElementById("big-status-overlay"),
+                bigTitleEl: document.getElementById("big-status-title"),
+                bigSubEl: document.getElementById("big-status-sub"),
+                objEl: document.getElementById("hud-objective-text"),
+                timerEl: document.getElementById("hud-mission-timer")
+            };
+        }
+        const { bigOverlay, bigTitleEl, bigSubEl, objEl, timerEl } = this._hudDomEls;
         if (bigOverlay && bigOverlay.classList.contains("visible") && bigTitleEl) {
             const bigText = (bigTitleEl.textContent || "").trim().toUpperCase();
             if (bigText) {
@@ -16397,8 +16432,6 @@ class RetroRenderer {
 
         // E. BOTTOM-CENTER MISSION OBJECTIVE & TIMER IN SUB2.FON (when mission active)
         if (game.missions.activeMission) {
-            const objEl = document.getElementById("hud-objective-text");
-            const timerEl = document.getElementById("hud-mission-timer");
             const objText = objEl ? (objEl.textContent || "").trim().toUpperCase() : "";
             const timerText = timerEl ? (timerEl.textContent || "").trim().toUpperCase() : "";
             if (objText) {

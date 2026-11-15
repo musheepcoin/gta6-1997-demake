@@ -13317,8 +13317,11 @@ class WorldObjectEngine {
 
         // 3. 180+ True 3D Destructible Sidewalk Street Props & 3D Water Geysers
         if (this.streetProps && this.streetProps.length > 0) {
-            for (let i = 0; i < this.streetProps.length; i++) {
-                const sp = this.streetProps[i];
+            const visStreetProps = typeof renderer._queryStaticChunkGrid === "function"
+                ? renderer._queryStaticChunkGrid(this.streetProps, "homeX", "homeY", minX - 80, minY - 80, maxX + 80, maxY + 80)
+                : this.streetProps;
+            for (let i = 0; i < visStreetProps.length; i++) {
+                const sp = visStreetProps[i];
                 if (sp.x < minX || sp.x > maxX || sp.y < minY || sp.y > maxY) continue;
                 const cosA = Math.cos(sp.ang);
                 const sinA = Math.sin(sp.ang);
@@ -13385,8 +13388,12 @@ class WorldObjectEngine {
         if (this.map && Array.isArray(this.map.streetlights)) {
             const nf = Math.max(0, Math.min(1, renderer.nightFactor || 0));
             const lightsOn = nf > 0.12;
-            for (let i = 0; i < this.map.streetlights.length; i++) {
-                const sl = this.map.streetlights[i];
+            const visStreetlights = typeof renderer._queryStaticChunkGrid === "function"
+                ? renderer._queryStaticChunkGrid(this.map.streetlights, "baseX", "baseY", minX, minY, maxX, maxY, "_idx")
+                : this.map.streetlights;
+            for (let k = 0; k < visStreetlights.length; k++) {
+                const sl = visStreetlights[k];
+                const i = sl._idx !== undefined ? sl._idx : k;
                 if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
                 const bz = sl.z || 2.0;
                 const isDeco = sl.style === "ART_DECO_NEON" || sl.style === "PROMENADE_TWIN";
@@ -13513,8 +13520,11 @@ class WorldObjectEngine {
         if (this.map && Array.isArray(this.map.parkBollardLights)) {
             const nf = Math.max(0, Math.min(1, renderer.nightFactor || 0)) || (renderer.nightMode ? 1.0 : 0.0);
             const lightsOn = nf > 0.12;
-            for (let i = 0; i < this.map.parkBollardLights.length; i++) {
-                const bl = this.map.parkBollardLights[i];
+            const visBollards = typeof renderer._queryStaticChunkGrid === "function"
+                ? renderer._queryStaticChunkGrid(this.map.parkBollardLights, "x", "y", minX, minY, maxX, maxY)
+                : this.map.parkBollardLights;
+            for (let i = 0; i < visBollards.length; i++) {
+                const bl = visBollards[i];
                 if (bl.x < minX || bl.x > maxX || bl.y < minY || bl.y > maxY) continue;
                 const bz = bl.z || 2.0;
                 const isVilla = bl.style === "VILLA_PATH";
@@ -13554,9 +13564,12 @@ class WorldObjectEngine {
             const ph = ((renderer.lastGameRef ? renderer.lastGameRef.trafficLightTimer : t) || t) % 12.0;
             const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
             const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+            const visSignals = typeof renderer._queryStaticChunkGrid === "function"
+                ? renderer._queryStaticChunkGrid(this.map.trafficSignals, "baseX", "baseY", minX, minY, maxX, maxY)
+                : this.map.trafficSignals;
 
-            for (let i = 0; i < this.map.trafficSignals.length; i++) {
-                const ts = this.map.trafficSignals[i];
+            for (let i = 0; i < visSignals.length; i++) {
+                const ts = visSignals[i];
                 if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
                 const bz = ts.z || 2.0;
                 const blkPole = [0.07, 0.08, 0.10];
@@ -14142,8 +14155,12 @@ class WorldObjectEngine {
             this.updateHeists(game, 1 / 60);
         }
 
-        for (let i = 0; i < this.instances.length; i++) {
-            const h = this.instances[i];
+        const visInstances = typeof renderer._queryStaticChunkGrid === "function"
+            ? renderer._queryStaticChunkGrid(this.instances, "x", "y", minX - 360, minY - 360, maxX + 360, maxY + 360, "_idx")
+            : this.instances;
+        for (let k = 0; k < visInstances.length; k++) {
+            const h = visInstances[k];
+            const i = h._idx !== undefined ? h._idx : k;
             if (h.x < minX - 360 || h.x > maxX + 360 || h.y < minY - 360 || h.y > maxY + 360) continue;
 
             const bz = (this.map && typeof this.map.getHeightAtPixel === "function")
@@ -14182,8 +14199,11 @@ class WorldObjectEngine {
         }
 
         // Render Poolside Interactive Props
-        for (let i = 0; i < this.interactiveProps.length; i++) {
-            const pr = this.interactiveProps[i];
+        const visInteractiveProps = typeof renderer._queryStaticChunkGrid === "function"
+            ? renderer._queryStaticChunkGrid(this.interactiveProps, "x", "y", minX - 180, minY - 180, maxX + 180, maxY + 180)
+            : this.interactiveProps;
+        for (let i = 0; i < visInteractiveProps.length; i++) {
+            const pr = visInteractiveProps[i];
             if (pr.x < minX - 120 || pr.x > maxX + 120 || pr.y < minY - 120 || pr.y > maxY + 120) continue;
             const zElev = pr.spr.includes("umbrella") ? (pr.z + (pr.broken ? 0.05 : 0.16)) : (pr.z + 0.040);
             const drawOrder = pr.spr.includes("umbrella") ? SPRITE_DRAW_ORDER.TREES : SPRITE_DRAW_ORDER.TIRE_MARKS;
