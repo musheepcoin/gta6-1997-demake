@@ -10550,6 +10550,144 @@ class RetroRenderer {
                 this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
             }
 
+            // Rare Sidewalk Dog Walkers (~4% of calm adult civilians): animated top-down companion dog on a leash!
+            if (ped.hasDog === undefined) {
+                if (ped.kind === "CIVILIAN" && !ped.isRollerblader && !isChildPed && !isPrisonZone && ped.missionTag !== "BEACH") {
+                    const dogHash = Math.abs(Math.floor((ped.turnSeed || 1) * 41 + (ped.animSeed || 0) * 997));
+                    ped.hasDog = (dogHash % 24) === 7;
+                    if (ped.hasDog && !ped.dogBreed) {
+                        const dogBreeds = ["GOLDEN", "FRENCHIE", "DALMATIAN", "DOBERMAN"];
+                        ped.dogBreed = dogBreeds[(dogHash >>> 4) % dogBreeds.length];
+                    }
+                } else {
+                    ped.hasDog = false;
+                }
+            }
+            if (
+                ped.hasDog &&
+                !ped.dead &&
+                (ped.drownTimer || 0) <= 0 &&
+                (ped.electroTimer || 0) <= 0 &&
+                (ped.slideCarTimer || 0) <= 0 &&
+                (ped.exitAnimTimer || 0) <= 0 &&
+                (ped.stunnedTimer || 0) <= 0
+            ) {
+                const pCos = Math.cos(ped.angle);
+                const pSin = Math.sin(ped.angle);
+                const isMovingDog = (ped.speed || 0) > 0.5 || (ped.panicTimer || 0) > 0;
+                const sniffWeave = isMovingDog ? Math.sin(this.time * 2.8 + (ped.animSeed || 0) * 19.0) * 1.8 : 0;
+                const leadDist = isMovingDog ? 13.5 : 8.5;
+                const sideDist = 6.2 + sniffWeave;
+                const targetDogX = ped.x + pCos * leadDist - pSin * sideDist;
+                const targetDogY = ped.y + pSin * leadDist + pCos * sideDist;
+                if (ped._dogX === undefined || Math.hypot(targetDogX - ped._dogX, targetDogY - ped._dogY) > 38) {
+                    ped._dogX = targetDogX;
+                    ped._dogY = targetDogY;
+                    ped._dogAng = ped.angle;
+                } else {
+                    const ddx = targetDogX - ped._dogX;
+                    const ddy = targetDogY - ped._dogY;
+                    ped._dogX += ddx * 0.22;
+                    ped._dogY += ddy * 0.22;
+                    if (Math.hypot(ddx, ddy) > 0.35 && isMovingDog) {
+                        const moveAng = Math.atan2(ddy, ddx);
+                        let da = moveAng - (ped._dogAng || ped.angle);
+                        while (da > Math.PI) da -= Math.PI * 2;
+                        while (da < -Math.PI) da += Math.PI * 2;
+                        ped._dogAng = (ped._dogAng || ped.angle) + da * 0.28;
+                    } else {
+                        ped._dogAng = ped.angle + Math.sin(this.time * 2.2 + (ped.animSeed || 0) * 11.0) * 0.10;
+                    }
+                }
+                const dogX = ped._dogX;
+                const dogY = ped._dogY;
+                const dogAng = ped._dogAng || ped.angle;
+                const dCos = Math.cos(dogAng);
+                const dSin = Math.sin(dogAng);
+                const dogZ = pz - 0.008;
+
+                // Breed palette (Golden Retriever, Cream Frenchie, Spotted Dalmatian, Black/Tan Doberman)
+                const breed = ped.dogBreed || "GOLDEN";
+                let br = 0.90, bg = 0.68, bb = 0.30; // coat
+                let er = 0.72, eg = 0.48, eb = 0.16; // ears/markings
+                let cr = 0.92, cg = 0.16, cb = 0.20; // collar & leash
+                const isCompact = breed === "FRENCHIE";
+                if (breed === "FRENCHIE") {
+                    br = 0.93; bg = 0.86; bb = 0.73;
+                    er = 0.24; eg = 0.20; eb = 0.18;
+                    cr = 0.08; cg = 0.82; cb = 0.96;
+                } else if (breed === "DALMATIAN") {
+                    br = 0.96; bg = 0.97; bb = 0.99;
+                    er = 0.12; eg = 0.13; eb = 0.16;
+                    cr = 0.92; cg = 0.16; cb = 0.22;
+                } else if (breed === "DOBERMAN") {
+                    br = 0.14; bg = 0.15; bb = 0.18;
+                    er = 0.78; eg = 0.45; eb = 0.20;
+                    cr = 0.96; cg = 0.78; cb = 0.18;
+                }
+
+                // 1) 2-segment sagging leash from pedestrian's right hand to the dog's collar
+                const handX = ped.x + pCos * 3.2 - pSin * 5.0;
+                const handY = ped.y + pSin * 3.2 + pCos * 5.0;
+                const colX = dogX + dCos * (isCompact ? 2.2 : 2.8);
+                const colY = dogY + dSin * (isCompact ? 2.2 : 2.8);
+                const midLX = (handX + colX) * 0.5 - pSin * 1.4;
+                const midLY = (handY + colY) * 0.5 + pCos * 1.4;
+                const l1Len = Math.hypot(midLX - handX, midLY - handY);
+                const l2Len = Math.hypot(colX - midLX, colY - midLY);
+                if (l1Len > 0.2 && l1Len < 28) {
+                    this.pushSolidQuad3D((handX + midLX) * 0.5, (handY + midLY) * 0.5, dogZ + 0.005, l1Len + 0.6, 1.05, Math.atan2(midLY - handY, midLX - handX), 0.18, 0.16, 0.15, 0.88, pedDrawOrder);
+                }
+                if (l2Len > 0.2 && l2Len < 28) {
+                    this.pushSolidQuad3D((midLX + colX) * 0.5, (midLY + colY) * 0.5, dogZ + 0.005, l2Len + 0.6, 1.05, Math.atan2(colY - midLY, colX - midLX), cr, cg, cb, 0.92, pedDrawOrder);
+                }
+
+                // 2) Solar contact shadow under the dog
+                this.pushSolidQuad3D(dogX + sunCos * 2.2, dogY + sunSin * 2.2, pz - 0.024, isCompact ? 7.2 : 9.0, isCompact ? 4.8 : 5.2, dogAng, 0.02, 0.03, 0.05, sunShadowAlpha * 0.85, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                // 3) Animated 4 trotting paws
+                const pawPhase = isMovingDog ? (this.time * ((ped.panicTimer || 0) > 0 ? 18.0 : 11.5) + (ped.animSeed || 0) * 13.0) : 0;
+                const stride = isMovingDog ? Math.sin(pawPhase) * 1.8 : 0;
+                const halfLen = isCompact ? 2.4 : 3.2;
+                const halfWid = isCompact ? 2.0 : 2.1;
+                // Front-left & rear-right (+stride), front-right & rear-left (-stride)
+                this.pushSolidQuad3D(dogX + dCos * (halfLen + stride) - dSin * (-halfWid), dogY + dSin * (halfLen + stride) + dCos * (-halfWid), dogZ - 0.004, 2.2, 1.5, dogAng, er, eg, eb, 0.96, pedDrawOrder);
+                this.pushSolidQuad3D(dogX + dCos * (halfLen - stride) - dSin * halfWid, dogY + dSin * (halfLen - stride) + dCos * halfWid, dogZ - 0.004, 2.2, 1.5, dogAng, er, eg, eb, 0.96, pedDrawOrder);
+                this.pushSolidQuad3D(dogX + dCos * (-halfLen - stride) - dSin * (-halfWid), dogY + dSin * (-halfLen - stride) + dCos * (-halfWid), dogZ - 0.004, 2.2, 1.5, dogAng, er, eg, eb, 0.96, pedDrawOrder);
+                this.pushSolidQuad3D(dogX + dCos * (-halfLen + stride) - dSin * halfWid, dogY + dSin * (-halfLen + stride) + dCos * halfWid, dogZ - 0.004, 2.2, 1.5, dogAng, er, eg, eb, 0.96, pedDrawOrder);
+
+                // 4) Wagging tail at rear
+                const tailWag = Math.sin(this.time * 14.5 + (ped.animSeed || 0) * 9.0) * 0.48;
+                const tailAng = dogAng + Math.PI + tailWag;
+                const tailBaseX = dogX - dCos * (isCompact ? 3.2 : 4.4);
+                const tailBaseY = dogY - dSin * (isCompact ? 3.2 : 4.4);
+                const tailLen = isCompact ? 1.8 : 3.4;
+                this.pushSolidQuad3D(tailBaseX + Math.cos(tailAng) * (tailLen * 0.45), tailBaseY + Math.sin(tailAng) * (tailLen * 0.45), dogZ + 0.001, tailLen, 1.4, tailAng, br, bg, bb, 0.98, pedDrawOrder);
+
+                // 5) Torso, Dalmatian spots, collar, head, ears & dark nose tip
+                this.pushSolidQuad3D(dogX, dogY, dogZ, isCompact ? 6.2 : 7.8, isCompact ? 4.4 : 4.2, dogAng, br, bg, bb, 0.99, pedDrawOrder);
+                if (breed === "DALMATIAN") {
+                    this.pushSolidQuad3D(dogX + dCos * 0.8 - dSin * 0.9, dogY + dSin * 0.8 + dCos * 0.9, dogZ + 0.001, 1.8, 1.6, dogAng + 0.3, 0.10, 0.11, 0.14, 0.96, pedDrawOrder);
+                    this.pushSolidQuad3D(dogX - dCos * 1.7 + dSin * 0.8, dogY - dSin * 1.7 - dCos * 0.8, dogZ + 0.001, 2.0, 1.6, dogAng - 0.2, 0.10, 0.11, 0.14, 0.96, pedDrawOrder);
+                }
+                // Collar band
+                this.pushSolidQuad3D(colX, colY, dogZ + 0.002, 1.6, isCompact ? 4.4 : 4.0, dogAng, cr, cg, cb, 0.98, pedDrawOrder);
+                // Head & Snout
+                const headDist = isCompact ? 3.4 : 4.4;
+                const headX = dogX + dCos * headDist;
+                const headY = dogY + dSin * headDist;
+                this.pushSolidQuad3D(headX, headY, dogZ + 0.003, isCompact ? 3.6 : 4.2, isCompact ? 4.0 : 3.6, dogAng, br, bg, bb, 0.99, pedDrawOrder);
+                // Snout & black nose button
+                const snoutX = headX + dCos * (isCompact ? 1.5 : 2.3);
+                const snoutY = headY + dSin * (isCompact ? 1.5 : 2.3);
+                this.pushSolidQuad3D(snoutX, snoutY, dogZ + 0.0035, isCompact ? 1.6 : 2.4, isCompact ? 2.6 : 2.2, dogAng, breed === "DOBERMAN" ? er : br * 0.94, breed === "DOBERMAN" ? eg : bg * 0.94, breed === "DOBERMAN" ? eb : bb * 0.94, 0.99, pedDrawOrder);
+                this.pushSolidQuad3D(snoutX + dCos * 0.9, snoutY + dSin * 0.9, dogZ + 0.004, 1.2, 1.3, dogAng, 0.08, 0.08, 0.10, 0.99, pedDrawOrder);
+                // Left & Right Ears
+                const earSpread = isCompact ? 1.9 : 1.8;
+                this.pushSolidQuad3D(headX - dCos * 0.4 - dSin * (-earSpread), headY - dSin * 0.4 + dCos * (-earSpread), dogZ + 0.004, 2.1, 1.4, dogAng - 0.25, er, eg, eb, 0.98, pedDrawOrder);
+                this.pushSolidQuad3D(headX - dCos * 0.4 - dSin * earSpread, headY - dSin * 0.4 + dCos * earSpread, dogZ + 0.004, 2.1, 1.4, dogAng + 0.25, er, eg, eb, 0.98, pedDrawOrder);
+            }
+
             // VCFD On-Foot Firefighter brass hose nozzle + coupled yellow canvas supply line to his Fire Engine!
             // The hose is ONE continuous line from the truck's rear hose bed to the firefighter (never cut by distance):
             // 4 x 50 ft (15 m) couplings = 200 ft (61 m) attack line = ~780 px at this map's scale (a car is ~54 px = 4.5 m).

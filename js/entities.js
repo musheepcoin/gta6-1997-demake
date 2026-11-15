@@ -4421,6 +4421,8 @@ class Pedestrian {
         this.targetBx = props.targetBx !== undefined ? props.targetBx : null;
         this.targetBy = props.targetBy !== undefined ? props.targetBy : null;
         this.animSeed = props.animSeed !== undefined ? props.animSeed : ((this.x + this.y) * 0.01);
+        this.hasDog = props.hasDog !== undefined ? Boolean(props.hasDog) : undefined;
+        this.dogBreed = props.dogBreed || null;
         this.state = this.computeState();
     }
 
@@ -4520,6 +4522,15 @@ class TrafficManager {
                     spec.carryProp = "SHOPPING_BAG";
                 } else if ((gt === "vc_tourist" || gt === "vc_hawaiian_red") && (r1 % 3) === 0) {
                     spec.carryProp = "CAMERA";
+                }
+            }
+            if (spec.hasDog === undefined && spec.kind === "CIVILIAN" && !spec.isRollerblader && !spec.isChild && !isSand && spec.missionTag !== "PRISONER") {
+                if ((r1 % 24) === 7) {
+                    const dogBreeds = ["GOLDEN", "FRENCHIE", "DALMATIAN", "DOBERMAN"];
+                    spec.hasDog = true;
+                    spec.dogBreed = dogBreeds[(r1 >>> 5) % dogBreeds.length];
+                } else {
+                    spec.hasDog = false;
                 }
             }
             if (!spec.personality) {
