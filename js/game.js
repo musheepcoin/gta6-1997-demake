@@ -759,7 +759,11 @@ class LeonidaGame {
             for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
                 const overlap = this.vehicles.some((other) => Math.hypot(other.x - vx, other.y - vy) < 68);
                 if (!overlap) break;
-                vy += 56;
+                const candY = vy + 56;
+                const cbx = Math.floor(vx / TILE_SIZE);
+                const cby = Math.floor(candY / TILE_SIZE);
+                if (p.driver && this.map.surfaceGround[cby * MAP_COLS + cbx] !== GROUND_TYPE.ROAD) break;
+                vy = candY;
             }
 
             const v = new Vehicle(p.id || `parked_${idx}`, p.spec, vx, vy, p.a);
@@ -1344,7 +1348,15 @@ class LeonidaGame {
                         v.x = (cbx + 0.5) * TILE_SIZE;
                         v.y = (cby + 0.5) * TILE_SIZE;
                     } else {
-                        v.y += (shiftTry % 2 === 0 ? 1 : -1) * TILE_SIZE;
+                        const backX = v.x - fwdX * TILE_SIZE * (shiftTry + 1);
+                        const backY = v.y - fwdY * TILE_SIZE * (shiftTry + 1);
+                        const bbx = Math.floor(backX / TILE_SIZE);
+                        const bby = Math.floor(backY / TILE_SIZE);
+                        const bnb = this.map.getNavigationBlock(bbx, bby, v.z);
+                        if (bnb && bnb.groundType === GROUND_TYPE.ROAD) {
+                            v.x = (bbx + 0.5) * TILE_SIZE;
+                            v.y = (bby + 0.5) * TILE_SIZE;
+                        }
                     }
                 }
 

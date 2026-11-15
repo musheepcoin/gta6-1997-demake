@@ -1540,24 +1540,19 @@ class Vehicle {
         let bx = Math.floor(this.x / TILE_SIZE);
         let by = Math.floor(this.y / TILE_SIZE);
         let curBlk = map.getNavigationBlock ? map.getNavigationBlock(bx, by, curZ) : null;
-        // If a vehicle ever slightly clips or drifts onto a sidewalk/non-road tile during a wide turn or collision,
-        // anchor its navigation block to the committed road tile or nearest adjacent road tile so it never drives along a sidewalk!
+        let isOffRoadRecovery = false;
+        // If a vehicle ever gets pushed or clips onto a sidewalk/non-road tile, find the closest true ROAD tile
+        // and actively steer back onto its lane centerline without freezing movedOutOfLane!
         if (curBlk && curBlk.groundType !== GROUND_TYPE.ROAD && map.getNavigationBlock) {
-            const prevBlk = (typeof this.aiBlockX === "number" && this.aiBlockX >= 0 && typeof this.aiBlockY === "number" && this.aiBlockY >= 0)
-                ? map.getNavigationBlock(this.aiBlockX, this.aiBlockY, curZ)
-                : null;
-            if (prevBlk && prevBlk.groundType === GROUND_TYPE.ROAD && Math.abs(this.aiBlockX - bx) <= 2 && Math.abs(this.aiBlockY - by) <= 2) {
-                bx = this.aiBlockX;
-                by = this.aiBlockY;
-                curBlk = prevBlk;
-            } else {
-                let bestD2 = 999999;
-                let bestRx = bx;
-                let bestRy = by;
-                let bestBlk = null;
-                for (let dy = -2; dy <= 2; dy++) {
-                    for (let dx = -2; dx <= 2; dx++) {
-                        if (dx === 0 && dy === 0) continue;
+            isOffRoadRecovery = true;
+            let bestD2 = 99999999;
+            let bestRx = bx;
+            let bestRy = by;
+            let bestBlk = null;
+            for (let r = 1; r <= 5 && !bestBlk; r++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
                         const nbx = bx + dx;
                         const nby = by + dy;
                         const nb = map.getNavigationBlock(nbx, nby, curZ);
@@ -1574,11 +1569,11 @@ class Vehicle {
                         }
                     }
                 }
-                if (bestBlk) {
-                    bx = bestRx;
-                    by = bestRy;
-                    curBlk = bestBlk;
-                }
+            }
+            if (bestBlk) {
+                bx = bestRx;
+                by = bestRy;
+                curBlk = bestBlk;
             }
         }
         const lidZ1 = (map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0);
@@ -1591,7 +1586,7 @@ class Vehicle {
                 : this.angle;
         }
 
-        if (lidZ1 === 25) {
+        if (lidZ1 === 25 || isOffRoadRecovery) {
             this.aiLaneShiftTimer = 0;
             this.aiOvertakeReverseTimer = 0;
         }
@@ -2054,43 +2049,47 @@ class Vehicle {
             this.aiOvertakeReverseTimer = 0;
         }
         const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-        const isActiveCornerTurn = Boolean(this.aiChosenDir.isTurn || Math.abs(laneAngleDiff) > 0.36);
-        const lookAheadDist = isActiveCornerTurn ? 36 : (this.aiLaneShiftTimer > 0 ? 44 : (this.isHeavyVehicle ? 48 : 42));
-        const maxYaw = isActiveCornerTurn
-            ? 0.34
-            : (this.aiLaneShiftTimer > 0
-                ? (this.isHeavyVehicle ? 0.26 : 0.38)
-                : (this.aiPullOverTimer > 0
-                    ? (this.isHeavyVehicle ? 0.16 : 0.24)
-                    : (this.isHeavyVehicle ? 0.15 : 0.22)));
+        const isActiveCornerTurn = Boolean(this.aiChosenDir.isTurn || Math.abs(laneAngleDiff) > 0.34);
+        const lookAheadDist = isActiveCornerTurn ? 30 : (this.aiLaneShiftTimer > 0 ? 44 : (this.isHeavyVehicle ? 46 : 40));
+        const maxYaw = isOffRoadRecovery
+            ? 0.58
+            : (isActiveCornerTurn
+                ? 0.42
+                : (this.aiLaneShiftTimer > 0
+                    ? (this.isHeavyVehicle ? 0.26 : 0.36)
+                    : (this.aiPullOverTimer > 0
+                        ? (this.isHeavyVehicle ? 0.16 : 0.24)
+                        : (this.isHeavyVehicle ? 0.18 : 0.25))));
         // Smooth S-curve counter-steering taper: as lateral error drops below 4px, taper rawYaw -> 0 so the vehicle
         // straightens out parallel to the curb/lane while still rolling forward instead of arriving at an angle!
-        const latTaper = isActiveCornerTurn
+        const latTaper = (isActiveCornerTurn || isOffRoadRecovery)
             ? (Math.abs(signedLatErr) < 0.6 ? 0.0 : 1.0)
-            : Math.min(1.0, Math.max(0.0, (Math.abs(signedLatErr) - 0.9) / 3.2));
+            : Math.min(1.0, Math.max(0.0, (Math.abs(signedLatErr) - 0.8) / 3.0));
         const rawYaw = latTaper <= 0
             ? 0
             : Math.max(-maxYaw, Math.min(maxYaw, Math.atan2(signedLatErr, lookAheadDist))) * latTaper;
-        // During a 90° intersection turn, while still rotating from the entry axis toward the new lane axis (|laneAngleDiff| > 0.38),
-        // do NOT add a yawOffset pointing back toward the old heading (which would delay the turn and make long vehicles overshoot onto the sidewalk!)
-        const yawBlend = Math.abs(laneAngleDiff) > 0.38
-            ? ((signedLatErr * laneAngleDiff < 0) ? 0.65 : 0.0)
+        // During a 90° intersection turn, while still rotating from the entry axis toward the new lane axis (|laneAngleDiff| > 0.32):
+        // - BEFORE reaching the new lane centerline (signedLatErr * laneAngleDiff < 0), rawYaw points backward toward the old heading,
+        //   so yawBlend MUST be 0.0 (otherwise it delays the turn and pushes vehicles onto the sidewalk!).
+        // - AFTER crossing/overshooting the centerline (signedLatErr * laneAngleDiff > 0), rawYaw points inward toward the lane center,
+        //   so yawBlend is 1.0 to pull the vehicle cleanly onto the centerline!
+        const yawBlend = (!isOffRoadRecovery && Math.abs(laneAngleDiff) > 0.32)
+            ? ((signedLatErr * laneAngleDiff > 0) ? 1.0 : 0.0)
             : 1.0;
         const yawOffset = rawYaw * yawBlend;
         let targetHeading = this.aiChosenDir.angle + yawOffset;
         let steer = 0;
 
         // 2B. Look-Ahead Turn Speed Control (Never uses negative reverse throttle!)
-        const maxTurnSpd = this.isHeavyVehicle ? 52 : 68;
-        if ((Math.abs(laneAngleDiff) > 0.26 && this.aiLaneShiftTimer <= 0) || this.aiChosenDir.isTurn) {
+        const maxTurnSpd = isOffRoadRecovery ? 46 : (this.isHeavyVehicle ? 46 : 60);
+        if ((Math.abs(laneAngleDiff) > 0.24 && this.aiLaneShiftTimer <= 0) || this.aiChosenDir.isTurn || isOffRoadRecovery) {
             if (this.speed > maxTurnSpd) {
                 desiredThrottle = 0;
-                const slowMult = Math.pow(0.035, dt);
-                this.vx *= slowMult;
-                this.vy *= slowMult;
-                this.speed *= slowMult;
+                this.speed = Math.max(maxTurnSpd, this.speed * Math.pow(0.008, dt));
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
             } else {
-                desiredThrottle = Math.min(desiredThrottle, 0.38);
+                desiredThrottle = Math.min(desiredThrottle, 0.36);
             }
         }
 
@@ -2777,13 +2776,35 @@ class Vehicle {
         const absSpd = Math.abs(this.speed || Math.hypot(this.vx || 0, this.vy || 0));
         const effectiveSpd = Math.max(absSpd, Math.abs(desiredThrottle) * 26);
         if (effectiveSpd > 1.2) {
-            const moveFactor = Math.min(1.0, effectiveSpd / 28.0);
+            const moveFactor = Math.min(1.0, effectiveSpd / 26.0);
             const headingDiff = this.normalizeAngle(targetHeading - this.angle);
-            const turnRate = (isActiveCornerTurn ? (this.isHeavyVehicle ? 11.5 : 13.0) : 8.5) * moveFactor;
+            const turnRate = (isActiveCornerTurn ? (this.isHeavyVehicle ? 13.5 : 15.0) : 9.0) * moveFactor;
             if (Math.abs(headingDiff) < 0.008 && Math.abs(signedLatErr) < 0.8) {
                 this.angle = this.aiChosenDir.angle;
             } else {
-                this.angle += headingDiff * Math.min(1, dt * turnRate);
+                const propStep = headingDiff * Math.min(1, dt * turnRate);
+                const minStep = Math.sign(headingDiff) * Math.min(Math.abs(headingDiff), (isActiveCornerTurn ? 3.8 : 1.4) * moveFactor * dt);
+                this.angle += Math.abs(propStep) >= Math.abs(minStep) ? propStep : minStep;
+            }
+            // Forward-rolling tire track alignment inside the committed lane (strictly disabled while stopped, changing lanes, or pulling over!)
+            if (
+                absSpd > 6.0 &&
+                this.aiLaneShiftTimer <= 0 &&
+                this.aiPullOverTimer <= 0 &&
+                (Math.abs(laneAngleDiff) < 0.55 || isOffRoadRecovery)
+            ) {
+                const maxTrackStep = Math.min(absSpd * (isOffRoadRecovery ? 0.55 : 0.28), isOffRoadRecovery ? 34 : 20) * dt;
+                if (this.aiChosenDir.dx !== 0) {
+                    const dyErr = targetLaneCenterY - this.y;
+                    if (Math.abs(dyErr) > 0.4) {
+                        this.y += Math.sign(dyErr) * Math.min(Math.abs(dyErr), maxTrackStep);
+                    }
+                } else if (this.aiChosenDir.dy !== 0) {
+                    const dxErr = targetLaneCenterX - this.x;
+                    if (Math.abs(dxErr) > 0.4) {
+                        this.x += Math.sign(dxErr) * Math.min(Math.abs(dxErr), maxTrackStep);
+                    }
+                }
             }
             if (absSpd > 0.1) {
                 this.vx = Math.cos(this.angle) * this.speed;
