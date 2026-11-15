@@ -7720,6 +7720,7 @@ class RetroRenderer {
     }
 
     renderWebGLScene(game, viewProj) {
+        this.lastGameRef = game;
         const gl = this.gl;
         if (!gl) return;
 
@@ -12344,9 +12345,14 @@ class RetroRenderer {
 
         // 2C. GTA 2 Junction Traffic Lights: subtle local lens visibility in night darkness (NO streetlamp star flare or giant pool!)
         if (this.map && Array.isArray(this.map.trafficSignals)) {
-            const ph = ((game ? game.trafficLightTimer : this.time) || 0) % 12.0;
-            const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
-            const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+            const rawT = (game && typeof game.trafficLightTimer === "number") ? game.trafficLightTimer : (this.time || 0);
+            const ph = ((rawT % 12.0) + 12.0) % 12.0;
+            const nsState = (game && typeof game.getNSTrafficLightState === "function")
+                ? game.getNSTrafficLightState()
+                : (ph < 4.6 ? "GREEN" : (ph < 6.0 ? "AMBER" : (ph < 10.6 ? "RED" : "AMBER")));
+            const ewState = (game && typeof game.getEWTrafficLightState === "function")
+                ? game.getEWTrafficLightState()
+                : (ph < 4.6 ? "RED" : (ph < 6.0 ? "AMBER" : (ph < 10.6 ? "GREEN" : "AMBER")));
             const tsNightVis = this._queryStaticChunkGrid(this.map.trafficSignals, "baseX", "baseY", this.camX - 920, this.camY - 680, this.camX + 920, this.camY + 680);
             for (let vi = 0; vi < tsNightVis.length; vi++) {
                 const ts = tsNightVis[vi];
@@ -12359,10 +12365,13 @@ class RetroRenderer {
                 const zDrop = ts.state === 1 ? 0.065 : 0.0;
                 const st = ts.axis === "NS" ? nsState : ewState;
                 const hl = ts.heads || [{ x: ts.headX, y: ts.headY }];
-                const lensZ = sz + 0.80 - zDrop - 0.03 - (st === "RED" ? 0.045 : (st === "AMBER" ? 0.135 : 0.225));
+                const armCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle || 0);
+                const armSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle || 0);
+                const lensOffAlong = st === "RED" ? -3.4 : (st === "AMBER" ? 0.0 : 3.4);
+                const lensZ = sz + 0.80 - zDrop - 0.03;
                 for (let hi = 0; hi < hl.length; hi++) {
-                    const lx = hl[hi].x + tdx + (ts.faceX || 0) * 4.0;
-                    const ly = hl[hi].y + tdy + (ts.faceY || 0) * 4.0;
+                    const lx = hl[hi].x + tdx + armCos * lensOffAlong + (ts.faceX || 0) * 1.65;
+                    const ly = hl[hi].y + tdy + armSin * lensOffAlong + (ts.faceY || 0) * 1.65;
                     const hSc = this.worldToScreen(lx, ly, lensZ);
                     if (hSc.x < -140 || hSc.x > W + 140 || hSc.y < -140 || hSc.y > H + 140) continue;
                     const pxScale = (hSc.scale * H) / 128.0;

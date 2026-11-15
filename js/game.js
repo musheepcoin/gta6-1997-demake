@@ -512,22 +512,28 @@ class LeonidaGame {
 
 
 
-    isNSGreen() {
-
-        const ph = this.trafficLightTimer % 12.0;
-
-        return ph < 5.2;
-
+    getNSTrafficLightState() {
+        const ph = ((this.trafficLightTimer || 0) % 12.0 + 12.0) % 12.0;
+        if (ph < 4.6) return "GREEN";
+        if (ph < 6.0) return "AMBER"; // GREEN -> AMBER (Orange) -> RED
+        if (ph < 10.6) return "RED";
+        return "AMBER";               // RED -> AMBER (Orange) -> GREEN
     }
 
+    getEWTrafficLightState() {
+        const ph = ((this.trafficLightTimer || 0) % 12.0 + 12.0) % 12.0;
+        if (ph < 4.6) return "RED";
+        if (ph < 6.0) return "AMBER"; // RED -> AMBER (Orange) -> GREEN
+        if (ph < 10.6) return "GREEN";
+        return "AMBER";               // GREEN -> AMBER (Orange) -> RED
+    }
 
+    isNSGreen() {
+        return this.getNSTrafficLightState() === "GREEN";
+    }
 
     isEWGreen() {
-
-        const ph = this.trafficLightTimer % 12.0;
-
-        return ph >= 6.0 && ph < 11.2;
-
+        return this.getEWTrafficLightState() === "GREEN";
     }
 
 
@@ -14259,7 +14265,7 @@ class LeonidaGame {
                     ped.crossWaitTimer = (ped.crossWaitTimer || 0) - dt;
                     const baseA = typeof ped.crossBaseAngle === "number" ? ped.crossBaseAngle : ped.angle;
                     ped.angle = baseA + Math.sin(performance.now() * 0.0045 + (ped.turnSeed || 0)) * 0.32;
-                    const walkGreen = (ped.crossDirX !== 0) ? !nsGreenNow : !ewGreenNow;
+                    const walkGreen = (ped.crossDirX !== 0) ? ewGreenNow : nsGreenNow;
                     if (walkGreen && typeof ped.crossStartBx === "number" && typeof ped.crossStartBy === "number") {
                         const rCx = (ped.crossStartBx + 0.5) * TILE_SIZE;
                         const rCy = (ped.crossStartBy + 0.5) * TILE_SIZE;

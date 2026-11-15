@@ -6097,9 +6097,9 @@ class LeonidaMap {
                 if ((rDir.isUturn && !(navContext.forceCrossDir)) || rDir.blocked) continue;
                 if (navContext.forceCrossDir && (rDir.dx !== navContext.forceCrossDir.dx || rDir.dy !== navContext.forceCrossDir.dy)) continue;
                 if (!this.isStopLineBlock(rDir.bx, rDir.by)) continue;
-                // Walking horizontally (dx !== 0) crosses a North/South road -> safe when NS light is RED (!nsGreen)
-                // Walking vertically (dy !== 0) crosses an East/West road -> safe when EW light is RED (!ewGreen)
-                const walkSignalGreen = (rDir.dx !== 0) ? !navContext.nsGreen : !navContext.ewGreen;
+                // Walking horizontally (dx !== 0) crosses a North/South road -> safe when NS light is RED (ewGreen)
+                // Walking vertically (dy !== 0) crosses an East/West road -> safe when EW light is RED (nsGreen)
+                const walkSignalGreen = (rDir.dx !== 0) ? Boolean(navContext.ewGreen) : Boolean(navContext.nsGreen);
 
                 // Verify that walking 2..3 tiles straight along (rDir.dx, rDir.dy) lands on a valid, unblocked opposite sidewalk
                 let oppositeSidewalk = null;

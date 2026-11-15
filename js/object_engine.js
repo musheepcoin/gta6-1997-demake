@@ -13561,9 +13561,15 @@ class WorldObjectEngine {
 
         // 3C. True 3D Volumetric Hardware-Z-Buffered Traffic Signal Gantries (this.map.trafficSignals)
         if (this.map && Array.isArray(this.map.trafficSignals)) {
-            const ph = ((renderer.lastGameRef ? renderer.lastGameRef.trafficLightTimer : t) || t) % 12.0;
-            const nsState = ph < 5.2 ? "GREEN" : (ph < 6.0 ? "AMBER" : "RED");
-            const ewState = (ph >= 6.0 && ph < 11.2) ? "GREEN" : (ph >= 11.2 ? "AMBER" : "RED");
+            const gRef = renderer.lastGameRef;
+            const rawT = (gRef && typeof gRef.trafficLightTimer === "number") ? gRef.trafficLightTimer : t;
+            const ph = ((rawT % 12.0) + 12.0) % 12.0;
+            const nsState = (gRef && typeof gRef.getNSTrafficLightState === "function")
+                ? gRef.getNSTrafficLightState()
+                : (ph < 4.6 ? "GREEN" : (ph < 6.0 ? "AMBER" : (ph < 10.6 ? "RED" : "AMBER")));
+            const ewState = (gRef && typeof gRef.getEWTrafficLightState === "function")
+                ? gRef.getEWTrafficLightState()
+                : (ph < 4.6 ? "RED" : (ph < 6.0 ? "AMBER" : (ph < 10.6 ? "GREEN" : "AMBER")));
             const visSignals = typeof renderer._queryStaticChunkGrid === "function"
                 ? renderer._queryStaticChunkGrid(this.map.trafficSignals, "baseX", "baseY", minX, minY, maxX, maxY)
                 : this.map.trafficSignals;
@@ -13667,26 +13673,25 @@ class WorldObjectEngine {
                 emitDynBox(armMidX, armMidY, armCos, armSin, 0, 0, reach * 0.92, 1.4, armZ + 0.015, armZ + 0.045, blkPole, 1.0, 9);
                 emitDynBox(topPoleX + armCos * 8.0, topPoleY + armSin * 8.0, armCos, armSin, 0, 0, 14.0, 2.0, armZ - 0.10, armZ - 0.06, blkPole, 1.0, 9);
 
-                // 3. One hanging vertical 3-lens signal head per lane (RED top / AMBER / GREEN bottom), facing approaching traffic
+                // 3. One hanging 3-lens signal head per lane (RED / AMBER / GREEN), visible from both top-down camera & approaching lanes
                 const fX = ts.faceX || 0, fY = ts.faceY || 0;
                 const fSign = ((-armSin) * fX + armCos * fY) >= 0 ? 1 : -1;
                 const lensOn = !isDamaged || Math.sin(t * 28.0 + ts.baseX) > -0.25;
                 const headTop = armZ - 0.03;
-                const headBot = headTop - 0.27;
+                const headBot = headTop - 0.14;
+                const lensOffsets = [-3.4, 0.0, 3.4];
+                const dark = [[0.28, 0.05, 0.07], [0.28, 0.18, 0.04], [0.04, 0.25, 0.12]];
+                const lit = [[1.0, 0.14, 0.20], [1.0, 0.72, 0.06], [0.08, 0.98, 0.42]];
+                const act = st === "RED" ? 0 : (st === "AMBER" ? 1 : 2);
                 for (let hi = 0; hi < heads.length; hi++) {
                     const hx = heads[hi].x + tDx, hy = heads[hi].y + tDy;
-                    // hanger stem + black housing + backplate
-                    emitDynBox(hx, hy, armCos, armSin, 0, 0, 2.0, 2.0, headTop, headTop + 0.03, blkPole, 1.0, 9);
-                    emitDynBox(hx, hy, armCos, armSin, 0, 0, 7.0, 6.4, headBot, headTop, blkPole, 1.0, 9);
-                    emitDynBox(hx, hy, armCos, armSin, 0, fSign * 3.4, 10.0, 0.8, headBot - 0.02, headTop + 0.02, [0.04, 0.05, 0.06], 1.0, 9);
-                    const lensY = fSign * 3.9;
-                    const zs = [headTop - 0.045, headTop - 0.135, headTop - 0.225];
-                    const dark = [[0.28, 0.05, 0.07], [0.28, 0.18, 0.04], [0.04, 0.25, 0.12]];
-                    const lit = [[1.0, 0.14, 0.20], [1.0, 0.76, 0.08], [0.08, 0.98, 0.42]];
-                    const act = st === "RED" ? 0 : (st === "AMBER" ? 1 : 2);
+                    // Hanger stem + dark backplate + black 3-lens housing
+                    emitDynBox(hx, hy, armCos, armSin, 0, 0, 2.4, 2.0, headTop, headTop + 0.035, blkPole, 1.0, 9);
+                    emitDynBox(hx, hy, armCos, armSin, 0, fSign * 0.6, 13.4, 7.6, headBot - 0.015, headTop - 0.015, [0.04, 0.05, 0.06], 1.0, 9);
+                    emitDynBox(hx, hy, armCos, armSin, 0, fSign * 0.6, 11.6, 5.8, headBot, headTop, blkPole, 1.0, 9);
                     for (let li = 0; li < 3; li++) {
                         const on = (li === act) && lensOn;
-                        emitDynBox(hx, hy, armCos, armSin, 0, lensY, 4.8, 0.7, zs[li] - 0.035, zs[li] + 0.035, on ? lit[li] : dark[li], 1.0, on ? 10 : 9);
+                        emitDynBox(hx, hy, armCos, armSin, lensOffsets[li], fSign * 1.65, 2.9, 4.4, headBot + 0.018, headTop + 0.015, on ? lit[li] : dark[li], 1.0, on ? 10 : 9);
                     }
                 }
             }
