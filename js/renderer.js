@@ -1437,9 +1437,7 @@ class RetroRenderer {
                 [966, 2422, 322], [4, 2426, 374], [446, 2426, 520], [1288, 2426, 292],
                 [966, 2448, 322], [4, 2452, 962], [1288, 2452, 292], [966, 2474, 322],
                 [1181, 2647, 863], [370, 2661, 811], [1181, 2673, 863], [4, 2757, 422],
-                [1519, 2774, 260], [1220, 3311, 824], [1320, 3460, 724], [1320, 3486, 724],
-                [1320, 3512, 724], [1320, 3538, 724], [1744, 3580, 300], [1744, 3606, 300],
-                [1744, 3632, 300], [1744, 3658, 300], [1266, 4042, 778], [1266, 4068, 778]
+                [1519, 2774, 260], [1220, 3311, 824]
             ];
             const g2Layout = [];
             if (g2SrcFrames) {
@@ -5100,10 +5098,8 @@ class RetroRenderer {
 
                 // =========================================================================
                 // 6K. GTA 6 LEONIDA DIVERSE FLORA & ARBORETUM SPRITES
-                // True 3ds Max / Raytraced 1999 DMA Design baked flora (y = 3480 in gta1_sprites.png)
-                // (10 distinct plant/tree species: palm_tree, fan_palm, swamp_cypress,
-                //  mangrove, banyan_tree, live_oak, bougainvillea_bush, sea_grape,
-                //  tropical_shrub, sawgrass_clump)
+                // True 3ds Max / Raytraced 1999 DMA Design baked flora (25 distinct Leonida species
+                // at y = 3470 & y = 3580 in gta1_sprites.png)
                 // =========================================================================
                 meta.sprites.objects["palm_tree"] = meta.sprites.objects["palm_tree"] || meta.sprites.objects["257"];
                 meta.sprites.objects["banyan_tree"] = meta.sprites.objects["banyan_tree"] || [12, 3470, 84, 84];
@@ -5116,6 +5112,22 @@ class RetroRenderer {
                 meta.sprites.objects["sea_grape"] = meta.sprites.objects["sea_grape"] || [532, 3470, 48, 48];
                 meta.sprites.objects["tropical_shrub"] = meta.sprites.objects["tropical_shrub"] || [588, 3470, 42, 42];
                 meta.sprites.objects["sawgrass_clump"] = meta.sprites.objects["sawgrass_clump"] || [638, 3470, 42, 42];
+                // 15 New GTA 6 Vice City / Leonida Botanical Species:
+                meta.sprites.objects["royal_poinciana"] = [1320, 3470, 76, 76];
+                meta.sprites.objects["bismarck_palm"] = [1400, 3470, 64, 64];
+                meta.sprites.objects["travelers_palm"] = [1468, 3470, 62, 62];
+                meta.sprites.objects["jacaranda_tree"] = [1534, 3470, 72, 72];
+                meta.sprites.objects["banana_tree"] = [1610, 3470, 58, 58];
+                meta.sprites.objects["canary_date_palm"] = [1672, 3470, 68, 68];
+                meta.sprites.objects["hibiscus_bush"] = [1744, 3470, 48, 48];
+                meta.sprites.objects["plumeria_tree"] = [1796, 3470, 56, 56];
+                meta.sprites.objects["monstera_clump"] = [1856, 3470, 48, 48];
+                meta.sprites.objects["bird_of_paradise"] = [1908, 3470, 46, 46];
+                meta.sprites.objects["agave_azul"] = [1958, 3470, 44, 44];
+                meta.sprites.objects["croton_bush"] = [2004, 3470, 42, 42];
+                meta.sprites.objects["weeping_willow_moss"] = [1750, 3580, 76, 76];
+                meta.sprites.objects["cattail_reeds"] = [1834, 3580, 56, 56];
+                meta.sprites.objects["golden_bamboo"] = [1898, 3580, 60, 60];
 
                 // =========================================================================
                 // 6L. GTA 6 LEONIDA 3D MULTI-STORY RESIDENTIAL ESTATES & 3D FACADE WALLS
@@ -6100,7 +6112,7 @@ class RetroRenderer {
             checkReady();
         }, 5, true);
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=99_72", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=101_137", () => {
             spritesLoaded = true;
             checkReady();
         }, 5, true);
@@ -6117,7 +6129,7 @@ class RetroRenderer {
             }, 5, true);
         }
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=101_89", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=101_137", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -8141,6 +8153,110 @@ class RetroRenderer {
             const breeze = Math.sin(this.time * 1.4 + pm.x * 0.015) * 0.035;
             this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.25, pm.y + Math.sin(shAngle) * shDist * 1.25, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.05, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
             this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.35 * hm, (pm.angle || 0) + breeze, sc * 1.08, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "royal_poinciana") {
+            const spr = this.gta1Meta.sprites.objects["royal_poinciana"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.15 + pm.x * 0.011 + pm.y * 0.013) * 0.024;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.22, pm.y + Math.sin(shAngle) * shDist * 1.22, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.04, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.08);
+            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.14 * hm, 3.6 * sc, 3.6 * sc, pm.angle || 0, 0.38, 0.29, 0.22, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.28 * hm, (pm.angle || 0) + 0.38 - breeze * 0.4, sc * 0.92, SPRITE_DRAW_ORDER.TREES, 0.78, 0.76, 0.74, 0.92);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.37 * hm, (pm.angle || 0) + breeze, sc * 1.08, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "bismarck_palm") {
+            const spr = this.gta1Meta.sprites.objects["bismarck_palm"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.45 + pm.x * 0.014 + pm.y * 0.016) * 0.032;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.15, pm.y + Math.sin(shAngle) * shDist * 1.15, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
+            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.15 * hm, 3.2 * sc, 3.2 * sc, pm.angle || 0, 0.48, 0.45, 0.41, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.27 * hm, (pm.angle || 0) + 0.35 - breeze * 0.5, sc * 0.92, SPRITE_DRAW_ORDER.TREES, 0.74, 0.84, 0.86, 0.94);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.36 * hm, (pm.angle || 0) + breeze, sc * 1.05, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "travelers_palm") {
+            const spr = this.gta1Meta.sprites.objects["travelers_palm"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.55 + pm.x * 0.016 + pm.y * 0.014) * 0.036;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.05, pm.y + Math.sin(shAngle) * shDist * 1.05, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha);
+            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.12 * hm, 2.8 * sc, 2.8 * sc, pm.angle || 0, 0.45, 0.36, 0.26, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.28 * hm, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "jacaranda_tree") {
+            const spr = this.gta1Meta.sprites.objects["jacaranda_tree"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.2 + pm.x * 0.013 + pm.y * 0.012) * 0.025;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.18, pm.y + Math.sin(shAngle) * shDist * 1.18, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.05);
+            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.14 * hm, 3.4 * sc, 3.4 * sc, pm.angle || 0, 0.36, 0.29, 0.25, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.26 * hm, (pm.angle || 0) + 0.42 - breeze * 0.4, sc * 0.91, SPRITE_DRAW_ORDER.TREES, 0.78, 0.74, 0.84, 0.92);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.35 * hm, (pm.angle || 0) + breeze, sc * 1.06, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "banana_tree") {
+            const spr = this.gta1Meta.sprites.objects["banana_tree"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.65 + pm.x * 0.018 + pm.y * 0.015) * 0.04;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 0.85, pm.y + Math.sin(shAngle) * shDist * 0.85, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.92);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.18 * hm, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "canary_date_palm") {
+            const spr = this.gta1Meta.sprites.objects["canary_date_palm"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.38 + pm.x * 0.014 + pm.y * 0.017) * 0.03;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.22, pm.y + Math.sin(shAngle) * shDist * 1.22, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.0, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.05);
+            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.16 * hm, 3.8 * sc, 3.8 * sc, pm.angle || 0, 0.50, 0.36, 0.22, 0.97, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.29 * hm, (pm.angle || 0) + 0.32 - breeze * 0.5, sc * 0.93, SPRITE_DRAW_ORDER.TREES, 0.72, 0.82, 0.68, 0.94);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.39 * hm, (pm.angle || 0) + breeze, sc * 1.06, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "hibiscus_bush") {
+            const spr = this.gta1Meta.sprites.objects["hibiscus_bush"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.7 + pm.x * 0.02) * 0.025;
+            this.pushAtlasSprite3D(spr, pm.x + 3 * sc, pm.y + 3 * sc, groundZ + 0.015, 0, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.88);
+            const isNightGlow = (this.nightFactor || 0) > 0.18 && pm.x >= mx256(165) * TILE_SIZE && pm.x <= mx256(222) * TILE_SIZE;
+            const cr = isNightGlow ? 1.14 : 1.0;
+            const cg = isNightGlow ? 0.94 : 1.0;
+            const cb = isNightGlow ? 1.08 : 1.0;
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.065, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, cr, cg, cb, 1);
+        } else if (kind === "plumeria_tree") {
+            const spr = this.gta1Meta.sprites.objects["plumeria_tree"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.35 + pm.x * 0.016 + pm.y * 0.014) * 0.028;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 0.92, pm.y + Math.sin(shAngle) * shDist * 0.92, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.95);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.22 * hm, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "monstera_clump") {
+            const spr = this.gta1Meta.sprites.objects["monstera_clump"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.6 + pm.x * 0.02 + pm.y * 0.018) * 0.03;
+            this.pushAtlasSprite3D(spr, pm.x + 2.8 * sc, pm.y + 2.8 * sc, groundZ + 0.015, 0, sc * 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.85);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.058, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "bird_of_paradise") {
+            const spr = this.gta1Meta.sprites.objects["bird_of_paradise"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.75 + pm.x * 0.022 + pm.y * 0.016) * 0.034;
+            this.pushAtlasSprite3D(spr, pm.x + 2.8 * sc, pm.y + 2.8 * sc, groundZ + 0.015, 0, sc * 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.86);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.068, (pm.angle || 0) + breeze, sc * 1.05, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "agave_azul") {
+            const spr = this.gta1Meta.sprites.objects["agave_azul"];
+            if (!spr) return;
+            this.pushAtlasSprite3D(spr, pm.x + 2.6 * sc, pm.y + 2.6 * sc, groundZ + 0.015, pm.angle || 0, sc * 0.93, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.85);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.055, pm.angle || 0, sc * 1.03, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "croton_bush") {
+            const spr = this.gta1Meta.sprites.objects["croton_bush"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.65 + pm.y * 0.02) * 0.024;
+            this.pushAtlasSprite3D(spr, pm.x + 2.5 * sc, pm.y + 2.5 * sc, groundZ + 0.015, 0, sc * 0.93, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.85);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.06, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "weeping_willow_moss") {
+            const spr = this.gta1Meta.sprites.objects["weeping_willow_moss"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.15 + pm.x * 0.012 + pm.y * 0.015) * 0.036;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 1.2, pm.y + Math.sin(shAngle) * shDist * 1.2, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 1.02, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 1.05);
+            this.pushSolidQuad3D(pm.x, pm.y, groundZ + 0.14 * hm, 3.4 * sc, 3.4 * sc, pm.angle || 0, 0.35, 0.30, 0.24, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.26 * hm, (pm.angle || 0) + 0.35 - breeze * 0.6, sc * 0.93, SPRITE_DRAW_ORDER.TREES, 0.76, 0.82, 0.74, 0.93);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.36 * hm, (pm.angle || 0) + breeze, sc * 1.06, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "cattail_reeds") {
+            const spr = this.gta1Meta.sprites.objects["cattail_reeds"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 2.1 + pm.x * 0.024 + pm.y * 0.02) * 0.048;
+            this.pushAtlasSprite3D(spr, pm.x + 2.4 * sc, pm.y + 2.4 * sc, groundZ + 0.015, breeze * 0.5, sc * 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.78);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.06, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
+        } else if (kind === "golden_bamboo") {
+            const spr = this.gta1Meta.sprites.objects["golden_bamboo"];
+            if (!spr) return;
+            const breeze = Math.sin(this.time * 1.85 + pm.x * 0.019 + pm.y * 0.017) * 0.042;
+            this.pushAtlasSprite3D(spr, pm.x + Math.cos(shAngle) * shDist * 0.9, pm.y + Math.sin(shAngle) * shDist * 0.9, groundZ + 0.016, (pm.angle || 0) + breeze * 0.5, sc * 0.95, SPRITE_DRAW_ORDER.TIRE_MARKS, 0, 0, 0, shadowAlpha * 0.9);
+            this.pushAtlasSprite3D(spr, pm.x, pm.y, groundZ + 0.20 * hm, (pm.angle || 0) + breeze, sc * 1.04, SPRITE_DRAW_ORDER.TREES, 1, 1, 1, 1);
         }
     }
 
@@ -11830,7 +11946,7 @@ class RetroRenderer {
             for (let vi = 0; vi < trVis.length; vi++) {
                 const tr = trVis[vi];
                 if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
-                this.batchObjectSprite3D("257", tr.x, tr.y, this.getEntityZ(tr, 0.12), 0, (tr.scale || 1.0), SPRITE_DRAW_ORDER.TREES);
+                this.renderLeonidaFlora3D(tr, vi + 5000, sunShadowAngle, sunShadowAlpha, nfGlobal);
             }
         }
 
