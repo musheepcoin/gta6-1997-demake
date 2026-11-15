@@ -9546,6 +9546,8 @@ class LeonidaGame {
             next[i] = head[cell];
             head[cell] = i;
         }
+        this._vehGridCols = 128;
+        this._vehGridRows = 128;
         this._vehGridCount = n;
         this._vehGridLastVeh = n > 0 ? this.vehicles[n - 1] : null;
     }
