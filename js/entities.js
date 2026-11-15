@@ -1812,13 +1812,13 @@ class Vehicle {
                 this.aiState = "FOLLOWING";
                 this.aiTurnSignal = bayTurnSign;
                 const bayLookAhead = Math.max(22, Math.min(44, Math.abs(alongErr) * 0.72));
-                const bayYaw = Math.abs(signedBayLat) < 0.8
+                const bayYaw = Math.abs(signedBayLat) < 3.2
                     ? 0
-                    : Math.max(-0.38, Math.min(0.38, Math.atan2(signedBayLat, bayLookAhead)));
+                    : Math.max(-0.34, Math.min(0.34, Math.atan2(signedBayLat, bayLookAhead)));
                 const targetBayAng = bay.angle + bayYaw;
                 const angErr = this.normalizeAngle(targetBayAng - this.angle);
                 const moveScale = Math.min(1, Math.max(Math.abs(this.speed || 0), 16) / 28);
-                this.angle += angErr * Math.min(1, dt * 8.5 * moveScale);
+                this.angle += angErr * Math.min(1, dt * 9.5 * moveScale);
                 if (Math.abs(this.speed || 0) > 0.1) {
                     this.vx = Math.cos(this.angle) * this.speed;
                     this.vy = Math.sin(this.angle) * this.speed;
@@ -1848,7 +1848,26 @@ class Vehicle {
             lidZ1 !== 25 &&
             (this.specKey === "VICE_CAB" || this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH")
         ) {
-            if (
+            const cDx = this.aiChosenDir ? (this.aiChosenDir.dx || 0) : 0;
+            const cDy = this.aiChosenDir ? (this.aiChosenDir.dy || 0) : 0;
+            const nearJunctionAhead = Boolean(
+                map.getBlockInfo &&
+                (
+                    map.getBlockInfo(bx + cDx, by + cDy, 1).lid === 25 ||
+                    map.getBlockInfo(bx + cDx * 2, by + cDy * 2, 1).lid === 25 ||
+                    (map.isStopLineBlock && (map.isStopLineBlock(bx, by) || map.isStopLineBlock(bx + cDx, by + cDy)))
+                )
+            );
+            if (nearJunctionAhead) {
+                // Never pull over or park on a crosswalk or right before an intersection traffic signal!
+                this.aiPassengerStopTimer = 0;
+                this.aiPassengerDropPending = false;
+                this.aiBoardingStarted = false;
+                if (!this.aiPassengerTarget) {
+                    this.aiPullOverOffset = 0;
+                    this.aiPullOverTimer = 0;
+                }
+            } else if (
                 movedOutOfLane &&
                 !this.aiPassengerTarget &&
                 (this.aiPassengerStopTimer || 0) <= 0 &&
@@ -1857,11 +1876,19 @@ class Vehicle {
                 !this.aiChosenDir.isTurn &&
                 this.aiTurnSeed > 0.84
             ) {
-                // Check if right-hand side is a paved sidewalk (GROUND_TYPE.PAWEMENT)
-                const rightBx = bx - (this.aiChosenDir.dy || 0);
-                const rightBy = by + (this.aiChosenDir.dx || 0);
+                // Check if right-hand side is a paved sidewalk (GROUND_TYPE.PAWEMENT) both here and 1 tile ahead
+                const rightBx = bx - cDy;
+                const rightBy = by + cDx;
+                const rightAheadBx = rightBx + cDx;
+                const rightAheadBy = rightBy + cDy;
                 const rightNav = map.getNavigationBlock ? map.getNavigationBlock(rightBx, rightBy, curZ) : null;
-                if (rightNav && rightNav.groundType === GROUND_TYPE.PAWEMENT) {
+                const rightAheadNav = map.getNavigationBlock ? map.getNavigationBlock(rightAheadBx, rightAheadBy, curZ) : null;
+                if (
+                    rightNav &&
+                    rightNav.groundType === GROUND_TYPE.PAWEMENT &&
+                    rightAheadNav &&
+                    rightAheadNav.groundType === GROUND_TYPE.PAWEMENT
+                ) {
                     this.aiPassengerStopTimer = this.specKey === "VICE_CAB" ? 3.2 : 4.2;
                     this.aiPassengerDropPending = true;
                 }
@@ -1870,24 +1897,33 @@ class Vehicle {
             if (hailedPed && (hailedPed.dead || (hailedPed.panicTimer || 0) > 0 || (hailedPed.hailingTaxiTimer || 0) <= 0)) {
                 this.aiPassengerTarget = null;
             }
-            if (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0) {
-                this.aiPullOverOffset = 18;
+            if (!nearJunctionAhead && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0)) {
+                const isBusOrCoach = this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH";
+                const curbPullDist = isBusOrCoach ? 10 : 14;
+                this.aiPullOverOffset = curbPullDist;
                 this.aiPullOverTimer = 1.2;
                 this.aiTurnSignal = 2; // 4-way hazard flashers while picking up / dropping off passengers
                 const pLaneX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
                 const pLaneY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
                 let curbErr = 0;
                 if (this.aiChosenDir && this.aiChosenDir.dx !== 0) {
-                    const cY = (pLaneY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? 18 : -18);
+                    const cY = (pLaneY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? curbPullDist : -curbPullDist);
                     curbErr = Math.abs(cY - this.y);
                 } else if (this.aiChosenDir && this.aiChosenDir.dy !== 0) {
-                    const cX = (pLaneX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -18 : 18);
+                    const cX = (pLaneX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -curbPullDist : curbPullDist);
                     curbErr = Math.abs(cX - this.x);
                 }
-                const reachedCurb = curbErr <= 5.5 || (this._cachedClosestGap !== undefined && this._cachedClosestGap <= 22);
-                if (reachedCurb) {
+                const curbAngErr = this.aiChosenDir ? Math.abs(this.normalizeAngle(this.aiChosenDir.angle - this.angle)) : 0;
+                const reachedCurbAligned = (curbErr <= 2.8 && curbAngErr <= 0.03) || (this._cachedClosestGap !== undefined && this._cachedClosestGap <= 22);
+                if (reachedCurbAligned) {
                     this.aiState = "STOPPED_LIGHT";
-                    const brakeMult = Math.pow(0.015, dt);
+                    if (this.aiChosenDir && Math.abs(this.speed || 0) > 1.0) {
+                        const alignDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
+                        this.angle += alignDiff * Math.min(1, dt * 12.0);
+                    } else if (this.aiChosenDir && curbAngErr <= 0.05) {
+                        this.angle = this.aiChosenDir.angle;
+                    }
+                    const brakeMult = Math.pow(0.012, dt);
                     this.vx *= brakeMult;
                     this.vy *= brakeMult;
                     this.speed *= brakeMult;
@@ -1895,12 +1931,13 @@ class Vehicle {
                         this.vx = 0;
                         this.vy = 0;
                         this.speed = 0;
+                        if (this.aiChosenDir) this.angle = this.aiChosenDir.angle;
                         if (this.aiPassengerDropPending && game && typeof game.spawnAlightingPassenger === "function") {
                             this.aiPassengerDropPending = false;
                             game.spawnAlightingPassenger(this);
                         }
                         // Buses / tour coaches: waiting pedestrians walk to the front door and climb aboard during the stop
-                        if (!this.aiBoardingStarted && (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH") && game && typeof game.boardBusPassengers === "function") {
+                        if (!this.aiBoardingStarted && isBusOrCoach && game && typeof game.boardBusPassengers === "function") {
                             this.aiBoardingStarted = true;
                             game.boardBusPassengers(this);
                         }
@@ -1963,11 +2000,12 @@ class Vehicle {
                         this.tryAdjacentLaneChange(bx, by, curZ, map, game);
                     }
                     const prefSide = signedLat > 4 ? -1 : 1; // Pull away from the emergency vehicle's side (default right curb +1)
-                    if (isRightSafe(prefSide * 22)) {
-                        this.aiPullOverOffset = prefSide * 24;
+                    const sirenPullOff = this.isHeavyVehicle ? 11 : 20;
+                    if (isRightSafe(prefSide * sirenPullOff)) {
+                        this.aiPullOverOffset = prefSide * sirenPullOff;
                         this.aiPullOverTimer = 1.6;
-                    } else if (isRightSafe(-prefSide * 22)) {
-                        this.aiPullOverOffset = -prefSide * 24;
+                    } else if (isRightSafe(-prefSide * sirenPullOff)) {
+                        this.aiPullOverOffset = -prefSide * sirenPullOff;
                         this.aiPullOverTimer = 1.6;
                     }
                 } else if (
@@ -1976,8 +2014,9 @@ class Vehicle {
                 ) {
                     // Priority vehicle oncoming or crossing intersection ahead: pull right and yield!
                     sirenYield = true;
-                    if (isRightSafe(20)) {
-                        this.aiPullOverOffset = 22;
+                    const sirenYieldOff = this.isHeavyVehicle ? 10 : 18;
+                    if (isRightSafe(sirenYieldOff)) {
+                        this.aiPullOverOffset = sirenYieldOff;
                         this.aiPullOverTimer = 1.4;
                     }
                 }
@@ -2016,11 +2055,22 @@ class Vehicle {
         }
         const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
         const isActiveCornerTurn = Boolean(this.aiChosenDir.isTurn || Math.abs(laneAngleDiff) > 0.36);
-        const lookAheadDist = isActiveCornerTurn ? 36 : (this.aiLaneShiftTimer > 0 ? 44 : 42);
-        const maxYaw = isActiveCornerTurn ? 0.34 : (this.aiLaneShiftTimer > 0 ? 0.40 : (this.aiPullOverTimer > 0 ? 0.34 : 0.24));
-        const rawYaw = Math.abs(signedLatErr) < 0.6
+        const lookAheadDist = isActiveCornerTurn ? 36 : (this.aiLaneShiftTimer > 0 ? 44 : (this.isHeavyVehicle ? 48 : 42));
+        const maxYaw = isActiveCornerTurn
+            ? 0.34
+            : (this.aiLaneShiftTimer > 0
+                ? (this.isHeavyVehicle ? 0.26 : 0.38)
+                : (this.aiPullOverTimer > 0
+                    ? (this.isHeavyVehicle ? 0.16 : 0.24)
+                    : (this.isHeavyVehicle ? 0.15 : 0.22)));
+        // Smooth S-curve counter-steering taper: as lateral error drops below 4px, taper rawYaw -> 0 so the vehicle
+        // straightens out parallel to the curb/lane while still rolling forward instead of arriving at an angle!
+        const latTaper = isActiveCornerTurn
+            ? (Math.abs(signedLatErr) < 0.6 ? 0.0 : 1.0)
+            : Math.min(1.0, Math.max(0.0, (Math.abs(signedLatErr) - 0.9) / 3.2));
+        const rawYaw = latTaper <= 0
             ? 0
-            : Math.max(-maxYaw, Math.min(maxYaw, Math.atan2(signedLatErr, lookAheadDist)));
+            : Math.max(-maxYaw, Math.min(maxYaw, Math.atan2(signedLatErr, lookAheadDist))) * latTaper;
         // During a 90° intersection turn, while still rotating from the entry axis toward the new lane axis (|laneAngleDiff| > 0.38),
         // do NOT add a yawOffset pointing back toward the old heading (which would delay the turn and make long vehicles overshoot onto the sidewalk!)
         const yawBlend = Math.abs(laneAngleDiff) > 0.38
@@ -2219,6 +2269,9 @@ class Vehicle {
                     }
                 } else if ((isStopBlock || longCarStopsInPreBlock) && !alreadyCommittedPastLine) {
                     this.aiState = "STOPPED_LIGHT";
+                    if (!isActiveCornerTurn) {
+                        targetHeading = this.aiChosenDir.angle;
+                    }
                     const effectiveStopDist = (isStopBlock && distToStopRef < stopDist - 8)
                         ? Math.max(minBoxBoundaryDist, distToStopRef)
                         : stopDist;
@@ -2243,6 +2296,9 @@ class Vehicle {
                             this.vx = 0;
                             this.vy = 0;
                             this.speed = 0;
+                            if (!isActiveCornerTurn && Math.abs(laneAngleDiff) < 0.08) {
+                                this.angle = this.aiChosenDir.angle;
+                            }
                         }
                     }
                 }
@@ -2700,13 +2756,20 @@ class Vehicle {
                 this.angularVelocity = 0;
                 this.steerAngleRad = 0;
                 return { throttle: 0, steer: 0, handbrake: true };
-            } else if (Math.abs(signedLatErr) <= 5.5 || closestBumperGap <= 22) {
+            } else if ((Math.abs(signedLatErr) <= 2.8 && Math.abs(laneAngleDiff) <= 0.03) || closestBumperGap <= 22) {
+                if (Math.abs(laneAngleDiff) <= 0.06) {
+                    this.angle = this.aiChosenDir.angle;
+                }
                 desiredThrottle = 0;
                 this.angularVelocity = 0;
                 this.steerAngleRad = 0;
                 return { throttle: 0, steer: 0, handbrake: true };
+            } else if (Math.abs(signedLatErr) <= 4.5) {
+                // Counter-steer parallel to the curb while creeping forward slowly before full stop
+                targetHeading = this.aiChosenDir.angle;
+                desiredThrottle = this.speed > 24 ? 0 : 0.18;
             } else {
-                desiredThrottle = this.speed > 42 ? 0 : 0.24;
+                desiredThrottle = this.speed > 38 ? 0 : 0.24;
             }
         }
 
