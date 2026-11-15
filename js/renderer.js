@@ -15094,135 +15094,177 @@ class RetroRenderer {
 
         if (!isMinimized) {
             const bw = pw + 8;
-            const bh = ph + 8;
+            const bh = ph + 14;
             if (!this._phoneBezelCanvas || this._phoneBezelCanvas.width !== bw || this._phoneBezelCanvas.height !== bh) {
                 const bc = document.createElement("canvas");
                 bc.width = bw;
                 bc.height = bh;
                 const bctx = bc.getContext("2d");
                 const ox = 4;
-                const oy = 4;
-                bctx.fillStyle = "#64748b";
-                rrectOn(bctx, ox - 2.5, oy + 38, 3, 10, 1.5); bctx.fill();
-                rrectOn(bctx, ox - 2.5, oy + 56, 3, 20, 1.5); bctx.fill();
-                rrectOn(bctx, ox - 2.5, oy + 80, 3, 20, 1.5); bctx.fill();
-                rrectOn(bctx, ox + pw - 0.5, oy + 64, 3, 26, 1.5); bctx.fill();
+                const oy = 10;
 
-                rrectOn(bctx, ox, oy, pw, ph, 22);
-                bctx.fillStyle = "#020617";
+                // Top-right stubby cellular mobile phone antenna
+                rrectOn(bctx, ox + pw - 28, 1, 13, 11, 3);
+                bctx.fillStyle = "#111622";
                 bctx.fill();
-                bctx.lineWidth = 2.5;
+                bctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
+                bctx.lineWidth = 1.2;
+                bctx.stroke();
+                bctx.fillStyle = "#39ff14";
+                bctx.fillRect(ox + pw - 23, 3, 3, 2);
+
+                // Side tactile buttons / grip ribs on mobile phone casing
+                bctx.fillStyle = "#273042";
+                bctx.strokeStyle = "rgba(250, 204, 21, 0.45)";
+                bctx.lineWidth = 1;
+                rrectOn(bctx, ox - 2.5, oy + 36, 3, 12, 1); bctx.fill(); bctx.stroke();
+                rrectOn(bctx, ox - 2.5, oy + 54, 3, 20, 1); bctx.fill(); bctx.stroke();
+                rrectOn(bctx, ox - 2.5, oy + 78, 3, 20, 1); bctx.fill(); bctx.stroke();
+                rrectOn(bctx, ox + pw - 0.5, oy + 62, 3, 26, 1); bctx.fill(); bctx.stroke();
+
+                // Rugged 90s / GTA Cellular Handset Chassis (Charcoal + Beveled Gold Rim)
+                rrectOn(bctx, ox, oy, pw, ph, 14);
+                const bodyGrad = bctx.createLinearGradient(ox, oy, ox + pw, oy + ph);
+                bodyGrad.addColorStop(0, "#1c2333");
+                bodyGrad.addColorStop(0.5, "#0f141f");
+                bodyGrad.addColorStop(1, "#182030");
+                bctx.fillStyle = bodyGrad;
+                bctx.fill();
+                bctx.lineWidth = 2.2;
                 const frameGrad = bctx.createLinearGradient(ox, oy, ox + pw, oy + ph);
-                frameGrad.addColorStop(0, "#94a3b8");
-                frameGrad.addColorStop(0.5, "#475569");
-                frameGrad.addColorStop(1, "#64748b");
+                frameGrad.addColorStop(0, "#fde047");
+                frameGrad.addColorStop(0.45, "#ca8a04");
+                frameGrad.addColorStop(1, "#eab308");
                 bctx.strokeStyle = frameGrad;
                 bctx.stroke();
 
+                // Inner metallic bezel trim
+                rrectOn(bctx, ox + 2.5, oy + 2.5, pw - 5, ph - 5, 12);
+                bctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+                bctx.lineWidth = 1;
+                bctx.stroke();
+
+                // Recessed Dark CRT LCD Screen
                 const osx = ox + 5;
                 const osy = oy + 5;
-                rrectOn(bctx, osx, osy, sw, sh, 18);
+                rrectOn(bctx, osx, osy, sw, sh, 9);
                 const wallGrad = bctx.createLinearGradient(osx, osy, osx, osy + sh);
-                wallGrad.addColorStop(0, "#0b1120");
-                wallGrad.addColorStop(0.55, "#111329");
-                wallGrad.addColorStop(1, "#1b0e28");
+                wallGrad.addColorStop(0, "#070b12");
+                wallGrad.addColorStop(0.6, "#090f1a");
+                wallGrad.addColorStop(1, "#060911");
                 bctx.fillStyle = wallGrad;
                 bctx.fill();
+                bctx.strokeStyle = "rgba(250, 204, 21, 0.35)";
+                bctx.lineWidth = 1;
+                bctx.stroke();
 
+                // Subtle CRT horizontal scanlines inside screen
+                bctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+                for (let syLine = osy + 2; syLine < osy + sh - 2; syLine += 3) {
+                    bctx.fillRect(osx + 2, syLine, sw - 4, 1);
+                }
+
+                // Classic cellular earpiece speaker grille + status LED at top-center
                 const onotchX = osx + (sw - notchW) * 0.5;
-                const onotchY = osy + 4;
-                rrectOn(bctx, onotchX, onotchY, notchW, notchH, 5.5);
-                bctx.fillStyle = "#000000";
+                const onotchY = osy + 3.5;
+                rrectOn(bctx, onotchX, onotchY, notchW, notchH, 3);
+                bctx.fillStyle = "#04070d";
                 bctx.fill();
-                bctx.fillStyle = "#0f172a";
-                bctx.beginPath();
-                bctx.arc(onotchX + notchW - 9, onotchY + notchH * 0.5, 2.6, 0, Math.PI * 2);
-                bctx.fill();
-                bctx.fillStyle = "#38bdf8";
-                bctx.beginPath();
-                bctx.arc(onotchX + notchW - 9.5, onotchY + notchH * 0.5 - 0.5, 0.9, 0, Math.PI * 2);
-                bctx.fill();
+                bctx.strokeStyle = "rgba(250, 204, 21, 0.38)";
+                bctx.lineWidth = 0.9;
+                bctx.stroke();
+                bctx.fillStyle = "#334155";
+                for (let slot = 0; slot < 5; slot++) {
+                    bctx.fillRect(onotchX + 9 + slot * 6.5, onotchY + 4, 4, 3);
+                }
+                bctx.fillStyle = "#39ff14";
+                bctx.fillRect(onotchX + notchW - 8, onotchY + 4, 3, 3);
 
-                const sigX = osx + sw - 50;
+                // Retro CELL signal bars + segmented battery icon
+                const sigX = osx + sw - 54;
                 const sigY = osy + 12.5;
-                bctx.fillStyle = "#f8fafc";
+                bctx.fillStyle = "#39ff14";
                 for (let b = 0; b < 4; b++) {
                     const bbh = 3 + b * 1.6;
-                    bctx.fillRect(sigX + b * 3.2, sigY - bbh, 2.1, bbh);
+                    bctx.fillRect(sigX + b * 3.2, sigY - bbh, 2.2, bbh);
                 }
-                bctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+                bctx.fillStyle = "#fde047";
+                bctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
                 bctx.textBaseline = "middle";
-                bctx.fillText("5G", sigX + 15, osy + 10);
+                bctx.fillText("CELL", sigX + 14, osy + 9.5);
 
-                const batX = osx + sw - 22;
-                const batY = osy + 6.5;
-                bctx.strokeStyle = "#cbd5e1";
+                const batX = osx + sw - 19;
+                const batY = osy + 6;
+                bctx.strokeStyle = "#facc15";
                 bctx.lineWidth = 1;
-                rrectOn(bctx, batX, batY, 13, 6.5, 1.5);
+                rrectOn(bctx, batX, batY, 13, 6.5, 1);
                 bctx.stroke();
-                bctx.fillStyle = "#4ade80";
+                bctx.fillStyle = "#39ff14";
                 bctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
-                bctx.fillStyle = "#cbd5e1";
-                bctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
+                bctx.fillStyle = "#facc15";
+                bctx.fillRect(batX + 13.5, batY + 2, 1.3, 2.5);
 
                 this._phoneBezelCanvas = bc;
             }
-            ctx.drawImage(this._phoneBezelCanvas, px - 4, py - 4);
+            ctx.drawImage(this._phoneBezelCanvas, px - 4, py - 10);
             ctx.save();
         } else {
-            // Minimized desktop smartphone pill
-            rrect(px, py, pw, ph, 22);
-            ctx.fillStyle = "#020617";
+            // Minimized retro cellular phone header bar
+            rrect(px + pw - 28, py - 6, 12, 7, 2);
+            ctx.fillStyle = "#111622";
             ctx.fill();
-            ctx.lineWidth = 2.5;
-            const frameGrad = ctx.createLinearGradient(px, py, px + pw, py + ph);
-            frameGrad.addColorStop(0, "#94a3b8");
-            frameGrad.addColorStop(0.5, "#475569");
-            frameGrad.addColorStop(1, "#64748b");
-            ctx.strokeStyle = frameGrad;
+            ctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
+            ctx.lineWidth = 1;
             ctx.stroke();
 
-            rrect(sx, sy, sw, sh, 18);
-            const wallGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
-            wallGrad.addColorStop(0, "#0b1120");
-            wallGrad.addColorStop(0.55, "#111329");
-            wallGrad.addColorStop(1, "#1b0e28");
-            ctx.fillStyle = wallGrad;
+            rrect(px, py, pw, ph, 10);
+            ctx.fillStyle = "#111622";
             ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#eab308";
+            ctx.stroke();
+
+            rrect(sx, sy, sw, sh, 7);
+            ctx.fillStyle = "#070b12";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(250, 204, 21, 0.35)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
             ctx.save();
 
-            const sigX = sx + sw - 50;
+            const sigX = sx + sw - 54;
             const sigY = sy + 12.5;
-            ctx.fillStyle = "#f8fafc";
+            ctx.fillStyle = "#39ff14";
             for (let b = 0; b < 4; b++) {
                 const bh = 3 + b * 1.6;
-                ctx.fillRect(sigX + b * 3.2, sigY - bh, 2.1, bh);
+                ctx.fillRect(sigX + b * 3.2, sigY - bh, 2.2, bh);
             }
-            ctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
             ctx.textBaseline = "middle";
-            ctx.fillText("5G", sigX + 15, sy + 10);
+            ctx.fillText("CELL", sigX + 14, sy + 9.5);
 
-            const batX = sx + sw - 22;
-            const batY = sy + 6.5;
-            ctx.strokeStyle = "#cbd5e1";
+            const batX = sx + sw - 19;
+            const batY = sy + 6;
+            ctx.strokeStyle = "#facc15";
             ctx.lineWidth = 1;
-            rrect(batX, batY, 13, 6.5, 1.5);
+            rrect(batX, batY, 13, 6.5, 1);
             ctx.stroke();
-            ctx.fillStyle = "#4ade80";
+            ctx.fillStyle = "#39ff14";
             ctx.fillRect(batX + 1.5, batY + 1.5, 9, 3.5);
-            ctx.fillStyle = "#cbd5e1";
-            ctx.fillRect(batX + 13.5, batY + 2, 1.2, 2.5);
+            ctx.fillStyle = "#facc15";
+            ctx.fillRect(batX + 13.5, batY + 2, 1.3, 2.5);
         }
 
-        ctx.fillStyle = "#f8fafc";
+        ctx.fillStyle = "#fde047";
         ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
-        ctx.fillText(`${timeInfo.icon} ${liveClockStr}`, sx + 8, sy + 10);
+        ctx.fillText(`${timeInfo.icon} ${liveClockStr}`, sx + 6, sy + 9.5);
         this.cheatButtons.push({ id: "TOGGLE_NIGHT", x: sx + 4, y: sy + 2, w: 68, h: 15 });
 
         if (isMinimized) {
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = isMobile ? "bold 10px -apple-system, 'Segoe UI', sans-serif" : "bold 10px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#39ff14";
+            ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
             ctx.fillText(isMobile ? "📱 • 🎵 • 📍" : "🧭 GPS • 🎵 FM • 📍 PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
             this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
             ctx.restore();
@@ -15236,7 +15278,7 @@ class RetroRenderer {
             return;
         }
 
-        // Tap top-right of status bar or Dynamic Island to minimize the Smartphone on mobile/desktop
+        // Tap top-right of status bar or earpiece grille to minimize the Mobile Phone on mobile/desktop
         this.cheatButtons.push({ id: "MINIMIZE_PHONE", x: notchX, y: sy + 1, w: sx + sw - notchX, h: 16 });
 
         // ====================================================================
@@ -15246,30 +15288,33 @@ class RetroRenderer {
         if (!isPlacesApp) {
             this.renderPhoneGpsWidget(ctx, game, sx + 6, gpsTopY, sw - 12, 174, rrect);
         } else {
-            // 16 Fast-Travel Landmarks Grid inside the Smartphone
+            // 16 Fast-Travel Landmarks Grid inside the Mobile Phone
             const hdrH = 19;
-            rrect(sx + 6, gpsTopY, sw - 12, hdrH, 5);
-            ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+            rrect(sx + 6, gpsTopY, sw - 12, hdrH, 3);
+            ctx.fillStyle = "rgba(9, 13, 22, 0.95)";
             ctx.fill();
+            ctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
 
             const visitedCount = Array.isArray(this.map.landmarks)
                 ? this.map.landmarks.filter((lm) => lm.visited).length
                 : 0;
             const totalLm = Array.isArray(this.map.landmarks) ? this.map.landmarks.length : 16;
 
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
-            ctx.fillText(`📍 Fast Travel • Places (${visitedCount}/${totalLm})`, sx + 12, gpsTopY + 10);
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+            ctx.fillText(`📍 FAST TRAVEL (${visitedCount}/${totalLm})`, sx + 11, gpsTopY + 10);
 
             const drawPhoneAppBtn = (id, label, bx, by, bw, bh = 17, highlight = false, extra = null) => {
-                rrect(bx, by, bw, bh, 4);
-                ctx.fillStyle = highlight ? "rgba(255, 42, 133, 0.24)" : "rgba(30, 41, 59, 0.92)";
+                rrect(bx, by, bw, bh, 3);
+                ctx.fillStyle = highlight ? "rgba(66, 32, 6, 0.85)" : "rgba(15, 21, 33, 0.94)";
                 ctx.fill();
-                ctx.strokeStyle = highlight ? "#ff2a85" : "rgba(56, 189, 248, 0.55)";
+                ctx.strokeStyle = highlight ? "#facc15" : "rgba(148, 163, 184, 0.42)";
                 ctx.lineWidth = 1;
                 ctx.stroke();
-                ctx.fillStyle = highlight ? "#fde047" : "#f8fafc";
-                ctx.font = "bold 8.8px -apple-system, 'Segoe UI', Consolas, sans-serif";
+                ctx.fillStyle = highlight ? "#fde047" : "#e2e8f0";
+                ctx.font = "bold 8.4px Consolas, 'Courier New', monospace";
                 ctx.fillText(label, bx + 4, by + bh * 0.5 + 0.5);
                 this.cheatButtons.push({ id, x: bx, y: by, w: bw, h: bh, ...(extra || {}) });
             };
@@ -15332,11 +15377,11 @@ class RetroRenderer {
         const musW = sw - 12;
         const musH = 44;
 
-        rrect(musX, musY, musW, musH, 10);
-        ctx.fillStyle = "rgba(19, 25, 46, 0.95)";
+        rrect(musX, musY, musW, musH, 4);
+        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
         ctx.fill();
-        ctx.strokeStyle = "rgba(255, 42, 133, 0.65)";
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.52)";
+        ctx.lineWidth = 1.1;
         ctx.stroke();
 
         const isPlaying = game.ytMusicEnabled !== false;
@@ -15349,11 +15394,11 @@ class RetroRenderer {
             ctx.fillRect(musX + 8 + b * 3.5, musY + 15 - eqH, 2.2, eqH);
         }
 
-        ctx.fillStyle = "#00f0ff";
-        ctx.font = "bold 9px -apple-system, 'Segoe UI', sans-serif";
+        ctx.fillStyle = "#fde047";
+        ctx.font = "bold 8.6px Consolas, 'Courier New', monospace";
         const curSt = (game.audio && typeof game.audio.getCurrentStation === "function") ? game.audio.getCurrentStation() : null;
         const stLabel = (curSt && curSt.name) ? curSt.name : "VICE CITY FM • RADIO OST";
-        ctx.fillText(`🎵 ${stLabel}`, musX + 26, musY + 10.5);
+        ctx.fillText(stLabel.slice(0, 22), musX + 24, musY + 10.5);
 
         if (!this._phoneDomEls) {
             this._phoneDomEls = {
@@ -15364,20 +15409,20 @@ class RetroRenderer {
         }
         const volSlider = this._phoneDomEls.volSlider;
         const curVol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (game.ytVolume || 28);
-        ctx.fillStyle = "#cbd5e1";
-        ctx.font = "bold 8.5px Consolas, monospace";
-        ctx.fillText(`${curVol}%`, musX + musW - 26, musY + 10.5);
+        ctx.fillStyle = "#39ff14";
+        ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
+        ctx.fillText(`${curVol}%`, musX + musW - 25, musY + 10.5);
 
         // Music Control Buttons Row inside the widget: [ON/OFF] [NEXT (R)] [VOL -] [VOL +]
-        const drawMusBtn = (id, label, bx, by, bw, activeColor = null) => {
-            rrect(bx, by, bw, 18, 5);
-            ctx.fillStyle = activeColor || "rgba(30, 41, 59, 0.95)";
+        const drawMusBtn = (id, label, bx, by, bw, activeColor = null, borderCol = null) => {
+            rrect(bx, by, bw, 18, 3);
+            ctx.fillStyle = activeColor || "rgba(20, 27, 42, 0.95)";
             ctx.fill();
-            ctx.strokeStyle = activeColor ? "#39ff14" : "#38bdf8";
+            ctx.strokeStyle = borderCol || (activeColor ? "#39ff14" : "rgba(250, 204, 21, 0.48)");
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 8.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.font = "bold 8.2px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.fillText(label, bx + bw * 0.5, by + 9.5);
             ctx.textAlign = "left";
@@ -15391,35 +15436,34 @@ class RetroRenderer {
             musX + 6,
             btnY,
             78,
-            isPlaying ? "rgba(21, 128, 61, 0.55)" : "rgba(153, 27, 27, 0.55)"
+            isPlaying ? "rgba(20, 83, 45, 0.72)" : "rgba(127, 29, 29, 0.72)",
+            isPlaying ? "#39ff14" : "#f87171"
         );
         drawMusBtn("PHONE_MUSIC_SKIP", "⏭ NEXT [R]", musX + 88, btnY, 60);
-        drawMusBtn("PHONE_VOL_DOWN", "🔉–", musX + 152, btnY, 22);
+        drawMusBtn("PHONE_VOL_DOWN", "🔉-", musX + 152, btnY, 22);
         drawMusBtn("PHONE_VOL_UP", "🔊+", musX + 176, btnY, 22);
 
         // ====================================================================
-        // WIDGET 3 (BOTTOM OF PHONE): JASON DUVAL iMESSAGE / SMS CARD
+        // WIDGET 3 (BOTTOM OF PHONE): JASON DUVAL PAGER / SMS CARD
         // ====================================================================
         const smsX = sx + 6;
         const smsY = sy + 244;
         const smsW = sw - 12;
         const smsH = 92;
 
-        rrect(smsX, smsY, smsW, smsH, 10);
-        ctx.fillStyle = "rgba(17, 24, 39, 0.95)";
+        rrect(smsX, smsY, smsW, smsH, 4);
+        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
         ctx.fill();
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.48)";
+        ctx.lineWidth = 1.1;
         ctx.stroke();
 
         // Jason Pixel Avatar + Green Online Dot
         const avX = smsX + 6;
         const avY = smsY + 5;
         this.drawPixelPortraitRect(ctx, avX, avY, 20, 20, "JASON");
-        ctx.fillStyle = "#22c55e";
-        ctx.beginPath();
-        ctx.arc(avX + 18, avY + 18, 2.8, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = "#39ff14";
+        ctx.fillRect(avX + 16, avY + 16, 4, 4);
 
         const senderEl = this._phoneDomEls.senderEl;
         let contactName = "Jason Duval";
@@ -15439,30 +15483,30 @@ class RetroRenderer {
             }
         }
 
-        ctx.fillStyle = "#f8fafc";
-        ctx.font = "bold 9.5px -apple-system, 'Segoe UI', sans-serif";
-        ctx.fillText(contactName, avX + 25, smsY + 11);
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "8px -apple-system, 'Segoe UI', sans-serif";
-        ctx.fillText("Online • Messages", avX + 25, smsY + 20);
+        ctx.fillStyle = "#fde047";
+        ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+        ctx.fillText(contactName.toUpperCase().slice(0, 14), avX + 24, smsY + 10.5);
+        ctx.fillStyle = "#39ff14";
+        ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
+        ctx.fillText("PAGER • SMS LINK", avX + 24, smsY + 20);
 
         // Interactive Online P2P Multiplayer Pill Button [O]
         const mpCount = (game && game.net && typeof game.net.getPlayerCount === "function")
             ? game.net.getPlayerCount()
             : 1;
-        const mpLabel = `🌐 ${mpCount}P ONLINE [O]`;
-        const mpBtnW = 68;
+        const mpLabel = `${mpCount}P ONLINE [O]`;
+        const mpBtnW = 66;
         const mpBtnH = 15;
         const mpBtnX = smsX + smsW - mpBtnW - 4;
         const mpBtnY = smsY + 5;
-        rrect(mpBtnX, mpBtnY, mpBtnW, mpBtnH, 4);
-        ctx.fillStyle = mpCount > 1 ? "rgba(6, 182, 212, 0.32)" : "rgba(30, 41, 59, 0.92)";
+        rrect(mpBtnX, mpBtnY, mpBtnW, mpBtnH, 3);
+        ctx.fillStyle = mpCount > 1 ? "rgba(20, 83, 45, 0.72)" : "rgba(20, 27, 42, 0.95)";
         ctx.fill();
-        ctx.strokeStyle = mpCount > 1 ? "#00f0ff" : "#38bdf8";
+        ctx.strokeStyle = mpCount > 1 ? "#39ff14" : "rgba(250, 204, 21, 0.52)";
         ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = mpCount > 1 ? "#00f0ff" : "#e2e8f0";
-        ctx.font = "bold 7.5px -apple-system, 'Segoe UI', sans-serif";
+        ctx.fillStyle = mpCount > 1 ? "#39ff14" : "#fde047";
+        ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
         ctx.textAlign = "center";
         ctx.fillText(mpLabel, mpBtnX + mpBtnW * 0.5, mpBtnY + mpBtnH * 0.5 + 0.5);
         ctx.textAlign = "left";
@@ -15475,7 +15519,7 @@ class RetroRenderer {
             : "Welcome to Vice City! Use the GPS map above or press [M] to fast-travel anywhere.";
 
         ctx.fillStyle = "#e2e8f0";
-        ctx.font = "9.5px -apple-system, 'Segoe UI', sans-serif";
+        ctx.font = "8.8px Consolas, 'Courier New', monospace";
         const maxLineW = smsW - 14;
         const smsCacheKey = `${maxLineW}:${rawMsg}`;
         let lines = this._smsLinesCache;
@@ -15510,7 +15554,7 @@ class RetroRenderer {
             textY += 12.5;
         }
 
-        // Interactive Smartphone Mission Launcher Bar inside Messages Card
+        // Interactive Mobile Phone Mission Launcher Bar inside Messages Card
         const mBarY = smsY + smsH - 24;
         const mBarH = 19;
         const activeM = game && game.missions ? game.missions.activeMission : null;
@@ -15521,20 +15565,20 @@ class RetroRenderer {
         if (activeM) {
             const abortW = 54;
             const statW = smsW - abortW - 14;
-            rrect(smsX + 6, mBarY, statW, mBarH, 5);
-            ctx.fillStyle = "rgba(190, 24, 93, 0.28)";
+            rrect(smsX + 6, mBarY, statW, mBarH, 3);
+            ctx.fillStyle = "rgba(66, 32, 6, 0.82)";
             ctx.fill();
-            ctx.strokeStyle = "#ff2a85";
+            ctx.strokeStyle = "#facc15";
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.fillStyle = "#fde047";
-            ctx.font = "bold 8.2px -apple-system, 'Segoe UI', sans-serif";
-            const objShort = String(activeM.objectiveLabel || activeM.title || "ACTIVE MISSION").slice(0, 21);
-            ctx.fillText(`🎯 ${objShort}`, smsX + 11, mBarY + mBarH * 0.5 + 0.5);
+            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
+            const objShort = String(activeM.objectiveLabel || activeM.title || "ACTIVE MISSION").slice(0, 20);
+            ctx.fillText(`🎯 ${objShort}`, smsX + 10, mBarY + mBarH * 0.5 + 0.5);
 
             const abX = smsX + 8 + statW;
-            rrect(abX, mBarY, abortW, mBarH, 5);
-            ctx.fillStyle = "rgba(153, 27, 27, 0.85)";
+            rrect(abX, mBarY, abortW, mBarH, 3);
+            ctx.fillStyle = "rgba(127, 29, 29, 0.9)";
             ctx.fill();
             ctx.strokeStyle = "#f87171";
             ctx.stroke();
@@ -15546,27 +15590,27 @@ class RetroRenderer {
         } else if (selPhone) {
             const nextW = 24;
             const startW = smsW - nextW - 14;
-            rrect(smsX + 6, mBarY, startW, mBarH, 5);
-            ctx.fillStyle = selPhone.completed ? "rgba(30, 58, 138, 0.72)" : "rgba(21, 128, 61, 0.78)";
+            rrect(smsX + 6, mBarY, startW, mBarH, 3);
+            ctx.fillStyle = selPhone.completed ? "rgba(30, 41, 59, 0.9)" : "rgba(20, 83, 45, 0.82)";
             ctx.fill();
-            ctx.strokeStyle = selPhone.completed ? "#38bdf8" : "#4ade80";
+            ctx.strokeStyle = selPhone.completed ? "#facc15" : "#39ff14";
             ctx.lineWidth = 1.2;
             ctx.stroke();
-            ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 8.4px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillStyle = selPhone.completed ? "#fde047" : "#f8fafc";
+            ctx.font = "bold 8.1px Consolas, 'Courier New', monospace";
             const btnTitle = selPhone.shortTitle || "MISSION";
-            const prefix = selPhone.completed ? "🔄 REPLAY " : "📲 START ";
-            ctx.fillText(`${prefix}${btnTitle}`, smsX + 11, mBarY + mBarH * 0.5 + 0.5);
+            const prefix = selPhone.completed ? "🔄 REPLAY " : "▶ START ";
+            ctx.fillText(`${prefix}${btnTitle}`.slice(0, 23), smsX + 9, mBarY + mBarH * 0.5 + 0.5);
             this.cheatButtons.push({ id: "PHONE_MISSION_START", x: smsX + 6, y: mBarY, w: startW, h: mBarH });
 
             const nxX = smsX + 8 + startW;
-            rrect(nxX, mBarY, nextW, mBarH, 5);
-            ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
+            rrect(nxX, mBarY, nextW, mBarH, 3);
+            ctx.fillStyle = "rgba(20, 27, 42, 0.95)";
             ctx.fill();
-            ctx.strokeStyle = "#38bdf8";
+            ctx.strokeStyle = "rgba(250, 204, 21, 0.58)";
             ctx.lineWidth = 1;
             ctx.stroke();
-            ctx.fillStyle = "#38bdf8";
+            ctx.fillStyle = "#fde047";
             ctx.textAlign = "center";
             ctx.fillText("⏭", nxX + nextW * 0.5, mBarY + mBarH * 0.5 + 0.5);
             ctx.textAlign = "left";
@@ -15574,26 +15618,29 @@ class RetroRenderer {
         }
 
         // ====================================================================
-        // 5. BOTTOM SMARTPHONE APP DOCK (🧭 GPS MAP | 📍 PLACES [C] | 🌙 NIGHT)
+        // 5. BOTTOM MOBILE PHONE KEYPAD DOCK (🧭 GPS MAP | 📍 PLACES [C] | ☀️ DAY [N])
         // ====================================================================
         const dockY = sy + sh - 32;
         const dockH = 21;
-        rrect(sx + 6, dockY, sw - 12, dockH, 7);
-        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+        rrect(sx + 6, dockY, sw - 12, dockH, 4);
+        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
         ctx.fill();
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.45)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
         const tabW = Math.floor((sw - 18) / 3);
         const drawDockTab = (id, label, tx, active) => {
             if (active) {
-                rrect(tx, dockY + 2, tabW, dockH - 4, 5);
-                ctx.fillStyle = "rgba(56, 189, 248, 0.24)";
+                rrect(tx, dockY + 2, tabW, dockH - 4, 3);
+                ctx.fillStyle = "rgba(250, 204, 21, 0.18)";
                 ctx.fill();
+                ctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
             }
-            ctx.fillStyle = active ? "#38bdf8" : "#cbd5e1";
-            ctx.font = "bold 8.5px -apple-system, 'Segoe UI', sans-serif";
+            ctx.fillStyle = active ? "#fde047" : "#cbd5e1";
+            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.fillText(label, tx + tabW * 0.5, dockY + dockH * 0.5 + 0.5);
             ctx.textAlign = "left";
@@ -15604,9 +15651,9 @@ class RetroRenderer {
         drawDockTab("TOGGLE_COLLAPSE", "📍 PLACES [C]", sx + 9 + tabW, isPlacesApp);
         drawDockTab("TOGGLE_NIGHT", timeInfo.dockLabel || "☀️ DAY [N]", sx + 11 + tabW * 2, timeInfo.phase !== "DAY");
 
-        // 6. Bottom iOS White Home Indicator Bar (Tap to minimize phone)
-        rrect(sx + (sw - 58) * 0.5, sy + sh - 6.5, 58, 3.2, 2);
-        ctx.fillStyle = "rgba(248, 250, 252, 0.65)";
+        // 6. Bottom Retro Cellular Microphone Grille / Minimize Bar
+        rrect(sx + (sw - 64) * 0.5, sy + sh - 7.5, 64, 4, 2);
+        ctx.fillStyle = "rgba(250, 204, 21, 0.55)";
         ctx.fill();
         this.cheatButtons.push({ id: "MINIMIZE_PHONE", x: sx + (sw - 90) * 0.5, y: sy + sh - 11, w: 90, h: 11 });
 
@@ -15638,7 +15685,8 @@ class RetroRenderer {
         const viewWorldH = spanBlocks * TILE_SIZE;
 
         let viewWorldX = p.x - viewWorldW * 0.5;
-        let viewWorldY = p.y - viewWorldH * 0.5;
+        let viewWorldY = p.y - viewWorldY_offset(viewWorldH);
+        function viewWorldY_offset(h) { return h * 0.5; }
         viewWorldX = Math.max(0, Math.min(worldW - viewWorldW, viewWorldX));
         viewWorldY = Math.max(0, Math.min(worldH - viewWorldH, viewWorldY));
 
@@ -15652,35 +15700,41 @@ class RetroRenderer {
         ctx.save();
 
         // 1. GPS Header Bar (District Name + [1x] + [M] Full Map)
-        rrect(gx, gy, gw, gh, 8);
-        ctx.fillStyle = "rgba(9, 13, 22, 0.95)";
+        rrect(gx, gy, gw, gh, 4);
+        ctx.fillStyle = "rgba(9, 13, 22, 0.96)";
         ctx.fill();
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.55)";
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.58)";
         ctx.lineWidth = 1.2;
         ctx.stroke();
 
         ctx.font = "bold 9px Consolas, 'Courier New', monospace";
         ctx.textBaseline = "middle";
         const distName = (game.currentDistrict || "VICE CITY").toUpperCase();
-        ctx.fillStyle = "#00f0ff";
+        ctx.fillStyle = "#fde047";
         ctx.fillText(`🧭 ${distName.slice(0, 14)}`, gx + 5, gy + 10);
 
         const zoomLabels = ["1x", "2x", "ALL"];
         const zBtnW = 28;
         const zBtnX = gx + gw - 62;
-        rrect(zBtnX, gy + 2, zBtnW, 15, 3);
-        ctx.fillStyle = "rgba(44, 78, 128, 0.95)";
+        rrect(zBtnX, gy + 2, zBtnW, 15, 2.5);
+        ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
         ctx.fill();
-        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.55)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = "#fde047";
         ctx.fillText(zoomLabels[zoomMode], zBtnX + 4, gy + 10);
         this.cheatButtons.push({ id: "MINIMAP_ZOOM", x: zBtnX, y: gy + 2, w: zBtnW, h: 15 });
 
         const mBtnW = 30;
         const mBtnX = gx + gw - 32;
-        rrect(mBtnX, gy + 2, mBtnW, 15, 3);
-        ctx.fillStyle = "rgba(180, 42, 118, 0.95)";
+        rrect(mBtnX, gy + 2, mBtnW, 15, 2.5);
+        ctx.fillStyle = "rgba(66, 32, 6, 0.92)";
         ctx.fill();
-        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#facc15";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = "#fde047";
         ctx.fillText("[M]", mBtnX + 5, gy + 10);
         this.cheatButtons.push({ id: "MINIMAP_FULLMAP", x: mBtnX, y: gy + 2, w: mBtnW, h: 15 });
 
@@ -15916,6 +15970,10 @@ class RetroRenderer {
             ctx.drawImage(this._gpsMiniCacheCanvas, mx, my);
         }
 
+        ctx.strokeStyle = "rgba(250, 204, 21, 0.42)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+
         // 3. Bottom GPS Landmark Navigation Bar
         const ftrY = my + mh;
         if (nearestLm) {
@@ -15935,7 +15993,7 @@ class RetroRenderer {
 
             const nearShort = nearestLm.short || nearestLm.shortName || "LANDMARK";
             ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-            ctx.fillStyle = "#ffd13b";
+            ctx.fillStyle = "#fde047";
             const statusTxt = distMeters < 35
                 ? `★ AT ${nearShort}`
                 : `📍 ${nearShort} (${distMeters}m ${dirStr})`;
@@ -15943,10 +16001,13 @@ class RetroRenderer {
 
             const goW = 34;
             const goX = gx + gw - goW - 3;
-            rrect(goX, ftrY + 2, goW, 14, 3);
-            ctx.fillStyle = "rgba(25, 115, 72, 0.95)";
+            rrect(goX, ftrY + 2, goW, 14, 2.5);
+            ctx.fillStyle = "rgba(20, 83, 45, 0.92)";
             ctx.fill();
-            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "#39ff14";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = "#39ff14";
             ctx.fillText("GO►", goX + 5, ftrY + 10);
 
             this.cheatButtons.push({

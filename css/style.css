@@ -1386,30 +1386,36 @@ html, body {
 }
 
 /* ============================================================================
-   VICE CITY '97 P2P ONLINE MULTIPLAYER LIVE CHAT WIDGET (COMPACT & READABLE)
+   VICE CITY '97 P2P ONLINE MULTIPLAYER LIVE CHAT WIDGET (1997 GTA 1 CRT HUD)
    ============================================================================ */
 #mp-chat-widget {
     position: absolute;
     right: 12px;
     bottom: 12px;
     width: 340px;
-    background: rgba(8, 12, 22, 0.90);
-    border: 1.5px solid rgba(0, 240, 255, 0.55);
-    border-radius: 9px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.72), 0 0 12px rgba(0, 240, 255, 0.14);
-    backdrop-filter: blur(6px);
+    background-color: rgba(9, 13, 22, 0.93);
+    background-image: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.20) 0px,
+        rgba(0, 0, 0, 0.20) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    border: 1.5px solid rgba(250, 204, 21, 0.62);
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(148, 163, 184, 0.14);
     z-index: 30;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: Consolas, 'Courier New', monospace;
     transition: opacity 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-    opacity: 0.94;
+    opacity: 0.95;
     pointer-events: auto;
 }
 
 #mp-chat-widget:hover,
 #mp-chat-widget.chat-active {
     opacity: 1;
-    border-color: var(--vice-pink);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85), 0 0 16px rgba(255, 42, 133, 0.28);
+    border-color: #fde047;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.92), 0 0 12px rgba(250, 204, 21, 0.24);
 }
 
 #mp-chat-widget.chat-collapsed #mp-chat-body {
@@ -1422,15 +1428,15 @@ html, body {
     justify-content: space-between;
     gap: 6px;
     padding: 4px 8px;
-    background: linear-gradient(90deg, rgba(24, 13, 38, 0.96) 0%, rgba(11, 24, 42, 0.96) 100%);
-    border-bottom: 1px solid rgba(56, 189, 248, 0.30);
-    border-radius: 8px 8px 0 0;
+    background: linear-gradient(90deg, rgba(24, 20, 12, 0.96) 0%, rgba(13, 19, 31, 0.96) 100%);
+    border-bottom: 1px solid rgba(250, 204, 21, 0.42);
+    border-radius: 3px 3px 0 0;
     white-space: nowrap;
 }
 
 #mp-chat-widget.chat-collapsed .mp-chat-header {
     border-bottom: none;
-    border-radius: 8px;
+    border-radius: 3px;
 }
 
 .mp-chat-title-wrap {
@@ -1442,27 +1448,28 @@ html, body {
 }
 
 .mp-chat-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--gta1-green);
-    box-shadow: 0 0 6px var(--gta1-green);
+    border-radius: 1px;
+    background: #39ff14;
+    box-shadow: 0 0 5px #39ff14;
 }
 
 .mp-chat-title {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 800;
-    letter-spacing: 0.4px;
-    color: #f8fafc;
+    letter-spacing: 0.5px;
+    color: #fde047;
+    font-family: Consolas, 'Courier New', monospace;
     white-space: nowrap;
 }
 
 .mp-chat-room {
     font-size: 10.5px;
     font-weight: 700;
-    color: var(--vice-cyan);
-    font-family: var(--font-arcade);
+    color: #39ff14;
+    font-family: Consolas, 'Courier New', monospace;
     white-space: nowrap;
 }
 
@@ -1474,15 +1481,16 @@ html, body {
 }
 
 .mp-chat-mini-btn {
-    background: rgba(30, 41, 59, 0.92);
-    color: #e2e8f0;
-    border: 1px solid rgba(56, 189, 248, 0.42);
-    border-radius: 4px;
+    background: rgba(20, 27, 42, 0.95);
+    color: #fde047;
+    border: 1px solid rgba(250, 204, 21, 0.50);
+    border-radius: 3px;
     padding: 1px 6px;
     height: 20px;
     line-height: 18px;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
+    font-family: Consolas, 'Courier New', monospace;
     cursor: pointer;
     white-space: nowrap;
     max-width: 118px;
@@ -1492,48 +1500,49 @@ html, body {
 }
 
 .mp-chat-mini-btn:hover {
-    background: var(--vice-pink);
-    border-color: #fff;
-    color: #fff;
+    background: rgba(66, 32, 6, 0.92);
+    border-color: #fde047;
+    color: #ffffff;
 }
 
 #mp-chat-messages {
-    height: 128px;
+    height: 124px;
     overflow-y: auto;
     padding: 6px 8px;
     display: flex;
     flex-direction: column;
     gap: 3px;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.32;
+    font-family: Consolas, 'Courier New', monospace;
     scrollbar-width: thin;
-    scrollbar-color: rgba(56, 189, 248, 0.4) transparent;
+    scrollbar-color: rgba(250, 204, 21, 0.45) transparent;
 }
 
 .mp-chat-line {
     word-break: break-word;
-    color: #ffffff;
-    font-weight: 500;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    color: #f8fafc;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
 
 .mp-chat-line .mp-time {
-    color: #64748b;
+    color: #94a3b8;
     font-size: 10px;
     margin-right: 4px;
-    font-family: var(--font-arcade);
+    font-family: Consolas, 'Courier New', monospace;
 }
 
 .mp-chat-line .mp-author {
-    font-size: 12.5px;
+    font-size: 11.5px;
     font-weight: 800;
     margin-right: 4px;
 }
 
 .mp-chat-line.mp-sys {
-    color: #94a3b8;
-    font-size: 11px;
-    font-weight: 600;
+    color: #cbd5e1;
+    font-size: 10.5px;
+    font-weight: 700;
     line-height: 1.25;
 }
 
@@ -1541,54 +1550,56 @@ html, body {
     display: flex;
     gap: 4px;
     padding: 3px 6px;
-    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    border-top: 1px solid rgba(250, 204, 21, 0.22);
 }
 
 .mp-quick-btn {
     flex: 1;
-    background: rgba(15, 23, 42, 0.88);
-    color: #cbd5e1;
-    border: 1px solid rgba(56, 189, 248, 0.28);
-    border-radius: 4px;
+    background: rgba(15, 21, 33, 0.94);
+    color: #fde047;
+    border: 1px solid rgba(250, 204, 21, 0.38);
+    border-radius: 3px;
     padding: 2px 4px;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
+    font-family: Consolas, 'Courier New', monospace;
     cursor: pointer;
     transition: all 0.12s ease;
     white-space: nowrap;
 }
 
 .mp-quick-btn:hover {
-    background: rgba(0, 240, 255, 0.22);
-    border-color: var(--vice-cyan);
-    color: #fff;
+    background: rgba(66, 32, 6, 0.88);
+    border-color: #fde047;
+    color: #ffffff;
 }
 
 #mp-chat-form {
     display: flex;
     gap: 5px;
     padding: 4px 6px 5px 6px;
-    border-top: 1px solid rgba(56, 189, 248, 0.20);
+    border-top: 1px solid rgba(250, 204, 21, 0.28);
 }
 
 #mp-chat-input {
     flex: 1;
     min-width: 0;
-    height: 28px;
-    background: rgba(15, 23, 42, 0.96);
-    color: #ffffff;
-    border: 1px solid rgba(56, 189, 248, 0.45);
-    border-radius: 5px;
+    height: 26px;
+    background: rgba(5, 8, 15, 0.96);
+    color: #39ff14;
+    border: 1px solid rgba(250, 204, 21, 0.48);
+    border-radius: 3px;
     padding: 3px 8px;
-    font-size: 13px;
+    font-size: 12px;
+    font-family: Consolas, 'Courier New', monospace;
     outline: none;
     user-select: text;
     -webkit-user-select: text;
 }
 
 #mp-chat-input:focus {
-    border-color: var(--vice-pink);
-    box-shadow: 0 0 8px rgba(255, 42, 133, 0.45);
+    border-color: #fde047;
+    box-shadow: 0 0 6px rgba(250, 204, 21, 0.35);
 }
 
 #mp-chat-input::placeholder {
@@ -1596,15 +1607,16 @@ html, body {
 }
 
 #mp-chat-send {
-    height: 28px;
-    background: linear-gradient(135deg, #ff2a85, #db2777);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 5px;
+    height: 26px;
+    background: linear-gradient(180deg, #eab308 0%, #a16207 100%);
+    color: #090d16;
+    border: 1px solid #fde047;
+    border-radius: 3px;
     padding: 0 10px;
-    font-size: 11.5px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
+    font-size: 11px;
+    font-weight: 900;
+    font-family: Consolas, 'Courier New', monospace;
+    letter-spacing: 0.4px;
     cursor: pointer;
     transition: filter 0.12s ease;
 }
