@@ -1396,7 +1396,7 @@ class Vehicle {
                     const odx = other.x - laneCenterX;
                     const ody = other.y - laneCenterY;
                     if (Math.abs(odx) > 190 || Math.abs(ody) > 190) return;
-                    const longDist = odx * fx + ody * fy;
+                    const longDist = (other.x - this.x) * fx + (other.y - this.y) * fy;
                     const latDist = Math.abs(odx * perpX + ody * perpY);
                     const halfLenSum = ((this.w || 48) + (other.w || 48)) * 0.5 + 14;
                     if (latDist < 28) {
@@ -1433,7 +1433,7 @@ class Vehicle {
             if (laneClear && game && game.player && !game.player.inVehicle && !game.player.dead) {
                 const pdx = game.player.x - laneCenterX;
                 const pdy = game.player.y - laneCenterY;
-                const longDist = pdx * fx + pdy * fy;
+                const longDist = (game.player.x - this.x) * fx + (game.player.y - this.y) * fy;
                 const latDist = Math.abs(pdx * perpX + pdy * perpY);
                 if (longDist > -24 && longDist < 110 && latDist < 24) {
                     laneClear = false;
@@ -1446,10 +1446,13 @@ class Vehicle {
                 this.aiTargetBlockX = nbx + dx;
                 this.aiTargetBlockY = nby + dy;
                 this.aiLaneChangeCooldown = this.isMotorcycle ? 1.8 : 2.8;
-                this.aiLaneShiftTimer = 0.58;
+                this.aiLaneShiftTimer = 2.2;
                 this.aiLaneChangeSign = side;
                 this.aiTurnSignal = side;
                 this.aiState = "LANE_CHANGE";
+                if (!this.isMotorcycle && this._cachedClosestGap !== undefined && this._cachedClosestGap < 34) {
+                    this.aiOvertakeReverseTimer = Math.min(0.45, Math.max(0.22, (36 - this._cachedClosestGap) / 48));
+                }
                 return true;
             }
         }
@@ -1463,6 +1466,7 @@ class Vehicle {
         if (this.aiHornCooldown > 0) this.aiHornCooldown -= dt;
         if (this.aiLaneChangeCooldown > 0) this.aiLaneChangeCooldown -= dt;
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
+        if (this.aiOvertakeReverseTimer > 0) this.aiOvertakeReverseTimer = Math.max(0, this.aiOvertakeReverseTimer - dt);
         if (this.aiPanicTimer > 0) this.aiPanicTimer = Math.max(0, this.aiPanicTimer - dt);
         if (this.aiPassengerStopCooldown > 0) this.aiPassengerStopCooldown = Math.max(0, this.aiPassengerStopCooldown - dt);
         if (this.aiHazardStopTimer > 0) this.aiHazardStopTimer = Math.max(0, this.aiHazardStopTimer - dt);
@@ -1546,9 +1550,27 @@ class Vehicle {
                 : this.angle;
         }
 
+        if (lidZ1 === 25) {
+            this.aiLaneShiftTimer = 0;
+            this.aiOvertakeReverseTimer = 0;
+        }
+
         // 1. Commit to a valid outgoing NYC.CMP arrow direction upon entering each road block.
         // Pass the previously committed cardinal angle (refAngle) so a car mid-turn doesn't think its new lane is a 2nd turn!
         const movedOutOfLane = this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
+        if (!movedOutOfLane && this.aiLaneShiftTimer > 0 && this.aiChosenDir && !this.aiChosenDir.isTurn) {
+            // While angling diagonally into an adjacent lane along a straight road, advance the longitudinal block
+            // index along the travel axis without resetting the target lane column/row back to the old lane!
+            if (this.aiChosenDir.dy !== 0 && by !== this.aiBlockY) {
+                this.aiBlockY = by;
+                this.aiTargetBlockX = this.aiBlockX;
+                this.aiTargetBlockY = by + this.aiChosenDir.dy;
+            } else if (this.aiChosenDir.dx !== 0 && bx !== this.aiBlockX) {
+                this.aiBlockX = bx;
+                this.aiTargetBlockX = bx + this.aiChosenDir.dx;
+                this.aiTargetBlockY = this.aiBlockY;
+            }
+        }
         if (movedOutOfLane) {
             const refAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number"
                 ? this.aiChosenDir.angle
@@ -1689,18 +1711,19 @@ class Vehicle {
             const travelSignY = Math.sin(bay.angle) >= 0 ? 1 : -1;
             const alongErr = (bay.y - this.y) * travelSignY;
             const latErr = bay.x - this.x;
+            const signedBayLat = latErr * (-travelSignY);
             // Right-hand side relative to vertical travel (0, travelSignY) is (-travelSignY, 0), so bay.dc * (-travelSignY) gives +1 right / -1 left
             const bayTurnSign = (bay.dc || 1) * (-travelSignY) >= 0 ? 1 : -1;
-            // Smoothly steer/glide laterally into the recessed bay
-            this.x += Math.max(-92 * dt, Math.min(92 * dt, latErr * Math.min(1, dt * 6.5)));
-            const angErr = this.normalizeAngle(bay.angle - this.angle);
-            this.angle += angErr * Math.min(1, dt * 10.0);
             this.angularVelocity = 0;
             this.steerAngleRad = 0;
 
-            if (Math.abs(alongErr) <= 10 && Math.abs(latErr) <= 5) {
-                this.x = bay.x;
-                this.angle = bay.angle;
+            if (Math.abs(alongErr) <= 10 && Math.abs(latErr) <= 6) {
+                const angErr = this.normalizeAngle(bay.angle - this.angle);
+                if (Math.abs(this.speed || 0) > 1.5) {
+                    this.angle += angErr * Math.min(1, dt * 10.0);
+                } else {
+                    this.angle = bay.angle;
+                }
                 this.vx = 0;
                 this.vy = 0;
                 this.speed = 0;
@@ -1735,7 +1758,7 @@ class Vehicle {
                         this.aiBlockY = bay.r;
                         this.aiTargetBlockX = this.aiBlockX;
                         this.aiTargetBlockY = this.aiBlockY + travelSignY;
-                        this.aiLaneShiftTimer = 0.65;
+                        this.aiLaneShiftTimer = 1.95;
                         this.aiLaneChangeSign = -bayTurnSign;
                         this.aiTurnSignal = -bayTurnSign;
                         this.aiState = "CRUISE";
@@ -1747,14 +1770,26 @@ class Vehicle {
             } else if (alongErr > -14 && alongErr < 125) {
                 this.aiState = "FOLLOWING";
                 this.aiTurnSignal = bayTurnSign;
-                const approachSpd = Math.max(14, Math.min(48, Math.abs(alongErr) * 1.4));
+                const bayLookAhead = Math.max(22, Math.min(44, Math.abs(alongErr) * 0.72));
+                const bayYaw = Math.abs(signedBayLat) < 0.8
+                    ? 0
+                    : Math.max(-0.38, Math.min(0.38, Math.atan2(signedBayLat, bayLookAhead)));
+                const targetBayAng = bay.angle + bayYaw;
+                const angErr = this.normalizeAngle(targetBayAng - this.angle);
+                const moveScale = Math.min(1, Math.max(Math.abs(this.speed || 0), 16) / 28);
+                this.angle += angErr * Math.min(1, dt * 8.5 * moveScale);
+                if (Math.abs(this.speed || 0) > 0.1) {
+                    this.vx = Math.cos(this.angle) * this.speed;
+                    this.vy = Math.sin(this.angle) * this.speed;
+                }
+                const approachSpd = Math.max(18, Math.min(52, Math.hypot(alongErr, latErr) * 1.25));
                 if (this.speed > approachSpd) {
                     this.vx *= Math.pow(0.04, dt);
                     this.vy *= Math.pow(0.04, dt);
                     this.speed *= Math.pow(0.04, dt);
                     return { throttle: 0, steer: 0, handbrake: false };
                 }
-                return { throttle: 0.22, steer: 0, handbrake: false };
+                return { throttle: 0.24, steer: 0, handbrake: false };
             } else {
                 // Missed the bay window -> release and continue cruising
                 if (bay._occupiedBy === this) bay._occupiedBy = null;
@@ -1798,30 +1833,43 @@ class Vehicle {
                 this.aiPullOverOffset = 18;
                 this.aiPullOverTimer = 1.2;
                 this.aiTurnSignal = 2; // 4-way hazard flashers while picking up / dropping off passengers
-                this.aiState = "STOPPED_LIGHT";
-                const brakeMult = Math.pow(0.015, dt);
-                this.vx *= brakeMult;
-                this.vy *= brakeMult;
-                this.speed *= brakeMult;
-                if (Math.abs(this.speed) < 12) {
-                    this.vx = 0;
-                    this.vy = 0;
-                    this.speed = 0;
-                    if (this.aiPassengerDropPending && game && typeof game.spawnAlightingPassenger === "function") {
-                        this.aiPassengerDropPending = false;
-                        game.spawnAlightingPassenger(this);
-                    }
-                    // Buses / tour coaches: waiting pedestrians walk to the front door and climb aboard during the stop
-                    if (!this.aiBoardingStarted && (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH") && game && typeof game.boardBusPassengers === "function") {
-                        this.aiBoardingStarted = true;
-                        game.boardBusPassengers(this);
-                    }
+                const pLaneX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
+                const pLaneY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
+                let curbErr = 0;
+                if (this.aiChosenDir && this.aiChosenDir.dx !== 0) {
+                    const cY = (pLaneY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? 18 : -18);
+                    curbErr = Math.abs(cY - this.y);
+                } else if (this.aiChosenDir && this.aiChosenDir.dy !== 0) {
+                    const cX = (pLaneX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -18 : 18);
+                    curbErr = Math.abs(cX - this.x);
                 }
-                if ((this.aiPassengerStopTimer || 0) > 0) {
-                    this.aiPassengerStopTimer = Math.max(0, this.aiPassengerStopTimer - dt);
-                    if (this.aiPassengerStopTimer <= 0) {
-                        this.aiPassengerStopCooldown = 28.0;
-                        this.aiBoardingStarted = false;
+                const reachedCurb = curbErr <= 5.5 || (this._cachedClosestGap !== undefined && this._cachedClosestGap <= 22);
+                if (reachedCurb) {
+                    this.aiState = "STOPPED_LIGHT";
+                    const brakeMult = Math.pow(0.015, dt);
+                    this.vx *= brakeMult;
+                    this.vy *= brakeMult;
+                    this.speed *= brakeMult;
+                    if (Math.abs(this.speed) < 12) {
+                        this.vx = 0;
+                        this.vy = 0;
+                        this.speed = 0;
+                        if (this.aiPassengerDropPending && game && typeof game.spawnAlightingPassenger === "function") {
+                            this.aiPassengerDropPending = false;
+                            game.spawnAlightingPassenger(this);
+                        }
+                        // Buses / tour coaches: waiting pedestrians walk to the front door and climb aboard during the stop
+                        if (!this.aiBoardingStarted && (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH") && game && typeof game.boardBusPassengers === "function") {
+                            this.aiBoardingStarted = true;
+                            game.boardBusPassengers(this);
+                        }
+                    }
+                    if ((this.aiPassengerStopTimer || 0) > 0) {
+                        this.aiPassengerStopTimer = Math.max(0, this.aiPassengerStopTimer - dt);
+                        if (this.aiPassengerStopTimer <= 0) {
+                            this.aiPassengerStopCooldown = 28.0;
+                            this.aiBoardingStarted = false;
+                        }
                     }
                 }
             }
@@ -1900,41 +1948,43 @@ class Vehicle {
             desiredThrottle = Math.max(desiredThrottle, 0.64);
         }
 
-        // 2. Strict Cardinal Lane-Centered Steering & Clean 90-Degree Pivot Alignment
+        // 2. Realistic Angled Look-Ahead Lane Steering & Clean 90-Degree Pivot Alignment
+        //    (Zero lateral teleportation/strafing: cars turn their chassis ~15°-22° toward the target lane/offset
+        //     ONLY while rolling forward/backward, and straighten out as they reach the lane centerline!)
         const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
         const ty = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
-        const desiredAngle = Math.atan2(ty - this.y, tx - this.x);
-        const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
-        let steer = Math.max(-1, Math.min(1, angleDiff * 2.4));
-
-        const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-        if (Math.abs(laneAngleDiff) < 0.025) {
-            this.angle = this.aiChosenDir.angle;
-        } else {
-            this.angle += laneAngleDiff * Math.min(1, dt * (this.aiChosenDir.isTurn ? 10.5 : 15.0));
-        }
-        this.angularVelocity = 0;
-        this.steerAngleRad = 0;
-        steer = 0;
-
-        // Always center vehicle smoothly onto the active lane centerline (plus any active curb pull-over offset!)
-        const maxLatStep = (this.aiChosenDir.isTurn ? 82 : (this.aiPullOverTimer > 0 ? 118 : 98)) * dt;
         const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
         const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
         const pullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
+        const targetLaneCenterX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy !== 0 ? (this.aiChosenDir.dy > 0 ? -pullOff : pullOff) : 0);
+        const targetLaneCenterY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx !== 0 ? (this.aiChosenDir.dx > 0 ? pullOff : -pullOff) : 0);
+        let signedLatErr = 0;
         if (this.aiChosenDir.dx !== 0) {
-            const centerY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
-            const dyErr = centerY - this.y;
-            this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 10.5)));
+            signedLatErr = (targetLaneCenterY - this.y) * (this.aiChosenDir.dx > 0 ? 1 : -1);
         } else if (this.aiChosenDir.dy !== 0) {
-            const centerX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
-            const dxErr = centerX - this.x;
-            this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 10.5)));
+            signedLatErr = (targetLaneCenterX - this.x) * (this.aiChosenDir.dy > 0 ? -1 : 1);
         }
+        if (
+            this.aiLaneShiftTimer > 0 &&
+            !this.aiChosenDir.isTurn &&
+            ((this.aiChosenDir.dy !== 0 && bx === laneBlockX) || (this.aiChosenDir.dx !== 0 && by === laneBlockY)) &&
+            Math.abs(signedLatErr) < 5.0
+        ) {
+            this.aiLaneShiftTimer = 0;
+            this.aiOvertakeReverseTimer = 0;
+        }
+        const lookAheadDist = this.aiChosenDir.isTurn ? 34 : (this.aiLaneShiftTimer > 0 ? 44 : 42);
+        const maxYaw = this.aiChosenDir.isTurn ? 0.52 : (this.aiLaneShiftTimer > 0 ? 0.40 : (this.aiPullOverTimer > 0 ? 0.34 : 0.24));
+        const yawOffset = Math.abs(signedLatErr) < 0.6
+            ? 0
+            : Math.max(-maxYaw, Math.min(maxYaw, Math.atan2(signedLatErr, lookAheadDist)));
+        let targetHeading = this.aiChosenDir.angle + yawOffset;
+        const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
+        let steer = 0;
 
         // 2B. Look-Ahead Turn Speed Control (Never uses negative reverse throttle!)
         const maxTurnSpd = this.isHeavyVehicle ? 72 : 88;
-        if (Math.abs(laneAngleDiff) > 0.16 || this.aiChosenDir.isTurn) {
+        if ((Math.abs(laneAngleDiff) > 0.28 && this.aiLaneShiftTimer <= 0) || this.aiChosenDir.isTurn) {
             if (this.speed > maxTurnSpd) {
                 desiredThrottle = 0;
                 const slowMult = Math.pow(0.15, dt);
@@ -2140,12 +2190,23 @@ class Vehicle {
                     ? 10
                     : Math.min(inTurnOrShift ? 31 : 27, (this.h + (other.h || 28)) * 0.43 + 2);
                 const halfLengthSum = ((this.w || 62) + (other.w || 62)) * 0.50;
+                const otherInOldLane = Boolean(
+                    this.aiLaneShiftTimer > 0 &&
+                    (this.aiOvertakeReverseTimer || 0) <= 0 &&
+                    this.aiChosenDir &&
+                    !this.aiChosenDir.isTurn &&
+                    (this.aiChosenDir.dx !== 0
+                        ? Math.abs(other.y - targetLaneCenterY) > 28
+                        : Math.abs(other.x - targetLaneCenterX) > 28)
+                );
                 if ((cosDiff > 0.42 || isStationaryObstacle) && forwardDist > 0 && lateralDist < halfWidthSum) {
                     const bumperGap = forwardDist - halfLengthSum;
-                    if (bumperGap < closestBumperGap) {
-                        closestBumperGap = bumperGap;
-                        closestEntity = other;
-                        isPlayerBlocking = other.driver === "PLAYER";
+                    if (!otherInOldLane || (bumperGap < 6 && lateralDist < 18)) {
+                        if (bumperGap < closestBumperGap) {
+                            closestBumperGap = bumperGap;
+                            closestEntity = other;
+                            isPlayerBlocking = other.driver === "PLAYER";
+                        }
                     }
                 }
 
@@ -2288,11 +2349,15 @@ class Vehicle {
         const followHorizon = Math.max(155, minStopGap + Math.max(0, this.speed || 0) * (this.isHeavyVehicle ? 0.90 : 0.72) + 48);
         if (sirenYield || crossTrafficYield) {
             this.aiState = sirenYield ? "YIELD_SIREN" : "FOLLOWING";
-            desiredThrottle = 0;
-            const brakeMult = Math.pow(0.01, dt);
-            this.vx *= brakeMult;
-            this.vy *= brakeMult;
-            this.speed *= brakeMult;
+            if (sirenYield && !crossTrafficYield && Math.abs(signedLatErr) > 6 && closestBumperGap > 24 && !inIntersectionBox && distToTargetCenter > 55) {
+                desiredThrottle = this.speed > 44 ? 0 : 0.22;
+            } else {
+                desiredThrottle = 0;
+                const brakeMult = Math.pow(0.01, dt);
+                this.vx *= brakeMult;
+                this.vy *= brakeMult;
+                this.speed *= brakeMult;
+            }
         } else if (closestEntity && closestBumperGap < followHorizon) {
             const obstacleSpeed = closestEntity.speed !== undefined ? Math.max(0, closestEntity.speed) : 0;
             const isDeadOrAbandonedObstacle = Boolean(
@@ -2301,16 +2366,16 @@ class Vehicle {
             );
             const isStationaryCar = Boolean(
                 isDeadOrAbandonedObstacle ||
-                (obstacleSpeed < 10 && this.aiState !== "STOPPED_LIGHT")
+                (obstacleSpeed < 18 && this.aiState !== "STOPPED_LIGHT")
             );
             const myDesiredCruiseSpd = (this.maxSpeed || 210) * (this.aiCruiseFactor || 0.50);
             const isSlowerMovingCar = Boolean(
                 this.aiState !== "STOPPED_LIGHT" &&
-                obstacleSpeed >= 10 &&
+                obstacleSpeed >= 18 &&
                 obstacleSpeed < myDesiredCruiseSpd * 0.78 &&
                 (this.isMotorcycle || this.aiAggressive || (this.aiCruiseFactor || 0.5) >= 0.50 || closestEntity.isHeavyVehicle)
             );
-            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 112 && this.aiLaneChangeCooldown <= 0) {
+            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 145 && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
             // Motorcycle Lane-Splitting / Queue Filtering at Red Lights & Traffic Queues:
@@ -2340,20 +2405,21 @@ class Vehicle {
                         this.aiFilteringTimer = 1.0;
                         this.aiTurnSignal = fSide;
                         this.aiState = "LANE_CHANGE";
-                        return { throttle: this.speed > 52 ? 0 : 0.28, steer: 0, handbrake: false };
+                        desiredThrottle = this.speed > 52 ? 0 : 0.28;
+                        break;
                     }
                 }
             }
             // Never wait forever behind a destroyed wreck or abandoned driverless car (or when hauling a wreck as AI_TOW):
             // actively steer around the pileup using 9-feeler obstacle bypass!
-            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 64) {
+            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 64 && this.aiLaneShiftTimer <= 0) {
                 const lookX = tx + (this.aiChosenDir ? (this.aiChosenDir.dx || 0) * TILE_SIZE * 0.95 : 0);
                 const lookY = ty + (this.aiChosenDir ? (this.aiChosenDir.dy || 0) * TILE_SIZE * 0.95 : 0);
                 const bypassAng = Math.atan2(lookY - this.y, lookX - this.x);
                 return this.steerTowardTargetWithFeelers(dt, map, curZ, bypassAng, this.driver === "AI_TOW" ? 0.36 : 0.48, game);
             }
             // If a Tow Truck hauling a vehicle (or a car clearing the way for a siren) is still blocked by a stopped car on a 2-lane street,
-            // shift laterally around the stopped obstacle instead of waiting forever!
+            // angle around the stopped obstacle instead of waiting forever!
             if (isStationaryCar && closestBumperGap < 62 && (this.driver === "AI_TOW" || sirenBehind)) {
                 const bypassSide = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? 1 : -1;
                 const testX = this.x + rx * bypassSide * 24;
@@ -2370,7 +2436,10 @@ class Vehicle {
             if (closestBumperGap < 50 && (isPlayerBlocking || (closestEntity && closestEntity.kind === "CIVILIAN"))) {
                 this.aiFlashHeadlightsTimer = Math.max(this.aiFlashHeadlightsTimer || 0, 0.85);
             }
-            if (closestBumperGap <= minStopGap) {
+            if ((this.aiOvertakeReverseTimer || 0) > 0) {
+                // Reversing slightly to open front-bumper swing clearance before pulling out into the adjacent lane:
+                // do not apply forward stop-gap braking against the lead car while backing away from it!
+            } else if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
                 const brakeMult = Math.pow(0.0008, dt);
                 this.vx *= brakeMult;
@@ -2414,6 +2483,72 @@ class Vehicle {
             }
         }
 
+        // Realistic Pull-Out Reverse Maneuver when boxed in close behind a stopped vehicle before changing lanes:
+        // Backs up slightly while angling the nose toward the adjacent lane so the front bumper clears the obstacle ahead!
+        if ((this.aiOvertakeReverseTimer || 0) > 0 && this.aiLaneShiftTimer > 0 && !isPanicked) {
+            let rearBlocked = false;
+            const rCos = Math.cos(this.angle);
+            const rSin = Math.sin(this.angle);
+            const rearX = this.x - rCos * ((this.w || 48) * 0.5 + 10);
+            const rearY = this.y - rSin * ((this.w || 48) * 0.5 + 10);
+            const rearLid = map.getBlockInfo ? map.getBlockInfo(Math.floor(rearX / TILE_SIZE), Math.floor(rearY / TILE_SIZE), 1).lid : 0;
+            if (rearLid === 25 || (map.resolveCircleBuildingCollision && map.resolveCircleBuildingCollision(rearX, rearY, 11, curZ).hit)) {
+                rearBlocked = true;
+            }
+            if (!rearBlocked && game && Array.isArray(game.vehicles)) {
+                const checkOvertakeRear = (o) => {
+                    if (!o || o === this || o === this.towingVehicle) return false;
+                    if (o.z !== undefined && Math.abs(o.z - curZ) > 0.85) return false;
+                    const ox = o.x - this.x;
+                    const oy = o.y - this.y;
+                    const along = ox * rCos + oy * rSin;
+                    const lat = Math.abs(-ox * rSin + oy * rCos);
+                    const need = ((this.w || 48) + (o.w || 48)) * 0.5 + 8;
+                    return along < 0 && along > -need && lat < ((this.h || 24) + (o.h || 24)) * 0.45;
+                };
+                if (game._vehGridHead && game._vehGridNext) {
+                    const gx0 = Math.max(0, (this.x >> 8) - 1);
+                    const gx1 = Math.min(127, (this.x >> 8) + 1);
+                    const gy0 = Math.max(0, (this.y >> 8) - 1);
+                    const gy1 = Math.min(127, (this.y >> 8) + 1);
+                    for (let gy = gy0; gy <= gy1 && !rearBlocked; gy++) {
+                        const rowOff = gy << 7;
+                        for (let gx = gx0; gx <= gx1 && !rearBlocked; gx++) {
+                            for (let vi = game._vehGridHead[rowOff | gx]; vi !== -1; vi = game._vehGridNext[vi]) {
+                                if (checkOvertakeRear(game.vehicles[vi])) {
+                                    rearBlocked = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for (let vi = 0; vi < game.vehicles.length; vi++) {
+                        if (checkOvertakeRear(game.vehicles[vi])) {
+                            rearBlocked = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (rearBlocked || closestBumperGap >= 38) {
+                this.aiOvertakeReverseTimer = 0;
+                if (this.speed < 0) {
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.speed = 0;
+                }
+            } else {
+                this.aiState = "LANE_CHANGE";
+                desiredThrottle = this.speed < -30 ? 0 : -0.36;
+                targetHeading = this.aiChosenDir.angle + (this.aiLaneChangeSign || (signedLatErr >= 0 ? 1 : -1)) * 0.28;
+            }
+        } else if (this.aiLaneShiftTimer > 0 && this.speed < 0) {
+            this.vx = 0;
+            this.vy = 0;
+            this.speed = 0;
+        }
+
         if (!isPanicked && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0 || (this.aiHazardStopTimer || 0) > 0)) {
             if ((this.aiHazardStopTimer || 0) > 0) {
                 this.aiTurnSignal = 2;
@@ -2427,10 +2562,39 @@ class Vehicle {
                     this.vy = 0;
                     this.speed = 0;
                 }
+                desiredThrottle = 0;
+                this.angularVelocity = 0;
+                this.steerAngleRad = 0;
+                return { throttle: 0, steer: 0, handbrake: true };
+            } else if (Math.abs(signedLatErr) <= 5.5 || closestBumperGap <= 22) {
+                desiredThrottle = 0;
+                this.angularVelocity = 0;
+                this.steerAngleRad = 0;
+                return { throttle: 0, steer: 0, handbrake: true };
+            } else {
+                desiredThrottle = this.speed > 42 ? 0 : 0.24;
             }
-            desiredThrottle = 0;
-            return { throttle: 0, steer: 0, handbrake: true };
         }
+
+        // Apply heading rotation strictly scaled by forward/reverse rolling speed (zero rotation or sideways shift while stopped!)
+        const absSpd = Math.abs(this.speed || Math.hypot(this.vx || 0, this.vy || 0));
+        const effectiveSpd = Math.max(absSpd, Math.abs(desiredThrottle) * 26);
+        if (effectiveSpd > 1.2) {
+            const moveFactor = Math.min(1.0, effectiveSpd / 28.0);
+            const headingDiff = this.normalizeAngle(targetHeading - this.angle);
+            const turnRate = (this.aiChosenDir.isTurn ? 9.5 : 8.5) * moveFactor;
+            if (Math.abs(headingDiff) < 0.008 && Math.abs(signedLatErr) < 0.8) {
+                this.angle = this.aiChosenDir.angle;
+            } else {
+                this.angle += headingDiff * Math.min(1, dt * turnRate);
+            }
+            if (absSpd > 0.1) {
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
+            }
+        }
+        this.angularVelocity = 0;
+        this.steerAngleRad = 0;
 
         return { throttle: desiredThrottle, steer, handbrake: false };
     }
@@ -2611,19 +2775,29 @@ class Vehicle {
         }
 
         const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-        if (!this.aiChosenDir.isTurn && Math.abs(laneAngleDiff) < 0.40) {
-            this.angle += laneAngleDiff * Math.min(1, dt * 14.0);
+        if (!this.aiChosenDir.isTurn && Math.abs(laneAngleDiff) < 0.45) {
+            let signedLatErr = 0;
+            if (this.aiChosenDir.dx !== 0) {
+                const centerY = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
+                signedLatErr = (centerY - this.y) * (this.aiChosenDir.dx > 0 ? 1 : -1);
+            } else if (this.aiChosenDir.dy !== 0) {
+                const centerX = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
+                signedLatErr = (centerX - this.x) * (this.aiChosenDir.dy > 0 ? -1 : 1);
+            }
+            const yawOff = Math.abs(signedLatErr) < 0.8
+                ? 0
+                : Math.max(-0.36, Math.min(0.36, Math.atan2(signedLatErr, 46)));
+            const targetHdg = this.aiChosenDir.angle + yawOff;
+            const hdgDiff = this.normalizeAngle(targetHdg - this.angle);
+            const moveScale = Math.min(1, Math.max(Math.abs(this.speed || 0), Math.abs(throttle) * 26) / 30);
+            this.angle += hdgDiff * Math.min(1, dt * 8.5 * moveScale);
+            if (Math.abs(this.speed || 0) > 0.1) {
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
+            }
             this.angularVelocity = 0;
             this.steerAngleRad = 0;
             steer = 0;
-            const maxLatStep = 115 * dt;
-            if (this.aiChosenDir.dx !== 0) {
-                const centerY = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
-                this.y += Math.max(-maxLatStep, Math.min(maxLatStep, (centerY - this.y) * Math.min(1, dt * 9.0)));
-            } else if (this.aiChosenDir.dy !== 0) {
-                const centerX = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
-                this.x += Math.max(-maxLatStep, Math.min(maxLatStep, (centerX - this.x) * Math.min(1, dt * 9.0)));
-            }
         } else {
             this.angle += angleDiff * Math.min(1, dt * 5.5);
             if (this.speed > 135) {
