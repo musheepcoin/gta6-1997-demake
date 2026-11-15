@@ -1831,7 +1831,7 @@ class RetroRenderer {
                                     const dp = ((dy + ly) * W + (dx + lx)) * 4;
                                     const br = d[bp], bg = d[bp + 1], bb = d[bp + 2], ba = d[bp + 3];
                                     const dr = d[dp], dg = d[dp + 1], db = d[dp + 2], da = d[dp + 3];
-                                    if (dr === br && dg === bg && db === bb && da === ba) {
+                                    if ((da < 16 && ba < 16) || (dr === br && dg === bg && db === bb && da === ba)) {
                                         // Unchanged body pixel -> make transparent so the vehicle's true remap paint shows through!
                                         d[dp] = 0;
                                         d[dp + 1] = 0;
@@ -11095,30 +11095,6 @@ class RetroRenderer {
                 const fanSpeed = v.driver ? 26.0 : 4.5;
                 const bladeSpan = 15.0 * Math.abs(Math.sin(this.time * fanSpeed + (v.x * 0.01)));
                 this.pushSolidQuad3D(fanX, fanY, vz + airZ + 0.045, 2.6, 3.0 + bladeSpan, v.angle, 0.92, 0.95, 0.98, 0.90, SPRITE_DRAW_ORDER.CAR_ROOF);
-            }
-            if (!v.destroyed && airZ < 0.08) {
-                const sk = v.specKey || "";
-                const hasUnderglow = (
-                    sk === "BANSHEE_GT" || sk === "STINGER_CABRIO" || sk === "TURISMO_CABRIO" ||
-                    sk === "PENETRATOR_GT" || sk === "CHALLENGER_RT" || sk === "TULIP_MUSCLE" ||
-                    sk === "VICE_CHEETAH" || sk === "PORKA_TURBO" || sk === "SUPERBIKE" ||
-                    sk === "E_SCOOTER"
-                );
-                if (hasUnderglow) {
-                    const ugAlpha = Math.max(0.18, Math.min(0.68, 0.22 + nfGlobal * 0.46));
-                    let ugR = 0.08, ugG = 0.94, ugB = 1.00; // South Beach Cyan
-                    if (sk === "STINGER_CABRIO" || sk === "TULIP_MUSCLE") {
-                        ugR = 1.00; ugG = 0.18; ugB = 0.76; // Flamingo Magenta
-                    } else if (sk === "CHALLENGER_RT" || sk === "PENETRATOR_GT") {
-                        ugR = 0.68; ugG = 0.24; ugB = 1.00; // Ultra-Violet Purple
-                    } else if (sk === "TURISMO_CABRIO" || sk === "SUPERBIKE" || sk === "E_SCOOTER") {
-                        ugR = 0.22; ugG = 1.00; ugB = 0.56; // Neon Mint-Lime
-                    }
-                    const ugW = (v.w || 46) * (sk === "E_SCOOTER" ? 0.58 : (mapInfo.isMotorcycle ? 0.68 : 0.92));
-                    const ugH = (v.h || 22) * (sk === "E_SCOOTER" ? 0.56 : (mapInfo.isMotorcycle ? 0.62 : 0.96));
-                    this.pushSolidQuad3D(v.x, v.y, vz - 0.020, ugW * 1.16, ugH * 1.24, v.angle, ugR, ugG, ugB, ugAlpha * 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    this.pushSolidQuad3D(v.x, v.y, vz - 0.019, ugW * 0.88, ugH * 0.92, v.angle, ugR, ugG, ugB, ugAlpha * 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                }
             }
 
             // B. GTA 2 live_geometry.cpp SetSpriteConform (kSmoothing = 0.25f): 4-Corner Ground Slope Pitch + Wheelie/Stunt Pitch!
