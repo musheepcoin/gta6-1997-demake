@@ -3333,6 +3333,7 @@ class RetroRenderer {
                 meta.sprites.objects["biker_chopper"] = [1832, 3407, 34, 15];
                 meta.sprites.objects["kayak_orange"] = [1944, 3407, 38, 14];
                 meta.sprites.objects["speedboat_v8"] = [1944, 3361, 58, 30];
+                meta.sprites.objects["boat_speedboat"] = [1944, 3361, 58, 30];
 
                 // 6I. Port Gellhorn Retro Mini-Golf Windmill Turret ("minigolf_windmill", 36x36)
                 {
@@ -8725,8 +8726,9 @@ class RetroRenderer {
                     );
                 }
                 if (isBoat) {
-                    this.batchObjectSprite3D("boat_speedboat", jx, jy, bz + 0.026, jAng, 0.94, SPRITE_DRAW_ORDER.CAR);
-                    this.batchPedSprite3D(js.ped || "surfer_guy", 84, jx - cosA * 4.0, jy - sinA * 4.0, bz + 0.040, jAng, 0.96, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
+                    this.batchObjectSprite3D("speedboat_v8", jx + sunCos * 3.5, jy + sunSin * 3.5, bz + 0.015, jAng, 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
+                    this.batchObjectSprite3D("speedboat_v8", jx, jy, bz + 0.028, jAng, 0.94, SPRITE_DRAW_ORDER.CAR);
+                    this.batchPedSprite3D(js.ped || "surfer_guy", 84, jx - cosA * 4.0, jy - sinA * 4.0, bz + 0.042, jAng, 0.96, false, SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER);
                 } else {
                     // Neon Vice WaveRunner ("jetski_neon") + Rider seated astride saddle (frame 84)
                     this.batchObjectSprite3D("jetski_neon", jx, jy, bz + 0.026, jAng, 1.02, SPRITE_DRAW_ORDER.CAR);
@@ -12572,6 +12574,40 @@ class RetroRenderer {
                     addLightPool(rScSiren.x, rScSiren.y, 128 * pxScale, "rgba(30, 165, 255, 0.96)", "rgba(10, 95, 235, 0.42)");
                     highResFlares.push({ x: rScSiren.x, y: rScSiren.y, r: 22 * pxScale, col: "rgba(45, 185, 255, 0.85)" });
                 }
+            }
+        }
+
+        // 5A-bis. Autonomous Canal & Ocean Jet-Skis / Speedboats ("jetSkiers") Bow Headlights at Night
+        if (this.map && Array.isArray(this.map.jetSkiers)) {
+            for (let ji = 0; ji < this.map.jetSkiers.length; ji++) {
+                const js = this.map.jetSkiers[ji];
+                if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
+                const jx = typeof js._liveX === "number" ? js._liveX : js.x;
+                const jy = typeof js._liveY === "number" ? js._liveY : js.y;
+                if (Math.abs(jx - this.camX) > 900 || Math.abs(jy - this.camY) > 700) continue;
+                const jAng = typeof js._liveAng === "number" ? js._liveAng : 0;
+                const jz = (js.z || 2.0) + 0.03;
+                const sc = this.worldToScreen(jx, jy, jz);
+                if (sc.x < -220 || sc.x > W + 220 || sc.y < -220 || sc.y > H + 220) continue;
+                const pxScale = (sc.scale * H) / 128.0;
+                const cosA = Math.cos(jAng);
+                const sinA = Math.sin(jAng);
+                const bowDist = js.isSpeedboat ? 22 : 14;
+                const fSc = this.worldToScreen(jx + cosA * bowDist, jy + sinA * bowDist, jz);
+                addLightPool(sc.x, sc.y, (js.isSpeedboat ? 54 : 42) * pxScale, "rgba(220, 248, 255, 0.68)", "rgba(56, 189, 248, 0.24)");
+                const beamLen = (js.isSpeedboat ? 142 : 112) * pxScale;
+                addHeadlightCone(fSc.x, fSc.y, jAng, beamLen, 0.22, 2.2 * pxScale, "rgba(255, 250, 225, 0.94)", "rgba(215, 232, 255, 0.48)");
+                highResCones.push({
+                    x: fSc.x,
+                    y: fSc.y,
+                    angle: jAng,
+                    len: beamLen * 0.92,
+                    spread: 0.20,
+                    baseHalfW: 2.2 * pxScale,
+                    col0: "rgba(255, 250, 220, 0.20)",
+                    col1: "rgba(180, 220, 255, 0.06)"
+                });
+                highResFlares.push({ x: fSc.x, y: fSc.y, r: 5.8 * pxScale, col: "rgba(255, 252, 230, 0.94)" });
             }
         }
 

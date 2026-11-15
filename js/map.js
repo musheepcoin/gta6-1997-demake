@@ -2061,10 +2061,17 @@ class LeonidaMap {
                             if (this.surfaceGround[(r + hSpan) * MAP_COLS + c] === GROUND_TYPE.WATER &&
                                 this.surfaceGround[(r - 3) * MAP_COLS + c] === GROUND_TYPE.WATER &&
                                 this.surfaceGround[(r + hSpan + 2) * MAP_COLS + c] === GROUND_TYPE.WATER) {
-                                const midX = (c + 0.5) * TILE_SIZE;
+                                let cSpan = 1;
+                                while (c + cSpan < MAP_COLS - 4 &&
+                                    this.bridgeMask[r * MAP_COLS + (c + cSpan)] === 1 &&
+                                    this.surfaceGround[(r - 1) * MAP_COLS + (c + cSpan)] === GROUND_TYPE.WATER &&
+                                    this.surfaceGround[(r + hSpan) * MAP_COLS + (c + cSpan)] === GROUND_TYPE.WATER) {
+                                    cSpan++;
+                                }
+                                const midX = (c + cSpan * 0.5) * TILE_SIZE;
                                 const midY = (r + hSpan * 0.5) * TILE_SIZE;
                                 if (!bridgeChannelPoints.some(p => Math.hypot(p.x - midX, p.y - midY) < 9.5 * TILE_SIZE)) {
-                                    bridgeChannelPoints.push({ x: midX, y: midY, rx: 14, ry: (hSpan * 0.5 + 3.2) * TILE_SIZE });
+                                    bridgeChannelPoints.push({ x: midX, y: midY, rx: 12, ry: (hSpan * 0.5 + 3.0) * TILE_SIZE });
                                 }
                             }
                         }
@@ -2078,10 +2085,17 @@ class LeonidaMap {
                             if (this.surfaceGround[r * MAP_COLS + (c + wSpan)] === GROUND_TYPE.WATER &&
                                 this.surfaceGround[r * MAP_COLS + (c - 3)] === GROUND_TYPE.WATER &&
                                 this.surfaceGround[r * MAP_COLS + (c + wSpan + 2)] === GROUND_TYPE.WATER) {
+                                let rSpan = 1;
+                                while (r + rSpan < MAP_ROWS - 4 &&
+                                    this.bridgeMask[(r + rSpan) * MAP_COLS + c] === 2 &&
+                                    this.surfaceGround[(r + rSpan) * MAP_COLS + (c - 1)] === GROUND_TYPE.WATER &&
+                                    this.surfaceGround[(r + rSpan) * MAP_COLS + (c + wSpan)] === GROUND_TYPE.WATER) {
+                                    rSpan++;
+                                }
                                 const midX = (c + wSpan * 0.5) * TILE_SIZE;
-                                const midY = (r + 0.5) * TILE_SIZE;
+                                const midY = (r + rSpan * 0.5) * TILE_SIZE;
                                 if (!bridgeChannelPoints.some(p => Math.hypot(p.x - midX, p.y - midY) < 9.5 * TILE_SIZE)) {
-                                    bridgeChannelPoints.push({ x: midX, y: midY, rx: (wSpan * 0.5 + 3.2) * TILE_SIZE, ry: 14 });
+                                    bridgeChannelPoints.push({ x: midX, y: midY, rx: (wSpan * 0.5 + 3.0) * TILE_SIZE, ry: 12 });
                                 }
                             }
                         }
