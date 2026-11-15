@@ -8851,6 +8851,16 @@ class LeonidaGame {
 
 
         const count = spec.pellets || 1;
+        const isTankCannon = (audioWeaponOverride === "TANK_CANNON");
+        const muzzleDist = isTankCannon ? 34 : 16;
+
+        if (isTankCannon) {
+            const muzX = shooterX + Math.cos(angle) * muzzleDist;
+            const muzY = shooterY + Math.sin(angle) * muzzleDist;
+            this.spawnParticle(muzX, muzY, "FIRE");
+            this.spawnParticle(muzX, muzY, "SMOKE");
+            this.spawnParticle(muzX, muzY, "SPARK");
+        }
 
         const spawnedPellets = [];
 
@@ -8860,13 +8870,15 @@ class LeonidaGame {
 
             const proj = {
 
-                x: shooterX + Math.cos(a) * 16,
+                x: shooterX + Math.cos(a) * muzzleDist,
 
-                y: shooterY + Math.sin(a) * 16,
+                y: shooterY + Math.sin(a) * muzzleDist,
 
                 vx: Math.cos(a) * spec.speed,
 
                 vy: Math.sin(a) * spec.speed,
+
+                angle: a,
 
                 damage: spec.damage,
 
@@ -8878,6 +8890,8 @@ class LeonidaGame {
 
                 isRocket: Boolean(spec.isRocket),
 
+                isTankShell: isTankCannon,
+
                 isElectro: Boolean(spec.isElectro),
 
                 fromPlayer: isPlayer,
@@ -8886,7 +8900,7 @@ class LeonidaGame {
 
                 npcFaction: npcFaction || null,
 
-                r: spec.isFlame ? 9 : 4
+                r: isTankCannon ? 6 : (spec.isFlame ? 9 : 4)
 
             };
 
@@ -11373,7 +11387,10 @@ class LeonidaGame {
 
                     }
 
-                    const fireAng = controlsTankTurret ? (v.turretAngle || shotAngle) : shotAngle;
+                    const fireAng = controlsTankTurret ? (typeof v.turretAngle === "number" ? v.turretAngle : shotAngle) : shotAngle;
+                    if (controlsTankTurret && v) {
+                        v.turretRecoil = 1.0;
+                    }
 
                     this.fireWeapon(p.x, p.y, fireAng, activeWep, true, false, null, controlsTankTurret ? "TANK_CANNON" : null);
 
@@ -15697,7 +15714,22 @@ class LeonidaGame {
 
             pr.y += stepY;
 
-            pr.rangeLeft -= Math.hypot(stepX, stepY);
+            const stepDist = Math.hypot(stepX, stepY);
+            pr.rangeLeft -= stepDist;
+
+            if (pr.isRocket) {
+                pr._trailAcc = (pr._trailAcc || 0) + stepDist;
+                if (pr._trailAcc >= 14) {
+                    pr._trailAcc -= 14;
+                    const pAng = typeof pr.angle === "number" ? pr.angle : Math.atan2(pr.vy || 0, pr.vx || 1);
+                    const tx = pr.x - Math.cos(pAng) * 10;
+                    const ty = pr.y - Math.sin(pAng) * 10;
+                    this.spawnParticle(tx, ty, "SMOKE");
+                    if (pr.isTankShell) {
+                        this.spawnParticle(tx, ty, "FIRE");
+                    }
+                }
+            }
 
 
 

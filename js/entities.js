@@ -2701,16 +2701,27 @@ class Vehicle {
         // Wanted player or ambient criminal off-road nearby (beach, plaza, park): cruiser leaves the asphalt and drives straight at them
         const forceDirect = !targetOnRoad && distToPlayer < 720;
 
-        // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger fires bursts!
+        // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger / tank turret fires!
+        const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
+        if (isTankUnit) {
+            this.turretAngle = Math.atan2(wantedTarget.y - this.y, wantedTarget.x - this.x);
+        }
         const canDriveByShoot =
             (wantedTarget.isCriminalNPC && wantedTarget.inVehicle) ||
             (!wantedTarget.isCriminalNPC && (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2);
-        if (canDriveByShoot && distToPlayer < 275 && game && typeof game.fireWeapon === "function") {
+        const maxShootDist = isTankUnit ? 420 : 275;
+        if (canDriveByShoot && distToPlayer < maxShootDist && (!isTankUnit || distToPlayer > 75) && game && typeof game.fireWeapon === "function") {
             this.copDriveByTimer = (this.copDriveByTimer || 0) - dt;
             if (this.copDriveByTimer <= 0) {
-                this.copDriveByTimer = 0.65 + Math.random() * 0.45;
+                this.copDriveByTimer = isTankUnit ? (2.2 + Math.random() * 0.8) : (0.65 + Math.random() * 0.45);
                 const aimAng = Math.atan2(wantedTarget.y - this.y, wantedTarget.x - this.x);
-                game.fireWeapon(this.x, this.y, aimAng, this.specKey === "SWAT_ENFORCER" ? "UZI" : "PISTOL", false, false, "COP");
+                if (isTankUnit) {
+                    this.turretAngle = aimAng;
+                    this.turretRecoil = 1.0;
+                    game.fireWeapon(this.x, this.y, aimAng, "ROCKET", false, false, "COP", "TANK_CANNON");
+                } else {
+                    game.fireWeapon(this.x, this.y, aimAng, this.specKey === "SWAT_ENFORCER" ? "UZI" : "PISTOL", false, false, "COP");
+                }
             }
         }
 

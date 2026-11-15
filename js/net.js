@@ -819,10 +819,12 @@ class ViceNetworkManager {
                         y: pl.y,
                         vx: pl.vx,
                         vy: pl.vy,
+                        angle: Math.atan2(pl.vy || 0, pl.vx || 1),
                         damage: pl.dmg || 20,
                         rangeLeft: pl.rng || 320,
                         isFlame: Boolean(pl.flm),
                         isRocket: Boolean(pl.rck),
+                        isTankShell: Boolean(pl.tsh),
                         isElectro: Boolean(pl.elc),
                         fromPlayer: false,
                         fromRemoteId: pkt.id,
@@ -1446,6 +1448,7 @@ class ViceNetworkManager {
                 rng: Math.round(pr.rangeLeft),
                 flm: pr.isFlame ? 1 : 0,
                 rck: pr.isRocket ? 1 : 0,
+                tsh: pr.isTankShell ? 1 : 0,
                 elc: pr.isElectro ? 1 : 0
             }))
         });

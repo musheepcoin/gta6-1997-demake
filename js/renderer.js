@@ -11478,12 +11478,19 @@ class RetroRenderer {
             if (mapInfo.isTank) {
                 const turretRect = this.gta1Meta.sprites.objects["267"];
                 if (turretRect) {
-                    const tRot = (v.turretAngle || v.angle) - Math.PI * 0.5 + (v.destroyed ? 0.28 : 0);
+                    const tAng = typeof v.turretAngle === "number" ? v.turretAngle : v.angle;
+                    const tRot = tAng - Math.PI * 0.5 + (v.destroyed ? 0.28 : 0);
                     const tTint = v.destroyed ? 0.42 : 1.0;
+                    const recoil = v.turretRecoil > 0 ? v.turretRecoil : 0;
+                    if (v.turretRecoil > 0) {
+                        v.turretRecoil = Math.max(0, v.turretRecoil - 0.08);
+                    }
+                    const tx = v.x - Math.cos(tAng) * (recoil * 5.0);
+                    const ty = v.y - Math.sin(tAng) * (recoil * 5.0);
                     this.pushAtlasSprite3D(
                         turretRect,
-                        v.x,
-                        v.y,
+                        tx,
+                        ty,
                         vz + 0.02,
                         tRot,
                         carScale,
@@ -11493,6 +11500,12 @@ class RetroRenderer {
                         tTint * 0.88,
                         1
                     );
+                    if (recoil > 0.45 && !v.destroyed) {
+                        const mx = tx + Math.cos(tAng) * 32;
+                        const my = ty + Math.sin(tAng) * 32;
+                        this.pushSolidQuad3D(mx, my, vz + 0.025, 16 * recoil, 10 * recoil, tAng, 1.0, 0.65, 0.15, 0.92, SPRITE_DRAW_ORDER.EXPLOSION);
+                        this.pushSolidQuad3D(mx, my, vz + 0.028, 9 * recoil, 6 * recoil, tAng, 1.0, 0.96, 0.75, 0.98, SPRITE_DRAW_ORDER.EXPLOSION);
+                    }
                 }
             }
 
@@ -11938,7 +11951,30 @@ class RetroRenderer {
                 const frameId = 234 + (Math.floor(this.time * 14) % 8);
                 this.batchObjectSprite3D(String(frameId), pr.x, pr.y, pz, 0, 0.85, SPRITE_DRAW_ORDER.PROJECTILES);
             } else if (pr.isRocket) {
-                this.batchObjectSprite3D("261", pr.x, pr.y, pz, pr.angle - Math.PI * 0.5, 0.85, SPRITE_DRAW_ORDER.PROJECTILES);
+                const rAng = (typeof pr.angle === "number" && !Number.isNaN(pr.angle))
+                    ? pr.angle
+                    : Math.atan2(pr.vy || 0, pr.vx || 1);
+                const cosR = Math.cos(rAng);
+                const sinR = Math.sin(rAng);
+                const isTank = Boolean(pr.isTankShell);
+                const floorZ = this.map ? this.map.getHeightAtPixel(pr.x, pr.y, this.camZBlocks) : this.camZBlocks;
+
+                // Ground drop shadow under the flying shell / rocket
+                this.pushSolidQuad3D(pr.x + 3, pr.y + 4, floorZ + 0.014, isTank ? 16 : 13, isTank ? 5.5 : 4.5, rAng, 0.03, 0.04, 0.07, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+
+                // Supersonic propellant flame plume behind the shell
+                const tailFlameId = 234 + (Math.floor(this.time * 18) % 8);
+                this.batchObjectSprite3D(String(tailFlameId), pr.x - cosR * 13, pr.y - sinR * 13, pz - 0.002, 0, isTank ? 0.58 : 0.46, SPRITE_DRAW_ORDER.PROJECTILES);
+                this.pushSolidQuad3D(pr.x - cosR * 11, pr.y - sinR * 11, pz, isTank ? 16.0 : 13.0, isTank ? 6.8 : 5.4, rAng, 1.0, 0.42, 0.08, 0.92, SPRITE_DRAW_ORDER.PROJECTILES);
+                this.pushSolidQuad3D(pr.x - cosR * 7.5, pr.y - sinR * 7.5, pz + 0.001, isTank ? 10.0 : 8.0, isTank ? 4.2 : 3.4, rAng, 1.0, 0.92, 0.45, 0.98, SPRITE_DRAW_ORDER.PROJECTILES);
+
+                // Heavy armor-piercing shell / warhead casing + glowing tracer band + white-hot nose cone
+                this.pushSolidQuad3D(pr.x, pr.y, pz + 0.002, isTank ? 15.5 : 13.0, isTank ? 6.2 : 5.0, rAng, 0.18, 0.20, 0.16, 1.0, SPRITE_DRAW_ORDER.PROJECTILES);
+                this.pushSolidQuad3D(pr.x + cosR * 1.2, pr.y + sinR * 1.2, pz + 0.003, isTank ? 11.0 : 9.0, isTank ? 4.4 : 3.6, rAng, 1.0, 0.78, 0.22, 1.0, SPRITE_DRAW_ORDER.PROJECTILES);
+                this.pushSolidQuad3D(pr.x + cosR * 5.5, pr.y + sinR * 5.5, pz + 0.004, isTank ? 5.5 : 4.5, isTank ? 3.2 : 2.6, rAng, 1.0, 0.98, 0.88, 1.0, SPRITE_DRAW_ORDER.PROJECTILES);
+
+                const rFrameId = 261 + (Math.floor(this.time * 20) % 4);
+                this.batchObjectSprite3D(String(rFrameId), pr.x, pr.y, pz + 0.005, rAng - Math.PI * 0.5, isTank ? 1.55 : 1.30, SPRITE_DRAW_ORDER.PROJECTILES);
             } else {
                 this.pushSolidQuad3D(pr.x, pr.y, pz, 2.5, 2.5, 0, 1.0, 0.94, 0.54, 1.0, SPRITE_DRAW_ORDER.PROJECTILES);
             }
