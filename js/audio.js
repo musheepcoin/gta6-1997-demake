@@ -51,9 +51,7 @@ const VEHICLE_AUDIO_MANIFEST = {
     tank_tracks: "assets/sfx/vehicles/tank_tracks.wav",
     tank_turret_loop: "assets/sfx/vehicles/tank_turret_loop.wav",
 
-    // Authentic GTA Bicycle (Pedal Chain, Freewheel Hub Ratchet & Brass Rotary Bell), E-Scooter & Police Chopper Loops
-    bike_pedal_loop: "assets/sfx/vehicles/bike_pedal_loop.wav",
-    bike_coast_loop: "assets/sfx/vehicles/bike_coast_loop.wav",
+    // Authentic GTA Bicycle Brass Rotary Bell, E-Scooter & Police Chopper Loops
     bike_bell: "assets/sfx/vehicles/bike_bell.wav",
     scooter_loop: "assets/sfx/vehicles/scooter_loop.wav",
     scooter_horn: "assets/sfx/vehicles/scooter_horn.wav",
@@ -247,10 +245,7 @@ const ENGINE_BANK_SPECS = {
         { key: "tank_tracks", center: 0.56, width: 0.75, baseRate: 0.78, rateSpan: 0.58, gain: 0.19 },
         { key: "tank_turret_loop", center: 0.50, width: 0.90, baseRate: 0.90, rateSpan: 0.35, gain: 0.16 }
     ],
-    BICYCLE: [
-        { key: "bike_pedal_loop", center: 0.50, width: 0.90, baseRate: 0.82, rateSpan: 0.56, gain: 0.21 },
-        { key: "bike_coast_loop", center: 0.50, width: 0.90, baseRate: 0.76, rateSpan: 0.74, gain: 0.20 }
-    ],
+    BICYCLE: [],
     ESCOOTER: [
         { key: "scooter_loop", center: 0.50, width: 0.95, baseRate: 0.74, rateSpan: 0.78, gain: 0.19 }
     ],
@@ -1103,6 +1098,7 @@ class RetroAudioEngine {
 
         const now = this.ctx.currentTime;
         this.inVehicle = Boolean(state.inVehicle);
+        this._activeVehicleSpecKey = this.inVehicle ? (state.vehicleSpecKey || null) : null;
         if (this._shiftCooldown > 0) this._shiftCooldown = Math.max(0, this._shiftCooldown - dt);
         if (this._shiftDipTimer > 0) this._shiftDipTimer = Math.max(0, this._shiftDipTimer - dt);
         if (this._bovCooldown > 0) this._bovCooldown = Math.max(0, this._bovCooldown - dt);
@@ -1118,38 +1114,52 @@ class RetroAudioEngine {
             const speedNorm = Math.min(1.0, absSpeed / maxSpd);
             const throttle = state.vehicleThrottle !== undefined ? state.vehicleThrottle : (absSpeed > this._prevAbsSpeed + 0.5 ? 1 : 0);
 
-            // BICYCLE & ELECTRIC SCOOTER: Sampled multi-layer pedal/freewheel & brushless motor loops!
-            if (vehClass === "BICYCLE" || vehClass === "ESCOOTER") {
+            // BICYCLE: Zero engine loop! Subtle, realistic pedal chain stroke cadence & crisp freewheel hub ratchet clicks!
+            if (vehClass === "BICYCLE") {
+                this._updateSkidLoop(now, false, 0);
+                if (this._engineLayers.length > 0) {
+                    this._stopEngineLayers();
+                }
+                if (this.engineMasterGain) {
+                    this._setParamSmooth(this.engineMasterGain.gain, 0.0, 0.35);
+                }
+                if (absSpeed > 12) {
+                    this._bikeTickTimer = (this._bikeTickTimer || 0) - dt;
+                    if (throttle !== 0) {
+                        // Pedaling cadence: soft chain-link & crank stroke ~2.2 to 3.8 half-strokes/sec
+                        const strokeInterval = Math.max(0.25, 0.46 - speedNorm * 0.20);
+                        if (this._bikeTickTimer <= 0) {
+                            this._bikeTickTimer = strokeInterval;
+                            this.playBicyclePedalStroke(speedNorm);
+                        }
+                    } else if (absSpeed > 22) {
+                        // Coasting freewheel pawl ratchet: delicate, high-pitched metallic "clic-clic-clic"
+                        const pawlInterval = Math.max(0.044, 0.135 - speedNorm * 0.088);
+                        if (this._bikeTickTimer <= 0 || this._bikeTickTimer > pawlInterval) {
+                            this._bikeTickTimer = pawlInterval;
+                            this.playBicycleFreewheelClick(speedNorm);
+                        }
+                    }
+                } else {
+                    this._bikeTickTimer = 0.04;
+                }
+                this._prevThrottle = throttle;
+                this._prevAbsSpeed = absSpeed;
+            } else if (vehClass === "ESCOOTER") {
                 this._updateSkidLoop(now, false, 0);
                 if (this._ensureEngineLayers(vehClass)) {
                     if (this.engineMasterFilter && this.engineMasterGain) {
-                        const filterHz = vehClass === "BICYCLE" ? 4200 : (1450 + speedNorm * 1650);
+                        const filterHz = 1450 + speedNorm * 1650;
                         this._setParamSmooth(this.engineMasterFilter.frequency, filterHz, 0.30);
-                        const masterVol = absSpeed > 8 ? (0.38 + speedNorm * 0.16) : 0.0;
+                        const masterVol = absSpeed > 8 ? (0.34 + speedNorm * 0.14) : 0.0;
                         this._setParamSmooth(this.engineMasterGain.gain, masterVol, 0.28);
                     }
                     for (const layer of this._engineLayers) {
                         const s = layer.spec;
-                        let w = 0;
-                        let rate = s.baseRate + speedNorm * s.rateSpan;
-                        if (s.key === "bike_pedal_loop") {
-                            w = (absSpeed > 10 && throttle > 0)
-                                ? Math.min(1.0, absSpeed / 110) * (0.72 + 0.28 * speedNorm)
-                                : 0.0;
-                            rate = s.baseRate + speedNorm * s.rateSpan + (throttle > 0 ? 0.06 : 0);
-                        } else if (s.key === "bike_coast_loop") {
-                            if (absSpeed > 14 && throttle <= 0) {
-                                w = Math.min(1.0, absSpeed / 125);
-                            } else if (absSpeed > 12) {
-                                w = 0.22 * Math.min(1.0, absSpeed / 150);
-                            }
-                            rate = s.baseRate + speedNorm * s.rateSpan;
-                        } else if (s.key === "scooter_loop") {
-                            w = absSpeed > 8
-                                ? Math.min(1.0, absSpeed / 105) * (throttle > 0 ? 1.0 : 0.65)
-                                : 0.0;
-                            rate = s.baseRate + speedNorm * s.rateSpan + (throttle > 0 ? 0.08 : 0);
-                        }
+                        const w = absSpeed > 8
+                            ? Math.min(1.0, absSpeed / 105) * (throttle > 0 ? 1.0 : 0.65)
+                            : 0.0;
+                        const rate = s.baseRate + speedNorm * s.rateSpan + (throttle > 0 ? 0.08 : 0);
                         this._setParamSmooth(layer.gainNode.gain, w * s.gain, 0.28);
                         this._setParamSmooth(layer.src.playbackRate, Math.max(0.58, Math.min(1.75, rate)), 0.28);
                     }
@@ -1157,20 +1167,7 @@ class RetroAudioEngine {
                     if (this.engineMasterGain) {
                         this.engineMasterGain.gain.setValueAtTime(0.0, now);
                     }
-                    if (vehClass === "BICYCLE" && absSpeed > 14) {
-                        this._bikeTickTimer = (this._bikeTickTimer || 0) - dt;
-                        const tickInterval = throttle > 0
-                            ? Math.max(0.18, 0.42 - speedNorm * 0.22)
-                            : Math.max(0.055, 0.14 - speedNorm * 0.08);
-                        if (this._bikeTickTimer <= 0) {
-                            this._bikeTickTimer = tickInterval;
-                            if (throttle > 0) {
-                                this.playBandNoise(0.032, 2600 + speedNorm * 800, 2.4, 0.011);
-                            } else if (absSpeed > 24) {
-                                this.playBandNoise(0.012, 4400, 4.2, 0.009);
-                            }
-                        }
-                    } else if (vehClass === "ESCOOTER" && absSpeed > 14) {
+                    if (absSpeed > 14) {
                         this._scooterHumTimer = (this._scooterHumTimer || 0) - dt;
                         if (this._scooterHumTimer <= 0) {
                             this._scooterHumTimer = 0.075;
@@ -1827,12 +1824,61 @@ class RetroAudioEngine {
         }
     }
 
-    playCarCrash(intensity = 1.0) {
+    playBicyclePedalStroke(speedNorm = 0.5) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const jit = 0.94 + Math.random() * 0.12;
+        // Soft, realistic chain-on-sprocket roller engagement + subtle pedal crank brush (no engine buzz!)
+        this.playBandNoise(0.036, (1850 + speedNorm * 450) * jit, 2.8, 0.0042 + speedNorm * 0.0032);
+        this.playBandNoise(0.011, (4300 + speedNorm * 600) * jit, 6.0, 0.0030 + speedNorm * 0.0020);
+    }
+
+    playBicycleFreewheelClick(speedNorm = 0.5) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        // Crisp, ultra-short 9ms metallic pawl ratchet click ("clic-clic-clic") when coasting without pedaling
+        const pawlHz = 5100 + speedNorm * 650 + (Math.random() - 0.5) * 280;
+        this.playBandNoise(0.009, pawlHz, 7.2, 0.0038 + speedNorm * 0.0028);
+    }
+
+    playBicycleBump(intensity = 1.0, isScooter = false) {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const k = Math.max(0.35, Math.min(1.35, intensity));
+        try {
+            // 1. Rubber tire & handlebar thud (pitch-dropping low sine/triangle thump, no car sheet-metal smash!)
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(isScooter ? 155 : 132, now);
+            osc.frequency.exponentialRampToValueAtTime(isScooter ? 54 : 44, now + 0.075);
+            g.gain.setValueAtTime(0.042 * k, now);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+            osc.connect(g);
+            g.connect(this.sfxOut());
+            osc.start(now);
+            osc.stop(now + 0.085);
+            this._registerVoice(osc, [g], now + 0.085);
+        } catch (_e) {}
+        // 2. Light aluminum bicycle frame / chain rattle clink (no shattering car glass!)
+        this.playBandNoise(0.038, isScooter ? 1950 : 2750, 4.2, 0.014 * k);
+        setTimeout(() => {
+            if (this.ctx && !this.muted) {
+                this.playBandNoise(0.022, isScooter ? 2450 : 3650, 5.5, 0.009 * k);
+            }
+        }, 42);
+    }
+
+    playCarCrash(intensity = 1.0, specKey = null) {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
         if (this._lastCrashTime && now - this._lastCrashTime < 0.32) return;
         this._lastCrashTime = now;
         const k = Math.max(0.35, Math.min(1.5, intensity));
+
+        const effSpec = specKey || (this.inVehicle ? this._activeVehicleSpecKey : null);
+        if (effSpec === "BMX_BIKE" || effSpec === "E_SCOOTER") {
+            this.playBicycleBump(k, effSpec === "E_SCOOTER");
+            return;
+        }
 
         const primaryKey = k > 0.85 ? "crash_heavy" : "crash_metal";
         const rate = 0.88 + Math.random() * 0.22;

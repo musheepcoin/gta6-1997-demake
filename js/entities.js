@@ -4270,9 +4270,11 @@ class Vehicle {
                     this.crashCooldown = 0.52;
                     this.receiveImpactDamage((impact - 140) * (this.driver === "PLAYER" ? 0.085 : 0.065), hitX, hitY);
                     if (this.driver === "PLAYER") {
-                        game.spawnParticle(hitX, hitY, "SPARK");
+                        if (this.specKey !== "BMX_BIKE") {
+                            game.spawnParticle(hitX, hitY, "SPARK");
+                        }
                         if (game && game.audio) {
-                            game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145));
+                            game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145), this.specKey);
                         }
                     }
                 }

@@ -8121,9 +8121,9 @@ class LeonidaGame {
         }
 
         if (isBicycle || isScooter) {
-            // A bicycle or e-scooter crumples / short-circuits with sparks & smoke without a lethal fireball!
+            // A bicycle or e-scooter crumples / short-circuits without a lethal fireball or car sheet-metal smash!
             if (this.audio && typeof this.audio.playCarCrash === "function") {
-                this.audio.playCarCrash(0.55);
+                this.audio.playCarCrash(0.55, v.specKey);
             }
             for (let i = 0; i < 10; i++) {
                 this.spawnParticle(
@@ -12125,9 +12125,9 @@ class LeonidaGame {
                         }
 
                         if (Math.hypot(a.x - p.x, a.y - p.y) < 480) {
-
-                            this.audio.playCarCrash(Math.min(1.5, dmg / 14));
-
+                            const bothMicro = (a.specKey === "BMX_BIKE" || a.specKey === "E_SCOOTER") &&
+                                (b.specKey === "BMX_BIKE" || b.specKey === "E_SCOOTER");
+                            this.audio.playCarCrash(Math.min(1.5, dmg / 14), bothMicro ? a.specKey : null);
                         }
 
                     }

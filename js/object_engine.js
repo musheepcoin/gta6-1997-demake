@@ -7453,7 +7453,7 @@ class WorldObjectEngine {
                 }
 
                 // 3A-bis. 3D Low Park, Promenade & Villa Walkway Bollard Lights
-                if (carSpd > 32) {
+                if (!isMicroVeh && carSpd > 32) {
                     const bollards = cell.bollards;
                     for (let i = 0; i < bollards.length; i++) {
                         const bl = bollards[i];
