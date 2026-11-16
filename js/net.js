@@ -95,10 +95,7 @@ class ViceNetworkManager {
             if (savedWs) {
                 return savedWs.trim();
             }
-            const host = window.location.hostname;
-            if (host === "localhost" || host === "127.0.0.1") {
-                return `ws://${host}:8787`;
-            }
+            return "wss://srv2162111.hstgr.cloud:8443";
         } catch (_e) {}
         return "";
     }
