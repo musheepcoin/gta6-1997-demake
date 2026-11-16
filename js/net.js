@@ -508,11 +508,11 @@ class ViceNetworkManager {
             const dotEl = document.getElementById(`srv-dot-${srv}`) || (srv === "VICE26" ? document.getElementById("srv-dot-VICE97") : null);
             if (countEl) {
                 if (count <= 0) {
-                    countEl.textContent = `0/${this.maxSlots} EMPTY`;
+                    countEl.textContent = "0 ONLINE";
                 } else if (count === 1) {
-                    countEl.textContent = `1/${this.maxSlots} PLAYER`;
+                    countEl.textContent = "1 PLAYER";
                 } else {
-                    countEl.textContent = `${count}/${this.maxSlots} PLAYERS`;
+                    countEl.textContent = `${count} PLAYERS`;
                 }
             }
             if (dotEl) {
