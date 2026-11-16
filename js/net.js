@@ -221,12 +221,17 @@ class ViceNetworkManager {
         }
         if (pkt.t === "PROP_SYNC" && Array.isArray(pkt.props)) {
             for (const pr of pkt.props) {
+                if (this._pendingPropSync.length >= 260) this._pendingPropSync.shift();
                 this._pendingPropSync.push(pr);
             }
             this.flushPendingPropSync();
             return;
         }
         if (pkt.t === "PROFILE_SYNC") {
+            if (this._profileSynced && this.game && this.game.started) {
+                this.broadcastStateNow();
+                return;
+            }
             this._pendingProfileSync = pkt.profile || null;
             this.tryApplyPendingProfileSync();
             return;
@@ -248,6 +253,18 @@ class ViceNetworkManager {
                 const cx = Number(item.x) || 0;
                 const cy = Number(item.y) || 0;
                 const ca = Number(item.a) || 0;
+                // Tombstoned corpse (revived or evacuated by paramedic): remove if present locally and skip spawning!
+                if (ca < -900 || cx < 128 || cy < 128) {
+                    if (Array.isArray(this.game.peds)) {
+                        for (let pi = this.game.peds.length - 1; pi >= 0; pi--) {
+                            const pd = this.game.peds[pi];
+                            if (pd && pd.dead && Math.hypot((pd.x || 0) - cx, (pd.y || 0) - cy) < 28) {
+                                this.game.peds.splice(pi, 1);
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if (Array.isArray(this.game.peds) && typeof Pedestrian === "function") {
                     let ped = this.game.peds.find((p) => p && Math.hypot((p.x || 0) - cx, (p.y || 0) - cy) < 22);
                     const cz = this.game.map.getHeightAtPixel ? this.game.map.getHeightAtPixel(cx, cy, 2.0) : 2.0;
@@ -265,6 +282,9 @@ class ViceNetworkManager {
                             dead: true
                         });
                         ped._corpsePersisted = true;
+                        ped._corpseSmashPType = item.pType;
+                        ped._corpseSmashX = Math.round(cx);
+                        ped._corpseSmashY = Math.round(cy);
                         this.game.peds.push(ped);
                     } else {
                         ped.dead = true;
@@ -274,11 +294,15 @@ class ViceNetworkManager {
                         ped.y = cy;
                         ped.angle = ca;
                         ped._corpsePersisted = true;
+                        ped._corpseSmashPType = item.pType;
+                        ped._corpseSmashX = Math.round(cx);
+                        ped._corpseSmashY = Math.round(cy);
                         if (typeof ped.computeState === "function") ped.state = ped.computeState();
                     }
                     if (Array.isArray(this.game.bloodDecals)) {
                         const hasBlood = this.game.bloodDecals.some((b) => Math.hypot((b.x || 0) - cx, (b.y || 0) - cy) < 18);
                         if (!hasBlood) {
+                            if (this.game.bloodDecals.length >= 80) this.game.bloodDecals.shift();
                             this.game.bloodDecals.push({ x: cx, y: cy, z: cz, r: 10, alpha: 0.85 });
                         }
                     }
@@ -1527,6 +1551,35 @@ class ViceNetworkManager {
         this.sendPacket(Object.assign({ t: "WORLD_EVENT" }, ev));
     }
 
+    broadcastVehicleRemoved(vehId) {
+        if (!this.enabled || !vehId) return;
+        // Tombstone the vehicle in server room.modifiedVehs (using negative coords so both existing and updated servers purge it)
+        this.broadcastWorldEvent({
+            kind: "VEH_EXIT",
+            vehId,
+            x: -9999,
+            y: -9999,
+            z: -99,
+            a: 0,
+            hp: 0,
+            flags: 0
+        });
+    }
+
+    broadcastCorpseCleared(ped) {
+        if (!this.enabled || !ped) return;
+        const pType = ped._corpseSmashPType || `CORPSE:${ped.g24Type || "civ0"}:${ped.kind || "CIVILIAN"}`;
+        const sx = ped._corpseSmashX !== undefined ? ped._corpseSmashX : Math.round(ped.x || 0);
+        const sy = ped._corpseSmashY !== undefined ? ped._corpseSmashY : Math.round(ped.y || 0);
+        this.broadcastWorldEvent({
+            kind: "PROP_SMASH",
+            pType,
+            x: sx,
+            y: sy,
+            a: -999
+        });
+    }
+
     applyWorldEvent(pkt) {
         if (!this.game || !pkt || !pkt.kind) return;
         if (pkt.kind === "VEH_ENTER" && pkt.vehId) {
@@ -1546,6 +1599,13 @@ class ViceNetworkManager {
                 }
             }
         } else if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
+            if (typeof pkt.x === "number" && typeof pkt.y === "number" && (pkt.x < 128 || pkt.y < 128)) {
+                const idx = this.game.vehicles.findIndex((veh) => veh.id === pkt.vehId);
+                if (idx !== -1 && this.game.vehicles[idx] !== this.game.player.inVehicle) {
+                    this.game.vehicles.splice(idx, 1);
+                }
+                return;
+            }
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
             const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
             if (v) {
@@ -1635,6 +1695,7 @@ class ViceNetworkManager {
             if (d === "AI_EMERGENCY") return 3;
             if (d === "PLAYER" || d === "REMOTE") return 4;
             if (d === "AI_CRIMINAL") return 5;
+            if (d === "AI_TOW") return 6;
             return 0;
         };
 
@@ -1693,13 +1754,19 @@ class ViceNetworkManager {
         for (let i = 0; i < g.peds.length; i++) {
             const pd = g.peds[i];
             if (!pd || pd._boardedVehicle) continue;
-            if (pd.dead && !pd._corpsePersisted) {
+            if (pd.dead && !pd._corpsePersisted && !pd.revived) {
                 pd._corpsePersisted = true;
+                const pType = `CORPSE:${pd.g24Type || "civ0"}:${pd.kind || "CIVILIAN"}`;
+                const sx = Math.round(pd.x);
+                const sy = Math.round(pd.y);
+                pd._corpseSmashPType = pType;
+                pd._corpseSmashX = sx;
+                pd._corpseSmashY = sy;
                 this.broadcastWorldEvent({
                     kind: "PROP_SMASH",
-                    pType: `CORPSE:${pd.g24Type || "civ0"}:${pd.kind || "CIVILIAN"}`,
-                    x: Math.round(pd.x),
-                    y: Math.round(pd.y),
+                    pType,
+                    x: sx,
+                    y: sy,
                     a: Math.round((pd.angle || 0) * 100) / 100
                 });
             }
@@ -1731,11 +1798,11 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
-            ver: 101161,
+            ver: 101163,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
-            vehs,
-            peds
+            vehs: vehs.slice(0, 180),
+            peds: peds.slice(0, 110)
         });
     }
 
@@ -1761,6 +1828,7 @@ class ViceNetworkManager {
             if (c === 3) return "AI_EMERGENCY";
             if (c === 4) return "REMOTE";
             if (c === 5) return "AI_CRIMINAL";
+            if (c === 6) return "AI_TOW";
             return null;
         };
 
@@ -1774,6 +1842,16 @@ class ViceNetworkManager {
             for (const row of pkt.vehs) {
                 if (!Array.isArray(row) || row.length < 11) continue;
                 let [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag, isMod] = row;
+                // Tombstoned / impounded / crushed vehicle: remove locally if present and skip!
+                if (x < 128 || y < 128) {
+                    const ex = existingById.get(id);
+                    if (ex && ex !== g.player.inVehicle) {
+                        const rIdx = g.vehicles.indexOf(ex);
+                        if (rIdx !== -1) g.vehicles.splice(rIdx, 1);
+                        existingById.delete(id);
+                    }
+                    continue;
+                }
                 if (g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(x, y) && specKey !== "AIRBOAT" && specKey !== "SPEEDBOAT" && specKey !== "JETSKI" && specKey !== "YACHT" && specKey !== "SWAMP_BOAT") {
                     continue;
                 }
@@ -1841,13 +1919,27 @@ class ViceNetworkManager {
                 v.vx = vx;
                 v.vy = vy;
                 v.speed = Math.hypot(vx, vy);
-                v.driver = codeToDrv(drvCode);
-                if (isInitialServerBootstrap && v.driver === null && v.isPolice && !nowDestroyed) {
-                    v.abandonedTimer = Math.max(v.abandonedTimer || 0, 10.0);
+                let resolvedDriver = codeToDrv(drvCode);
+                if (resolvedDriver === "REMOTE") {
+                    // Only keep driver = "REMOTE" if an active remote player is actually claiming this vehicle!
+                    let hasActiveRemote = false;
+                    for (const rp of this.remotePlayers.values()) {
+                        if (rp && rp.veh && rp.veh.id === id && (rp.veh.seat || 0) === 0) {
+                            hasActiveRemote = true;
+                            break;
+                        }
+                    }
+                    if (!hasActiveRemote) {
+                        resolvedDriver = null;
+                    }
                 }
+                v.driver = resolvedDriver;
                 v.hp = Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp;
                 const wasDestroyed = v.destroyed;
                 const nowDestroyed = Boolean(flags & 1);
+                if (isInitialServerBootstrap && v.driver === null && v.isPolice && !nowDestroyed) {
+                    v.abandonedTimer = Math.max(v.abandonedTimer || 0, 10.0);
+                }
                 if (!wasDestroyed && nowDestroyed) {
                     g.explodeVehicle(v, false, true);
                 } else if (nowDestroyed) {
@@ -1864,7 +1956,16 @@ class ViceNetworkManager {
             if (!isInitialServerBootstrap) {
                 for (let i = g.vehicles.length - 1; i >= 0; i--) {
                     const v = g.vehicles[i];
-                    const isDynamicTraffic = typeof v.id === "string" && (v.id.startsWith("traf_") || v.id.startsWith("cop_"));
+                    const isDynamicTraffic = typeof v.id === "string" && (
+                        v.id.startsWith("trf_") ||
+                        v.id.startsWith("traf_") ||
+                        v.id.startsWith("cop_") ||
+                        v.id.startsWith("rb_") ||
+                        v.id.startsWith("amb_") ||
+                        v.id.startsWith("medic_") ||
+                        v.id.startsWith("vcfd_") ||
+                        v.id.startsWith("tow_")
+                    );
                     if (isDynamicTraffic && !seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId && !v._worldModified) {
                         g.vehicles.splice(i, 1);
                     }
@@ -1901,6 +2002,10 @@ class ViceNetworkManager {
                 seenPedIds.add(id);
                 const kindStr = codeToKind(kindCode);
                 let ped = existingPedById.get(id);
+                // On initial server bootstrap, never hijack a distant living starter pedestrian whose sequential ID happened to match an old persisted corpse!
+                if (isInitialServerBootstrap && isDead && ped && !ped.dead && Math.hypot((ped.x || 0) - x, (ped.y || 0) - y) > 48) {
+                    ped = null;
+                }
 
                 // If a corpse arrives with a remote ID, match any local ped at the exact same spot so we don't duplicate
                 if (!ped && isDead) {
@@ -1914,8 +2019,11 @@ class ViceNetworkManager {
                 }
 
                 if (!ped) {
+                    const resolvedPedId = (isInitialServerBootstrap && isDead && existingPedById.has(id))
+                        ? `corpse_${Math.round(x)}_${Math.round(y)}`
+                        : id;
                     ped = new Pedestrian({
-                        id,
+                        id: resolvedPedId,
                         x,
                         y,
                         z: z !== undefined ? z : 2.0,
@@ -1929,13 +2037,15 @@ class ViceNetworkManager {
                         copWeapon: copWeapon || null
                     });
                     g.peds.push(ped);
-                    existingPedById.set(id, ped);
+                    existingPedById.set(resolvedPedId, ped);
+                    seenPedIds.add(resolvedPedId);
                 }
 
                 if (isDead) {
                     if (!ped.dead && Array.isArray(g.bloodDecals)) {
                         const hasBlood = g.bloodDecals.some((b) => Math.hypot((b.x || 0) - x, (b.y || 0) - y) < 18);
                         if (!hasBlood) {
+                            if (g.bloodDecals.length >= 80) g.bloodDecals.shift();
                             g.bloodDecals.push({ x, y, z: z !== undefined ? z : 2.0, r: 10, alpha: 0.85 });
                         }
                     }
@@ -2093,8 +2203,17 @@ class ViceNetworkManager {
         // Release any world vehicle whose remote driver exited or disconnected
         if (this.game && Array.isArray(this.game.vehicles)) {
             for (const v of this.game.vehicles) {
-                if (v._linkedRemoteId) {
-                    const owner = this.remotePlayers.get(v._linkedRemoteId);
+                if (v._linkedRemoteId || v.driver === "REMOTE") {
+                    let owner = v._linkedRemoteId ? this.remotePlayers.get(v._linkedRemoteId) : null;
+                    if (!owner) {
+                        for (const rp of this.remotePlayers.values()) {
+                            if (rp && rp.veh && rp.veh.id === v.id && (rp.veh.seat || 0) === 0) {
+                                owner = rp;
+                                v._linkedRemoteId = rp.id;
+                                break;
+                            }
+                        }
+                    }
                     if (!owner || !owner.veh || owner.veh.id !== v.id || (owner.veh.seat || 0) !== 0) {
                         v._linkedRemoteId = null;
                         if (v.driver === "REMOTE") {

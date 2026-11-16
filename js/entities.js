@@ -3361,11 +3361,32 @@ class Vehicle {
         // If already towing a vehicle/wreck, haul it slowly & heavily along the road network (~62 px/s max)
         if (this.towingVehicle) {
             const tv = this.towingVehicle;
+            this.towingTimer = (this.towingTimer || 0) + dt;
             const tvBurning = (!tv.destroyed && ((tv.burnTimer || 0) > 0 || tv.hp <= 50)) ||
                 (tv.destroyed && !tv.fireExtinguished && tv.specKey !== "BMX_BIKE" && tv.specKey !== "E_SCOOTER");
+            const distPlayer = (game && game.player) ? Math.hypot(tv.x - game.player.x, tv.y - game.player.y) : 999;
+            // Deliver towed vehicle to VCPD Impound once hauled out of sight (> 560px after 7s) or after 22s of hauling!
+            if (
+                (this.towingTimer > 7.0 && distPlayer > 560) ||
+                this.towingTimer > 22.0
+            ) {
+                tv.towedByTruck = null;
+                this.towingVehicle = null;
+                this.towingTimer = 0;
+                const tvIdx = game.vehicles.indexOf(tv);
+                if (tvIdx !== -1 && tv !== (game.player && game.player.inVehicle)) {
+                    game.vehicles.splice(tvIdx, 1);
+                }
+                if (game.net && typeof game.net.broadcastVehicleRemoved === "function" && tv.id) {
+                    game.net.broadcastVehicleRemoved(tv.id);
+                }
+                this.sirenActive = false;
+                return this.computeTrafficControls(dt, map, game);
+            }
             if (!game.vehicles.includes(tv) || tv.driver === "PLAYER" || tvBurning) {
                 tv.towedByTruck = null;
                 this.towingVehicle = null;
+                this.towingTimer = 0;
             } else {
                 const tCtrl = this.computeTrafficControls(dt, map, game);
                 if (this.speed > 64) {
@@ -5168,7 +5189,11 @@ class TrafficManager {
                 ? (45 + Math.random() * 6)
                 : (spec.isChild ? (21 + Math.random() * 3) : (spec.speed || (22 + Math.random() * 5)));
 
+            if (!this._sessionTag) {
+                this._sessionTag = Math.random().toString(36).slice(2, 6);
+            }
             const newPed = new Pedestrian({
+                id: `dped_${this._sessionTag}_${++Pedestrian._nextId}`,
                 x: mx,
                 y: my,
                 z: pedZ,
@@ -5426,8 +5451,8 @@ class TrafficManager {
             const isAbandonedOrWreck =
                 !v.isStaticParked &&
                 !v.isEstateCar &&
-                ((v.destroyed && (v.abandonedTimer || 0) > 120.0) ||
-                 (!v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 120.0 : 85.0)));
+                ((v.destroyed && (v.abandonedTimer || 0) > 90.0) ||
+                 (!v.destroyed && v.driver === null && (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 180.0 : 85.0)));
             const canRecycle =
                 v.driver === "AI_TRAFFIC" ||
                 v.driver === "AI_EMERGENCY" ||
@@ -5435,7 +5460,7 @@ class TrafficManager {
                 v.driver === "AI_TOW" ||
                 (!anyWanted && v.driver === "AI_COP") ||
                 isAbandonedOrWreck;
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || v._worldModified) continue;
+            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || (v._worldModified && !isAbandonedOrWreck)) continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
@@ -5444,9 +5469,15 @@ class TrafficManager {
                 if (v.towingVehicle) {
                     const tIdx = game.vehicles.indexOf(v.towingVehicle);
                     if (tIdx >= 0) {
+                        if (game.net && typeof game.net.broadcastVehicleRemoved === "function" && v.towingVehicle.id) {
+                            game.net.broadcastVehicleRemoved(v.towingVehicle.id);
+                        }
                         game.vehicles.splice(tIdx, 1);
                         if (tIdx < i) i--;
                     }
+                }
+                if (v._worldModified && game.net && typeof game.net.broadcastVehicleRemoved === "function" && v.id) {
+                    game.net.broadcastVehicleRemoved(v.id);
                 }
                 game.vehicles.splice(i, 1);
                 continue;
@@ -5462,9 +5493,15 @@ class TrafficManager {
                 if (v.towingVehicle) {
                     const tIdx = game.vehicles.indexOf(v.towingVehicle);
                     if (tIdx >= 0) {
+                        if (game.net && typeof game.net.broadcastVehicleRemoved === "function" && v.towingVehicle.id) {
+                            game.net.broadcastVehicleRemoved(v.towingVehicle.id);
+                        }
                         game.vehicles.splice(tIdx, 1);
                         if (tIdx < i) i--;
                     }
+                }
+                if ((v._worldModified || v.destroyed) && game.net && typeof game.net.broadcastVehicleRemoved === "function" && v.id) {
+                    game.net.broadcastVehicleRemoved(v.id);
                 }
                 if (v.driver === "AI_TRAFFIC" || v.driver === "AI_EMERGENCY" || v.driver === "AI_COP") {
                     activeMovingCount--;
@@ -5572,7 +5609,10 @@ class TrafficManager {
                 const activeFireTrucks = game.vehicles.filter((ov) => !ov.destroyed && ov.specKey === "FIRE_TRUCK").length;
                 if (activeFireTrucks >= 3) spec = "FLATBED_TRUCK";
             }
-            const newCar = new Vehicle(`trf_${++this._trafficSeq}`, spec, vx, vy, roadAngle);
+            if (!this._sessionTag) {
+                this._sessionTag = Math.floor(100 + Math.random() * 900);
+            }
+            const newCar = new Vehicle(`trf_${this._sessionTag}_${++this._trafficSeq}`, spec, vx, vy, roadAngle);
             newCar.z = vz;
             newCar.driver = (spec === "FIRE_TRUCK" || spec === "MEDIC_AMBULANCE") ? "AI_EMERGENCY" : "AI_TRAFFIC";
             newCar.speed = 85;

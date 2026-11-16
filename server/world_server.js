@@ -27,7 +27,7 @@ if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const ROOM_CODES = ["VICE97", "MIAMI86", "KEYS305"];
+const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 
 function createEmptyRoom() {
     return {
@@ -35,6 +35,8 @@ function createEmptyRoom() {
         modifiedVehs: {},  // Player-driven, moved, parked, damaged, or wrecked vehicles (NEVER overwritten by default map!)
         smashedProps: {},  // Knocked-down streetlamps, traffic lights, bollards, hydrants, benches
         chat: [],
+        ver: 0,
+        worldMinutes: 720,
         trafficLightTimer: 0,
         updatedAt: 0
     };
@@ -257,6 +259,8 @@ function sendRoomBootstrap(socket, meta) {
     sendJson(socket, {
         t: "WORLD_SYNC",
         id: "server_world",
+        ver: room.ver || 101162,
+        wm: room.worldMinutes || 720,
         tl: room.trafficLightTimer || 0,
         vehs: vehRows,
         peds: pedRows
@@ -402,6 +406,12 @@ function handleClientPacket(socket, pkt) {
     }
 
     if (pkt.t === "WORLD_SYNC" && Array.isArray(pkt.vehs)) {
+        if (typeof pkt.ver === "number" && pkt.ver > (room.ver || 0)) {
+            room.ver = pkt.ver;
+        }
+        if (typeof pkt.wm === "number") {
+            room.worldMinutes = pkt.wm;
+        }
         if (typeof pkt.tl === "number") {
             room.trafficLightTimer = pkt.tl;
         }
@@ -412,6 +422,11 @@ function handleClientPacket(socket, pkt) {
             const row = pkt.vehs[i];
             if (!Array.isArray(row) || !row[0]) continue;
             const vid = row[0];
+            if (row[2] < 128 || row[3] < 128) {
+                delete room.modifiedVehs[vid];
+                delete room.vehs[vid];
+                continue;
+            }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
             if (isMod) {
                 row[13] = 1;
@@ -461,6 +476,13 @@ function handleClientPacket(socket, pkt) {
 
     if (pkt.t === "WORLD_EVENT") {
         if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
+            if (typeof pkt.x === "number" && typeof pkt.y === "number" && (pkt.x < 128 || pkt.y < 128)) {
+                delete room.modifiedVehs[pkt.vehId];
+                delete room.vehs[pkt.vehId];
+                isDirty = true;
+                broadcastToRoom(roomCode, pkt, socket);
+                return;
+            }
             const existing = room.modifiedVehs[pkt.vehId] || room.vehs[pkt.vehId];
             const row = existing ? existing.slice() : [
                 pkt.vehId,
@@ -522,6 +544,12 @@ function handleClientPacket(socket, pkt) {
             isDirty = true;
         } else if (pkt.kind === "PROP_SMASH" && pkt.pType && typeof pkt.x === "number" && typeof pkt.y === "number") {
             const pKey = `${pkt.pType}_${Math.round(pkt.x)}_${Math.round(pkt.y)}`;
+            if (Number(pkt.a) < -900) {
+                delete room.smashedProps[pKey];
+                isDirty = true;
+                broadcastToRoom(roomCode, pkt, socket);
+                return;
+            }
             room.smashedProps[pKey] = {
                 pType: pkt.pType,
                 x: Math.round(pkt.x),
@@ -742,6 +770,22 @@ server.on("upgrade", (req, socket) => {
     const cleanup = () => {
         const m = clients.get(socket);
         if (m) {
+            // Release any vehicle this player was driving so it becomes a parked unoccupied car (drvCode = 0)
+            if (m.lastState && m.lastState.veh && m.lastState.veh.id) {
+                const { room: r } = ensureRoom(m.room);
+                const vid = m.lastState.veh.id;
+                if (r.modifiedVehs[vid] && r.modifiedVehs[vid][8] === 4) {
+                    r.modifiedVehs[vid][8] = 0;
+                    r.modifiedVehs[vid][6] = 0;
+                    r.modifiedVehs[vid][7] = 0;
+                    isDirty = true;
+                }
+                if (r.vehs[vid] && r.vehs[vid][8] === 4) {
+                    r.vehs[vid][8] = 0;
+                    r.vehs[vid][6] = 0;
+                    r.vehs[vid][7] = 0;
+                }
+            }
             clients.delete(socket);
             broadcastToRoom(m.room, { t: "LEAVE", id: m.playerId, name: m.name }, socket);
             broadcastDirectoryCounts();

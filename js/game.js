@@ -9794,9 +9794,9 @@ class LeonidaGame {
 
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
-            // Coherent VCPD Cruiser Recovery: if an intact police cruiser is left driverless on the street after a chase,
-            // a nearby VCPD relief officer walks from the nearest sidewalk, climbs into the cruiser, and drives it back on patrol!
-            if (v.isPolice && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 6.0) {
+            // Coherent VCPD Cruiser & Crime-Scene Getaway Car Recovery: if an intact police cruiser or bandit car is left driverless on the street after a chase,
+            // a nearby VCPD relief officer walks from the nearest sidewalk, climbs into the vehicle, and drives it away!
+            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 6.0) {
                 const hasReturningCop = this.peds.some(
                     (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || (!pd.inCombat && Math.hypot(pd.x - v.x, pd.y - v.y) < 380))
                 );
@@ -9817,6 +9817,7 @@ class LeonidaGame {
                             (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(sx, sy, 10, cz).hit)
                         ) {
                             const reliefCop = new Pedestrian({
+                                id: `rcop_${Date.now()}_${ca}`,
                                 x: sx,
                                 y: sy,
                                 z: cz,
@@ -12378,6 +12379,10 @@ class LeonidaGame {
 
                         this.vehicles = this.vehicles.filter((veh) => veh !== cv);
 
+                        if (this.net && typeof this.net.broadcastVehicleRemoved === "function" && cv.id) {
+                            this.net.broadcastVehicleRemoved(cv.id);
+                        }
+
                         cr.crushingVehicle = null;
 
                         cr.crushProgress = 0;
@@ -13149,9 +13154,14 @@ class LeonidaGame {
                             returnCar.driver = "AI_COP";
                             returnCar.wasCriminalCar = false;
                             returnCar.sirenActive = Boolean(this.wantedLevel > 0);
-                            returnCar._worldModified = true;
+                            returnCar._worldModified = false;
+                            returnCar.lastPlayerDriven = false;
                             returnCar.abandonedTimer = 0;
                             returnCar.doorOpenTimer = 0.44;
+                            if (this.net && typeof this.net.broadcastVehicleRemoved === "function" && returnCar.id) {
+                                // Clear any stale parked entry in server room.modifiedVehs now that a patrol officer is driving it away
+                                this.net.broadcastVehicleRemoved(returnCar.id);
+                            }
                             ped._boardedVehicle = true;
                             ped.dead = true;
                             continue;
@@ -13438,6 +13448,24 @@ class LeonidaGame {
 
                 ped.medicOutTimer = (ped.medicOutTimer || 0) + dt;
 
+                if (!ped.homeAmbulance || !this.vehicles.includes(ped.homeAmbulance)) {
+                    let bestAmb = null;
+                    let bestAmbDist = 820;
+                    for (const v of this.vehicles) {
+                        if (v && !v.destroyed && v.specKey === "MEDIC_AMBULANCE" && v.driver === "AI_EMERGENCY") {
+                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                            if (d < bestAmbDist) {
+                                bestAmbDist = d;
+                                bestAmb = v;
+                            }
+                        }
+                    }
+                    if (bestAmb) {
+                        ped.homeAmbulance = bestAmb;
+                        bestAmb.deployedMedic = ped;
+                    }
+                }
+
                 const amb = ped.homeAmbulance;
 
                 if (!amb || amb.destroyed || amb.driver !== "AI_EMERGENCY") {
@@ -13540,14 +13568,19 @@ class LeonidaGame {
                                 // Evacuate dead criminal / hostile body back to the ambulance instead of reviving them on the street!
                                 targetCorpse.revived = true;
                                 ped.carryingCorpse = targetCorpse;
-                                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
-                                    this.net.broadcastWorldEvent({
-                                        kind: "PED_REVIVE",
-                                        pedId: targetCorpse.id,
-                                        x: Math.round(targetCorpse.x),
-                                        y: Math.round(targetCorpse.y),
-                                        evacuated: true
-                                    });
+                                if (this.net) {
+                                    if (typeof this.net.broadcastCorpseCleared === "function") {
+                                        this.net.broadcastCorpseCleared(targetCorpse);
+                                    }
+                                    if (typeof this.net.broadcastWorldEvent === "function") {
+                                        this.net.broadcastWorldEvent({
+                                            kind: "PED_REVIVE",
+                                            pedId: targetCorpse.id,
+                                            x: Math.round(targetCorpse.x),
+                                            y: Math.round(targetCorpse.y),
+                                            evacuated: true
+                                        });
+                                    }
                                 }
                                 this.addFloatingText(targetCorpse.x, targetCorpse.y - 22, "🚑 EVACUATING CRIMINAL BODY!", "#38bdf8");
                             } else {
@@ -13570,14 +13603,19 @@ class LeonidaGame {
                                 targetCorpse.drownTimer = 0;
 
                                 targetCorpse.panicTimer = 4.0;
-                                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
-                                    this.net.broadcastWorldEvent({
-                                        kind: "PED_REVIVE",
-                                        pedId: targetCorpse.id,
-                                        x: Math.round(targetCorpse.x),
-                                        y: Math.round(targetCorpse.y),
-                                        evacuated: false
-                                    });
+                                if (this.net) {
+                                    if (typeof this.net.broadcastCorpseCleared === "function") {
+                                        this.net.broadcastCorpseCleared(targetCorpse);
+                                    }
+                                    if (typeof this.net.broadcastWorldEvent === "function") {
+                                        this.net.broadcastWorldEvent({
+                                            kind: "PED_REVIVE",
+                                            pedId: targetCorpse.id,
+                                            x: Math.round(targetCorpse.x),
+                                            y: Math.round(targetCorpse.y),
+                                            evacuated: false
+                                        });
+                                    }
                                 }
 
                                 for (let k = 0; k < 5; k++) {
@@ -13737,6 +13775,24 @@ class LeonidaGame {
                 // On-Foot VCFD Firefighter AI: Advances from parked Fire Engine with high-pressure hose nozzle to extinguish burning vehicles, wrecks & burning peds!
 
                 ped.firemanOutTimer = (ped.firemanOutTimer || 0) + dt;
+
+                if (!ped.homeFireTruck || !this.vehicles.includes(ped.homeFireTruck)) {
+                    let bestFt = null;
+                    let bestFtDist = 820;
+                    for (const v of this.vehicles) {
+                        if (v && !v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
+                            const d = Math.hypot(v.x - ped.x, v.y - ped.y);
+                            if (d < bestFtDist) {
+                                bestFtDist = d;
+                                bestFt = v;
+                            }
+                        }
+                    }
+                    if (bestFt) {
+                        ped.homeFireTruck = bestFt;
+                        bestFt.deployedFireman = ped;
+                    }
+                }
 
                 const ft = ped.homeFireTruck;
 

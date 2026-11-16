@@ -7660,6 +7660,7 @@ class WorldObjectEngine {
                 if (Math.abs(hx - px) <= 16 && Math.abs(hy - py) <= 16) {
                     sp.broken = true;
                     sp._persistedSmash = true;
+                    sp.ang = ang;
                     sp.x = hx + Math.cos(ang) * 18;
                     sp.y = hy + Math.sin(ang) * 18;
                     sp.z = 2.0;
