@@ -58,6 +58,10 @@ class ViceNetworkManager {
         this.serverRoomCounts = null;
         this._wsReconnectTimer = null;
         this._pendingServerWorldSnapshot = null;
+        this._pendingPropSync = [];
+        this._pendingProfileSync = undefined;
+        this._serverBootstrapApplied = false;
+        this._profileSynced = false;
         this.bc = null;
         this.dirBc = null;
         this.directoryPeers = new Map(); // playerId -> { room, bots, lastSeen }
@@ -160,6 +164,7 @@ class ViceNetworkManager {
             const scheduleReconnect = () => {
                 if (this.ws !== ws) return;
                 this.wsConnected = false;
+                this._serverBootstrapApplied = false;
                 this.serverRoomCounts = null;
                 this.ws = null;
                 if (this.wsUrl) {
@@ -185,7 +190,6 @@ class ViceNetworkManager {
                 "#39ff14",
                 true
             );
-            this.broadcastStateNow();
             return;
         }
         if (pkt.t === "DIR_COUNTS" && pkt.counts) {
@@ -201,14 +205,102 @@ class ViceNetworkManager {
             }
             return;
         }
-        if (pkt.t === "PROFILE_SYNC" && pkt.profile && this.game) {
-            const prof = pkt.profile;
-            if (typeof prof.cash === "number" && prof.cash > (this.game.cash || 0)) {
-                this.game.cash = prof.cash;
+        if (pkt.t === "PROP_SYNC" && Array.isArray(pkt.props)) {
+            for (const pr of pkt.props) {
+                this._pendingPropSync.push(pr);
             }
+            this.flushPendingPropSync();
+            return;
+        }
+        if (pkt.t === "PROFILE_SYNC") {
+            this._pendingProfileSync = pkt.profile || null;
+            this.tryApplyPendingProfileSync();
             return;
         }
         this.handlePacket(pkt);
+    }
+
+    flushPendingPropSync() {
+        if (!this._pendingPropSync || this._pendingPropSync.length === 0) return;
+        if (!this.game || !this.game.map || !this.game.map.cmpLoaded) return;
+        const oe = this.game.map.objectEngine;
+        if (!oe || typeof oe.applySmashedProp !== "function") return;
+        const list = this._pendingPropSync.splice(0, this._pendingPropSync.length);
+        for (const item of list) {
+            oe.applySmashedProp(item);
+        }
+    }
+
+    tryApplyPendingProfileSync() {
+        if (this._pendingProfileSync === undefined) return;
+        if (!this.game || !this.game.started || !this.game.map || !this.game.map.cmpLoaded) return;
+        const prof = this._pendingProfileSync;
+        this._pendingProfileSync = undefined;
+        this._profileSynced = true;
+        if (!prof || typeof prof !== "object") {
+            this.broadcastStateNow();
+            return;
+        }
+        const g = this.game;
+        const p = g.player;
+        if (!p) return;
+
+        if (typeof prof.cash === "number" && prof.cash > (g.cash || 0)) {
+            g.cash = prof.cash;
+            if (typeof g.score === "number" && prof.cash > g.score) g.score = prof.cash;
+        }
+        if (!prof.dead && typeof prof.hp === "number" && prof.hp > 0) {
+            p.hp = Math.min(p.maxHp || 100, prof.hp);
+        }
+        if (typeof prof.armor === "number") {
+            p.armor = Math.min(p.maxArmor || 100, Math.max(p.armor || 0, prof.armor));
+        }
+        if (Array.isArray(prof.weaponsOwned) && prof.weaponsOwned.length > 0) {
+            for (const w of prof.weaponsOwned) {
+                if (w && !p.weaponsOwned.includes(w)) {
+                    p.weaponsOwned.push(w);
+                }
+            }
+        }
+        if (prof.ammo && typeof prof.ammo === "object" && p.ammo) {
+            for (const [wk, av] of Object.entries(prof.ammo)) {
+                if (wk !== "FIST" && typeof av === "number" && av > (p.ammo[wk] || 0)) {
+                    p.ammo[wk] = av;
+                }
+            }
+        }
+        if (prof.weapon && p.weaponsOwned.includes(prof.weapon)) {
+            p.weapon = prof.weapon;
+        }
+        if (typeof prof.kills === "number" && prof.kills > this.kills) {
+            this.kills = prof.kills;
+        }
+        if (!prof.dead && typeof prof.x === "number" && typeof prof.y === "number" && prof.x > 128 && prof.y > 128) {
+            const isWater = g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(prof.x, prof.y);
+            if (!isWater || prof.inVehId) {
+                p.x = prof.x;
+                p.y = prof.y;
+                p.z = typeof prof.z === "number" ? prof.z : 2.0;
+                if (typeof prof.a === "number") p.angle = prof.a;
+                g.cameraX = p.x;
+                g.cameraY = p.y;
+            }
+        }
+        if (prof.inVehId && Array.isArray(g.vehicles) && !p.inVehicle) {
+            const v = g.vehicles.find((veh) => veh.id === prof.inVehId && !veh.destroyed);
+            if (v && Math.hypot(v.x - p.x, v.y - p.y) < 180 && v.driver !== "REMOTE") {
+                p.inVehicle = v;
+                p.seatIndex = 0;
+                v.driver = "PLAYER";
+                v._worldModified = true;
+                v.isStaticParked = false;
+            }
+        }
+        if (typeof g.updateHud === "function") g.updateHud();
+        if (typeof g.addFloatingText === "function") {
+            g.addFloatingText(p.x, p.y - 42, "💾 PERSISTENT PROFILE RESTORED!", "#39ff14");
+        }
+        this.broadcastStateNow();
     }
 
     /* ========================================================================
@@ -522,11 +614,24 @@ class ViceNetworkManager {
             this.playerColor = color;
         }
         const cleanRoom = String(roomCode || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+        this._profileSynced = false;
         if (cleanRoom && cleanRoom !== this.roomCode) {
             this.roomCode = cleanRoom;
             this.remotePlayers.clear();
             if (this.chatRoomBadge) {
                 this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
+            }
+            if (this.wsConnected && this.ws) {
+                try {
+                    this.ws.send(JSON.stringify({
+                        t: "SWITCH_ROOM",
+                        id: this.playerId,
+                        name: this.playerName,
+                        color: this.playerColor,
+                        pedType: this.pedSpriteType,
+                        room: this.roomCode
+                    }));
+                } catch (_e) {}
             }
             this.initBroadcastChannel();
             this.claimRoomSlot(0);
@@ -538,7 +643,10 @@ class ViceNetworkManager {
                 color: this.playerColor,
                 pedType: this.pedSpriteType
             });
-            this.broadcastStateNow();
+            if (!this.wsConnected) {
+                this._profileSynced = true;
+                this.broadcastStateNow();
+            }
         }
         // Replace initial startup system line if no player messages have been sent yet
         if (
@@ -1178,6 +1286,8 @@ class ViceNetworkManager {
             const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
             if (v) {
                 v.doorOpenTimer = 0.48;
+                v._worldModified = true;
+                v.isStaticParked = false;
                 const localIsDriver = this.game.player.inVehicle === v && (this.game.player.seatIndex || 0) === 0;
                 if (rSeat === 0 && !localIsDriver) {
                     v.driver = null;
@@ -1193,9 +1303,16 @@ class ViceNetworkManager {
             }
         } else if (pkt.kind === "VEH_EXPLODE" && pkt.vehId) {
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
-            if (v && !v.destroyed) {
-                this.game.explodeVehicle(v, false, true);
+            if (v) {
+                v._worldModified = true;
+                v.isStaticParked = false;
+                if (!v.destroyed) {
+                    this.game.explodeVehicle(v, false, true);
+                }
             }
+        } else if (pkt.kind === "PROP_SMASH" && pkt.pType) {
+            this._pendingPropSync.push(pkt);
+            this.flushPendingPropSync();
         } else if (pkt.kind === "PED_KILL" && pkt.pedId) {
             const ped = this.game.peds.find((pd) => pd.id === pkt.pedId);
             if (ped && !ped.dead) {
@@ -1221,6 +1338,20 @@ class ViceNetworkManager {
         const vehs = [];
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
+            const isMod = Boolean(
+                v._worldModified ||
+                v.lastPlayerDriven ||
+                v.destroyed ||
+                v.frontDented ||
+                v.rearDented ||
+                v.heavyDented ||
+                v.driver === "PLAYER" ||
+                v.driver === "REMOTE"
+            );
+            // Skip untouched static curb-parked cars so the 200-vehicle sync budget is reserved for modified cars & active traffic
+            if (!isMod && v.isCurbParked && v.isStaticParked && !v.driver) {
+                continue;
+            }
             const flags =
                 (v.destroyed ? 1 : 0) |
                 (v.sirenActive ? 2 : 0) |
@@ -1242,7 +1373,8 @@ class ViceNetworkManager {
                 Math.round(v.hp || 0),
                 flags,
                 v.remapIdx || 0,
-                v.missionTag || 0
+                v.missionTag || 0,
+                isMod ? 1 : 0
             ]);
         }
 
@@ -1296,10 +1428,12 @@ class ViceNetworkManager {
     applyWorldSync(pkt) {
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded || !pkt) return;
         this.lastWorldSyncReceivedMs = performance.now();
+        const isInitialServerBootstrap = (pkt.id === "server_world");
+        if (isInitialServerBootstrap) {
+            this._serverBootstrapApplied = true;
+        }
         const g = this.game;
 
-        // Never overwrite local g.worldMinutes from remote WORLD_SYNC packets so each player
-        // freely controls their own Day/Night mode ([N] / smartphone toggle) without being locked in night mode by a peer!
         if (typeof pkt.tl === "number") {
             g.trafficLightTimer = pkt.tl;
         }
@@ -1322,7 +1456,7 @@ class ViceNetworkManager {
 
             for (const row of pkt.vehs) {
                 if (!Array.isArray(row) || row.length < 11) continue;
-                let [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag] = row;
+                let [id, specKey, x, y, z, a, vx, vy, drvCode, hp, flags, remapIdx, missionTag, isMod] = row;
                 if (g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(x, y) && specKey !== "AIRBOAT" && specKey !== "SPEEDBOAT" && specKey !== "JETSKI" && specKey !== "YACHT" && specKey !== "SWAMP_BOAT") {
                     continue;
                 }
@@ -1339,7 +1473,8 @@ class ViceNetworkManager {
                     }
                 }
                 seenIds.add(id);
-                if (typeof id === "string" && (id.startsWith("curb_park_") || id === "armored_vice_port" || id === "parked_35") && drvCode === 0 && !(flags & 1)) {
+                // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
+                if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id === "armored_vice_port" || id === "parked_35") && drvCode === 0 && !(flags & 1)) {
                     continue;
                 }
                 let v = existingById.get(id);
@@ -1361,11 +1496,23 @@ class ViceNetworkManager {
                     g.vehicles.push(v);
                 }
 
+                if (isMod) {
+                    v._worldModified = true;
+                    v.isStaticParked = false;
+                }
+
                 // Never overwrite the vehicle currently driven by the local player or linked to a 20Hz remote player
                 if (g.player.inVehicle === v || v._linkedRemoteId) {
                     continue;
                 }
 
+                // On initial server bootstrap or parked modified cars, snap directly to persisted coordinates!
+                if (isInitialServerBootstrap || (isMod && drvCode === 0) || Math.hypot((v.x || 0) - x, (v.y || 0) - y) > 260) {
+                    v.x = x;
+                    v.y = y;
+                    v.z = z;
+                    v.angle = a;
+                }
                 v.netTargetX = x;
                 v.netTargetY = y;
                 v.netTargetZ = z;
@@ -1390,10 +1537,13 @@ class ViceNetworkManager {
                 if (flags & 64) v.aiPanicTimer = Math.max(v.aiPanicTimer || 0, 1.0);
             }
 
-            for (let i = g.vehicles.length - 1; i >= 0; i--) {
-                const v = g.vehicles[i];
-                if (!seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId && !(v.isCurbParked && v.isStaticParked)) {
-                    g.vehicles.splice(i, 1);
+            if (!isInitialServerBootstrap) {
+                for (let i = g.vehicles.length - 1; i >= 0; i--) {
+                    const v = g.vehicles[i];
+                    const isDynamicTraffic = typeof v.id === "string" && (v.id.startsWith("traf_") || v.id.startsWith("cop_"));
+                    if (isDynamicTraffic && !seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId && !v._worldModified) {
+                        g.vehicles.splice(i, 1);
+                    }
                 }
             }
         }
@@ -1538,21 +1688,23 @@ class ViceNetworkManager {
         // 3. Check bumper-to-bumper collisions between remote player vehicles and local player/vehicles
         this.checkRemoteVehicleInteractions(dt);
 
-        // Apply deferred initial world snapshot from persistent server once local map & initial vehicles finish loading
+        // Apply deferred initial world snapshot, smashed props, and player profile once local map finishes loading
         if (this._pendingServerWorldSnapshot && this.game.map && this.game.map.cmpLoaded && this.game.vehicles && this.game.vehicles.length > 0) {
             const snap = this._pendingServerWorldSnapshot;
             this._pendingServerWorldSnapshot = null;
             this.applyWorldSync(snap);
         }
+        this.flushPendingPropSync();
+        this.tryApplyPendingProfileSync();
 
-        // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (or 1 Hz when solo on Persistent Server) & Server Directory Heartbeat
+        // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (or 1.5s when solo on Persistent Server) & Server Directory Heartbeat
         this.syncAccumulator += dt;
         if (this.syncAccumulator >= this.syncInterval) {
             this.syncAccumulator = 0;
             this.broadcastStateNow();
         }
         const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
-        if (this.isWorldHost() && (hasRemoteHumans || this.wsConnected)) {
+        if (this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
             this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
             const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 1.5;
             if (this.worldSyncAccumulator >= targetWorldInterval) {
@@ -1584,6 +1736,7 @@ class ViceNetworkManager {
                 w: v.w || 48,
                 h: v.h || 24,
                 speed: Math.round(v.speed || 0),
+                hp: Math.round(v.hp || 100),
                 siren: Boolean(v.sirenActive),
                 isEmerg: Boolean(v.isEmergency),
                 isMoto: Boolean(v.isMotorcycle),
@@ -1596,6 +1749,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "STATE",
+            started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             name: this.playerName,
             color: this.playerColor,
             pedType: this.pedSpriteType,
@@ -1611,6 +1765,15 @@ class ViceNetworkManager {
             ar: Math.round(p.armor || 0),
             dead: Boolean(p.dead),
             wep: p.weapon || "FIST",
+            weps: Array.isArray(p.weaponsOwned) ? p.weaponsOwned : ["FIST", "PISTOL"],
+            ammo: p.ammo ? {
+                PISTOL: p.ammo.PISTOL || 0,
+                UZI: p.ammo.UZI || 0,
+                SHOTGUN: p.ammo.SHOTGUN || 0,
+                FLAMETHROWER: p.ammo.FLAMETHROWER || 0,
+                ROCKET: p.ammo.ROCKET || 0,
+                ELECTRO: p.ammo.ELECTRO || 0
+            } : null,
             mov: Boolean(p.isMoving),
             run: Boolean(this.game.input && this.game.input.sprint),
             wp: Math.round((p.walkPhase || 0) * 100) / 100,

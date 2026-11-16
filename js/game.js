@@ -5646,15 +5646,28 @@ class LeonidaGame {
 
             p.angle = v.angle + (mySeat % 2 === 1 ? -Math.PI * 0.5 : Math.PI * 0.5);
 
+            v._worldModified = true;
+            v.isStaticParked = false;
+            v.lastPlayerDriven = true;
+
             if (this.net) {
 
                 if (typeof this.net.broadcastWorldEvent === "function") {
+
+                    const vFlags =
+                        (v.destroyed ? 1 : 0) |
+                        (v.sirenActive ? 2 : 0) |
+                        (v.frontDented ? 4 : 0) |
+                        (v.rearDented ? 8 : 0) |
+                        (v.heavyDented ? 16 : 0);
 
                     this.net.broadcastWorldEvent({
 
                         kind: "VEH_EXIT",
 
                         vehId: v.id,
+
+                        specKey: v.specKey || "STALLION",
 
                         seat: mySeat,
 
@@ -5664,7 +5677,13 @@ class LeonidaGame {
 
                         z: Math.round((v.z || 2.0) * 100) / 100,
 
-                        a: Math.round((v.angle || 0) * 1000) / 1000
+                        a: Math.round((v.angle || 0) * 1000) / 1000,
+
+                        hp: Math.round(v.hp || 100),
+
+                        flags: vFlags,
+
+                        remapIdx: v.remapIdx || 0
 
                     });
 
@@ -5931,6 +5950,10 @@ class LeonidaGame {
 
 
 
+        closest._worldModified = true;
+        closest.isStaticParked = false;
+        closest.lastPlayerDriven = true;
+
         if (this.net) {
 
             if (typeof this.net.broadcastWorldEvent === "function") {
@@ -5940,6 +5963,8 @@ class LeonidaGame {
                     kind: "VEH_ENTER",
 
                     vehId: closest.id,
+
+                    specKey: closest.specKey || "STALLION",
 
                     seat: freeSeat,
 
@@ -8071,6 +8096,9 @@ class LeonidaGame {
         const isBicycle = (v.specKey === "BMX_BIKE");
         const isScooter = (v.specKey === "E_SCOOTER");
 
+        v._worldModified = true;
+        v.isStaticParked = false;
+
         if (!fromNetwork && this.net && typeof this.net.broadcastWorldEvent === "function") {
 
             this.net.broadcastWorldEvent({
@@ -8079,9 +8107,17 @@ class LeonidaGame {
 
                 vehId: v.id,
 
+                specKey: v.specKey || "STALLION",
+
                 x: Math.round(v.x),
 
-                y: Math.round(v.y)
+                y: Math.round(v.y),
+
+                z: Math.round((v.z || 2.0) * 100) / 100,
+
+                a: Math.round((v.angle || 0) * 1000) / 1000,
+
+                remapIdx: v.remapIdx || 0
 
             });
 

@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 /**
  * ============================================================================
- * VICE CITY 26 — PERSISTENT DEDICATED WORLD SERVER (Hostinger KVM2 / Node.js)
- * Zero external npm dependencies required (uses native Node.js http + crypto
- * RFC-6455 WebSocket implementation + atomic disk persistence).
- *
- * Features:
- * - 24/7 Persistent World State per Room (VICE97, MIAMI86, KEYS305):
- *   - Persists moved, parked, damaged & destroyed vehicles across sessions
- *   - Persists All-Time Best Scores Leaderboard (Top 25)
- *   - Persists last 30 Chat Messages per room
- *   - Persists Player Profiles (cash, weapon, armor, kills, last position)
- * - Real-time 20Hz Player Pose Relay & 10Hz World Sync
- * - Live Cross-Room Directory Counts (VICE97 / MIAMI86 / KEYS305)
- * - HTTP Status & Leaderboard API: GET /status , GET /health
+ * VICE CITY 26 — PERSISTENT DEDICATED WORLD SERVER v2 (Hostinger KVM2)
+ * True 24/7 World & Player Persistence:
+ * - Permanent Modified/Parked/Damaged/Destroyed Vehicles (`modifiedVehs`)
+ *   that are NEVER overwritten by a fresh client's default map reset!
+ * - Permanent Smashed Street Props (`smashedProps`: streetlamps, traffic lights,
+ *   bollards, hydrants, payphones, benches)
+ * - Full Player Profile Persistence by Nickname (`profiles`: x, y, z, angle,
+ *   cash, hp, armor, weapon, weaponsOwned, ammo, kills, inVehId)
+ * - All-Time Best Scores Leaderboard & Room Chat History
  * ============================================================================
  */
 
@@ -31,28 +27,41 @@ if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-/* ============================================================================
-   1. PERSISTENT WORLD STATE STORE (RAM + ATOMIC JSON SNAPSHOT ON DISK)
-   ============================================================================ */
 const ROOM_CODES = ["VICE97", "MIAMI86", "KEYS305"];
+
+function createEmptyRoom() {
+    return {
+        vehs: {},          // Live AI traffic vehicles
+        modifiedVehs: {},  // Player-driven, moved, parked, damaged, or wrecked vehicles (NEVER overwritten by default map!)
+        smashedProps: {},  // Knocked-down streetlamps, traffic lights, bollards, hydrants, benches
+        chat: [],
+        trafficLightTimer: 0,
+        updatedAt: 0
+    };
+}
 
 const persistentStore = {
     updatedAt: new Date().toISOString(),
     leaderboard: [],
-    profiles: {}, // profileKey -> { name, charId, cash, weapon, armor, kills, x, y, z, updatedAt }
+    profiles: {},
     rooms: {
-        VICE97: { vehs: {}, chat: [], trafficLightTimer: 0, updatedAt: 0 },
-        MIAMI86: { vehs: {}, chat: [], trafficLightTimer: 0, updatedAt: 0 },
-        KEYS305: { vehs: {}, chat: [], trafficLightTimer: 0, updatedAt: 0 }
+        VICE97: createEmptyRoom(),
+        MIAMI86: createEmptyRoom(),
+        KEYS305: createEmptyRoom()
     }
 };
 
 function ensureRoom(roomCode) {
     const code = String(roomCode || "VICE97").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE97";
     if (!persistentStore.rooms[code]) {
-        persistentStore.rooms[code] = { vehs: {}, chat: [], trafficLightTimer: 0, updatedAt: 0 };
+        persistentStore.rooms[code] = createEmptyRoom();
     }
-    return { code, room: persistentStore.rooms[code] };
+    const r = persistentStore.rooms[code];
+    if (!r.modifiedVehs) r.modifiedVehs = {};
+    if (!r.smashedProps) r.smashedProps = {};
+    if (!r.vehs) r.vehs = {};
+    if (!Array.isArray(r.chat)) r.chat = [];
+    return { code, room: r };
 }
 
 function loadPersistentState() {
@@ -72,6 +81,8 @@ function loadPersistentState() {
                         if (rv && typeof rv === "object") {
                             persistentStore.rooms[rk] = {
                                 vehs: (rv.vehs && typeof rv.vehs === "object") ? rv.vehs : {},
+                                modifiedVehs: (rv.modifiedVehs && typeof rv.modifiedVehs === "object") ? rv.modifiedVehs : {},
+                                smashedProps: (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {},
                                 chat: Array.isArray(rv.chat) ? rv.chat.slice(-30) : [],
                                 trafficLightTimer: Number(rv.trafficLightTimer) || 0,
                                 updatedAt: Number(rv.updatedAt) || 0
@@ -134,12 +145,12 @@ function mergeLeaderboardEntry(name, charId, score, color) {
 }
 
 loadPersistentState();
-setInterval(savePersistentStateNow, 5000);
+setInterval(savePersistentStateNow, 4000);
 
 /* ============================================================================
    2. NATIVE RFC-6455 WEBSOCKET PROTOCOL ENCODER / DECODER
    ============================================================================ */
-const clients = new Map(); // socket -> clientMeta
+const clients = new Map();
 
 function encodeWsFrame(payloadStr) {
     const payload = Buffer.from(payloadStr, "utf8");
@@ -147,7 +158,7 @@ function encodeWsFrame(payloadStr) {
     let header;
     if (len < 126) {
         header = Buffer.alloc(2);
-        header[0] = 0x81; // FIN + text frame
+        header[0] = 0x81;
         header[1] = len;
     } else if (len < 65536) {
         header = Buffer.alloc(4);
@@ -166,8 +177,7 @@ function encodeWsFrame(payloadStr) {
 function sendJson(socket, obj) {
     if (!socket || socket.destroyed || !socket.writable) return;
     try {
-        const frame = encodeWsFrame(JSON.stringify(obj));
-        socket.write(frame);
+        socket.write(encodeWsFrame(JSON.stringify(obj)));
     } catch (_e) {}
 }
 
@@ -176,9 +186,7 @@ function broadcastToRoom(roomCode, obj, excludeSocket = null) {
     for (const [sock, meta] of clients.entries()) {
         if (sock === excludeSocket || sock.destroyed || !sock.writable) continue;
         if (meta.room === roomCode) {
-            try {
-                sock.write(frame);
-            } catch (_e) {}
+            try { sock.write(frame); } catch (_e) {}
         }
     }
 }
@@ -190,8 +198,7 @@ function broadcastDirectoryCounts() {
         const r = meta.room || "VICE97";
         counts[r] = (counts[r] || 0) + 1 + (meta.bots || 0);
     }
-    const pkt = { t: "DIR_COUNTS", counts };
-    const frame = encodeWsFrame(JSON.stringify(pkt));
+    const frame = encodeWsFrame(JSON.stringify({ t: "DIR_COUNTS", counts }));
     for (const [sock] of clients.entries()) {
         if (!sock.destroyed && sock.writable) {
             try { sock.write(frame); } catch (_e) {}
@@ -199,9 +206,6 @@ function broadcastDirectoryCounts() {
     }
 }
 
-/* ============================================================================
-   3. WORLD SIMULATION & PACKET HANDLER
-   ============================================================================ */
 function assignRoomSlot(roomCode, excludeSocket = null) {
     const used = new Set();
     for (const [sock, meta] of clients.entries()) {
@@ -215,10 +219,15 @@ function assignRoomSlot(roomCode, excludeSocket = null) {
     return 0;
 }
 
+function getCombinedRoomVehicles(room) {
+    const merged = Object.assign({}, room.vehs || {}, room.modifiedVehs || {});
+    return Object.values(merged);
+}
+
 function sendRoomBootstrap(socket, meta) {
     const { code, room } = ensureRoom(meta.room);
 
-    // 1. Send assigned deterministic slot + live server counts
+    // 1. Welcome + Slot
     sendJson(socket, {
         t: "WELCOME",
         slot: meta.slot,
@@ -226,7 +235,7 @@ function sendRoomBootstrap(socket, meta) {
         online: Array.from(clients.values()).filter((m) => m.room === code).length
     });
 
-    // 2. Send persisted All-Time High Scores
+    // 2. Leaderboard
     if (persistentStore.leaderboard.length > 0) {
         sendJson(socket, {
             t: "LEADERBOARD_SYNC",
@@ -234,7 +243,7 @@ function sendRoomBootstrap(socket, meta) {
         });
     }
 
-    // 3. Send recent chat history for this room
+    // 3. Chat History
     if (Array.isArray(room.chat) && room.chat.length > 0) {
         sendJson(socket, {
             t: "CHAT_HISTORY",
@@ -242,26 +251,33 @@ function sendRoomBootstrap(socket, meta) {
         });
     }
 
-    // 4. Send persisted World Vehicles snapshot for this room if available
-    const vehRows = Object.values(room.vehs || {});
-    if (vehRows.length > 0) {
+    // 4. Persisted World Vehicles (Modified/Parked/Wrecked + Active Traffic)
+    const vehRows = getCombinedRoomVehicles(room);
+    sendJson(socket, {
+        t: "WORLD_SYNC",
+        id: "server_world",
+        tl: room.trafficLightTimer || 0,
+        vehs: vehRows
+    });
+
+    // 5. Persisted Smashed Street Props (Streetlamps, Traffic Signals, Bollards, Hydrants, Benches)
+    const propList = Object.values(room.smashedProps || {});
+    if (propList.length > 0) {
         sendJson(socket, {
-            t: "WORLD_SYNC",
-            id: "server_world",
-            tl: room.trafficLightTimer || 0,
-            vehs: vehRows
+            t: "PROP_SYNC",
+            props: propList
         });
     }
 
-    // 5. Send saved player profile if matching playerName / profileKey exists
-    if (meta.profileKey && persistentStore.profiles[meta.profileKey]) {
-        sendJson(socket, {
-            t: "PROFILE_SYNC",
-            profile: persistentStore.profiles[meta.profileKey]
-        });
-    }
+    // 6. Saved Player Profile (always send PROFILE_SYNC even if null so client unlocks profile saving!)
+    const prof = (meta.profileKey && persistentStore.profiles[meta.profileKey]) || null;
+    sendJson(socket, {
+        t: "PROFILE_SYNC",
+        profileKey: meta.profileKey,
+        profile: prof
+    });
 
-    // 6. Send current active players in the same room immediately
+    // 7. Current active players in the room
     for (const [otherSock, otherMeta] of clients.entries()) {
         if (otherSock !== socket && otherMeta.room === code && otherMeta.lastState) {
             sendJson(socket, otherMeta.lastState);
@@ -282,7 +298,6 @@ function handleClientPacket(socket, pkt) {
     if (pkt.color) meta.color = String(pkt.color).slice(0, 16);
     if (pkt.pedType) meta.pedType = String(pkt.pedType).slice(0, 16);
 
-    // Room switch or initial join
     if (pkt.t === "SWITCH_ROOM" && pkt.room) {
         const prevRoom = meta.room;
         const { code } = ensureRoom(pkt.room);
@@ -321,35 +336,45 @@ function handleClientPacket(socket, pkt) {
         meta.lastState = pkt;
         meta.lastSeen = Date.now();
 
-        // Persist player profile & high score
         if (typeof pkt.sc === "number" && pkt.sc > 0) {
             mergeLeaderboardEntry(meta.name, pkt.charId || "LUCIA", pkt.sc, meta.color);
         }
-        if (meta.profileKey && typeof pkt.x === "number" && typeof pkt.y === "number") {
+
+        // Only overwrite saved player profile when the player has actually started playing & synced!
+        if (pkt.started && meta.profileKey && typeof pkt.x === "number" && typeof pkt.y === "number") {
             persistentStore.profiles[meta.profileKey] = {
                 name: meta.name,
                 charId: pkt.charId || "LUCIA",
+                pedType: pkt.pedType || meta.pedType || "lucia",
+                color: pkt.color || meta.color || "#00f0ff",
                 cash: Math.round(pkt.sc || 0),
-                weapon: pkt.wep || "PISTOL",
+                hp: Math.round(pkt.hp !== undefined ? pkt.hp : 100),
                 armor: Math.round(pkt.ar || 0),
+                dead: Boolean(pkt.dead),
+                weapon: pkt.wep || "PISTOL",
+                weaponsOwned: Array.isArray(pkt.weps) ? pkt.weps.slice(0, 12) : ["FIST", "PISTOL"],
+                ammo: (pkt.ammo && typeof pkt.ammo === "object") ? pkt.ammo : null,
                 kills: Math.round(pkt.k || 0),
+                wl: Math.round(pkt.wl || 0),
                 x: Math.round(pkt.x),
                 y: Math.round(pkt.y),
                 z: Number(pkt.z) || 2.0,
+                a: Number(pkt.a) || 0,
+                inVehId: (pkt.veh && pkt.veh.id) ? pkt.veh.id : null,
                 updatedAt: Date.now()
             };
             isDirty = true;
         }
 
-        // If player is driving a vehicle, update that vehicle's persistent pose in the room store!
-        if (pkt.veh && pkt.veh.id && typeof pkt.x === "number" && typeof pkt.y === "number") {
+        // If player is driving a vehicle, persist its pose in room.modifiedVehs!
+        if (pkt.started && pkt.veh && pkt.veh.id && typeof pkt.x === "number" && typeof pkt.y === "number") {
             const v = pkt.veh;
             const flags =
                 (v.siren ? 2 : 0) |
                 (v.fDent ? 4 : 0) |
                 (v.rDent ? 8 : 0) |
                 (v.hDent ? 16 : 0);
-            room.vehs[v.id] = [
+            const row = [
                 v.id,
                 v.specKey || "STALLION",
                 Math.round(pkt.x),
@@ -358,12 +383,15 @@ function handleClientPacket(socket, pkt) {
                 Math.round((pkt.a || 0) * 1000) / 1000,
                 Math.round(pkt.vx || 0),
                 Math.round(pkt.vy || 0),
-                4, // PLAYER / REMOTE driven
-                100,
+                4, // Driven
+                Math.round(v.hp || 100),
                 flags,
                 v.remapIdx || 0,
-                0
+                0,
+                1 // mod = 1 (persisted player-modified vehicle)
             ];
+            room.modifiedVehs[v.id] = row;
+            room.vehs[v.id] = row;
             isDirty = true;
         }
 
@@ -376,25 +404,58 @@ function handleClientPacket(socket, pkt) {
             room.trafficLightTimer = pkt.tl;
         }
         room.updatedAt = Date.now();
-        // Update room's persistent vehicle map (cap at 180 active vehicles per room)
         const nextVehs = {};
-        const maxVehs = Math.min(pkt.vehs.length, 180);
+        const maxVehs = Math.min(pkt.vehs.length, 200);
         for (let i = 0; i < maxVehs; i++) {
             const row = pkt.vehs[i];
-            if (Array.isArray(row) && row[0]) {
-                nextVehs[row[0]] = row;
+            if (!Array.isArray(row) || !row[0]) continue;
+            const vid = row[0];
+            const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
+            if (isMod) {
+                row[13] = 1;
+                room.modifiedVehs[vid] = row;
+                nextVehs[vid] = row;
+            } else if (!room.modifiedVehs[vid]) {
+                // Only update unmodified traffic/parked row if this vehicle was NOT modified in room.modifiedVehs!
+                nextVehs[vid] = row;
+            } else {
+                // Preserve the persisted modified vehicle!
+                nextVehs[vid] = room.modifiedVehs[vid];
             }
+        }
+        // Keep all modifiedVehs (capped at 120 most recent) so parked/wrecked cars across the city never vanish!
+        const modKeys = Object.keys(room.modifiedVehs);
+        if (modKeys.length > 120) {
+            delete room.modifiedVehs[modKeys[0]];
         }
         room.vehs = nextVehs;
         isDirty = true;
+
+        // Broadcast the authoritative merged vehicle list to other players in the room
+        pkt.vehs = getCombinedRoomVehicles(room);
         broadcastToRoom(roomCode, pkt, socket);
         return;
     }
 
     if (pkt.t === "WORLD_EVENT") {
-        // Persist vehicle exit position or explosion state immediately in room store
-        if (pkt.kind === "VEH_EXIT" && pkt.vehId && room.vehs[pkt.vehId]) {
-            const row = room.vehs[pkt.vehId];
+        if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
+            const existing = room.modifiedVehs[pkt.vehId] || room.vehs[pkt.vehId];
+            const row = existing ? existing.slice() : [
+                pkt.vehId,
+                pkt.specKey || "STALLION",
+                Math.round(pkt.x || 0),
+                Math.round(pkt.y || 0),
+                Math.round((pkt.z || 2.0) * 100) / 100,
+                Math.round((pkt.a || 0) * 1000) / 1000,
+                0,
+                0,
+                0,
+                Math.round(pkt.hp || 100),
+                pkt.flags || 0,
+                pkt.remapIdx || 0,
+                0,
+                1
+            ];
             if (typeof pkt.x === "number") row[2] = Math.round(pkt.x);
             if (typeof pkt.y === "number") row[3] = Math.round(pkt.y);
             if (typeof pkt.z === "number") row[4] = Math.round(pkt.z * 100) / 100;
@@ -402,11 +463,54 @@ function handleClientPacket(socket, pkt) {
             row[6] = 0;
             row[7] = 0;
             row[8] = 0; // Parked (no driver)
+            if (typeof pkt.hp === "number") row[9] = Math.round(pkt.hp);
+            if (typeof pkt.flags === "number") row[10] = pkt.flags;
+            row[13] = 1; // Permanent modified flag
+            room.modifiedVehs[pkt.vehId] = row;
+            room.vehs[pkt.vehId] = row;
             isDirty = true;
-        } else if (pkt.kind === "VEH_EXPLODE" && pkt.vehId && room.vehs[pkt.vehId]) {
-            const row = room.vehs[pkt.vehId];
-            row[9] = 0; // 0 HP
-            row[10] = (row[10] || 0) | 1; // destroyed flag
+        } else if (pkt.kind === "VEH_EXPLODE" && pkt.vehId) {
+            const existing = room.modifiedVehs[pkt.vehId] || room.vehs[pkt.vehId];
+            const row = existing ? existing.slice() : [
+                pkt.vehId,
+                pkt.specKey || "STALLION",
+                Math.round(pkt.x || 0),
+                Math.round(pkt.y || 0),
+                Math.round((pkt.z || 2.0) * 100) / 100,
+                Math.round((pkt.a || 0) * 1000) / 1000,
+                0,
+                0,
+                0,
+                0,
+                1,
+                pkt.remapIdx || 0,
+                0,
+                1
+            ];
+            if (typeof pkt.x === "number") row[2] = Math.round(pkt.x);
+            if (typeof pkt.y === "number") row[3] = Math.round(pkt.y);
+            row[6] = 0;
+            row[7] = 0;
+            row[8] = 0;
+            row[9] = 0;
+            row[10] = (row[10] || 0) | 1; // Destroyed flag
+            row[13] = 1;
+            room.modifiedVehs[pkt.vehId] = row;
+            room.vehs[pkt.vehId] = row;
+            isDirty = true;
+        } else if (pkt.kind === "PROP_SMASH" && pkt.pType && typeof pkt.x === "number" && typeof pkt.y === "number") {
+            const pKey = `${pkt.pType}_${Math.round(pkt.x)}_${Math.round(pkt.y)}`;
+            room.smashedProps[pKey] = {
+                pType: pkt.pType,
+                x: Math.round(pkt.x),
+                y: Math.round(pkt.y),
+                a: Number(pkt.a) || 0,
+                ts: Date.now()
+            };
+            const propKeys = Object.keys(room.smashedProps);
+            if (propKeys.length > 400) {
+                delete room.smashedProps[propKeys[0]];
+            }
             isDirty = true;
         }
         broadcastToRoom(roomCode, pkt, socket);
@@ -459,7 +563,6 @@ function handleClientPacket(socket, pkt) {
         return;
     }
 
-    // Relay all other real-time packets (SHOOT, EXPLODE, HORN, KILLED, NAME, LEAVE) to the room
     broadcastToRoom(roomCode, pkt, socket);
 }
 
@@ -482,14 +585,16 @@ const server = http.createServer((req, res) => {
         for (const [rk, rv] of Object.entries(persistentStore.rooms)) {
             roomSummary[rk] = {
                 playersOnline: Array.from(clients.values()).filter((m) => m.room === rk).length,
-                persistedVehicles: Object.keys(rv.vehs || {}).length,
+                persistedVehicles: Object.keys(Object.assign({}, rv.vehs || {}, rv.modifiedVehs || {})).length,
+                playerModifiedVehicles: Object.keys(rv.modifiedVehs || {}).length,
+                smashedPropsCount: Object.keys(rv.smashedProps || {}).length,
                 chatMessages: (rv.chat || []).length
             };
         }
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({
             ok: true,
-            service: "VICE CITY 26 — Persistent World Server",
+            service: "VICE CITY 26 — Persistent World Server v2",
             uptimeSec: Math.round(process.uptime()),
             totalPlayersOnline: clients.size,
             rooms: roomSummary,
@@ -523,7 +628,6 @@ server.on("upgrade", (req, socket) => {
     );
     socket.setNoDelay(true);
 
-    // Parse initial room from query string (?room=VICE97&id=...)
     let initRoom = "VICE97";
     let initId = `p_${Date.now().toString(36)}`;
     let initName = "PLAYER";
@@ -578,12 +682,10 @@ server.on("upgrade", (req, socket) => {
             if (rxBuf.length < totalFrameLen) return;
 
             if (opcode === 0x8) {
-                // Close frame
                 socket.end();
                 return;
             }
             if (opcode === 0x9) {
-                // Ping -> Pong
                 const pong = Buffer.from([0x8a, 0x00]);
                 try { socket.write(pong); } catch (_e) {}
                 rxBuf = rxBuf.subarray(totalFrameLen);
@@ -622,7 +724,6 @@ server.on("upgrade", (req, socket) => {
     socket.on("error", cleanup);
 });
 
-// Advance global traffic light timer on the server even when rooms are idle
 setInterval(() => {
     for (const rv of Object.values(persistentStore.rooms)) {
         rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 14.0;
@@ -640,7 +741,7 @@ process.on("SIGTERM", () => {
 
 server.listen(PORT, HOST, () => {
     console.log(`====================================================================`);
-    console.log(`🌴 VICE CITY 26 — PERSISTENT WORLD SERVER RUNNING`);
+    console.log(`🌴 VICE CITY 26 — PERSISTENT WORLD SERVER v2 RUNNING`);
     console.log(`🔗 WebSocket URL : ws://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
     console.log(`📊 Status URL    : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/status`);
     console.log(`💾 World DB File : ${STATE_FILE}`);

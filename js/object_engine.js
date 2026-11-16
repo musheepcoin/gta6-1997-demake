@@ -7113,7 +7113,7 @@ class WorldObjectEngine {
                     sp.vy *= dampXY;
                     sp.ang += sp.vang * dt;
                     sp.vang *= dampAng;
-                    if (sp.timer > 24.0 && Math.hypot(cx - sp.homeX, cy - sp.homeY) > 320) {
+                    if (!sp._persistedSmash && sp.timer > 24.0 && Math.hypot(cx - sp.homeX, cy - sp.homeY) > 320) {
                         sp.broken = false;
                         sp.damaged = false;
                         sp.tiltDx = 0;
@@ -7153,7 +7153,7 @@ class WorldObjectEngine {
                             sl.fallVy = 0;
                         }
                     }
-                    if (sl.timer > 30.0 && Math.hypot(cx - sl.baseX, cy - sl.baseY) > 360) {
+                    if (!sl._persistedSmash && sl.timer > 30.0 && Math.hypot(cx - sl.baseX, cy - sl.baseY) > 360) {
                         sl.state = 0;
                         sl.timer = 0;
                         sl.tiltDx = 0;
@@ -7175,7 +7175,7 @@ class WorldObjectEngine {
                 if (bl.hitCooldown > 0) bl.hitCooldown = Math.max(0, bl.hitCooldown - dt);
                 if (bl.state === 2) {
                     bl.knockdownTimer = (bl.knockdownTimer || 0) + dt;
-                    if (bl.knockdownTimer > 25.0 && Math.hypot((bl.x || 0) - cx, (bl.y || 0) - cy) > 320) {
+                    if (!bl._persistedSmash && bl.knockdownTimer > 25.0 && Math.hypot((bl.x || 0) - cx, (bl.y || 0) - cy) > 320) {
                         bl.state = 0;
                         bl.knockdownTimer = 0;
                     }
@@ -7195,6 +7195,7 @@ class WorldObjectEngine {
                     ts.timer = (ts.timer || 0) + dt;
                     if (ts.fallVx || ts.fallVy) {
                         ts.fallenX = (ts.fallenX ?? ts.baseX) + ts.fallVx * dt;
+                        sl_noop: ;
                         ts.fallenY = (ts.fallenY ?? ts.baseY) + ts.fallVy * dt;
                         ts.fallAngle = (ts.fallAngle || 0) + (ts.fallVang || 0) * dt;
                         ts.fallVx *= dampFall;
@@ -7205,7 +7206,7 @@ class WorldObjectEngine {
                             ts.fallVy = 0;
                         }
                     }
-                    if (ts.timer > 30.0 && Math.hypot(cx - ts.baseX, cy - ts.baseY) > 360) {
+                    if (!ts._persistedSmash && ts.timer > 30.0 && Math.hypot(cx - ts.baseX, cy - ts.baseY) > 360) {
                         ts.state = 0;
                         ts.timer = 0;
                         ts.tiltDx = 0;
@@ -7331,8 +7332,18 @@ class WorldObjectEngine {
                                 }
 
                                 sp.broken = true;
+                                sp._persistedSmash = true;
                                 sp.timer = 0;
                                 actSProps.add(sp);
+                                if (game.net && typeof game.net.broadcastWorldEvent === "function") {
+                                    game.net.broadcastWorldEvent({
+                                        kind: "PROP_SMASH",
+                                        pType: "SPROP",
+                                        x: Math.round(sp.homeX ?? sp.x),
+                                        y: Math.round(sp.homeY ?? sp.y),
+                                        a: Math.round(Math.atan2(dy, dx) * 100) / 100
+                                    });
+                                }
                                 const launchSpd = Math.min(310, Math.max(110, carSpd * 1.25));
                                 sp.vx = (dx / d) * launchSpd;
                                 sp.vy = (dy / d) * launchSpd;
@@ -7397,9 +7408,19 @@ class WorldObjectEngine {
                                 );
                                 if (isHeavyVeh) {
                                     sl.state = 2;
+                                    sl._persistedSmash = true;
                                     sl.timer = 0;
                                     sl.hitCooldown = 0.8;
                                     actLights.add(sl);
+                                    if (game.net && typeof game.net.broadcastWorldEvent === "function") {
+                                        game.net.broadcastWorldEvent({
+                                            kind: "PROP_SMASH",
+                                            pType: "LIGHT",
+                                            x: Math.round(sl.baseX),
+                                            y: Math.round(sl.baseY),
+                                            a: Math.round(impAng * 100) / 100
+                                        });
+                                    }
                                     sl.fallAngle = impAng;
                                     sl.fallenX = sl.baseX + Math.cos(impAng) * 18;
                                     sl.fallenY = sl.baseY + Math.sin(impAng) * 18;
@@ -7465,9 +7486,19 @@ class WorldObjectEngine {
                             if (dist < 20) {
                                 bl.hitCooldown = 0.55;
                                 bl.state = 2;
+                                bl._persistedSmash = true;
                                 bl.knockdownTimer = 0;
                                 actBollards.add(bl);
                                 const impAng = carSpd > 10 ? Math.atan2(pCar.vy, pCar.vx) : (pCar.angle || 0);
+                                if (game.net && typeof game.net.broadcastWorldEvent === "function") {
+                                    game.net.broadcastWorldEvent({
+                                        kind: "PROP_SMASH",
+                                        pType: "BOLLARD",
+                                        x: Math.round(bl.x),
+                                        y: Math.round(bl.y),
+                                        a: Math.round(impAng * 100) / 100
+                                    });
+                                }
                                 bl.fallAngle = impAng;
                                 bl.fallenX = bl.x + Math.cos(impAng) * 14;
                                 bl.fallenY = bl.y + Math.sin(impAng) * 14;
@@ -7506,9 +7537,19 @@ class WorldObjectEngine {
                                 );
                                 if (isHeavyVeh) {
                                     ts.state = 2;
+                                    ts._persistedSmash = true;
                                     ts.timer = 0;
                                     ts.hitCooldown = 0.8;
                                     actSignals.add(ts);
+                                    if (game.net && typeof game.net.broadcastWorldEvent === "function") {
+                                        game.net.broadcastWorldEvent({
+                                            kind: "PROP_SMASH",
+                                            pType: "SIGNAL",
+                                            x: Math.round(ts.baseX),
+                                            y: Math.round(ts.baseY),
+                                            a: Math.round(impAng * 100) / 100
+                                        });
+                                    }
                                     ts.fallAngle = impAng;
                                     ts.fallenX = ts.baseX + Math.cos(impAng) * 4.5;
                                     ts.fallenY = ts.baseY + Math.sin(impAng) * 4.5;
@@ -7559,6 +7600,73 @@ class WorldObjectEngine {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    applySmashedProp(item) {
+        if (!item || !this.map) return;
+        const px = Number(item.x) || 0;
+        const py = Number(item.y) || 0;
+        const ang = Number(item.a) || 0;
+        const pType = item.pType;
+
+        if (pType === "LIGHT" && Array.isArray(this.map.streetlights)) {
+            for (let i = 0; i < this.map.streetlights.length; i++) {
+                const sl = this.map.streetlights[i];
+                if (Math.abs(sl.baseX - px) <= 16 && Math.abs(sl.baseY - py) <= 16) {
+                    sl.state = 2;
+                    sl._persistedSmash = true;
+                    sl.fallAngle = ang;
+                    sl.fallenX = sl.baseX + Math.cos(ang) * 18;
+                    sl.fallenY = sl.baseY + Math.sin(ang) * 18;
+                    sl.fallVx = 0;
+                    sl.fallVy = 0;
+                    break;
+                }
+            }
+        } else if (pType === "SIGNAL" && Array.isArray(this.map.trafficSignals)) {
+            for (let i = 0; i < this.map.trafficSignals.length; i++) {
+                const ts = this.map.trafficSignals[i];
+                if (Math.abs(ts.baseX - px) <= 16 && Math.abs(ts.baseY - py) <= 16) {
+                    ts.state = 2;
+                    ts._persistedSmash = true;
+                    ts.fallAngle = ang;
+                    ts.fallenX = ts.baseX + Math.cos(ang) * 4.5;
+                    ts.fallenY = ts.baseY + Math.sin(ang) * 4.5;
+                    ts.fallVx = 0;
+                    ts.fallVy = 0;
+                    break;
+                }
+            }
+        } else if (pType === "BOLLARD" && Array.isArray(this.map.parkBollardLights)) {
+            for (let i = 0; i < this.map.parkBollardLights.length; i++) {
+                const bl = this.map.parkBollardLights[i];
+                if (Math.abs(bl.x - px) <= 16 && Math.abs(bl.y - py) <= 16) {
+                    bl.state = 2;
+                    bl._persistedSmash = true;
+                    bl.fallAngle = ang;
+                    bl.fallenX = bl.x + Math.cos(ang) * 14;
+                    bl.fallenY = bl.y + Math.sin(ang) * 14;
+                    break;
+                }
+            }
+        } else if (pType === "SPROP" && Array.isArray(this.streetProps)) {
+            for (let i = 0; i < this.streetProps.length; i++) {
+                const sp = this.streetProps[i];
+                const hx = sp.homeX ?? sp.x;
+                const hy = sp.homeY ?? sp.y;
+                if (Math.abs(hx - px) <= 16 && Math.abs(hy - py) <= 16) {
+                    sp.broken = true;
+                    sp._persistedSmash = true;
+                    sp.x = hx + Math.cos(ang) * 18;
+                    sp.y = hy + Math.sin(ang) * 18;
+                    sp.z = 2.0;
+                    sp.vx = 0;
+                    sp.vy = 0;
+                    sp.vz = 0;
+                    break;
                 }
             }
         }

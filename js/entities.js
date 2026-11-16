@@ -5387,7 +5387,7 @@ class TrafficManager {
                 v.driver === "AI_TOW" ||
                 (!anyWanted && v.driver === "AI_COP") ||
                 isAbandonedOrWreck;
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE") continue;
+            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || v._worldModified) continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
