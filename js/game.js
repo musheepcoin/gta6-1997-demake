@@ -17407,53 +17407,63 @@ class LeonidaGame {
 
 
     loop() {
-
         let last = performance.now();
 
-        const frame = (now) => {
-
-            let dt = Math.min(0.05, (now - last) / 1000);
+        const stepSimulation = (now, doRender) => {
+            let dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
             if (this._resetLoopClock) {
                 this._resetLoopClock = false;
                 dt = 0.016;
             }
-
             last = now;
 
             try {
                 this.update(dt);
-
-                this.renderer.render(this, dt);
-
-                if (this.fullMapOpen && this.renderer) {
-
-                    this.renderer.renderFullMap(this);
-
+                if (doRender && this.renderer) {
+                    this.renderer.render(this, dt);
+                    if (this.fullMapOpen) {
+                        this.renderer.renderFullMap(this);
+                    }
                 }
-
                 if (
-
-                    this.killFrenzy ||
-
-                    (this.player.inVehicle && this.player.inVehicle.bombArmed) ||
-
-                    (this.missions.activeMission && this.missions.activeMission.timer !== null)
-
+                    doRender &&
+                    (this.killFrenzy ||
+                        (this.player.inVehicle && this.player.inVehicle.bombArmed) ||
+                        (this.missions.activeMission && this.missions.activeMission.timer !== null))
                 ) {
-
                     this.updateHud();
-
                 }
             } catch (err) {
                 console.error("Game frame error:", err);
             }
-
-            requestAnimationFrame(frame);
-
         };
 
-        requestAnimationFrame(frame);
+        const frame = (now) => {
+            if (typeof document === "undefined" || !document.hidden) {
+                stepSimulation(now, true);
+            }
+            requestAnimationFrame(frame);
+        };
 
+        // Un-throttled Web Worker background ticker so minimizing the tab or switching windows NEVER pauses the persistent world simulation!
+        try {
+            const workerCode = "setInterval(function(){postMessage(1);}, 50);";
+            const blob = new Blob([workerCode], { type: "application/javascript" });
+            this._bgLoopWorker = new Worker(URL.createObjectURL(blob));
+            this._bgLoopWorker.onmessage = () => {
+                if (typeof document !== "undefined" && document.hidden) {
+                    stepSimulation(performance.now(), false);
+                }
+            };
+        } catch (_e) {
+            setInterval(() => {
+                if (typeof document !== "undefined" && document.hidden) {
+                    stepSimulation(performance.now(), false);
+                }
+            }, 50);
+        }
+
+        requestAnimationFrame(frame);
     }
 
 }

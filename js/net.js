@@ -1071,6 +1071,7 @@ class ViceNetworkManager {
             rp.walkPhase = pkt.wp || 0;
             rp.muzzleTimer = pkt.mz || 0;
             rp.kills = pkt.k || 0;
+            rp.isHidden = Boolean(pkt.hid);
             rp.veh = pkt.veh || null;
             rp.lastSeen = performance.now();
             if (typeof pkt.sc === "number" && pkt.sc > 0 && this.game && typeof this.game.recordHighScore === "function") {
@@ -1244,8 +1245,13 @@ class ViceNetworkManager {
     isWorldHost() {
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
+        const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
         const mySlot = (typeof this.slotIndex === "number" && this.slotIndex >= 0) ? this.slotIndex : 999;
         for (const rp of humans) {
+            const rpHidden = Boolean(rp.isHidden);
+            // A visible tab always takes World Host priority over a minimized/hidden tab
+            if (myHidden && !rpHidden) return false;
+            if (!myHidden && rpHidden) continue;
             const rpSlot = (typeof rp.slot === "number" && rp.slot >= 0) ? rp.slot : 999;
             if (rpSlot < mySlot) return false;
             if (rpSlot === mySlot && String(rp.id) < String(this.playerId)) return false;
@@ -1750,6 +1756,7 @@ class ViceNetworkManager {
         this.sendPacket({
             t: "STATE",
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
+            hid: Boolean(typeof document !== "undefined" && document.hidden),
             name: this.playerName,
             color: this.playerColor,
             pedType: this.pedSpriteType,
