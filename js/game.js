@@ -7462,11 +7462,11 @@ class LeonidaGame {
             const dFromCop = Math.hypot(realX - fromX, realY - fromY);
             const hasDirectSight =
                 !this.activeInterior &&
-                dFromCop < 420 &&
-                (!this.map || !this.map.traceSegment2D || !this.map.traceSegment2D(fromX, fromY, realX, realY, realZ).hit);
+                dFromCop < 540 &&
+                (dFromCop < 145 || !this.map || !this.map.traceSegment2D || !this.map.traceSegment2D(fromX, fromY, realX, realY, realZ).hit);
 
             // If the player broke line-of-sight and is actively evading, cops without visual lock converge on the player's Last Known Position!
-            const useLastKnown = !hasDirectSight && !this.isPoliceSpotted && (this.wantedDecayTimer || 0) > 0.8 && this.lastKnownWantedPos;
+            const useLastKnown = !hasDirectSight && !this.isPoliceSpotted && (this.wantedDecayTimer || 0) > 1.2 && this.lastKnownWantedPos;
             const targX = useLastKnown ? this.lastKnownWantedPos.x : realX;
             const targY = useLastKnown ? this.lastKnownWantedPos.y : realY;
 
@@ -7719,6 +7719,7 @@ class LeonidaGame {
             const ent = this.player.inVehicle || this.player;
             this.lastKnownWantedPos = { x: ent.x, y: ent.y };
             this.isPoliceSpotted = true;
+            this.wantedSearchLockTimer = 6.5; // Initial APB dispatch lock so evasion cannot start before first units arrive
             if (!this.player.ankleScrambled) {
                 this.audio.playAnkleMonitorAlert();
             }
@@ -10728,10 +10729,11 @@ class LeonidaGame {
             this.missions.update(dt);
         }
         if (this.wantedLevel > 0) {
-            this.isPoliceSpotted = Boolean((p.playerCombatTimer || 0) > 0);
-            this.wantedDecayDuration = this.wantedLevel === 1 ? 12 : (this.wantedLevel === 2 ? 15 : (this.wantedLevel === 3 ? 18 : 22));
+            this.wantedSearchLockTimer = Math.max(0, (this.wantedSearchLockTimer || 0) - dt);
+            this.isPoliceSpotted = Boolean((p.playerCombatTimer || 0) > 0 || (this.wantedSearchLockTimer || 0) > 0);
+            this.wantedDecayDuration = this.wantedLevel === 1 ? 22 : (this.wantedLevel === 2 ? 28 : (this.wantedLevel === 3 ? 35 : 45));
             if (this.isPoliceSpotted) {
-                this.wantedDecayTimer = Math.max(0, (this.wantedDecayTimer || 0) - dt * 2.2);
+                this.wantedDecayTimer = Math.max(0, (this.wantedDecayTimer || 0) - dt * 3.5);
             } else {
                 this.wantedDecayTimer = (this.wantedDecayTimer || 0) + dt;
                 if (this.wantedDecayTimer >= this.wantedDecayDuration) {
@@ -15671,8 +15673,8 @@ class LeonidaGame {
 
                 if (d < nearestCopDist) nearestCopDist = d;
 
-                if (!anyCopHasVisual && !this.activeInterior && d < 410) {
-                    const blocked = this.map && this.map.traceSegment2D && this.map.traceSegment2D(v.x, v.y, pEnt.x, pEnt.y, pZ).hit;
+                if (!anyCopHasVisual && !this.activeInterior && d < 540) {
+                    const blocked = d >= 145 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(v.x, v.y, pEnt.x, pEnt.y, pZ).hit;
                     if (!blocked) anyCopHasVisual = true;
                 }
 
@@ -15690,8 +15692,8 @@ class LeonidaGame {
 
                 if (d < 850) activeFootCopsNear++;
 
-                if (!anyCopHasVisual && !this.activeInterior && d < 360) {
-                    const blocked = this.map && this.map.traceSegment2D && this.map.traceSegment2D(ped.x, ped.y, pEnt.x, pEnt.y, pZ).hit;
+                if (!anyCopHasVisual && !this.activeInterior && d < 420) {
+                    const blocked = d >= 120 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(ped.x, ped.y, pEnt.x, pEnt.y, pZ).hit;
                     if (!blocked) anyCopHasVisual = true;
                 }
 
@@ -16001,17 +16003,18 @@ class LeonidaGame {
         if (this.wantedLevel > 0) {
 
             // Line-of-Sight Getaway System:
-            // If no police unit has direct visual contact (< 410px with clear line-of-sight) and the player is not firing,
-            // the player enters EVADING mode and loses 1★ every 12..22 seconds!
-            const decayThreshold = this.wantedLevel === 1 ? 12 : (this.wantedLevel === 2 ? 15 : (this.wantedLevel === 3 ? 18 : 22));
+            // If no police unit has direct visual contact (< 540px with clear line-of-sight), the 6.5s initial APB lock has expired,
+            // and the player is not firing, the player enters EVADING mode and loses 1★ every 22..45 seconds!
+            this.wantedSearchLockTimer = Math.max(0, (this.wantedSearchLockTimer || 0) - dt);
+            const decayThreshold = this.wantedLevel === 1 ? 22 : (this.wantedLevel === 2 ? 28 : (this.wantedLevel === 3 ? 35 : 45));
             this.wantedDecayDuration = decayThreshold;
-            this.isPoliceSpotted = Boolean(anyCopHasVisual || (p.playerCombatTimer || 0) > 0);
+            this.isPoliceSpotted = Boolean(anyCopHasVisual || (p.playerCombatTimer || 0) > 0 || (this.wantedSearchLockTimer || 0) > 0);
 
             if (this.isPoliceSpotted) {
 
                 this.lastKnownWantedPos = { x: pEnt.x, y: pEnt.y };
-                // Drain evasion progress gradually (instead of instant 0 wipe) if briefly glimpsed across an intersection
-                this.wantedDecayTimer = Math.max(0, (this.wantedDecayTimer || 0) - dt * 2.2);
+                // Drain evasion progress rapidly when re-spotted by police
+                this.wantedDecayTimer = Math.max(0, (this.wantedDecayTimer || 0) - dt * 3.5);
 
             } else {
 
@@ -16028,6 +16031,7 @@ class LeonidaGame {
         } else {
             this.isPoliceSpotted = false;
             this.wantedDecayTimer = 0;
+            this.wantedSearchLockTimer = 0;
         }
 
 
