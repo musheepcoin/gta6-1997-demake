@@ -11175,15 +11175,17 @@ class RetroRenderer {
             }
 
             if (!rect) continue;
+            // Apply purely visual lane-change / pull-over nose angle (visualSteerYaw) without touching physics v.angle
+            const renderAngle = v.angle + (!v.destroyed && v.driver && v.driver !== "PLAYER" ? (v.visualSteerYaw || 0) : 0);
             // Boat sprites (jet-ski, speedboat) are drawn bow-east (horizontal) instead of the GTA1 south-facing car layout
-            const rot = mapInfo.horizontalSprite ? v.angle : (v.angle - Math.PI * 0.5);
+            const rot = mapInfo.horizontalSprite ? renderAngle : (renderAngle - Math.PI * 0.5);
             const airZ = v.stuntZOffset || 0;
             const isMicroTwoWheeler = (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER");
             const baseVehScale = isMicroTwoWheeler ? (carScale * 1.12) : carScale;
             const vScale = baseVehScale * (1.0 + airZ * 0.22);
             const vDrawOrder = airZ > 0.05 ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.CAR;
-            const cosA = Math.cos(v.angle);
-            const sinA = Math.sin(v.angle);
+            const cosA = Math.cos(renderAngle);
+            const sinA = Math.sin(renderAngle);
 
             // A. GTA 2 live_geometry.cpp: True Sprite-Silhouette Under-Chassis & Solar-Tracked 3D Drop Shadow!
             // (Uses exact per-pixel sprite alpha via pushAtlasSprite3D instead of a rectangular box so narrow motorcycles,

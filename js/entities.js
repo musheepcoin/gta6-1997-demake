@@ -1342,7 +1342,7 @@ class Vehicle {
        Checks adjacent road lane on 4-lane boulevards & highways when blocked ahead
        ======================================================================== */
     tryAdjacentLaneChange(bx, by, curZ, map, game) {
-        if (this.aiLaneChangeCooldown > 0 || !this.aiChosenDir || this.aiChosenDir.isTurn) return false;
+        if (this.aiLaneChangeCooldown > 0 || !this.aiChosenDir || this.aiChosenDir.isTurn || Math.abs(this.speed || 0) < 16) return false;
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
         if (lidZ1 === 25 || lidZ1 === 24 || (map.isStopLineBlock && map.isStopLineBlock(bx, by))) return false;
 
@@ -1446,7 +1446,7 @@ class Vehicle {
                 this.aiTargetBlockX = nbx + dx;
                 this.aiTargetBlockY = nby + dy;
                 this.aiLaneChangeCooldown = this.isMotorcycle ? 1.8 : 2.8;
-                this.aiLaneShiftTimer = 0.58;
+                this.aiLaneShiftTimer = 1.15;
                 this.aiLaneChangeSign = side;
                 this.aiTurnSignal = side;
                 this.aiState = "LANE_CHANGE";
@@ -1548,7 +1548,21 @@ class Vehicle {
 
         // 1. Commit to a valid outgoing NYC.CMP arrow direction upon entering each road block.
         // Pass the previously committed cardinal angle (refAngle) so a car mid-turn doesn't think its new lane is a 2nd turn!
+        if (lidZ1 === 25 && this.aiLaneShiftTimer > 0) {
+            this.aiLaneShiftTimer = 0;
+        }
         const movedOutOfLane = this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
+        if (!movedOutOfLane && this.aiLaneShiftTimer > 0 && this.aiChosenDir && !this.aiChosenDir.isTurn) {
+            if (this.aiChosenDir.dy !== 0 && by !== this.aiBlockY) {
+                this.aiBlockY = by;
+                this.aiTargetBlockX = this.aiBlockX;
+                this.aiTargetBlockY = by + this.aiChosenDir.dy;
+            } else if (this.aiChosenDir.dx !== 0 && bx !== this.aiBlockX) {
+                this.aiBlockX = bx;
+                this.aiTargetBlockX = bx + this.aiChosenDir.dx;
+                this.aiTargetBlockY = this.aiBlockY;
+            }
+        }
         if (movedOutOfLane) {
             const refAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number"
                 ? this.aiChosenDir.angle
@@ -1691,8 +1705,18 @@ class Vehicle {
             const latErr = bay.x - this.x;
             // Right-hand side relative to vertical travel (0, travelSignY) is (-travelSignY, 0), so bay.dc * (-travelSignY) gives +1 right / -1 left
             const bayTurnSign = (bay.dc || 1) * (-travelSignY) >= 0 ? 1 : -1;
-            // Smoothly steer/glide laterally into the recessed bay
-            this.x += Math.max(-92 * dt, Math.min(92 * dt, latErr * Math.min(1, dt * 6.5)));
+            // Smoothly steer/glide laterally into the recessed bay ONLY while rolling forward
+            const bayRollSpd = Math.abs(this.speed || 0);
+            const maxBayLat = Math.min(48, bayRollSpd * 0.48) * dt;
+            this.x += Math.max(-maxBayLat, Math.min(maxBayLat, latErr * Math.min(1, dt * 6.5)));
+            const signedBayLat = latErr * (-travelSignY);
+            if (bayRollSpd > 8 && Math.abs(latErr) > 2.2) {
+                const targetBayVis = Math.max(-0.26, Math.min(0.26, Math.atan2(signedBayLat * 0.65, 36)));
+                this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetBayVis - (this.visualSteerYaw || 0)) * Math.min(1, dt * 10.0);
+            } else {
+                this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.001, dt);
+                if (Math.abs(this.visualSteerYaw) < 0.005 || bayRollSpd < 3) this.visualSteerYaw = 0;
+            }
             const angErr = this.normalizeAngle(bay.angle - this.angle);
             this.angle += angErr * Math.min(1, dt * 10.0);
             this.angularVelocity = 0;
@@ -1948,19 +1972,35 @@ class Vehicle {
         this.steerAngleRad = 0;
         steer = 0;
 
-        // Always center vehicle smoothly onto the active lane centerline (plus any active curb pull-over offset!)
-        const maxLatStep = (this.aiChosenDir.isTurn ? 82 : (this.aiPullOverTimer > 0 ? 118 : 98)) * dt;
+        // Always center vehicle smoothly onto the active lane centerline ONLY while rolling forward (zero sideways strafing while stopped!)
+        const rollSpd = Math.abs(this.speed || 0);
+        const maxLatRate = this.aiChosenDir.isTurn
+            ? Math.min(82, rollSpd * 0.85)
+            : Math.min(54, rollSpd * 0.48);
+        const maxLatStep = maxLatRate * dt;
         const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
         const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
         const pullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
+        let signedLatErr = 0;
         if (this.aiChosenDir.dx !== 0) {
             const centerY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
             const dyErr = centerY - this.y;
-            this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 10.5)));
+            signedLatErr = dyErr * (this.aiChosenDir.dx > 0 ? 1 : -1);
+            this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 8.5)));
         } else if (this.aiChosenDir.dy !== 0) {
             const centerX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
             const dxErr = centerX - this.x;
-            this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 10.5)));
+            signedLatErr = dxErr * (this.aiChosenDir.dy > 0 ? -1 : 1);
+            this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 8.5)));
+        }
+        // Purely visual nose yaw for the renderer during lane changes / pull-overs (never alters physics this.angle or AI radars!)
+        const isBusOrCoach = (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH");
+        if (!this.aiChosenDir.isTurn && !isBusOrCoach && rollSpd > 14 && Math.abs(signedLatErr) > 2.2) {
+            const targetVisYaw = Math.max(-0.26, Math.min(0.26, Math.atan2(signedLatErr * 0.65, Math.max(36, rollSpd * 0.55))));
+            this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetVisYaw - (this.visualSteerYaw || 0)) * Math.min(1, dt * 11.0);
+        } else {
+            this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.0005, dt);
+            if (Math.abs(this.visualSteerYaw) < 0.005 || rollSpd < 4 || isBusOrCoach) this.visualSteerYaw = 0;
         }
 
         // 2B. Look-Ahead Turn Speed Control (Never uses negative reverse throttle!)
@@ -2691,14 +2731,27 @@ class Vehicle {
             this.angularVelocity = 0;
             this.steerAngleRad = 0;
             steer = 0;
-            const maxLatStep = 115 * dt;
+            const emRollSpd = Math.abs(this.speed || 0);
+            const maxLatStep = Math.min(58, emRollSpd * 0.52) * dt;
             const pullOff = this.aiPullOverOffset || 0;
+            let emSignedLat = 0;
             if (this.aiChosenDir.dx !== 0) {
                 const centerY = (this.aiTargetBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
-                this.y += Math.max(-maxLatStep, Math.min(maxLatStep, (centerY - this.y) * Math.min(1, dt * 9.0)));
+                const dyErr = centerY - this.y;
+                emSignedLat = dyErr * (this.aiChosenDir.dx > 0 ? 1 : -1);
+                this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 8.5)));
             } else if (this.aiChosenDir.dy !== 0) {
                 const centerX = (this.aiTargetBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
-                this.x += Math.max(-maxLatStep, Math.min(maxLatStep, (centerX - this.x) * Math.min(1, dt * 9.0)));
+                const dxErr = centerX - this.x;
+                emSignedLat = dxErr * (this.aiChosenDir.dy > 0 ? -1 : 1);
+                this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 8.5)));
+            }
+            if (emRollSpd > 14 && Math.abs(emSignedLat) > 2.2) {
+                const targetVisYaw = Math.max(-0.26, Math.min(0.26, Math.atan2(emSignedLat * 0.65, Math.max(36, emRollSpd * 0.55))));
+                this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetVisYaw - (this.visualSteerYaw || 0)) * Math.min(1, dt * 11.0);
+            } else {
+                this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.0005, dt);
+                if (Math.abs(this.visualSteerYaw) < 0.005 || emRollSpd < 4) this.visualSteerYaw = 0;
             }
         } else {
             this.angle += angleDiff * Math.min(1, dt * 5.5);
