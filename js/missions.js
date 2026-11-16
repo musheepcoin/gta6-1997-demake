@@ -14,6 +14,7 @@ class MissionManager {
             {
                 id: "phone_ai_fixer",
                 missionId: "M0_DYNAMIC_FIXER",
+                isVirtualPhone: true,
                 shortTitle: "⚡ FIXER: LIVE 90S",
                 caller: "ViceNet AI Fixer",
                 rewardCash: 40000,
@@ -147,6 +148,9 @@ class MissionManager {
             }
             return true;
         });
+        if (typeof g.rebuildVehicleSpatialGrid === "function") {
+            g.rebuildVehicleSpatialGrid();
+        }
         if (Array.isArray(g.peds)) {
             g.peds = g.peds.filter((pd) => !pd || pd.missionTag !== "FIXER_VIP");
         }
@@ -374,6 +378,7 @@ class MissionManager {
                         m.stage = 2;
                         m.timer = 75;
                         m.slowTimer = 0;
+                        m.graceTimer = 4.0;
                         m.targetPos = { x: m.dropPos.x, y: m.dropPos.y };
                         m.objectiveLabel = `KEEP SPEED HIGH -> ${m.dropName}`;
                         g.sendPager(
@@ -389,7 +394,10 @@ class MissionManager {
                         m.objectiveLabel = `SPEED RUN -> ${m.dropName}`;
                     }
                     const spd = Math.hypot(m.targetCar.vx || 0, m.targetCar.vy || 0) || Math.abs(m.targetCar.speed || 0);
-                    if (spd < 48) {
+                    if ((m.graceTimer || 0) > 0) {
+                        m.graceTimer = Math.max(0, m.graceTimer - dt);
+                        if (spd >= 52) m.graceTimer = 0;
+                    } else if (spd < 48) {
                         m.slowTimer = (m.slowTimer || 0) + dt;
                         if (Math.floor((m.slowTimer - dt) * 2) !== Math.floor(m.slowTimer * 2)) {
                             const left = Math.max(1, Math.ceil(4.5 - m.slowTimer));
@@ -449,30 +457,14 @@ class MissionManager {
         const arch = archetypes[(this._fixerRollIdx++) % archetypes.length];
 
         if (arch === "HIJACK_LIVE_TARGET") {
-            // Scan for a real live exotic/muscle car in the player's vicinity first!
-            let targetCar = null;
-            let bestScore = -1;
-            for (const v of g.vehicles) {
-                if (!v || v.destroyed || v === p.inVehicle || v.driver === "REMOTE" || v.missionTag || v.isEstateCar || v.waterOnly) continue;
-                const d = Math.hypot(v.x - p.x, v.y - p.y);
-                if (d < 130 || d > 520) continue;
-                const isExotic = v.maxSpeed >= 265 ? 2 : 1;
-                const sc = isExotic * 1000 - d;
-                if (sc > bestScore) {
-                    bestScore = sc;
-                    targetCar = v;
-                }
-            }
-            if (!targetCar) {
-                const spot = this.findNearbyRoadSpot(220, 380);
-                const pool = ["VICE_CHEETAH", "BANSHEE_GT", "STINGER_CABRIO", "PENETRATOR_GT", "CHALLENGER_RT"];
-                const spec = pool[Math.floor(Math.random() * pool.length)];
-                targetCar = new Vehicle("fixer_target_car", spec, spot.x, spot.y, spot.angle);
-                targetCar.z = spot.z;
-                targetCar.driver = "AI_TRAFFIC";
-                g.vehicles.push(targetCar);
-            }
+            const spot = this.findNearbyRoadSpot(200, 360);
+            const pool = ["VICE_CHEETAH", "BANSHEE_GT", "STINGER_CABRIO", "PENETRATOR_GT", "CHALLENGER_RT"];
+            const spec = pool[Math.floor(Math.random() * pool.length)];
+            const targetCar = new Vehicle("fixer_target_car", spec, spot.x, spot.y, spot.angle);
+            targetCar.z = spot.z;
+            targetCar.driver = "AI_TRAFFIC";
             targetCar.missionTag = "FIXER_TARGET";
+            g.vehicles.push(targetCar);
             // Pick nearest Pay 'n' Spray or Crane as drop-off
             let bestDrop = { name: "VICE CUSTOMS", x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
             let bestDropDist = Infinity;
@@ -566,6 +558,7 @@ class MissionManager {
                 stage: alreadyIn ? 2 : 1,
                 timer: alreadyIn ? 75 : 90,
                 slowTimer: 0,
+                graceTimer: 4.5,
                 reward: 45000,
                 targetCar: bombCar,
                 dropPos: { x: dropLm.x, y: dropLm.y },
@@ -633,6 +626,9 @@ class MissionManager {
                 true
             );
             g.showBigBanner("🎯 SYNDICATE VIP HIT", `ELIMINATE THE LIEUTENANT IN ${distName}`, "#ff2a85", 2.6);
+        }
+        if (typeof g.rebuildVehicleSpatialGrid === "function") {
+            g.rebuildVehicleSpatialGrid();
         }
     }
 

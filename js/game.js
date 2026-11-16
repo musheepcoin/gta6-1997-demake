@@ -8091,6 +8091,9 @@ class LeonidaGame {
                 hitCar.isNemesisCar = true;
                 hitCar.nemesisBoss = fSpec.boss;
                 this.vehicles.push(hitCar);
+                if (typeof this.rebuildVehicleSpatialGrid === "function") {
+                    this.rebuildVehicleSpatialGrid();
+                }
 
                 for (let i = 0; i < 2; i++) {
                     const hitman = new Pedestrian({
@@ -12132,7 +12135,7 @@ class LeonidaGame {
                         const noseX = v.x + Math.cos(v.angle || 0) * bOff;
                         const noseY = v.y + Math.sin(v.angle || 0) * bOff;
                         for (const ph of this.missions.payphones) {
-                            if ((ph.wipeoutTimer || 0) > 0) continue;
+                            if (ph.isVirtualPhone || (ph.wipeoutTimer || 0) > 0) continue;
                             if (Math.abs(ph.x - v.x) > 54 || Math.abs(ph.y - v.y) > 54) continue;
                             const dPh = Math.min(Math.hypot(ph.x - v.x, ph.y - v.y), Math.hypot(ph.x - noseX, ph.y - noseY));
                             if (dPh < 26) {

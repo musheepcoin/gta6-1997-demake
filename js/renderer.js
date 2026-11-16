@@ -10265,6 +10265,7 @@ class RetroRenderer {
         }
 
         for (const ph of game.missions.payphones) {
+            if (ph.isVirtualPhone) continue;
             if (ph.x < minX || ph.x > maxX || ph.y < minY || ph.y > maxY) continue;
             // Static silent payphone booth prop (or toppled/smashed flat on the sidewalk!)
             const pz = this.getEntityZ(ph, 0.06);
@@ -15880,11 +15881,11 @@ class RetroRenderer {
             this._smsLinesCache = lines;
         }
 
-        let textY = bubY + 11.5;
-        const maxLines = Math.min(2, lines.length);
+        let textY = bubY + 9.5;
+        const maxLines = Math.min(3, lines.length);
         for (let i = 0; i < maxLines; i++) {
             ctx.fillText(lines[i], bubX + 5, textY);
-            textY += 12.5;
+            textY += 10.5;
         }
 
         // Interactive 2026 Smartphone Mission Launcher Bar inside DM Card
@@ -15901,7 +15902,7 @@ class RetroRenderer {
             drawPixelBox(ctx, smsX + 6, mBarY, statW, mBarH, "#3b0764", "#ff2a85", "#f472b6", "#1e0536", 2);
             ctx.fillStyle = "#fde047";
             ctx.font = "bold 8px Consolas, 'Courier New', monospace";
-            const objShort = String(activeM.objectiveLabel || activeM.title || "ACTIVE MISSION").slice(0, 20);
+            const objShort = String(activeM.title || activeM.objectiveLabel || "ACTIVE MISSION").slice(0, 20);
             ctx.fillText(`🎯 ${objShort}`, smsX + 10, mBarY + mBarH * 0.5 + 0.5);
 
             const abX = smsX + 8 + statW;
@@ -16365,8 +16366,8 @@ class RetroRenderer {
                     game.triggerInteriorStation(btn.station);
                     return true;
                 }
-                if (btn.id === "BOARD_BOAT" && typeof game.tryEnterExitVehicle === "function") {
-                    game.tryEnterExitVehicle();
+                if (btn.id === "BOARD_BOAT" && typeof game.handleEnterExitVehicle === "function") {
+                    game.handleEnterExitVehicle();
                     return true;
                 }
                 if (btn.id === "MINIMAP_FULLMAP" && typeof game.toggleFullMap === "function") {

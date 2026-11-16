@@ -18532,7 +18532,7 @@ class WorldObjectEngine {
             [rw + 92, 74], [rw + 92, 280], [rw + 92, rh - 54],
             [180, -68], [rw - 180, -68], [180, rh + 86], [rw - 180, rh + 86]
         ]) {
-            renderer.batchObjectSprite3D("palm_tree", epx, epy, 2.18, (epx + epy) * 0.01, 0.92, SPRITE_DRAW_ORDER.TREE, exR, exG, exB, 1.0);
+            renderer.batchObjectSprite3D("palm_tree", epx, epy, 2.18, (epx + epy) * 0.01, 0.92, SPRITE_DRAW_ORDER.TREES, exR, exG, exB, 1.0);
         }
         const extFacing = (intr && intr.facing) || "S";
         if (extFacing === "W") {
