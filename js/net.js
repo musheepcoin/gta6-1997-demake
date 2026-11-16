@@ -178,9 +178,11 @@ class ViceNetworkManager {
                 this.serverRoomCounts = null;
                 this.ws = null;
                 if (this.wsUrl) {
+                    const retryCount = (this._wsRetryCount = Math.min(6, (this._wsRetryCount || 0) + 1));
+                    const delayMs = Math.min(12000, 1800 + retryCount * 1200);
                     this._wsReconnectTimer = setTimeout(() => {
                         this.initWebSocketServer();
-                    }, 4000);
+                    }, delayMs);
                 }
             };
             ws.onclose = scheduleReconnect;
@@ -190,7 +192,11 @@ class ViceNetworkManager {
 
     handleServerPacket(pkt) {
         if (!pkt || typeof pkt !== "object") return;
+        if (pkt.t === "PONG") {
+            return;
+        }
         if (pkt.t === "WELCOME") {
+            this._wsRetryCount = 0;
             if (typeof pkt.slot === "number") {
                 this.slotIndex = pkt.slot;
             }
@@ -212,9 +218,17 @@ class ViceNetworkManager {
             return;
         }
         if (pkt.t === "CHAT_HISTORY" && Array.isArray(pkt.messages)) {
+            if (!this._seenChatKeys) this._seenChatKeys = new Set();
             for (const m of pkt.messages) {
                 if (m && m.text) {
-                    this.addChatLog(m.author || "PLAYER", m.text, m.color || "#00f0ff", false);
+                    const chatKey = `${m.ts || m.timeStr || ""}|${m.author || "PLAYER"}|${m.text}`;
+                    if (this._seenChatKeys.has(chatKey)) continue;
+                    this._seenChatKeys.add(chatKey);
+                    if (this._seenChatKeys.size > 150) {
+                        const first = this._seenChatKeys.values().next().value;
+                        this._seenChatKeys.delete(first);
+                    }
+                    this.addChatLog(m.author || "PLAYER", m.text, m.color || "#00f0ff", false, m.timeStr);
                 }
             }
             return;
@@ -343,9 +357,35 @@ class ViceNetworkManager {
         const p = g.player;
         if (!p) return;
 
-        if (typeof prof.cash === "number" && prof.cash > (g.cash || 0)) {
-            g.cash = prof.cash;
-            if (typeof g.score === "number" && prof.cash > g.score) g.score = prof.cash;
+        // Economy v2 Migration Guard:
+        // If the remote server sends a legacy pre-v2 profile (missing econVer >= 2) and this profileKey hasn't been migrated yet,
+        // reset cash to START_CASH ($500) so old pre-v101_174 millionaire saves on the server are cleanly migrated to $500!
+        const profKey = String(prof.name || this.playerName || "PLAYER").toUpperCase().replace(/[^A-Z0-9_#]/g, "");
+        const migKey = `vc26_econ_v2_mig_${profKey}`;
+        const alreadyMigratedLocal = this.safeGetStorage(migKey) === "1";
+        const isV2Profile = (Number(prof.econVer) || 1) >= 2;
+        if (!isV2Profile && !alreadyMigratedLocal) {
+            this.safeSetStorage(migKey, "1");
+            g.cash = g.START_CASH || 500;
+            g.multiplier = 1;
+        } else {
+            this.safeSetStorage(migKey, "1");
+            if (!prof.dead && typeof prof.cash === "number" && prof.cash >= (g.START_CASH || 500)) {
+                g.cash = prof.cash;
+            }
+            if (!prof.dead && typeof prof.mlt === "number" && prof.mlt >= 1) {
+                g.multiplier = Math.min(99, Math.max(1, Math.round(prof.mlt)));
+            }
+        }
+
+        if (typeof prof.lvs === "number" && prof.lvs >= 1) {
+            g.lives = Math.min(9, Math.max(1, Math.round(prof.lvs)));
+        }
+        if (typeof prof.jfc === "number" && prof.jfc >= 0) {
+            g.jailFreeCards = Math.min(9, Math.max(0, Math.round(prof.jfc)));
+        }
+        if (typeof prof.bnd === "boolean") {
+            p.bandana = prof.bnd;
         }
         if (!prof.dead && typeof prof.hp === "number" && prof.hp > 0) {
             p.hp = Math.min(p.maxHp || 100, prof.hp);
@@ -430,14 +470,39 @@ class ViceNetworkManager {
             } catch (_e) {}
         }
         if (typeof window !== "undefined") {
-            window.addEventListener("beforeunload", () => {
+            const flushDisconnect = () => {
+                if (this._disconnectFlushed) return;
+                this._disconnectFlushed = true;
+                if (this.game && this.game.started) {
+                    this.broadcastStateNow();
+                }
                 this.sendPacket({ t: "LEAVE", id: this.playerId, name: this.playerName });
                 if (this.dirBc) {
                     try {
                         this.dirBc.postMessage({ t: "DIR_LEAVE", id: this.playerId });
                     } catch (_e) {}
                 }
+            };
+            window.addEventListener("beforeunload", flushDisconnect);
+            window.addEventListener("pagehide", flushDisconnect);
+            window.addEventListener("online", () => {
+                if (!this.wsConnected && this.wsUrl) {
+                    this._wsRetryCount = 0;
+                    this.initWebSocketServer();
+                }
             });
+            if (typeof document !== "undefined") {
+                document.addEventListener("visibilitychange", () => {
+                    if (document.hidden) {
+                        if (this.game && this.game.started) {
+                            this.broadcastStateNow();
+                        }
+                    } else if (!this.wsConnected && this.wsUrl) {
+                        this._wsRetryCount = 0;
+                        this.initWebSocketServer();
+                    }
+                });
+            }
         }
         this.updateServerListUI();
     }
@@ -473,12 +538,23 @@ class ViceNetworkManager {
 
     getServerPlayerCount(targetRoom) {
         const normRoom = this.normalizeRoomCode(targetRoom);
-        if (normRoom === this.roomCode) {
-            // Local player + verified active started remote players in our current room
-            return this.getPlayerCount();
+        let srvCount = 0;
+        if (this.wsConnected && this.serverRoomCounts) {
+            if (normRoom === "VICE26") {
+                // Combine VICE26 and legacy VICE97 counts if server hasn't restarted yet
+                srvCount = Math.max(
+                    Number(this.serverRoomCounts.VICE26) || 0,
+                    Number(this.serverRoomCounts.VICE97) || 0
+                );
+            } else if (typeof this.serverRoomCounts[normRoom] === "number") {
+                srvCount = this.serverRoomCounts[normRoom];
+            }
         }
-        if (this.wsConnected && this.serverRoomCounts && typeof this.serverRoomCounts[normRoom] === "number") {
-            return this.serverRoomCounts[normRoom];
+        if (normRoom === this.roomCode) {
+            return Math.max(this.getPlayerCount(), srvCount);
+        }
+        if (this.wsConnected && this.serverRoomCounts) {
+            return srvCount;
         }
         const now = performance.now();
         let count = 0;
@@ -787,11 +863,16 @@ class ViceNetworkManager {
         this.chatInput.focus();
     }
 
-    addChatLog(author, text, color = "#00f0ff", isSystem = false) {
+    addChatLog(author, text, color = "#00f0ff", isSystem = false, customTimeStr = null) {
         const now = new Date();
         const hh = String(now.getHours()).padStart(2, "0");
         const mm = String(now.getMinutes()).padStart(2, "0");
-        const timeStr = `${hh}:${mm}`;
+        const timeStr = customTimeStr || `${hh}:${mm}`;
+
+        if (!isSystem && text) {
+            if (!this._seenChatKeys) this._seenChatKeys = new Set();
+            this._seenChatKeys.add(`${timeStr}|${author || "PLAYER"}|${text}`);
+        }
 
         this.chatHistory.push({ timeStr, author, text, color, isSystem });
         if (this.chatHistory.length > 40) {
@@ -801,6 +882,11 @@ class ViceNetworkManager {
         if (!this.chatMessagesEl) return;
         const row = document.createElement("div");
         row.className = isSystem ? "mp-chat-line mp-sys" : "mp-chat-line";
+        if (isSystem && typeof text === "string" && text.startsWith("🟢 Room [")) {
+            row.setAttribute("data-room-banner", "1");
+            const oldBanners = this.chatMessagesEl.querySelectorAll('[data-room-banner="1"]');
+            oldBanners.forEach((el) => el.remove());
+        }
 
         const timeSpan = document.createElement("span");
         timeSpan.className = "mp-time";
@@ -908,6 +994,9 @@ class ViceNetworkManager {
             if (newName) {
                 const oldName = this.playerName;
                 this.playerName = newName;
+                if (this.game && this.game.player) {
+                    this.game.player.nickname = newName;
+                }
                 this.safeSetStorage("vc97_mp_name", newName);
                 if (this.chatNameBtn) {
                     this.chatNameBtn.textContent = `✏️ ${this.playerName.slice(0, 12)}`;
@@ -919,6 +1008,7 @@ class ViceNetworkManager {
                     name: this.playerName,
                     color: this.playerColor
                 });
+                this.broadcastStateNow();
             }
             return true;
         }
@@ -1283,6 +1373,7 @@ class ViceNetworkManager {
             if (this.game && typeof this.game.getAllTimeHighScores === "function") {
                 this.sendPacket({
                     t: "LEADERBOARD_SYNC",
+                    econVer: 2,
                     entries: this.game.getAllTimeHighScores()
                 });
             }
@@ -1308,18 +1399,40 @@ class ViceNetworkManager {
                 }
             }
             if (this.isWorldHost()) {
+                if (this.game && this.game.activeFlashEvent && (this.game.activeFlashEvent.timer || 0) > 5) {
+                    this.broadcastWorldEvent({
+                        kind: "FLASH_DROP_SPAWN",
+                        x: Math.round(this.game.activeFlashEvent.x),
+                        y: Math.round(this.game.activeFlashEvent.y),
+                        z: this.game.activeFlashEvent.z || 2.0,
+                        reward: this.game.activeFlashEvent.reward || 800,
+                        weapon: this.game.activeFlashEvent.weapon || "ROCKET",
+                        duration: Math.ceil(this.game.activeFlashEvent.timer)
+                    });
+                }
+                if (this.game && this.game.activeServerBounty && (this.game.activeServerBounty.timer || 0) > 5) {
+                    this.broadcastWorldEvent({
+                        kind: "BOUNTY_START",
+                        targetId: this.game.activeServerBounty.targetId,
+                        targetName: this.game.activeServerBounty.targetName,
+                        reward: this.game.activeServerBounty.reward || 1200,
+                        duration: Math.ceil(this.game.activeServerBounty.timer)
+                    });
+                }
                 this.broadcastWorldSync();
             }
             return;
         }
 
         if (pkt.t === "LEADERBOARD_SYNC" && this.game && typeof this.game.mergeAllTimeScores === "function") {
-            this.game.mergeAllTimeScores(pkt.entries, true);
+            this.game.mergeAllTimeScores(pkt.entries, true, pkt.econVer || 1);
             return;
         }
 
         if (pkt.t === "HISCORE" && this.game && typeof this.game.recordHighScore === "function") {
-            this.game.recordHighScore(pkt.name, pkt.charId || "LUCIA", pkt.sc || 0, pkt.color || "#00f0ff", false);
+            if ((pkt.econVer || 1) >= 2 || (pkt.sc || 0) <= 50000) {
+                this.game.recordHighScore(pkt.name, pkt.charId || "LUCIA", pkt.sc || 0, pkt.color || "#00f0ff", false);
+            }
             return;
         }
 
@@ -1389,7 +1502,7 @@ class ViceNetworkManager {
             rp.ver = pkt.ver || 0;
             rp.veh = pkt.veh || null;
             rp.lastSeen = performance.now();
-            if (typeof pkt.sc === "number" && pkt.sc > 0 && this.game && typeof this.game.recordHighScore === "function") {
+            if (typeof pkt.sc === "number" && pkt.sc > 0 && ((pkt.econVer || 1) >= 2 || pkt.sc <= 50000) && this.game && typeof this.game.recordHighScore === "function") {
                 this.game.recordHighScore(rp.name, pkt.charId || "LUCIA", pkt.sc, rp.color, false);
             }
 
@@ -1621,6 +1734,7 @@ class ViceNetworkManager {
         const sy = ped._corpseSmashY !== undefined ? ped._corpseSmashY : Math.round(ped.y || 0);
         this.broadcastWorldEvent({
             kind: "PROP_SMASH",
+            pedId: ped.id || null,
             pType,
             x: sx,
             y: sy,
@@ -1651,6 +1765,9 @@ class ViceNetworkManager {
                 const idx = this.game.vehicles.findIndex((veh) => veh.id === pkt.vehId);
                 if (idx !== -1 && this.game.vehicles[idx] !== this.game.player.inVehicle) {
                     this.game.vehicles.splice(idx, 1);
+                    if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
+                        this.game.rebuildVehicleSpatialGrid();
+                    }
                 }
                 return;
             }
@@ -1774,12 +1891,13 @@ class ViceNetworkManager {
             if (zones && zones[pkt.turfKey]) {
                 zones[pkt.turfKey].leaderName = pkt.leaderName || "PLAYER";
                 zones[pkt.turfKey].leaderColor = pkt.leaderColor || "#00f0ff";
-                zones[pkt.turfKey].leaderScore = pkt.leaderScore || 2500;
+                zones[pkt.turfKey].leaderScore = pkt.leaderScore || 600;
+                if (typeof this.game.saveTurfStandings === "function") this.game.saveTurfStandings();
             }
             if (pkt.wasTakeover) {
                 this.addChatLog(
                     "TURF WAR",
-                    `👑 ${pkt.leaderName || "PLAYER"} took control of ${pkt.shortLabel || pkt.turfKey} ($${Number(pkt.leaderScore || 2500).toLocaleString()})!`,
+                    `👑 ${pkt.leaderName || "PLAYER"} took control of ${pkt.shortLabel || pkt.turfKey} ($${Number(pkt.leaderScore || 600).toLocaleString()})!`,
                     pkt.leaderColor || "#fde047",
                     true
                 );
@@ -1787,12 +1905,17 @@ class ViceNetworkManager {
         } else if (pkt.kind === "TURF_SYNC" && this.game && pkt.standings && typeof pkt.standings === "object") {
             const zones = typeof this.game.ensureTurfZones === "function" ? this.game.ensureTurfZones() : null;
             if (zones) {
+                let updatedTurf = false;
                 for (const [k, s] of Object.entries(pkt.standings)) {
                     if (zones[k] && s && s.leaderName && (s.leaderScore || 0) > (zones[k].leaderScore || 0)) {
                         zones[k].leaderName = s.leaderName;
                         zones[k].leaderColor = s.leaderColor || "#00f0ff";
                         zones[k].leaderScore = s.leaderScore;
+                        updatedTurf = true;
                     }
+                }
+                if (updatedTurf && typeof this.game.saveTurfStandings === "function") {
+                    this.game.saveTurfStandings();
                 }
             }
         }
@@ -2086,12 +2209,17 @@ class ViceNetworkManager {
                     id.startsWith("tow_")
                 );
                 // On initial server bootstrap, only restore truly modified vehicles (isMod === 1),
-                // and auto-purge any stale dynamic traffic/event vehicle that was left in AI-driven state or far away!
+                // and auto-purge any stale dynamic traffic/event vehicle or distant burned wreck!
                 if (isInitialServerBootstrap) {
                     if (!isMod) {
                         continue;
                     }
-                    if (isDynamicId && (drvCode !== 0 || Math.hypot(x - (g.player ? g.player.x : x), y - (g.player ? g.player.y : y)) > 2200)) {
+                    const distFromPlayer = Math.hypot(x - (g.player ? g.player.x : x), y - (g.player ? g.player.y : y));
+                    if ((flags & 1) && distFromPlayer > 900) {
+                        this.broadcastVehicleRemoved(id);
+                        continue;
+                    }
+                    if (isDynamicId && (drvCode !== 0 || distFromPlayer > 1800)) {
                         this.broadcastVehicleRemoved(id);
                         continue;
                     }
@@ -2108,6 +2236,13 @@ class ViceNetworkManager {
                     v = null;
                 }
                 if (!v) {
+                    // Prevent stacking a newly spawned persisted vehicle directly on top of an untouched static curb-parked car
+                    for (let oi = g.vehicles.length - 1; oi >= 0; oi--) {
+                        const ov = g.vehicles[oi];
+                        if (ov && !ov._worldModified && ov !== g.player.inVehicle && (ov.isStaticParked || ov.isCurbParked) && Math.hypot(ov.x - x, ov.y - y) < 26) {
+                            g.vehicles.splice(oi, 1);
+                        }
+                    }
                     v = new Vehicle(id, specKey, x, y, a);
                     v.z = z;
                     v.netTargetX = x;
@@ -2140,9 +2275,6 @@ class ViceNetworkManager {
                 v.netTargetY = y;
                 v.netTargetZ = z;
                 v.netTargetAngle = a;
-                v.vx = vx;
-                v.vy = vy;
-                v.speed = Math.hypot(vx, vy);
                 let resolvedDriver = codeToDrv(drvCode);
                 if (resolvedDriver === "REMOTE") {
                     // Only keep driver = "REMOTE" if an active remote player is actually claiming this vehicle!
@@ -2158,7 +2290,18 @@ class ViceNetworkManager {
                     }
                 }
                 v.driver = resolvedDriver;
-                v.hp = Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp;
+                if (resolvedDriver === null) {
+                    v.vx = 0;
+                    v.vy = 0;
+                    v.speed = 0;
+                } else {
+                    v.vx = vx;
+                    v.vy = vy;
+                    v.speed = Math.hypot(vx, vy);
+                }
+                if (Number.isFinite(hp)) {
+                    v.hp = (hp >= (v.maxHp || 100) && !(flags & 28)) ? hp : (Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp);
+                }
                 const wasDestroyed = v.destroyed;
                 const nowDestroyed = Boolean(flags & 1);
                 if (isInitialServerBootstrap && v.driver === null && v.isPolice && !nowDestroyed) {
@@ -2169,7 +2312,7 @@ class ViceNetworkManager {
                 } else if (nowDestroyed) {
                     v.destroyed = true;
                 }
-                v.sirenActive = Boolean(flags & 2);
+                v.sirenActive = resolvedDriver === null ? false : Boolean(flags & 2);
                 v.frontDented = Boolean(flags & 4);
                 v.rearDented = Boolean(flags & 8);
                 v.heavyDented = Boolean(flags & 16);
@@ -2194,6 +2337,9 @@ class ViceNetworkManager {
                         g.vehicles.splice(i, 1);
                     }
                 }
+            }
+            if (typeof g.rebuildVehicleSpatialGrid === "function") {
+                g.rebuildVehicleSpatialGrid();
             }
         }
 
@@ -2495,6 +2641,15 @@ class ViceNetworkManager {
             this.broadcastDirectoryHeartbeat();
             this.updateServerListUI();
         }
+        if (this.wsConnected && this.ws && this.ws.readyState === 1) {
+            this._wsPingAccum = (this._wsPingAccum || 0) + dt;
+            if (this._wsPingAccum >= 22.0) {
+                this._wsPingAccum = 0;
+                try {
+                    this.ws.send(JSON.stringify({ t: "PING", ts: Date.now() }));
+                } catch (_e) {}
+            }
+        }
     }
 
     broadcastStateNow() {
@@ -2526,7 +2681,8 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "STATE",
-            ver: 101161,
+            ver: 101177,
+            econVer: 2,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),
             name: this.playerName,
@@ -2559,6 +2715,10 @@ class ViceNetworkManager {
             mz: (p.muzzleTimer || 0) > 0 ? 0.08 : 0,
             k: this.kills,
             sc: Math.round(this.game.cash || 0),
+            mlt: Math.round(this.game.multiplier || 1),
+            lvs: Math.round(this.game.lives !== undefined ? this.game.lives : 3),
+            jfc: Math.round(this.game.jailFreeCards !== undefined ? this.game.jailFreeCards : 1),
+            bnd: Boolean(p.bandana),
             charId: p.charId || "LUCIA",
             veh: vehData
         });
@@ -2568,6 +2728,7 @@ class ViceNetworkManager {
         if (!this.enabled) return;
         this.sendPacket({
             t: "HISCORE",
+            econVer: 2,
             name,
             charId: charId || "LUCIA",
             sc: Math.round(score || 0),

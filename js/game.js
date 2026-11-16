@@ -2061,8 +2061,9 @@ class LeonidaGame {
         if (this.player.inVehicle) {
 
             const prevVeh = this.player.inVehicle;
+            const prevSeat = this.player.seatIndex || 0;
 
-            if ((this.player.seatIndex || 0) === 0) {
+            if (prevSeat === 0) {
 
                 prevVeh.driver = null;
 
@@ -2075,6 +2076,28 @@ class LeonidaGame {
                 prevVeh.drifting = false;
 
                 prevVeh.sirenActive = false;
+                prevVeh._worldModified = true;
+                prevVeh.isStaticParked = false;
+                if (this.net && typeof this.net.broadcastWorldEvent === "function" && prevVeh.id) {
+                    const flags =
+                        (prevVeh.destroyed ? 1 : 0) |
+                        (prevVeh.frontDented ? 4 : 0) |
+                        (prevVeh.rearDented ? 8 : 0) |
+                        (prevVeh.heavyDented ? 16 : 0);
+                    this.net.broadcastWorldEvent({
+                        kind: "VEH_EXIT",
+                        vehId: prevVeh.id,
+                        seat: 0,
+                        specKey: prevVeh.specKey || "STALLION",
+                        x: Math.round(prevVeh.x),
+                        y: Math.round(prevVeh.y),
+                        z: Math.round((prevVeh.z || 2.0) * 100) / 100,
+                        a: Math.round((prevVeh.angle || 0) * 1000) / 1000,
+                        hp: Math.round(prevVeh.hp || 100),
+                        flags,
+                        remapIdx: prevVeh.remapIdx || 0
+                    });
+                }
 
             }
 
@@ -4033,13 +4056,18 @@ class LeonidaGame {
 
 
 
-        // Bind the 3 Official Server Slot Buttons (VICE97 / MIAMI86 / KEYS305)
+        // Bind the 3 Official Server Slot Buttons (VICE26 / MIAMI86 / KEYS305)
 
-        const currentRoom = (this.net && this.net.roomCode) || "VICE97";
+        const currentRoom = (this.net && typeof this.net.normalizeRoomCode === "function")
+            ? this.net.normalizeRoomCode(this.net.roomCode || "VICE26")
+            : ((this.net && this.net.roomCode) || "VICE26");
 
         serverBtns.forEach((btn) => {
+            const btnRoom = (this.net && typeof this.net.normalizeRoomCode === "function")
+                ? this.net.normalizeRoomCode(btn.getAttribute("data-room") || "VICE26")
+                : (btn.getAttribute("data-room") || "VICE26");
 
-            if (btn.getAttribute("data-room") === currentRoom) {
+            if (btnRoom === currentRoom) {
 
                 serverBtns.forEach((b) => b.classList.remove("active-server"));
 
@@ -4053,7 +4081,7 @@ class LeonidaGame {
 
                 btn.classList.add("active-server");
 
-                const targetRoom = btn.getAttribute("data-room") || "VICE97";
+                const targetRoom = btn.getAttribute("data-room") || "VICE26";
 
                 if (this.audio) {
 
@@ -4169,15 +4197,15 @@ class LeonidaGame {
 
         const defaultScores = [
 
-            { name: "TOMMY_86", charId: "TOMMY", score: 50000, color: "#38bdf8" },
+            { name: "TOMMY_86", charId: "TOMMY", score: 50000, color: "#38bdf8", econVer: 2 },
 
-            { name: "CROCKETT", charId: "CROCKETT", score: 35000, color: "#fde047" },
+            { name: "CROCKETT", charId: "CROCKETT", score: 35000, color: "#fde047", econVer: 2 },
 
-            { name: "TREVOR_TP", charId: "TREVOR", score: 20000, color: "#f97316" },
+            { name: "TREVOR_TP", charId: "TREVOR", score: 20000, color: "#f97316", econVer: 2 },
 
-            { name: "CJ_GROVE", charId: "CJ", score: 12500, color: "#22c55e" },
+            { name: "CJ_GROVE", charId: "CJ", score: 12500, color: "#22c55e", econVer: 2 },
 
-            { name: "JASON_305", charId: "JASON", score: 7500, color: "#00f0ff" }
+            { name: "JASON_305", charId: "JASON", score: 7500, color: "#00f0ff", econVer: 2 }
 
         ];
 
@@ -4185,7 +4213,7 @@ class LeonidaGame {
 
         try {
 
-            const raw = window.localStorage ? window.localStorage.getItem("vc26_alltime_scores_v2") : null;
+            const raw = window.localStorage ? window.localStorage.getItem("vc26_alltime_scores_v3") : null;
 
             if (raw) {
 
@@ -4193,7 +4221,7 @@ class LeonidaGame {
 
                 if (Array.isArray(parsed) && parsed.length > 0) {
 
-                    this.mergeAllTimeScores(parsed, false);
+                    this.mergeAllTimeScores(parsed, false, 2);
 
                 }
 
@@ -4211,7 +4239,7 @@ class LeonidaGame {
 
             if (window.localStorage && Array.isArray(this.allTimeScores)) {
 
-                window.localStorage.setItem("vc26_alltime_scores_v2", JSON.stringify(this.allTimeScores.slice(0, 10)));
+                window.localStorage.setItem("vc26_alltime_scores_v3", JSON.stringify(this.allTimeScores.slice(0, 10)));
 
             }
 
@@ -4264,6 +4292,7 @@ class LeonidaGame {
             if (numScore > existing.score) {
 
                 existing.score = numScore;
+                existing.econVer = 2;
 
                 if (charId) existing.charId = charId;
 
@@ -4287,7 +4316,8 @@ class LeonidaGame {
 
                     score: numScore,
 
-                    color: color || "#ff2a85"
+                    color: color || "#ff2a85",
+                    econVer: 2
 
                 });
 
@@ -4327,7 +4357,7 @@ class LeonidaGame {
 
 
 
-    mergeAllTimeScores(entries, render = true) {
+    mergeAllTimeScores(entries, render = true, defaultEconVer = 1) {
 
         if (!Array.isArray(entries)) return;
 
@@ -4344,6 +4374,9 @@ class LeonidaGame {
             const sc = Math.floor(Number(item.score) || 0);
 
             if (sc <= 0) continue;
+            const entryEconVer = Number(item.econVer) || defaultEconVer;
+            // Filter out legacy pre-v2 millionaire entries from un-migrated server state
+            if (entryEconVer < 2 && sc > 50000) continue;
 
             const cleanName = String(item.name).trim().slice(0, 18).toUpperCase();
 
@@ -4354,6 +4387,7 @@ class LeonidaGame {
                 if (sc > existing.score) {
 
                     existing.score = sc;
+                    existing.econVer = 2;
 
                     if (item.charId) existing.charId = item.charId;
 
@@ -4371,7 +4405,8 @@ class LeonidaGame {
 
                     score: sc,
 
-                    color: item.color || "#00f0ff"
+                    color: item.color || "#00f0ff",
+                    econVer: 2
 
                 });
 
@@ -7872,7 +7907,39 @@ class LeonidaGame {
                 leaderScore: 0
             }
         };
+        try {
+            const raw = window.localStorage ? window.localStorage.getItem("vc26_turf_standings_v2") : null;
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object") {
+                    for (const [tk, tv] of Object.entries(parsed)) {
+                        if (this.turfZones[tk] && tv && tv.leaderName && Number(tv.leaderScore) > 0) {
+                            this.turfZones[tk].leaderName = tv.leaderName;
+                            this.turfZones[tk].leaderColor = tv.leaderColor || this.turfZones[tk].leaderColor;
+                            this.turfZones[tk].leaderScore = Number(tv.leaderScore) || 0;
+                        }
+                    }
+                }
+            }
+        } catch (_e) {}
         return this.turfZones;
+    }
+
+    saveTurfStandings() {
+        try {
+            if (!window.localStorage || !this.turfZones) return;
+            const out = {};
+            for (const [tk, z] of Object.entries(this.turfZones)) {
+                if (z && z.leaderName && z.leaderScore > 0) {
+                    out[tk] = {
+                        leaderName: z.leaderName,
+                        leaderColor: z.leaderColor,
+                        leaderScore: z.leaderScore
+                    };
+                }
+            }
+            window.localStorage.setItem("vc26_turf_standings_v2", JSON.stringify(out));
+        } catch (_e) {}
     }
 
     getTurfKeyForDistrict(distStr = this.currentDistrict) {
@@ -7923,14 +7990,15 @@ class LeonidaGame {
 
         const isAlreadyMe = zone.leaderName && String(zone.leaderName).toUpperCase() === myName;
         const threshold = isAlreadyMe
-            ? (zone.leaderScore + 1000)
-            : Math.max(2500, (zone.leaderScore || 0) + 1000);
+            ? (zone.leaderScore + 300)
+            : Math.max(600, (zone.leaderScore || 0) + 300);
 
         if (myScore >= threshold) {
             const prevLeader = zone.leaderName;
             zone.leaderName = myName;
             zone.leaderColor = myColor;
             zone.leaderScore = myScore;
+            this.saveTurfStandings();
 
             if (!isAlreadyMe) {
                 if (this.audio && typeof this.audio.playFanfare === "function") {
@@ -7939,14 +8007,14 @@ class LeonidaGame {
                 this.showBigBanner(
                     `👑 TURF KINGPIN: ${zone.shortLabel}!`,
                     prevLeader
-                        ? `DETHRONED ${prevLeader} — YOU NOW RULE ${zone.shortLabel} (+25% TURF CASH & FACTION TRUCE)!`
-                        : `YOU CLAIMED ${zone.shortLabel} (+25% TURF CASH & LOCAL FACTION TRUCE)!`,
+                        ? `DETHRONED ${prevLeader} — YOU NOW RULE ${zone.shortLabel} (+10% TURF CASH & FACTION TRUCE)!`
+                        : `YOU CLAIMED ${zone.shortLabel} (+10% TURF CASH & LOCAL FACTION TRUCE)!`,
                     myColor,
                     3.2
                 );
                 this.sendPager(
                     "👑 VICE NET TURF WAR",
-                    `You now control ${zone.shortLabel} ($${myScore.toLocaleString()} Influence)! You earn +25% bonus cash in this district and local syndicates won't send hit squads after you!`,
+                    `You now control ${zone.shortLabel} ($${myScore.toLocaleString()} Influence)! You earn +10% bonus cash in this district and local syndicates won't send hit squads after you!`,
                     false
                 );
             }
@@ -8241,7 +8309,9 @@ class LeonidaGame {
 
     explodeAt(x, y, radius = 115, damage = 180, byPlayer = false, fromNetwork = false) {
 
-        this.audio.playExplosion();
+        if (!this.player || Math.hypot(x - this.player.x, y - this.player.y) < 820) {
+            this.audio.playExplosion();
+        }
 
         if (byPlayer && !fromNetwork && this.net) {
 
@@ -8390,7 +8460,7 @@ class LeonidaGame {
 
                 }
 
-                this.killPed(ped, byPlayer);
+                this.killPed(ped, byPlayer, fromNetwork);
 
             } else if (d < radius * 2.5) {
 
@@ -8559,7 +8629,7 @@ class LeonidaGame {
             return;
         }
 
-        this.explodeAt(v.x, v.y, 130, 200, playerResponsible);
+        this.explodeAt(v.x, v.y, 130, 200, playerResponsible, fromNetwork);
 
         if (playerResponsible) {
             const isCriminalCar = (v.driver === "AI_CRIMINAL" || v.wasCriminalCar);
@@ -8882,6 +8952,28 @@ class LeonidaGame {
                 prevVeh.drifting = false;
 
                 prevVeh.sirenActive = false;
+                prevVeh._worldModified = true;
+                prevVeh.isStaticParked = false;
+                if (this.net && typeof this.net.broadcastWorldEvent === "function" && prevVeh.id) {
+                    const flags =
+                        (prevVeh.destroyed ? 1 : 0) |
+                        (prevVeh.frontDented ? 4 : 0) |
+                        (prevVeh.rearDented ? 8 : 0) |
+                        (prevVeh.heavyDented ? 16 : 0);
+                    this.net.broadcastWorldEvent({
+                        kind: "VEH_EXIT",
+                        vehId: prevVeh.id,
+                        seat: 0,
+                        specKey: prevVeh.specKey || "STALLION",
+                        x: Math.round(prevVeh.x),
+                        y: Math.round(prevVeh.y),
+                        z: Math.round((prevVeh.z || 2.0) * 100) / 100,
+                        a: Math.round((prevVeh.angle || 0) * 1000) / 1000,
+                        hp: Math.round(prevVeh.hp || 100),
+                        flags,
+                        remapIdx: prevVeh.remapIdx || 0
+                    });
+                }
 
             }
 
@@ -8935,6 +9027,9 @@ class LeonidaGame {
 
                 this.addFloatingText(p.x, p.y - 30, `-$${lost.toLocaleString("en-US")} LOST`, "#ef4444");
 
+            }
+            if (this.net && typeof this.net.broadcastStateNow === "function") {
+                this.net.broadcastStateNow();
             }
 
             return lost;
@@ -9097,6 +9192,9 @@ class LeonidaGame {
             }
 
             this.updateHud();
+            if (this.net && typeof this.net.broadcastStateNow === "function") {
+                this.net.broadcastStateNow();
+            }
 
         }, 2800);
 
@@ -10695,18 +10793,14 @@ class LeonidaGame {
                             if (!intr._targetHitTimers) intr._targetHitTimers = [0, 0, 0, 0];
                             intr._targetHitTimers[lane] = 0.30;
                             const isBullseye = dist <= 10;
-                            const prize = isBullseye ? 250 : 100;
-                            this.cash += prize;
-                            this.score += prize * this.multiplier;
                             if (!this.interiorPopups) this.interiorPopups = [];
                             this.interiorPopups.push({
                                 x: tp.x,
                                 y: tp.y,
-                                text: isBullseye ? `🎯 BULLSEYE! +$${prize}` : `🎯 TARGET HIT! +$${prize}`,
+                                text: isBullseye ? "🎯 BULLSEYE!" : "🎯 TARGET HIT!",
                                 color: isBullseye ? "#fde047" : "#39ff14",
                                 life: 1.15
                             });
-                            if (this.audio && this.audio.playCashSound) this.audio.playCashSound();
                             this.updateHud();
                             break;
                         }
@@ -12103,9 +12197,7 @@ class LeonidaGame {
                                     });
                                 }
                                 if (v.driver === "PLAYER") {
-                                    this.score += 85 * this.multiplier;
-                                    this.updateHud();
-                                    this.addFloatingText(ph.x, ph.y - 20, "☎️ PAYPHONE SMASHED! +$85", "#38bdf8");
+                                    this.addFloatingText(ph.x, ph.y - 20, "☎️ PAYPHONE SMASHED!", "#38bdf8");
                                 }
                             }
                         }
@@ -17496,8 +17588,6 @@ class LeonidaGame {
                 });
             }
             if (byPlayer) {
-                this.score += 25 * this.multiplier;
-                this.updateHud();
                 this.addFloatingText(ux, uy - 18, "⛱️ PARASOL SMASHED!", "#38bdf8");
             }
         };
@@ -17536,7 +17626,7 @@ class LeonidaGame {
                         ped.x += Math.cos(awayAng) * 14;
                         ped.y += Math.sin(awayAng) * 14;
                     } else {
-                        this.killPed(ped, byPlayer);
+                        this.killPed(ped, byPlayer, fromNetwork);
                     }
                     killedCount++;
                 }

@@ -28,12 +28,22 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
+const ECON_VERSION = 2;
+
+function normalizeRoomCode(roomCode) {
+    const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
+    return raw === "VICE97" ? "VICE26" : raw;
+}
 
 function createEmptyRoom() {
     return {
         vehs: {},          // Live AI traffic vehicles
         modifiedVehs: {},  // Player-driven, moved, parked, damaged, or wrecked vehicles (NEVER overwritten by default map!)
         smashedProps: {},  // Knocked-down streetlamps, traffic lights, bollards, hydrants, benches
+        corpses: {},       // Recent pedestrian corpses (auto-cleaned after 180s or paramedic pickup)
+        turfStandings: {}, // District Turf War Kingpins (leaderName, leaderColor, leaderScore)
+        activeFlashDrop: null,
+        activeBounty: null,
         chat: [],
         ver: 0,
         worldMinutes: 720,
@@ -43,24 +53,27 @@ function createEmptyRoom() {
 }
 
 const persistentStore = {
+    econVer: ECON_VERSION,
     updatedAt: new Date().toISOString(),
     leaderboard: [],
     profiles: {},
     rooms: {
-        VICE97: createEmptyRoom(),
+        VICE26: createEmptyRoom(),
         MIAMI86: createEmptyRoom(),
         KEYS305: createEmptyRoom()
     }
 };
 
 function ensureRoom(roomCode) {
-    const code = String(roomCode || "VICE97").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE97";
+    const code = normalizeRoomCode(roomCode);
     if (!persistentStore.rooms[code]) {
         persistentStore.rooms[code] = createEmptyRoom();
     }
     const r = persistentStore.rooms[code];
     if (!r.modifiedVehs) r.modifiedVehs = {};
     if (!r.smashedProps) r.smashedProps = {};
+    if (!r.corpses) r.corpses = {};
+    if (!r.turfStandings) r.turfStandings = {};
     if (!r.vehs) r.vehs = {};
     if (!Array.isArray(r.chat)) r.chat = [];
     return { code, room: r };
@@ -72,27 +85,46 @@ function loadPersistentState() {
             const raw = fs.readFileSync(STATE_FILE, "utf8");
             const parsed = JSON.parse(raw);
             if (parsed && typeof parsed === "object") {
+                const isLegacyEcon = (Number(parsed.econVer) || 1) < ECON_VERSION;
                 if (Array.isArray(parsed.leaderboard)) {
-                    persistentStore.leaderboard = parsed.leaderboard.slice(0, 25);
+                    persistentStore.leaderboard = parsed.leaderboard
+                        .filter((e) => e && e.name && (!isLegacyEcon || (Number(e.econVer) || 1) >= ECON_VERSION || Number(e.score) <= 50000))
+                        .slice(0, 25);
                 }
                 if (parsed.profiles && typeof parsed.profiles === "object") {
-                    persistentStore.profiles = parsed.profiles;
+                    for (const [pk, pv] of Object.entries(parsed.profiles)) {
+                        if (!pv || typeof pv !== "object") continue;
+                        if (isLegacyEcon && (Number(pv.econVer) || 1) < ECON_VERSION) {
+                            pv.cash = 500;
+                            pv.econVer = ECON_VERSION;
+                        }
+                        persistentStore.profiles[pk] = pv;
+                    }
                 }
                 if (parsed.rooms && typeof parsed.rooms === "object") {
                     for (const [rk, rv] of Object.entries(parsed.rooms)) {
                         if (rv && typeof rv === "object") {
-                            persistentStore.rooms[rk] = {
-                                vehs: (rv.vehs && typeof rv.vehs === "object") ? rv.vehs : {},
-                                modifiedVehs: (rv.modifiedVehs && typeof rv.modifiedVehs === "object") ? rv.modifiedVehs : {},
-                                smashedProps: (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {},
-                                chat: Array.isArray(rv.chat) ? rv.chat.slice(-30) : [],
-                                trafficLightTimer: Number(rv.trafficLightTimer) || 0,
-                                updatedAt: Number(rv.updatedAt) || 0
+                            const normKey = normalizeRoomCode(rk);
+                            const existing = persistentStore.rooms[normKey] || createEmptyRoom();
+                            persistentStore.rooms[normKey] = {
+                                vehs: Object.assign({}, existing.vehs, (rv.vehs && typeof rv.vehs === "object") ? rv.vehs : {}),
+                                modifiedVehs: Object.assign({}, existing.modifiedVehs, (rv.modifiedVehs && typeof rv.modifiedVehs === "object") ? rv.modifiedVehs : {}),
+                                smashedProps: Object.assign({}, existing.smashedProps, (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {}),
+                                corpses: Object.assign({}, existing.corpses, (rv.corpses && typeof rv.corpses === "object") ? rv.corpses : {}),
+                                turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
+                                activeFlashDrop: null,
+                                activeBounty: null,
+                                chat: (existing.chat || []).concat(Array.isArray(rv.chat) ? rv.chat : []).slice(-30),
+                                ver: Math.max(Number(existing.ver) || 0, Number(rv.ver) || 0),
+                                worldMinutes: Number(rv.worldMinutes) || existing.worldMinutes || 720,
+                                trafficLightTimer: Number(rv.trafficLightTimer) || existing.trafficLightTimer || 0,
+                                updatedAt: Math.max(Number(existing.updatedAt) || 0, Number(rv.updatedAt) || 0)
                             };
                         }
                     }
                 }
-                console.log(`[WORLD-DB] Loaded persistent state from ${STATE_FILE}`);
+                persistentStore.econVer = ECON_VERSION;
+                console.log(`[WORLD-DB] Loaded persistent state from ${STATE_FILE} (econVer=${ECON_VERSION})`);
             }
         }
     } catch (err) {
@@ -114,16 +146,20 @@ function savePersistentStateNow() {
     }
 }
 
-function mergeLeaderboardEntry(name, charId, score, color) {
+function mergeLeaderboardEntry(name, charId, score, color, econVer = 1) {
     const cleanName = String(name || "").trim().slice(0, 18).toUpperCase();
     const sc = Math.floor(Number(score) || 0);
     if (!cleanName || sc <= 0) return false;
+    // Ignore un-migrated pre-v2 inflated scores (> $50,000 without econVer >= 2)
+    if ((Number(econVer) || 1) < ECON_VERSION && sc > 50000) return false;
     const existing = persistentStore.leaderboard.find((e) => e.name === cleanName);
     if (existing) {
-        if (sc > existing.score) {
+        const existingIsLegacy = (Number(existing.econVer) || 1) < ECON_VERSION && existing.score > 50000;
+        if (sc > existing.score || existingIsLegacy) {
             existing.score = sc;
             existing.charId = charId || existing.charId || "LUCIA";
             existing.color = color || existing.color || "#00f0ff";
+            existing.econVer = ECON_VERSION;
             existing.ts = Date.now();
             isDirty = true;
         } else {
@@ -135,6 +171,7 @@ function mergeLeaderboardEntry(name, charId, score, color) {
             charId: charId || "LUCIA",
             score: sc,
             color: color || "#00f0ff",
+            econVer: ECON_VERSION,
             ts: Date.now()
         });
         isDirty = true;
@@ -197,9 +234,11 @@ function broadcastDirectoryCounts() {
     const counts = {};
     for (const code of ROOM_CODES) counts[code] = 0;
     for (const meta of clients.values()) {
-        const r = meta.room || "VICE97";
+        const r = normalizeRoomCode(meta.room || "VICE26");
         counts[r] = (counts[r] || 0) + 1 + (meta.bots || 0);
     }
+    // Mirror VICE26 <-> VICE97 count so both legacy and current UI badges match 100%
+    counts.VICE97 = counts.VICE26 || 0;
     const frame = encodeWsFrame(JSON.stringify({ t: "DIR_COUNTS", counts }));
     for (const [sock] of clients.entries()) {
         if (!sock.destroyed && sock.writable) {
@@ -283,6 +322,31 @@ function sendRoomBootstrap(socket, meta) {
         profile: prof
     });
 
+    // 6B. Persisted District Turf Standings + Active Hot Drop / Bounty Events
+    if (room.turfStandings && Object.keys(room.turfStandings).length > 0) {
+        sendJson(socket, {
+            t: "WORLD_EVENT",
+            kind: "TURF_SYNC",
+            standings: room.turfStandings
+        });
+    }
+    if (room.activeFlashDrop && (Date.now() - (room.activeFlashDrop.startedAt || 0)) < (room.activeFlashDrop.duration || 90) * 1000) {
+        const remSec = Math.max(5, Math.round((room.activeFlashDrop.duration || 90) - (Date.now() - room.activeFlashDrop.startedAt) / 1000));
+        sendJson(socket, Object.assign({}, room.activeFlashDrop, {
+            t: "WORLD_EVENT",
+            kind: "FLASH_DROP_SPAWN",
+            duration: remSec
+        }));
+    }
+    if (room.activeBounty && (Date.now() - (room.activeBounty.startedAt || 0)) < (room.activeBounty.duration || 60) * 1000) {
+        const remSec = Math.max(5, Math.round((room.activeBounty.duration || 60) - (Date.now() - room.activeBounty.startedAt) / 1000));
+        sendJson(socket, Object.assign({}, room.activeBounty, {
+            t: "WORLD_EVENT",
+            kind: "BOUNTY_START",
+            duration: remSec
+        }));
+    }
+
     // 7. Current active players in the room
     for (const [otherSock, otherMeta] of clients.entries()) {
         if (otherSock !== socket && otherMeta.room === code && otherMeta.lastState) {
@@ -304,6 +368,12 @@ function handleClientPacket(socket, pkt) {
     if (pkt.color) meta.color = String(pkt.color).slice(0, 16);
     if (pkt.pedType) meta.pedType = String(pkt.pedType).slice(0, 16);
 
+    if (pkt.t === "PING") {
+        meta.lastSeen = Date.now();
+        sendJson(socket, { t: "PONG", ts: pkt.ts || Date.now() });
+        return;
+    }
+
     if (pkt.t === "SWITCH_ROOM" && pkt.room) {
         const prevRoom = meta.room;
         const { code } = ensureRoom(pkt.room);
@@ -321,6 +391,19 @@ function handleClientPacket(socket, pkt) {
     if (meta.room !== roomCode) {
         meta.room = roomCode;
         meta.slot = assignRoomSlot(roomCode, socket);
+    }
+
+    if (pkt.t === "NAME" && pkt.name) {
+        meta.name = String(pkt.name).slice(0, 18).toUpperCase();
+        meta.profileKey = meta.name.replace(/[^A-Z0-9_#]/g, "");
+        const prof = (meta.profileKey && persistentStore.profiles[meta.profileKey]) || null;
+        sendJson(socket, {
+            t: "PROFILE_SYNC",
+            profileKey: meta.profileKey,
+            profile: prof
+        });
+        broadcastToRoom(roomCode, pkt, socket);
+        return;
     }
 
     if (pkt.t === "JOIN") {
@@ -343,17 +426,24 @@ function handleClientPacket(socket, pkt) {
         meta.lastSeen = Date.now();
 
         if (typeof pkt.sc === "number" && pkt.sc > 0) {
-            mergeLeaderboardEntry(meta.name, pkt.charId || "LUCIA", pkt.sc, meta.color);
+            mergeLeaderboardEntry(meta.name, pkt.charId || "LUCIA", pkt.sc, meta.color, pkt.econVer || 1);
         }
 
         // Only overwrite saved player profile when the player has actually started playing & synced!
         if (pkt.started && meta.profileKey && typeof pkt.x === "number" && typeof pkt.y === "number") {
+            const clientEconVer = Number(pkt.econVer) || 1;
+            const safeCash = clientEconVer >= ECON_VERSION ? Math.round(pkt.sc || 0) : Math.min(500, Math.round(pkt.sc || 500));
             persistentStore.profiles[meta.profileKey] = {
+                econVer: ECON_VERSION,
                 name: meta.name,
                 charId: pkt.charId || "LUCIA",
                 pedType: pkt.pedType || meta.pedType || "lucia",
                 color: pkt.color || meta.color || "#00f0ff",
-                cash: Math.round(pkt.sc || 0),
+                cash: safeCash,
+                mlt: Math.max(1, Math.min(99, Math.round(pkt.mlt || 1))),
+                lvs: Math.max(1, Math.min(9, Math.round(pkt.lvs !== undefined ? pkt.lvs : 3))),
+                jfc: Math.max(0, Math.min(9, Math.round(pkt.jfc !== undefined ? pkt.jfc : 1))),
+                bnd: Boolean(pkt.bnd),
                 hp: Math.round(pkt.hp !== undefined ? pkt.hp : 100),
                 armor: Math.round(pkt.ar || 0),
                 dead: Boolean(pkt.dead),
@@ -546,6 +636,16 @@ function handleClientPacket(socket, pkt) {
             const pKey = `${pkt.pType}_${Math.round(pkt.x)}_${Math.round(pkt.y)}`;
             if (Number(pkt.a) < -900) {
                 delete room.smashedProps[pKey];
+                if (typeof pkt.pType === "string" && pkt.pType.startsWith("CORPSE:") && room.corpses) {
+                    if (pkt.pedId && room.corpses[pkt.pedId]) {
+                        delete room.corpses[pkt.pedId];
+                    }
+                    for (const [cid, crow] of Object.entries(room.corpses)) {
+                        if (Array.isArray(crow) && Math.hypot((crow[3] || 0) - pkt.x, (crow[4] || 0) - pkt.y) < 38) {
+                            delete room.corpses[cid];
+                        }
+                    }
+                }
                 isDirty = true;
                 broadcastToRoom(roomCode, pkt, socket);
                 return;
@@ -562,6 +662,67 @@ function handleClientPacket(socket, pkt) {
                 delete room.smashedProps[propKeys[0]];
             }
             isDirty = true;
+        } else if (pkt.kind === "PED_REVIVE") {
+            if (room.corpses) {
+                if (pkt.pedId && room.corpses[pkt.pedId]) {
+                    delete room.corpses[pkt.pedId];
+                }
+                if (typeof pkt.x === "number" && typeof pkt.y === "number") {
+                    for (const [cid, crow] of Object.entries(room.corpses)) {
+                        if (Array.isArray(crow) && Math.hypot((crow[3] || 0) - pkt.x, (crow[4] || 0) - pkt.y) < 38) {
+                            delete room.corpses[cid];
+                        }
+                    }
+                }
+            }
+            if (typeof pkt.x === "number" && typeof pkt.y === "number") {
+                for (const [pk, pv] of Object.entries(room.smashedProps)) {
+                    if (pv && typeof pv.pType === "string" && pv.pType.startsWith("CORPSE:") && Math.hypot((pv.x || 0) - pkt.x, (pv.y || 0) - pkt.y) < 38) {
+                        delete room.smashedProps[pk];
+                    }
+                }
+            }
+            isDirty = true;
+        } else if (pkt.kind === "TURF_TAKEOVER" && pkt.turfKey) {
+            if (!room.turfStandings) room.turfStandings = {};
+            room.turfStandings[pkt.turfKey] = {
+                leaderName: pkt.leaderName || "PLAYER",
+                leaderColor: pkt.leaderColor || "#00f0ff",
+                leaderScore: Number(pkt.leaderScore) || 600
+            };
+            isDirty = true;
+        } else if (pkt.kind === "TURF_SYNC" && pkt.standings && typeof pkt.standings === "object") {
+            if (!room.turfStandings) room.turfStandings = {};
+            for (const [tk, ts] of Object.entries(pkt.standings)) {
+                if (ts && ts.leaderName && (Number(ts.leaderScore) || 0) > ((room.turfStandings[tk] && room.turfStandings[tk].leaderScore) || 0)) {
+                    room.turfStandings[tk] = {
+                        leaderName: ts.leaderName,
+                        leaderColor: ts.leaderColor || "#00f0ff",
+                        leaderScore: Number(ts.leaderScore) || 600
+                    };
+                    isDirty = true;
+                }
+            }
+        } else if (pkt.kind === "FLASH_DROP_SPAWN" && typeof pkt.x === "number" && typeof pkt.y === "number") {
+            room.activeFlashDrop = {
+                x: pkt.x,
+                y: pkt.y,
+                z: pkt.z || 2.0,
+                reward: pkt.reward || 800,
+                weapon: pkt.weapon || "ROCKET",
+                duration: pkt.duration || 90,
+                startedAt: Date.now()
+            };
+        } else if (pkt.kind === "FLASH_DROP_CLAIM") {
+            room.activeFlashDrop = null;
+        } else if (pkt.kind === "BOUNTY_START" && pkt.targetId) {
+            room.activeBounty = {
+                targetId: pkt.targetId,
+                targetName: pkt.targetName || "PLAYER",
+                reward: pkt.reward || 1200,
+                duration: pkt.duration || 60,
+                startedAt: Date.now()
+            };
         }
         broadcastToRoom(roomCode, pkt, socket);
         return;
@@ -591,9 +752,10 @@ function handleClientPacket(socket, pkt) {
     }
 
     if (pkt.t === "HISCORE") {
-        if (mergeLeaderboardEntry(pkt.name || meta.name, pkt.charId, pkt.sc, pkt.color || meta.color)) {
+        if (mergeLeaderboardEntry(pkt.name || meta.name, pkt.charId, pkt.sc, pkt.color || meta.color, pkt.econVer || 1)) {
             broadcastToRoom(roomCode, {
                 t: "LEADERBOARD_SYNC",
+                econVer: ECON_VERSION,
                 entries: persistentStore.leaderboard
             });
         }
@@ -602,9 +764,10 @@ function handleClientPacket(socket, pkt) {
 
     if (pkt.t === "LEADERBOARD_SYNC" && Array.isArray(pkt.entries)) {
         let changed = false;
+        const pktEconVer = pkt.econVer || 1;
         for (const e of pkt.entries) {
             if (e && e.name && e.score) {
-                if (mergeLeaderboardEntry(e.name, e.charId, e.score, e.color)) {
+                if (mergeLeaderboardEntry(e.name, e.charId, e.score, e.color, e.econVer || pktEconVer)) {
                     changed = true;
                 }
             }
@@ -612,6 +775,7 @@ function handleClientPacket(socket, pkt) {
         if (changed) {
             broadcastToRoom(roomCode, {
                 t: "LEADERBOARD_SYNC",
+                econVer: ECON_VERSION,
                 entries: persistentStore.leaderboard
             });
         }
@@ -713,57 +877,76 @@ server.on("upgrade", (req, socket) => {
     let rxBuf = Buffer.alloc(0);
 
     socket.on("data", (chunk) => {
-        rxBuf = Buffer.concat([rxBuf, chunk]);
-        while (rxBuf.length >= 2) {
-            const firstByte = rxBuf[0];
-            const secondByte = rxBuf[1];
-            const opcode = firstByte & 0x0f;
-            const isMasked = Boolean(secondByte & 0x80);
-            let payloadLen = secondByte & 0x7f;
-            let offset = 2;
-
-            if (payloadLen === 126) {
-                if (rxBuf.length < 4) return;
-                payloadLen = rxBuf.readUInt16BE(2);
-                offset = 4;
-            } else if (payloadLen === 127) {
-                if (rxBuf.length < 10) return;
-                payloadLen = Number(rxBuf.readBigUInt64BE(2));
-                offset = 10;
-            }
-
-            const maskLen = isMasked ? 4 : 0;
-            const totalFrameLen = offset + maskLen + payloadLen;
-            if (rxBuf.length < totalFrameLen) return;
-
-            if (opcode === 0x8) {
-                socket.end();
+        try {
+            rxBuf = Buffer.concat([rxBuf, chunk]);
+            if (rxBuf.length > 524288) {
+                rxBuf = Buffer.alloc(0);
+                socket.destroy();
                 return;
             }
-            if (opcode === 0x9) {
-                const pong = Buffer.from([0x8a, 0x00]);
-                try { socket.write(pong); } catch (_e) {}
-                rxBuf = rxBuf.subarray(totalFrameLen);
-                continue;
-            }
+            while (rxBuf.length >= 2) {
+                const firstByte = rxBuf[0];
+                const secondByte = rxBuf[1];
+                const opcode = firstByte & 0x0f;
+                const isMasked = Boolean(secondByte & 0x80);
+                let payloadLen = secondByte & 0x7f;
+                let offset = 2;
 
-            let payload = rxBuf.subarray(offset + maskLen, totalFrameLen);
-            if (isMasked) {
-                const mask = rxBuf.subarray(offset, offset + 4);
-                const unmasked = Buffer.allocUnsafe(payload.length);
-                for (let i = 0; i < payload.length; i++) {
-                    unmasked[i] = payload[i] ^ mask[i & 3];
+                if (payloadLen === 126) {
+                    if (rxBuf.length < 4) return;
+                    payloadLen = rxBuf.readUInt16BE(2);
+                    offset = 4;
+                } else if (payloadLen === 127) {
+                    if (rxBuf.length < 10) return;
+                    payloadLen = Number(rxBuf.readBigUInt64BE(2));
+                    offset = 10;
                 }
-                payload = unmasked;
-            }
-            rxBuf = rxBuf.subarray(totalFrameLen);
 
-            if (opcode === 0x1) {
-                try {
-                    const pkt = JSON.parse(payload.toString("utf8"));
-                    handleClientPacket(socket, pkt);
-                } catch (_e) {}
+                if (payloadLen > 262144) {
+                    rxBuf = Buffer.alloc(0);
+                    socket.destroy();
+                    return;
+                }
+
+                const maskLen = isMasked ? 4 : 0;
+                const totalFrameLen = offset + maskLen + payloadLen;
+                if (rxBuf.length < totalFrameLen) return;
+
+                if (opcode === 0x8) {
+                    socket.end();
+                    return;
+                }
+
+                let payload = rxBuf.subarray(offset + maskLen, totalFrameLen);
+                if (isMasked && payloadLen > 0) {
+                    const mask = rxBuf.subarray(offset, offset + 4);
+                    const unmasked = Buffer.allocUnsafe(payload.length);
+                    for (let i = 0; i < payload.length; i++) {
+                        unmasked[i] = payload[i] ^ mask[i & 3];
+                    }
+                    payload = unmasked;
+                }
+                rxBuf = rxBuf.subarray(totalFrameLen);
+
+                if (opcode === 0x9) {
+                    const pLen = Math.min(payload.length, 125);
+                    const pong = Buffer.allocUnsafe(2 + pLen);
+                    pong[0] = 0x8a;
+                    pong[1] = pLen;
+                    if (pLen > 0) payload.copy(pong, 2, 0, pLen);
+                    try { socket.write(pong); } catch (_e) {}
+                    continue;
+                }
+
+                if (opcode === 0x1) {
+                    try {
+                        const pkt = JSON.parse(payload.toString("utf8"));
+                        handleClientPacket(socket, pkt);
+                    } catch (_e) {}
+                }
             }
+        } catch (_err) {
+            rxBuf = Buffer.alloc(0);
         }
     });
 
@@ -796,8 +979,20 @@ server.on("upgrade", (req, socket) => {
 });
 
 setInterval(() => {
+    const nowMs = Date.now();
     for (const rv of Object.values(persistentStore.rooms)) {
         rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 24.0;
+        // Municipal auto-repair for ancient smashed props (> 5 minutes old) & corpse cleanup (> 3 minutes old)
+        if (rv.smashedProps) {
+            for (const [pk, pv] of Object.entries(rv.smashedProps)) {
+                const isCorpse = pv && typeof pv.pType === "string" && pv.pType.startsWith("CORPSE:");
+                const maxAge = isCorpse ? 180000 : 300000;
+                if (pv && pv.ts && (nowMs - pv.ts) > maxAge) {
+                    delete rv.smashedProps[pk];
+                    isDirty = true;
+                }
+            }
+        }
     }
 }, 500);
 

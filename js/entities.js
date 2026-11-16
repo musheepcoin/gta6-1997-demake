@@ -5682,13 +5682,27 @@ class TrafficManager {
         let corpseCount = 0;
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
-            if (ped.dead && !ped._boardedVehicle) {
-                corpseCount++;
-                if (corpseCount <= 65) continue;
-            }
-            if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
+            if (ped.dead) {
+                if (ped._boardedVehicle) {
+                    if (game.net && typeof game.net.broadcastCorpseCleared === "function") {
+                        game.net.broadcastCorpseCleared(ped);
+                    }
+                    game.peds.splice(i, 1);
+                    continue;
+                }
+                corpseCount++;
+                const nearAnyViewport = outerRects.some((r) => this.isPointInRect(bx, by, r));
+                if (corpseCount > 55 || ((ped.deadTimer || 0) > 95 && !nearAnyViewport)) {
+                    if (game.net && typeof game.net.broadcastCorpseCleared === "function") {
+                        game.net.broadcastCorpseCleared(ped);
+                    }
+                    game.peds.splice(i, 1);
+                }
+                continue;
+            }
+            if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
             // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway or Port of Vice City industrial zone
             if ((ped.kind === "CIVILIAN" || ped.kind === "CRIMINAL") && (
                 (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) ||
