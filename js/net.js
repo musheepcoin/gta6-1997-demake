@@ -1822,6 +1822,9 @@ class ViceNetworkManager {
                 v.vy = vy;
                 v.speed = Math.hypot(vx, vy);
                 v.driver = codeToDrv(drvCode);
+                if (isInitialServerBootstrap && v.driver === null && v.isPolice && !nowDestroyed) {
+                    v.abandonedTimer = Math.max(v.abandonedTimer || 0, 10.0);
+                }
                 v.hp = Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp;
                 const wasDestroyed = v.destroyed;
                 const nowDestroyed = Boolean(flags & 1);

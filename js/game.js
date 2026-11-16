@@ -9764,17 +9764,15 @@ class LeonidaGame {
 
             // Coherent VCPD Cruiser Recovery: if an intact police cruiser is left driverless on the street after a chase,
             // a nearby VCPD relief officer walks from the nearest sidewalk, climbs into the cruiser, and drives it back on patrol!
-            if (v.isPolice && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 9.0) {
+            if (v.isPolice && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 6.0) {
                 const hasReturningCop = this.peds.some(
-                    (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || Math.hypot(pd.x - v.x, pd.y - v.y) < 460)
+                    (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || (!pd.inCombat && Math.hypot(pd.x - v.x, pd.y - v.y) < 380))
                 );
-                if (!hasReturningCop && this.peds.length < 135) {
-                    const cbx = Math.floor(v.x / TILE_SIZE);
-                    const cby = Math.floor(v.y / TILE_SIZE);
+                if (!hasReturningCop && this.peds.length < 145) {
                     const cz = v.z || 2.0;
                     for (let ca = 0; ca < 12; ca++) {
                         const ang = (ca / 12) * Math.PI * 2;
-                        const sDist = 145 + (ca % 3) * 28;
+                        const sDist = 85 + (ca % 3) * 20;
                         const sx = v.x + Math.cos(ang) * sDist;
                         const sy = v.y + Math.sin(ang) * sDist;
                         const sbx = Math.floor(sx / TILE_SIZE);
@@ -9784,7 +9782,7 @@ class LeonidaGame {
                             nav &&
                             (nav.groundType === GROUND_TYPE.PAWEMENT || nav.groundType === GROUND_TYPE.ROAD) &&
                             (!this.map.isWaterAtPixel || !this.map.isWaterAtPixel(sx, sy)) &&
-                            (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(sx, sy, 12, cz).hit)
+                            (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(sx, sy, 10, cz).hit)
                         ) {
                             const reliefCop = new Pedestrian({
                                 x: sx,
@@ -9795,8 +9793,9 @@ class LeonidaGame {
                                 g24Type: "police",
                                 copWeapon: "PISTOL",
                                 hp: 105,
-                                speed: 74
+                                speed: 84
                             });
+                            reliefCop.isReliefDriver = true;
                             reliefCop._boardingVeh = v;
                             this.peds.push(reliefCop);
                             break;
@@ -12949,7 +12948,14 @@ class LeonidaGame {
 
                 }
 
-                const copTarget = this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
+                const activeReliefTarget = Boolean(
+                    ped.isReliefDriver &&
+                    ped._boardingVeh &&
+                    !ped._boardingVeh.destroyed &&
+                    ped._boardingVeh.driver === null &&
+                    !ped._boardingVeh.towedByTruck
+                );
+                const copTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
 
                     x: p.inVehicle ? p.inVehicle.x : p.x,
 
@@ -13101,13 +13107,13 @@ class LeonidaGame {
 
                     if (returnCar) {
                         ped._boardingVeh = returnCar;
-                        const boardDist = Math.max(42, (returnCar.w || 48) * 0.52 + 12);
-                        if (bestCarDist < boardDist) {
+                        ped._reliefTimer = (ped._reliefTimer || 0) + dt;
+                        const boardDist = Math.max(44, (returnCar.w || 48) * 0.52 + 14);
+                        if (bestCarDist < boardDist || (ped.isReliefDriver && ped._reliefTimer > 5.5)) {
                             returnCar.driver = "AI_COP";
                             returnCar.wasCriminalCar = false;
-                            returnCar.sirenActive = false;
-                            returnCar._worldModified = false;
-                            returnCar.lastPlayerDriven = false;
+                            returnCar.sirenActive = Boolean(this.wantedLevel > 0);
+                            returnCar._worldModified = true;
                             returnCar.abandonedTimer = 0;
                             returnCar.doorOpenTimer = 0.44;
                             ped._boardedVehicle = true;
@@ -13115,8 +13121,8 @@ class LeonidaGame {
                             continue;
                         }
                         ped.angle = this.steerPedWithObstacleFeelers(ped, returnCar.x, returnCar.y, returnCar);
-                        ped.x += Math.cos(ped.angle) * 76 * dt;
-                        ped.y += Math.sin(ped.angle) * 76 * dt;
+                        ped.x += Math.cos(ped.angle) * 86 * dt;
+                        ped.y += Math.sin(ped.angle) * 86 * dt;
                     } else {
                         // Routine VCPD foot patrol when no wanted player or active criminal is nearby
                         ped.x += Math.cos(ped.angle) * 26 * dt;
