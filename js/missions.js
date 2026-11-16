@@ -133,8 +133,19 @@ class MissionManager {
         if (!g || !Array.isArray(g.vehicles)) return;
         const pVeh = g.player ? g.player.inVehicle : null;
         g.vehicles = g.vehicles.filter((v) => {
-            if (!v || v === pVeh) return true;
-            return v.id !== "mission_cheetah" && v.id !== "mission_brinks" && v.id !== "fixer_target_car";
+            if (!v) return false;
+            if (v === pVeh) {
+                if (v.missionTag === "FIXER_TARGET") v.missionTag = null;
+                if (v.id === "fixer_target_car") v.id = `stolen_fixer_${Date.now()}`;
+                return true;
+            }
+            if (v.id === "mission_cheetah" || v.id === "mission_brinks" || v.id === "fixer_target_car") {
+                return false;
+            }
+            if (v.missionTag === "FIXER_TARGET") {
+                v.missionTag = null;
+            }
+            return true;
         });
         if (Array.isArray(g.peds)) {
             g.peds = g.peds.filter((pd) => !pd || pd.missionTag !== "FIXER_VIP");
@@ -461,6 +472,7 @@ class MissionManager {
                 targetCar.driver = "AI_TRAFFIC";
                 g.vehicles.push(targetCar);
             }
+            targetCar.missionTag = "FIXER_TARGET";
             // Pick nearest Pay 'n' Spray or Crane as drop-off
             let bestDrop = { name: "VICE CUSTOMS", x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
             let bestDropDist = Infinity;
@@ -503,6 +515,7 @@ class MissionManager {
             courier.z = spot.z;
             courier.driver = "AI_CRIMINAL";
             courier.wasCriminalCar = true;
+            courier.missionTag = "FIXER_TARGET";
             courier.hp = 260;
             courier.maxHp = 260;
             g.vehicles.push(courier);
@@ -533,6 +546,7 @@ class MissionManager {
                 bombCar.z = spot.z;
                 g.vehicles.push(bombCar);
             }
+            bombCar.missionTag = "FIXER_TARGET";
             let dropLm = { shortName: "OCEAN DRIVE", x: 443.5 * TILE_SIZE, y: 287.0 * TILE_SIZE };
             if (g.map && Array.isArray(g.map.landmarks)) {
                 const cands = g.map.landmarks.filter((lm) => {
@@ -725,14 +739,28 @@ class MissionManager {
 
     completeMission(phone, title, reward) {
         const g = this.game;
-        if (phone) phone.completed = true;
+        const wasDynamicFixer = Boolean((phone && phone.missionId === "M0_DYNAMIC_FIXER") || (this.activeMission && this.activeMission.id === "M0_DYNAMIC_FIXER"));
+        if (phone && phone.missionId !== "M0_DYNAMIC_FIXER") {
+            phone.completed = true;
+        }
+        this.cleanupMissionVehicles();
         this.activeMission = null;
         g.multiplier = Math.min(9, g.multiplier + 1);
         g.addCash(reward, "MISSION PASSED!");
         g.audio.playCashSound();
         g.showBigBanner("MISSION PASSED!", `${title} — +$${reward.toLocaleString()} (MULTIPLIER x${g.multiplier})`, "#39ff14", 3.5);
 
-        const nextIdx = this.payphones.findIndex(p => !p.completed);
+        if (wasDynamicFixer) {
+            this.selectedMissionIdx = 0;
+            g.sendPager(
+                "📱 VICENET AI FIXER",
+                `Contract cleared! Multiplier is now x${g.multiplier}. Hit [START] on your Smartphone (or type @fixer in chat) whenever you want the next 90s live contract!`,
+                false
+            );
+            return;
+        }
+
+        const nextIdx = this.payphones.findIndex(p => !p.completed && p.missionId !== "M0_DYNAMIC_FIXER");
         if (nextIdx !== -1) {
             this.selectedMissionIdx = nextIdx;
             const nextPhone = this.payphones[nextIdx];
@@ -742,9 +770,10 @@ class MissionManager {
                 false
             );
         } else {
+            this.selectedMissionIdx = 0;
             g.sendPager(
                 "STATE OF LEONIDA",
-                "ALL STORY MISSIONS COMPLETED! Lucia's DOC Ankle Monitor is permanently scrambled. You can replay any mission from your Smartphone!",
+                "ALL STORY MISSIONS COMPLETED! Lucia's DOC Ankle Monitor is permanently scrambled. Launch ⚡ FIXER: LIVE 90S contracts anytime!",
                 true
             );
         }
@@ -752,6 +781,7 @@ class MissionManager {
 
     failMission(reason) {
         const g = this.game;
+        this.cleanupMissionVehicles();
         this.activeMission = null;
         g.showBigBanner("MISSION FAILED", reason, "#ff1e38", 3.0);
         g.sendPager(

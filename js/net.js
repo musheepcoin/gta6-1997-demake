@@ -1286,6 +1286,27 @@ class ViceNetworkManager {
                     entries: this.game.getAllTimeHighScores()
                 });
             }
+            if (this.game && typeof this.game.ensureTurfZones === "function") {
+                const zones = this.game.ensureTurfZones();
+                const standings = {};
+                let hasAny = false;
+                for (const [k, z] of Object.entries(zones)) {
+                    if (z && z.leaderName && z.leaderScore > 0) {
+                        standings[k] = {
+                            leaderName: z.leaderName,
+                            leaderColor: z.leaderColor || "#00f0ff",
+                            leaderScore: z.leaderScore
+                        };
+                        hasAny = true;
+                    }
+                }
+                if (hasAny) {
+                    this.broadcastWorldEvent({
+                        kind: "TURF_SYNC",
+                        standings
+                    });
+                }
+            }
             if (this.isWorldHost()) {
                 this.broadcastWorldSync();
             }
@@ -1764,6 +1785,17 @@ class ViceNetworkManager {
                     true
                 );
             }
+        } else if (pkt.kind === "TURF_SYNC" && this.game && pkt.standings && typeof pkt.standings === "object") {
+            const zones = typeof this.game.ensureTurfZones === "function" ? this.game.ensureTurfZones() : null;
+            if (zones) {
+                for (const [k, s] of Object.entries(pkt.standings)) {
+                    if (zones[k] && s && s.leaderName && (s.leaderScore || 0) > (zones[k].leaderScore || 0)) {
+                        zones[k].leaderName = s.leaderName;
+                        zones[k].leaderColor = s.leaderColor || "#00f0ff";
+                        zones[k].leaderScore = s.leaderScore;
+                    }
+                }
+            }
         }
     }
 
@@ -1797,11 +1829,11 @@ class ViceNetworkManager {
                     : `Live on Flash FM! ${pName} is cruising through ${dist} holding $${Math.floor(g.cash || 0).toLocaleString()}! Current district Kingpin: ${king}!`;
             } else if (lower.startsWith("@diaz") || lower.startsWith("@sonny") || lower.startsWith("@toussaint") || lower.startsWith("@mitch") || lower.startsWith("@cortez")) {
                 const bossMap = {
-                    "@diaz": { name: "🏛️ DON DIAZ (STAR CARTEL)", col: "#c084fc" },
-                    "@sonny": { name: "🌴 SONNY (OCEAN SYNDICATE)", col: "#fb7185" },
-                    "@toussaint": { name: "🎨 TOUSSAINT (ZOE POUND)", col: "#e879f9" },
-                    "@mitch": { name: "🏙️ BIG MITCH (BROTHERHOOD)", col: "#fb923c" },
-                    "@cortez": { name: "🚔 CAPT. CORTEZ (VCPD)", col: "#38bdf8" }
+                    "@diaz": { name: "🏛️ DON DIAZ (STAR CARTEL)", col: "#c084fc", fKey: "STAR" },
+                    "@sonny": { name: "🌴 SONNY (OCEAN SYNDICATE)", col: "#fb7185", fKey: "BEACH" },
+                    "@toussaint": { name: "🎨 TOUSSAINT (ZOE POUND)", col: "#e879f9", fKey: "HAITI" },
+                    "@mitch": { name: "🏙️ BIG MITCH (BROTHERHOOD)", col: "#fb923c", fKey: "BIKER" },
+                    "@cortez": { name: "🚔 CAPT. CORTEZ (VCPD)", col: "#38bdf8", fKey: "VCPD" }
                 };
                 const tag = Object.keys(bossMap).find((k) => lower.startsWith(k)) || "@diaz";
                 agentName = bossMap[tag].name;
@@ -1810,9 +1842,7 @@ class ViceNetworkManager {
                     ? `Tu oses m'appeler depuis ${dist}, ${pName} ?! Montre ce que tu vaux : fais grimper ton score dans le quartier ou affronte mes gars !`
                     : `You got nerve messaging me from ${dist}, ${pName}! Prove yourself on my turf or face my hit squad!`;
                 if (typeof g.recordFactionGrudge === "function") {
-                    g.factionGrudges = g.factionGrudges || {};
-                    g.factionGrudges.STAR = 3;
-                    g.recordFactionGrudge("CHALLENGE", "Syndicate Turf", tag === "@cortez");
+                    g.recordFactionGrudge("CHALLENGE", "Syndicate Turf", tag === "@cortez", bossMap[tag].fKey);
                 }
             } else {
                 // @fixer or /ai -> Launch a live dynamic contract or drop a crate if requested!

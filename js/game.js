@@ -7737,16 +7737,34 @@ class LeonidaGame {
     }
 
     addCash(amount, label = "", skipCombo = false) {
-        if (!skipCombo) {
-            this.triggerArcadeCombo(amount, label, "#39ff14", 2.8, true);
+        const amt = Number(amount) || 0;
+        if (amt <= 0) return;
+        // Tactile street actions (<= $2,500) feed directly into the Adrenaline Combo Multiplier (x1..x10)
+        if (!skipCombo && amt <= 2500) {
+            this.triggerArcadeCombo(amt, label, "#39ff14", 2.8, true);
             return;
         }
-        const total = Math.floor(amount * (this.multiplier || 1));
+        // Major lump-sum payouts (Mission rewards, Bounties, Vaults, Hot Drops > $2,500) scale by base Multiplier + Turf Kingpin bonus (+25%) without x10 combo inflation
+        const turfBonusMult = (!skipCombo && this.isCurrentDistrictControlledByMe()) ? 1.25 : 1.0;
+        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * turfBonusMult);
         this.cash += total;
-        if (label) {
-            this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}`, "#39ff14");
-        } else {
-            this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}`, "#39ff14");
+        if (!skipCombo) {
+            const maxDur = this.getMaxComboDuration();
+            this.comboMaxTimer = maxDur;
+            this.comboTimer = Math.min(maxDur, Math.max(this.comboTimer || 0, maxDur * 0.85));
+            this.comboPot = (this.comboPot || 0) + total;
+            this.addTurfInfluence(Math.min(total, 3500));
+            if ((this.wantedLevel || 0) > 0) {
+                this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.min(5000, Math.round(total * 0.2));
+            }
+        }
+        if (this.player) {
+            const turfTag = turfBonusMult > 1.0 ? " 👑+25%" : "";
+            if (label) {
+                this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}${turfTag}`, "#39ff14");
+            } else {
+                this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}${turfTag}`, "#39ff14");
+            }
         }
         this._checkScoreMilestonesAndSave();
         this.updateHud();
@@ -7784,10 +7802,10 @@ class LeonidaGame {
         const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * this.comboMult * turfBonusMult);
         this.cash += total;
         this.comboPot = (this.comboPot || 0) + total;
-        this.addTurfInfluence(total);
+        this.addTurfInfluence(Math.min(total, 2500));
 
         if ((this.wantedLevel || 0) > 0) {
-            this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.round(total * 0.32);
+            this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.min(2500, Math.round(total * 0.32));
         }
 
         if (showFloat && this.player) {
@@ -7983,7 +8001,7 @@ class LeonidaGame {
     /* ========================================================================
        02 — 2.5D FACTION NEMESIS MEMORY & LIVE RADIO / VICENET 5G COMMENTARY
        ======================================================================== */
-    recordFactionGrudge(actionType, detailName = "ride", isPoliceTarget = false) {
+    recordFactionGrudge(actionType, detailName = "ride", isPoliceTarget = false, forceFactionKey = null) {
         if (!this.player || this.player.dead) return;
         const now = performance.now();
         if (!this.factionGrudges) {
@@ -7992,20 +8010,22 @@ class LeonidaGame {
             this._lastRadioFlashMs = 0;
         }
         const dist = String(this.currentDistrict || "VICE CITY").toUpperCase();
-        // If the player is the reigning Turf Kingpin of this district, local non-police gangs respect their turf!
-        if (!isPoliceTarget && typeof this.isCurrentDistrictControlledByMe === "function" && this.isCurrentDistrictControlledByMe()) {
+        // If the player is the reigning Turf Kingpin of this district, local non-police gangs respect their turf (unless directly challenged via @boss chat)!
+        if (!forceFactionKey && !isPoliceTarget && typeof this.isCurrentDistrictControlledByMe === "function" && this.isCurrentDistrictControlledByMe()) {
             return;
         }
-        let fKey = "BEACH";
-        if (isPoliceTarget) fKey = "VCPD";
-        else if (dist.includes("STAR") || dist.includes("VENETIAN")) fKey = "STAR";
-        else if (dist.includes("HAITI") || dist.includes("WYNWOOD") || dist.includes("LAKE")) fKey = "HAITI";
-        else if (dist.includes("DOWNTOWN") || dist.includes("PORT") || dist.includes("AIRPORT") || dist.includes("GELLHORN")) fKey = "BIKER";
+        let fKey = forceFactionKey || "BEACH";
+        if (!forceFactionKey) {
+            if (isPoliceTarget) fKey = "VCPD";
+            else if (dist.includes("STAR") || dist.includes("VENETIAN")) fKey = "STAR";
+            else if (dist.includes("HAITI") || dist.includes("WYNWOOD") || dist.includes("LAKE")) fKey = "HAITI";
+            else if (dist.includes("DOWNTOWN") || dist.includes("PORT") || dist.includes("AIRPORT") || dist.includes("GELLHORN")) fKey = "BIKER";
+        }
 
-        this.factionGrudges[fKey] = (this.factionGrudges[fKey] || 0) + 1;
+        this.factionGrudges[fKey] = (this.factionGrudges[fKey] || 0) + (forceFactionKey ? 3 : 1);
 
         // Live Flash FM Radio Commentary on multi-wreck or police takedowns (every 45s max)
-        if (this.factionGrudges[fKey] === 2 && now - (this._lastRadioFlashMs || 0) > 45000) {
+        if (!forceFactionKey && this.factionGrudges[fKey] === 2 && now - (this._lastRadioFlashMs || 0) > 45000) {
             this._lastRadioFlashMs = now;
             const pName = (this.net && this.net.playerName) || this.player.nickname || "LUCIA";
             this.sendPager(
@@ -8015,8 +8035,9 @@ class LeonidaGame {
             );
         }
 
-        // Trigger Faction Boss Nemesis Vendetta Hit Squad at grudge >= 3 (80s cooldown)
-        if (this.factionGrudges[fKey] >= 3 && now - (this._lastNemesisMs || 0) > 80000) {
+        // Trigger Faction Boss Nemesis Vendetta Hit Squad at grudge >= 3 (80s cooldown, or 15s when directly challenged via @boss)
+        const cooldownMs = forceFactionKey ? 15000 : 80000;
+        if (this.factionGrudges[fKey] >= 3 && now - (this._lastNemesisMs || 0) > cooldownMs) {
             this.factionGrudges[fKey] = 0;
             this._lastNemesisMs = now;
             const pName = (this.net && this.net.playerName) || this.player.nickname || "LUCIA";
