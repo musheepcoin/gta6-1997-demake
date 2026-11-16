@@ -251,13 +251,15 @@ function sendRoomBootstrap(socket, meta) {
         });
     }
 
-    // 4. Persisted World Vehicles (Modified/Parked/Wrecked + Active Traffic)
+    // 4. Persisted World Vehicles (Modified/Parked/Wrecked + Active Traffic) & Corpses/Peds
     const vehRows = getCombinedRoomVehicles(room);
+    const pedRows = Object.values(Object.assign({}, room.peds || {}, room.corpses || {}));
     sendJson(socket, {
         t: "WORLD_SYNC",
         id: "server_world",
         tl: room.trafficLightTimer || 0,
-        vehs: vehRows
+        vehs: vehRows,
+        peds: pedRows
     });
 
     // 5. Persisted Smashed Street Props (Streetlamps, Traffic Signals, Bollards, Hydrants, Benches)
@@ -429,9 +431,29 @@ function handleClientPacket(socket, pkt) {
             delete room.modifiedVehs[modKeys[0]];
         }
         room.vehs = nextVehs;
+        if (Array.isArray(pkt.peds)) {
+            if (!room.corpses) room.corpses = {};
+            const nextPeds = {};
+            const maxPeds = Math.min(pkt.peds.length, 160);
+            for (let i = 0; i < maxPeds; i++) {
+                const pr = pkt.peds[i];
+                if (!Array.isArray(pr) || !pr[0]) continue;
+                const pid = pr[0];
+                nextPeds[pid] = pr;
+                if (pr[9] & 1) {
+                    room.corpses[pid] = pr;
+                }
+            }
+            const cKeys = Object.keys(room.corpses);
+            if (cKeys.length > 65) {
+                delete room.corpses[cKeys[0]];
+            }
+            room.peds = nextPeds;
+            pkt.peds = Object.values(Object.assign({}, room.peds, room.corpses));
+        }
         isDirty = true;
 
-        // Broadcast the authoritative merged vehicle list to other players in the room
+        // Broadcast the authoritative merged vehicle & ped list to other players in the room
         pkt.vehs = getCombinedRoomVehicles(room);
         broadcastToRoom(roomCode, pkt, socket);
         return;

@@ -372,17 +372,16 @@ class ViceNetworkManager {
     }
 
     getServerPlayerCount(targetRoom) {
+        if (targetRoom === this.roomCode) {
+            // Local player + verified active started remote players in our current room
+            return this.getPlayerCount();
+        }
         if (this.wsConnected && this.serverRoomCounts && typeof this.serverRoomCounts[targetRoom] === "number") {
-            return Math.max(targetRoom === this.roomCode ? this.getPlayerCount() : 0, this.serverRoomCounts[targetRoom]);
+            return this.serverRoomCounts[targetRoom];
         }
         const now = performance.now();
         let count = 0;
         let maxBotsInRoom = 0;
-
-        if (targetRoom === this.roomCode) {
-            // Local player + active remote players in our current room
-            return this.getPlayerCount();
-        }
 
         for (const [pid, info] of this.directoryPeers.entries()) {
             if (now - info.lastSeen > 4500) {
@@ -770,6 +769,7 @@ class ViceNetworkManager {
         } else {
             this.sendPacket({
                 t: "JOIN",
+                started: true,
                 id: this.playerId,
                 name: this.playerName,
                 color: this.playerColor,
@@ -1146,6 +1146,7 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "JOIN") {
+            if (pkt.started === false) return;
             const isNew = !this.remotePlayers.has(pkt.id);
             const rp = this.ensureRemotePlayer(pkt);
             if (typeof pkt.slot === "number") rp.slot = pkt.slot;
@@ -1227,6 +1228,14 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "STATE") {
+            // Ignore un-started lobby tabs sitting on the start screen
+            if (pkt.started === false) {
+                if (this.remotePlayers.has(pkt.id)) {
+                    this.remotePlayers.delete(pkt.id);
+                    this.updateServerListUI();
+                }
+                return;
+            }
             const rp = this.ensureRemotePlayer(pkt);
             rp.name = pkt.name || rp.name;
             rp.color = pkt.color || rp.color;
@@ -1573,13 +1582,15 @@ class ViceNetworkManager {
             if (k === "HOSTILE") return 3;
             if (k === "GATOR") return 4;
             if (k === "CRIMINAL") return 5;
-            if (k === "PARAMEDIC") return 6;
+            if (k === "PARAMEDIC" || k === "MEDIC") return 6;
+            if (k === "FIREMAN") return 7;
             return 0;
         };
 
         const peds = [];
         for (let i = 0; i < g.peds.length; i++) {
             const pd = g.peds[i];
+            if (!pd || pd._boardedVehicle) continue;
             const flags =
                 (pd.dead ? 1 : 0) |
                 ((pd.panicTimer || 0) > 0 ? 2 : 0) |
@@ -1611,17 +1622,14 @@ class ViceNetworkManager {
             ver: 101150,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
-            vehs
+            vehs,
+            peds
         });
     }
 
     applyWorldSync(pkt) {
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded || !pkt) return;
         const isInitialServerBootstrap = (pkt.id === "server_world");
-        // Ignore live WORLD_SYNC packets sent by an outdated client tab running an older game version
-        if (!isInitialServerBootstrap && (pkt.ver || 0) < 101150) {
-            return;
-        }
         this.lastWorldSyncReceivedMs = performance.now();
         if (isInitialServerBootstrap) {
             this._serverBootstrapApplied = true;
@@ -1752,12 +1760,102 @@ class ViceNetworkManager {
             if (c === 3) return "HOSTILE";
             if (c === 4) return "GATOR";
             if (c === 5) return "CRIMINAL";
-            if (c === 6) return "PARAMEDIC";
+            if (c === 6) return "MEDIC";
+            if (c === 7) return "FIREMAN";
             return "CIVILIAN";
         };
 
-        // Ambient sidewalk pedestrians & formations are simulated locally around each player's own camera
-        // so a remote host in another district never wipes out or starves local sidewalk population!
+        if (Array.isArray(pkt.peds) && typeof Pedestrian === "function" && Array.isArray(g.peds)) {
+            const existingPedById = new Map();
+            for (const p of g.peds) {
+                if (p && p.id) existingPedById.set(p.id, p);
+            }
+            const seenPedIds = new Set();
+
+            for (const row of pkt.peds) {
+                if (!Array.isArray(row) || row.length < 10) continue;
+                const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag, copWeapon] = row;
+                const isDead = Boolean(flags & 1);
+                // On initial server bootstrap from disk, only restore corpses and special/emergency peds
+                if (isInitialServerBootstrap && !isDead && kindCode === 0) {
+                    continue;
+                }
+                seenPedIds.add(id);
+                const kindStr = codeToKind(kindCode);
+                let ped = existingPedById.get(id);
+
+                // If a corpse arrives with a remote ID, match any local ped at the exact same spot so we don't duplicate
+                if (!ped && isDead) {
+                    for (const lp of g.peds) {
+                        if (lp && Math.hypot((lp.x || 0) - x, (lp.y || 0) - y) < 22) {
+                            ped = lp;
+                            seenPedIds.add(lp.id);
+                            break;
+                        }
+                    }
+                }
+
+                if (!ped) {
+                    ped = new Pedestrian({
+                        id,
+                        x,
+                        y,
+                        z: z !== undefined ? z : 2.0,
+                        angle: a || 0,
+                        kind: kindStr,
+                        g24Type: g24Type || "civ0",
+                        hp: isDead ? 0 : (hp !== undefined ? hp : 35),
+                        speed: isDead ? 0 : (spd || 0),
+                        dead: isDead,
+                        missionTag: missionTag || null,
+                        copWeapon: copWeapon || null
+                    });
+                    g.peds.push(ped);
+                    existingPedById.set(id, ped);
+                }
+
+                if (isDead) {
+                    if (!ped.dead && Array.isArray(g.bloodDecals)) {
+                        const hasBlood = g.bloodDecals.some((b) => Math.hypot((b.x || 0) - x, (b.y || 0) - y) < 18);
+                        if (!hasBlood) {
+                            g.bloodDecals.push({ x, y, z: z !== undefined ? z : 2.0, r: 10, alpha: 0.85 });
+                        }
+                    }
+                    ped.dead = true;
+                    ped.hp = 0;
+                    ped.speed = 0;
+                    ped.x = x;
+                    ped.y = y;
+                    ped.z = z !== undefined ? z : 2.0;
+                    ped.angle = a || 0;
+                    if (typeof ped.computeState === "function") ped.state = ped.computeState();
+                } else if (!ped.dead) {
+                    if (isInitialServerBootstrap || Math.hypot((ped.x || 0) - x, (ped.y || 0) - y) > 120) {
+                        ped.x = x;
+                        ped.y = y;
+                    } else {
+                        ped.x += (x - ped.x) * 0.45;
+                        ped.y += (y - ped.y) * 0.45;
+                    }
+                    ped.z = z !== undefined ? z : 2.0;
+                    ped.angle = a || 0;
+                    ped.speed = spd || 0;
+                    ped.hp = hp !== undefined ? hp : ped.hp;
+                    ped.kind = kindStr;
+                    if (g24Type) ped.g24Type = g24Type;
+                    if (copWeapon) ped.copWeapon = copWeapon;
+                    ped.panicTimer = (flags & 2) ? Math.max(ped.panicTimer || 0, 1.0) : 0;
+                    ped.stunnedTimer = (flags & 4) ? Math.max(ped.stunnedTimer || 0, 0.6) : 0;
+                    ped.burnTimer = (flags & 8) ? Math.max(ped.burnTimer || 0, 1.0) : 0;
+                    ped.electroTimer = (flags & 16) ? Math.max(ped.electroTimer || 0, 0.6) : 0;
+                    ped.drownTimer = (flags & 32) ? Math.max(ped.drownTimer || 0, 0.6) : 0;
+                    ped.exitAnimTimer = (flags & 64) ? Math.max(ped.exitAnimTimer || 0, 0.35) : 0;
+                    ped.muzzleTimer = (flags & 128) ? Math.max(ped.muzzleTimer || 0, 0.2) : 0;
+                    ped.inCombat = Boolean(flags & 256);
+                    if (typeof ped.computeState === "function") ped.state = ped.computeState();
+                }
+            }
+        }
     }
 
     /* ========================================================================
@@ -1896,18 +1994,20 @@ class ViceNetworkManager {
         this.tryApplyPendingProfileSync();
 
         // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (or 1.5s when solo on Persistent Server) & Server Directory Heartbeat
-        this.syncAccumulator += dt;
-        if (this.syncAccumulator >= this.syncInterval) {
-            this.syncAccumulator = 0;
-            this.broadcastStateNow();
-        }
-        const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
-        if (this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
-            this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
-            const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 1.5;
-            if (this.worldSyncAccumulator >= targetWorldInterval) {
-                this.worldSyncAccumulator = 0;
-                this.broadcastWorldSync();
+        if (this.game.started) {
+            this.syncAccumulator += dt;
+            if (this.syncAccumulator >= this.syncInterval) {
+                this.syncAccumulator = 0;
+                this.broadcastStateNow();
+            }
+            const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
+            if (this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
+                this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
+                const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 1.5;
+                if (this.worldSyncAccumulator >= targetWorldInterval) {
+                    this.worldSyncAccumulator = 0;
+                    this.broadcastWorldSync();
+                }
             }
         }
         this.dirAccumulator = (this.dirAccumulator || 0) + dt;

@@ -5398,8 +5398,13 @@ class TrafficManager {
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 5));
         const farRects = vps.map((vp) => this.expandRect(vp.area, this.pedsMaxDistanceBlocks + 9));
 
+        let corpseCount = 0;
         for (let i = game.peds.length - 1; i >= 0; i--) {
             const ped = game.peds[i];
+            if (ped.dead && !ped._boardedVehicle) {
+                corpseCount++;
+                if (corpseCount <= 65) continue;
+            }
             if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
             const bx = Math.floor(ped.x / TILE_SIZE);
             const by = Math.floor(ped.y / TILE_SIZE);
