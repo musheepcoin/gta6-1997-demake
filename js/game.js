@@ -10403,7 +10403,12 @@ class LeonidaGame {
 
     update(dt) {
 
-        if (!this.started) return;
+        if (!this.started) {
+            if (this.net && typeof this.net.update === "function") {
+                this.net.update(dt);
+            }
+            return;
+        }
 
         // Wait until the binary 3D map (cmpLoaded) and WebGL renderer (gta1Ready) are ready
         // so AI traffic and pedestrians never simulate on uninitialized PAWEMENT tiles during startup!
@@ -10446,11 +10451,14 @@ class LeonidaGame {
 
 
 
-        // If Lucia is currently inside a Venue Interior, update the interior room!
+        // If Lucia is currently inside a Venue Interior, update the interior room AND keep multiplayer/world sync running!
 
         if (this.activeInterior) {
 
             this.updateInterior(dt);
+            if (this.net && typeof this.net.update === "function") {
+                this.net.update(dt);
+            }
 
             return;
 
