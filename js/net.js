@@ -1584,6 +1584,24 @@ class ViceNetworkManager {
                 ped._corpsePersisted = true;
                 this.game.killPed(ped, false, true);
             }
+        } else if (pkt.kind === "PED_REVIVE") {
+            let ped = pkt.pedId ? this.game.peds.find((pd) => pd && pd.id === pkt.pedId) : null;
+            if (!ped && typeof pkt.x === "number" && typeof pkt.y === "number") {
+                ped = this.game.peds.find((pd) => pd && pd.dead && Math.hypot((pd.x || 0) - pkt.x, (pd.y || 0) - pkt.y) < 32);
+            }
+            if (ped) {
+                ped.revived = true;
+                if (pkt.evacuated) {
+                    ped._boardedVehicle = true;
+                } else {
+                    ped.dead = false;
+                    ped.deadTimer = 0;
+                    ped.hp = 35;
+                    ped.speed = 36;
+                    ped.panicTimer = 4.0;
+                    if (typeof ped.computeState === "function") ped.state = ped.computeState();
+                }
+            }
         }
     }
 

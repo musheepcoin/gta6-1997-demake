@@ -3005,9 +3005,10 @@ class Vehicle {
                 if (
                     !ped.dead ||
                     ped.revived ||
+                    ped._boardedVehicle ||
                     ped.unreachableForMedic ||
                     ped.deathKind === "DROWNED" ||
-                    (ped.deadTimer || 0) < 6.0
+                    (ped.deadTimer || 0) < 2.5
                 ) {
                     continue;
                 }
@@ -3029,10 +3030,10 @@ class Vehicle {
                 }
                 const noProgress = this.updateApproachProgress(dt, bestDist);
 
-                // Park and send the paramedic on foot when close (< 140px) or when blocked (water/walls) within 700px
-                if (bestDist < 140 || (bestDist < 700 && noProgress > 2.0)) {
+                // Park and send the paramedic on foot ONLY when truly close to the scene (< 165px, or < 310px if off-road/blocked)
+                if (bestDist < 165 || (bestDist < 310 && noProgress > 2.6)) {
                     this.aiBailTimer += dt;
-                    if (this.aiBailTimer > 0.5 && Math.abs(this.speed) < 30 && typeof game.deployParamedicFromAmbulance === "function") {
+                    if (this.aiBailTimer > 0.4 && Math.abs(this.speed) < 34 && typeof game.deployParamedicFromAmbulance === "function") {
                         this.aiBailTimer = 0;
                         this.approachNoProgress = 0;
                         game.deployParamedicFromAmbulance(this, nearestCorpse);
@@ -3041,7 +3042,7 @@ class Vehicle {
                 }
                 this.aiBailTimer = 0;
                 const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
-                const forceDirect = !corpseOnRoad && bestDist < 720;
+                const forceDirect = (!corpseOnRoad && bestDist < 420) || noProgress > 1.8;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3050,7 +3051,7 @@ class Vehicle {
                     nearestCorpse.y,
                     0,
                     0,
-                    forceDirect ? 0.62 : 0.80,
+                    forceDirect ? 0.68 : 0.84,
                     false,
                     forceDirect
                 );

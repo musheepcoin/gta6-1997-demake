@@ -13494,6 +13494,15 @@ class LeonidaGame {
                                 // Evacuate dead criminal / hostile body back to the ambulance instead of reviving them on the street!
                                 targetCorpse.revived = true;
                                 ped.carryingCorpse = targetCorpse;
+                                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                                    this.net.broadcastWorldEvent({
+                                        kind: "PED_REVIVE",
+                                        pedId: targetCorpse.id,
+                                        x: Math.round(targetCorpse.x),
+                                        y: Math.round(targetCorpse.y),
+                                        evacuated: true
+                                    });
+                                }
                                 this.addFloatingText(targetCorpse.x, targetCorpse.y - 22, "🚑 EVACUATING CRIMINAL BODY!", "#38bdf8");
                             } else {
                                 targetCorpse.dead = false;
@@ -13515,6 +13524,15 @@ class LeonidaGame {
                                 targetCorpse.drownTimer = 0;
 
                                 targetCorpse.panicTimer = 4.0;
+                                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                                    this.net.broadcastWorldEvent({
+                                        kind: "PED_REVIVE",
+                                        pedId: targetCorpse.id,
+                                        x: Math.round(targetCorpse.x),
+                                        y: Math.round(targetCorpse.y),
+                                        evacuated: false
+                                    });
+                                }
 
                                 for (let k = 0; k < 5; k++) {
 
@@ -13595,7 +13613,7 @@ class LeonidaGame {
 
                             }
 
-                            if (ped.medicStuckTimer > 9.0) {
+                            if (ped.medicStuckTimer > 18.0) {
 
                                 targetCorpse.unreachableForMedic = true;
 
@@ -15533,11 +15551,11 @@ class LeonidaGame {
 
             let casualtyNearPlayer = null;
 
-            let bestCasDist = 680;
+            let bestCasDist = 760;
 
             for (const ped of this.peds) {
 
-                if (!ped.dead || ped.revived || ped._boardedVehicle || ped.unreachableForMedic || ped.deathKind === "DROWNED" || (ped.deadTimer || 0) < 6.0) continue;
+                if (!ped.dead || ped.revived || ped._boardedVehicle || ped.unreachableForMedic || ped.deathKind === "DROWNED" || (ped.deadTimer || 0) < 2.5) continue;
 
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) continue;
 
@@ -15569,11 +15587,12 @@ class LeonidaGame {
 
                         const dCas = Math.hypot(v.x - casualtyNearPlayer.x, v.y - casualtyNearPlayer.y);
 
-                        if (v.aiState === "EMERGENCY_MEDIC" || v.deployedMedic || dCas < 980) {
+                        // Only consider an ambulance as actively serving THIS casualty if it is within 560px and not stuck!
+                        if ((v.deployedMedic && dCas < 680) || (dCas < 560 && (v.approachNoProgress || 0) < 4.5)) {
 
                             medicNearCasualty = true;
 
-                        } else if (Math.hypot(v.x - p.x, v.y - p.y) > 1250) {
+                        } else if (!v.deployedMedic && (dCas > 600 || (v.approachNoProgress || 0) >= 4.5)) {
 
                             farMedicCar = v;
 
@@ -15587,9 +15606,9 @@ class LeonidaGame {
 
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
 
-                    if (this.medicDispatchTimer > 14.0) {
+                    if (this.medicDispatchTimer > 4.5) {
 
-                        this.medicDispatchTimer = 10.0; // if no road spawn point is found, retry ~4s later
+                        this.medicDispatchTimer = 2.5; // if no road spawn point is found, retry ~2s later
 
                         const baseBx = Math.floor(casualtyNearPlayer.x / TILE_SIZE);
 
@@ -15597,11 +15616,11 @@ class LeonidaGame {
 
                         const pz = casualtyNearPlayer.z || 2.0;
 
-                        for (let attempt = 0; attempt < 30; attempt++) {
+                        for (let attempt = 0; attempt < 36; attempt++) {
 
                             const ang = Math.random() * Math.PI * 2;
 
-                            const distB = 11.0 + Math.random() * 6.0;
+                            const distB = 5.5 + Math.random() * 4.0;
 
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
 
@@ -15617,7 +15636,7 @@ class LeonidaGame {
 
                                 const sy = (by + 0.5) * TILE_SIZE;
 
-                                if (Math.hypot(sx - p.x, sy - p.y) < 640) continue;
+                                if (Math.hypot(sx - p.x, sy - p.y) < 310) continue;
 
                                 const toCasAng = Math.atan2(casualtyNearPlayer.y - sy, casualtyNearPlayer.x - sx);
 
@@ -15641,11 +15660,11 @@ class LeonidaGame {
 
                                     reuseCar.angle = roadAng;
 
-                                    reuseCar.speed = 95;
+                                    reuseCar.speed = 102;
 
-                                    reuseCar.vx = Math.cos(roadAng) * 95;
+                                    reuseCar.vx = Math.cos(roadAng) * 102;
 
-                                    reuseCar.vy = Math.sin(roadAng) * 95;
+                                    reuseCar.vy = Math.sin(roadAng) * 102;
 
                                     reuseCar.sirenActive = true;
 
@@ -15659,7 +15678,7 @@ class LeonidaGame {
 
                                     this.medicDispatchTimer = 0;
 
-                                    this.medicDispatchCooldown = 22.0;
+                                    this.medicDispatchCooldown = 9.0;
 
                                 } else if (totalMedics < 3) {
 
@@ -15671,17 +15690,17 @@ class LeonidaGame {
 
                                     medCar.sirenActive = true;
 
-                                    medCar.speed = 95;
+                                    medCar.speed = 102;
 
-                                    medCar.vx = Math.cos(roadAng) * 95;
+                                    medCar.vx = Math.cos(roadAng) * 102;
 
-                                    medCar.vy = Math.sin(roadAng) * 95;
+                                    medCar.vy = Math.sin(roadAng) * 102;
 
                                     this.vehicles.push(medCar);
 
                                     this.medicDispatchTimer = 0;
 
-                                    this.medicDispatchCooldown = 22.0;
+                                    this.medicDispatchCooldown = 9.0;
 
                                 }
 
