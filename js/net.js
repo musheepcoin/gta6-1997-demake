@@ -1707,18 +1707,6 @@ class ViceNetworkManager {
                     if (typeof ped.computeState === "function") ped.state = ped.computeState();
                 }
             }
-        } else if (pkt.kind === "EMPIRE_BUY" && pkt.propId && this.game && Array.isArray(this.game.empireProperties)) {
-            const prop = this.game.empireProperties.find((pr) => pr.id === pkt.propId);
-            if (prop) {
-                prop.ownerName = pkt.ownerName || "RIVAL";
-                prop.ownerColor = pkt.ownerColor || "#00f0ff";
-            }
-            this.addChatLog(
-                "EMPIRE SYNDICATE",
-                `🏢 ${pkt.ownerName || "PLAYER"} acquired ${pkt.propName || pkt.propId}!`,
-                pkt.ownerColor || "#39ff14",
-                true
-            );
         } else if (pkt.kind === "FLASH_DROP_SPAWN" && this.game && typeof pkt.x === "number" && typeof pkt.y === "number") {
             this.game.activeFlashEvent = {
                 x: pkt.x,

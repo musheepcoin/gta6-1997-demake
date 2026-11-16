@@ -22,9 +22,9 @@ Ce document découpe la mise en œuvre concrète des mécaniques dans l'architec
 
 ---
 
-## Phase 3 : Contrôle Visuel des Quartiers & Rachat de Commerces (`js/game.js` & `js/renderer.js`) — ✅ TERMINÉ (`v101_166`)
-- [x] **Acquisition des 8 Commerces & Propriétés Iconiques (*Hotel Dixon*, *Malibu & Española*, *Vice Port Depot*, *Jack of Hearts*, *Bayfront Tower*, *Club Nine1Nine*, *Gellhorn Speedway*, *Vercetti Palazzo*)** :
-  - Anneaux néon au sol, achat par `[E]` ou arrêt sur le marqueur, loyers passifs toutes les 30s, coffre-fort garanti après *Wasted/Busted*, multiplicateur plancher permanent (`x2` / `x3`) et synchronisation multijoueur en direct (`EMPIRE_BUY`).
+## Phase 3 (Futur) : Système Complexe de Syndicats / Contrôle de Territoire Multijoueur
+- [ ] **Architecture Multijoueur dédiée (à concevoir séparément)** :
+  - Pas de rachat simple des monuments publics iconiques ; nécessite un vrai système multijoueur compétitif (influence de quartier dynamique, planques instanciées ou guerre de syndicats persistante sur le serveur).
 
 ---
 
