@@ -11999,6 +11999,10 @@ class LeonidaGame {
 
                         if (!a.destroyed && !b.destroyed) {
 
+                            if ((a.gridlockEscapeTimer || 0) > 0 || (b.gridlockEscapeTimer || 0) > 0) {
+                                continue;
+                            }
+
                             if (Math.cos(a.angle - b.angle) > 0.45) {
 
                                 const proj = (b.x - a.x) * aCos + (b.y - a.y) * aSin;

@@ -33,10 +33,10 @@ class ViceNetworkManager {
         this.playerColor = NET_COLORS[randNum % NET_COLORS.length];
         this.pedSpriteType = NET_PED_TYPES[randNum % NET_PED_TYPES.length];
 
-        // Room code (from URL ?room=XXX or default public lobby "VICE97")
+        // Room code (from URL ?room=XXX or default public lobby "VICE26")
         const urlParams = new URLSearchParams(window.location.search || "");
-        const rawRoom = (urlParams.get("room") || "VICE97").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
-        this.roomCode = rawRoom || "VICE97";
+        const rawRoom = (urlParams.get("room") || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+        this.roomCode = this.normalizeRoomCode(rawRoom || "VICE26");
 
         // Map of remote players: id -> state object
         this.remotePlayers = new Map();
@@ -428,13 +428,19 @@ class ViceNetworkManager {
         } catch (_e) {}
     }
 
+    normalizeRoomCode(rawCode) {
+        const clean = String(rawCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
+        return clean === "VICE97" ? "VICE26" : clean;
+    }
+
     getServerPlayerCount(targetRoom) {
-        if (targetRoom === this.roomCode) {
+        const normRoom = this.normalizeRoomCode(targetRoom);
+        if (normRoom === this.roomCode) {
             // Local player + verified active started remote players in our current room
             return this.getPlayerCount();
         }
-        if (this.wsConnected && this.serverRoomCounts && typeof this.serverRoomCounts[targetRoom] === "number") {
-            return this.serverRoomCounts[targetRoom];
+        if (this.wsConnected && this.serverRoomCounts && typeof this.serverRoomCounts[normRoom] === "number") {
+            return this.serverRoomCounts[normRoom];
         }
         const now = performance.now();
         let count = 0;
@@ -445,7 +451,7 @@ class ViceNetworkManager {
                 this.directoryPeers.delete(pid);
                 continue;
             }
-            if (info.room === targetRoom) {
+            if (this.normalizeRoomCode(info.room) === normRoom) {
                 count++;
                 if ((info.bots || 0) > maxBotsInRoom) {
                     maxBotsInRoom = info.bots;
@@ -457,11 +463,11 @@ class ViceNetworkManager {
 
     updateServerListUI() {
         if (typeof document === "undefined") return;
-        const servers = ["VICE97", "MIAMI86", "KEYS305"];
+        const servers = ["VICE26", "MIAMI86", "KEYS305"];
         for (const srv of servers) {
             const count = this.getServerPlayerCount(srv);
-            const countEl = document.getElementById(`srv-count-${srv}`);
-            const dotEl = document.getElementById(`srv-dot-${srv}`);
+            const countEl = document.getElementById(`srv-count-${srv}`) || (srv === "VICE26" ? document.getElementById("srv-count-VICE97") : null);
+            const dotEl = document.getElementById(`srv-dot-${srv}`) || (srv === "VICE26" ? document.getElementById("srv-dot-VICE97") : null);
             if (countEl) {
                 if (count <= 0) {
                     countEl.textContent = `0/${this.maxSlots} EMPTY`;
@@ -482,7 +488,7 @@ class ViceNetworkManager {
     }
 
     switchServer(newRoomCode) {
-        const cleanRoom = String(newRoomCode || "VICE97").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+        const cleanRoom = this.normalizeRoomCode(newRoomCode);
         if (!cleanRoom) return;
         if (cleanRoom !== this.roomCode) {
             this.sendPacket({ t: "LEAVE", id: this.playerId, name: this.playerName });
@@ -801,7 +807,7 @@ class ViceNetworkManager {
         if (color) {
             this.playerColor = color;
         }
-        const cleanRoom = String(roomCode || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+        const cleanRoom = roomCode ? this.normalizeRoomCode(roomCode) : "";
         this._profileSynced = false;
         if (cleanRoom && cleanRoom !== this.roomCode) {
             this.roomCode = cleanRoom;
@@ -1288,8 +1294,8 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "STATE") {
-            // Ignore un-started lobby tabs sitting on the start screen
-            if (pkt.started === false) {
+            // Ignore un-started lobby tabs or outdated zombie browser tabs (< v101_161)
+            if (pkt.started === false || (pkt.ver || 0) < 101161) {
                 if (this.remotePlayers.has(pkt.id)) {
                     this.remotePlayers.delete(pkt.id);
                     this.updateServerListUI();
@@ -1342,7 +1348,7 @@ class ViceNetworkManager {
                 } else {
                     this._pendingServerWorldSnapshot = pkt;
                 }
-            } else if (!this.isWorldHost()) {
+            } else if ((pkt.ver || 0) >= 101161 && !this.isWorldHost()) {
                 this.applyWorldSync(pkt);
             }
             return;
@@ -1490,7 +1496,7 @@ class ViceNetworkManager {
     }
 
     isWorldHost() {
-        const MY_VER = 101150;
+        const MY_VER = 101161;
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
         const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
@@ -1725,7 +1731,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
-            ver: 101150,
+            ver: 101161,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
             vehs,
@@ -1789,7 +1795,7 @@ class ViceNetworkManager {
                     continue;
                 }
                 // Never restore stale ambient AI traffic cars from an older build's server snapshot
-                if (isInitialServerBootstrap && !isMod && (pkt.ver || 0) < 101150) {
+                if (isInitialServerBootstrap && !isMod && (pkt.ver || 0) < 101161) {
                     continue;
                 }
                 let v = existingById.get(id);
@@ -2177,7 +2183,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "STATE",
-            ver: 101150,
+            ver: 101161,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),
             name: this.playerName,

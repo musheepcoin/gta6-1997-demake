@@ -2112,22 +2112,27 @@ class Vehicle {
 
         let boxExitBlocked = false;
         if (!isPanicked && !sirenBehind && isStopBlock && runFullRadarNow && game && Array.isArray(game.vehicles)) {
+            const extraExitClearance = Math.max(0, (this.w || 62) - 62);
             for (let vi = 0; vi < game.vehicles.length; vi++) {
                 const ov = game.vehicles[vi];
                 if (!ov || ov === this || ov.destroyed) continue;
                 const dx = ov.x - this.x;
                 const dy = ov.y - this.y;
-                if (Math.abs(dx) > 170 || Math.abs(dy) > 170) continue;
+                if (Math.abs(dx) > 220 || Math.abs(dy) > 220) continue;
                 if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) continue;
                 const fwd = dx * fx + dy * fy;
                 const lat = Math.abs(dx * rx + dy * ry);
-                if (fwd > 22 && fwd < 165 && lat < 22 && Math.cos(ov.angle - this.angle) > 0.65) {
-                    const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
-                    const ovLid = map.getBlockInfo ? map.getBlockInfo(Math.floor(ov.x / TILE_SIZE), Math.floor(ov.y / TILE_SIZE), 1).lid : 0;
-                    if (ovSpd < 8 && ovLid === 25) {
-                        boxExitBlocked = true;
-                        break;
-                    }
+                const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
+                const ovLid = map.getBlockInfo ? map.getBlockInfo(Math.floor(ov.x / TILE_SIZE), Math.floor(ov.y / TILE_SIZE), 1).lid : 0;
+                // 1. Any vehicle (same-direction OR perpendicular cross-traffic/bus) stopped inside the intersection box ahead
+                if (ovLid === 25 && ovSpd < 12 && fwd > 12 && fwd < 155 && lat < 44) {
+                    boxExitBlocked = true;
+                    break;
+                }
+                // 2. Same-direction traffic stopped on the far side of the box (prevents buses/cars from entering and hanging their tail in the box!)
+                if (fwd > 22 && fwd < (150 + extraExitClearance) && lat < 24 && ovSpd < 10 && Math.cos(ov.angle - this.angle) > 0.65) {
+                    boxExitBlocked = true;
+                    break;
                 }
             }
             this._cachedBoxBlocked = boxExitBlocked;
@@ -2489,7 +2494,9 @@ class Vehicle {
             if (closestBumperGap < 50 && (isPlayerBlocking || (closestEntity && closestEntity.kind === "CIVILIAN"))) {
                 this.aiFlashHeadlightsTimer = Math.max(this.aiFlashHeadlightsTimer || 0, 0.85);
             }
-            if (closestBumperGap <= minStopGap) {
+            if ((this.gridlockEscapeTimer || 0) > 0 && !isPlayerBlocking) {
+                desiredThrottle = 0.38;
+            } else if (closestBumperGap <= minStopGap) {
                 desiredThrottle = 0;
                 const brakeMult = Math.pow(0.0008, dt);
                 this.vx *= brakeMult;
@@ -3627,11 +3634,14 @@ class Vehicle {
         if (this.gridlockReverseTimer > 0) {
             this.gridlockReverseTimer = Math.max(0, this.gridlockReverseTimer - dt);
         }
+        if (this.gridlockEscapeTimer > 0) {
+            this.gridlockEscapeTimer = Math.max(0, this.gridlockEscapeTimer - dt);
+        }
         if (this.gridlockAvoidTimer > 0) {
             this.gridlockAvoidTimer = Math.max(0, this.gridlockAvoidTimer - dt);
         }
         const isAiDriven = this.driver === "AI_TRAFFIC" || this.driver === "AI_TOW" || this.driver === "AI_EMERGENCY";
-        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && this.aiState !== "CURB_PARKED" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0)) {
+        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && this.aiState !== "CURB_PARKED" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0) && !(this.gridlockEscapeTimer > 0)) {
             let counts = true;
             if (this.driver === "AI_TOW") counts = (this.approachNoProgress || 0) > 3.0 && !this.towHookTimer;
             else if (this.driver === "AI_EMERGENCY") counts = !this.deployedFireman && !this.deployedMedic && (this.approachNoProgress || 0) > 3.0;
@@ -3702,7 +3712,13 @@ class Vehicle {
                             this.aiReverseSteer = Math.random() < 0.5 ? 0.8 : -0.8;
                         }
                     } else {
-                        this.gridlockTimer = threshold * 0.5; // check again shortly
+                        // Boxed in from behind by queued traffic so reversing is impossible:
+                        // engage lateral bypass maneuver to steer around the blocking vehicle and clear the intersection!
+                        this.gridlockEscapeTimer = 2.8;
+                        this.aiPullOverOffset = ((idNum % 2 === 0) ? 1 : -1) * 24;
+                        this.aiPullOverTimer = 2.8;
+                        this.gridlockTimer = 0;
+                        this.aiLaneChangeCooldown = 0;
                     }
                 }
             } else {
@@ -3987,7 +4003,7 @@ class Vehicle {
             const latTol = Math.min(27, ((this.h || 28) + (lead.h || 28)) * 0.43);
             const minCenterDist = ((this.w || 62) + (lead.w || 62)) * 0.50 + (this.isMotorcycle ? 12 : 18);
             if (fDist > 4 && fDist < minCenterDist && lDist < latTol) {
-                if ((lead.destroyed || lead.driver === null) && (this.aiPullOverTimer || 0) > 0) {
+                if (((lead.destroyed || lead.driver === null) && (this.aiPullOverTimer || 0) > 0) || (this.gridlockEscapeTimer || 0) > 0) {
                     const sideSign = (this.aiPullOverOffset || 0) >= 0 ? 1 : -1;
                     this.x += -cfy * sideSign * 65 * dt;
                     this.y += cfx * sideSign * 65 * dt;
