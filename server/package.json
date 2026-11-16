@@ -1,0 +1,12 @@
+{
+  "name": "vice-city-26-world-server",
+  "version": "1.0.0",
+  "description": "24/7 Persistent World & Multiplayer WebSocket Server for Vice City 26 (Hostinger KVM2)",
+  "main": "world_server.js",
+  "scripts": {
+    "start": "node world_server.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

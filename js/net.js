@@ -52,6 +52,12 @@ class ViceNetworkManager {
         this.cleanupAccumulator = 0;
 
         // Transports
+        this.ws = null;
+        this.wsConnected = false;
+        this.wsUrl = this.resolveInitialWsUrl();
+        this.serverRoomCounts = null;
+        this._wsReconnectTimer = null;
+        this._pendingServerWorldSnapshot = null;
         this.bc = null;
         this.dirBc = null;
         this.directoryPeers = new Map(); // playerId -> { room, bots, lastSeen }
@@ -67,8 +73,145 @@ class ViceNetworkManager {
 
         this.initChatUI();
         this.initServerDirectory();
+        this.initWebSocketServer();
         this.initBroadcastChannel();
         this.initWebRTCMesh();
+    }
+
+    resolveInitialWsUrl() {
+        if (typeof window === "undefined") return "";
+        try {
+            const urlParams = new URLSearchParams(window.location.search || "");
+            const paramWs = urlParams.get("ws") || urlParams.get("server");
+            if (paramWs) {
+                const clean = paramWs.trim();
+                this.safeSetStorage("vc97_ws_url", clean);
+                return clean;
+            }
+            if (window.__VC26_WS_URL) {
+                return String(window.__VC26_WS_URL).trim();
+            }
+            const savedWs = this.safeGetStorage("vc97_ws_url");
+            if (savedWs) {
+                return savedWs.trim();
+            }
+            const host = window.location.hostname;
+            if (host === "localhost" || host === "127.0.0.1") {
+                return `ws://${host}:8787`;
+            }
+        } catch (_e) {}
+        return "";
+    }
+
+    /* ========================================================================
+       00. PERSISTENT DEDICATED WEBSOCKET WORLD SERVER (Hostinger KVM2 / Node.js)
+       ======================================================================== */
+    initWebSocketServer(customUrl) {
+        if (typeof window === "undefined" || typeof WebSocket === "undefined") return;
+        if (customUrl !== undefined) {
+            this.wsUrl = String(customUrl || "").trim();
+            if (this.wsUrl) {
+                this.safeSetStorage("vc97_ws_url", this.wsUrl);
+            } else if (window.localStorage) {
+                try { window.localStorage.removeItem("vc97_ws_url"); } catch (_e) {}
+            }
+        }
+        if (this._wsReconnectTimer) {
+            clearTimeout(this._wsReconnectTimer);
+            this._wsReconnectTimer = null;
+        }
+        if (this.ws) {
+            try {
+                this.ws.onclose = null;
+                this.ws.onerror = null;
+                this.ws.onmessage = null;
+                this.ws.close();
+            } catch (_e) {}
+            this.ws = null;
+            this.wsConnected = false;
+        }
+        if (!this.wsUrl) return;
+
+        try {
+            const sep = this.wsUrl.includes("?") ? "&" : "?";
+            const fullUrl = `${this.wsUrl}${sep}room=${encodeURIComponent(this.roomCode)}&id=${encodeURIComponent(this.playerId)}&name=${encodeURIComponent(this.playerName)}`;
+            const ws = new WebSocket(fullUrl);
+            this.ws = ws;
+
+            ws.onopen = () => {
+                if (this.ws !== ws) return;
+                this.wsConnected = true;
+                this.statusText = `DEDICATED (${this.roomCode})`;
+                ws.send(JSON.stringify({
+                    t: "JOIN",
+                    id: this.playerId,
+                    room: this.roomCode,
+                    name: this.playerName,
+                    color: this.playerColor,
+                    pedType: this.pedSpriteType
+                }));
+            };
+
+            ws.onmessage = (ev) => {
+                if (!ev || !ev.data) return;
+                try {
+                    const pkt = JSON.parse(ev.data);
+                    this.handleServerPacket(pkt);
+                } catch (_e) {}
+            };
+
+            const scheduleReconnect = () => {
+                if (this.ws !== ws) return;
+                this.wsConnected = false;
+                this.serverRoomCounts = null;
+                this.ws = null;
+                if (this.wsUrl) {
+                    this._wsReconnectTimer = setTimeout(() => {
+                        this.initWebSocketServer();
+                    }, 4000);
+                }
+            };
+            ws.onclose = scheduleReconnect;
+            ws.onerror = scheduleReconnect;
+        } catch (_e) {}
+    }
+
+    handleServerPacket(pkt) {
+        if (!pkt || typeof pkt !== "object") return;
+        if (pkt.t === "WELCOME") {
+            if (typeof pkt.slot === "number") {
+                this.slotIndex = pkt.slot;
+            }
+            this.addChatLog(
+                "WORLD SERVER",
+                `⚡ Persistent Server [${this.getRoomDisplayName(pkt.room || this.roomCode)}] connected (Slot #${(pkt.slot || 0) + 1})`,
+                "#39ff14",
+                true
+            );
+            this.broadcastStateNow();
+            return;
+        }
+        if (pkt.t === "DIR_COUNTS" && pkt.counts) {
+            this.serverRoomCounts = pkt.counts;
+            this.updateServerListUI();
+            return;
+        }
+        if (pkt.t === "CHAT_HISTORY" && Array.isArray(pkt.messages)) {
+            for (const m of pkt.messages) {
+                if (m && m.text) {
+                    this.addChatLog(m.author || "PLAYER", m.text, m.color || "#00f0ff", false);
+                }
+            }
+            return;
+        }
+        if (pkt.t === "PROFILE_SYNC" && pkt.profile && this.game) {
+            const prof = pkt.profile;
+            if (typeof prof.cash === "number" && prof.cash > (this.game.cash || 0)) {
+                this.game.cash = prof.cash;
+            }
+            return;
+        }
+        this.handlePacket(pkt);
     }
 
     /* ========================================================================
@@ -113,8 +256,18 @@ class ViceNetworkManager {
     }
 
     broadcastDirectoryHeartbeat() {
-        if (!this.dirBc) return;
         const botCount = Array.from(this.remotePlayers.values()).filter((r) => r.isBot).length;
+        if (this.wsConnected && this.ws) {
+            try {
+                this.ws.send(JSON.stringify({
+                    t: "DIR_HEARTBEAT",
+                    id: this.playerId,
+                    room: this.roomCode,
+                    bots: botCount
+                }));
+            } catch (_e) {}
+        }
+        if (!this.dirBc) return;
         try {
             this.dirBc.postMessage({
                 t: "DIR_HEARTBEAT",
@@ -126,6 +279,9 @@ class ViceNetworkManager {
     }
 
     getServerPlayerCount(targetRoom) {
+        if (this.wsConnected && this.serverRoomCounts && typeof this.serverRoomCounts[targetRoom] === "number") {
+            return Math.max(targetRoom === this.roomCode ? this.getPlayerCount() : 0, this.serverRoomCounts[targetRoom]);
+        }
         const now = performance.now();
         let count = 0;
         let maxBotsInRoom = 0;
@@ -185,6 +341,16 @@ class ViceNetworkManager {
             this.remotePlayers.clear();
             if (this.chatRoomBadge) {
                 this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
+            }
+            if (this.wsConnected && this.ws) {
+                try {
+                    this.ws.send(JSON.stringify({
+                        t: "SWITCH_ROOM",
+                        id: this.playerId,
+                        name: this.playerName,
+                        room: this.roomCode
+                    }));
+                } catch (_e) {}
             }
             this.initBroadcastChannel();
             this.claimRoomSlot(0);
@@ -426,6 +592,23 @@ class ViceNetworkManager {
             return;
         }
 
+        // Slash command: /server ws://IP:8787 or /server wss://domain (connect to Hostinger KVM2 Persistent World Server)
+        if (/^\/(server|ws)\b/i.test(cleaned)) {
+            const arg = cleaned.replace(/^\/(server|ws)\s*/i, "").trim();
+            if (!arg) {
+                const status = this.wsConnected ? `🟢 CONNECTED (${this.wsUrl})` : (this.wsUrl ? `🟡 RECONNECTING (${this.wsUrl})` : "⚪ P2P MODE (Use /server ws://IP:8787 to link KVM2)");
+                this.addChatLog("WORLD SERVER", status, "#00f0ff", true);
+            } else if (arg.toLowerCase() === "off" || arg.toLowerCase() === "p2p") {
+                this.initWebSocketServer("");
+                this.addChatLog("WORLD SERVER", "Switched to P2P mode.", "#fde047", true);
+            } else {
+                const normalized = /^wss?:\/\//i.test(arg) ? arg : `ws://${arg}`;
+                this.addChatLog("WORLD SERVER", `Connecting to ${normalized}...`, "#39ff14", true);
+                this.initWebSocketServer(normalized);
+            }
+            return;
+        }
+
         const p = this.game ? this.game.player : null;
         if (p) {
             p.chatText = cleaned;
@@ -646,7 +829,14 @@ class ViceNetworkManager {
     sendPacket(pkt) {
         if (!this.enabled) return;
         pkt.id = this.playerId;
+        pkt.room = this.roomCode;
         pkt.ts = performance.now();
+
+        if (this.wsConnected && this.ws && this.ws.readyState === 1) {
+            try {
+                this.ws.send(JSON.stringify(pkt));
+            } catch (_e) {}
+        }
 
         if (this.bc) {
             try {
@@ -654,7 +844,8 @@ class ViceNetworkManager {
             } catch (_e) {}
         }
 
-        if (this.peerConns.size > 0) {
+        // When connected to the dedicated Hostinger KVM2 WebSocket server, skip redundant P2P mesh fan-out
+        if (!this.wsConnected && this.peerConns.size > 0) {
             for (const [peerId, conn] of this.peerConns.entries()) {
                 if (conn && conn.open) {
                     try {
@@ -792,7 +983,13 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "WORLD_SYNC" && this.game) {
-            if (!this.isWorldHost()) {
+            if (pkt.id === "server_world") {
+                if (this.game.map && this.game.map.cmpLoaded && this.game.vehicles && this.game.vehicles.length > 0) {
+                    this.applyWorldSync(pkt);
+                } else {
+                    this._pendingServerWorldSnapshot = pkt;
+                }
+            } else if (!this.isWorldHost()) {
                 this.applyWorldSync(pkt);
             }
             return;
@@ -1344,15 +1541,24 @@ class ViceNetworkManager {
         // 3. Check bumper-to-bumper collisions between remote player vehicles and local player/vehicles
         this.checkRemoteVehicleInteractions(dt);
 
-        // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (Host) & Server Directory Heartbeat
+        // Apply deferred initial world snapshot from persistent server once local map & initial vehicles finish loading
+        if (this._pendingServerWorldSnapshot && this.game.map && this.game.map.cmpLoaded && this.game.vehicles && this.game.vehicles.length > 0) {
+            const snap = this._pendingServerWorldSnapshot;
+            this._pendingServerWorldSnapshot = null;
+            this.applyWorldSync(snap);
+        }
+
+        // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (or 1 Hz when solo on Persistent Server) & Server Directory Heartbeat
         this.syncAccumulator += dt;
         if (this.syncAccumulator >= this.syncInterval) {
             this.syncAccumulator = 0;
             this.broadcastStateNow();
         }
-        if (this.isWorldHost() && this.getHumanRemotePlayers().length > 0) {
+        const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
+        if (this.isWorldHost() && (hasRemoteHumans || this.wsConnected)) {
             this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
-            if (this.worldSyncAccumulator >= this.worldSyncInterval) {
+            const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 1.5;
+            if (this.worldSyncAccumulator >= targetWorldInterval) {
                 this.worldSyncAccumulator = 0;
                 this.broadcastWorldSync();
             }
