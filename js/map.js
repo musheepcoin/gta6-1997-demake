@@ -616,37 +616,29 @@ class LeonidaMap {
                 }
                 setColVoxels(448, y, stonePaveCol);
 
-                const rawTrailW = Math.round(454.8 + Math.sin(y * 0.075) * 1.15 + Math.cos(y * 0.038 + 0.8) * 0.65);
-                const trailW    = Math.min(rawTrailW, waterX - 12);
+                const rawTrailW = Math.round(454.5 + Math.sin(y * 0.075) * 1.15 + Math.cos(y * 0.038 + 0.8) * 0.65);
+                const rawDuneE  = Math.round(462.4 + Math.sin(y * 0.065 + 1.4) * 1.25 + Math.cos(y * 0.11) * 0.65);
+                const duneE     = Math.min(rawDuneE, waterX - 9);
+                const trailW    = Math.min(rawTrailW, duneE - 4);
                 const trailE    = trailW + 1;
-                // Narrower 3-tile-wide Coastal Dune Strip east of the serpentine beachwalk (matching real Miami Lummus Park / Beachwalk in Image 1!)
-                const duneWidth = Math.round(2.8 + Math.sin(y * 0.08 + 1.2) * 0.6);
-                const duneE     = Math.min(trailE + duneWidth, waterX - 8);
-                // Natural sandy beach walkovers & open volleyball sand plaza (y = 228..258) east of the serpentine path
+                // Sparse 2-tile-wide sandy beach walkovers connecting Ocean Drive through Lummus Park & the Dunes to Vice Beach
                 const isWalkover = (
-                    (y >= 95 && y <= 97) ||
-                    (y >= 128 && y <= 130) ||
-                    (y >= 161 && y <= 163) ||
-                    (y >= 202 && y <= 204) ||
-                    (y >= 232 && y <= 234) ||
-                    (y >= 275 && y <= 277) ||
-                    (y >= 316 && y <= 318)
+                    y === 96 || y === 97 ||
+                    y === 162 || y === 163 ||
+                    y === 232 || y === 233 ||
+                    y === 276 || y === 277 ||
+                    y === 318 || y === 319
                 );
-                const isEastDuneOpenSand = isWalkover || (y >= 232 && y <= 262) || (y >= 184 && y <= 188);
 
                 if (duneE >= 457) {
                     for (let x = 449; x < waterX; x++) {
                         if (x < trailW) {
-                            // Wide Lummus Park green lawn (x = 449 .. trailW-1, ~6 tiles wide) right next to Ocean Drive sidewalk!
                             setColVoxels(x, y, isWalkover ? sandColVoxels : grassColVoxels);
                         } else if (x <= trailE) {
-                            // Serpentine Lummus Park Beachwalk path (2 tiles wide)
                             setColVoxels(x, y, sandColVoxels);
                         } else if (x <= duneE) {
-                            // Narrower segmented Coastal Dune ridge (2-3 tiles wide) east of the path
-                            setColVoxels(x, y, isEastDuneOpenSand ? sandColVoxels : grassColVoxels);
+                            setColVoxels(x, y, isWalkover ? sandColVoxels : grassColVoxels);
                         } else {
-                            // Wide open golden Atlantic beach sand
                             setColVoxels(x, y, sandColVoxels);
                         }
                     }
@@ -1257,53 +1249,65 @@ class LeonidaMap {
                 if (c >= 443 && c <= 464 && r >= 46 && r <= 365) {
                     const isWestSidewalk = (c === 443 && r >= 72);
                     const isEastCurbside = (c === 448 && r >= 76) || (c === 458 && r < 72);
-                    const isParkOrDuneGrass = (c >= 449 && c <= 463) && (blkZ1.lid === 10);
+                    const isParkOrDuneGrass = (c >= 449 && c <= 464) && (blkZ1.lid === 10);
                     const isDuneBelt = (c >= 456);
-                    const isLummusCenter = (c >= 451 && c <= 453) && !isDuneBelt;
-                    const isPathEdgeSandPalm = (c >= 456 && c <= 460) && (blkZ1.lid === 98) && (((r * 17 + c * 31 + seed) % 18) === 0);
+                    const isLummusLawn = (c >= 450 && c <= 454) && !isDuneBelt;
+                    const isWindingTrailEdge = (c >= 453 && c <= 457) && (blkZ1.lid === 98) && ((r + c * 5) % 19 === 0);
 
                     if (isWestSidewalk && (r % 8 === 0)) {
-                        chosenKind = (((r >> 3) % 4) === 0) ? "coconut_palm_cluster" : "palm_tree";
+                        const wRoll = ((r >> 3) + c) % 5;
+                        chosenKind = (wRoll === 0) ? "coconut_palm_cluster" : ((wRoll === 3) ? "sabal_palmetto" : "palm_tree");
                         posX = (c + 0.22 + (hs1 - 0.5) * 0.10) * TILE_SIZE;
                         scaleMul = 0.95 + hs1 * 0.30;
                         heightMul = 0.90 + hs2 * 0.55;
                     } else if (isEastCurbside && ((r + 4) % 8 === 0)) {
-                        chosenKind = ((((r + 4) >> 3) % 4) === 0) ? "coconut_palm_cluster" : "palm_tree";
+                        const eRoll = (((r + 4) >> 3) + c) % 5;
+                        chosenKind = (eRoll === 0) ? "coconut_palm_cluster" : ((eRoll === 3) ? "sabal_palmetto" : "palm_tree");
                         posX = (c + 0.78 + (hs1 - 0.5) * 0.10) * TILE_SIZE;
                         scaleMul = 1.02 + hs1 * 0.35;
                         heightMul = 0.95 + hs2 * 0.60;
                     } else if (isParkOrDuneGrass) {
                         const clusterRoll = ((c * 19 + r * 31 + seed) % 14);
-                        if (clusterRoll <= 3) {
+                        if (clusterRoll <= 2) {
                             chosenKind = "palm_tree";
                             scaleMul = 0.94 + hs1 * 0.38;
                             heightMul = 0.90 + hs2 * 0.65;
-                        } else if (clusterRoll === 4 || clusterRoll === 5) {
+                        } else if (clusterRoll === 3 || clusterRoll === 4) {
                             chosenKind = "coconut_palm_cluster";
                             scaleMul = 0.96 + hs1 * 0.34;
                             heightMul = 0.92 + hs2 * 0.60;
+                        } else if (clusterRoll === 5) {
+                            chosenKind = "sabal_palmetto";
+                            scaleMul = 0.92 + hs1 * 0.30;
+                            heightMul = 0.90 + hs2 * 0.50;
                         } else if (clusterRoll === 6) {
-                            // In the center of Lummus Park lawn (just like the real aerial photo!), mix in lush dark-green shade trees!
-                            chosenKind = isLummusCenter ? ((seed % 2 === 0) ? "subtropical_mahogany" : "live_oak") : "sabal_palmetto";
-                            scaleMul = isLummusCenter ? (1.00 + hs1 * 0.32) : (0.92 + hs1 * 0.30);
-                            heightMul = 0.95 + hs2 * 0.50;
-                        } else if (clusterRoll === 7) {
-                            chosenKind = "fan_palm";
+                            chosenKind = isDuneBelt ? "fan_palm" : ((seed % 2 === 0) ? "areca_palm_clump" : "fan_palm");
                             scaleMul = 0.90 + hs1 * 0.30;
-                        } else if (clusterRoll === 8 && isDuneBelt) {
-                            chosenKind = nearSand ? "dune_panicgrass" : "coastal_palmetto_bush";
-                            scaleMul = 0.88 + hs1 * 0.26;
+                        } else if (clusterRoll === 7) {
+                            // In Lummus Park lawn (c=450..454), mix in lush dark-green tropical shade trees like on the real Ocean Drive photo!
+                            if (isLummusLawn) {
+                                chosenKind = (seed % 2 === 0) ? "subtropical_mahogany" : "live_oak";
+                                scaleMul = 1.00 + hs1 * 0.32;
+                                heightMul = 1.02 + hs2 * 0.45;
+                            } else {
+                                chosenKind = nearSand ? "dune_panicgrass" : "coastal_palmetto_bush";
+                                scaleMul = 0.90 + hs1 * 0.28;
+                            }
+                        } else if (clusterRoll === 8) {
+                            chosenKind = isDuneBelt
+                                ? (nearSand ? "dune_panicgrass" : ((seed % 2 === 0) ? "sea_grape" : "coastal_palmetto_bush"))
+                                : ((seed % 2 === 0) ? "monstera_fern" : "coastal_palmetto_bush");
+                            scaleMul = 0.90 + hs1 * 0.28;
                         }
                         if (chosenKind) {
                             posX = (c + 0.50 + (hs1 - 0.5) * 0.44) * TILE_SIZE;
                             posY = (r + 0.50 + (hs2 - 0.5) * 0.44) * TILE_SIZE;
                         }
-                    } else if (isPathEdgeSandPalm) {
+                    } else if (isWindingTrailEdge) {
                         chosenKind = (seed % 3 === 0) ? "coconut_palm_cluster" : "palm_tree";
-                        posX = (c + 0.50 + (hs1 - 0.5) * 0.38) * TILE_SIZE;
-                        posY = (r + 0.50 + (hs2 - 0.5) * 0.38) * TILE_SIZE;
-                        scaleMul = 0.92 + hs1 * 0.35;
-                        heightMul = 0.88 + hs2 * 0.58;
+                        posX = (c + 0.50 + (hs1 - 0.5) * 0.35) * TILE_SIZE;
+                        scaleMul = 0.90 + hs1 * 0.32;
+                        heightMul = 0.88 + hs2 * 0.52;
                     }
                 }
                 // 2) Sidewalks & Tree Planters across Vice City (lid 69, or lid 8/9 adjacent to road — never inside boulevard parking bays or on bridges!)
