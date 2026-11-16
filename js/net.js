@@ -143,8 +143,18 @@ class ViceNetworkManager {
                 if (this.ws !== ws) return;
                 this.wsConnected = true;
                 this.statusText = `DEDICATED (${this.roomCode})`;
+                // Tear down any P2P WebRTC fallback timers/sockets since the dedicated server is connected
+                if (this._slotDialTimer) {
+                    clearInterval(this._slotDialTimer);
+                    this._slotDialTimer = null;
+                }
+                if (this.peer) {
+                    try { this.peer.destroy(); } catch (_e) {}
+                    this.peer = null;
+                }
                 ws.send(JSON.stringify({
                     t: "JOIN",
+                    started: Boolean(this.game && this.game.started),
                     id: this.playerId,
                     room: this.roomCode,
                     name: this.playerName,
@@ -396,7 +406,8 @@ class ViceNetworkManager {
 
     broadcastDirectoryHeartbeat() {
         const botCount = Array.from(this.remotePlayers.values()).filter((r) => r.isBot).length;
-        if (this.wsConnected && this.ws) {
+        if (this.wsConnected && this.ws && this._lastWsBots !== botCount) {
+            this._lastWsBots = botCount;
             try {
                 this.ws.send(JSON.stringify({
                     t: "DIR_HEARTBEAT",
@@ -1033,8 +1044,9 @@ class ViceNetworkManager {
        ======================================================================== */
     initWebRTCMesh() {
         if (typeof window === "undefined") return;
-        // Defer PeerJS WebRTC initialization until initial 3D map assets have priority on the network & main thread
+        // Only initialize PeerJS WebRTC fallback if the dedicated Hostinger WebSocket server is not connected after 3.5s
         setTimeout(() => {
+            if (this.wsConnected) return;
             if (typeof window.Peer === "function") {
                 this.claimRoomSlot(0);
                 return;
@@ -1043,15 +1055,17 @@ class ViceNetworkManager {
             script.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
             script.async = true;
             script.onload = () => {
-                if (typeof window.Peer === "function") {
+                if (!this.wsConnected && typeof window.Peer === "function") {
                     this.claimRoomSlot(0);
                 }
             };
             script.onerror = () => {
-                this.statusText = `LOCAL ONLINE (${this.roomCode})`;
+                if (!this.wsConnected) {
+                    this.statusText = `LOCAL ONLINE (${this.roomCode})`;
+                }
             };
             document.head.appendChild(script);
-        }, 1200);
+        }, 3500);
     }
 
     getSlotPeerId(slotIdx) {
@@ -2100,17 +2114,26 @@ class ViceNetworkManager {
         this.flushPendingPropSync();
         this.tryApplyPendingProfileSync();
 
-        // 4. Broadcast local player state at 20 Hz, Full-Map World State at 10 Hz (or 1.5s when solo on Persistent Server) & Server Directory Heartbeat
+        // 4. Adaptive Network Tick Rate:
+        //    - Multiplayer active (visible tab): 20 Hz STATE (0.05s) + 10 Hz WORLD_SYNC (0.10s)
+        //    - Solo on Persistent Server (visible tab): 0.67 Hz STATE (1.5s) + 0.33 Hz WORLD_SYNC (3.0s) -> cuts solo bandwidth by ~90%!
+        //    - Minimized / Background tab (document.hidden): throttled to 2 Hz (multiplayer) or 0.25 Hz (solo)
         if (this.game.started) {
+            const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
+            const isTabHidden = Boolean(typeof document !== "undefined" && document.hidden);
+            const targetStateInterval = hasRemoteHumans
+                ? (isTabHidden ? 0.50 : this.syncInterval)
+                : (isTabHidden ? 4.0 : 1.5);
             this.syncAccumulator += dt;
-            if (this.syncAccumulator >= this.syncInterval) {
+            if (this.syncAccumulator >= targetStateInterval) {
                 this.syncAccumulator = 0;
                 this.broadcastStateNow();
             }
-            const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
             if (this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
                 this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
-                const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 1.5;
+                const targetWorldInterval = hasRemoteHumans
+                    ? (isTabHidden ? 0.50 : this.worldSyncInterval)
+                    : (isTabHidden ? 6.0 : 3.0);
                 if (this.worldSyncAccumulator >= targetWorldInterval) {
                     this.worldSyncAccumulator = 0;
                     this.broadcastWorldSync();
