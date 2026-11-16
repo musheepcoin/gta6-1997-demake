@@ -1451,13 +1451,24 @@ class ViceNetworkManager {
                 "#ff2a85",
                 true
             );
+            let bountyBonus = 0;
+            if (this.game.activeServerBounty && (this.game.activeServerBounty.targetId === pkt.id || this.game.activeServerBounty.targetName === pkt.victimName)) {
+                bountyBonus = this.game.activeServerBounty.reward || 20000;
+                this.game.activeServerBounty = null;
+                this.addChatLog(
+                    "VICE NET BOUNTY",
+                    `🎯 ${pkt.killerName} claimed the $${bountyBonus.toLocaleString()} bounty on ${pkt.victimName}!`,
+                    "#fde047",
+                    true
+                );
+            }
             if (pkt.killerId === this.playerId) {
                 this.kills++;
                 this.game.multiplier += 1;
-                this.game.addCash(5000, `PVP FRAG: ${pkt.victimName}!`);
+                this.game.addCash(5000 + bountyBonus, bountyBonus > 0 ? `🎯 BOUNTY FRAG: ${pkt.victimName}!` : `PVP FRAG: ${pkt.victimName}!`);
                 this.game.showBigBanner(
-                    "ONLINE FRAG!",
-                    `YOU WASTED ${pkt.victimName}! (+$5,000 & MULTIPLIER +1 • KILLS: ${this.kills})`,
+                    bountyBonus > 0 ? "🎯 SERVER BOUNTY CLAIMED!" : "ONLINE FRAG!",
+                    `YOU WASTED ${pkt.victimName}! (+$${(5000 + bountyBonus).toLocaleString()} & MULTIPLIER +1 • KILLS: ${this.kills})`,
                     "#00f0ff",
                     2.6
                 );
@@ -1696,6 +1707,57 @@ class ViceNetworkManager {
                     if (typeof ped.computeState === "function") ped.state = ped.computeState();
                 }
             }
+        } else if (pkt.kind === "EMPIRE_BUY" && pkt.propId && this.game && Array.isArray(this.game.empireProperties)) {
+            const prop = this.game.empireProperties.find((pr) => pr.id === pkt.propId);
+            if (prop) {
+                prop.ownerName = pkt.ownerName || "RIVAL";
+                prop.ownerColor = pkt.ownerColor || "#00f0ff";
+            }
+            this.addChatLog(
+                "EMPIRE SYNDICATE",
+                `🏢 ${pkt.ownerName || "PLAYER"} acquired ${pkt.propName || pkt.propId}!`,
+                pkt.ownerColor || "#39ff14",
+                true
+            );
+        } else if (pkt.kind === "FLASH_DROP_SPAWN" && this.game && typeof pkt.x === "number" && typeof pkt.y === "number") {
+            this.game.activeFlashEvent = {
+                x: pkt.x,
+                y: pkt.y,
+                z: pkt.z || 2.0,
+                reward: pkt.reward || 20000,
+                weapon: pkt.weapon || "ROCKET",
+                timer: pkt.duration || 90,
+                maxTimer: pkt.duration || 90
+            };
+            if (typeof this.game.sendPager === "function") {
+                this.game.sendPager(
+                    "VICE NET FLASH EVENT",
+                    `📦 SPEC-OPS HOT DROP CRATE landed in Vice City! Race to the golden flare for +$${(pkt.reward || 20000).toLocaleString()} & ${pkt.weapon || "ROCKET"}!`,
+                    false
+                );
+            }
+        } else if (pkt.kind === "FLASH_DROP_CLAIM" && this.game) {
+            this.game.activeFlashEvent = null;
+            this.addChatLog(
+                "FLASH EVENT",
+                `📦 ${pkt.claimer || "PLAYER"} claimed the Spec-Ops Hot Drop Crate (+$${Number(pkt.reward || 20000).toLocaleString()})!`,
+                "#fde047",
+                true
+            );
+        } else if (pkt.kind === "BOUNTY_START" && this.game && pkt.targetId) {
+            this.game.activeServerBounty = {
+                targetId: pkt.targetId,
+                targetName: pkt.targetName || "PLAYER",
+                reward: pkt.reward || 20000,
+                timer: pkt.duration || 60,
+                maxTimer: pkt.duration || 60
+            };
+            this.addChatLog(
+                "VICE NET BOUNTY",
+                `🎯 $${Number(pkt.reward || 20000).toLocaleString()} BOUNTY placed on ${pkt.targetName || "PLAYER"}! (60s)`,
+                "#ff2a85",
+                true
+            );
         }
     }
 

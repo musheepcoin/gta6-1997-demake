@@ -13300,6 +13300,89 @@ class RetroRenderer {
             }
         }
 
+        // 2A-bis. ARCADE 2026: Empire Real Estate Property Rings & Prompts + Spec-Ops Hot Drop Crate
+        if (Array.isArray(game.empireProperties)) {
+            const pulse = 0.5 + 0.5 * Math.sin((this.time || 0) * 6.5);
+            for (let ei = 0; ei < game.empireProperties.length; ei++) {
+                const prop = game.empireProperties[ei];
+                if (Math.abs(p.x - prop.x) > 380 || Math.abs(p.y - prop.y) > 380) continue;
+                const dist = Math.hypot(p.x - prop.x, p.y - prop.y);
+                if (dist > 370) continue;
+                const pz = this.map.getHeightAtPixel(prop.x, prop.y, 2.0) + 0.05;
+                const sc = this.worldToScreen(prop.x, prop.y, pz);
+                const canAfford = !prop.owned && (game.cash || 0) >= prop.cost;
+                const ringCol = prop.owned ? (prop.ownerColor || "#00f0ff") : (canAfford ? "#39ff14" : "#fde047");
+
+                // Glowing ground purchase/ownership circle
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(sc.x, sc.y + 14, 18 + pulse * 4, 0, Math.PI * 2);
+                ctx.fillStyle = prop.owned ? "rgba(0, 240, 255, 0.16)" : (canAfford ? "rgba(57, 255, 20, 0.22)" : "rgba(250, 204, 21, 0.14)");
+                ctx.fill();
+                ctx.strokeStyle = ringCol;
+                ctx.lineWidth = dist < 48 ? 2.6 : 1.6;
+                ctx.stroke();
+                ctx.restore();
+
+                const isClose = dist < 56;
+                let label;
+                if (prop.owned) {
+                    label = `👑 ${prop.shortName} [${prop.ownerName || "OWNED"}] • +$${(prop.rent * 2).toLocaleString()}/M`;
+                } else if (canAfford) {
+                    label = isClose
+                        ? `🏢 [E] BUY ${prop.shortName} — $${prop.cost.toLocaleString()} (${prop.perkShort})`
+                        : `🏢 BUY ${prop.shortName}: $${prop.cost.toLocaleString()} (+$${(prop.rent * 2).toLocaleString()}/M)`;
+                } else {
+                    label = `🏢 ${prop.shortName}: $${prop.cost.toLocaleString()} (${prop.perkShort})`;
+                }
+                const bw = Math.max(150, measurePromptW(label) + 18);
+                const bh = 21;
+                const bx = Math.round(sc.x - bw * 0.5);
+                const by = Math.round(sc.y - 18);
+                ctx.fillStyle = isClose && canAfford ? "rgba(16, 98, 42, 0.94)" : "rgba(9, 13, 24, 0.88)";
+                ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = ringCol;
+                ctx.lineWidth = isClose ? 2 : 1.2;
+                ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(label, sc.x, by + bh * 0.5);
+            }
+        }
+
+        if (game.activeFlashEvent) {
+            const ev = game.activeFlashEvent;
+            const dist = Math.hypot(p.x - ev.x, p.y - ev.y);
+            if (dist < 560) {
+                const sc = this.worldToScreen(ev.x, ev.y, (ev.z || 2.0) + 0.08);
+                const pulse = 0.5 + 0.5 * Math.sin((this.time || 0) * 10.0);
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(sc.x, sc.y, 16 + pulse * 8, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(250, 204, 21, 0.25)";
+                ctx.fill();
+                ctx.strokeStyle = "#fde047";
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+                ctx.fillStyle = "#b45309";
+                ctx.fillRect(sc.x - 9, sc.y - 9, 18, 18);
+                ctx.strokeStyle = "#fde047";
+                ctx.strokeRect(sc.x - 9, sc.y - 9, 18, 18);
+                ctx.restore();
+
+                const label = `📦 HOT DROP CRATE (+$${(ev.reward || 20000).toLocaleString()} + ${ev.weapon}) • ${Math.ceil(ev.timer)}s`;
+                const bw = measurePromptW(label) + 18;
+                const bx = Math.round(sc.x - bw * 0.5);
+                const by = Math.round(sc.y - 28);
+                ctx.fillStyle = "rgba(120, 53, 15, 0.92)";
+                ctx.fillRect(bx, by, bw, 20);
+                ctx.strokeStyle = "#fde047";
+                ctx.lineWidth = 1.6;
+                ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 19);
+                ctx.fillStyle = "#fef08a";
+                ctx.fillText(label, sc.x, by + 10);
+            }
+        }
+
         // 2B. Interactive Watercraft Boarding Prompt ([E] 🚤 BOARD SPEEDBOAT / JET-SKI / AIRBOAT) when near shore, piers or marinas!
         if (!p.inVehicle) {
             let bestBoat = null;
@@ -16653,6 +16736,132 @@ class RetroRenderer {
             if (this._lbHudCanvas && this._lbHudCacheKey === lbCacheKey) {
                 ctx.drawImage(this._lbHudCanvas, lbX - 2, lbY - 2);
             }
+
+            // A3. ARCADE 2026 LIVE RETENTION HUD WIDGETS (Adrenaline Combo Bar, Getaway Pot, Empire Rent & Flash/Bounty Tracker)
+            let curY = lbY + lbH + 6;
+            ctx.save();
+            ctx.textBaseline = "middle";
+
+            // 1. 🔥 Adrenaline Combo Bar
+            if ((game.comboTimer || 0) > 0 && (game.comboChain || 0) > 0) {
+                const boxH = 26;
+                const ratio = Math.max(0, Math.min(1, game.comboTimer / (game.comboMaxTimer || 6.0)));
+                const isLow = game.comboTimer < 1.8 && Math.floor(this.time * 12) % 2 === 0;
+                ctx.fillStyle = isLow ? "rgba(88, 12, 32, 0.90)" : "rgba(12, 16, 30, 0.88)";
+                ctx.fillRect(lbX, curY, lbW, boxH);
+                ctx.strokeStyle = (game.comboMult || 1) >= 4 ? "#fde047" : "#ff2a85";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+
+                ctx.font = "bold 10px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(`🔥 COMBO x${game.comboMult || 1} (${game.comboChain} HIT)`, lbX + 6, curY + 9);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#39ff14";
+                ctx.fillText(`+$${Number(game.comboPot || 0).toLocaleString()}`, lbX + lbW - 6, curY + 9);
+
+                // Progress bar
+                ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+                ctx.fillRect(lbX + 6, curY + 18, lbW - 12, 4);
+                ctx.fillStyle = ratio < 0.28 ? "#ef4444" : ((game.comboMult || 1) >= 4 ? "#fde047" : "#00f0ff");
+                ctx.fillRect(lbX + 6, curY + 18, Math.round((lbW - 12) * ratio), 4);
+                curY += boxH + 5;
+            }
+
+            // 2. 🚨 Wanted Getaway Pot ("Push Your Luck")
+            if ((game.wantedLevel || 0) > 0 && (game.wantedGetawayPot || 0) >= 50) {
+                const boxH = 25;
+                ctx.fillStyle = "rgba(28, 10, 18, 0.88)";
+                ctx.fillRect(lbX, curY, lbW, boxH);
+                ctx.strokeStyle = "#ef4444";
+                ctx.lineWidth = 1.3;
+                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+
+                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#f87171";
+                ctx.fillText("🚨 GETAWAY POT", lbX + 6, curY + 8.5);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#39ff14";
+                ctx.fillText(`+$${Math.round(game.wantedGetawayPot).toLocaleString()}`, lbX + lbW - 6, curY + 8.5);
+
+                ctx.font = "bold 8px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#fde047";
+                ctx.fillText("ESCAPE VCPD OR PAY 'N' SPRAY TO BANK!", lbX + lbW * 0.5, curY + 19);
+                curY += boxH + 5;
+            }
+
+            // 3. 🏢 Empire Real Estate Status
+            if (Array.isArray(game.empireProperties)) {
+                const ownedCount = game.empireProperties.filter((pr) => pr.owned).length;
+                if (ownedCount > 0) {
+                    const boxH = 24;
+                    const incPerMin = (typeof game.getEmpireIncomePer30s === "function" ? game.getEmpireIncomePer30s() : 0) * 2;
+                    const rentRatio = 1.0 - Math.max(0, Math.min(1, (game.empireRentTimer || 0) / 30.0));
+                    ctx.fillStyle = "rgba(8, 22, 26, 0.86)";
+                    ctx.fillRect(lbX, curY, lbW, boxH);
+                    ctx.strokeStyle = "#00f0ff";
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+
+                    ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                    ctx.textAlign = "left";
+                    ctx.fillStyle = "#00f0ff";
+                    ctx.fillText(`🏢 EMPIRE ${ownedCount}/8`, lbX + 6, curY + 9);
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillText(`+$${incPerMin.toLocaleString()}/M`, lbX + lbW - 6, curY + 9);
+
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+                    ctx.fillRect(lbX + 6, curY + 17, lbW - 12, 3.5);
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillRect(lbX + 6, curY + 17, Math.round((lbW - 12) * rentRatio), 3.5);
+                    curY += boxH + 5;
+                }
+            }
+
+            // 4. 📦 Active Flash Drop Crate or 🎯 Server Bounty Tracker
+            if (game.activeFlashEvent && game.player) {
+                const ev = game.activeFlashEvent;
+                const dx = ev.x - game.player.x;
+                const dy = ev.y - game.player.y;
+                const distM = Math.round(Math.hypot(dx, dy) / 16);
+                const dirs = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
+                const dirStr = dirs[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8];
+                const boxH = 22;
+                ctx.fillStyle = "rgba(68, 32, 6, 0.90)";
+                ctx.fillRect(lbX, curY, lbW, boxH);
+                ctx.strokeStyle = "#fde047";
+                ctx.lineWidth = 1.4;
+                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(`📦 HOT DROP (${distM}m ${dirStr})`, lbX + 6, curY + 11);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(`${Math.ceil(ev.timer)}s`, lbX + lbW - 6, curY + 11);
+                curY += boxH + 5;
+            }
+            if (game.activeServerBounty) {
+                const b = game.activeServerBounty;
+                const boxH = 22;
+                ctx.fillStyle = "rgba(76, 12, 24, 0.90)";
+                ctx.fillRect(lbX, curY, lbW, boxH);
+                ctx.strokeStyle = "#ff2a85";
+                ctx.lineWidth = 1.4;
+                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#ff2a85";
+                ctx.fillText(`🎯 BOUNTY: ${String(b.targetName || "PLAYER").slice(0, 9)}`, lbX + 6, curY + 11);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(`$${Number(b.reward || 20000).toLocaleString()} (${Math.ceil(b.timer)}s)`, lbX + lbW - 6, curY + 11);
+            }
+            ctx.restore();
         }
 
         // B. LEFT PANEL (Top-Left): LUCIA MUGSHOT BADGE + WEAPON, ARMOR, KEY & PAGER POPUP
@@ -16980,7 +17189,30 @@ class RetroRenderer {
             }
         }
 
-        // 7. Active Mission Target Blip
+        // 7. Active Mission Target Blip & Hot Drop Flash Crate Blip
+        if (Array.isArray(game.empireProperties)) {
+            for (const prop of game.empireProperties) {
+                const pt = worldToMini(prop.x, prop.y);
+                if (pt.x < mx + 4 || pt.x > mx + mw - 4 || pt.y < my + 4 || pt.y > my + mh - 4) continue;
+                ctx.fillStyle = prop.owned ? "#00f0ff" : ((game.cash || 0) >= prop.cost ? "#39ff14" : "#fde047");
+                ctx.fillRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
+                ctx.strokeStyle = "#050811";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(pt.x - 3.5, pt.y - 3.5, 7, 7);
+            }
+        }
+        if (game.activeFlashEvent) {
+            const ev = game.activeFlashEvent;
+            const pt = worldToMini(ev.x, ev.y);
+            const cx = Math.max(mx + 6, Math.min(mx + mw - 6, pt.x));
+            const cy = Math.max(my + 6, Math.min(my + mh - 6, pt.y));
+            const pulse = 4 + Math.sin(this.time * 10) * 2;
+            ctx.fillStyle = "#fde047";
+            ctx.fillRect(cx - 3.5, cy - 3.5, 7, 7);
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = 1.8;
+            ctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
+        }
         const mTarget = game.missions ? game.missions.getTargetPosition() : null;
         if (mTarget) {
             const pt = worldToMini(mTarget.x, mTarget.y);

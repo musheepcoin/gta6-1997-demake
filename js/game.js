@@ -265,6 +265,25 @@ class LeonidaGame {
 
         this.craters = [];
 
+        // ====================================================================
+        // ARCADE 2026 RETENTION LOOPS (Adrenaline Combo, Getaway Pot, Empire & Flash Events)
+        // ====================================================================
+        this.comboChain = 0;
+        this.comboMult = 1;
+        this.comboTimer = 0;
+        this.comboMaxTimer = 6.0;
+        this.comboPot = 0;
+        this._driftComboAccum = 0;
+        this.wantedGetawayPot = 0;
+        this.wantedPeakLevel = 0;
+        this.empireProperties = this.initEmpireProperties();
+        this.empireRentTimer = 30.0;
+        this.empireJailCardTimer = 120.0;
+        this.activeFlashEvent = null;
+        this.flashEventCooldown = 35.0;
+        this.activeServerBounty = null;
+        this.bountyCooldown = 55.0;
+
 
 
         // Start directly in the live GTA 1 street scene once the 3D map is compiled!
@@ -5489,6 +5508,9 @@ class LeonidaGame {
             return;
         }
         if (!p.inVehicle && !p.isSitting && this.map) {
+            if (typeof this.tryPurchaseNearbyEmpireProperty === "function" && this.tryPurchaseNearbyEmpireProperty()) {
+                return;
+            }
             let nearVeh = false;
             for (const v of this.vehicles) {
                 if (!v.destroyed && Math.hypot(v.x - p.x, v.y - p.y) < 36) { nearVeh = true; break; }
@@ -7655,8 +7677,35 @@ class LeonidaGame {
         if (this.wantedLevel === 0 && clamped > 0) {
 
             this.copSpawnTimer = 2.5; // Progressive dispatch delay so police don't appear instantly on top of the player
+            this.wantedPeakLevel = clamped;
+
+        } else if (clamped > this.wantedLevel) {
+
+            this.wantedPeakLevel = Math.max(this.wantedPeakLevel || 1, clamped);
 
         } else if (clamped === 0) {
+
+            // Boucle 2 ("Push Your Luck"): If the player was Wanted and escaped alive, cash out the Getaway Pot!
+            if (this.wantedLevel > 0 && this.player && !this.player.dead && (this.wantedGetawayPot || 0) >= 200) {
+                const peak = Math.max(1, this.wantedPeakLevel || this.wantedLevel || 1);
+                const getawayBonus = Math.round(this.wantedGetawayPot * (1 + (peak - 1) * 0.25));
+                this.wantedGetawayPot = 0;
+                this.wantedPeakLevel = 0;
+                this.cash += getawayBonus;
+                if (this.audio && typeof this.audio.playFanfare === "function") {
+                    this.audio.playFanfare("MISSION");
+                }
+                this.showBigBanner(
+                    `🏦 ${peak}★ CLEAN GETAWAY!`,
+                    `ESCAPED VCPD PURSUIT — BANKED +$${getawayBonus.toLocaleString()} GETAWAY BONUS!`,
+                    "#39ff14",
+                    3.2
+                );
+                this.addFloatingText(this.player.x, this.player.y - 34, `🏦 CLEAN GETAWAY! +$${getawayBonus.toLocaleString()}`, "#39ff14");
+            } else {
+                this.wantedGetawayPot = 0;
+                this.wantedPeakLevel = 0;
+            }
 
             this.clearAllPlayerPursuit(false);
 
@@ -7676,60 +7725,328 @@ class LeonidaGame {
 
     }
 
+    get score() {
+        return this.cash;
+    }
 
+    set score(val) {
+        this.cash = Math.max(0, Number(val) || 0);
+    }
 
-    addCash(amount, label = "") {
+    addScore(amount, label = "") {
+        this.triggerArcadeCombo(amount, label, "#fde047", 2.4, Boolean(label));
+    }
 
-        const total = Math.floor(amount * this.multiplier);
-
-        this.cash += total;
-
-        if (label) {
-
-            this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}`, "#39ff14");
-
-        } else {
-
-            this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}`, "#39ff14");
-
+    addCash(amount, label = "", skipCombo = false) {
+        if (!skipCombo) {
+            this.triggerArcadeCombo(amount, label, "#39ff14", 2.8, true);
+            return;
         }
+        const total = Math.floor(amount * (this.multiplier || 1));
+        this.cash += total;
+        if (label) {
+            this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}`, "#39ff14");
+        } else {
+            this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}`, "#39ff14");
+        }
+        this._checkScoreMilestonesAndSave();
+        this.updateHud();
+    }
 
-
-
+    _checkScoreMilestonesAndSave() {
         const pName = (this.net && this.net.playerName) || (this.player && this.player.nickname) || "LUCIA";
-
         const pColor = (this.net && this.net.playerColor) || "#ff2a85";
-
         this.recordHighScore(pName, (this.player && this.player.charId) || "LUCIA", this.cash, pColor, true);
 
-
-
-        // Classic 1997 GTA 1 Chapter Target Score ($1,000,000) Check!
-
         if (!this.chapterCleared && this.cash >= this.targetScore) {
-
             this.chapterCleared = true;
-
             this.audio.playFanfare("GOURANGA");
-
             this.showBigBanner(
-
                 "CHAPTER TARGET REACHED!",
-
                 "$1,000,000 SCORE GOAL CLEARED — LEONIDA STATE KINGPIN STATUS UNLOCKED!",
-
                 "#ffd13b",
-
                 4.2
-
             );
+        }
+    }
 
+    triggerArcadeCombo(baseAmount, label = "", color = "#39ff14", addTimerSec = 2.5, showFloat = true) {
+        const amt = Number(baseAmount) || 0;
+        if (amt <= 0) return 0;
+        const maxDur = this.getMaxComboDuration();
+        this.comboChain = (this.comboTimer > 0 ? (this.comboChain || 0) : 0) + 1;
+        this.comboMaxTimer = maxDur;
+        this.comboTimer = Math.min(maxDur, Math.max(this.comboTimer || 0, maxDur * 0.72) + addTimerSec);
+
+        const c = this.comboChain;
+        this.comboMult = c >= 36 ? 10 : (c >= 28 ? 8 : (c >= 21 ? 6 : (c >= 15 ? 5 : (c >= 10 ? 4 : (c >= 6 ? 3 : (c >= 3 ? 2 : 1))))));
+
+        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * this.comboMult);
+        this.cash += total;
+        this.comboPot = (this.comboPot || 0) + total;
+
+        if ((this.wantedLevel || 0) > 0) {
+            this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.round(total * 0.32);
         }
 
+        if (showFloat && this.player) {
+            const multTag = this.comboMult > 1 ? ` [COMBO x${this.comboMult}]` : "";
+            const txt = label
+                ? `${label} +$${total.toLocaleString()}${multTag}`
+                : `+$${total.toLocaleString()}${multTag}`;
+            this.addFloatingText(this.player.x, this.player.y - 22, txt, color);
+        }
 
-
+        this._checkScoreMilestonesAndSave();
         this.updateHud();
+        return total;
+    }
 
+    initEmpireProperties() {
+        const saved = this.loadOwnedEmpireIds();
+        const props = [
+            {
+                id: "EMP_DIXON",
+                shortName: "HOTEL DIXON FRONT",
+                name: "🏨 HOTEL DIXON ART DECO FRONT",
+                district: "OCEAN DRIVE",
+                x: 432.5 * TILE_SIZE,
+                y: 286.0 * TILE_SIZE,
+                cost: 5000,
+                rent: 400,
+                bankGuarantee: 1500,
+                floorMult: 1,
+                perkShort: "+HP REGEN & $1.5K SAFE",
+                color: "#f472b6",
+                owned: saved.includes("EMP_DIXON"),
+                ownerName: saved.includes("EMP_DIXON") ? "YOU" : null
+            },
+            {
+                id: "EMP_ESPANOLA",
+                shortName: "MALIBU & ESPAÑOLA CLUB",
+                name: "🦩 MALIBU & ESPAÑOLA NEON BISTRO",
+                district: "MID-BEACH",
+                x: mx256(208.5) * TILE_SIZE,
+                y: my256(106.5) * TILE_SIZE,
+                cost: 12000,
+                rent: 750,
+                bankGuarantee: 2500,
+                floorMult: 1,
+                perkShort: "+1.5s COMBO TIMER",
+                color: "#fb7185",
+                owned: saved.includes("EMP_ESPANOLA"),
+                ownerName: saved.includes("EMP_ESPANOLA") ? "YOU" : null
+            },
+            {
+                id: "EMP_VICEPORT",
+                shortName: "VICE PORT CARGO DEPOT",
+                name: "🚢 VICE PORT SMUGGLER DEPOT",
+                district: "VICE PORT",
+                x: mx256(171.5) * TILE_SIZE,
+                y: my256(164.5) * TILE_SIZE,
+                cost: 20000,
+                rent: 1200,
+                bankGuarantee: 3000,
+                floorMult: 1,
+                perkShort: "+50 RESPAWN ARMOR",
+                color: "#38bdf8",
+                owned: saved.includes("EMP_VICEPORT"),
+                ownerName: saved.includes("EMP_VICEPORT") ? "YOU" : null
+            },
+            {
+                id: "EMP_WYNWOOD",
+                shortName: "JACK OF HEARTS LOUNGE",
+                name: "🎨 CLUB JACK OF HEARTS VIP",
+                district: "WYNWOOD",
+                x: mx256(115.5) * TILE_SIZE,
+                y: my256(82.5) * TILE_SIZE,
+                cost: 30000,
+                rent: 1750,
+                bankGuarantee: 4000,
+                floorMult: 1,
+                perkShort: "+35% NEAR-MISS & DRIFT",
+                color: "#e879f9",
+                owned: saved.includes("EMP_WYNWOOD"),
+                ownerName: saved.includes("EMP_WYNWOOD") ? "YOU" : null
+            },
+            {
+                id: "EMP_DOWNTOWN",
+                shortName: "BAYFRONT PENTHOUSE",
+                name: "🏙️ DOWNTOWN BAYFRONT TOWER",
+                district: "DOWNTOWN VC",
+                x: mx256(141.5) * TILE_SIZE,
+                y: my256(116.5) * TILE_SIZE,
+                cost: 45000,
+                rent: 2500,
+                bankGuarantee: 5000,
+                floorMult: 2,
+                perkShort: "MIN MULTIPLIER x2",
+                color: "#818cf8",
+                owned: saved.includes("EMP_DOWNTOWN"),
+                ownerName: saved.includes("EMP_DOWNTOWN") ? "YOU" : null
+            },
+            {
+                id: "EMP_NINE1NINE",
+                shortName: "CLUB NINE1NINE VIP",
+                name: "💃 CLUB NINE1NINE MEGA-CLUB",
+                district: "NORTH BEACH",
+                x: mx256(213.5) * TILE_SIZE,
+                y: my256(48.0) * TILE_SIZE,
+                cost: 65000,
+                rent: 3500,
+                bankGuarantee: 6500,
+                floorMult: 2,
+                perkShort: "FREE JAIL CARD / 2 MIN",
+                color: "#22d3ee",
+                owned: saved.includes("EMP_NINE1NINE"),
+                ownerName: saved.includes("EMP_NINE1NINE") ? "YOU" : null
+            },
+            {
+                id: "EMP_SPEEDWAY",
+                shortName: "SPEEDWAY PIT GARAGE",
+                name: "🏁 GELLHORN SUPER-SPEEDWAY CUSTOMS",
+                district: "PORT GELLHORN",
+                x: 84.5 * TILE_SIZE,
+                y: 174.5 * TILE_SIZE,
+                cost: 85000,
+                rent: 4500,
+                bankGuarantee: 8000,
+                floorMult: 2,
+                perkShort: "AUTO-REPAIR VEHICLE",
+                color: "#fb923c",
+                owned: saved.includes("EMP_SPEEDWAY"),
+                ownerName: saved.includes("EMP_SPEEDWAY") ? "YOU" : null
+            },
+            {
+                id: "EMP_STAR_ISLAND",
+                shortName: "VERCETTI PALAZZO",
+                name: "👑 STAR ISLAND VERCETTI SYNDICATE",
+                district: "STAR ISLAND",
+                x: mx256(173.0) * TILE_SIZE,
+                y: my256(106.5) * TILE_SIZE,
+                cost: 125000,
+                rent: 7500,
+                bankGuarantee: 12000,
+                floorMult: 3,
+                perkShort: "KINGPIN MIN MULT x3",
+                color: "#fde047",
+                owned: saved.includes("EMP_STAR_ISLAND"),
+                ownerName: saved.includes("EMP_STAR_ISLAND") ? "YOU" : null
+            }
+        ];
+        return props;
+    }
+
+    loadOwnedEmpireIds() {
+        try {
+            const raw = localStorage.getItem("vc26_empire_owned_v1");
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) return arr;
+            }
+        } catch (_e) {}
+        return [];
+    }
+
+    saveOwnedEmpireIds() {
+        try {
+            const ids = (this.empireProperties || []).filter((pr) => pr.owned).map((pr) => pr.id);
+            localStorage.setItem("vc26_empire_owned_v1", JSON.stringify(ids));
+        } catch (_e) {}
+    }
+
+    hasEmpireProperty(id) {
+        return Boolean(this.empireProperties && this.empireProperties.some((pr) => pr.id === id && pr.owned));
+    }
+
+    getMaxComboDuration() {
+        return this.hasEmpireProperty("EMP_ESPANOLA") ? 7.5 : 6.0;
+    }
+
+    getEmpireFloorMultiplier() {
+        let floor = 1;
+        if (this.empireProperties) {
+            for (const pr of this.empireProperties) {
+                if (pr.owned && (pr.floorMult || 1) > floor) {
+                    floor = pr.floorMult;
+                }
+            }
+        }
+        return floor;
+    }
+
+    getEmpireGuaranteedBank() {
+        let bank = this.START_CASH || 500;
+        if (this.empireProperties) {
+            for (const pr of this.empireProperties) {
+                if (pr.owned) {
+                    bank += (pr.bankGuarantee || 0);
+                }
+            }
+        }
+        return bank;
+    }
+
+    getEmpireIncomePer30s() {
+        let rent = 0;
+        if (this.empireProperties) {
+            for (const pr of this.empireProperties) {
+                if (pr.owned) rent += (pr.rent || 0);
+            }
+        }
+        return rent;
+    }
+
+    tryPurchaseNearbyEmpireProperty(specificId = null) {
+        if (!this.player || this.player.dead || !Array.isArray(this.empireProperties)) return false;
+        const p = this.player;
+        for (const prop of this.empireProperties) {
+            if (prop.owned) continue;
+            if (specificId && prop.id !== specificId) continue;
+            const d = Math.hypot(prop.x - p.x, prop.y - p.y);
+            if (!specificId && d > 58) continue;
+            if (this.cash < prop.cost) {
+                this.addFloatingText(prop.x, prop.y - 24, `❌ NEED $${prop.cost.toLocaleString()} TO BUY ${prop.shortName}!`, "#ef4444");
+                return false;
+            }
+            this.cash -= prop.cost;
+            prop.owned = true;
+            const myName = (this.net && this.net.playerName) || p.nickname || "LUCIA";
+            const myColor = (this.net && this.net.playerColor) || "#39ff14";
+            prop.ownerName = myName;
+            prop.ownerColor = myColor;
+            this.saveOwnedEmpireIds();
+            const minMult = this.getEmpireFloorMultiplier();
+            if (this.multiplier < minMult) {
+                this.multiplier = minMult;
+            }
+            if (this.audio && typeof this.audio.playFanfare === "function") {
+                this.audio.playFanfare("MISSION");
+            }
+            this.showBigBanner(
+                `🏢 ${prop.shortName} ACQUIRED!`,
+                `EMPIRE INCOME +$${(prop.rent * 2).toLocaleString()}/MIN • PERK: ${prop.perkShort}`,
+                prop.color || "#39ff14",
+                3.6
+            );
+            this.sendPager(
+                "VICE CITY REAL ESTATE SYNDICATE",
+                `🏢 Congratulations! You now own ${prop.name} (${prop.district})! Passive rent: +$${(prop.rent * 2).toLocaleString()}/min • Perk unlocked: ${prop.perkShort}.`,
+                false
+            );
+            if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                this.net.broadcastWorldEvent({
+                    kind: "EMPIRE_BUY",
+                    propId: prop.id,
+                    propName: prop.shortName,
+                    ownerName: myName,
+                    ownerColor: myColor
+                });
+            }
+            this.updateHud();
+            return true;
+        }
+        return false;
     }
 
     addMultiplier(n = 1) {
@@ -8592,13 +8909,24 @@ class LeonidaGame {
 
 
 
-        // Dying (or being arrested without a get-out-of-jail card) costs ALL your money: back to the starting sum
+        // Dying (or being arrested without a get-out-of-jail card) costs on-hand cash down to your Empire Guaranteed Bank!
+        this.wantedGetawayPot = 0;
+        this.wantedPeakLevel = 0;
+        this.comboTimer = 0;
+        this.comboChain = 0;
+        this.comboMult = 1;
+        this.comboPot = 0;
+
+        const safeFloorCash = typeof this.getEmpireGuaranteedBank === "function" ? this.getEmpireGuaranteedBank() : this.START_CASH;
+        const minEmpireMult = typeof this.getEmpireFloorMultiplier === "function" ? this.getEmpireFloorMultiplier() : 1;
 
         const loseAllCash = () => {
 
-            const lost = Math.max(0, this.cash - this.START_CASH);
+            const keepCash = Math.min(this.cash, safeFloorCash);
 
-            this.cash = this.START_CASH;
+            const lost = Math.max(0, this.cash - keepCash);
+
+            this.cash = Math.max(this.START_CASH, keepCash);
 
             if (lost > 0) {
 
@@ -8634,7 +8962,7 @@ class LeonidaGame {
 
             } else {
 
-                this.multiplier = Math.max(1, Math.floor(this.multiplier * 0.5));
+                this.multiplier = Math.max(minEmpireMult, Math.floor(this.multiplier * 0.5));
 
                 p.weapon = "PISTOL";
 
@@ -8644,7 +8972,7 @@ class LeonidaGame {
 
                     title,
 
-                    `${subtitle} — ALL CASH CONFISCATED (BACK TO $${this.START_CASH}), MULTIPLIER x${this.multiplier}`,
+                    `${subtitle} — CASH CONFISCATED (EMPIRE SAFE: $${this.cash.toLocaleString()}), MULTIPLIER x${this.multiplier}`,
 
                     color,
 
@@ -8656,7 +8984,7 @@ class LeonidaGame {
 
         } else {
 
-            // WASTED: lose 1 life & halve multiplier
+            // WASTED: lose 1 life & halve multiplier (never below Empire Floor Multiplier!)
 
             if (this.lastAttackerId && this.net) {
 
@@ -8668,7 +8996,7 @@ class LeonidaGame {
 
             this.lives = Math.max(0, this.lives - 1);
 
-            this.multiplier = Math.max(1, Math.floor(this.multiplier * 0.5));
+            this.multiplier = Math.max(minEmpireMult, Math.floor(this.multiplier * 0.5));
 
             loseAllCash();
 
@@ -8676,11 +9004,11 @@ class LeonidaGame {
 
                 this.lives = 3;
 
-                this.showBigBanner("WASTED! (LIVES RESET)", `${subtitle} — ALL CASH LOST (BACK TO $${this.START_CASH}), LIVES RESTORED TO 3`, color, 3.2);
+                this.showBigBanner("WASTED! (LIVES RESET)", `${subtitle} — EMPIRE SAFE BANK: $${this.cash.toLocaleString()}, LIVES RESTORED TO 3`, color, 3.2);
 
             } else {
 
-                this.showBigBanner(title, `${subtitle} — ALL CASH LOST (BACK TO $${this.START_CASH}), LIVES LEFT: ${this.lives}`, color, 3.0);
+                this.showBigBanner(title, `${subtitle} — EMPIRE SAFE BANK: $${this.cash.toLocaleString()}, LIVES LEFT: ${this.lives}`, color, 3.0);
 
             }
 
@@ -8699,7 +9027,7 @@ class LeonidaGame {
 
             p.hp = 100;
 
-            p.armor = 50;
+            p.armor = this.hasEmpireProperty && this.hasEmpireProperty("EMP_VICEPORT") ? 100 : 50;
 
             if (p.ammo) {
 
@@ -16466,6 +16794,7 @@ class LeonidaGame {
         }
 
         this.updateLivingEventsRespawn(dt);
+        this.updateArcade2026Systems(dt);
 
 
 
@@ -16862,6 +17191,326 @@ class LeonidaGame {
         tickArray(this.map.golfGreens);
         if (this.map.industrialAndParkDetails) {
             tickArray(this.map.industrialAndParkDetails.bikerRallies);
+        }
+    }
+
+    /* ========================================================================
+       ARCADE 2026 RETENTION ENGINE (01_VISION_ARCADE_2026_RETENTION)
+       - Loop 1 (3-5s): Near-Miss, Drift, Stunt & Carnage Adrenaline Combo Bar
+       - Loop 2 (2-4m): Wanted Getaway Pot ("Push Your Luck") & 90s Hot Drop Crate
+       - Loop 3 (15-30m): Persistent Empire Real Estate Ownership, Rent & Perks
+       - Loop 4 (24/7): Live Server Bounties & Territory Announcements
+       ======================================================================== */
+    updateArcade2026Systems(dt) {
+        const p = this.player;
+        if (!p || !this.map) return;
+
+        // 1. Decrement Near-Miss cooldowns on nearby vehicles
+        if (Array.isArray(this.vehicles)) {
+            for (let i = 0; i < this.vehicles.length; i++) {
+                const v = this.vehicles[i];
+                if (v && (v._nearMissCd || 0) > 0) {
+                    v._nearMissCd = Math.max(0, v._nearMissCd - dt);
+                }
+            }
+        }
+
+        // 2. LOOP 1 (3-5s): Near-Miss & High-Speed Drift Detection while driving
+        if (!p.dead && p.inVehicle && !p.inVehicle.destroyed && (p.seatIndex || 0) === 0) {
+            const v = p.inVehicle;
+            const spd = Math.hypot(v.vx || 0, v.vy || 0) || Math.abs(v.speed || 0);
+
+            // Perk EMP_SPEEDWAY: Auto-repair driven vehicle slowly (+10 HP/s)
+            if (this.hasEmpireProperty("EMP_SPEEDWAY") && v.hp < v.maxHp) {
+                v.hp = Math.min(v.maxHp, v.hp + 10 * dt);
+            }
+
+            if (spd > 125 && (v.crashCooldown || 0) <= 0) {
+                const cosA = Math.cos(v.angle || 0);
+                const sinA = Math.sin(v.angle || 0);
+                const vHalfL = (v.w || 48) * 0.5;
+                const vHalfW = (v.h || 24) * 0.5;
+                const inspectNearMiss = (ov) => {
+                    if (!ov || ov === v || ov.destroyed || (ov._nearMissCd || 0) > 0) return;
+                    if (ov.z !== undefined && v.z !== undefined && Math.abs(ov.z - v.z) > 0.45) return;
+                    const dx = ov.x - v.x;
+                    const dy = ov.y - v.y;
+                    if (Math.abs(dx) > 78 || Math.abs(dy) > 78) return;
+                    const along = Math.abs(dx * cosA + dy * sinA);
+                    const lat = Math.abs(-dx * sinA + dy * cosA);
+                    const sumL = vHalfL + (ov.w || 48) * 0.5;
+                    const sumW = vHalfW + (ov.h || 24) * 0.5;
+                    if (along < sumL + 14 && lat < sumW + 19 && lat > sumW * 0.55) {
+                        ov._nearMissCd = 3.8;
+                        const bonusMult = this.hasEmpireProperty("EMP_WYNWOOD") ? 1.35 : 1.0;
+                        const isOncoming = ov.driver && Math.cos((v.angle || 0) - (ov.angle || 0)) < -0.35;
+                        const basePts = Math.round((ov.isPolice ? 300 : (isOncoming ? 225 : 150)) * bonusMult);
+                        const lbl = ov.isPolice ? "🚔 COP NEAR MISS!" : (isOncoming ? "⚡ ONCOMING NEAR MISS!" : "⚡ NEAR MISS!");
+                        this.triggerArcadeCombo(basePts, lbl, ov.isPolice ? "#fde047" : "#00f0ff", 2.5, true);
+                        if (this.audio && typeof this.audio.playBeep === "function") {
+                            this.audio.playBeep(520 + Math.min(14, this.comboChain || 1) * 42, 0.06, "triangle", 0.075);
+                        }
+                    }
+                };
+                if (this._vehGridHead && this._vehGridNext) {
+                    const gcx = v.x >> 8;
+                    const gcy = v.y >> 8;
+                    for (let cy = Math.max(0, gcy - 1); cy <= Math.min(127, gcy + 1); cy++) {
+                        const rowOff = cy << 7;
+                        for (let cx = Math.max(0, gcx - 1); cx <= Math.min(127, gcx + 1); cx++) {
+                            for (let vi = this._vehGridHead[rowOff | cx]; vi !== -1; vi = this._vehGridNext[vi]) {
+                                inspectNearMiss(this.vehicles[vi]);
+                            }
+                        }
+                    }
+                } else {
+                    for (let i = 0; i < this.vehicles.length; i++) {
+                        inspectNearMiss(this.vehicles[i]);
+                    }
+                }
+            }
+
+            if (v.drifting && spd > 118) {
+                this._driftComboAccum = (this._driftComboAccum || 0) + dt;
+                if (this._driftComboAccum >= 0.65) {
+                    this._driftComboAccum = 0;
+                    const driftPts = Math.round(120 * (this.hasEmpireProperty("EMP_WYNWOOD") ? 1.35 : 1.0));
+                    this.triggerArcadeCombo(driftPts, "💨 DRIFT COMBO!", "#f472b6", 2.0, true);
+                }
+            } else {
+                this._driftComboAccum = Math.max(0, (this._driftComboAccum || 0) - dt * 1.5);
+            }
+        }
+
+        // 3. LOOP 1: Adrenaline Combo Timer Countdown & Mega-Combo Reward
+        if ((this.comboTimer || 0) > 0) {
+            this.comboTimer = Math.max(0, this.comboTimer - dt);
+            if (this.comboTimer <= 0) {
+                const finalChain = this.comboChain || 0;
+                const finalPot = this.comboPot || 0;
+                this.comboChain = 0;
+                this.comboMult = 1;
+                this.comboPot = 0;
+                if (finalChain >= 15) {
+                    this.addMultiplier(1);
+                    if (this.audio && typeof this.audio.playFanfare === "function") {
+                        this.audio.playFanfare("MISSION");
+                    }
+                    this.showBigBanner(
+                        `🔥 ${finalChain}-HIT MEGA COMBO!`,
+                        `BANKED +$${finalPot.toLocaleString()} • PERMANENT MULTIPLIER +1 (x${this.multiplier})!`,
+                        "#39ff14",
+                        3.0
+                    );
+                } else if (finalChain >= 4) {
+                    this.addFloatingText(p.x, p.y - 30, `🔥 ${finalChain}-HIT COMBO BANKED! +$${finalPot.toLocaleString()}`, "#fde047");
+                }
+            }
+        }
+
+        // 4. LOOP 2 (2-4m): Wanted Getaway Pot Accrual ("Push Your Luck")
+        if (!p.dead && (this.wantedLevel || 0) > 0) {
+            this.wantedPeakLevel = Math.max(this.wantedPeakLevel || 1, this.wantedLevel);
+            const curSpd = p.inVehicle
+                ? Math.hypot(p.inVehicle.vx || 0, p.inVehicle.vy || 0)
+                : (p.isMoving ? 115 : 0);
+            if (curSpd > 30) {
+                this.wantedGetawayPot = (this.wantedGetawayPot || 0) + (28 * this.wantedLevel * (p.inVehicle ? 1.35 : 1.0)) * dt;
+            }
+        }
+
+        // 5. LOOP 3 (15-30m): Empire Real Estate Passive Rent, Perks & Proximity Purchase
+        if (!p.dead) {
+            // Perk EMP_DIXON: Passive Health Regeneration (+2.2 HP/s)
+            if (this.hasEmpireProperty("EMP_DIXON") && p.hp < (p.maxHp || 100)) {
+                p.hp = Math.min(p.maxHp || 100, p.hp + 2.2 * dt);
+            }
+            // Perk EMP_NINE1NINE: +1 Get Out of Jail Free Card every 120s (up to 3)
+            if (this.hasEmpireProperty("EMP_NINE1NINE") && (this.jailFreeCards || 0) < 3) {
+                this.empireJailCardTimer = (this.empireJailCardTimer || 120) - dt;
+                if (this.empireJailCardTimer <= 0) {
+                    this.empireJailCardTimer = 120.0;
+                    this.jailFreeCards = Math.min(3, (this.jailFreeCards || 0) + 1);
+                    this.addFloatingText(p.x, p.y - 26, "🃏 CLUB NINE1NINE PERK: +1 JAIL FREE CARD!", "#22d3ee");
+                    this.updateHud();
+                }
+            }
+            // Passive Rent Payout every 30s
+            const totalRent = this.getEmpireIncomePer30s();
+            if (totalRent > 0) {
+                this.empireRentTimer = (this.empireRentTimer || 30.0) - dt;
+                if (this.empireRentTimer <= 0) {
+                    this.empireRentTimer = 30.0;
+                    this.cash += totalRent;
+                    this._checkScoreMilestonesAndSave();
+                    this.addFloatingText(p.x, p.y - 28, `🏢 EMPIRE RENT COLLECTED: +$${totalRent.toLocaleString()}!`, "#39ff14");
+                    this.updateHud();
+                }
+            }
+            // Proximity stand-on-ring auto-purchase (0.65s inside 36px ring when player has enough cash)
+            if (Array.isArray(this.empireProperties)) {
+                let insideProp = null;
+                for (let i = 0; i < this.empireProperties.length; i++) {
+                    const pr = this.empireProperties[i];
+                    if (!pr.owned && this.cash >= pr.cost && Math.hypot(pr.x - p.x, pr.y - p.y) < 36) {
+                        insideProp = pr;
+                        break;
+                    }
+                }
+                if (insideProp) {
+                    this._empireBuyHoldTimer = (this._empireBuyHoldTimer || 0) + dt;
+                    if (this._empireBuyHoldTimer >= 0.65) {
+                        this._empireBuyHoldTimer = 0;
+                        this.tryPurchaseNearbyEmpireProperty(insideProp.id);
+                    }
+                } else {
+                    this._empireBuyHoldTimer = 0;
+                }
+            }
+        }
+
+        // 6. LOOP 2 & 4: 90s Hot Drop Flash Crate Event
+        if (this.activeFlashEvent) {
+            const ev = this.activeFlashEvent;
+            ev.timer -= dt;
+            if (Math.random() < 0.35 && typeof this.spawnParticle === "function") {
+                this.spawnParticle(ev.x + (Math.random() - 0.5) * 18, ev.y + (Math.random() - 0.5) * 18, "SPARK");
+            }
+            if (!p.dead && Math.hypot(p.x - ev.x, p.y - ev.y) < 38) {
+                const reward = ev.reward || 20000;
+                const wep = ev.weapon || "ROCKET";
+                this.activeFlashEvent = null;
+                this.flashEventCooldown = 135.0;
+                this.cash += reward;
+                this.addMultiplier(1);
+                p.armor = 100;
+                if (Array.isArray(p.weaponsOwned) && !p.weaponsOwned.includes(wep)) {
+                    p.weaponsOwned.push(wep);
+                }
+                if (p.ammo) {
+                    p.ammo[wep] = (p.ammo[wep] || 0) + (wep === "ROCKET" ? 12 : 120);
+                }
+                p.weapon = wep;
+                if (this.audio && typeof this.audio.playFanfare === "function") {
+                    this.audio.playFanfare("MISSION");
+                }
+                this.showBigBanner(
+                    "📦 SPEC-OPS HOT DROP CLAIMED!",
+                    `+$${reward.toLocaleString()} CASH • +1 MULTIPLIER • ${wep} & FULL ARMOR!`,
+                    "#fde047",
+                    3.5
+                );
+                const myName = (this.net && this.net.playerName) || p.nickname || "LUCIA";
+                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                    this.net.broadcastWorldEvent({
+                        kind: "FLASH_DROP_CLAIM",
+                        claimer: myName,
+                        reward
+                    });
+                }
+                this._checkScoreMilestonesAndSave();
+                this.updateHud();
+            } else if (ev.timer <= 0) {
+                this.activeFlashEvent = null;
+                this.flashEventCooldown = 120.0;
+                this.addFloatingText(p.x, p.y - 24, "⌛ HOT DROP CRATE EXPIRED!", "#f97316");
+            }
+        } else if (!this.activeInterior && (!this.net || this.net.isWorldHost())) {
+            this.flashEventCooldown = (this.flashEventCooldown || 90.0) - dt;
+            if (this.flashEventCooldown <= 0) {
+                this.flashEventCooldown = 135.0;
+                const pz = p.z || 2.0;
+                for (let att = 0; att < 28; att++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const dist = 360 + Math.random() * 280;
+                    const tx = Math.floor((p.x + Math.cos(ang) * dist) / TILE_SIZE);
+                    const ty = Math.floor((p.y + Math.sin(ang) * dist) / TILE_SIZE);
+                    if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(tx, ty)) continue;
+                    const nb = this.map.getNavigationBlock ? this.map.getNavigationBlock(tx, ty, pz) : null;
+                    if (!nb || (nb.groundType !== GROUND_TYPE.ROAD && nb.groundType !== GROUND_TYPE.PAWEMENT)) continue;
+                    const wx = (tx + 0.5) * TILE_SIZE;
+                    const wy = (ty + 0.5) * TILE_SIZE;
+                    if (this.map.resolveCircleBuildingCollision && this.map.resolveCircleBuildingCollision(wx, wy, 20, pz).hit) continue;
+                    const wepPool = ["ROCKET", "FLAMETHROWER", "ELECTRO", "SHOTGUN"];
+                    const wep = wepPool[Math.floor(Math.random() * wepPool.length)];
+                    const reward = 15000 + Math.floor(Math.random() * 3) * 5000;
+                    const wz = this.map.getHeightAtPixel ? this.map.getHeightAtPixel(wx, wy, pz) : 2.0;
+                    this.activeFlashEvent = { x: wx, y: wy, z: wz, timer: 90.0, maxTimer: 90.0, reward, weapon: wep };
+                    this.sendPager(
+                        "VICE NET FLASH EVENT",
+                        `📦 SPEC-OPS HOT DROP CRATE landed nearby! Reach the golden flare within 90s for +$${reward.toLocaleString()}, +1 Multiplier & ${wep}!`,
+                        false
+                    );
+                    if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                        this.net.broadcastWorldEvent({
+                            kind: "FLASH_DROP_SPAWN",
+                            x: Math.round(wx),
+                            y: Math.round(wy),
+                            z: wz,
+                            reward,
+                            weapon: wep,
+                            duration: 90
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 7. LOOP 4 (24/7): Live Server Bounty System
+        if (this.activeServerBounty) {
+            this.activeServerBounty.timer -= dt;
+            if (this.activeServerBounty.timer <= 0) {
+                const b = this.activeServerBounty;
+                this.activeServerBounty = null;
+                this.bountyCooldown = 140.0;
+                const myId = (this.net && this.net.playerId) || "local";
+                if (b.targetId === myId && !p.dead) {
+                    const survReward = b.reward || 20000;
+                    this.cash += survReward;
+                    this.addMultiplier(1);
+                    if (this.audio && typeof this.audio.playFanfare === "function") {
+                        this.audio.playFanfare("MISSION");
+                    }
+                    this.showBigBanner(
+                        "🏆 BOUNTY SURVIVED!",
+                        `SURVIVED SERVER MANHUNT — EARNED +$${survReward.toLocaleString()} & +1 MULTIPLIER!`,
+                        "#39ff14",
+                        3.4
+                    );
+                    this._checkScoreMilestonesAndSave();
+                    this.updateHud();
+                }
+            }
+        } else {
+            this.bountyCooldown = Math.max(0, (this.bountyCooldown || 0) - dt);
+            if (!p.dead && this.bountyCooldown <= 0 && ((this.wantedLevel || 0) >= 4 || (this.comboChain || 0) >= 14)) {
+                this.bountyCooldown = 150.0;
+                const myId = (this.net && this.net.playerId) || "local";
+                const myName = (this.net && this.net.playerName) || p.nickname || "LUCIA";
+                const reward = 15000 + Math.max(1, this.wantedLevel || 2) * 5000;
+                this.activeServerBounty = {
+                    targetId: myId,
+                    targetName: myName,
+                    reward,
+                    timer: 60.0,
+                    maxTimer: 60.0
+                };
+                this.sendPager(
+                    "VICE NET SERVER BOUNTY",
+                    `🎯 $${reward.toLocaleString()} BOUNTY PLACED ON ${myName}! Survive 60 seconds to claim the bounty yourself!`,
+                    true
+                );
+                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                    this.net.broadcastWorldEvent({
+                        kind: "BOUNTY_START",
+                        targetId: myId,
+                        targetName: myName,
+                        reward,
+                        duration: 60
+                    });
+                }
+            }
         }
     }
 
