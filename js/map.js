@@ -616,39 +616,37 @@ class LeonidaMap {
                 }
                 setColVoxels(448, y, stonePaveCol);
 
-                const rawTrailW = Math.round(454.5 + Math.sin(y * 0.075) * 1.15 + Math.cos(y * 0.038 + 0.8) * 0.65);
-                const rawDuneE  = Math.round(462.4 + Math.sin(y * 0.065 + 1.4) * 1.25 + Math.cos(y * 0.11) * 0.65);
-                const duneE     = Math.min(rawDuneE, waterX - 9);
-                const trailW    = Math.min(rawTrailW, duneE - 4);
+                const rawTrailW = Math.round(454.8 + Math.sin(y * 0.075) * 1.15 + Math.cos(y * 0.038 + 0.8) * 0.65);
+                const trailW    = Math.min(rawTrailW, waterX - 12);
                 const trailE    = trailW + 1;
-                // Natural sandy beach walkovers & dune gaps (matching the segmented green dune islands in the GTA 6 Vice Beach 3D map reference!)
+                // Narrower 3-tile-wide Coastal Dune Strip east of the serpentine beachwalk (matching real Miami Lummus Park / Beachwalk in Image 1!)
+                const duneWidth = Math.round(2.8 + Math.sin(y * 0.08 + 1.2) * 0.6);
+                const duneE     = Math.min(trailE + duneWidth, waterX - 8);
+                // Natural sandy beach walkovers & open volleyball sand plaza (y = 228..258) east of the serpentine path
                 const isWalkover = (
                     (y >= 95 && y <= 97) ||
-                    (y >= 123 && y <= 125) ||
+                    (y >= 128 && y <= 130) ||
                     (y >= 161 && y <= 163) ||
-                    (y >= 187 && y <= 189) ||
-                    (y >= 217 && y <= 219) ||
-                    (y >= 246 && y <= 248) ||
+                    (y >= 202 && y <= 204) ||
+                    (y >= 232 && y <= 234) ||
                     (y >= 275 && y <= 277) ||
-                    (y >= 302 && y <= 304) ||
-                    (y >= 326 && y <= 328)
+                    (y >= 316 && y <= 318)
                 );
+                const isEastDuneOpenSand = isWalkover || (y >= 232 && y <= 262) || (y >= 184 && y <= 188);
 
                 if (duneE >= 457) {
-                    // In Southern Lummus Park (y >= 205, matching Photo 4's foreground & minimap):
-                    // Keep a 2-tile-wide green curb strip along Ocean Drive (x = 449..450, swelling to 451 in organic pockets),
-                    // while opening x = 451 .. (trailW - 1) into natural golden beach sand with scattered palms!
-                    const westLawnMaxX = (y < 205)
-                        ? (trailW - 1)
-                        : (450 + ((Math.sin(y * 0.16) > 0.45) ? 1 : 0));
                     for (let x = 449; x < waterX; x++) {
-                        if (x <= westLawnMaxX && x < trailW) {
+                        if (x < trailW) {
+                            // Wide Lummus Park green lawn (x = 449 .. trailW-1, ~6 tiles wide) right next to Ocean Drive sidewalk!
                             setColVoxels(x, y, isWalkover ? sandColVoxels : grassColVoxels);
                         } else if (x <= trailE) {
+                            // Serpentine Lummus Park Beachwalk path (2 tiles wide)
                             setColVoxels(x, y, sandColVoxels);
                         } else if (x <= duneE) {
-                            setColVoxels(x, y, isWalkover ? sandColVoxels : grassColVoxels);
+                            // Narrower segmented Coastal Dune ridge (2-3 tiles wide) east of the path
+                            setColVoxels(x, y, isEastDuneOpenSand ? sandColVoxels : grassColVoxels);
                         } else {
+                            // Wide open golden Atlantic beach sand
                             setColVoxels(x, y, sandColVoxels);
                         }
                     }
@@ -1249,22 +1247,20 @@ class LeonidaMap {
                 let posY = (r + 0.5 + (hs2 - 0.5) * 0.28) * TILE_SIZE;
                 let plantZ = (surfGt === GROUND_TYPE.WATER) ? 1.0 : 2.0;
 
-                // 1) Ocean Drive Iconic Palm Boulevard, Lummus Park, Sandy Mid-Zone & Segmented Coastal Dune Islands (c=443..466, r=46..365)
-                // FAITHFUL TO GTA 6 3D VICE BEACH REFERENCE (Photo 4):
+                // 1) Ocean Drive Iconic Palm Boulevard, Wide Lummus Park Lawn, Serpentine Path & Narrow Coastal Dune Strip (c=443..464, r=46..365)
+                // FAITHFUL TO REAL OCEAN DRIVE & LUMMUS PARK AERIAL PHOTO:
                 // - West sidewalk (c=443) & East promenade curb (c=448): Tall Royal/Coconut Palms (palm_tree & coconut_palm_cluster).
-                // - Green Dune Islands & Lummus Park Lawn (lid=10): Natural green clusters of Coconut Palms (palm_tree, coconut_palm_cluster),
-                //   Cabbage Palms (sabal_palmetto), Fan Palms (fan_palm), Sea Grape (sea_grape), Coastal Palmetto (coastal_palmetto_bush)
-                //   and Dune Oats (dune_panicgrass) along the sandy dune edges (ZERO pink/purple/orange/blue blobs!).
-                // - Open Sand Zone west of the winding trail (c=450..455, lid=98): Sparse lone Coconut Palms & 2-tree Palm Clusters in the sand.
-                // - Inner Beach Sand just east of the green dune islands (c=462..466, lid=98): Rare small groups of Coconut Palms just seaward of the dunes.
-                if (c >= 443 && c <= 466 && r >= 46 && r <= 365) {
+                // - Wide Lummus Park Lawn (c=449..454, lid=10): Tall swaying Coconut Palms (palm_tree, coconut_palm_cluster),
+                //   Cabbage Palms (sabal_palmetto), and lush dark-green tropical shade trees (subtropical_mahogany, live_oak) in the center of the lawn!
+                // - Narrow Coastal Dune Strip east of the path (c=457..460, lid=10): Coconut Palms & low green coastal palmetto/dune grass.
+                // - East edge of the serpentine path on open sand (c=457..460, lid=98): Clusters of Coconut Palms along the path & volleyball courts!
+                if (c >= 443 && c <= 464 && r >= 46 && r <= 365) {
                     const isWestSidewalk = (c === 443 && r >= 72);
                     const isEastCurbside = (c === 448 && r >= 76) || (c === 458 && r < 72);
-                    const isParkOrDuneGrass = (c >= 449 && c <= 464) && (blkZ1.lid === 10);
+                    const isParkOrDuneGrass = (c >= 449 && c <= 463) && (blkZ1.lid === 10);
                     const isDuneBelt = (c >= 456);
-                    const isSandyMidZonePalm = (c >= 450 && c <= 456) && (blkZ1.lid === 98) && (((r * 13 + c * 29 + seed) % 24) === 0);
-                    const westDuneBlk = this.getBlockInfo(c - 2, r, 1) || this.getBlockInfo(c - 3, r, 1);
-                    const isSeawardDuneOutpostPalm = (c >= 462 && c <= 466) && (blkZ1.lid === 98) && westDuneBlk && (westDuneBlk.lid === 10) && (((r * 19 + c * 31 + seed) % 28) === 0);
+                    const isLummusCenter = (c >= 451 && c <= 453) && !isDuneBelt;
+                    const isPathEdgeSandPalm = (c >= 456 && c <= 460) && (blkZ1.lid === 98) && (((r * 17 + c * 31 + seed) % 18) === 0);
 
                     if (isWestSidewalk && (r % 8 === 0)) {
                         chosenKind = (((r >> 3) % 4) === 0) ? "coconut_palm_cluster" : "palm_tree";
@@ -1287,24 +1283,25 @@ class LeonidaMap {
                             scaleMul = 0.96 + hs1 * 0.34;
                             heightMul = 0.92 + hs2 * 0.60;
                         } else if (clusterRoll === 6) {
-                            chosenKind = "sabal_palmetto";
-                            scaleMul = 0.92 + hs1 * 0.30;
-                            heightMul = 0.90 + hs2 * 0.50;
+                            // In the center of Lummus Park lawn (just like the real aerial photo!), mix in lush dark-green shade trees!
+                            chosenKind = isLummusCenter ? ((seed % 2 === 0) ? "subtropical_mahogany" : "live_oak") : "sabal_palmetto";
+                            scaleMul = isLummusCenter ? (1.00 + hs1 * 0.32) : (0.92 + hs1 * 0.30);
+                            heightMul = 0.95 + hs2 * 0.50;
                         } else if (clusterRoll === 7) {
                             chosenKind = "fan_palm";
                             scaleMul = 0.90 + hs1 * 0.30;
-                        } else if (clusterRoll === 8) {
-                            chosenKind = nearSand ? "dune_panicgrass" : (isDuneBelt ? "sea_grape" : "coastal_palmetto_bush");
-                            scaleMul = 0.90 + hs1 * 0.28;
+                        } else if (clusterRoll === 8 && isDuneBelt) {
+                            chosenKind = nearSand ? "dune_panicgrass" : "coastal_palmetto_bush";
+                            scaleMul = 0.88 + hs1 * 0.26;
                         }
                         if (chosenKind) {
                             posX = (c + 0.50 + (hs1 - 0.5) * 0.44) * TILE_SIZE;
                             posY = (r + 0.50 + (hs2 - 0.5) * 0.44) * TILE_SIZE;
                         }
-                    } else if (isSandyMidZonePalm || isSeawardDuneOutpostPalm) {
+                    } else if (isPathEdgeSandPalm) {
                         chosenKind = (seed % 3 === 0) ? "coconut_palm_cluster" : "palm_tree";
-                        posX = (c + 0.50 + (hs1 - 0.5) * 0.40) * TILE_SIZE;
-                        posY = (r + 0.50 + (hs2 - 0.5) * 0.40) * TILE_SIZE;
+                        posX = (c + 0.50 + (hs1 - 0.5) * 0.38) * TILE_SIZE;
+                        posY = (r + 0.50 + (hs2 - 0.5) * 0.38) * TILE_SIZE;
                         scaleMul = 0.92 + hs1 * 0.35;
                         heightMul = 0.88 + hs2 * 0.58;
                     }
