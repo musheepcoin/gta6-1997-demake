@@ -16823,26 +16823,60 @@ class RetroRenderer {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
 
-        // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS), DISTRICT BANNER (25/26) & CAR NAME (27)
+        // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS) + LINE-OF-SIGHT EVASION BAR, DISTRICT BANNER (25/26) & CAR NAME (27)
         if ((game.wantedLevel || 0) > 0) {
             const headSp = this.gta1Meta.sprites.hud["41"];
             const headScale = isPhonePortrait ? s * 0.85 : s;
             const headW = headSp ? headSp[2] * headScale : 24;
+            const headH = headSp ? headSp[3] * headScale : 24;
             const maxHeads = 6;
             const stripW = maxHeads * (headW + 3);
-            let hx = Math.round((W - stripW) * 0.5);
+            const stripX = Math.round((W - stripW) * 0.5);
+            let hx = stripX;
             const hy = W < 640 ? (leftY + mugH + 10) : 10;
-            const flashActive = Math.floor(this.time * 6) % 2 === 0;
+            const isEvading = !game.isPoliceSpotted && (game.wantedDecayTimer || 0) > 0.15;
+            const flashActive = Math.floor(this.time * (isEvading ? 3.2 : 6.5)) % 2 === 0;
 
             for (let i = 0; i < maxHeads; i++) {
                 const isLit = i < game.wantedLevel;
                 const sprId = isLit ? (flashActive ? "41" : "42") : "42";
                 ctx.save();
                 if (!isLit) ctx.globalAlpha = 0.32;
+                else if (isEvading && !flashActive) ctx.globalAlpha = 0.55;
                 this.drawHudSprite(ctx, sprId, hx, hy, headScale);
                 ctx.restore();
                 hx += headW + 3;
             }
+
+            // Line-of-Sight Police Getaway / Evasion Countdown Pill directly below the Wanted Heads
+            const barW = Math.max(168, Math.round(stripW));
+            const barH = 16;
+            const barX = Math.round((W - barW) * 0.5);
+            const barY = Math.round(hy + headH + 4);
+            const dur = game.wantedDecayDuration || 12;
+            const prog = Math.max(0, Math.min(1, (game.wantedDecayTimer || 0) / dur));
+            const secsLeft = Math.max(1, Math.ceil(dur - (game.wantedDecayTimer || 0)));
+
+            ctx.save();
+            ctx.fillStyle = isEvading ? "rgba(8, 22, 38, 0.90)" : "rgba(38, 10, 18, 0.88)";
+            ctx.fillRect(barX, barY, barW, barH);
+            if (isEvading && prog > 0) {
+                ctx.fillStyle = "rgba(56, 189, 248, 0.35)";
+                ctx.fillRect(barX + 1, barY + 1, Math.round((barW - 2) * prog), barH - 2);
+            }
+            ctx.strokeStyle = isEvading ? "#38bdf8" : "#ef4444";
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
+            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = isEvading ? "#7dd3fc" : "#fca5a5";
+            ctx.fillText(
+                isEvading ? `🕵️ HIDDEN — LOSING 1★ IN ${secsLeft}s` : "🚨 SPOTTED — BREAK LINE OF SIGHT!",
+                barX + barW * 0.5,
+                barY + barH * 0.5 + 0.5
+            );
+            ctx.restore();
         }
 
         if ((game.districtPopupTimer || 0) > 0 && game.currentDistrict) {
