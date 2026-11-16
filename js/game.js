@@ -4185,7 +4185,7 @@ class LeonidaGame {
 
         try {
 
-            const raw = window.localStorage ? window.localStorage.getItem("vc26_alltime_scores_v1") : null;
+            const raw = window.localStorage ? window.localStorage.getItem("vc26_alltime_scores_v2") : null;
 
             if (raw) {
 
@@ -4211,7 +4211,7 @@ class LeonidaGame {
 
             if (window.localStorage && Array.isArray(this.allTimeScores)) {
 
-                window.localStorage.setItem("vc26_alltime_scores_v1", JSON.stringify(this.allTimeScores.slice(0, 10)));
+                window.localStorage.setItem("vc26_alltime_scores_v2", JSON.stringify(this.allTimeScores.slice(0, 10)));
 
             }
 
@@ -5934,8 +5934,6 @@ class LeonidaGame {
 
         if (wasOccupied) {
 
-            this.addCash(150, "CARJACKED!");
-
             this.ejectVehicleDriver(closest, "CARJACK");
 
             if (closest.isPolice) {
@@ -7003,7 +7001,7 @@ class LeonidaGame {
             if (this.graffitiTags.length > 120) this.graffitiTags.shift();
             this.saveGraffitiTags();
             this.tagSprayTarget = null;
-            this.addCash(75, `🎨 TAG #${this.graffitiTags.length} SPRAYED!`);
+            this.addFloatingText(p.x, p.y - 26, `🎨 TAG #${this.graffitiTags.length} SPRAYED!`, "#39ff14");
             // Cops that see vandalism get angry
             const copWitness =
                 this.peds.some((ped) => !ped.dead && ped.kind === "COP" && Math.hypot(ped.x - p.x, ped.y - p.y) < 260) ||
@@ -7686,27 +7684,8 @@ class LeonidaGame {
 
         } else if (clamped === 0) {
 
-            // Boucle 2 ("Push Your Luck"): If the player was Wanted and escaped alive, cash out the Getaway Pot!
-            if (this.wantedLevel > 0 && this.player && !this.player.dead && (this.wantedGetawayPot || 0) >= 200) {
-                const peak = Math.max(1, this.wantedPeakLevel || this.wantedLevel || 1);
-                const getawayBonus = Math.round(this.wantedGetawayPot * (1 + (peak - 1) * 0.25));
-                this.wantedGetawayPot = 0;
-                this.wantedPeakLevel = 0;
-                this.cash += getawayBonus;
-                if (this.audio && typeof this.audio.playFanfare === "function") {
-                    this.audio.playFanfare("MISSION");
-                }
-                this.showBigBanner(
-                    `🏦 ${peak}★ CLEAN GETAWAY!`,
-                    `ESCAPED VCPD PURSUIT — BANKED +$${getawayBonus.toLocaleString()} GETAWAY BONUS!`,
-                    "#39ff14",
-                    3.2
-                );
-                this.addFloatingText(this.player.x, this.player.y - 34, `🏦 CLEAN GETAWAY! +$${getawayBonus.toLocaleString()}`, "#39ff14");
-            } else {
-                this.wantedGetawayPot = 0;
-                this.wantedPeakLevel = 0;
-            }
+            this.wantedGetawayPot = 0;
+            this.wantedPeakLevel = 0;
 
             this.clearAllPlayerPursuit(false);
 
@@ -7734,34 +7713,21 @@ class LeonidaGame {
         this.cash = Math.max(0, Number(val) || 0);
     }
 
-    addScore(amount, label = "") {
-        this.triggerArcadeCombo(amount, label, "#fde047", 2.4, Boolean(label));
+    addScore(_amount, _label = "") {
+        // Street prop smashes (bushes, cones, benches, streetlights) do not grant free cash
     }
 
     addCash(amount, label = "", skipCombo = false) {
         const amt = Number(amount) || 0;
         if (amt <= 0) return;
-        // Tactile street actions (<= $2,500) feed directly into the Adrenaline Combo Multiplier (x1..x10)
-        if (!skipCombo && amt <= 2500) {
-            this.triggerArcadeCombo(amt, label, "#39ff14", 2.8, true);
-            return;
-        }
-        // Major lump-sum payouts (Mission rewards, Bounties, Vaults, Hot Drops > $2,500) scale by base Multiplier + Turf Kingpin bonus (+25%) without x10 combo inflation
-        const turfBonusMult = (!skipCombo && this.isCurrentDistrictControlledByMe()) ? 1.25 : 1.0;
+        const turfBonusMult = (!skipCombo && this.isCurrentDistrictControlledByMe()) ? 1.10 : 1.0;
         const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * turfBonusMult);
         this.cash += total;
         if (!skipCombo) {
-            const maxDur = this.getMaxComboDuration();
-            this.comboMaxTimer = maxDur;
-            this.comboTimer = Math.min(maxDur, Math.max(this.comboTimer || 0, maxDur * 0.85));
-            this.comboPot = (this.comboPot || 0) + total;
-            this.addTurfInfluence(Math.min(total, 3500));
-            if ((this.wantedLevel || 0) > 0) {
-                this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.min(5000, Math.round(total * 0.2));
-            }
+            this.addTurfInfluence(Math.min(total, 1500));
         }
         if (this.player) {
-            const turfTag = turfBonusMult > 1.0 ? " 👑+25%" : "";
+            const turfTag = turfBonusMult > 1.0 ? " 👑+10%" : "";
             if (label) {
                 this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}${turfTag}`, "#39ff14");
             } else {
@@ -7789,39 +7755,9 @@ class LeonidaGame {
         }
     }
 
-    triggerArcadeCombo(baseAmount, label = "", color = "#39ff14", addTimerSec = 2.5, showFloat = true) {
-        const amt = Number(baseAmount) || 0;
-        if (amt <= 0) return 0;
-        const maxDur = this.getMaxComboDuration();
-        this.comboChain = (this.comboTimer > 0 ? (this.comboChain || 0) : 0) + 1;
-        this.comboMaxTimer = maxDur;
-        this.comboTimer = Math.min(maxDur, Math.max(this.comboTimer || 0, maxDur * 0.72) + addTimerSec);
-
-        const c = this.comboChain;
-        this.comboMult = c >= 36 ? 10 : (c >= 28 ? 8 : (c >= 21 ? 6 : (c >= 15 ? 5 : (c >= 10 ? 4 : (c >= 6 ? 3 : (c >= 3 ? 2 : 1))))));
-
-        const turfBonusMult = this.isCurrentDistrictControlledByMe() ? 1.25 : 1.0;
-        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * this.comboMult * turfBonusMult);
-        this.cash += total;
-        this.comboPot = (this.comboPot || 0) + total;
-        this.addTurfInfluence(Math.min(total, 2500));
-
-        if ((this.wantedLevel || 0) > 0) {
-            this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.min(2500, Math.round(total * 0.32));
-        }
-
-        if (showFloat && this.player) {
-            const multTag = this.comboMult > 1 ? ` [COMBO x${this.comboMult}]` : "";
-            const turfTag = turfBonusMult > 1.0 ? " 👑+25%" : "";
-            const txt = label
-                ? `${label} +$${total.toLocaleString()}${multTag}${turfTag}`
-                : `+$${total.toLocaleString()}${multTag}${turfTag}`;
-            this.addFloatingText(this.player.x, this.player.y - 22, txt, color);
-        }
-
-        this._checkScoreMilestonesAndSave();
-        this.updateHud();
-        return total;
+    triggerArcadeCombo(baseAmount, label = "", _color = "#39ff14", _addTimerSec = 2.5, _showFloat = true) {
+        this.addCash(baseAmount, label);
+        return Math.floor((Number(baseAmount) || 0) * Math.max(1, this.multiplier || 1));
     }
 
     getMaxComboDuration() {
@@ -8592,21 +8528,19 @@ class LeonidaGame {
                     ped.panicTimer = 4.5;
                 }
             }
-            if (playerResponsible) {
-                this.addCash(isScooter ? 150 : 50, `${v.name} WRECKED!`);
-            }
             return;
         }
 
         this.explodeAt(v.x, v.y, 130, 200, playerResponsible);
 
         if (playerResponsible) {
+            const isCriminalCar = (v.driver === "AI_CRIMINAL" || v.wasCriminalCar);
             if (v.isNemesisCar) {
-                this.addCash(15000, `💀 ${v.nemesisBoss || "NEMESIS"} HIT SQUAD WIPED OUT!`);
-                this.showBigBanner("💀 VENDETTA SURVIVED!", `WIPED OUT ${v.nemesisBoss || "FACTION"} HIT SQUAD (+$15,000)!`, "#39ff14", 2.8);
+                this.addCash(1000, `💀 ${v.nemesisBoss || "NEMESIS"} HIT SQUAD WIPED OUT!`);
+                this.showBigBanner("💀 VENDETTA SURVIVED!", `WIPED OUT ${v.nemesisBoss || "FACTION"} HIT SQUAD (+$1,000)!`, "#39ff14", 2.8);
+            } else if (isCriminalCar) {
+                this.addCash(200, `⚖️ VIGILANTE TAKEDOWN! (${v.name})`);
             } else {
-                const isCriminalCar = (v.driver === "AI_CRIMINAL" || v.wasCriminalCar);
-                this.addCash(500, isCriminalCar ? `⚖️ VIGILANTE TAKEDOWN! (${v.name})` : `${v.name} WRECKED!`);
                 if (typeof this.recordFactionGrudge === "function") {
                     this.recordFactionGrudge("DESTROY_CAR", v.name || "vehicle", Boolean(v.isPolice));
                 }
@@ -8801,43 +8735,14 @@ class LeonidaGame {
 
 
 
-        const reward = ped.kind === "COP" ? 1000 : (ped.kind === "GATOR" ? 600 : (ped.kind === "CRIMINAL" ? 500 : 100));
-
+        // Only armed targets (Cops, Criminals, Gators) grant a combat bounty; killing innocent unarmed civilians grants $0
+        const reward = ped.kind === "COP" ? 100 : (ped.kind === "GATOR" ? 100 : (ped.kind === "CRIMINAL" ? 75 : 0));
         const label = ped.kind === "COP" ? "COP DOWN!" : (ped.kind === "GATOR" ? "GATOR BAG!" : (ped.kind === "CRIMINAL" ? "⚖️ VIGILANTE BONUS!" : ""));
-
-        this.addCash(reward, label);
-
-
-
-        // GTA 2 Style Splatter / Multi-Kill Chain Combo (within 2.4s window)
-
-        const nowSec = performance.now() * 0.001;
-
-        if (this.lastKillTime && (nowSec - this.lastKillTime) < 2.4) {
-
-            this.comboCount = (this.comboCount || 1) + 1;
-
-            const comboBonus = Math.min(2000, this.comboCount * 150);
-
-            const comboTitle =
-
-                this.comboCount === 2 ? "DOUBLE KILL!" :
-
-                this.comboCount === 3 ? "TRIPLE KILL!" :
-
-                `MULTI SPLATTER x${this.comboCount}!`;
-
-            this.cash += comboBonus * this.multiplier;
-
-            this.addFloatingText(ped.x, ped.y - 28, `🔥 ${comboTitle} +$${(comboBonus * this.multiplier).toLocaleString()}`, "#facc15");
-
-        } else {
-
-            this.comboCount = 1;
-
+        if (reward > 0) {
+            this.addCash(reward, label);
         }
 
-        this.lastKillTime = nowSec;
+        this.lastKillTime = performance.now() * 0.001;
 
     }
 
@@ -11255,13 +11160,11 @@ class LeonidaGame {
 
                         if (mySeat === 0) {
 
-                            this.multiplier += 1;
-
                             this.audio.playCashSound();
 
-                            this.addCash(5000, "🔥 INSANE STUNT JUMP!");
+                            this.addCash(250, "🔥 STUNT JUMP!");
 
-                            this.showBigBanner("UNIQUE STUNT BONUS!", `${v.lastRampName || "BIG AIR"} — +$5,000 & MULTIPLIER +1!`, "#fde047", 2.4);
+                            this.showBigBanner("UNIQUE STUNT BONUS!", `${v.lastRampName || "BIG AIR"} — +$250!`, "#fde047", 2.0);
 
                         }
 
@@ -11343,8 +11246,6 @@ class LeonidaGame {
 
                         v.wheelieTimer = 0;
 
-                        this.addCash(400, "🚤 HYDRO ROOSTERTAIL BOOST!");
-
                     }
 
                 } else if (mySeat === 0 && v.isMotorcycle && this.input.handbrake && Math.hypot(v.vx, v.vy) > 130) {
@@ -11360,8 +11261,6 @@ class LeonidaGame {
                     if (v.wheelieTimer >= 1.2) {
 
                         v.wheelieTimer = 0;
-
-                        this.addCash(500, "🏍️ WHEELIE BONUS!");
 
                     }
 
@@ -16512,12 +16411,6 @@ class LeonidaGame {
 
                         }
 
-                        if (pr.fromPlayer && !v.destroyed) {
-
-                            this.cash += 10 * this.multiplier;
-
-                        }
-
                         this.spawnParticle(pr.x, pr.y, pr.isFlame ? "FIRE" : "SPARK");
 
                         if (!pr.isFlame && !pr.isRocket && Math.hypot(pr.x - p.x, pr.y - p.y) < 480) {
@@ -17302,123 +17195,13 @@ class LeonidaGame {
 
     /* ========================================================================
        ARCADE 2026 RETENTION ENGINE (01_VISION_ARCADE_2026_RETENTION)
-       - Loop 1 (3-5s): Near-Miss, Drift, Stunt & Carnage Adrenaline Combo Bar
-       - Loop 2 (2-4m): Wanted Getaway Pot ("Push Your Luck") & 90s Hot Drop Crate
-       - Loop 3 (15-30m): Persistent Empire Real Estate Ownership, Rent & Perks
-       - Loop 4 (24/7): Live Server Bounties & Territory Announcements
+       - Spec-Ops Hot Drop Crate & Live Server Bounties (Balanced Economy)
        ======================================================================== */
     updateArcade2026Systems(dt) {
         const p = this.player;
         if (!p || !this.map) return;
 
-        // 1. Decrement Near-Miss cooldowns on nearby vehicles
-        if (Array.isArray(this.vehicles)) {
-            for (let i = 0; i < this.vehicles.length; i++) {
-                const v = this.vehicles[i];
-                if (v && (v._nearMissCd || 0) > 0) {
-                    v._nearMissCd = Math.max(0, v._nearMissCd - dt);
-                }
-            }
-        }
-
-        // 2. LOOP 1 (3-5s): Near-Miss & High-Speed Drift Detection while driving
-        if (!p.dead && p.inVehicle && !p.inVehicle.destroyed && (p.seatIndex || 0) === 0) {
-            const v = p.inVehicle;
-            const spd = Math.hypot(v.vx || 0, v.vy || 0) || Math.abs(v.speed || 0);
-
-            if (spd > 125 && (v.crashCooldown || 0) <= 0) {
-                const cosA = Math.cos(v.angle || 0);
-                const sinA = Math.sin(v.angle || 0);
-                const vHalfL = (v.w || 48) * 0.5;
-                const vHalfW = (v.h || 24) * 0.5;
-                const inspectNearMiss = (ov) => {
-                    if (!ov || ov === v || ov.destroyed || (ov._nearMissCd || 0) > 0) return;
-                    if (ov.z !== undefined && v.z !== undefined && Math.abs(ov.z - v.z) > 0.45) return;
-                    const dx = ov.x - v.x;
-                    const dy = ov.y - v.y;
-                    if (Math.abs(dx) > 78 || Math.abs(dy) > 78) return;
-                    const along = Math.abs(dx * cosA + dy * sinA);
-                    const lat = Math.abs(-dx * sinA + dy * cosA);
-                    const sumL = vHalfL + (ov.w || 48) * 0.5;
-                    const sumW = vHalfW + (ov.h || 24) * 0.5;
-                    if (along < sumL + 14 && lat < sumW + 19 && lat > sumW * 0.55) {
-                        ov._nearMissCd = 3.8;
-                        const isOncoming = ov.driver && Math.cos((v.angle || 0) - (ov.angle || 0)) < -0.35;
-                        const basePts = ov.isPolice ? 300 : (isOncoming ? 225 : 150);
-                        const lbl = ov.isPolice ? "🚔 COP NEAR MISS!" : (isOncoming ? "⚡ ONCOMING NEAR MISS!" : "⚡ NEAR MISS!");
-                        this.triggerArcadeCombo(basePts, lbl, ov.isPolice ? "#fde047" : "#00f0ff", 2.5, true);
-                        if (this.audio && typeof this.audio.playBeep === "function") {
-                            this.audio.playBeep(520 + Math.min(14, this.comboChain || 1) * 42, 0.06, "triangle", 0.075);
-                        }
-                    }
-                };
-                if (this._vehGridHead && this._vehGridNext) {
-                    const gcx = v.x >> 8;
-                    const gcy = v.y >> 8;
-                    for (let cy = Math.max(0, gcy - 1); cy <= Math.min(127, gcy + 1); cy++) {
-                        const rowOff = cy << 7;
-                        for (let cx = Math.max(0, gcx - 1); cx <= Math.min(127, gcx + 1); cx++) {
-                            for (let vi = this._vehGridHead[rowOff | cx]; vi !== -1; vi = this._vehGridNext[vi]) {
-                                inspectNearMiss(this.vehicles[vi]);
-                            }
-                        }
-                    }
-                } else {
-                    for (let i = 0; i < this.vehicles.length; i++) {
-                        inspectNearMiss(this.vehicles[i]);
-                    }
-                }
-            }
-
-            if (v.drifting && spd > 118) {
-                this._driftComboAccum = (this._driftComboAccum || 0) + dt;
-                if (this._driftComboAccum >= 0.65) {
-                    this._driftComboAccum = 0;
-                    this.triggerArcadeCombo(120, "💨 DRIFT COMBO!", "#f472b6", 2.0, true);
-                }
-            } else {
-                this._driftComboAccum = Math.max(0, (this._driftComboAccum || 0) - dt * 1.5);
-            }
-        }
-
-        // 3. LOOP 1: Adrenaline Combo Timer Countdown & Mega-Combo Reward
-        if ((this.comboTimer || 0) > 0) {
-            this.comboTimer = Math.max(0, this.comboTimer - dt);
-            if (this.comboTimer <= 0) {
-                const finalChain = this.comboChain || 0;
-                const finalPot = this.comboPot || 0;
-                this.comboChain = 0;
-                this.comboMult = 1;
-                this.comboPot = 0;
-                if (finalChain >= 15) {
-                    this.addMultiplier(1);
-                    if (this.audio && typeof this.audio.playFanfare === "function") {
-                        this.audio.playFanfare("MISSION");
-                    }
-                    this.showBigBanner(
-                        `🔥 ${finalChain}-HIT MEGA COMBO!`,
-                        `BANKED +$${finalPot.toLocaleString()} • PERMANENT MULTIPLIER +1 (x${this.multiplier})!`,
-                        "#39ff14",
-                        3.0
-                    );
-                } else if (finalChain >= 4) {
-                    this.addFloatingText(p.x, p.y - 30, `🔥 ${finalChain}-HIT COMBO BANKED! +$${finalPot.toLocaleString()}`, "#fde047");
-                }
-            }
-        }
-
-        // 4. LOOP 2 (2-4m): Wanted Getaway Pot Accrual ("Push Your Luck")
-        if (!p.dead && (this.wantedLevel || 0) > 0) {
-            this.wantedPeakLevel = Math.max(this.wantedPeakLevel || 1, this.wantedLevel);
-            const curSpd = p.inVehicle
-                ? Math.hypot(p.inVehicle.vx || 0, p.inVehicle.vy || 0)
-                : (p.isMoving ? 115 : 0);
-            if (curSpd > 30) {
-                this.wantedGetawayPot = (this.wantedGetawayPot || 0) + (28 * this.wantedLevel * (p.inVehicle ? 1.35 : 1.0)) * dt;
-            }
-        }
-
-        // 5. LOOP 2 & 4: 90s Hot Drop Flash Crate Event
+        // 1. 90s Hot Drop Flash Crate Event
         if (this.activeFlashEvent) {
             const ev = this.activeFlashEvent;
             ev.timer -= dt;
@@ -17426,18 +17209,17 @@ class LeonidaGame {
                 this.spawnParticle(ev.x + (Math.random() - 0.5) * 18, ev.y + (Math.random() - 0.5) * 18, "SPARK");
             }
             if (!p.dead && Math.hypot(p.x - ev.x, p.y - ev.y) < 38) {
-                const reward = ev.reward || 20000;
+                const reward = ev.reward || 800;
                 const wep = ev.weapon || "ROCKET";
                 this.activeFlashEvent = null;
-                this.flashEventCooldown = 135.0;
-                this.cash += reward;
-                this.addMultiplier(1);
+                this.flashEventCooldown = 180.0;
+                this.addCash(reward, "📦 HOT DROP CRATE!");
                 p.armor = 100;
                 if (Array.isArray(p.weaponsOwned) && !p.weaponsOwned.includes(wep)) {
                     p.weaponsOwned.push(wep);
                 }
                 if (p.ammo) {
-                    p.ammo[wep] = (p.ammo[wep] || 0) + (wep === "ROCKET" ? 12 : 120);
+                    p.ammo[wep] = (p.ammo[wep] || 0) + (wep === "ROCKET" ? 8 : 80);
                 }
                 p.weapon = wep;
                 if (this.audio && typeof this.audio.playFanfare === "function") {
@@ -17445,9 +17227,9 @@ class LeonidaGame {
                 }
                 this.showBigBanner(
                     "📦 SPEC-OPS HOT DROP CLAIMED!",
-                    `+$${reward.toLocaleString()} CASH • +1 MULTIPLIER • ${wep} & FULL ARMOR!`,
+                    `+$${reward.toLocaleString()} CASH • ${wep} & FULL ARMOR!`,
                     "#fde047",
-                    3.5
+                    3.0
                 );
                 const myName = (this.net && this.net.playerName) || p.nickname || "LUCIA";
                 if (this.net && typeof this.net.broadcastWorldEvent === "function") {
@@ -17457,17 +17239,15 @@ class LeonidaGame {
                         reward
                     });
                 }
-                this._checkScoreMilestonesAndSave();
-                this.updateHud();
             } else if (ev.timer <= 0) {
                 this.activeFlashEvent = null;
-                this.flashEventCooldown = 120.0;
+                this.flashEventCooldown = 180.0;
                 this.addFloatingText(p.x, p.y - 24, "⌛ HOT DROP CRATE EXPIRED!", "#f97316");
             }
         } else if (!this.activeInterior && (!this.net || this.net.isWorldHost())) {
-            this.flashEventCooldown = (this.flashEventCooldown || 90.0) - dt;
+            this.flashEventCooldown = (this.flashEventCooldown || 140.0) - dt;
             if (this.flashEventCooldown <= 0) {
-                this.flashEventCooldown = 135.0;
+                this.flashEventCooldown = 180.0;
                 const pz = p.z || 2.0;
                 for (let att = 0; att < 28; att++) {
                     const ang = Math.random() * Math.PI * 2;
@@ -17482,12 +17262,12 @@ class LeonidaGame {
                     if (this.map.resolveCircleBuildingCollision && this.map.resolveCircleBuildingCollision(wx, wy, 20, pz).hit) continue;
                     const wepPool = ["ROCKET", "FLAMETHROWER", "ELECTRO", "SHOTGUN"];
                     const wep = wepPool[Math.floor(Math.random() * wepPool.length)];
-                    const reward = 15000 + Math.floor(Math.random() * 3) * 5000;
+                    const reward = 800;
                     const wz = this.map.getHeightAtPixel ? this.map.getHeightAtPixel(wx, wy, pz) : 2.0;
                     this.activeFlashEvent = { x: wx, y: wy, z: wz, timer: 90.0, maxTimer: 90.0, reward, weapon: wep };
                     this.sendPager(
                         "VICE NET FLASH EVENT",
-                        `📦 SPEC-OPS HOT DROP CRATE landed nearby! Reach the golden flare within 90s for +$${reward.toLocaleString()}, +1 Multiplier & ${wep}!`,
+                        `📦 SPEC-OPS HOT DROP CRATE landed nearby! Reach the golden flare within 90s for +$${reward.toLocaleString()} & ${wep}!`,
                         false
                     );
                     if (this.net && typeof this.net.broadcastWorldEvent === "function") {
@@ -17506,38 +17286,35 @@ class LeonidaGame {
             }
         }
 
-        // 7. LOOP 4 (24/7): Live Server Bounty System
+        // 2. Live Server Bounty System (Triggered at 4★+ Wanted Level)
         if (this.activeServerBounty) {
             this.activeServerBounty.timer -= dt;
             if (this.activeServerBounty.timer <= 0) {
                 const b = this.activeServerBounty;
                 this.activeServerBounty = null;
-                this.bountyCooldown = 140.0;
+                this.bountyCooldown = 180.0;
                 const myId = (this.net && this.net.playerId) || "local";
                 if (b.targetId === myId && !p.dead) {
-                    const survReward = b.reward || 20000;
-                    this.cash += survReward;
-                    this.addMultiplier(1);
+                    const survReward = b.reward || 1200;
+                    this.addCash(survReward, "🏆 BOUNTY SURVIVED!");
                     if (this.audio && typeof this.audio.playFanfare === "function") {
                         this.audio.playFanfare("MISSION");
                     }
                     this.showBigBanner(
                         "🏆 BOUNTY SURVIVED!",
-                        `SURVIVED SERVER MANHUNT — EARNED +$${survReward.toLocaleString()} & +1 MULTIPLIER!`,
+                        `SURVIVED SERVER MANHUNT — EARNED +$${survReward.toLocaleString()}!`,
                         "#39ff14",
-                        3.4
+                        3.0
                     );
-                    this._checkScoreMilestonesAndSave();
-                    this.updateHud();
                 }
             }
         } else {
             this.bountyCooldown = Math.max(0, (this.bountyCooldown || 0) - dt);
-            if (!p.dead && this.bountyCooldown <= 0 && ((this.wantedLevel || 0) >= 4 || (this.comboChain || 0) >= 14)) {
-                this.bountyCooldown = 150.0;
+            if (!p.dead && this.bountyCooldown <= 0 && (this.wantedLevel || 0) >= 4) {
+                this.bountyCooldown = 180.0;
                 const myId = (this.net && this.net.playerId) || "local";
                 const myName = (this.net && this.net.playerName) || p.nickname || "LUCIA";
-                const reward = 15000 + Math.max(1, this.wantedLevel || 2) * 5000;
+                const reward = 1200;
                 this.activeServerBounty = {
                     targetId: myId,
                     targetName: myName,

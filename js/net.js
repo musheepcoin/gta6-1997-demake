@@ -1477,7 +1477,7 @@ class ViceNetworkManager {
             );
             let bountyBonus = 0;
             if (this.game.activeServerBounty && (this.game.activeServerBounty.targetId === pkt.id || this.game.activeServerBounty.targetName === pkt.victimName)) {
-                bountyBonus = this.game.activeServerBounty.reward || 20000;
+                bountyBonus = this.game.activeServerBounty.reward || 1200;
                 this.game.activeServerBounty = null;
                 this.addChatLog(
                     "VICE NET BOUNTY",
@@ -1488,11 +1488,10 @@ class ViceNetworkManager {
             }
             if (pkt.killerId === this.playerId) {
                 this.kills++;
-                this.game.multiplier += 1;
-                this.game.addCash(5000 + bountyBonus, bountyBonus > 0 ? `🎯 BOUNTY FRAG: ${pkt.victimName}!` : `PVP FRAG: ${pkt.victimName}!`);
+                this.game.addCash(500 + bountyBonus, bountyBonus > 0 ? `🎯 BOUNTY FRAG: ${pkt.victimName}!` : `PVP FRAG: ${pkt.victimName}!`);
                 this.game.showBigBanner(
                     bountyBonus > 0 ? "🎯 SERVER BOUNTY CLAIMED!" : "ONLINE FRAG!",
-                    `YOU WASTED ${pkt.victimName}! (+$${(5000 + bountyBonus).toLocaleString()} & MULTIPLIER +1 • KILLS: ${this.kills})`,
+                    `YOU WASTED ${pkt.victimName}! (+$${(500 + bountyBonus).toLocaleString()} • KILLS: ${this.kills})`,
                     "#00f0ff",
                     2.6
                 );

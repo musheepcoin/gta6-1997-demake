@@ -17,9 +17,9 @@ class MissionManager {
                 isVirtualPhone: true,
                 shortTitle: "⚡ FIXER: LIVE 90S",
                 caller: "ViceNet AI Fixer",
-                rewardCash: 40000,
+                rewardCash: 1500,
                 name: "VICENET DYNAMIC 90S CONTRACT",
-                briefing: "⚡ LIVE AI FIXER: Scans real vehicles & syndicates in your current district to generate an instant 90-second arcade contract!",
+                briefing: "⚡ LIVE AI FIXER: Scans real vehicles & syndicates in your current district to generate an instant 90-second contract ($1,200–$1,800)!",
                 x: 443.5 * TILE_SIZE,
                 y: 285.5 * TILE_SIZE,
                 completed: false
@@ -29,7 +29,7 @@ class MissionManager {
                 missionId: "M1_UNCLE_JACK",
                 shortTitle: "M1: LIQUOR HOLD-UP",
                 caller: "Jason Duval",
-                rewardCash: 25000,
+                rewardCash: 1500,
                 name: "SOUTH BEACH LIQUOR HOLD-UP",
                 briefing: "MISSION 1 (TRUST?): Hold up South Beach Liquor on Ocean Drive with Jason, then lose VCPD at Vice Customs!",
                 x: 443.5 * TILE_SIZE,
@@ -41,7 +41,7 @@ class MissionManager {
                 missionId: "M2_GRASSRIVERS",
                 shortTitle: "M2: PIER CONTRABAND",
                 caller: "Dre'Quan Priest",
-                rewardCash: 45000,
+                rewardCash: 2500,
                 name: "VICE BEACH PIER CONTRABAND",
                 briefing: "MISSION 2 (CONTRABAND): Collect 3 contraband crates on Vice Beach & Ocean Pier, then deliver to Hotel Dixon!",
                 x: 448.5 * TILE_SIZE,
@@ -53,7 +53,7 @@ class MissionManager {
                 missionId: "M3_OCEAN_DRIVE",
                 shortTitle: "M3: CHEETAH BOOST",
                 caller: "Jason Duval",
-                rewardCash: 75000,
+                rewardCash: 4000,
                 name: "STAR ISLAND CHEETAH BOOST",
                 briefing: "MISSION 3 (CHEETAH BOOST): Steal the VIP Grotti Cheetah on Star Island and deliver it to Vice Port Crane!",
                 x: 344.5 * TILE_SIZE,
@@ -65,7 +65,7 @@ class MissionManager {
                 missionId: "M4_ANKLE_OVERRIDE",
                 shortTitle: "M4: ANKLE OVERRIDE",
                 caller: "Lucia & Jason",
-                rewardCash: 150000,
+                rewardCash: 7500,
                 name: "DOC ANKLE MONITOR OVERRIDE",
                 briefing: "MISSION 4 (THE BIG SCORE): Ambush the Armored Van in Port Gellhorn, then hack the DOC Relay at VCIA Airport!",
                 x: 68.5 * TILE_SIZE,
@@ -208,11 +208,11 @@ class MissionManager {
                 const d = Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y);
                 if (d < 68) {
                     m.stage = 2;
-                    g.addCash(15000, "REGISTER ROBBED!");
+                    g.addCash(400, "REGISTER ROBBED!");
                     g.setWantedLevel(Math.max(g.wantedLevel, 2));
                     g.sendPager(
                         "JASON (SMARTPHONE)",
-                        "REGISTER CLEARED ($15,000)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
+                        "REGISTER CLEARED ($400)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
                         true
                     );
                     m.targetPos = { x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
@@ -220,7 +220,7 @@ class MissionManager {
                 }
             } else if (m.stage === 2) {
                 if (g.wantedLevel === 0) {
-                    this.completeMission(m.phone, "TRUST? — HOLD-UP COMPLETE", 25000);
+                    this.completeMission(m.phone, "TRUST? — HOLD-UP COMPLETE", 1500);
                 }
             }
         } else if (m.id === "M2_GRASSRIVERS") {
@@ -229,7 +229,7 @@ class MissionManager {
                     const c = m.crates[i];
                     if (Math.hypot(p.x - c.x, p.y - c.y) < 58) {
                         m.crates.splice(i, 1);
-                        g.addCash(5000, "CONTRABAND CRATE");
+                        g.addCash(250, "CONTRABAND CRATE");
                         g.audio.playCashSound();
                     }
                 }
@@ -250,7 +250,7 @@ class MissionManager {
             } else if (m.stage === 2) {
                 const insideHotelDixon = Boolean(g.activeInterior && g.activeInterior.id === "HOTEL_DIXON");
                 if (insideHotelDixon || Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 82) {
-                    this.completeMission(m.phone, "VICE BEACH CONTRABAND RUN", 45000);
+                    this.completeMission(m.phone, "VICE BEACH CONTRABAND RUN", 2500);
                 }
             }
         } else if (m.id === "M3_OCEAN_DRIVE") {
@@ -282,7 +282,7 @@ class MissionManager {
                     Math.hypot(p.x - 333.2 * TILE_SIZE, p.y - 306.5 * TILE_SIZE)
                 );
                 if (p.inVehicle === m.targetCar && (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 95 || craneDist < 110)) {
-                    this.completeMission(m.phone, "STAR ISLAND GRAND THEFT", 75000);
+                    this.completeMission(m.phone, "STAR ISLAND GRAND THEFT", 4000);
                 }
             }
         } else if (m.id === "M4_ANKLE_OVERRIDE") {
@@ -293,7 +293,7 @@ class MissionManager {
                 }
                 if (!v || v.destroyed || p.inVehicle === v) {
                     m.stage = 2;
-                    g.addCash(50000, "ARMORED VAULT LOOT!");
+                    g.addCash(1500, "ARMORED VAULT LOOT!");
                     g.setWantedLevel(Math.max(g.wantedLevel, 4));
                     m.targetPos = { x: 128.0 * TILE_SIZE, y: 297.5 * TILE_SIZE };
                     m.objectiveLabel = "HACK DOC RELAY AT VCIA AIRPORT";
@@ -308,7 +308,7 @@ class MissionManager {
                 if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 92 || altAirDist < 92) {
                     g.player.ankleScrambled = true;
                     g.setWantedLevel(0);
-                    this.completeMission(m.phone, "LEONIDA KINGPIN — ANKLE MONITOR OVERRIDDEN!", 150000);
+                    this.completeMission(m.phone, "LEONIDA KINGPIN — ANKLE MONITOR OVERRIDDEN!", 7500);
                 }
             }
         } else if (m.id === "M0_DYNAMIC_FIXER") {
@@ -337,7 +337,7 @@ class MissionManager {
                         return;
                     }
                     if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 92) {
-                        this.completeMission(null, `FIXER BOOST: ${m.targetCar.name}`, m.reward || 35000);
+                        this.completeMission(null, `FIXER BOOST: ${m.targetCar.name}`, m.reward || 1200);
                     }
                 }
             } else if (m.archetype === "RAM_AND_EXTORT") {
@@ -349,7 +349,7 @@ class MissionManager {
                         const dropX = tc ? tc.x : m.targetPos.x;
                         const dropY = tc ? tc.y : m.targetPos.y;
                         if (p.inVehicle === tc) {
-                            this.completeMission(null, "COURIER HIJACKED & LOOTED", m.reward || 40000);
+                            this.completeMission(null, "COURIER HIJACKED & LOOTED", m.reward || 1500);
                             return;
                         }
                         m.stage = 2;
@@ -364,7 +364,7 @@ class MissionManager {
                     }
                 } else if (m.stage === 2) {
                     if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 46) {
-                        this.completeMission(null, "CARTEL COURIER EXTORTION", m.reward || 40000);
+                        this.completeMission(null, "CARTEL COURIER EXTORTION", m.reward || 1500);
                     }
                 }
             } else if (m.archetype === "SPEED_BOMB_RUN") {
@@ -413,14 +413,14 @@ class MissionManager {
                         m.slowTimer = Math.max(0, (m.slowTimer || 0) - dt * 1.6);
                     }
                     if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 90) {
-                        this.completeMission(null, `NITRO SPEED DELIVERY (${m.dropName})`, m.reward || 45000);
+                        this.completeMission(null, `NITRO SPEED DELIVERY (${m.dropName})`, m.reward || 1800);
                     }
                 }
             } else if (m.archetype === "VIP_HIT_SQUAD") {
                 if (m.targetPed && !m.targetPed.dead) {
                     m.targetPos = { x: m.targetPed.x, y: m.targetPed.y };
                 } else {
-                    this.completeMission(null, `SYNDICATE VIP ELIMINATED`, m.reward || 35000);
+                    this.completeMission(null, `SYNDICATE VIP ELIMINATED`, m.reward || 1500);
                 }
             }
         }
@@ -486,7 +486,7 @@ class MissionManager {
                 phone,
                 stage: 1,
                 timer: 95,
-                reward: 35000,
+                reward: 1200,
                 targetCar,
                 dropPos: { x: bestDrop.x, y: bestDrop.y },
                 dropName: bestDrop.name,
@@ -495,7 +495,7 @@ class MissionManager {
             };
             g.sendPager(
                 "📱 VICENET AI FIXER",
-                `Yo ${pName}! Our spotter in ${distName} just tagged a high-value ${targetCar.name}! Hijack it and deliver it to ${bestDrop.name} for $35,000!`,
+                `Yo ${pName}! Our spotter in ${distName} just tagged a ${targetCar.name}! Hijack it and deliver it to ${bestDrop.name} for $1,200!`,
                 true
             );
             g.showBigBanner("⚡ FIXER: LIVE BOOST", `STEAL THE ${targetCar.name} & DELIVER TO ${bestDrop.name}`, "#00f0ff", 2.6);
@@ -519,17 +519,17 @@ class MissionManager {
                 phone,
                 stage: 1,
                 timer: 90,
-                reward: 40000,
+                reward: 1500,
                 targetCar: courier,
                 targetPos: { x: courier.x, y: courier.y },
                 objectiveLabel: `RAM OR SHOOT THE ${courier.name} COURIER!`
             };
             g.sendPager(
                 "📱 VICENET AI FIXER",
-                `${pName}, a Cartel courier in a ${courier.name} is cutting through ${distName} with $40,000 in bearer bonds! Ram or shoot his car until he drops the briefcase!`,
+                `${pName}, a Cartel courier in a ${courier.name} is cutting through ${distName} with $1,500 in bearer bonds! Ram or shoot his car until he drops the briefcase!`,
                 true
             );
-            g.showBigBanner("💥 FIXER: RAM & EXTORT", `SMASH THE ${courier.name} COURIER FOR $40,000!`, "#f97316", 2.6);
+            g.showBigBanner("💥 FIXER: RAM & EXTORT", `SMASH THE ${courier.name} COURIER FOR $1,500!`, "#f97316", 2.6);
         } else if (arch === "SPEED_BOMB_RUN") {
             let bombCar = (p.inVehicle && !p.inVehicle.destroyed && !p.inVehicle.waterOnly) ? p.inVehicle : null;
             if (!bombCar) {
@@ -559,7 +559,7 @@ class MissionManager {
                 timer: alreadyIn ? 75 : 90,
                 slowTimer: 0,
                 graceTimer: 4.5,
-                reward: 45000,
+                reward: 1800,
                 targetCar: bombCar,
                 dropPos: { x: dropLm.x, y: dropLm.y },
                 dropName: dropLm.shortName || dropLm.short || "DROP ZONE",
@@ -568,7 +568,7 @@ class MissionManager {
             };
             g.sendPager(
                 "📱 VICENET AI FIXER",
-                `💣 High-voltage job, ${pName}! This ${bombCar.name} is wired with a speed-sensitive nitro payload. Floor it to ${this.activeMission.dropName} without stopping for $45,000!`,
+                `💣 High-voltage job, ${pName}! This ${bombCar.name} is wired with a speed-sensitive nitro payload. Floor it to ${this.activeMission.dropName} without stopping for $1,800!`,
                 true
             );
             g.showBigBanner("💣 60 MPH NITRO RUN", `FLOOR IT TO ${this.activeMission.dropName} — DO NOT STOP!`, "#ef4444", 2.6);
@@ -615,14 +615,14 @@ class MissionManager {
                 phone,
                 stage: 1,
                 timer: 90,
-                reward: 35000,
+                reward: 1500,
                 targetPed: vip,
                 targetPos: { x: vip.x, y: vip.y },
                 objectiveLabel: `ELIMINATE SYNDICATE LIEUTENANT IN ${distName}`
             };
             g.sendPager(
                 "📱 VICENET AI FIXER",
-                `🎯 Contract live for ${pName}: A Syndicate Lieutenant and his 2 bodyguards were just spotted in ${distName}. Take him out within 90s for $35,000!`,
+                `🎯 Contract live for ${pName}: A Syndicate Lieutenant and his 2 bodyguards were just spotted in ${distName}. Take him out within 90s for $1,500!`,
                 true
             );
             g.showBigBanner("🎯 SYNDICATE VIP HIT", `ELIMINATE THE LIEUTENANT IN ${distName}`, "#ff2a85", 2.6);
@@ -738,19 +738,19 @@ class MissionManager {
         const wasDynamicFixer = Boolean((phone && phone.missionId === "M0_DYNAMIC_FIXER") || (this.activeMission && this.activeMission.id === "M0_DYNAMIC_FIXER"));
         if (phone && phone.missionId !== "M0_DYNAMIC_FIXER") {
             phone.completed = true;
+            g.multiplier = Math.min(9, g.multiplier + 1);
         }
         this.cleanupMissionVehicles();
         this.activeMission = null;
-        g.multiplier = Math.min(9, g.multiplier + 1);
         g.addCash(reward, "MISSION PASSED!");
         g.audio.playCashSound();
-        g.showBigBanner("MISSION PASSED!", `${title} — +$${reward.toLocaleString()} (MULTIPLIER x${g.multiplier})`, "#39ff14", 3.5);
+        g.showBigBanner("MISSION PASSED!", `${title} — +$${reward.toLocaleString()}`, "#39ff14", 3.2);
 
         if (wasDynamicFixer) {
             this.selectedMissionIdx = 0;
             g.sendPager(
                 "📱 VICENET AI FIXER",
-                `Contract cleared! Multiplier is now x${g.multiplier}. Hit [START] on your Smartphone (or type @fixer in chat) whenever you want the next 90s live contract!`,
+                `Contract cleared (+$${reward.toLocaleString()})! Hit [START] on your Smartphone (or type @fixer in chat) whenever you want another 90s contract!`,
                 false
             );
             return;

@@ -16692,63 +16692,12 @@ class RetroRenderer {
                 ctx.drawImage(this._lbHudCanvas, lbX - 2, lbY - 2);
             }
 
-            // A3. ARCADE 2026 LIVE RETENTION HUD WIDGETS (Adrenaline Combo Bar, Getaway Pot, Empire Rent & Flash/Bounty Tracker)
+            // A3. LIVE TURF KINGPIN, HOT DROP & BOUNTY HUD WIDGETS
             let curY = lbY + lbH + 6;
             ctx.save();
             ctx.textBaseline = "middle";
 
-            // 1. 🔥 Adrenaline Combo Bar
-            if ((game.comboTimer || 0) > 0 && (game.comboChain || 0) > 0) {
-                const boxH = 26;
-                const ratio = Math.max(0, Math.min(1, game.comboTimer / (game.comboMaxTimer || 6.0)));
-                const isLow = game.comboTimer < 1.8 && Math.floor(this.time * 12) % 2 === 0;
-                ctx.fillStyle = isLow ? "rgba(88, 12, 32, 0.90)" : "rgba(12, 16, 30, 0.88)";
-                ctx.fillRect(lbX, curY, lbW, boxH);
-                ctx.strokeStyle = (game.comboMult || 1) >= 4 ? "#fde047" : "#ff2a85";
-                ctx.lineWidth = 1.5;
-                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
-
-                ctx.font = "bold 10px Consolas, 'Courier New', monospace";
-                ctx.textAlign = "left";
-                ctx.fillStyle = "#fde047";
-                ctx.fillText(`🔥 COMBO x${game.comboMult || 1} (${game.comboChain} HIT)`, lbX + 6, curY + 9);
-                ctx.textAlign = "right";
-                ctx.fillStyle = "#39ff14";
-                ctx.fillText(`+$${Number(game.comboPot || 0).toLocaleString()}`, lbX + lbW - 6, curY + 9);
-
-                // Progress bar
-                ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
-                ctx.fillRect(lbX + 6, curY + 18, lbW - 12, 4);
-                ctx.fillStyle = ratio < 0.28 ? "#ef4444" : ((game.comboMult || 1) >= 4 ? "#fde047" : "#00f0ff");
-                ctx.fillRect(lbX + 6, curY + 18, Math.round((lbW - 12) * ratio), 4);
-                curY += boxH + 5;
-            }
-
-            // 2. 🚨 Wanted Getaway Pot ("Push Your Luck")
-            if ((game.wantedLevel || 0) > 0 && (game.wantedGetawayPot || 0) >= 50) {
-                const boxH = 25;
-                ctx.fillStyle = "rgba(28, 10, 18, 0.88)";
-                ctx.fillRect(lbX, curY, lbW, boxH);
-                ctx.strokeStyle = "#ef4444";
-                ctx.lineWidth = 1.3;
-                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
-
-                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
-                ctx.textAlign = "left";
-                ctx.fillStyle = "#f87171";
-                ctx.fillText("🚨 GETAWAY POT", lbX + 6, curY + 8.5);
-                ctx.textAlign = "right";
-                ctx.fillStyle = "#39ff14";
-                ctx.fillText(`+$${Math.round(game.wantedGetawayPot).toLocaleString()}`, lbX + lbW - 6, curY + 8.5);
-
-                ctx.font = "bold 8px Consolas, 'Courier New', monospace";
-                ctx.textAlign = "center";
-                ctx.fillStyle = "#fde047";
-                ctx.fillText("ESCAPE VCPD OR PAY 'N' SPRAY TO BANK!", lbX + lbW * 0.5, curY + 19);
-                curY += boxH + 5;
-            }
-
-            // 3. 👑 District Turf Kingpin Badge
+            // 1. 👑 District Turf Kingpin Badge
             if (typeof game.getCurrentDistrictTurf === "function") {
                 const turf = game.getCurrentDistrictTurf();
                 const myTurfCount = typeof game.getMyTurfControlledCount === "function" ? game.getMyTurfControlledCount() : 0;
