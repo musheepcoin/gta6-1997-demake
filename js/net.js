@@ -1009,6 +1009,9 @@ class ViceNetworkManager {
             y: p ? Math.round(p.y) : 0
         });
 
+        // Interactive AI Agents (@fixer, @diaz, @sonny, @toussaint, @mitch, @cortez, @radio, /ai)
+        this.handleInteractiveAiChat(cleaned);
+
         // If any Online Rival Bots are present in the lobby, let one reply naturally after ~1s!
         const bots = Array.from(this.remotePlayers.values()).filter((r) => r.isBot && !r.dead);
         if (bots.length > 0) {
@@ -1746,7 +1749,106 @@ class ViceNetworkManager {
                 "#ff2a85",
                 true
             );
+        } else if (pkt.kind === "TURF_TAKEOVER" && this.game && pkt.turfKey) {
+            const zones = typeof this.game.ensureTurfZones === "function" ? this.game.ensureTurfZones() : null;
+            if (zones && zones[pkt.turfKey]) {
+                zones[pkt.turfKey].leaderName = pkt.leaderName || "PLAYER";
+                zones[pkt.turfKey].leaderColor = pkt.leaderColor || "#00f0ff";
+                zones[pkt.turfKey].leaderScore = pkt.leaderScore || 2500;
+            }
+            if (pkt.wasTakeover) {
+                this.addChatLog(
+                    "TURF WAR",
+                    `👑 ${pkt.leaderName || "PLAYER"} took control of ${pkt.shortLabel || pkt.turfKey} ($${Number(pkt.leaderScore || 2500).toLocaleString()})!`,
+                    pkt.leaderColor || "#fde047",
+                    true
+                );
+            }
         }
+    }
+
+    handleInteractiveAiChat(rawText) {
+        if (!this.game || !rawText) return;
+        const lower = rawText.toLowerCase();
+        const isAiTrigger =
+            /^@(fixer|diaz|sonny|toussaint|mitch|cortez|radio|ai)\b/i.test(rawText) ||
+            /^\/ai\b/i.test(rawText);
+        if (!isAiTrigger) return;
+
+        const g = this.game;
+        const p = g.player;
+        const pName = this.playerName || "LUCIA";
+        const dist = g.currentDistrict || "OCEAN DRIVE";
+        const isFr = /[éèêàùç]|(\b(donne|mission|contrat|salut|qui|quoi|argent|flic|quartier|boss)\b)/i.test(lower);
+
+        setTimeout(() => {
+            if (!this.game) return;
+            let agentName = "📱 VICENET AI FIXER";
+            let agentColor = "#00f0ff";
+            let reply = "";
+
+            if (lower.startsWith("@radio") || lower.includes("lazlow") || lower.includes("news")) {
+                agentName = "🎙️ DJ LAZLOW (FLASH FM)";
+                agentColor = "#f472b6";
+                const turf = typeof g.getCurrentDistrictTurf === "function" ? g.getCurrentDistrictTurf() : null;
+                const king = (turf && turf.leaderName) ? turf.leaderName : (isFr ? "personne pour l'instant" : "nobody yet");
+                reply = isFr
+                    ? `En direct sur Flash FM ! ${pName} roule dans ${dist} avec $${Math.floor(g.cash || 0).toLocaleString()} en poche ! Le boss actuel du quartier est ${king}. Faites chauffer le bitume !`
+                    : `Live on Flash FM! ${pName} is cruising through ${dist} holding $${Math.floor(g.cash || 0).toLocaleString()}! Current district Kingpin: ${king}!`;
+            } else if (lower.startsWith("@diaz") || lower.startsWith("@sonny") || lower.startsWith("@toussaint") || lower.startsWith("@mitch") || lower.startsWith("@cortez")) {
+                const bossMap = {
+                    "@diaz": { name: "🏛️ DON DIAZ (STAR CARTEL)", col: "#c084fc" },
+                    "@sonny": { name: "🌴 SONNY (OCEAN SYNDICATE)", col: "#fb7185" },
+                    "@toussaint": { name: "🎨 TOUSSAINT (ZOE POUND)", col: "#e879f9" },
+                    "@mitch": { name: "🏙️ BIG MITCH (BROTHERHOOD)", col: "#fb923c" },
+                    "@cortez": { name: "🚔 CAPT. CORTEZ (VCPD)", col: "#38bdf8" }
+                };
+                const tag = Object.keys(bossMap).find((k) => lower.startsWith(k)) || "@diaz";
+                agentName = bossMap[tag].name;
+                agentColor = bossMap[tag].col;
+                reply = isFr
+                    ? `Tu oses m'appeler depuis ${dist}, ${pName} ?! Montre ce que tu vaux : fais grimper ton score dans le quartier ou affronte mes gars !`
+                    : `You got nerve messaging me from ${dist}, ${pName}! Prove yourself on my turf or face my hit squad!`;
+                if (typeof g.recordFactionGrudge === "function") {
+                    g.factionGrudges = g.factionGrudges || {};
+                    g.factionGrudges.STAR = 3;
+                    g.recordFactionGrudge("CHALLENGE", "Syndicate Turf", tag === "@cortez");
+                }
+            } else {
+                // @fixer or /ai -> Launch a live dynamic contract or drop a crate if requested!
+                agentName = "📱 VICENET AI FIXER";
+                agentColor = "#39ff14";
+                if (g.missions && !g.missions.activeMission) {
+                    const fixerPhone = g.missions.payphones ? g.missions.payphones[0] : null;
+                    if (fixerPhone && typeof g.missions.startDynamicFixerMission === "function") {
+                        g.missions.startDynamicFixerMission(fixerPhone);
+                        const m = g.missions.activeMission;
+                        reply = isFr
+                            ? `Reçu 5/5 ${pName} ! Je viens de scanner ${dist} : contrat "${m ? m.title : "LIVE 90S"}" verrouillé sur ton GPS ($${m ? (m.reward || 35000).toLocaleString() : "35,000"} à la clé). Fonce !`
+                            : `Copy that ${pName}! Scanned ${dist} — contract "${m ? m.title : "LIVE 90S"}" is now locked on your GPS ($${m ? (m.reward || 35000).toLocaleString() : "35,000"} payout). Punch it!`;
+                    }
+                } else {
+                    reply = isFr
+                        ? `${pName}, tu es dans ${dist} (Multiplicateur x${g.multiplier}). Termine ton contrat en cours ou tape [START] sur ton Smartphone pour un nouveau coup !`
+                        : `${pName}, you're in ${dist} (Multiplier x${g.multiplier}). Finish your active contract or hit [START] on your Smartphone for a fresh score!`;
+                }
+            }
+
+            if (reply) {
+                this.addChatLog(agentName, reply, agentColor, false);
+                if (typeof g.sendPager === "function") {
+                    g.sendPager(agentName, reply, false);
+                }
+                this.sendPacket({
+                    t: "CHAT",
+                    name: agentName,
+                    color: agentColor,
+                    text: reply,
+                    x: p ? Math.round(p.x) : 0,
+                    y: p ? Math.round(p.y) : 0
+                });
+            }
+        }, 550);
     }
 
     broadcastWorldSync() {

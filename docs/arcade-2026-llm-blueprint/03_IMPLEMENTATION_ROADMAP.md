@@ -22,13 +22,14 @@ Ce document découpe la mise en œuvre concrète des mécaniques dans l'architec
 
 ---
 
-## Phase 3 (Futur) : Système Complexe de Syndicats / Contrôle de Territoire Multijoueur
-- [ ] **Architecture Multijoueur dédiée (à concevoir séparément)** :
-  - Pas de rachat simple des monuments publics iconiques ; nécessite un vrai système multijoueur compétitif (influence de quartier dynamique, planques instanciées ou guerre de syndicats persistante sur le serveur).
+## Phase 3 : Guerre de Quartiers Multijoueur "King of the District / Live Turf War" (`js/game.js`, `js/renderer.js`, `js/net.js`) — ✅ TERMINÉ (`v101_169`)
+- [x] **Domination Dynamique des 8 Grands Quartiers (`turfZones`) sans blocage des monuments** :
+  - Chaque action de score/combo fait grimper l'influence du joueur dans le quartier actuel (`addTurfInfluence`).
+  - Dépasser le leader actuel déclenche un `👑 TURF TAKEOVER` diffusé à tout le serveur, affiche `👑 CROWNED TURF OF <PSEUDO>` à l'entrée du quartier et sur la carte `[M]`, octroie `+25 %` de bonus cash dans le quartier et pacifie le gang local !
 
 ---
 
-## Phase 4 : Cerveau IA "ViceNet 5G Director", Contrats Fixer Dynamiques & Factions à Mémoire (`js/missions.js` & `js/game.js`) — ✅ TERMINÉ (`v101_168`)
+## Phase 4 : Cerveau IA "ViceNet 5G Director", Agents Chat (`@fixer`, `@diaz`, `@radio`), Contrats Dynamiques & Factions (`js/missions.js`, `js/game.js`, `js/net.js`) — ✅ TERMINÉ (`v101_169`)
 - [x] **Contrats "Fixer IA" Dynamiques de 90s sur le Smartphone (`⚡ FIXER: LIVE 90S` dans `js/missions.js`)** :
   - Scanne les vrais véhicules et quartiers autour du joueur pour générer à la volée 4 archétypes de contrats 90s (*Live Boost & Chop*, *Cartel Courier Ram & Extort*, *60 MPH Nitro Speed Run*, *Syndicate VIP Hit*).
 - [x] **Mémoire Rancunière des 5 Factions ("2.5D Nemesis System" dans `js/game.js`)** :

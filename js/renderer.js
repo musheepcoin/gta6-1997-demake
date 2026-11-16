@@ -16745,7 +16745,30 @@ class RetroRenderer {
                 curY += boxH + 5;
             }
 
-            // 3. 📦 Active Flash Drop Crate or 🎯 Server Bounty Tracker
+            // 3. 👑 District Turf Kingpin Badge
+            if (typeof game.getCurrentDistrictTurf === "function") {
+                const turf = game.getCurrentDistrictTurf();
+                const myTurfCount = typeof game.getMyTurfControlledCount === "function" ? game.getMyTurfControlledCount() : 0;
+                if (turf && (turf.leaderName || myTurfCount > 0)) {
+                    const boxH = 22;
+                    ctx.fillStyle = "rgba(18, 12, 34, 0.88)";
+                    ctx.fillRect(lbX, curY, lbW, boxH);
+                    ctx.strokeStyle = turf.leaderColor || "#c084fc";
+                    ctx.lineWidth = 1.3;
+                    ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+                    ctx.textAlign = "left";
+                    ctx.fillStyle = turf.leaderColor || "#fde047";
+                    const lName = turf.leaderName ? turf.leaderName.slice(0, 10) : "OPEN TURF";
+                    ctx.fillText(`👑 ${turf.shortLabel.slice(0, 10)}: ${lName}`, lbX + 6, curY + 11);
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillText(`${myTurfCount}/8`, lbX + lbW - 6, curY + 11);
+                    curY += boxH + 5;
+                }
+            }
+
+            // 4. 📦 Active Flash Drop Crate or 🎯 Server Bounty Tracker
             if (game.activeFlashEvent && game.player) {
                 const ev = game.activeFlashEvent;
                 const dx = ev.x - game.player.x;
@@ -16880,6 +16903,13 @@ class RetroRenderer {
                 this.drawHudSprite(ctx, "25", bx, by, s);
                 this.drawHudSprite(ctx, "26", bx + spL[2] * s, by, s);
                 this.drawGta1FontString(ctx, "SUB2", game.currentDistrict.toUpperCase(), W * 0.5, by + 6 * s, s, "center");
+                if (typeof game.getCurrentDistrictTurf === "function") {
+                    const turf = game.getCurrentDistrictTurf();
+                    if (turf && turf.leaderName) {
+                        const turfSub = `CROWNED TURF OF ${turf.leaderName}`;
+                        this.drawGta1FontString(ctx, "SUB2", turfSub.toUpperCase(), W * 0.5, by + 24 * s, s * 0.85, "center");
+                    }
+                }
             }
         } else if (this.vehicleBannerTimer > 0 && this.vehicleBannerName) {
             const spCar = this.gta1Meta.sprites.hud["27"];
@@ -17438,6 +17468,26 @@ class RetroRenderer {
         }
 
         const target = game.missions.getTargetPosition();
+        if (game.turfZones) {
+            fctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+            fctx.textBaseline = "middle";
+            for (const tz of Object.values(game.turfZones)) {
+                if (!tz || !tz.leaderName) continue;
+                const tx = Math.round(tz.x * sx);
+                const ty = Math.round(tz.y * sy) - 16;
+                const tag = `👑 ${tz.leaderName}`;
+                const tw = fctx.measureText(tag).width + 8;
+                const bx = Math.max(4, Math.min(w - tw - 4, tx - Math.round(tw * 0.5)));
+                const by = Math.max(12, Math.min(h - 12, ty));
+                fctx.fillStyle = "rgba(15, 10, 30, 0.92)";
+                fctx.fillRect(bx, by - 7, tw, 14);
+                fctx.strokeStyle = tz.leaderColor || "#fde047";
+                fctx.lineWidth = 1.4;
+                fctx.strokeRect(bx, by - 7, tw, 14);
+                fctx.fillStyle = tz.leaderColor || "#fde047";
+                fctx.fillText(tag, bx + 4, by);
+            }
+        }
         if (target) {
             const tx = Math.round(target.x * sx);
             const ty = Math.round(target.y * sy);

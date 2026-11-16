@@ -7780,9 +7780,11 @@ class LeonidaGame {
         const c = this.comboChain;
         this.comboMult = c >= 36 ? 10 : (c >= 28 ? 8 : (c >= 21 ? 6 : (c >= 15 ? 5 : (c >= 10 ? 4 : (c >= 6 ? 3 : (c >= 3 ? 2 : 1))))));
 
-        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * this.comboMult);
+        const turfBonusMult = this.isCurrentDistrictControlledByMe() ? 1.25 : 1.0;
+        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * this.comboMult * turfBonusMult);
         this.cash += total;
         this.comboPot = (this.comboPot || 0) + total;
+        this.addTurfInfluence(total);
 
         if ((this.wantedLevel || 0) > 0) {
             this.wantedGetawayPot = (this.wantedGetawayPot || 0) + Math.round(total * 0.32);
@@ -7790,9 +7792,10 @@ class LeonidaGame {
 
         if (showFloat && this.player) {
             const multTag = this.comboMult > 1 ? ` [COMBO x${this.comboMult}]` : "";
+            const turfTag = turfBonusMult > 1.0 ? " 👑+25%" : "";
             const txt = label
-                ? `${label} +$${total.toLocaleString()}${multTag}`
-                : `+$${total.toLocaleString()}${multTag}`;
+                ? `${label} +$${total.toLocaleString()}${multTag}${turfTag}`
+                : `+$${total.toLocaleString()}${multTag}${turfTag}`;
             this.addFloatingText(this.player.x, this.player.y - 22, txt, color);
         }
 
@@ -7803,6 +7806,178 @@ class LeonidaGame {
 
     getMaxComboDuration() {
         return 6.0;
+    }
+
+    /* ========================================================================
+       03 — MULTIPLAYER "KING OF THE DISTRICT" LIVE TURF WAR SYSTEM
+       ======================================================================== */
+    ensureTurfZones() {
+        if (this.turfZones) return this.turfZones;
+        this.myTurfScores = {};
+        this.turfZones = {
+            OCEAN_DRIVE: {
+                key: "OCEAN_DRIVE",
+                shortLabel: "OCEAN DRIVE",
+                x: mx256(213.5) * TILE_SIZE,
+                y: my256(146.0) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#ff2a85",
+                leaderScore: 0
+            },
+            NORTH_BEACH: {
+                key: "NORTH_BEACH",
+                shortLabel: "NORTH BEACH",
+                x: mx256(213.5) * TILE_SIZE,
+                y: my256(48.0) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#22d3ee",
+                leaderScore: 0
+            },
+            STAR_ISLAND: {
+                key: "STAR_ISLAND",
+                shortLabel: "STAR ISLAND",
+                x: mx256(173.0) * TILE_SIZE,
+                y: my256(106.5) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#c084fc",
+                leaderScore: 0
+            },
+            DOWNTOWN: {
+                key: "DOWNTOWN",
+                shortLabel: "DOWNTOWN VC",
+                x: mx256(141.5) * TILE_SIZE,
+                y: my256(116.5) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#818cf8",
+                leaderScore: 0
+            },
+            WYNWOOD_HAITI: {
+                key: "WYNWOOD_HAITI",
+                shortLabel: "WYNWOOD / HAITI",
+                x: mx256(115.5) * TILE_SIZE,
+                y: my256(82.5) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#e879f9",
+                leaderScore: 0
+            },
+            VICE_PORT: {
+                key: "VICE_PORT",
+                shortLabel: "VICE PORT",
+                x: mx256(171.5) * TILE_SIZE,
+                y: my256(164.5) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#38bdf8",
+                leaderScore: 0
+            },
+            PORT_GELLHORN: {
+                key: "PORT_GELLHORN",
+                shortLabel: "PORT GELLHORN",
+                x: 84.5 * TILE_SIZE,
+                y: 174.5 * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#fb923c",
+                leaderScore: 0
+            },
+            VCIA_KEYS: {
+                key: "VCIA_KEYS",
+                shortLabel: "VCIA & KEYS",
+                x: mx256(66.5) * TILE_SIZE,
+                y: my256(152.0) * TILE_SIZE,
+                leaderName: null,
+                leaderColor: "#39ff14",
+                leaderScore: 0
+            }
+        };
+        return this.turfZones;
+    }
+
+    getTurfKeyForDistrict(distStr = this.currentDistrict) {
+        const d = String(distStr || "OCEAN DRIVE").toUpperCase();
+        if (d.includes("STAR") || d.includes("VENETIAN")) return "STAR_ISLAND";
+        if (d.includes("NORTH") || d.includes("NINE1NINE") || d.includes("SERA") || d.includes("SHORES")) return "NORTH_BEACH";
+        if (d.includes("WYNWOOD") || d.includes("HAITI") || d.includes("JACK") || d.includes("LAKE")) return "WYNWOOD_HAITI";
+        if (d.includes("DOWNTOWN") || d.includes("STADIUM") || d.includes("BAYFRONT")) return "DOWNTOWN";
+        if (d.includes("VICE PORT") || d.includes("CRUISE")) return "VICE_PORT";
+        if (d.includes("GELLHORN") || d.includes("SPEEDWAY") || d.includes("PENITENTIARY")) return "PORT_GELLHORN";
+        if (d.includes("VCIA") || d.includes("AIRPORT") || d.includes("KEYS") || d.includes("GRASSRIVERS") || d.includes("MUD")) return "VCIA_KEYS";
+        return "OCEAN_DRIVE";
+    }
+
+    getCurrentDistrictTurf() {
+        const zones = this.ensureTurfZones();
+        return zones[this.getTurfKeyForDistrict(this.currentDistrict)] || zones.OCEAN_DRIVE;
+    }
+
+    isCurrentDistrictControlledByMe() {
+        const z = this.getCurrentDistrictTurf();
+        const myName = String((this.net && this.net.playerName) || (this.player && this.player.nickname) || "LUCIA").toUpperCase();
+        return Boolean(z && z.leaderName && String(z.leaderName).toUpperCase() === myName);
+    }
+
+    getMyTurfControlledCount() {
+        const zones = this.ensureTurfZones();
+        const myName = String((this.net && this.net.playerName) || (this.player && this.player.nickname) || "LUCIA").toUpperCase();
+        let count = 0;
+        for (const z of Object.values(zones)) {
+            if (z.leaderName && String(z.leaderName).toUpperCase() === myName) count++;
+        }
+        return count;
+    }
+
+    addTurfInfluence(points) {
+        const pts = Math.floor(Number(points) || 0);
+        if (pts <= 0 || !this.player || this.player.dead) return;
+        const zones = this.ensureTurfZones();
+        const tKey = this.getTurfKeyForDistrict(this.currentDistrict);
+        const zone = zones[tKey];
+        if (!zone) return;
+
+        const myName = String((this.net && this.net.playerName) || (this.player && this.player.nickname) || "LUCIA").toUpperCase();
+        const myColor = (this.net && this.net.playerColor) || "#ff2a85";
+        this.myTurfScores[tKey] = (this.myTurfScores[tKey] || 0) + pts;
+        const myScore = this.myTurfScores[tKey];
+
+        const isAlreadyMe = zone.leaderName && String(zone.leaderName).toUpperCase() === myName;
+        const threshold = isAlreadyMe
+            ? (zone.leaderScore + 1000)
+            : Math.max(2500, (zone.leaderScore || 0) + 1000);
+
+        if (myScore >= threshold) {
+            const prevLeader = zone.leaderName;
+            zone.leaderName = myName;
+            zone.leaderColor = myColor;
+            zone.leaderScore = myScore;
+
+            if (!isAlreadyMe) {
+                if (this.audio && typeof this.audio.playFanfare === "function") {
+                    this.audio.playFanfare("MISSION");
+                }
+                this.showBigBanner(
+                    `👑 TURF KINGPIN: ${zone.shortLabel}!`,
+                    prevLeader
+                        ? `DETHRONED ${prevLeader} — YOU NOW RULE ${zone.shortLabel} (+25% TURF CASH & FACTION TRUCE)!`
+                        : `YOU CLAIMED ${zone.shortLabel} (+25% TURF CASH & LOCAL FACTION TRUCE)!`,
+                    myColor,
+                    3.2
+                );
+                this.sendPager(
+                    "👑 VICE NET TURF WAR",
+                    `You now control ${zone.shortLabel} ($${myScore.toLocaleString()} Influence)! You earn +25% bonus cash in this district and local syndicates won't send hit squads after you!`,
+                    false
+                );
+            }
+            if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                this.net.broadcastWorldEvent({
+                    kind: "TURF_TAKEOVER",
+                    turfKey: tKey,
+                    shortLabel: zone.shortLabel,
+                    leaderName: myName,
+                    leaderColor: myColor,
+                    leaderScore: myScore,
+                    wasTakeover: !isAlreadyMe
+                });
+            }
+        }
     }
 
     /* ========================================================================
@@ -7817,6 +7992,10 @@ class LeonidaGame {
             this._lastRadioFlashMs = 0;
         }
         const dist = String(this.currentDistrict || "VICE CITY").toUpperCase();
+        // If the player is the reigning Turf Kingpin of this district, local non-police gangs respect their turf!
+        if (!isPoliceTarget && typeof this.isCurrentDistrictControlledByMe === "function" && this.isCurrentDistrictControlledByMe()) {
+            return;
+        }
         let fKey = "BEACH";
         if (isPoliceTarget) fKey = "VCPD";
         else if (dist.includes("STAR") || dist.includes("VENETIAN")) fKey = "STAR";
