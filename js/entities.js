@@ -2594,6 +2594,12 @@ class Vehicle {
         if (this.aiTrafficBypassTimer > 0) {
             this.aiTrafficBypassTimer = Math.max(0, this.aiTrafficBypassTimer - dt);
         }
+        if (this.aiPullOverTimer > 0) {
+            this.aiPullOverTimer = Math.max(0, this.aiPullOverTimer - dt);
+        } else if (this.aiPullOverOffset) {
+            this.aiPullOverOffset *= Math.pow(0.06, dt);
+            if (Math.abs(this.aiPullOverOffset) < 0.4) this.aiPullOverOffset = 0;
+        }
         const fx = Math.cos(this.angle);
         const fy = Math.sin(this.angle);
         const rx = -fy;
@@ -2618,8 +2624,28 @@ class Vehicle {
                     const changed = this.aiLaneChangeCooldown <= 0
                         ? this.tryAdjacentLaneChange(bx, by, curZ, map, game)
                         : false;
-                    if (!changed && bumperGap < 68) {
-                        this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 1.35);
+                    if (!changed && bumperGap < 88) {
+                        const prefSides = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? [1, -1] : [-1, 1];
+                        let shifted = false;
+                        for (const bSide of prefSides) {
+                            const bOff = 28;
+                            const testX = this.x + rx * bSide * bOff;
+                            const testY = this.y + ry * bSide * bOff;
+                            const testAheadX = testX + fx * 42;
+                            const testAheadY = testY + fy * 42;
+                            if (
+                                (!map.isWaterAtPixel || (!map.isWaterAtPixel(testX, testY) && !map.isWaterAtPixel(testAheadX, testAheadY))) &&
+                                (!map.resolveCircleBuildingCollision || (!map.resolveCircleBuildingCollision(testX, testY, 13, curZ).hit && !map.resolveCircleBuildingCollision(testAheadX, testAheadY, 13, curZ).hit))
+                            ) {
+                                this.aiPullOverOffset = bSide * bOff;
+                                this.aiPullOverTimer = 1.65;
+                                shifted = true;
+                                break;
+                            }
+                        }
+                        if (!shifted && bumperGap < 68) {
+                            this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 1.35);
+                        }
                     }
                 }
             };
@@ -2655,7 +2681,7 @@ class Vehicle {
         const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
         let steer = Math.max(-1, Math.min(1, angleDiff * 2.75));
         let throttle = maxThrottle;
-        if (sameLaneLeadGap < 26) {
+        if (sameLaneLeadGap < 26 && (this.aiPullOverTimer || 0) <= 0) {
             throttle = this.speed > sameLaneLeadSpd + 8 ? -0.45 : 0;
         }
 
@@ -2666,11 +2692,12 @@ class Vehicle {
             this.steerAngleRad = 0;
             steer = 0;
             const maxLatStep = 115 * dt;
+            const pullOff = this.aiPullOverOffset || 0;
             if (this.aiChosenDir.dx !== 0) {
-                const centerY = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
+                const centerY = (this.aiTargetBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
                 this.y += Math.max(-maxLatStep, Math.min(maxLatStep, (centerY - this.y) * Math.min(1, dt * 9.0)));
             } else if (this.aiChosenDir.dy !== 0) {
-                const centerX = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
+                const centerX = (this.aiTargetBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
                 this.x += Math.max(-maxLatStep, Math.min(maxLatStep, (centerX - this.x) * Math.min(1, dt * 9.0)));
             }
         } else {
@@ -3101,7 +3128,7 @@ class Vehicle {
                 }
 
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
-                const shouldParkAndDeploy = bestDist < 215 || (bestDist < 700 && (this.approachNoProgress || 0) > 1.5) || Boolean(this.deployedFireman);
+                const shouldParkAndDeploy = bestDist < 225 || (bestDist < 340 && (this.approachNoProgress || 0) > 2.8) || Boolean(this.deployedFireman);
                 if (shouldParkAndDeploy) {
                     // Deploy an on-foot VCFD Firefighter in bunker gear & helmet with a handheld fire hose!
                     if (!this.deployedFireman) {
@@ -3113,8 +3140,8 @@ class Vehicle {
                         }
                     }
 
-                    // If within rooftop deck-gun range (< 235px), also fire the truck's rooftop water cannon over any obstacles!
-                    if (bestDist < 235) {
+                    // If within rooftop deck-gun range (< 285px), also fire the truck's rooftop water cannon over any obstacles!
+                    if (bestDist < 285) {
                         const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
                         for (let k = 0; k < 2; k++) {
                             if (Math.random() < 0.85) {
@@ -3163,7 +3190,7 @@ class Vehicle {
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
-                const forceDirect = bestDist < 260 || (this.approachNoProgress || 0) > 1.6;
+                const forceDirect = bestDist < 320 || (this.approachNoProgress || 0) > 1.6;
                 const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3172,7 +3199,8 @@ class Vehicle {
                     burningCar.y,
                     burningCar.vx || 0,
                     burningCar.vy || 0,
-                    0.55,
+                    0.68,
+                    false,
                     forceDirect
                 );
                 // A heavy fire engine drives to the scene at a measured emergency pace (not race speed),
