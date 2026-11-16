@@ -864,20 +864,7 @@ class LeonidaMap {
                     const tooCloseTree = this.trees.some(tr => Math.hypot(tr.x - planterX, tr.y - planterY) < 96.0);
                     const keepPlanter = !isInsidePrisonOrAirport && !tooCloseTree && surfZ <= 2 && (!blkZ2 || blkZ2.lid === 0) && surfGt === GROUND_TYPE.PAWEMENT && (planterHash < 28);
                     if (keepPlanter) {
-                        const planterKinds = [
-                            "palm_tree", "palm_tree", "coconut_palm_cluster", "sabal_palmetto",
-                            "subtropical_mahogany", "live_oak"
-                        ];
-                        const pKind = planterKinds[((c * 17 + r * 31) >>> 0) % planterKinds.length];
-                        this.trees.push({
-                            kind: pKind,
-                            x: planterX,
-                            y: planterY,
-                            z: 2.0,
-                            scale: 0.92 + (planterHash % 15) * 0.014,
-                            height: 0.90 + (planterHash % 13) * 0.018,
-                            angle: ((c * 29 + r * 43) % 628) * 0.01
-                        });
+                        this.trees.push({ x: planterX, y: planterY, z: 2.0, scale: 1.0 });
                     }
                 }
             }
@@ -1239,72 +1226,47 @@ class LeonidaMap {
                 let posY = (r + 0.5 + (hs2 - 0.5) * 0.28) * TILE_SIZE;
                 let plantZ = (surfGt === GROUND_TYPE.WATER) ? 1.0 : 2.0;
 
-                // 1) Ocean Drive Iconic Palm Boulevard, Wide Lummus Park Lawn, Serpentine Path & Narrow Coastal Dune Strip (c=443..464, r=46..365)
-                // FAITHFUL TO REAL OCEAN DRIVE & LUMMUS PARK AERIAL PHOTO:
-                // - West sidewalk (c=443) & East promenade curb (c=448): Tall Royal/Coconut Palms (palm_tree & coconut_palm_cluster).
-                // - Wide Lummus Park Lawn (c=449..454, lid=10): Tall swaying Coconut Palms (palm_tree, coconut_palm_cluster),
-                //   Cabbage Palms (sabal_palmetto), and lush dark-green tropical shade trees (subtropical_mahogany, live_oak) in the center of the lawn!
-                // - Narrow Coastal Dune Strip east of the path (c=457..460, lid=10): Coconut Palms & low green coastal palmetto/dune grass.
-                // - East edge of the serpentine path on open sand (c=457..460, lid=98): Clusters of Coconut Palms along the path & volleyball courts!
+                // 1) Ocean Drive Iconic Palm Boulevard, Wide Lummus Park & Vegetated Coastal Dune Belt (c=443..464, r=46..365)
+                // 100% RESTORED ORIGINAL BEACH FLORA (from v101_136):
                 if (c >= 443 && c <= 464 && r >= 46 && r <= 365) {
                     const isWestSidewalk = (c === 443 && r >= 72);
                     const isEastCurbside = (c === 448 && r >= 76) || (c === 458 && r < 72);
                     const isParkOrDuneGrass = (c >= 449 && c <= 464) && (blkZ1.lid === 10);
                     const isDuneBelt = (c >= 456);
-                    const isLummusLawn = (c >= 450 && c <= 454) && !isDuneBelt;
                     const isWindingTrailEdge = (c >= 453 && c <= 457) && (blkZ1.lid === 98) && ((r + c * 5) % 19 === 0);
 
                     if (isWestSidewalk && (r % 8 === 0)) {
-                        const wRoll = ((r >> 3) + c) % 5;
-                        chosenKind = (wRoll === 0) ? "coconut_palm_cluster" : ((wRoll === 3) ? "sabal_palmetto" : "palm_tree");
+                        chosenKind = "palm_tree";
                         posX = (c + 0.22 + (hs1 - 0.5) * 0.10) * TILE_SIZE;
                         scaleMul = 0.95 + hs1 * 0.30;
                         heightMul = 0.90 + hs2 * 0.55;
                     } else if (isEastCurbside && ((r + 4) % 8 === 0)) {
-                        const eRoll = (((r + 4) >> 3) + c) % 5;
-                        chosenKind = (eRoll === 0) ? "coconut_palm_cluster" : ((eRoll === 3) ? "sabal_palmetto" : "palm_tree");
+                        chosenKind = "palm_tree";
                         posX = (c + 0.78 + (hs1 - 0.5) * 0.10) * TILE_SIZE;
                         scaleMul = 1.02 + hs1 * 0.35;
                         heightMul = 0.95 + hs2 * 0.60;
                     } else if (isParkOrDuneGrass) {
-                        const clusterRoll = ((c * 19 + r * 31 + seed) % 14);
-                        if (clusterRoll <= 2) {
+                        // Organic palm clusters & coastal dune vegetation across both Lummus Park and the Coastal Dune Ridge
+                        const clusterRoll = ((c * 19 + r * 31 + seed) % 10);
+                        if (clusterRoll <= 3) {
                             chosenKind = "palm_tree";
-                            scaleMul = 0.94 + hs1 * 0.38;
-                            heightMul = 0.90 + hs2 * 0.65;
-                        } else if (clusterRoll === 3 || clusterRoll === 4) {
-                            chosenKind = "coconut_palm_cluster";
-                            scaleMul = 0.96 + hs1 * 0.34;
-                            heightMul = 0.92 + hs2 * 0.60;
-                        } else if (clusterRoll === 5) {
-                            chosenKind = "sabal_palmetto";
-                            scaleMul = 0.92 + hs1 * 0.30;
-                            heightMul = 0.90 + hs2 * 0.50;
-                        } else if (clusterRoll === 6) {
-                            chosenKind = isDuneBelt ? "fan_palm" : ((seed % 2 === 0) ? "areca_palm_clump" : "fan_palm");
-                            scaleMul = 0.90 + hs1 * 0.30;
-                        } else if (clusterRoll === 7) {
-                            // In Lummus Park lawn (c=450..454), mix in lush dark-green tropical shade trees like on the real Ocean Drive photo!
-                            if (isLummusLawn) {
-                                chosenKind = (seed % 2 === 0) ? "subtropical_mahogany" : "live_oak";
-                                scaleMul = 1.00 + hs1 * 0.32;
-                                heightMul = 1.02 + hs2 * 0.45;
-                            } else {
-                                chosenKind = nearSand ? "dune_panicgrass" : "coastal_palmetto_bush";
-                                scaleMul = 0.90 + hs1 * 0.28;
-                            }
-                        } else if (clusterRoll === 8) {
-                            chosenKind = isDuneBelt
-                                ? (nearSand ? "dune_panicgrass" : ((seed % 2 === 0) ? "sea_grape" : "coastal_palmetto_bush"))
-                                : ((seed % 2 === 0) ? "monstera_fern" : "coastal_palmetto_bush");
-                            scaleMul = 0.90 + hs1 * 0.28;
-                        }
-                        if (chosenKind) {
                             posX = (c + 0.50 + (hs1 - 0.5) * 0.44) * TILE_SIZE;
                             posY = (r + 0.50 + (hs2 - 0.5) * 0.44) * TILE_SIZE;
+                            scaleMul = 0.92 + hs1 * 0.40;
+                            heightMul = 0.88 + hs2 * 0.65;
+                        } else if (clusterRoll === 4) {
+                            chosenKind = "fan_palm";
+                            posX = (c + 0.50 + (hs1 - 0.5) * 0.42) * TILE_SIZE;
+                            posY = (r + 0.50 + (hs2 - 0.5) * 0.42) * TILE_SIZE;
+                            scaleMul = 0.90 + hs1 * 0.32;
+                        } else if (clusterRoll === 5) {
+                            chosenKind = isDuneBelt ? "sea_grape" : ((seed % 2 === 0) ? "tropical_shrub" : "bougainvillea_bush");
+                            posX = (c + 0.50 + (hs1 - 0.5) * 0.40) * TILE_SIZE;
+                            posY = (r + 0.50 + (hs2 - 0.5) * 0.40) * TILE_SIZE;
+                            scaleMul = 0.90 + hs1 * 0.30;
                         }
                     } else if (isWindingTrailEdge) {
-                        chosenKind = (seed % 3 === 0) ? "coconut_palm_cluster" : "palm_tree";
+                        chosenKind = "palm_tree";
                         posX = (c + 0.50 + (hs1 - 0.5) * 0.35) * TILE_SIZE;
                         scaleMul = 0.90 + hs1 * 0.32;
                         heightMul = 0.88 + hs2 * 0.52;
@@ -1319,56 +1281,53 @@ class LeonidaMap {
                     (!this.bridgeMask || this.bridgeMask[idx] === 0) &&
                     (!this.bridgeRampMask || this.bridgeRampMask[idx] === 0)
                 ) {
-                    if (seed % 32 === 0) {
-                        chosenKind = (seed % 64 === 0) ? "coconut_palm_cluster" : "palm_tree";
-                        scaleMul = 0.88 + hs1 * 0.34;
-                        heightMul = 0.82 + hs2 * 0.52;
-                    } else if (seed % 32 === 1) {
-                        chosenKind = (seed % 64 === 1) ? "sabal_palmetto" : "fan_palm";
-                        scaleMul = 0.84 + hs1 * 0.28;
-                    } else if (seed % 32 === 2) {
-                        chosenKind = "areca_palm_clump";
-                        scaleMul = 0.85 + hs1 * 0.26;
+                    if (seed % 28 === 0) {
+                        chosenKind = "palm_tree";
+                        scaleMul = 0.88 + hs1 * 0.35;
+                        heightMul = 0.80 + hs2 * 0.55;
+                    } else if (seed % 28 === 1) {
+                        chosenKind = "fan_palm";
+                        scaleMul = 0.82 + hs1 * 0.30;
+                    } else if (seed % 28 === 2) {
+                        chosenKind = "bougainvillea_bush";
+                        scaleMul = 0.85 + hs1 * 0.28;
                     }
                 }
-                // 3) Vice Beach Open Atlantic Sand (East of the Coastal Dune Outposts, c >= 467)
-                // STRICT RULE: ZERO flora on open sunbathing sand (c >= 467)! Clean golden sand for beachgoers, volleyball & lifeguard towers!
-                else if ((blkZ1.lid >= 98 && blkZ1.lid <= 101) || (blkZ1.lid >= 488 && blkZ1.lid <= 495) || (c >= 467 && c <= 500 && r <= 390)) {
+                // 3) Vice Beach Open Atlantic Sand (East of the Coastal Dune Ridge, c >= 465)
+                // STRICT RULE: ZERO flora on open sunbathing sand (c >= 465)! Clean golden sand for beachgoers, volleyball & lifeguard towers!
+                else if ((blkZ1.lid >= 98 && blkZ1.lid <= 101) || (blkZ1.lid >= 488 && blkZ1.lid <= 495) || (c >= 465 && c <= 500 && r <= 390)) {
                     // 100% pristine open golden sand for towels, beach umbrellas, volleyball & lifeguard towers!
                 }
                 // 4) Star Island Waterfront Mansions (c=330..360, r=162..184)
                 else if (c >= 330 && c <= 360 && r >= 162 && r <= 184 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
-                    if (seed % 10 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.05 + hs1 * 0.40; heightMul = 1.1 + hs2 * 0.5; }
-                    else if (seed % 10 === 1) { chosenKind = "coconut_palm_cluster"; scaleMul = 0.95 + hs1 * 0.35; heightMul = 0.95 + hs2 * 0.55; }
-                    else if (seed % 10 === 2) { chosenKind = "areca_palm_clump"; scaleMul = 0.90 + hs1 * 0.30; }
-                    else if (seed % 10 === 3) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.42; heightMul = 0.9 + hs2 * 0.65; }
-                    else if (seed % 10 === 4) { chosenKind = "monstera_fern"; scaleMul = 0.90 + hs1 * 0.28; }
+                    if (seed % 8 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 8 === 1) { chosenKind = "bougainvillea_bush"; scaleMul = 0.95 + hs1 * 0.35; }
+                    else if (seed % 8 === 2) { chosenKind = (seed % 16 === 2) ? "areca_palm_clump" : "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; }
+                    else if (seed % 8 === 3) { chosenKind = (seed % 24 === 3) ? "coconut_palm_cluster" : "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.9 + hs2 * 0.7; }
                 }
                 // 5) Grassrivers / Everglades / Thrillbilly Mud Park (c=60..230, r=370..495)
                 else if (c >= 60 && c <= 230 && r >= 370 && r <= 495) {
                     if (surfGt === GROUND_TYPE.WATER && nearLand) {
-                        if (seed % 18 === 0) { chosenKind = (seed % 36 === 0) ? "cattail_reeds" : "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
+                        if (seed % 16 === 0) { chosenKind = (seed % 48 === 0) ? "cattail_reeds" : "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
                         else if (seed % 22 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
                         else if (seed % 22 === 1) { chosenKind = "mangrove"; scaleMul = 0.85 + hs1 * 0.40; }
                     } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
-                        if (seed % 16 === 0) { chosenKind = (seed % 32 === 0) ? "cattail_reeds" : "sawgrass_clump"; scaleMul = 0.90 + hs1 * 0.35; }
-                        else if (seed % 18 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
-                        else if (seed % 18 === 1) { chosenKind = "mangrove"; scaleMul = 0.90 + hs1 * 0.40; }
-                        else if (seed % 22 === 0) { chosenKind = "weeping_willow_moss"; scaleMul = 1.00 + hs1 * 0.40; heightMul = 1.05 + hs2 * 0.5; }
-                        else if (seed % 26 === 0) { chosenKind = "live_oak"; scaleMul = 1.02 + hs1 * 0.42; heightMul = 1.1 + hs2 * 0.5; }
+                        if (seed % 14 === 0) { chosenKind = "sawgrass_clump"; scaleMul = 0.90 + hs1 * 0.35; }
+                        else if (seed % 16 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 16 === 1) { chosenKind = "mangrove"; scaleMul = 0.90 + hs1 * 0.40; }
+                        else if (seed % 20 === 0) { chosenKind = (seed % 60 === 0) ? "weeping_willow_moss" : "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
                     }
                 }
                 // 6) Lake Leonida & Gator Island (c=75..175, r=180..260)
                 else if (c >= 75 && c <= 175 && r >= 180 && r <= 260) {
                     if (surfGt === GROUND_TYPE.WATER && nearLand) {
                         if (seed % 16 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.95 + hs1 * 0.45; heightMul = 1.0 + hs2 * 0.6; }
-                        else if (seed % 20 === 0) { chosenKind = (seed % 40 === 0) ? "cattail_reeds" : "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
+                        else if (seed % 20 === 0) { chosenKind = (seed % 60 === 0) ? "cattail_reeds" : "sawgrass_clump"; scaleMul = 0.85 + hs1 * 0.35; }
                     } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
-                        if (seed % 12 === 0) { chosenKind = "slash_pine"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.6; }
-                        else if (seed % 16 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.92 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.6; }
-                        else if (seed % 20 === 0) { chosenKind = "weeping_willow_moss"; scaleMul = 0.98 + hs1 * 0.38; heightMul = 1.0 + hs2 * 0.5; }
-                        else if (seed % 24 === 0) { chosenKind = "live_oak"; scaleMul = 0.95 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.5; }
-                        else if (seed % 28 === 0) { chosenKind = "sabal_palmetto"; scaleMul = 0.88 + hs1 * 0.34; }
+                        if (seed % 10 === 0) { chosenKind = "slash_pine"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.6; }
+                        else if (seed % 14 === 0) { chosenKind = "swamp_cypress"; scaleMul = 0.92 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.6; }
+                        else if (seed % 18 === 0) { chosenKind = (seed % 54 === 0) ? "weeping_willow_moss" : "live_oak"; scaleMul = 0.95 + hs1 * 0.40; heightMul = 1.0 + hs2 * 0.5; }
+                        else if (seed % 22 === 0) { chosenKind = "fan_palm"; scaleMul = 0.85 + hs1 * 0.35; }
                     }
                 }
                 // 7) Leonida Keys (c=180..460, r=410..495)
@@ -1376,59 +1335,31 @@ class LeonidaMap {
                     if (surfGt === GROUND_TYPE.WATER && nearLand && (seed % 18 === 0)) {
                         chosenKind = "mangrove"; scaleMul = 0.90 + hs1 * 0.40;
                     } else if (surfGt === GROUND_TYPE.FIELD && !adjRoad) {
-                        if (seed % 14 === 0) { chosenKind = "coconut_palm_cluster"; scaleMul = 0.92 + hs1 * 0.38; heightMul = 0.90 + hs2 * 0.65; }
-                        else if (seed % 16 === 0) { chosenKind = "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
-                        else if (seed % 18 === 0) { chosenKind = "sabal_palmetto"; scaleMul = 0.90 + hs1 * 0.35; }
-                        else if (seed % 20 === 0) { chosenKind = "mangrove"; scaleMul = 0.85 + hs1 * 0.40; }
-                        else if (seed % 22 === 0) { chosenKind = "sea_grape"; scaleMul = 0.85 + hs1 * 0.35; }
-                        else if (seed % 24 === 0) { chosenKind = "banana_tree"; scaleMul = 0.90 + hs1 * 0.32; }
+                        if (seed % 12 === 0) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.40; }
+                        else if (seed % 14 === 0) { chosenKind = (seed % 56 === 0) ? "coconut_palm_cluster" : "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
+                        else if (seed % 16 === 0) { chosenKind = "mangrove"; scaleMul = 0.85 + hs1 * 0.40; }
+                        else if (seed % 18 === 0) { chosenKind = "sea_grape"; scaleMul = 0.85 + hs1 * 0.35; }
+                        else if (seed % 20 === 0) { chosenKind = "bougainvillea_bush"; scaleMul = 0.90 + hs1 * 0.35; }
                     }
                 }
                 // 8) Bayfront Park & Downtown Urban Parks (c=210..245, r=40..85, gt==FIELD)
                 else if (c >= 210 && c <= 245 && r >= 40 && r <= 85 && surfGt === GROUND_TYPE.FIELD && !adjRoad) {
-                    if (seed % 12 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.08 + hs1 * 0.40; heightMul = 1.15 + hs2 * 0.5; }
-                    else if (seed % 12 === 1) { chosenKind = "subtropical_mahogany"; scaleMul = 1.02 + hs1 * 0.38; heightMul = 1.08 + hs2 * 0.45; }
-                    else if (seed % 12 === 2) { chosenKind = "live_oak"; scaleMul = 1.02 + hs1 * 0.40; heightMul = 1.1 + hs2 * 0.5; }
-                    else if (seed % 12 === 3) { chosenKind = "coconut_palm_cluster"; scaleMul = 0.94 + hs1 * 0.34; }
-                    else if (seed % 12 === 4) { chosenKind = "areca_palm_clump"; scaleMul = 0.90 + hs1 * 0.30; }
+                    if (seed % 10 === 0) { chosenKind = "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
+                    else if (seed % 10 === 1) { chosenKind = "bougainvillea_bush"; scaleMul = 0.95 + hs1 * 0.35; }
+                    else if (seed % 10 === 2) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 10 === 3) { chosenKind = "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
+                    else if (seed % 10 === 4) { chosenKind = "tropical_shrub"; scaleMul = 0.90 + hs1 * 0.30; }
                 }
-                // 9) General mainland fields / South Beach Resort Lagoon Parks / Little Cuba / North Vice Shores (SPARSE & NATURAL GREEN!)
+                // 9) General mainland fields / countryside / North Vice Shores (NEVER beach sand!)
                 else if (surfGt === GROUND_TYPE.FIELD && !adjRoad && c < 443 && blkZ1.lid !== 98 && blkZ1.lid !== 99 && blkZ1.lid !== 100 && blkZ1.lid !== 101) {
-                    if (nearWater) {
-                        // Waterfront / Resort Pool / Lagoon edge: natural palms & lush green ferns (sparse, ~14% density)
-                        if (seed % 18 === 0) { chosenKind = "coconut_palm_cluster"; scaleMul = 0.95 + hs1 * 0.36; heightMul = 0.92 + hs2 * 0.55; }
-                        else if (seed % 20 === 0) { chosenKind = "palm_tree"; scaleMul = 0.92 + hs1 * 0.40; heightMul = 0.88 + hs2 * 0.65; }
-                        else if (seed % 22 === 0) { chosenKind = "areca_palm_clump"; scaleMul = 0.90 + hs1 * 0.32; }
-                        else if (seed % 26 === 0) { chosenKind = "monstera_fern"; scaleMul = 0.90 + hs1 * 0.28; }
-                    } else if (r < 105 && c < 200) {
-                        // Northern Mount Kalaga Woodlands: Slash Pine, Willow-Oak & Live Oak (sparse, ~14% density)
-                        if (seed % 20 === 0) { chosenKind = "slash_pine"; scaleMul = 1.04 + hs1 * 0.42; heightMul = 1.1 + hs2 * 0.55; }
-                        else if (seed % 24 === 0) { chosenKind = "weeping_willow_moss"; scaleMul = 1.02 + hs1 * 0.40; heightMul = 1.05 + hs2 * 0.5; }
-                        else if (seed % 26 === 0) { chosenKind = "live_oak"; scaleMul = 1.02 + hs1 * 0.42; heightMul = 1.08 + hs2 * 0.5; }
-                        else if (seed % 30 === 0) { chosenKind = "coastal_palmetto_bush"; scaleMul = 0.88 + hs1 * 0.30; }
-                    } else {
-                        // Mainland Parks, Little Cuba & Vice Shores Lawns: keep the clean, open ~14% density of v101_136!
-                        if (seed % 24 === 0) {
-                            chosenKind = ((c + r) % 2 === 0) ? "subtropical_mahogany" : "live_oak";
-                            scaleMul = 1.02 + hs1 * 0.40;
-                            heightMul = 1.08 + hs2 * 0.48;
-                        } else if (seed % 26 === 0) {
-                            chosenKind = ((c + r) % 3 === 0) ? "sabal_palmetto" : (((c + r) % 3 === 1) ? "areca_palm_clump" : "fan_palm");
-                            scaleMul = 0.90 + hs1 * 0.34;
-                        } else if (seed % 28 === 0) {
-                            chosenKind = ((c + r) % 2 === 0) ? "coconut_palm_cluster" : "palm_tree";
-                            scaleMul = 0.92 + hs1 * 0.42;
-                            heightMul = 0.88 + hs2 * 0.68;
-                        } else if (seed % 32 === 0) {
-                            chosenKind = (c >= 165 && c <= 325 && r >= 90 && r <= 295 && (seed % 64 === 0)) ? "banana_tree" : "banyan_tree";
-                            scaleMul = 1.04 + hs1 * 0.40;
-                            heightMul = 1.10 + hs2 * 0.48;
-                        }
-                    }
+                    if (seed % 22 === 0) { chosenKind = "live_oak"; scaleMul = 1.05 + hs1 * 0.45; heightMul = 1.1 + hs2 * 0.5; }
+                    else if (seed % 24 === 0) { chosenKind = (seed % 96 === 0) ? "sabal_palmetto" : "fan_palm"; scaleMul = 0.90 + hs1 * 0.35; }
+                    else if (seed % 26 === 0) { chosenKind = (seed % 104 === 0) ? "coconut_palm_cluster" : "palm_tree"; scaleMul = 0.90 + hs1 * 0.45; heightMul = 0.85 + hs2 * 0.75; }
+                    else if (seed % 30 === 0) { chosenKind = (c >= 165 && c <= 325 && r >= 90 && r <= 295 && (seed % 120 === 0)) ? "banana_tree" : "banyan_tree"; scaleMul = 1.10 + hs1 * 0.45; heightMul = 1.15 + hs2 * 0.5; }
                 }
 
                 if (chosenKind) {
-                    const minPalmDist = (c >= 449 && c <= 466 && r >= 46 && r <= 365) ? 38.0 : 56.0;
+                    const minPalmDist = (c >= 449 && c <= 464 && r >= 46 && r <= 365) ? 34.0 : 54.0;
                     const tooCloseFlora =
                         (Array.isArray(this.trees) && this.trees.some(tr => Math.hypot(tr.x - posX, tr.y - posY) < 58.0)) ||
                         (Array.isArray(this.vicePalms) && this.vicePalms.some(pm => Math.hypot(pm.x - posX, pm.y - posY) < minPalmDist));

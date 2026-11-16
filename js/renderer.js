@@ -6107,7 +6107,7 @@ class RetroRenderer {
             checkReady();
         }, 5, true);
 
-        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=101_140", () => {
+        loadImageWithRetry(this.gta1SpritesImg, "assets/gta1/gta1_sprites.png?v=101_146", () => {
             spritesLoaded = true;
             checkReady();
         }, 5, true);
@@ -6124,7 +6124,7 @@ class RetroRenderer {
             }, 5, true);
         }
 
-        fetchWithRetry("assets/gta1/gta1_meta.json?v=101_140", false)
+        fetchWithRetry("assets/gta1/gta1_meta.json?v=101_146", false)
             .then((meta) => {
                 this.gta1Meta = meta;
                 checkReady();
@@ -11904,7 +11904,7 @@ class RetroRenderer {
             for (let vi = 0; vi < trVis.length; vi++) {
                 const tr = trVis[vi];
                 if (tr.x < minX || tr.x > maxX || tr.y < minY || tr.y > maxY) continue;
-                this.renderLeonidaFlora3D(tr, vi + 5000, sunShadowAngle, sunShadowAlpha, nfGlobal);
+                this.batchObjectSprite3D("257", tr.x, tr.y, this.getEntityZ(tr, 0.12), 0, (tr.scale || 1.0), SPRITE_DRAW_ORDER.TREES);
             }
         }
 
