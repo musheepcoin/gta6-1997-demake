@@ -477,6 +477,11 @@ const PedNav = (function () {
         const map = game.map;
         if (!map || !map.getNavigationBlock) return null;
         const z = ped.z !== undefined ? ped.z : 2.0;
+        // If there is a direct unobstructed line of sight (no building wall in between), walk straight to (tx, ty) without grid-tile zig-zagging!
+        if (Math.hypot(tx - ped.x, ty - ped.y) < 96 || !map.traceSegment2D || !map.traceSegment2D(ped.x, ped.y, tx, ty, z).hit) {
+            ped._route = null;
+            return null;
+        }
         const now = game.trafficLightTimer || 0;
         const sx = Math.floor(ped.x / TILE_SIZE), sy = Math.floor(ped.y / TILE_SIZE);
         const gx = Math.floor(tx / TILE_SIZE), gy = Math.floor(ty / TILE_SIZE);
@@ -559,13 +564,14 @@ const PedNav = (function () {
                     k = parent.get(k);
                 }
                 pts.reverse();
+                pts.push({ x: tx, y: ty });
             }
             rt = { pts, idx: 0, t: now, tx, ty };
             ped._route = rt;
         }
         if (!rt.pts.length) return null;
         // Advance past reached waypoints strictly in order (no corner-cutting across building walls/awnings!)
-        while (rt.idx < rt.pts.length - 1 && Math.hypot(rt.pts[rt.idx].x - ped.x, rt.pts[rt.idx].y - ped.y) < 14) rt.idx++;
+        while (rt.idx < rt.pts.length - 1 && Math.hypot(rt.pts[rt.idx].x - ped.x, rt.pts[rt.idx].y - ped.y) < 20) rt.idx++;
         return rt.pts[rt.idx];
     }
 

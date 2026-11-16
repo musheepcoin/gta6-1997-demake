@@ -6795,14 +6795,16 @@ class LeonidaGame {
 
             }
 
-            if (this.resolveCircleVehicleCollision(p1x, p1y, 9, pz, ignoreVeh).hit) {
+            if (ped.kind !== "FIREMAN" && ped.kind !== "MEDIC") {
+                if (this.resolveCircleVehicleCollision(p1x, p1y, 9, pz, ignoreVeh).hit) {
 
-                score -= 68;
+                    score -= 68;
 
-            } else if (this.resolveCircleVehicleCollision(p2x, p2y, 9, pz, ignoreVeh).hit) {
+                } else if (this.resolveCircleVehicleCollision(p2x, p2y, 9, pz, ignoreVeh).hit) {
 
-                score -= 32;
+                    score -= 32;
 
+                }
             }
 
             if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0) {
@@ -14169,9 +14171,15 @@ class LeonidaGame {
 
                 if (!ped.homeFireTruck || !this.vehicles.includes(ped.homeFireTruck)) {
                     let bestFt = null;
-                    let bestFtDist = 820;
+                    let bestFtDist = 480;
                     for (const v of this.vehicles) {
-                        if (v && !v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
+                        if (
+                            v &&
+                            !v.destroyed &&
+                            v.specKey === "FIRE_TRUCK" &&
+                            v.driver === "AI_EMERGENCY" &&
+                            (!v.deployedFireman || v.deployedFireman === ped)
+                        ) {
                             const d = Math.hypot(v.x - ped.x, v.y - ped.y);
                             if (d < bestFtDist) {
                                 bestFtDist = d;
@@ -14187,13 +14195,15 @@ class LeonidaGame {
 
                 const ft = ped.homeFireTruck;
 
-                if (!ft || ft.destroyed || ft.driver !== "AI_EMERGENCY") {
+                if (!ft || ft.destroyed || ft.driver !== "AI_EMERGENCY" || (ft.deployedFireman && ft.deployedFireman !== ped)) {
 
-                    if (ft) ft.deployedFireman = null;
+                    if (ft && ft.deployedFireman === ped) ft.deployedFireman = null;
 
                     ped.sprayingHose = false;
 
-                    ped.kind = "CIVILIAN";
+                    ped._boardedVehicle = true;
+
+                    ped.dead = true;
 
                     continue;
 
@@ -14253,10 +14263,10 @@ class LeonidaGame {
 
                 }
 
-                if (targetFire && ped.firemanOutTimer < 30.0) {
+                if (targetFire && ped.firemanOutTimer < 26.0) {
 
                     const hasFireLOS = !this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, targetFire.x, targetFire.y, ped.z || 2.0).hit;
-                    const maxHoseReach = (ped.firemanStuckTimer || 0) > 1.0 ? 235 : 185;
+                    const maxHoseReach = (ped.firemanStuckTimer || 0) > 0.8 ? 255 : 215;
 
                     if (bestDist < maxHoseReach && hasFireLOS) {
 
@@ -14443,23 +14453,28 @@ class LeonidaGame {
 
                 } else {
 
-                    // All fires extinguished — reel in the hose and climb back into the VCFD Fire Engine!
+                    // All fires extinguished — reel in the hose point-by-point along _hoseTrail and climb back into the VCFD Fire Engine!
 
                     ped.sprayingHose = false;
 
-                    ped.speed = 98;
+                    ped.speed = 104;
 
                     ped._boardingVeh = ft;
 
-                    const dFt = Math.hypot(ft.x - ped.x, ft.y - ped.y);
+                    const fcosB = Math.cos(ft.angle || 0), fsinB = Math.sin(ft.angle || 0);
+                    const bedGoalX = ft.x - fcosB * ((ft.w || 66) * 0.5) - fsinB * 5;
+                    const bedGoalY = ft.y - fsinB * ((ft.w || 66) * 0.5) + fcosB * 5;
+                    const dFt = Math.min(Math.hypot(ft.x - ped.x, ft.y - ped.y), Math.hypot(bedGoalX - ped.x, bedGoalY - ped.y));
 
-                    const ftBoardDist = Math.max(44, (ft.w || 66) * 0.52 + 12);
+                    const ftBoardDist = Math.max(58, (ft.w || 66) * 0.58 + 16);
 
-                    if (dFt < ftBoardDist || ped.firemanOutTimer > 34.0) {
+                    if (dFt < ftBoardDist || ped.firemanOutTimer > 28.0 || Math.abs(ft.speed || 0) > 42) {
 
                         ft.doorOpenTimer = 0.45;
 
                         ft.deployedFireman = null;
+
+                        ft._parkedAtFireScene = false;
 
                         ped._boardedVehicle = true;
 
@@ -14469,12 +14484,33 @@ class LeonidaGame {
 
                     }
 
-                    const fmBackWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function") ? PedNav.routeWaypoint(this, ped, ft.x, ft.y) : null;
-                    ped.angle = this.steerPedWithObstacleFeelers(ped, fmBackWp ? fmBackWp.x : ft.x, fmBackWp ? fmBackWp.y : ft.y, ft);
+                    let goalX = bedGoalX;
+                    let goalY = bedGoalY;
+                    if (Array.isArray(ped._hoseTrail) && ped._hoseTrail.length > 1) {
+                        while (
+                            ped._hoseTrail.length > 1 &&
+                            Math.hypot(ped.x - ped._hoseTrail[ped._hoseTrail.length - 1].x, ped.y - ped._hoseTrail[ped._hoseTrail.length - 1].y) < 22
+                        ) {
+                            ped._hoseTrail.pop();
+                        }
+                        const pt = ped._hoseTrail[ped._hoseTrail.length - 1];
+                        if (pt) {
+                            goalX = pt.x;
+                            goalY = pt.y;
+                        }
+                    }
 
-                    ped.x += Math.cos(ped.angle) * 98 * dt;
+                    const hasDirectBackLOS = !this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, goalX, goalY, ped.z || 2.0).hit;
+                    if (hasDirectBackLOS) {
+                        ped.angle = Math.atan2(goalY - ped.y, goalX - ped.x);
+                    } else {
+                        const fmBackWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function") ? PedNav.routeWaypoint(this, ped, goalX, goalY) : null;
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, fmBackWp ? fmBackWp.x : goalX, fmBackWp ? fmBackWp.y : goalY, ft);
+                    }
 
-                    ped.y += Math.sin(ped.angle) * 98 * dt;
+                    ped.x += Math.cos(ped.angle) * 104 * dt;
+
+                    ped.y += Math.sin(ped.angle) * 104 * dt;
 
                 }
 
@@ -15511,6 +15547,8 @@ class LeonidaGame {
                 !ped.isLivingProp &&
                 !ped.inCombat &&
                 ped.kind !== "GATOR" &&
+                ped.kind !== "FIREMAN" &&
+                ped.kind !== "MEDIC" &&
                 (ped.healTimer || 0) <= 0 &&
                 !ped.sprayingHose &&
                 (ped.slideCarTimer || 0) <= 0 &&
@@ -16238,9 +16276,9 @@ class LeonidaGame {
                     if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
                         totalFireTrucks++;
                         const dFire = Math.hypot(v.x - burningVehNearPlayer.x, v.y - burningVehNearPlayer.y);
-                        if ((v.deployedFireman && dFire < 680) || (dFire < 560 && (v.approachNoProgress || 0) < 4.5)) {
+                        if (dFire < 820 && (v.deployedFireman || (v.approachNoProgress || 0) < 5.5)) {
                             fireTruckNearTarget = true;
-                        } else if (!v.deployedFireman && (dFire > 600 || (v.approachNoProgress || 0) >= 4.5)) {
+                        } else if (!v.deployedFireman && (dFire >= 820 || (v.approachNoProgress || 0) >= 5.5)) {
                             farFireTruck = v;
                         }
                     }
@@ -16282,8 +16320,8 @@ class LeonidaGame {
                                     farFireTruck.approachBestDist = undefined;
                                     farFireTruck.approachNoProgress = 0;
                                     this.fireDispatchTimer = 0;
-                                    this.fireDispatchCooldown = 12.0;
-                                } else if (totalFireTrucks < 3) {
+                                    this.fireDispatchCooldown = 14.0;
+                                } else if (totalFireTrucks < 1) {
                                     const fireCar = new Vehicle(`vcfd_${Date.now()}_${attempt}`, "FIRE_TRUCK", sx, sy, roadAng);
                                     fireCar.z = sz;
                                     fireCar.driver = "AI_EMERGENCY";

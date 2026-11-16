@@ -3262,6 +3262,7 @@ class Vehicle {
                     this.fireTargetCar = burningCar;
                     this.approachBestDist = bestDist;
                     this.approachNoProgress = 0;
+                    if (bestDist > 360) this._parkedAtFireScene = false;
                 } else if (bestDist < (this.approachBestDist ?? 9999) - 6) {
                     this.approachBestDist = bestDist;
                     this.approachNoProgress = 0;
@@ -3270,20 +3271,39 @@ class Vehicle {
                 }
 
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
-                const shouldParkAndDeploy = bestDist < 225 || (bestDist < 340 && (this.approachNoProgress || 0) > 2.8) || Boolean(this.deployedFireman);
+                const blockedNearFire = bestDist < 380 && (
+                    (this.approachNoProgress || 0) > 1.15 ||
+                    (this.aiStuckTimer || 0) > 0.28 ||
+                    (this.aiReverseTimer || 0) > 0
+                );
+                const shouldParkAndDeploy =
+                    bestDist < 260 ||
+                    blockedNearFire ||
+                    Boolean(this.deployedFireman) ||
+                    Boolean(this._parkedAtFireScene && bestDist < 420);
+
                 if (shouldParkAndDeploy) {
+                    this._parkedAtFireScene = true;
+                    // Never reverse back-and-forth once at the fire scene: lock brakes and deploy!
+                    this.aiReverseTimer = 0;
+                    this.aiStuckTimer = 0;
+                    if (Math.abs(this.speed) < 22) {
+                        this.speed = 0;
+                        this.vx = 0;
+                        this.vy = 0;
+                    }
                     // Deploy an on-foot VCFD Firefighter in bunker gear & helmet with a handheld fire hose!
                     if (!this.deployedFireman) {
                         this.aiBailTimer = (this.aiBailTimer || 0) + dt;
-                        if (this.aiBailTimer > 0.38 && Math.abs(this.speed) < 36 && typeof game.deployFirefighterFromTruck === "function") {
+                        if (this.aiBailTimer > 0.30 && Math.abs(this.speed) < 36 && typeof game.deployFirefighterFromTruck === "function") {
                             this.aiBailTimer = 0;
                             this.approachNoProgress = 0;
                             game.deployFirefighterFromTruck(this, burningCar);
                         }
                     }
 
-                    // If within rooftop deck-gun range (< 285px), also fire the truck's rooftop water cannon over any obstacles!
-                    if (bestDist < 285) {
+                    // If within rooftop deck-gun range (< 320px), also fire the truck's rooftop water cannon over any obstacles!
+                    if (bestDist < 320) {
                         const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
                         for (let k = 0; k < 2; k++) {
                             if (Math.random() < 0.85) {
@@ -3307,13 +3327,13 @@ class Vehicle {
                                 "WHITE_SMOKE"
                             );
                         }
-                        burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt * 0.35;
+                        burningCar.extinguishProgress = (burningCar.extinguishProgress || 0) + dt * 0.45;
                         if (!burningCar.destroyed) {
                             burningCar.chainExplodeTimer = 0;
                             if ((burningCar.burnTimer || 0) > 0) {
                                 burningCar.burnTimer = Math.max(burningCar.burnTimer, 1.5);
                             }
-                            if (burningCar.extinguishProgress >= 3.2) {
+                            if (burningCar.extinguishProgress >= 3.0) {
                                 burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 35 * dt, 58));
                                 burningCar.burnTimer = 0;
                                 if (!burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
@@ -3321,7 +3341,7 @@ class Vehicle {
                                     game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
                                 }
                             }
-                        } else if (burningCar.extinguishProgress >= 5.2 && !burningCar.fireExtinguished) {
+                        } else if (burningCar.extinguishProgress >= 4.5 && !burningCar.fireExtinguished) {
                             burningCar.fireExtinguished = true;
                             burningCar.burnTimer = 0;
                             if (typeof game.addFloatingText === "function") {
@@ -3332,7 +3352,7 @@ class Vehicle {
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
-                const forceDirect = bestDist < 320 || (this.approachNoProgress || 0) > 1.6;
+                const forceDirect = bestDist < 340 || (this.approachNoProgress || 0) > 1.4;
                 const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3347,7 +3367,7 @@ class Vehicle {
                 );
                 // A heavy fire engine drives to the scene at a measured emergency pace (not race speed),
                 // and slows right down on the final approach so it can stop & deploy the crew
-                const fireMaxSpd = bestDist < 320 ? 70 : 125;
+                const fireMaxSpd = bestDist < 340 ? 68 : 122;
                 if (this.speed > fireMaxSpd) {
                     fireCtrl.throttle = -0.35;
                 } else if (fireCtrl.throttle > 0) {
@@ -3356,9 +3376,17 @@ class Vehicle {
                 return fireCtrl;
             }
             this.fireTargetCar = null;
+            this._parkedAtFireScene = false;
             if (this.deployedFireman) {
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_FIRE";
+                this.aiReverseTimer = 0;
+                this.aiStuckTimer = 0;
+                if (Math.abs(this.speed) < 22) {
+                    this.speed = 0;
+                    this.vx = 0;
+                    this.vy = 0;
+                }
                 return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
             }
         }
