@@ -12969,7 +12969,7 @@ class LeonidaGame {
 
                     wantedLevel: Math.max(1, this.wantedLevel || 1)
 
-                } : null);
+                } : null));
 
                 ped.inCombat = Boolean(copTarget);
 
