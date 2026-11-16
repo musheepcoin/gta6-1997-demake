@@ -797,7 +797,7 @@ server.on("upgrade", (req, socket) => {
 
 setInterval(() => {
     for (const rv of Object.values(persistentStore.rooms)) {
-        rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 14.0;
+        rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 24.0;
     }
 }, 500);
 

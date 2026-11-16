@@ -13154,14 +13154,9 @@ class LeonidaGame {
                             returnCar.driver = "AI_COP";
                             returnCar.wasCriminalCar = false;
                             returnCar.sirenActive = Boolean(this.wantedLevel > 0);
-                            returnCar._worldModified = false;
                             returnCar.lastPlayerDriven = false;
                             returnCar.abandonedTimer = 0;
                             returnCar.doorOpenTimer = 0.44;
-                            if (this.net && typeof this.net.broadcastVehicleRemoved === "function" && returnCar.id) {
-                                // Clear any stale parked entry in server room.modifiedVehs now that a patrol officer is driving it away
-                                this.net.broadcastVehicleRemoved(returnCar.id);
-                            }
                             ped._boardedVehicle = true;
                             ped.dead = true;
                             continue;

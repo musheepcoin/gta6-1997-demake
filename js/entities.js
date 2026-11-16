@@ -1842,7 +1842,7 @@ class Vehicle {
                 this.aiPassengerStopTimer = 0;
                 this.aiPassengerDropPending = false;
                 this.aiBoardingStarted = false;
-                if (!this.aiPassengerTarget) {
+                if (!this.aiPassengerTarget && !(this.gridlockEscapeTimer > 0)) {
                     this.aiPullOverOffset = 0;
                     this.aiPullOverTimer = 0;
                 }
@@ -2583,11 +2583,24 @@ class Vehicle {
             this.aiReverseTimer -= dt;
             const rearX = this.x - Math.cos(this.angle) * (this.w * 0.48 + 10);
             const rearY = this.y - Math.sin(this.angle) * (this.w * 0.48 + 10);
+            const rearVehBlocked = Boolean(
+                game &&
+                typeof game.resolveCircleVehicleCollision === "function" &&
+                game.resolveCircleVehicleCollision(rearX, rearY, 13, curZ, this).hit
+            );
             if (
                 map.isWaterAtPixel(rearX, rearY) ||
-                map.resolveCircleBuildingCollision(rearX, rearY, 14, curZ).hit
+                map.resolveCircleBuildingCollision(rearX, rearY, 14, curZ).hit ||
+                rearVehBlocked
             ) {
                 this.aiReverseTimer = 0;
+                if (rearVehBlocked) {
+                    const idNum = parseInt(String(this.id).replace(/\D/g, ""), 10) || 0;
+                    this.gridlockEscapeTimer = 2.6;
+                    this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 2.6);
+                    this.aiPullOverOffset = ((idNum % 2 === 0) ? 1 : -1) * 24;
+                    this.aiPullOverTimer = 2.6;
+                }
             }
             if (this.aiReverseTimer <= 0) {
                 this.aiReverseTimer = 0;
@@ -3661,7 +3674,12 @@ class Vehicle {
         if (this.gridlockAvoidTimer > 0) {
             this.gridlockAvoidTimer = Math.max(0, this.gridlockAvoidTimer - dt);
         }
-        const isAiDriven = this.driver === "AI_TRAFFIC" || this.driver === "AI_TOW" || this.driver === "AI_EMERGENCY";
+        const isAiDriven =
+            this.driver === "AI_TRAFFIC" ||
+            this.driver === "AI_TOW" ||
+            this.driver === "AI_EMERGENCY" ||
+            this.driver === "AI_COP" ||
+            this.driver === "AI_CRIMINAL";
         if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && this.aiState !== "CURB_PARKED" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0) && !(this.gridlockEscapeTimer > 0)) {
             let counts = true;
             if (this.driver === "AI_TOW") counts = (this.approachNoProgress || 0) > 3.0 && !this.towHookTimer;
@@ -5458,9 +5476,12 @@ class TrafficManager {
                 v.driver === "AI_EMERGENCY" ||
                 v.driver === "AI_CRIMINAL" ||
                 v.driver === "AI_TOW" ||
-                (!anyWanted && v.driver === "AI_COP") ||
+                v.driver === "AI_COP" ||
                 isAbandonedOrWreck;
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || (v._worldModified && !isAbandonedOrWreck)) continue;
+            // Only protect a player-modified vehicle from off-screen recycling while it sits parked & unoccupied (< 180s).
+            // Once an AI driver (AI_COP, AI_TRAFFIC, AI_CRIMINAL, AI_TOW) drives it off-screen, recycle and purge it!
+            const isRecentParkedMod = v._worldModified && !v.destroyed && v.driver === null && !isAbandonedOrWreck;
+            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || isRecentParkedMod) continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
@@ -5484,10 +5505,11 @@ class TrafficManager {
             }
             const isApproachingTowTruck = v.driver === "AI_TOW" && Boolean(v.towTarget) && !v.towingVehicle;
             const isRespondingFireTruck = v.specKey === "FIRE_TRUCK" && (v.aiState === "EMERGENCY_FIRE" || Boolean(v.sirenActive));
-            if (activeMovingCount <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isRespondingFireTruck) continue;
-            // Burned wrecks, abandoned cars, Tow Trucks, and responding Fire Trucks stay in the neighborhood;
+            const isActiveWantedCop = anyWanted && v.driver === "AI_COP";
+            if (activeMovingCount <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isRespondingFireTruck && !isActiveWantedCop) continue;
+            // Burned wrecks, abandoned cars, Tow Trucks, responding Fire Trucks, and active pursuit Cops stay in the neighborhood;
             // only garbage-collect them if the player has driven far away into another district (> 28 blocks / ~1800px)!
-            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isRespondingFireTruck) ? farWreckRects : outerRects;
+            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isRespondingFireTruck || isActiveWantedCop) ? farWreckRects : outerRects;
             const nearAnyPlayer = checkRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
                 if (v.towingVehicle) {
@@ -5500,7 +5522,7 @@ class TrafficManager {
                         if (tIdx < i) i--;
                     }
                 }
-                if ((v._worldModified || v.destroyed) && game.net && typeof game.net.broadcastVehicleRemoved === "function" && v.id) {
+                if ((v._worldModified || v.destroyed || v.lastPlayerDriven) && game.net && typeof game.net.broadcastVehicleRemoved === "function" && v.id) {
                     game.net.broadcastVehicleRemoved(v.id);
                 }
                 if (v.driver === "AI_TRAFFIC" || v.driver === "AI_EMERGENCY" || v.driver === "AI_COP") {

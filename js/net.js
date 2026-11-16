@@ -244,6 +244,26 @@ class ViceNetworkManager {
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded) return;
         const oe = this.game.map.objectEngine;
         const list = this._pendingPropSync.splice(0, this._pendingPropSync.length);
+        // Pass 1: collect all corpse tombstones (a < -900 or x < 128) so even slightly shifted corpses within 36px are purged!
+        const corpseTombstones = [];
+        for (const item of list) {
+            if (!item || typeof item.pType !== "string" || !item.pType.startsWith("CORPSE:")) continue;
+            const cx = Number(item.x) || 0;
+            const cy = Number(item.y) || 0;
+            const ca = Number(item.a) || 0;
+            if (ca < -900 || cx < 128 || cy < 128) {
+                corpseTombstones.push({ x: cx, y: cy });
+                if (Array.isArray(this.game.peds)) {
+                    for (let pi = this.game.peds.length - 1; pi >= 0; pi--) {
+                        const pd = this.game.peds[pi];
+                        if (pd && pd.dead && Math.hypot((pd.x || 0) - cx, (pd.y || 0) - cy) < 36) {
+                            this.game.peds.splice(pi, 1);
+                        }
+                    }
+                }
+            }
+        }
+        // Pass 2: apply remaining live corpse / smashed prop entries
         for (const item of list) {
             if (!item || !item.pType) continue;
             if (typeof item.pType === "string" && item.pType.startsWith("CORPSE:")) {
@@ -253,16 +273,10 @@ class ViceNetworkManager {
                 const cx = Number(item.x) || 0;
                 const cy = Number(item.y) || 0;
                 const ca = Number(item.a) || 0;
-                // Tombstoned corpse (revived or evacuated by paramedic): remove if present locally and skip spawning!
                 if (ca < -900 || cx < 128 || cy < 128) {
-                    if (Array.isArray(this.game.peds)) {
-                        for (let pi = this.game.peds.length - 1; pi >= 0; pi--) {
-                            const pd = this.game.peds[pi];
-                            if (pd && pd.dead && Math.hypot((pd.x || 0) - cx, (pd.y || 0) - cy) < 28) {
-                                this.game.peds.splice(pi, 1);
-                            }
-                        }
-                    }
+                    continue;
+                }
+                if (corpseTombstones.some((tb) => Math.hypot(tb.x - cx, tb.y - cy) < 36)) {
                     continue;
                 }
                 if (Array.isArray(this.game.peds) && typeof Pedestrian === "function") {
@@ -1709,8 +1723,16 @@ class ViceNetworkManager {
                 v.driver === "PLAYER" ||
                 v.driver === "REMOTE"
             );
-            // Skip untouched static curb-parked cars so the 200-vehicle sync budget is reserved for modified cars & active traffic
-            if (!isMod && v.isCurbParked && v.isStaticParked && !v.driver) {
+            // Skip untouched static parked / landmark / estate / pier / port vehicles (every client spawns them deterministically)
+            // so the WORLD_SYNC bandwidth & 180-vehicle budget are 100% reserved for active traffic and modified cars!
+            const isUntouchedStatic = Boolean(
+                !isMod &&
+                !v.driver &&
+                !v.destroyed &&
+                (v.hp || v.maxHp || 100) >= (v.maxHp || 100) &&
+                (v.isStaticParked || v.isCurbParked || v.isEstateCar || v.missionTag === "LANDMARK")
+            );
+            if (isUntouchedStatic) {
                 continue;
             }
             const flags =
@@ -1798,7 +1820,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
-            ver: 101163,
+            ver: 101164,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
             vehs: vehs.slice(0, 180),
@@ -1818,8 +1840,12 @@ class ViceNetworkManager {
         if (typeof pkt.wm === "number") {
             g.worldMinutes = pkt.wm;
         }
-        if (typeof pkt.tl === "number") {
-            g.trafficLightTimer = pkt.tl;
+        if (!isInitialServerBootstrap && typeof pkt.tl === "number") {
+            const curTl = g.trafficLightTimer || 0;
+            const diffTl = Math.abs(curTl - pkt.tl);
+            if (diffTl > 0.8 && diffTl < 23.2) {
+                g.trafficLightTimer = pkt.tl;
+            }
         }
 
         const codeToDrv = (c) => {
@@ -1868,12 +1894,29 @@ class ViceNetworkManager {
                     }
                 }
                 seenIds.add(id);
-                // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
-                if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id === "armored_vice_port" || id === "parked_35") && drvCode === 0 && !(flags & 1)) {
-                    continue;
+                const isDynamicId = typeof id === "string" && (
+                    id.startsWith("trf_") ||
+                    id.startsWith("traf_") ||
+                    id.startsWith("cop_") ||
+                    id.startsWith("rb_") ||
+                    id.startsWith("amb_") ||
+                    id.startsWith("medic_") ||
+                    id.startsWith("vcfd_") ||
+                    id.startsWith("tow_")
+                );
+                // On initial server bootstrap, only restore truly modified vehicles (isMod === 1),
+                // and auto-purge any stale dynamic traffic/event vehicle that was left in AI-driven state or far away!
+                if (isInitialServerBootstrap) {
+                    if (!isMod) {
+                        continue;
+                    }
+                    if (isDynamicId && (drvCode !== 0 || Math.hypot(x - (g.player ? g.player.x : x), y - (g.player ? g.player.y : y)) > 2200)) {
+                        this.broadcastVehicleRemoved(id);
+                        continue;
+                    }
                 }
-                // Never restore stale ambient AI traffic cars from an older build's server snapshot
-                if (isInitialServerBootstrap && !isMod && (pkt.ver || 0) < 101161) {
+                // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
+                if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id.startsWith("estate_") || id.startsWith("boat_") || id.startsWith("vport_") || id.startsWith("armored_") || id.startsWith("parked_") || missionTag === "LANDMARK") && drvCode === 0 && !(flags & 1)) {
                     continue;
                 }
                 let v = existingById.get(id);
