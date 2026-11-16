@@ -1538,6 +1538,36 @@ class Vehicle {
         const curBlk = map.getNavigationBlock ? map.getNavigationBlock(bx, by, curZ) : null;
         const lidZ1 = (map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0);
 
+        // Off-road / sidewalk recovery: if a road vehicle is ever pushed onto a sidewalk or wedged against parked cars/props,
+        // steer (and reverse if blocked) back onto the nearest road block instead of driving along the sidewalk!
+        if (!this.waterOnly && !this.aiCurbParkingBay && curBlk && curBlk.groundType !== GROUND_TYPE.ROAD && map.getNavigationBlock) {
+            let bestR2 = 999999;
+            let bestRx = -1;
+            let bestRy = -1;
+            for (let rdy = -3; rdy <= 3; rdy++) {
+                for (let rdx = -3; rdx <= 3; rdx++) {
+                    if (rdx === 0 && rdy === 0) continue;
+                    const nbx = bx + rdx;
+                    const nby = by + rdy;
+                    const nb = map.getNavigationBlock(nbx, nby, curZ);
+                    if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway) {
+                        const rcx = (nbx + 0.5) * TILE_SIZE;
+                        const rcy = (nby + 0.5) * TILE_SIZE;
+                        const d2 = (rcx - this.x) * (rcx - this.x) + (rcy - this.y) * (rcy - this.y);
+                        if (d2 < bestR2) {
+                            bestR2 = d2;
+                            bestRx = nbx;
+                            bestRy = nby;
+                        }
+                    }
+                }
+            }
+            if (bestRx >= 0) {
+                const toRoadAng = Math.atan2((bestRy + 0.5) * TILE_SIZE - this.y, (bestRx + 0.5) * TILE_SIZE - this.x);
+                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.52, game);
+            }
+        }
+
         // Reset single-turn intersection guard and record entry heading whenever outside an intersection (lidZ1 !== 25)
         if (lidZ1 !== 25) {
             this.aiTurnedInIntersection = false;
@@ -2568,10 +2598,40 @@ class Vehicle {
             ? map.hasClearLineOfSightForVehicle(this.x, this.y, targetX, targetY, curZ)
             : (distToTarget < 210);
         const onRoadNow = map.isRoadAtPixel(this.x, this.y);
+        const targetOnRoadNow = map.isRoadAtPixel ? map.isRoadAtPixel(targetX, targetY) : true;
 
-        // Mode A: Direct Line-of-Sight Tactical Interception & PIT Maneuver (or when off-road)
-        // forceDirect: target is off-road nearby (beach, plaza, park) -> leave the asphalt and drive straight there like GTA 1
-        if (forceDirect || (hasLOS && distToTarget < 275) || !onRoadNow) {
+        // If knocked off-road onto a sidewalk while not intentionally on beach sand, steer back onto the nearest road tile!
+        if (!onRoadNow && !forceDirect && map.getNavigationBlock) {
+            const cbx = Math.floor(this.x / TILE_SIZE);
+            const cby = Math.floor(this.y / TILE_SIZE);
+            let bestR2 = 999999;
+            let bestRx = -1;
+            let bestRy = -1;
+            for (let rdy = -3; rdy <= 3; rdy++) {
+                for (let rdx = -3; rdx <= 3; rdx++) {
+                    const nbx = cbx + rdx;
+                    const nby = cby + rdy;
+                    const nb = map.getNavigationBlock(nbx, nby, curZ);
+                    if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway) {
+                        const rcx = (nbx + 0.5) * TILE_SIZE;
+                        const rcy = (nby + 0.5) * TILE_SIZE;
+                        const d2 = (rcx - this.x) * (rcx - this.x) + (rcy - this.y) * (rcy - this.y);
+                        if (d2 < bestR2) {
+                            bestR2 = d2;
+                            bestRx = nbx;
+                            bestRy = nby;
+                        }
+                    }
+                }
+            }
+            if (bestRx >= 0) {
+                const toRoadAng = Math.atan2((bestRy + 0.5) * TILE_SIZE - this.y, (bestRx + 0.5) * TILE_SIZE - this.x);
+                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.55, game);
+            }
+        }
+
+        // Mode A: Direct Line-of-Sight Tactical Interception & PIT Maneuver (ONLY when target is on the road or open beach sand!)
+        if (forceDirect || (hasLOS && targetOnRoadNow && distToTarget < 245)) {
             const leadTime = Math.min(0.44, distToTarget / 640);
             let aimX = targetX + targetVx * leadTime;
             let aimY = targetY + targetVy * leadTime;
@@ -2808,15 +2868,22 @@ class Vehicle {
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
         // GTA 1 Tactical Officer Bail-Out:
-        // 1) Close to a wanted player on foot (< 210px) or a boxed-in slow car (< 130px), OR
-        // 2) Cruiser can't get any closer (blocked by water/buildings/plaza walls) for 1.6s while within 650px
-        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 210;
+        // 1) Close to a wanted player on foot (< 225px) or a boxed-in slow car (< 130px), OR
+        // 2) Cruiser can't get any closer (blocked by buildings/parked cars/sidewalk) for 1.3s while within 380px
+        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 225;
         const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
-        const blockedNear = !wantedTarget.inVehicle && distToPlayer < 650 && noProgress > 1.6;
+        const blockedNear = !wantedTarget.inVehicle && distToPlayer < 380 && noProgress > 1.3;
 
         if (playerOnFootNear || playerBoxedNear || blockedNear) {
+            if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number" && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y)) {
+                const alignErr = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
+                if (Math.abs(alignErr) < 0.45) {
+                    this.angle = this.aiChosenDir.angle;
+                    this.visualSteerYaw = 0;
+                }
+            }
             this.aiBailTimer += dt;
-            const bailDelay = playerBoxedNear ? 0.70 : 0.25;
+            const bailDelay = playerBoxedNear ? 0.70 : 0.22;
             if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
                 this.approachNoProgress = 0;
@@ -2827,8 +2894,10 @@ class Vehicle {
         }
         this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
 
-        // Wanted player or ambient criminal off-road nearby (beach, plaza, park): cruiser leaves the asphalt and drives straight at them
-        const forceDirect = !targetOnRoad && distToPlayer < 720;
+        // Stay strictly on the road network when the player is on city sidewalks (never ram parked cars or sidewalk trees!);
+        // only leave the asphalt if the player is out on open Vice Beach sand within 280px!
+        const targetOnSand = Boolean(!targetOnRoad && map.getTileAtPixel && map.getTileAtPixel(wantedTarget.x, wantedTarget.y) === TILE.SAND);
+        const forceDirect = targetOnSand && distToPlayer < 280;
 
         // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger / tank turret fires!
         const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
