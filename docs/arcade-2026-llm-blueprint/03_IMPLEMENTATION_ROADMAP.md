@@ -28,9 +28,10 @@ Ce document découpe la mise en œuvre concrète des mécaniques dans l'architec
 
 ---
 
-## Phase 4 : Cerveau LLM "ViceNet AI Director" & Factions à Mémoire (`server/world_server.js` & `js/missions.js`)
-- [ ] **Module `ViceNetDirector` dans `server/world_server.js`** :
-  - Collecte le `WorldDigest` (actions récentes, joueurs, quartiers chauds) et interroge un endpoint LLM léger (avec fallback procédural instantané) pour générer :
-    1. Les **Flashs Info Radio** personnalisés avec les vrais pseudos des joueurs.
-    2. Les **SMS / Pagers des Boss de Factions** (rancunes suite aux vols de voitures ou fusillades dans leur quartier).
-    3. Les **Contrats Dynamiques de 90s** aux cabines téléphoniques (`PAYPHONE_BOOTH`).
+## Phase 4 : Cerveau IA "ViceNet 5G Director", Contrats Fixer Dynamiques & Factions à Mémoire (`js/missions.js` & `js/game.js`) — ✅ TERMINÉ (`v101_168`)
+- [x] **Contrats "Fixer IA" Dynamiques de 90s sur le Smartphone (`⚡ FIXER: LIVE 90S` dans `js/missions.js`)** :
+  - Scanne les vrais véhicules et quartiers autour du joueur pour générer à la volée 4 archétypes de contrats 90s (*Live Boost & Chop*, *Cartel Courier Ram & Extort*, *60 MPH Nitro Speed Run*, *Syndicate VIP Hit*).
+- [x] **Mémoire Rancunière des 5 Factions ("2.5D Nemesis System" dans `js/game.js`)** :
+  - *Don Diaz (Star Cartel)*, *Toussaint (Zoe Pound)*, *Sonny (Ocean Syndicate)*, *Big Mitch (Brotherhood)* et *Capt. Cortez (VCPD SWAT)* traquent les vols et destructions dans leur quartier, envoient des DM menaçants personnalisés sur le Smartphone et dépêchent une escouade de représailles (`+$15,000` si éliminée).
+- [x] **Flashs Info Radio (`🎙️ FLASH FM // BREAKING NEWS`)** :
+  - Commentaires en direct sur le Smartphone réagissant aux actions du joueur dans son quartier actuel.

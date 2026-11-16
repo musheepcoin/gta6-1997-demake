@@ -75,12 +75,12 @@ La carte réduite compte **5 Factions / Figures clés** dotées d'une mémoire p
   - Le LLM génère un SMS / Pager personnalisé du Boss mentionnant **exactement** le dernier acte du joueur (ex. *"Tu crois que j'ai pas vu qui a volé ma Turismo jaune sur Star Island, VALERIA ? Mes gars t'attendent au pont Est."*).
   - La faction déclenche une embuscade ciblée ou offre au contraire un contrat très lucratif si le joueur s'est attaqué à une faction ennemie !
 
-### Système 3 : Contrats "Fixer" Générés à la Volée aux Cabines Téléphoniques (`PAYPHONE_BOOTH`)
-Lorsque le joueur s'approche d'une cabine téléphonique qui sonne :
-- Au lieu de répéter toujours la même mission scriptée, le moteur inspecte les entités réellement présentes dans un rayon de 400 mètres autour du joueur (un bus sur Washington Ave, une voiture de sport garée devant un hôtel, une escouade de flics, un bateau au ponton).
-- Le LLM assemble en JSON un **Micro-Contrat Arcade de 90 secondes** combinant 1 à 2 briques atomiques du moteur :
+### Système 3 : Contrats "Fixer" Générés à la Volée sur le Smartphone (`ViceNet 5G DM`)
+Lorsque le joueur consulte ou lance un contrat depuis son **Smartphone 2026 (`ViceNet 5G DM`)** :
+- Au lieu de répéter uniquement des missions figées, le moteur inspecte les entités réellement présentes dans un rayon de 400 mètres autour du joueur (un bus sur Washington Ave, une voiture de sport garée devant un hôtel, une escouade de flics, un bateau au ponton).
+- Le système / LLM assemble en JSON un **Micro-Contrat Arcade de 90 secondes** combinant 1 à 2 briques atomiques du moteur :
   - `HIJACK_SPECIFIC_VEHICLE` (Voler tel véhicule précis avant qu'il ne quitte le quartier)
-  - `RAM_AND_EXTORT` (Percuter la limousine d'un banquier jusqu'à ce qu'il lâche la mallette)
+  - `RAM_AND_EXTORT` (Percuter la voiture d'une cible jusqu'à ce qu'elle lâche la mallette)
   - `HOT_DELIVERY` (Livrer un véhicule piégé à telle adresse sans descendre sous 60 mph)
   - `CLEANUP_WITNESSES` (Éliminer une cible protégée et semer les 3 étoiles en moins de 90s)
 

@@ -6001,6 +6001,11 @@ class LeonidaGame {
         closest._worldModified = true;
         closest.isStaticParked = false;
         closest.lastPlayerDriven = true;
+        if (wasOccupied || closest.isEstateCar || closest.isPolice) {
+            if (typeof this.recordFactionGrudge === "function") {
+                this.recordFactionGrudge("STEAL_CAR", closest.name || "vehicle", Boolean(closest.isPolice));
+            }
+        }
 
         if (this.net) {
 
@@ -7800,6 +7805,114 @@ class LeonidaGame {
         return 6.0;
     }
 
+    /* ========================================================================
+       02 — 2.5D FACTION NEMESIS MEMORY & LIVE RADIO / VICENET 5G COMMENTARY
+       ======================================================================== */
+    recordFactionGrudge(actionType, detailName = "ride", isPoliceTarget = false) {
+        if (!this.player || this.player.dead) return;
+        const now = performance.now();
+        if (!this.factionGrudges) {
+            this.factionGrudges = { STAR: 0, HAITI: 0, BEACH: 0, BIKER: 0, VCPD: 0 };
+            this._lastNemesisMs = 0;
+            this._lastRadioFlashMs = 0;
+        }
+        const dist = String(this.currentDistrict || "VICE CITY").toUpperCase();
+        let fKey = "BEACH";
+        if (isPoliceTarget) fKey = "VCPD";
+        else if (dist.includes("STAR") || dist.includes("VENETIAN")) fKey = "STAR";
+        else if (dist.includes("HAITI") || dist.includes("WYNWOOD") || dist.includes("LAKE")) fKey = "HAITI";
+        else if (dist.includes("DOWNTOWN") || dist.includes("PORT") || dist.includes("AIRPORT") || dist.includes("GELLHORN")) fKey = "BIKER";
+
+        this.factionGrudges[fKey] = (this.factionGrudges[fKey] || 0) + 1;
+
+        // Live Flash FM Radio Commentary on multi-wreck or police takedowns (every 45s max)
+        if (this.factionGrudges[fKey] === 2 && now - (this._lastRadioFlashMs || 0) > 45000) {
+            this._lastRadioFlashMs = now;
+            const pName = (this.net && this.net.playerName) || this.player.nickname || "LUCIA";
+            this.sendPager(
+                "🎙️ FLASH FM // BREAKING NEWS",
+                `LIVE TRAFFIC REPORT: Eyewitnesses in ${dist} report ${pName} tearing up the avenue after ${actionType === "STEAL_CAR" ? `boosting a ${detailName}` : `wrecking a ${detailName}`}! Stay clear!`,
+                false
+            );
+        }
+
+        // Trigger Faction Boss Nemesis Vendetta Hit Squad at grudge >= 3 (80s cooldown)
+        if (this.factionGrudges[fKey] >= 3 && now - (this._lastNemesisMs || 0) > 80000) {
+            this.factionGrudges[fKey] = 0;
+            this._lastNemesisMs = now;
+            const pName = (this.net && this.net.playerName) || this.player.nickname || "LUCIA";
+            const factionSpecs = {
+                STAR: {
+                    boss: "DON DIAZ (STAR CARTEL)",
+                    car: "VICE_CHEETAH",
+                    ped: "g2_zaibatsu",
+                    wep: "UZI",
+                    dm: `You think you can ${actionType === "STEAL_CAR" ? `boost my ${detailName}` : `wreck rides`} in ${dist} and walk away, ${pName}? My Star Island hitmen are on your tail!`
+                },
+                HAITI: {
+                    boss: "TOUSSAINT (ZOE POUND)",
+                    car: "TULIP_MUSCLE",
+                    ped: "vc_haitian",
+                    wep: "UZI",
+                    dm: `Big mistake messing with ${detailName} in ${dist}, ${pName}! My Little Haiti crew just locked onto your GPS!`
+                },
+                BIKER: {
+                    boss: "BIG MITCH (BROTHERHOOD)",
+                    car: "CHALLENGER_RT",
+                    ped: "g2_russian",
+                    wep: "SHOTGUN",
+                    dm: `Nobody touches our ${detailName} in ${dist}, ${pName}! My enforcers are coming to collect in blood!`
+                },
+                BEACH: {
+                    boss: "SONNY (OCEAN SYNDICATE)",
+                    car: "BANSHEE_GT",
+                    ped: "vc_cuban",
+                    wep: "UZI",
+                    dm: `Word travels fast on Ocean Drive, ${pName}. You touched our ${detailName} in ${dist} — now survive my hit squad!`
+                },
+                VCPD: {
+                    boss: "CAPT. CORTEZ (VCPD SWAT)",
+                    car: "SWAT_ENFORCER",
+                    ped: "g2_swat",
+                    wep: "SHOTGUN",
+                    dm: `All tactical units: ${pName} just hit a ${detailName} in ${dist}. Deploy the SWAT Hit Unit — shoot on sight!`
+                }
+            };
+            const fSpec = factionSpecs[fKey] || factionSpecs.BEACH;
+            this.sendPager(`📱 ${fSpec.boss}`, fSpec.dm, true);
+            this.addFloatingText(this.player.x, this.player.y - 32, `💀 ${fSpec.boss} VENDETTA!`, "#ef4444");
+
+            if (this.missions && typeof this.missions.findNearbyRoadSpot === "function") {
+                const spot = this.missions.findNearbyRoadSpot(240, 390);
+                const hitCar = new Vehicle(`nemesis_${Date.now()}`, fSpec.car, spot.x, spot.y, spot.angle);
+                hitCar.z = spot.z;
+                hitCar.driver = "AI_CRIMINAL";
+                hitCar.wasCriminalCar = true;
+                hitCar.isNemesisCar = true;
+                hitCar.nemesisBoss = fSpec.boss;
+                this.vehicles.push(hitCar);
+
+                for (let i = 0; i < 2; i++) {
+                    const hitman = new Pedestrian({
+                        id: `nemesis_ped_${Date.now()}_${i}`,
+                        x: spot.x + (i === 0 ? -18 : 18),
+                        y: spot.y + 14,
+                        z: spot.z,
+                        kind: "CRIMINAL",
+                        g24Type: fSpec.ped,
+                        g2Remapped: true,
+                        copWeapon: fSpec.wep,
+                        hp: 125,
+                        maxHp: 125,
+                        speed: 92
+                    });
+                    hitman.attackedByPlayer = true;
+                    this.peds.push(hitman);
+                }
+            }
+        }
+    }
+
     addMultiplier(n = 1) {
         this.multiplier = Math.max(1, (this.multiplier || 1) + n);
         this.updateHud();
@@ -8283,10 +8396,16 @@ class LeonidaGame {
         this.explodeAt(v.x, v.y, 130, 200, playerResponsible);
 
         if (playerResponsible) {
-
-            const isCriminalCar = (v.driver === "AI_CRIMINAL" || v.wasCriminalCar);
-
-            this.addCash(500, isCriminalCar ? `⚖️ VIGILANTE TAKEDOWN! (${v.name})` : `${v.name} WRECKED!`);
+            if (v.isNemesisCar) {
+                this.addCash(15000, `💀 ${v.nemesisBoss || "NEMESIS"} HIT SQUAD WIPED OUT!`);
+                this.showBigBanner("💀 VENDETTA SURVIVED!", `WIPED OUT ${v.nemesisBoss || "FACTION"} HIT SQUAD (+$15,000)!`, "#39ff14", 2.8);
+            } else {
+                const isCriminalCar = (v.driver === "AI_CRIMINAL" || v.wasCriminalCar);
+                this.addCash(500, isCriminalCar ? `⚖️ VIGILANTE TAKEDOWN! (${v.name})` : `${v.name} WRECKED!`);
+                if (typeof this.recordFactionGrudge === "function") {
+                    this.recordFactionGrudge("DESTROY_CAR", v.name || "vehicle", Boolean(v.isPolice));
+                }
+            }
 
             this.recordFrenzyKill();
 
