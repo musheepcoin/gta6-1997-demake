@@ -184,12 +184,16 @@ class ViceNetworkManager {
             if (typeof pkt.slot === "number") {
                 this.slotIndex = pkt.slot;
             }
-            this.addChatLog(
-                "WORLD SERVER",
-                `⚡ Persistent Server [${this.getRoomDisplayName(pkt.room || this.roomCode)}] connected (Slot #${(pkt.slot || 0) + 1})`,
-                "#39ff14",
-                true
-            );
+            const welcomeKey = `${pkt.room || this.roomCode}_${pkt.slot || 0}`;
+            if (this._lastWelcomeKey !== welcomeKey) {
+                this._lastWelcomeKey = welcomeKey;
+                this.addChatLog(
+                    "WORLD SERVER",
+                    `⚡ Persistent Server [${this.getRoomDisplayName(pkt.room || this.roomCode)}] connected (Slot #${(pkt.slot || 0) + 1})`,
+                    "#39ff14",
+                    true
+                );
+            }
             return;
         }
         if (pkt.t === "DIR_COUNTS" && pkt.counts) {
@@ -459,7 +463,103 @@ class ViceNetworkManager {
         this.chatInput = document.getElementById("mp-chat-input");
         this.chatRoomBadge = document.getElementById("mp-chat-room");
         this.chatNameBtn = document.getElementById("mp-chat-name-btn");
+        this.chatSizeBtn = document.getElementById("mp-chat-size-btn");
+        this.chatResizeGrip = document.getElementById("mp-chat-resize-grip");
         this.chatToggleBtn = document.getElementById("mp-chat-toggle-btn");
+
+        // Anti-spam state (local + quick buttons)
+        this._chatSentTimestamps = [];
+        this._chatMuteUntilMs = 0;
+        this._lastChatSentText = "";
+        this._lastChatSentMs = 0;
+        this._quickCooldownUntilMs = 0;
+        this._quickCooldownTimer = null;
+
+        // PC Customizable Chat Size (S / M / L presets + free top-left corner drag resize, persisted in localStorage)
+        const isMobileInit = typeof window !== "undefined" && (
+            window.innerWidth <= 960 ||
+            window.innerHeight <= 560 ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+        );
+        const sizePresets = [
+            { label: "S", w: 284, h: 86 },
+            { label: "M", w: 344, h: 126 },
+            { label: "L", w: 448, h: 224 }
+        ];
+        this._chatPresetIdx = 1;
+
+        const applyChatDimensions = (w, h, presetLabel = null, save = true) => {
+            if (!this.chatWidget || !this.chatMessagesEl || isMobileInit) return;
+            const maxW = Math.max(280, Math.min(580, (window.innerWidth || 1280) - 32));
+            const maxH = Math.max(80, Math.min(400, (window.innerHeight || 720) - 180));
+            const clampedW = Math.max(260, Math.min(maxW, Math.round(w)));
+            const clampedH = Math.max(76, Math.min(maxH, Math.round(h)));
+            this.chatWidget.style.width = `${clampedW}px`;
+            this.chatMessagesEl.style.height = `${clampedH}px`;
+            if (this.chatSizeBtn) {
+                this.chatSizeBtn.textContent = `⤢ ${presetLabel || "C"}`;
+            }
+            if (save) {
+                this.safeSetStorage("vc97_chat_w", String(clampedW));
+                this.safeSetStorage("vc97_chat_h", String(clampedH));
+                if (presetLabel) this.safeSetStorage("vc97_chat_preset", presetLabel);
+            }
+            this.chatMessagesEl.scrollTop = this.chatMessagesEl.scrollHeight;
+        };
+
+        if (!isMobileInit && this.chatWidget && this.chatMessagesEl) {
+            const savedW = parseInt(this.safeGetStorage("vc97_chat_w") || "", 10);
+            const savedH = parseInt(this.safeGetStorage("vc97_chat_h") || "", 10);
+            const savedPreset = this.safeGetStorage("vc97_chat_preset") || "M";
+            const foundIdx = sizePresets.findIndex((p) => p.label === savedPreset);
+            if (foundIdx >= 0) this._chatPresetIdx = foundIdx;
+            if (Number.isFinite(savedW) && Number.isFinite(savedH) && savedW >= 250 && savedH >= 70) {
+                applyChatDimensions(savedW, savedH, savedPreset, false);
+            }
+        }
+
+        if (this.chatSizeBtn && !isMobileInit) {
+            this.chatSizeBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (this.chatWidget && this.chatWidget.classList.contains("chat-collapsed")) {
+                    this.chatWidget.classList.remove("chat-collapsed");
+                    if (this.chatToggleBtn) this.chatToggleBtn.textContent = "–";
+                }
+                this._chatPresetIdx = (this._chatPresetIdx + 1) % sizePresets.length;
+                const pr = sizePresets[this._chatPresetIdx];
+                applyChatDimensions(pr.w, pr.h, pr.label, true);
+            });
+        }
+
+        if (this.chatResizeGrip && this.chatWidget && this.chatMessagesEl && !isMobileInit) {
+            this.chatResizeGrip.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startW = this.chatWidget.offsetWidth || 344;
+                const startH = this.chatMessagesEl.offsetHeight || 126;
+
+                const onMove = (me) => {
+                    // Dragging top-left corner left/up increases width/height (since widget is anchored bottom-right)
+                    const newW = startW + (startX - me.clientX);
+                    const newH = startH + (startY - me.clientY);
+                    applyChatDimensions(newW, newH, "C", false);
+                };
+                const onUp = () => {
+                    window.removeEventListener("mousemove", onMove);
+                    window.removeEventListener("mouseup", onUp);
+                    applyChatDimensions(
+                        this.chatWidget.offsetWidth || 344,
+                        this.chatMessagesEl.offsetHeight || 126,
+                        "C",
+                        true
+                    );
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+            });
+        }
 
         if (this.chatRoomBadge) {
             this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
@@ -526,11 +626,43 @@ class ViceNetworkManager {
             });
         }
 
-        document.querySelectorAll(".mp-quick-btn").forEach((btn) => {
+        const quickBtns = Array.from(document.querySelectorAll(".mp-quick-btn"));
+        quickBtns.forEach((btn) => {
+            btn.setAttribute("data-orig-label", btn.textContent || "");
             btn.addEventListener("click", () => {
                 const msg = btn.getAttribute("data-msg");
-                if (msg) {
-                    this.sendChatMessage(msg);
+                if (!msg) return;
+                const nowMs = performance.now();
+                if (nowMs < (this._quickCooldownUntilMs || 0)) {
+                    const waitSec = Math.ceil(((this._quickCooldownUntilMs || 0) - nowMs) / 1000);
+                    this.addChatLog("ANTI-SPAM", `⏳ Quick-chat cooldown (${waitSec}s)...`, "#fde047", true);
+                    return;
+                }
+                const sent = this.sendChatMessage(msg, true);
+                if (sent) {
+                    this._quickCooldownUntilMs = nowMs + 6000;
+                    quickBtns.forEach((b) => {
+                        b.disabled = true;
+                        b.classList.add("mp-quick-cooldown");
+                    });
+                    if (this._quickCooldownTimer) clearInterval(this._quickCooldownTimer);
+                    const updateQuickBtnLabels = () => {
+                        const remMs = (this._quickCooldownUntilMs || 0) - performance.now();
+                        if (remMs <= 0) {
+                            clearInterval(this._quickCooldownTimer);
+                            this._quickCooldownTimer = null;
+                            quickBtns.forEach((b) => {
+                                b.disabled = false;
+                                b.classList.remove("mp-quick-cooldown");
+                                b.textContent = b.getAttribute("data-orig-label") || b.textContent;
+                            });
+                        } else {
+                            const sec = Math.ceil(remMs / 1000);
+                            btn.textContent = `⏳ ${sec}s`;
+                        }
+                    };
+                    updateQuickBtnLabels();
+                    this._quickCooldownTimer = setInterval(updateQuickBtnLabels, 250);
                 }
             });
         });
@@ -665,9 +797,9 @@ class ViceNetworkManager {
         );
     }
 
-    sendChatMessage(rawText) {
+    sendChatMessage(rawText, isQuick = false) {
         const cleaned = String(rawText || "").trim().slice(0, 140);
-        if (!cleaned) return;
+        if (!cleaned) return false;
 
         // Slash command: /name NewPseudo or /nick NewPseudo
         if (/^\/(name|nick|pseudo)\s+/i.test(cleaned)) {
@@ -687,14 +819,14 @@ class ViceNetworkManager {
                     color: this.playerColor
                 });
             }
-            return;
+            return true;
         }
 
         // Slash command: /clear
         if (/^\/clear$/i.test(cleaned)) {
             if (this.chatMessagesEl) this.chatMessagesEl.innerHTML = "";
             this.addChatLog("VICE NET", "Chat history cleared.", "#00f0ff", true);
-            return;
+            return true;
         }
 
         // Slash command: /server ws://IP:8787 or /server wss://domain (connect to Hostinger KVM2 Persistent World Server)
@@ -711,8 +843,45 @@ class ViceNetworkManager {
                 this.addChatLog("WORLD SERVER", `Connecting to ${normalized}...`, "#39ff14", true);
                 this.initWebSocketServer(normalized);
             }
-            return;
+            return true;
         }
+
+        // ====================================================================
+        // ANTI-SPAM FILTER (Quick-Chat Cooldown + Burst Rate Limit + Duplicate Block)
+        // ====================================================================
+        const nowMs = performance.now();
+        if (nowMs < (this._chatMuteUntilMs || 0)) {
+            const waitSec = Math.ceil(((this._chatMuteUntilMs || 0) - nowMs) / 1000);
+            this.addChatLog("ANTI-SPAM", `🚫 Muted for spam! Wait ${waitSec}s.`, "#ff2a85", true);
+            return false;
+        }
+
+        const minGapMs = isQuick ? 6000 : 1800;
+        if (this._lastChatSentMs && (nowMs - this._lastChatSentMs) < minGapMs) {
+            const waitSec = Math.max(1, Math.ceil((minGapMs - (nowMs - this._lastChatSentMs)) / 1000));
+            this.addChatLog("ANTI-SPAM", `⏳ Slow down! Wait ${waitSec}s before sending another message.`, "#fde047", true);
+            return false;
+        }
+
+        if (
+            this._lastChatSentText &&
+            this._lastChatSentText.toLowerCase() === cleaned.toLowerCase() &&
+            (nowMs - (this._lastChatSentMs || 0)) < 12000
+        ) {
+            this.addChatLog("ANTI-SPAM", "⏳ Please don't repeat the same message!", "#fde047", true);
+            return false;
+        }
+
+        if (!this._chatSentTimestamps) this._chatSentTimestamps = [];
+        this._chatSentTimestamps = this._chatSentTimestamps.filter((t) => nowMs - t < 12000);
+        if (this._chatSentTimestamps.length >= 4) {
+            this._chatMuteUntilMs = nowMs + 8000;
+            this.addChatLog("ANTI-SPAM", "🚫 Too many messages! Chat locked for 8s.", "#ff2a85", true);
+            return false;
+        }
+        this._chatSentTimestamps.push(nowMs);
+        this._lastChatSentMs = nowMs;
+        this._lastChatSentText = cleaned;
 
         const p = this.game ? this.game.player : null;
         if (p) {
@@ -766,6 +935,7 @@ class ViceNetworkManager {
                 }
             }, 950);
         }
+        return true;
     }
 
     safeGetStorage(key) {
@@ -1025,8 +1195,14 @@ class ViceNetworkManager {
 
         if (pkt.t === "CHAT") {
             const rp = this.ensureRemotePlayer(pkt);
-            const msg = String(pkt.text || "").slice(0, 140);
+            const msg = String(pkt.text || "").trim().slice(0, 140);
             if (!msg) return;
+            // Remote player anti-spam guard (ignore rapid floods or repeated identical messages within 10s)
+            const nowMs = performance.now();
+            if (rp._lastChatMs && (nowMs - rp._lastChatMs) < 1400) return;
+            if (rp._lastChatText && rp._lastChatText.toLowerCase() === msg.toLowerCase() && (nowMs - (rp._lastChatMs || 0)) < 10000) return;
+            rp._lastChatMs = nowMs;
+            rp._lastChatText = msg;
             rp.name = pkt.name || rp.name;
             rp.color = pkt.color || rp.color;
             rp.chatText = msg;

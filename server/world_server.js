@@ -520,6 +520,11 @@ function handleClientPacket(socket, pkt) {
     if (pkt.t === "CHAT" && pkt.text) {
         const cleanText = String(pkt.text).trim().slice(0, 140);
         if (!cleanText) return;
+        const nowMs = Date.now();
+        if (meta.lastChatMs && (nowMs - meta.lastChatMs) < 1500) return;
+        if (meta.lastChatText && meta.lastChatText.toLowerCase() === cleanText.toLowerCase() && (nowMs - (meta.lastChatMs || 0)) < 10000) return;
+        meta.lastChatMs = nowMs;
+        meta.lastChatText = cleanText;
         const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
         room.chat.push({
@@ -527,7 +532,7 @@ function handleClientPacket(socket, pkt) {
             author: meta.name || pkt.name || "PLAYER",
             color: meta.color || pkt.color || "#00f0ff",
             text: cleanText,
-            ts: Date.now()
+            ts: nowMs
         });
         if (room.chat.length > 30) room.chat.shift();
         isDirty = true;

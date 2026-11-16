@@ -1433,8 +1433,27 @@ html, body {
         0 10px 28px rgba(0, 0, 0, 0.9);
 }
 
-#mp-chat-widget.chat-collapsed #mp-chat-body {
+#mp-chat-widget.chat-collapsed #mp-chat-body,
+#mp-chat-widget.chat-collapsed #mp-chat-resize-grip,
+#mp-chat-widget.chat-collapsed #mp-chat-size-btn {
     display: none;
+}
+
+#mp-chat-resize-grip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+    z-index: 5;
+    background: linear-gradient(135deg, #00f0ff 0%, #00f0ff 32%, transparent 33%, transparent 50%, #38bdf8 51%, #38bdf8 66%, transparent 67%);
+    opacity: 0.72;
+}
+
+#mp-chat-resize-grip:hover {
+    opacity: 1;
+    background: linear-gradient(135deg, #ff2a85 0%, #ff2a85 35%, transparent 36%, transparent 50%, #f472b6 51%, #f472b6 68%, transparent 69%);
 }
 
 .mp-chat-header {
@@ -1593,10 +1612,19 @@ html, body {
     white-space: nowrap;
 }
 
-.mp-quick-btn:hover {
+.mp-quick-btn:hover:not(:disabled) {
     background: #0369a1;
     border-color: #00f0ff;
     color: #ffffff;
+}
+
+.mp-quick-btn:disabled,
+.mp-quick-btn.mp-quick-cooldown {
+    opacity: 0.45;
+    cursor: not-allowed;
+    border-color: #334155;
+    color: #94a3b8;
+    box-shadow: none;
 }
 
 #mp-chat-form {
@@ -1950,6 +1978,8 @@ body.touch-enabled #mobile-touch-controls {
         gap: 4px;
     }
 
+    #mp-chat-resize-grip,
+    #mp-chat-size-btn,
     #mp-chat-widget.chat-collapsed #mp-chat-name-btn,
     #mp-chat-widget.chat-collapsed .mp-chat-room,
     #mp-chat-widget.chat-collapsed #mp-chat-toggle-btn {
