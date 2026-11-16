@@ -9762,11 +9762,54 @@ class LeonidaGame {
 
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 12.0;
+            // Coherent VCPD Cruiser Recovery: if an intact police cruiser is left driverless on the street after a chase,
+            // a nearby VCPD relief officer walks from the nearest sidewalk, climbs into the cruiser, and drives it back on patrol!
+            if (v.isPolice && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 9.0) {
+                const hasReturningCop = this.peds.some(
+                    (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || Math.hypot(pd.x - v.x, pd.y - v.y) < 460)
+                );
+                if (!hasReturningCop && this.peds.length < 135) {
+                    const cbx = Math.floor(v.x / TILE_SIZE);
+                    const cby = Math.floor(v.y / TILE_SIZE);
+                    const cz = v.z || 2.0;
+                    for (let ca = 0; ca < 12; ca++) {
+                        const ang = (ca / 12) * Math.PI * 2;
+                        const sDist = 145 + (ca % 3) * 28;
+                        const sx = v.x + Math.cos(ang) * sDist;
+                        const sy = v.y + Math.sin(ang) * sDist;
+                        const sbx = Math.floor(sx / TILE_SIZE);
+                        const sby = Math.floor(sy / TILE_SIZE);
+                        const nav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, cz) : null;
+                        if (
+                            nav &&
+                            (nav.groundType === GROUND_TYPE.PAWEMENT || nav.groundType === GROUND_TYPE.ROAD) &&
+                            (!this.map.isWaterAtPixel || !this.map.isWaterAtPixel(sx, sy)) &&
+                            (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(sx, sy, 12, cz).hit)
+                        ) {
+                            const reliefCop = new Pedestrian({
+                                x: sx,
+                                y: sy,
+                                z: cz,
+                                angle: Math.atan2(v.y - sy, v.x - sx),
+                                kind: "COP",
+                                g24Type: "police",
+                                copWeapon: "PISTOL",
+                                hp: 105,
+                                speed: 74
+                            });
+                            reliefCop._boardingVeh = v;
+                            this.peds.push(reliefCop);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 8.0;
 
             const isAbandoned = !v.destroyed &&
                 v.driver === null &&
-                (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
+                (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 38.0 : 18.0);
 
             if (!isWreck && !isAbandoned) continue;
 
@@ -9928,7 +9971,7 @@ class LeonidaGame {
 
                 farTowTruck.approachNoProgress = 0;
 
-            } else if (activeTowTrucks < 2) {
+            } else if (activeTowTrucks < 3) {
 
                 const towTruck = new Vehicle(`tow_${Date.now()}_${attempt}`, "TOW_TRUCK", sx, sy, roadAng);
 
@@ -13016,16 +13059,18 @@ class LeonidaGame {
 
                     // Post-shootout scene cleanup: if an unoccupied police cruiser or bandit getaway car is nearby,
                     // VCPD officers walk back to it, climb in, and drive it away on patrol!
-                    let returnCar = null;
-                    let bestCarDist = 420;
-                    if (ped.missionTag !== "PRISON_GUARD") {
+                    let returnCar = (ped._boardingVeh && !ped._boardingVeh.destroyed && ped._boardingVeh.driver === null && !ped._boardingVeh.towedByTruck)
+                        ? ped._boardingVeh
+                        : null;
+                    let bestCarDist = returnCar ? Math.hypot(returnCar.x - ped.x, returnCar.y - ped.y) : 780;
+                    if (!returnCar && ped.missionTag !== "PRISON_GUARD") {
                         const vHead = this._vehGridHead;
                         const vNext = this._vehGridNext;
                         if (vHead && vNext) {
-                            const cx0 = Math.max(0, (ped.x >> 8) - 2);
-                            const cx1 = Math.min(127, (ped.x >> 8) + 2);
-                            const cy0 = Math.max(0, (ped.y >> 8) - 2);
-                            const cy1 = Math.min(127, (ped.y >> 8) + 2);
+                            const cx0 = Math.max(0, (ped.x >> 8) - 3);
+                            const cx1 = Math.min(127, (ped.x >> 8) + 3);
+                            const cy0 = Math.max(0, (ped.y >> 8) - 3);
+                            const cy1 = Math.min(127, (ped.y >> 8) + 3);
                             for (let cy = cy0; cy <= cy1; cy++) {
                                 const rowOff = cy << 7;
                                 for (let cx = cx0; cx <= cx1; cx++) {
@@ -13052,11 +13097,14 @@ class LeonidaGame {
 
                     if (returnCar) {
                         ped._boardingVeh = returnCar;
-                        const boardDist = Math.max(40, (returnCar.w || 48) * 0.52 + 10);
+                        const boardDist = Math.max(42, (returnCar.w || 48) * 0.52 + 12);
                         if (bestCarDist < boardDist) {
                             returnCar.driver = "AI_COP";
                             returnCar.wasCriminalCar = false;
                             returnCar.sirenActive = false;
+                            returnCar._worldModified = false;
+                            returnCar.lastPlayerDriven = false;
+                            returnCar.abandonedTimer = 0;
                             returnCar.doorOpenTimer = 0.44;
                             ped._boardedVehicle = true;
                             ped.dead = true;

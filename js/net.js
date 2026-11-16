@@ -1607,9 +1607,6 @@ class ViceNetworkManager {
                 v._worldModified ||
                 v.lastPlayerDriven ||
                 v.destroyed ||
-                v.frontDented ||
-                v.rearDented ||
-                v.heavyDented ||
                 v.driver === "PLAYER" ||
                 v.driver === "REMOTE"
             );

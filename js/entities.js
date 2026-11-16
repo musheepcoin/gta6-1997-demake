@@ -2375,9 +2375,27 @@ class Vehicle {
                     }
                 }
             }
-            // Never wait forever behind a destroyed wreck or abandoned driverless car (or when hauling a wreck as AI_TOW):
-            // actively steer around the pileup using 9-feeler obstacle bypass!
-            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 64) {
+            // Never wait forever behind a destroyed wreck or abandoned driverless vehicle (e.g. empty police cruiser or wreck on a 2-lane street):
+            // smoothly shift laterally around the abandoned obstacle!
+            if ((isDeadOrAbandonedObstacle || (this.driver === "AI_TOW" && this.towingVehicle && isStationaryCar)) && closestBumperGap < 92) {
+                const prefSides = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? [1, -1] : [-1, 1];
+                for (const bSide of prefSides) {
+                    const bOff = 28;
+                    const testX = this.x + rx * bSide * bOff;
+                    const testY = this.y + ry * bSide * bOff;
+                    const testAheadX = testX + fx * 42;
+                    const testAheadY = testY + fy * 42;
+                    if (
+                        (!map.isWaterAtPixel || (!map.isWaterAtPixel(testX, testY) && !map.isWaterAtPixel(testAheadX, testAheadY))) &&
+                        (!map.resolveCircleBuildingCollision || (!map.resolveCircleBuildingCollision(testX, testY, 13, curZ).hit && !map.resolveCircleBuildingCollision(testAheadX, testAheadY, 13, curZ).hit))
+                    ) {
+                        this.aiPullOverOffset = bSide * bOff;
+                        this.aiPullOverTimer = 1.65;
+                        this.aiTurnSignal = bSide;
+                        this.aiState = "LANE_CHANGE";
+                        return { throttle: this.speed > 62 ? 0 : 0.36, steer: 0, handbrake: false };
+                    }
+                }
                 const lookX = tx + (this.aiChosenDir ? (this.aiChosenDir.dx || 0) * TILE_SIZE * 0.95 : 0);
                 const lookY = ty + (this.aiChosenDir ? (this.aiChosenDir.dy || 0) * TILE_SIZE * 0.95 : 0);
                 const bypassAng = Math.atan2(lookY - this.y, lookX - this.x);
@@ -3818,14 +3836,20 @@ class Vehicle {
             const latTol = Math.min(27, ((this.h || 28) + (lead.h || 28)) * 0.43);
             const minCenterDist = ((this.w || 62) + (lead.w || 62)) * 0.50 + (this.isMotorcycle ? 12 : 18);
             if (fDist > 4 && fDist < minCenterDist && lDist < latTol) {
-                const pushBack = minCenterDist - fDist;
-                this.x -= cfx * pushBack;
-                this.y -= cfy * pushBack;
-                const capSpd = Math.max(0, (lead.speed || 0) * 0.90);
-                if (this.speed > capSpd) {
-                    this.speed = capSpd;
-                    this.vx = cfx * capSpd;
-                    this.vy = cfy * capSpd;
+                if ((lead.destroyed || lead.driver === null) && (this.aiPullOverTimer || 0) > 0) {
+                    const sideSign = (this.aiPullOverOffset || 0) >= 0 ? 1 : -1;
+                    this.x += -cfy * sideSign * 65 * dt;
+                    this.y += cfx * sideSign * 65 * dt;
+                } else {
+                    const pushBack = minCenterDist - fDist;
+                    this.x -= cfx * pushBack;
+                    this.y -= cfy * pushBack;
+                    const capSpd = Math.max(0, (lead.speed || 0) * 0.90);
+                    if (this.speed > capSpd) {
+                        this.speed = capSpd;
+                        this.vx = cfx * capSpd;
+                        this.vy = cfy * capSpd;
+                    }
                 }
             }
         }
