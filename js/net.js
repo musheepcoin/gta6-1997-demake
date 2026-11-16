@@ -228,10 +228,56 @@ class ViceNetworkManager {
         if (!this._pendingPropSync || this._pendingPropSync.length === 0) return;
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded) return;
         const oe = this.game.map.objectEngine;
-        if (!oe || typeof oe.applySmashedProp !== "function") return;
         const list = this._pendingPropSync.splice(0, this._pendingPropSync.length);
         for (const item of list) {
-            oe.applySmashedProp(item);
+            if (!item || !item.pType) continue;
+            if (typeof item.pType === "string" && item.pType.startsWith("CORPSE:")) {
+                const parts = item.pType.split(":");
+                const g24Type = parts[1] || "civ0";
+                const kindStr = parts[2] || "CIVILIAN";
+                const cx = Number(item.x) || 0;
+                const cy = Number(item.y) || 0;
+                const ca = Number(item.a) || 0;
+                if (Array.isArray(this.game.peds) && typeof Pedestrian === "function") {
+                    let ped = this.game.peds.find((p) => p && Math.hypot((p.x || 0) - cx, (p.y || 0) - cy) < 22);
+                    const cz = this.game.map.getHeightAtPixel ? this.game.map.getHeightAtPixel(cx, cy, 2.0) : 2.0;
+                    if (!ped) {
+                        ped = new Pedestrian({
+                            id: `corpse_${Math.round(cx)}_${Math.round(cy)}`,
+                            x: cx,
+                            y: cy,
+                            z: cz,
+                            angle: ca,
+                            kind: kindStr,
+                            g24Type,
+                            hp: 0,
+                            speed: 0,
+                            dead: true
+                        });
+                        ped._corpsePersisted = true;
+                        this.game.peds.push(ped);
+                    } else {
+                        ped.dead = true;
+                        ped.hp = 0;
+                        ped.speed = 0;
+                        ped.x = cx;
+                        ped.y = cy;
+                        ped.angle = ca;
+                        ped._corpsePersisted = true;
+                        if (typeof ped.computeState === "function") ped.state = ped.computeState();
+                    }
+                    if (Array.isArray(this.game.bloodDecals)) {
+                        const hasBlood = this.game.bloodDecals.some((b) => Math.hypot((b.x || 0) - cx, (b.y || 0) - cy) < 18);
+                        if (!hasBlood) {
+                            this.game.bloodDecals.push({ x: cx, y: cy, z: cz, r: 10, alpha: 0.85 });
+                        }
+                    }
+                }
+                continue;
+            }
+            if (oe && typeof oe.applySmashedProp === "function") {
+                oe.applySmashedProp(item);
+            }
         }
     }
 
@@ -1511,10 +1557,31 @@ class ViceNetworkManager {
         } else if (pkt.kind === "PROP_SMASH" && pkt.pType) {
             this._pendingPropSync.push(pkt);
             this.flushPendingPropSync();
-        } else if (pkt.kind === "PED_KILL" && pkt.pedId) {
-            const ped = this.game.peds.find((pd) => pd.id === pkt.pedId);
+        } else if (pkt.kind === "PED_KILL" && (pkt.pedId || (typeof pkt.x === "number" && typeof pkt.y === "number"))) {
+            let ped = this.game.peds.find((pd) => pd.id === pkt.pedId);
+            if (!ped && typeof pkt.x === "number" && typeof pkt.y === "number") {
+                ped = this.game.peds.find((pd) => pd && !pd.dead && Math.hypot((pd.x || 0) - pkt.x, (pd.y || 0) - pkt.y) < 28);
+            }
+            if (!ped && typeof Pedestrian === "function" && typeof pkt.x === "number" && typeof pkt.y === "number") {
+                ped = new Pedestrian({
+                    id: pkt.pedId || `corpse_${Math.round(pkt.x)}_${Math.round(pkt.y)}`,
+                    x: pkt.x,
+                    y: pkt.y,
+                    z: typeof pkt.z === "number" ? pkt.z : 2.0,
+                    angle: pkt.a || 0,
+                    kind: pkt.pedKind || "CIVILIAN",
+                    g24Type: pkt.g24Type || "civ0",
+                    hp: 10,
+                    speed: 0
+                });
+                this.game.peds.push(ped);
+            }
             if (ped && !ped.dead) {
+                if (typeof pkt.x === "number") ped.x = pkt.x;
+                if (typeof pkt.y === "number") ped.y = pkt.y;
+                if (typeof pkt.a === "number") ped.angle = pkt.a;
                 if (pkt.deathKind) ped.deathKind = pkt.deathKind;
+                ped._corpsePersisted = true;
                 this.game.killPed(ped, false, true);
             }
         }
@@ -1591,6 +1658,16 @@ class ViceNetworkManager {
         for (let i = 0; i < g.peds.length; i++) {
             const pd = g.peds[i];
             if (!pd || pd._boardedVehicle) continue;
+            if (pd.dead && !pd._corpsePersisted) {
+                pd._corpsePersisted = true;
+                this.broadcastWorldEvent({
+                    kind: "PROP_SMASH",
+                    pType: `CORPSE:${pd.g24Type || "civ0"}:${pd.kind || "CIVILIAN"}`,
+                    x: Math.round(pd.x),
+                    y: Math.round(pd.y),
+                    a: Math.round((pd.angle || 0) * 100) / 100
+                });
+            }
             const flags =
                 (pd.dead ? 1 : 0) |
                 ((pd.panicTimer || 0) > 0 ? 2 : 0) |
@@ -1636,6 +1713,9 @@ class ViceNetworkManager {
         }
         const g = this.game;
 
+        if (typeof pkt.wm === "number") {
+            g.worldMinutes = pkt.wm;
+        }
         if (typeof pkt.tl === "number") {
             g.trafficLightTimer = pkt.tl;
         }
@@ -1833,12 +1913,12 @@ class ViceNetworkManager {
                     if (isInitialServerBootstrap || Math.hypot((ped.x || 0) - x, (ped.y || 0) - y) > 120) {
                         ped.x = x;
                         ped.y = y;
-                    } else {
-                        ped.x += (x - ped.x) * 0.45;
-                        ped.y += (y - ped.y) * 0.45;
                     }
+                    ped.netTargetX = x;
+                    ped.netTargetY = y;
+                    ped.netTargetZ = z !== undefined ? z : 2.0;
+                    ped.netTargetAngle = a || 0;
                     ped.z = z !== undefined ? z : 2.0;
-                    ped.angle = a || 0;
                     ped.speed = spd || 0;
                     ped.hp = hp !== undefined ? hp : ped.hp;
                     ped.kind = kindStr;
@@ -1853,6 +1933,15 @@ class ViceNetworkManager {
                     ped.muzzleTimer = (flags & 128) ? Math.max(ped.muzzleTimer || 0, 0.2) : 0;
                     ped.inCombat = Boolean(flags & 256);
                     if (typeof ped.computeState === "function") ped.state = ped.computeState();
+                }
+            }
+
+            if (!isInitialServerBootstrap) {
+                for (let i = g.peds.length - 1; i >= 0; i--) {
+                    const p = g.peds[i];
+                    if (p && !p.dead && !p.missionTag && !seenPedIds.has(p.id)) {
+                        g.peds.splice(i, 1);
+                    }
                 }
             }
         }

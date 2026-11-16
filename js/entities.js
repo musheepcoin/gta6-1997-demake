@@ -5192,11 +5192,11 @@ class TrafficManager {
             this.generateTrafficCars(vp.area, vp.z);
         }
 
-        if (this.lastGenPedsTime >= this.genPedsCooldown) {
+        if (!isClientSync && this.lastGenPedsTime >= this.genPedsCooldown) {
             this.lastGenPedsTime = 0;
-            const localVp = viewports[0];
-            this.removeOffscreenPeds([localVp]);
-            this.generateTrafficPeds(localVp.area, localVp.z, localVp.x, localVp.y);
+            this.removeOffscreenPeds(viewports);
+            this.generateTrafficPeds(vp.area, vp.z, vp.x, vp.y);
+            this._spawnPlayerCursor = (this._spawnPlayerCursor + 1) % Math.max(1, viewports.length);
         }
     }
 

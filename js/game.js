@@ -8242,21 +8242,25 @@ class LeonidaGame {
         ped.drownTimer = 0;
 
         if (!fromNetwork && this.net && typeof this.net.broadcastWorldEvent === "function") {
-
+            ped._corpsePersisted = true;
             this.net.broadcastWorldEvent({
-
                 kind: "PED_KILL",
-
                 pedId: ped.id,
-
                 x: Math.round(ped.x),
-
                 y: Math.round(ped.y),
-
+                z: Math.round((ped.z || 2.0) * 100) / 100,
+                a: Math.round((ped.angle || 0) * 100) / 100,
+                g24Type: ped.g24Type || "civ0",
+                pedKind: ped.kind || "CIVILIAN",
                 deathKind: ped.deathKind || null
-
             });
-
+            this.net.broadcastWorldEvent({
+                kind: "PROP_SMASH",
+                pType: `CORPSE:${ped.g24Type || "civ0"}:${ped.kind || "CIVILIAN"}`,
+                x: Math.round(ped.x),
+                y: Math.round(ped.y),
+                a: Math.round((ped.angle || 0) * 100) / 100
+            });
         }
 
         const noBlood = ped.deathKind === "DROWNED" || ped.deathKind === "ELECTRO" || ped.deathKind === "BURNT";
@@ -12483,8 +12487,12 @@ class LeonidaGame {
             sHead[cell] = cIdx;
         }
 
-        // Ambient pedestrians and their social formations always simulate locally at 60 FPS around the player!
-        const isClientWorldSync = false;
+        // When connected as a Client to a World Host, interpolate authoritative WORLD_SYNC pedestrians at 60 FPS!
+        const isClientWorldSync = Boolean(
+            this.net &&
+            typeof this.net.isClientWorldSyncActive === "function" &&
+            this.net.isClientWorldSyncActive()
+        );
 
         for (const ped of this.peds) {
 
