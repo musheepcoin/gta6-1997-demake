@@ -640,7 +640,7 @@ class ViceNetworkManager {
                 }
                 const sent = this.sendChatMessage(msg, true);
                 if (sent) {
-                    this._quickCooldownUntilMs = nowMs + 6000;
+                    this._quickCooldownUntilMs = nowMs + 4000;
                     quickBtns.forEach((b) => {
                         b.disabled = true;
                         b.classList.add("mp-quick-cooldown");
@@ -856,27 +856,28 @@ class ViceNetworkManager {
             return false;
         }
 
-        const minGapMs = isQuick ? 6000 : 1800;
+        const minGapMs = isQuick ? 4000 : 550;
         if (this._lastChatSentMs && (nowMs - this._lastChatSentMs) < minGapMs) {
             const waitSec = Math.max(1, Math.ceil((minGapMs - (nowMs - this._lastChatSentMs)) / 1000));
-            this.addChatLog("ANTI-SPAM", `⏳ Slow down! Wait ${waitSec}s before sending another message.`, "#fde047", true);
+            this.addChatLog("ANTI-SPAM", `⏳ Slow down! Wait ${waitSec}s.`, "#fde047", true);
             return false;
         }
 
+        const dupWindowMs = isQuick ? 8000 : 4500;
         if (
             this._lastChatSentText &&
             this._lastChatSentText.toLowerCase() === cleaned.toLowerCase() &&
-            (nowMs - (this._lastChatSentMs || 0)) < 12000
+            (nowMs - (this._lastChatSentMs || 0)) < dupWindowMs
         ) {
-            this.addChatLog("ANTI-SPAM", "⏳ Please don't repeat the same message!", "#fde047", true);
+            this.addChatLog("ANTI-SPAM", "⏳ Please don't spam the same message!", "#fde047", true);
             return false;
         }
 
         if (!this._chatSentTimestamps) this._chatSentTimestamps = [];
-        this._chatSentTimestamps = this._chatSentTimestamps.filter((t) => nowMs - t < 12000);
-        if (this._chatSentTimestamps.length >= 4) {
-            this._chatMuteUntilMs = nowMs + 8000;
-            this.addChatLog("ANTI-SPAM", "🚫 Too many messages! Chat locked for 8s.", "#ff2a85", true);
+        this._chatSentTimestamps = this._chatSentTimestamps.filter((t) => nowMs - t < 10000);
+        if (this._chatSentTimestamps.length >= 7) {
+            this._chatMuteUntilMs = nowMs + 5000;
+            this.addChatLog("ANTI-SPAM", "🚫 Flood detected! Chat paused for 5s.", "#ff2a85", true);
             return false;
         }
         this._chatSentTimestamps.push(nowMs);
@@ -1197,10 +1198,10 @@ class ViceNetworkManager {
             const rp = this.ensureRemotePlayer(pkt);
             const msg = String(pkt.text || "").trim().slice(0, 140);
             if (!msg) return;
-            // Remote player anti-spam guard (ignore rapid floods or repeated identical messages within 10s)
+            // Remote player anti-spam guard (ignore rapid floods or repeated identical messages)
             const nowMs = performance.now();
-            if (rp._lastChatMs && (nowMs - rp._lastChatMs) < 1400) return;
-            if (rp._lastChatText && rp._lastChatText.toLowerCase() === msg.toLowerCase() && (nowMs - (rp._lastChatMs || 0)) < 10000) return;
+            if (rp._lastChatMs && (nowMs - rp._lastChatMs) < 500) return;
+            if (rp._lastChatText && rp._lastChatText.toLowerCase() === msg.toLowerCase() && (nowMs - (rp._lastChatMs || 0)) < 4500) return;
             rp._lastChatMs = nowMs;
             rp._lastChatText = msg;
             rp.name = pkt.name || rp.name;

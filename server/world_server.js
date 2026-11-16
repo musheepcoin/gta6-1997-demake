@@ -521,8 +521,8 @@ function handleClientPacket(socket, pkt) {
         const cleanText = String(pkt.text).trim().slice(0, 140);
         if (!cleanText) return;
         const nowMs = Date.now();
-        if (meta.lastChatMs && (nowMs - meta.lastChatMs) < 1500) return;
-        if (meta.lastChatText && meta.lastChatText.toLowerCase() === cleanText.toLowerCase() && (nowMs - (meta.lastChatMs || 0)) < 10000) return;
+        if (meta.lastChatMs && (nowMs - meta.lastChatMs) < 500) return;
+        if (meta.lastChatText && meta.lastChatText.toLowerCase() === cleanText.toLowerCase() && (nowMs - (meta.lastChatMs || 0)) < 4500) return;
         meta.lastChatMs = nowMs;
         meta.lastChatText = cleanText;
         const now = new Date();
