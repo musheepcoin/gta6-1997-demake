@@ -3380,7 +3380,16 @@ class LeonidaGame {
 
                 this._ytBuffering = false;
 
+                this._ytStallChecks = 0;
+
                 this._lastYtProgressMs = performance.now();
+
+                if (this._ytGestureUnlocked && this.ytMusicEnabled && !this._ytUnmutedAfterPlay) {
+                    this._ytUnmutedAfterPlay = true;
+                    const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
+                    this.sendYouTubeCommand("unMute", []);
+                    this.sendYouTubeCommand("setVolume", [vol]);
+                }
 
             } else if (st === 3) {
 
@@ -3435,6 +3444,7 @@ class LeonidaGame {
         const handleYtError = (_errCode) => {
             this.ytActuallyPlaying = false;
             this._ytBuffering = false;
+            this._ytUnmutedAfterPlay = false;
             if (!Array.isArray(this.ytRadioFallbackIds) || this.ytRadioFallbackIds.length === 0) return;
             this._ytErrorFailoverIdx = ((this._ytErrorFailoverIdx || 0) + 1) % this.ytRadioFallbackIds.length;
             const nextVid = this.ytRadioFallbackIds[this._ytErrorFailoverIdx];
@@ -3443,13 +3453,25 @@ class LeonidaGame {
             if (this.ytMusicEnabled) {
                 this.sendYouTubeCommand("loadVideoById", [nextVid, this.ytSeekOffset || 0]);
                 this.sendYouTubeCommand("playVideo", []);
+                if (this._ytGestureUnlocked) {
+                    const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
+                    this.sendYouTubeCommand("unMute", []);
+                    this.sendYouTubeCommand("setVolume", [vol]);
+                }
             }
         };
 
         this._ensureYtIframeBooted = () => {
             if (!iframe) return;
             if (!iframe.getAttribute("src") && iframe.dataset && iframe.dataset.src) {
-                iframe.setAttribute("src", iframe.dataset.src);
+                let bootUrl = iframe.dataset.src;
+                if (!this._ytGestureUnlocked && !bootUrl.includes("mute=")) {
+                    bootUrl += "&mute=1";
+                }
+                if (typeof window !== "undefined" && window.location && /^https?:$/i.test(window.location.protocol) && !bootUrl.includes("origin=")) {
+                    bootUrl += `&origin=${encodeURIComponent(window.location.origin)}`;
+                }
+                iframe.setAttribute("src", bootUrl);
             }
             if (typeof window !== "undefined" && !window._vc26YtApiLoaded) {
                 window._vc26YtApiLoaded = true;
@@ -3502,13 +3524,17 @@ class LeonidaGame {
 
             if (fromUserGesture) {
 
+                this._ytGestureUnlocked = true;
+
                 this.sendYouTubeCommand("unMute", []);
 
                 this.sendYouTubeCommand("setVolume", [vol]);
 
                 this.sendYouTubeCommand("playVideo", []);
 
-                this._ytGestureUnlocked = true;
+                if (this.ytActuallyPlaying) {
+                    this._ytUnmutedAfterPlay = true;
+                }
 
             } else if (!this.ytActuallyPlaying && !this._ytBuffering) {
 
@@ -3694,7 +3720,13 @@ class LeonidaGame {
 
                 if (!this.ytActuallyPlaying && !this._ytBuffering) {
 
-                    tryAutoStart(false);
+                    this._ytStallChecks = (this._ytStallChecks || 0) + 1;
+                    if (this.started && this._ytStallChecks >= 2) {
+                        this._ytStallChecks = 0;
+                        handleYtError("stall");
+                    } else {
+                        tryAutoStart(Boolean(this._ytGestureUnlocked));
+                    }
 
                 }
 

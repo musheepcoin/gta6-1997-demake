@@ -297,11 +297,15 @@ class RetroAudioEngine {
         this._rawArrayBuffers = {};
         this.buffers = {};
         this._fetchingKeys = new Set();
+        this._fetchQueue = [];
+        this._queuedFetchKeys = new Set();
         this._decodingKeys = new Set();
         this._queuedDecodeKeys = new Set();
         this._decodeQueue = [];
         this._activeDecodeCount = 0;
+        this._failCounts = {};
         this._failedKeys = new Set();
+        this._pendingPlayOnDecode = {};
 
         // Multi-Layer Player Vehicle Engine State
         this._activeEngineClass = null;
@@ -352,118 +356,147 @@ class RetroAudioEngine {
         this._preloadRawAudioFiles();
     }
 
-    _ensureKeyLoaded(key) {
+    _ensureKeyLoaded(key, highPriority = false) {
         if (!key || this.buffers[key] || this._failedKeys.has(key)) return;
         if (this._rawArrayBuffers[key]) {
-            if (this.ctx) this._decodeKey(key);
+            if (this.ctx) this._decodeKey(key, highPriority);
             return;
         }
         if (this._fetchingKeys.has(key) || this._decodingKeys.has(key)) return;
-        const url = VEHICLE_AUDIO_MANIFEST[key];
-        if (!url || typeof fetch !== "function") return;
-        this._fetchingKeys.add(key);
-        fetch(`${url}?v=101_118`)
-            .then((res) => (res.ok ? res.arrayBuffer() : null))
-            .then((buf) => {
-                this._fetchingKeys.delete(key);
-                if (!buf) {
-                    this._failedKeys.add(key);
-                    return;
+        if (!VEHICLE_AUDIO_MANIFEST[key] || typeof fetch !== "function") return;
+        if (this._queuedFetchKeys.has(key)) {
+            if (highPriority) {
+                const idx = this._fetchQueue.indexOf(key);
+                if (idx > 0) {
+                    this._fetchQueue.splice(idx, 1);
+                    this._fetchQueue.unshift(key);
                 }
-                this._rawArrayBuffers[key] = buf;
-                if (this.ctx) {
-                    this._decodeKey(key);
-                }
-            })
-            .catch(() => {
-                this._fetchingKeys.delete(key);
-                this._failedKeys.add(key);
-            });
-    }
-
-    _preloadRawAudioFiles() {
-        if (typeof window === "undefined" || typeof fetch !== "function") return;
-        if (this._isMobileAudio) {
-            // On mobile, defer audio preloading until after WebGL textures & city mesh finish booting,
-            // and only preload a compact 16-clip core kit (2 at a time); all other 98 clips stream & decode on demand!
-            const mobileCoreKeys = [
-                "sedan_idle", "sedan_low", "sedan_mid", "sedan_high",
-                "moto_low", "car_door", "gta_car_door_open", "gta_car_door_close",
-                "crash_metal", "tire_skid_loop", "siren_police",
-                "gta_shot_pistol", "gta_shot_uzi", "gta_explosion",
-                "gta_pickup", "gta_scream_scared_1"
-            ];
-            setTimeout(() => {
-                let idx = 0;
-                const pumpMobileFetch = () => {
-                    while (this._fetchingKeys.size < 2 && idx < mobileCoreKeys.length) {
-                        const k = mobileCoreKeys[idx++];
-                        if ( !this.buffers[k] && !this._rawArrayBuffers[k] && !this._fetchingKeys.has(k) && VEHICLE_AUDIO_MANIFEST[k] ) {
-                            this._fetchingKeys.add(k);
-                            fetch(`${VEHICLE_AUDIO_MANIFEST[k]}?v=101_118`)
-                                .then((res) => (res.ok ? res.arrayBuffer() : null))
-                                .then((buf) => {
-                                    this._fetchingKeys.delete(k);
-                                    if (buf) {
-                                        this._rawArrayBuffers[k] = buf;
-                                        if (this.ctx) this._decodeKey(k);
-                                    } else {
-                                        this._failedKeys.add(k);
-                                    }
-                                    pumpMobileFetch();
-                                })
-                                .catch(() => {
-                                    this._fetchingKeys.delete(k);
-                                    this._failedKeys.add(k);
-                                    pumpMobileFetch();
-                                });
-                        }
-                    }
-                };
-                pumpMobileFetch();
-            }, 900);
+            }
+            this._pumpFetchQueue();
             return;
         }
+        this._queuedFetchKeys.add(key);
+        if (highPriority) {
+            this._fetchQueue.unshift(key);
+        } else {
+            this._fetchQueue.push(key);
+        }
+        this._pumpFetchQueue();
+    }
 
-        for (const [key, url] of Object.entries(VEHICLE_AUDIO_MANIFEST)) {
+    _pumpFetchQueue() {
+        if (typeof fetch !== "function") return;
+        const maxConcFetch = this._isMobileAudio ? 2 : 6;
+        while (this._fetchingKeys.size < maxConcFetch && this._fetchQueue.length > 0) {
+            const key = this._fetchQueue.shift();
+            this._queuedFetchKeys.delete(key);
+            if (!key || this.buffers[key] || this._rawArrayBuffers[key] || this._fetchingKeys.has(key) || this._failedKeys.has(key)) {
+                continue;
+            }
+            const url = VEHICLE_AUDIO_MANIFEST[key];
+            if (!url) continue;
             this._fetchingKeys.add(key);
-            fetch(`${url}?v=101_118`)
-                .then((res) => (res.ok ? res.arrayBuffer() : null))
+            fetch(`${url}?v=101_118`, { cache: "force-cache" })
+                .then((res) => (res && res.ok ? res.arrayBuffer() : null))
                 .then((buf) => {
                     this._fetchingKeys.delete(key);
-                    if (!buf) {
-                        this._failedKeys.add(key);
-                        return;
+                    if (buf && buf.byteLength > 0) {
+                        this._rawArrayBuffers[key] = buf;
+                        if (this.ctx) {
+                            const isUrgent = Boolean(this._pendingPlayOnDecode && this._pendingPlayOnDecode[key]);
+                            this._decodeKey(key, isUrgent);
+                        }
+                    } else {
+                        this._failCounts[key] = (this._failCounts[key] || 0) + 1;
+                        if (this._failCounts[key] >= 3) {
+                            this._failedKeys.add(key);
+                        }
                     }
-                    this._rawArrayBuffers[key] = buf;
-                    if (this.ctx) {
-                        this._decodeKey(key);
-                    }
+                    this._pumpFetchQueue();
                 })
                 .catch(() => {
                     this._fetchingKeys.delete(key);
-                    this._failedKeys.add(key);
+                    this._failCounts[key] = (this._failCounts[key] || 0) + 1;
+                    if (this._failCounts[key] >= 3) {
+                        this._failedKeys.add(key);
+                    }
+                    this._pumpFetchQueue();
                 });
         }
     }
 
-    _decodeKey(key) {
-        if (!key || this.buffers[key] || this._failedKeys.has(key) || this._decodingKeys.has(key) || this._queuedDecodeKeys.has(key)) {
+    _preloadRawAudioFiles() {
+        if (typeof window === "undefined" || typeof fetch !== "function") return;
+        const corePriorityKeys = [
+            "sedan_idle", "sedan_low", "sedan_mid", "sedan_high",
+            "v8_idle", "v8_low", "v8_mid", "v8_high",
+            "super_idle", "super_low", "super_mid", "super_high",
+            "moto_idle", "moto_low", "moto_mid", "moto_high",
+            "car_door", "gta_car_door_open", "gta_car_door_close",
+            "start_sedan", "start_v8", "start_super",
+            "crash_metal", "crash_heavy", "tire_skid_loop",
+            "siren_police", "siren_medic", "siren_firetruck",
+            "horn_car", "horn_sport", "horn_truck",
+            "shot_pistol_1", "gta_shot_pistol", "shot_uzi_1", "gta_shot_uzi",
+            "shot_shotgun_1", "explosion_modern", "gta_explosion",
+            "gta_pickup", "gta_pager", "gta_scream_scared_1", "gta_scream_die_1",
+            "gta_step_1", "gta_step_2"
+        ];
+        if (this._isMobileAudio) {
+            const mobileCoreKeys = corePriorityKeys.slice(0, 18);
+            setTimeout(() => {
+                for (const k of mobileCoreKeys) {
+                    this._ensureKeyLoaded(k, false);
+                }
+            }, 600);
+            return;
+        }
+        // On desktop, enqueue Priority Tier 1 core sounds first, then Tier 2 ambient/secondary clips
+        // via a 6-connection concurrent pool (eliminates the 114-simultaneous-request startup storm!)
+        for (const k of corePriorityKeys) {
+            this._ensureKeyLoaded(k, false);
+        }
+        setTimeout(() => {
+            for (const k of Object.keys(VEHICLE_AUDIO_MANIFEST)) {
+                if (!this.buffers[k] && !this._rawArrayBuffers[k] && !this._queuedFetchKeys.has(k) && !this._fetchingKeys.has(k)) {
+                    this._ensureKeyLoaded(k, false);
+                }
+            }
+        }, 350);
+    }
+
+    _decodeKey(key, highPriority = false) {
+        if (!key || this.buffers[key] || this._failedKeys.has(key) || this._decodingKeys.has(key)) {
+            return;
+        }
+        if (this._queuedDecodeKeys.has(key)) {
+            if (highPriority) {
+                const idx = this._decodeQueue.indexOf(key);
+                if (idx > 0) {
+                    this._decodeQueue.splice(idx, 1);
+                    this._decodeQueue.unshift(key);
+                }
+            }
+            this._pumpDecodeQueue();
             return;
         }
         if (!this._rawArrayBuffers[key]) {
-            this._ensureKeyLoaded(key);
+            this._ensureKeyLoaded(key, highPriority);
             return;
         }
         if (!this.ctx) return;
         this._queuedDecodeKeys.add(key);
-        this._decodeQueue.push(key);
+        if (highPriority) {
+            this._decodeQueue.unshift(key);
+        } else {
+            this._decodeQueue.push(key);
+        }
         this._pumpDecodeQueue();
     }
 
     _pumpDecodeQueue() {
         if (!this.ctx) return;
-        const maxConc = this._isMobileAudio ? 2 : 4;
+        const maxConc = this._isMobileAudio ? 2 : 6;
         while (this._activeDecodeCount < maxConc && this._decodeQueue.length > 0) {
             const key = this._decodeQueue.shift();
             this._queuedDecodeKeys.delete(key);
@@ -484,17 +517,30 @@ class RetroAudioEngine {
                         if ((key === "sedan_low" || key === "moto_low") && this.initialized) {
                             this._ensureTrafficSampleLoops();
                         }
+                        if (this._pendingPlayOnDecode && this._pendingPlayOnDecode[key]) {
+                            const req = this._pendingPlayOnDecode[key];
+                            delete this._pendingPlayOnDecode[key];
+                            if (performance.now() - req.ts < 420) {
+                                this.playSample(key, req.vol, req.rate, req.maxDuration);
+                            }
+                        }
                         this._pumpDecodeQueue();
                     },
                     () => {
-                        this._failedKeys.add(key);
+                        this._failCounts[key] = (this._failCounts[key] || 0) + 1;
+                        if (this._failCounts[key] >= 3) {
+                            this._failedKeys.add(key);
+                        }
                         this._decodingKeys.delete(key);
                         this._activeDecodeCount = Math.max(0, this._activeDecodeCount - 1);
                         this._pumpDecodeQueue();
                     }
                 );
             } catch (_e) {
-                this._failedKeys.add(key);
+                this._failCounts[key] = (this._failCounts[key] || 0) + 1;
+                if (this._failCounts[key] >= 3) {
+                    this._failedKeys.add(key);
+                }
                 this._decodingKeys.delete(key);
                 this._activeDecodeCount = Math.max(0, this._activeDecodeCount - 1);
             }
@@ -780,7 +826,9 @@ class RetroAudioEngine {
         if (!this.initialized || this.muted || !this.ctx) return false;
         const buf = this.buffers[key];
         if (!buf) {
-            this._decodeKey(key);
+            if (!this._pendingPlayOnDecode) this._pendingPlayOnDecode = {};
+            this._pendingPlayOnDecode[key] = { vol, rate, maxDuration, ts: performance.now() };
+            this._decodeKey(key, true);
             return false;
         }
         try {
@@ -906,15 +954,28 @@ class RetroAudioEngine {
             effClass = "TRUCK";
             specs = ENGINE_BANK_SPECS.TRUCK;
         }
-        // Trigger lazy fetch/decode for all required layers of this class at once
-        let allReady = true;
+        // Trigger high-priority fetch/decode for all required layers of this class at once
+        let readyCount = 0;
         for (const s of specs) {
             if (!this.buffers[s.key]) {
-                this._decodeKey(s.key);
-                allReady = false;
+                this._decodeKey(s.key, true);
+            } else {
+                readyCount++;
             }
         }
-        if (!allReady) return false;
+        const allReady = (readyCount === specs.length);
+        // If this class's buffers are still decoding on initial vehicle entry, temporarily use SEDAN bank if ready!
+        if (readyCount === 0) {
+            if (effClass !== "SEDAN" && ENGINE_BANK_SPECS.SEDAN.every((s) => Boolean(this.buffers[s.key]))) {
+                effClass = "SEDAN_FALLBACK";
+                specs = ENGINE_BANK_SPECS.SEDAN;
+            } else {
+                return false;
+            }
+        } else if (!allReady) {
+            effClass = `${effClass}_PARTIAL_${readyCount}`;
+            specs = specs.filter((s) => Boolean(this.buffers[s.key]));
+        }
         if (this._activeEngineClass === effClass && this._engineLayers.length === specs.length) {
             return true;
         }
