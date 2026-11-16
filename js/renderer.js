@@ -11857,7 +11857,7 @@ class RetroRenderer {
                             SPRITE_DRAW_ORDER.SKIDMARKS
                         );
                         // Cream-white Art Deco stucco low ribbon wall base
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.055, 6.2, wLen, wAng, 0.96, 0.93, 0.87, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.055, 6.2, wLen, wAng, 0.96, 0.93, 0.87, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         // Pastel coral-pink or tropical turquoise Art Deco top coping cap
                         this.pushSolidQuad3D(
                             vd.x,
@@ -11870,7 +11870,7 @@ class RetroRenderer {
                             isPink ? 0.54 : 0.86,
                             isPink ? 0.72 : 0.88,
                             0.98,
-                            SPRITE_DRAW_ORDER.PEDESTRIANS
+                            SPRITE_DRAW_ORDER.PEDESTRIAN
                         );
                         // Subtle recessed neon tube accent strip
                         if (nfGlobal > 0.05) {
@@ -11885,15 +11885,15 @@ class RetroRenderer {
                                 isPink ? 0.32 : 0.95,
                                 isPink ? 0.78 : 1.0,
                                 Math.min(0.95, 0.35 + nfGlobal * 0.60),
-                                SPRITE_DRAW_ORDER.PEDESTRIANS
+                                SPRITE_DRAW_ORDER.PEDESTRIAN
                             );
                         }
                     } else if (vd.kind === "VALET_PODIUM") {
                         // Ocean Drive Art Deco Hotel Valet Stand & Neon Podium
                         const isPink = vd.theme === "PINK";
                         this.pushSolidQuad3D(vd.x + sunCos * 4.5, vd.y + sunSin * 4.5, vz + 0.003, 9, 9, 0, 0.04, 0.06, 0.10, sunShadowAlpha * 0.45, SPRITE_DRAW_ORDER.SKIDMARKS);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.06, 7.5, 9.5, 0, 0.94, 0.91, 0.86, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
-                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.11, 5.5, 7.5, 0, isPink ? 0.96 : 0.22, isPink ? 0.36 : 0.86, isPink ? 0.68 : 0.94, 0.98, SPRITE_DRAW_ORDER.PEDESTRIANS);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.06, 7.5, 9.5, 0, 0.94, 0.91, 0.86, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.pushSolidQuad3D(vd.x, vd.y, vz + 0.11, 5.5, 7.5, 0, isPink ? 0.96 : 0.22, isPink ? 0.36 : 0.86, isPink ? 0.68 : 0.94, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     } else if (vd.kind === "CUBA_DOMINO_TABLE") {
                         // Little Cuba (Calle Ocho / Maximo Gomez Domino Park) 1:1 Scale Sidewalk Domino Table & Seated Guayabera Players
                         this.renderDominoTableScene3D(vd.x, vd.y, vz, (vd.wipeoutTimer || 0) > 0);
@@ -12233,10 +12233,12 @@ class RetroRenderer {
             // Active Mission 3D Ground Beacon Corona (pulsing gold & cyan objective marker on the street!)
             if (game.missions && game.missions.activeMission && dist < 900) {
                 const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
-                const tz = game.map.getHeightAtPx(target.x, target.y) + 0.03;
+                const tz = (game.map && typeof game.map.getHeightAtPixel === "function"
+                    ? game.map.getHeightAtPixel(target.x, target.y, this.camZBlocks)
+                    : 2.0) + 0.03;
                 const ringSz = 38 + pulse * 14;
-                this.pushSolidQuad3D(target.x, target.y, tz, ringSz, ringSz, performance.now() * 0.002, 1.0, 0.85, 0.15, 0.28 + pulse * 0.22, SPRITE_DRAW_ORDER.DECALS);
-                this.pushSolidQuad3D(target.x, target.y, tz + 0.01, ringSz * 0.58, ringSz * 0.58, -performance.now() * 0.003, 0.0, 0.94, 1.0, 0.35 + pulse * 0.25, SPRITE_DRAW_ORDER.DECALS);
+                this.pushSolidQuad3D(target.x, target.y, tz, ringSz, ringSz, performance.now() * 0.002, 1.0, 0.85, 0.15, 0.28 + pulse * 0.22, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(target.x, target.y, tz + 0.01, ringSz * 0.58, ringSz * 0.58, -performance.now() * 0.003, 0.0, 0.94, 1.0, 0.35 + pulse * 0.25, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
     }
