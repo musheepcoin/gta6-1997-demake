@@ -1249,6 +1249,7 @@ class ViceNetworkManager {
             rp.muzzleTimer = pkt.mz || 0;
             rp.kills = pkt.k || 0;
             rp.isHidden = Boolean(pkt.hid);
+            rp.ver = pkt.ver || 0;
             rp.veh = pkt.veh || null;
             rp.lastSeen = performance.now();
             if (typeof pkt.sc === "number" && pkt.sc > 0 && this.game && typeof this.game.recordHighScore === "function") {
@@ -1420,11 +1421,16 @@ class ViceNetworkManager {
     }
 
     isWorldHost() {
+        const MY_VER = 101150;
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
         const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
         const mySlot = (typeof this.slotIndex === "number" && this.slotIndex >= 0) ? this.slotIndex : 999;
         for (const rp of humans) {
+            const rpVer = rp.ver || 0;
+            // Newer game build version always takes World Host priority over an un-refreshed old tab!
+            if (rpVer > MY_VER) return false;
+            if (rpVer < MY_VER) continue;
             const rpHidden = Boolean(rp.isHidden);
             // A visible tab always takes World Host priority over a minimized/hidden tab
             if (myHidden && !rpHidden) return false;
@@ -1602,6 +1608,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
+            ver: 101150,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
             vehs
@@ -1610,8 +1617,12 @@ class ViceNetworkManager {
 
     applyWorldSync(pkt) {
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded || !pkt) return;
-        this.lastWorldSyncReceivedMs = performance.now();
         const isInitialServerBootstrap = (pkt.id === "server_world");
+        // Ignore live WORLD_SYNC packets sent by an outdated client tab running an older game version
+        if (!isInitialServerBootstrap && (pkt.ver || 0) < 101150) {
+            return;
+        }
+        this.lastWorldSyncReceivedMs = performance.now();
         if (isInitialServerBootstrap) {
             this._serverBootstrapApplied = true;
         }
@@ -1658,6 +1669,10 @@ class ViceNetworkManager {
                 seenIds.add(id);
                 // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
                 if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id === "armored_vice_port" || id === "parked_35") && drvCode === 0 && !(flags & 1)) {
+                    continue;
+                }
+                // Never restore stale ambient AI traffic cars from an older build's server snapshot
+                if (isInitialServerBootstrap && !isMod && (pkt.ver || 0) < 101150) {
                     continue;
                 }
                 let v = existingById.get(id);
@@ -1932,6 +1947,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "STATE",
+            ver: 101150,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),
             name: this.playerName,

@@ -1769,23 +1769,50 @@ class Vehicle {
             !isPanicked &&
             this.driver === "AI_TRAFFIC" &&
             !this.aiCurbParkingBay &&
-            lidZ1 !== 25 &&
             (this.specKey === "VICE_CAB" || this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH")
         ) {
-            if (
+            const cDx = this.aiChosenDir ? (this.aiChosenDir.dx || 0) : 0;
+            const cDy = this.aiChosenDir ? (this.aiChosenDir.dy || 0) : 0;
+            const curAlignErr = this.aiChosenDir ? Math.abs(this.normalizeAngle(this.aiChosenDir.angle - this.angle)) : 0;
+            const nearJunction = Boolean(
+                lidZ1 === 25 ||
+                (this.aiChosenDir && this.aiChosenDir.isTurn) ||
+                (map.getBlockInfo && (
+                    map.getBlockInfo(bx + cDx, by + cDy, 1).lid === 25 ||
+                    map.getBlockInfo(bx + cDx * 2, by + cDy * 2, 1).lid === 25 ||
+                    map.getBlockInfo(bx - cDx, by - cDy, 1).lid === 25
+                )) ||
+                (map.isStopLineBlock && (map.isStopLineBlock(bx, by) || map.isStopLineBlock(bx + cDx, by + cDy)))
+            );
+            if (nearJunction) {
+                this.aiPassengerStopTimer = 0;
+                this.aiPassengerDropPending = false;
+                this.aiBoardingStarted = false;
+                if (!this.aiPassengerTarget) {
+                    this.aiPullOverOffset = 0;
+                    this.aiPullOverTimer = 0;
+                }
+            } else if (
                 movedOutOfLane &&
                 !this.aiPassengerTarget &&
                 (this.aiPassengerStopTimer || 0) <= 0 &&
                 (this.aiPassengerStopCooldown || 0) <= 0 &&
                 this.aiChosenDir &&
                 !this.aiChosenDir.isTurn &&
+                curAlignErr < 0.03 &&
                 this.aiTurnSeed > 0.84
             ) {
-                // Check if right-hand side is a paved sidewalk (GROUND_TYPE.PAWEMENT)
-                const rightBx = bx - (this.aiChosenDir.dy || 0);
-                const rightBy = by + (this.aiChosenDir.dx || 0);
+                // Check if right-hand side is a paved sidewalk (GROUND_TYPE.PAWEMENT) both here and 1 tile ahead
+                const rightBx = bx - cDy;
+                const rightBy = by + cDx;
                 const rightNav = map.getNavigationBlock ? map.getNavigationBlock(rightBx, rightBy, curZ) : null;
-                if (rightNav && rightNav.groundType === GROUND_TYPE.PAWEMENT) {
+                const rightAheadNav = map.getNavigationBlock ? map.getNavigationBlock(rightBx + cDx, rightBy + cDy, curZ) : null;
+                if (
+                    rightNav &&
+                    rightNav.groundType === GROUND_TYPE.PAWEMENT &&
+                    rightAheadNav &&
+                    rightAheadNav.groundType === GROUND_TYPE.PAWEMENT
+                ) {
                     this.aiPassengerStopTimer = this.specKey === "VICE_CAB" ? 3.2 : 4.2;
                     this.aiPassengerDropPending = true;
                 }
@@ -1794,11 +1821,15 @@ class Vehicle {
             if (hailedPed && (hailedPed.dead || (hailedPed.panicTimer || 0) > 0 || (hailedPed.hailingTaxiTimer || 0) <= 0)) {
                 this.aiPassengerTarget = null;
             }
-            if (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0) {
-                this.aiPullOverOffset = 18;
+            if (!nearJunction && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0)) {
+                const isBusOrCoach = (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH");
+                this.aiPullOverOffset = isBusOrCoach ? 12 : 16;
                 this.aiPullOverTimer = 1.2;
                 this.aiTurnSignal = 2; // 4-way hazard flashers while picking up / dropping off passengers
                 this.aiState = "STOPPED_LIGHT";
+                if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
+                    this.angle = this.aiChosenDir.angle;
+                }
                 const brakeMult = Math.pow(0.015, dt);
                 this.vx *= brakeMult;
                 this.vy *= brakeMult;
@@ -1812,7 +1843,7 @@ class Vehicle {
                         game.spawnAlightingPassenger(this);
                     }
                     // Buses / tour coaches: waiting pedestrians walk to the front door and climb aboard during the stop
-                    if (!this.aiBoardingStarted && (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH") && game && typeof game.boardBusPassengers === "function") {
+                    if (!this.aiBoardingStarted && isBusOrCoach && game && typeof game.boardBusPassengers === "function") {
                         this.aiBoardingStarted = true;
                         game.boardBusPassengers(this);
                     }
