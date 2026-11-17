@@ -272,11 +272,11 @@ class MissionManager {
                 const d = Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y);
                 if (d < 68) {
                     m.stage = 2;
-                    g.addCash(400, "REGISTER ROBBED!");
+                    g.addCash(m.phone && m.phone.completed ? 100 : 300, "REGISTER ROBBED!", true);
                     g.setWantedLevel(Math.max(g.wantedLevel, 2));
                     g.sendPager(
                         "JASON (SMARTPHONE)",
-                        "REGISTER CLEARED ($400)! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
+                        "REGISTER CLEARED! VCPD cruisers incoming! Drive west to VICE CUSTOMS PAY 'N' SPRAY on Collins Ave to lose the heat!",
                         true
                     );
                     m.targetPos = { x: 435.5 * TILE_SIZE, y: 287.7 * TILE_SIZE };
@@ -293,7 +293,7 @@ class MissionManager {
                     const c = m.crates[i];
                     if (Math.hypot(p.x - c.x, p.y - c.y) < 58) {
                         m.crates.splice(i, 1);
-                        g.addCash(250, "CONTRABAND CRATE");
+                        g.addCash(m.phone && m.phone.completed ? 75 : 200, "CONTRABAND CRATE", true);
                         g.audio.playCashSound();
                     }
                 }
@@ -357,7 +357,7 @@ class MissionManager {
                 }
                 if (!v || v.destroyed || p.inVehicle === v) {
                     m.stage = 2;
-                    g.addCash(1500, "ARMORED VAULT LOOT!");
+                    g.addCash(m.phone && m.phone.completed ? 250 : 750, "ARMORED VAULT LOOT!", true);
                     g.setWantedLevel(Math.max(g.wantedLevel, 4));
                     m.targetPos = { x: 128.0 * TILE_SIZE, y: 297.5 * TILE_SIZE };
                     m.objectiveLabel = "HACK DOC RELAY AT VCIA AIRPORT";
@@ -804,29 +804,33 @@ class MissionManager {
     completeMission(phone, title, reward) {
         const g = this.game;
         const wasDynamicFixer = Boolean((phone && phone.missionId === "M0_DYNAMIC_FIXER") || (this.activeMission && this.activeMission.id === "M0_DYNAMIC_FIXER"));
+        const wasAlreadyCompleted = Boolean(phone && phone.completed && !wasDynamicFixer);
         if (phone && phone.missionId !== "M0_DYNAMIC_FIXER") {
             phone.completed = true;
             this.saveLocalStoryProgress();
-            if (typeof g.addMultiplier === "function") {
-                g.addMultiplier(1);
-            } else {
-                g.multiplier = Math.min(5, (g.multiplier || 1) + 1);
+            if (!wasAlreadyCompleted) {
+                if (typeof g.addMultiplier === "function") {
+                    g.addMultiplier(1);
+                } else {
+                    g.multiplier = Math.min(5, (g.multiplier || 1) + 1);
+                }
             }
         }
+        const finalReward = wasAlreadyCompleted ? Math.max(250, Math.round((reward || 1000) * 0.25)) : (reward || 1000);
         this.cleanupMissionVehicles();
         this.activeMission = null;
-        g.addCash(reward, "MISSION PASSED!");
+        g.addCash(finalReward, "MISSION PASSED!", true);
         if (g.net && typeof g.net.broadcastStateNow === "function") {
             g.net.broadcastStateNow();
         }
         g.audio.playCashSound();
-        g.showBigBanner("MISSION PASSED!", `${title} — +$${reward.toLocaleString()}`, "#39ff14", 3.2);
+        g.showBigBanner("MISSION PASSED!", `${title} — +$${finalReward.toLocaleString()}`, "#39ff14", 3.2);
 
         if (wasDynamicFixer) {
             this.selectedMissionIdx = 0;
             g.sendPager(
                 "📱 VICENET AI FIXER",
-                `Contract cleared (+$${reward.toLocaleString()})! Hit [START] on your Smartphone (or type @fixer in chat) whenever you want another 90s contract!`,
+                `Contract cleared (+$${finalReward.toLocaleString()})! Hit [START] on your Smartphone (or type @fixer in chat) whenever you want another 90s contract!`,
                 false
             );
             return;

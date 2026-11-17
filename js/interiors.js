@@ -45,7 +45,7 @@
                     { id: `${id}_EXPRESS`, x: 185, y: 245, color: "#fbbf24", label: "🍕 HOT SLICE & ESPRESSO ($60)", sub: "+45 HP INSTANT HEAL!", action: "BUY_SNACK", cost: 60 },
                     { id: `${id}_FEAST`, x: 410, y: 245, color: "#22c55e", label: "🥩 CHEF'S FULL PLATTER ($180)", sub: "100% FULL HEALTH + SPRINT BOOST!", action: "BUY_MEAL", cost: 180 },
                     { id: `${id}_WINE`, x: 685, y: 350, color: "#e879f9", label: "🍷 VINTAGE RESERVE BOTTLE ($300)", sub: "100% HEALTH + +50 ARMOR!", action: "BUY_DRINK", cost: 300 },
-                    { id: `${id}_REG`, x: 685, y: 155, color: "#fde047", label: "💵 OFFICE SAFE STICK-UP", sub: "ROB THE MANAGER'S SAFE (+$3,500, +2★ WANTED)!", action: "ROB_REGISTER", reward: 3500 }
+                    { id: `${id}_REG`, x: 685, y: 155, color: "#fde047", label: "💵 OFFICE SAFE STICK-UP", sub: "ROB THE MANAGER'S SAFE (+$350, +2★ WANTED)!", action: "ROB_REGISTER", reward: 350 }
                 ];
             },
             buildNpcs() {
@@ -70,7 +70,7 @@
                 return [
                     { id: `${id}_SUITE`, x: 138, y: 162, color: "#ec4899", label: "🛏️ PRESIDENTIAL KING SUITE ($300)", sub: "REST & HEAL 100% HP + CLEAR 1★ WANTED!", action: "RENT_SUITE", cost: 300 },
                     { id: `${id}_CLOSET`, x: 138, y: 395, color: "#38bdf8", label: "🕶️ WALK-IN SUITE WARDROBE ($400)", sub: "NEW DISGUISE — CLEAR ALL WANTED STARS!", action: "CHANGE_OUTFIT", cost: 400 },
-                    { id: `${id}_CONCIERGE`, x: 410, y: 256, color: "#fde047", label: "🛎️ CONCIERGE SAFE DEPOSIT", sub: "COLLECT VIP GUEST STASH (+$1,500)!", action: "HOTEL_PERK", reward: 1500 },
+                    { id: `${id}_CONCIERGE`, x: 410, y: 256, color: "#fde047", label: "🛎️ CONCIERGE SAFE DEPOSIT", sub: "COLLECT VIP GUEST STASH (+$250)!", action: "HOTEL_PERK", reward: 250 },
                     { id: `${id}_BAR`, x: 665, y: 175, color: "#22d3ee", label: "🍹 POOLSIDE MOJITO BAR ($120)", sub: "FULL HEALTH + SPRINT SPEED BOOST!", action: "BUY_COCKTAIL", cost: 120 }
                 ];
             },
@@ -120,8 +120,8 @@
                 return [
                     { id: `${id}_SLUSH`, x: 705, y: 265, color: "#38bdf8", label: "🥤 VICE BERRY SLUSHIE ($35)", sub: "+35 HP QUICK REFRESH!", action: "BUY_SNACK", cost: 35 },
                     { id: `${id}_ENERGY`, x: 705, y: 435, color: "#22c55e", label: "⚡ 6-PACK ENERGY DRINK ($95)", sub: "100% FULL HEALTH + SPEED BOOST!", action: "BUY_ENERGY", cost: 95 },
-                    { id: `${id}_LOTTO`, x: 145, y: 315, color: "#fbbf24", label: "🎟️ LEONIDA SCRATCH-OFF ($100)", sub: "WIN UP TO $2,500 INSTANT CASH!", action: "PLAY_LOTTO", cost: 100 },
-                    { id: `${id}_ROB`, x: 485, y: 118, color: "#ef4444", label: "💰 CRACK BACKROOM STOCK SAFE", sub: "ROB +$3,200 CASH (+2★ WANTED LEVEL)!", action: "ROB_REGISTER", reward: 3200 }
+                    { id: `${id}_LOTTO`, x: 145, y: 315, color: "#fbbf24", label: "🎟️ LEONIDA SCRATCH-OFF ($50)", sub: "WIN UP TO $400 INSTANT CASH!", action: "PLAY_LOTTO", cost: 50 },
+                    { id: `${id}_ROB`, x: 485, y: 118, color: "#ef4444", label: "💰 CRACK BACKROOM STOCK SAFE", sub: "ROB +$320 CASH (+2★ WANTED LEVEL)!", action: "ROB_REGISTER", reward: 320 }
                 ];
             },
             buildNpcs() {
@@ -144,8 +144,8 @@
                 return [
                     { id: `${id}_BEER`, x: 410, y: 205, color: "#fbbf24", label: "🍺 ICE COLD VICE LAGER ($50)", sub: "+50 HP REFRESHMENT!", action: "BUY_SNACK", cost: 50 },
                     { id: `${id}_SHOT`, x: 135, y: 165, color: "#06b6d4", label: "🥃 TOP-SHELF TEQUILA FLIGHT ($160)", sub: "100% HEALTH + +50 ARMOR!", action: "BUY_DRINK", cost: 160 },
-                    { id: `${id}_POOL`, x: 135, y: 395, color: "#22c55e", label: "🎱 HIGH-STAKES 8-BALL HUSTLE ($200)", sub: "BEAT THE HUSTLER FOR UP TO $3,000!", action: "PLAY_POOL", cost: 200 },
-                    { id: `${id}_SAFE`, x: 685, y: 145, color: "#fde047", label: "💼 BACKROOM BOOKIE STASH", sub: "CRACK THE BAR OFFICE SAFE (+$3,500, +2★ WANTED)!", action: "ROB_REGISTER", reward: 3500 }
+                    { id: `${id}_POOL`, x: 135, y: 395, color: "#22c55e", label: "🎱 HIGH-STAKES 8-BALL HUSTLE ($100)", sub: "BEAT THE HUSTLER FOR UP TO $350!", action: "PLAY_POOL", cost: 100 },
+                    { id: `${id}_SAFE`, x: 685, y: 145, color: "#fde047", label: "💼 BACKROOM BOOKIE STASH", sub: "CRACK THE BAR OFFICE SAFE (+$350, +2★ WANTED)!", action: "ROB_REGISTER", reward: 350 }
                 ];
             },
             buildNpcs() {

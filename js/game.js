@@ -4817,14 +4817,14 @@ class LeonidaGame {
 
 
 
+        if (!this.vaultLockouts) this.vaultLockouts = {};
+        const nowMs = Date.now();
         if (Array.isArray(intr.stations)) {
-
             for (const st of intr.stations) {
-
-                st.cooldown = 0;
-
+                const vKey = `${intr.id}_${st.id || st.label || "st"}`;
+                const lockUntil = Math.max(st.cooldownUntilMs || 0, this.vaultLockouts[vKey] || 0);
+                st.cooldown = lockUntil > nowMs ? (lockUntil - nowMs) * 0.001 : 0;
             }
-
         }
 
 
@@ -5016,15 +5016,17 @@ class LeonidaGame {
 
             const loot = Math.min(400, fx.heist[0] + Math.floor(Math.random() * (fx.heist[1] - fx.heist[0] + 1)));
 
-            this.addCash(loot, "HOLD-UP!");
+            this.addCash(loot, "HOLD-UP!", true);
 
             this.setWantedLevel(Math.max(this.wantedLevel, fx.wanted || 3));
 
             this.audio.playShot("PISTOL");
+            this.recordStationCooldown(this.activeInterior, st, st.cooldown || 90.0, true);
 
         } else {
 
             this.audio.playCashSound();
+            this.recordStationCooldown(this.activeInterior, st, st.cooldown || 5.0, Boolean(fx.multiplier || fx.extraLife || fx.jailCards));
 
         }
 
@@ -5035,6 +5037,41 @@ class LeonidaGame {
             this.net.broadcastStateNow();
         }
 
+    }
+
+    recordStationCooldown(intr, st, cooldownSec, syncToServer = false) {
+        if (!st) return;
+        const sec = Math.max(1, Number(cooldownSec) || 5);
+        st.cooldown = sec;
+        const untilMs = Date.now() + sec * 1000;
+        st.cooldownUntilMs = untilMs;
+        if (!this.vaultLockouts) this.vaultLockouts = {};
+        const intrId = (intr && intr.id) ? intr.id : (this.activeInterior ? this.activeInterior.id : "INTR");
+        const vKey = `${intrId}_${st.id || st.label || "st"}`;
+        this.vaultLockouts[vKey] = untilMs;
+        if (syncToServer && this.net && typeof this.net.broadcastWorldEvent === "function") {
+            this.net.broadcastWorldEvent({
+                kind: "VAULT_ROBBED",
+                vaultKey: vKey,
+                cooldownSec: Math.round(sec)
+            });
+        }
+    }
+
+    applyNetworkVaultCooldown(vaultKey, remSec) {
+        if (!vaultKey || !(remSec > 0)) return;
+        if (!this.vaultLockouts) this.vaultLockouts = {};
+        const untilMs = Date.now() + remSec * 1000;
+        this.vaultLockouts[vaultKey] = untilMs;
+        if (this.activeInterior && Array.isArray(this.activeInterior.stations)) {
+            for (const st of this.activeInterior.stations) {
+                const k = `${this.activeInterior.id}_${st.id || st.label || "st"}`;
+                if (k === vaultKey) {
+                    st.cooldownUntilMs = untilMs;
+                    st.cooldown = remSec;
+                }
+            }
+        }
     }
 
 
@@ -5167,24 +5204,24 @@ class LeonidaGame {
                     break;
                 case "HOTEL_PERK": {
                     const stash = Math.min(250, Number(st.reward) || 250);
-                    st.cooldown = 90.0;
+                    this.recordStationCooldown(this.activeInterior, st, 120.0, true);
                     p.hp = p.maxHp;
                     p.armor = Math.min(100, (p.armor || 0) + 50);
                     p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 20.0);
-                    this.addCash(stash, "🛎️ VIP GUEST STASH!");
+                    this.addCash(stash, "🛎️ VIP GUEST STASH!", true);
                     bannerSub = `COLLECTED +$${stash.toLocaleString()} VIP STASH + 100% HP & +50 ARMOR!`;
                     break;
                 }
                 case "PLAY_LOTTO": {
-                    st.cooldown = 8.0;
+                    this.recordStationCooldown(this.activeInterior, st, 10.0, false);
                     const roll = Math.random();
                     if (roll < 0.12) {
-                        this.addCash(400, "🎰 FLORIDA LOTTO JACKPOT!");
+                        this.addCash(400, "🎰 FLORIDA LOTTO JACKPOT!", true);
                         bannerTitle = "🎰 LOTTO JACKPOT WINNER!";
                         bannerSub = "SCRATCHED 3 GOLDEN FLAMINGOS: WON +$400!";
                         bannerCol = "#fde047";
                     } else if (roll < 0.42) {
-                        this.addCash(100, "🎟️ LOTTO PRIZE WINNER!");
+                        this.addCash(100, "🎟️ LOTTO PRIZE WINNER!", true);
                         bannerTitle = "🎟️ SCRATCH-OFF WINNER!";
                         bannerSub = "MATCHED 2 PALM TREES: WON +$100!";
                         bannerCol = "#39ff14";
@@ -5196,15 +5233,15 @@ class LeonidaGame {
                     break;
                 }
                 case "PLAY_POOL": {
-                    st.cooldown = 15.0;
+                    this.recordStationCooldown(this.activeInterior, st, 18.0, false);
                     const poolRoll = Math.random();
                     if (poolRoll < 0.20) {
-                        this.addCash(350, "🎱 8-BALL TABLE RUN HUSTLE!");
+                        this.addCash(350, "🎱 8-BALL TABLE RUN HUSTLE!", true);
                         bannerTitle = "🎱 CLEAN TABLE RUN!";
                         bannerSub = "RAN THE RACK ON THE SHARK: WON +$350!";
                         bannerCol = "#fde047";
                     } else if (poolRoll < 0.60) {
-                        this.addCash(150, "🎱 8-BALL BANK SHOT HUSTLE!");
+                        this.addCash(150, "🎱 8-BALL BANK SHOT HUSTLE!", true);
                         bannerTitle = "🎱 SANK THE 8-BALL!";
                         bannerSub = "CORNER POCKET BANK SHOT: HUSTLED +$150!";
                         bannerCol = "#39ff14";
@@ -5216,9 +5253,9 @@ class LeonidaGame {
                     break;
                 }
                 case "ROB_REGISTER": {
-                    st.cooldown = 60.0;
+                    this.recordStationCooldown(this.activeInterior, st, 120.0, true);
                     const take = Math.min(350, Number(st.reward) || 300);
-                    this.addCash(take, "💵 ARMED REGISTER HOLD-UP!");
+                    this.addCash(take, "💵 ARMED REGISTER HOLD-UP!", true);
                     this.setWantedLevel(Math.max(this.wantedLevel + 1, 2));
                     if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
                         this.missions.onInteriorRobbery();
@@ -5236,9 +5273,13 @@ class LeonidaGame {
                 }
                 default:
                     p.hp = p.maxHp;
+                    this.recordStationCooldown(this.activeInterior, st, st.cooldown || 6.0, false);
                     break;
             }
 
+            if ((st.cooldownUntilMs || 0) <= Date.now()) {
+                this.recordStationCooldown(this.activeInterior, st, st.cooldown || 6.0, false);
+            }
             if (this.audio && this.audio.playCashSound) this.audio.playCashSound();
             this.showBigBanner(bannerTitle, bannerSub, bannerCol, 2.2);
             this.updateHud();
@@ -5248,9 +5289,8 @@ class LeonidaGame {
             return;
         }
 
-        st.cooldown = 8.0;
-
-
+        let rwdCooldown = 60.0;
+        let syncVault = false;
 
         switch (st.rewardType) {
 
@@ -5260,11 +5300,11 @@ class LeonidaGame {
 
                 p.armor = 100;
 
-                grantWep("SHOTGUN", 40);
+                grantWep("SHOTGUN", 35);
 
-                grantWep("UZI", 180);
+                grantWep("UZI", 120);
 
-                this.addCash(2000, st.label);
+                rwdCooldown = 60.0;
 
                 break;
 
@@ -5274,15 +5314,16 @@ class LeonidaGame {
 
                 p.armor = 100;
 
-                grantWep("SHOTGUN", 50);
+                grantWep("SHOTGUN", 40);
 
-                grantWep("UZI", 200);
+                grantWep("UZI", 140);
 
-                grantWep("FLAMETHROWER", 240);
+                grantWep("FLAMETHROWER", 80);
 
-                grantWep("ROCKET", 16);
+                grantWep("ROCKET", 8);
 
-                this.addCash(3500, st.label);
+                rwdCooldown = 90.0;
+                syncVault = true;
 
                 break;
 
@@ -5298,7 +5339,8 @@ class LeonidaGame {
 
                 this.renderPortraits();
 
-                this.addCash(2500, "DISGUISE & WANTED CLEARED!");
+                rwdCooldown = 90.0;
+                syncVault = true;
 
                 break;
 
@@ -5308,7 +5350,7 @@ class LeonidaGame {
 
                 p.speedBoostTimer = 18.0;
 
-                this.addCash(2000, "ADRENALINE SPEED BOOST!");
+                rwdCooldown = 60.0;
 
                 break;
 
@@ -5316,9 +5358,10 @@ class LeonidaGame {
 
                 p.hp = p.maxHp;
 
-                this.multiplier += 1;
+                this.addMultiplier(1);
 
-                this.addCash(4000, "MULTIPLIER +1!");
+                rwdCooldown = 120.0;
+                syncVault = true;
 
                 break;
 
@@ -5326,11 +5369,15 @@ class LeonidaGame {
 
                 p.hp = p.maxHp;
 
-                grantWep("SHOTGUN", 30);
+                grantWep("SHOTGUN", 24);
 
-                grantWep("UZI", 150);
+                grantWep("UZI", 90);
 
-                this.addCash(12000, "VAULT CRACKED!");
+                this.addCash(600, "VAULT CRACKED!", true);
+                this.setWantedLevel(Math.max(this.wantedLevel + 1, 3));
+
+                rwdCooldown = 150.0;
+                syncVault = true;
 
                 if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
                     this.missions.onInteriorRobbery();
@@ -5348,9 +5395,10 @@ class LeonidaGame {
 
                 p.hp = p.maxHp;
 
-                this.lives += 1;
+                this.lives = Math.min(9, (this.lives || 3) + 1);
 
-                this.addCash(5000, "1UP EXTRA LIFE!");
+                rwdCooldown = 180.0;
+                syncVault = true;
 
                 break;
 
@@ -5358,11 +5406,12 @@ class LeonidaGame {
 
                 p.hp = p.maxHp;
 
-                this.jailFreeCards = (this.jailFreeCards || 0) + 2;
+                this.jailFreeCards = Math.min(9, (this.jailFreeCards || 0) + 1);
 
                 this.setWantedLevel(0);
 
-                this.addCash(5000, "+2 JAIL FREE CARDS!");
+                rwdCooldown = 150.0;
+                syncVault = true;
 
                 break;
 
@@ -5370,11 +5419,15 @@ class LeonidaGame {
 
                 p.hp = p.maxHp;
 
-                this.multiplier += 2;
+                this.addMultiplier(1);
 
-                grantWep("ROCKET", 20);
+                grantWep("ROCKET", 10);
 
-                this.addCash(20000, "🚀 CAPE LEONIDA ROCKET LAUNCHED!");
+                this.addCash(1000, "🚀 CAPE LEONIDA ROCKET LAUNCHED!", true);
+                this.setWantedLevel(Math.max(this.wantedLevel, 4));
+
+                rwdCooldown = 180.0;
+                syncVault = true;
 
                 break;
 
@@ -5382,17 +5435,24 @@ class LeonidaGame {
 
                 p.hp = p.maxHp;
 
-                this.addCash(3000, st.label);
+                this.addCash(150, st.label, true);
+
+                rwdCooldown = 60.0;
 
                 break;
 
         }
+
+        this.recordStationCooldown(this.activeInterior, st, rwdCooldown, syncVault);
 
         this.audio.playCashSound();
 
         this.showBigBanner(st.label, st.sub, st.color || "#39ff14", 2.2);
 
         this.updateHud();
+        if (this.net && typeof this.net.broadcastStateNow === "function") {
+            this.net.broadcastStateNow();
+        }
 
     }
 
@@ -7305,21 +7365,21 @@ class LeonidaGame {
 
         if (this.killFrenzy.kills >= this.killFrenzy.targetKills) {
 
-            const reward = this.killFrenzy.reward;
+            const reward = Math.min(2500, this.killFrenzy.reward || 1500);
 
             this.killFrenzy = null;
 
-            this.multiplier += 1;
+            this.addMultiplier(1);
 
             this.audio.playFanfare("GOURANGA");
 
-            this.addCash(reward, "FRENZY PASSED!");
+            this.addCash(reward, "FRENZY PASSED!", true);
 
             this.showBigBanner(
 
                 "FRENZY PASSED!",
 
-                `KILL FRENZY COMPLETED! +$${(reward * this.multiplier).toLocaleString()} & MULTIPLIER x${this.multiplier}!`,
+                `KILL FRENZY COMPLETED! +$${reward.toLocaleString()} & MULTIPLIER x${this.multiplier}!`,
 
                 "#39ff14",
 
@@ -7459,25 +7519,25 @@ class LeonidaGame {
 
         } else if (pk.type === "JAIL_FREE") {
 
-            this.jailFreeCards += 1;
+            this.jailFreeCards = Math.min(9, (this.jailFreeCards || 0) + 1);
 
             this.addFloatingText(pk.x, pk.y - 16, "🃏 GET OUT OF JAIL FREE CARD!", "#ffd13b");
 
         } else if (pk.type === "MULTIPLIER") {
 
-            this.multiplier += 1;
+            this.addMultiplier(1);
 
             this.addFloatingText(pk.x, pk.y - 16, `✨ MULTIPLIER x${this.multiplier}!`, "#39ff14");
 
         } else if (pk.type === "EXTRA_LIFE") {
 
-            this.lives += 1;
+            this.lives = Math.min(9, (this.lives || 3) + 1);
 
             this.addFloatingText(pk.x, pk.y - 16, `❤️ EXTRA LIFE! (LIVES: ${this.lives})`, "#ff2a85");
 
         } else if (pk.type === "CASH") {
 
-            this.addCash(pk.amount || 5000, pk.label);
+            this.addCash(Math.min(500, pk.amount || 250), pk.label, true);
 
         }
 
@@ -8173,7 +8233,7 @@ class LeonidaGame {
     }
 
     addMultiplier(n = 1) {
-        this.multiplier = Math.max(1, (this.multiplier || 1) + n);
+        this.multiplier = Math.min(5, Math.max(1, (this.multiplier || 1) + n));
         this.updateHud();
     }
 
@@ -8823,23 +8883,23 @@ class LeonidaGame {
 
             this.monksKilled++;
 
-            this.addCash(200, `MONK DOWN (${this.monksKilled}/7)`);
+            this.addCash(25, `MONK DOWN (${this.monksKilled}/7)`, true);
 
             if (this.monksKilled >= 7) {
 
-                this.monkRespawnTimer = 28;
+                this.monkRespawnTimer = 120;
 
-                this.multiplier += 1;
+                this.addMultiplier(1);
 
                 this.audio.playFanfare("GOURANGA");
 
-                this.addCash(50000, "GOURANGA!");
+                this.addCash(1000, "GOURANGA!", true);
 
                 this.showBigBanner(
 
                     "GOURANGA!",
 
-                    "ALL 7 SAFFRON MONKS WIPED OUT! +$50,000 BONUS & MULTIPLIER +1!",
+                    "ALL 7 SAFFRON MONKS WIPED OUT! +$1,000 BONUS & MULTIPLIER +1!",
 
                     "#ff9900",
 
@@ -12802,6 +12862,9 @@ class LeonidaGame {
         if (this.map.cranes) {
 
             for (const cr of this.map.cranes) {
+                if ((cr.cooldown || 0) > 0) {
+                    cr.cooldown = Math.max(0, cr.cooldown - dt);
+                }
 
                 if (cr.crushingVehicle) {
 
@@ -12823,7 +12886,7 @@ class LeonidaGame {
 
                     if (cr.crushProgress >= 1.0) {
 
-                        const payout = cv.resellValue || 12000;
+                        const payout = Math.min(500, cv.resellValue || 250);
 
                         const vName = cv.name;
 
@@ -12840,20 +12903,19 @@ class LeonidaGame {
                         cr.crushProgress = 0;
 
                         cr.armAngle = 0;
-
-                        this.multiplier += 1;
+                        cr.cooldown = 45.0;
 
                         this.audio.playCrateSmash();
 
                         this.audio.playCashSound();
 
-                        this.addCash(payout, "CRUSHED & EXPORTED!");
+                        this.addCash(payout, "CRUSHED & EXPORTED!", true);
 
                         this.showBigBanner(
 
                             "CAR CRUSHED!",
 
-                            `${vName} COMPACTED FOR +$${(payout * this.multiplier).toLocaleString()} & MULTIPLIER +1!`,
+                            `${vName} COMPACTED FOR +$${payout.toLocaleString()} SCRAP BONUS!`,
 
                             "#ffd13b",
 
@@ -12863,9 +12925,9 @@ class LeonidaGame {
 
                     }
 
-                } else if (Math.abs(p.x - cr.x) < 900 && Math.abs(p.y - cr.y) < 900) {
+                } else if ((cr.cooldown || 0) <= 0 && Math.abs(p.x - cr.x) < 900 && Math.abs(p.y - cr.y) < 900) {
 
-                    // Look for any unoccupied non-destroyed vehicle parked inside the crane pad via spatial grid
+                    // Look for any unoccupied non-destroyed player-delivered vehicle parked inside the crane pad via spatial grid
                     const vHead = this._vehGridHead;
                     const vNext = this._vehGridNext;
                     if (vHead && vNext) {
@@ -12879,7 +12941,7 @@ class LeonidaGame {
                             for (let cx = cx0; cx <= cx1; cx++) {
                                 for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
                                     const v = this.vehicles[vi];
-                                    if (v && !v.destroyed && v.driver === null && v !== p.inVehicle) {
+                                    if (v && !v.destroyed && v.driver === null && v !== p.inVehicle && v.lastPlayerDriven) {
                                         if (v.x > cr.x && v.x < cr.x + cr.w && v.y > cr.y && v.y < cr.y + cr.h) {
                                             cr.crushingVehicle = v;
                                             cr.crushProgress = 0.01;

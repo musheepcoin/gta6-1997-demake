@@ -195,6 +195,21 @@ class ViceNetworkManager {
         if (pkt.t === "PONG") {
             return;
         }
+        if (pkt.t === "FORCE_RELOAD" && typeof window !== "undefined") {
+            const targetBuild = String(pkt.build || "101_180");
+            if (window.__VC26_BUILD !== targetBuild) {
+                try {
+                    const lastReload = Number(window.sessionStorage.getItem("vc26_force_reload_ts") || 0);
+                    if (Date.now() - lastReload > 15000) {
+                        window.sessionStorage.setItem("vc26_force_reload_ts", String(Date.now()));
+                        window.location.replace(window.location.pathname + "?v=" + targetBuild);
+                    }
+                } catch (_e) {
+                    window.location.reload();
+                }
+            }
+            return;
+        }
         if (pkt.t === "WELCOME") {
             this._wsRetryCount = 0;
             if (typeof pkt.slot === "number") {
@@ -1520,8 +1535,8 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "STATE") {
-            // Ignore un-started lobby tabs or outdated zombie browser tabs (< v101_161)
-            if (pkt.started === false || (pkt.ver || 0) < 101161) {
+            // Ignore un-started lobby tabs or outdated zombie browser tabs (< v101_180)
+            if (pkt.started === false || (pkt.ver || 0) < 101180) {
                 if (this.remotePlayers.has(pkt.id)) {
                     this.remotePlayers.delete(pkt.id);
                     this.updateServerListUI();
@@ -1574,7 +1589,7 @@ class ViceNetworkManager {
                 } else {
                     this._pendingServerWorldSnapshot = pkt;
                 }
-            } else if ((pkt.ver || 0) >= 101161 && !this.isWorldHost()) {
+            } else if ((pkt.ver || 0) >= 101180 && !this.isWorldHost()) {
                 this.applyWorldSync(pkt);
             }
             return;
@@ -1740,7 +1755,7 @@ class ViceNetworkManager {
     }
 
     isWorldHost() {
-        const MY_VER = 101161;
+        const MY_VER = 101180;
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
         const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
@@ -1977,6 +1992,14 @@ class ViceNetworkManager {
                     this.game.saveTurfStandings();
                 }
             }
+        } else if (pkt.kind === "VAULT_ROBBED" && this.game && pkt.vaultKey && typeof this.game.applyNetworkVaultCooldown === "function") {
+            this.game.applyNetworkVaultCooldown(pkt.vaultKey, Number(pkt.cooldownSec) || 120);
+        } else if (pkt.kind === "VAULT_SYNC" && this.game && pkt.vaults && typeof pkt.vaults === "object" && typeof this.game.applyNetworkVaultCooldown === "function") {
+            for (const [vk, remSec] of Object.entries(pkt.vaults)) {
+                if (vk && Number(remSec) > 0) {
+                    this.game.applyNetworkVaultCooldown(vk, Number(remSec));
+                }
+            }
         }
     }
 
@@ -2086,14 +2109,14 @@ class ViceNetworkManager {
                 v.driver === "PLAYER" ||
                 v.driver === "REMOTE"
             );
-            // Skip untouched static parked / landmark / estate / pier / port vehicles (every client spawns them deterministically)
-            // so the WORLD_SYNC bandwidth & 180-vehicle budget are 100% reserved for active traffic and modified cars!
+            // Skip ALL untouched driverless static map vehicles (every client spawns them deterministically)
+            // so the WORLD_SYNC bandwidth & 180-vehicle budget are 100% reserved for active moving traffic and player-modified cars!
             const isUntouchedStatic = Boolean(
                 !isMod &&
                 !v.driver &&
                 !v.destroyed &&
-                (v.hp || v.maxHp || 100) >= (v.maxHp || 100) &&
-                (v.isStaticParked || v.isCurbParked || v.isEstateCar || v.missionTag === "LANDMARK")
+                !v.towedByTruck &&
+                (v.hp || v.maxHp || 100) >= (v.maxHp || 100)
             );
             if (isUntouchedStatic) {
                 continue;
@@ -2185,7 +2208,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
-            ver: 101179,
+            ver: 101180,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
             vehs: vehs.slice(0, 180),
@@ -2757,7 +2780,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "STATE",
-            ver: 101179,
+            ver: 101180,
             econVer: 2,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),

@@ -1029,7 +1029,7 @@ class Vehicle {
         this.bombArmed = false;
         this.bombTimer = 0;
         this.bombTickSecond = 5;
-        this.resellValue = spec.maxSpeed > 420 ? 22000 : (spec.maxSpeed > 370 ? 15000 : 10000);
+        this.resellValue = spec.maxSpeed > 420 ? 500 : (spec.maxSpeed > 370 ? 350 : 200);
     }
 
     /* ========================================================================

@@ -5201,7 +5201,7 @@ class LeonidaMap {
                         y: 385,
                         color: "#38bdf8",
                         label: "👗 SAFEHOUSE WARDROBE",
-                        sub: "CLEAR WANTED LEVEL + TOGGLE BANDANA + $2,000!",
+                        sub: "CLEAR WANTED LEVEL + TOGGLE BANDANA + 100 ARMOR!",
                         rewardType: "WARDROBE"
                     },
                     {
@@ -5210,7 +5210,7 @@ class LeonidaMap {
                         y: 182,
                         color: "#f472b6",
                         label: "🍹 NEON MOJITO LOUNGE",
-                        sub: "FULL HEALTH + SPEED BOOST + $1,500!",
+                        sub: "FULL HEALTH + 18S ADRENALINE SPEED BOOST!",
                         rewardType: "LOUNGE"
                     }
                 ]
@@ -5240,7 +5240,7 @@ class LeonidaMap {
                         y: 185,
                         color: "#00f0ff",
                         label: "🎧 DJ TURNTABLE BOOTH",
-                        sub: "DROP THE BASS! +1 MULTIPLIER & +$4,000!",
+                        sub: "DROP THE BASS! +1 MULTIPLIER (MAX x5) & 100% HP!",
                         rewardType: "MULTIPLIER_CASH"
                     },
                     {
@@ -5258,7 +5258,7 @@ class LeonidaMap {
                         y: 178,
                         color: "#fde047",
                         label: "💰 NIGHTCLUB OFFICE VAULT",
-                        sub: "CRACK THE SAFE FOR +$10,000 CASH!",
+                        sub: "CRACK THE SAFE FOR +$600 CASH (+3★ WANTED)!",
                         rewardType: "HEIST_SAFE"
                     }
                 ]
@@ -5296,7 +5296,7 @@ class LeonidaMap {
                         y: 178,
                         color: "#fde047",
                         label: "💼 BOOBIE IKE'S CASH VAULT",
-                        sub: "+$12,000 CASH HEIST + SHOTGUN & UZI!",
+                        sub: "+$600 CASH HEIST + SHOTGUN & UZI (+3★ WANTED)!",
                         rewardType: "HEIST_SAFE"
                     },
                     {
@@ -5342,7 +5342,7 @@ class LeonidaMap {
                         y: 178,
                         color: "#39ff14",
                         label: "🕹️ 1997 GTA ARCADE CABINET",
-                        sub: "+1 EXTRA LIFE & +$5,000 HIGH SCORE!",
+                        sub: "+1 EXTRA LIFE (MAX 9) & 100% HP!",
                         rewardType: "EXTRA_LIFE"
                     },
                     {
@@ -5351,7 +5351,7 @@ class LeonidaMap {
                         y: 365,
                         color: "#fb7185",
                         label: "🍸 HAVANA MOJITO COUNTER",
-                        sub: "100% HEALTH + SPEED BOOST + $2,000!",
+                        sub: "100% HEALTH + 18S ADRENALINE SPEED BOOST!",
                         rewardType: "LOUNGE"
                     }
                 ]
@@ -5379,7 +5379,7 @@ class LeonidaMap {
                         y: 175,
                         color: "#fde047",
                         label: "🖥️ SCARFACE OFFICE & SAFE",
-                        sub: "+$15,000 CARTEL PAYROLL & 0 WANTED!",
+                        sub: "+$600 CARTEL PAYROLL + UZI & SHOTGUN (+3★ WANTED)!",
                         rewardType: "HEIST_SAFE"
                     },
                     {
@@ -5425,7 +5425,7 @@ class LeonidaMap {
                         y: 192,
                         color: "#ef4444",
                         label: "🔴 [LAUNCH CAPE LEONIDA ROCKET!]",
-                        sub: "IGNITE PAD 39A! +$20,000 & +2 MULTIPLIER!",
+                        sub: "IGNITE PAD 39A! +$1,000, +1 MULTIPLIER & +4★ ALERT!",
                         rewardType: "ROCKET_LAUNCH"
                     },
                     {
@@ -5471,7 +5471,7 @@ class LeonidaMap {
                         y: 168,
                         color: "#fde047",
                         label: "🗝️ WARDEN'S PAROLE SAFE",
-                        sub: "+2 GET OUT OF JAIL FREE CARDS & 0 WANTED!",
+                        sub: "+1 GET OUT OF JAIL FREE CARD & 0 WANTED!",
                         rewardType: "JAIL_CARDS"
                     },
                     {
@@ -5489,7 +5489,7 @@ class LeonidaMap {
                         y: 168,
                         color: "#f87171",
                         label: "🛏️ LUCIA'S CELL #06 STASH",
-                        sub: "+$7,500 CONTRABAND STASH & 100% HP!",
+                        sub: "+$600 CONTRABAND STASH & 100% HP (+3★ WANTED)!",
                         rewardType: "HEIST_SAFE"
                     }
                 ]
@@ -5517,7 +5517,7 @@ class LeonidaMap {
                         y: 192,
                         color: "#fde047",
                         label: "💵 ROB DINER REGISTER (TRAILER 1!)",
-                        sub: "STICK UP THE REGISTER FOR +$8,500 CASH!",
+                        sub: "STICK UP THE REGISTER FOR +$600 CASH (+3★ WANTED)!",
                         rewardType: "HEIST_SAFE"
                     },
                     {

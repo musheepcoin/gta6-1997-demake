@@ -29,6 +29,8 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
+const MIN_CLIENT_VER = 101180;
+const CURRENT_BUILD = "101_180";
 
 function normalizeRoomCode(roomCode) {
     const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
@@ -61,6 +63,7 @@ function createEmptyRoom() {
         smashedProps: {},  // Knocked-down streetlamps, traffic lights, bollards, hydrants, benches
         corpses: {},       // Recent pedestrian corpses (auto-cleaned after 180s or paramedic pickup)
         corpseTs: {},      // Timestamp (ms) when each corpse was recorded
+        robbedVaults: {},  // Interior station / safe / register lockout timestamps { [vaultKey]: expiresAtMs }
         turfStandings: {}, // District Turf War Kingpins (leaderName, leaderColor, leaderScore)
         activeFlashDrop: null,
         activeBounty: null,
@@ -95,6 +98,7 @@ function ensureRoom(roomCode) {
     if (!r.smashedProps) r.smashedProps = {};
     if (!r.corpses) r.corpses = {};
     if (!r.corpseTs) r.corpseTs = {};
+    if (!r.robbedVaults) r.robbedVaults = {};
     if (!r.turfStandings) r.turfStandings = {};
     if (!r.vehs) r.vehs = {};
     if (!Array.isArray(r.chat)) r.chat = [];
@@ -168,6 +172,7 @@ function loadPersistentState() {
                                 smashedProps: Object.assign({}, existing.smashedProps, (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {}),
                                 corpses: {},
                                 corpseTs: {},
+                                robbedVaults: Object.assign({}, existing.robbedVaults || {}, (rv.robbedVaults && typeof rv.robbedVaults === "object") ? rv.robbedVaults : {}),
                                 turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
                                 activeFlashDrop: null,
                                 activeBounty: null,
@@ -381,7 +386,25 @@ function sendRoomBootstrap(socket, meta) {
         profile: prof
     });
 
-    // 6B. Persisted District Turf Standings + Active Hot Drop / Bounty Events
+    // 6B. Persisted District Turf Standings + Active Vault Lockouts + Active Hot Drop / Bounty Events
+    if (room.robbedVaults && typeof room.robbedVaults === "object") {
+        const nowMs = Date.now();
+        const activeVaults = {};
+        let hasVaults = false;
+        for (const [vk, expMs] of Object.entries(room.robbedVaults)) {
+            if (expMs > nowMs) {
+                activeVaults[vk] = Math.ceil((expMs - nowMs) / 1000);
+                hasVaults = true;
+            }
+        }
+        if (hasVaults) {
+            sendJson(socket, {
+                t: "WORLD_EVENT",
+                kind: "VAULT_SYNC",
+                vaults: activeVaults
+            });
+        }
+    }
     if (room.turfStandings && Object.keys(room.turfStandings).length > 0) {
         sendJson(socket, {
             t: "WORLD_EVENT",
@@ -419,7 +442,26 @@ function handleClientPacket(socket, pkt) {
     const meta = clients.get(socket);
     if (!meta) return;
 
-    if (pkt.id) meta.playerId = String(pkt.id).slice(0, 40);
+    // Per-socket token-bucket packet rate limiter (max 95 packets/sec)
+    const nowPktMs = Date.now();
+    if (!meta.pktWindowMs || (nowPktMs - meta.pktWindowMs) >= 1000) {
+        meta.pktWindowMs = nowPktMs;
+        meta.pktCount = 0;
+    }
+    if (++meta.pktCount > 95) {
+        return;
+    }
+
+    if (pkt.id) {
+        meta.playerId = String(pkt.id).slice(0, 40);
+        // Evict any lingering ghost socket from the same browser tab / playerId
+        for (const [otherSock, otherMeta] of clients.entries()) {
+            if (otherSock !== socket && otherMeta.playerId === meta.playerId) {
+                try { otherSock.destroy(); } catch (_e) {}
+                clients.delete(otherSock);
+            }
+        }
+    }
     if (pkt.name) {
         meta.name = String(pkt.name).slice(0, 18).toUpperCase();
         meta.profileKey = meta.name.replace(/[^A-Z0-9_#]/g, "");
@@ -483,6 +525,12 @@ function handleClientPacket(socket, pkt) {
         pkt.slot = meta.slot;
         meta.lastState = pkt;
         meta.lastSeen = Date.now();
+        if ((Number(pkt.ver) || 0) < MIN_CLIENT_VER) {
+            if (!meta.lastForceReloadMs || (Date.now() - meta.lastForceReloadMs) > 4000) {
+                meta.lastForceReloadMs = Date.now();
+                sendJson(socket, { t: "FORCE_RELOAD", build: CURRENT_BUILD });
+            }
+        }
 
         if (typeof pkt.sc === "number" && pkt.sc > 0) {
             mergeLeaderboardEntry(meta.name, pkt.charId || "LUCIA", pkt.sc, meta.color, pkt.econVer || 1);
@@ -560,6 +608,14 @@ function handleClientPacket(socket, pkt) {
 
     if (pkt.t === "WORLD_SYNC" && Array.isArray(pkt.vehs)) {
         meta.lastSeen = Date.now();
+        // Reject WORLD_SYNC from outdated un-refreshed browser tabs (< MIN_CLIENT_VER) and instruct them to reload!
+        if ((Number(pkt.ver) || 0) < MIN_CLIENT_VER) {
+            if (!meta.lastForceReloadMs || (Date.now() - meta.lastForceReloadMs) > 4000) {
+                meta.lastForceReloadMs = Date.now();
+                sendJson(socket, { t: "FORCE_RELOAD", build: CURRENT_BUILD });
+            }
+            return;
+        }
         if (typeof pkt.ver === "number" && pkt.ver > (room.ver || 0)) {
             room.ver = pkt.ver;
         }
@@ -584,6 +640,13 @@ function handleClientPacket(socket, pkt) {
                 continue;
             }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
+            // Skip unmodified driverless static map vehicles (every client spawns them locally)
+            if (!isMod && row[8] === 0 && !(row[10] & 256)) {
+                if (room.modifiedVehs[vid]) {
+                    nextVehs[vid] = room.modifiedVehs[vid];
+                }
+                continue;
+            }
             if (isMod) {
                 row[13] = 1;
                 if (!room.modifiedVehs[vid] || row[8] !== 0) {
@@ -592,7 +655,7 @@ function handleClientPacket(socket, pkt) {
                 room.modifiedVehs[vid] = row;
                 nextVehs[vid] = row;
             } else if (!room.modifiedVehs[vid]) {
-                // Only update unmodified traffic/parked row if this vehicle was NOT modified in room.modifiedVehs!
+                // Only update unmodified active traffic row if this vehicle was NOT modified in room.modifiedVehs!
                 nextVehs[vid] = row;
             } else {
                 // Preserve the persisted modified vehicle!
@@ -806,6 +869,11 @@ function handleClientPacket(socket, pkt) {
                 duration: pkt.duration || 60,
                 startedAt: Date.now()
             };
+        } else if (pkt.kind === "VAULT_ROBBED" && pkt.vaultKey) {
+            if (!room.robbedVaults) room.robbedVaults = {};
+            const cdSec = Math.max(5, Math.min(600, Number(pkt.cooldownSec) || 120));
+            room.robbedVaults[String(pkt.vaultKey).slice(0, 80)] = Date.now() + cdSec * 1000;
+            isDirty = true;
         }
         broadcastToRoom(roomCode, pkt, socket);
         return;
@@ -902,6 +970,8 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
             ok: true,
             service: "VICE CITY 26 — Persistent World Server v2",
+            build: CURRENT_BUILD,
+            minClientVer: MIN_CLIENT_VER,
             econVer: ECON_VERSION,
             uptimeSec: Math.round(process.uptime()),
             totalPlayersOnline: clients.size,
@@ -1084,9 +1154,27 @@ setInterval(() => {
         broadcastDirectoryCounts();
     }
 
-    // 2. Per-room periodic maintenance: traffic lights, prop auto-repair, corpse TTL, wreck TTL & event expiry
+    // 2. Per-room periodic maintenance: traffic lights, world clock, prop auto-repair, corpse TTL, wreck TTL & event expiry
     for (const [rCode, rv] of Object.entries(persistentStore.rooms)) {
         rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 24.0;
+        if ((nowMs - (rv.updatedAt || 0)) > 3000) {
+            rv.worldMinutes = Math.round((((rv.worldMinutes || 720) + 0.125) % 1440) * 100) / 100;
+        }
+        // If no WORLD_SYNC has arrived in the room for > 15s, prune transient AI traffic from rv.vehs while keeping rv.modifiedVehs
+        if ((nowMs - (rv.updatedAt || 0)) > 15000 && rv.vehs) {
+            for (const vid of Object.keys(rv.vehs)) {
+                if (!rv.modifiedVehs || !rv.modifiedVehs[vid]) {
+                    delete rv.vehs[vid];
+                }
+            }
+        }
+        if (rv.robbedVaults) {
+            for (const [vk, expMs] of Object.entries(rv.robbedVaults)) {
+                if (!expMs || nowMs >= expMs) {
+                    delete rv.robbedVaults[vk];
+                }
+            }
+        }
 
         if (rv.activeFlashDrop && (nowMs - (rv.activeFlashDrop.startedAt || 0)) >= (rv.activeFlashDrop.duration || 90) * 1000) {
             rv.activeFlashDrop = null;
