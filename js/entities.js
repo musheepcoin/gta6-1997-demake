@@ -3400,6 +3400,18 @@ class Vehicle {
         }
         if (this.homeStation) {
             const dHome = Math.hypot(this.x - this.homeStation.x, this.y - this.homeStation.y);
+            const isOffscreen = game && typeof game.isPointInAnyPlayerCameraView === "function"
+                ? !game.isPointInAnyPlayerCameraView(this.x, this.y, 120)
+                : true;
+            // Once the Ambulance or Fire Engine returns to its Hospital / Firehouse (or is off-screen heading back after 14s), it enters the station garage!
+            this._returnToBaseTimer = (this._returnToBaseTimer || 0) + dt;
+            if ((dHome < 240 && isOffscreen) || (this._returnToBaseTimer > 14.0 && isOffscreen)) {
+                const idx = game.vehicles.indexOf(this);
+                if (idx !== -1 && this !== (game.player && game.player.inVehicle)) {
+                    game.vehicles.splice(idx, 1);
+                }
+                return { throttle: 0, steer: 0, handbrake: true };
+            }
             if (dHome > 180) {
                 const retCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
@@ -3534,6 +3546,28 @@ class Vehicle {
 
         if (!target) {
             this.sirenActive = false;
+            if (!this.homeStation && game && typeof game.getNearestEmergencyStation === "function") {
+                this.homeStation = game.getNearestEmergencyStation("TOW", this.x, this.y);
+            }
+            if (this.homeStation) {
+                const dHome = Math.hypot(this.x - this.homeStation.x, this.y - this.homeStation.y);
+                const isOffscreen = game && typeof game.isPointInAnyPlayerCameraView === "function"
+                    ? !game.isPointInAnyPlayerCameraView(this.x, this.y, 120)
+                    : true;
+                this._returnToBaseTimer = (this._returnToBaseTimer || 0) + dt;
+                if ((dHome < 240 && isOffscreen) || (this._returnToBaseTimer > 14.0 && isOffscreen)) {
+                    const idx = game.vehicles.indexOf(this);
+                    if (idx !== -1 && this !== (game.player && game.player.inVehicle)) {
+                        game.vehicles.splice(idx, 1);
+                    }
+                    return { throttle: 0, steer: 0, handbrake: true };
+                }
+                if (dHome > 180) {
+                    const retCtrl = this.computeTargetRoadOrFeelerControls(dt, map, game, this.homeStation.x, this.homeStation.y, 0, 0, 0.45, false, false);
+                    if (this.speed > 76) retCtrl.throttle = -0.25;
+                    return retCtrl;
+                }
+            }
             return this.computeTrafficControls(dt, map, game);
         }
 
@@ -5667,8 +5701,7 @@ class TrafficManager {
             "CITY_BUS",
             "TOUR_COACH",
             "FLATBED_TRUCK",
-            "TANKER_RIG",
-            "FIRE_TRUCK"
+            "TANKER_RIG"
         ];
 
         for (let attempt = 0; attempt < 8 && candidates.length > 0; attempt++) {

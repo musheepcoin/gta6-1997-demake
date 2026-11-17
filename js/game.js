@@ -598,8 +598,6 @@ class LeonidaGame {
 
             { spec: "CITY_BUS", c: 204.5, r: 147.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "MEDIC_AMBULANCE", c: 205.5, r: 152.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
-
 
 
             // --- B. S-Curving Vice Beach Sand & South Wooden Pier (off-road on beach sand & water) ---
@@ -673,10 +671,6 @@ class LeonidaGame {
             { spec: "BANSHEE_GT", c: 58.8, r: 176.2, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "FIRE_TRUCK", c: 63.2, r: 176.2, a: 0, z: 2.0, missionTag: "LANDMARK", raw512: true },
-
-            { spec: "FIRE_TRUCK", c: 38.5, r: 136.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY" },
-
-            { spec: "FIRE_TRUCK", c: 286.5, r: 230.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_EMERGENCY", raw512: true },
 
 
 
@@ -1179,11 +1173,7 @@ class LeonidaGame {
 
                 "FLATBED_TRUCK",
 
-                "TANKER_RIG",
-
-                "VCPD_CRUISER",
-
-                "MEDIC_AMBULANCE"
+                "TANKER_RIG"
 
             ];
 
@@ -8294,32 +8284,6 @@ class LeonidaGame {
                 if (st && st.type === serviceType) list.push(st);
             }
         }
-        if (serviceType === "TOW" && this.map) {
-            if (Array.isArray(this.map.payNSprays)) {
-                for (const pns of this.map.payNSprays) {
-                    list.push({
-                        id: pns.id,
-                        type: "TOW",
-                        name: pns.name,
-                        shortName: pns.name.split("(")[0].trim(),
-                        x: pns.x + (pns.w || 64) * 0.5,
-                        y: pns.y + (pns.h || 64) * 0.5
-                    });
-                }
-            }
-            if (Array.isArray(this.map.cranes)) {
-                for (const cr of this.map.cranes) {
-                    list.push({
-                        id: cr.id,
-                        type: "TOW",
-                        name: cr.name,
-                        shortName: cr.name,
-                        x: cr.x + (cr.w || 64) * 0.5,
-                        y: cr.y + (cr.h || 64) * 0.5
-                    });
-                }
-            }
-        }
         return list;
     }
 
@@ -10564,8 +10528,8 @@ class LeonidaGame {
             return;
         }
 
-        // Persistent World Priority #2: Depart from the nearest Vice Customs / Municipal Impound Yard (strictly off-screen, never teleporting existing units!)
-        if (activeTowTrucks < 3) {
+        // Persistent World Priority #2: Depart from the nearest Municipal Impound Yard (max 1 active Tow Truck on the map!)
+        if (activeTowTrucks < 1) {
             const pz = targetBlockedCar.z || 2.0;
             const spawnInfo = this.findStationDispatchSpawn("TOW", targetBlockedCar.x, targetBlockedCar.y, pz);
             if (spawnInfo) {
@@ -16291,11 +16255,11 @@ class LeonidaGame {
                     }
                 }
 
-                // Persistent World Priority #2: If no Ambulance is in the district, dispatch one from the nearest Hospital / Trauma Center (strictly off-screen)!
+                // Persistent World Priority #2: If no Ambulance is active on the map (max 1 Ambulance), dispatch one from the nearest Hospital (strictly off-screen)!
                 if (!medicResponding) {
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
-                    if (this.medicDispatchTimer > 4.5 && totalMedics < 3) {
-                        this.medicDispatchTimer = 2.5;
+                    if (this.medicDispatchTimer > 6.5 && totalMedics < 1) {
+                        this.medicDispatchTimer = 3.0;
                         const pz = casualtyNearPlayer.z || 2.0;
                         const spawnInfo = this.findStationDispatchSpawn("MEDIC", casualtyNearPlayer.x, casualtyNearPlayer.y, pz);
                         if (spawnInfo) {
@@ -16311,7 +16275,7 @@ class LeonidaGame {
                             medCar.vy = Math.sin(spawnInfo.angle) * 102;
                             this.vehicles.push(medCar);
                             this.medicDispatchTimer = 0;
-                            this.medicDispatchCooldown = 12.0;
+                            this.medicDispatchCooldown = 22.0;
                         }
                     }
                 } else {
@@ -16350,11 +16314,11 @@ class LeonidaGame {
                         }
                     }
                 }
-                // Persistent World Priority #2: If no Fire Engine is in the district, dispatch one from the nearest VCFD Fire Station (strictly off-screen)!
+                // Persistent World Priority #2: If no Fire Engine is active on the map (max 1 Fire Engine), dispatch one from the nearest VCFD Firehouse (strictly off-screen)!
                 if (!fireTruckResponding) {
                     this.fireDispatchTimer = (this.fireDispatchTimer || 0) + emergDt;
-                    if (this.fireDispatchTimer > 4.0 && totalFireTrucks < 2) {
-                        this.fireDispatchTimer = 2.0;
+                    if (this.fireDispatchTimer > 6.0 && totalFireTrucks < 1) {
+                        this.fireDispatchTimer = 3.0;
                         const fz = burningVehNearPlayer.z || 2.0;
                         const spawnInfo = this.findStationDispatchSpawn("FIRE", burningVehNearPlayer.x, burningVehNearPlayer.y, fz);
                         if (spawnInfo) {
@@ -16370,7 +16334,7 @@ class LeonidaGame {
                             fireCar.vy = Math.sin(spawnInfo.angle) * 102;
                             this.vehicles.push(fireCar);
                             this.fireDispatchTimer = 0;
-                            this.fireDispatchCooldown = 14.0;
+                            this.fireDispatchCooldown = 24.0;
                         }
                     }
                 } else {
