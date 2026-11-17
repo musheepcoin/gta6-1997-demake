@@ -6504,24 +6504,20 @@ class LeonidaMap {
         ];
 
         // --------------------------------------------------------------------
-        // PERSISTENT WORLD MUNICIPAL STATIONS (1 EAST + 1 WEST PER SERVICE — SCALED TO MAP SIZE)
+        // PERSISTENT WORLD MUNICIPAL HQ BUILDINGS (1 CENTRAL BUILDING PER SERVICE FOR THE MAP)
         // --------------------------------------------------------------------
         this.emergencyStations = [
-            // 2 VCPD POLICE PRECINCTS (East Vice Beach & West Mainland)
-            { id: "vcpd_southbeach", type: "POLICE", name: "VCPD SOUTH BEACH PRECINCT", shortName: "VCPD SOUTH BEACH", x: mx256(203.0) * TILE_SIZE, y: my256(146.0) * TILE_SIZE },
-            { id: "vcpd_mainland", type: "POLICE", name: "VCPD MAINLAND HQ (DOWNTOWN)", shortName: "VCPD MAINLAND HQ", x: 285.0 * TILE_SIZE, y: 182.0 * TILE_SIZE },
+            // 1 CENTRAL VCPD POLICE PRECINCT
+            { id: "vcpd_hq", type: "POLICE", name: "VCPD CENTRAL PRECINCT HQ", shortName: "VCPD CENTRAL HQ", x: mx256(203.0) * TILE_SIZE, y: my256(146.0) * TILE_SIZE },
 
-            // 2 HOSPITALS (East Vice Beach & West Mainland)
-            { id: "ems_southbeach", type: "MEDIC", name: "OCEAN VIEW HOSPITAL (VICE BEACH)", shortName: "OCEAN VIEW HOSPITAL", x: mx256(208.5) * TILE_SIZE, y: my256(140.5) * TILE_SIZE },
-            { id: "ems_mainland", type: "MEDIC", name: "LEONIDA GENERAL HOSPITAL (MAINLAND)", shortName: "LEONIDA GENERAL", x: 268.5 * TILE_SIZE, y: 179.5 * TILE_SIZE },
+            // 1 CENTRAL HOSPITAL
+            { id: "ems_hq", type: "MEDIC", name: "LEONIDA GENERAL HOSPITAL", shortName: "LEONIDA HOSPITAL", x: mx256(208.5) * TILE_SIZE, y: my256(140.5) * TILE_SIZE },
 
-            // 2 VCFD FIREHOUSES (East Vice Beach & West Mainland)
-            { id: "vcfd_southbeach", type: "FIRE", name: "VCFD STATION #1 (VICE BEACH)", shortName: "VCFD STATION #1", x: 428.5 * TILE_SIZE, y: 295.5 * TILE_SIZE },
-            { id: "vcfd_mainland", type: "FIRE", name: "VCFD STATION #2 (MAINLAND)", shortName: "VCFD STATION #2", x: 192.5 * TILE_SIZE, y: 162.5 * TILE_SIZE },
+            // 1 CENTRAL VCFD FIRE STATION
+            { id: "vcfd_hq", type: "FIRE", name: "VCFD CENTRAL FIRE STATION", shortName: "VCFD CENTRAL STATION", x: 428.5 * TILE_SIZE, y: 295.5 * TILE_SIZE },
 
-            // 2 MUNICIPAL IMPOUND YARDS (East Vice Port & West Port Gellhorn)
-            { id: "tow_viceport", type: "TOW", name: "VICE PORT MUNICIPAL IMPOUND", shortName: "VICE PORT IMPOUND", x: 333.2 * TILE_SIZE, y: 306.5 * TILE_SIZE },
-            { id: "tow_gellhorn", type: "TOW", name: "PORT GELLHORN MUNICIPAL IMPOUND", shortName: "GELLHORN IMPOUND", x: 66.5 * TILE_SIZE, y: 213.5 * TILE_SIZE }
+            // 1 CENTRAL MUNICIPAL IMPOUND YARD
+            { id: "tow_hq", type: "TOW", name: "VICE CITY MUNICIPAL IMPOUND", shortName: "MUNICIPAL IMPOUND", x: 333.2 * TILE_SIZE, y: 306.5 * TILE_SIZE }
         ];
 
         // --------------------------------------------------------------------

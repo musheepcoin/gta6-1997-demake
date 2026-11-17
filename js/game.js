@@ -10528,8 +10528,8 @@ class LeonidaGame {
             return;
         }
 
-        // Persistent World Priority #2: Depart from the nearest Municipal Impound Yard (max 1 active Tow Truck on the map!)
-        if (activeTowTrucks < 1) {
+        // Persistent World Priority #2: Depart from the Central Municipal Impound Yard (up to 3 Tow Trucks in the fleet!)
+        if (activeTowTrucks < 3) {
             const pz = targetBlockedCar.z || 2.0;
             const spawnInfo = this.findStationDispatchSpawn("TOW", targetBlockedCar.x, targetBlockedCar.y, pz);
             if (spawnInfo) {
@@ -16214,68 +16214,59 @@ class LeonidaGame {
                 const emergDt = this._emergScanAccum;
                 this._emergScanAccum = 0;
 
-            let casualtyNearPlayer = null;
-
-            let bestCasDist = 760;
-
+            const unassignedCasualties = [];
             for (const ped of this.peds) {
-
                 if (!ped.dead || ped.revived || ped._boardedVehicle || ped.unreachableForMedic || ped.deathKind === "DROWNED" || (ped.deadTimer || 0) < 2.5) continue;
-
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) continue;
-
                 const d = Math.hypot(ped.x - p.x, ped.y - p.y);
-
-                if (d < bestCasDist) {
-
-                    bestCasDist = d;
-
-                    casualtyNearPlayer = ped;
-
+                if (d < 820) {
+                    unassignedCasualties.push(ped);
                 }
-
             }
 
-            if (casualtyNearPlayer && (this.medicDispatchCooldown || 0) <= 0) {
-                let medicResponding = false;
+            if (unassignedCasualties.length > 0 && (this.medicDispatchCooldown || 0) <= 0) {
+                // Hospital Fleet Logic: 1 Ambulance for 1-2 victims, 2 for 3-4, 3 for 5-6, up to 4 Ambulances for a major shootout!
+                const desiredMedics = Math.min(4, Math.ceil(unassignedCasualties.length / 2));
+                let activeNearMedics = 0;
                 let totalMedics = 0;
 
-                // Persistent World Priority #1: Check if an Ambulance already in the district (< 1650px) can respond from its real street position (NEVER teleporting!)
                 for (const v of this.vehicles) {
                     if (v.specKey === "MEDIC_AMBULANCE" && !v.destroyed && v.driver === "AI_EMERGENCY") {
                         totalMedics++;
-                        const dCas = Math.hypot(v.x - casualtyNearPlayer.x, v.y - casualtyNearPlayer.y);
-                        if (dCas < 1650) {
-                            medicResponding = true;
-                            if (!v.deployedMedic) {
-                                v.medicTargetPed = casualtyNearPlayer;
+                        const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
+                        if (dPlayer < 1650) {
+                            activeNearMedics++;
+                            if (!v.deployedMedic && (!v.medicTargetPed || v.medicTargetPed.revived || !v.medicTargetPed.dead)) {
+                                const pickCas = unassignedCasualties[activeNearMedics % unassignedCasualties.length];
+                                v.medicTargetPed = pickCas;
                                 v.sirenActive = true;
                             }
                         }
                     }
                 }
 
-                // Persistent World Priority #2: If no Ambulance is active on the map (max 1 Ambulance), dispatch one from the nearest Hospital (strictly off-screen)!
-                if (!medicResponding) {
+                // Dispatch additional Ambulances from the Central Hospital until activeNearMedics reaches desiredMedics (up to 4 Ambulances)!
+                if (activeNearMedics < desiredMedics && totalMedics < 4) {
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
-                    if (this.medicDispatchTimer > 6.5 && totalMedics < 1) {
-                        this.medicDispatchTimer = 3.0;
-                        const pz = casualtyNearPlayer.z || 2.0;
-                        const spawnInfo = this.findStationDispatchSpawn("MEDIC", casualtyNearPlayer.x, casualtyNearPlayer.y, pz);
+                    if (this.medicDispatchTimer > 4.0) {
+                        this.medicDispatchTimer = 2.0;
+                        const targetCas = unassignedCasualties[activeNearMedics % unassignedCasualties.length];
+                        const pz = targetCas.z || 2.0;
+                        const spawnInfo = this.findStationDispatchSpawn("MEDIC", targetCas.x, targetCas.y, pz);
                         if (spawnInfo) {
-                            const medCar = new Vehicle(`medic_${Date.now()}`, "MEDIC_AMBULANCE", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                            const medCar = new Vehicle(`medic_${Date.now()}_${totalMedics}`, "MEDIC_AMBULANCE", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
                             medCar.z = spawnInfo.z;
                             medCar.driver = "AI_EMERGENCY";
                             medCar.isPersistentFleet = true;
                             medCar.homeStation = spawnInfo.station;
-                            medCar.medicTargetPed = casualtyNearPlayer;
+                            medCar.medicTargetPed = targetCas;
                             medCar.sirenActive = true;
                             medCar.speed = 102;
                             medCar.vx = Math.cos(spawnInfo.angle) * 102;
                             medCar.vy = Math.sin(spawnInfo.angle) * 102;
                             this.vehicles.push(medCar);
                             this.medicDispatchTimer = 0;
-                            this.medicDispatchCooldown = 22.0;
+                            this.medicDispatchCooldown = 6.5;
                         }
                     }
                 } else {
@@ -16285,56 +16276,59 @@ class LeonidaGame {
                 this.medicDispatchTimer = 0;
             }
 
-            // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK) for Burning Cars & Unextinguished Burning Wrecks
-            let burningVehNearPlayer = null;
+            // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK): VCFD Central Station dispatches 1 to 3 Fire Engines depending on how many vehicles are burning!
+            const burningVehsNearPlayer = [];
             for (const v of this.vehicles) {
                 if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
                 const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 3.0;
-                if ((isLiveBurning || isFreshBurningWreck) && Math.hypot(v.x - p.x, v.y - p.y) < 780) {
-                    burningVehNearPlayer = v;
-                    break;
+                if ((isLiveBurning || isFreshBurningWreck) && Math.hypot(v.x - p.x, v.y - p.y) < 820) {
+                    burningVehsNearPlayer.push(v);
                 }
             }
-            if (burningVehNearPlayer && this.fireDispatchCooldown <= 0) {
-                let fireTruckResponding = false;
+            if (burningVehsNearPlayer.length > 0 && this.fireDispatchCooldown <= 0) {
+                // VCFD Fleet Logic: 1 Fire Engine for 1 burning vehicle, 2 for 2-3 burning vehicles, up to 3 Fire Engines for a major pileup!
+                const desiredFireTrucks = Math.min(3, Math.ceil(burningVehsNearPlayer.length / 1.5));
+                let activeNearFireTrucks = 0;
                 let totalFireTrucks = 0;
-                // Persistent World Priority #1: Check if a VCFD Fire Engine already in the district (< 1750px) can respond from its real position (NEVER teleporting!)
+
                 for (const v of this.vehicles) {
                     if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
                         totalFireTrucks++;
-                        const dFire = Math.hypot(v.x - burningVehNearPlayer.x, v.y - burningVehNearPlayer.y);
-                        if (dFire < 1750) {
-                            fireTruckResponding = true;
-                            if (!v.deployedFireman) {
-                                v.fireTargetCar = burningVehNearPlayer;
+                        const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
+                        if (dPlayer < 1750) {
+                            activeNearFireTrucks++;
+                            if (!v.deployedFireman && (!v.fireTargetCar || v.fireTargetCar.fireExtinguished)) {
+                                v.fireTargetCar = burningVehsNearPlayer[activeNearFireTrucks % burningVehsNearPlayer.length];
                                 v.sirenActive = true;
                             }
                         }
                     }
                 }
-                // Persistent World Priority #2: If no Fire Engine is active on the map (max 1 Fire Engine), dispatch one from the nearest VCFD Firehouse (strictly off-screen)!
-                if (!fireTruckResponding) {
+
+                // Dispatch additional Fire Engines from the Central VCFD Firehouse until activeNearFireTrucks reaches desiredFireTrucks (up to 3 Fire Engines)!
+                if (activeNearFireTrucks < desiredFireTrucks && totalFireTrucks < 3) {
                     this.fireDispatchTimer = (this.fireDispatchTimer || 0) + emergDt;
-                    if (this.fireDispatchTimer > 6.0 && totalFireTrucks < 1) {
-                        this.fireDispatchTimer = 3.0;
-                        const fz = burningVehNearPlayer.z || 2.0;
-                        const spawnInfo = this.findStationDispatchSpawn("FIRE", burningVehNearPlayer.x, burningVehNearPlayer.y, fz);
+                    if (this.fireDispatchTimer > 3.8) {
+                        this.fireDispatchTimer = 2.0;
+                        const targetFireVeh = burningVehsNearPlayer[activeNearFireTrucks % burningVehsNearPlayer.length];
+                        const fz = targetFireVeh.z || 2.0;
+                        const spawnInfo = this.findStationDispatchSpawn("FIRE", targetFireVeh.x, targetFireVeh.y, fz);
                         if (spawnInfo) {
-                            const fireCar = new Vehicle(`vcfd_${Date.now()}`, "FIRE_TRUCK", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                            const fireCar = new Vehicle(`vcfd_${Date.now()}_${totalFireTrucks}`, "FIRE_TRUCK", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
                             fireCar.z = spawnInfo.z;
                             fireCar.driver = "AI_EMERGENCY";
                             fireCar.isPersistentFleet = true;
                             fireCar.homeStation = spawnInfo.station;
-                            fireCar.fireTargetCar = burningVehNearPlayer;
+                            fireCar.fireTargetCar = targetFireVeh;
                             fireCar.sirenActive = true;
                             fireCar.speed = 102;
                             fireCar.vx = Math.cos(spawnInfo.angle) * 102;
                             fireCar.vy = Math.sin(spawnInfo.angle) * 102;
                             this.vehicles.push(fireCar);
                             this.fireDispatchTimer = 0;
-                            this.fireDispatchCooldown = 24.0;
+                            this.fireDispatchCooldown = 7.5;
                         }
                     }
                 } else {
