@@ -8287,6 +8287,102 @@ class LeonidaGame {
         return false;
     }
 
+    getEmergencyStations(serviceType) {
+        const list = [];
+        if (this.map && Array.isArray(this.map.emergencyStations)) {
+            for (const st of this.map.emergencyStations) {
+                if (st && st.type === serviceType) list.push(st);
+            }
+        }
+        if (serviceType === "TOW" && this.map) {
+            if (Array.isArray(this.map.payNSprays)) {
+                for (const pns of this.map.payNSprays) {
+                    list.push({
+                        id: pns.id,
+                        type: "TOW",
+                        name: pns.name,
+                        shortName: pns.name.split("(")[0].trim(),
+                        x: pns.x + (pns.w || 64) * 0.5,
+                        y: pns.y + (pns.h || 64) * 0.5
+                    });
+                }
+            }
+            if (Array.isArray(this.map.cranes)) {
+                for (const cr of this.map.cranes) {
+                    list.push({
+                        id: cr.id,
+                        type: "TOW",
+                        name: cr.name,
+                        shortName: cr.name,
+                        x: cr.x + (cr.w || 64) * 0.5,
+                        y: cr.y + (cr.h || 64) * 0.5
+                    });
+                }
+            }
+        }
+        return list;
+    }
+
+    getNearestEmergencyStation(serviceType, wx, wy) {
+        const stations = this.getEmergencyStations(serviceType);
+        let best = null;
+        let bestDist = Infinity;
+        for (const st of stations) {
+            const d = Math.hypot(st.x - wx, st.y - wy);
+            if (d < bestDist) {
+                bestDist = d;
+                best = st;
+            }
+        }
+        return best;
+    }
+
+    findStationDispatchSpawn(serviceType, targetX, targetY, targetZ = 2.0) {
+        if (!this.map || typeof this.map.getNavigationBlock !== "function") return null;
+        const stations = this.getEmergencyStations(serviceType).slice();
+        stations.sort((a, b) => Math.hypot(a.x - targetX, a.y - targetY) - Math.hypot(b.x - targetX, b.y - targetY));
+
+        // 1. Try spawning directly at the road exit of the nearest station (or along the road avenue coming from that station)
+        for (let si = 0; si < stations.length; si++) {
+            const st = stations[si];
+            const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
+            // If the station itself is outside the player's screen and within reasonable driving range (< 1550px), depart directly from the station's road gate!
+            // If the station is further away (> 1550px), place the departing unit on the road corridor coming from that exact station direction at 960..1350px!
+            const useStationGate = distStToTarget >= 740 && distStToTarget <= 1550 && !this.isPointInAnyPlayerCameraView(st.x, st.y, 150);
+            const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
+            const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * Math.min(distStToTarget, 1080));
+            const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * Math.min(distStToTarget, 1080));
+            const baseBx = Math.floor(anchorX / TILE_SIZE);
+            const baseBy = Math.floor(anchorY / TILE_SIZE);
+
+            for (let r = 0; r <= 8; r++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                        const bx = baseBx + dx;
+                        const by = baseBy + dy;
+                        if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
+                        const navBlk = this.map.getNavigationBlock(bx, by, targetZ);
+                        if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
+                        const sx = (bx + 0.5) * TILE_SIZE;
+                        const sy = (by + 0.5) * TILE_SIZE;
+                        if (Math.hypot(sx - targetX, sy - targetY) < 740) continue;
+                        if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
+                        const occupied = this.vehicles.some((ov) => ov && Math.hypot(ov.x - sx, ov.y - sy) < 72);
+                        if (occupied) continue;
+                        const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
+                        const roadAng = typeof this.map.getAlignedRoadAngle === "function"
+                            ? this.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
+                            : toTargetAng;
+                        const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
+                        return { x: sx, y: sy, z: sz, angle: roadAng, station: st };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     hasLineOfSight(x1, y1, x2, y2, z = 2.0) {
         if (!this.map || typeof this.map.traceSegment2D !== "function") return true;
         return !this.map.traceSegment2D(x1, y1, x2, y2, z).hit;
@@ -10428,155 +10524,67 @@ class LeonidaGame {
 
 
 
-            // Check if a tow truck is already assigned or close to this vehicle
-
+            // Check if a tow truck is already assigned or close to this vehicle (within 1800px)
             const alreadyTargeted = this.vehicles.some(
-
-                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (tv.towTarget === v || (!tv.towingVehicle && Math.hypot(tv.x - v.x, tv.y - v.y) < 340))
-
+                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (tv.towTarget === v || (!tv.towingVehicle && Math.hypot(tv.x - v.x, tv.y - v.y) < 620))
             );
-
             if (alreadyTargeted) continue;
 
-
-
             bestDist = dPlayer;
-
             targetBlockedCar = v;
-
         }
-
-
 
         if (!targetBlockedCar) {
-
             this.towDispatchTimer = 0;
-
             return;
-
         }
-
-
 
         this.towDispatchTimer = (this.towDispatchTimer || 0) + scanDt;
-
         if (this.towDispatchTimer < 6.0) return;
-
         this.towDispatchTimer = 3.0; // retry ~3s later if no road spawn block found
 
-
-
-        const baseBx = Math.floor(targetBlockedCar.x / TILE_SIZE);
-
-        const baseBy = Math.floor(targetBlockedCar.y / TILE_SIZE);
-
-        const pz = targetBlockedCar.z || 2.0;
-
-
-
-        for (let attempt = 0; attempt < 42; attempt++) {
-
-            const ang = Math.random() * Math.PI * 2;
-
-            // Spawn Tow Truck 11.5..16.0 blocks (736..1024px) away, strictly outside every player's camera viewport!
-            const distB = 11.5 + Math.random() * 4.5;
-
-            const bx = Math.floor(baseBx + Math.cos(ang) * distB);
-
-            const by = Math.floor(baseBy + Math.sin(ang) * distB);
-
-            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
-
-            const navBlk = typeof this.map.getNavigationBlock === "function"
-
-                ? this.map.getNavigationBlock(bx, by, pz)
-
-                : null;
-
-            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
-
-
-
-            const sx = (bx + 0.5) * TILE_SIZE;
-
-            const sy = (by + 0.5) * TILE_SIZE;
-
-            if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
-
-
-
-            const toCarAng = Math.atan2(targetBlockedCar.y - sy, targetBlockedCar.x - sx);
-
-            const roadAng = typeof this.map.getAlignedRoadAngle === "function"
-
-                ? this.map.getAlignedRoadAngle(bx, by, toCarAng, pz)
-
-                : toCarAng;
-
-            const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-
-
-
-            if (farTowTruck && !this.isPointInAnyPlayerCameraView(farTowTruck.x, farTowTruck.y, 150)) {
-
-                farTowTruck.x = sx;
-
-                farTowTruck.y = sy;
-
-                farTowTruck.z = sz;
-
-                farTowTruck.angle = roadAng;
-
-                farTowTruck.towTarget = targetBlockedCar;
-
-                farTowTruck.towingVehicle = null;
-
-                farTowTruck.sirenActive = true;
-
-                farTowTruck.speed = 68;
-
-                farTowTruck.vx = Math.cos(roadAng) * 68;
-
-                farTowTruck.vy = Math.sin(roadAng) * 68;
-
-                farTowTruck.aiStuckTimer = 0;
-
-                farTowTruck.aiChosenDir = null;
-
-                farTowTruck.approachBestDist = undefined;
-
-                farTowTruck.approachNoProgress = 0;
-
-            } else if (activeTowTrucks < 3) {
-
-                const towTruck = new Vehicle(`tow_${Date.now()}_${attempt}`, "TOW_TRUCK", sx, sy, roadAng);
-
-                towTruck.z = sz;
-
-                towTruck.driver = "AI_TOW";
-
-                towTruck.isEmergency = true;
-
-                towTruck.sirenActive = true;
-
-                towTruck.towTarget = targetBlockedCar;
-
-                towTruck.speed = 68;
-
-                towTruck.vx = Math.cos(roadAng) * 68;
-
-                towTruck.vy = Math.sin(roadAng) * 68;
-
-                this.vehicles.push(towTruck);
-
+        // Persistent World Priority #1: If an idle Tow Truck is already patrolling in the district (< 1850px), assign it via radio without teleporting!
+        let idlePatrolTow = null;
+        let bestPatrolDist = 1850;
+        for (const tv of this.vehicles) {
+            if (!tv.destroyed && tv.driver === "AI_TOW" && !tv.towingVehicle && !tv.towTarget) {
+                const d = Math.hypot(tv.x - targetBlockedCar.x, tv.y - targetBlockedCar.y);
+                if (d < bestPatrolDist) {
+                    bestPatrolDist = d;
+                    idlePatrolTow = tv;
+                }
             }
-
+        }
+        if (idlePatrolTow) {
+            idlePatrolTow.towTarget = targetBlockedCar;
+            idlePatrolTow.sirenActive = true;
+            idlePatrolTow.approachBestDist = undefined;
+            idlePatrolTow.approachNoProgress = 0;
             this.towDispatchTimer = 0;
-
-            break;
-
+            return;
         }
 
+        // Persistent World Priority #2: Depart from the nearest Vice Customs / Municipal Impound Yard (strictly off-screen, never teleporting existing units!)
+        if (activeTowTrucks < 3) {
+            const pz = targetBlockedCar.z || 2.0;
+            const spawnInfo = this.findStationDispatchSpawn("TOW", targetBlockedCar.x, targetBlockedCar.y, pz);
+            if (spawnInfo) {
+                const towTruck = new Vehicle(`tow_${Date.now()}`, "TOW_TRUCK", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                towTruck.z = spawnInfo.z;
+                towTruck.driver = "AI_TOW";
+                towTruck.isEmergency = true;
+                towTruck.isPersistentFleet = true;
+                towTruck.homeStation = spawnInfo.station;
+                towTruck.impoundDepot = spawnInfo.station;
+                towTruck.sirenActive = true;
+                towTruck.towTarget = targetBlockedCar;
+                towTruck.speed = 68;
+                towTruck.vx = Math.cos(spawnInfo.angle) * 68;
+                towTruck.vy = Math.sin(spawnInfo.angle) * 68;
+                this.vehicles.push(towTruck);
+                this.towDispatchTimer = 0;
+            }
+        }
     }
 
 
@@ -15949,67 +15957,41 @@ class LeonidaGame {
 
                 this.copSpawnTimer = 0;
 
-                const baseBx = Math.floor(spawnTarget.x / TILE_SIZE);
-
-                const baseBy = Math.floor(spawnTarget.y / TILE_SIZE);
-
                 const pz = spawnTarget.z || 2.0;
 
-                for (let attempt = 0; attempt < 40; attempt++) {
-
-                    const ang = Math.random() * Math.PI * 2;
-
-                    const distB = 12.5 + Math.random() * 5.0; // 800..1120px away, strictly outside camera view so police arrive from down the street!
-
-                    const bx = Math.floor(baseBx + Math.cos(ang) * distB);
-
-                    const by = Math.floor(baseBy + Math.sin(ang) * distB);
-
-                    if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
-
-                    const navBlk = this.map.getNavigationBlock(bx, by, pz);
-
-                    if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
-
-                        const sx = (bx + 0.5) * TILE_SIZE;
-
-                        const sy = (by + 0.5) * TILE_SIZE;
-
-                        if (Math.hypot(sx - spawnTarget.x, sy - spawnTarget.y) < 760) continue;
-                        if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
-
-                        const toPlayerAng = Math.atan2(spawnTarget.y - sy, spawnTarget.x - sx);
-
-                        const roadAng = typeof this.map.getAlignedRoadAngle === "function"
-
-                            ? this.map.getAlignedRoadAngle(bx, by, toPlayerAng, pz)
-
-                            : toPlayerAng;
-
-                        // SWAT only appears at >= 4*, and even then regular VCPD cruisers remain the majority (~78% regular police, max 1 active SWAT van)
+                // Persistent World Priority #1: Alert an existing patrolling VCPD Cruiser already on the streets (< 1850px) to switch its siren on and respond!
+                let alertedPatrolCop = null;
+                let bestPatrolDist = 1850;
+                for (const v of this.vehicles) {
+                    if (!v.destroyed && v.isPolice && v.driver === "AI_TRAFFIC") {
+                        const d = Math.hypot(v.x - spawnTarget.x, v.y - spawnTarget.y);
+                        if (d < bestPatrolDist) {
+                            bestPatrolDist = d;
+                            alertedPatrolCop = v;
+                        }
+                    }
+                }
+                if (alertedPatrolCop) {
+                    alertedPatrolCop.driver = "AI_COP";
+                    alertedPatrolCop.sirenActive = true;
+                    alertedPatrolCop.isPersistentFleet = true;
+                } else {
+                    // Persistent World Priority #2: Dispatch a unit from the nearest VCPD Police Precinct (strictly off-screen)!
+                    const spawnInfo = this.findStationDispatchSpawn("POLICE", spawnTarget.x, spawnTarget.y, pz);
+                    if (spawnInfo) {
                         const useSwat = tWanted >= 4 && activeSwatCars < 1 && Math.random() < (tWanted >= 5 ? 0.25 : 0.20);
                         const specKey = useSwat ? "SWAT_ENFORCER" : "VCPD_CRUISER";
-
-                        const copCar = new Vehicle(`cop_${Date.now()}_${attempt}`, specKey, sx, sy, roadAng);
-
-                        copCar.z = this.map.getHeightAtPixel(sx, sy, 4.0);
-
+                        const copCar = new Vehicle(`cop_${Date.now()}`, specKey, spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                        copCar.z = spawnInfo.z;
                         copCar.driver = "AI_COP";
-
+                        copCar.isPersistentFleet = true;
+                        copCar.homeStation = spawnInfo.station;
                         copCar.sirenActive = true;
-
                         copCar.speed = 110;
-
-                        copCar.vx = Math.cos(roadAng) * 110;
-
-                        copCar.vy = Math.sin(roadAng) * 110;
-
+                        copCar.vx = Math.cos(spawnInfo.angle) * 110;
+                        copCar.vy = Math.sin(spawnInfo.angle) * 110;
                         this.vehicles.push(copCar);
-
-                        break;
-
                     }
-
                 }
 
             }
@@ -16198,13 +16180,22 @@ class LeonidaGame {
                 }
             }
 
-        } else if (this.policeHeli) {
-            const heli = this.policeHeli;
-            heli.departing = true;
-            heli.x += Math.cos(heli.angle || 0) * 320 * dt;
-            heli.y += Math.sin(heli.angle || 0) * 320 * dt;
-            if (Math.hypot(heli.x - p.x, heli.y - p.y) > 850) {
-                this.policeHeli = null;
+        } else {
+            // Persistent World Logic: when no player in the room is wanted (0★), VCPD cruisers turn off their sirens and resume calm street patrol!
+            for (const v of this.vehicles) {
+                if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
+                    v.driver = "AI_TRAFFIC";
+                    v.sirenActive = false;
+                }
+            }
+            if (this.policeHeli) {
+                const heli = this.policeHeli;
+                heli.departing = true;
+                heli.x += Math.cos(heli.angle || 0) * 320 * dt;
+                heli.y += Math.sin(heli.angle || 0) * 320 * dt;
+                if (Math.hypot(heli.x - p.x, heli.y - p.y) > 850) {
+                    this.policeHeli = null;
+                }
             }
         }
 
@@ -16282,157 +16273,52 @@ class LeonidaGame {
             }
 
             if (casualtyNearPlayer && (this.medicDispatchCooldown || 0) <= 0) {
-
-                let medicNearCasualty = false;
-
-                let farMedicCar = null;
-
+                let medicResponding = false;
                 let totalMedics = 0;
 
+                // Persistent World Priority #1: Check if an Ambulance already in the district (< 1650px) can respond from its real street position (NEVER teleporting!)
                 for (const v of this.vehicles) {
-
                     if (v.specKey === "MEDIC_AMBULANCE" && !v.destroyed && v.driver === "AI_EMERGENCY") {
-
                         totalMedics++;
-
                         const dCas = Math.hypot(v.x - casualtyNearPlayer.x, v.y - casualtyNearPlayer.y);
-
-                        // Consider an ambulance within 950px as already responding to this casualty; only recycle a very distant off-screen ambulance (> 1150px)
-                        if (dCas < 950) {
-
-                            medicNearCasualty = true;
-
-                        } else if (!v.deployedMedic && dCas >= 1150 && !this.isPointInAnyPlayerCameraView(v.x, v.y, 160)) {
-
-                            farMedicCar = v;
-
-                        }
-
-                    }
-
-                }
-
-                if (!medicNearCasualty) {
-
-                    this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
-
-                    if (this.medicDispatchTimer > 4.5) {
-
-                        this.medicDispatchTimer = 2.5; // if no road spawn point is found, retry ~2s later
-
-                        const baseBx = Math.floor(casualtyNearPlayer.x / TILE_SIZE);
-
-                        const baseBy = Math.floor(casualtyNearPlayer.y / TILE_SIZE);
-
-                        const pz = casualtyNearPlayer.z || 2.0;
-
-                        for (let attempt = 0; attempt < 44; attempt++) {
-
-                            const ang = Math.random() * Math.PI * 2;
-
-                            // Spawn Ambulance 11.5..16.0 blocks (736..1024px) away, strictly off-screen!
-                            const distB = 11.5 + Math.random() * 4.5;
-
-                            const bx = Math.floor(baseBx + Math.cos(ang) * distB);
-
-                            const by = Math.floor(baseBy + Math.sin(ang) * distB);
-
-                            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
-
-                            const navBlk = this.map.getNavigationBlock(bx, by, pz);
-
-                            if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
-
-                                const sx = (bx + 0.5) * TILE_SIZE;
-
-                                const sy = (by + 0.5) * TILE_SIZE;
-
-                                if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
-
-                                const toCasAng = Math.atan2(casualtyNearPlayer.y - sy, casualtyNearPlayer.x - sx);
-
-                                const roadAng = typeof this.map.getAlignedRoadAngle === "function"
-
-                                    ? this.map.getAlignedRoadAngle(bx, by, toCasAng, pz)
-
-                                    : toCasAng;
-
-                                const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-
-                                if (farMedicCar) {
-
-                                    const reuseCar = farMedicCar;
-
-                                    reuseCar.x = sx;
-
-                                    reuseCar.y = sy;
-
-                                    reuseCar.z = sz;
-
-                                    reuseCar.angle = roadAng;
-
-                                    reuseCar.speed = 102;
-
-                                    reuseCar.vx = Math.cos(roadAng) * 102;
-
-                                    reuseCar.vy = Math.sin(roadAng) * 102;
-
-                                    reuseCar.sirenActive = true;
-
-                                    reuseCar.aiStuckTimer = 0;
-
-                                    reuseCar.aiChosenDir = null;
-
-                                    reuseCar.approachBestDist = undefined;
-
-                                    reuseCar.approachNoProgress = 0;
-
-                                    this.medicDispatchTimer = 0;
-
-                                    this.medicDispatchCooldown = 9.0;
-
-                                } else if (totalMedics < 3) {
-
-                                    const medCar = new Vehicle(`medic_${Date.now()}_${attempt}`, "MEDIC_AMBULANCE", sx, sy, roadAng);
-
-                                    medCar.z = sz;
-
-                                    medCar.driver = "AI_EMERGENCY";
-
-                                    medCar.sirenActive = true;
-
-                                    medCar.speed = 102;
-
-                                    medCar.vx = Math.cos(roadAng) * 102;
-
-                                    medCar.vy = Math.sin(roadAng) * 102;
-
-                                    this.vehicles.push(medCar);
-
-                                    this.medicDispatchTimer = 0;
-
-                                    this.medicDispatchCooldown = 9.0;
-
-                                }
-
-                                break;
-
+                        if (dCas < 1650) {
+                            medicResponding = true;
+                            if (!v.deployedMedic) {
+                                v.medicTargetPed = casualtyNearPlayer;
+                                v.sirenActive = true;
                             }
-
                         }
-
                     }
-
-                } else {
-
-                    this.medicDispatchTimer = 0;
-
                 }
 
+                // Persistent World Priority #2: If no Ambulance is in the district, dispatch one from the nearest Hospital / Trauma Center (strictly off-screen)!
+                if (!medicResponding) {
+                    this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
+                    if (this.medicDispatchTimer > 4.5 && totalMedics < 3) {
+                        this.medicDispatchTimer = 2.5;
+                        const pz = casualtyNearPlayer.z || 2.0;
+                        const spawnInfo = this.findStationDispatchSpawn("MEDIC", casualtyNearPlayer.x, casualtyNearPlayer.y, pz);
+                        if (spawnInfo) {
+                            const medCar = new Vehicle(`medic_${Date.now()}`, "MEDIC_AMBULANCE", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                            medCar.z = spawnInfo.z;
+                            medCar.driver = "AI_EMERGENCY";
+                            medCar.isPersistentFleet = true;
+                            medCar.homeStation = spawnInfo.station;
+                            medCar.medicTargetPed = casualtyNearPlayer;
+                            medCar.sirenActive = true;
+                            medCar.speed = 102;
+                            medCar.vx = Math.cos(spawnInfo.angle) * 102;
+                            medCar.vy = Math.sin(spawnInfo.angle) * 102;
+                            this.vehicles.push(medCar);
+                            this.medicDispatchTimer = 0;
+                            this.medicDispatchCooldown = 12.0;
+                        }
+                    }
+                } else {
+                    this.medicDispatchTimer = 0;
+                }
             } else {
-
                 this.medicDispatchTimer = 0;
-
             }
 
             // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK) for Burning Cars & Unextinguished Burning Wrecks
@@ -16448,73 +16334,43 @@ class LeonidaGame {
                 }
             }
             if (burningVehNearPlayer && this.fireDispatchCooldown <= 0) {
-                let fireTruckNearTarget = false;
-                let farFireTruck = null;
+                let fireTruckResponding = false;
                 let totalFireTrucks = 0;
+                // Persistent World Priority #1: Check if a VCFD Fire Engine already in the district (< 1750px) can respond from its real position (NEVER teleporting!)
                 for (const v of this.vehicles) {
                     if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
                         totalFireTrucks++;
                         const dFire = Math.hypot(v.x - burningVehNearPlayer.x, v.y - burningVehNearPlayer.y);
-                        if (dFire < 1050) {
-                            fireTruckNearTarget = true;
-                        } else if (!v.deployedFireman && dFire >= 1200 && !this.isPointInAnyPlayerCameraView(v.x, v.y, 160)) {
-                            farFireTruck = v;
+                        if (dFire < 1750) {
+                            fireTruckResponding = true;
+                            if (!v.deployedFireman) {
+                                v.fireTargetCar = burningVehNearPlayer;
+                                v.sirenActive = true;
+                            }
                         }
                     }
                 }
-                if (!fireTruckNearTarget) {
+                // Persistent World Priority #2: If no Fire Engine is in the district, dispatch one from the nearest VCFD Fire Station (strictly off-screen)!
+                if (!fireTruckResponding) {
                     this.fireDispatchTimer = (this.fireDispatchTimer || 0) + emergDt;
-                    if (this.fireDispatchTimer > 4.0) {
-                        this.fireDispatchTimer = 2.0; // retry ~2s later if road candidate busy
-                        const baseBx = Math.floor(burningVehNearPlayer.x / TILE_SIZE);
-                        const baseBy = Math.floor(burningVehNearPlayer.y / TILE_SIZE);
+                    if (this.fireDispatchTimer > 4.0 && totalFireTrucks < 2) {
+                        this.fireDispatchTimer = 2.0;
                         const fz = burningVehNearPlayer.z || 2.0;
-                        for (let attempt = 0; attempt < 44; attempt++) {
-                            const ang = Math.random() * Math.PI * 2;
-                            // Spawn Fire Truck 11.5..16.0 blocks (736..1024px) away, strictly off-screen!
-                            const distB = 11.5 + Math.random() * 4.5;
-                            const bx = Math.floor(baseBx + Math.cos(ang) * distB);
-                            const by = Math.floor(baseBy + Math.sin(ang) * distB);
-                            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
-                            const navBlk = this.map.getNavigationBlock(bx, by, fz);
-                            if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
-                                const sx = (bx + 0.5) * TILE_SIZE;
-                                const sy = (by + 0.5) * TILE_SIZE;
-                                if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
-                                const toFireAng = Math.atan2(burningVehNearPlayer.y - sy, burningVehNearPlayer.x - sx);
-                                const roadAng = typeof this.map.getAlignedRoadAngle === "function"
-                                    ? this.map.getAlignedRoadAngle(bx, by, toFireAng, fz)
-                                    : toFireAng;
-                                const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-                                if (farFireTruck) {
-                                    farFireTruck.x = sx;
-                                    farFireTruck.y = sy;
-                                    farFireTruck.z = sz;
-                                    farFireTruck.angle = roadAng;
-                                    farFireTruck.speed = 102;
-                                    farFireTruck.vx = Math.cos(roadAng) * 102;
-                                    farFireTruck.vy = Math.sin(roadAng) * 102;
-                                    farFireTruck.sirenActive = true;
-                                    farFireTruck.aiStuckTimer = 0;
-                                    farFireTruck.aiChosenDir = null;
-                                    farFireTruck.approachBestDist = undefined;
-                                    farFireTruck.approachNoProgress = 0;
-                                    this.fireDispatchTimer = 0;
-                                    this.fireDispatchCooldown = 14.0;
-                                } else if (totalFireTrucks < 1) {
-                                    const fireCar = new Vehicle(`vcfd_${Date.now()}_${attempt}`, "FIRE_TRUCK", sx, sy, roadAng);
-                                    fireCar.z = sz;
-                                    fireCar.driver = "AI_EMERGENCY";
-                                    fireCar.sirenActive = true;
-                                    fireCar.speed = 102;
-                                    fireCar.vx = Math.cos(roadAng) * 102;
-                                    fireCar.vy = Math.sin(roadAng) * 102;
-                                    this.vehicles.push(fireCar);
-                                    this.fireDispatchTimer = 0;
-                                    this.fireDispatchCooldown = 12.0;
-                                }
-                                break;
-                            }
+                        const spawnInfo = this.findStationDispatchSpawn("FIRE", burningVehNearPlayer.x, burningVehNearPlayer.y, fz);
+                        if (spawnInfo) {
+                            const fireCar = new Vehicle(`vcfd_${Date.now()}`, "FIRE_TRUCK", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                            fireCar.z = spawnInfo.z;
+                            fireCar.driver = "AI_EMERGENCY";
+                            fireCar.isPersistentFleet = true;
+                            fireCar.homeStation = spawnInfo.station;
+                            fireCar.fireTargetCar = burningVehNearPlayer;
+                            fireCar.sirenActive = true;
+                            fireCar.speed = 102;
+                            fireCar.vx = Math.cos(spawnInfo.angle) * 102;
+                            fireCar.vy = Math.sin(spawnInfo.angle) * 102;
+                            this.vehicles.push(fireCar);
+                            this.fireDispatchTimer = 0;
+                            this.fireDispatchCooldown = 14.0;
                         }
                     }
                 } else {

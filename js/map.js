@@ -6504,6 +6504,36 @@ class LeonidaMap {
         ];
 
         // --------------------------------------------------------------------
+        // PERSISTENT WORLD MUNICIPAL STATIONS (VCPD PRECINCTS, HOSPITALS, VCFD FIREHOUSES & IMPOUND YARDS)
+        // --------------------------------------------------------------------
+        this.emergencyStations = [
+            // VCPD POLICE PRECINCTS
+            { id: "vcpd_southbeach", type: "POLICE", name: "VCPD SOUTH BEACH PRECINCT", shortName: "SOUTH BEACH PRECINCT", x: mx256(203.0) * TILE_SIZE, y: my256(146.0) * TILE_SIZE },
+            { id: "vcpd_northbeach", type: "POLICE", name: "VCPD NORTH BEACH PRECINCT", shortName: "NORTH BEACH PRECINCT", x: 434.5 * TILE_SIZE, y: 82.5 * TILE_SIZE },
+            { id: "vcpd_downtown", type: "POLICE", name: "VCPD DOWNTOWN HQ (BISCAYNE)", shortName: "DOWNTOWN VCPD HQ", x: 285.0 * TILE_SIZE, y: 182.0 * TILE_SIZE },
+            { id: "vcpd_wynwood", type: "POLICE", name: "VCPD WYNWOOD & STADIUM PRECINCT", shortName: "WYNWOOD PRECINCT", x: 188.5 * TILE_SIZE, y: 162.5 * TILE_SIZE },
+            { id: "vcpd_prison", type: "POLICE", name: "LEONIDA STATE PENITENTIARY BARRACKS", shortName: "PENITENTIARY HQ", x: 64.5 * TILE_SIZE, y: 95.5 * TILE_SIZE },
+            { id: "vcpd_gellhorn", type: "POLICE", name: "PORT GELLHORN HIGHWAY PATROL", shortName: "GELLHORN PATROL", x: 68.5 * TILE_SIZE, y: 213.5 * TILE_SIZE },
+            { id: "vcpd_vcia", type: "POLICE", name: "VCIA AIRPORT & PORT AUTHORITY POLICE", shortName: "VCIA PORT POLICE", x: 161.0 * TILE_SIZE, y: 292.5 * TILE_SIZE },
+
+            // LEONIDA HOSPITALS & EMS TRAUMA CENTERS
+            { id: "ems_southbeach", type: "MEDIC", name: "OCEAN VIEW TRAUMA CENTER (SOUTH BEACH)", shortName: "OCEAN VIEW HOSPITAL", x: mx256(208.5) * TILE_SIZE, y: my256(140.5) * TILE_SIZE },
+            { id: "ems_northbeach", type: "MEDIC", name: "MOUNT SINAI MEDICAL (NORTH BEACH)", shortName: "MOUNT SINAI MEDICAL", x: 428.5 * TILE_SIZE, y: 96.5 * TILE_SIZE },
+            { id: "ems_downtown", type: "MEDIC", name: "LEONIDA GENERAL HOSPITAL (DOWNTOWN)", shortName: "LEONIDA GENERAL", x: 268.5 * TILE_SIZE, y: 179.5 * TILE_SIZE },
+            { id: "ems_wynwood", type: "MEDIC", name: "MAMBAS STADIUM PARAMEDIC DEPOT", shortName: "STADIUM EMS DEPOT", x: 190.5 * TILE_SIZE, y: 170.5 * TILE_SIZE },
+            { id: "ems_gellhorn", type: "MEDIC", name: "PORT GELLHORN REGIONAL CLINIC", shortName: "GELLHORN CLINIC", x: 72.5 * TILE_SIZE, y: 213.5 * TILE_SIZE },
+            { id: "ems_vcia", type: "MEDIC", name: "VCIA & VICE PORT MEDICAL TRIAGE", shortName: "VCIA TRIAGE", x: 245.5 * TILE_SIZE, y: 295.5 * TILE_SIZE },
+
+            // VCFD FIRE STATIONS
+            { id: "vcfd_southbeach", type: "FIRE", name: "VCFD STATION #1 (SOUTH BEACH)", shortName: "VCFD STATION #1", x: 428.5 * TILE_SIZE, y: 295.5 * TILE_SIZE },
+            { id: "vcfd_northbeach", type: "FIRE", name: "VCFD STATION #2 (NORTH BEACH)", shortName: "VCFD STATION #2", x: 428.5 * TILE_SIZE, y: 75.5 * TILE_SIZE },
+            { id: "vcfd_downtown", type: "FIRE", name: "VCFD STATION #3 (BISCAYNE / DOWNTOWN)", shortName: "VCFD STATION #3", x: 282.5 * TILE_SIZE, y: 179.5 * TILE_SIZE },
+            { id: "vcfd_stadium", type: "FIRE", name: "VCFD STATION #4 (MAMBAS STADIUM)", shortName: "VCFD STATION #4", x: 192.5 * TILE_SIZE, y: 162.5 * TILE_SIZE },
+            { id: "vcfd_gellhorn", type: "FIRE", name: "VCFD STATION #5 (PORT GELLHORN)", shortName: "VCFD STATION #5", x: 63.5 * TILE_SIZE, y: 176.5 * TILE_SIZE },
+            { id: "vcfd_vcia", type: "FIRE", name: "VCFD STATION #6 (VCIA CRASH TENDER)", shortName: "VCFD STATION #6", x: 142.5 * TILE_SIZE, y: 295.5 * TILE_SIZE }
+        ];
+
+        // --------------------------------------------------------------------
         // 8 GTA 1 "KILL FRENZY!" RAMPAGE TOKENS ACROSS ALL REGIONS
         // --------------------------------------------------------------------
         this.killFrenzies = [

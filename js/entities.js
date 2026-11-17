@@ -3392,6 +3392,31 @@ class Vehicle {
         }
 
         this.sirenActive = false;
+        this.aiState = "PATROL";
+        // Persistent World Logic: once an Ambulance or Fire Engine finishes its 911 call, it drives back toward its Hospital or VCFD Fire Station!
+        if (!this.homeStation && game && typeof game.getNearestEmergencyStation === "function") {
+            const stType = this.specKey === "FIRE_TRUCK" ? "FIRE" : "MEDIC";
+            this.homeStation = game.getNearestEmergencyStation(stType, this.x, this.y);
+        }
+        if (this.homeStation) {
+            const dHome = Math.hypot(this.x - this.homeStation.x, this.y - this.homeStation.y);
+            if (dHome > 180) {
+                const retCtrl = this.computeTargetRoadOrFeelerControls(
+                    dt,
+                    map,
+                    game,
+                    this.homeStation.x,
+                    this.homeStation.y,
+                    0,
+                    0,
+                    0.48,
+                    false,
+                    false
+                );
+                if (this.speed > 86) retCtrl.throttle = -0.25;
+                return retCtrl;
+            }
+        }
         return this.computeTrafficControls(dt, map, game);
     }
 
@@ -3399,18 +3424,28 @@ class Vehicle {
         this.aiState = "TOW_TRUCK";
         this.sirenActive = true;
 
-        // If already towing a vehicle/wreck, haul it slowly & heavily along the road network (~62 px/s max)
+        // If already towing a vehicle/wreck, haul it along the road network directly toward the nearest Municipal Impound / Vice Customs Yard!
         if (this.towingVehicle) {
             const tv = this.towingVehicle;
             this.towingTimer = (this.towingTimer || 0) + dt;
             const tvBurning = (!tv.destroyed && ((tv.burnTimer || 0) > 0 || tv.hp <= 50)) ||
                 (tv.destroyed && !tv.fireExtinguished && tv.specKey !== "BMX_BIKE" && tv.specKey !== "E_SCOOTER");
-            const distPlayer = (game && game.player) ? Math.hypot(tv.x - game.player.x, tv.y - game.player.y) : 999;
-            // Deliver towed vehicle to VCPD Impound once hauled out of sight (> 560px after 7s) or after 22s of hauling!
+            if (!this.impoundDepot && game && typeof game.getNearestEmergencyStation === "function") {
+                this.impoundDepot = game.getNearestEmergencyStation("TOW", this.x, this.y);
+            }
+            const distToDepot = this.impoundDepot ? Math.hypot(this.x - this.impoundDepot.x, this.y - this.impoundDepot.y) : 9999;
+            const isOffscreen = game && typeof game.isPointInAnyPlayerCameraView === "function"
+                ? !game.isPointInAnyPlayerCameraView(this.x, this.y, 80)
+                : ((game && game.player) ? Math.hypot(tv.x - game.player.x, tv.y - game.player.y) > 720 : true);
+            // Deliver towed vehicle once it reaches the Vice Customs / Impound Yard (< 190px) or is hauled off-screen toward the depot!
             if (
-                (this.towingTimer > 7.0 && distPlayer > 560) ||
-                this.towingTimer > 22.0
+                distToDepot < 190 ||
+                (this.towingTimer > 12.0 && isOffscreen && distToDepot < 680) ||
+                (this.towingTimer > 28.0 && isOffscreen)
             ) {
+                if (this.impoundDepot && game && typeof game.addFloatingText === "function" && !isOffscreen) {
+                    game.addFloatingText(tv.x, tv.y - 24, `🛻 IMPOUNDED AT ${this.impoundDepot.shortName || "VICE CUSTOMS"}!`, "#ffd13b");
+                }
                 tv.towedByTruck = null;
                 this.towingVehicle = null;
                 this.towingTimer = 0;
@@ -3429,11 +3464,13 @@ class Vehicle {
                 this.towingVehicle = null;
                 this.towingTimer = 0;
             } else {
-                const tCtrl = this.computeTrafficControls(dt, map, game);
+                const tCtrl = this.impoundDepot
+                    ? this.computeTargetRoadOrFeelerControls(dt, map, game, this.impoundDepot.x, this.impoundDepot.y, 0, 0, 0.35, false, false)
+                    : this.computeTrafficControls(dt, map, game);
                 if (this.speed > 64) {
                     tCtrl.throttle = -0.25;
                 } else {
-                    tCtrl.throttle = Math.min(tCtrl.throttle, 0.26);
+                    tCtrl.throttle = Math.min(tCtrl.throttle, 0.28);
                 }
                 return tCtrl;
             }
@@ -5481,7 +5518,7 @@ class TrafficManager {
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
         const minKeep = 24 + (vps.length - 1) * 10;
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
-        const farWreckRects = vps.map((vp) => this.expandRect(vp.area, 28));
+        const farWreckRects = vps.map((vp) => this.expandRect(vp.area, 38));
         let activeMovingCount = 0;
         for (let k = 0; k < game.vehicles.length; k++) {
             const mv = game.vehicles[k];
@@ -5531,13 +5568,13 @@ class TrafficManager {
                 game.vehicles.splice(i, 1);
                 continue;
             }
-            const isApproachingTowTruck = v.driver === "AI_TOW" && Boolean(v.towTarget) && !v.towingVehicle;
-            const isRespondingFireTruck = v.specKey === "FIRE_TRUCK" && (v.aiState === "EMERGENCY_FIRE" || Boolean(v.sirenActive));
+            const isApproachingTowTruck = v.driver === "AI_TOW";
+            const isEmergencyFleet = v.driver === "AI_EMERGENCY" || v.specKey === "FIRE_TRUCK" || v.specKey === "MEDIC_AMBULANCE" || Boolean(v.isPersistentFleet);
             const isActiveWantedCop = anyWanted && v.driver === "AI_COP";
-            if (activeMovingCount <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isRespondingFireTruck && !isActiveWantedCop) continue;
-            // Burned wrecks, abandoned cars, Tow Trucks, responding Fire Trucks, and active pursuit Cops stay in the neighborhood;
-            // only garbage-collect them if the player has driven far away into another district (> 28 blocks / ~1800px)!
-            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isRespondingFireTruck || isActiveWantedCop) ? farWreckRects : outerRects;
+            if (activeMovingCount <= minKeep && !isAbandonedOrWreck && v.driver !== "AI_TOW" && !isEmergencyFleet && !isActiveWantedCop) continue;
+            // Burned wrecks, abandoned cars, Tow Trucks, Ambulances, Fire Engines, and active pursuit Cops stay in the wider district (38 blocks / ~2432px)
+            // so units dispatched from real Precincts, Hospitals, Firehouses, and Impound Yards drive all the way to the incident without ever vanishing!
+            const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isEmergencyFleet || isActiveWantedCop) ? farWreckRects : outerRects;
             const nearAnyPlayer = checkRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
                 if (v.towingVehicle) {
