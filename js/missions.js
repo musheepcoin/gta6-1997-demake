@@ -490,13 +490,15 @@ class MissionManager {
         }
     }
 
-    findNearbyRoadSpot(minDist = 200, maxDist = 420) {
+    findNearbyRoadSpot(minDist = 720, maxDist = 1040) {
         const g = this.game;
         const p = g.player;
         const pz = p.z || 2.0;
-        for (let att = 0; att < 32; att++) {
+        const safeMin = Math.max(680, minDist);
+        const safeMax = Math.max(safeMin + 240, maxDist);
+        for (let att = 0; att < 44; att++) {
             const ang = Math.random() * Math.PI * 2;
-            const dist = minDist + Math.random() * (maxDist - minDist);
+            const dist = safeMin + Math.random() * (safeMax - safeMin);
             const tx = Math.floor((p.x + Math.cos(ang) * dist) / TILE_SIZE);
             const ty = Math.floor((p.y + Math.sin(ang) * dist) / TILE_SIZE);
             if (g.map.isRestrictedNoTrafficZone && g.map.isRestrictedNoTrafficZone(tx, ty)) continue;
@@ -504,12 +506,13 @@ class MissionManager {
             if (!nb || nb.groundType !== GROUND_TYPE.ROAD) continue;
             const wx = (tx + 0.5) * TILE_SIZE;
             const wy = (ty + 0.5) * TILE_SIZE;
+            if (typeof g.isPointInAnyPlayerCameraView === "function" && g.isPointInAnyPlayerCameraView(wx, wy, 140)) continue;
             if (g.map.resolveCircleBuildingCollision && g.map.resolveCircleBuildingCollision(wx, wy, 22, pz).hit) continue;
             const wz = g.map.getHeightAtPixel ? g.map.getHeightAtPixel(wx, wy, pz) : 2.0;
             const roadAng = g.map.getAlignedRoadAngle ? g.map.getAlignedRoadAngle(tx, ty, ang, pz) : 0;
             return { x: wx, y: wy, z: wz, angle: roadAng };
         }
-        return { x: p.x + 220, y: p.y, z: pz, angle: 0 };
+        return { x: p.x + 820, y: p.y, z: pz, angle: 0 };
     }
 
     startDynamicFixerMission(phone) {

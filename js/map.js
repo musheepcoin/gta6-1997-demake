@@ -6898,8 +6898,8 @@ class LeonidaMap {
         const aspect = Math.max(0.5, canvasW / Math.max(1, canvasH));
         const tanHalfFovy = Math.tan((55.0 * Math.PI) / 360.0); // ~0.520567
         const distBlocks = Math.max(2.2, extraHeightBlocks);
-        const halfH = distBlocks * tanHalfFovy + 1.0;
-        const halfW = halfH * aspect + 1.0;
+        const halfH = distBlocks * tanHalfFovy + 2.6;
+        const halfW = (distBlocks * tanHalfFovy) * aspect + 3.2;
 
         const cx = camX / TILE_SIZE;
         const cy = camY / TILE_SIZE;

@@ -8199,7 +8199,7 @@ class LeonidaGame {
             this.addFloatingText(this.player.x, this.player.y - 32, `💀 ${fSpec.boss} VENDETTA!`, "#ef4444");
 
             if (this.missions && typeof this.missions.findNearbyRoadSpot === "function") {
-                const spot = this.missions.findNearbyRoadSpot(240, 390);
+                const spot = this.missions.findNearbyRoadSpot(760, 1080);
                 const hitCar = new Vehicle(`nemesis_${Date.now()}`, fSpec.car, spot.x, spot.y, spot.angle);
                 hitCar.z = spot.z;
                 hitCar.driver = "AI_CRIMINAL";
@@ -8254,6 +8254,37 @@ class LeonidaGame {
                 self.setWantedLevel(0);
             }
         };
+    }
+
+    isPointInAnyPlayerCameraView(wx, wy, marginPx = 140) {
+        const p = this.player;
+        if (p && Math.hypot(wx - p.x, wy - p.y) < 700) return true;
+        if (this.renderer) {
+            const camX = this.renderer.camX !== undefined ? this.renderer.camX : (p ? p.x : 0);
+            const camY = this.renderer.camY !== undefined ? this.renderer.camY : (p ? p.y : 0);
+            if (Math.hypot(wx - camX, wy - camY) < 720) return true;
+            if (typeof this.renderer.worldToScreen === "function" && this.renderer.canvas) {
+                const sp = this.renderer.worldToScreen(wx, wy, p ? (p.z || 2.0) : 2.0);
+                const W = this.renderer.canvas.width || 1280;
+                const H = this.renderer.canvas.height || 720;
+                if (sp && sp.x >= -marginPx && sp.x <= W + marginPx && sp.y >= -marginPx && sp.y <= H + marginPx) {
+                    return true;
+                }
+            }
+        }
+        if (this.trafficManager && typeof this.trafficManager.getAllHumanPlayerViewports === "function") {
+            const bx = Math.floor(wx / TILE_SIZE);
+            const by = Math.floor(wy / TILE_SIZE);
+            const vps = this.trafficManager.getAllHumanPlayerViewports();
+            for (let i = 0; i < vps.length; i++) {
+                const vp = vps[i];
+                if (Math.hypot(wx - vp.x, wy - vp.y) < 700) return true;
+                if (vp.area && bx >= vp.area.minX - 3 && bx <= vp.area.maxX + 3 && by >= vp.area.minY - 3 && by <= vp.area.maxY + 3) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     hasLineOfSight(x1, y1, x2, y2, z = 2.0) {
@@ -10306,18 +10337,19 @@ class LeonidaGame {
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
             // Coherent VCPD Cruiser & Crime-Scene Getaway Car Recovery: if an intact police cruiser or bandit car is left driverless on the street after a chase,
-            // a nearby VCPD relief officer walks from the nearest sidewalk, climbs into the vehicle, and drives it away!
-            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 6.0) {
+            // a relief officer only spawns off-screen (never materializing in front of the player's eyes) and walks to recover the vehicle!
+            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 12.0 && Math.hypot(v.x - p.x, v.y - p.y) > 480) {
                 const hasReturningCop = this.peds.some(
-                    (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || (!pd.inCombat && Math.hypot(pd.x - v.x, pd.y - v.y) < 380))
+                    (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || (!pd.inCombat && Math.hypot(pd.x - v.x, pd.y - v.y) < 420))
                 );
                 if (!hasReturningCop && this.peds.length < 145) {
                     const cz = v.z || 2.0;
                     for (let ca = 0; ca < 12; ca++) {
                         const ang = (ca / 12) * Math.PI * 2;
-                        const sDist = 85 + (ca % 3) * 20;
+                        const sDist = 220 + (ca % 3) * 45;
                         const sx = v.x + Math.cos(ang) * sDist;
                         const sy = v.y + Math.sin(ang) * sDist;
+                        if (this.isPointInAnyPlayerCameraView(sx, sy, 120)) continue;
                         const sbx = Math.floor(sx / TILE_SIZE);
                         const sby = Math.floor(sy / TILE_SIZE);
                         const nav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, cz) : null;
@@ -10442,11 +10474,12 @@ class LeonidaGame {
 
 
 
-        for (let attempt = 0; attempt < 32; attempt++) {
+        for (let attempt = 0; attempt < 42; attempt++) {
 
             const ang = Math.random() * Math.PI * 2;
 
-            const distB = 5.0 + Math.random() * 3.2;
+            // Spawn Tow Truck 11.5..16.0 blocks (736..1024px) away, strictly outside every player's camera viewport!
+            const distB = 11.5 + Math.random() * 4.5;
 
             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
 
@@ -10468,7 +10501,7 @@ class LeonidaGame {
 
             const sy = (by + 0.5) * TILE_SIZE;
 
-            if (Math.hypot(sx - p.x, sy - p.y) < 260) continue;
+            if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
 
 
 
@@ -10484,7 +10517,7 @@ class LeonidaGame {
 
 
 
-            if (farTowTruck) {
+            if (farTowTruck && !this.isPointInAnyPlayerCameraView(farTowTruck.x, farTowTruck.y, 150)) {
 
                 farTowTruck.x = sx;
 
@@ -15922,11 +15955,11 @@ class LeonidaGame {
 
                 const pz = spawnTarget.z || 2.0;
 
-                for (let attempt = 0; attempt < 28; attempt++) {
+                for (let attempt = 0; attempt < 40; attempt++) {
 
                     const ang = Math.random() * Math.PI * 2;
 
-                    const distB = 11.5 + Math.random() * 4.5; // 736..1024px away so police arrive progressively from a distance
+                    const distB = 12.5 + Math.random() * 5.0; // 800..1120px away, strictly outside camera view so police arrive from down the street!
 
                     const bx = Math.floor(baseBx + Math.cos(ang) * distB);
 
@@ -15942,7 +15975,8 @@ class LeonidaGame {
 
                         const sy = (by + 0.5) * TILE_SIZE;
 
-                        if (Math.hypot(sx - spawnTarget.x, sy - spawnTarget.y) < 680) continue;
+                        if (Math.hypot(sx - spawnTarget.x, sy - spawnTarget.y) < 760) continue;
+                        if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
 
                         const toPlayerAng = Math.atan2(spawnTarget.y - sy, spawnTarget.x - sx);
 
@@ -15982,21 +16016,21 @@ class LeonidaGame {
 
 
 
-            // Spawn GTA 1 Police Roadblock at Wanted Level >= 3
+            // Spawn GTA 1 Police Roadblock at Wanted Level >= 3 (strictly off-screen at 840px ahead so it never pops in front of the player's hood!)
 
             if (tWanted >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 5) {
 
                 this.roadblockCooldown = 28;
 
-                const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 480;
+                const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 840;
 
-                const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 480;
+                const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 840;
 
                 const rbBx = Math.floor(rbX / TILE_SIZE);
 
                 const rbBy = Math.floor(rbY / TILE_SIZE);
 
-                if (this.map.isRoadAtPixel(rbX, rbY) && !(this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(rbBx, rbBy))) {
+                if (!this.isPointInAnyPlayerCameraView(rbX, rbY, 120) && this.map.isRoadAtPixel(rbX, rbY) && !(this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(rbBx, rbBy))) {
 
                     const rbIsSwat = tWanted >= 4 && activeSwatCars < 1 && Math.random() < 0.25;
                     const rbSpec = rbIsSwat ? "SWAT_ENFORCER" : "VCPD_CRUISER";
@@ -16263,12 +16297,12 @@ class LeonidaGame {
 
                         const dCas = Math.hypot(v.x - casualtyNearPlayer.x, v.y - casualtyNearPlayer.y);
 
-                        // Only consider an ambulance as actively serving THIS casualty if it is within 560px and not stuck!
-                        if ((v.deployedMedic && dCas < 680) || (dCas < 560 && (v.approachNoProgress || 0) < 4.5)) {
+                        // Consider an ambulance within 950px as already responding to this casualty; only recycle a very distant off-screen ambulance (> 1150px)
+                        if (dCas < 950) {
 
                             medicNearCasualty = true;
 
-                        } else if (!v.deployedMedic && (dCas > 600 || (v.approachNoProgress || 0) >= 4.5)) {
+                        } else if (!v.deployedMedic && dCas >= 1150 && !this.isPointInAnyPlayerCameraView(v.x, v.y, 160)) {
 
                             farMedicCar = v;
 
@@ -16292,11 +16326,12 @@ class LeonidaGame {
 
                         const pz = casualtyNearPlayer.z || 2.0;
 
-                        for (let attempt = 0; attempt < 36; attempt++) {
+                        for (let attempt = 0; attempt < 44; attempt++) {
 
                             const ang = Math.random() * Math.PI * 2;
 
-                            const distB = 5.5 + Math.random() * 4.0;
+                            // Spawn Ambulance 11.5..16.0 blocks (736..1024px) away, strictly off-screen!
+                            const distB = 11.5 + Math.random() * 4.5;
 
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
 
@@ -16312,7 +16347,7 @@ class LeonidaGame {
 
                                 const sy = (by + 0.5) * TILE_SIZE;
 
-                                if (Math.hypot(sx - p.x, sy - p.y) < 310) continue;
+                                if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
 
                                 const toCasAng = Math.atan2(casualtyNearPlayer.y - sy, casualtyNearPlayer.x - sx);
 
@@ -16420,9 +16455,9 @@ class LeonidaGame {
                     if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
                         totalFireTrucks++;
                         const dFire = Math.hypot(v.x - burningVehNearPlayer.x, v.y - burningVehNearPlayer.y);
-                        if (dFire < 820 && (v.deployedFireman || (v.approachNoProgress || 0) < 5.5)) {
+                        if (dFire < 1050) {
                             fireTruckNearTarget = true;
-                        } else if (!v.deployedFireman && (dFire >= 820 || (v.approachNoProgress || 0) >= 5.5)) {
+                        } else if (!v.deployedFireman && dFire >= 1200 && !this.isPointInAnyPlayerCameraView(v.x, v.y, 160)) {
                             farFireTruck = v;
                         }
                     }
@@ -16434,9 +16469,10 @@ class LeonidaGame {
                         const baseBx = Math.floor(burningVehNearPlayer.x / TILE_SIZE);
                         const baseBy = Math.floor(burningVehNearPlayer.y / TILE_SIZE);
                         const fz = burningVehNearPlayer.z || 2.0;
-                        for (let attempt = 0; attempt < 36; attempt++) {
+                        for (let attempt = 0; attempt < 44; attempt++) {
                             const ang = Math.random() * Math.PI * 2;
-                            const distB = 5.5 + Math.random() * 4.0;
+                            // Spawn Fire Truck 11.5..16.0 blocks (736..1024px) away, strictly off-screen!
+                            const distB = 11.5 + Math.random() * 4.5;
                             const bx = Math.floor(baseBx + Math.cos(ang) * distB);
                             const by = Math.floor(baseBy + Math.sin(ang) * distB);
                             if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
@@ -16444,7 +16480,7 @@ class LeonidaGame {
                             if (navBlk && navBlk.groundType === GROUND_TYPE.ROAD) {
                                 const sx = (bx + 0.5) * TILE_SIZE;
                                 const sy = (by + 0.5) * TILE_SIZE;
-                                if (Math.hypot(sx - p.x, sy - p.y) < 310) continue;
+                                if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
                                 const toFireAng = Math.atan2(burningVehNearPlayer.y - sy, burningVehNearPlayer.x - sx);
                                 const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                                     ? this.map.getAlignedRoadAngle(bx, by, toFireAng, fz)

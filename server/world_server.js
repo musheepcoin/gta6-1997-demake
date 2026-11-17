@@ -30,7 +30,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_181";
+const CURRENT_BUILD = "101_182";
 
 function normalizeRoomCode(roomCode) {
     const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";

@@ -4606,7 +4606,7 @@ class TrafficManager {
         this.genPedsCooldown = isMobile ? 0.32 : 0.12;
         this.maxTrafficCars = isMobile ? 16 : 22;
         this.maxTrafficPeds = isMobile ? 68 : 110;
-        this.carsMaxDistanceBlocks = isMobile ? 5 : 6; // mTrafficGenCarsMaxDistance
+        this.carsMaxDistanceBlocks = isMobile ? 6 : 8; // mTrafficGenCarsMaxDistance
         this.pedsMaxDistanceBlocks = isMobile ? 7 : 9; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
         this._trafficSeq = 1;
