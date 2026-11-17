@@ -135,7 +135,7 @@ class ViceNetworkManager {
 
         try {
             const sep = this.wsUrl.includes("?") ? "&" : "?";
-            const fullUrl = `${this.wsUrl}${sep}room=${encodeURIComponent(this.roomCode)}&id=${encodeURIComponent(this.playerId)}&name=${encodeURIComponent(this.playerName)}`;
+            const fullUrl = `${this.wsUrl}${sep}room=${encodeURIComponent(this.roomCode)}&id=${encodeURIComponent(this.playerId)}&name=${encodeURIComponent(this.playerName)}&ver=101181`;
             const ws = new WebSocket(fullUrl);
             this.ws = ws;
 
@@ -154,6 +154,7 @@ class ViceNetworkManager {
                 }
                 ws.send(JSON.stringify({
                     t: "JOIN",
+                    ver: 101181,
                     started: Boolean(this.game && this.game.started),
                     id: this.playerId,
                     room: this.roomCode,
@@ -1535,8 +1536,8 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "STATE") {
-            // Ignore un-started lobby tabs or outdated zombie browser tabs (< v101_180)
-            if (pkt.started === false || (pkt.ver || 0) < 101180) {
+            // Ignore un-started lobby tabs or outdated zombie browser tabs (< v101_181)
+            if (pkt.started === false || (pkt.ver || 0) < 101181) {
                 if (this.remotePlayers.has(pkt.id)) {
                     this.remotePlayers.delete(pkt.id);
                     this.updateServerListUI();
@@ -1589,7 +1590,7 @@ class ViceNetworkManager {
                 } else {
                     this._pendingServerWorldSnapshot = pkt;
                 }
-            } else if ((pkt.ver || 0) >= 101180 && !this.isWorldHost()) {
+            } else if ((pkt.ver || 0) >= 101181 && !this.isWorldHost()) {
                 this.applyWorldSync(pkt);
             }
             return;
@@ -1755,7 +1756,7 @@ class ViceNetworkManager {
     }
 
     isWorldHost() {
-        const MY_VER = 101180;
+        const MY_VER = 101181;
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
         const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
@@ -2208,9 +2209,9 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
-            ver: 101180,
+            ver: 101181,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
-            tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
+            tl: Math.round(((g.trafficLightTimer || 0) % 24.0) * 100) / 100,
             vehs: vehs.slice(0, 180),
             peds: peds.slice(0, 110)
         });
@@ -2229,10 +2230,12 @@ class ViceNetworkManager {
             g.worldMinutes = pkt.wm;
         }
         if (!isInitialServerBootstrap && typeof pkt.tl === "number") {
-            const curTl = g.trafficLightTimer || 0;
-            const diffTl = Math.abs(curTl - pkt.tl);
-            if (diffTl > 0.8 && diffTl < 23.2) {
-                g.trafficLightTimer = pkt.tl;
+            const curTl = ((g.trafficLightTimer || 0) % 24.0 + 24.0) % 24.0;
+            const netTl = ((pkt.tl || 0) % 24.0 + 24.0) % 24.0;
+            const rawDiff = Math.abs(curTl - netTl);
+            const circDiff = Math.min(rawDiff, 24.0 - rawDiff);
+            if (circDiff > 0.8) {
+                g.trafficLightTimer = netTl;
             }
         }
 
@@ -2780,7 +2783,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "STATE",
-            ver: 101180,
+            ver: 101181,
             econVer: 2,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),

@@ -29,8 +29,8 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
-const MIN_CLIENT_VER = 101180;
-const CURRENT_BUILD = "101_180";
+const MIN_CLIENT_VER = 101181;
+const CURRENT_BUILD = "101_181";
 
 function normalizeRoomCode(roomCode) {
     const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
@@ -202,7 +202,12 @@ function savePersistentStateNow() {
     try {
         persistentStore.updatedAt = new Date().toISOString();
         const tmpFile = `${STATE_FILE}.tmp`;
-        fs.writeFileSync(tmpFile, JSON.stringify(persistentStore), "utf8");
+        const bakFile = `${STATE_FILE}.bak`;
+        const payload = JSON.stringify(persistentStore);
+        fs.writeFileSync(tmpFile, payload, "utf8");
+        if (fs.existsSync(STATE_FILE)) {
+            try { fs.copyFileSync(STATE_FILE, bakFile); } catch (_e) {}
+        }
         fs.renameSync(tmpFile, STATE_FILE);
         isDirty = false;
     } catch (err) {
@@ -298,6 +303,7 @@ function broadcastDirectoryCounts() {
     const counts = {};
     for (const code of ROOM_CODES) counts[code] = 0;
     for (const meta of clients.values()) {
+        if (meta.isOutdated) continue;
         const r = normalizeRoomCode(meta.room || "VICE26");
         counts[r] = (counts[r] || 0) + 1 + (meta.bots || 0);
     }
@@ -508,9 +514,17 @@ function handleClientPacket(socket, pkt) {
     }
 
     if (pkt.t === "JOIN") {
+        if (typeof pkt.ver === "number") {
+            meta.ver = pkt.ver;
+            meta.isOutdated = pkt.ver < MIN_CLIENT_VER;
+        }
         pkt.slot = meta.slot;
         sendRoomBootstrap(socket, meta);
-        broadcastToRoom(roomCode, pkt, socket);
+        if (!meta.isOutdated) {
+            broadcastToRoom(roomCode, pkt, socket);
+        } else {
+            sendJson(socket, { t: "FORCE_RELOAD", build: CURRENT_BUILD });
+        }
         broadcastDirectoryCounts();
         return;
     }
@@ -523,14 +537,26 @@ function handleClientPacket(socket, pkt) {
 
     if (pkt.t === "STATE") {
         pkt.slot = meta.slot;
-        meta.lastState = pkt;
         meta.lastSeen = Date.now();
+        if (typeof pkt.ver === "number") {
+            meta.ver = pkt.ver;
+        }
         if ((Number(pkt.ver) || 0) < MIN_CLIENT_VER) {
+            const wasOutdated = meta.isOutdated;
+            meta.isOutdated = true;
+            meta.lastState = null;
+            if (!wasOutdated) broadcastDirectoryCounts();
             if (!meta.lastForceReloadMs || (Date.now() - meta.lastForceReloadMs) > 4000) {
                 meta.lastForceReloadMs = Date.now();
                 sendJson(socket, { t: "FORCE_RELOAD", build: CURRENT_BUILD });
             }
+            return;
         }
+        if (meta.isOutdated) {
+            meta.isOutdated = false;
+            broadcastDirectoryCounts();
+        }
+        meta.lastState = pkt;
 
         if (typeof pkt.sc === "number" && pkt.sc > 0) {
             mergeLeaderboardEntry(meta.name, pkt.charId || "LUCIA", pkt.sc, meta.color, pkt.econVer || 1);
@@ -953,8 +979,14 @@ const server = http.createServer((req, res) => {
 
     if (req.url === "/health" || req.url === "/status" || req.url === "/") {
         const roomSummary = {};
+        let activeClientsCount = 0;
+        let outdatedTabsCount = 0;
+        for (const m of clients.values()) {
+            if (m.isOutdated) outdatedTabsCount++;
+            else activeClientsCount++;
+        }
         for (const [rk, rv] of Object.entries(persistentStore.rooms)) {
-            const roomClients = Array.from(clients.values()).filter((m) => m.room === rk);
+            const roomClients = Array.from(clients.values()).filter((m) => m.room === rk && !m.isOutdated);
             roomSummary[rk] = {
                 playersOnline: roomClients.length,
                 players: roomClients.map((m) => m.name),
@@ -962,6 +994,7 @@ const server = http.createServer((req, res) => {
                 playerModifiedVehicles: Object.keys(rv.modifiedVehs || {}).length,
                 smashedPropsCount: Object.keys(rv.smashedProps || {}).length,
                 corpsesCount: Object.keys(rv.corpses || {}).length,
+                vaultLockoutsCount: Object.keys(rv.robbedVaults || {}).length,
                 turfZonesCount: Object.keys(rv.turfStandings || {}).length,
                 chatMessages: (rv.chat || []).length
             };
@@ -974,7 +1007,8 @@ const server = http.createServer((req, res) => {
             minClientVer: MIN_CLIENT_VER,
             econVer: ECON_VERSION,
             uptimeSec: Math.round(process.uptime()),
-            totalPlayersOnline: clients.size,
+            totalPlayersOnline: activeClientsCount,
+            outdatedTabsQuarantined: outdatedTabsCount,
             rooms: roomSummary,
             topScores: persistentStore.leaderboard.slice(0, 10),
             savedProfilesCount: Object.keys(persistentStore.profiles).length,
@@ -1009,11 +1043,13 @@ server.on("upgrade", (req, socket) => {
     let initRoom = "VICE26";
     let initId = `p_${Date.now().toString(36)}`;
     let initName = "PLAYER";
+    let initVer = 0;
     try {
         const u = new URL(req.url, "http://localhost");
         if (u.searchParams.get("room")) initRoom = u.searchParams.get("room");
         if (u.searchParams.get("id")) initId = u.searchParams.get("id");
         if (u.searchParams.get("name")) initName = u.searchParams.get("name");
+        if (u.searchParams.get("ver")) initVer = Number(u.searchParams.get("ver")) || 0;
     } catch (_e) {}
 
     const { code } = ensureRoom(initRoom);
@@ -1026,6 +1062,8 @@ server.on("upgrade", (req, socket) => {
         pedType: "lucia",
         room: code,
         slot,
+        ver: initVer,
+        isOutdated: initVer < MIN_CLIENT_VER,
         bots: 0,
         lastSeen: Date.now(),
         lastState: null

@@ -11099,7 +11099,7 @@ class LeonidaGame {
 
         const p = this.player;
 
-        this.trafficLightTimer += dt;
+        this.trafficLightTimer = ((this.trafficLightTimer || 0) + dt) % 24.0;
 
         this.updateTrafficSpawner(dt);
 

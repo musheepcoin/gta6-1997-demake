@@ -259,7 +259,7 @@ const PedNav = (function () {
         const map = game.map;
         if (!map || !map.getNavigationBlock || !map.isStopLineBlock) return null;
         const nav = getNav(game);
-        const now = game.trafficLightTimer || 0;
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) * 0.001;
         const z = pz;
 
         // Must be standing on a normal sidewalk tile to plan; otherwise let the legacy logic recover (road exit etc.)
@@ -482,11 +482,11 @@ const PedNav = (function () {
             ped._route = null;
             return null;
         }
-        const now = game.trafficLightTimer || 0;
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) * 0.001;
         const sx = Math.floor(ped.x / TILE_SIZE), sy = Math.floor(ped.y / TILE_SIZE);
         const gx = Math.floor(tx / TILE_SIZE), gy = Math.floor(ty / TILE_SIZE);
         let rt = ped._route;
-        const stale = !rt || now - rt.t > 1.8 || Math.hypot(rt.tx - tx, rt.ty - ty) > 70 || rt.idx >= rt.pts.length;
+        const stale = !rt || Math.abs(now - rt.t) > 1.8 || Math.hypot(rt.tx - tx, rt.ty - ty) > 70 || rt.idx >= rt.pts.length;
         if (stale) {
             const ok = (x, y) => {
                 if (x < 2 || y < 2 || x >= MAP_COLS - 2 || y >= MAP_ROWS - 2) return false;
