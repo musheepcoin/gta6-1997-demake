@@ -4599,14 +4599,18 @@ class RetroRenderer {
                         }
                     }
 
-                    // Paint 2 Dedicated Kneeling Paramedic CPR / First-Aid Sprite Frames ("kneel_0" & "kneel_1", 24x24)
-                    // at [1870, 4036, 24, 24] and [1898, 4036, 24, 24] (facing South +Y):
-                    // - Bent white-trouser knees & black EMS boots tucked behind (y = 2..9)
-                    // - Hunched-forward white EMS uniform shirt with red paramedic cross on back (y = 8..15)
-                    // - Bowed head looking down at patient (y = 12..17)
-                    // - Extended forearms & blue-gloved hands performing chest compressions / holding paddles (y = 15..22)
+                    // Paint 2 Dedicated Kneeling Paramedic CPR / First-Aid Sprite Frames ("kneel_0" & "kneel_1", 16x18)
+                    // at [1870, 4036, 16, 18] and [1898, 4036, 16, 18] (facing South +Y):
+                    // Clones the exact 14x10 torso, shoulders, head & hair directly from `g2_medic["98"]` so the paramedic
+                    // preserves 100% of his original GTA 1/2 body shape and proportions when kneeling to treat a patient!
+                    const medicFrames = meta.sprites.peds && meta.sprites.peds["g2_medic"];
+                    const src98 = (medicFrames && medicFrames["98"]) || [1160, 1658, 14, 10];
+                    const base98Data = ctx.getImageData(src98[0], src98[1], src98[2], src98[3]);
+                    const b98 = base98Data.data;
+                    const bw98 = src98[2], bh98 = src98[3];
+
                     const buildMedicKneelFrame = (pressStage) => {
-                        const kw = 24, kh = 24;
+                        const kw = 16, kh = 18;
                         const kid = ctx.createImageData(kw, kh);
                         const kpx = kid.data;
                         const setK = (x, y, r, g, b, a = 255) => {
@@ -4614,95 +4618,60 @@ class RetroRenderer {
                             const i = (y * kw + x) * 4;
                             kpx[i] = r; kpx[i + 1] = g; kpx[i + 2] = b; kpx[i + 3] = a;
                         };
-                        // 1) Tucked Black EMS Boots (y = 2..4) & Bent Kneeling White-Trouser Legs (y = 4..9)
-                        for (let y = 2; y <= 9; y++) {
-                            for (const legX of [[7, 10], [13, 16]]) {
-                                for (let x = legX[0]; x <= legX[1]; x++) {
-                                    const isEdge = (x === legX[0] || x === legX[1] || y === 2);
-                                    if (y <= 4) {
-                                        setK(x, y, isEdge ? 12 : 28, isEdge ? 16 : 36, isEdge ? 24 : 52);
-                                    } else {
-                                        const isFold = (y === 6 || y === 8);
-                                        setK(x, y, isEdge ? 30 : (isFold ? 198 : 234), isEdge ? 41 : (isFold ? 208 : 240), isEdge ? 59 : (isFold ? 222 : 248));
-                                    }
-                                }
-                            }
-                        }
-                        // 2) Hunched-Forward White EMS Shirt Torso with Red Paramedic Cross on Back (y = 8..15, x = 6..17)
-                        const shiftY = pressStage === 0 ? 1 : 0; // leans 1px further forward on compression downstroke
-                        for (let y = 8 + shiftY; y <= 15 + shiftY; y++) {
-                            const ry = y - shiftY;
-                            const halfW = (ry === 8 || ry === 15) ? 5 : 6;
-                            const x0 = Math.round(11.5 - halfW);
-                            const x1 = Math.round(11.5 + halfW);
-                            for (let x = x0; x <= x1; x++) {
-                                const isEdge = (x === x0 || x === x1 || ry === 8 || ry === 15);
-                                const isRedCross = (
-                                    ((x === 11 || x === 12) && ry >= 9 && ry <= 13) ||
-                                    ((ry === 10 || ry === 11) && x >= 9 && x <= 14)
-                                );
-                                const isHiVisShoulder = (ry === 13 || ry === 14) && (x === x0 + 1 || x === x1 - 1);
+                        const shiftY = pressStage === 0 ? 1 : 0; // subtle 1px forward lean on chest compression
+
+                        // 1) Compact tucked knees behind the torso (matching exact leg width of walking g2_medic)
+                        for (let y = 1 + shiftY; y <= 3 + shiftY; y++) {
+                            for (const lx of [4, 5, 10, 11]) {
+                                const isEdge = (y === 1 + shiftY || lx === 4 || lx === 11);
                                 if (isEdge) {
-                                    setK(x, y, 22, 30, 46);
-                                } else if (isRedCross || isHiVisShoulder) {
-                                    setK(x, y, 226, 34, 44);
+                                    setK(lx, y, 24, 32, 46);
                                 } else {
-                                    const dome = 1.0 - Math.abs(x - 11.5) / 7.0;
-                                    const w = Math.round(226 + 28 * dome);
-                                    setK(x, y, w, w + 1, Math.min(255, w + 4));
+                                    setK(lx, y, 226, 232, 242);
                                 }
                             }
                         }
-                        // 3) Extended Forearms & Blue Nitrile-Gloved Hands Performing CPR / Defibrillation (y = 14..22)
+
+                        // 2) Short forearms & blue-gloved hands reaching forward in front of the torso (drawn before torso so head/shoulders stay cleanly on top)
                         if (pressStage === 0) {
-                            // Downstroke: Both forearms converging to clasped blue-gloved hands pressing patient's chest (x = 9..14, y = 19..22)
-                            for (let y = 15; y <= 22; y++) {
-                                const t = (y - 15) / 7.0;
-                                const lArmX = Math.round(7 + t * 3.0);
-                                const rArmX = Math.round(16 - t * 3.0);
-                                for (const ax of [lArmX, lArmX + 1, rArmX - 1, rArmX]) {
-                                    if (y >= 20) {
-                                        // Bright cyan-blue surgical/nitrile paramedic gloves clasped together
-                                        setK(ax, y, 14, 165, 233);
-                                    } else {
-                                        // Bare forearm skin
-                                        setK(ax, y, 236, 184, 146);
-                                    }
+                            // Downstroke: forearms converging to clasped blue-gloved hands at center (x = 6..9, y = 13..15)
+                            for (let y = 11; y <= 15; y++) {
+                                const t = (y - 11) / 4.0;
+                                const lx = Math.round(3 + t * 3.0);
+                                const rx = Math.round(12 - t * 3.0);
+                                for (const ax of [lx, lx + 1, rx - 1, rx]) {
+                                    const isGlove = y >= 13;
+                                    setK(ax, y, isGlove ? 56 : 232, isGlove ? 189 : 182, isGlove ? 248 : 144);
+                                }
+                                setK(lx - 1, y, 24, 30, 42);
+                                setK(rx + 1, y, 24, 30, 42);
+                            }
+                            for (let x = 6; x <= 9; x++) setK(x, 16, 24, 30, 42);
+                        } else {
+                            // Upstroke: hands slightly apart over patient's chest (x = 4..6 & 9..11, y = 11..14)
+                            for (let y = 11; y <= 14; y++) {
+                                for (const baseX of [4, 10]) {
+                                    const isGlove = y >= 13;
+                                    setK(baseX, y, isGlove ? 56 : 232, isGlove ? 189 : 182, isGlove ? 248 : 144);
+                                    setK(baseX + 1, y, isGlove ? 56 : 232, isGlove ? 189 : 182, isGlove ? 248 : 144);
+                                    setK(baseX - 1, y, 24, 30, 42);
+                                    setK(baseX + 2, y, 24, 30, 42);
                                 }
                             }
-                            // Dark outline around clasped gloved hands
-                            for (let x = 9; x <= 14; x++) setK(x, 23, 15, 23, 42);
-                        } else {
-                            // Upstroke: Forearms apart holding white/red defibrillator paddles over chest (y = 15..21)
-                            for (let y = 15; y <= 21; y++) {
-                                for (const side of [-1, 1]) {
-                                    const cx = side < 0 ? 7 : 15;
-                                    for (let dx = 0; dx <= 1; dx++) {
-                                        if (y >= 19) {
-                                            // White/red defibrillator paddle + blue glove
-                                            setK(cx + dx, y, y === 21 ? 226 : 14, y === 21 ? 34 : 165, y === 21 ? 44 : 233);
-                                        } else {
-                                            setK(cx + dx, y, 236, 184, 146);
-                                        }
-                                    }
-                                }
+                            for (const baseX of [4, 10]) {
+                                setK(baseX, 15, 24, 30, 42);
+                                setK(baseX + 1, 15, 24, 30, 42);
                             }
                         }
-                        // 4) Bowed Paramedic Head Looking Down at Patient (y = 12..17, x = 9..14)
-                        for (let y = 12 + shiftY; y <= 17 + shiftY; y++) {
-                            const ry = y - shiftY;
-                            for (let x = 9; x <= 14; x++) {
-                                const d = Math.hypot(x - 11.5, ry - 14.5);
-                                if (d > 3.1) continue;
-                                if (d > 2.25) {
-                                    setK(x, y, 20, 24, 34);
-                                } else if (ry <= 15) {
-                                    // Brown hair crown bowed forward
-                                    setK(x, y, 96, 58, 30);
-                                } else {
-                                    // Forehead / nose tip looking down at patient
-                                    setK(x, y, 240, 192, 156);
-                                }
+
+                        // 3) Copy the exact 14x10 `g2_medic["98"]` standing torso, shoulders & head on top (x = 1..14, y = 2+shiftY .. 11+shiftY)
+                        const ox = Math.floor((kw - bw98) * 0.5);
+                        const oy = 2 + shiftY;
+                        for (let sy = 0; sy < bh98; sy++) {
+                            for (let sx = 0; sx < bw98; sx++) {
+                                const si = (sy * bw98 + sx) * 4;
+                                if (b98[si + 3] < 16) continue;
+                                setK(ox + sx, oy + sy, b98[si], b98[si + 1], b98[si + 2], b98[si + 3]);
                             }
                         }
                         return kid;
@@ -4710,8 +4679,8 @@ class RetroRenderer {
                     ctx.putImageData(buildMedicKneelFrame(0), 1870, 4036);
                     ctx.putImageData(buildMedicKneelFrame(1), 1898, 4036);
                     if (meta.sprites.peds && meta.sprites.peds["g2_medic"]) {
-                        meta.sprites.peds["g2_medic"]["kneel_0"] = [1870, 4036, 24, 24];
-                        meta.sprites.peds["g2_medic"]["kneel_1"] = [1898, 4036, 24, 24];
+                        meta.sprites.peds["g2_medic"]["kneel_0"] = [1870, 4036, 16, 18];
+                        meta.sprites.peds["g2_medic"]["kneel_1"] = [1898, 4036, 16, 18];
                     }
                 }
 
@@ -10590,37 +10559,26 @@ class RetroRenderer {
             if (ped.kind === "MEDIC" && (ped.isKneelingMedic || (ped.healTimer || 0) > 0)) {
                 const mCos = Math.cos(ped.angle);
                 const mSin = Math.sin(ped.angle);
-                const cprPress = 0.5 + 0.5 * Math.sin(this.time * 17.5);
-                const cprLunge = cprPress * 2.2;
-                const kneelZ = pz - 0.016 - cprPress * 0.004;
-                const kneelScale = thisPedScale * (0.90 - cprPress * 0.05);
+                const cprPress = 0.5 + 0.5 * Math.sin(this.time * 14.0);
+                const cprLunge = cprPress * 0.65;
+                const kneelZ = pz - 0.006 - cprPress * 0.002;
 
-                // Tucked-back bent knees & EMS black boots behind the kneeling paramedic
-                for (const side of [-1, 1]) {
-                    const kx = ped.x - mCos * 4.8 + (-mSin * side) * 3.8;
-                    const ky = ped.y - mSin * 4.8 + (mCos * side) * 3.8;
-                    this.pushSolidQuad3D(kx, ky, pz - 0.022, 5.2, 3.0, ped.angle, 0.86, 0.90, 0.95, 0.96, pedDrawOrder);
-                    const bx = ped.x - mCos * 7.6 + (-mSin * side) * 3.9;
-                    const by = ped.y - mSin * 7.6 + (mCos * side) * 3.9;
-                    this.pushSolidQuad3D(bx, by, pz - 0.024, 3.2, 2.6, ped.angle, 0.10, 0.12, 0.15, 0.98, pedDrawOrder);
-                }
-
-                // Red & White EMS First-Aid Trauma Bag placed on the ground beside the paramedic's knee
-                const bagX = ped.x - mSin * 9.8 - mCos * 1.2;
-                const bagY = ped.y + mCos * 9.8 - mSin * 1.2;
+                // Red & White EMS First-Aid Trauma Bag placed on the ground beside the paramedic
+                const bagX = ped.x - mSin * 9.2 - mCos * 1.0;
+                const bagY = ped.y + mCos * 9.2 - mSin * 1.0;
                 const bagAng = ped.angle + 0.25;
-                this.pushSolidQuad3D(bagX, bagY, pz - 0.024, 7.6, 5.4, bagAng, 0.05, 0.06, 0.08, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(bagX, bagY, pz - 0.018, 6.8, 4.6, bagAng, 0.86, 0.14, 0.16, 0.98, pedDrawOrder);
-                this.pushSolidQuad3D(bagX, bagY, pz - 0.016, 3.4, 1.2, bagAng, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
-                this.pushSolidQuad3D(bagX, bagY, pz - 0.016, 1.2, 3.4, bagAng, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.024, 6.4, 4.6, bagAng, 0.05, 0.06, 0.08, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.018, 5.8, 4.0, bagAng, 0.86, 0.14, 0.16, 0.98, pedDrawOrder);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.016, 2.8, 1.0, bagAng, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+                this.pushSolidQuad3D(bagX, bagY, pz - 0.016, 1.0, 2.8, bagAng, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
 
-                // Rhythmic CPR / Defibrillator medical pulse ring over the patient's chest
-                const patX = (ped.healingPatient && ped.healingPatient.x != null) ? ped.healingPatient.x : (ped.x + mCos * 12.5);
-                const patY = (ped.healingPatient && ped.healingPatient.y != null) ? ped.healingPatient.y : (ped.y + mSin * 12.5);
-                const pulseR = 6.0 + cprPress * 6.5;
-                this.pushSolidQuad3D(patX, patY, pz - 0.019, pulseR, pulseR, this.time * 2.0, 0.18, 0.88, 0.98, (1.0 - cprPress * 0.65) * 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                // Subtle rhythmic CPR medical pulse ring over the patient's chest
+                const patX = (ped.healingPatient && ped.healingPatient.x != null) ? ped.healingPatient.x : (ped.x + mCos * 12.0);
+                const patY = (ped.healingPatient && ped.healingPatient.y != null) ? ped.healingPatient.y : (ped.y + mSin * 12.0);
+                const pulseR = 5.0 + cprPress * 5.0;
+                this.pushSolidQuad3D(patX, patY, pz - 0.019, pulseR, pulseR, this.time * 2.0, 0.18, 0.88, 0.98, (1.0 - cprPress * 0.65) * 0.36, SPRITE_DRAW_ORDER.TIRE_MARKS);
 
-                this.batchPedSprite3D(pedType, frameIdx, ped.x + mCos * cprLunge, ped.y + mSin * cprLunge, kneelZ, ped.angle, kneelScale, false, pedDrawOrder, pr, pg, pb);
+                this.batchPedSprite3D(pedType, frameIdx, ped.x + mCos * cprLunge, ped.y + mSin * cprLunge, kneelZ, ped.angle, thisPedScale, false, pedDrawOrder, pr, pg, pb);
             } else {
                 this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
             }
