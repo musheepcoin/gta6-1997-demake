@@ -4992,11 +4992,17 @@ class LeonidaGame {
 
         if (fx.bribe) this.setWantedLevel(Math.max(0, this.wantedLevel - fx.bribe));
 
-        if (fx.extraLife) this.lives += fx.extraLife;
+        if (fx.extraLife) this.lives = Math.min(9, (this.lives || 3) + fx.extraLife);
 
-        if (fx.jailCards) this.jailFreeCards = (this.jailFreeCards || 0) + fx.jailCards;
+        if (fx.jailCards) this.jailFreeCards = Math.min(9, (this.jailFreeCards || 0) + fx.jailCards);
 
-        if (fx.multiplier) this.multiplier += fx.multiplier;
+        if (fx.multiplier) {
+            if (typeof this.addMultiplier === "function") {
+                this.addMultiplier(fx.multiplier);
+            } else {
+                this.multiplier = Math.min(5, (this.multiplier || 1) + fx.multiplier);
+            }
+        }
 
         if (typeof fx.setMinutes === "number") {
 
@@ -5008,7 +5014,7 @@ class LeonidaGame {
 
         if (Array.isArray(fx.heist)) {
 
-            const loot = fx.heist[0] + Math.floor(Math.random() * (fx.heist[1] - fx.heist[0] + 1));
+            const loot = Math.min(400, fx.heist[0] + Math.floor(Math.random() * (fx.heist[1] - fx.heist[0] + 1)));
 
             this.addCash(loot, "HOLD-UP!");
 
@@ -5025,6 +5031,9 @@ class LeonidaGame {
         this.showBigBanner(st.label.split(" — ")[0], fx.desc || "PURCHASED", st.color || "#39ff14", 1.8);
 
         this.updateHud();
+        if (this.net && typeof this.net.broadcastStateNow === "function") {
+            this.net.broadcastStateNow();
+        }
 
     }
 
@@ -5147,14 +5156,18 @@ class LeonidaGame {
                     p.hp = p.maxHp;
                     p.armor = 100;
                     p.bandana = !p.bandana;
-                    this.multiplier += 1;
+                    if (typeof this.addMultiplier === "function") {
+                        this.addMultiplier(1);
+                    } else {
+                        this.multiplier = Math.min(5, (this.multiplier || 1) + 1);
+                    }
                     this.setWantedLevel(0);
                     this.renderPortraits();
                     bannerSub = "VIP COUTURE! +100 ARMOR, +1 MULTIPLIER & 0 WANTED!";
                     break;
                 case "HOTEL_PERK": {
-                    const stash = Number(st.reward) || 1500;
-                    st.cooldown = 20.0;
+                    const stash = Math.min(250, Number(st.reward) || 250);
+                    st.cooldown = 90.0;
                     p.hp = p.maxHp;
                     p.armor = Math.min(100, (p.armor || 0) + 50);
                     p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 20.0);
@@ -5163,35 +5176,37 @@ class LeonidaGame {
                     break;
                 }
                 case "PLAY_LOTTO": {
+                    st.cooldown = 8.0;
                     const roll = Math.random();
-                    if (roll < 0.22) {
-                        this.addCash(2500, "🎰 FLORIDA LOTTO JACKPOT!");
+                    if (roll < 0.12) {
+                        this.addCash(400, "🎰 FLORIDA LOTTO JACKPOT!");
                         bannerTitle = "🎰 LOTTO JACKPOT WINNER!";
-                        bannerSub = "SCRATCHED 3 GOLDEN FLAMINGOS: WON +$2,500!";
+                        bannerSub = "SCRATCHED 3 GOLDEN FLAMINGOS: WON +$400!";
                         bannerCol = "#fde047";
-                    } else if (roll < 0.58) {
-                        this.addCash(250, "🎟️ LOTTO PRIZE WINNER!");
+                    } else if (roll < 0.42) {
+                        this.addCash(100, "🎟️ LOTTO PRIZE WINNER!");
                         bannerTitle = "🎟️ SCRATCH-OFF WINNER!";
-                        bannerSub = "MATCHED 2 PALM TREES: WON +$250!";
+                        bannerSub = "MATCHED 2 PALM TREES: WON +$100!";
                         bannerCol = "#39ff14";
                     } else {
                         bannerTitle = "🎟️ NO MATCH THIS TIME";
-                        bannerSub = "TRY AGAIN! JACKPOT UP TO $2,500!";
+                        bannerSub = "TRY AGAIN! JACKPOT UP TO $400!";
                         bannerCol = "#94a3b8";
                     }
                     break;
                 }
                 case "PLAY_POOL": {
+                    st.cooldown = 15.0;
                     const poolRoll = Math.random();
-                    if (poolRoll < 0.25) {
-                        this.addCash(3000, "🎱 8-BALL TABLE RUN HUSTLE!");
+                    if (poolRoll < 0.20) {
+                        this.addCash(350, "🎱 8-BALL TABLE RUN HUSTLE!");
                         bannerTitle = "🎱 CLEAN TABLE RUN!";
-                        bannerSub = "RAN THE RACK ON THE SHARK: WON +$3,000!";
+                        bannerSub = "RAN THE RACK ON THE SHARK: WON +$350!";
                         bannerCol = "#fde047";
-                    } else if (poolRoll < 0.70) {
-                        this.addCash(800, "🎱 8-BALL BANK SHOT HUSTLE!");
+                    } else if (poolRoll < 0.60) {
+                        this.addCash(150, "🎱 8-BALL BANK SHOT HUSTLE!");
                         bannerTitle = "🎱 SANK THE 8-BALL!";
-                        bannerSub = "CORNER POCKET BANK SHOT: HUSTLED +$800!";
+                        bannerSub = "CORNER POCKET BANK SHOT: HUSTLED +$150!";
                         bannerCol = "#39ff14";
                     } else {
                         bannerTitle = "🎱 SCRATCH ON THE 8-BALL!";
@@ -5201,7 +5216,8 @@ class LeonidaGame {
                     break;
                 }
                 case "ROB_REGISTER": {
-                    const take = Number(st.reward) || 1250;
+                    st.cooldown = 60.0;
+                    const take = Math.min(350, Number(st.reward) || 300);
                     this.addCash(take, "💵 ARMED REGISTER HOLD-UP!");
                     this.setWantedLevel(Math.max(this.wantedLevel + 1, 2));
                     if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
@@ -5226,6 +5242,9 @@ class LeonidaGame {
             if (this.audio && this.audio.playCashSound) this.audio.playCashSound();
             this.showBigBanner(bannerTitle, bannerSub, bannerCol, 2.2);
             this.updateHud();
+            if (this.net && typeof this.net.broadcastStateNow === "function") {
+                this.net.broadcastStateNow();
+            }
             return;
         }
 
@@ -7681,6 +7700,9 @@ class LeonidaGame {
                 if (v.driver === "AI_COP") {
                     v.sirenActive = false;
                     if (despawnNearPoint && this.player && Math.hypot(v.x - this.player.x, v.y - this.player.y) < 380) {
+                        if (v._worldModified && this.net && typeof this.net.broadcastVehicleRemoved === "function" && v.id) {
+                            this.net.broadcastVehicleRemoved(v.id);
+                        }
                         this.vehicles.splice(i, 1);
                     }
                 }

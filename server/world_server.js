@@ -35,12 +35,32 @@ function normalizeRoomCode(roomCode) {
     return raw === "VICE97" ? "VICE26" : raw;
 }
 
+function isDynamicVehicleId(vid) {
+    if (typeof vid !== "string") return false;
+    return (
+        vid.startsWith("trf_") ||
+        vid.startsWith("traf_") ||
+        vid.startsWith("cop_") ||
+        vid.startsWith("rb_") ||
+        vid.startsWith("amb_") ||
+        vid.startsWith("medic_") ||
+        vid.startsWith("vcfd_") ||
+        vid.startsWith("tow_") ||
+        vid.startsWith("fixer_") ||
+        vid.startsWith("mission_") ||
+        vid.startsWith("mcheetah_") ||
+        vid.startsWith("mbrinks_")
+    );
+}
+
 function createEmptyRoom() {
     return {
         vehs: {},          // Live AI traffic vehicles
         modifiedVehs: {},  // Player-driven, moved, parked, damaged, or wrecked vehicles (NEVER overwritten by default map!)
+        modifiedVehTs: {}, // Timestamp (ms) when each modifiedVeh was last updated
         smashedProps: {},  // Knocked-down streetlamps, traffic lights, bollards, hydrants, benches
         corpses: {},       // Recent pedestrian corpses (auto-cleaned after 180s or paramedic pickup)
+        corpseTs: {},      // Timestamp (ms) when each corpse was recorded
         turfStandings: {}, // District Turf War Kingpins (leaderName, leaderColor, leaderScore)
         activeFlashDrop: null,
         activeBounty: null,
@@ -71,13 +91,17 @@ function ensureRoom(roomCode) {
     }
     const r = persistentStore.rooms[code];
     if (!r.modifiedVehs) r.modifiedVehs = {};
+    if (!r.modifiedVehTs) r.modifiedVehTs = {};
     if (!r.smashedProps) r.smashedProps = {};
     if (!r.corpses) r.corpses = {};
+    if (!r.corpseTs) r.corpseTs = {};
     if (!r.turfStandings) r.turfStandings = {};
     if (!r.vehs) r.vehs = {};
     if (!Array.isArray(r.chat)) r.chat = [];
     return { code, room: r };
 }
+
+let isDirty = false;
 
 function loadPersistentState() {
     try {
@@ -85,18 +109,31 @@ function loadPersistentState() {
             const raw = fs.readFileSync(STATE_FILE, "utf8");
             const parsed = JSON.parse(raw);
             if (parsed && typeof parsed === "object") {
-                const isLegacyEcon = (Number(parsed.econVer) || 1) < ECON_VERSION;
+                const nowMs = Date.now();
+                let migratedAny = (Number(parsed.econVer) || 1) < ECON_VERSION;
                 if (Array.isArray(parsed.leaderboard)) {
-                    persistentStore.leaderboard = parsed.leaderboard
-                        .filter((e) => e && e.name && (!isLegacyEcon || (Number(e.econVer) || 1) >= ECON_VERSION || Number(e.score) <= 50000))
+                    const filteredLb = parsed.leaderboard
+                        .filter((e) => {
+                            if (!e || !e.name) return false;
+                            const entryVer = Number(e.econVer) || 1;
+                            if (entryVer < ECON_VERSION && Number(e.score) > 50000) {
+                                migratedAny = true;
+                                return false;
+                            }
+                            return true;
+                        })
+                        .map((e) => Object.assign({}, e, { econVer: ECON_VERSION }))
                         .slice(0, 25);
+                    persistentStore.leaderboard = filteredLb;
                 }
                 if (parsed.profiles && typeof parsed.profiles === "object") {
                     for (const [pk, pv] of Object.entries(parsed.profiles)) {
                         if (!pv || typeof pv !== "object") continue;
-                        if (isLegacyEcon && (Number(pv.econVer) || 1) < ECON_VERSION) {
+                        if ((Number(pv.econVer) || 1) < ECON_VERSION) {
                             pv.cash = 500;
+                            pv.mlt = 1;
                             pv.econVer = ECON_VERSION;
+                            migratedAny = true;
                         }
                         persistentStore.profiles[pk] = pv;
                     }
@@ -104,13 +141,33 @@ function loadPersistentState() {
                 if (parsed.rooms && typeof parsed.rooms === "object") {
                     for (const [rk, rv] of Object.entries(parsed.rooms)) {
                         if (rv && typeof rv === "object") {
+                            if (rk === "VICE97") migratedAny = true;
                             const normKey = normalizeRoomCode(rk);
                             const existing = persistentStore.rooms[normKey] || createEmptyRoom();
+                            const rawModVehs = Object.assign({}, existing.modifiedVehs, (rv.modifiedVehs && typeof rv.modifiedVehs === "object") ? rv.modifiedVehs : {});
+                            const cleanModVehs = {};
+                            const cleanModTs = Object.assign({}, existing.modifiedVehTs || {}, (rv.modifiedVehTs && typeof rv.modifiedVehTs === "object") ? rv.modifiedVehTs : {});
+                            for (const [vid, vrow] of Object.entries(rawModVehs)) {
+                                if (!Array.isArray(vrow) || vrow.length < 11) continue;
+                                if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
+                                // Strip destroyed wrecks and transient traffic/cop/mission cars on server startup
+                                if ((vrow[10] & 1) || isDynamicVehicleId(vid)) {
+                                    migratedAny = true;
+                                    continue;
+                                }
+                                vrow[8] = 0; // Ensure parked on startup
+                                vrow[6] = 0;
+                                vrow[7] = 0;
+                                cleanModVehs[vid] = vrow;
+                                if (!cleanModTs[vid]) cleanModTs[vid] = nowMs;
+                            }
                             persistentStore.rooms[normKey] = {
-                                vehs: Object.assign({}, existing.vehs, (rv.vehs && typeof rv.vehs === "object") ? rv.vehs : {}),
-                                modifiedVehs: Object.assign({}, existing.modifiedVehs, (rv.modifiedVehs && typeof rv.modifiedVehs === "object") ? rv.modifiedVehs : {}),
+                                vehs: Object.assign({}, cleanModVehs),
+                                modifiedVehs: cleanModVehs,
+                                modifiedVehTs: cleanModTs,
                                 smashedProps: Object.assign({}, existing.smashedProps, (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {}),
-                                corpses: Object.assign({}, existing.corpses, (rv.corpses && typeof rv.corpses === "object") ? rv.corpses : {}),
+                                corpses: {},
+                                corpseTs: {},
                                 turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
                                 activeFlashDrop: null,
                                 activeBounty: null,
@@ -124,7 +181,10 @@ function loadPersistentState() {
                     }
                 }
                 persistentStore.econVer = ECON_VERSION;
-                console.log(`[WORLD-DB] Loaded persistent state from ${STATE_FILE} (econVer=${ECON_VERSION})`);
+                if (migratedAny) {
+                    isDirty = true;
+                }
+                console.log(`[WORLD-DB] Loaded persistent state from ${STATE_FILE} (econVer=${ECON_VERSION}, migrated=${migratedAny})`);
             }
         }
     } catch (err) {
@@ -132,7 +192,6 @@ function loadPersistentState() {
     }
 }
 
-let isDirty = false;
 function savePersistentStateNow() {
     if (!isDirty) return;
     try {
@@ -433,6 +492,7 @@ function handleClientPacket(socket, pkt) {
         if (pkt.started && meta.profileKey && typeof pkt.x === "number" && typeof pkt.y === "number") {
             const clientEconVer = Number(pkt.econVer) || 1;
             const safeCash = clientEconVer >= ECON_VERSION ? Math.round(pkt.sc || 0) : Math.min(500, Math.round(pkt.sc || 500));
+            const prevProf = persistentStore.profiles[meta.profileKey] || {};
             persistentStore.profiles[meta.profileKey] = {
                 econVer: ECON_VERSION,
                 name: meta.name,
@@ -440,10 +500,12 @@ function handleClientPacket(socket, pkt) {
                 pedType: pkt.pedType || meta.pedType || "lucia",
                 color: pkt.color || meta.color || "#00f0ff",
                 cash: safeCash,
-                mlt: Math.max(1, Math.min(99, Math.round(pkt.mlt || 1))),
+                mlt: Math.max(1, Math.min(5, Math.round(pkt.mlt || 1))),
                 lvs: Math.max(1, Math.min(9, Math.round(pkt.lvs !== undefined ? pkt.lvs : 3))),
                 jfc: Math.max(0, Math.min(9, Math.round(pkt.jfc !== undefined ? pkt.jfc : 1))),
                 bnd: Boolean(pkt.bnd),
+                msn: Math.max(Number(prevProf.msn) || 0, Math.max(0, Math.min(31, Math.round(pkt.msn || 0)))) | (Math.max(0, Math.min(31, Math.round(pkt.msn || 0)))),
+                ank: Boolean(pkt.ank || prevProf.ank),
                 hp: Math.round(pkt.hp !== undefined ? pkt.hp : 100),
                 armor: Math.round(pkt.ar || 0),
                 dead: Boolean(pkt.dead),
@@ -487,6 +549,7 @@ function handleClientPacket(socket, pkt) {
                 1 // mod = 1 (persisted player-modified vehicle)
             ];
             room.modifiedVehs[v.id] = row;
+            room.modifiedVehTs[v.id] = Date.now();
             room.vehs[v.id] = row;
             isDirty = true;
         }
@@ -496,6 +559,7 @@ function handleClientPacket(socket, pkt) {
     }
 
     if (pkt.t === "WORLD_SYNC" && Array.isArray(pkt.vehs)) {
+        meta.lastSeen = Date.now();
         if (typeof pkt.ver === "number" && pkt.ver > (room.ver || 0)) {
             room.ver = pkt.ver;
         }
@@ -505,7 +569,8 @@ function handleClientPacket(socket, pkt) {
         if (typeof pkt.tl === "number") {
             room.trafficLightTimer = pkt.tl;
         }
-        room.updatedAt = Date.now();
+        const nowMs = Date.now();
+        room.updatedAt = nowMs;
         const nextVehs = {};
         const maxVehs = Math.min(pkt.vehs.length, 200);
         for (let i = 0; i < maxVehs; i++) {
@@ -514,12 +579,16 @@ function handleClientPacket(socket, pkt) {
             const vid = row[0];
             if (row[2] < 128 || row[3] < 128) {
                 delete room.modifiedVehs[vid];
+                delete room.modifiedVehTs[vid];
                 delete room.vehs[vid];
                 continue;
             }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
             if (isMod) {
                 row[13] = 1;
+                if (!room.modifiedVehs[vid] || row[8] !== 0) {
+                    room.modifiedVehTs[vid] = nowMs;
+                }
                 room.modifiedVehs[vid] = row;
                 nextVehs[vid] = row;
             } else if (!room.modifiedVehs[vid]) {
@@ -533,11 +602,14 @@ function handleClientPacket(socket, pkt) {
         // Keep all modifiedVehs (capped at 120 most recent) so parked/wrecked cars across the city never vanish!
         const modKeys = Object.keys(room.modifiedVehs);
         if (modKeys.length > 120) {
-            delete room.modifiedVehs[modKeys[0]];
+            const oldVid = modKeys[0];
+            delete room.modifiedVehs[oldVid];
+            delete room.modifiedVehTs[oldVid];
         }
         room.vehs = nextVehs;
         if (Array.isArray(pkt.peds)) {
             if (!room.corpses) room.corpses = {};
+            if (!room.corpseTs) room.corpseTs = {};
             const nextPeds = {};
             const maxPeds = Math.min(pkt.peds.length, 160);
             for (let i = 0; i < maxPeds; i++) {
@@ -546,12 +618,15 @@ function handleClientPacket(socket, pkt) {
                 const pid = pr[0];
                 nextPeds[pid] = pr;
                 if (pr[9] & 1) {
+                    if (!room.corpses[pid]) room.corpseTs[pid] = nowMs;
                     room.corpses[pid] = pr;
                 }
             }
             const cKeys = Object.keys(room.corpses);
             if (cKeys.length > 65) {
-                delete room.corpses[cKeys[0]];
+                const oldCid = cKeys[0];
+                delete room.corpses[oldCid];
+                delete room.corpseTs[oldCid];
             }
             room.peds = nextPeds;
             pkt.peds = Object.values(Object.assign({}, room.peds, room.corpses));
@@ -565,9 +640,11 @@ function handleClientPacket(socket, pkt) {
     }
 
     if (pkt.t === "WORLD_EVENT") {
+        meta.lastSeen = Date.now();
         if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
             if (typeof pkt.x === "number" && typeof pkt.y === "number" && (pkt.x < 128 || pkt.y < 128)) {
                 delete room.modifiedVehs[pkt.vehId];
+                delete room.modifiedVehTs[pkt.vehId];
                 delete room.vehs[pkt.vehId];
                 isDirty = true;
                 broadcastToRoom(roomCode, pkt, socket);
@@ -601,6 +678,7 @@ function handleClientPacket(socket, pkt) {
             if (typeof pkt.flags === "number") row[10] = pkt.flags;
             row[13] = 1; // Permanent modified flag
             room.modifiedVehs[pkt.vehId] = row;
+            room.modifiedVehTs[pkt.vehId] = Date.now();
             room.vehs[pkt.vehId] = row;
             isDirty = true;
         } else if (pkt.kind === "VEH_EXPLODE" && pkt.vehId) {
@@ -630,6 +708,7 @@ function handleClientPacket(socket, pkt) {
             row[10] = (row[10] || 0) | 1; // Destroyed flag
             row[13] = 1;
             room.modifiedVehs[pkt.vehId] = row;
+            room.modifiedVehTs[pkt.vehId] = Date.now();
             room.vehs[pkt.vehId] = row;
             isDirty = true;
         } else if (pkt.kind === "PROP_SMASH" && pkt.pType && typeof pkt.x === "number" && typeof pkt.y === "number") {
@@ -639,10 +718,12 @@ function handleClientPacket(socket, pkt) {
                 if (typeof pkt.pType === "string" && pkt.pType.startsWith("CORPSE:") && room.corpses) {
                     if (pkt.pedId && room.corpses[pkt.pedId]) {
                         delete room.corpses[pkt.pedId];
+                        if (room.corpseTs) delete room.corpseTs[pkt.pedId];
                     }
                     for (const [cid, crow] of Object.entries(room.corpses)) {
                         if (Array.isArray(crow) && Math.hypot((crow[3] || 0) - pkt.x, (crow[4] || 0) - pkt.y) < 38) {
                             delete room.corpses[cid];
+                            if (room.corpseTs) delete room.corpseTs[cid];
                         }
                     }
                 }
@@ -666,11 +747,13 @@ function handleClientPacket(socket, pkt) {
             if (room.corpses) {
                 if (pkt.pedId && room.corpses[pkt.pedId]) {
                     delete room.corpses[pkt.pedId];
+                    if (room.corpseTs) delete room.corpseTs[pkt.pedId];
                 }
                 if (typeof pkt.x === "number" && typeof pkt.y === "number") {
                     for (const [cid, crow] of Object.entries(room.corpses)) {
                         if (Array.isArray(crow) && Math.hypot((crow[3] || 0) - pkt.x, (crow[4] || 0) - pkt.y) < 38) {
                             delete room.corpses[cid];
+                            if (room.corpseTs) delete room.corpseTs[cid];
                         }
                     }
                 }
@@ -732,6 +815,7 @@ function handleClientPacket(socket, pkt) {
         const cleanText = String(pkt.text).trim().slice(0, 140);
         if (!cleanText) return;
         const nowMs = Date.now();
+        meta.lastSeen = nowMs;
         if (meta.lastChatMs && (nowMs - meta.lastChatMs) < 500) return;
         if (meta.lastChatText && meta.lastChatText.toLowerCase() === cleanText.toLowerCase() && (nowMs - (meta.lastChatMs || 0)) < 4500) return;
         meta.lastChatMs = nowMs;
@@ -802,11 +886,15 @@ const server = http.createServer((req, res) => {
     if (req.url === "/health" || req.url === "/status" || req.url === "/") {
         const roomSummary = {};
         for (const [rk, rv] of Object.entries(persistentStore.rooms)) {
+            const roomClients = Array.from(clients.values()).filter((m) => m.room === rk);
             roomSummary[rk] = {
-                playersOnline: Array.from(clients.values()).filter((m) => m.room === rk).length,
+                playersOnline: roomClients.length,
+                players: roomClients.map((m) => m.name),
                 persistedVehicles: Object.keys(Object.assign({}, rv.vehs || {}, rv.modifiedVehs || {})).length,
                 playerModifiedVehicles: Object.keys(rv.modifiedVehs || {}).length,
                 smashedPropsCount: Object.keys(rv.smashedProps || {}).length,
+                corpsesCount: Object.keys(rv.corpses || {}).length,
+                turfZonesCount: Object.keys(rv.turfStandings || {}).length,
                 chatMessages: (rv.chat || []).length
             };
         }
@@ -814,6 +902,7 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
             ok: true,
             service: "VICE CITY 26 — Persistent World Server v2",
+            econVer: ECON_VERSION,
             uptimeSec: Math.round(process.uptime()),
             totalPlayersOnline: clients.size,
             rooms: roomSummary,
@@ -847,7 +936,7 @@ server.on("upgrade", (req, socket) => {
     );
     socket.setNoDelay(true);
 
-    let initRoom = "VICE97";
+    let initRoom = "VICE26";
     let initId = `p_${Date.now().toString(36)}`;
     let initName = "PLAYER";
     try {
@@ -929,6 +1018,7 @@ server.on("upgrade", (req, socket) => {
                 rxBuf = rxBuf.subarray(totalFrameLen);
 
                 if (opcode === 0x9) {
+                    meta.lastSeen = Date.now();
                     const pLen = Math.min(payload.length, 125);
                     const pong = Buffer.allocUnsafe(2 + pLen);
                     pong[0] = 0x8a;
@@ -980,8 +1070,31 @@ server.on("upgrade", (req, socket) => {
 
 setInterval(() => {
     const nowMs = Date.now();
-    for (const rv of Object.values(persistentStore.rooms)) {
+    // 1. Evict silent/dead zombie sockets (> 65s without PING, STATE, or WORLD_SYNC)
+    let evictedAny = false;
+    for (const [sock, meta] of clients.entries()) {
+        if ((nowMs - (meta.lastSeen || 0)) > 65000) {
+            try { sock.destroy(); } catch (_e) {}
+            clients.delete(sock);
+            broadcastToRoom(meta.room, { t: "LEAVE", id: meta.playerId, name: meta.name }, sock);
+            evictedAny = true;
+        }
+    }
+    if (evictedAny) {
+        broadcastDirectoryCounts();
+    }
+
+    // 2. Per-room periodic maintenance: traffic lights, prop auto-repair, corpse TTL, wreck TTL & event expiry
+    for (const [rCode, rv] of Object.entries(persistentStore.rooms)) {
         rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 24.0;
+
+        if (rv.activeFlashDrop && (nowMs - (rv.activeFlashDrop.startedAt || 0)) >= (rv.activeFlashDrop.duration || 90) * 1000) {
+            rv.activeFlashDrop = null;
+        }
+        if (rv.activeBounty && (nowMs - (rv.activeBounty.startedAt || 0)) >= (rv.activeBounty.duration || 60) * 1000) {
+            rv.activeBounty = null;
+        }
+
         // Municipal auto-repair for ancient smashed props (> 5 minutes old) & corpse cleanup (> 3 minutes old)
         if (rv.smashedProps) {
             for (const [pk, pv] of Object.entries(rv.smashedProps)) {
@@ -993,9 +1106,56 @@ setInterval(() => {
                 }
             }
         }
+
+        // Expire old corpses in rv.corpses after 3 minutes (180s)
+        if (rv.corpses && rv.corpseTs) {
+            for (const cid of Object.keys(rv.corpses)) {
+                const cts = rv.corpseTs[cid] || 0;
+                if (cts && (nowMs - cts) > 180000) {
+                    delete rv.corpses[cid];
+                    delete rv.corpseTs[cid];
+                    isDirty = true;
+                }
+            }
+        }
+
+        // Expire burned wrecks (> 90s) and abandoned dynamic traffic/mission vehicles (> 180s) from modifiedVehs
+        if (rv.modifiedVehs && rv.modifiedVehTs) {
+            for (const [vid, vrow] of Object.entries(rv.modifiedVehs)) {
+                if (!Array.isArray(vrow)) continue;
+                const vts = rv.modifiedVehTs[vid] || nowMs;
+                const isDestroyed = Boolean(vrow[10] & 1);
+                const isUnoccupiedDynamic = (vrow[8] === 0) && isDynamicVehicleId(vid);
+                const maxVehAge = isDestroyed ? 90000 : (isUnoccupiedDynamic ? 180000 : 0);
+                if (maxVehAge > 0 && (nowMs - vts) > maxVehAge) {
+                    delete rv.modifiedVehs[vid];
+                    delete rv.modifiedVehTs[vid];
+                    delete rv.vehs[vid];
+                    isDirty = true;
+                    broadcastToRoom(rCode, {
+                        t: "WORLD_EVENT",
+                        kind: "VEH_EXIT",
+                        vehId: vid,
+                        x: -9999,
+                        y: -9999,
+                        z: -99,
+                        a: 0,
+                        hp: 0,
+                        flags: 0
+                    });
+                }
+            }
+        }
     }
 }, 500);
 
+process.on("uncaughtException", (err) => {
+    console.warn("[WORLD-SERVER] Uncaught Exception:", err && err.message);
+    savePersistentStateNow();
+});
+process.on("unhandledRejection", (reason) => {
+    console.warn("[WORLD-SERVER] Unhandled Rejection:", reason);
+});
 process.on("SIGINT", () => {
     savePersistentStateNow();
     process.exit(0);
@@ -1006,6 +1166,7 @@ process.on("SIGTERM", () => {
 });
 
 server.listen(PORT, HOST, () => {
+    savePersistentStateNow();
     console.log(`====================================================================`);
     console.log(`🌴 VICE CITY 26 — PERSISTENT WORLD SERVER v2 RUNNING`);
     console.log(`🔗 WebSocket URL : ws://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);

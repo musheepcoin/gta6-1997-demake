@@ -78,6 +78,51 @@ class MissionManager {
         this.activeMission = null;
         this.ringTimer = 0;
         this._fixerRollIdx = 0;
+        this.loadLocalStoryProgress();
+    }
+
+    getStoryBitmask() {
+        let mask = 0;
+        for (let i = 1; i < this.payphones.length && i <= 4; i++) {
+            if (this.payphones[i] && this.payphones[i].completed) {
+                mask |= (1 << (i - 1));
+            }
+        }
+        return mask;
+    }
+
+    applyStoryBitmask(mask, saveLocal = true) {
+        const m = Math.max(0, Math.min(31, Number(mask) || 0));
+        for (let i = 1; i < this.payphones.length && i <= 4; i++) {
+            if (m & (1 << (i - 1))) {
+                this.payphones[i].completed = true;
+            }
+        }
+        if ((m & 8) && this.game && this.game.player) {
+            this.game.player.ankleScrambled = true;
+        }
+        if (saveLocal) {
+            this.saveLocalStoryProgress();
+        }
+    }
+
+    loadLocalStoryProgress() {
+        try {
+            if (typeof window !== "undefined" && window.localStorage) {
+                const raw = window.localStorage.getItem("vc26_story_progress_v1");
+                if (raw) {
+                    this.applyStoryBitmask(parseInt(raw, 10) || 0, false);
+                }
+            }
+        } catch (_e) {}
+    }
+
+    saveLocalStoryProgress() {
+        try {
+            if (typeof window !== "undefined" && window.localStorage) {
+                window.localStorage.setItem("vc26_story_progress_v1", String(this.getStoryBitmask()));
+            }
+        } catch (_e) {}
     }
 
     getSelectedPhone() {
@@ -91,7 +136,7 @@ class MissionManager {
         this.selectedMissionIdx = (this.selectedMissionIdx + delta + this.payphones.length) % this.payphones.length;
         const sel = this.getSelectedPhone();
         if (sel && this.game && typeof this.game.sendPager === "function") {
-            const statusTag = sel.completed ? " [REPLAY]" : ` [$${(sel.rewardCash || 25000).toLocaleString()}]`;
+            const statusTag = sel.completed ? " [REPLAY]" : ` [$${(sel.rewardCash || 1500).toLocaleString()}]`;
             this.game.sendPager(
                 `📱 ${sel.caller.toUpperCase()}`,
                 `${sel.briefing}${statusTag}`,
@@ -135,12 +180,31 @@ class MissionManager {
         const pVeh = g.player ? g.player.inVehicle : null;
         g.vehicles = g.vehicles.filter((v) => {
             if (!v) return false;
+            const isMissionId = typeof v.id === "string" && (
+                v.id === "mission_cheetah" ||
+                v.id === "mission_brinks" ||
+                v.id === "fixer_target_car" ||
+                v.id.startsWith("fixer_") ||
+                v.id.startsWith("mcheetah_") ||
+                v.id.startsWith("mbrinks_")
+            );
             if (v === pVeh) {
-                if (v.missionTag === "FIXER_TARGET") v.missionTag = null;
-                if (v.id === "fixer_target_car") v.id = `stolen_fixer_${Date.now()}`;
+                if (v.missionTag === "FIXER_TARGET" || v.missionTag === "TARGET_CHEETAH" || v.missionTag === "ARMORED_TARGET") {
+                    v.missionTag = null;
+                }
+                if (isMissionId) {
+                    const oldId = v.id;
+                    v.id = `stolen_car_${Date.now().toString(36)}`;
+                    if (g.net && typeof g.net.broadcastVehicleRemoved === "function") {
+                        g.net.broadcastVehicleRemoved(oldId);
+                    }
+                }
                 return true;
             }
-            if (v.id === "mission_cheetah" || v.id === "mission_brinks" || v.id === "fixer_target_car") {
+            if (isMissionId) {
+                if (g.net && typeof g.net.broadcastVehicleRemoved === "function") {
+                    g.net.broadcastVehicleRemoved(v.id);
+                }
                 return false;
             }
             if (v.missionTag === "FIXER_TARGET") {
@@ -453,6 +517,8 @@ class MissionManager {
         const p = g.player;
         const pName = (g.net && g.net.playerName) || p.nickname || "LUCIA";
         const distName = g.currentDistrict || "VICE CITY";
+        const pidTag = (g.net && g.net.playerId) ? String(g.net.playerId).slice(-6) : Date.now().toString(36);
+        const fixerVehId = `fixer_${pidTag}`;
         const archetypes = ["HIJACK_LIVE_TARGET", "RAM_AND_EXTORT", "SPEED_BOMB_RUN", "VIP_HIT_SQUAD"];
         const arch = archetypes[(this._fixerRollIdx++) % archetypes.length];
 
@@ -460,7 +526,7 @@ class MissionManager {
             const spot = this.findNearbyRoadSpot(200, 360);
             const pool = ["VICE_CHEETAH", "BANSHEE_GT", "STINGER_CABRIO", "PENETRATOR_GT", "CHALLENGER_RT"];
             const spec = pool[Math.floor(Math.random() * pool.length)];
-            const targetCar = new Vehicle("fixer_target_car", spec, spot.x, spot.y, spot.angle);
+            const targetCar = new Vehicle(fixerVehId, spec, spot.x, spot.y, spot.angle);
             targetCar.z = spot.z;
             targetCar.driver = "AI_TRAFFIC";
             targetCar.missionTag = "FIXER_TARGET";
@@ -503,7 +569,7 @@ class MissionManager {
             const spot = this.findNearbyRoadSpot(220, 390);
             const pool = ["CHALLENGER_RT", "TULIP_MUSCLE", "PENETRATOR_GT"];
             const spec = pool[Math.floor(Math.random() * pool.length)];
-            const courier = new Vehicle("fixer_target_car", spec, spot.x, spot.y, spot.angle);
+            const courier = new Vehicle(fixerVehId, spec, spot.x, spot.y, spot.angle);
             courier.z = spot.z;
             courier.driver = "AI_CRIMINAL";
             courier.wasCriminalCar = true;
@@ -534,7 +600,7 @@ class MissionManager {
             let bombCar = (p.inVehicle && !p.inVehicle.destroyed && !p.inVehicle.waterOnly) ? p.inVehicle : null;
             if (!bombCar) {
                 const spot = this.findNearbyRoadSpot(90, 190);
-                bombCar = new Vehicle("fixer_target_car", "BANSHEE_GT", spot.x, spot.y, spot.angle);
+                bombCar = new Vehicle(fixerVehId, "BANSHEE_GT", spot.x, spot.y, spot.angle);
                 bombCar.z = spot.z;
                 g.vehicles.push(bombCar);
             }
@@ -684,7 +750,8 @@ class MissionManager {
         } else if (phone.missionId === "M3_OCEAN_DRIVE") {
             const cx = mx256(173.5) * TILE_SIZE;
             const cy = my256(107.5) * TILE_SIZE;
-            const cheetah = new Vehicle("mission_cheetah", "VICE_CHEETAH", cx, cy, 0);
+            const pidTag = (g.net && g.net.playerId) ? String(g.net.playerId).slice(-6) : "p1";
+            const cheetah = new Vehicle(`mcheetah_${pidTag}`, "VICE_CHEETAH", cx, cy, 0);
             cheetah.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(cx, cy, 4.0) : 2.0;
             cheetah.missionTag = "TARGET_CHEETAH";
             g.vehicles.push(cheetah);
@@ -708,7 +775,8 @@ class MissionManager {
         } else if (phone.missionId === "M4_ANKLE_OVERRIDE") {
             const bx = 70.5 * TILE_SIZE;
             const by = 213.5 * TILE_SIZE;
-            const brinks = new Vehicle("mission_brinks", "BRINKS_TRUCK", bx, by, 0);
+            const pidTag = (g.net && g.net.playerId) ? String(g.net.playerId).slice(-6) : "p1";
+            const brinks = new Vehicle(`mbrinks_${pidTag}`, "BRINKS_TRUCK", bx, by, 0);
             brinks.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(bx, by, 4.0) : 2.0;
             brinks.missionTag = "ARMORED_TARGET";
             g.vehicles.push(brinks);
@@ -738,11 +806,19 @@ class MissionManager {
         const wasDynamicFixer = Boolean((phone && phone.missionId === "M0_DYNAMIC_FIXER") || (this.activeMission && this.activeMission.id === "M0_DYNAMIC_FIXER"));
         if (phone && phone.missionId !== "M0_DYNAMIC_FIXER") {
             phone.completed = true;
-            g.multiplier = Math.min(9, g.multiplier + 1);
+            this.saveLocalStoryProgress();
+            if (typeof g.addMultiplier === "function") {
+                g.addMultiplier(1);
+            } else {
+                g.multiplier = Math.min(5, (g.multiplier || 1) + 1);
+            }
         }
         this.cleanupMissionVehicles();
         this.activeMission = null;
         g.addCash(reward, "MISSION PASSED!");
+        if (g.net && typeof g.net.broadcastStateNow === "function") {
+            g.net.broadcastStateNow();
+        }
         g.audio.playCashSound();
         g.showBigBanner("MISSION PASSED!", `${title} — +$${reward.toLocaleString()}`, "#39ff14", 3.2);
 

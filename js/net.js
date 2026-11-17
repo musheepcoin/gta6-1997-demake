@@ -374,7 +374,7 @@ class ViceNetworkManager {
                 g.cash = prof.cash;
             }
             if (!prof.dead && typeof prof.mlt === "number" && prof.mlt >= 1) {
-                g.multiplier = Math.min(99, Math.max(1, Math.round(prof.mlt)));
+                g.multiplier = Math.min(5, Math.max(1, Math.round(prof.mlt)));
             }
         }
 
@@ -386,6 +386,12 @@ class ViceNetworkManager {
         }
         if (typeof prof.bnd === "boolean") {
             p.bandana = prof.bnd;
+        }
+        if (typeof prof.msn === "number" && prof.msn > 0 && g.missions && typeof g.missions.applyStoryBitmask === "function") {
+            g.missions.applyStoryBitmask(prof.msn);
+        }
+        if (prof.ank) {
+            p.ankleScrambled = true;
         }
         if (!prof.dead && typeof prof.hp === "number" && prof.hp > 0) {
             p.hp = Math.min(p.maxHp || 100, prof.hp);
@@ -420,6 +426,13 @@ class ViceNetworkManager {
                 p.y = prof.y;
                 p.z = typeof prof.z === "number" ? prof.z : 2.0;
                 if (typeof prof.a === "number") p.angle = prof.a;
+                if (!prof.inVehId && g.map && typeof g.map.resolveCircleBuildingCollision === "function") {
+                    const col = g.map.resolveCircleBuildingCollision(p.x, p.y, p.r || 10, p.z);
+                    if (col && col.hit) {
+                        p.x = col.x;
+                        p.y = col.y;
+                    }
+                }
                 g.cameraX = p.x;
                 g.cameraY = p.y;
             }
@@ -474,6 +487,23 @@ class ViceNetworkManager {
                 if (this._disconnectFlushed) return;
                 this._disconnectFlushed = true;
                 if (this.game && this.game.started) {
+                    const p = this.game.player;
+                    if (p && p.inVehicle && (p.seatIndex || 0) === 0) {
+                        const v = p.inVehicle;
+                        this.broadcastWorldEvent({
+                            kind: "VEH_EXIT",
+                            vehId: v.id,
+                            seat: 0,
+                            specKey: v.specKey || "STALLION",
+                            x: Math.round(v.x),
+                            y: Math.round(v.y),
+                            z: Math.round((v.z || 2.0) * 100) / 100,
+                            a: Math.round((v.angle || 0) * 1000) / 1000,
+                            hp: Math.round(v.hp || 100),
+                            flags: (v.destroyed ? 1 : 0) | (v.frontDented ? 4 : 0) | (v.rearDented ? 8 : 0) | (v.heavyDented ? 16 : 0) | (v.fireExtinguished ? 128 : 0),
+                            remapIdx: v.remapIdx || 0
+                        });
+                    }
                     this.broadcastStateNow();
                 }
                 this.sendPacket({ t: "LEAVE", id: this.playerId, name: this.playerName });
@@ -605,9 +635,28 @@ class ViceNetworkManager {
         const cleanRoom = this.normalizeRoomCode(newRoomCode);
         if (!cleanRoom) return;
         if (cleanRoom !== this.roomCode) {
+            if (this.game && this.game.player && this.game.player.inVehicle && (this.game.player.seatIndex || 0) === 0) {
+                const v = this.game.player.inVehicle;
+                this.broadcastWorldEvent({
+                    kind: "VEH_EXIT",
+                    vehId: v.id,
+                    seat: 0,
+                    specKey: v.specKey || "STALLION",
+                    x: Math.round(v.x),
+                    y: Math.round(v.y),
+                    z: Math.round((v.z || 2.0) * 100) / 100,
+                    a: Math.round((v.angle || 0) * 1000) / 1000,
+                    hp: Math.round(v.hp || 100),
+                    flags: (v.destroyed ? 1 : 0) | (v.frontDented ? 4 : 0) | (v.rearDented ? 8 : 0) | (v.heavyDented ? 16 : 0) | (v.fireExtinguished ? 128 : 0),
+                    remapIdx: v.remapIdx || 0
+                });
+            }
             this.sendPacket({ t: "LEAVE", id: this.playerId, name: this.playerName });
             this.roomCode = cleanRoom;
             this.remotePlayers.clear();
+            this._pendingPropSync = [];
+            this._pendingServerWorldSnapshot = null;
+            this._serverBootstrapApplied = false;
             if (this.chatRoomBadge) {
                 this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
             }
@@ -1347,7 +1396,9 @@ class ViceNetworkManager {
             const isNew = !this.remotePlayers.has(pkt.id);
             const rp = this.ensureRemotePlayer(pkt);
             if (typeof pkt.slot === "number") rp.slot = pkt.slot;
-            if (isNew && this.game) {
+            const nowMs = performance.now();
+            if (isNew && this.game && (nowMs - (rp._lastJoinAnnounceMs || 0)) > 12000) {
+                rp._lastJoinAnnounceMs = nowMs;
                 this.addChatLog(
                     "VICE NET",
                     `🌐 ${pkt.name || "PLAYER"} joined room [${this.roomCode}] (${this.getPlayerCount()}P online)`,
@@ -1544,15 +1595,17 @@ class ViceNetworkManager {
                 this.game.audio.playShot(pkt.wep || "PISTOL");
             }
             if (Array.isArray(pkt.pellets)) {
-                for (const pl of pkt.pellets) {
+                const maxPellets = pkt.pellets.slice(0, 12);
+                for (const pl of maxPellets) {
+                    if (!pl || typeof pl.x !== "number" || typeof pl.y !== "number") continue;
                     this.game.projectiles.push({
                         x: pl.x,
                         y: pl.y,
-                        vx: pl.vx,
-                        vy: pl.vy,
+                        vx: Number(pl.vx) || 0,
+                        vy: Number(pl.vy) || 0,
                         angle: Math.atan2(pl.vy || 0, pl.vx || 1),
-                        damage: pl.dmg || 20,
-                        rangeLeft: pl.rng || 320,
+                        damage: Math.max(1, Math.min(180, Number(pl.dmg) || 20)),
+                        rangeLeft: Math.max(10, Math.min(900, Number(pl.rng) || 320)),
                         isFlame: Boolean(pl.flm),
                         isRocket: Boolean(pl.rck),
                         isTankShell: Boolean(pl.tsh),
@@ -1568,7 +1621,11 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "EXPLODE" && this.game) {
-            this.game.explodeAt(pkt.x, pkt.y, pkt.rad || 120, pkt.dmg || 180, false, true);
+            if (typeof pkt.x === "number" && typeof pkt.y === "number") {
+                const safeRad = Math.max(20, Math.min(180, Number(pkt.rad) || 120));
+                const safeDmg = Math.max(10, Math.min(250, Number(pkt.dmg) || 180));
+                this.game.explodeAt(pkt.x, pkt.y, safeRad, safeDmg, false, true);
+            }
             return;
         }
 
@@ -1622,17 +1679,19 @@ class ViceNetworkManager {
     ensureRemotePlayer(pkt) {
         let rp = this.remotePlayers.get(pkt.id);
         if (!rp) {
+            const defX = (typeof mx256 === "function" ? mx256(213.5) : 443.5) * 64;
+            const defY = (typeof my256 === "function" ? my256(146.0) : 287.0) * 64;
             rp = {
                 id: pkt.id,
                 name: pkt.name || "LUCIA ONLINE",
                 color: pkt.color || "#00f0ff",
                 pedType: pkt.pedType || "gang",
-                x: pkt.x || mx256(213.5) * 64,
-                y: pkt.y || my256(146.0) * 64,
+                x: pkt.x || defX,
+                y: pkt.y || defY,
                 z: pkt.z || 2.0,
                 angle: pkt.a || 0,
-                targetX: pkt.x || mx256(213.5) * 64,
-                targetY: pkt.y || my256(146.0) * 64,
+                targetX: pkt.x || defX,
+                targetY: pkt.y || defY,
                 targetZ: pkt.z || 2.0,
                 targetAngle: pkt.a || 0,
                 vx: 0,
@@ -1852,7 +1911,7 @@ class ViceNetworkManager {
                 x: pkt.x,
                 y: pkt.y,
                 z: pkt.z || 2.0,
-                reward: pkt.reward || 20000,
+                reward: pkt.reward || 800,
                 weapon: pkt.weapon || "ROCKET",
                 timer: pkt.duration || 90,
                 maxTimer: pkt.duration || 90
@@ -1860,7 +1919,7 @@ class ViceNetworkManager {
             if (typeof this.game.sendPager === "function") {
                 this.game.sendPager(
                     "VICE NET FLASH EVENT",
-                    `📦 SPEC-OPS HOT DROP CRATE landed in Vice City! Race to the golden flare for +$${(pkt.reward || 20000).toLocaleString()} & ${pkt.weapon || "ROCKET"}!`,
+                    `📦 SPEC-OPS HOT DROP CRATE landed in Vice City! Race to the golden flare for +$${(pkt.reward || 800).toLocaleString()} & ${pkt.weapon || "ROCKET"}!`,
                     false
                 );
             }
@@ -1868,7 +1927,7 @@ class ViceNetworkManager {
             this.game.activeFlashEvent = null;
             this.addChatLog(
                 "FLASH EVENT",
-                `📦 ${pkt.claimer || "PLAYER"} claimed the Spec-Ops Hot Drop Crate (+$${Number(pkt.reward || 20000).toLocaleString()})!`,
+                `📦 ${pkt.claimer || "PLAYER"} claimed the Spec-Ops Hot Drop Crate (+$${Number(pkt.reward || 800).toLocaleString()})!`,
                 "#fde047",
                 true
             );
@@ -1876,13 +1935,13 @@ class ViceNetworkManager {
             this.game.activeServerBounty = {
                 targetId: pkt.targetId,
                 targetName: pkt.targetName || "PLAYER",
-                reward: pkt.reward || 20000,
+                reward: pkt.reward || 1200,
                 timer: pkt.duration || 60,
                 maxTimer: pkt.duration || 60
             };
             this.addChatLog(
                 "VICE NET BOUNTY",
-                `🎯 $${Number(pkt.reward || 20000).toLocaleString()} BOUNTY placed on ${pkt.targetName || "PLAYER"}! (60s)`,
+                `🎯 $${Number(pkt.reward || 1200).toLocaleString()} BOUNTY placed on ${pkt.targetName || "PLAYER"}! (${pkt.duration || 60}s)`,
                 "#ff2a85",
                 true
             );
@@ -1976,8 +2035,8 @@ class ViceNetworkManager {
                         g.missions.startDynamicFixerMission(fixerPhone);
                         const m = g.missions.activeMission;
                         reply = isFr
-                            ? `Reçu 5/5 ${pName} ! Je viens de scanner ${dist} : contrat "${m ? m.title : "LIVE 90S"}" verrouillé sur ton GPS ($${m ? (m.reward || 35000).toLocaleString() : "35,000"} à la clé). Fonce !`
-                            : `Copy that ${pName}! Scanned ${dist} — contract "${m ? m.title : "LIVE 90S"}" is now locked on your GPS ($${m ? (m.reward || 35000).toLocaleString() : "35,000"} payout). Punch it!`;
+                            ? `Reçu 5/5 ${pName} ! Je viens de scanner ${dist} : contrat "${m ? m.title : "LIVE 90S"}" verrouillé sur ton GPS ($${m ? (m.reward || 1500).toLocaleString() : "1,500"} à la clé). Fonce !`
+                            : `Copy that ${pName}! Scanned ${dist} — contract "${m ? m.title : "LIVE 90S"}" is now locked on your GPS ($${m ? (m.reward || 1500).toLocaleString() : "1,500"} payout). Punch it!`;
                     }
                 } else {
                     reply = isFr
@@ -2046,7 +2105,9 @@ class ViceNetworkManager {
                 (v.rearDented ? 8 : 0) |
                 (v.heavyDented ? 16 : 0) |
                 ((v.doorOpenTimer || 0) > 0 ? 32 : 0) |
-                ((v.aiPanicTimer || 0) > 0 ? 64 : 0);
+                ((v.aiPanicTimer || 0) > 0 ? 64 : 0) |
+                (v.fireExtinguished ? 128 : 0) |
+                (v.towedByTruck ? 256 : 0);
             vehs.push([
                 v.id,
                 v.specKey || "STALLION",
@@ -2124,7 +2185,7 @@ class ViceNetworkManager {
 
         this.sendPacket({
             t: "WORLD_SYNC",
-            ver: 101164,
+            ver: 101179,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round((g.trafficLightTimer || 0) * 100) / 100,
             vehs: vehs.slice(0, 180),
@@ -2206,7 +2267,11 @@ class ViceNetworkManager {
                     id.startsWith("amb_") ||
                     id.startsWith("medic_") ||
                     id.startsWith("vcfd_") ||
-                    id.startsWith("tow_")
+                    id.startsWith("tow_") ||
+                    id.startsWith("fixer_") ||
+                    id.startsWith("mission_") ||
+                    id.startsWith("mcheetah_") ||
+                    id.startsWith("mbrinks_")
                 );
                 // On initial server bootstrap, only restore truly modified vehicles (isMod === 1),
                 // and auto-purge any stale dynamic traffic/event vehicle or distant burned wreck!
@@ -2259,13 +2324,13 @@ class ViceNetworkManager {
                     v.isStaticParked = false;
                 }
 
-                // Never overwrite the vehicle currently driven by the local player or linked to a 20Hz remote player
-                if (g.player.inVehicle === v || v._linkedRemoteId) {
+                // Never overwrite the vehicle currently driven by the local player, linked to a 20Hz remote player, or actively towed locally
+                if (g.player.inVehicle === v || v._linkedRemoteId || v.towedByTruck) {
                     continue;
                 }
 
-                // On initial server bootstrap or parked modified cars, snap directly to persisted coordinates!
-                if (isInitialServerBootstrap || (isMod && drvCode === 0) || Math.hypot((v.x || 0) - x, (v.y || 0) - y) > 260) {
+                // On initial server bootstrap or parked modified cars (not currently being towed), snap directly to persisted coordinates!
+                if (isInitialServerBootstrap || (isMod && drvCode === 0 && !(flags & 256)) || Math.hypot((v.x || 0) - x, (v.y || 0) - y) > 260) {
                     v.x = x;
                     v.y = y;
                     v.z = z;
@@ -2311,6 +2376,10 @@ class ViceNetworkManager {
                     g.explodeVehicle(v, false, true);
                 } else if (nowDestroyed) {
                     v.destroyed = true;
+                }
+                if (flags & 128) {
+                    v.fireExtinguished = true;
+                    v.burnTimer = 0;
                 }
                 v.sirenActive = resolvedDriver === null ? false : Boolean(flags & 2);
                 v.frontDented = Boolean(flags & 4);
@@ -2524,6 +2593,9 @@ class ViceNetworkManager {
                 if (!wv && typeof Vehicle === "function") {
                     wv = new Vehicle(rp.veh.id, rp.veh.specKey || "STALLION", rp.x, rp.y, rp.angle);
                     this.game.vehicles.push(wv);
+                    if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
+                        this.game.rebuildVehicleSpatialGrid();
+                    }
                 }
                 const rSeat = typeof rp.veh.seat === "number" ? rp.veh.seat : 0;
                 const localIsDriver = Boolean(wv && this.game.player.inVehicle === wv && (this.game.player.seatIndex || 0) === 0);
@@ -2679,9 +2751,13 @@ class ViceNetworkManager {
             };
         }
 
+        const storyMask = (this.game && this.game.missions && typeof this.game.missions.getStoryBitmask === "function")
+            ? this.game.missions.getStoryBitmask()
+            : 0;
+
         this.sendPacket({
             t: "STATE",
-            ver: 101177,
+            ver: 101179,
             econVer: 2,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),
@@ -2719,6 +2795,8 @@ class ViceNetworkManager {
             lvs: Math.round(this.game.lives !== undefined ? this.game.lives : 3),
             jfc: Math.round(this.game.jailFreeCards !== undefined ? this.game.jailFreeCards : 1),
             bnd: Boolean(p.bandana),
+            msn: storyMask,
+            ank: Boolean(p.ankleScrambled),
             charId: p.charId || "LUCIA",
             veh: vehData
         });
@@ -2856,8 +2934,8 @@ class ViceNetworkManager {
         const botId = `bot_rival_${Date.now()}_${idx}`;
 
         // Spawn on nearest road or 2 blocks along Ocean Drive
-        const spawnX = 215.5 * 64;
-        const spawnY = Math.max(40 * 64, Math.min(200 * 64, p.y - 160 + (idx % 2 === 0 ? -120 : 180)));
+        const spawnX = (typeof mx256 === "function" ? mx256(215.5) : 445.5) * 64;
+        const spawnY = Math.max(40 * 64, Math.min(480 * 64, p.y - 160 + (idx % 2 === 0 ? -120 : 180)));
 
         const rp = {
             id: botId,
@@ -2919,8 +2997,8 @@ class ViceNetworkManager {
                 if (rp.respawnTimer <= 0) {
                     rp.dead = false;
                     rp.hp = 100;
-                    rp.x = 215.5 * 64;
-                    rp.y = Math.max(45 * 64, Math.min(195 * 64, p.y - 240));
+                    rp.x = (typeof mx256 === "function" ? mx256(215.5) : 445.5) * 64;
+                    rp.y = Math.max(45 * 64, Math.min(480 * 64, p.y - 240));
                 }
                 continue;
             }
@@ -2998,11 +3076,13 @@ class ViceNetworkManager {
                 rp.respawnTimer = 5.0;
                 this.kills++;
                 if (byLocalPlayer) {
-                    this.game.multiplier += 1;
-                    this.game.addCash(5000, `ONLINE RIVAL WASTED: ${rp.name}!`);
+                    if (typeof this.game.addMultiplier === "function") {
+                        this.game.addMultiplier(1);
+                    }
+                    this.game.addCash(300, `ONLINE RIVAL WASTED: ${rp.name}!`);
                     this.game.showBigBanner(
                         "ONLINE FRAG!",
-                        `YOU WASTED ${rp.name}! (+$5,000 & MULTIPLIER +1 • KILLS: ${this.kills})`,
+                        `YOU WASTED ${rp.name}! (+$300 • KILLS: ${this.kills})`,
                         "#00f0ff",
                         2.6
                     );
@@ -3054,12 +3134,24 @@ class ViceNetworkManager {
             this.game.audio.resetLoops();
         }
         const targetObj = p.inVehicle || p;
+        if (p.inVehicle) {
+            p.inVehicle._worldModified = true;
+            p.inVehicle.isStaticParked = false;
+        }
         targetObj.x = target.x - 64;
         targetObj.y = target.y;
         targetObj.z = target.z || 2.0;
         targetObj.vx = 0;
         targetObj.vy = 0;
         if (targetObj.speed !== undefined) targetObj.speed = 0;
+        if (this.game) {
+            this.game.cameraX = targetObj.x;
+            this.game.cameraY = targetObj.y;
+            if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
+                this.game.rebuildVehicleSpatialGrid();
+            }
+        }
+        this.broadcastStateNow();
         this.game.addFloatingText(targetObj.x, targetObj.y - 30, `🌐 TELEPORTED TO ${target.name}!`, target.color || "#00f0ff");
         this.addChatLog("VICE NET", `🌐 Teleported to ${target.name}`, target.color || "#00f0ff", true);
     }
