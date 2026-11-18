@@ -2885,14 +2885,22 @@ class Vehicle {
 
         const distToPlayer = Math.hypot(wantedTarget.x - this.x, wantedTarget.y - this.y);
         const targetOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(wantedTarget.x, wantedTarget.y) : false;
+        const targetOnSand = Boolean(!targetOnRoad && map.getTileAtPixel && map.getTileAtPixel(wantedTarget.x, wantedTarget.y) === TILE.SAND);
+        const targetInBeachOrParkExpanse = Boolean(
+            !targetOnRoad && (
+                targetOnSand ||
+                wantedTarget.x >= 447.5 * TILE_SIZE
+            )
+        );
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
         // GTA 1 Tactical Officer Bail-Out:
         // 1) Close to a wanted player on foot (< 225px) or a boxed-in slow car (< 130px), OR
-        // 2) Cruiser can't get any closer (blocked by buildings/parked cars/sidewalk) for 1.3s while within 380px
+        // 2) Cruiser can't get any closer (blocked by buildings/parked cars/sidewalk/promenade) for 1.15..1.3s while within range
+        const maxBailDist = targetInBeachOrParkExpanse ? 1750 : (!targetOnRoad ? 780 : 380);
         const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 225;
         const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
-        const blockedNear = !wantedTarget.inVehicle && distToPlayer < 380 && noProgress > 1.3;
+        const blockedNear = !wantedTarget.inVehicle && distToPlayer < maxBailDist && noProgress > (targetInBeachOrParkExpanse ? 1.15 : 1.3);
 
         if (playerOnFootNear || playerBoxedNear || blockedNear) {
             if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number" && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y)) {
@@ -2914,10 +2922,9 @@ class Vehicle {
         }
         this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
 
-        // Stay strictly on the road network when the player is on city sidewalks (never ram parked cars or sidewalk trees!);
-        // only leave the asphalt if the player is out on open Vice Beach sand within 280px!
-        const targetOnSand = Boolean(!targetOnRoad && map.getTileAtPixel && map.getTileAtPixel(wantedTarget.x, wantedTarget.y) === TILE.SAND);
-        const forceDirect = targetOnSand && distToPlayer < 280;
+        // Stay on the road network when the player is on city sidewalks,
+        // but drive off-road onto Vice Beach sand / Lummus Park when the wanted target is in the beach expanse (< 1750px)!
+        const forceDirect = (targetInBeachOrParkExpanse && distToPlayer < 1750) || (!targetOnRoad && distToPlayer < 520 && noProgress > 0.8);
 
         // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger / tank turret fires!
         const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
@@ -3169,7 +3176,7 @@ class Vehicle {
             }
 
             let nearestCorpse = null;
-            let bestDist = 1500;
+            let bestDist = 1850;
             for (const ped of game.peds) {
                 if (
                     !ped.dead ||
@@ -3198,9 +3205,17 @@ class Vehicle {
                     this.approachNoProgress = 0;
                 }
                 const noProgress = this.updateApproachProgress(dt, bestDist);
+                const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
+                const corpseInBeachOrPark = Boolean(
+                    !corpseOnRoad && (
+                        nearestCorpse.x >= 447.5 * TILE_SIZE ||
+                        (map.getTileAtPixel && map.getTileAtPixel(nearestCorpse.x, nearestCorpse.y) === TILE.SAND)
+                    )
+                );
+                const maxMedicBailDist = corpseInBeachOrPark ? 1650 : 620;
 
-                // Park and send the paramedic on foot ONLY when truly close to the scene (< 165px, or < 310px if off-road/blocked)
-                if (bestDist < 165 || (bestDist < 310 && noProgress > 2.6)) {
+                // Park and send the paramedic on foot when close to the scene (< 165px) or when blocked off-road/beach
+                if (bestDist < 165 || (bestDist < maxMedicBailDist && noProgress > 1.8)) {
                     this.aiBailTimer += dt;
                     if (this.aiBailTimer > 0.4 && Math.abs(this.speed) < 34 && typeof game.deployParamedicFromAmbulance === "function") {
                         this.aiBailTimer = 0;
@@ -3210,8 +3225,7 @@ class Vehicle {
                     return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
-                const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
-                const forceDirect = (!corpseOnRoad && bestDist < 420) || noProgress > 1.8;
+                const forceDirect = (!corpseOnRoad && bestDist < (corpseInBeachOrPark ? 1650 : 540)) || noProgress > 1.4;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
