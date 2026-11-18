@@ -30,7 +30,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_185";
+const CURRENT_BUILD = "101_186";
 
 function normalizeRoomCode(roomCode) {
     const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
@@ -435,9 +435,17 @@ function sendRoomBootstrap(socket, meta) {
         }));
     }
 
-    // 7. Current active players in the room
+    // 7. Current active players in the room (only send players who have started and sent a fresh STATE within the last 8s)
+    const bootNowMs = Date.now();
     for (const [otherSock, otherMeta] of clients.entries()) {
-        if (otherSock !== socket && otherMeta.room === code && otherMeta.lastState) {
+        if (
+            otherSock !== socket &&
+            otherMeta.room === code &&
+            !otherMeta.isOutdated &&
+            otherMeta.lastState &&
+            otherMeta.lastState.started &&
+            (bootNowMs - (otherMeta.lastStateMs || 0)) < 8000
+        ) {
             sendJson(socket, otherMeta.lastState);
         }
     }
@@ -557,6 +565,7 @@ function handleClientPacket(socket, pkt) {
             broadcastDirectoryCounts();
         }
         meta.lastState = pkt;
+        meta.lastStateMs = Date.now();
 
         if (typeof pkt.sc === "number" && pkt.sc > 0) {
             mergeLeaderboardEntry(meta.name, pkt.charId || "LUCIA", pkt.sc, meta.color, pkt.econVer || 1);

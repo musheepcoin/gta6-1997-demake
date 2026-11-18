@@ -80,6 +80,15 @@ class ViceNetworkManager {
         this.initWebSocketServer();
         this.initBroadcastChannel();
         this.initWebRTCMesh();
+
+        // Immediately broadcast hid: true/false on tab visibility change BEFORE browser suspends requestAnimationFrame!
+        if (typeof document !== "undefined") {
+            document.addEventListener("visibilitychange", () => {
+                if (this.game && this.game.started) {
+                    this.broadcastStateNow();
+                }
+            });
+        }
     }
 
     resolveInitialWsUrl() {
@@ -1759,9 +1768,12 @@ class ViceNetworkManager {
         const MY_VER = 101181;
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
+        const now = performance.now();
         const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
         const mySlot = (typeof this.slotIndex === "number" && this.slotIndex >= 0) ? this.slotIndex : 999;
         for (const rp of humans) {
+            // A throttled/idle remote tab that hasn't sent a fresh 20Hz STATE within 1.6s cannot take World Host priority!
+            if ((now - (rp.lastSeen || 0)) > 1600) continue;
             const rpVer = rp.ver || 0;
             // Newer game build version always takes World Host priority over an un-refreshed old tab!
             if (rpVer > MY_VER) return false;
@@ -1779,7 +1791,7 @@ class ViceNetworkManager {
 
     isClientWorldSyncActive() {
         if (this.isWorldHost()) return false;
-        return (performance.now() - (this.lastWorldSyncReceivedMs || 0)) < 3500;
+        return (performance.now() - (this.lastWorldSyncReceivedMs || 0)) < 450;
     }
 
     broadcastWorldEvent(ev) {
@@ -2220,7 +2232,10 @@ class ViceNetworkManager {
     applyWorldSync(pkt) {
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded || !pkt) return;
         const isInitialServerBootstrap = (pkt.id === "server_world");
-        this.lastWorldSyncReceivedMs = performance.now();
+        const syncNowMs = performance.now();
+        if (!isInitialServerBootstrap) {
+            this.lastWorldSyncReceivedMs = syncNowMs;
+        }
         if (isInitialServerBootstrap) {
             this._serverBootstrapApplied = true;
         }
@@ -2366,6 +2381,9 @@ class ViceNetworkManager {
                 v.netTargetY = y;
                 v.netTargetZ = z;
                 v.netTargetAngle = a;
+                if (!isInitialServerBootstrap) {
+                    v._lastNetSyncMs = syncNowMs;
+                }
                 let resolvedDriver = codeToDrv(drvCode);
                 if (resolvedDriver === "REMOTE") {
                     // Only keep driver = "REMOTE" if an active remote player is actually claiming this vehicle!
@@ -2722,11 +2740,10 @@ class ViceNetworkManager {
                 this.syncAccumulator = 0;
                 this.broadcastStateNow();
             }
-            if (this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
+            // Never broadcast WORLD_SYNC from a hidden/background tab (whose requestAnimationFrame is throttled to 1 Hz by the browser!)
+            if (!isTabHidden && this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
                 this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
-                const targetWorldInterval = hasRemoteHumans
-                    ? (isTabHidden ? 0.50 : this.worldSyncInterval)
-                    : (isTabHidden ? 6.0 : 3.0);
+                const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 3.0;
                 if (this.worldSyncAccumulator >= targetWorldInterval) {
                     this.worldSyncAccumulator = 0;
                     this.broadcastWorldSync();
