@@ -1330,10 +1330,14 @@ class Vehicle {
         return diff;
     }
 
-    triggerPanic(duration = 7.5) {
+    triggerPanic(duration = 7.5, threatX = undefined, threatY = undefined) {
         if (this.driver === "AI_TRAFFIC") {
             this.aiPanicTimer = Math.max(this.aiPanicTimer, duration);
             this.aiState = "PANIC";
+            if (typeof threatX === "number" && typeof threatY === "number") {
+                this.aiThreatX = threatX;
+                this.aiThreatY = threatY;
+            }
         }
     }
 
@@ -1604,15 +1608,30 @@ class Vehicle {
             this.aiBlockY = by;
             this.aiTurnSeed = (this.aiTurnSeed * 1.6180339887 + 0.31) % 1.0;
             if (typeof map.chooseNextRoadBlock === "function") {
-                this.aiChosenDir = map.chooseNextRoadBlock(
-                    bx,
-                    by,
-                    refAngle,
-                    curZ,
-                    this.aiTurnSeed,
-                    Boolean(this.aiTurnedInIntersection),
-                    entryAngle
-                );
+                if (this.aiPanicTimer > 0 && typeof this.aiThreatX === "number" && typeof map.chooseTargetGuidedRoadBlock === "function") {
+                    const fleeX = this.x + (this.x - this.aiThreatX) * 4.0;
+                    const fleeY = this.y + (this.y - this.aiThreatY) * 4.0;
+                    this.aiChosenDir = map.chooseTargetGuidedRoadBlock(
+                        bx,
+                        by,
+                        refAngle,
+                        fleeX,
+                        fleeY,
+                        curZ,
+                        Boolean(this.aiTurnedInIntersection),
+                        entryAngle
+                    );
+                } else {
+                    this.aiChosenDir = map.chooseNextRoadBlock(
+                        bx,
+                        by,
+                        refAngle,
+                        curZ,
+                        this.aiTurnSeed,
+                        Boolean(this.aiTurnedInIntersection),
+                        entryAngle
+                    );
+                }
                 // Alternative route after backing out of a gridlock: try other exits than the jammed direction
                 if (this.gridlockAvoidTimer > 0 && typeof this.gridlockAvoidAngle === "number") {
                     const isJammedDir = (dir) => dir && Math.abs(this.normalizeAngle(dir.angle - this.gridlockAvoidAngle)) < 0.3;
@@ -1934,9 +1953,9 @@ class Vehicle {
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
                 const dx = other.x - this.x;
                 const dy = other.y - this.y;
-                if (Math.abs(dx) > 220 || Math.abs(dy) > 220) continue;
+                if (Math.abs(dx) > 290 || Math.abs(dy) > 290) continue;
                 const dist = Math.hypot(dx, dy);
-                if (dist > 220) continue;
+                if (dist > 290) continue;
 
                 const forwardDist = dx * fx + dy * fy; // < 0 means emergency/tow vehicle is BEHIND us
                 const signedLat = dx * rx + dy * ry;
@@ -1952,29 +1971,37 @@ class Vehicle {
                     );
                 };
 
-                if (cosDiff > 0.35 && forwardDist < 36 && forwardDist > -210 && lateralDist < 54) {
-                    // Priority vehicle approaching from behind in our direction: NEVER stop in front of it!
-                    sirenBehind = true;
-                    if (this.aiLaneChangeCooldown <= 0) {
-                        this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+                if (cosDiff > 0.35 && forwardDist < 42 && forwardDist > -275 && lateralDist < 58) {
+                    // Real-Life "Move Over Law":
+                    // 1) If we are still in the emergency vehicle's path (lateralDist < 22), advance & pull over to the right curb (even across a red light)!
+                    // 2) Once we have pulled over to the side (lateralDist >= 22), put on 4-way hazards and STOP until the siren passes!
+                    const prefSide = signedLat > 6 ? -1 : 1; // Default: pull right (+1)
+                    if (isRightSafe(prefSide * 24)) {
+                        this.aiPullOverOffset = prefSide * 25;
+                        this.aiPullOverTimer = 2.0;
+                    } else if (isRightSafe(-prefSide * 24)) {
+                        this.aiPullOverOffset = -prefSide * 25;
+                        this.aiPullOverTimer = 2.0;
                     }
-                    const prefSide = signedLat > 4 ? -1 : 1; // Pull away from the emergency vehicle's side (default right curb +1)
-                    if (isRightSafe(prefSide * 22)) {
-                        this.aiPullOverOffset = prefSide * 24;
-                        this.aiPullOverTimer = 1.6;
-                    } else if (isRightSafe(-prefSide * 22)) {
-                        this.aiPullOverOffset = -prefSide * 24;
-                        this.aiPullOverTimer = 1.6;
+                    this.aiTurnSignal = 2; // 4-way hazard blinkers
+                    if (lateralDist < 22 && forwardDist < 0) {
+                        sirenBehind = true;
+                        if (this.aiLaneChangeCooldown <= 0) {
+                            this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+                        }
+                    } else {
+                        sirenYield = true;
                     }
                 } else if (
-                    (cosDiff < -0.35 && forwardDist > -10 && forwardDist < 150 && lateralDist < 54) ||
-                    (Math.abs(cosDiff) <= 0.45 && forwardDist > -8 && forwardDist < 115 && lateralDist < 48)
+                    (cosDiff < -0.35 && forwardDist > -15 && forwardDist < 190 && lateralDist < 62) ||
+                    (Math.abs(cosDiff) <= 0.45 && forwardDist > -15 && forwardDist < 160 && lateralDist < 58)
                 ) {
-                    // Priority vehicle oncoming or crossing intersection ahead: pull right and yield!
+                    // Priority vehicle oncoming or crossing intersection ahead: pull right, flash hazards, and STOP before the junction!
                     sirenYield = true;
-                    if (isRightSafe(20)) {
-                        this.aiPullOverOffset = 22;
-                        this.aiPullOverTimer = 1.4;
+                    this.aiTurnSignal = 2;
+                    if (isRightSafe(22)) {
+                        this.aiPullOverOffset = 24;
+                        this.aiPullOverTimer = 1.8;
                     }
                 }
             }
@@ -2570,21 +2597,47 @@ class Vehicle {
     }
 
     /* ========================================================================
-       STRICT ROAD-GRAPH PURSUIT & EMERGENCY NAVIGATION (VCPD, EMS, VCFD, TOW)
-       Stays 100% on the asphalt road network, aligns cleanly with road lanes,
-       changes lanes smoothly around slower traffic, and never jackknifes or
-       drives off-road onto sidewalks, parks, or beaches!
+       HYBRID CODE-3 EMERGENCY & TACTICAL OFF-ROAD PURSUIT (VCPD, EMS, VCFD)
+       - Uses road-graph routing when far away across city blocks blocked by 3D buildings,
+         running red lights and overtaking slow/stopped traffic on adjacent or oncoming lanes.
+       - As soon as line-of-sight is clear of 3D buildings (or when entering Lummus Park /
+         Vice Beach / plazas / sidewalks near the incident), switches to 13-ray off-road
+         feeler navigation (`forceDirect`) to drive right onto the beach sand, park grass,
+         or sidewalk up to the exact scene!
        ======================================================================== */
-    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, _forceDirect = false) {
+    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, forceDirect = false) {
         const curZ = this.z !== undefined ? this.z : 2.0;
         if (this.aiLaneChangeCooldown > 0) this.aiLaneChangeCooldown -= dt;
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
         this.aiReverseTimer = 0;
         this.aiTrafficBypassTimer = 0;
 
+        const distToTarget = Math.hypot(targetX - this.x, targetY - this.y);
+        const clearOfBuildings = map.traceSegment2D
+            ? !map.traceSegment2D(this.x, this.y, targetX, targetY, curZ).hit
+            : (distToTarget < 320);
         const onRoadNow = map.isRoadAtPixel(this.x, this.y);
 
-        // If ever knocked off-road onto a sidewalk/park, immediately steer back onto the nearest road tile!
+        // Mode A: Real-Life Off-Road / Direct Tactical Interception (`forceDirect` or direct building-free line of sight within 420px):
+        // Emergency & police vehicles mount sidewalks, cross Lummus Park, and drive onto Vice Beach sand while weaving around trees & cars!
+        if (forceDirect || (clearOfBuildings && distToTarget < 420)) {
+            const leadTime = Math.min(0.42, distToTarget / 640);
+            let aimX = targetX + targetVx * leadTime;
+            let aimY = targetY + targetVy * leadTime;
+
+            const targetSpd = Math.hypot(targetVx, targetVy);
+            if (allowPit && distToTarget > 34 && distToTarget < 115 && targetSpd > 85) {
+                const tAng = Math.atan2(targetVy, targetVx);
+                const flankSign = ((String(this.id).charCodeAt(String(this.id).length - 1) || 0) % 2 === 0) ? 1 : -1;
+                aimX -= Math.cos(tAng) * 14 - Math.sin(tAng) * (12 * flankSign);
+                aimY -= Math.sin(tAng) * 14 + Math.cos(tAng) * (12 * flankSign);
+            }
+
+            const directAngle = Math.atan2(aimY - this.y, aimX - this.x);
+            return this.steerTowardTargetWithFeelers(dt, map, curZ, directAngle, maxThrottle, game);
+        }
+
+        // If off-road while still far from the target and blocked by city buildings, steer back to the nearest road corridor
         if (!onRoadNow && map.getNavigationBlock) {
             const cbx = Math.floor(this.x / TILE_SIZE);
             const cby = Math.floor(this.y / TILE_SIZE);
@@ -2612,14 +2665,11 @@ class Vehicle {
                 const rcx = (bestRx + 0.5) * TILE_SIZE;
                 const rcy = (bestRy + 0.5) * TILE_SIZE;
                 const toRoadAng = Math.atan2(rcy - this.y, rcx - this.x);
-                this.angle = toRoadAng;
-                this.x += Math.cos(toRoadAng) * 72 * dt;
-                this.y += Math.sin(toRoadAng) * 72 * dt;
-                return { throttle: 0.45, steer: 0, handbrake: false };
+                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.65, game);
             }
         }
 
-        // Target-Guided Road Network Routing (navigates city blocks & intersections strictly along road lanes!)
+        // Mode B: Code-3 Road Network Routing (runs red lights, overtakes traffic via adjacent/oncoming lanes or curb!)
         const bx = Math.floor(this.x / TILE_SIZE);
         const by = Math.floor(this.y / TILE_SIZE);
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
@@ -2683,28 +2733,29 @@ class Vehicle {
                 const lDist = Math.abs(dx * rx + dy * ry);
                 const halfLenSum = ((this.w || 62) + (other.w || 62)) * 0.50;
                 const bumperGap = fDist - halfLenSum;
-                if (fDist > 4 && bumperGap < 110 && lDist < 24) {
+                if (fDist > 4 && bumperGap < 125 && lDist < 24) {
                     if (bumperGap < sameLaneLeadGap) {
                         sameLaneLeadGap = bumperGap;
                         sameLaneLeadSpd = Math.max(0, other.speed || 0);
                     }
+                    // Code-3 Overtaking: change lanes or swing wide onto the oncoming lane / sidewalk shoulder (±28..36px) to pass stopped traffic!
                     const changed = this.aiLaneChangeCooldown <= 0
                         ? this.tryAdjacentLaneChange(bx, by, curZ, map, game)
                         : false;
-                    if (!changed && bumperGap < 85) {
-                        const prefSides = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? [1, -1] : [-1, 1];
+                    if (!changed && bumperGap < 98) {
+                        const prefSides = (this.aiPullOverOffset && this.aiPullOverOffset < 0) ? [-1, 1] : [-1, 1];
                         for (const bSide of prefSides) {
-                            const bOff = 22;
+                            const bOff = 30;
                             const testX = this.x + rx * bSide * bOff;
                             const testY = this.y + ry * bSide * bOff;
-                            const testAheadX = testX + fx * 38;
-                            const testAheadY = testY + fy * 38;
+                            const testAheadX = testX + fx * 42;
+                            const testAheadY = testY + fy * 42;
                             if (
                                 (!map.isWaterAtPixel || (!map.isWaterAtPixel(testX, testY) && !map.isWaterAtPixel(testAheadX, testAheadY))) &&
                                 (!map.resolveCircleBuildingCollision || (!map.resolveCircleBuildingCollision(testX, testY, 13, curZ).hit && !map.resolveCircleBuildingCollision(testAheadX, testAheadY, 13, curZ).hit))
                             ) {
                                 this.aiPullOverOffset = bSide * bOff;
-                                this.aiPullOverTimer = 1.4;
+                                this.aiPullOverTimer = 1.6;
                                 break;
                             }
                         }
@@ -2733,8 +2784,6 @@ class Vehicle {
 
         const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
         const ty = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
-        const desiredAngle = Math.atan2(ty - this.y, tx - this.x);
-        const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
         let steer = 0;
         let throttle = maxThrottle;
 
@@ -2748,7 +2797,7 @@ class Vehicle {
         this.steerAngleRad = 0;
 
         const emRollSpd = Math.abs(this.speed || 0);
-        const maxLatStep = Math.min(62, Math.max(24, emRollSpd * 0.55)) * dt;
+        const maxLatStep = Math.min(72, Math.max(28, emRollSpd * 0.62)) * dt;
         const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
         const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
         const pullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
@@ -2773,49 +2822,47 @@ class Vehicle {
         }
 
         if (Math.abs(laneAngleDiff) > 0.18 || this.aiChosenDir.isTurn) {
-            if (this.speed > 92) {
+            if (this.speed > 96) {
                 throttle = 0;
                 const slowMult = Math.pow(0.15, dt);
                 this.vx *= slowMult;
                 this.vy *= slowMult;
                 this.speed *= slowMult;
             } else {
-                throttle = Math.min(maxThrottle, 0.48);
+                throttle = Math.min(maxThrottle, 0.52);
             }
         }
 
-        // Smooth following distance behind any vehicle in front that hasn't cleared the lane yet
-        if (sameLaneLeadGap < 28) {
+        if (sameLaneLeadGap < 24 && Math.abs(this.aiPullOverOffset || 0) < 16) {
             throttle = 0;
             const brakeMult = Math.pow(0.004, dt);
             this.vx *= brakeMult;
             this.vy *= brakeMult;
             this.speed *= brakeMult;
-        } else if (sameLaneLeadGap < 64 && this.speed > sameLaneLeadSpd + 18) {
-            throttle = 0.15;
         }
 
         this.aiStuckTimer = 0;
         return { throttle, steer, handbrake: false };
     }
 
-    // Helper: aligns an emergency/police vehicle cleanly parallel to its road lane and checks that it isn't stacking on top of another parked unit
-    alignCurbsideAndCheckSpacing(map, game, minSpacing = 68) {
-        if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
+    // Helper: checks spacing against other stopped emergency/police units so responders never stack on top of each other
+    alignCurbsideAndCheckSpacing(map, game, minSpacing = 68, tacticalTarget = null) {
+        if (tacticalTarget) {
+            // Real-life tactical "fend-off" angle (30-deg angled shield posture facing the suspect/scene)
+            const toTarg = Math.atan2(tacticalTarget.y - this.y, tacticalTarget.x - this.x);
+            const sideSign = ((String(this.id).charCodeAt(String(this.id).length - 1) || 0) % 2 === 0) ? 1 : -1;
+            this.angle = toTarg + sideSign * 0.48;
+        } else if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number" && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y)) {
             this.angle = this.aiChosenDir.angle;
-        } else {
-            this.angle = Math.round(this.angle / (Math.PI * 0.5)) * (Math.PI * 0.5);
         }
         this.visualSteerYaw = 0;
         this.angularVelocity = 0;
-        this.aiPullOverOffset = 16;
-        this.aiPullOverTimer = 3.0;
         if (game && Array.isArray(game.vehicles)) {
             for (const ov of game.vehicles) {
                 if (!ov || ov === this || ov.destroyed) continue;
                 const isOtherStoppedResponder = (ov.isPolice || ov.isEmergency) && Math.abs(ov.speed || 0) < 20;
                 if (isOtherStoppedResponder && Math.hypot(ov.x - this.x, ov.y - this.y) < minSpacing) {
-                    return false; // Keep rolling forward a bit so units park in a clean staggered line along the curb!
+                    return false;
                 }
             }
         }
@@ -2823,9 +2870,11 @@ class Vehicle {
     }
 
     /* ========================================================================
-       AUTHENTIC GTA 1 VCPD POLICE PURSUIT AI (Road-Graph + Curbside Squad Deploy)
-       Pursues the nearest wanted player along the road network, parks cleanly at
-       the nearest road point (e.g. Ocean Drive for Vice Beach), and deploys officers!
+       REAL-LIFE VCPD / SWAT TACTICAL PURSUIT AI (Off-Road Beach/Park + Fend-Off Stop)
+       - Runs red lights, overtakes traffic, and leaves the road (`forceDirect = true`)
+         to drive across Lummus Park, sidewalks, and Vice Beach sand right up to the suspect!
+       - Stops at tactical standoff range (135..175px) in an angled fend-off posture
+         and deploys its 2-officer squad!
        ======================================================================== */
     computePoliceControls(dt, map, game) {
         const wantedTarget = (game && typeof game.getNearestWantedTarget === "function")
@@ -2850,6 +2899,7 @@ class Vehicle {
         this.sirenActive = true;
         this.aiState = "PURSUIT";
 
+        const curZ = this.z !== undefined ? this.z : 2.0;
         const distToPlayer = Math.hypot(wantedTarget.x - this.x, wantedTarget.y - this.y);
         const targetOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(wantedTarget.x, wantedTarget.y) : false;
         const targetOnSand = Boolean(!targetOnRoad && map.getTileAtPixel && map.getTileAtPixel(wantedTarget.x, wantedTarget.y) === TILE.SAND);
@@ -2861,26 +2911,26 @@ class Vehicle {
         );
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
-        // Tactical Curbside Squad Deployment:
-        // 1) Close to a wanted player on foot (< 210px) or boxed-in slow car (< 130px), OR
-        // 2) Cruiser has reached the closest road point (e.g. Ocean Drive next to Lummus Park / Vice Beach) and distToPlayer stopped decreasing for 0.70s!
-        const maxBailDist = targetInBeachOrParkExpanse ? 1750 : (!targetOnRoad ? 780 : 360);
-        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 210;
+        // Tactical Squad Deployment right at the scene:
+        // 1) Cruiser has driven up to tactical standoff range (< 175px) of a suspect on foot (on the beach, park, or street), OR
+        // 2) Boxed-in slow getaway car (< 130px), OR
+        // 3) Blocked by a solid building wall within 440px for > 1.35s
+        const playerOnFootAtScene = !wantedTarget.inVehicle && distToPlayer < 175;
         const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
-        const reachedNearestRoadPoint = !wantedTarget.inVehicle && distToPlayer < maxBailDist && noProgress > (targetInBeachOrParkExpanse ? 0.70 : 1.10);
+        const blockedByWallNear = !wantedTarget.inVehicle && distToPlayer < 440 && noProgress > 1.35;
 
-        if (playerOnFootNear || playerBoxedNear || reachedNearestRoadPoint) {
-            const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68);
-            if (!spacingOk && this.aiBailTimer < 0.8) {
-                this.aiBailTimer += dt * 0.35;
-                return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.38, false, false);
+        if (playerOnFootAtScene || playerBoxedNear || blockedByWallNear) {
+            const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 64, wantedTarget);
+            if (!spacingOk && this.aiBailTimer < 0.65) {
+                this.aiBailTimer += dt * 0.4;
+                return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.42, false, true);
             }
             this.aiBailTimer += dt;
-            const brakeMult = Math.pow(0.002, dt);
+            const brakeMult = Math.pow(0.001, dt);
             this.vx *= brakeMult;
             this.vy *= brakeMult;
             this.speed *= brakeMult;
-            const bailDelay = playerBoxedNear ? 0.65 : 0.25;
+            const bailDelay = playerBoxedNear ? 0.55 : 0.18;
             if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
                 this.approachNoProgress = 0;
@@ -2893,6 +2943,18 @@ class Vehicle {
             return { throttle: 0, steer: 0, handbrake: true };
         }
         this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
+
+        // Real-Life Off-Road Pursuit:
+        // Leave the asphalt road (`forceDirect = true`) as soon as:
+        // - The suspect is on Vice Beach / Lummus Park and the cruiser has reached Ocean Drive (this.x >= 445.0 * TILE_SIZE), OR
+        // - No 3D building blocks the line to the suspect within 520px!
+        const clearOfBuildings = map.traceSegment2D
+            ? !map.traceSegment2D(this.x, this.y, wantedTarget.x, wantedTarget.y, curZ).hit
+            : (distToPlayer < 320);
+        const forceDirect =
+            (targetInBeachOrParkExpanse && this.x >= 445.0 * TILE_SIZE && distToPlayer < 1750) ||
+            (!targetOnRoad && clearOfBuildings && distToPlayer < 560) ||
+            (clearOfBuildings && distToPlayer < 380);
 
         // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger / tank turret fires!
         const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
@@ -2926,9 +2988,9 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            0.86,
+            forceDirect ? 0.82 : 0.90,
             Boolean(wantedTarget.inVehicle && targetOnRoad),
-            false
+            forceDirect
         );
     }
 
@@ -3011,16 +3073,18 @@ class Vehicle {
     }
 
     steerTowardTargetWithFeelers(dt, map, curZ, directAngle, maxThrottle = 0.92, game = null) {
-        // Evaluate 9 candidate feeler directions (-72 deg .. +72 deg) to steer around buildings, water & traffic!
-        const candidateOffsets = [-1.25, -0.90, -0.56, -0.26, 0, 0.26, 0.56, 0.90, 1.25];
+        // Evaluate 13 candidate feeler directions (-90 deg .. +90 deg) at 3 probe distances (p0, p1, p2)
+        // so off-road Police, SWAT, Ambulances, and Fire Engines weave cleanly around palm trunks, benches, buildings & cars!
+        const candidateOffsets = [-1.55, -1.25, -0.96, -0.68, -0.42, -0.18, 0, 0.18, 0.42, 0.68, 0.96, 1.25, 1.55];
         let bestOffset = 0;
         let bestScore = -9999;
         const myFrontHalf = (this.w || 62) * 0.50;
-        const probeNear = myFrontHalf + 18;
-        const probeFar = myFrontHalf + 58;
+        const probeClose = myFrontHalf + 10;
+        const probeNear = myFrontHalf + 34;
+        const probeFar = myFrontHalf + 68;
         let frontBlockedClose = false;
 
-        // Pre-collect nearby vehicles once via the 256px spatial hash grid instead of scanning all 636 vehicles per feeler!
+        // Pre-collect nearby vehicles once via the 256px spatial hash grid
         const nearbyVehs = [];
         const maxProbeReach = probeFar + 48;
         if (game && Array.isArray(game.vehicles)) {
@@ -3054,42 +3118,56 @@ class Vehicle {
         for (const off of candidateOffsets) {
             const candAng = this.angle + off;
             const alignDiff = Math.abs(this.normalizeAngle(directAngle - candAng));
-            let score = -alignDiff * 3.2 - Math.abs(off) * 0.32;
+            let score = -alignDiff * 3.0 - Math.abs(off) * 0.28;
 
             const cCos = Math.cos(candAng);
             const cSin = Math.sin(candAng);
+            const p0x = this.x + cCos * probeClose;
+            const p0y = this.y + cSin * probeClose;
             const p1x = this.x + cCos * probeNear;
             const p1y = this.y + cSin * probeNear;
             const p2x = this.x + cCos * probeFar;
             const p2y = this.y + cSin * probeFar;
 
-            if (map.resolveCircleBuildingCollision(p1x, p1y, 16, curZ).hit) {
+            // Check 3D buildings, security barriers & solid palm/tree trunks at all 3 distances
+            if (map.resolveCircleBuildingCollision(p0x, p0y, 15, curZ).hit) {
+                score -= 85;
+                if (off === 0) frontBlockedClose = true;
+            }
+            if (map.resolveCircleBuildingCollision(p1x, p1y, 15, curZ).hit) {
                 score -= 55;
             }
-            if (map.resolveCircleBuildingCollision(p2x, p2y, 16, curZ).hit) {
-                score -= 30;
+            if (map.resolveCircleBuildingCollision(p2x, p2y, 15, curZ).hit) {
+                score -= 28;
             }
-            if (map.isWaterAtPixel(p1x, p1y) || map.isWaterAtPixel(p2x, p2y)) {
-                score -= 65;
-            }
-            if (map.isRoadAtPixel(p1x, p1y)) {
-                score += 1.5;
-            }
-            if (map.isRoadAtPixel(p2x, p2y)) {
-                score += 1.2;
+            if (map.isWaterAtPixel(p0x, p0y) || map.isWaterAtPixel(p1x, p1y) || map.isWaterAtPixel(p2x, p2y)) {
+                score -= 95;
             }
 
-            // Penalize feelers that collide with civilian/wrecked vehicles so police, ambulances & tow trucks weave around traffic!
+            // Prefer open sand trails / paved walkways (lid !== 10) over dense palm lawn in Lummus Park (c = 448..464)
+            if (map.getBlockInfo) {
+                const b1x = Math.floor(p1x / TILE_SIZE);
+                const b1y = Math.floor(p1y / TILE_SIZE);
+                if (b1x >= 448 && b1x <= 464) {
+                    const lid1 = map.getBlockInfo(b1x, b1y, 1).lid;
+                    if (lid1 >= 98 && lid1 <= 101) score += 3.5;
+                }
+            }
+
+            // Penalize feelers that collide with civilian/wrecked vehicles
             for (let vi = 0; vi < nearbyVehs.length; vi++) {
                 const other = nearbyVehs[vi];
-                const oRad = Math.max(26, (other.w || 62) * 0.36);
+                const oRad = Math.max(24, (other.w || 62) * 0.35);
+                const d0 = Math.hypot(other.x - p0x, other.y - p0y);
                 const d1 = Math.hypot(other.x - p1x, other.y - p1y);
                 const d2 = Math.hypot(other.x - p2x, other.y - p2y);
-                if (d1 < oRad) {
-                    score -= 36;
+                if (d0 < oRad) {
+                    score -= 52;
                     if (off === 0) frontBlockedClose = true;
+                } else if (d1 < oRad) {
+                    score -= 34;
                 } else if (d2 < oRad) {
-                    score -= 20;
+                    score -= 18;
                 }
             }
 
@@ -3099,35 +3177,30 @@ class Vehicle {
             }
         }
 
-        const chosenAngle = bestScore < -35 ? directAngle : (this.angle + bestOffset);
+        const chosenAngle = bestScore < -65 ? directAngle : (this.angle + bestOffset);
         const diff = this.normalizeAngle(chosenAngle - this.angle);
-        const steer = Math.max(-1, Math.min(1, diff * 2.9));
-        let throttle = Math.abs(diff) > 0.75 && this.speed > 175 ? 0.35 : maxThrottle;
-        if (frontBlockedClose && Math.abs(bestOffset) < 0.20 && this.speed > 65) {
-            throttle = -0.35;
+        this.angle += Math.max(-4.8 * dt, Math.min(4.8 * dt, diff * 4.2 * dt));
+        const steer = Math.max(-1, Math.min(1, diff * 3.1));
+        let throttle = Math.abs(diff) > 0.75 && this.speed > 145 ? 0.38 : maxThrottle;
+        if (frontBlockedClose && Math.abs(bestOffset) < 0.18 && this.speed > 75) {
+            throttle = 0.18;
         }
-
-        if (Math.abs(this.speed) < 15) {
-            this.aiStuckTimer += dt;
-            if (this.aiStuckTimer > 0.75) {
-                this.aiStuckTimer = 0;
-                this.aiReverseTimer = 1.0;
-                this.aiReverseSteer = diff > 0 ? -0.9 : 0.9;
-            }
-        } else {
-            this.aiStuckTimer = Math.max(0, this.aiStuckTimer - dt * 2);
-        }
-
+        this.aiStuckTimer = 0;
+        this.aiReverseTimer = 0;
         return { throttle, steer, handbrake: false };
     }
 
     /* ========================================================================
-       AUTHENTIC GTA 1 EMERGENCY AI (Ambulance Paramedics & Fire Engine Hose)
+       REAL-LIFE EMS AMBULANCE & VCFD FIRE ENGINE AI
+       - Staging Protocol ("Scene Safety"): Ambulance waits at safe standoff (260..320px)
+         while active gunfire/explosions are occurring at the casualty scene!
+       - Off-Road Rescue: Once safe, drives across sidewalks, Lummus Park, and onto
+         Vice Beach sand right up to the casualties (85..135px) and deploys its Paramedic!
        ======================================================================== */
     computeEmergencyControls(dt, map, game) {
         if (!game) return this.computeTrafficControls(dt, map, game);
 
-        // A. MEDIC AMBULANCE: Stays strictly on roads, stops at nearest road point, and deploys an on-foot Paramedic!
+        // A. MEDIC AMBULANCE
         if (this.specKey === "MEDIC_AMBULANCE" && Array.isArray(game.peds)) {
             if (this.deployedMedic) {
                 if (
@@ -3157,7 +3230,6 @@ class Vehicle {
                     continue;
                 }
                 if (map.isWaterAtPixel && map.isWaterAtPixel(ped.x, ped.y)) continue;
-                // Avoid two ambulances targeting the exact same casualty when multiple casualties exist
                 const claimedByOther = Array.isArray(game.vehicles) && game.vehicles.some(
                     (ov) => ov && ov !== this && !ov.destroyed && ov.specKey === "MEDIC_AMBULANCE" &&
                         (ov.medicTargetPed === ped || (ov.deployedMedic && ov.deployedMedic.healingPatient === ped))
@@ -3170,6 +3242,7 @@ class Vehicle {
             }
 
             if (nearestCorpse) {
+                const curZ = this.z !== undefined ? this.z : 2.0;
                 const rawDist = Math.hypot(nearestCorpse.x - this.x, nearestCorpse.y - this.y);
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_MEDIC";
@@ -3178,6 +3251,22 @@ class Vehicle {
                     this.approachBestDist = undefined;
                     this.approachNoProgress = 0;
                 }
+
+                // Real-Life EMS "Scene Safety" Staging: hold at 260..320px while active gunfire/rockets are happening right on the casualties!
+                const activeShooterOnScene = Boolean(
+                    game.player &&
+                    !game.player.dead &&
+                    (game.player.playerCombatTimer || 0) > 0.5 &&
+                    Math.hypot(game.player.x - nearestCorpse.x, game.player.y - nearestCorpse.y) < 250
+                );
+                if (activeShooterOnScene && rawDist < 310) {
+                    const brakeMult = Math.pow(0.004, dt);
+                    this.vx *= brakeMult;
+                    this.vy *= brakeMult;
+                    this.speed *= brakeMult;
+                    return { throttle: 0, steer: 0, handbrake: true };
+                }
+
                 const noProgress = this.updateApproachProgress(dt, rawDist);
                 const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
                 const corpseInBeachOrPark = Boolean(
@@ -3186,21 +3275,20 @@ class Vehicle {
                         (map.getTileAtPixel && map.getTileAtPixel(nearestCorpse.x, nearestCorpse.y) === TILE.SAND)
                     )
                 );
-                const maxMedicBailDist = corpseInBeachOrPark ? 1650 : 620;
 
-                // Park cleanly at the nearest road curb and send the paramedic on foot!
-                if (rawDist < 185 || (rawDist < maxMedicBailDist && noProgress > (corpseInBeachOrPark ? 0.70 : 1.15))) {
-                    const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 72);
-                    if (!spacingOk && this.aiBailTimer < 0.8) {
-                        this.aiBailTimer += dt * 0.35;
-                        return this.computeTargetRoadOrFeelerControls(dt, map, game, nearestCorpse.x, nearestCorpse.y, 0, 0, 0.36, false, false);
+                // Stop right next to the victim (< 130px on beach/road, or if blocked by a solid wall within 460px for > 1.5s) and deploy Paramedic!
+                if (rawDist < 130 || (rawDist < 460 && noProgress > 1.50)) {
+                    const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68, nearestCorpse);
+                    if (!spacingOk && this.aiBailTimer < 0.7) {
+                        this.aiBailTimer += dt * 0.4;
+                        return this.computeTargetRoadOrFeelerControls(dt, map, game, nearestCorpse.x, nearestCorpse.y, 0, 0, 0.36, false, true);
                     }
                     this.aiBailTimer += dt;
                     const brakeMult = Math.pow(0.002, dt);
                     this.vx *= brakeMult;
                     this.vy *= brakeMult;
                     this.speed *= brakeMult;
-                    if (this.aiBailTimer > 0.32 && typeof game.deployParamedicFromAmbulance === "function") {
+                    if (this.aiBailTimer > 0.28 && typeof game.deployParamedicFromAmbulance === "function") {
                         this.aiBailTimer = 0;
                         this.approachNoProgress = 0;
                         this.vx = 0;
@@ -3211,6 +3299,13 @@ class Vehicle {
                     return { throttle: 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
+                const clearOfBuildings = map.traceSegment2D
+                    ? !map.traceSegment2D(this.x, this.y, nearestCorpse.x, nearestCorpse.y, curZ).hit
+                    : (rawDist < 320);
+                const forceDirect =
+                    (corpseInBeachOrPark && this.x >= 445.0 * TILE_SIZE && rawDist < 1650) ||
+                    (!corpseOnRoad && clearOfBuildings && rawDist < 540) ||
+                    (clearOfBuildings && rawDist < 360);
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3219,9 +3314,9 @@ class Vehicle {
                     nearestCorpse.y,
                     0,
                     0,
-                    0.82,
+                    forceDirect ? 0.76 : 0.86,
                     false,
-                    false
+                    forceDirect
                 );
             }
             this.medicTargetPed = null;
@@ -4219,6 +4314,8 @@ class Vehicle {
             const hitSign = this.speed >= 0 ? 1 : -1;
             const hitX = this.x + Math.cos(this.angle) * 20 * hitSign;
             const hitY = this.y + Math.sin(this.angle) * 20 * hitSign;
+            const pushDx = col.x - this.x;
+            const pushDy = col.y - this.y;
             this.x = col.x;
             this.y = col.y;
             this.angularVelocity = 0;
@@ -4228,6 +4325,24 @@ class Vehicle {
                 if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
                     this.angle = this.aiChosenDir.angle;
                 }
+            } else if (this.driver === "AI_COP" || this.driver === "AI_EMERGENCY" || this.driver === "AI_TOW") {
+                // Smooth tangential slide around palm trunks, benches & curbs so off-road emergency units never bounce backwards or jackknife!
+                const pushLen = Math.hypot(pushDx, pushDy);
+                if (pushLen > 0.01) {
+                    const nx = pushDx / pushLen;
+                    const ny = pushDy / pushLen;
+                    const vn = this.vx * nx + this.vy * ny;
+                    if (vn < 0) {
+                        this.vx -= nx * vn;
+                        this.vy -= ny * vn;
+                    }
+                    const tangentAng = Math.atan2(this.vy, this.vx);
+                    if (Math.hypot(this.vx, this.vy) > 12) {
+                        const aDiff = this.normalizeAngle(tangentAng - this.angle);
+                        this.angle += aDiff * 0.35;
+                    }
+                }
+                this.speed = Math.hypot(this.vx, this.vy);
             } else {
                 this.vx *= -0.35;
                 this.vy *= -0.35;

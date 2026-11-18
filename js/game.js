@@ -8602,9 +8602,24 @@ class LeonidaGame {
 
             }
 
-            if (d < radius * 2.8 && typeof v.triggerPanic === "function") {
+            if (d < Math.max(380, radius * 3.2) && typeof v.triggerPanic === "function") {
 
-                v.triggerPanic(9.0);
+                v.triggerPanic(9.5, x, y);
+                // Real-life blast shock: civilian drivers right next to a rocket/car explosion slam the brakes and bail out on foot in terror!
+                if (
+                    d >= radius &&
+                    d < radius + 65 &&
+                    v.driver === "AI_TRAFFIC" &&
+                    !v.isHeavyVehicle &&
+                    Math.random() < 0.45 &&
+                    this.peds.length < 130
+                ) {
+                    v.vx = 0;
+                    v.vy = 0;
+                    v.speed = 0;
+                    v.aiTurnSignal = 2;
+                    this.ejectVehicleDriver(v, "BAIL_FIRE");
+                }
 
             }
 
@@ -8664,12 +8679,14 @@ class LeonidaGame {
 
                 this.killPed(ped, byPlayer, fromNetwork);
 
-            } else if (d < radius * 2.5) {
+            } else if (d < Math.max(460, radius * 3.8)) {
 
-                ped.panicTimer = 6.5;
+                ped.panicTimer = 8.5;
                 ped.threatX = x;
                 ped.threatY = y;
                 ped.isCrossingRoad = false;
+                ped.waitingAtCrosswalk = false;
+                ped.hangoutTimer = 0;
                 ped.angle = Math.atan2(ped.y - y, ped.x - x);
                 ped.targetBx = null;
                 ped.targetBy = null;
@@ -9526,9 +9543,9 @@ class LeonidaGame {
 
         for (const v of this.vehicles) {
 
-            if (!v.destroyed && v.driver === "AI_TRAFFIC" && Math.hypot(v.x - shooterX, v.y - shooterY) < 310) {
+            if (!v.destroyed && v.driver === "AI_TRAFFIC" && Math.hypot(v.x - shooterX, v.y - shooterY) < 350) {
 
-                if (typeof v.triggerPanic === "function") v.triggerPanic(7.5);
+                if (typeof v.triggerPanic === "function") v.triggerPanic(7.5, shooterX, shooterY);
 
             }
 
@@ -9536,7 +9553,7 @@ class LeonidaGame {
 
         for (const ped of this.peds) {
 
-            if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - shooterX, ped.y - shooterY) < 280) {
+            if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - shooterX, ped.y - shooterY) < 360) {
 
                 if (ped.isVillaGuard) {
                     if (isPlayer) {
@@ -12098,7 +12115,7 @@ class LeonidaGame {
                 (sv.burnTimer || 0) > 0 ||
                 (!sv.destroyed && typeof sv.hp === "number" && sv.hp <= 42 && sv.specKey !== "BMX_BIKE" && sv.specKey !== "E_SCOOTER")
             );
-            if (isBurningHazard || (!sv.destroyed && svSpd >= 58)) {
+            if (isBurningHazard || (!sv.destroyed && (svSpd >= 58 || (sv.sirenActive && svSpd >= 24)))) {
                 hazardVehicles.push(sv);
             }
             if (!sv.destroyed && (sv.sirenActive || (sv.driver === "AI_TOW" && (sv.towTarget || sv.towingVehicle)))) {
@@ -14898,16 +14915,18 @@ class LeonidaGame {
                             break;
                         }
 
-                        // B. Oncoming Speeding Vehicle Sidestep Reflex
+                        // B. Oncoming Speeding Vehicle & Off-Road Emergency Siren Sidestep Reflex
                         if (v.destroyed || (ped.dodgeTimer || 0) > 0) continue;
                         const vSpd = Math.abs(v.speed || 0);
-                        if (vSpd < 62) continue;
+                        const isSirenUnit = Boolean(v.sirenActive);
+                        if (vSpd < (isSirenUnit ? 28 : 62)) continue;
                         const vCos = Math.cos(v.angle || 0);
                         const vSin = Math.sin(v.angle || 0);
                         const fwdProj = dx * vCos + dy * vSin;
                         const latProj = -dx * vSin + dy * vCos;
-                        const dangerCorridor = (v.h || 24) * 0.5 + 15;
-                        if (fwdProj > 14 && fwdProj < 115 && Math.abs(latProj) < dangerCorridor && (fwdProj / vSpd) < 1.15) {
+                        const dangerCorridor = (v.h || 24) * 0.5 + (isSirenUnit ? 28 : 15);
+                        const maxLookFwd = isSirenUnit ? 175 : 115;
+                        if (fwdProj > 10 && fwdProj < maxLookFwd && Math.abs(latProj) < dangerCorridor && (isSirenUnit || (fwdProj / Math.max(1, vSpd)) < 1.15)) {
                             const sideSign = latProj >= 0 ? 1 : -1;
                             let dodgeAng = (v.angle || 0) + sideSign * Math.PI * 0.5;
                             // Prefer dodging toward the nearest PAWEMENT/FIELD sidewalk if one side is sidewalk
