@@ -2136,8 +2136,12 @@ class ViceNetworkManager {
             return 0;
         };
 
-        const priorityVehs = [];
-        const regularVehs = [];
+        const priorityVehs = this._syncPriorityVehs || (this._syncPriorityVehs = []);
+        const regularVehs = this._syncRegularVehs || (this._syncRegularVehs = []);
+        const vehs = this._syncVehOut || (this._syncVehOut = []);
+        priorityVehs.length = 0;
+        regularVehs.length = 0;
+        vehs.length = 0;
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
             const isMod = Boolean(
@@ -2186,12 +2190,17 @@ class ViceNetworkManager {
                 isMod ? 1 : 0
             ];
             if (isMod || v.isPolice || v.isEmergency || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY" || v.driver === "AI_TOW" || v.driver === "AI_CRIMINAL") {
-                priorityVehs.push(row);
+                if (priorityVehs.length < 220) priorityVehs.push(row);
             } else {
                 regularVehs.push(row);
             }
         }
-        const vehs = priorityVehs.concat(regularVehs);
+        for (let i = 0; i < priorityVehs.length && vehs.length < 220; i++) {
+            vehs.push(priorityVehs[i]);
+        }
+        for (let i = 0; i < regularVehs.length && vehs.length < 220; i++) {
+            vehs.push(regularVehs[i]);
+        }
 
         const kindToCode = (k) => {
             if (k === "COP") return 1;
@@ -2204,8 +2213,12 @@ class ViceNetworkManager {
             return 0;
         };
 
-        const priorityPeds = [];
-        const regularPeds = [];
+        const priorityPeds = this._syncPriorityPeds || (this._syncPriorityPeds = []);
+        const regularPeds = this._syncRegularPeds || (this._syncRegularPeds = []);
+        const peds = this._syncPedOut || (this._syncPedOut = []);
+        priorityPeds.length = 0;
+        regularPeds.length = 0;
+        peds.length = 0;
         for (let i = 0; i < g.peds.length; i++) {
             const pd = g.peds[i];
             if (!pd || pd._boardedVehicle) continue;
@@ -2250,20 +2263,25 @@ class ViceNetworkManager {
                 pd.copWeapon || 0
             ];
             if (pd.kind !== "CIVILIAN" || pd.dead || (pd.calling911Timer || 0) > 0 || (pd.panicTimer || 0) > 0) {
-                priorityPeds.push(pRow);
+                if (priorityPeds.length < 160) priorityPeds.push(pRow);
             } else {
                 regularPeds.push(pRow);
             }
         }
-        const peds = priorityPeds.concat(regularPeds);
+        for (let i = 0; i < priorityPeds.length && peds.length < 160; i++) {
+            peds.push(priorityPeds[i]);
+        }
+        for (let i = 0; i < regularPeds.length && peds.length < 160; i++) {
+            peds.push(regularPeds[i]);
+        }
 
         this.sendPacket({
             t: "WORLD_SYNC",
             ver: 101195,
             wm: Math.round((g.worldMinutes || 720) * 10) / 10,
             tl: Math.round(((g.trafficLightTimer || 0) % 24.0) * 100) / 100,
-            vehs: vehs.slice(0, 220),
-            peds: peds.slice(0, 160)
+            vehs,
+            peds
         });
     }
 

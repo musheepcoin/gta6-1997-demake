@@ -7298,13 +7298,21 @@ class RetroRenderer {
             ? rect
             : (Array.isArray(rect.remaps) && rect.remaps.length > 0 ? rect.remaps[0] : rect.base);
         if (!Array.isArray(arr) || arr.length < 4) return;
-        const [sx, sy, sw, sh] = arr;
-        const texW = this.spritesTexW || this.gta1SpritesImg.width;
-        const texH = this.spritesTexH || this.gta1SpritesImg.height;
-        const u0 = (sx + 0.35) / texW;
-        const v0 = (sy + 0.35) / texH;
-        const u1 = (sx + sw - 0.35) / texW;
-        const v1 = (sy + sh - 0.35) / texH;
+        const sw = arr[2], sh = arr[3];
+        let u0 = arr._u0, v0 = arr._v0, u1 = arr._u1, v1 = arr._v1;
+        if (u0 === undefined) {
+            const sx = arr[0], sy = arr[1];
+            const texW = this.spritesTexW || this.gta1SpritesImg.width;
+            const texH = this.spritesTexH || this.gta1SpritesImg.height;
+            u0 = (sx + 0.35) / texW;
+            v0 = (sy + 0.35) / texH;
+            u1 = (sx + sw - 0.35) / texW;
+            v1 = (sy + sh - 0.35) / texH;
+            arr._u0 = u0;
+            arr._v0 = v0;
+            arr._u1 = u1;
+            arr._v1 = v1;
+        }
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, sw * scale, sh * scale, angleRad, u0, v0, u1, v1, r, g, b, a, drawOrder, pitchZ);
     }
 
@@ -7333,7 +7341,8 @@ class RetroRenderer {
             this.skySpriteStartIdx = 0;
             return;
         }
-        this.spriteQueue.sort((lhs, rhs) => lhs.sortKey - rhs.sortKey);
+        const cmp = this._spriteSortCmp || (this._spriteSortCmp = (lhs, rhs) => lhs.sortKey - rhs.sortKey);
+        this.spriteQueue.sort(cmp);
 
         const verts = this.spriteVerts;
         let offset = 0;
@@ -7350,16 +7359,24 @@ class RetroRenderer {
             const cz = s.yPx * invTile;
             const hw = s.wPx * invTile * 0.5;
             const hh = s.hPx * invTile * 0.5;
-            const cosA = Math.cos(s.angleRad);
-            const sinA = Math.sin(s.angleRad);
-            const hwCos = hw * cosA, hwSin = hw * sinA;
-            const hhCos = hh * cosA, hhSin = hh * sinA;
-
-            // 4 rotated corners without allocating arrays: 0=(-hw,-hh), 1=(hw,-hh), 2=(-hw,hh), 3=(hw,hh)
-            const wx0 = cx - hwCos + hhSin, wz0 = cz - hwSin - hhCos;
-            const wx1 = cx + hwCos + hhSin, wz1 = cz + hwSin - hhCos;
-            const wx2 = cx - hwCos - hhSin, wz2 = cz - hwSin + hhCos;
-            const wx3 = cx + hwCos - hhSin, wz3 = cz + hwSin + hhCos;
+            let wx0, wz0, wx1, wz1, wx2, wz2, wx3, wz3;
+            const ang = s.angleRad;
+            if (ang === 0) {
+                wx0 = cx - hw; wz0 = cz - hh;
+                wx1 = cx + hw; wz1 = cz - hh;
+                wx2 = cx - hw; wz2 = cz + hh;
+                wx3 = cx + hw; wz3 = cz + hh;
+            } else {
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+                const hwCos = hw * cosA, hwSin = hw * sinA;
+                const hhCos = hh * cosA, hhSin = hh * sinA;
+                // 4 rotated corners without allocating arrays: 0=(-hw,-hh), 1=(hw,-hh), 2=(-hw,hh), 3=(hw,hh)
+                wx0 = cx - hwCos + hhSin; wz0 = cz - hwSin - hhCos;
+                wx1 = cx + hwCos + hhSin; wz1 = cz + hwSin - hhCos;
+                wx2 = cx - hwCos - hhSin; wz2 = cz - hwSin + hhCos;
+                wx3 = cx + hwCos - hhSin; wz3 = cz + hwSin + hhCos;
+            }
 
             const pZ = s.pitchZ || 0;
             const yTop = s.zBlocks - pZ;
@@ -8222,6 +8239,8 @@ class RetroRenderer {
         let grid = this._staticChunkGridMap.get(arr);
         if (!grid) {
             grid = new Array(1024);
+            const cm = new Uint32Array(32);
+            let ax0 = 1e9, ax1 = -1e9, ay0 = 1e9, ay1 = -1e9;
             for (let i = 0; i < arr.length; i++) {
                 const it = arr[i];
                 if (!it) continue;
@@ -8229,8 +8248,13 @@ class RetroRenderer {
                 const px = it[xProp] !== undefined ? it[xProp] : it.x;
                 const py = it[yProp] !== undefined ? it[yProp] : it.y;
                 if (typeof px !== "number" || typeof py !== "number") continue;
+                if (px < ax0) ax0 = px;
+                if (px > ax1) ax1 = px;
+                if (py < ay0) ay0 = py;
+                if (py > ay1) ay1 = py;
                 const cx = Math.max(0, Math.min(31, px >> 10));
                 const cy = Math.max(0, Math.min(31, py >> 10));
+                cm[cy] |= (1 << cx);
                 const k = (cy << 5) | cx;
                 let bucket = grid[k];
                 if (!bucket) {
@@ -8239,13 +8263,25 @@ class RetroRenderer {
                 }
                 bucket.push(it);
             }
+            grid._minX = ax0;
+            grid._maxX = ax1;
+            grid._minY = ay0;
+            grid._maxY = ay1;
+            grid._chunkMask32 = cm;
             this._staticChunkGridMap.set(arr, grid);
+        }
+        if (maxX < grid._minX || minX > grid._maxX || maxY < grid._minY || minY > grid._maxY) {
+            return out;
         }
         const x0 = Math.max(0, minX >> 10);
         const x1 = Math.min(31, maxX >> 10);
         const y0 = Math.max(0, minY >> 10);
         const y1 = Math.min(31, maxY >> 10);
+        const span = x1 - x0 + 1;
+        const rowBits = span >= 32 ? -1 : (((1 << span) - 1) << x0);
+        const cm = grid._chunkMask32;
         for (let cy = y0; cy <= y1; cy++) {
+            if ((cm[cy] & rowBits) === 0) continue;
             const rowOff = cy << 5;
             for (let cx = x0; cx <= x1; cx++) {
                 const bucket = grid[rowOff | cx];
@@ -8253,6 +8289,78 @@ class RetroRenderer {
                 for (let j = 0; j < bucket.length; j++) {
                     out.push(bucket[j]);
                 }
+            }
+        }
+        return out;
+    }
+
+    _queryPedsInBox(game, minX, minY, maxX, maxY) {
+        const out = this._pedBoxOut || (this._pedBoxOut = []);
+        out.length = 0;
+        if (!game || !Array.isArray(game.peds) || game.peds.length === 0) return out;
+        const head = game._pedGridHead;
+        const next = game._pedGridNext;
+        const peds = game.peds;
+        if (head && next && next.length >= peds.length) {
+            const x0 = Math.max(0, minX >> 8);
+            const x1 = Math.min(127, maxX >> 8);
+            const y0 = Math.max(0, minY >> 8);
+            const y1 = Math.min(127, maxY >> 8);
+            for (let cy = y0; cy <= y1; cy++) {
+                const rowOff = cy << 7;
+                for (let cx = x0; cx <= x1; cx++) {
+                    let idx = head[rowOff | cx];
+                    while (idx !== -1) {
+                        const ped = peds[idx];
+                        if (ped && ped.x >= minX && ped.x <= maxX && ped.y >= minY && ped.y <= maxY) {
+                            out.push(ped);
+                        }
+                        idx = next[idx];
+                    }
+                }
+            }
+            return out;
+        }
+        for (let i = 0; i < peds.length; i++) {
+            const ped = peds[i];
+            if (ped && ped.x >= minX && ped.x <= maxX && ped.y >= minY && ped.y <= maxY) {
+                out.push(ped);
+            }
+        }
+        return out;
+    }
+
+    _queryVehiclesInBox(game, minX, minY, maxX, maxY) {
+        const out = this._vehBoxOut || (this._vehBoxOut = []);
+        out.length = 0;
+        if (!game || !Array.isArray(game.vehicles) || game.vehicles.length === 0) return out;
+        const head = game._vehGridHead;
+        const next = game._vehGridNext;
+        const vehs = game.vehicles;
+        if (head && next && next.length >= vehs.length) {
+            const x0 = Math.max(0, minX >> 8);
+            const x1 = Math.min(127, maxX >> 8);
+            const y0 = Math.max(0, minY >> 8);
+            const y1 = Math.min(127, maxY >> 8);
+            for (let cy = y0; cy <= y1; cy++) {
+                const rowOff = cy << 7;
+                for (let cx = x0; cx <= x1; cx++) {
+                    let idx = head[rowOff | cx];
+                    while (idx !== -1) {
+                        const v = vehs[idx];
+                        if (v && v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY) {
+                            out.push(v);
+                        }
+                        idx = next[idx];
+                    }
+                }
+            }
+            return out;
+        }
+        for (let i = 0; i < vehs.length; i++) {
+            const v = vehs[i];
+            if (v && v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY) {
+                out.push(v);
             }
         }
         return out;
@@ -8350,8 +8458,10 @@ class RetroRenderer {
 
         // 2. Live Animated 3D Beach Volleyball Matches (2v2 Bikini Women & Surfers + 3D Raised Net + Parabolic Flying Volleyball!)
         if (Array.isArray(this.map.beachVolleyballCourts)) {
-            for (let ci = 0; ci < this.map.beachVolleyballCourts.length; ci++) {
-                const vc = this.map.beachVolleyballCourts[ci];
+            const vbVis = this._queryStaticChunkGrid(this.map.beachVolleyballCourts, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_vcIdx");
+            for (let vi = 0; vi < vbVis.length; vi++) {
+                const vc = vbVis[vi];
+                const ci = vc._vcIdx !== undefined ? vc._vcIdx : vi;
                 if (vc.x < minX - 64 || vc.x > maxX + 64 || vc.y < minY - 64 || vc.y > maxY + 64) continue;
                 const bz = vc.z || 2.0;
 
@@ -8433,8 +8543,10 @@ class RetroRenderer {
 
         // 3. Beach Aerobics & Retro Boombox Dance Parties on the Sand
         if (Array.isArray(this.map.beachParties)) {
-            for (let pi = 0; pi < this.map.beachParties.length; pi++) {
-                const bp = this.map.beachParties[pi];
+            const bpVis = this._queryStaticChunkGrid(this.map.beachParties, "x", "y", minX - 56, minY - 56, maxX + 56, maxY + 56, "_bpIdx");
+            for (let vi = 0; vi < bpVis.length; vi++) {
+                const bp = bpVis[vi];
+                const pi = bp._bpIdx !== undefined ? bp._bpIdx : vi;
                 if (bp.x < minX - 56 || bp.x > maxX + 56 || bp.y < minY - 56 || bp.y > maxY + 56) continue;
                 const bz = bp.z || 2.0;
 
@@ -8475,8 +8587,10 @@ class RetroRenderer {
 
         // 4. Atlantic & Bay Wave Surfers & Shallow-Water Bikini Swimmers
         if (Array.isArray(this.map.beachSwimmers)) {
-            for (let si = 0; si < this.map.beachSwimmers.length; si++) {
-                const sw = this.map.beachSwimmers[si];
+            const swVis = this._queryStaticChunkGrid(this.map.beachSwimmers, "x", "y", minX - 48, minY - 48, maxX + 48, maxY + 48, "_swIdx");
+            for (let vi = 0; vi < swVis.length; vi++) {
+                const sw = swVis[vi];
+                const si = sw._swIdx !== undefined ? sw._swIdx : vi;
                 if (sw.x < minX - 48 || sw.x > maxX + 48 || sw.y < minY - 48 || sw.y > maxY + 48) continue;
                 const bz = sw.z || 2.0;
                 const waveT = this.time * 2.1 + si * 1.37;
@@ -8515,8 +8629,10 @@ class RetroRenderer {
         // 4B. SAND CATCH GAMES / METAL-DETECTOR COMBERS
         // =========================================================================
         if (Array.isArray(this.map.beachCatchGames)) {
-            for (let bi = 0; bi < this.map.beachCatchGames.length; bi++) {
-                const bg = this.map.beachCatchGames[bi];
+            const bgVis = this._queryStaticChunkGrid(this.map.beachCatchGames, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_bgIdx");
+            for (let vi = 0; vi < bgVis.length; vi++) {
+                const bg = bgVis[vi];
+                const bi = bg._bgIdx !== undefined ? bg._bgIdx : vi;
                 if (bg.x < minX - 64 || bg.x > maxX + 64 || bg.y < minY - 64 || bg.y > maxY + 64) continue;
                 const bz = bg.z || 2.0;
                 if (bg.kind === "METAL_DETECTOR") {
@@ -8563,8 +8679,10 @@ class RetroRenderer {
         // 5. MUSCLE BEACH OUTDOOR FITNESS PARK (Weightlifting Benches, Pull-Up Racks & Bodybuilders)
         // =========================================================================
         if (Array.isArray(this.map.muscleBeachGyms)) {
-            for (let gi = 0; gi < this.map.muscleBeachGyms.length; gi++) {
-                const gm = this.map.muscleBeachGyms[gi];
+            const gmVis = this._queryStaticChunkGrid(this.map.muscleBeachGyms, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_gmIdx");
+            for (let vi = 0; vi < gmVis.length; vi++) {
+                const gm = gmVis[vi];
+                const gi = gm._gmIdx !== undefined ? gm._gmIdx : vi;
                 if (gm.x < minX - 64 || gm.x > maxX + 64 || gm.y < minY - 64 || gm.y > maxY + 64) continue;
                 const bz = gm.z || 2.0;
 
@@ -8614,8 +8732,10 @@ class RetroRenderer {
         // 6. LEONIDA EVERGLADES & LAKE LEONIDA ALLIGATORS ("gator_3d")
         // =========================================================================
         if (Array.isArray(this.map.leonidaGators)) {
-            for (let gi = 0; gi < this.map.leonidaGators.length; gi++) {
-                const gt = this.map.leonidaGators[gi];
+            const gtVis = this._queryStaticChunkGrid(this.map.leonidaGators, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_gtIdx");
+            for (let vi = 0; vi < gtVis.length; vi++) {
+                const gt = gtVis[vi];
+                const gi = gt._gtIdx !== undefined ? gt._gtIdx : vi;
                 if (gt.x < minX - 64 || gt.x > maxX + 64 || gt.y < minY - 64 || gt.y > maxY + 64) continue;
                 const bz = gt.z || 2.0;
                 const t = this.time * 0.85 + gt.seed;
@@ -8649,8 +8769,10 @@ class RetroRenderer {
         // 7. LEONIDA PINK FLAMINGO FLOCKS & EMERALD LILYPADS ("flamingo_pink", "lilypad_green")
         // =========================================================================
         if (Array.isArray(this.map.flamingoFlocks)) {
-            for (let fi = 0; fi < this.map.flamingoFlocks.length; fi++) {
-                const fl = this.map.flamingoFlocks[fi];
+            const flVis = this._queryStaticChunkGrid(this.map.flamingoFlocks, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_flIdx");
+            for (let vi = 0; vi < flVis.length; vi++) {
+                const fl = flVis[vi];
+                const fi = fl._flIdx !== undefined ? fl._flIdx : vi;
                 if (fl.x < minX - 64 || fl.x > maxX + 64 || fl.y < minY - 64 || fl.y > maxY + 64) continue;
                 const bz = fl.z || 2.0;
 
@@ -8683,8 +8805,10 @@ class RetroRenderer {
         // =========================================================================
         if (Array.isArray(this.map.yachtParties)) {
             const yachtDancers = ["bikini_pink", "bikini_cyan", "vc_tommy", "bikini_yellow", "surfer_guy", "bikini_red"];
-            for (let yi = 0; yi < this.map.yachtParties.length; yi++) {
-                const yp = this.map.yachtParties[yi];
+            const ypVis = this._queryStaticChunkGrid(this.map.yachtParties, "x", "y", minX - 96, minY - 96, maxX + 96, maxY + 96, "_ypIdx");
+            for (let vi = 0; vi < ypVis.length; vi++) {
+                const yp = ypVis[vi];
+                const yi = yp._ypIdx !== undefined ? yp._ypIdx : vi;
                 if (yp.x < minX - 96 || yp.x > maxX + 96 || yp.y < minY - 96 || yp.y > maxY + 96) continue;
                 const bz = yp.z || 2.0;
                 const ang = yp.angle || 0;
@@ -8837,8 +8961,10 @@ class RetroRenderer {
         // =========================================================================
         if (Array.isArray(this.map.rooftopParties)) {
             const roofPeds = ["bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "surfer_guy"];
-            for (let ri = 0; ri < this.map.rooftopParties.length; ri++) {
-                const rp = this.map.rooftopParties[ri];
+            const rpVis = this._queryStaticChunkGrid(this.map.rooftopParties, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_rpIdx");
+            for (let vi = 0; vi < rpVis.length; vi++) {
+                const rp = rpVis[vi];
+                const ri = rp._rpIdx !== undefined ? rp._rpIdx : vi;
                 if (rp.x < minX - 64 || rp.x > maxX + 64 || rp.y < minY - 64 || rp.y > maxY + 64) continue;
                 const rz = rp.z || 4.0;
                 const floatX = rp.x + Math.sin(this.time * 1.9 + rp.seed) * 4.5;
@@ -8873,8 +8999,10 @@ class RetroRenderer {
         // 10. WYNWOOD CYPHERS, OCEAN DRIVE BISTRO PATIOS, PROMENADE BENCHES & LITTLE CUBA DOMINO TABLES
         // =========================================================================
         if (Array.isArray(this.map.streetEvents)) {
-            for (let ei = 0; ei < this.map.streetEvents.length; ei++) {
-                const ev = this.map.streetEvents[ei];
+            const evVis = this._queryStaticChunkGrid(this.map.streetEvents, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_evIdx");
+            for (let vi = 0; vi < evVis.length; vi++) {
+                const ev = evVis[vi];
+                const ei = ev._evIdx !== undefined ? ev._evIdx : vi;
                 if (ev.x < minX - 64 || ev.x > maxX + 64 || ev.y < minY - 64 || ev.y > maxY + 64) continue;
                 const bz = ev.z || 2.0;
 
@@ -9005,8 +9133,10 @@ class RetroRenderer {
         // 11. MOUNT KALAGA WILDERNESS CAMPSITES, GOLF GREENS & MAMBAS STADIUM SCRIMMAGE
         // =========================================================================
         if (Array.isArray(this.map.wildernessCamps)) {
-            for (let ci = 0; ci < this.map.wildernessCamps.length; ci++) {
-                const cp = this.map.wildernessCamps[ci];
+            const wcVis = this._queryStaticChunkGrid(this.map.wildernessCamps, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_wcIdx");
+            for (let vi = 0; vi < wcVis.length; vi++) {
+                const cp = wcVis[vi];
+                const ci = cp._wcIdx !== undefined ? cp._wcIdx : vi;
                 if (cp.x < minX - 64 || cp.x > maxX + 64 || cp.y < minY - 64 || cp.y > maxY + 64) continue;
                 const bz = cp.z || 2.0;
 
@@ -9029,8 +9159,10 @@ class RetroRenderer {
         }
 
         if (Array.isArray(this.map.golfGreens)) {
-            for (let gi = 0; gi < this.map.golfGreens.length; gi++) {
-                const gg = this.map.golfGreens[gi];
+            const ggVis = this._queryStaticChunkGrid(this.map.golfGreens, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_ggIdx");
+            for (let vi = 0; vi < ggVis.length; vi++) {
+                const gg = ggVis[vi];
+                const gi = gg._ggIdx !== undefined ? gg._ggIdx : vi;
                 if (gg.x < minX - 64 || gg.x > maxX + 64 || gg.y < minY - 64 || gg.y > maxY + 64) continue;
                 const bz = gg.z || 2.0;
 
@@ -9089,8 +9221,10 @@ class RetroRenderer {
         // 9) VCIA Airport, SERA Spaceport, Star Island & Vice Port Aviation Props (Airliners, Learjets & Spinning-Rotor Helicopters)
         const airProps = this.map.airportProps;
         if (airProps && airProps.length > 0) {
-            for (let i = 0; i < airProps.length; i++) {
-                const ap = airProps[i];
+            const apVis = this._queryStaticChunkGrid(airProps, "x", "y", minX - 180, minY - 180, maxX + 180, maxY + 180, "_apIdx");
+            for (let vi = 0; vi < apVis.length; vi++) {
+                const ap = apVis[vi];
+                const i = ap._apIdx !== undefined ? ap._apIdx : vi;
                 if (ap.x < minX - 180 || ap.x > maxX + 180 || ap.y < minY - 180 || ap.y > maxY + 180) continue;
                 const bz = ap.z || 2.0;
                 const cs = Math.cos(ap.ang);
@@ -9433,8 +9567,10 @@ class RetroRenderer {
         // 11) Vice Port, Port Gellhorn, Ambrosia Docks & Island Marinas (Cargo Barges, Container Stacks & Boats)
         const portTerms = this.map.portTerminals;
         if (portTerms && portTerms.length > 0) {
-            for (let i = 0; i < portTerms.length; i++) {
-                const pt = portTerms[i];
+            const ptVis = this._queryStaticChunkGrid(portTerms, "x", "y", minX - 160, minY - 160, maxX + 160, maxY + 160, "_ptIdx");
+            for (let vi = 0; vi < ptVis.length; vi++) {
+                const pt = ptVis[vi];
+                const i = pt._ptIdx !== undefined ? pt._ptIdx : vi;
                 if (pt._boardedVehicle && !pt._boardedVehicle.destroyed) continue;
                 if (pt.x < minX - 160 || pt.x > maxX + 160 || pt.y < minY - 160 || pt.y > maxY + 160) continue;
                 const bz = pt.z || 2.0;
@@ -9523,8 +9659,9 @@ class RetroRenderer {
         }
         const mPlanes = this.map.mooredSeaplanes;
         if (mPlanes && mPlanes.length > 0) {
-            for (let i = 0; i < mPlanes.length; i++) {
-                const mp = mPlanes[i];
+            const mpVis = this._queryStaticChunkGrid(mPlanes, "x", "y", minX - 120, minY - 120, maxX + 120, maxY + 120);
+            for (let i = 0; i < mpVis.length; i++) {
+                const mp = mpVis[i];
                 if (mp.x < minX - 120 || mp.x > maxX + 120 || mp.y < minY - 120 || mp.y > maxY + 120) continue;
                 const bob = Math.sin(this.time * 2.1 + mp.seed) * 0.008;
                 this.batchObjectSprite3D("dodo_seaplane", mp.x + sunCos * 4, mp.y + sunSin * 4, 2.015, mp.ang, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.30);
@@ -9608,8 +9745,9 @@ class RetroRenderer {
         }
         if (Array.isArray(this.map.seagullFlocks)) {
             const pRef = game && game.player;
-            for (let fi = 0; fi < this.map.seagullFlocks.length; fi++) {
-                const sf = this.map.seagullFlocks[fi];
+            const sfVis = this._queryStaticChunkGrid(this.map.seagullFlocks, "x", "y", minX - 180, minY - 180, maxX + 180, maxY + 180);
+            for (let fi = 0; fi < sfVis.length; fi++) {
+                const sf = sfVis[fi];
                 if (sf.x < minX - 180 || sf.x > maxX + 180 || sf.y < minY - 180 || sf.y > maxY + 180) continue;
                 const dPlayer = pRef ? Math.hypot(pRef.x - sf.x, pRef.y - sf.y) : 999;
                 const startled = dPlayer < 130 ? Math.min(1.0, (130 - dPlayer) / 90) : 0.0;
@@ -9647,8 +9785,10 @@ class RetroRenderer {
         };
         if (takeovers && takeovers.length > 0) {
             const crowdPeds = ["vc_haitian", "vc_cuban", "bikini_pink", "g2_civ_aqua", "vc_tourist", "g2_mugger"];
-            for (let i = 0; i < takeovers.length; i++) {
-                const st = takeovers[i];
+            const stVis = this._queryStaticChunkGrid(takeovers, "x", "y", minX - 120, minY - 120, maxX + 120, maxY + 120, "_stIdx");
+            for (let vi = 0; vi < stVis.length; vi++) {
+                const st = stVis[vi];
+                const i = st._stIdx !== undefined ? st._stIdx : vi;
                 if (st.x < minX - 120 || st.x > maxX + 120 || st.y < minY - 120 || st.y > maxY + 120) continue;
                 const bz = st.z || 2.0;
                 this.batchObjectSprite3D("donut_skid_ring", st.x, st.y, bz + 0.014, st.seed, 1.32, SPRITE_DRAW_ORDER.TIRE_MARKS);
@@ -9705,8 +9845,10 @@ class RetroRenderer {
         // 16) Leonida Keys, Ocean Drive & Little Cuba Thatched Tiki Bars & String-Light Café Terraces ("tiki_hut_roof", "cafe_table_umb")
         const tikis = this.map.tikiBars;
         if (tikis && tikis.length > 0) {
-            for (let i = 0; i < tikis.length; i++) {
-                const tb = tikis[i];
+            const tbVis = this._queryStaticChunkGrid(tikis, "x", "y", minX - 96, minY - 96, maxX + 96, maxY + 96, "_tbIdx");
+            for (let vi = 0; vi < tbVis.length; vi++) {
+                const tb = tbVis[vi];
+                const i = tb._tbIdx !== undefined ? tb._tbIdx : vi;
                 if (tb.x < minX - 96 || tb.x > maxX + 96 || tb.y < minY - 96 || tb.y > maxY + 96) continue;
                 const bz = tb.z || 2.0;
                 // Solar ground shadow (true 3D bamboo posts, mahogany bar & 3D pitched thatch roof rendered by WorldObjectEngine)
@@ -9735,8 +9877,10 @@ class RetroRenderer {
         if (ind) {
             // 17A. Ambrosia 3D Tall Refinery Smokestacks + Billowing Industrial Steam Plumes
             if (ind.smokestacks) {
-                for (let i = 0; i < ind.smokestacks.length; i++) {
-                    const st = ind.smokestacks[i];
+                const stVis = this._queryStaticChunkGrid(ind.smokestacks, "x", "y", minX - 140, minY - 140, maxX + 140, maxY + 140, "_smkIdx");
+                for (let vi = 0; vi < stVis.length; vi++) {
+                    const st = stVis[vi];
+                    const i = st._smkIdx !== undefined ? st._smkIdx : vi;
                     if (st.x < minX - 140 || st.x > maxX + 140 || st.y < minY - 140 || st.y > maxY + 140) continue;
                     const rz = st.z || 3.0;
                     // True 3D red-and-white striped refinery smokestack tower rendered in WorldObjectEngine.buildStatic3DMesh
@@ -9752,8 +9896,9 @@ class RetroRenderer {
             }
             // 17B. Outlaw Biker Gang Custom Chopper Lineup & Bikers ("biker_chopper")
             if (ind.bikerRallies) {
-                for (let ri = 0; ri < ind.bikerRallies.length; ri++) {
-                    const br = ind.bikerRallies[ri];
+                const brVis = this._queryStaticChunkGrid(ind.bikerRallies, "x", "y", minX - 120, minY - 120, maxX + 120, maxY + 120);
+                for (let ri = 0; ri < brVis.length; ri++) {
+                    const br = brVis[ri];
                     if (br.x < minX - 120 || br.x > maxX + 120 || br.y < minY - 120 || br.y > maxY + 120) continue;
                     const bz = br.z || 2.0;
                     for (let bi = 0; bi < br.count; bi++) {
@@ -10313,7 +10458,9 @@ class RetroRenderer {
         }
 
         // 3. Dead Pedestrians & Blood Pools (Sprite 444 + Frame 42 — eSpriteDrawOrder_Corpse)
-        for (const ped of game.peds) {
+        const visPeds = this._queryPedsInBox(game, minX, minY, maxX, maxY);
+        for (let pi = 0; pi < visPeds.length; pi++) {
+            const ped = visPeds[pi];
             if (!ped.dead || ped._boardedVehicle) continue;
             if (ped.x < minX || ped.x > maxX || ped.y < minY || ped.y > maxY) continue;
             if (ped.deathKind === "DROWNED") continue; // sank below the surface
@@ -10371,7 +10518,8 @@ class RetroRenderer {
             [1.10, 0.94, 0.84], // Coral Peach
             [0.90, 0.98, 1.10]  // Biscayne Blue
         ];
-        for (const ped of game.peds) {
+        for (let pi = 0; pi < visPeds.length; pi++) {
+            const ped = visPeds[pi];
             if (ped.dead) continue;
             if (ped.x < minX || ped.x > maxX || ped.y < minY || ped.y > maxY) continue;
             if (ped.animSeed === undefined) ped.animSeed = (ped.x + ped.y) * 0.01;
@@ -11053,7 +11201,9 @@ class RetroRenderer {
 
         // 5. Authentic STYLE001.G24 Vehicles (1:1 1997 GTA 1 scale = 1.0 + Delta Doors & Crash Dents! — eSpriteDrawOrder_Car)
         const carScale = 1.0;
-        for (const v of game.vehicles) {
+        const visVehs = this._queryVehiclesInBox(game, minX, minY, maxX, maxY);
+        for (let vi = 0; vi < visVehs.length; vi++) {
+            const v = visVehs[vi];
             if (v.x < minX || v.x > maxX || v.y < minY || v.y > maxY) continue;
             const isWaterCraft = Boolean(v.waterOnly || v.specKey === "AIRBOAT");
             const waveBob = isWaterCraft ? (0.012 + Math.sin(this.time * 2.6 + v.x * 0.02 + v.y * 0.015) * 0.008) : 0;
@@ -11444,12 +11594,16 @@ class RetroRenderer {
                 const cosA = Math.cos(v.angle);
                 const sinA = Math.sin(v.angle);
                 const riderDrawOrder = airZ > 0.05 ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.CONVERTIBLE_PASSENGER;
-                let idHash = 0;
-                const idStr = String(v.id || "0");
-                for (let ci = 0; ci < idStr.length; ci++) {
-                    idHash = (idHash * 31 + idStr.charCodeAt(ci)) | 0;
+                let idHash = v._idHash;
+                if (idHash === undefined) {
+                    idHash = 0;
+                    const idStr = String(v.id || "0");
+                    for (let ci = 0; ci < idStr.length; ci++) {
+                        idHash = (idHash * 31 + idStr.charCodeAt(ci)) | 0;
+                    }
+                    idHash = Math.abs(idHash);
+                    v._idHash = idHash;
                 }
-                idHash = Math.abs(idHash);
 
                 const occSeats = typeof v.getOccupiedSeats === "function" ? v.getOccupiedSeats(game) : [];
 
@@ -12621,7 +12775,9 @@ class RetroRenderer {
         }
 
         // 5. Vehicle Conical Headlights, Red Taillights & Flashing Police/Emergency Sirens!
-        for (const v of game.vehicles) {
+        const litVehs = this._queryVehiclesInBox(game, this.camX - 960, this.camY - 720, this.camX + 960, this.camY + 720);
+        for (let vi = 0; vi < litVehs.length; vi++) {
+            const v = litVehs[vi];
             const isBurning = (v.destroyed && !v.fireExtinguished) || (v.burnTimer || 0) > 0;
             // Parked unlit vehicles (v.driver === null && !isBurning) never emit light — skip BEFORE getEntityZ & worldToScreen!
             if (!v.driver && !isBurning) continue;
@@ -17215,7 +17371,7 @@ class RetroRenderer {
             const strobeRed = (Math.floor((this.time || 0) * 6.5) % 2) === 0;
             if (game.lastKnownWantedPos) {
                 const spt = worldToMini(game.lastKnownWantedPos.x, game.lastKnownWantedPos.y);
-                const sRad = Math.max(8, (320 / viewSpan) * mw);
+                const sRad = Math.max(8, (320 / viewWorldW) * mw);
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(spt.x, spt.y, sRad, 0, Math.PI * 2);

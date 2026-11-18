@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_190";
+const CURRENT_BUILD = "101_199";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -375,11 +375,20 @@ function sendJson(socket, obj) {
     } catch (_e) {}
 }
 
+function hasOtherRoomClients(roomCode, excludeSocket = null) {
+    for (const [sock, meta] of clients.entries()) {
+        if (sock === excludeSocket || sock.destroyed || !sock.writable) continue;
+        if (meta.room === roomCode) return true;
+    }
+    return false;
+}
+
 function broadcastToRoom(roomCode, obj, excludeSocket = null) {
-    const frame = encodeWsFrame(JSON.stringify(obj));
+    let frame = null;
     for (const [sock, meta] of clients.entries()) {
         if (sock === excludeSocket || sock.destroyed || !sock.writable) continue;
         if (meta.room === roomCode) {
+            if (!frame) frame = encodeWsFrame(JSON.stringify(obj));
             try { sock.write(frame); } catch (_e) {}
         }
     }
@@ -837,13 +846,17 @@ function handleClientPacket(socket, pkt) {
                     }
                 }
             }
-            pkt.peds = Object.values(Object.assign({}, room.peds, room.corpses));
         }
         isDirty = true;
 
-        // Broadcast the authoritative merged vehicle & ped list to other players in the room
-        pkt.vehs = getCombinedRoomVehicles(room);
-        broadcastToRoom(roomCode, pkt, socket);
+        // Broadcast the authoritative merged vehicle & ped list only when other players are in the room
+        if (hasOtherRoomClients(roomCode, socket)) {
+            if (Array.isArray(pkt.peds)) {
+                pkt.peds = Object.values(Object.assign({}, room.peds, room.corpses));
+            }
+            pkt.vehs = getCombinedRoomVehicles(room);
+            broadcastToRoom(roomCode, pkt, socket);
+        }
         return;
     }
 

@@ -8579,7 +8579,7 @@ class LeonidaGame {
 
         if (this.skidmarks.length > 2800) {
 
-            this.skidmarks.shift();
+            this.skidmarks.splice(0, 350);
 
         }
 
@@ -10419,9 +10419,12 @@ class LeonidaGame {
         const head = this._vehGridHead;
         const next = this._vehGridNext;
         head.fill(-1);
+        this._gridEpoch = ((this._gridEpoch || 0) + 1) | 0;
+        const epoch = this._gridEpoch;
         for (let i = 0; i < n; i++) {
             const v = this.vehicles[i];
             if (!v) continue;
+            v._gridEpoch = epoch;
             const cx = Math.max(0, Math.min(127, v.x >> 8));
             const cy = Math.max(0, Math.min(127, v.y >> 8));
             const cell = (cy << 7) | cx;
@@ -10432,6 +10435,31 @@ class LeonidaGame {
         this._vehGridRows = 128;
         this._vehGridCount = n;
         this._vehGridLastVeh = n > 0 ? this.vehicles[n - 1] : null;
+    }
+
+    rebuildPedSpatialGrid() {
+        const n = this.peds ? this.peds.length : 0;
+        if (!this._pedGridHead) {
+            this._pedGridHead = new Int16Array(16384);
+        }
+        if (!this._pedGridNext || this._pedGridNext.length < Math.max(1024, n + 64)) {
+            this._pedGridNext = new Int16Array(Math.max(1024, n + 256));
+        }
+        const head = this._pedGridHead;
+        const next = this._pedGridNext;
+        head.fill(-1);
+        const epoch = this._gridEpoch || 1;
+        for (let i = 0; i < n; i++) {
+            const ped = this.peds[i];
+            if (!ped) continue;
+            ped._gridEpoch = epoch;
+            const cx = Math.max(0, Math.min(127, ped.x >> 8));
+            const cy = Math.max(0, Math.min(127, ped.y >> 8));
+            const cell = (cy << 7) | cx;
+            next[i] = head[cell];
+            head[cell] = i;
+        }
+        this._pedGridCount = n;
     }
 
     ensureVehicleSpatialGrid() {
@@ -12253,8 +12281,9 @@ class LeonidaGame {
         }
 
         // Pre-filter active priority siren vehicles, hazard/speeding vehicles, and available taxis once per frame
-        // AND build the 128x128 (256px cell) vehicle spatial grid so AI radar & collisions never scan 580+ distant cars!
+        // AND build the 128x128 (256px cell) vehicle & pedestrian spatial grids so AI radar & collisions never scan 580+ distant entities!
         this.rebuildVehicleSpatialGrid();
+        this.rebuildPedSpatialGrid();
         const hazardVehicles = this._hazardVehicles || (this._hazardVehicles = []);
         const prioritySirenVehicles = this._prioritySirenVehicles || (this._prioritySirenVehicles = []);
         const activeTaxis = this._activeTaxis || (this._activeTaxis = []);
@@ -12323,129 +12352,104 @@ class LeonidaGame {
 
             const isLethalDriver = !v.destroyed && (v.driver === "PLAYER" || v.driver === "AI_CRIMINAL");
 
-            if (!v.destroyed && !isLethalDriver && v.driver && vSpeed > 14 && Math.abs(v.x - p.x) < 680 && Math.abs(v.y - p.y) < 520) {
-                for (let pi = 0; pi < this.peds.length; pi++) {
-                    const ped = this.peds[pi];
-                    if (ped.dead) continue;
-                    const pdx = ped.x - v.x;
-                    if (pdx >= 26 || pdx <= -26) continue;
-                    const pdy = ped.y - v.y;
-                    if (pdy >= 26 || pdy <= -26) continue;
-                    if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
-                    if (pdx * pdx + pdy * pdy < 576) {
-                        const rCos = -Math.sin(v.angle || 0);
-                        const rSin = Math.cos(v.angle || 0);
-                        const sideSign = (pdx * rCos + pdy * rSin) >= 0 ? 1 : -1;
-                        ped.x += rCos * sideSign * 14;
-                        ped.y += rSin * sideSign * 14;
+            const pHead = this._pedGridHead;
+            const pNext = this._pedGridNext;
+            if (!v.destroyed && !isLethalDriver && v.driver && vSpeed > 14 && Math.abs(v.x - p.x) < 680 && Math.abs(v.y - p.y) < 520 && pHead && pNext) {
+                const cx0 = Math.max(0, (v.x - 28) >> 8);
+                const cx1 = Math.min(127, (v.x + 28) >> 8);
+                const cy0 = Math.max(0, (v.y - 28) >> 8);
+                const cy1 = Math.min(127, (v.y + 28) >> 8);
+                for (let cy = cy0; cy <= cy1; cy++) {
+                    const rowOff = cy << 7;
+                    for (let cx = cx0; cx <= cx1; cx++) {
+                        for (let pi = pHead[rowOff | cx]; pi !== -1; pi = pNext[pi]) {
+                            const ped = this.peds[pi];
+                            if (!ped || ped.dead) continue;
+                            const pdx = ped.x - v.x;
+                            if (pdx >= 26 || pdx <= -26) continue;
+                            const pdy = ped.y - v.y;
+                            if (pdy >= 26 || pdy <= -26) continue;
+                            if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
+                            if (pdx * pdx + pdy * pdy < 576) {
+                                const rCos = -Math.sin(v.angle || 0);
+                                const rSin = Math.cos(v.angle || 0);
+                                const sideSign = (pdx * rCos + pdy * rSin) >= 0 ? 1 : -1;
+                                ped.x += rCos * sideSign * 14;
+                                ped.y += rSin * sideSign * 14;
+                            }
+                        }
                     }
                 }
             }
 
-            if (isLethalDriver && vSpeed > 28) {
+            if (isLethalDriver && vSpeed > 28 && pHead && pNext) {
+                const cx0 = Math.max(0, (v.x - 28) >> 8);
+                const cx1 = Math.min(127, (v.x + 28) >> 8);
+                const cy0 = Math.max(0, (v.y - 28) >> 8);
+                const cy1 = Math.min(127, (v.y + 28) >> 8);
+                for (let cy = cy0; cy <= cy1; cy++) {
+                    const rowOff = cy << 7;
+                    for (let cx = cx0; cx <= cx1; cx++) {
+                        for (let pi = pHead[rowOff | cx]; pi !== -1; pi = pNext[pi]) {
+                            const ped = this.peds[pi];
+                            if (!ped || ped.dead) continue;
 
-                for (let pi = 0; pi < this.peds.length; pi++) {
+                            const pdx = ped.x - v.x;
+                            if (pdx >= 25 || pdx <= -25) continue;
+                            const pdy = ped.y - v.y;
+                            if (pdy >= 25 || pdy <= -25) continue;
+                            if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
 
-                    const ped = this.peds[pi];
+                            if (ped.kind === "COP" && v.driver === "AI_COP") continue;
 
-                    if (ped.dead) continue;
-
-                    const pdx = ped.x - v.x;
-                    if (pdx >= 25 || pdx <= -25) continue;
-                    const pdy = ped.y - v.y;
-                    if (pdy >= 25 || pdy <= -25) continue;
-                    if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
-
-                    if (ped.kind === "COP" && v.driver === "AI_COP") continue;
-
-                    if (pdx * pdx + pdy * pdy < 625) {
-
-                        if (isNonLethalWheeler) {
-
-                            if ((ped.stunnedTimer || 0) <= 0) {
-
-                                ped.stunnedTimer = 1.55;
-
-                                ped.panicTimer = 4.5;
-
-                                ped.x += (v.vx / Math.max(1, vSpeed)) * 18;
-
-                                ped.y += (v.vy / Math.max(1, vSpeed)) * 18;
-
-                                v.vx *= 0.84;
-
-                                v.vy *= 0.84;
-
-                                v.speed *= 0.84;
-
-                                if (v.driver === "PLAYER") {
-
-                                    if (this.audio && typeof this.audio.playPedScream === "function") {
-
-                                        this.audio.playPedScream();
-
+                            if (pdx * pdx + pdy * pdy < 625) {
+                                if (isNonLethalWheeler) {
+                                    if ((ped.stunnedTimer || 0) <= 0) {
+                                        ped.stunnedTimer = 1.55;
+                                        ped.panicTimer = 4.5;
+                                        ped.x += (v.vx / Math.max(1, vSpeed)) * 18;
+                                        ped.y += (v.vy / Math.max(1, vSpeed)) * 18;
+                                        v.vx *= 0.84;
+                                        v.vy *= 0.84;
+                                        v.speed *= 0.84;
+                                        if (v.driver === "PLAYER") {
+                                            if (this.audio && typeof this.audio.playPedScream === "function") {
+                                                this.audio.playPedScream();
+                                            }
+                                            this.addFloatingText(ped.x, ped.y - 22, "💫 KNOCKOUT!", "#38bdf8");
+                                        }
                                     }
-
-                                    this.addFloatingText(ped.x, ped.y - 22, "💫 KNOCKOUT!", "#38bdf8");
-
-                                }
-
-                            }
-
-                        } else if (ped.kind === "COP" && !v.crushesCars) {
-
-                            if ((ped.stunnedTimer || 0) <= 0) {
-
-                                ped.hp -= vSpeed * 0.45;
-
-                                ped.stunnedTimer = 0.55;
-
-                                ped.x += (v.vx / Math.max(1, vSpeed)) * 16;
-
-                                ped.y += (v.vy / Math.max(1, vSpeed)) * 16;
-
-                                this.spawnParticle(ped.x, ped.y, "BLOOD");
-
-                                if (ped.hp <= 0) {
-
+                                } else if (ped.kind === "COP" && !v.crushesCars) {
+                                    if ((ped.stunnedTimer || 0) <= 0) {
+                                        ped.hp -= vSpeed * 0.45;
+                                        ped.stunnedTimer = 0.55;
+                                        ped.x += (v.vx / Math.max(1, vSpeed)) * 16;
+                                        ped.y += (v.vy / Math.max(1, vSpeed)) * 16;
+                                        this.spawnParticle(ped.x, ped.y, "BLOOD");
+                                        if (ped.hp <= 0) {
+                                            this.killPed(ped, v.driver === "PLAYER");
+                                        }
+                                    }
+                                } else if (vSpeed > 68 || (v.driver !== "PLAYER" && vSpeed > 110)) {
                                     this.killPed(ped, v.driver === "PLAYER");
-
+                                } else if ((ped.stunnedTimer || 0) <= 0) {
+                                    ped.stunnedTimer = 1.15;
+                                    ped.panicTimer = 4.5;
+                                    ped.x += (v.vx / Math.max(1, vSpeed)) * 14;
+                                    ped.y += (v.vy / Math.max(1, vSpeed)) * 14;
                                 }
-
                             }
-
-                        } else if (vSpeed > 68 || (v.driver !== "PLAYER" && vSpeed > 110)) {
-
-                            this.killPed(ped, v.driver === "PLAYER");
-
-                        } else if ((ped.stunnedTimer || 0) <= 0) {
-
-                            ped.stunnedTimer = 1.15;
-
-                            ped.panicTimer = 4.5;
-
-                            ped.x += (v.vx / Math.max(1, vSpeed)) * 14;
-
-                            ped.y += (v.vy / Math.max(1, vSpeed)) * 14;
-
                         }
-
                     }
-
                 }
 
                 if (v.driver === "PLAYER" && vSpeed > 45 && this.map.crates) {
-
-                    for (const cr of this.map.crates) {
-
-                        if (!cr.smashed && Math.hypot(cr.x - v.x, cr.y - v.y) < 30) {
-
+                    for (let ci = 0; ci < this.map.crates.length; ci++) {
+                        const cr = this.map.crates[ci];
+                        if (!cr.smashed && Math.abs(cr.x - v.x) < 30 && Math.abs(cr.y - v.y) < 30 && Math.hypot(cr.x - v.x, cr.y - v.y) < 30) {
                             this.smashCrate(cr);
-
                         }
-
                     }
-
                 }
 
                 // Allow cars, trucks, vans, buses & tanks (NOT motorcycles, bicycles, or e-scooters) to smash sidewalk payphone booths!
@@ -13220,7 +13224,9 @@ class LeonidaGame {
 
         if (this.map.killFrenzies) {
 
-            for (const kf of this.map.killFrenzies) {
+            for (let i = 0; i < this.map.killFrenzies.length; i++) {
+
+                const kf = this.map.killFrenzies[i];
 
                 if (kf.cooldown > 0) {
 
@@ -13230,7 +13236,7 @@ class LeonidaGame {
 
                 }
 
-                if (!this.activeInterior && !this.killFrenzy && Math.hypot(p.x - kf.x, p.y - kf.y) < 30) {
+                if (!this.activeInterior && !this.killFrenzy && Math.abs(p.x - kf.x) < 30 && Math.abs(p.y - kf.y) < 30 && Math.hypot(p.x - kf.x, p.y - kf.y) < 30) {
 
                     kf.cooldown = 45;
 
@@ -13246,7 +13252,9 @@ class LeonidaGame {
 
         // 5C. Pickups Check
 
-        for (const pk of this.map.pickups) {
+        for (let i = 0; i < this.map.pickups.length; i++) {
+
+            const pk = this.map.pickups[i];
 
             if (pk.respawnTimer > 0) {
 
@@ -13256,7 +13264,7 @@ class LeonidaGame {
 
             }
 
-            if (!this.activeInterior && Math.hypot(p.x - pk.x, p.y - pk.y) < 28) {
+            if (!this.activeInterior && Math.abs(p.x - pk.x) < 28 && Math.abs(p.y - pk.y) < 28 && Math.hypot(p.x - pk.x, p.y - pk.y) < 28) {
 
                 pk.respawnTimer = 25;
 
@@ -13747,7 +13755,7 @@ class LeonidaGame {
                 // is nearby (< 360px), the officer runs back to the cruiser and re-boards it to resume high-speed vehicle pursuit!
                 const rawDistToTarget = rawCopTarget ? Math.hypot(rawCopTarget.x - ped.x, rawCopTarget.y - ped.y) : 9999;
                 const hc = ped.homeCruiser;
-                const hcValid = Boolean(hc && !hc.destroyed && hc !== (p && p.inVehicle) && !hc.towedByTruck && this.vehicles.includes(hc));
+                const hcValid = Boolean(hc && !hc.destroyed && hc !== (p && p.inVehicle) && !hc.towedByTruck && hc._gridEpoch === this._gridEpoch);
                 const dHomeCruiser = hcValid ? Math.hypot(hc.x - ped.x, hc.y - ped.y) : 9999;
                 const shouldReboardCruiser = Boolean(
                     rawCopTarget &&
@@ -13858,7 +13866,7 @@ class LeonidaGame {
 
                     // Post-shootout scene cleanup OR Squad Re-Boarding for Distant Pursuit:
                     // VCPD officers walk/run back to their patrol cruiser (or nearest unoccupied police car), climb in, and drive off!
-                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && this.vehicles.includes(ped.homeCruiser))
+                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && ped.homeCruiser._gridEpoch === this._gridEpoch)
                         ? ped.homeCruiser
                         : ((ped._boardingVeh && !ped._boardingVeh.destroyed && ped._boardingVeh.driver === null && !ped._boardingVeh.towedByTruck)
                             ? ped._boardingVeh
@@ -13933,22 +13941,38 @@ class LeonidaGame {
 
                 let bestCopDist = 440;
 
-                for (const other of this.peds) {
-
-                    if (!other.dead && other.kind === "COP") {
-
-                        const d = Math.hypot(other.x - ped.x, other.y - ped.y);
-
-                        if (d < bestCopDist) {
-
-                            bestCopDist = d;
-
-                            crimTarget = { x: other.x, y: other.y, vx: 0, vy: 0 };
-
+                if (this._pedGridHead && this._pedGridNext) {
+                    const pHead = this._pedGridHead;
+                    const pNext = this._pedGridNext;
+                    const cx0 = Math.max(0, (ped.x - 440) >> 8);
+                    const cx1 = Math.min(127, (ped.x + 440) >> 8);
+                    const cy0 = Math.max(0, (ped.y - 440) >> 8);
+                    const cy1 = Math.min(127, (ped.y + 440) >> 8);
+                    for (let cy = cy0; cy <= cy1; cy++) {
+                        const rowOff = cy << 7;
+                        for (let cx = cx0; cx <= cx1; cx++) {
+                            for (let pi = pHead[rowOff | cx]; pi !== -1; pi = pNext[pi]) {
+                                const other = this.peds[pi];
+                                if (other && !other.dead && other.kind === "COP") {
+                                    const d = Math.hypot(other.x - ped.x, other.y - ped.y);
+                                    if (d < bestCopDist) {
+                                        bestCopDist = d;
+                                        crimTarget = { x: other.x, y: other.y, vx: 0, vy: 0 };
+                                    }
+                                }
+                            }
                         }
-
                     }
-
+                } else {
+                    for (const other of this.peds) {
+                        if (!other.dead && other.kind === "COP") {
+                            const d = Math.hypot(other.x - ped.x, other.y - ped.y);
+                            if (d < bestCopDist) {
+                                bestCopDist = d;
+                                crimTarget = { x: other.x, y: other.y, vx: 0, vy: 0 };
+                            }
+                        }
+                    }
                 }
 
                 if (this._vehGridHead && this._vehGridNext) {
@@ -14195,7 +14219,7 @@ class LeonidaGame {
 
                 ped.medicOutTimer = (ped.medicOutTimer || 0) + dt;
 
-                if (!ped.homeAmbulance || !this.vehicles.includes(ped.homeAmbulance)) {
+                if (!ped.homeAmbulance || ped.homeAmbulance._gridEpoch !== this._gridEpoch) {
                     let bestAmb = null;
                     let bestAmbDist = 820;
                     for (const v of this.vehicles) {
@@ -14228,7 +14252,7 @@ class LeonidaGame {
 
                 // Keep carried criminal corpse moving with the paramedic on the stretcher back to the ambulance
                 if (ped.carryingCorpse) {
-                    if (!this.peds.includes(ped.carryingCorpse)) {
+                    if (ped.carryingCorpse._gridEpoch !== this._gridEpoch) {
                         ped.carryingCorpse = null;
                     } else {
                         ped.carryingCorpse.x = ped.x - Math.cos(ped.angle) * 10;
@@ -14523,7 +14547,7 @@ class LeonidaGame {
 
                 ped.firemanOutTimer = (ped.firemanOutTimer || 0) + dt;
 
-                if (!ped.homeFireTruck || !this.vehicles.includes(ped.homeFireTruck)) {
+                if (!ped.homeFireTruck || ped.homeFireTruck._gridEpoch !== this._gridEpoch) {
                     let bestFt = null;
                     let bestFtDist = 480;
                     for (const v of this.vehicles) {
@@ -15992,107 +16016,85 @@ class LeonidaGame {
                 this.peds.splice(i, 1);
             }
         }
-
-
+        this.rebuildPedSpatialGrid();
 
         // 6B. Pedestrian-to-Pedestrian Mutual Separation & Reciprocal Collision Avoidance (RVO)
-
-        // Eliminates conga lines, stacking, clumping, and ghost pass-throughs
-
-        const nearPeds = [];
-
+        // Eliminates conga lines, stacking, clumping, and ghost pass-throughs (Accelerated via 256px Spatial Grid!)
         const pCamX = this.player.x, pCamY = this.player.y;
+        const pHeadRvo = this._pedGridHead;
+        const pNextRvo = this._pedGridNext;
+        if (pHeadRvo && pNextRvo) {
+            const minDist = 11.0; // 11.0px separation diameter so passing pedestrians on 2-way sidewalks never block or shove each other
+            const minDistSq = minDist * minDist;
+            for (let i = 0; i < this.peds.length; i++) {
+                const p1 = this.peds[i];
+                if (!p1 || p1.dead || Math.abs(p1.x - pCamX) >= 800 || Math.abs(p1.y - pCamY) >= 600) continue;
+                const cx0 = Math.max(0, (p1.x - 12) >> 8);
+                const cx1 = Math.min(127, (p1.x + 12) >> 8);
+                const cy0 = Math.max(0, (p1.y - 12) >> 8);
+                const cy1 = Math.min(127, (p1.y + 12) >> 8);
+                for (let cy = cy0; cy <= cy1; cy++) {
+                    const rowOff = cy << 7;
+                    for (let cx = cx0; cx <= cx1; cx++) {
+                        for (let j = pHeadRvo[rowOff | cx]; j !== -1; j = pNextRvo[j]) {
+                            if (j <= i) continue;
+                            const p2 = this.peds[j];
+                            if (!p2 || p2.dead) continue;
+                            const dx = p1.x - p2.x;
+                            if (dx >= 11.0 || dx <= -11.0) continue;
+                            const dy = p1.y - p2.y;
+                            if (dy >= 11.0 || dy <= -11.0) continue;
 
-        for (let i = 0; i < this.peds.length; i++) {
+                            // Members of the same cohesive formation (couples, families, friend groups, hangout circles) never repel each other unless panicked
+                            if (
+                                p1.formationId &&
+                                p1.formationId === p2.formationId &&
+                                (p1.panicTimer || 0) <= 0 &&
+                                (p2.panicTimer || 0) <= 0
+                            ) {
+                                continue;
+                            }
 
-            const p = this.peds[i];
+                            const dist2 = dx * dx + dy * dy;
+                            if (dist2 < minDistSq && dist2 > 0.001) {
+                                const dist = Math.sqrt(dist2);
+                                const overlap = (minDist - dist) * 0.45;
+                                const nx = dx / dist;
+                                const ny = dy / dist;
 
-            if (!p.dead && Math.abs(p.x - pCamX) < 800 && Math.abs(p.y - pCamY) < 600) {
+                                let nx1 = p1.x + nx * overlap;
+                                let ny1 = p1.y + ny * overlap;
+                                let nx2 = p2.x - nx * overlap;
+                                let ny2 = p2.y - ny * overlap;
 
-                nearPeds.push(p);
+                                // If pedestrians are heading towards each other, step slightly to their right (reciprocal detour)
+                                const dot = Math.cos(p1.angle) * Math.cos(p2.angle) + Math.sin(p1.angle) * Math.sin(p2.angle);
+                                if (dot < -0.3) {
+                                    const sideStep = 12 * dt;
+                                    nx1 += -Math.sin(p1.angle) * sideStep;
+                                    ny1 += Math.cos(p1.angle) * sideStep;
+                                    nx2 += -Math.sin(p2.angle) * sideStep;
+                                    ny2 += Math.cos(p2.angle) * sideStep;
+                                }
 
-            }
-
-        }
-
-        for (let i = 0; i < nearPeds.length; i++) {
-
-            const p1 = nearPeds[i];
-
-            for (let j = i + 1; j < nearPeds.length; j++) {
-
-                const p2 = nearPeds[j];
-
-                const dx = p1.x - p2.x;
-                if (dx >= 11.0 || dx <= -11.0) continue;
-
-                const dy = p1.y - p2.y;
-                if (dy >= 11.0 || dy <= -11.0) continue;
-
-                // Members of the same cohesive formation (couples, families, friend groups, hangout circles) never repel each other unless panicked
-                if (
-                    p1.formationId &&
-                    p1.formationId === p2.formationId &&
-                    (p1.panicTimer || 0) <= 0 &&
-                    (p2.panicTimer || 0) <= 0
-                ) {
-                    continue;
+                                // Smart positioning guard: never let crowd separation push a pedestrian onto road lanes, water, or inside buildings
+                                const nav1 = this.map.getNavigationBlock(Math.floor(nx1 / TILE_SIZE), Math.floor(ny1 / TILE_SIZE), p1.z || 2);
+                                if (nav1 && nav1.groundType !== GROUND_TYPE.ROAD && nav1.groundType !== GROUND_TYPE.WATER && nav1.groundType !== GROUND_TYPE.BUILDING &&
+                                    !this.map.resolveCircleBuildingCollision(nx1, ny1, 9, p1.z || 2).hit) {
+                                    p1.x = nx1;
+                                    p1.y = ny1;
+                                }
+                                const nav2 = this.map.getNavigationBlock(Math.floor(nx2 / TILE_SIZE), Math.floor(ny2 / TILE_SIZE), p2.z || 2);
+                                if (nav2 && nav2.groundType !== GROUND_TYPE.ROAD && nav2.groundType !== GROUND_TYPE.WATER && nav2.groundType !== GROUND_TYPE.BUILDING &&
+                                    !this.map.resolveCircleBuildingCollision(nx2, ny2, 9, p2.z || 2).hit) {
+                                    p2.x = nx2;
+                                    p2.y = ny2;
+                                }
+                            }
+                        }
+                    }
                 }
-
-                const dist2 = dx * dx + dy * dy;
-
-                const minDist = 11.0; // 11.0px separation diameter so passing pedestrians on 2-way sidewalks never block or shove each other
-
-                if (dist2 < minDist * minDist && dist2 > 0.001) {
-
-                    const dist = Math.sqrt(dist2);
-
-                    const overlap = (minDist - dist) * 0.45;
-
-                    const nx = dx / dist;
-
-                    const ny = dy / dist;
-
-                    let nx1 = p1.x + nx * overlap;
-                    let ny1 = p1.y + ny * overlap;
-                    let nx2 = p2.x - nx * overlap;
-                    let ny2 = p2.y - ny * overlap;
-
-                    // If pedestrians are heading towards each other, step slightly to their right (reciprocal detour)
-                    const dot = Math.cos(p1.angle) * Math.cos(p2.angle) + Math.sin(p1.angle) * Math.sin(p2.angle);
-
-                    if (dot < -0.3) {
-
-                        const sideStep = 12 * dt;
-
-                        nx1 += -Math.sin(p1.angle) * sideStep;
-
-                        ny1 += Math.cos(p1.angle) * sideStep;
-
-                        nx2 += -Math.sin(p2.angle) * sideStep;
-
-                        ny2 += Math.cos(p2.angle) * sideStep;
-
-                    }
-
-                    // Smart positioning guard: never let crowd separation push a pedestrian onto road lanes, water, or inside buildings
-                    const nav1 = this.map.getNavigationBlock(Math.floor(nx1 / TILE_SIZE), Math.floor(ny1 / TILE_SIZE), p1.z || 2);
-                    if (nav1 && nav1.groundType !== GROUND_TYPE.ROAD && nav1.groundType !== GROUND_TYPE.WATER && nav1.groundType !== GROUND_TYPE.BUILDING &&
-                        !this.map.resolveCircleBuildingCollision(nx1, ny1, 9, p1.z || 2).hit) {
-                        p1.x = nx1;
-                        p1.y = ny1;
-                    }
-                    const nav2 = this.map.getNavigationBlock(Math.floor(nx2 / TILE_SIZE), Math.floor(ny2 / TILE_SIZE), p2.z || 2);
-                    if (nav2 && nav2.groundType !== GROUND_TYPE.ROAD && nav2.groundType !== GROUND_TYPE.WATER && nav2.groundType !== GROUND_TYPE.BUILDING &&
-                        !this.map.resolveCircleBuildingCollision(nx2, ny2, 9, p2.z || 2).hit) {
-                        p2.x = nx2;
-                        p2.y = ny2;
-                    }
-
-                }
-
             }
-
         }
 
 
@@ -16763,9 +16765,11 @@ class LeonidaGame {
 
             if (!hitSomething && this.map.crates) {
 
-                for (const cr of this.map.crates) {
+                for (let ci = 0; ci < this.map.crates.length; ci++) {
 
-                    if (!cr.smashed && Math.hypot(cr.x - pr.x, cr.y - pr.y) < 18) {
+                    const cr = this.map.crates[ci];
+
+                    if (!cr.smashed && Math.abs(cr.x - pr.x) < 18 && Math.abs(cr.y - pr.y) < 18 && Math.hypot(cr.x - pr.x, cr.y - pr.y) < 18) {
 
                         this.smashCrate(cr);
 
@@ -16781,139 +16785,121 @@ class LeonidaGame {
 
 
 
-            // Hit vehicle?
+            // Hit vehicle? (Accelerated via 256px Vehicle Spatial Grid)
 
             if (!hitSomething) {
 
                 const distTraveled = (pr.maxRange || 320) - (pr.rangeLeft || 0);
+                const vHead = this._vehGridHead;
+                const vNext = this._vehGridNext;
 
-                for (const v of this.vehicles) {
-
-                    if (pr.fromPlayer && p.inVehicle === v) continue;
-
-                    if (!pr.fromPlayer && pr.npcFaction === "COP" && v.isPolice && p.inVehicle !== v) continue;
-
-                    if (!pr.fromPlayer && pr.npcFaction === "CRIMINAL" && v.driver === "AI_CRIMINAL") continue;
-
-                    if (!pr.fromPlayer && !pr.npcFaction && v.isPolice && p.inVehicle !== v) continue;
+                const testVehHit = (v) => {
+                    if (!v) return false;
+                    if (pr.fromPlayer && p.inVehicle === v) return false;
+                    if (!pr.fromPlayer && pr.npcFaction === "COP" && v.isPolice && p.inVehicle !== v) return false;
+                    if (!pr.fromPlayer && pr.npcFaction === "CRIMINAL" && v.driver === "AI_CRIMINAL") return false;
+                    if (!pr.fromPlayer && !pr.npcFaction && v.isPolice && p.inVehicle !== v) return false;
+                    const vdx = v.x - pr.x;
+                    if (vdx >= 24 || vdx <= -24) return false;
+                    const vdy = v.y - pr.y;
+                    if (vdy >= 24 || vdy <= -24) return false;
 
                     // Do not let a vehicle immediately next to an NPC shooter swallow their bullet on spawn,
                     // nor swallow a bullet that is hitting the on-foot player right next to the car
-                    if (!pr.fromPlayer && p.inVehicle !== v && (distTraveled < 44 || (!p.inVehicle && Math.hypot(p.x - pr.x, p.y - pr.y) < 16))) continue;
+                    if (!pr.fromPlayer && p.inVehicle !== v && (distTraveled < 44 || (!p.inVehicle && Math.hypot(p.x - pr.x, p.y - pr.y) < 16))) return false;
 
-                    if (Math.hypot(v.x - pr.x, v.y - pr.y) < 24) {
-
+                    if (vdx * vdx + vdy * vdy < 576) {
                         const vehDmg = pr.isRocket
-
                             ? pr.damage * 1.35
-
                             : (pr.isFlame ? pr.damage * 0.85 : (pr.fromPlayer ? pr.damage * 0.34 : pr.damage * 0.42));
-
                         if (pr.fromPlayer) {
-
                             v.damagedByPlayer = true;
-
                             if (v.isPolice && !pr.fromJason && Math.random() < 0.75) {
-
                                 this.setWantedLevel(Math.max(this.wantedLevel, 1));
-
                             }
-
                         }
-
                         if (typeof v.receiveImpactDamage === "function") {
-
                             v.receiveImpactDamage(vehDmg, pr.x, pr.y, Boolean(pr.isRocket));
-
                         } else {
-
                             v.hp -= vehDmg;
-
                         }
-
                         if (!pr.fromPlayer && p.inVehicle === v && (v.isMotorcycle || v.isConvertible)) {
-
                             this.damagePlayer(pr.damage * 0.22);
-
                         }
-
                         this.spawnParticle(pr.x, pr.y, pr.isFlame ? "FIRE" : "SPARK");
-
                         if (!pr.isFlame && !pr.isRocket && Math.hypot(pr.x - p.x, pr.y - p.y) < 480) {
-
                             this.audio.playRicochet();
-
                         }
-
                         hitSomething = true;
-
-                        break;
-
+                        return true;
                     }
+                    return false;
+                };
 
+                if (vHead && vNext) {
+                    const cx0 = Math.max(0, (pr.x - 28) >> 8);
+                    const cx1 = Math.min(127, (pr.x + 28) >> 8);
+                    const cy0 = Math.max(0, (pr.y - 28) >> 8);
+                    const cy1 = Math.min(127, (pr.y + 28) >> 8);
+                    for (let cy = cy0; cy <= cy1 && !hitSomething; cy++) {
+                        const rowOff = cy << 7;
+                        for (let cx = cx0; cx <= cx1 && !hitSomething; cx++) {
+                            for (let vi = vHead[rowOff | cx]; vi !== -1; vi = vNext[vi]) {
+                                if (testVehHit(this.vehicles[vi])) break;
+                            }
+                        }
+                    }
+                } else {
+                    for (let vi = 0; vi < this.vehicles.length; vi++) {
+                        if (testVehHit(this.vehicles[vi])) break;
+                    }
                 }
 
             }
 
 
 
-            // Hit pedestrian?
+            // Hit pedestrian? (Accelerated via 256px Pedestrian Spatial Grid)
 
             if (!hitSomething && (pr.fromPlayer || pr.npcFaction === "COP" || pr.npcFaction === "CRIMINAL")) {
+                const pHead = this._pedGridHead;
+                const pNext = this._pedGridNext;
 
-                for (const ped of this.peds) {
-
-                    if (ped.dead) continue;
-
+                const testPedHit = (ped) => {
+                    if (!ped || ped.dead) return false;
                     // Jason's cover fire never hits innocent civilians or monks!
-
-                    if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE" && ped.kind !== "CRIMINAL" && !ped.isAlertedGuard) continue;
-
+                    if (pr.fromJason && ped.kind !== "COP" && ped.kind !== "HOSTILE" && ped.kind !== "CRIMINAL" && !ped.isAlertedGuard) return false;
                     // Police bullets only hit armed criminals on foot (never friendly fire other cops or civilians)
+                    if (pr.npcFaction === "COP" && ped.kind !== "CRIMINAL") return false;
+                    // Criminal bullets hit VCPD officers
+                    if (pr.npcFaction === "CRIMINAL" && ped.kind !== "COP") return false;
 
-                    if (pr.npcFaction === "COP" && ped.kind !== "CRIMINAL") continue;
+                    const pdx = ped.x - pr.x;
+                    if (pdx >= 13 || pdx <= -13) return false;
+                    const pdy = ped.y - pr.y;
+                    if (pdy >= 13 || pdy <= -13) return false;
 
-                    // Criminal bullets hit VCPD officers (and occasionally stray-hit nearby panicking civilians)
-
-                    if (pr.npcFaction === "CRIMINAL" && ped.kind !== "COP") continue;
-
-                    if (Math.hypot(ped.x - pr.x, pr.y - ped.y) < 13) {
-
+                    if (pdx * pdx + pdy * pdy < 169) {
                         if (pr.isElectro) {
-
                             // GTA 2 ElectroGun: freeze & electrocute (X-ray skeleton flash) then drop charred
-
                             if (!(ped.electroTimer > 0)) {
-
                                 ped.electroTimer = 1.5;
-
                                 ped.electroByPlayer = Boolean(pr.fromPlayer);
-
                                 ped.burnTimer = 0;
-
                                 if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) this.audio.playPedScream();
-
                             }
-
                             this.spawnParticle(pr.x, pr.y, "SPARK");
-
                             hitSomething = true;
-
-                            break;
-
+                            return true;
                         }
 
                         // Cop-vs-bandit crossfire is deliberately less lethal so street shootouts last long enough to be watched
                         const npcVsNpcMul = (pr.npcFaction === "COP" && ped.kind === "CRIMINAL") ? 0.36 : 0.62;
-
                         const pedDmg = pr.fromPlayer ? pr.damage : pr.damage * npcVsNpcMul;
-
                         ped.hp -= pedDmg;
 
                         if (pr.fromPlayer && ped.kind === "CRIMINAL") {
-
                             ped.attackedByPlayer = true;
-
                         }
                         if (pr.fromPlayer && ped.isVillaGuard) {
                             ped.isAlertedGuard = true;
@@ -16923,41 +16909,47 @@ class LeonidaGame {
                         this.spawnParticle(pr.x, pr.y, "BLOOD");
 
                         if (pr.fromPlayer && ped.kind === "COP" && Math.random() < 0.80) {
-
                             this.setWantedLevel(Math.max(this.wantedLevel, 2));
-
                         }
 
                         if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) {
-
                             this.audio.playPedScream();
-
                         }
 
                         if (pr.isFlame && ped.hp > 0) {
-
                             ped.burnTimer = 3.2;
-
                             ped.panicTimer = (ped.kind === "COP" || ped.kind === "CRIMINAL") ? 0 : 4.5;
-
                             if (ped.kind !== "COP" && ped.kind !== "CRIMINAL") ped.angle = Math.random() * Math.PI * 2;
-
                         }
 
                         if (ped.hp <= 0) {
-
                             if (pr.isFlame) ped.deathKind = "BURNT";
-
                             this.killPed(ped, Boolean(pr.fromPlayer));
-
                         }
 
                         hitSomething = true;
-
-                        break;
-
+                        return true;
                     }
+                    return false;
+                };
 
+                if (pHead && pNext) {
+                    const cx0 = Math.max(0, (pr.x - 16) >> 8);
+                    const cx1 = Math.min(127, (pr.x + 16) >> 8);
+                    const cy0 = Math.max(0, (pr.y - 16) >> 8);
+                    const cy1 = Math.min(127, (pr.y + 16) >> 8);
+                    for (let cy = cy0; cy <= cy1 && !hitSomething; cy++) {
+                        const rowOff = cy << 7;
+                        for (let cx = cx0; cx <= cx1 && !hitSomething; cx++) {
+                            for (let pi = pHead[rowOff | cx]; pi !== -1; pi = pNext[pi]) {
+                                if (testPedHit(this.peds[pi])) break;
+                            }
+                        }
+                    }
+                } else {
+                    for (let pi = 0; pi < this.peds.length; pi++) {
+                        if (testPedHit(this.peds[pi])) break;
+                    }
                 }
 
             }
@@ -17056,45 +17048,29 @@ class LeonidaGame {
 
 
 
-        // 9. Particles & Floating Texts Update (with GTA 2 gibs.cpp resting arc settlement!)
-
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-
+        // 9. Particles & Floating Texts Update (with GTA 2 gibs.cpp resting arc settlement! Single-pass O(N) compaction)
+        let pWrite = 0;
+        for (let i = 0; i < this.particles.length; i++) {
             const pt = this.particles[i];
-
             if (!pt.isRestingGib) {
-
                 pt.x += pt.vx * dt;
-
                 pt.y += pt.vy * dt;
-
             }
-
             pt.life -= dt;
-
             if (pt.life <= 0) {
-
                 if (pt.kind === "GIB_ARC" && !pt.isRestingGib) {
-
                     pt.isRestingGib = true;
-
                     pt.vx = 0;
-
                     pt.vy = 0;
-
                     pt.life = 18.0;
-
                     pt.maxLife = 18.0;
-
-                } else {
-
-                    this.particles.splice(i, 1);
-
+                    this.particles[pWrite++] = pt;
                 }
-
+            } else {
+                this.particles[pWrite++] = pt;
             }
-
         }
+        this.particles.length = pWrite;
 
 
 
@@ -17112,25 +17088,20 @@ class LeonidaGame {
 
 
 
-        // Progressive fade-out & cleanup of tire/surface tracks (grass, sand, mud, road)
-
-        for (let i = this.skidmarks.length - 1; i >= 0; i--) {
-
+        // Progressive fade-out & cleanup of tire/surface tracks (grass, sand, mud, road — single-pass O(N) compaction)
+        let sWrite = 0;
+        for (let i = 0; i < this.skidmarks.length; i++) {
             const sk = this.skidmarks[i];
-
             if (typeof sk.life === "number") {
-
                 sk.life -= dt;
-
-                if (sk.life <= 0) {
-
-                    this.skidmarks.splice(i, 1);
-
+                if (sk.life > 0) {
+                    this.skidmarks[sWrite++] = sk;
                 }
-
+            } else {
+                this.skidmarks[sWrite++] = sk;
             }
-
         }
+        this.skidmarks.length = sWrite;
 
 
 
@@ -17138,13 +17109,17 @@ class LeonidaGame {
 
         if (Array.isArray(this.map.landmarks)) {
 
-            for (const lm of this.map.landmarks) {
+            for (let li = 0; li < this.map.landmarks.length; li++) {
+
+                const lm = this.map.landmarks[li];
 
                 if (lm.perkCooldown > 0) {
 
                     lm.perkCooldown = Math.max(0, lm.perkCooldown - dt);
 
                 }
+
+                if (Math.abs(p.x - lm.x) >= 105 || Math.abs(p.y - lm.y) >= 105) continue;
 
                 const distLm = Math.hypot(p.x - lm.x, p.y - lm.y);
 
@@ -17195,8 +17170,13 @@ class LeonidaGame {
 
 
         // 11. District Change Detection & Restricted Security Compound Trespass (VCIA Tarmac & Leonida Penitentiary Yard)
-
-        const newDist = this.map.getDistrictName(p.x, p.y);
+        const distTileKey = ((p.y >> 6) << 10) | (p.x >> 6);
+        let newDist = this._cachedDistrictName;
+        if (this._cachedDistrictTileKey !== distTileKey || !newDist) {
+            this._cachedDistrictTileKey = distTileKey;
+            newDist = this.map.getDistrictName(p.x, p.y);
+            this._cachedDistrictName = newDist;
+        }
 
         if (newDist !== this.currentDistrict) {
 
@@ -17482,32 +17462,25 @@ class LeonidaGame {
 
 
 
-        // Compute proximity to Atlantic Ocean / Biscayne Bay / Lake Leonida water tiles
-
-        let waterProximity = 0;
-
-        const pc = Math.max(4, Math.min(MAP_COLS - 5, Math.floor(p.x / 64)));
-
-        const pr = Math.max(4, Math.min(MAP_ROWS - 5, Math.floor(p.y / 64)));
-
-        if (this.map.surfaceGround) {
-
-            for (let dr = -4; dr <= 4; dr += 2) {
-
-                for (let dc = -4; dc <= 4; dc += 2) {
-
-                    if (this.map.surfaceGround[(pr + dr) * MAP_COLS + (pc + dc)] === 1) {
-
-                        const wd = Math.hypot(dc, dr);
-
-                        waterProximity = Math.max(waterProximity, Math.max(0, 1 - wd / 5.5));
-
+        // Compute proximity to Atlantic Ocean / Biscayne Bay / Lake Leonida water tiles (cached per player 64px tile!)
+        const pc = Math.max(4, Math.min(MAP_COLS - 5, p.x >> 6));
+        const pr = Math.max(4, Math.min(MAP_ROWS - 5, p.y >> 6));
+        const waterTileKey = (pr << 10) | pc;
+        let waterProximity = this._cachedWaterProx || 0;
+        if (this._cachedWaterTileKey !== waterTileKey) {
+            this._cachedWaterTileKey = waterTileKey;
+            waterProximity = 0;
+            if (this.map.surfaceGround) {
+                for (let dr = -4; dr <= 4; dr += 2) {
+                    for (let dc = -4; dc <= 4; dc += 2) {
+                        if (this.map.surfaceGround[(pr + dr) * MAP_COLS + (pc + dc)] === 1) {
+                            const wd = Math.hypot(dc, dr);
+                            waterProximity = Math.max(waterProximity, Math.max(0, 1 - wd / 5.5));
+                        }
                     }
-
                 }
-
             }
-
+            this._cachedWaterProx = waterProximity;
         }
 
 

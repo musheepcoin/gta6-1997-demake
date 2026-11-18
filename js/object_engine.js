@@ -12641,10 +12641,43 @@ class WorldObjectEngine {
         }
         let dBuf = this.dynFloatBuf;
         let dLen = 0;
-        const encUV = (matId, u, v) => [
-            -matId - Math.max(0.01, Math.min(0.99, u)) * 0.85,
-            Math.max(0.01, Math.min(0.99, v))
-        ];
+        const invTile = 1.0 / TILE_SIZE;
+        if (!this._dynCylTrigCache) {
+            this._dynCylTrigCache = new Map();
+        }
+        const getCylTrig = (segs) => {
+            let tbl = this._dynCylTrigCache.get(segs);
+            if (!tbl) {
+                const cos = new Float32Array(segs + 1);
+                const sin = new Float32Array(segs + 1);
+                const shadeCyl = new Float32Array(segs);
+                const shadeCone = new Float32Array(segs);
+                const uClamped = new Float32Array(segs + 1);
+                const capU = new Float32Array(segs + 1);
+                const capV = new Float32Array(segs + 1);
+                for (let s = 0; s <= segs; s++) {
+                    const a = (s * Math.PI * 2.0) / segs;
+                    const c = Math.cos(a);
+                    const sn = Math.sin(a);
+                    cos[s] = c;
+                    sin[s] = sn;
+                    uClamped[s] = Math.max(0.01, Math.min(0.99, s / segs)) * 0.85;
+                    capU[s] = Math.max(0.01, Math.min(0.99, 0.5 + 0.45 * c)) * 0.85;
+                    capV[s] = Math.max(0.01, Math.min(0.99, 0.5 + 0.45 * sn));
+                }
+                for (let s = 0; s < segs; s++) {
+                    const aMid = ((s + 0.5) * Math.PI * 2.0) / segs;
+                    const sunDot = Math.cos(aMid) * 0.65 + Math.sin(aMid) * 0.76;
+                    const posDot = Math.max(0, sunDot);
+                    const p2 = posDot * posDot;
+                    shadeCyl[s] = 0.85 + 0.19 * sunDot + (p2 * p2) * 0.08;
+                    shadeCone[s] = 0.88 + 0.18 * sunDot;
+                }
+                tbl = { cos, sin, shadeCyl, shadeCone, uClamped, capU, capV };
+                this._dynCylTrigCache.set(segs, tbl);
+            }
+            return tbl;
+        };
         const pushV = (x, yElev, z, u, v, r, g, b, a = 1.0) => {
             if (dLen + 9 > dBuf.length) {
                 const nextBuf = new Float32Array(dBuf.length * 2);
@@ -12662,100 +12695,119 @@ class WorldObjectEngine {
             dBuf[dLen + 8] = a;
             dLen += 9;
         };
-        const pushQ = (p0, p1, p2, p3, matId, r, g, b, a = 1.0) => {
-            const [u0, v0] = encUV(matId, 0.02, 0.98);
-            const [u1, v1] = encUV(matId, 0.98, 0.02);
-            pushV(p0[0], p0[1], p0[2], u0, v0, r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], u1, v0, r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], u1, v0, r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], u0, v1, r, g, b, a);
-            pushV(p3[0], p3[1], p3[2], u1, v1, r, g, b, a);
-        };
-        const pushTri = (p0, p1, p2, uv0, uv1, uv2, r, g, b, a = 1.0) => {
-            pushV(p0[0], p0[1], p0[2], uv0[0], uv0[1], r, g, b, a);
-            pushV(p1[0], p1[1], p1[2], uv1[0], uv1[1], r, g, b, a);
-            pushV(p2[0], p2[1], p2[2], uv2[0], uv2[1], r, g, b, a);
+        const pushQuadScalar = (
+            x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3,
+            u0, v0, u1, v1, r, g, b, a
+        ) => {
+            if (dLen + 54 > dBuf.length) {
+                const nextBuf = new Float32Array(dBuf.length * 2);
+                nextBuf.set(dBuf);
+                this.dynFloatBuf = dBuf = nextBuf;
+            }
+            dBuf[dLen]      = x0; dBuf[dLen + 1]  = y0; dBuf[dLen + 2]  = z0; dBuf[dLen + 3]  = u0; dBuf[dLen + 4]  = v0; dBuf[dLen + 5]  = r; dBuf[dLen + 6]  = g; dBuf[dLen + 7]  = b; dBuf[dLen + 8]  = a;
+            dBuf[dLen + 9]  = x2; dBuf[dLen + 10] = y2; dBuf[dLen + 11] = z2; dBuf[dLen + 12] = u0; dBuf[dLen + 13] = v1; dBuf[dLen + 14] = r; dBuf[dLen + 15] = g; dBuf[dLen + 16] = b; dBuf[dLen + 17] = a;
+            dBuf[dLen + 18] = x1; dBuf[dLen + 19] = y1; dBuf[dLen + 20] = z1; dBuf[dLen + 21] = u1; dBuf[dLen + 22] = v0; dBuf[dLen + 23] = r; dBuf[dLen + 24] = g; dBuf[dLen + 25] = b; dBuf[dLen + 26] = a;
+            dBuf[dLen + 27] = x1; dBuf[dLen + 28] = y1; dBuf[dLen + 29] = z1; dBuf[dLen + 30] = u1; dBuf[dLen + 31] = v0; dBuf[dLen + 32] = r; dBuf[dLen + 33] = g; dBuf[dLen + 34] = b; dBuf[dLen + 35] = a;
+            dBuf[dLen + 36] = x2; dBuf[dLen + 37] = y2; dBuf[dLen + 38] = z2; dBuf[dLen + 39] = u0; dBuf[dLen + 40] = v1; dBuf[dLen + 41] = r; dBuf[dLen + 42] = g; dBuf[dLen + 43] = b; dBuf[dLen + 44] = a;
+            dBuf[dLen + 45] = x3; dBuf[dLen + 46] = y3; dBuf[dLen + 47] = z3; dBuf[dLen + 48] = u1; dBuf[dLen + 49] = v1; dBuf[dLen + 50] = r; dBuf[dLen + 51] = g; dBuf[dLen + 52] = b; dBuf[dLen + 53] = a;
+            dLen += 54;
         };
         const emitDynBox = (cxPx, cyPx, cosA, sinA, offX, offY, wPx, dPx, yBot, yTop, col, alpha = 1.0, matId = 1) => {
             const hw = wPx * 0.5;
             const hd = dPx * 0.5;
-            const [r, g, b] = col;
-            const toW = (lx, ly, yE) => [
-                (cxPx + lx * cosA - ly * sinA) / TILE_SIZE,
-                yE,
-                (cyPx + lx * sinA + ly * cosA) / TILE_SIZE
-            ];
-            const tNW = toW(offX - hw, offY - hd, yTop);
-            const tNE = toW(offX + hw, offY - hd, yTop);
-            const tSW = toW(offX - hw, offY + hd, yTop);
-            const tSE = toW(offX + hw, offY + hd, yTop);
-            const bNW = toW(offX - hw, offY - hd, yBot);
-            const bNE = toW(offX + hw, offY - hd, yBot);
-            const bSW = toW(offX - hw, offY + hd, yBot);
-            const bSE = toW(offX + hw, offY + hd, yBot);
+            const r = col[0], g = col[1], b = col[2];
+            const lx0 = offX - hw, lx1 = offX + hw;
+            const ly0 = offY - hd, ly1 = offY + hd;
+            const xNW = (cxPx + lx0 * cosA - ly0 * sinA) * invTile;
+            const zNW = (cyPx + lx0 * sinA + ly0 * cosA) * invTile;
+            const xNE = (cxPx + lx1 * cosA - ly0 * sinA) * invTile;
+            const zNE = (cyPx + lx1 * sinA + ly0 * cosA) * invTile;
+            const xSW = (cxPx + lx0 * cosA - ly1 * sinA) * invTile;
+            const zSW = (cyPx + lx0 * sinA + ly1 * cosA) * invTile;
+            const xSE = (cxPx + lx1 * cosA - ly1 * sinA) * invTile;
+            const zSE = (cyPx + lx1 * sinA + ly1 * cosA) * invTile;
+            const u0 = -matId - 0.017;
+            const u1 = -matId - 0.833;
+            const v0 = 0.98;
+            const v1 = 0.02;
 
-            pushQ(tSW, tSE, bSW, bSE, matId, r, g, b, alpha);
-            pushQ(tNE, tNW, bNE, bNW, matId, r * 0.78, g * 0.80, b * 0.84, alpha);
-            pushQ(tNW, tSW, bNW, bSW, matId, r * 0.92, g * 0.92, b * 0.95, alpha);
-            pushQ(tSE, tNE, bSE, bNE, matId, r * 0.85, g * 0.86, b * 0.90, alpha);
+            pushQuadScalar(xSW, yTop, zSW, xSE, yTop, zSE, xSW, yBot, zSW, xSE, yBot, zSE, u0, v0, u1, v1, r, g, b, alpha);
+            pushQuadScalar(xNE, yTop, zNE, xNW, yTop, zNW, xNE, yBot, zNE, xNW, yBot, zNW, u0, v0, u1, v1, r * 0.78, g * 0.80, b * 0.84, alpha);
+            pushQuadScalar(xNW, yTop, zNW, xSW, yTop, zSW, xNW, yBot, zNW, xSW, yBot, zSW, u0, v0, u1, v1, r * 0.92, g * 0.92, b * 0.95, alpha);
+            pushQuadScalar(xSE, yTop, zSE, xNE, yTop, zNE, xSE, yBot, zSE, xNE, yBot, zNE, u0, v0, u1, v1, r * 0.85, g * 0.86, b * 0.90, alpha);
             if (matId !== 4) {
-                pushQ(tNW, tNE, tSW, tSE, matId, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+                pushQuadScalar(xNW, yTop, zNW, xNE, yTop, zNE, xSW, yTop, zSW, xSE, yTop, zSE, u0, v0, u1, v1, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
             }
         };
         const emitDynCylinder = (cxPx, cyPx, offX, offY, rBotPx, rTopPx, yBot, yTop, segs, col, matId = 5, capTop = true, alpha = 1.0, checkerRoll = false) => {
-            const [r, g, b] = col;
-            const toW = (lx, ly, yE) => [(cxPx + lx) / TILE_SIZE, yE, (cyPx + ly) / TILE_SIZE];
-            const centerTop = toW(offX, offY, yTop);
-            const uvCenter = encUV(matId, 0.5, 0.5);
+            const r = col[0], g = col[1], b = col[2];
+            const baseX = (cxPx + offX) * invTile;
+            const baseZ = (cyPx + offY) * invTile;
+            const rBotW = rBotPx * invTile;
+            const rTopW = rTopPx * invTile;
+            const uCenter = -matId - 0.425;
+            const vCenter = 0.5;
+            const tbl = getCylTrig(segs);
+            const cosArr = tbl.cos;
+            const sinArr = tbl.sin;
+            const shArr = tbl.shadeCyl;
+            const uClamped = tbl.uClamped;
+            const capU = tbl.capU;
+            const capV = tbl.capV;
+            const doCap = capTop && rTopPx > 0.5;
+            const capR = Math.min(1, r * 1.06);
+            const capG = Math.min(1, g * 1.06);
+            const capB = Math.min(1, b * 1.06);
+
             for (let s = 0; s < segs; s++) {
-                const a0 = (s * Math.PI * 2.0) / segs;
-                const a1 = ((s + 1) * Math.PI * 2.0) / segs;
-                const aMid = (a0 + a1) * 0.5;
-                const sunDot = Math.cos(aMid) * 0.65 + Math.sin(aMid) * 0.76;
-                const shade = 0.85 + 0.19 * sunDot + Math.pow(Math.max(0, sunDot), 4.0) * 0.08;
+                const c0 = cosArr[s], s0 = sinArr[s];
+                const c1 = cosArr[s + 1], s1 = sinArr[s + 1];
+                const shade = shArr[s];
                 const isBlk = checkerRoll && (s % 4 < 2);
-                const cr = (isBlk ? 0.14 : r) * shade;
-                const cg = (isBlk ? 0.16 : g) * shade;
-                const cb = (isBlk ? 0.20 : b) * shade;
+                const cr = Math.min(1, (isBlk ? 0.14 : r) * shade);
+                const cg = Math.min(1, (isBlk ? 0.16 : g) * shade);
+                const cb = Math.min(1, (isBlk ? 0.20 : b) * shade);
 
-                const b0 = toW(offX + Math.cos(a0) * rBotPx, offY + Math.sin(a0) * rBotPx, yBot);
-                const b1 = toW(offX + Math.cos(a1) * rBotPx, offY + Math.sin(a1) * rBotPx, yBot);
-                const t0 = toW(offX + Math.cos(a0) * rTopPx, offY + Math.sin(a0) * rTopPx, yTop);
-                const t1 = toW(offX + Math.cos(a1) * rTopPx, offY + Math.sin(a1) * rTopPx, yTop);
+                const bx0 = baseX + c0 * rBotW, bz0 = baseZ + s0 * rBotW;
+                const bx1 = baseX + c1 * rBotW, bz1 = baseZ + s1 * rBotW;
+                const tx0 = baseX + c0 * rTopW, tz0 = baseZ + s0 * rTopW;
+                const tx1 = baseX + c1 * rTopW, tz1 = baseZ + s1 * rTopW;
 
-                const [u0, v0] = encUV(matId, s / segs, 0.98);
-                const [u1, v1] = encUV(matId, (s + 1) / segs, 0.02);
-                pushV(t0[0], t0[1], t0[2], u0, v0, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
-                pushV(b0[0], b0[1], b0[2], u0, v1, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
-                pushV(t1[0], t1[1], t1[2], u1, v0, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
-                pushV(t1[0], t1[1], t1[2], u1, v0, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
-                pushV(b0[0], b0[1], b0[2], u0, v1, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
-                pushV(b1[0], b1[1], b1[2], u1, v1, Math.min(1, cr), Math.min(1, cg), Math.min(1, cb), alpha);
+                const u0 = -matId - uClamped[s];
+                const u1 = -matId - uClamped[s + 1];
+                pushQuadScalar(tx0, yTop, tz0, tx1, yTop, tz1, bx0, yBot, bz0, bx1, yBot, bz1, u0, 0.98, u1, 0.02, cr, cg, cb, alpha);
 
-                if (capTop && rTopPx > 0.5) {
-                    const uv0 = encUV(matId, 0.5 + 0.45 * Math.cos(a0), 0.5 + 0.45 * Math.sin(a0));
-                    const uv1 = encUV(matId, 0.5 + 0.45 * Math.cos(a1), 0.5 + 0.45 * Math.sin(a1));
-                    pushTri(centerTop, t0, t1, uvCenter, uv0, uv1, Math.min(1, r * 1.06), Math.min(1, g * 1.06), Math.min(1, b * 1.06), alpha);
+                if (doCap) {
+                    pushV(baseX, yTop, baseZ, uCenter, vCenter, capR, capG, capB, alpha);
+                    pushV(tx0, yTop, tz0, -matId - capU[s], capV[s], capR, capG, capB, alpha);
+                    pushV(tx1, yTop, tz1, -matId - capU[s + 1], capV[s + 1], capR, capG, capB, alpha);
                 }
             }
         };
         const emitDynCone = (cxPx, cyPx, offX, offY, rBotPx, yBot, yTop, segs, col, matId = 5, alpha = 1.0) => {
-            const [r, g, b] = col;
-            const toW = (lx, ly, yE) => [(cxPx + lx) / TILE_SIZE, yE, (cyPx + ly) / TILE_SIZE];
-            const apex = toW(offX, offY, yTop);
-            const uvApex = encUV(matId, 0.5, 0.98);
+            const r = col[0], g = col[1], b = col[2];
+            const apexX = (cxPx + offX) * invTile;
+            const apexZ = (cyPx + offY) * invTile;
+            const rBotW = rBotPx * invTile;
+            const uApex = -matId - 0.425;
+            const tbl = getCylTrig(segs);
+            const cosArr = tbl.cos;
+            const sinArr = tbl.sin;
+            const shArr = tbl.shadeCone;
+            const uClamped = tbl.uClamped;
+
             for (let s = 0; s < segs; s++) {
-                const a0 = (s * Math.PI * 2.0) / segs;
-                const a1 = ((s + 1) * Math.PI * 2.0) / segs;
-                const aMid = (a0 + a1) * 0.5;
-                const sunDot = Math.cos(aMid) * 0.65 + Math.sin(aMid) * 0.76;
-                const shade = 0.88 + 0.18 * sunDot;
-                const b0 = toW(offX + Math.cos(a0) * rBotPx, offY + Math.sin(a0) * rBotPx, yBot);
-                const b1 = toW(offX + Math.cos(a1) * rBotPx, offY + Math.sin(a1) * rBotPx, yBot);
-                const uv0 = encUV(matId, s / segs, 0.05);
-                const uv1 = encUV(matId, (s + 1) / segs, 0.05);
-                pushTri(apex, b0, b1, uvApex, uv0, uv1, Math.min(1, r * shade), Math.min(1, g * shade), Math.min(1, b * shade), alpha);
+                const shade = shArr[s];
+                const cr = Math.min(1, r * shade);
+                const cg = Math.min(1, g * shade);
+                const cb = Math.min(1, b * shade);
+                const bx0 = apexX + cosArr[s] * rBotW;
+                const bz0 = apexZ + sinArr[s] * rBotW;
+                const bx1 = apexX + cosArr[s + 1] * rBotW;
+                const bz1 = apexZ + sinArr[s + 1] * rBotW;
+                pushV(apexX, yTop, apexZ, uApex, 0.98, cr, cg, cb, alpha);
+                pushV(bx0, yBot, bz0, -matId - uClamped[s], 0.05, cr, cg, cb, alpha);
+                pushV(bx1, yBot, bz1, -matId - uClamped[s + 1], 0.05, cr, cg, cb, alpha);
             }
         };
 
@@ -13111,6 +13163,11 @@ class WorldObjectEngine {
         if (this.map && Array.isArray(this.map.streetlights)) {
             const nf = Math.max(0, Math.min(1, renderer.nightFactor || 0));
             const lightsOn = nf > 0.12;
+            const colDecoPole = [0.78, 0.84, 0.92], colStdPole = [0.52, 0.58, 0.66];
+            const colDecoBase = [0.58, 0.64, 0.74], colStdBase = [0.34, 0.38, 0.45];
+            const colDecoHood = [0.64, 0.70, 0.80], colStdHood = [0.38, 0.43, 0.50];
+            const colDecoCyan = [0.22, 0.92, 0.98], colDecoPink = [0.98, 0.36, 0.78];
+            const colSodium = [1.0, 0.82, 0.32], colMercury = [1.0, 0.90, 0.44], colBulbOff = [0.86, 0.84, 0.74];
             const visStreetlights = typeof renderer._queryStaticChunkGrid === "function"
                 ? renderer._queryStaticChunkGrid(this.map.streetlights, "baseX", "baseY", minX, minY, maxX, maxY, "_idx")
                 : this.map.streetlights;
@@ -13120,15 +13177,20 @@ class WorldObjectEngine {
                 if (sl.baseX < minX || sl.baseX > maxX || sl.baseY < minY || sl.baseY > maxY) continue;
                 const bz = sl.z || 2.0;
                 const isDeco = sl.style === "ART_DECO_NEON" || sl.style === "PROMENADE_TWIN";
-                const poleCol = isDeco ? [0.78, 0.84, 0.92] : [0.52, 0.58, 0.66];
-                const baseCol = isDeco ? [0.58, 0.64, 0.74] : [0.34, 0.38, 0.45];
-                const hoodCol = isDeco ? [0.64, 0.70, 0.80] : [0.38, 0.43, 0.50];
+                const poleCol = isDeco ? colDecoPole : colStdPole;
+                const baseCol = isDeco ? colDecoBase : colStdBase;
+                const hoodCol = isDeco ? colDecoHood : colStdHood;
+                if (sl._armCos === undefined) {
+                    sl._armCos = Math.cos(sl.armAngle || 0);
+                    sl._armSin = Math.sin(sl.armAngle || 0);
+                    sl._armLen = Math.max(12, Math.hypot((sl.headX || sl.baseX) - sl.baseX, (sl.headY || sl.baseY) - sl.baseY) + 3.0);
+                }
 
                 // State 2: Knocked-down / Uprooted 3D Streetlamp lying on the ground ("défoncé")
                 //          Uses the exact 3D octagonal pedestal stump, tapered pole, cantilever arm & cobra-head luminaire!
                 if (sl.state === 2) {
-                    const origArmCos = Math.cos(sl.armAngle || 0);
-                    const origArmSin = Math.sin(sl.armAngle || 0);
+                    const origArmCos = sl._armCos;
+                    const origArmSin = sl._armSin;
                     const fx = sl.fallenX ?? (sl.baseX + origArmCos * 4.5);
                     const fy = sl.fallenY ?? (sl.baseY + origArmSin * 4.5);
                     const fAng = sl.fallAngle !== undefined ? sl.fallAngle : (sl.armAngle || 0);
@@ -13148,7 +13210,7 @@ class WorldObjectEngine {
                         emitDynBox(fx + fCos * (poleLen * 0.62), fy + fSin * (poleLen * 0.62), fCos, fSin, 0, 0, 5.2, 3.4, bz + 0.010, bz + 0.054, decoCol, 1.0, 9);
                     }
                     // 3. Cantilever mast arm + diagonal gusset + cobra-head luminaire hood & dark shattered lens at the pole tip
-                    const armLen = Math.max(12, Math.hypot((sl.headX || sl.baseX) - sl.baseX, (sl.headY || sl.baseY) - sl.baseY) + 3.0);
+                    const armLen = sl._armLen;
                     const dotFA = fCos * origArmCos + fSin * origArmSin;
                     let aCos = origArmCos;
                     let aSin = origArmSin;
@@ -13175,9 +13237,9 @@ class WorldObjectEngine {
                 const topPoleY = sl.baseY + tDy;
                 const effHeadX = sl.headX + tDx;
                 const effHeadY = sl.headY + tDy;
-                const armCos = Math.cos(sl.armAngle);
-                const armSin = Math.sin(sl.armAngle);
-                const armLen = Math.max(12, Math.hypot(effHeadX - topPoleX, effHeadY - topPoleY) + 3.0);
+                const armCos = sl._armCos;
+                const armSin = sl._armSin;
+                const armLen = sl._armLen;
                 const midX = (topPoleX + effHeadX) * 0.5;
                 const midY = (topPoleY + effHeadY) * 0.5;
 
@@ -13192,7 +13254,7 @@ class WorldObjectEngine {
                 } else {
                     emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 2.2, 1.75, bz + 0.16, bz + 0.56, 8, poleCol, 9, true);
                     if (isDeco) {
-                        const decoCol = (i % 2 === 0) ? [0.22, 0.92, 0.98] : [0.98, 0.36, 0.78];
+                        const decoCol = (i % 2 === 0) ? colDecoCyan : colDecoPink;
                         emitDynCylinder(sl.baseX, sl.baseY, 0, 0, 2.5, 2.5, bz + 0.36, bz + 0.46, 8, decoCol, 10, true);
                     }
                 }
@@ -13219,8 +13281,8 @@ class WorldObjectEngine {
                 emitDynBox(effHeadX, effHeadY, armCos, armSin, 0, 0, 11.2, 6.4, bz + 0.54 - zDrop, bz + 0.58 - zDrop, hoodCol, 1.0, 9);
                 const bulbLit = lightsOn && (!isDamaged || Math.sin(t * 28.0 + sl.baseX) > -0.25);
                 const bulbCol = bulbLit
-                    ? (sl.colorType === "SODIUM" ? [1.0, 0.82, 0.32] : [1.0, 0.90, 0.44])
-                    : [0.86, 0.84, 0.74];
+                    ? (sl.colorType === "SODIUM" ? colSodium : colMercury)
+                    : colBulbOff;
                 emitDynBox(
                     effHeadX,
                     effHeadY,
@@ -13243,6 +13305,10 @@ class WorldObjectEngine {
         if (this.map && Array.isArray(this.map.parkBollardLights)) {
             const nf = Math.max(0, Math.min(1, renderer.nightFactor || 0)) || (renderer.nightMode ? 1.0 : 0.0);
             const lightsOn = nf > 0.12;
+            const colVillaBase = [0.24, 0.20, 0.15], colDecoBaseB = [0.22, 0.25, 0.28], colParkBase = [0.16, 0.20, 0.18];
+            const colVillaPole = [0.30, 0.25, 0.18], colDecoPoleB = [0.30, 0.34, 0.38], colParkPole = [0.20, 0.26, 0.22];
+            const colVillaHood = [0.20, 0.16, 0.11], colParkHood = [0.14, 0.17, 0.16];
+            const colVillaLit = [1.0, 0.90, 0.56], colDecoLit = [1.0, 0.93, 0.65], colParkLit = [1.0, 0.88, 0.50], colBolOff = [0.82, 0.85, 0.80];
             const visBollards = typeof renderer._queryStaticChunkGrid === "function"
                 ? renderer._queryStaticChunkGrid(this.map.parkBollardLights, "x", "y", minX, minY, maxX, maxY)
                 : this.map.parkBollardLights;
@@ -13252,9 +13318,9 @@ class WorldObjectEngine {
                 const bz = bl.z || 2.0;
                 const isVilla = bl.style === "VILLA_PATH";
                 const isDecoPark = bl.style === "DECO_PARK";
-                const baseCol = isVilla ? [0.24, 0.20, 0.15] : (isDecoPark ? [0.22, 0.25, 0.28] : [0.16, 0.20, 0.18]);
-                const poleCol = isVilla ? [0.30, 0.25, 0.18] : (isDecoPark ? [0.30, 0.34, 0.38] : [0.20, 0.26, 0.22]);
-                const hoodCol = isVilla ? [0.20, 0.16, 0.11] : [0.14, 0.17, 0.16];
+                const baseCol = isVilla ? colVillaBase : (isDecoPark ? colDecoBaseB : colParkBase);
+                const poleCol = isVilla ? colVillaPole : (isDecoPark ? colDecoPoleB : colParkPole);
+                const hoodCol = isVilla ? colVillaHood : colParkHood;
 
                 if (bl.state === 2) {
                     // Knocked-down bollard lying on the grass/walkway edge
@@ -13274,8 +13340,8 @@ class WorldObjectEngine {
                 emitDynCylinder(bl.x, bl.y, 0, 0, 2.8, 2.5, bz + 0.045, bz + 0.135, 8, poleCol, 9, true);
                 // 3. 360° Warm Frosted Glass Lantern Globe/Collar (bz + 0.135 .. bz + 0.195) — wider than top finial so glowing ring is clearly visible from 2.5D top-down camera!
                 const bulbCol = lightsOn
-                    ? (isVilla ? [1.0, 0.90, 0.56] : (isDecoPark ? [1.0, 0.93, 0.65] : [1.0, 0.88, 0.50]))
-                    : [0.82, 0.85, 0.80];
+                    ? (isVilla ? colVillaLit : (isDecoPark ? colDecoLit : colParkLit))
+                    : colBolOff;
                 emitDynCylinder(bl.x, bl.y, 0, 0, 3.7, 3.3, bz + 0.135, bz + 0.195, 8, bulbCol, lightsOn ? 10 : 7, true);
                 // 4. Compact Top Center Finial Cap (bz + 0.195 .. bz + 0.215)
                 emitDynCylinder(bl.x, bl.y, 0, 0, 2.1, 1.1, bz + 0.195, bz + 0.215, 8, hoodCol, 9, true);
@@ -13296,16 +13362,27 @@ class WorldObjectEngine {
             const visSignals = typeof renderer._queryStaticChunkGrid === "function"
                 ? renderer._queryStaticChunkGrid(this.map.trafficSignals, "baseX", "baseY", minX, minY, maxX, maxY)
                 : this.map.trafficSignals;
+            const blkPole = [0.07, 0.08, 0.10];
+            const colCorePipe = [0.24, 0.27, 0.33];
+            const colBackplate = [0.04, 0.05, 0.06];
+            const darkLenses = [[0.34, 0.06, 0.08], [0.34, 0.22, 0.05], [0.05, 0.30, 0.14]];
+            const fallenLensOffsets = [3.4, 0.0, -3.4];
+            const uprightLensOffsets = [-3.4, 0.0, 3.4];
+            const darkUpright = [[0.28, 0.05, 0.07], [0.28, 0.18, 0.04], [0.04, 0.25, 0.12]];
+            const litUpright = [[1.0, 0.14, 0.20], [1.0, 0.72, 0.06], [0.08, 0.98, 0.42]];
 
             for (let i = 0; i < visSignals.length; i++) {
                 const ts = visSignals[i];
                 if (ts.baseX < minX || ts.baseX > maxX || ts.baseY < minY || ts.baseY > maxY) continue;
                 const bz = ts.z || 2.0;
-                const blkPole = [0.07, 0.08, 0.10];
                 const reach = ts.armReach || 40.0;
-                const heads = ts.heads || [{ x: ts.headX, y: ts.headY }];
-                const origArmCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle || 0);
-                const origArmSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle || 0);
+                const heads = ts.heads || (ts._heads || (ts._heads = [{ x: ts.headX, y: ts.headY }]));
+                if (ts._origArmCos === undefined) {
+                    ts._origArmCos = ts.dirX !== undefined ? ts.dirX : Math.cos(ts.armAngle || 0);
+                    ts._origArmSin = ts.dirY !== undefined ? ts.dirY : Math.sin(ts.armAngle || 0);
+                }
+                const origArmCos = ts._origArmCos;
+                const origArmSin = ts._origArmSin;
 
                 // State 2: Knocked-down / Uprooted 3D Mast-Arm Traffic Signal Gantry lying flat on the street
                 //          Uses the EXACT same 3D black steel mast pole, truss arm & multi-head 3-lens housings as the intact model!
@@ -13318,7 +13395,7 @@ class WorldObjectEngine {
 
                     // 1. Sheared black steel octagonal corner foundation stump + fractured inner steel pipe core
                     emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 5.4, 4.6, bz, bz + 0.055, 8, blkPole, 9, true);
-                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 2.8, 2.4, bz + 0.055, bz + 0.082, 8, [0.24, 0.27, 0.33], 9, true);
+                    emitDynCylinder(ts.baseX, ts.baseY, 0, 0, 2.8, 2.4, bz + 0.055, bz + 0.082, 8, colCorePipe, 9, true);
 
                     // 2. Toppled 3D tapered black steel mast pole shaft (28px long = exact 0.70-block vertical mast height)
                     const poleLen = 28.0;
@@ -13346,7 +13423,6 @@ class WorldObjectEngine {
                     emitDynBox(topX + aCos * 7.0 - fCos * 2.6, topY + aSin * 7.0 - fSin * 2.6, aCos, aSin, 0, 0, 13.0, 2.0, bz + 0.010, bz + 0.044, blkPole, 1.0, 9);
 
                     // 4. Fallen 3-lens black signal heads (1 or 2 heads matching ts.heads) with dark backplates & shattered Red/Amber/Green lenses
-                    const darkLenses = [[0.34, 0.06, 0.08], [0.34, 0.22, 0.05], [0.05, 0.30, 0.14]];
                     for (let hi = 0; hi < heads.length; hi++) {
                         const rawDist = Math.hypot((heads[hi].x - ts.baseX), (heads[hi].y - ts.baseY));
                         const dArm = rawDist > 8.0 ? Math.min(reach - 3.0, rawDist) : (reach * (hi === 0 ? 0.56 : 0.88));
@@ -13356,13 +13432,12 @@ class WorldObjectEngine {
                         const hy = mountY - fSin * 4.8;
                         // Hanger stem + black backplate + black 3-lens housing lying flat on the pavement
                         emitDynBox(mountX - fCos * 1.4, mountY - fSin * 1.4, fCos, fSin, 0, 0, 2.8, 1.8, bz + 0.012, bz + 0.042, blkPole, 1.0, 9);
-                        emitDynBox(hx, hy, fCos, fSin, 0, 0, 13.4, 8.0, bz + 0.008, bz + 0.028, [0.04, 0.05, 0.06], 1.0, 9);
+                        emitDynBox(hx, hy, fCos, fSin, 0, 0, 13.4, 8.0, bz + 0.008, bz + 0.028, colBackplate, 1.0, 9);
                         emitDynBox(hx, hy, fCos, fSin, 0, 0, 11.6, 5.8, bz + 0.020, bz + 0.062, blkPole, 1.0, 9);
                         // 3 dark/shattered signal lenses (Red / Amber / Green) along the fallen housing
-                        const lensOffsets = [3.4, 0.0, -3.4];
                         for (let li = 0; li < 3; li++) {
-                            const lx = hx + fCos * lensOffsets[li];
-                            const ly = hy + fSin * lensOffsets[li];
+                            const lx = hx + fCos * fallenLensOffsets[li];
+                            const ly = hy + fSin * fallenLensOffsets[li];
                             emitDynBox(lx, ly, fCos, fSin, 0, 0, 2.9, 3.8, bz + 0.056, bz + 0.070, darkLenses[li], 1.0, 9);
                         }
                     }
@@ -13402,19 +13477,16 @@ class WorldObjectEngine {
                 const lensOn = !isDamaged || Math.sin(t * 28.0 + ts.baseX) > -0.25;
                 const headTop = armZ - 0.03;
                 const headBot = headTop - 0.14;
-                const lensOffsets = [-3.4, 0.0, 3.4];
-                const dark = [[0.28, 0.05, 0.07], [0.28, 0.18, 0.04], [0.04, 0.25, 0.12]];
-                const lit = [[1.0, 0.14, 0.20], [1.0, 0.72, 0.06], [0.08, 0.98, 0.42]];
                 const act = st === "RED" ? 0 : (st === "AMBER" ? 1 : 2);
                 for (let hi = 0; hi < heads.length; hi++) {
                     const hx = heads[hi].x + tDx, hy = heads[hi].y + tDy;
                     // Hanger stem + dark backplate + black 3-lens housing
                     emitDynBox(hx, hy, armCos, armSin, 0, 0, 2.4, 2.0, headTop, headTop + 0.035, blkPole, 1.0, 9);
-                    emitDynBox(hx, hy, armCos, armSin, 0, fSign * 0.6, 13.4, 7.6, headBot - 0.015, headTop - 0.015, [0.04, 0.05, 0.06], 1.0, 9);
+                    emitDynBox(hx, hy, armCos, armSin, 0, fSign * 0.6, 13.4, 7.6, headBot - 0.015, headTop - 0.015, colBackplate, 1.0, 9);
                     emitDynBox(hx, hy, armCos, armSin, 0, fSign * 0.6, 11.6, 5.8, headBot, headTop, blkPole, 1.0, 9);
                     for (let li = 0; li < 3; li++) {
                         const on = (li === act) && lensOn;
-                        emitDynBox(hx, hy, armCos, armSin, lensOffsets[li], fSign * 1.65, 2.9, 4.4, headBot + 0.018, headTop + 0.015, on ? lit[li] : dark[li], 1.0, on ? 10 : 9);
+                        emitDynBox(hx, hy, armCos, armSin, uprightLensOffsets[li], fSign * 1.65, 2.9, 4.4, headBot + 0.018, headTop + 0.015, on ? litUpright[li] : darkUpright[li], 1.0, on ? 10 : 9);
                     }
                 }
             }
@@ -13462,7 +13534,7 @@ class WorldObjectEngine {
         }
 
         // 5. 3D Articulated GTA 6 Trailer 1 Rogue Leonida Alligators (Poolside & Convenience Store Forecourts!)
-        if (Array.isArray(this.gatorEncounters)) {
+        if (this._isStaticArrInView(this.gatorEncounters, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.gatorEncounters.length; i++) {
                 const ge = this.gatorEncounters[i];
                 if (!ge.active || ge.x < minX - 120 || ge.x > maxX + 120 || ge.y < minY - 120 || ge.y > maxY + 120) continue;
@@ -13492,7 +13564,7 @@ class WorldObjectEngine {
         }
 
         // 6. 3D VCPD Radar Speed Trap Strobe Flash & Pulsing LED Speed Readout
-        if (Array.isArray(this.speedTraps)) {
+        if (this._isStaticArrInView(this.speedTraps, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.speedTraps.length; i++) {
                 const st = this.speedTraps[i];
                 if (st.x < minX - 140 || st.x > maxX + 140 || st.y < minY - 140 || st.y > maxY + 140) continue;
@@ -13523,7 +13595,7 @@ class WorldObjectEngine {
         }
 
         // 8. 12 Bobbing 3D Red Port & Green Starboard Marine Channel Navigation Buoys + Mount Kalaga Lookout Beacon
-        if (this.landmarks3D && Array.isArray(this.landmarks3D.marineBuoys)) {
+        if (this.landmarks3D && this._isStaticArrInView(this.landmarks3D.marineBuoys, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.landmarks3D.marineBuoys.length; i++) {
                 const mb = this.landmarks3D.marineBuoys[i];
                 if (mb.x < minX - 120 || mb.x > maxX + 120 || mb.y < minY - 120 || mb.y > maxY + 120) continue;
@@ -13601,7 +13673,7 @@ class WorldObjectEngine {
                 emitDynBox(ww.x, ww.y + 18, -sA, cA, 0, 0, 12, 12, bz + 0.44 + bob, bz + 0.64 + bob, [0.18, 0.94, 0.98], 0.94, 7);
             }
         }
-        if (Array.isArray(this.graffitiWalls)) {
+        if (this._isStaticArrInView(this.graffitiWalls, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.graffitiWalls.length; i++) {
                 const gw = this.graffitiWalls[i];
                 if (gw.x < minX - 140 || gw.x > maxX + 140 || gw.y < minY - 140 || gw.y > maxY + 140) continue;
@@ -13635,7 +13707,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.smugglerDrops)) {
+        if (this._isStaticArrInView(this.smugglerDrops, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.smugglerDrops.length; i++) {
                 const sd = this.smugglerDrops[i];
                 if (!sd.active || sd.x < minX - 140 || sd.x > maxX + 140 || sd.y < minY - 140 || sd.y > maxY + 140) continue;
@@ -13730,7 +13802,7 @@ class WorldObjectEngine {
         }
 
         // 17. GTA 6 70+ Official Screenshots: Spinning 3D Golden Camera Icons on Photo Safari Pedestals
-        if (Array.isArray(this.photoSafariSpots)) {
+        if (this._isStaticArrInView(this.photoSafariSpots, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.photoSafariSpots.length; i++) {
                 const ps = this.photoSafariSpots[i];
                 if (ps.x < minX - 140 || ps.x > maxX + 140 || ps.y < minY - 140 || ps.y > maxY + 140) continue;
@@ -13745,7 +13817,7 @@ class WorldObjectEngine {
         }
 
         // 18. GTA 6 Trailer 2 (0:38): Muscle Beach Live Animated 3D Olympic Barbell Bench-Pressing
-        if (this.map && Array.isArray(this.map.muscleBeachGyms)) {
+        if (this.map && this._isStaticArrInView(this.map.muscleBeachGyms, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.map.muscleBeachGyms.length; i++) {
                 const mg = this.map.muscleBeachGyms[i];
                 if (mg.x < minX - 120 || mg.x > maxX + 120 || mg.y < minY - 120 || mg.y > maxY + 120) continue;
@@ -13761,7 +13833,7 @@ class WorldObjectEngine {
         }
 
         // 19. GTA 6 Trailer 1 (0:11): Live Parabolic Arcing 3D Beach Volleyballs Across the Net
-        if (this.map && Array.isArray(this.map.beachVolleyballCourts)) {
+        if (this.map && this._isStaticArrInView(this.map.beachVolleyballCourts, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.map.beachVolleyballCourts.length; i++) {
                 const vc = this.map.beachVolleyballCourts[i];
                 if (vc.x < minX - 140 || vc.x > maxX + 140 || vc.y < minY - 140 || vc.y > maxY + 140) continue;
@@ -13778,7 +13850,7 @@ class WorldObjectEngine {
         }
 
         // 20. GTA 6 Trailer 1 (0:11): Vice Bay, Ocean Beach & Leonida Keys Leaping 3D Dolphin Pods
-        if (Array.isArray(this.dolphinPods)) {
+        if (this._isStaticArrInView(this.dolphinPods, minX, minY, maxX, maxY, 210)) {
             for (let i = 0; i < this.dolphinPods.length; i++) {
                 const dp = this.dolphinPods[i];
                 if (dp.x < minX - 200 || dp.x > maxX + 200 || dp.y < minY - 200 || dp.y > maxY + 200) continue;
@@ -13820,7 +13892,7 @@ class WorldObjectEngine {
         }
 
         // 21. GTA 6 Trailer 1 (0:41): 3D Luxury Catamaran Yacht Pulsing DJ Laser Equalizer Bars
-        if (this.map && Array.isArray(this.map.yachtParties)) {
+        if (this.map && this._isStaticArrInView(this.map.yachtParties, minX, minY, maxX, maxY, 190)) {
             for (let i = 0; i < this.map.yachtParties.length; i++) {
                 const yp = this.map.yachtParties[i];
                 if (yp.x < minX - 180 || yp.x > maxX + 180 || yp.y < minY - 180 || yp.y > maxY + 180) continue;
@@ -13840,7 +13912,7 @@ class WorldObjectEngine {
                 emitDynBox(tw.x, tw.y, 1, 0, -28 + pulse * 56, -26, 12, 7.5, 2.66, 2.71, [0.18, 0.96, 0.98], 0.92, 10);
             }
         }
-        if (Array.isArray(this.cubanVentanitas)) {
+        if (this._isStaticArrInView(this.cubanVentanitas, minX, minY, maxX, maxY, 110)) {
             for (let i = 0; i < this.cubanVentanitas.length; i++) {
                 const cv = this.cubanVentanitas[i];
                 if (cv.x < minX - 100 || cv.x > maxX + 100 || cv.y < minY - 100 || cv.y > maxY + 100) continue;
@@ -14016,7 +14088,7 @@ class WorldObjectEngine {
         }
 
         // Render GTA 6 Rogue Alligator Bystander Livestreamers & Pulsing Gator Bounty Rings
-        if (Array.isArray(this.gatorEncounters)) {
+        if (this._isStaticArrInView(this.gatorEncounters, minX, minY, maxX, maxY, 160)) {
             const pFrame = Math.floor(renderer.time * 4.5) % 8;
             for (let i = 0; i < this.gatorEncounters.length; i++) {
                 const ge = this.gatorEncounters[i];
@@ -14048,13 +14120,17 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(v.x, v.y, (v.z || 2.0) + 0.024, rSz, 28, v.angle || 0, 0.98, 0.82, 0.16, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
-        if (Array.isArray(this.cashDrops)) {
+        if (Array.isArray(this.cashDrops) && this.cashDrops.length > 0) {
             for (let i = 0; i < this.cashDrops.length; i++) {
                 const cd = this.cashDrops[i];
                 if (cd.x < minX - 100 || cd.x > maxX + 100 || cd.y < minY - 100 || cd.y > maxY + 100) continue;
                 const rSz = 20 + Math.sin(renderer.time * 6.0 + cd.seed) * 2.5;
                 renderer.pushSolidQuad3D(cd.x, cd.y, (cd.z || 2.0) + 0.024, rSz, rSz, renderer.time * 2.0, 0.98, 0.84, 0.18, 0.52, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
+        }
+
+        if (!this._isPromptViewportActive(minX, minY, maxX, maxY) && !(this.speedwayRace && this.speedwayRace.active)) {
+            return;
         }
 
         // Render Pulsing Ground/Water Rings for Thrillbilly Mud Club, Gellhorn Speedway, Wynwood Graffiti Walls & Smuggler Drops
@@ -14080,7 +14156,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.graffitiWalls)) {
+        if (this._isStaticArrInView(this.graffitiWalls, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.graffitiWalls.length; i++) {
                 const gw = this.graffitiWalls[i];
                 if (gw.tagged || gw.x < minX - 120 || gw.x > maxX + 120 || gw.y < minY - 120 || gw.y > maxY + 120) continue;
@@ -14089,7 +14165,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(gw.x - gSin * 18, gw.y + gCos * 18, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.28, 0.78, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
-        if (Array.isArray(this.smugglerDrops)) {
+        if (this._isStaticArrInView(this.smugglerDrops, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.smugglerDrops.length; i++) {
                 const sd = this.smugglerDrops[i];
                 if (!sd.active || sd.x < minX - 140 || sd.x > maxX + 140 || sd.y < minY - 140 || sd.y > maxY + 140) continue;
@@ -14114,7 +14190,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(ch.x, ch.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.22, 0.78, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
-        if (Array.isArray(this.stickUpStores)) {
+        if (this._isStaticArrInView(this.stickUpStores, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.stickUpStores.length; i++) {
                 const su = this.stickUpStores[i];
                 if ((su.cooldown || 0) > 0 || su.x < minX - 140 || su.x > maxX + 140 || su.y < minY - 140 || su.y > maxY + 140) continue;
@@ -14122,7 +14198,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(su.x, su.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.82, 0.16, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
-        if (Array.isArray(this.photoSafariSpots)) {
+        if (this._isStaticArrInView(this.photoSafariSpots, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.photoSafariSpots.length; i++) {
                 const ps = this.photoSafariSpots[i];
                 if (ps.snapped || ps.x < minX - 140 || ps.x > maxX + 140 || ps.y < minY - 140 || ps.y > maxY + 140) continue;
@@ -14143,7 +14219,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_pink", vFr, tw.x + 12, tw.y + 6, 2.042, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.cubanVentanitas)) {
+        if (this._isStaticArrInView(this.cubanVentanitas, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.cubanVentanitas.length; i++) {
                 const cv = this.cubanVentanitas[i];
                 if (cv.x < minX - 120 || cv.x > maxX + 120 || cv.y < minY - 120 || cv.y > maxY + 120) continue;
@@ -14156,7 +14232,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_hawaiian_red", cFr, cv.x + 8, cv.y + 14, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.iceCreamCarts)) {
+        if (this._isStaticArrInView(this.iceCreamCarts, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.iceCreamCarts.length; i++) {
                 const ic = this.iceCreamCarts[i];
                 if (ic.x < minX - 120 || ic.x > maxX + 120 || ic.y < minY - 120 || ic.y > maxY + 120) continue;
@@ -14169,7 +14245,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_pink", gFr, ic.x - 6, ic.y + 13, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.poolTables)) {
+        if (this._isStaticArrInView(this.poolTables, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.poolTables.length; i++) {
                 const pt = this.poolTables[i];
                 if (pt.x < minX - 120 || pt.x > maxX + 120 || pt.y < minY - 120 || pt.y > maxY + 120) continue;
@@ -14183,7 +14259,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_cuban", pFr, pt.x + 19, pt.y, 2.040, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.fishingSpots)) {
+        if (this._isStaticArrInView(this.fishingSpots, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.fishingSpots.length; i++) {
                 const fs = this.fishingSpots[i];
                 if (fs.x < minX - 120 || fs.x > maxX + 120 || fs.y < minY - 120 || fs.y > maxY + 120) continue;
@@ -14200,7 +14276,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(bobX, bobY, 2.028, 3.6, 3.6, renderer.time * 2.0, 0.98, 0.20, 0.20, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         }
-        if (Array.isArray(this.streetBasketballCourts)) {
+        if (this._isStaticArrInView(this.streetBasketballCourts, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.streetBasketballCourts.length; i++) {
                 const bc = this.streetBasketballCourts[i];
                 if (bc.x < minX - 120 || bc.x > maxX + 120 || bc.y < minY - 120 || bc.y > maxY + 120) continue;
@@ -14218,7 +14294,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_haitian", sFr, bc.x + 9, bc.y + 4, 2.040, -Math.PI * 0.6, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.carMeets)) {
+        if (this._isStaticArrInView(this.carMeets, minX, minY, maxX, maxY, 150)) {
             const vehSprites = renderer.gta1Meta && renderer.gta1Meta.sprites && renderer.gta1Meta.sprites.vehicles;
             for (let i = 0; i < this.carMeets.length; i++) {
                 const cm = this.carMeets[i];
@@ -14245,7 +14321,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_tommy", mFr, cm.x + 28, cm.y + 12, 2.042, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.coralDiveSites)) {
+        if (this._isStaticArrInView(this.coralDiveSites, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.coralDiveSites.length; i++) {
                 const cd = this.coralDiveSites[i];
                 if (cd.x < minX - 140 || cd.x > maxX + 140 || cd.y < minY - 140 || cd.y > maxY + 140) continue;
@@ -14269,7 +14345,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.dirtBikeStuntRamps)) {
+        if (this._isStaticArrInView(this.dirtBikeStuntRamps, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.dirtBikeStuntRamps.length; i++) {
                 const sr = this.dirtBikeStuntRamps[i];
                 if ((sr.cooldown || 0) > 0 || sr.x < minX - 120 || sr.x > maxX + 120 || sr.y < minY - 120 || sr.y > maxY + 120) continue;
@@ -14277,7 +14353,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(sr.x, sr.y, 2.03, rSz, rSz, renderer.time * 1.6, 0.98, 0.54, 0.14, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
-        if (Array.isArray(this.surfShacks)) {
+        if (this._isStaticArrInView(this.surfShacks, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.surfShacks.length; i++) {
                 const ss = this.surfShacks[i];
                 if (ss.x < minX - 120 || ss.x > maxX + 120 || ss.y < minY - 120 || ss.y > maxY + 120) continue;
@@ -14288,7 +14364,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), ss.x + 2, ss.y + 13, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.jetSkiSlalomGates)) {
+        if (this._isStaticArrInView(this.jetSkiSlalomGates, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.jetSkiSlalomGates.length; i++) {
                 const jg = this.jetSkiSlalomGates[i];
                 if ((jg.cooldown || 0) > 0 || jg.x < minX - 140 || jg.x > maxX + 140 || jg.y < minY - 140 || jg.y > maxY + 140) continue;
@@ -14296,7 +14372,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(jg.x, jg.y, 2.022, 34, 8, 0, 0.16, 0.92, 0.98, pulse * 0.58, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
-        if (Array.isArray(this.bbqSmokerStands)) {
+        if (this._isStaticArrInView(this.bbqSmokerStands, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.bbqSmokerStands.length; i++) {
                 const bq = this.bbqSmokerStands[i];
                 if (bq.x < minX - 120 || bq.x > maxX + 120 || bq.y < minY - 120 || bq.y > maxY + 120) continue;
@@ -14311,7 +14387,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_biker", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bq.x - 4, bq.y + 12, 2.042, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.tattooParlors)) {
+        if (this._isStaticArrInView(this.tattooParlors, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.tattooParlors.length; i++) {
                 const tp = this.tattooParlors[i];
                 if (tp.x < minX - 120 || tp.x > maxX + 120 || tp.y < minY - 120 || tp.y > maxY + 120) continue;
@@ -14322,7 +14398,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 4.8 + i) % 4), tp.x, tp.y + 13, 2.042, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.sandbarPartyBarges)) {
+        if (this._isStaticArrInView(this.sandbarPartyBarges, minX, minY, maxX, maxY, 160)) {
             for (let i = 0; i < this.sandbarPartyBarges.length; i++) {
                 const sb = this.sandbarPartyBarges[i];
                 if (sb.x < minX - 150 || sb.x > maxX + 150 || sb.y < minY - 150 || sb.y > maxY + 150) continue;
@@ -14336,7 +14412,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("surfer_guy", dFr, sb.x - 20, sb.y + 14, 2.03, 0.4, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.sandcastles)) {
+        if (this._isStaticArrInView(this.sandcastles, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.sandcastles.length; i++) {
                 const sc = this.sandcastles[i];
                 if (sc.x < minX - 120 || sc.x > maxX + 120 || sc.y < minY - 120 || sc.y > maxY + 120) continue;
@@ -14347,7 +14423,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), sc.x - 13, sc.y + 4, 2.04, 0, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.kayakOutposts)) {
+        if (this._isStaticArrInView(this.kayakOutposts, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.kayakOutposts.length; i++) {
                 const ko = this.kayakOutposts[i];
                 if (ko.x < minX - 130 || ko.x > maxX + 130 || ko.y < minY - 130 || ko.y > maxY + 130) continue;
@@ -14358,7 +14434,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.6 + i) % 4), ko.x + 2, ko.y + 13, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.baseJumpPads)) {
+        if (this._isStaticArrInView(this.baseJumpPads, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.baseJumpPads.length; i++) {
                 const bj = this.baseJumpPads[i];
                 if (bj.x < minX - 120 || bj.x > maxX + 120 || bj.y < minY - 120 || bj.y > maxY + 120) continue;
@@ -14368,7 +14444,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.kitesurfStands)) {
+        if (this._isStaticArrInView(this.kitesurfStands, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.kitesurfStands.length; i++) {
                 const ks = this.kitesurfStands[i];
                 if (ks.x < minX - 140 || ks.x > maxX + 140 || ks.y < minY - 140 || ks.y > maxY + 140) continue;
@@ -14384,7 +14460,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 5.0 + i) % 4), ks.x + 12, ks.y, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.luxuryValetStands)) {
+        if (this._isStaticArrInView(this.luxuryValetStands, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.luxuryValetStands.length; i++) {
                 const lv = this.luxuryValetStands[i];
                 if (lv.x < minX - 120 || lv.x > maxX + 120 || lv.y < minY - 120 || lv.y > maxY + 120) continue;
@@ -14395,7 +14471,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_suit", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), lv.x + 4, lv.y + 10, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.gatorTourDocks)) {
+        if (this._isStaticArrInView(this.gatorTourDocks, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.gatorTourDocks.length; i++) {
                 const gt = this.gatorTourDocks[i];
                 if (gt.x < minX - 130 || gt.x > maxX + 130 || gt.y < minY - 130 || gt.y > maxY + 130) continue;
@@ -14406,7 +14482,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_biker", 50 + (Math.floor(renderer.time * 4.0 + i) % 4), gt.x - 4, gt.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.graffitiScaffolds)) {
+        if (this._isStaticArrInView(this.graffitiScaffolds, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.graffitiScaffolds.length; i++) {
                 const gs = this.graffitiScaffolds[i];
                 if (gs.x < minX - 120 || gs.x > maxX + 120 || gs.y < minY - 120 || gs.y > maxY + 120) continue;
@@ -14417,7 +14493,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 5.2 + i) % 4), gs.x + 4, gs.y, 2.20, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.pierCarnivalGames)) {
+        if (this._isStaticArrInView(this.pierCarnivalGames, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.pierCarnivalGames.length; i++) {
                 const pc = this.pierCarnivalGames[i];
                 if (pc.x < minX - 120 || pc.x > maxX + 120 || pc.y < minY - 120 || pc.y > maxY + 120) continue;
@@ -14428,7 +14504,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_cuban", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), pc.x + 2, pc.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.latinStreetBands)) {
+        if (this._isStaticArrInView(this.latinStreetBands, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.latinStreetBands.length; i++) {
                 const lb = this.latinStreetBands[i];
                 if (lb.x < minX - 130 || lb.x > maxX + 130 || lb.y < minY - 130 || lb.y > maxY + 130) continue;
@@ -14441,7 +14517,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_pink", bFr, lb.x + 6, lb.y + 5, 2.08, -renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.monsterCrushPads)) {
+        if (this._isStaticArrInView(this.monsterCrushPads, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.monsterCrushPads.length; i++) {
                 const mc = this.monsterCrushPads[i];
                 if (mc.x < minX - 140 || mc.x > maxX + 140 || mc.y < minY - 140 || mc.y > maxY + 140) continue;
@@ -14451,7 +14527,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.sharkCageCharters)) {
+        if (this._isStaticArrInView(this.sharkCageCharters, minX, minY, maxX, maxY, 160)) {
             for (let i = 0; i < this.sharkCageCharters.length; i++) {
                 const sc = this.sharkCageCharters[i];
                 if (sc.x < minX - 150 || sc.x > maxX + 150 || sc.y < minY - 150 || sc.y > maxY + 150) continue;
@@ -14466,7 +14542,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(shX, shY, 2.035, 7.5, 3.0, shAng + Math.PI * 0.5, 0.28, 0.34, 0.42, 0.92, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.heliTourPads)) {
+        if (this._isStaticArrInView(this.heliTourPads, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.heliTourPads.length; i++) {
                 const hp = this.heliTourPads[i];
                 if (hp.x < minX - 130 || hp.x > maxX + 130 || hp.y < minY - 130 || hp.y > maxY + 130) continue;
@@ -14476,7 +14552,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.cigarRumStands)) {
+        if (this._isStaticArrInView(this.cigarRumStands, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.cigarRumStands.length; i++) {
                 const cr = this.cigarRumStands[i];
                 if (cr.x < minX - 120 || cr.x > maxX + 120 || cr.y < minY - 120 || cr.y > maxY + 120) continue;
@@ -14487,7 +14563,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("vc_cuban", 50 + (Math.floor(renderer.time * 4.0 + i) % 4), cr.x - 3, cr.y + 10, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.kalagaLookoutTowers)) {
+        if (this._isStaticArrInView(this.kalagaLookoutTowers, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.kalagaLookoutTowers.length; i++) {
                 const kl = this.kalagaLookoutTowers[i];
                 if (kl.x < minX - 130 || kl.x > maxX + 130 || kl.y < minY - 130 || kl.y > maxY + 130) continue;
@@ -14497,7 +14573,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.beachCabanaLounges)) {
+        if (this._isStaticArrInView(this.beachCabanaLounges, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.beachCabanaLounges.length; i++) {
                 const bc = this.beachCabanaLounges[i];
                 if (bc.x < minX - 120 || bc.x > maxX + 120 || bc.y < minY - 120 || bc.y > maxY + 120) continue;
@@ -14508,7 +14584,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_cyan", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bc.x + 2, bc.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.beachRescueStations)) {
+        if (this._isStaticArrInView(this.beachRescueStations, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.beachRescueStations.length; i++) {
                 const br = this.beachRescueStations[i];
                 if (br.x < minX - 120 || br.x > maxX + 120 || br.y < minY - 120 || br.y > maxY + 120) continue;
@@ -14519,7 +14595,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.4 + i) % 4), br.x + 2, br.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.rollerDiscoRinks)) {
+        if (this._isStaticArrInView(this.rollerDiscoRinks, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.rollerDiscoRinks.length; i++) {
                 const rd = this.rollerDiscoRinks[i];
                 if (rd.x < minX - 130 || rd.x > maxX + 130 || rd.y < minY - 130 || rd.y > maxY + 130) continue;
@@ -14531,7 +14607,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_pink", 8 + (Math.floor(renderer.time * 9.0 + i) % 8), rd.x + Math.cos(skAng) * 9, rd.y + Math.sin(skAng) * 6, 2.065, skAng + Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
-        if (Array.isArray(this.conchShacks)) {
+        if (this._isStaticArrInView(this.conchShacks, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.conchShacks.length; i++) {
                 const cs = this.conchShacks[i];
                 if (cs.x < minX - 120 || cs.x > maxX + 120 || cs.y < minY - 120 || cs.y > maxY + 120) continue;
@@ -14541,7 +14617,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.moonshineStills)) {
+        if (this._isStaticArrInView(this.moonshineStills, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.moonshineStills.length; i++) {
                 const ms = this.moonshineStills[i];
                 if (ms.x < minX - 120 || ms.x > maxX + 120 || ms.y < minY - 120 || ms.y > maxY + 120) continue;
@@ -14551,7 +14627,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.spaceViewingStands)) {
+        if (this._isStaticArrInView(this.spaceViewingStands, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.spaceViewingStands.length; i++) {
                 const sv = this.spaceViewingStands[i];
                 if (sv.x < minX - 130 || sv.x > maxX + 130 || sv.y < minY - 130 || sv.y > maxY + 130) continue;
@@ -14561,7 +14637,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.catamaranDocks)) {
+        if (this._isStaticArrInView(this.catamaranDocks, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.catamaranDocks.length; i++) {
                 const cd = this.catamaranDocks[i];
                 if (cd.x < minX - 140 || cd.x > maxX + 140 || cd.y < minY - 140 || cd.y > maxY + 140) continue;
@@ -14571,7 +14647,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.botanicaShrines)) {
+        if (this._isStaticArrInView(this.botanicaShrines, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.botanicaShrines.length; i++) {
                 const bs = this.botanicaShrines[i];
                 if (bs.x < minX - 120 || bs.x > maxX + 120 || bs.y < minY - 120 || bs.y > maxY + 120) continue;
@@ -14581,7 +14657,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.droneLaunchPads)) {
+        if (this._isStaticArrInView(this.droneLaunchPads, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.droneLaunchPads.length; i++) {
                 const dl = this.droneLaunchPads[i];
                 if (dl.x < minX - 120 || dl.x > maxX + 120 || dl.y < minY - 120 || dl.y > maxY + 120) continue;
@@ -14596,7 +14672,7 @@ class WorldObjectEngine {
                 renderer.pushSolidQuad3D(drX, drY, 2.52, 8.5, 8.5, renderer.time * 8.0, 0.14, 0.96, 1.0, 0.92, SPRITE_DRAW_ORDER.TREES);
             }
         }
-        if (Array.isArray(this.tarotNeonBooths)) {
+        if (this._isStaticArrInView(this.tarotNeonBooths, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.tarotNeonBooths.length; i++) {
                 const tb = this.tarotNeonBooths[i];
                 if (tb.x < minX - 120 || tb.x > maxX + 120 || tb.y < minY - 120 || tb.y > maxY + 120) continue;
@@ -14606,7 +14682,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.beachBoxingRings)) {
+        if (this._isStaticArrInView(this.beachBoxingRings, minX, minY, maxX, maxY, 150)) {
             const boxFrame = Math.floor(renderer.time * 6.5) % 8;
             for (let i = 0; i < this.beachBoxingRings.length; i++) {
                 const br = this.beachBoxingRings[i];
@@ -14620,7 +14696,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("civ2", (boxFrame + 4) % 8, br.x + 5 - spar * 0.5, br.y, 2.13, Math.PI, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }
-        if (Array.isArray(this.derbyPitGarages)) {
+        if (this._isStaticArrInView(this.derbyPitGarages, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.derbyPitGarages.length; i++) {
                 const dp = this.derbyPitGarages[i];
                 if (dp.x < minX - 140 || dp.x > maxX + 140 || dp.y < minY - 140 || dp.y > maxY + 140) continue;
@@ -14630,7 +14706,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.lobsterTrapBuoys)) {
+        if (this._isStaticArrInView(this.lobsterTrapBuoys, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.lobsterTrapBuoys.length; i++) {
                 const lb = this.lobsterTrapBuoys[i];
                 if (lb.x < minX - 120 || lb.x > maxX + 120 || lb.y < minY - 120 || lb.y > maxY + 120) continue;
@@ -14640,7 +14716,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.blockPartyStages)) {
+        if (this._isStaticArrInView(this.blockPartyStages, minX, minY, maxX, maxY, 150)) {
             const djFrame = Math.floor(renderer.time * 5.0) % 8;
             for (let i = 0; i < this.blockPartyStages.length; i++) {
                 const bp = this.blockPartyStages[i];
@@ -14653,7 +14729,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_cyan", djFrame, bp.x, bp.y - 2, 2.13, djAng, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }
-        if (Array.isArray(this.coconutSmoothieBars)) {
+        if (this._isStaticArrInView(this.coconutSmoothieBars, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.coconutSmoothieBars.length; i++) {
                 const cb = this.coconutSmoothieBars[i];
                 if (cb.x < minX - 120 || cb.x > maxX + 120 || cb.y < minY - 120 || cb.y > maxY + 120) continue;
@@ -14663,7 +14739,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.goldPanningCamps)) {
+        if (this._isStaticArrInView(this.goldPanningCamps, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.goldPanningCamps.length; i++) {
                 const gp = this.goldPanningCamps[i];
                 if (gp.x < minX - 120 || gp.x > maxX + 120 || gp.y < minY - 120 || gp.y > maxY + 120) continue;
@@ -14673,7 +14749,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.vipCourierDrops)) {
+        if (this._isStaticArrInView(this.vipCourierDrops, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.vipCourierDrops.length; i++) {
                 const vc = this.vipCourierDrops[i];
                 if (vc.x < minX - 120 || vc.x > maxX + 120 || vc.y < minY - 120 || vc.y > maxY + 120) continue;
@@ -14683,7 +14759,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.beachYogaDecks)) {
+        if (this._isStaticArrInView(this.beachYogaDecks, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.beachYogaDecks.length; i++) {
                 const yd = this.beachYogaDecks[i];
                 if (yd.x < minX - 130 || yd.x > maxX + 130 || yd.y < minY - 130 || yd.y > maxY + 130) continue;
@@ -14696,7 +14772,7 @@ class WorldObjectEngine {
                 renderer.batchPedSprite3D("bikini_cyan", 0, yd.x + 9, yd.y, 2.09, -stretchAng, 1.22, false, SPRITE_DRAW_ORDER.PED);
             }
         }
-        if (Array.isArray(this.dominoParkTables)) {
+        if (this._isStaticArrInView(this.dominoParkTables, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.dominoParkTables.length; i++) {
                 const dp = this.dominoParkTables[i];
                 if (dp.x < minX - 120 || dp.x > maxX + 120 || dp.y < minY - 120 || dp.y > maxY + 120) continue;
@@ -14706,7 +14782,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.pythonBountyCamps)) {
+        if (this._isStaticArrInView(this.pythonBountyCamps, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.pythonBountyCamps.length; i++) {
                 const pb = this.pythonBountyCamps[i];
                 if (pb.x < minX - 120 || pb.x > maxX + 120 || pb.y < minY - 120 || pb.y > maxY + 120) continue;
@@ -14716,7 +14792,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.smugglerFloatingCaches)) {
+        if (this._isStaticArrInView(this.smugglerFloatingCaches, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.smugglerFloatingCaches.length; i++) {
                 const sc = this.smugglerFloatingCaches[i];
                 if (sc.x < minX - 120 || sc.x > maxX + 120 || sc.y < minY - 120 || sc.y > maxY + 120) continue;
@@ -14726,7 +14802,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.driveInScreens)) {
+        if (this._isStaticArrInView(this.driveInScreens, minX, minY, maxX, maxY, 160)) {
             for (let i = 0; i < this.driveInScreens.length; i++) {
                 const ds = this.driveInScreens[i];
                 if (ds.x < minX - 150 || ds.x > maxX + 150 || ds.y < minY - 150 || ds.y > maxY + 150) continue;
@@ -14736,7 +14812,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.oysterRawBars)) {
+        if (this._isStaticArrInView(this.oysterRawBars, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.oysterRawBars.length; i++) {
                 const ob = this.oysterRawBars[i];
                 if (ob.x < minX - 120 || ob.x > maxX + 120 || ob.y < minY - 120 || ob.y > maxY + 120) continue;
@@ -14746,7 +14822,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.kalagaZiplineTowers)) {
+        if (this._isStaticArrInView(this.kalagaZiplineTowers, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.kalagaZiplineTowers.length; i++) {
                 const kz = this.kalagaZiplineTowers[i];
                 if (kz.x < minX - 130 || kz.x > maxX + 130 || kz.y < minY - 130 || kz.y > maxY + 130) continue;
@@ -14756,7 +14832,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.neonArcadePavilions)) {
+        if (this._isStaticArrInView(this.neonArcadePavilions, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.neonArcadePavilions.length; i++) {
                 const na = this.neonArcadePavilions[i];
                 if (na.x < minX - 120 || na.x > maxX + 120 || na.y < minY - 120 || na.y > maxY + 120) continue;
@@ -14766,7 +14842,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.gulfSunsetTikiClubs)) {
+        if (this._isStaticArrInView(this.gulfSunsetTikiClubs, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.gulfSunsetTikiClubs.length; i++) {
                 const gt = this.gulfSunsetTikiClubs[i];
                 if (gt.x < minX - 140 || gt.x > maxX + 140 || gt.y < minY - 140 || gt.y > maxY + 140) continue;
@@ -14776,7 +14852,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.gulfManateePiers)) {
+        if (this._isStaticArrInView(this.gulfManateePiers, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.gulfManateePiers.length; i++) {
                 const mp = this.gulfManateePiers[i];
                 if (mp.x < minX - 130 || mp.x > maxX + 130 || mp.y < minY - 130 || mp.y > maxY + 130) continue;
@@ -14786,7 +14862,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.citrusOrchardStands)) {
+        if (this._isStaticArrInView(this.citrusOrchardStands, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.citrusOrchardStands.length; i++) {
                 const co = this.citrusOrchardStands[i];
                 if (co.x < minX - 130 || co.x > maxX + 130 || co.y < minY - 130 || co.y > maxY + 130) continue;
@@ -14796,7 +14872,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.gatorWrestlingRodeos)) {
+        if (this._isStaticArrInView(this.gatorWrestlingRodeos, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.gatorWrestlingRodeos.length; i++) {
                 const gr = this.gatorWrestlingRodeos[i];
                 if (gr.x < minX - 140 || gr.x > maxX + 140 || gr.y < minY - 140 || gr.y > maxY + 140) continue;
@@ -14806,7 +14882,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.lagoonFloatingCabanas)) {
+        if (this._isStaticArrInView(this.lagoonFloatingCabanas, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.lagoonFloatingCabanas.length; i++) {
                 const lc = this.lagoonFloatingCabanas[i];
                 if (lc.x < minX - 140 || lc.x > maxX + 140 || lc.y < minY - 140 || lc.y > maxY + 140) continue;
@@ -14816,7 +14892,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.stiltsvilleOutposts)) {
+        if (this._isStaticArrInView(this.stiltsvilleOutposts, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.stiltsvilleOutposts.length; i++) {
                 const so = this.stiltsvilleOutposts[i];
                 if (so.x < minX - 140 || so.x > maxX + 140 || so.y < minY - 140 || so.y > maxY + 140) continue;
@@ -14826,7 +14902,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.hangarBlackMarkets)) {
+        if (this._isStaticArrInView(this.hangarBlackMarkets, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.hangarBlackMarkets.length; i++) {
                 const hb = this.hangarBlackMarkets[i];
                 if (hb.x < minX - 140 || hb.x > maxX + 140 || hb.y < minY - 140 || hb.y > maxY + 140) continue;
@@ -14836,7 +14912,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.botanicalGlasshouses)) {
+        if (this._isStaticArrInView(this.botanicalGlasshouses, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.botanicalGlasshouses.length; i++) {
                 const bg = this.botanicalGlasshouses[i];
                 if (bg.x < minX - 140 || bg.x > maxX + 140 || bg.y < minY - 140 || bg.y > maxY + 140) continue;
@@ -14846,7 +14922,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.gulfOilRigPlatforms)) {
+        if (this._isStaticArrInView(this.gulfOilRigPlatforms, minX, minY, maxX, maxY, 160)) {
             for (let i = 0; i < this.gulfOilRigPlatforms.length; i++) {
                 const or = this.gulfOilRigPlatforms[i];
                 if (or.x < minX - 150 || or.x > maxX + 150 || or.y < minY - 150 || or.y > maxY + 150) continue;
@@ -14856,7 +14932,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.lumberjackSawmills)) {
+        if (this._isStaticArrInView(this.lumberjackSawmills, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.lumberjackSawmills.length; i++) {
                 const ls = this.lumberjackSawmills[i];
                 if (ls.x < minX - 140 || ls.x > maxX + 140 || ls.y < minY - 140 || ls.y > maxY + 140) continue;
@@ -14866,7 +14942,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.horseRanchCorrals)) {
+        if (this._isStaticArrInView(this.horseRanchCorrals, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.horseRanchCorrals.length; i++) {
                 const hr = this.horseRanchCorrals[i];
                 if (hr.x < minX - 140 || hr.x > maxX + 140 || hr.y < minY - 140 || hr.y > maxY + 140) continue;
@@ -14876,7 +14952,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.solarPowerArrays)) {
+        if (this._isStaticArrInView(this.solarPowerArrays, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.solarPowerArrays.length; i++) {
                 const sp = this.solarPowerArrays[i];
                 if (sp.x < minX - 140 || sp.x > maxX + 140 || sp.y < minY - 140 || sp.y > maxY + 140) continue;
@@ -14886,7 +14962,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.stoneCrabCamps)) {
+        if (this._isStaticArrInView(this.stoneCrabCamps, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.stoneCrabCamps.length; i++) {
                 const sc = this.stoneCrabCamps[i];
                 if (sc.x < minX - 130 || sc.x > maxX + 130 || sc.y < minY - 130 || sc.y > maxY + 130) continue;
@@ -14896,7 +14972,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.flamingoSanctuaries)) {
+        if (this._isStaticArrInView(this.flamingoSanctuaries, minX, minY, maxX, maxY, 140)) {
             for (let i = 0; i < this.flamingoSanctuaries.length; i++) {
                 const fs = this.flamingoSanctuaries[i];
                 if (fs.x < minX - 130 || fs.x > maxX + 130 || fs.y < minY - 130 || fs.y > maxY + 130) continue;
@@ -14906,7 +14982,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.underwaterObservatories)) {
+        if (this._isStaticArrInView(this.underwaterObservatories, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.underwaterObservatories.length; i++) {
                 const uo = this.underwaterObservatories[i];
                 if (uo.x < minX - 140 || uo.x > maxX + 140 || uo.y < minY - 140 || uo.y > maxY + 140) continue;
@@ -14916,7 +14992,7 @@ class WorldObjectEngine {
                 }
             }
         }
-        if (Array.isArray(this.salvageDredgeBarges)) {
+        if (this._isStaticArrInView(this.salvageDredgeBarges, minX, minY, maxX, maxY, 150)) {
             for (let i = 0; i < this.salvageDredgeBarges.length; i++) {
                 const sb = this.salvageDredgeBarges[i];
                 if (sb.x < minX - 140 || sb.x > maxX + 140 || sb.y < minY - 140 || sb.y > maxY + 140) continue;
@@ -14926,6 +15002,61 @@ class WorldObjectEngine {
                 }
             }
         }
+    }
+
+    _isStaticArrInView(arr, minX, minY, maxX, maxY, pad = 160) {
+        if (!Array.isArray(arr) || arr.length === 0) return false;
+        let cm = arr._chunkMask32;
+        if (!cm) {
+            cm = new Uint32Array(32);
+            let ax0 = 1e9, ax1 = -1e9, ay0 = 1e9, ay1 = -1e9;
+            for (let i = 0; i < arr.length; i++) {
+                const it = arr[i];
+                if (!it || typeof it.x !== "number" || typeof it.y !== "number") continue;
+                const px = it.x, py = it.y;
+                if (px < ax0) ax0 = px;
+                if (px > ax1) ax1 = px;
+                if (py < ay0) ay0 = py;
+                if (py > ay1) ay1 = py;
+                const cx = Math.max(0, Math.min(31, px >> 10));
+                const cy = Math.max(0, Math.min(31, py >> 10));
+                cm[cy] |= (1 << cx);
+            }
+            arr._minX = ax0;
+            arr._maxX = ax1;
+            arr._minY = ay0;
+            arr._maxY = ay1;
+            arr._chunkMask32 = cm;
+        }
+        if (maxX + pad < arr._minX || minX - pad > arr._maxX || maxY + pad < arr._minY || minY - pad > arr._maxY) {
+            return false;
+        }
+        const cx0 = Math.max(0, (minX - pad) >> 10);
+        const cx1 = Math.min(31, (maxX + pad) >> 10);
+        const cy0 = Math.max(0, (minY - pad) >> 10);
+        const cy1 = Math.min(31, (maxY + pad) >> 10);
+        const span = cx1 - cx0 + 1;
+        const rowBits = span >= 32 ? -1 : (((1 << span) - 1) << cx0);
+        for (let cy = cy0; cy <= cy1; cy++) {
+            if ((cm[cy] & rowBits) !== 0) return true;
+        }
+        return false;
+    }
+
+    _isPromptViewportActive(minX, minY, maxX, maxY) {
+        const mask = this._ensurePromptCellMask();
+        if (!mask) return true;
+        const x0 = Math.max(0, (minX - 64) >> 8);
+        const x1 = Math.min(127, (maxX + 64) >> 8);
+        const y0 = Math.max(0, (minY - 64) >> 8);
+        const y1 = Math.min(127, (maxY + 64) >> 8);
+        for (let cy = y0; cy <= y1; cy++) {
+            const rowOff = cy << 7;
+            for (let cx = x0; cx <= x1; cx++) {
+                if (mask[rowOff | cx]) return true;
+            }
+        }
+        return false;
     }
 
     /* ========================================================================
