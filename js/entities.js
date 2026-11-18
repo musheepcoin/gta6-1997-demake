@@ -2622,12 +2622,9 @@ class Vehicle {
         const cbx = Math.floor(this.x / TILE_SIZE);
         const cby = Math.floor(this.y / TILE_SIZE);
         const curNav = map.getNavigationBlock ? map.getNavigationBlock(cbx, cby, curZ) : null;
-        const hasRoadDirsHere = !map.getAllowedRoadDirections || map.getAllowedRoadDirections(cbx, cby, curZ).length > 0;
         const onRoadNow = Boolean(
-            hasRoadDirsHere && (
-                (curNav && curNav.groundType === GROUND_TYPE.ROAD && !curNav.isRailway) ||
-                (map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y, curZ))
-            )
+            (curNav && curNav.groundType === GROUND_TYPE.ROAD && !curNav.isRailway) ||
+            (map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y, curZ))
         );
 
         // Mode A: Real-Life Off-Road / Direct Tactical Interception (`forceDirect` ONLY):

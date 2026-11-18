@@ -2312,6 +2312,25 @@ class ViceNetworkManager {
         };
 
         if (Array.isArray(pkt.vehs) && typeof Vehicle === "function") {
+            // On initial server bootstrap, replace default local startup traffic cars (`trf_*`) with the persistent server's traffic fleet
+            // so `g.vehicles` never doubles from ~180 to 380+ vehicles!
+            if (isInitialServerBootstrap) {
+                for (let oi = g.vehicles.length - 1; oi >= 0; oi--) {
+                    const ov = g.vehicles[oi];
+                    if (
+                        ov &&
+                        ov !== g.player.inVehicle &&
+                        !ov._worldModified &&
+                        ov.driver === "AI_TRAFFIC" &&
+                        !ov.isPolice &&
+                        !ov.isEmergency &&
+                        typeof ov.id === "string" &&
+                        ov.id.startsWith("trf_")
+                    ) {
+                        g.vehicles.splice(oi, 1);
+                    }
+                }
+            }
             const existingById = new Map();
             for (const v of g.vehicles) {
                 existingById.set(v.id, v);
@@ -2334,7 +2353,7 @@ class ViceNetworkManager {
                 if (g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(x, y) && specKey !== "AIRBOAT" && specKey !== "SPEEDBOAT" && specKey !== "JETSKI" && specKey !== "YACHT" && specKey !== "SWAMP_BOAT") {
                     continue;
                 }
-                if (g.map && Array.isArray(g.map.beachProps)) {
+                if (x >= 460 * 64 && g.map && Array.isArray(g.map.beachProps)) {
                     for (const bp of g.map.beachProps) {
                         const dx = x - bp.x;
                         const dy = y - bp.y;
@@ -2576,24 +2595,6 @@ class ViceNetworkManager {
                     ped.muzzleTimer = (flags & 128) ? Math.max(ped.muzzleTimer || 0, 0.2) : 0;
                     ped.inCombat = Boolean(flags & 256);
                     if (typeof ped.computeState === "function") ped.state = ped.computeState();
-                }
-            }
-
-            if (!isInitialServerBootstrap) {
-                for (let i = g.peds.length - 1; i >= 0; i--) {
-                    const p = g.peds[i];
-                    if (
-                        p &&
-                        !p.dead &&
-                        !p.missionTag &&
-                        p.kind !== "MEDIC" &&
-                        p.kind !== "FIREMAN" &&
-                        p.kind !== "COP" &&
-                        !(p.calling911Timer > 0) &&
-                        !seenPedIds.has(p.id)
-                    ) {
-                        g.peds.splice(i, 1);
-                    }
                 }
             }
         }

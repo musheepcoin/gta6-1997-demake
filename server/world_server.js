@@ -1622,7 +1622,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
 
     // 3. Autonomous Municipal Dispatch Check (every 1.0s = 10 ticks)
     room._dispatchTick = ((room._dispatchTick || 0) + 1) % 10;
-    if (room._dispatchTick === 0 && (nowMs - (room.lastClientWorldSyncMs || 0)) > 450) {
+    if (room._dispatchTick === 0 && (nowMs - (room.lastClientWorldSyncMs || 0)) > 4500) {
         // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
         const corpseEntries = Object.entries(room.corpses || {});
         if (corpseEntries.length > 0) {
@@ -1722,8 +1722,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     for (const [vid, row] of allVehEntries) {
         seq++;
         if (!Array.isArray(row) || row.length < 11) continue;
-        // If an active client WorldHost updated this specific vehicle within the last 400ms, let the 60 FPS client drive it
-        if ((nowMs - (room.vehClientSyncMs[vid] || 0)) < 400) {
+        // If an active client WorldHost updated this vehicle within the last 4500ms (covers the 3.0s solo WORLD_SYNC interval), let the 60 FPS client drive it!
+        if ((nowMs - (room.vehClientSyncMs[vid] || 0)) < 4500) {
             let nav = room.vehNav[vid];
             if (!nav) {
                 nav = { turnSeed: ((seq * 0.6180339) % 1.0) };
@@ -1923,7 +1923,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         pSeq++;
         if (!Array.isArray(prow) || prow.length < 10) continue;
         if (prow[9] & 1) continue; // Dead corpse
-        if ((nowMs - (room.pedClientSyncMs[pid] || 0)) < 400) continue;
+        if ((nowMs - (room.pedClientSyncMs[pid] || 0)) < 4500) continue;
 
         let pnav = room.pedNav[pid];
         if (!pnav) {
@@ -1973,8 +1973,9 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         prow[6] = Math.round(pa * 100) / 100;
     }
 
-    // 6. Broadcast 10 Hz server simulation tick to connected clients whenever no client WorldHost has broadcast in the last 220ms
-    if ((nowMs - (room.lastClientWorldSyncMs || 0)) > 220) {
+    // 6. Only broadcast autonomous server simulation ticks (throttled to 1 Hz = every 10th tick) when NO client WorldHost has synced in the last 4500ms!
+    // Never spam 10 Hz server_sim WORLD_SYNC packets back at an active 60 FPS client WorldHost!
+    if (room._dispatchTick === 0 && (nowMs - (room.lastClientWorldSyncMs || 0)) > 4500) {
         let hasRoomClients = false;
         for (const meta of clients.values()) {
             if (meta.room === roomCode && !meta.isOutdated) {
@@ -1983,8 +1984,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             }
         }
         if (hasRoomClients) {
-            const vehRows = getCombinedRoomVehicles(room).slice(0, 190);
-            const pedRows = Object.values(Object.assign({}, room.peds || {}, room.corpses || {})).slice(0, 120);
+            const vehRows = getCombinedRoomVehicles(room).slice(0, 140);
+            const pedRows = Object.values(Object.assign({}, room.peds || {}, room.corpses || {})).slice(0, 90);
             broadcastToRoom(roomCode, {
                 t: "WORLD_SYNC",
                 id: "server_sim",

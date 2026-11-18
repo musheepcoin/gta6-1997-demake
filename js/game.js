@@ -12290,9 +12290,22 @@ class LeonidaGame {
             }
         }
 
-        for (const v of this.vehicles) {
+        this._vehTickFrame = ((this._vehTickFrame || 0) + 1) & 3;
+        for (let vi = 0; vi < this.vehicles.length; vi++) {
+            const v = this.vehicles[vi];
+            if (!v) continue;
 
-            v.update(dt, this.input, this.map, this);
+            // Performance Optimization:
+            // Distant calm AI_TRAFFIC vehicles (> 1350px off-screen in other districts) step at 15 Hz (every 4th frame with dt * 4)
+            // while all nearby vehicles (<= 1350px) and all PLAYER / REMOTE / AI_COP / AI_EMERGENCY / AI_TOW / AI_CRIMINAL units run at full 60 FPS!
+            const isNearPlayer = Math.abs(v.x - p.x) <= 1350 && Math.abs(v.y - p.y) <= 1350;
+            const isFarCalmTraffic = !isNearPlayer && v.driver === "AI_TRAFFIC" && !v.sirenActive && !(v.burnTimer > 0) && !(v.aiPanicTimer > 0);
+            if (isFarCalmTraffic && ((vi + this._vehTickFrame) & 3) !== 0) {
+                continue;
+            }
+            const vehDt = isFarCalmTraffic ? Math.min(0.12, dt * 4) : dt;
+
+            v.update(vehDt, this.input, this.map, this);
 
             if (!v.driver && Math.abs(v.speed || 0) < 0.1 && Math.abs(v.vx || 0) < 0.1 && Math.abs(v.vy || 0) < 0.1) {
                 continue;
@@ -12302,7 +12315,7 @@ class LeonidaGame {
 
             // Check player vehicle (or fleeing bandit car) hitting pedestrians:
             // AI traffic, Police cruisers, Ambulances, Fire Engines, and Tow Trucks NEVER run over or kill pedestrians/responders!
-            // Instead, AI vehicles gently push pedestrians aside onto the sidewalk so AI cars never create corpse pileups!
+            // Instead, nearby AI vehicles gently push pedestrians aside onto the sidewalk so AI cars never create corpse pileups!
 
             const vSpeed = Math.hypot(v.vx, v.vy);
 
@@ -12310,7 +12323,7 @@ class LeonidaGame {
 
             const isLethalDriver = !v.destroyed && (v.driver === "PLAYER" || v.driver === "AI_CRIMINAL");
 
-            if (!v.destroyed && !isLethalDriver && v.driver && vSpeed > 14) {
+            if (!v.destroyed && !isLethalDriver && v.driver && vSpeed > 14 && Math.abs(v.x - p.x) < 680 && Math.abs(v.y - p.y) < 520) {
                 for (let pi = 0; pi < this.peds.length; pi++) {
                     const ped = this.peds[pi];
                     if (ped.dead) continue;
@@ -12558,7 +12571,9 @@ class LeonidaGame {
         activeVehs.length = 0;
         for (let i = 0; i < this.vehicles.length; i++) {
             const v = this.vehicles[i];
-            if (v.driver || Math.abs(v.speed || 0) > 0.05 || Math.abs(v.vx || 0) > 0.05 || Math.abs(v.vy || 0) > 0.05) {
+            const isMovingOrDriven = Boolean(v.driver || Math.abs(v.speed || 0) > 0.05 || Math.abs(v.vx || 0) > 0.05 || Math.abs(v.vy || 0) > 0.05);
+            const isNearOrPriority = (Math.abs(v.x - p.x) <= 1450 && Math.abs(v.y - p.y) <= 1450) || v.driver === "PLAYER" || v.driver === "REMOTE" || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY" || v.driver === "AI_TOW" || v.driver === "AI_CRIMINAL";
+            if (isMovingOrDriven && isNearOrPriority) {
                 v._activePairIdx = activeVehs.length;
                 activeVehs.push(v);
             } else {
