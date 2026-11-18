@@ -5860,9 +5860,9 @@ class LeonidaMap {
             const lookY = (by + d.dy * 4 + 0.5) * TILE_SIZE;
             const distToTarget = Math.hypot(targetX - lookX, targetY - lookY);
             const penalty =
-                (exitsIntersection ? 0 : 650) +
-                (isUturn ? 2500 : 0) +
-                (isTurn && turnedInIntersection ? 850 : 0);
+                (exitsIntersection ? 0 : 25000) +
+                (isUturn ? 50000 : 0) +
+                (isTurn && turnedInIntersection ? 35000 : 0);
 
             candidates.push({
                 ...d,
@@ -5879,8 +5879,10 @@ class LeonidaMap {
         if (candidates.length === 0) {
             return this.chooseNextRoadBlock(bx, by, currentAngle, zBlocks, 0.2, turnedInIntersection, entryAngle);
         }
-        candidates.sort((a, b) => b.score - a.score);
-        return candidates[0];
+        const validFiltered = candidates.filter((c) => !c.isUturn && c.exitsIntersection && !(c.isTurn && turnedInIntersection));
+        const pool = validFiltered.length > 0 ? validFiltered : candidates;
+        pool.sort((a, b) => b.score - a.score);
+        return pool[0];
     }
 
     chooseNextRoadBlock(bx, by, currentAngle, zBlocks = 2.0, turnSeed = 0.5, turnedInIntersection = false, entryAngle = null) {

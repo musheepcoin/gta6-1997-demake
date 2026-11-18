@@ -9636,7 +9636,7 @@ class RetroRenderer {
                 const u = cyc < 1.0 ? cyc : (2.0 - cyc);
                 const px = bp.x0 + (bp.x1 - bp.x0) * u;
                 const py = bp.y0 + (bp.y1 - bp.y0) * u;
-                if (px < minX - 240 || px > maxX + 240 || py < minY - 240 || py > maxY + 240) continue;
+                if (px < minX - 960 || px > maxX + 960 || py < minY - 960 || py > maxY + 960) continue;
                 const ang = Math.atan2(bp.y1 - bp.y0, bp.x1 - bp.x0) + (cyc >= 1.0 ? Math.PI : 0);
                 const cs = Math.cos(ang), sn = Math.sin(ang);
                 const pz = bp.z || 4.65;
@@ -9678,7 +9678,7 @@ class RetroRenderer {
                 const t = this.time * (ah.speed || 0.24) + ah.seed;
                 const hx = ah.cx + Math.cos(t) * ah.rx;
                 const hy = ah.cy + Math.sin(t) * ah.ry;
-                if (hx < minX - 280 || hx > maxX + 280 || hy < minY - 280 || hy > maxY + 280) continue;
+                if (hx < minX - 960 || hx > maxX + 960 || hy < minY - 960 || hy > maxY + 960) continue;
                 const vx = -Math.sin(t) * ah.rx;
                 const vy = Math.cos(t) * ah.ry;
                 const hAng = Math.atan2(vy, vx);
@@ -9703,7 +9703,7 @@ class RetroRenderer {
             const ph = game.policeHeli;
             const hx = ph.x;
             const hy = ph.y;
-            if (hx >= minX - 480 && hx <= maxX + 480 && hy >= minY - 480 && hy <= maxY + 480) {
+            if (hx >= minX - 960 && hx <= maxX + 960 && hy >= minY - 960 && hy <= maxY + 960) {
                 const skyOrder = SPRITE_DRAW_ORDER.SKY_AIRCRAFT || 16;
                 const hAng = ph.angle || 0;
                 const cs = Math.cos(hAng), sn = Math.sin(hAng);
@@ -12969,7 +12969,7 @@ class RetroRenderer {
                 const t = this.time * (ah.speed || 0.24) + ah.seed;
                 const hx = ah.cx + Math.cos(t) * ah.rx;
                 const hy = ah.cy + Math.sin(t) * ah.ry;
-                if (Math.abs(hx - this.camX) > 1080 || Math.abs(hy - this.camY) > 840) continue;
+                if (Math.abs(hx - this.camX) > 1650 || Math.abs(hy - this.camY) > 1350) continue;
                 const vx = -Math.sin(t) * ah.rx;
                 const vy = Math.cos(t) * ah.ry;
                 const hAng = Math.atan2(vy, vx);
@@ -13036,7 +13036,7 @@ class RetroRenderer {
             const ph = game.policeHeli;
             const hx = ph.x;
             const hy = ph.y;
-            if (Math.abs(hx - this.camX) <= 1080 && Math.abs(hy - this.camY) <= 840) {
+            if (Math.abs(hx - this.camX) <= 1650 && Math.abs(hy - this.camY) <= 1350) {
                 const hAng = ph.angle || 0;
                 const cs = Math.cos(hAng), sn = Math.sin(hAng);
                 const hz = ph.z || 4.55;

@@ -2703,6 +2703,10 @@ class Vehicle {
         // Used strictly when crossing Lummus Park / Vice Beach (`this.x >= 445 * TILE_SIZE`) or pulling up onto an off-road plaza/sidewalk (< 240px).
         // On normal city streets (`forceDirect === false`), vehicles stay strictly in Mode B (Cardinal Road-Lane Routing) so they never spin against buildings!
         if (forceDirect) {
+            this.aiChosenDir = null;
+            this.aiBlockX = -1;
+            this.aiBlockY = -1;
+            this.aiTurnedInIntersection = false;
             const leadTime = Math.min(0.42, distToTarget / 640);
             let aimX = targetX + targetVx * leadTime;
             let aimY = targetY + targetVy * leadTime;
@@ -2721,6 +2725,10 @@ class Vehicle {
 
         // If off-road while still far from the target and blocked by city buildings, steer back to the nearest road corridor
         if (!onRoadNow && map.getNavigationBlock) {
+            this.aiChosenDir = null;
+            this.aiBlockX = -1;
+            this.aiBlockY = -1;
+            this.aiTurnedInIntersection = false;
             let bestR2 = 999999;
             let bestRx = -1;
             let bestRy = -1;
@@ -2772,8 +2780,23 @@ class Vehicle {
                 ? this.aiChosenDir.angle
                 : this.angle;
         }
+        if (lidZ1 === 25 && this.aiLaneShiftTimer > 0) {
+            this.aiLaneShiftTimer = 0;
+        }
 
-        if (this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir)) {
+        const movedOutOfLane = this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
+        if (!movedOutOfLane && this.aiLaneShiftTimer > 0 && this.aiChosenDir && !this.aiChosenDir.isTurn) {
+            if (this.aiChosenDir.dy !== 0 && by !== this.aiBlockY) {
+                this.aiBlockY = by;
+                this.aiTargetBlockX = this.aiBlockX;
+                this.aiTargetBlockY = by + this.aiChosenDir.dy;
+            } else if (this.aiChosenDir.dx !== 0 && bx !== this.aiBlockX) {
+                this.aiBlockX = bx;
+                this.aiTargetBlockX = bx + this.aiChosenDir.dx;
+                this.aiTargetBlockY = this.aiBlockY;
+            }
+        }
+        if (movedOutOfLane) {
             const refAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number"
                 ? this.aiChosenDir.angle
                 : this.angle;

@@ -8426,13 +8426,13 @@ class LeonidaGame {
         };
     }
 
-    isPointInAnyPlayerCameraView(wx, wy, marginPx = 140) {
+    isPointInAnyPlayerCameraView(wx, wy, marginPx = 180) {
         const p = this.player;
-        if (p && Math.hypot(wx - p.x, wy - p.y) < 700) return true;
+        if (p && Math.hypot(wx - p.x, wy - p.y) < 880) return true;
         if (this.renderer && !this.activeInterior) {
             const camX = this.renderer.camX !== undefined ? this.renderer.camX : (p ? p.x : 0);
             const camY = this.renderer.camY !== undefined ? this.renderer.camY : (p ? p.y : 0);
-            if (Math.hypot(wx - camX, wy - camY) < 720) return true;
+            if (Math.hypot(wx - camX, wy - camY) < 920) return true;
             if (typeof this.renderer.worldToScreen === "function" && this.renderer.canvas) {
                 const sp = this.renderer.worldToScreen(wx, wy, p ? (p.z || 2.0) : 2.0);
                 const W = this.renderer.canvas.width || 1280;
@@ -8448,13 +8448,27 @@ class LeonidaGame {
             const vps = this.trafficManager.getAllHumanPlayerViewports();
             for (let i = 0; i < vps.length; i++) {
                 const vp = vps[i];
-                if (Math.hypot(wx - vp.x, wy - vp.y) < 700) return true;
-                if (vp.area && bx >= vp.area.minX - 3 && bx <= vp.area.maxX + 3 && by >= vp.area.minY - 3 && by <= vp.area.maxY + 3) {
+                if (Math.hypot(wx - vp.x, wy - vp.y) < 880) return true;
+                if (vp.area && bx >= vp.area.minX - 4 && bx <= vp.area.maxX + 4 && by >= vp.area.minY - 4 && by <= vp.area.maxY + 4) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    getDistanceToNearestHumanPlayer(wx, wy) {
+        let best = this.player && !this.player.dead ? Math.hypot(wx - this.player.x, wy - this.player.y) : 99999;
+        if (this.net && typeof this.net.getHumanRemotePlayers === "function") {
+            const humans = this.net.getHumanRemotePlayers();
+            for (let i = 0; i < humans.length; i++) {
+                const rp = humans[i];
+                if (!rp || rp.dead) continue;
+                const d = Math.hypot(wx - rp.x, wy - rp.y);
+                if (d < best) best = d;
+            }
+        }
+        return best;
     }
 
     getEmergencyStations(serviceType) {
@@ -8487,40 +8501,49 @@ class LeonidaGame {
         stations.sort((a, b) => Math.hypot(a.x - targetX, a.y - targetY) - Math.hypot(b.x - targetX, b.y - targetY));
 
         // 1. Try spawning directly at the road exit of the nearest station (or along the road avenue coming from that station)
-        for (let si = 0; si < stations.length; si++) {
-            const st = stations[si];
-            const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
-            // If the station itself is outside the player's screen and within reasonable driving range (< 1550px), depart directly from the station's road gate!
-            // If the station is further away (> 1550px), place the departing unit on the road corridor coming from that exact station direction at 960..1350px!
-            const useStationGate = distStToTarget >= 740 && distStToTarget <= 1550 && !this.isPointInAnyPlayerCameraView(st.x, st.y, 150);
-            const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
-            const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * Math.min(distStToTarget, 1080));
-            const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * Math.min(distStToTarget, 1080));
-            const baseBx = Math.floor(anchorX / TILE_SIZE);
-            const baseBy = Math.floor(anchorY / TILE_SIZE);
+        for (let pass = 0; pass < 2; pass++) {
+            const strictLaneAlign = (pass === 0);
+            for (let si = 0; si < stations.length; si++) {
+                const st = stations[si];
+                const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
+                const useStationGate = distStToTarget >= 920 && distStToTarget <= 1650 && !this.isPointInAnyPlayerCameraView(st.x, st.y, 200);
+                const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
+                const corridorDist = Math.max(1020, Math.min(distStToTarget, 1280));
+                const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * corridorDist);
+                const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
+                const baseBx = Math.floor(anchorX / TILE_SIZE);
+                const baseBy = Math.floor(anchorY / TILE_SIZE);
 
-            for (let r = 0; r <= 36; r++) {
-                for (let dy = -r; dy <= r; dy++) {
-                    for (let dx = -r; dx <= r; dx++) {
-                        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
-                        const bx = baseBx + dx;
-                        const by = baseBy + dy;
-                        if (bx < 2 || bx >= MAP_COLS - 2 || by < 2 || by >= MAP_ROWS - 2) continue;
-                        if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
-                        const navBlk = this.map.getNavigationBlock(bx, by, targetZ);
-                        if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
-                        const sx = (bx + 0.5) * TILE_SIZE;
-                        const sy = (by + 0.5) * TILE_SIZE;
-                        if (Math.hypot(sx - targetX, sy - targetY) < 740) continue;
-                        if (this.isPointInAnyPlayerCameraView(sx, sy, 150)) continue;
-                        const occupied = this.vehicles.some((ov) => ov && Math.hypot(ov.x - sx, ov.y - sy) < 72);
-                        if (occupied) continue;
-                        const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
-                        const roadAng = typeof this.map.getAlignedRoadAngle === "function"
-                            ? this.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
-                            : toTargetAng;
-                        const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-                        return { x: sx, y: sy, z: sz, angle: roadAng, station: st };
+                for (let r = 0; r <= 36; r++) {
+                    for (let dy = -r; dy <= r; dy++) {
+                        for (let dx = -r; dx <= r; dx++) {
+                            if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                            const bx = baseBx + dx;
+                            const by = baseBy + dy;
+                            if (bx < 2 || bx >= MAP_COLS - 2 || by < 2 || by >= MAP_ROWS - 2) continue;
+                            if (this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(bx, by)) continue;
+                            const navBlk = this.map.getNavigationBlock(bx, by, targetZ);
+                            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD || navBlk.isRailway) continue;
+                            if (strictLaneAlign) {
+                                const lidZ1 = this.map.getBlockInfo ? this.map.getBlockInfo(bx, by, 1).lid : 0;
+                                const bits = (navBlk.up ? 1 : 0) + (navBlk.down ? 1 : 0) + (navBlk.left ? 1 : 0) + (navBlk.right ? 1 : 0);
+                                if (bits !== 1 || lidZ1 === 25) continue;
+                            }
+                            const sx = (bx + 0.5) * TILE_SIZE;
+                            const sy = (by + 0.5) * TILE_SIZE;
+                            if (Math.hypot(sx - targetX, sy - targetY) < 880) continue;
+                            if (this.isPointInAnyPlayerCameraView(sx, sy, 200)) continue;
+                            const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
+                            const roadAng = typeof this.map.getAlignedRoadAngle === "function"
+                                ? this.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
+                                : toTargetAng;
+                            // Ensure the chosen road lane actually travels TOWARD the incident (never on the opposite one-way lane heading 180° away!)
+                            if (strictLaneAlign && Math.cos(roadAng - toTargetAng) < 0.12) continue;
+                            const occupied = this.vehicles.some((ov) => ov && Math.hypot(ov.x - sx, ov.y - sy) < 76);
+                            if (occupied) continue;
+                            const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
+                            return { x: sx, y: sy, z: sz, angle: roadAng, station: st };
+                        }
                     }
                 }
             }
@@ -9946,7 +9969,7 @@ class LeonidaGame {
 
             const ang = baseHeading + angOffset;
 
-            const dist = 520 + Math.random() * 330;
+            const dist = 940 + Math.random() * 340;
 
             const tx = Math.floor((p.x + Math.cos(ang) * dist) / TILE_SIZE);
 
@@ -9960,15 +9983,15 @@ class LeonidaGame {
 
                 : null;
 
-            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD) continue;
+            if (!navBlk || navBlk.groundType !== GROUND_TYPE.ROAD || navBlk.isRailway) continue;
 
             const wx = (tx + 0.5) * TILE_SIZE;
 
             const wy = (ty + 0.5) * TILE_SIZE;
 
-            if (Math.hypot(wx - p.x, wy - p.y) < 480) continue;
+            if (Math.hypot(wx - p.x, wy - p.y) < 880) continue;
 
-            if (isVisibleToAnyPlayer(wx, wy)) continue;
+            if (isVisibleToAnyPlayer(wx, wy) || this.isPointInAnyPlayerCameraView(wx, wy, 220)) continue;
 
             const bCol = this.map.resolveCircleBuildingCollision(wx, wy, 24, pz);
 
@@ -10634,7 +10657,7 @@ class LeonidaGame {
 
             // Coherent VCPD Cruiser & Crime-Scene Getaway Car Recovery: if an intact police cruiser or bandit car is left driverless on the street after a chase,
             // a relief officer only spawns off-screen (never materializing in front of the player's eyes) and walks to recover the vehicle!
-            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 12.0 && Math.hypot(v.x - p.x, v.y - p.y) > 480) {
+            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 12.0 && this.getDistanceToNearestHumanPlayer(v.x, v.y) > 760) {
                 const hasReturningCop = this.peds.some(
                     (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || (!pd.inCombat && Math.hypot(pd.x - v.x, pd.y - v.y) < 420))
                 );
@@ -10642,10 +10665,10 @@ class LeonidaGame {
                     const cz = v.z || 2.0;
                     for (let ca = 0; ca < 12; ca++) {
                         const ang = (ca / 12) * Math.PI * 2;
-                        const sDist = 220 + (ca % 3) * 45;
+                        const sDist = 260 + (ca % 3) * 55;
                         const sx = v.x + Math.cos(ang) * sDist;
                         const sy = v.y + Math.sin(ang) * sDist;
-                        if (this.isPointInAnyPlayerCameraView(sx, sy, 120)) continue;
+                        if (this.isPointInAnyPlayerCameraView(sx, sy, 200)) continue;
                         const sbx = Math.floor(sx / TILE_SIZE);
                         const sby = Math.floor(sy / TILE_SIZE);
                         const nav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, cz) : null;
@@ -10686,7 +10709,7 @@ class LeonidaGame {
 
 
 
-            const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
+            const dPlayer = this.getDistanceToNearestHumanPlayer(v.x, v.y);
 
             if ((!isWreck && dPlayer < 42) || dPlayer >= bestDist) continue;
 
@@ -16256,21 +16279,21 @@ class LeonidaGame {
 
 
 
-            // Spawn GTA 1 Police Roadblock at Wanted Level >= 3 (strictly off-screen at 840px ahead so it never pops in front of the player's hood!)
+            // Spawn GTA 1 Police Roadblock at Wanted Level >= 3 (strictly off-screen at 1020px ahead so it never pops in front of the player's hood!)
 
             if (tWanted >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 5) {
 
                 this.roadblockCooldown = 28;
 
-                const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 840;
+                const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 1020;
 
-                const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 840;
+                const rbY = spawnTarget.y + Math.sin(spawnTarget.angle || 0) * 1020;
 
                 const rbBx = Math.floor(rbX / TILE_SIZE);
 
                 const rbBy = Math.floor(rbY / TILE_SIZE);
 
-                if (!this.isPointInAnyPlayerCameraView(rbX, rbY, 120) && this.map.isRoadAtPixel(rbX, rbY) && !(this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(rbBx, rbBy))) {
+                if (!this.isPointInAnyPlayerCameraView(rbX, rbY, 220) && this.map.isRoadAtPixel(rbX, rbY) && !(this.map.isRestrictedNoTrafficZone && this.map.isRestrictedNoTrafficZone(rbBx, rbBy))) {
 
                     const rbIsSwat = tWanted >= 4 && activeSwatCars < 1 && Math.random() < 0.25;
                     const rbSpec = rbIsSwat ? "SWAT_ENFORCER" : "VCPD_CRUISER";
@@ -16323,125 +16346,7 @@ class LeonidaGame {
 
             }
 
-            // 6-Star VCPD Police Pursuit Helicopter: high-altitude wide standoff orbit around the Last Known / Visual Target!
-            if (tWanted >= 6) {
-                const realEnt = p.inVehicle || p;
-                const targetEnt = (anyCopHasVisual || this.isPoliceSpotted || !this.lastKnownWantedPos)
-                    ? realEnt
-                    : { x: this.lastKnownWantedPos.x, y: this.lastKnownWantedPos.y, vx: 0, vy: 0 };
-                if (!this.policeHeli) {
-                    const initAng = Math.random() * Math.PI * 2;
-                    this.policeHeli = {
-                        x: targetEnt.x + Math.cos(initAng) * 340,
-                        y: targetEnt.y + Math.sin(initAng) * 280,
-                        z: 3.88,
-                        cx: targetEnt.x,
-                        cy: targetEnt.y,
-                        orbitAngle: initAng,
-                        orbitRx: 128,
-                        orbitRy: 94,
-                        angle: initAng + Math.PI * 0.5,
-                        searchX: targetEnt.x,
-                        searchY: targetEnt.y,
-                        burstTimer: 2.4,
-                        burstShotsLeft: 0,
-                        burstShotDelay: 0,
-                        muzzleTimer: 0,
-                        departing: false
-                    };
-                    this.addFloatingText(targetEnt.x, targetEnt.y - 32, "🚁 VCPD CHOPPER IN PURSUIT!", "#38bdf8");
-                }
-                const heli = this.policeHeli;
-                heli.departing = false;
-                // Smooth standoff tracking inertia so the chopper doesn't glue rigidly to the player's bumper
-                heli.cx += (targetEnt.x - heli.cx) * Math.min(1, dt * 2.1);
-                heli.cy += (targetEnt.y - heli.cy) * Math.min(1, dt * 2.1);
-                const orbitOmega = 0.48; // ~13.1s per wide 360° observation orbit
-                heli.orbitAngle = (heli.orbitAngle || 0) + orbitOmega * dt;
-                const wobble = 1.0 + Math.sin(heli.orbitAngle * 2.0) * 0.06;
-                const rx = (heli.orbitRx || 128) * wobble;
-                const ry = (heli.orbitRy || 94) * wobble;
-                const desX = heli.cx + Math.cos(heli.orbitAngle) * rx;
-                const desY = heli.cy + Math.sin(heli.orbitAngle) * ry;
-                const dx = desX - heli.x;
-                const dy = desY - heli.y;
-                const distToSlot = Math.hypot(dx, dy);
-                const maxStep = 380 * dt;
-                let vx, vy;
-                if (distToSlot > maxStep) {
-                    vx = (dx / distToSlot) * 380;
-                    vy = (dy / distToSlot) * 380;
-                    heli.x += (dx / distToSlot) * maxStep;
-                    heli.y += (dy / distToSlot) * maxStep;
-                } else {
-                    heli.x = desX;
-                    heli.y = desY;
-                    vx = -Math.sin(heli.orbitAngle) * rx * orbitOmega + (targetEnt.vx || 0) * 0.45;
-                    vy = Math.cos(heli.orbitAngle) * ry * orbitOmega + (targetEnt.vy || 0) * 0.45;
-                }
-                const tangentAng = Math.atan2(vy, vx);
-                const toPlayerAng = Math.atan2(targetEnt.y - heli.y, targetEnt.x - heli.x);
-                const desiredAng = Math.atan2(
-                    Math.sin(tangentAng) * 0.88 + Math.sin(toPlayerAng) * 0.12,
-                    Math.cos(tangentAng) * 0.88 + Math.cos(toPlayerAng) * 0.12
-                );
-                let angDiff = desiredAng - (heli.angle || 0);
-                while (angDiff > Math.PI) angDiff -= Math.PI * 2;
-                while (angDiff < -Math.PI) angDiff += Math.PI * 2;
-                heli.angle = (heli.angle || 0) + angDiff * Math.min(1, dt * 5.5);
-                // Dynamic rooftop-clearing radar altimeter: sample nearby building heights and climb smoothly when passing over buildings!
-                let localRoofZ = 2.0;
-                if (this.map && typeof this.map.getHeightAtPixel === "function") {
-                    const probes = [
-                        [0, 0], [44, 0], [-44, 0], [0, 44], [0, -44]
-                    ];
-                    for (let pi = 0; pi < probes.length; pi++) {
-                        const pz = this.map.getHeightAtPixel(heli.x + probes[pi][0], heli.y + probes[pi][1], 6.0, true);
-                        if (pz > localRoofZ) localRoofZ = pz;
-                    }
-                }
-                const targetAltZ = (localRoofZ > 2.5 ? 4.12 : 3.88) + Math.sin(performance.now() * 0.0035) * 0.04;
-                heli.z = (heli.z || 3.88) + (targetAltZ - (heli.z || 3.88)) * Math.min(1, dt * 3.5);
-                heli.searchX += (targetEnt.x - (heli.searchX ?? targetEnt.x)) * Math.min(1, dt * 6.5);
-                heli.searchY += (targetEnt.y - (heli.searchY ?? targetEnt.y)) * Math.min(1, dt * 6.5);
-
-                const dHeli = Math.hypot(realEnt.x - heli.x, realEnt.y - heli.y);
-                if (!this.activeInterior && dHeli < nearestCopDist) {
-                    nearestCopDist = dHeli;
-                }
-                if (!this.activeInterior && dHeli < 340) {
-                    anyCopHasVisual = true;
-                }
-                if (!this.activeInterior && !p.dead && dHeli < 340) {
-                    heli.burstTimer = (heli.burstTimer || 0) - dt;
-                    if (heli.burstTimer <= 0 && (heli.burstShotsLeft || 0) <= 0) {
-                        heli.burstShotsLeft = 3;
-                        heli.burstShotDelay = 0;
-                        heli.burstTimer = 2.6 + Math.random() * 1.2;
-                    }
-                    if ((heli.burstShotsLeft || 0) > 0) {
-                        heli.burstShotDelay = (heli.burstShotDelay || 0) - dt;
-                        if (heli.burstShotDelay <= 0) {
-                            heli.burstShotsLeft--;
-                            heli.burstShotDelay = 0.14;
-                            heli.muzzleTimer = 0.09;
-                            const aimAng = Math.atan2(realEnt.y - heli.y, realEnt.x - heli.x) + (Math.random() - 0.5) * 0.18;
-                            this.fireWeapon(heli.x, heli.y, aimAng, "UZI", false, false, "COP");
-                        }
-                    }
-                }
-                if ((heli.muzzleTimer || 0) > 0) heli.muzzleTimer = Math.max(0, heli.muzzleTimer - dt);
-            } else if (this.policeHeli) {
-                const heli = this.policeHeli;
-                heli.departing = true;
-                heli.x += Math.cos(heli.angle || 0) * 320 * dt;
-                heli.y += Math.sin(heli.angle || 0) * 320 * dt;
-                if (Math.hypot(heli.x - p.x, heli.y - p.y) > 850) {
-                    this.policeHeli = null;
-                }
-            }
-
-        } else {
+        } else if (!isClientWorldSync) {
             // Persistent World Logic: when no player in the room is wanted (0★), VCPD cruisers turn off their sirens and resume calm street patrol!
             for (const v of this.vehicles) {
                 if (!v.destroyed && v.isPolice) {
@@ -16453,14 +16358,131 @@ class LeonidaGame {
                     }
                 }
             }
-            if (this.policeHeli) {
-                const heli = this.policeHeli;
-                heli.departing = true;
-                heli.x += Math.cos(heli.angle || 0) * 320 * dt;
-                heli.y += Math.sin(heli.angle || 0) * 320 * dt;
-                if (Math.hypot(heli.x - p.x, heli.y - p.y) > 850) {
-                    this.policeHeli = null;
+        }
+
+        // 6-Star VCPD Police Pursuit Helicopter: departs from nearest VCPD Precinct / Helipad well off-screen (1550px) and orbits at wide standoff!
+        if ((this.wantedLevel || 0) >= 6 || maxRoomWanted >= 6) {
+            const realEnt = p.inVehicle || p;
+            const targetEnt = (anyCopHasVisual || this.isPoliceSpotted || !this.lastKnownWantedPos)
+                ? realEnt
+                : { x: this.lastKnownWantedPos.x, y: this.lastKnownWantedPos.y, vx: 0, vy: 0 };
+            if (!this.policeHeli) {
+                const nearPrecinct = typeof this.getNearestEmergencyStation === "function"
+                    ? this.getNearestEmergencyStation("POLICE", targetEnt.x, targetEnt.y)
+                    : null;
+                const initAng = nearPrecinct
+                    ? Math.atan2(nearPrecinct.y - targetEnt.y, nearPrecinct.x - targetEnt.x)
+                    : (Math.random() * Math.PI * 2);
+                const spawnDist = 1550;
+                const spawnX = targetEnt.x + Math.cos(initAng) * spawnDist;
+                const spawnY = targetEnt.y + Math.sin(initAng) * spawnDist;
+                this.policeHeli = {
+                    x: spawnX,
+                    y: spawnY,
+                    z: 4.10,
+                    cx: spawnX,
+                    cy: spawnY,
+                    orbitAngle: initAng,
+                    orbitRx: 250,
+                    orbitRy: 190,
+                    angle: initAng + Math.PI,
+                    searchX: spawnX,
+                    searchY: spawnY,
+                    burstTimer: 3.2,
+                    burstShotsLeft: 0,
+                    burstShotDelay: 0,
+                    muzzleTimer: 0,
+                    departing: false
+                };
+                this.addFloatingText(targetEnt.x, targetEnt.y - 32, "🚁 VCPD CHOPPER DISPATCHED FROM PRECINCT!", "#38bdf8");
+            }
+            const heli = this.policeHeli;
+            heli.departing = false;
+            // Smooth standoff tracking inertia so the chopper flies in from off-screen and orbits without gluing to the player's bumper
+            heli.cx += (targetEnt.x - heli.cx) * Math.min(1, dt * 1.45);
+            heli.cy += (targetEnt.y - heli.cy) * Math.min(1, dt * 1.45);
+            const orbitOmega = 0.44; // ~14.2s per wide 360° observation orbit
+            heli.orbitAngle = (heli.orbitAngle || 0) + orbitOmega * dt;
+            const wobble = 1.0 + Math.sin(heli.orbitAngle * 2.0) * 0.06;
+            const rx = (heli.orbitRx || 250) * wobble;
+            const ry = (heli.orbitRy || 190) * wobble;
+            const desX = heli.cx + Math.cos(heli.orbitAngle) * rx;
+            const desY = heli.cy + Math.sin(heli.orbitAngle) * ry;
+            const dx = desX - heli.x;
+            const dy = desY - heli.y;
+            const distToSlot = Math.hypot(dx, dy);
+            const maxStep = 380 * dt;
+            let vx, vy;
+            if (distToSlot > maxStep) {
+                vx = (dx / distToSlot) * 380;
+                vy = (dy / distToSlot) * 380;
+                heli.x += (dx / distToSlot) * maxStep;
+                heli.y += (dy / distToSlot) * maxStep;
+            } else {
+                heli.x = desX;
+                heli.y = desY;
+                vx = -Math.sin(heli.orbitAngle) * rx * orbitOmega + (targetEnt.vx || 0) * 0.45;
+                vy = Math.cos(heli.orbitAngle) * ry * orbitOmega + (targetEnt.vy || 0) * 0.45;
+            }
+            const tangentAng = Math.atan2(vy, vx);
+            const toPlayerAng = Math.atan2(targetEnt.y - heli.y, targetEnt.x - heli.x);
+            const desiredAng = Math.atan2(
+                Math.sin(tangentAng) * 0.88 + Math.sin(toPlayerAng) * 0.12,
+                Math.cos(tangentAng) * 0.88 + Math.cos(toPlayerAng) * 0.12
+            );
+            let angDiff = desiredAng - (heli.angle || 0);
+            while (angDiff > Math.PI) angDiff -= Math.PI * 2;
+            while (angDiff < -Math.PI) angDiff += Math.PI * 2;
+            heli.angle = (heli.angle || 0) + angDiff * Math.min(1, dt * 5.5);
+            // Dynamic rooftop-clearing radar altimeter: sample nearby building heights and climb smoothly when passing over buildings!
+            let localRoofZ = 2.0;
+            if (this.map && typeof this.map.getHeightAtPixel === "function") {
+                const probes = [
+                    [0, 0], [44, 0], [-44, 0], [0, 44], [0, -44]
+                ];
+                for (let pi = 0; pi < probes.length; pi++) {
+                    const pz = this.map.getHeightAtPixel(heli.x + probes[pi][0], heli.y + probes[pi][1], 6.0, true);
+                    if (pz > localRoofZ) localRoofZ = pz;
                 }
+            }
+            const targetAltZ = (localRoofZ > 2.5 ? 4.12 : 3.88) + Math.sin(performance.now() * 0.0035) * 0.04;
+            heli.z = (heli.z || 3.88) + (targetAltZ - (heli.z || 3.88)) * Math.min(1, dt * 3.5);
+            heli.searchX += (targetEnt.x - (heli.searchX ?? targetEnt.x)) * Math.min(1, dt * 5.2);
+            heli.searchY += (targetEnt.y - (heli.searchY ?? targetEnt.y)) * Math.min(1, dt * 5.2);
+
+            const dHeli = Math.hypot(realEnt.x - heli.x, realEnt.y - heli.y);
+            if (!this.activeInterior && dHeli < nearestCopDist) {
+                nearestCopDist = dHeli;
+            }
+            if (!this.activeInterior && dHeli < 420) {
+                anyCopHasVisual = true;
+            }
+            if (!this.activeInterior && !p.dead && dHeli < 420) {
+                heli.burstTimer = (heli.burstTimer || 0) - dt;
+                if (heli.burstTimer <= 0 && (heli.burstShotsLeft || 0) <= 0) {
+                    heli.burstShotsLeft = 3;
+                    heli.burstShotDelay = 0;
+                    heli.burstTimer = 2.6 + Math.random() * 1.2;
+                }
+                if ((heli.burstShotsLeft || 0) > 0) {
+                    heli.burstShotDelay = (heli.burstShotDelay || 0) - dt;
+                    if (heli.burstShotDelay <= 0) {
+                        heli.burstShotsLeft--;
+                        heli.burstShotDelay = 0.14;
+                        heli.muzzleTimer = 0.09;
+                        const aimAng = Math.atan2(realEnt.y - heli.y, realEnt.x - heli.x) + (Math.random() - 0.5) * 0.18;
+                        this.fireWeapon(heli.x, heli.y, aimAng, "UZI", false, false, "COP");
+                    }
+                }
+            }
+            if ((heli.muzzleTimer || 0) > 0) heli.muzzleTimer = Math.max(0, heli.muzzleTimer - dt);
+        } else if (this.policeHeli) {
+            const heli = this.policeHeli;
+            heli.departing = true;
+            heli.x += Math.cos(heli.angle || 0) * 360 * dt;
+            heli.y += Math.sin(heli.angle || 0) * 360 * dt;
+            if (Math.hypot(heli.x - p.x, heli.y - p.y) > 1650 && !this.isPointInAnyPlayerCameraView(heli.x, heli.y, 320)) {
+                this.policeHeli = null;
             }
         }
 
@@ -16553,7 +16575,7 @@ class LeonidaGame {
             for (const ped of this.peds) {
                 if (!ped.dead || ped.revived || ped._boardedVehicle || ped.unreachableForMedic || ped.deathKind === "DROWNED" || (ped.deadTimer || 0) < 2.5) continue;
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(ped.x, ped.y)) continue;
-                const d = Math.hypot(ped.x - p.x, ped.y - p.y);
+                const d = this.getDistanceToNearestHumanPlayer(ped.x, ped.y);
                 if (d < 1150) {
                     unassignedCasualties.push(ped);
                 }
@@ -16568,8 +16590,8 @@ class LeonidaGame {
                 for (const v of this.vehicles) {
                     if (v.specKey === "MEDIC_AMBULANCE" && !v.destroyed && v.driver === "AI_EMERGENCY") {
                         totalMedics++;
-                        const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
-                        if (dPlayer < 1650) {
+                        const dPlayer = this.getDistanceToNearestHumanPlayer(v.x, v.y);
+                        if (dPlayer < 1750) {
                             activeNearMedics++;
                             if (!v.deployedMedic && (!v.medicTargetPed || v.medicTargetPed.revived || !v.medicTargetPed.dead)) {
                                 const pickCas = unassignedCasualties[activeNearMedics % unassignedCasualties.length];
@@ -16618,7 +16640,7 @@ class LeonidaGame {
                 if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
                 const isFreshBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 3.0;
-                if ((isLiveBurning || isFreshBurningWreck) && Math.hypot(v.x - p.x, v.y - p.y) < 820) {
+                if ((isLiveBurning || isFreshBurningWreck) && this.getDistanceToNearestHumanPlayer(v.x, v.y) < 920) {
                     burningVehsNearPlayer.push(v);
                 }
             }
@@ -16630,8 +16652,8 @@ class LeonidaGame {
                 for (const v of this.vehicles) {
                     if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
                         totalFireTrucks++;
-                        const dPlayer = Math.hypot(v.x - p.x, v.y - p.y);
-                        if (dPlayer < 1750) {
+                        const dPlayer = this.getDistanceToNearestHumanPlayer(v.x, v.y);
+                        if (dPlayer < 1850) {
                             activeNearFireTrucks++;
                             if (!v.deployedFireman && (!v.fireTargetCar || v.fireTargetCar.fireExtinguished)) {
                                 v.fireTargetCar = burningVehsNearPlayer[activeNearFireTrucks % burningVehsNearPlayer.length];
