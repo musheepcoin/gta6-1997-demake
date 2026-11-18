@@ -3315,14 +3315,10 @@ class LeonidaGame {
         this.ytCurrentVideoId = "Nl7r0rL38nU";
         this._ytErrorFailoverIdx = 0;
 
-        const isMobileDevice = typeof window !== "undefined" && (
-            window.innerWidth <= 960 ||
-            window.innerHeight <= 560 ||
-            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
-        );
-        // On mobile phones, default YouTube background video stream to OFF so WebGL gets 100% CPU/GPU/decoder headroom
-        // (WebAudio engine SFX, horns, sirens & gunshots remain 100% active, and tapping MUSIC: ON lazy-boots the stream).
-        this.ytMusicEnabled = !isMobileDevice;
+        // Enable YouTube Radio Soundtrack by default on both desktop and mobile!
+        // Pre-booting the hidden iframe while the Start / Character Select modal is open ensures YT.Player is ready
+        // before the user taps [ ENTER VICE CITY 26 — PLAY NOW ], unlocking mobile audio inside the touch gesture!
+        this.ytMusicEnabled = true;
 
         this.ytVolume = 28;
 
@@ -3518,8 +3514,15 @@ class LeonidaGame {
                                 events: {
                                     onReady: () => {
                                         subscribeYtEvents();
-                                        if (this.ytMusicEnabled && !this.ytActuallyPlaying && !this._ytBuffering) {
-                                            this.sendYouTubeCommand("playVideo", []);
+                                        if (this.ytMusicEnabled) {
+                                            const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
+                                            if (this._ytGestureUnlocked) {
+                                                this.sendYouTubeCommand("unMute", []);
+                                                this.sendYouTubeCommand("setVolume", [vol]);
+                                            }
+                                            if (!this.ytActuallyPlaying && !this._ytBuffering) {
+                                                this.sendYouTubeCommand("playVideo", []);
+                                            }
                                         }
                                     },
                                     onStateChange: (ev) => {
@@ -3665,7 +3668,15 @@ class LeonidaGame {
 
 
 
-        // Start/resume YouTube audio on any user gesture in capture phase (before canvas/joystick e.preventDefault())
+        // Start/resume YouTube audio on W3C user-activation gestures (touchend / pointerup / click / keydown).
+        // IMPORTANT: On iOS Safari & Mobile Chrome, pointerdown/touchstart do NOT grant cross-origin iframe media activation —
+        // only touchend/pointerup/click do! So pointerdown/touchstart only pre-warm WebAudio/iframe without consuming _lastYtKickMs!
+        const prewarmAudio = () => {
+            if (this.audio) this.audio.resume();
+            if (this.ytMusicEnabled && this._ensureYtIframeBooted) {
+                this._ensureYtIframeBooted();
+            }
+        };
 
         const unlockGesture = () => {
 
@@ -3682,7 +3693,7 @@ class LeonidaGame {
 
             if (!this._ytGestureUnlocked || (!this.ytActuallyPlaying && !this._ytBuffering)) {
 
-                if (nowMs - (this._lastYtKickMs || 0) > 900) {
+                if (nowMs - (this._lastYtKickMs || 0) > 450) {
 
                     this._lastYtKickMs = nowMs;
 
@@ -3694,9 +3705,11 @@ class LeonidaGame {
 
         };
 
-        window.addEventListener("pointerdown", unlockGesture, { capture: true, passive: true });
+        window.addEventListener("pointerdown", prewarmAudio, { capture: true, passive: true });
 
-        window.addEventListener("touchstart", unlockGesture, { capture: true, passive: true });
+        window.addEventListener("touchstart", prewarmAudio, { capture: true, passive: true });
+
+        window.addEventListener("pointerup", unlockGesture, { capture: true, passive: true });
 
         window.addEventListener("touchend", unlockGesture, { capture: true, passive: true });
 
@@ -3826,6 +3839,8 @@ class LeonidaGame {
 
         if (this.ytMusicEnabled) {
 
+            this._ytGestureUnlocked = true;
+
             if (this._ensureYtIframeBooted) this._ensureYtIframeBooted();
 
             const vol = volSlider ? (parseInt(volSlider.value, 10) || 28) : (this.ytVolume || 28);
@@ -3836,7 +3851,13 @@ class LeonidaGame {
 
             this.sendYouTubeCommand("playVideo", []);
 
-            this._ytGestureUnlocked = true;
+            setTimeout(() => {
+                if (this.ytMusicEnabled && !this.ytActuallyPlaying) {
+                    this.sendYouTubeCommand("unMute", []);
+                    this.sendYouTubeCommand("setVolume", [vol]);
+                    this.sendYouTubeCommand("playVideo", []);
+                }
+            }, 320);
 
             if (toggleBtn) {
 
@@ -4558,6 +4579,9 @@ class LeonidaGame {
         try {
             if (this.audio && typeof this.audio.resume === "function") {
                 this.audio.resume();
+            }
+            if (this.ytMusicEnabled && typeof this.setYouTubeMusicEnabled === "function") {
+                this.setYouTubeMusicEnabled(true);
             }
         } catch (e) {
             console.warn("audio.resume warning:", e);

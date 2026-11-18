@@ -15552,10 +15552,32 @@ class RetroRenderer {
         this.cheatButtons.push({ id: "TOGGLE_NIGHT", x: sx + 4, y: sy + 2, w: 68, h: 15 });
 
         if (isMinimized) {
+            const musOn = game.ytMusicEnabled !== false;
+            const musBtnW = isMobile ? 48 : 54;
+            const musBtnX = sx + sw - musBtnW - 4;
+            const musBtnY = sy + (isMobile ? 13 : 16);
             ctx.fillStyle = "#38bdf8";
             ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-            ctx.fillText(isMobile ? "MAPS • MUSIC • DM" : "MAPS 26 • MUSIC • PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
-            this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw, h: ph });
+            ctx.fillText(isMobile ? "MAPS • DM [TAP]" : "MAPS 26 • PLACES [TAP]", sx + 7, sy + (isMobile ? 20 : 25));
+            drawPixelBox(
+                ctx,
+                musBtnX,
+                musBtnY,
+                musBtnW,
+                14,
+                musOn ? "#064e3b" : "#450a0a",
+                musOn ? "#10b981" : "#ef4444",
+                musOn ? "#34d399" : "#f87171",
+                "#020617",
+                1
+            );
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "bold 7.8px Consolas, 'Courier New', monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(musOn ? "🎵 ON" : "🔇 OFF", musBtnX + musBtnW * 0.5, musBtnY + 7.5);
+            ctx.textAlign = "left";
+            this.cheatButtons.push({ id: "PHONE_MUSIC_TOGGLE", x: musBtnX - 2, y: musBtnY - 2, w: musBtnW + 4, h: 18 });
+            this.cheatButtons.push({ id: "UNMINIMIZE_PHONE", x: px, y: py, w: pw - musBtnW - 8, h: ph });
             ctx.restore();
             const miniRadarH = isMobile ? 114 : 0;
             if (miniRadarH > 0) {
