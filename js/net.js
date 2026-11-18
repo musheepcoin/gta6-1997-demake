@@ -1232,6 +1232,8 @@ class ViceNetworkManager {
             if (this.bc) this.bc.close();
             this.bc = new BroadcastChannel(`vc97_room_${this.roomCode}`);
             this.bc.onmessage = (ev) => {
+                // When connected to the dedicated WebSocket server, ignore duplicate local BroadcastChannel echo to prevent 50ms double-packet jitter!
+                if (this.wsConnected) return;
                 if (ev && ev.data) {
                     this.handlePacket(ev.data);
                 }
@@ -1383,9 +1385,7 @@ class ViceNetworkManager {
             try {
                 this.ws.send(JSON.stringify(pkt));
             } catch (_e) {}
-        }
-
-        if (this.bc) {
+        } else if (this.bc) {
             try {
                 this.bc.postMessage(pkt);
             } catch (_e) {}
@@ -1790,8 +1790,9 @@ class ViceNetworkManager {
     }
 
     isClientWorldSyncActive() {
-        if (this.isWorldHost()) return false;
-        return (performance.now() - (this.lastWorldSyncReceivedMs || 0)) < 450;
+        // Always run native 60 FPS local vehicle & pedestrian physics on every client!
+        // Remote player cars sync at 20 Hz via STATE, and persistent modified/parked/wrecked cars sync via WORLD_SYNC & WORLD_EVENT.
+        return false;
     }
 
     broadcastWorldEvent(ev) {
@@ -2122,16 +2123,9 @@ class ViceNetworkManager {
                 v.driver === "PLAYER" ||
                 v.driver === "REMOTE"
             );
-            // Skip ALL untouched driverless static map vehicles (every client spawns them deterministically)
-            // so the WORLD_SYNC bandwidth & 180-vehicle budget are 100% reserved for active moving traffic and player-modified cars!
-            const isUntouchedStatic = Boolean(
-                !isMod &&
-                !v.driver &&
-                !v.destroyed &&
-                !v.towedByTruck &&
-                (v.hp || v.maxHp || 100) >= (v.maxHp || 100)
-            );
-            if (isUntouchedStatic) {
+            // Only include player-modified, player-driven, damaged, or wrecked vehicles in WORLD_SYNC!
+            // Unmodified ambient AI traffic runs at native 60 FPS locally on each client so there is zero network jitter or ID collision.
+            if (!isMod) {
                 continue;
             }
             const flags =
@@ -2176,7 +2170,7 @@ class ViceNetworkManager {
         const peds = [];
         for (let i = 0; i < g.peds.length; i++) {
             const pd = g.peds[i];
-            if (!pd || pd._boardedVehicle) continue;
+            if (!pd || pd._boardedVehicle || !pd.dead) continue;
             if (pd.dead && !pd._corpsePersisted && !pd.revived) {
                 pd._corpsePersisted = true;
                 const pType = `CORPSE:${pd.g24Type || "civ0"}:${pd.kind || "CIVILIAN"}`;
@@ -2330,11 +2324,15 @@ class ViceNetworkManager {
                         continue;
                     }
                 }
-                // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
-                if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id.startsWith("estate_") || id.startsWith("boat_") || id.startsWith("vport_") || id.startsWith("armored_") || id.startsWith("parked_") || missionTag === "LANDMARK") && drvCode === 0 && !(flags & 1)) {
+                // Only apply player-modified / wrecked vehicles from WORLD_SYNC; never overwrite unmodified local 60 FPS AI traffic!
+                if (!isMod && !(flags & 1)) {
                     continue;
                 }
                 let v = existingById.get(id);
+                // If this vehicle is currently being driven by a remote player (20Hz STATE), local player, or local AI, do not snap it from a periodic WORLD_SYNC!
+                if (v && (g.player.inVehicle === v || v._linkedRemoteId || v.towedByTruck || (v.driver && v.driver !== "REMOTE" && drvCode !== 0 && !(flags & 1)))) {
+                    continue;
+                }
                 if (v && specKey && v.specKey !== specKey) {
                     const idx = g.vehicles.indexOf(v);
                     if (idx !== -1) g.vehicles.splice(idx, 1);
@@ -2433,24 +2431,6 @@ class ViceNetworkManager {
                 if (flags & 64) v.aiPanicTimer = Math.max(v.aiPanicTimer || 0, 1.0);
             }
 
-            if (!isInitialServerBootstrap) {
-                for (let i = g.vehicles.length - 1; i >= 0; i--) {
-                    const v = g.vehicles[i];
-                    const isDynamicTraffic = typeof v.id === "string" && (
-                        v.id.startsWith("trf_") ||
-                        v.id.startsWith("traf_") ||
-                        v.id.startsWith("cop_") ||
-                        v.id.startsWith("rb_") ||
-                        v.id.startsWith("amb_") ||
-                        v.id.startsWith("medic_") ||
-                        v.id.startsWith("vcfd_") ||
-                        v.id.startsWith("tow_")
-                    );
-                    if (isDynamicTraffic && !seenIds.has(v.id) && v !== g.player.inVehicle && !v._linkedRemoteId && !v._worldModified) {
-                        g.vehicles.splice(i, 1);
-                    }
-                }
-            }
             if (typeof g.rebuildVehicleSpatialGrid === "function") {
                 g.rebuildVehicleSpatialGrid();
             }
