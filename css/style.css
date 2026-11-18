@@ -301,9 +301,20 @@ html, body {
     animation: copFlash 0.45s infinite alternate;
 }
 
+.cop-head.active.searching {
+    background: rgba(250, 204, 21, 0.18);
+    border-color: #facc15;
+    animation: copSearching 0.9s infinite alternate;
+}
+
 @keyframes copFlash {
     0% { background: rgba(239, 68, 68, 0.45); border-color: #ef4444; transform: translateY(-1px); }
     100% { background: rgba(59, 130, 246, 0.45); border-color: #3b82f6; transform: translateY(1px); }
+}
+
+@keyframes copSearching {
+    0% { opacity: 0.95; background: rgba(250, 204, 21, 0.28); border-color: #facc15; }
+    100% { opacity: 0.32; background: rgba(56, 189, 248, 0.14); border-color: #38bdf8; }
 }
 
 #vehicle-radio-banner {

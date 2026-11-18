@@ -16225,6 +16225,53 @@ class RetroRenderer {
                 }
             }
 
+            // VCPD APB Search Zone & Police Blips (when Wanted > 0)
+            if ((game.wantedLevel || 0) > 0) {
+                const strobeRed = (Math.floor((this.time || 0) * 6.5) % 2) === 0;
+                if (game.lastKnownWantedPos) {
+                    const sx = ox + (game.lastKnownWantedPos.x - viewWorldX) * invW;
+                    const sy = oy + (game.lastKnownWantedPos.y - viewWorldY) * invH;
+                    const sRad = Math.max(8, 320 * invW);
+                    mctx.save();
+                    mctx.beginPath();
+                    mctx.arc(sx, sy, sRad, 0, Math.PI * 2);
+                    mctx.fillStyle = game.isPoliceSpotted
+                        ? (strobeRed ? "rgba(239, 68, 68, 0.18)" : "rgba(59, 130, 246, 0.18)")
+                        : "rgba(250, 204, 21, 0.14)";
+                    mctx.fill();
+                    mctx.strokeStyle = game.isPoliceSpotted
+                        ? (strobeRed ? "#ef4444" : "#3b82f6")
+                        : "#facc15";
+                    mctx.lineWidth = 1.4;
+                    mctx.stroke();
+                    mctx.restore();
+                }
+                if (Array.isArray(game.vehicles)) {
+                    for (const v of game.vehicles) {
+                        if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
+                            const cpx = ox + (v.x - viewWorldX) * invW;
+                            const cpy = oy + (v.y - viewWorldY) * invH;
+                            if (cpx >= ox - 3 && cpx <= ox + mw + 3 && cpy >= oy - 3 && cpy <= oy + mh + 3) {
+                                mctx.fillStyle = strobeRed ? "#ef4444" : "#3b82f6";
+                                mctx.fillRect(cpx - 2.2, cpy - 2.2, 4.4, 4.4);
+                            }
+                        }
+                    }
+                }
+                if (Array.isArray(game.peds)) {
+                    for (const ped of game.peds) {
+                        if (!ped.dead && ped.kind === "COP") {
+                            const cpx = ox + (ped.x - viewWorldX) * invW;
+                            const cpy = oy + (ped.y - viewWorldY) * invH;
+                            if (cpx >= ox - 2 && cpx <= ox + mw + 2 && cpy >= oy - 2 && cpy <= oy + mh + 2) {
+                                mctx.fillStyle = strobeRed ? "#38bdf8" : "#ef4444";
+                                mctx.fillRect(cpx - 1.6, cpy - 1.6, 3.2, 3.2);
+                            }
+                        }
+                    }
+                }
+            }
+
             // Player Pulsing Round Radar Blip
             const ppx = ox + (p.x - viewWorldX) * invW;
             const ppy = oy + (p.y - viewWorldY) * invH;
