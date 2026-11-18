@@ -7679,9 +7679,7 @@ class LeonidaGame {
 
         const p = this.player;
 
-        const anyRemoteWanted = this.net && typeof this.net.getMaxWantedLevel === "function" && this.net.getMaxWantedLevel() > 0;
-
-        const effectiveGlobalWanted = Math.max(this.wantedLevel || 0, anyRemoteWanted ? this.net.getMaxWantedLevel() : 0);
+        const effectiveGlobalWanted = this.wantedLevel || 0;
 
 
 
@@ -7741,48 +7739,6 @@ class LeonidaGame {
                 wantedLevel: this.wantedLevel
 
             });
-
-        }
-
-
-
-        if (effectiveGlobalWanted > 0 && this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0) {
-
-            for (const rp of this.net.remotePlayers.values()) {
-
-                if (rp.isBot || rp.dead) continue;
-
-                if ((rp.wantedLevel || 0) > 0 || this.wantedLevel > 0) {
-
-                    candidates.push({
-
-                        x: rp.x,
-
-                        y: rp.y,
-
-                        z: rp.z || 2.0,
-
-                        angle: rp.angle || 0,
-
-                        vx: rp.vx || 0,
-
-                        vy: rp.vy || 0,
-
-                        speed: rp.veh ? (rp.veh.speed || Math.hypot(rp.vx || 0, rp.vy || 0)) : Math.hypot(rp.vx || 0, rp.vy || 0),
-
-                        inVehicle: Boolean(rp.veh),
-
-                        isRemote: true,
-
-                        isCriminalNPC: false,
-
-                        wantedLevel: rp.wantedLevel || effectiveGlobalWanted
-
-                    });
-
-                }
-
-            }
 
         }
 
@@ -16444,17 +16400,7 @@ class LeonidaGame {
 
 
 
-        const maxRoomWanted = Math.max(
-
-            this.wantedLevel || 0,
-
-            (!isClientWorldSync && this.net && typeof this.net.getMaxWantedLevel === "function")
-
-                ? this.net.getMaxWantedLevel()
-
-                : 0
-
-        );
+        const maxRoomWanted = this.wantedLevel || 0;
 
 
 

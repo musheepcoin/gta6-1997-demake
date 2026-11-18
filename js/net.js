@@ -2697,7 +2697,12 @@ class ViceNetworkManager {
                 rp.chatTimer = Math.max(0, rp.chatTimer - dt);
             }
             if (rp.isBot) continue;
-            if (now - rp.lastSeen > 8500) {
+            if (rp.isHidden) {
+                rp._hiddenTimer = (rp._hiddenTimer || 0) + dt;
+            } else {
+                rp._hiddenTimer = 0;
+            }
+            if (now - rp.lastSeen > 8500 || (rp._hiddenTimer || 0) > 10.0) {
                 this.remotePlayers.delete(id);
                 continue;
             }
@@ -2831,11 +2836,16 @@ class ViceNetworkManager {
         if (this.game.started) {
             const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
             const isTabHidden = Boolean(typeof document !== "undefined" && document.hidden);
+            if (isTabHidden) {
+                this._localHiddenTimer = (this._localHiddenTimer || 0) + dt;
+            } else {
+                this._localHiddenTimer = 0;
+            }
             const targetStateInterval = hasRemoteHumans
-                ? (isTabHidden ? 0.50 : this.syncInterval)
-                : (isTabHidden ? 4.0 : 1.5);
+                ? (isTabHidden ? 1.50 : this.syncInterval)
+                : (isTabHidden ? 6.0 : 1.5);
             this.syncAccumulator += dt;
-            if (this.syncAccumulator >= targetStateInterval) {
+            if (this.syncAccumulator >= targetStateInterval && (this._localHiddenTimer || 0) < 8.0) {
                 this.syncAccumulator = 0;
                 this.broadcastStateNow();
             }
