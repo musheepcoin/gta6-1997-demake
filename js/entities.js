@@ -1636,8 +1636,8 @@ class Vehicle {
             this.aiTargetBlockY = by + this.aiChosenDir.dy;
         }
 
-        const isPanicked = this.aiPanicTimer > 0 || Boolean(this.sirenActive);
-        let desiredThrottle = isPanicked ? 0.78 : this.aiCruiseFactor;
+        const isPanicked = (this.aiPanicTimer > 0 && !this.isHeavyVehicle) || Boolean(this.sirenActive);
+        let desiredThrottle = isPanicked ? (this.sirenActive ? 0.78 : Math.min(0.66, (this.aiCruiseFactor || 0.5) + 0.14)) : this.aiCruiseFactor;
         this.aiState = isPanicked ? "PANIC" : "CRUISE";
         if (this.aiCurbParkCooldown > 0) {
             this.aiCurbParkCooldown = Math.max(0, this.aiCurbParkCooldown - dt);
@@ -1922,7 +1922,7 @@ class Vehicle {
         let sirenBehind = false;
         let sirenYield = false;
         const sirenVehicles = (game && game._prioritySirenVehicles) || (game && game.vehicles);
-        if (!isPanicked && this.driver === "AI_TRAFFIC" && Array.isArray(sirenVehicles) && sirenVehicles.length > 0) {
+        if (this.driver === "AI_TRAFFIC" && Array.isArray(sirenVehicles) && sirenVehicles.length > 0) {
             for (let si = 0; si < sirenVehicles.length; si++) {
                 const other = sirenVehicles[si];
                 if (!other || other === this || other.destroyed) continue;
@@ -2340,7 +2340,7 @@ class Vehicle {
             }
 
             // Check pedestrians or player on foot directly in front of car's bumper (and wider scan on zebra crosswalks!)
-            if (!isPanicked && game) {
+            if (game) {
                 const myFrontHalf = (this.w || 62) * 0.46 + 6;
                 const extraFrontReach = Math.max(0, myFrontHalf - 28);
                 if (game.player && !game.player.inVehicle && !game.player.dead) {
@@ -2570,65 +2570,29 @@ class Vehicle {
     }
 
     /* ========================================================================
-       HYBRID ROAD-GRAPH + TACTICAL FEELER PURSUIT (VCPD Police & Emergency AI)
-       Uses road-network intersection routing when blocked by buildings/far away,
-       and switches to 9-feeler tactical interception + PIT maneuver on line-of-sight!
+       STRICT ROAD-GRAPH PURSUIT & EMERGENCY NAVIGATION (VCPD, EMS, VCFD, TOW)
+       Stays 100% on the asphalt road network, aligns cleanly with road lanes,
+       changes lanes smoothly around slower traffic, and never jackknifes or
+       drives off-road onto sidewalks, parks, or beaches!
        ======================================================================== */
-    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, forceDirect = false) {
+    computeTargetRoadOrFeelerControls(dt, map, game, targetX, targetY, targetVx = 0, targetVy = 0, maxThrottle = 0.94, allowPit = false, _forceDirect = false) {
         const curZ = this.z !== undefined ? this.z : 2.0;
         if (this.aiLaneChangeCooldown > 0) this.aiLaneChangeCooldown -= dt;
         if (this.aiLaneShiftTimer > 0) this.aiLaneShiftTimer = Math.max(0, this.aiLaneShiftTimer - dt);
+        this.aiReverseTimer = 0;
+        this.aiTrafficBypassTimer = 0;
 
-        if (this.aiReverseTimer > 0) {
-            this.aiReverseTimer -= dt;
-            const rearX = this.x - Math.cos(this.angle) * (this.w * 0.48 + 10);
-            const rearY = this.y - Math.sin(this.angle) * (this.w * 0.48 + 10);
-            const rearVehBlocked = Boolean(
-                game &&
-                typeof game.resolveCircleVehicleCollision === "function" &&
-                game.resolveCircleVehicleCollision(rearX, rearY, 13, curZ, this).hit
-            );
-            if (
-                map.isWaterAtPixel(rearX, rearY) ||
-                map.resolveCircleBuildingCollision(rearX, rearY, 14, curZ).hit ||
-                rearVehBlocked
-            ) {
-                this.aiReverseTimer = 0;
-                if (rearVehBlocked) {
-                    const idNum = parseInt(String(this.id).replace(/\D/g, ""), 10) || 0;
-                    this.gridlockEscapeTimer = 2.6;
-                    this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 2.6);
-                    this.aiPullOverOffset = ((idNum % 2 === 0) ? 1 : -1) * 24;
-                    this.aiPullOverTimer = 2.6;
-                }
-            }
-            if (this.aiReverseTimer <= 0) {
-                this.aiReverseTimer = 0;
-                this.aiBlockX = -1;
-                this.aiBlockY = -1;
-                this.aiChosenDir = null;
-            } else {
-                this.aiState = "REVERSING";
-                return { throttle: -0.75, steer: this.aiReverseSteer, handbrake: false };
-            }
-        }
-
-        const distToTarget = Math.hypot(targetX - this.x, targetY - this.y);
-        const hasLOS = typeof map.hasClearLineOfSightForVehicle === "function"
-            ? map.hasClearLineOfSightForVehicle(this.x, this.y, targetX, targetY, curZ)
-            : (distToTarget < 210);
         const onRoadNow = map.isRoadAtPixel(this.x, this.y);
-        const targetOnRoadNow = map.isRoadAtPixel ? map.isRoadAtPixel(targetX, targetY) : true;
 
-        // If knocked off-road onto a sidewalk while not intentionally on beach sand, steer back onto the nearest road tile!
-        if (!onRoadNow && !forceDirect && map.getNavigationBlock) {
+        // If ever knocked off-road onto a sidewalk/park, immediately steer back onto the nearest road tile!
+        if (!onRoadNow && map.getNavigationBlock) {
             const cbx = Math.floor(this.x / TILE_SIZE);
             const cby = Math.floor(this.y / TILE_SIZE);
             let bestR2 = 999999;
             let bestRx = -1;
             let bestRy = -1;
-            for (let rdy = -3; rdy <= 3; rdy++) {
-                for (let rdx = -3; rdx <= 3; rdx++) {
+            for (let rdy = -4; rdy <= 4; rdy++) {
+                for (let rdx = -4; rdx <= 4; rdx++) {
                     const nbx = cbx + rdx;
                     const nby = cby + rdy;
                     const nb = map.getNavigationBlock(nbx, nby, curZ);
@@ -2645,31 +2609,17 @@ class Vehicle {
                 }
             }
             if (bestRx >= 0) {
-                const toRoadAng = Math.atan2((bestRy + 0.5) * TILE_SIZE - this.y, (bestRx + 0.5) * TILE_SIZE - this.x);
-                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.55, game);
+                const rcx = (bestRx + 0.5) * TILE_SIZE;
+                const rcy = (bestRy + 0.5) * TILE_SIZE;
+                const toRoadAng = Math.atan2(rcy - this.y, rcx - this.x);
+                this.angle = toRoadAng;
+                this.x += Math.cos(toRoadAng) * 72 * dt;
+                this.y += Math.sin(toRoadAng) * 72 * dt;
+                return { throttle: 0.45, steer: 0, handbrake: false };
             }
         }
 
-        // Mode A: Direct Line-of-Sight Tactical Interception & PIT Maneuver (ONLY when target is on the road or open beach sand!)
-        if (forceDirect || (hasLOS && targetOnRoadNow && distToTarget < 245)) {
-            const leadTime = Math.min(0.44, distToTarget / 640);
-            let aimX = targetX + targetVx * leadTime;
-            let aimY = targetY + targetVy * leadTime;
-
-            // 1997 GTA 1 PIT Maneuver: aim slightly at the fleeing car's rear flank when closing in fast
-            const targetSpd = Math.hypot(targetVx, targetVy);
-            if (allowPit && distToTarget > 34 && distToTarget < 115 && targetSpd > 85) {
-                const tAng = Math.atan2(targetVy, targetVx);
-                const flankSign = ((String(this.id).charCodeAt(String(this.id).length - 1) || 0) % 2 === 0) ? 1 : -1;
-                aimX -= Math.cos(tAng) * 14 - Math.sin(tAng) * (12 * flankSign);
-                aimY -= Math.sin(tAng) * 14 + Math.cos(tAng) * (12 * flankSign);
-            }
-
-            const directAngle = Math.atan2(aimY - this.y, aimX - this.x);
-            return this.steerTowardTargetWithFeelers(dt, map, curZ, directAngle, maxThrottle, game);
-        }
-
-        // Mode B: Target-Guided Road Network Routing (navigates city blocks & intersections around buildings!)
+        // Target-Guided Road Network Routing (navigates city blocks & intersections strictly along road lanes!)
         const bx = Math.floor(this.x / TILE_SIZE);
         const by = Math.floor(this.y / TILE_SIZE);
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
@@ -2710,16 +2660,13 @@ class Vehicle {
             this.aiTargetBlockY = by + this.aiChosenDir.dy;
         }
 
-        // Overtake civilian traffic in the same lane while racing down the avenue (or swerve around traffic jams via 9-feeler bypass!)
-        if (this.aiTrafficBypassTimer > 0) {
-            this.aiTrafficBypassTimer = Math.max(0, this.aiTrafficBypassTimer - dt);
-        }
         if (this.aiPullOverTimer > 0) {
             this.aiPullOverTimer = Math.max(0, this.aiPullOverTimer - dt);
         } else if (this.aiPullOverOffset) {
             this.aiPullOverOffset *= Math.pow(0.06, dt);
             if (Math.abs(this.aiPullOverOffset) < 0.4) this.aiPullOverOffset = 0;
         }
+
         const fx = Math.cos(this.angle);
         const fy = Math.sin(this.angle);
         const rx = -fy;
@@ -2736,7 +2683,7 @@ class Vehicle {
                 const lDist = Math.abs(dx * rx + dy * ry);
                 const halfLenSum = ((this.w || 62) + (other.w || 62)) * 0.50;
                 const bumperGap = fDist - halfLenSum;
-                if (fDist > 6 && bumperGap < 96 && lDist < 24) {
+                if (fDist > 4 && bumperGap < 110 && lDist < 24) {
                     if (bumperGap < sameLaneLeadGap) {
                         sameLaneLeadGap = bumperGap;
                         sameLaneLeadSpd = Math.max(0, other.speed || 0);
@@ -2744,27 +2691,22 @@ class Vehicle {
                     const changed = this.aiLaneChangeCooldown <= 0
                         ? this.tryAdjacentLaneChange(bx, by, curZ, map, game)
                         : false;
-                    if (!changed && bumperGap < 88) {
+                    if (!changed && bumperGap < 85) {
                         const prefSides = (this.aiPullOverOffset && this.aiPullOverOffset > 0) ? [1, -1] : [-1, 1];
-                        let shifted = false;
                         for (const bSide of prefSides) {
-                            const bOff = 28;
+                            const bOff = 22;
                             const testX = this.x + rx * bSide * bOff;
                             const testY = this.y + ry * bSide * bOff;
-                            const testAheadX = testX + fx * 42;
-                            const testAheadY = testY + fy * 42;
+                            const testAheadX = testX + fx * 38;
+                            const testAheadY = testY + fy * 38;
                             if (
                                 (!map.isWaterAtPixel || (!map.isWaterAtPixel(testX, testY) && !map.isWaterAtPixel(testAheadX, testAheadY))) &&
                                 (!map.resolveCircleBuildingCollision || (!map.resolveCircleBuildingCollision(testX, testY, 13, curZ).hit && !map.resolveCircleBuildingCollision(testAheadX, testAheadY, 13, curZ).hit))
                             ) {
                                 this.aiPullOverOffset = bSide * bOff;
-                                this.aiPullOverTimer = 1.65;
-                                shifted = true;
+                                this.aiPullOverTimer = 1.4;
                                 break;
                             }
-                        }
-                        if (!shifted && bumperGap < 68) {
-                            this.aiTrafficBypassTimer = Math.max(this.aiTrafficBypassTimer || 0, 1.35);
                         }
                     }
                 }
@@ -2791,74 +2733,99 @@ class Vehicle {
 
         const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
         const ty = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
-        if (this.aiTrafficBypassTimer > 0) {
-            const lookAheadX = tx + (this.aiChosenDir ? (this.aiChosenDir.dx || 0) * TILE_SIZE * 0.85 : 0);
-            const lookAheadY = ty + (this.aiChosenDir ? (this.aiChosenDir.dy || 0) * TILE_SIZE * 0.85 : 0);
-            const bypassAngle = Math.atan2(lookAheadY - this.y, lookAheadX - this.x);
-            return this.steerTowardTargetWithFeelers(dt, map, curZ, bypassAngle, maxThrottle, game);
-        }
         const desiredAngle = Math.atan2(ty - this.y, tx - this.x);
         const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
-        let steer = Math.max(-1, Math.min(1, angleDiff * 2.75));
+        let steer = 0;
         let throttle = maxThrottle;
-        if (sameLaneLeadGap < 26 && (this.aiPullOverTimer || 0) <= 0) {
-            throttle = this.speed > sameLaneLeadSpd + 8 ? -0.45 : 0;
-        }
 
         const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-        if (!this.aiChosenDir.isTurn && Math.abs(laneAngleDiff) < 0.40) {
-            this.angle += laneAngleDiff * Math.min(1, dt * 14.0);
-            this.angularVelocity = 0;
-            this.steerAngleRad = 0;
-            steer = 0;
-            const emRollSpd = Math.abs(this.speed || 0);
-            const maxLatStep = Math.min(58, emRollSpd * 0.52) * dt;
-            const pullOff = this.aiPullOverOffset || 0;
-            let emSignedLat = 0;
-            if (this.aiChosenDir.dx !== 0) {
-                const centerY = (this.aiTargetBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
-                const dyErr = centerY - this.y;
-                emSignedLat = dyErr * (this.aiChosenDir.dx > 0 ? 1 : -1);
-                this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 8.5)));
-            } else if (this.aiChosenDir.dy !== 0) {
-                const centerX = (this.aiTargetBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
-                const dxErr = centerX - this.x;
-                emSignedLat = dxErr * (this.aiChosenDir.dy > 0 ? -1 : 1);
-                this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 8.5)));
-            }
-            if (emRollSpd > 14 && Math.abs(emSignedLat) > 2.2) {
-                const targetVisYaw = Math.max(-0.26, Math.min(0.26, Math.atan2(emSignedLat * 0.65, Math.max(36, emRollSpd * 0.55))));
-                this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetVisYaw - (this.visualSteerYaw || 0)) * Math.min(1, dt * 11.0);
-            } else {
-                this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.0005, dt);
-                if (Math.abs(this.visualSteerYaw) < 0.005 || emRollSpd < 4) this.visualSteerYaw = 0;
-            }
+        if (Math.abs(laneAngleDiff) < 0.03) {
+            this.angle = this.aiChosenDir.angle;
         } else {
-            this.angle += angleDiff * Math.min(1, dt * 5.5);
-            if (this.speed > 135) {
-                throttle = -0.35;
+            this.angle += laneAngleDiff * Math.min(1, dt * (this.aiChosenDir.isTurn ? 11.0 : 15.0));
+        }
+        this.angularVelocity = 0;
+        this.steerAngleRad = 0;
+
+        const emRollSpd = Math.abs(this.speed || 0);
+        const maxLatStep = Math.min(62, Math.max(24, emRollSpd * 0.55)) * dt;
+        const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
+        const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
+        const pullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
+        let emSignedLat = 0;
+        if (this.aiChosenDir.dx !== 0) {
+            const centerY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
+            const dyErr = centerY - this.y;
+            emSignedLat = dyErr * (this.aiChosenDir.dx > 0 ? 1 : -1);
+            this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 8.5)));
+        } else if (this.aiChosenDir.dy !== 0) {
+            const centerX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
+            const dxErr = centerX - this.x;
+            emSignedLat = dxErr * (this.aiChosenDir.dy > 0 ? -1 : 1);
+            this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 8.5)));
+        }
+        if (!this.aiChosenDir.isTurn && emRollSpd > 14 && Math.abs(emSignedLat) > 2.2) {
+            const targetVisYaw = Math.max(-0.22, Math.min(0.22, Math.atan2(emSignedLat * 0.55, Math.max(36, emRollSpd * 0.55))));
+            this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetVisYaw - (this.visualSteerYaw || 0)) * Math.min(1, dt * 11.0);
+        } else {
+            this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.0005, dt);
+            if (Math.abs(this.visualSteerYaw) < 0.005 || emRollSpd < 4) this.visualSteerYaw = 0;
+        }
+
+        if (Math.abs(laneAngleDiff) > 0.18 || this.aiChosenDir.isTurn) {
+            if (this.speed > 92) {
+                throttle = 0;
+                const slowMult = Math.pow(0.15, dt);
+                this.vx *= slowMult;
+                this.vy *= slowMult;
+                this.speed *= slowMult;
             } else {
                 throttle = Math.min(maxThrottle, 0.48);
             }
         }
 
-        if (Math.abs(this.speed) < 15) {
-            this.aiStuckTimer += dt;
-            if (this.aiStuckTimer > 0.80) {
-                this.aiStuckTimer = 0;
-                this.aiReverseTimer = 0.95;
-                this.aiReverseSteer = angleDiff > 0 ? -0.9 : 0.9;
-            }
-        } else {
-            this.aiStuckTimer = Math.max(0, this.aiStuckTimer - dt * 2.0);
+        // Smooth following distance behind any vehicle in front that hasn't cleared the lane yet
+        if (sameLaneLeadGap < 28) {
+            throttle = 0;
+            const brakeMult = Math.pow(0.004, dt);
+            this.vx *= brakeMult;
+            this.vy *= brakeMult;
+            this.speed *= brakeMult;
+        } else if (sameLaneLeadGap < 64 && this.speed > sameLaneLeadSpd + 18) {
+            throttle = 0.15;
         }
 
+        this.aiStuckTimer = 0;
         return { throttle, steer, handbrake: false };
     }
 
+    // Helper: aligns an emergency/police vehicle cleanly parallel to its road lane and checks that it isn't stacking on top of another parked unit
+    alignCurbsideAndCheckSpacing(map, game, minSpacing = 68) {
+        if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
+            this.angle = this.aiChosenDir.angle;
+        } else {
+            this.angle = Math.round(this.angle / (Math.PI * 0.5)) * (Math.PI * 0.5);
+        }
+        this.visualSteerYaw = 0;
+        this.angularVelocity = 0;
+        this.aiPullOverOffset = 16;
+        this.aiPullOverTimer = 3.0;
+        if (game && Array.isArray(game.vehicles)) {
+            for (const ov of game.vehicles) {
+                if (!ov || ov === this || ov.destroyed) continue;
+                const isOtherStoppedResponder = (ov.isPolice || ov.isEmergency) && Math.abs(ov.speed || 0) < 20;
+                if (isOtherStoppedResponder && Math.hypot(ov.x - this.x, ov.y - this.y) < minSpacing) {
+                    return false; // Keep rolling forward a bit so units park in a clean staggered line along the curb!
+                }
+            }
+        }
+        return true;
+    }
+
     /* ========================================================================
-       AUTHENTIC GTA 1 VCPD POLICE PURSUIT AI (Road-Graph + 9-Feeler + PIT)
-       Pursues the nearest wanted player (Host or Remote Online Player) on the map!
+       AUTHENTIC GTA 1 VCPD POLICE PURSUIT AI (Road-Graph + Curbside Squad Deploy)
+       Pursues the nearest wanted player along the road network, parks cleanly at
+       the nearest road point (e.g. Ocean Drive for Vice Beach), and deploys officers!
        ======================================================================== */
     computePoliceControls(dt, map, game) {
         const wantedTarget = (game && typeof game.getNearestWantedTarget === "function")
@@ -2894,37 +2861,38 @@ class Vehicle {
         );
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
-        // GTA 1 Tactical Officer Bail-Out:
-        // 1) Close to a wanted player on foot (< 225px) or a boxed-in slow car (< 130px), OR
-        // 2) Cruiser can't get any closer (blocked by buildings/parked cars/sidewalk/promenade) for 1.15..1.3s while within range
-        const maxBailDist = targetInBeachOrParkExpanse ? 1750 : (!targetOnRoad ? 780 : 380);
-        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 225;
+        // Tactical Curbside Squad Deployment:
+        // 1) Close to a wanted player on foot (< 210px) or boxed-in slow car (< 130px), OR
+        // 2) Cruiser has reached the closest road point (e.g. Ocean Drive next to Lummus Park / Vice Beach) and distToPlayer stopped decreasing for 0.70s!
+        const maxBailDist = targetInBeachOrParkExpanse ? 1750 : (!targetOnRoad ? 780 : 360);
+        const playerOnFootNear = !wantedTarget.inVehicle && distToPlayer < 210;
         const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
-        const blockedNear = !wantedTarget.inVehicle && distToPlayer < maxBailDist && noProgress > (targetInBeachOrParkExpanse ? 1.15 : 1.3);
+        const reachedNearestRoadPoint = !wantedTarget.inVehicle && distToPlayer < maxBailDist && noProgress > (targetInBeachOrParkExpanse ? 0.70 : 1.10);
 
-        if (playerOnFootNear || playerBoxedNear || blockedNear) {
-            if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number" && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y)) {
-                const alignErr = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-                if (Math.abs(alignErr) < 0.45) {
-                    this.angle = this.aiChosenDir.angle;
-                    this.visualSteerYaw = 0;
-                }
+        if (playerOnFootNear || playerBoxedNear || reachedNearestRoadPoint) {
+            const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68);
+            if (!spacingOk && this.aiBailTimer < 0.8) {
+                this.aiBailTimer += dt * 0.35;
+                return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.38, false, false);
             }
             this.aiBailTimer += dt;
-            const bailDelay = playerBoxedNear ? 0.70 : 0.22;
+            const brakeMult = Math.pow(0.002, dt);
+            this.vx *= brakeMult;
+            this.vy *= brakeMult;
+            this.speed *= brakeMult;
+            const bailDelay = playerBoxedNear ? 0.65 : 0.25;
             if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
                 this.approachNoProgress = 0;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 0;
                 game.ejectVehicleDriver(this, "COP_DEPLOY");
                 return { throttle: 0, steer: 0, handbrake: true };
             }
-            return { throttle: this.speed > 10 ? -0.8 : 0, steer: 0, handbrake: true };
+            return { throttle: 0, steer: 0, handbrake: true };
         }
         this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
-
-        // Stay on the road network when the player is on city sidewalks,
-        // but drive off-road onto Vice Beach sand / Lummus Park when the wanted target is in the beach expanse (< 1750px)!
-        const forceDirect = (targetInBeachOrParkExpanse && distToPlayer < 1750) || (!targetOnRoad && distToPlayer < 520 && noProgress > 0.8);
 
         // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger / tank turret fires!
         const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
@@ -2958,9 +2926,9 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            forceDirect ? 0.76 : 0.88,
+            0.86,
             Boolean(wantedTarget.inVehicle && targetOnRoad),
-            forceDirect
+            false
         );
     }
 
@@ -3189,7 +3157,12 @@ class Vehicle {
                     continue;
                 }
                 if (map.isWaterAtPixel && map.isWaterAtPixel(ped.x, ped.y)) continue;
-                const d = Math.hypot(ped.x - this.x, ped.y - this.y);
+                // Avoid two ambulances targeting the exact same casualty when multiple casualties exist
+                const claimedByOther = Array.isArray(game.vehicles) && game.vehicles.some(
+                    (ov) => ov && ov !== this && !ov.destroyed && ov.specKey === "MEDIC_AMBULANCE" &&
+                        (ov.medicTargetPed === ped || (ov.deployedMedic && ov.deployedMedic.healingPatient === ped))
+                );
+                const d = Math.hypot(ped.x - this.x, ped.y - this.y) + (claimedByOther ? 420 : 0);
                 if (d < bestDist) {
                     bestDist = d;
                     nearestCorpse = ped;
@@ -3197,6 +3170,7 @@ class Vehicle {
             }
 
             if (nearestCorpse) {
+                const rawDist = Math.hypot(nearestCorpse.x - this.x, nearestCorpse.y - this.y);
                 this.sirenActive = true;
                 this.aiState = "EMERGENCY_MEDIC";
                 if (this.medicTargetPed !== nearestCorpse) {
@@ -3204,7 +3178,7 @@ class Vehicle {
                     this.approachBestDist = undefined;
                     this.approachNoProgress = 0;
                 }
-                const noProgress = this.updateApproachProgress(dt, bestDist);
+                const noProgress = this.updateApproachProgress(dt, rawDist);
                 const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
                 const corpseInBeachOrPark = Boolean(
                     !corpseOnRoad && (
@@ -3214,18 +3188,29 @@ class Vehicle {
                 );
                 const maxMedicBailDist = corpseInBeachOrPark ? 1650 : 620;
 
-                // Park and send the paramedic on foot when close to the scene (< 165px) or when blocked off-road/beach
-                if (bestDist < 165 || (bestDist < maxMedicBailDist && noProgress > 1.8)) {
+                // Park cleanly at the nearest road curb and send the paramedic on foot!
+                if (rawDist < 185 || (rawDist < maxMedicBailDist && noProgress > (corpseInBeachOrPark ? 0.70 : 1.15))) {
+                    const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 72);
+                    if (!spacingOk && this.aiBailTimer < 0.8) {
+                        this.aiBailTimer += dt * 0.35;
+                        return this.computeTargetRoadOrFeelerControls(dt, map, game, nearestCorpse.x, nearestCorpse.y, 0, 0, 0.36, false, false);
+                    }
                     this.aiBailTimer += dt;
-                    if (this.aiBailTimer > 0.4 && Math.abs(this.speed) < 34 && typeof game.deployParamedicFromAmbulance === "function") {
+                    const brakeMult = Math.pow(0.002, dt);
+                    this.vx *= brakeMult;
+                    this.vy *= brakeMult;
+                    this.speed *= brakeMult;
+                    if (this.aiBailTimer > 0.32 && typeof game.deployParamedicFromAmbulance === "function") {
                         this.aiBailTimer = 0;
                         this.approachNoProgress = 0;
+                        this.vx = 0;
+                        this.vy = 0;
+                        this.speed = 0;
                         game.deployParamedicFromAmbulance(this, nearestCorpse);
                     }
-                    return { throttle: this.speed > 6 ? -0.85 : 0, steer: 0, handbrake: true };
+                    return { throttle: 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
-                const forceDirect = (!corpseOnRoad && bestDist < (corpseInBeachOrPark ? 1650 : 540)) || noProgress > 1.4;
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3234,9 +3219,9 @@ class Vehicle {
                     nearestCorpse.y,
                     0,
                     0,
-                    forceDirect ? 0.68 : 0.84,
+                    0.82,
                     false,
-                    forceDirect
+                    false
                 );
             }
             this.medicTargetPed = null;
@@ -3297,6 +3282,7 @@ class Vehicle {
                     Boolean(this._parkedAtFireScene && bestDist < 420);
 
                 if (shouldParkAndDeploy) {
+                    this.alignCurbsideAndCheckSpacing(map, game, 82);
                     this._parkedAtFireScene = true;
                     // Never reverse back-and-forth once at the fire scene: lock brakes and deploy!
                     this.aiReverseTimer = 0;
@@ -3366,7 +3352,6 @@ class Vehicle {
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
-                const forceDirect = bestDist < 340 || (this.approachNoProgress || 0) > 1.4;
                 const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3377,7 +3362,7 @@ class Vehicle {
                     burningCar.vy || 0,
                     0.68,
                     false,
-                    forceDirect
+                    false
                 );
                 // A heavy fire engine drives to the scene at a measured emergency pace (not race speed),
                 // and slows right down on the final approach so it can stop & deploy the crew
@@ -5736,9 +5721,13 @@ class TrafficManager {
             const vz = map.getHeightAtPixel(vx, vy, 4.0);
             const roadAngle = dirs[Math.floor(Math.random() * dirs.length)].angle;
             let spec = specPool[Math.floor(Math.random() * specPool.length)];
-            if (spec === "FIRE_TRUCK") {
-                const activeFireTrucks = game.vehicles.filter((ov) => !ov.destroyed && ov.specKey === "FIRE_TRUCK").length;
-                if (activeFireTrucks >= 3) spec = "FLATBED_TRUCK";
+            const isHeavySpec = (spec === "CITY_BUS" || spec === "TOUR_COACH" || spec === "TANKER_RIG" || spec === "FLATBED_TRUCK" || spec === "STRETCH_LIMO");
+            if (isHeavySpec) {
+                const activeHeavyNear = game.vehicles.filter(
+                    (ov) => !ov.destroyed && (ov.specKey === "CITY_BUS" || ov.specKey === "TOUR_COACH" || ov.specKey === "TANKER_RIG" || ov.specKey === "FLATBED_TRUCK" || ov.specKey === "STRETCH_LIMO") &&
+                        Math.hypot(ov.x - vx, ov.y - vy) < 1600
+                ).length;
+                if (activeHeavyNear >= 1) spec = "REGAL_SEDAN";
             }
             if (!this._sessionTag) {
                 this._sessionTag = Math.floor(100 + Math.random() * 900);

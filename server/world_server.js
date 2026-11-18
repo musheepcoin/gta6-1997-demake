@@ -1325,8 +1325,7 @@ const SERVER_SPEC_POOL = [
     "TURISMO_CABRIO", "MINT_STALLION", "SILVER_ROADSTER", "VICE_CHEETAH",
     "TULIP_MUSCLE", "CHALLENGER_RT", "FJORD_FASTBACK", "REGAL_SEDAN",
     "BEETLE_BUG", "MUNDANO_WAGON", "LELAND_SEDAN", "MICRO_KART", "MONSTER_BUGGY",
-    "GATOR_4X4", "PICKUP_TRUCK", "CAMPER_PICKUP", "BOXVILLE_VAN", "HOTDOG_VAN",
-    "STRETCH_LIMO", "CITY_BUS", "TOUR_COACH", "FLATBED_TRUCK", "TANKER_RIG"
+    "GATOR_4X4", "PICKUP_TRUCK", "CAMPER_PICKUP", "BOXVILLE_VAN", "HOTDOG_VAN"
 ];
 
 const SERVER_STARTER_TRAFFIC = [
@@ -1345,7 +1344,7 @@ const SERVER_STARTER_TRAFFIC = [
     { id: "parked_12", spec: "VICE_CAB", c: 215.5, r: 144.5, a: Math.PI * 0.5 },
     { id: "parked_13", spec: "CHALLENGER_RT", c: 216.5, r: 155.5, a: -Math.PI * 0.5 },
     { id: "parked_14", spec: "VCPD_CRUISER", c: 214.5, r: 154.5, a: Math.PI * 0.5 },
-    { id: "parked_15", spec: "CITY_BUS", c: 204.5, r: 147.5, a: Math.PI * 0.5 },
+    { id: "parked_15", spec: "REGAL_SEDAN", c: 204.5, r: 147.5, a: Math.PI * 0.5 },
     { id: "parked_19", spec: "TURISMO_CABRIO", c: 208.5, r: 106.5, a: 0 },
     { id: "parked_20", spec: "STRETCH_LIMO", c: 214.5, r: 47.5, a: Math.PI * 0.5 },
     { id: "parked_21", spec: "PENETRATOR_GT", c: 214.5, r: 50.0, a: Math.PI * 0.5 },
@@ -1457,13 +1456,27 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
         }
     }
 
-    // 3. Seed Dedicated Municipal & City Service Patrols (8 VCPD Cruisers, 6 Transit Buses, 8 Vice Cabs, 3 Brinks Armored Trucks)
+    // 3. Seed Dedicated Municipal & City Service Patrols (8 VCPD Cruisers, 1 Transit Bus, 8 Vice Cabs, 1 Brinks Armored Truck)
     const serviceRoster = [
         { prefix: "srv_cop_", count: 8, spec: "VCPD_CRUISER", drv: 1, hp: 140 },
-        { prefix: "srv_bus_", count: 6, spec: "CITY_BUS", drv: 1, hp: 180 },
+        { prefix: "srv_bus_", count: 1, spec: "CITY_BUS", drv: 1, hp: 180 },
         { prefix: "srv_cab_", count: 8, spec: "VICE_CAB", drv: 1, hp: 110 },
-        { prefix: "srv_brinks_", count: 3, spec: "BRINKS_TRUCK", drv: 1, hp: 220 }
+        { prefix: "srv_brinks_", count: 1, spec: "BRINKS_TRUCK", drv: 1, hp: 220 }
     ];
+    // Clean up any legacy excess buses or heavy trucks from persisted room state
+    for (let bIdx = 1; bIdx < 8; bIdx++) {
+        delete room.vehs[`srv_bus_${bIdx}`];
+        if (room.modifiedVehs) delete room.modifiedVehs[`srv_bus_${bIdx}`];
+        if (bIdx >= 1 && bIdx < 5) {
+            delete room.vehs[`srv_brinks_${bIdx}`];
+            if (room.modifiedVehs) delete room.modifiedVehs[`srv_brinks_${bIdx}`];
+        }
+    }
+    for (const [vid, row] of Object.entries(room.vehs)) {
+        if (Array.isArray(row) && vid !== "srv_bus_0" && (row[1] === "CITY_BUS" || row[1] === "TOUR_COACH" || row[1] === "TANKER_RIG" || row[1] === "FLATBED_TRUCK")) {
+            row[1] = "REGAL_SEDAN";
+        }
+    }
     const tilePool = hotspotRoadTiles.length > 0 ? hotspotRoadTiles : roadSpawnTiles;
     if (tilePool.length > 0) {
         let seedIdx = 7;

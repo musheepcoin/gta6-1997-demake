@@ -6318,15 +6318,33 @@ class LeonidaGame {
 
             const deployTarget = this.getNearestWantedTarget(doorX, doorY) || this.player;
 
+            // Pick the curb door facing the target (e.g. eastern sidewalk of Ocean Drive toward Vice Beach) and ensure it is clear of buildings
+            const rightX = -Math.sin(vehicle.angle || 0);
+            const rightY = Math.cos(vehicle.angle || 0);
+            const fwdX = Math.cos(vehicle.angle || 0);
+            const fwdY = Math.sin(vehicle.angle || 0);
+            const toTargX = deployTarget ? (deployTarget.x - vehicle.x) : rightX;
+            const toTargY = deployTarget ? (deployTarget.y - vehicle.y) : rightY;
+            const sideSign = (toTargX * rightX + toTargY * rightY) >= 0 ? 1 : -1;
+            let deployX1 = isCarjacked ? doorX : (vehicle.x + rightX * sideSign * 24 + fwdX * 8);
+            let deployY1 = isCarjacked ? doorY : (vehicle.y + rightY * sideSign * 24 + fwdY * 8);
+            if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                const c1 = this.map.resolveCircleBuildingCollision(deployX1, deployY1, 10, vz);
+                if (c1.hit) {
+                    deployX1 = c1.x;
+                    deployY1 = c1.y;
+                }
+            }
+
             this.peds.push(new Pedestrian({
 
-                x: doorX,
+                x: deployX1,
 
-                y: doorY,
+                y: deployY1,
 
                 z: vz,
 
-                angle: Math.atan2(deployTarget.y - doorY, deployTarget.x - doorX),
+                angle: Math.atan2(deployTarget.y - deployY1, deployTarget.x - deployX1),
 
                 speed: isSwat ? 104 : 98,
 
@@ -6362,41 +6380,48 @@ class LeonidaGame {
 
             if (isCarjacked) {
 
-                this.addFloatingText(doorX, doorY - 22, "🚓 VCPD OFFICER YANKED OUT! STEP ON IT!", "#38bdf8");
+                this.addFloatingText(deployX1, deployY1 - 22, "🚓 VCPD OFFICER YANKED OUT! STEP ON IT!", "#38bdf8");
 
             }
 
-            if (isSwat && reason === "COP_DEPLOY") {
+            // Deploy the 2nd patrol partner from the rear/passenger door when a VCPD Cruiser or SWAT unit parks to intervene!
+            if (reason === "COP_DEPLOY") {
 
-                const doorX2 = vehicle.x + Math.sin(vehicle.angle) * 28;
-
-                const doorY2 = vehicle.y - Math.cos(vehicle.angle) * 28;
+                let deployX2 = vehicle.x + rightX * sideSign * 24 - fwdX * 12;
+                let deployY2 = vehicle.y + rightY * sideSign * 24 - fwdY * 12;
+                if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                    const c2 = this.map.resolveCircleBuildingCollision(deployX2, deployY2, 10, vz);
+                    if (c2.hit) {
+                        deployX2 = c2.x;
+                        deployY2 = c2.y;
+                    }
+                }
 
                 this.peds.push(new Pedestrian({
 
-                    x: doorX2,
+                    x: deployX2,
 
-                    y: doorY2,
+                    y: deployY2,
 
                     z: vz,
 
-                    angle: Math.atan2(this.player.y - doorY2, this.player.x - doorX2),
+                    angle: Math.atan2(deployTarget.y - deployY2, deployTarget.x - deployX2),
 
-                    speed: 104,
+                    speed: isSwat ? 104 : 98,
 
                     kind: "COP",
 
-                    g24Type: "g2_swat",
+                    g24Type: isSwat ? "g2_swat" : "police",
 
-                    isSwat: true,
+                    isSwat,
 
-                    shirtColor: "#1e293b",
+                    shirtColor: isSwat ? "#1e293b" : "#1e3a8a",
 
                     hp: copHp,
 
                     maxHp: copHp,
 
-                    copWeapon: "UZI",
+                    copWeapon: isSwat ? "UZI" : (this.wantedLevel >= 3 ? "UZI" : "PISTOL"),
 
                     dead: false,
 
@@ -6406,11 +6431,7 @@ class LeonidaGame {
 
                 }));
 
-            }
-
-            if (reason === "COP_DEPLOY") {
-
-                this.addFloatingText(doorX, doorY - 22, isSwat ? "🚓 SWAT SQUAD DEPLOYED!" : "🚓 VCPD OFFICER DEPLOYED!", "#38bdf8");
+                this.addFloatingText(deployX1, deployY1 - 22, isSwat ? "🚓 SWAT SQUAD DEPLOYED!" : "🚓 VCPD UNIT DEPLOYED!", "#38bdf8");
 
             }
 
@@ -6830,9 +6851,11 @@ class LeonidaGame {
     steerPedWithObstacleFeelers(ped, targetX, targetY, ignoreVeh = null) {
 
         const directAngle = Math.atan2(targetY - ped.y, targetX - ped.x);
+        const isActiveResponder = (ped.kind === "COP" || ped.kind === "MEDIC" || ped.kind === "FIREMAN" || ped.kind === "CRIMINAL");
 
-        // Off-screen pedestrians (>840px from player) already have unobstructed tile targets from chooseNextSidewalkBlock: skip 26-ray feeler sweeps
-        if (this.player && (Math.abs(ped.x - this.player.x) > 840 || Math.abs(ped.y - this.player.y) > 640)) {
+        // Off-screen calm civilians (>840px from player) already have unobstructed tile targets from chooseNextSidewalkBlock;
+        // active responders (COP, MEDIC, FIREMAN) ALWAYS run 26-ray obstacle feelers even at 1500px across Lummus Park / Vice Beach!
+        if (!isActiveResponder && this.player && (Math.abs(ped.x - this.player.x) > 840 || Math.abs(ped.y - this.player.y) > 640)) {
             return directAngle;
         }
 
@@ -12099,21 +12122,36 @@ class LeonidaGame {
 
 
 
-            // Check player vehicle OR high-speed panicked/cop vehicle hitting pedestrians:
-            // E-Scooters & Bicycles NEVER kill pedestrians — they only knock them out (stunnedTimer)!
-            // For cars/motorcycles: low-speed bumps (30 < vSpeed <= 68) knock pedestrians down; high-speed (> 68) runs them over!
+            // Check player vehicle (or fleeing bandit car) hitting pedestrians:
+            // AI traffic, Police cruisers, Ambulances, Fire Engines, and Tow Trucks NEVER run over or kill pedestrians/responders!
+            // Instead, AI vehicles gently push pedestrians aside onto the sidewalk so AI cars never create corpse pileups!
 
             const vSpeed = Math.hypot(v.vx, v.vy);
 
             const isNonLethalWheeler = (v.specKey === "E_SCOOTER" || v.specKey === "BMX_BIKE");
 
-            const isActiveThreatCar =
+            const isLethalDriver = !v.destroyed && (v.driver === "PLAYER" || v.driver === "AI_CRIMINAL");
 
-                !v.destroyed &&
+            if (!v.destroyed && !isLethalDriver && v.driver && vSpeed > 14) {
+                for (let pi = 0; pi < this.peds.length; pi++) {
+                    const ped = this.peds[pi];
+                    if (ped.dead) continue;
+                    const pdx = ped.x - v.x;
+                    if (pdx >= 26 || pdx <= -26) continue;
+                    const pdy = ped.y - v.y;
+                    if (pdy >= 26 || pdy <= -26) continue;
+                    if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
+                    if (pdx * pdx + pdy * pdy < 576) {
+                        const rCos = -Math.sin(v.angle || 0);
+                        const rSin = Math.cos(v.angle || 0);
+                        const sideSign = (pdx * rCos + pdy * rSin) >= 0 ? 1 : -1;
+                        ped.x += rCos * sideSign * 14;
+                        ped.y += rSin * sideSign * 14;
+                    }
+                }
+            }
 
-                (v.driver === "PLAYER" || v.driver === "AI_COP" || v.aiPanicTimer > 0);
-
-            if (isActiveThreatCar && vSpeed > 28) {
+            if (isLethalDriver && vSpeed > 28) {
 
                 for (let pi = 0; pi < this.peds.length; pi++) {
 
@@ -12486,21 +12524,18 @@ class LeonidaGame {
 
 
 
+                    // Only apply violent rigid-body PIT spin & impact damage when a human player is involved (or police vs criminal getaway car).
+                    // AI-vs-AI pairs (including Police, Ambulance, Fire Truck, Tow Truck, and Civilian Traffic) resolve cleanly along their lanes
+                    // so emergency vehicles NEVER spin buses sideways or create multi-car pileups!
                     const involvesPlayerOrActiveCop =
-
                         a.driver === "PLAYER" ||
-
                         b.driver === "PLAYER" ||
-
-                        (!a.destroyed && a.driver === "AI_CRIMINAL") ||
-
-                        (!b.destroyed && b.driver === "AI_CRIMINAL") ||
-
-                        (!a.destroyed && (a.driver === "AI_EMERGENCY" || a.driver === "AI_TOW") && a.sirenActive) ||
-
-                        (!b.destroyed && (b.driver === "AI_EMERGENCY" || b.driver === "AI_TOW") && b.sirenActive) ||
-
-                        (((!a.destroyed && a.driver === "AI_COP") || (!b.destroyed && b.driver === "AI_COP")) && (this.wantedLevel > 0 || a.sirenActive || b.sirenActive));
+                        a.driver === "REMOTE" ||
+                        b.driver === "REMOTE" ||
+                        (!a.destroyed && !b.destroyed && (
+                            (a.driver === "AI_COP" && b.driver === "AI_CRIMINAL") ||
+                            (b.driver === "AI_COP" && a.driver === "AI_CRIMINAL")
+                        ));
 
 
 
@@ -12528,6 +12563,27 @@ class LeonidaGame {
 
                             if ((a.gridlockEscapeTimer || 0) > 0 || (b.gridlockEscapeTimer || 0) > 0) {
                                 continue;
+                            }
+
+                            // Emergency Corridor Assist: if one vehicle has its siren active (Police, Ambulance, Fire, Tow)
+                            // and touches a civilian traffic vehicle, smoothly shift the civilian vehicle toward its right curb
+                            // so the emergency responder passes through without ever getting stuck or spinning the civilian car!
+                            const aPriority = Boolean(a.sirenActive || a.driver === "AI_COP" || a.driver === "AI_EMERGENCY" || a.driver === "AI_TOW");
+                            const bPriority = Boolean(b.sirenActive || b.driver === "AI_COP" || b.driver === "AI_EMERGENCY" || b.driver === "AI_TOW");
+                            if (aPriority !== bPriority) {
+                                const civ = aPriority ? b : a;
+                                const emg = aPriority ? a : b;
+                                if (civ.driver === "AI_TRAFFIC") {
+                                    const cRx = -Math.sin(civ.angle || 0);
+                                    const cRy = Math.cos(civ.angle || 0);
+                                    civ.aiPullOverOffset = 20;
+                                    civ.aiPullOverTimer = 2.0;
+                                    civ.x += cRx * (bestOverlap * 0.65 + 1.5);
+                                    civ.y += cRy * (bestOverlap * 0.65 + 1.5);
+                                    emg.angularVelocity = 0;
+                                    civ.angularVelocity = 0;
+                                    continue;
+                                }
                             }
 
                             if (Math.cos(a.angle - b.angle) > 0.45) {
@@ -15621,15 +15677,13 @@ class LeonidaGame {
                 }
             }
 
-            // Real-displacement anti-stuck watchdog: if any walking pedestrian moved < 4.5px over 1.35s,
-            // nudge toward the center of the current walkable tile and pick a clear direction without random spinning!
+            // Real-displacement anti-stuck watchdog: if any walking pedestrian or on-foot responder (COP, MEDIC, FIREMAN) moved < 4.5px over 1.35s,
+            // nudge toward a clear lateral offset without random spinning!
             if (
                 !ped.dead &&
                 !ped.isLivingProp &&
-                !ped.inCombat &&
                 ped.kind !== "GATOR" &&
-                ped.kind !== "FIREMAN" &&
-                ped.kind !== "MEDIC" &&
+                !ped.isKneelingMedic &&
                 (ped.healTimer || 0) <= 0 &&
                 !ped.sprayingHose &&
                 (ped.slideCarTimer || 0) <= 0 &&
@@ -15642,13 +15696,22 @@ class LeonidaGame {
                 if (ped._lastCheckX === undefined) {
                     ped._lastCheckX = ped.x;
                     ped._lastCheckY = ped.y;
-                } else if (ped._stuckCheckTimer >= 1.35) {
+                } else if (ped._stuckCheckTimer >= 1.25) {
                     const movedDist = Math.hypot(ped.x - ped._lastCheckX, ped.y - ped._lastCheckY);
                     ped._lastCheckX = ped.x;
                     ped._lastCheckY = ped.y;
                     ped._stuckCheckTimer = 0;
                     if (movedDist < 4.5) {
-                        if (ped.formationLeader) {
+                        if (ped.kind === "COP" || ped.kind === "MEDIC" || ped.kind === "FIREMAN") {
+                            const sideAng = (ped.angle || 0) + (((ped.turnSeed || 1) % 2 === 0) ? 1 : -1) * (Math.PI * 0.5);
+                            const testX = ped.x + Math.cos(sideAng) * 16;
+                            const testY = ped.y + Math.sin(sideAng) * 16;
+                            if (!this.map.resolveCircleBuildingCollision(testX, testY, 8, ped.z || 2.0).hit) {
+                                ped.x = testX;
+                                ped.y = testY;
+                            }
+                            ped.turnSeed = (ped.turnSeed || 1) + 1;
+                        } else if (ped.formationLeader) {
                             // If a follower is physically snagged on an obstacle while its leader moved ahead, detach cleanly so it walks around
                             ped.formationLeader = null;
                             ped.targetBx = null;
@@ -15868,16 +15931,18 @@ class LeonidaGame {
 
             const tWanted = spawnTarget.wantedLevel || maxRoomWanted;
 
-            const maxCops = Math.min(6, Math.ceil(tWanted * 0.95) + (this.net && this.net.remotePlayers && this.net.remotePlayers.size > 0 ? 1 : 0));
+            // Coherent Police Fleet Scaling: 1 Cruiser at 1★, 2 at 2★, 3 at 3★, up to 4 Cruisers/SWAT at 4★+
+            // Each Cruiser parks cleanly on the nearest road (e.g. Ocean Drive) and deploys 2 VCPD officers on foot!
+            const maxCops = Math.min(4, tWanted);
 
-            const totalActiveUnits = activeCopCars + activeFootCopsNear;
+            const totalActiveUnits = activeCopCars + Math.floor(activeFootCopsNear * 0.5);
 
             const isEvadingNow = this.wantedLevel > 0 && !anyCopHasVisual && (this.wantedDecayTimer || 0) > 1.5 && totalActiveUnits >= maxCops;
             this.copSpawnTimer += dt * (isEvadingNow ? 0.32 : 1.0);
 
-            const spawnInterval = tWanted <= 1 ? 9.5 : (tWanted === 2 ? 7.8 : (tWanted === 3 ? 6.2 : 4.8));
+            const spawnInterval = tWanted <= 1 ? 9.5 : (tWanted === 2 ? 8.0 : (tWanted === 3 ? 6.5 : 5.2));
 
-            if (totalActiveUnits < maxCops && this.copSpawnTimer > spawnInterval) {
+            if (totalActiveUnits < maxCops && activeCopCars < maxCops && this.copSpawnTimer > spawnInterval) {
 
                 this.copSpawnTimer = 0;
 
@@ -15911,47 +15976,10 @@ class LeonidaGame {
                         copCar.isPersistentFleet = true;
                         copCar.homeStation = spawnInfo.station;
                         copCar.sirenActive = true;
-                        copCar.speed = 115;
-                        copCar.vx = Math.cos(spawnInfo.angle) * 115;
-                        copCar.vy = Math.sin(spawnInfo.angle) * 115;
+                        copCar.speed = 112;
+                        copCar.vx = Math.cos(spawnInfo.angle) * 112;
+                        copCar.vy = Math.sin(spawnInfo.angle) * 112;
                         this.vehicles.push(copCar);
-                    }
-                }
-
-                // Beach & Off-Road Tactical Foot Patrol Dispatch: when the wanted suspect is on Vice Beach, Lummus Park, or off-road,
-                // also deploy VCPD foot officers just outside camera view (730..860px) so foot squads converge across the sand alongside cruisers!
-                const targetOffRoad = !this.map.isRoadAtPixel || !this.map.isRoadAtPixel(spawnTarget.x, spawnTarget.y) || spawnTarget.x >= 447.5 * TILE_SIZE;
-                if (targetOffRoad && activeFootCopsNear < Math.min(5, tWanted + 1)) {
-                    const squadCount = tWanted >= 3 ? 2 : 1;
-                    let spawnedFoot = 0;
-                    for (let att = 0; att < 18 && spawnedFoot < squadCount; att++) {
-                        const ang = (att / 18) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
-                        const dist = 740 + (att % 3) * 55;
-                        const fx = spawnTarget.x + Math.cos(ang) * dist;
-                        const fy = spawnTarget.y + Math.sin(ang) * dist;
-                        if (this.isPointInAnyPlayerCameraView(fx, fy, 80)) continue;
-                        if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(fx, fy)) continue;
-                        if (this.map.resolveCircleBuildingCollision && this.map.resolveCircleBuildingCollision(fx, fy, 12, pz).hit) continue;
-                        const isSwatFoot = tWanted >= 4 && spawnedFoot === 0;
-                        const footCop = new Pedestrian({
-                            id: `beach_cop_${Date.now()}_${att}`,
-                            x: fx,
-                            y: fy,
-                            z: pz,
-                            angle: Math.atan2(spawnTarget.y - fy, spawnTarget.x - fx),
-                            speed: isSwatFoot ? 104 : 98,
-                            kind: "COP",
-                            g24Type: isSwatFoot ? "g2_swat" : "police",
-                            isSwat: isSwatFoot,
-                            shirtColor: isSwatFoot ? "#1e293b" : "#1e3a8a",
-                            hp: isSwatFoot ? 125 : 110,
-                            maxHp: isSwatFoot ? 125 : 110,
-                            copWeapon: isSwatFoot ? "SHOTGUN" : (tWanted >= 3 ? "UZI" : "PISTOL"),
-                            dead: false,
-                            panicTimer: 0
-                        });
-                        this.peds.push(footCop);
-                        spawnedFoot++;
                     }
                 }
 
@@ -16225,8 +16253,8 @@ class LeonidaGame {
             }
 
             if (unassignedCasualties.length > 0 && (this.medicDispatchCooldown || 0) <= 0) {
-                // Hospital Fleet Logic: 1 Ambulance for 1-2 victims, 2 for 3-4, 3 for 5-6, up to 4 Ambulances for a major shootout!
-                const desiredMedics = Math.min(4, Math.ceil(unassignedCasualties.length / 2));
+                // Coherent Hospital Fleet Logic: 1 Ambulance for 1-3 victims, maximum 2 Ambulances for 4+ victims so they never pile up!
+                const desiredMedics = Math.min(2, Math.ceil(unassignedCasualties.length / 3));
                 let activeNearMedics = 0;
                 let totalMedics = 0;
 
@@ -16245,10 +16273,10 @@ class LeonidaGame {
                     }
                 }
 
-                // Dispatch additional Ambulances from the Central Hospital until activeNearMedics reaches desiredMedics (up to 4 Ambulances)!
-                if (activeNearMedics < desiredMedics && totalMedics < 4) {
+                // Dispatch at most 2 Ambulances from the Hospital, spaced by a 9.5s cooldown!
+                if (activeNearMedics < desiredMedics && totalMedics < 2) {
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
-                    if (this.medicDispatchTimer > 4.0) {
+                    if (this.medicDispatchTimer > 4.2) {
                         this.medicDispatchTimer = 2.0;
                         const targetCas = unassignedCasualties[activeNearMedics % unassignedCasualties.length];
                         const pz = targetCas.z || 2.0;
@@ -16261,12 +16289,12 @@ class LeonidaGame {
                             medCar.homeStation = spawnInfo.station;
                             medCar.medicTargetPed = targetCas;
                             medCar.sirenActive = true;
-                            medCar.speed = 102;
-                            medCar.vx = Math.cos(spawnInfo.angle) * 102;
-                            medCar.vy = Math.sin(spawnInfo.angle) * 102;
+                            medCar.speed = 98;
+                            medCar.vx = Math.cos(spawnInfo.angle) * 98;
+                            medCar.vy = Math.sin(spawnInfo.angle) * 98;
                             this.vehicles.push(medCar);
                             this.medicDispatchTimer = 0;
-                            this.medicDispatchCooldown = 6.5;
+                            this.medicDispatchCooldown = 9.5;
                         }
                     }
                 } else {
@@ -16276,7 +16304,7 @@ class LeonidaGame {
                 this.medicDispatchTimer = 0;
             }
 
-            // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK): VCFD Central Station dispatches 1 to 3 Fire Engines depending on how many vehicles are burning!
+            // 7b-2. 911 Fire Department Dispatch (FIRE_TRUCK): VCFD Central Station dispatches 1 to 2 Fire Engines
             const burningVehsNearPlayer = [];
             for (const v of this.vehicles) {
                 if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
@@ -16288,8 +16316,7 @@ class LeonidaGame {
                 }
             }
             if (burningVehsNearPlayer.length > 0 && this.fireDispatchCooldown <= 0) {
-                // VCFD Fleet Logic: 1 Fire Engine for 1 burning vehicle, 2 for 2-3 burning vehicles, up to 3 Fire Engines for a major pileup!
-                const desiredFireTrucks = Math.min(3, Math.ceil(burningVehsNearPlayer.length / 1.5));
+                const desiredFireTrucks = Math.min(2, Math.ceil(burningVehsNearPlayer.length / 2));
                 let activeNearFireTrucks = 0;
                 let totalFireTrucks = 0;
 
@@ -16307,8 +16334,7 @@ class LeonidaGame {
                     }
                 }
 
-                // Dispatch additional Fire Engines from the Central VCFD Firehouse until activeNearFireTrucks reaches desiredFireTrucks (up to 3 Fire Engines)!
-                if (activeNearFireTrucks < desiredFireTrucks && totalFireTrucks < 3) {
+                if (activeNearFireTrucks < desiredFireTrucks && totalFireTrucks < 2) {
                     this.fireDispatchTimer = (this.fireDispatchTimer || 0) + emergDt;
                     if (this.fireDispatchTimer > 3.8) {
                         this.fireDispatchTimer = 2.0;
