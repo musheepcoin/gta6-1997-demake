@@ -2619,7 +2619,13 @@ class Vehicle {
         const clearOfBuildings = map.traceSegment2D
             ? !map.traceSegment2D(this.x, this.y, targetX, targetY, curZ).hit
             : (distToTarget < 320);
-        const onRoadNow = map.isRoadAtPixel(this.x, this.y);
+        const cbx = Math.floor(this.x / TILE_SIZE);
+        const cby = Math.floor(this.y / TILE_SIZE);
+        const curNav = map.getNavigationBlock ? map.getNavigationBlock(cbx, cby, curZ) : null;
+        const onRoadNow = Boolean(
+            (curNav && curNav.groundType === GROUND_TYPE.ROAD && !curNav.isRailway) ||
+            (map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y, curZ))
+        );
 
         // Mode A: Real-Life Off-Road / Direct Tactical Interception (`forceDirect` ONLY):
         // Used strictly when crossing Lummus Park / Vice Beach (`this.x >= 445 * TILE_SIZE`) or pulling up onto an off-road plaza/sidewalk (< 240px).
@@ -2643,13 +2649,12 @@ class Vehicle {
 
         // If off-road while still far from the target and blocked by city buildings, steer back to the nearest road corridor
         if (!onRoadNow && map.getNavigationBlock) {
-            const cbx = Math.floor(this.x / TILE_SIZE);
-            const cby = Math.floor(this.y / TILE_SIZE);
             let bestR2 = 999999;
             let bestRx = -1;
             let bestRy = -1;
             for (let rdy = -4; rdy <= 4; rdy++) {
                 for (let rdx = -4; rdx <= 4; rdx++) {
+                    if (rdx === 0 && rdy === 0) continue;
                     const nbx = cbx + rdx;
                     const nby = cby + rdy;
                     const nb = map.getNavigationBlock(nbx, nby, curZ);

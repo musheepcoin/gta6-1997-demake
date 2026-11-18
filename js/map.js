@@ -6777,11 +6777,13 @@ class LeonidaMap {
         };
     }
 
-    isRoadAtPixel(px, py) {
+    isRoadAtPixel(px, py, z = 2.0) {
         const c = Math.floor(px / TILE_SIZE);
         const r = Math.floor(py / TILE_SIZE);
         if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return false;
-        return this.surfaceGround[r * this.cols + c] === GROUND_TYPE.ROAD;
+        if (this.surfaceGround && this.surfaceGround[r * this.cols + c] === GROUND_TYPE.ROAD) return true;
+        const nb = this.getNavigationBlock ? this.getNavigationBlock(c, r, z) : null;
+        return Boolean(nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway);
     }
 
     /* ========================================================================
