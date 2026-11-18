@@ -9023,7 +9023,7 @@ class LeonidaGame {
 
         const p = this.player;
 
-        if (p.dead) return;
+        if (p.dead || this.activeInterior) return;
 
         let rem = amount;
 
@@ -10905,26 +10905,7 @@ class LeonidaGame {
 
 
 
-        // Keep active missions & police evasion countdown ticking while inside a building!
-        if (this.missions && typeof this.missions.update === "function") {
-            this.missions.update(dt);
-        }
-        if (this.wantedLevel > 0) {
-            this.wantedSearchLockTimer = Math.max(0, (this.wantedSearchLockTimer || 0) - dt);
-            this.isPoliceSpotted = Boolean((p.playerCombatTimer || 0) > 0 || (this.wantedSearchLockTimer || 0) > 0);
-            this.wantedDecayDuration = this.wantedLevel === 1 ? 22 : (this.wantedLevel === 2 ? 28 : (this.wantedLevel === 3 ? 35 : 45));
-            if (this.isPoliceSpotted) {
-                this.wantedDecayTimer = Math.max(0, (this.wantedDecayTimer || 0) - dt * 3.5);
-            } else {
-                this.wantedDecayTimer = (this.wantedDecayTimer || 0) + dt;
-                if (this.wantedDecayTimer >= this.wantedDecayDuration) {
-                    this.setWantedLevel(this.wantedLevel - 1);
-                }
-            }
-        }
-
         // The companion stays outside while the player is in a venue
-
         if (this.jason) this.jason.isMoving = false;
 
 
@@ -11055,24 +11036,13 @@ class LeonidaGame {
 
 
 
-        // If Lucia is currently inside a Venue Interior, update the interior room AND keep multiplayer/world sync running!
-
+        // If Lucia is currently inside a Venue Interior, update the interior room while keeping the full exterior persistent world ticking at 60 FPS!
         if (this.activeInterior) {
-
             this.updateInterior(dt);
-            if (this.net && typeof this.net.update === "function") {
-                this.net.update(dt);
-            }
-
-            return;
-
         }
 
-
-
         // Spawn / respawn / teleport (big jump in one frame): never auto-enter a door we land next to
-
-        if (Array.isArray(this.map.interiors)) {
+        if (!this.activeInterior && Array.isArray(this.map.interiors)) {
 
             const pp = this.player;
 
@@ -11148,7 +11118,7 @@ class LeonidaGame {
 
         // 1. Player On-Foot or In-Vehicle Update
 
-        if (!p.dead) {
+        if (!p.dead && !this.activeInterior) {
 
             if (p.muzzleTimer > 0) p.muzzleTimer -= dt;
 
@@ -12064,7 +12034,9 @@ class LeonidaGame {
 
         // 2. Partner AI removed (solo & multiplayer only)
 
-        this.updateGraffitiTagging(dt);
+        if (!this.activeInterior) {
+            this.updateGraffitiTagging(dt);
+        }
 
 
 
@@ -12317,6 +12289,8 @@ class LeonidaGame {
                 !p.inVehicle &&
 
                 !p.dead &&
+
+                !this.activeInterior &&
 
                 (p.jumpTimer || 0) <= 0 &&
 
@@ -13004,7 +12978,7 @@ class LeonidaGame {
 
                 }
 
-                if (!this.killFrenzy && Math.hypot(p.x - kf.x, p.y - kf.y) < 30) {
+                if (!this.activeInterior && !this.killFrenzy && Math.hypot(p.x - kf.x, p.y - kf.y) < 30) {
 
                     kf.cooldown = 45;
 
@@ -13030,7 +13004,7 @@ class LeonidaGame {
 
             }
 
-            if (Math.hypot(p.x - pk.x, p.y - pk.y) < 28) {
+            if (!this.activeInterior && Math.hypot(p.x - pk.x, p.y - pk.y) < 28) {
 
                 pk.respawnTimer = 25;
 
@@ -13168,7 +13142,7 @@ class LeonidaGame {
                 }
 
                 // Check close-range COP arrest / damage AND ranged weapon fire on local player even in client sync mode
-                if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop) && !p.dead) {
+                if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop) && !p.dead && !this.activeInterior) {
                     ped.inCombat = true;
                     const targetEnt = p.inVehicle || p;
                     const dPlayer = Math.hypot(targetEnt.x - ped.x, targetEnt.y - ped.y);
@@ -13447,7 +13421,7 @@ class LeonidaGame {
 
                 const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
 
-                if (!p.inVehicle && dPlayer < 190) {
+                if (!p.inVehicle && !this.activeInterior && dPlayer < 190) {
 
                     ped.angle = Math.atan2(p.y - ped.y, p.x - ped.x);
 
@@ -13548,7 +13522,7 @@ class LeonidaGame {
 
                             ped.y += Math.sin(strafeAng) * 52 * dt;
 
-                        } else if (!copTarget.isRemote && !copTarget.isCriminalNPC && !p.dead && !((ped.bustedGraceTimer || 0) > 0)) {
+                        } else if (!copTarget.isRemote && !copTarget.isCriminalNPC && !p.dead && !this.activeInterior && !((ped.bustedGraceTimer || 0) > 0)) {
 
                             // Cops never bust a player inside a vehicle; on foot, arrest only triggers below 25% HP!
 
@@ -13574,7 +13548,7 @@ class LeonidaGame {
 
                     ped.shootCooldown = (ped.shootCooldown || 0) - dt;
 
-                    if (dTarget < 325 && ped.shootCooldown <= 0) {
+                    if (dTarget < 325 && ped.shootCooldown <= 0 && (copTarget.isRemote || copTarget.isCriminalNPC || !this.activeInterior)) {
 
                         const blocked = this.map.traceSegment2D
 
@@ -13725,7 +13699,7 @@ class LeonidaGame {
                     }
                 }
 
-                if (ped.attackedByPlayer && p && !p.dead) {
+                if (ped.attackedByPlayer && p && !p.dead && !this.activeInterior) {
 
                     const px = p.inVehicle ? p.inVehicle.x : p.x;
 
@@ -13885,7 +13859,7 @@ class LeonidaGame {
 
                 const dPlayer = Math.hypot(p.x - ped.x, p.y - ped.y);
 
-                if (dPlayer < 290 && !p.dead) {
+                if (dPlayer < 290 && !p.dead && !this.activeInterior) {
 
                     const reachDist = p.inVehicle ? Math.max(38, (p.inVehicle.w || 48) * 0.50 + 10) : 24;
 
@@ -16660,7 +16634,7 @@ class LeonidaGame {
 
             // Hit player? (Stray police bullets during an NPC crime shootout do NOT hurt an innocent bystander player!)
 
-            if (!hitSomething && !pr.fromPlayer && !p.inVehicle) {
+            if (!hitSomething && !pr.fromPlayer && !p.inVehicle && !this.activeInterior) {
 
                 const canHitPlayer =
 
@@ -17021,6 +16995,7 @@ class LeonidaGame {
 
 
         // 12A. Surface-aware Footsteps for Lucia on foot (Pavement, Vice Beach Sand, Park Grass, Water)
+        if (!this.activeInterior) {
 
         if (!p.inVehicle && !p.dead) {
 
@@ -17227,6 +17202,7 @@ class LeonidaGame {
             nightFactor: this.renderer ? (this.renderer.nightFactor || 0) : 0
 
         });
+        }
 
     }
 
