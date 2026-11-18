@@ -18,10 +18,17 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
+// Load the authentic 512x512x6 3D LeonidaMap engine directly on the Dedicated Server
+// so the server simulates real road lanes, traffic lights, bridges, municipal stations, and sidewalks 24/7!
+global.window = global;
+require("../js/map.js");
+
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "0.0.0.0";
 const DATA_DIR = path.join(__dirname, "data");
 const STATE_FILE = path.join(DATA_DIR, "world_state.json");
+const MAP_BIN_FILE = path.join(__dirname, "..", "assets", "gta1", "gta1_map.bin");
+const MAP_META_FILE = path.join(__dirname, "..", "assets", "gta1", "gta1_meta.json");
 
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -30,7 +37,63 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_188";
+const CURRENT_BUILD = "101_190";
+
+const serverMap = new global.LeonidaMap();
+let serverMapMeta = null;
+const roadSpawnTiles = [];
+const hotspotRoadTiles = [];
+const sidewalkSpawnTiles = [];
+let autonomousSimTickCount = 0;
+
+function initServerMapAndRoadTopology() {
+    try {
+        if (fs.existsSync(MAP_META_FILE)) {
+            serverMapMeta = JSON.parse(fs.readFileSync(MAP_META_FILE, "utf8"));
+        }
+        if (fs.existsSync(MAP_BIN_FILE)) {
+            const binBuf = fs.readFileSync(MAP_BIN_FILE);
+            const ab = binBuf.buffer.slice(binBuf.byteOffset, binBuf.byteOffset + binBuf.byteLength);
+            serverMap.loadCmpBinary(ab, serverMapMeta ? serverMapMeta.districts : null);
+        }
+        if (serverMap.cmpLoaded) {
+            for (let by = 6; by < global.MAP_ROWS - 6; by += 2) {
+                for (let bx = 6; bx < global.MAP_COLS - 6; bx += 2) {
+                    if (serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(bx, by)) continue;
+                    const z = serverMap.getHeightAtPixel((bx + 0.5) * global.TILE_SIZE, (by + 0.5) * global.TILE_SIZE, 4.0);
+                    const nav = serverMap.getNavigationBlock(bx, by, z);
+                    if (!nav) continue;
+                    const isHotspot =
+                        (bx >= 400 && bx <= 452 && by >= 40 && by <= 365) || // Ocean Drive, Collins Ave, Española Way, South Beach
+                        (bx >= 325 && bx <= 405 && by >= 118 && by <= 220) || // Star Island & Venetian Isles
+                        (bx >= 255 && bx <= 345 && by >= 105 && by <= 295) || // Downtown & Little Cuba
+                        (bx >= 165 && bx <= 265 && by >= 95 && by <= 210);    // Wynwood & Mambas Stadium
+                    if (nav.groundType === global.GROUND_TYPE.ROAD && !nav.isRailway && !nav.isParkingBay) {
+                        const lidZ1 = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
+                        const bits = (nav.up ? 1 : 0) + (nav.down ? 1 : 0) + (nav.left ? 1 : 0) + (nav.right ? 1 : 0);
+                        if (bits === 1 && lidZ1 !== 25) {
+                            const dirs = serverMap.getAllowedRoadDirections(bx, by, z);
+                            if (dirs.length > 0) {
+                                const entry = { bx, by, z, angle: dirs[0].angle, isHotspot };
+                                roadSpawnTiles.push(entry);
+                                if (isHotspot) hotspotRoadTiles.push(entry);
+                            }
+                        }
+                    } else if (nav.groundType === global.GROUND_TYPE.PAWEMENT && isHotspot) {
+                        const lidZ1 = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
+                        if (lidZ1 !== 69 && !(bx >= 449 && bx <= 464 && lidZ1 === 10)) {
+                            sidewalkSpawnTiles.push({ bx, by, z });
+                        }
+                    }
+                }
+            }
+            console.log(`[WORLD-SIM] Loaded 512x512x6 LeonidaMap: roadTiles=${roadSpawnTiles.length} (hotspots=${hotspotRoadTiles.length}), sidewalkTiles=${sidewalkSpawnTiles.length}`);
+        }
+    } catch (err) {
+        console.warn("[WORLD-SIM] Failed to load server map binary:", err.message);
+    }
+}
+initServerMapAndRoadTopology();
 
 function normalizeRoomCode(roomCode) {
     const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
@@ -57,7 +120,8 @@ function isDynamicVehicleId(vid) {
 
 function createEmptyRoom() {
     return {
-        vehs: {},          // Live AI traffic vehicles
+        vehs: {},          // Live AI traffic, police, ambulance, fire, tow, bus, cab, and armored vehicles
+        peds: {},          // Live sidewalk pedestrians & active responders
         modifiedVehs: {},  // Player-driven, moved, parked, damaged, or wrecked vehicles (NEVER overwritten by default map!)
         modifiedVehTs: {}, // Timestamp (ms) when each modifiedVeh was last updated
         smashedProps: {},  // Knocked-down streetlamps, traffic lights, bollards, hydrants, benches
@@ -101,6 +165,7 @@ function ensureRoom(roomCode) {
     if (!r.robbedVaults) r.robbedVaults = {};
     if (!r.turfStandings) r.turfStandings = {};
     if (!r.vehs) r.vehs = {};
+    if (!r.peds) r.peds = {};
     if (!Array.isArray(r.chat)) r.chat = [];
     return { code, room: r };
 }
@@ -154,7 +219,7 @@ function loadPersistentState() {
                             for (const [vid, vrow] of Object.entries(rawModVehs)) {
                                 if (!Array.isArray(vrow) || vrow.length < 11) continue;
                                 if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
-                                // Strip destroyed wrecks and transient traffic/cop/mission cars on server startup
+                                // Strip destroyed wrecks and transient traffic/cop/mission cars from modifiedVehs on server startup
                                 if ((vrow[10] & 1) || isDynamicVehicleId(vid)) {
                                     migratedAny = true;
                                     continue;
@@ -165,8 +230,27 @@ function loadPersistentState() {
                                 cleanModVehs[vid] = vrow;
                                 if (!cleanModTs[vid]) cleanModTs[vid] = nowMs;
                             }
+                            const loadedVehs = Object.assign({}, cleanModVehs);
+                            if (rv.vehs && typeof rv.vehs === "object") {
+                                for (const [vid, vrow] of Object.entries(rv.vehs)) {
+                                    if (!Array.isArray(vrow) || vrow.length < 11) continue;
+                                    if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
+                                    if (cleanModVehs[vid]) continue;
+                                    if (vrow[8] === 4) vrow[8] = 0;
+                                    loadedVehs[vid] = vrow;
+                                }
+                            }
+                            const loadedPeds = {};
+                            if (rv.peds && typeof rv.peds === "object") {
+                                for (const [pid, prow] of Object.entries(rv.peds)) {
+                                    if (Array.isArray(prow) && prow.length >= 10 && !(prow[9] & 1)) {
+                                        loadedPeds[pid] = prow;
+                                    }
+                                }
+                            }
                             persistentStore.rooms[normKey] = {
-                                vehs: Object.assign({}, cleanModVehs),
+                                vehs: loadedVehs,
+                                peds: loadedPeds,
                                 modifiedVehs: cleanModVehs,
                                 modifiedVehTs: cleanModTs,
                                 smashedProps: Object.assign({}, existing.smashedProps, (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {}),
@@ -203,7 +287,9 @@ function savePersistentStateNow() {
         persistentStore.updatedAt = new Date().toISOString();
         const tmpFile = `${STATE_FILE}.tmp`;
         const bakFile = `${STATE_FILE}.bak`;
-        const payload = JSON.stringify(persistentStore);
+        const payload = JSON.stringify(persistentStore, (k, v) => (
+            (k === "vehNav" || k === "pedNav" || k === "vehClientSyncMs" || k === "pedClientSyncMs") ? undefined : v
+        ));
         fs.writeFileSync(tmpFile, payload, "utf8");
         if (fs.existsSync(STATE_FILE)) {
             try { fs.copyFileSync(STATE_FILE, bakFile); } catch (_e) {}
@@ -662,7 +748,9 @@ function handleClientPacket(socket, pkt) {
         }
         const nowMs = Date.now();
         room.updatedAt = nowMs;
-        const nextVehs = {};
+        room.lastClientWorldSyncMs = nowMs;
+        if (!room.vehClientSyncMs) room.vehClientSyncMs = {};
+        if (!room.pedClientSyncMs) room.pedClientSyncMs = {};
         const maxVehs = Math.min(pkt.vehs.length, 200);
         for (let i = 0; i < maxVehs; i++) {
             const row = pkt.vehs[i];
@@ -672,29 +760,31 @@ function handleClientPacket(socket, pkt) {
                 delete room.modifiedVehs[vid];
                 delete room.modifiedVehTs[vid];
                 delete room.vehs[vid];
+                delete room.vehClientSyncMs[vid];
                 continue;
             }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
             // Skip unmodified driverless static map vehicles (every client spawns them locally)
             if (!isMod && row[8] === 0 && !(row[10] & 256)) {
                 if (room.modifiedVehs[vid]) {
-                    nextVehs[vid] = room.modifiedVehs[vid];
+                    room.vehs[vid] = room.modifiedVehs[vid];
                 }
                 continue;
             }
+            room.vehClientSyncMs[vid] = nowMs;
             if (isMod) {
                 row[13] = 1;
                 if (!room.modifiedVehs[vid] || row[8] !== 0) {
                     room.modifiedVehTs[vid] = nowMs;
                 }
                 room.modifiedVehs[vid] = row;
-                nextVehs[vid] = row;
+                room.vehs[vid] = row;
             } else if (!room.modifiedVehs[vid]) {
-                // Only update unmodified active traffic row if this vehicle was NOT modified in room.modifiedVehs!
-                nextVehs[vid] = row;
+                // Update active traffic row in-place while preserving server-simulated vehicles in other districts!
+                room.vehs[vid] = row;
             } else {
                 // Preserve the persisted modified vehicle!
-                nextVehs[vid] = room.modifiedVehs[vid];
+                room.vehs[vid] = room.modifiedVehs[vid];
             }
         }
         // Keep all modifiedVehs (capped at 120 most recent) so parked/wrecked cars across the city never vanish!
@@ -704,17 +794,28 @@ function handleClientPacket(socket, pkt) {
             delete room.modifiedVehs[oldVid];
             delete room.modifiedVehTs[oldVid];
         }
-        room.vehs = nextVehs;
+        // Cap total room.vehs at 240 by pruning only the oldest transient trf_ cars if exceeded
+        const allVehKeys = Object.keys(room.vehs);
+        if (allVehKeys.length > 240) {
+            for (const vk of allVehKeys) {
+                if (Object.keys(room.vehs).length <= 210) break;
+                if (vk.startsWith("trf_") && !room.modifiedVehs[vk] && (nowMs - (room.vehClientSyncMs[vk] || 0)) > 5000) {
+                    delete room.vehs[vk];
+                    delete room.vehClientSyncMs[vk];
+                }
+            }
+        }
         if (Array.isArray(pkt.peds)) {
             if (!room.corpses) room.corpses = {};
             if (!room.corpseTs) room.corpseTs = {};
-            const nextPeds = {};
+            if (!room.peds) room.peds = {};
             const maxPeds = Math.min(pkt.peds.length, 160);
             for (let i = 0; i < maxPeds; i++) {
                 const pr = pkt.peds[i];
                 if (!Array.isArray(pr) || !pr[0]) continue;
                 const pid = pr[0];
-                nextPeds[pid] = pr;
+                room.peds[pid] = pr;
+                room.pedClientSyncMs[pid] = nowMs;
                 if (pr[9] & 1) {
                     if (!room.corpses[pid]) room.corpseTs[pid] = nowMs;
                     room.corpses[pid] = pr;
@@ -726,7 +827,16 @@ function handleClientPacket(socket, pkt) {
                 delete room.corpses[oldCid];
                 delete room.corpseTs[oldCid];
             }
-            room.peds = nextPeds;
+            const pKeys = Object.keys(room.peds);
+            if (pKeys.length > 150) {
+                for (const pk of pKeys) {
+                    if (Object.keys(room.peds).length <= 125) break;
+                    if (pk.startsWith("dped_") && (nowMs - (room.pedClientSyncMs[pk] || 0)) > 5000) {
+                        delete room.peds[pk];
+                        delete room.pedClientSyncMs[pk];
+                    }
+                }
+            }
             pkt.peds = Object.values(Object.assign({}, room.peds, room.corpses));
         }
         isDirty = true;
@@ -996,26 +1106,41 @@ const server = http.createServer((req, res) => {
         }
         for (const [rk, rv] of Object.entries(persistentStore.rooms)) {
             const roomClients = Array.from(clients.values()).filter((m) => m.room === rk && !m.isOutdated);
+            const allVehs = Object.values(Object.assign({}, rv.vehs || {}, rv.modifiedVehs || {}));
+            const movingVehs = allVehs.filter((row) => Array.isArray(row) && row[8] > 0 && !(row[10] & 1));
             roomSummary[rk] = {
                 playersOnline: roomClients.length,
                 players: roomClients.map((m) => m.name),
-                persistedVehicles: Object.keys(Object.assign({}, rv.vehs || {}, rv.modifiedVehs || {})).length,
+                persistedVehicles: allVehs.length,
+                autonomousMovingVehicles: movingVehs.length,
                 playerModifiedVehicles: Object.keys(rv.modifiedVehs || {}).length,
+                activePedestrians: Object.keys(rv.peds || {}).length,
                 smashedPropsCount: Object.keys(rv.smashedProps || {}).length,
                 corpsesCount: Object.keys(rv.corpses || {}).length,
                 vaultLockoutsCount: Object.keys(rv.robbedVaults || {}).length,
                 turfZonesCount: Object.keys(rv.turfStandings || {}).length,
+                worldMinutes: rv.worldMinutes || 720,
+                trafficLightTimer: Math.round((rv.trafficLightTimer || 0) * 100) / 100,
                 chatMessages: (rv.chat || []).length
             };
         }
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({
             ok: true,
-            service: "VICE CITY 26 — Persistent World Server v2",
+            service: "VICE CITY 26 — Persistent World Server v2 (24/7 Autonomous Living World Engine)",
             build: CURRENT_BUILD,
             minClientVer: MIN_CLIENT_VER,
             econVer: ECON_VERSION,
             uptimeSec: Math.round(process.uptime()),
+            autonomousWorldEngine: {
+                enabled: true,
+                cmpLoaded: Boolean(serverMap && serverMap.cmpLoaded),
+                roadTilesIndexed: roadSpawnTiles.length,
+                hotspotRoadTilesIndexed: hotspotRoadTiles.length,
+                sidewalkTilesIndexed: sidewalkSpawnTiles.length,
+                tickRateHz: 10,
+                simTickCount: autonomousSimTickCount
+            },
             totalPlayersOnline: activeClientsCount,
             outdatedTabsQuarantined: outdatedTabsCount,
             rooms: roomSummary,
@@ -1185,6 +1310,687 @@ server.on("upgrade", (req, socket) => {
     socket.on("error", cleanup);
 });
 
+/* ============================================================================
+   5. 24/7 AUTONOMOUS SERVER-SIDE LIVING WORLD ENGINE (10 HZ / 100MS TICK)
+   - Runs continuously on the Dedicated Server even when 0 players are online!
+   - Drives 115+ persistent vehicles along the real 512x512x6 .CMP road network,
+     obeying traffic lights, intersection turns, bridges, and bumper spacing.
+   - Dispatches & returns Municipal EMS Ambulances (ems_hq), VCFD Fire Engines (vcfd_hq),
+     Tow Trucks (tow_hq), and VCPD Patrol Cruisers (vcpd_hq) autonomously.
+   - Advances 64+ sidewalk pedestrians along .CMP sidewalks and crosswalks.
+   ============================================================================ */
+const SERVER_SPEC_POOL = [
+    "HARLEY_BIKE", "SUPERBIKE", "E_SCOOTER", "BMX_BIKE", "VICE_CAB",
+    "BANSHEE_GT", "PENETRATOR_GT", "PORKA_TURBO", "COSSIE_RS", "STINGER_CABRIO",
+    "TURISMO_CABRIO", "MINT_STALLION", "SILVER_ROADSTER", "VICE_CHEETAH",
+    "TULIP_MUSCLE", "CHALLENGER_RT", "FJORD_FASTBACK", "REGAL_SEDAN",
+    "BEETLE_BUG", "MUNDANO_WAGON", "LELAND_SEDAN", "MICRO_KART", "MONSTER_BUGGY",
+    "GATOR_4X4", "PICKUP_TRUCK", "CAMPER_PICKUP", "BOXVILLE_VAN", "HOTDOG_VAN",
+    "STRETCH_LIMO", "CITY_BUS", "TOUR_COACH", "FLATBED_TRUCK", "TANKER_RIG"
+];
+
+const SERVER_STARTER_TRAFFIC = [
+    { id: "parked_0", spec: "STINGER_CABRIO", c: 217.5, r: 136.5, a: -Math.PI * 0.5 },
+    { id: "parked_1", spec: "TURISMO_CABRIO", c: 214.5, r: 138.5, a: Math.PI * 0.5 },
+    { id: "parked_2", spec: "TULIP_MUSCLE", c: 216.5, r: 143.5, a: -Math.PI * 0.5 },
+    { id: "parked_3", spec: "SUPERBIKE", c: 216.5, r: 141.5, a: -Math.PI * 0.5 },
+    { id: "parked_4", spec: "HARLEY_BIKE", c: 215.5, r: 148.5, a: Math.PI * 0.5 },
+    { id: "parked_5", spec: "BANSHEE_GT", c: 217.5, r: 158.5, a: -Math.PI * 0.5 },
+    { id: "parked_6", spec: "CHALLENGER_RT", c: 206.5, r: 143.5, a: -Math.PI * 0.5 },
+    { id: "parked_7", spec: "PORKA_TURBO", c: 207.5, r: 150.5, a: -Math.PI * 0.5 },
+    { id: "parked_8", spec: "SUPERBIKE", c: 216.5, r: 148.5, a: -Math.PI * 0.5 },
+    { id: "parked_9", spec: "HARLEY_BIKE", c: 214.5, r: 142.5, a: Math.PI * 0.5 },
+    { id: "parked_10", spec: "STINGER_CABRIO", c: 217.5, r: 152.5, a: -Math.PI * 0.5 },
+    { id: "parked_11", spec: "BANSHEE_GT", c: 216.5, r: 145.5, a: -Math.PI * 0.5 },
+    { id: "parked_12", spec: "VICE_CAB", c: 215.5, r: 144.5, a: Math.PI * 0.5 },
+    { id: "parked_13", spec: "CHALLENGER_RT", c: 216.5, r: 155.5, a: -Math.PI * 0.5 },
+    { id: "parked_14", spec: "VCPD_CRUISER", c: 214.5, r: 154.5, a: Math.PI * 0.5 },
+    { id: "parked_15", spec: "CITY_BUS", c: 204.5, r: 147.5, a: Math.PI * 0.5 },
+    { id: "parked_19", spec: "TURISMO_CABRIO", c: 208.5, r: 106.5, a: 0 },
+    { id: "parked_20", spec: "STRETCH_LIMO", c: 214.5, r: 47.5, a: Math.PI * 0.5 },
+    { id: "parked_21", spec: "PENETRATOR_GT", c: 214.5, r: 50.0, a: Math.PI * 0.5 },
+    { id: "parked_28", spec: "SUPERBIKE", c: 141.5, r: 116.5, a: Math.PI * 0.5 },
+    { id: "parked_30", spec: "HARLEY_BIKE", c: 116.5, r: 82.5, a: Math.PI * 0.5 },
+    { id: "parked_41", spec: "STINGER_CABRIO", c: 231.0, r: 480.5, a: -Math.PI, raw512: true },
+    { id: "parked_42", spec: "BANSHEE_GT", c: 446.5, r: 215.5, a: -Math.PI * 0.5, raw512: true },
+    { id: "parked_43", spec: "TURISMO_CABRIO", c: 445.5, r: 280.5, a: Math.PI * 0.5, raw512: true },
+    { id: "parked_44", spec: "STINGER_CABRIO", c: 395.5, r: 297.5, a: 0, raw512: true },
+    { id: "parked_45", spec: "CHALLENGER_RT", c: 285.5, r: 215.5, a: Math.PI * 0.5, raw512: true },
+    { id: "micromob_0", spec: "E_SCOOTER", c: 214.5, r: 145.8, a: Math.PI * 0.5 },
+    { id: "micromob_1", spec: "BMX_BIKE", c: 215.5, r: 151.8, a: Math.PI * 0.5 },
+    { id: "micromob_2", spec: "E_SCOOTER", c: 217.5, r: 143.2, a: -Math.PI * 0.5 },
+    { id: "micromob_3", spec: "BMX_BIKE", c: 216.5, r: 152.4, a: -Math.PI * 0.5 },
+    { id: "micromob_4", spec: "E_SCOOTER", c: 215.5, r: 138.0, a: Math.PI * 0.5 },
+    { id: "micromob_5", spec: "BMX_BIKE", c: 216.5, r: 158.0, a: -Math.PI * 0.5 },
+    { id: "micromob_6", spec: "E_SCOOTER", c: 207.5, r: 146.0, a: -Math.PI * 0.5 },
+    { id: "micromob_7", spec: "E_SCOOTER", c: 217.5, r: 146.8, a: -Math.PI * 0.5 },
+    { id: "micromob_8", spec: "BMX_BIKE", c: 217.5, r: 150.2, a: -Math.PI * 0.5 },
+    { id: "micromob_9", spec: "E_SCOOTER", c: 214.5, r: 149.2, a: Math.PI * 0.5 },
+    { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 135.5, a: Math.PI * 0.5 }
+];
+
+function getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive) {
+    if (specKey === "BMX_BIKE") return 54;
+    if (specKey === "E_SCOOTER") return 64;
+    if (sirenActive || drvCode === 2 || drvCode === 3) return 108;
+    if (drvCode === 5) return 114;
+    if (drvCode === 6) return 92;
+    if (specKey === "CITY_BUS" || specKey === "TOUR_COACH" || specKey === "TANKER_RIG" || specKey === "FLATBED_TRUCK" || specKey === "BRINKS_TRUCK") return 72;
+    if (specKey === "SUPERBIKE" || specKey === "BANSHEE_GT" || specKey === "PENETRATOR_GT" || specKey === "VICE_CHEETAH" || specKey === "STINGER_CABRIO" || specKey === "TURISMO_CABRIO") return 92;
+    return 82;
+}
+
+function ensureRoomAutonomousPopulation(roomCode, room) {
+    if (!serverMap || !serverMap.cmpLoaded) return;
+    if (!room.vehs) room.vehs = {};
+    if (!room.peds) room.peds = {};
+    if (!room.vehNav) room.vehNav = {};
+    if (!room.pedNav) room.pedNav = {};
+    const TS = global.TILE_SIZE || 64;
+
+    // 1. Seed starter Ocean Drive / Collins Ave / Española Way moving vehicles if missing
+    for (let i = 0; i < SERVER_STARTER_TRAFFIC.length; i++) {
+        const st = SERVER_STARTER_TRAFFIC[i];
+        if (room.vehs[st.id] || (room.modifiedVehs && room.modifiedVehs[st.id])) continue;
+        const bx = Math.floor(st.raw512 ? st.c : global.mx256(st.c));
+        const by = Math.floor(st.raw512 ? st.r : global.my256(st.r));
+        const vx = (bx + 0.5) * TS;
+        const vy = (by + 0.5) * TS;
+        const vz = serverMap.getHeightAtPixel(vx, vy, 4.0);
+        const ang = serverMap.getAlignedRoadAngle ? serverMap.getAlignedRoadAngle(bx, by, st.a, vz) : st.a;
+        const spd = getServerVehicleCruiseSpeed(st.spec, 1, false);
+        room.vehs[st.id] = [
+            st.id,
+            st.spec,
+            Math.round(vx),
+            Math.round(vy),
+            Math.round(vz * 100) / 100,
+            Math.round(ang * 1000) / 1000,
+            Math.round(Math.cos(ang) * spd),
+            Math.round(Math.sin(ang) * spd),
+            1, // AI_TRAFFIC
+            100,
+            0,
+            i % 6,
+            0,
+            0
+        ];
+    }
+
+    // 2. Seed cmp_car_0..71 from gta1_meta.json startup_cars if missing
+    if (serverMapMeta && Array.isArray(serverMapMeta.startup_cars)) {
+        const count = Math.min(72, serverMapMeta.startup_cars.length);
+        for (let i = 0; i < count; i++) {
+            const vid = `cmp_car_${i}`;
+            if (room.vehs[vid] || (room.modifiedVehs && room.modifiedVehs[vid])) continue;
+            const sc = serverMapMeta.startup_cars[i];
+            const bx = Math.floor(sc.x);
+            const by = Math.floor(sc.y);
+            if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
+            if (serverMap.surfaceGround && serverMap.surfaceGround[by * 512 + bx] !== global.GROUND_TYPE.ROAD) continue;
+            if (serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(bx, by)) continue;
+            const lidZ1 = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
+            if (lidZ1 === 25) continue;
+            const vx = (bx + 0.5) * TS;
+            const vy = (by + 0.5) * TS;
+            const vz = serverMap.getHeightAtPixel(vx, vy, 4.0);
+            const spec = SERVER_SPEC_POOL[i % SERVER_SPEC_POOL.length];
+            const rawAng = sc.ang !== undefined ? sc.ang : (((sc.rot || 0) / 1024.0) * Math.PI * 2);
+            const ang = serverMap.getAlignedRoadAngle ? serverMap.getAlignedRoadAngle(bx, by, rawAng, vz) : rawAng;
+            const spd = getServerVehicleCruiseSpeed(spec, 1, false);
+            room.vehs[vid] = [
+                vid,
+                spec,
+                Math.round(vx),
+                Math.round(vy),
+                Math.round(vz * 100) / 100,
+                Math.round(ang * 1000) / 1000,
+                Math.round(Math.cos(ang) * spd),
+                Math.round(Math.sin(ang) * spd),
+                1,
+                100,
+                0,
+                i % 6,
+                0,
+                0
+            ];
+        }
+    }
+
+    // 3. Seed Dedicated Municipal & City Service Patrols (8 VCPD Cruisers, 6 Transit Buses, 8 Vice Cabs, 3 Brinks Armored Trucks)
+    const serviceRoster = [
+        { prefix: "srv_cop_", count: 8, spec: "VCPD_CRUISER", drv: 1, hp: 140 },
+        { prefix: "srv_bus_", count: 6, spec: "CITY_BUS", drv: 1, hp: 180 },
+        { prefix: "srv_cab_", count: 8, spec: "VICE_CAB", drv: 1, hp: 110 },
+        { prefix: "srv_brinks_", count: 3, spec: "BRINKS_TRUCK", drv: 1, hp: 220 }
+    ];
+    const tilePool = hotspotRoadTiles.length > 0 ? hotspotRoadTiles : roadSpawnTiles;
+    if (tilePool.length > 0) {
+        let seedIdx = 7;
+        for (const sr of serviceRoster) {
+            for (let k = 0; k < sr.count; k++) {
+                const vid = `${sr.prefix}${k}`;
+                if (room.vehs[vid] || (room.modifiedVehs && room.modifiedVehs[vid])) continue;
+                const spot = tilePool[(seedIdx * 37 + k * 53) % tilePool.length];
+                seedIdx++;
+                const vx = (spot.bx + 0.5) * TS;
+                const vy = (spot.by + 0.5) * TS;
+                const spd = getServerVehicleCruiseSpeed(sr.spec, sr.drv, false);
+                room.vehs[vid] = [
+                    vid,
+                    sr.spec,
+                    Math.round(vx),
+                    Math.round(vy),
+                    Math.round(spot.z * 100) / 100,
+                    Math.round(spot.angle * 1000) / 1000,
+                    Math.round(Math.cos(spot.angle) * spd),
+                    Math.round(Math.sin(spot.angle) * spd),
+                    sr.drv,
+                    sr.hp,
+                    0,
+                    k % 4,
+                    0,
+                    0
+                ];
+            }
+        }
+    }
+
+    // 4. Seed 64 Autonomous Sidewalk Pedestrians across Ocean Drive, South Beach, Española Way, Downtown & Little Cuba
+    if (sidewalkSpawnTiles.length > 0 && Object.keys(room.peds).length < 48) {
+        const pedTypes = [
+            "civ0", "civ1", "civ2", "civ3", "bikini_pink", "bikini_cyan", "bikini_yellow",
+            "surfer_guy", "beach_guy_red", "vc_tourist", "vc_jogger", "vc_crockett", "vc_tubbs",
+            "g2_civ_aqua", "g2_civ_pink", "vc_cuban", "vc_haitian"
+        ];
+        const cardAngles = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
+        for (let i = 0; i < 64; i++) {
+            const pid = `ped_init_${i}`;
+            if (room.peds[pid]) continue;
+            const tile = sidewalkSpawnTiles[(i * 29 + 11) % sidewalkSpawnTiles.length];
+            const px = (tile.bx + 0.5) * TS;
+            const py = (tile.by + 0.5) * TS;
+            const ang = cardAngles[i % 4];
+            const gType = pedTypes[i % pedTypes.length];
+            const spd = gType === "vc_jogger" ? 38 : 25;
+            room.peds[pid] = [
+                pid,
+                0, // CIVILIAN
+                gType,
+                Math.round(px),
+                Math.round(py),
+                Math.round(tile.z * 100) / 100,
+                Math.round(ang * 100) / 100,
+                spd,
+                35,
+                0,
+                0,
+                0
+            ];
+        }
+    }
+}
+
+function getStationCoords(serviceType) {
+    const TS = global.TILE_SIZE || 64;
+    if (serverMap && Array.isArray(serverMap.emergencyStations)) {
+        const st = serverMap.emergencyStations.find((s) => s.type === serviceType);
+        if (st) return st;
+    }
+    if (serviceType === "MEDIC") return { id: "ems_hq", x: global.mx256(208.5) * TS, y: global.my256(140.5) * TS };
+    if (serviceType === "FIRE") return { id: "vcfd_hq", x: 428.5 * TS, y: 295.5 * TS };
+    if (serviceType === "TOW") return { id: "tow_hq", x: 333.2 * TS, y: 306.5 * TS };
+    return { id: "vcpd_hq", x: global.mx256(203.0) * TS, y: global.my256(146.0) * TS };
+}
+
+function snapStationToNearestRoad(wx, wy) {
+    const TS = global.TILE_SIZE || 64;
+    const baseBx = Math.floor(wx / TS);
+    const baseBy = Math.floor(wy / TS);
+    for (let r = 0; r <= 8; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                const bx = baseBx + dx;
+                const by = baseBy + dy;
+                if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
+                const nav = serverMap.getNavigationBlock(bx, by, 2.0);
+                if (nav && nav.groundType === global.GROUND_TYPE.ROAD && !nav.isParkingBay) {
+                    const dirs = serverMap.getAllowedRoadDirections(bx, by, 2.0);
+                    const ang = dirs.length > 0 ? dirs[0].angle : 0;
+                    const rx = (bx + 0.5) * TS;
+                    const ry = (by + 0.5) * TS;
+                    return { x: rx, y: ry, z: serverMap.getHeightAtPixel(rx, ry, 4.0), angle: ang };
+                }
+            }
+        }
+    }
+    return { x: wx, y: wy, z: 2.0, angle: 0 };
+}
+
+function tickAutonomousRoom(roomCode, room, dt = 0.10) {
+    if (!serverMap || !serverMap.cmpLoaded) return;
+    ensureRoomAutonomousPopulation(roomCode, room);
+
+    const nowMs = Date.now();
+    const TS = global.TILE_SIZE || 64;
+
+    // 1. Advance traffic lights (24s cycle) and 24-hour world clock continuously
+    room.trafficLightTimer = ((room.trafficLightTimer || 0) + dt) % 24.0;
+    if ((nowMs - (room.lastClientWorldSyncMs || 0)) > 250) {
+        const prevHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+        room.worldMinutes = Math.round((((room.worldMinutes || 720) + dt * 0.35) % 1440) * 100) / 100;
+        const nextHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+        if (prevHr < 17.0 && nextHr >= 17.0) {
+            room.worldMinutes = 600;
+        }
+    }
+
+    if (!room.vehNav) room.vehNav = {};
+    if (!room.pedNav) room.pedNav = {};
+    if (!room.vehClientSyncMs) room.vehClientSyncMs = {};
+    if (!room.pedClientSyncMs) room.pedClientSyncMs = {};
+
+    // 2. Build 128x128 spatial hash (256px cells) of all vehicles so autonomous traffic obeys safe bumper spacing
+    const cellBuckets = new Map();
+    const allVehEntries = Object.entries(room.vehs);
+    for (let i = 0; i < allVehEntries.length; i++) {
+        const vrow = allVehEntries[i][1];
+        if (!Array.isArray(vrow)) continue;
+        const cx = vrow[2] >> 8;
+        const cy = vrow[3] >> 8;
+        const key = (cy << 8) | cx;
+        let b = cellBuckets.get(key);
+        if (!b) {
+            b = [];
+            cellBuckets.set(key, b);
+        }
+        b.push(vrow);
+    }
+
+    // 3. Autonomous Municipal Dispatch Check (every 1.0s = 10 ticks)
+    room._dispatchTick = ((room._dispatchTick || 0) + 1) % 10;
+    if (room._dispatchTick === 0 && (nowMs - (room.lastClientWorldSyncMs || 0)) > 450) {
+        // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
+        const corpseEntries = Object.entries(room.corpses || {});
+        if (corpseEntries.length > 0) {
+            const activeAmbs = allVehEntries.filter(([, r]) => Array.isArray(r) && r[1] === "MEDIC_AMBULANCE" && !(r[10] & 1));
+            if (activeAmbs.length < Math.min(3, corpseEntries.length)) {
+                const [targetCid, targetCrow] = corpseEntries[0];
+                if (Array.isArray(targetCrow)) {
+                    const st = getStationCoords("MEDIC");
+                    const sp = snapStationToNearestRoad(st.x, st.y);
+                    const aid = `amb_srv_${nowMs.toString(36)}`;
+                    const spd = 106;
+                    room.vehs[aid] = [
+                        aid, "MEDIC_AMBULANCE",
+                        Math.round(sp.x), Math.round(sp.y), Math.round(sp.z * 100) / 100,
+                        Math.round(sp.angle * 1000) / 1000,
+                        Math.round(Math.cos(sp.angle) * spd), Math.round(Math.sin(sp.angle) * spd),
+                        3, 160, 2, 0, 0, 0
+                    ];
+                    room.vehNav[aid] = {
+                        role: "EMS",
+                        phase: "TO_SCENE",
+                        targetId: targetCid,
+                        goalX: targetCrow[3],
+                        goalY: targetCrow[4],
+                        homeX: sp.x,
+                        homeY: sp.y,
+                        workTimer: 0,
+                        turnSeed: 0.37
+                    };
+                }
+            }
+        }
+
+        // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
+        for (const [vid, vrow] of Object.entries(room.modifiedVehs || {})) {
+            if (!Array.isArray(vrow) || !(vrow[10] & 1)) continue;
+            const wx = vrow[2];
+            const wy = vrow[3];
+            if (!(vrow[10] & 128)) {
+                const hasFireUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "FIRE" && nv.targetId === vid);
+                if (!hasFireUnit) {
+                    const st = getStationCoords("FIRE");
+                    const sp = snapStationToNearestRoad(st.x, st.y);
+                    const fid = `vcfd_srv_${nowMs.toString(36)}`;
+                    const spd = 104;
+                    room.vehs[fid] = [
+                        fid, "FIRE_TRUCK",
+                        Math.round(sp.x), Math.round(sp.y), Math.round(sp.z * 100) / 100,
+                        Math.round(sp.angle * 1000) / 1000,
+                        Math.round(Math.cos(sp.angle) * spd), Math.round(Math.sin(sp.angle) * spd),
+                        3, 220, 2, 0, 0, 0
+                    ];
+                    room.vehNav[fid] = {
+                        role: "FIRE",
+                        phase: "TO_SCENE",
+                        targetId: vid,
+                        goalX: wx,
+                        goalY: wy,
+                        homeX: sp.x,
+                        homeY: sp.y,
+                        workTimer: 0,
+                        turnSeed: 0.41
+                    };
+                }
+            } else {
+                const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
+                if (!hasTowUnit) {
+                    const st = getStationCoords("TOW");
+                    const sp = snapStationToNearestRoad(st.x, st.y);
+                    const tid = `tow_srv_${nowMs.toString(36)}`;
+                    const spd = 92;
+                    room.vehs[tid] = [
+                        tid, "TOW_TRUCK",
+                        Math.round(sp.x), Math.round(sp.y), Math.round(sp.z * 100) / 100,
+                        Math.round(sp.angle * 1000) / 1000,
+                        Math.round(Math.cos(sp.angle) * spd), Math.round(Math.sin(sp.angle) * spd),
+                        6, 180, 2, 0, 0, 0
+                    ];
+                    room.vehNav[tid] = {
+                        role: "TOW",
+                        phase: "TO_SCENE",
+                        targetId: vid,
+                        goalX: wx,
+                        goalY: wy,
+                        homeX: sp.x,
+                        homeY: sp.y,
+                        workTimer: 0,
+                        turnSeed: 0.53
+                    };
+                }
+            }
+        }
+    }
+
+    // 4. Advance all autonomous vehicles along the .CMP road network
+    let seq = 1;
+    for (const [vid, row] of allVehEntries) {
+        seq++;
+        if (!Array.isArray(row) || row.length < 11) continue;
+        // If an active client WorldHost updated this specific vehicle within the last 400ms, let the 60 FPS client drive it
+        if ((nowMs - (room.vehClientSyncMs[vid] || 0)) < 400) {
+            let nav = room.vehNav[vid];
+            if (!nav) {
+                nav = { turnSeed: ((seq * 0.6180339) % 1.0) };
+                room.vehNav[vid] = nav;
+            }
+            nav.targetBx = Math.floor(row[2] / TS);
+            nav.targetBy = Math.floor(row[3] / TS);
+            continue;
+        }
+
+        const drvCode = row[8] || 0;
+        const flags = row[10] || 0;
+        if (drvCode === 0 || drvCode === 4 || (flags & 1)) {
+            row[6] = 0;
+            row[7] = 0;
+            continue;
+        }
+
+        let nav = room.vehNav[vid];
+        if (!nav) {
+            nav = {
+                targetBx: null,
+                targetBy: null,
+                turnSeed: ((seq * 0.6180339887) % 1.0),
+                turnedInIntersection: false,
+                entryAngle: row[5] || 0
+            };
+            room.vehNav[vid] = nav;
+        }
+
+        let x = row[2];
+        let y = row[3];
+        let z = row[4] || 2.0;
+        let a = row[5] || 0;
+        const specKey = row[1] || "STALLION";
+        const sirenActive = Boolean(flags & 2);
+
+        // Handle Municipal Fleet scene work & station return (EMS, FIRE, TOW)
+        if (nav.role && nav.goalX !== undefined && nav.goalY !== undefined) {
+            const distGoal = Math.hypot(nav.goalX - x, nav.goalY - y);
+            if (nav.phase === "TO_SCENE" && distGoal < 125) {
+                row[6] = 0;
+                row[7] = 0;
+                nav.workTimer = (nav.workTimer || 0) + dt;
+                if (nav.workTimer >= 2.2) {
+                    if (nav.role === "EMS" && nav.targetId && room.corpses && room.corpses[nav.targetId]) {
+                        const crow = room.corpses[nav.targetId];
+                        delete room.corpses[nav.targetId];
+                        if (room.corpseTs) delete room.corpseTs[nav.targetId];
+                        broadcastToRoom(roomCode, {
+                            t: "WORLD_EVENT",
+                            kind: "PED_REVIVE",
+                            pedId: nav.targetId,
+                            x: Array.isArray(crow) ? crow[3] : Math.round(x),
+                            y: Array.isArray(crow) ? crow[4] : Math.round(y),
+                            evacuated: false
+                        });
+                    } else if (nav.role === "FIRE" && nav.targetId) {
+                        if (room.modifiedVehs && room.modifiedVehs[nav.targetId]) {
+                            room.modifiedVehs[nav.targetId][10] |= 128;
+                        }
+                        if (room.vehs && room.vehs[nav.targetId]) {
+                            room.vehs[nav.targetId][10] |= 128;
+                        }
+                    } else if (nav.role === "TOW" && nav.targetId) {
+                        delete room.modifiedVehs[nav.targetId];
+                        if (room.modifiedVehTs) delete room.modifiedVehTs[nav.targetId];
+                        delete room.vehs[nav.targetId];
+                        broadcastToRoom(roomCode, {
+                            t: "WORLD_EVENT",
+                            kind: "VEH_EXIT",
+                            vehId: nav.targetId,
+                            x: -9999,
+                            y: -9999,
+                            z: -99,
+                            a: 0,
+                            hp: 0,
+                            flags: 0
+                        });
+                    }
+                    nav.phase = "RETURNING";
+                    nav.goalX = nav.homeX;
+                    nav.goalY = nav.homeY;
+                    row[10] = flags & ~2; // Turn siren off for return trip
+                }
+                continue;
+            } else if (nav.phase === "RETURNING" && distGoal < 110) {
+                delete room.vehs[vid];
+                delete room.vehNav[vid];
+                continue;
+            }
+        }
+
+        const bx = Math.max(1, Math.min(510, Math.floor(x / TS)));
+        const by = Math.max(1, Math.min(510, Math.floor(y / TS)));
+
+        if (
+            nav.targetBx === null ||
+            nav.targetBy === null ||
+            (bx === nav.targetBx && by === nav.targetBy && Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) < 26) ||
+            Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) > TS * 2.6
+        ) {
+            nav.turnSeed = (nav.turnSeed + 0.381966011) % 1.0;
+            const curDirs = serverMap.getAllowedRoadDirections(bx, by, z);
+            if (curDirs.length <= 1) {
+                nav.turnedInIntersection = false;
+                nav.entryAngle = a;
+            }
+            const nextStep = (nav.role && typeof nav.goalX === "number" && typeof nav.goalY === "number")
+                ? serverMap.chooseDirectedRoadBlock(bx, by, a, nav.goalX, nav.goalY, z, nav.turnedInIntersection, nav.entryAngle)
+                : serverMap.chooseNextRoadBlock(bx, by, a, z, nav.turnSeed, nav.turnedInIntersection, nav.entryAngle);
+            if (nextStep) {
+                nav.targetBx = nextStep.bx;
+                nav.targetBy = nextStep.by;
+                nav.targetAngle = nextStep.angle;
+                if (nextStep.isTurn) nav.turnedInIntersection = true;
+            } else {
+                nav.targetBx = bx + Math.round(Math.cos(a));
+                nav.targetBy = by + Math.round(Math.sin(a));
+                nav.targetAngle = a;
+            }
+        }
+
+        const tx = (nav.targetBx + 0.5) * TS;
+        const ty = (nav.targetBy + 0.5) * TS;
+        const desiredAng = Math.atan2(ty - y, tx - x);
+        let angDiff = desiredAng - a;
+        while (angDiff > Math.PI) angDiff -= Math.PI * 2;
+        while (angDiff < -Math.PI) angDiff += Math.PI * 2;
+        const maxTurn = 4.2 * dt;
+        if (Math.abs(angDiff) <= maxTurn) a = desiredAng;
+        else a += Math.sign(angDiff) * maxTurn;
+
+        // Check red traffic light when approaching intersection (unless emergency siren is active)
+        let targetSpd = getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive);
+        if (!sirenActive && serverMap.isRedLightForApproach) {
+            const hdx = Math.round(Math.cos(a));
+            const hdy = Math.round(Math.sin(a));
+            if ((hdx !== 0 || hdy !== 0) && serverMap.isRedLightForApproach(bx, by, hdx, hdy, room.trafficLightTimer, z)) {
+                targetSpd = 0;
+            }
+        }
+
+        // Check lead vehicle spacing in spatial hash
+        if (targetSpd > 0) {
+            const cfx = Math.cos(a);
+            const cfy = Math.sin(a);
+            const gx = x >> 8;
+            const gy = y >> 8;
+            let blockedByLead = false;
+            for (let dy = -1; dy <= 1 && !blockedByLead; dy++) {
+                for (let dx = -1; dx <= 1 && !blockedByLead; dx++) {
+                    const bucket = cellBuckets.get(((gy + dy) << 8) | (gx + dx));
+                    if (!bucket) continue;
+                    for (let k = 0; k < bucket.length; k++) {
+                        const other = bucket[k];
+                        if (other === row) continue;
+                        const odx = other[2] - x;
+                        const ody = other[3] - y;
+                        const fwd = odx * cfx + ody * cfy;
+                        const lat = Math.abs(-odx * cfy + ody * cfx);
+                        if (fwd > 8 && fwd < 90 && lat < 24) {
+                            const otherSpd = Math.hypot(other[6] || 0, other[7] || 0);
+                            targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.85);
+                            if (targetSpd === 0) blockedByLead = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        const vx = Math.cos(a) * targetSpd;
+        const vy = Math.sin(a) * targetSpd;
+        x += vx * dt;
+        y += vy * dt;
+        z = serverMap.getHeightAtPixel(x, y, z);
+
+        row[2] = Math.round(x * 10) / 10;
+        row[3] = Math.round(y * 10) / 10;
+        row[4] = Math.round(z * 100) / 100;
+        row[5] = Math.round(a * 1000) / 1000;
+        row[6] = Math.round(vx);
+        row[7] = Math.round(vy);
+    }
+
+    // 5. Advance all autonomous pedestrians along .CMP sidewalks
+    let pSeq = 1;
+    for (const [pid, prow] of Object.entries(room.peds)) {
+        pSeq++;
+        if (!Array.isArray(prow) || prow.length < 10) continue;
+        if (prow[9] & 1) continue; // Dead corpse
+        if ((nowMs - (room.pedClientSyncMs[pid] || 0)) < 400) continue;
+
+        let pnav = room.pedNav[pid];
+        if (!pnav) {
+            pnav = { targetBx: null, targetBy: null, turnSeed: ((pSeq * 0.6180339) % 1.0) };
+            room.pedNav[pid] = pnav;
+        }
+        let px = prow[3];
+        let py = prow[4];
+        let pz = prow[5] || 2.0;
+        let pa = prow[6] || 0;
+        const pspd = prow[7] || 25;
+        const bx = Math.max(1, Math.min(510, Math.floor(px / TS)));
+        const by = Math.max(1, Math.min(510, Math.floor(py / TS)));
+
+        if (
+            pnav.targetBx === null ||
+            pnav.targetBy === null ||
+            Math.hypot((pnav.targetBx + 0.5) * TS - px, (pnav.targetBy + 0.5) * TS - py) < 16 ||
+            Math.hypot((pnav.targetBx + 0.5) * TS - px, (pnav.targetBy + 0.5) * TS - py) > TS * 2.2
+        ) {
+            pnav.turnSeed = (pnav.turnSeed + 0.381966011) % 1.0;
+            const step = serverMap.chooseNextSidewalkBlock
+                ? serverMap.chooseNextSidewalkBlock(bx, by, pa, pz, pnav.turnSeed, false, null, -1, -1, null)
+                : null;
+            if (step) {
+                pnav.targetBx = step.bx;
+                pnav.targetBy = step.by;
+                pa = step.angle;
+            } else {
+                pa = ((pa + Math.PI) % (Math.PI * 2));
+                pnav.targetBx = bx + Math.round(Math.cos(pa));
+                pnav.targetBy = by + Math.round(Math.sin(pa));
+            }
+        } else {
+            const tx = (pnav.targetBx + 0.5) * TS;
+            const ty = (pnav.targetBy + 0.5) * TS;
+            pa = Math.atan2(ty - py, tx - px);
+        }
+
+        px += Math.cos(pa) * pspd * dt;
+        py += Math.sin(pa) * pspd * dt;
+        pz = serverMap.getHeightAtPixel(px, py, pz);
+
+        prow[3] = Math.round(px * 10) / 10;
+        prow[4] = Math.round(py * 10) / 10;
+        prow[5] = Math.round(pz * 100) / 100;
+        prow[6] = Math.round(pa * 100) / 100;
+    }
+
+    // 6. Broadcast 10 Hz server simulation tick to connected clients whenever no client WorldHost has broadcast in the last 220ms
+    if ((nowMs - (room.lastClientWorldSyncMs || 0)) > 220) {
+        let hasRoomClients = false;
+        for (const meta of clients.values()) {
+            if (meta.room === roomCode && !meta.isOutdated) {
+                hasRoomClients = true;
+                break;
+            }
+        }
+        if (hasRoomClients) {
+            const vehRows = getCombinedRoomVehicles(room).slice(0, 190);
+            const pedRows = Object.values(Object.assign({}, room.peds || {}, room.corpses || {})).slice(0, 120);
+            broadcastToRoom(roomCode, {
+                t: "WORLD_SYNC",
+                id: "server_sim",
+                ver: room.ver || MIN_CLIENT_VER,
+                wm: room.worldMinutes || 720,
+                tl: Math.round((room.trafficLightTimer || 0) * 100) / 100,
+                vehs: vehRows,
+                peds: pedRows
+            });
+        }
+    }
+}
+
+// Run the 10 Hz (100ms) Autonomous World Simulation across all persistent rooms 24/7!
+for (const [rCode, rv] of Object.entries(persistentStore.rooms)) {
+    ensureRoomAutonomousPopulation(rCode, rv);
+}
+setInterval(() => {
+    autonomousSimTickCount++;
+    for (const [rCode, rv] of Object.entries(persistentStore.rooms)) {
+        tickAutonomousRoom(rCode, rv, 0.10);
+    }
+    if ((autonomousSimTickCount % 40) === 0) {
+        isDirty = true;
+    }
+}, 100);
+
 setInterval(() => {
     const nowMs = Date.now();
     // 1. Evict silent/dead zombie sockets (> 65s without PING, STATE, or WORLD_SYNC)
@@ -1201,20 +2007,8 @@ setInterval(() => {
         broadcastDirectoryCounts();
     }
 
-    // 2. Per-room periodic maintenance: traffic lights, world clock, prop auto-repair, corpse TTL, wreck TTL & event expiry
+    // 2. Per-room periodic maintenance: prop auto-repair, corpse TTL, wreck TTL & event expiry
     for (const [rCode, rv] of Object.entries(persistentStore.rooms)) {
-        rv.trafficLightTimer = ((rv.trafficLightTimer || 0) + 0.5) % 24.0;
-        if ((nowMs - (rv.updatedAt || 0)) > 3000) {
-            rv.worldMinutes = Math.round((((rv.worldMinutes || 720) + 0.125) % 1440) * 100) / 100;
-        }
-        // If no WORLD_SYNC has arrived in the room for > 15s, prune transient AI traffic from rv.vehs while keeping rv.modifiedVehs
-        if ((nowMs - (rv.updatedAt || 0)) > 15000 && rv.vehs) {
-            for (const vid of Object.keys(rv.vehs)) {
-                if (!rv.modifiedVehs || !rv.modifiedVehs[vid]) {
-                    delete rv.vehs[vid];
-                }
-            }
-        }
         if (rv.robbedVaults) {
             for (const [vk, expMs] of Object.entries(rv.robbedVaults)) {
                 if (!expMs || nowMs >= expMs) {

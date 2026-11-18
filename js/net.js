@@ -2106,8 +2106,24 @@ class ViceNetworkManager {
         }, 550);
     }
 
+    onWorldReady() {
+        this.flushPendingPropSync();
+        this.tryApplyPendingProfileSync();
+        if (this._pendingServerBootstrapPkt) {
+            const bootPkt = this._pendingServerBootstrapPkt;
+            this._pendingServerBootstrapPkt = null;
+            this.applyWorldSync(bootPkt);
+        }
+        if (this._pendingWorldSyncPkt) {
+            const syncPkt = this._pendingWorldSyncPkt;
+            this._pendingWorldSyncPkt = null;
+            this.applyWorldSync(syncPkt);
+        }
+    }
+
     broadcastWorldSync() {
-        if (!this.enabled || !this.game || !this.game.map || !this.game.map.cmpLoaded) return;
+        if (!this.enabled || !this.game || !this.game.worldReady || !this.game.map || !this.game.map.cmpLoaded) return;
+        if (this.wsConnected && !this._serverBootstrapApplied) return;
         const g = this.game;
 
         const drvToCode = (d) => {
@@ -2238,13 +2254,22 @@ class ViceNetworkManager {
     }
 
     applyWorldSync(pkt) {
-        if (!this.game || !this.game.map || !this.game.map.cmpLoaded || !pkt) return;
+        if (!pkt) return;
         const isInitialServerBootstrap = (pkt.id === "server_world");
+        const isAutonomousServerTick = (pkt.id === "server_sim");
+        if (!this.game || !this.game.worldReady || !this.game.map || !this.game.map.cmpLoaded) {
+            if (isInitialServerBootstrap) {
+                this._pendingServerBootstrapPkt = pkt;
+            } else {
+                this._pendingWorldSyncPkt = pkt;
+            }
+            return;
+        }
         const syncNowMs = performance.now();
-        if (!isInitialServerBootstrap) {
+        if (!isInitialServerBootstrap && !isAutonomousServerTick) {
             this.lastWorldSyncReceivedMs = syncNowMs;
         }
-        if (isInitialServerBootstrap) {
+        if (isInitialServerBootstrap || isAutonomousServerTick) {
             this._serverBootstrapApplied = true;
         }
         const g = this.game;
@@ -2252,12 +2277,12 @@ class ViceNetworkManager {
         if (typeof pkt.wm === "number") {
             g.worldMinutes = pkt.wm;
         }
-        if (!isInitialServerBootstrap && typeof pkt.tl === "number") {
+        if (typeof pkt.tl === "number") {
             const curTl = ((g.trafficLightTimer || 0) % 24.0 + 24.0) % 24.0;
             const netTl = ((pkt.tl || 0) % 24.0 + 24.0) % 24.0;
             const rawDiff = Math.abs(curTl - netTl);
             const circDiff = Math.min(rawDiff, 24.0 - rawDiff);
-            if (circDiff > 0.8) {
+            if (isInitialServerBootstrap || circDiff > 0.8) {
                 g.trafficLightTimer = netTl;
             }
         }
@@ -2308,36 +2333,6 @@ class ViceNetworkManager {
                     }
                 }
                 seenIds.add(id);
-                const isDynamicId = typeof id === "string" && (
-                    id.startsWith("trf_") ||
-                    id.startsWith("traf_") ||
-                    id.startsWith("cop_") ||
-                    id.startsWith("rb_") ||
-                    id.startsWith("amb_") ||
-                    id.startsWith("medic_") ||
-                    id.startsWith("vcfd_") ||
-                    id.startsWith("tow_") ||
-                    id.startsWith("fixer_") ||
-                    id.startsWith("mission_") ||
-                    id.startsWith("mcheetah_") ||
-                    id.startsWith("mbrinks_")
-                );
-                // On initial server bootstrap, only restore truly modified vehicles (isMod === 1),
-                // and auto-purge any stale dynamic traffic/event vehicle or distant burned wreck!
-                if (isInitialServerBootstrap) {
-                    if (!isMod) {
-                        continue;
-                    }
-                    const distFromPlayer = Math.hypot(x - (g.player ? g.player.x : x), y - (g.player ? g.player.y : y));
-                    if ((flags & 1) && distFromPlayer > 900) {
-                        this.broadcastVehicleRemoved(id);
-                        continue;
-                    }
-                    if (isDynamicId && (drvCode !== 0 || distFromPlayer > 1800)) {
-                        this.broadcastVehicleRemoved(id);
-                        continue;
-                    }
-                }
                 // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
                 if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id.startsWith("estate_") || id.startsWith("boat_") || id.startsWith("vport_") || id.startsWith("armored_") || id.startsWith("parked_") || missionTag === "LANDMARK") && drvCode === 0 && !(flags & 1)) {
                     continue;
@@ -2350,10 +2345,12 @@ class ViceNetworkManager {
                     v = null;
                 }
                 if (!v) {
-                    // Prevent stacking a newly spawned persisted vehicle directly on top of an untouched static curb-parked car
+                    // Prevent stacking a newly spawned server vehicle on top of an untouched static curb-parked or local startup car
                     for (let oi = g.vehicles.length - 1; oi >= 0; oi--) {
                         const ov = g.vehicles[oi];
-                        if (ov && !ov._worldModified && ov !== g.player.inVehicle && (ov.isStaticParked || ov.isCurbParked) && Math.hypot(ov.x - x, ov.y - y) < 26) {
+                        if (!ov || ov === g.player.inVehicle || seenIds.has(ov.id)) continue;
+                        const isDisposableLocal = !ov._worldModified && (ov.isStaticParked || ov.isCurbParked || (isInitialServerBootstrap && ov.driver === "AI_TRAFFIC"));
+                        if (isDisposableLocal && Math.hypot(ov.x - x, ov.y - y) < 58) {
                             g.vehicles.splice(oi, 1);
                         }
                     }
@@ -2368,6 +2365,11 @@ class ViceNetworkManager {
                     if (remapIdx !== undefined) v.remapIdx = remapIdx;
                     if (missionTag) v.missionTag = missionTag;
                     g.vehicles.push(v);
+                } else if (isInitialServerBootstrap) {
+                    v.aiBlockX = -1;
+                    v.aiBlockY = -1;
+                    v.aiChosenDir = null;
+                    v.aiTurnedInIntersection = false;
                 }
 
                 if (isMod) {
@@ -2478,10 +2480,6 @@ class ViceNetworkManager {
                 if (!Array.isArray(row) || row.length < 10) continue;
                 const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag, copWeapon] = row;
                 const isDead = Boolean(flags & 1);
-                // On initial server bootstrap from disk, only restore corpses and special/emergency peds
-                if (isInitialServerBootstrap && !isDead && kindCode === 0) {
-                    continue;
-                }
                 seenPedIds.add(id);
                 const kindStr = codeToKind(kindCode);
                 let ped = existingPedById.get(id);

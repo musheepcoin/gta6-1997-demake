@@ -5472,9 +5472,10 @@ class TrafficManager {
         const canvasH = renderer && renderer.canvas ? renderer.canvas.height : 720;
         const camDist = renderer ? (renderer.followHeightBlocks + renderer.zoomOffsetBlocks) : 5.0;
 
-        const camX = renderer ? renderer.camX : game.player.x;
-        const camY = renderer ? renderer.camY : game.player.y;
-        const camZ = renderer ? renderer.camZBlocks : (game.player.z || 2.0);
+        const useRendererCam = Boolean(renderer && !game.activeInterior);
+        const camX = useRendererCam ? renderer.camX : game.player.x;
+        const camY = useRendererCam ? renderer.camY : game.player.y;
+        const camZ = useRendererCam ? renderer.camZBlocks : (game.player.z || 2.0);
         const list = [{
             x: camX,
             y: camY,

@@ -1503,6 +1503,9 @@ class LeonidaGame {
 
         this.worldReady = true;
         this._resetLoopClock = true;
+        if (this.net && typeof this.net.onWorldReady === "function") {
+            this.net.onWorldReady();
+        }
 
         if (this._pendingStartGame) {
             this._pendingStartGame = false;
@@ -8249,7 +8252,7 @@ class LeonidaGame {
     isPointInAnyPlayerCameraView(wx, wy, marginPx = 140) {
         const p = this.player;
         if (p && Math.hypot(wx - p.x, wy - p.y) < 700) return true;
-        if (this.renderer) {
+        if (this.renderer && !this.activeInterior) {
             const camX = this.renderer.camX !== undefined ? this.renderer.camX : (p ? p.x : 0);
             const camY = this.renderer.camY !== undefined ? this.renderer.camY : (p ? p.y : 0);
             if (Math.hypot(wx - camX, wy - camY) < 720) return true;
@@ -9023,7 +9026,7 @@ class LeonidaGame {
 
         const p = this.player;
 
-        if (p.dead || this.activeInterior) return;
+        if (!this.started || p.dead || this.activeInterior) return;
 
         let rem = amount;
 
@@ -10988,16 +10991,12 @@ class LeonidaGame {
 
     update(dt) {
 
-        if (!this.started) {
-            if (this.net && typeof this.net.update === "function") {
-                this.net.update(dt);
-            }
-            return;
-        }
-
         // Wait until the binary 3D map (cmpLoaded) and WebGL renderer (gta1Ready) are ready
         // so AI traffic and pedestrians never simulate on uninitialized PAWEMENT tiles during startup!
         if (!this.map || !this.map.cmpLoaded || !this.renderer || !this.renderer.gta1Ready) {
+            if (this.net && typeof this.net.update === "function") {
+                this.net.update(dt);
+            }
             return;
         }
 
@@ -11118,7 +11117,7 @@ class LeonidaGame {
 
         // 1. Player On-Foot or In-Vehicle Update
 
-        if (!p.dead && !this.activeInterior) {
+        if (this.started && !p.dead && !this.activeInterior) {
 
             if (p.muzzleTimer > 0) p.muzzleTimer -= dt;
 
@@ -16984,7 +16983,9 @@ class LeonidaGame {
 
         // 12. Missions, Online P2P Network, Footsteps & Spatial Ambient Audio Update
 
-        this.missions.update(dt);
+        if (this.started && this.missions) {
+            this.missions.update(dt);
+        }
 
         if (this.net) {
 
@@ -16995,7 +16996,7 @@ class LeonidaGame {
 
 
         // 12A. Surface-aware Footsteps for Lucia on foot (Pavement, Vice Beach Sand, Park Grass, Water)
-        if (!this.activeInterior) {
+        if (this.started && !this.activeInterior) {
 
         if (!p.inVehicle && !p.dead) {
 
