@@ -8606,20 +8606,24 @@ class RetroRenderer {
                 if (sw.isSurfer) {
                     const surfAng = (sw.angle || Math.PI) + Math.sin(waveT) * 0.12;
                     this.batchObjectSprite3D(sw.boardSpr || "surfboard_pink", wx, wy, bz + 0.022, surfAng + Math.PI * 0.5, 1.08, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                    const surfFr = (si % 2 === 0) ? (50 + (Math.floor(this.time * 4.5 + si) % 4)) : 42;
-                    this.batchPedSprite3D(sw.pedType || "surfer_guy", surfFr, wx, wy, bz + 0.036, surfAng, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (!((sw.wipeoutTimer || 0) > 0)) {
+                        const surfFr = (si % 2 === 0) ? (50 + (Math.floor(this.time * 4.5 + si) % 4)) : 42;
+                        this.batchPedSprite3D(sw.pedType || "surfer_guy", surfFr, wx, wy, bz + 0.036, surfAng, 1.02, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 } else {
                     if (sw.hasFloatRing) {
                         this.batchObjectSprite3D("flamingo_float", wx, wy, bz + 0.020, this.time * 0.35 + si, 0.84, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     }
-                    const swimFr = 50 + (Math.floor(this.time * 4.2 + si) % 4);
-                    this.batchPedSprite3D(sw.pedType || "bikini_cyan", swimFr, wx, wy, bz + 0.028, (sw.angle || 0) + Math.sin(waveT) * 0.25, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                    if (sw.friendWaderType) {
-                        const fwx = wx + 8;
-                        const fwy = wy + 13;
-                        const fwFr = 50 + (Math.floor(this.time * 3.9 + si + 2) % 4);
-                        this.pushSolidQuad3D(fwx, fwy, bz + 0.014, rippleSize * 0.9, rippleSize * 0.65, 0, 0.85, 0.97, 1.0, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.batchPedSprite3D(sw.friendWaderType, fwFr, fwx, fwy, bz + 0.028, (sw.angle || 0) + Math.PI - Math.sin(waveT) * 0.2, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    if (!((sw.wipeoutTimer || 0) > 0)) {
+                        const swimFr = 50 + (Math.floor(this.time * 4.2 + si) % 4);
+                        this.batchPedSprite3D(sw.pedType || "bikini_cyan", swimFr, wx, wy, bz + 0.028, (sw.angle || 0) + Math.sin(waveT) * 0.25, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        if (sw.friendWaderType) {
+                            const fwx = wx + 8;
+                            const fwy = wy + 13;
+                            const fwFr = 50 + (Math.floor(this.time * 3.9 + si + 2) % 4);
+                            this.pushSolidQuad3D(fwx, fwy, bz + 0.014, rippleSize * 0.9, rippleSize * 0.65, 0, 0.85, 0.97, 1.0, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                            this.batchPedSprite3D(sw.friendWaderType, fwFr, fwx, fwy, bz + 0.028, (sw.angle || 0) + Math.PI - Math.sin(waveT) * 0.2, 1.00, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        }
                     }
                 }
             }
@@ -8633,6 +8637,7 @@ class RetroRenderer {
             for (let vi = 0; vi < bgVis.length; vi++) {
                 const bg = bgVis[vi];
                 const bi = bg._bgIdx !== undefined ? bg._bgIdx : vi;
+                if ((bg.wipeoutTimer || 0) > 0) continue;
                 if (bg.x < minX - 64 || bg.x > maxX + 64 || bg.y < minY - 64 || bg.y > maxY + 64) continue;
                 const bz = bg.z || 2.0;
                 if (bg.kind === "METAL_DETECTOR") {
@@ -9187,7 +9192,7 @@ class RetroRenderer {
         }
 
         // Mambas Stadium Live Pitch Scrimmage (inside the emerald stadium bowl at c=112..119, r=99..105)
-        if (this.map.stadiumScrimmage) {
+        if (this.map.stadiumScrimmage && !((this.map.stadiumScrimmage.wipeoutTimer || 0) > 0)) {
             const sc = this.map.stadiumScrimmage;
             if (sc.x >= minX - 240 && sc.x <= maxX + 240 && sc.y >= minY - 240 && sc.y <= maxY + 240) {
                 const bz = sc.z || 2.0;
@@ -9240,11 +9245,9 @@ class RetroRenderer {
                         this.pushSolidQuad3D(wxL, wyL, bz + 0.09, 6, 6, 0, 1.0, 0.18, 0.18, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                         this.pushSolidQuad3D(wxR, wyR, bz + 0.09, 6, 6, 0, 0.15, 0.95, 0.38, 0.85, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
                     }
-                    this.batchPedSprite3D("g2_fireman", Math.floor(this.time * 3 + i) % 8, ap.x + cs * 76 - sn * 28, ap.y + sn * 76 + cs * 28, bz + 0.038, ap.ang + Math.PI, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 } else if (ap.kind === "LEARJET") {
                     this.batchObjectSprite3D("private_learjet", ap.x + sunCos * 6, ap.y + sunSin * 6, bz + 0.015, ap.ang, ap.scale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.35);
                     this.batchObjectSprite3D("private_learjet", ap.x, ap.y, bz + 0.065, ap.ang, ap.scale, SPRITE_DRAW_ORDER.CAR);
-                    this.batchPedSprite3D("g2_zaibatsu", 0, ap.x + cs * 38 + sn * 24, ap.y + sn * 38 - cs * 24, bz + 0.038, ap.ang - 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 } else if (ap.kind === "HELIPAD") {
                     if (!ap.isRooftop) {
                         this.batchObjectSprite3D("helipad_mark", ap.x, ap.y, bz + 0.016, 0, 1.18, SPRITE_DRAW_ORDER.TIRE_MARKS);
@@ -9323,26 +9326,15 @@ class RetroRenderer {
                         const bx = gt.x - gt.w * 0.5 + (gt.w * bi) / nBars;
                         this.pushSolidQuad3D(bx, gt.y, bz + 0.16, 4.2, 6.5, 0, 0.30, 0.35, 0.42, 0.98, SPRITE_DRAW_ORDER.CAR);
                     }
-                    // Flashing red/blue strobe & armed SWAT/police gate sentries beside 3D sally-port guardhouse
+                    // Flashing red/blue strobe atop 3D sally-port guardhouse (guards are real interactive Pedestrian entities!)
                     if (gt.boothX && gt.boothY) {
                         const beaconOn = Math.sin(this.time * 9.0 + gi * 1.7) >= 0;
                         this.pushSolidQuad3D(gt.boothX, gt.boothY, bz + 0.50, 7, 7, 0, beaconOn ? 1.0 : 0.2, beaconOn ? 0.15 : 0.65, beaconOn ? 0.15 : 1.0, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
-                        this.batchPedSprite3D("g2_swat", 0, gt.boothX + 24, gt.boothY + 12, bz + 0.04, Math.PI * 0.5, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        this.batchPedSprite3D("police", 0, gt.x + gt.w * 0.5 + 16, gt.y + 14, bz + 0.04, -Math.PI * 0.5, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 }
             }
 
-            // 10.4 Armed Tower Snipers & Rotating Searchlight Cones atop 8 3D Concrete Guard Watchtowers (3D towers rendered in WorldObjectEngine)
-            for (let ti = 0; ti < pris.towers.length; ti++) {
-                const tw = pris.towers[ti];
-                if (tw.x >= minX - 180 && tw.x <= maxX + 180 && tw.y >= minY - 180 && tw.y <= maxY + 180) {
-                    const sAng = tw.baseAng + Math.sin(this.time * 1.15 + ti * 1.4) * 0.65;
-                    this.batchPedSprite3D("g2_swat", 0, tw.x, tw.y, bz + 0.86, sAng, 1.18, false, SPRITE_DRAW_ORDER.HUD_ARROW);
-                }
-            }
-
-            // 10.5 Outdoor Prison Weightlifting Benches ("gym_bench") & Lifters in Central Plaza (r=97..101) & Upper Exercise Lawn (r=108..114)
+            // 10.5 Outdoor Prison Weightlifting Benches ("gym_bench") in Central Plaza (r=97..101) & Upper Exercise Lawn (r=108..114)
             const prisonGymBenches = [
                 { x: 58.6 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: 0 },
                 { x: 65.4 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: Math.PI },
@@ -9356,43 +9348,9 @@ class RetroRenderer {
                 const gb = prisonGymBenches[bi];
                 if (gb.x < minX - 64 || gb.x > maxX + 64 || gb.y < minY - 64 || gb.y > maxY + 64) continue;
                 this.batchObjectSprite3D("gym_bench", gb.x, gb.y, bz + 0.022, gb.ang, 1.15, SPRITE_DRAW_ORDER.MAP_OBJECT);
-                // Prisoner lying on bench pressing barbell + upright spotter in bright orange jumpsuit!
-                this.batchPedSprite3D("g2_prisoner", 42, gb.x, gb.y, bz + 0.036, gb.ang, pScale * 0.95, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.batchPedSprite3D("g2_prisoner", 98, gb.x + Math.cos(gb.ang) * 20, gb.y + Math.sin(gb.ang) * 20, bz + 0.038, gb.ang + Math.PI, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
 
-            // 10.6 Orange-Jumpsuit Prisoners ("g2_prisoner") across North Cellblock Walkways (r=80..95), Central Roll-Call Plaza (r=96..102) & Upper Exercise Lawn (r=105..115)
-            const yardGroups = [
-                // North Reception & Cellblock Walkways (r = 79..94)
-                { x: 58.5 * TILE_SIZE, y: 81.0 * TILE_SIZE, rx: 18, ry: 36, spd: 1.1, seed: 0.4 },
-                { x: 65.5 * TILE_SIZE, y: 81.0 * TILE_SIZE, rx: 18, ry: 36, spd: 1.2, seed: 1.7 },
-                { x: 58.3 * TILE_SIZE, y: 89.5 * TILE_SIZE, rx: 14, ry: 48, spd: 1.0, seed: 2.9 },
-                { x: 65.7 * TILE_SIZE, y: 89.5 * TILE_SIZE, rx: 14, ry: 48, spd: 1.1, seed: 4.1 },
-                // Central Roll-Call Plaza (r = 96.5..102.0 — directly visible in upper yard!)
-                { x: 60.2 * TILE_SIZE, y: 97.5 * TILE_SIZE, rx: 32, ry: 14, spd: 1.3, seed: 0.8 },
-                { x: 63.8 * TILE_SIZE, y: 97.5 * TILE_SIZE, rx: 32, ry: 14, spd: 1.2, seed: 2.2 },
-                { x: 61.0 * TILE_SIZE, y: 101.2 * TILE_SIZE, rx: 36, ry: 12, spd: 1.1, seed: 3.5 },
-                { x: 64.2 * TILE_SIZE, y: 101.2 * TILE_SIZE, rx: 36, ry: 12, spd: 1.4, seed: 5.0 },
-                // Upper-Middle Grass Exercise Lawn (r = 105.5..115.0 — directly visible in middle yard!)
-                { x: 58.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, rx: 28, ry: 22, spd: 1.2, seed: 1.1 },
-                { x: 65.8 * TILE_SIZE, y: 106.5 * TILE_SIZE, rx: 28, ry: 22, spd: 1.3, seed: 2.6 },
-                { x: 58.6 * TILE_SIZE, y: 112.0 * TILE_SIZE, rx: 24, ry: 34, spd: 1.1, seed: 3.9 },
-                { x: 66.0 * TILE_SIZE, y: 112.0 * TILE_SIZE, rx: 24, ry: 34, spd: 1.2, seed: 5.4 }
-            ];
-            for (let yi = 0; yi < yardGroups.length; yi++) {
-                const yg = yardGroups[yi];
-                const t = this.time * yg.spd + yg.seed;
-                const px = yg.x + Math.cos(t) * yg.rx;
-                const py = yg.y + Math.sin(t) * yg.ry;
-                if (px < minX - 48 || px > maxX + 48 || py < minY - 48 || py > maxY + 48) continue;
-                const vx = -Math.sin(t) * yg.rx;
-                const vy = Math.cos(t) * yg.ry;
-                const pAng = Math.atan2(vy, vx);
-                const fr = Math.floor(this.time * 6.5 + yi * 3) % 8;
-                this.batchPedSprite3D("g2_prisoner", fr, px, py, bz + 0.038, pAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-            }
-
-            // 10.7 Central Concrete Basketball Court (c=59..64, r=117..130): Painted Court Lines, 3D Hoops, Arcing Basketball & 8 Orange-Jumpsuit Players
+            // 10.7 Central Concrete Basketball Court (c=59..64, r=117..130): Painted Court Lines & 3D Hoops
             const cx = pris.courtX, cy = pris.courtY;
             if (cx >= minX - 240 && cx <= maxX + 240 && cy >= minY - 280 && cy <= maxY + 280) {
                 // Crisp painted white court boundary lines, center line & orange key paint
@@ -9406,59 +9364,6 @@ class RetroRenderer {
                 this.pushSolidQuad3D(cx, cy - 110, bz + 0.15, 9, 9, 0, 0.98, 0.42, 0.08, 0.98, SPRITE_DRAW_ORDER.TREES);
                 this.pushSolidQuad3D(cx, cy + 116, bz + 0.18, 26, 4.5, 0, 0.96, 0.97, 0.99, 0.98, SPRITE_DRAW_ORDER.TREES);
                 this.pushSolidQuad3D(cx, cy + 110, bz + 0.15, 9, 9, 0, 0.98, 0.42, 0.08, 0.98, SPRITE_DRAW_ORDER.TREES);
-                // Animated 3D Orange Basketball arcing toward the hoops!
-                const ballPh = (this.time * 0.95) % 2.0;
-                const ballT = ballPh < 1.0 ? ballPh : (2.0 - ballPh);
-                const ballX = cx + Math.sin(this.time * 1.9) * 18;
-                const ballY = (cy - 106) + ballT * 212;
-                const ballZ = bz + 0.06 + Math.sin(ballT * Math.PI) * 0.24;
-                this.pushSolidQuad3D(ballX, ballY, bz + 0.02, 6, 6, 0, 0.02, 0.03, 0.06, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(ballX, ballY, ballZ, 7.5, 7.5, this.time * 4.0, 0.98, 0.45, 0.08, 0.99, SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN);
-
-                for (let pi = 0; pi < 8; pi++) {
-                    const isCourt = pi < 6;
-                    const px = isCourt
-                        ? cx + ((pi % 2 === 0) ? -32 : 32) + Math.sin(this.time * 2.3 + pi) * 20
-                        : cx + ((pi % 2 === 0) ? -102 : 102);
-                    const py = isCourt
-                        ? cy + (pi - 2.5) * 34 + Math.cos(this.time * 2.0 + pi) * 22
-                        : cy + (pi - 6.5) * 48;
-                    const pAng = Math.atan2(ballY - py, ballX - px);
-                    const fr = isCourt ? (Math.floor(this.time * 7.0 + pi * 2) % 8) : 98;
-                    this.batchPedSprite3D("g2_prisoner", fr, px, py, bz + 0.038, pAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                }
-            }
-
-            // 10.8 South Yard Fight Ring (c=61.5, r=141.5): 2 Prisoners Brawling surrounded by Cheering Orange-Jumpsuit Inmates
-            const fightX = 62.0 * TILE_SIZE, fightY = 141.5 * TILE_SIZE;
-            if (fightX >= minX - 160 && fightX <= maxX + 160 && fightY >= minY - 160 && fightY <= maxY + 160) {
-                const fAng = this.time * 2.4;
-                const fFr = 50 + (Math.floor(this.time * 8.0) % 4);
-                this.batchPedSprite3D("g2_prisoner", fFr, fightX + Math.cos(fAng) * 11, fightY + Math.sin(fAng) * 11, bz + 0.038, fAng + Math.PI, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.batchPedSprite3D("g2_prisoner", fFr, fightX - Math.cos(fAng) * 11, fightY - Math.sin(fAng) * 11, bz + 0.038, fAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                for (let ci = 0; ci < 6; ci++) {
-                    const ca = (ci / 6) * Math.PI * 2 + 0.2;
-                    this.batchPedSprite3D("g2_prisoner", 98, fightX + Math.cos(ca) * 36, fightY + Math.sin(ca) * 36, bz + 0.038, ca + Math.PI, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                }
-            }
-
-            // 10.9 Armed Correctional Officers ("police" & "g2_swat") patrolling inside the prison yard
-            const guardPatrols = [
-                { x: 66.8 * TILE_SIZE, y: 96.5 * TILE_SIZE,  dx: 0,  dy: 45, seed: 0.3 },
-                { x: 57.6 * TILE_SIZE, y: 103.5 * TILE_SIZE, dx: 35, dy: 0,  seed: 1.6 },
-                { x: 66.8 * TILE_SIZE, y: 112.0 * TILE_SIZE, dx: 0,  dy: 55, seed: 2.9 },
-                { x: 57.8 * TILE_SIZE, y: 124.0 * TILE_SIZE, dx: 0,  dy: 55, seed: 4.2 },
-                { x: 66.5 * TILE_SIZE, y: 138.0 * TILE_SIZE, dx: 0,  dy: 45, seed: 5.5 }
-            ];
-            for (let gi = 0; gi < guardPatrols.length; gi++) {
-                const gp = guardPatrols[gi];
-                const ph = Math.sin(this.time * 0.95 + gp.seed);
-                const gx = gp.x + gp.dx * ph;
-                const gy = gp.y + gp.dy * ph;
-                if (gx < minX - 48 || gx > maxX + 48 || gy < minY - 48 || gy > maxY + 48) continue;
-                const dirSign = Math.cos(this.time * 0.95 + gp.seed) >= 0 ? 1 : -1;
-                const gAng = Math.atan2(gp.dy * dirSign, gp.dx * dirSign);
-                this.batchPedSprite3D((gi % 2 === 0) ? "police" : "g2_swat", Math.floor(this.time * 4.8 + gi) % 8, gx, gy, bz + 0.038, gAng, pScale, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
 
@@ -9501,21 +9406,9 @@ class RetroRenderer {
                     this.pushSolidQuad3D(bx + sunCos * 6, by + sunSin * 6, bz + 0.015, 28, 22, 0, 0.02, 0.03, 0.06, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
             }
-            if (Array.isArray(airComp.patrolGuards)) {
-                for (let pi = 0; pi < airComp.patrolGuards.length; pi++) {
-                    const pg = airComp.patrolGuards[pi];
-                    const osc = Math.sin(this.time * 1.1 + pg.seed);
-                    const gx = pg.x + pg.dx * osc;
-                    const gy = pg.y + pg.dy * osc;
-                    if (gx < minX - 80 || gx > maxX + 80 || gy < minY - 80 || gy > maxY + 80) continue;
-                    const gAng = Math.atan2(pg.dy * Math.cos(this.time * 1.1 + pg.seed), pg.dx * Math.cos(this.time * 1.1 + pg.seed) || 0.01);
-                    const fr = Math.floor(this.time * 5.0 + pi * 2) % 8;
-                    this.batchPedSprite3D(pi % 2 === 0 ? "police" : "g2_swat", fr, gx, gy, bz + 0.038, gAng, 1.06, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                }
-            }
         }
 
-        // 10C) SERA Space Center (Cape Canaveral) Fenced Federal Launch Complex, West Checkpoint Boom Barrier, Searchlights & Armed SWAT Sentries
+        // 10C) SERA Space Center (Cape Canaveral) Fenced Federal Launch Complex, West Checkpoint Boom Barrier & Searchlights
         const seraComp = this.map.seraCompound;
         if (seraComp && seraComp.x1 >= minX - 140 && seraComp.x0 <= maxX + 140 && seraComp.y1 >= minY - 140 && seraComp.y0 <= maxY + 140) {
             const bz = seraComp.z || 2.0;
@@ -9548,18 +9441,6 @@ class RetroRenderer {
                         this.pushSolidQuad3D(px, armCy, bz + 0.14, 3.6, armLen, 0, 0.95, 0.18, 0.18, 0.96, SPRITE_DRAW_ORDER.TREES);
                         this.pushSolidQuad3D(px, armCy, bz + 0.145, 3.6, armLen * 0.45, 0, 0.98, 0.98, 1.0, 0.96, SPRITE_DRAW_ORDER.TREES);
                     }
-                }
-            }
-            if (Array.isArray(seraComp.patrolGuards)) {
-                for (let pi = 0; pi < seraComp.patrolGuards.length; pi++) {
-                    const pg = seraComp.patrolGuards[pi];
-                    const osc = Math.sin(this.time * 1.15 + pg.seed);
-                    const gx = pg.x + pg.dx * osc;
-                    const gy = pg.y + pg.dy * osc;
-                    if (gx < minX - 80 || gx > maxX + 80 || gy < minY - 80 || gy > maxY + 80) continue;
-                    const gAng = Math.atan2(pg.dy * Math.cos(this.time * 1.15 + pg.seed), pg.dx * Math.cos(this.time * 1.15 + pg.seed) || 0.01);
-                    const fr = Math.floor(this.time * 5.0 + pi * 2) % 8;
-                    this.batchPedSprite3D(pi % 2 === 0 ? "g2_swat" : "police", fr, gx, gy, bz + 0.038, gAng, 1.08, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 }
             }
         }
@@ -9813,35 +9694,6 @@ class RetroRenderer {
             }
         }
 
-        // 15) Port Gellhorn Super-Speedway Stock-Car Race & Thrillbilly Mud Park Figure-8 Monster Mudders
-        const tr = this.map.trackRacers;
-        if (tr && vehSprites) {
-            const sp = tr.speedway;
-            const cullRx = (sp && sp.rx ? sp.rx : 1600) + 280;
-            const cullRy = (sp && sp.ry ? sp.ry : 1150) + 280;
-            if (sp && sp.cx >= minX - cullRx && sp.cx <= maxX + cullRx && sp.cy >= minY - cullRy && sp.cy <= maxY + cullRy) {
-                const bz = sp.z || 2.04;
-                const nCars = sp.cars.length;
-                for (let ci = 0; ci < nCars; ci++) {
-                    const t = -this.time * (0.68 + (ci % 2) * 0.04) - ci * (Math.PI * 2 / nCars);
-                    const laneR = 1.0 + ((ci % 3) - 1) * 0.038;
-                    const cx = sp.cx + Math.cos(t) * (sp.rx * laneR);
-                    const cy = sp.cy + Math.sin(t) * (sp.ry * laneR);
-                    const vx = -Math.sin(t) * sp.rx;
-                    const vy = Math.cos(t) * sp.ry;
-                    const cAng = Math.atan2(vy, vx) - 0.12;
-                    const vRect = getVehRect(sp.cars[ci], ci + 1);
-                    if (vRect) {
-                        this.pushSolidQuad3D(cx + sunCos * 4, cy + sunSin * 4, bz + 0.018, 36, 18, cAng, 0.02, 0.03, 0.06, 0.35, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                        this.pushAtlasSprite3D(vRect, cx, cy, bz + 0.048, cAng - Math.PI * 0.5, 1.0, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
-                    }
-                    // Tire smoke puff behind stock car
-                    const dustSpr = String(200 + ((Math.floor(this.time * 12) + ci) % 6));
-                    this.batchObjectSprite3D(dustSpr, cx - Math.cos(cAng) * 20, cy - Math.sin(cAng) * 20, bz + 0.045, this.time * 3, 0.58, SPRITE_DRAW_ORDER.EXPLOSION);
-                }
-            }
-        }
-
         // 16) Leonida Keys, Ocean Drive & Little Cuba Thatched Tiki Bars & String-Light Café Terraces ("tiki_hut_roof", "cafe_table_umb")
         const tikis = this.map.tikiBars;
         if (tikis && tikis.length > 0) {
@@ -9857,9 +9709,11 @@ class RetroRenderer {
                 const cs = Math.cos(tb.ang), sn = Math.sin(tb.ang);
                 this.batchObjectSprite3D("cafe_table_umb", tb.x + cs * 38 - sn * 12, tb.y + sn * 38 + cs * 12, bz + 0.12, this.time * 0.2 + i, 1.0, SPRITE_DRAW_ORDER.TREES);
                 this.batchObjectSprite3D("cafe_table_umb", tb.x - cs * 38 - sn * 12, tb.y - sn * 38 + cs * 12, bz + 0.12, -this.time * 0.2 + i, 1.0, SPRITE_DRAW_ORDER.TREES);
-                this.batchPedSprite3D("vc_cuban", 98, tb.x, tb.y, bz + 0.038, tb.ang + Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                this.renderSeatedPed3D("bikini_pink", tb.x + sn * 22, tb.y - cs * 22, bz + 0.036, tb.ang - Math.PI * 0.5, "STOOL_WOOD", 1.04);
-                this.renderSeatedPed3D("vc_tommy", tb.x - cs * 18 + sn * 22, tb.y - sn * 18 - cs * 22, bz + 0.036, tb.ang - Math.PI * 0.5, "STOOL_WOOD", 1.04);
+                if (!((tb.wipeoutTimer || 0) > 0)) {
+                    this.batchPedSprite3D("vc_cuban", 98, tb.x, tb.y, bz + 0.038, tb.ang + Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.renderSeatedPed3D("bikini_pink", tb.x + sn * 22, tb.y - cs * 22, bz + 0.036, tb.ang - Math.PI * 0.5, "STOOL_WOOD", 1.04);
+                    this.renderSeatedPed3D("vc_tommy", tb.x - cs * 18 + sn * 22, tb.y - sn * 18 - cs * 22, bz + 0.036, tb.ang - Math.PI * 0.5, "STOOL_WOOD", 1.04);
+                }
             }
         }
 
@@ -9894,26 +9748,23 @@ class RetroRenderer {
                     }
                 }
             }
-            // 17B. Outlaw Biker Gang Custom Chopper Lineup & Bikers ("biker_chopper")
+            // 17B. Outlaw Biker Gang Rally (real stealable HARLEY_BIKE vehicles spawned in game.js!)
             if (ind.bikerRallies) {
                 const brVis = this._queryStaticChunkGrid(ind.bikerRallies, "x", "y", minX - 120, minY - 120, maxX + 120, maxY + 120);
                 for (let ri = 0; ri < brVis.length; ri++) {
                     const br = brVis[ri];
+                    if ((br.wipeoutTimer || 0) > 0) continue;
                     if (br.x < minX - 120 || br.x > maxX + 120 || br.y < minY - 120 || br.y > maxY + 120) continue;
                     const bz = br.z || 2.0;
-                    for (let bi = 0; bi < br.count; bi++) {
+                    for (let bi = 0; bi < br.count; bi += 2) {
                         const bx = br.x + (bi - (br.count - 1) * 0.5) * 20;
                         const by = br.y;
-                        this.batchObjectSprite3D("biker_chopper", bx + sunCos * 3, by + sunSin * 3, bz + 0.015, 0.65, 1.15, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.35);
-                        this.batchObjectSprite3D("biker_chopper", bx, by, bz + 0.038, 0.65, 1.15, SPRITE_DRAW_ORDER.CAR);
-                        if (bi % 2 === 0 && !((br.wipeoutTimer || 0) > 0)) {
-                            this.batchPedSprite3D((bi === 0) ? "g2_russian" : "g2_redneck_blond", 98, bx + 4, by + 18, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                        }
+                        this.batchPedSprite3D((bi === 0) ? "g2_russian" : "g2_redneck_blond", 98, bx + 4, by + 18, bz + 0.038, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
                 }
             }
             // 17C. Port Gellhorn Retro Mini-Golf Course & Live Spinning 3D Windmill ("minigolf_windmill")
-            if (ind.miniGolf) {
+            if (ind.miniGolf && !((ind.miniGolf.wipeoutTimer || 0) > 0)) {
                 const mg = ind.miniGolf;
                 if (mg.x >= minX - 120 && mg.x <= maxX + 120 && mg.y >= minY - 120 && mg.y <= maxY + 120) {
                     const bz = mg.z || 2.0;

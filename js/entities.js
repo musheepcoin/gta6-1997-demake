@@ -4826,7 +4826,10 @@ class Vehicle {
    ============================================================================ */
 class Pedestrian {
     constructor(props = {}) {
-        this.id = props.id || `ped_${++Pedestrian._nextId}`;
+        if (!Pedestrian._sessionTag) {
+            Pedestrian._sessionTag = Math.random().toString(36).slice(2, 6);
+        }
+        this.id = props.id || `ped_${Pedestrian._sessionTag}_${++Pedestrian._nextId}`;
         this.x = props.x || 0;
         this.y = props.y || 0;
         this.z = props.z !== undefined ? props.z : 2.0;

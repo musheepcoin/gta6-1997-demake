@@ -6078,11 +6078,18 @@ class LeonidaMap {
 
         const sidewalkDirs = [];
         const roadDirs = [];
+        const inPrisonYardNow = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
 
         for (const c of cardinals) {
             const nx = bx + c.dx;
             const ny = by + c.dy;
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
+            if (inPrisonYardNow) {
+                if (nx < 57 || nx > 67 || ny < 77 || ny > 145) continue;
+                if (ny === 103 && nx !== 61 && nx !== 62) continue;
+            } else if (nx >= 56 && nx <= 68 && ny >= 76 && ny <= 146) {
+                continue;
+            }
             // Never allow sidewalk/beach pedestrians to walk into Port Gellhorn Super-Speedway, VCIA Airport tarmac, or Vice Port interior container/warehouse yards
             if (nx >= 26 && nx <= 87 && ny >= 149 && ny <= 200) continue;
             if (nx >= 64 && nx <= 165 && ny >= 299 && ny <= 368) continue;

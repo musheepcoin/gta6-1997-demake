@@ -5216,7 +5216,7 @@ class WorldObjectEngine {
                 if (g.ped && (checkGuardArrays || distVilla < 820) && !game.peds.includes(g.ped)) {
                     g.ped = null;
                 }
-                if (!g.ped && !g.deadUntilReset && distVilla < 720 && Array.isArray(game.peds) && typeof Pedestrian === "function") {
+                if (!g.ped && !g.deadUntilReset && distVilla < 1150 && Array.isArray(game.peds) && typeof Pedestrian === "function") {
                     const guardArch = gi === 0 ? "g2_zaibatsu" : "g2_yakuza";
                     g.ped = new Pedestrian({
                         id: `villa_guard_${i}_${gi}_${Date.now()}`,
@@ -13979,12 +13979,6 @@ class WorldObjectEngine {
                 const flX = px + csP * (16 * pSc) + Math.sin(renderer.time * 1.8 + i) * 5.0;
                 const flY = py + snP * (16 * pSc) + Math.cos(renderer.time * 1.5 + i) * 3.5;
                 renderer.batchObjectSprite3D("flamingo_float", flX, flY, bz + 0.048, renderer.time * 0.35 + i, 0.88, SPRITE_DRAW_ORDER.MAP_OBJECT);
-
-                for (let li = -1; li <= 1; li += 2) {
-                    const lx = px + csP * (-58 * pSc) - snP * (li * 18 * pSc);
-                    const ly = py + snP * (-58 * pSc) + csP * (li * 18 * pSc);
-                    renderer.batchPedSprite3D(li < 0 ? "bikini_pink" : "bikini_cyan", 42, lx, ly, bz + 0.052, pAng, 1.24, false, SPRITE_DRAW_ORDER.CORPSE);
-                }
             }
 
             if (h.dockBoat && (!h.dockBoat._liveBoat || h.dockBoat._liveBoat.destroyed)) {
@@ -14031,21 +14025,13 @@ class WorldObjectEngine {
             }
         }
 
-        // Render Cartel Villa Bodyguards & Interactive Heist Ground Rings
+        // Render Interactive Heist Ground Rings (Villa Bodyguards are real interactive Pedestrian entities in game.peds)
         if (this.heistTargets && this.heistTargets.length > 0) {
-            const walkFrame = Math.floor(renderer.time * 6.5) % 8;
             for (let i = 0; i < this.heistTargets.length; i++) {
                 const ht = this.heistTargets[i];
                 const inst = ht.inst;
                 if (inst.x < minX - 280 || inst.x > maxX + 280 || inst.y < minY - 280 || inst.y > maxY + 280) continue;
                 const bz = inst.z || 2.0;
-
-                for (let gi = 0; gi < ht.guards.length; gi++) {
-                    const g = ht.guards[gi];
-                    if (!g.ped && !g.deadUntilReset) {
-                        renderer.batchPedSprite3D(gi === 0 ? "g2_zaibatsu" : "g2_yakuza", walkFrame, g.x, g.y, bz + 0.045, g.ang, 1.26, false, SPRITE_DRAW_ORDER.PED);
-                    }
-                }
 
                 if (!ht.looted) {
                     const ringSz = 26 + Math.sin(renderer.time * 4.5 + i) * 3.0;
@@ -14087,26 +14073,14 @@ class WorldObjectEngine {
             }
         }
 
-        // Render GTA 6 Rogue Alligator Bystander Livestreamers & Pulsing Gator Bounty Rings
+        // Render Pulsing Gator Bounty Rings
         if (this._isStaticArrInView(this.gatorEncounters, minX, minY, maxX, maxY, 160)) {
-            const pFrame = Math.floor(renderer.time * 4.5) % 8;
             for (let i = 0; i < this.gatorEncounters.length; i++) {
                 const ge = this.gatorEncounters[i];
                 if (!ge.active || ge.x < minX - 160 || ge.x > maxX + 160 || ge.y < minY - 160 || ge.y > maxY + 160) continue;
                 const bz = ge.z || 2.0;
                 const rSz = 26 + Math.sin(renderer.time * 5.5 + i) * 3.5;
                 renderer.pushSolidQuad3D(ge.x, ge.y, bz + 0.025, rSz, rSz, renderer.time * 1.1, 0.18, 0.94, 0.44, 0.44, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                // 2 Bystander Tourists filming the rogue gator on glowing cyan smartphones!
-                for (let bi = 0; bi < 2; bi++) {
-                    const bAng = (ge.ang || 0) + (bi === 0 ? 1.85 : -1.85);
-                    const bx = ge.x + Math.cos(bAng) * 36.0;
-                    const by = ge.y + Math.sin(bAng) * 36.0;
-                    const faceGator = Math.atan2(ge.y - by, ge.x - bx);
-                    renderer.batchPedSprite3D(bi === 0 ? "bikini_pink" : "civ1", pFrame, bx, by, bz + 0.045, faceGator, 1.22, false, SPRITE_DRAW_ORDER.PED);
-                    const phX = bx + Math.cos(faceGator) * 9.0;
-                    const phY = by + Math.sin(faceGator) * 9.0;
-                    renderer.pushSolidQuad3D(phX, phY, bz + 0.075, 4.5, 3.0, faceGator, 0.22, 0.94, 1.0, 0.92, SPRITE_DRAW_ORDER.ROOF_LIGHTS);
-                }
             }
         }
 
@@ -14211,12 +14185,6 @@ class WorldObjectEngine {
             if (tw.x >= minX - 140 && tw.x <= maxX + 140 && tw.y >= minY - 140 && tw.y <= maxY + 140) {
                 const rSz = 34 + Math.sin(renderer.time * 5.6) * 4.0;
                 renderer.pushSolidQuad3D(tw.x, tw.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.98, 0.36, 0.76, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                // Flea market vendors & bargain-hunting shoppers browsing the canopy tents!
-                const vFr = 50 + (Math.floor(renderer.time * 4.8) % 4);
-                renderer.batchPedSprite3D("vc_haitian", vFr, tw.x - 22, tw.y - 10, 2.042, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_cuban", vFr, tw.x + 22, tw.y - 10, 2.042, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_tourist", vFr, tw.x - 10, tw.y + 4, 2.042, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("bikini_pink", vFr, tw.x + 12, tw.y + 6, 2.042, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.cubanVentanitas, minX, minY, maxX, maxY, 130)) {
@@ -14227,9 +14195,6 @@ class WorldObjectEngine {
                     const rSz = 24 + Math.sin(renderer.time * 5.4 + i) * 3.0;
                     renderer.pushSolidQuad3D(cv.x, cv.y + 12, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.84, 0.20, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const cFr = 50 + (Math.floor(renderer.time * 4.5 + i) % 4);
-                renderer.batchPedSprite3D("vc_cuban", cFr, cv.x - 8, cv.y + 14, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_hawaiian_red", cFr, cv.x + 8, cv.y + 14, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.iceCreamCarts, minX, minY, maxX, maxY, 130)) {
@@ -14240,9 +14205,6 @@ class WorldObjectEngine {
                     const rSz = 22 + Math.sin(renderer.time * 5.6 + i) * 3.0;
                     renderer.pushSolidQuad3D(ic.x, ic.y + 10, 2.03, rSz, rSz, renderer.time * 1.5, 0.22, 0.90, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const gFr = 50 + (Math.floor(renderer.time * 4.8 + i) % 4);
-                renderer.batchPedSprite3D("vc_sailor", 0, ic.x, ic.y - 11, 2.040, Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("bikini_pink", gFr, ic.x - 6, ic.y + 13, 2.040, -Math.PI * 0.5, 1.04, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.poolTables, minX, minY, maxX, maxY, 130)) {
@@ -14253,10 +14215,6 @@ class WorldObjectEngine {
                     const rSz = 24 + Math.sin(renderer.time * 5.2 + i) * 3.0;
                     renderer.pushSolidQuad3D(pt.x, pt.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.22, 0.94, 0.52, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                // Two pool sharks lined up around the 8-ball table with cue stick!
-                const pFr = 50 + (Math.floor(renderer.time * 4.2 + i) % 4);
-                renderer.batchPedSprite3D("g2_redneck_blond", pFr, pt.x - 19, pt.y, 2.040, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_cuban", pFr, pt.x + 19, pt.y, 2.040, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.fishingSpots, minX, minY, maxX, maxY, 130)) {
@@ -14268,8 +14226,6 @@ class WorldObjectEngine {
                     const rSz = 22 + Math.sin(renderer.time * 5.2 + i) * 3.0;
                     renderer.pushSolidQuad3D(fs.x, fs.y, 2.03, rSz, rSz, renderer.time * 1.4, 0.22, 0.88, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                // Angler standing at pier rail + bobbing red/white fishing float in the water!
-                renderer.batchPedSprite3D("vc_sailor", 0, fs.x - cA * 4, fs.y - sA * 4, 2.040, fs.ang || 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 const bobX = fs.x + cA * 22.0 + Math.sin(renderer.time * 2.5 + i) * 1.8;
                 const bobY = fs.y + sA * 22.0 + Math.cos(renderer.time * 2.1 + i) * 1.8;
                 renderer.pushSolidQuad3D(bobX, bobY, 2.018, 9.0, 9.0, 0, 0.85, 0.98, 1.0, 0.38, SPRITE_DRAW_ORDER.TIRE_MARKS);
@@ -14284,18 +14240,13 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.6 + i) * 3.5;
                     renderer.pushSolidQuad3D(bc.x, bc.y + 6, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.46, 0.12, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                // Two streetball players + arcing 3D orange basketball toward the hoop!
                 const shotU = (renderer.time * 1.15 + i * 0.4) % 1.0;
                 const bY = (bc.y + 10) + ((bc.y - 13) - (bc.y + 10)) * shotU;
                 const bZ = 2.06 + Math.sin(shotU * Math.PI) * 0.26;
                 renderer.pushSolidQuad3D(bc.x, bY, bZ, 5.5, 5.5, renderer.time * 5.0, 0.98, 0.44, 0.08, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
-                const sFr = 50 + (Math.floor(renderer.time * 6.0 + i) % 4);
-                renderer.batchPedSprite3D("vc_jogger", sFr, bc.x - 8, bc.y + 10, 2.040, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_haitian", sFr, bc.x + 9, bc.y + 4, 2.040, -Math.PI * 0.6, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.carMeets, minX, minY, maxX, maxY, 150)) {
-            const vehSprites = renderer.gta1Meta && renderer.gta1Meta.sprites && renderer.gta1Meta.sprites.vehicles;
             for (let i = 0; i < this.carMeets.length; i++) {
                 const cm = this.carMeets[i];
                 if (cm.x < minX - 140 || cm.x > maxX + 140 || cm.y < minY - 140 || cm.y > maxY + 140) continue;
@@ -14303,22 +14254,6 @@ class WorldObjectEngine {
                     const rSz = 32 + Math.sin(renderer.time * 5.8 + i) * 4.0;
                     renderer.pushSolidQuad3D(cm.x, cm.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.98, 0.26, 0.78, 0.50, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                // Two custom lowrider / tuner show cars with bouncing hydraulics & neon underglow + admiring car-meet crowd!
-                for (let ci = -1; ci <= 1; ci += 2) {
-                    const cx = cm.x + ci * 18;
-                    const cy = cm.y + 2;
-                    const bounceZ = Math.abs(Math.sin(renderer.time * 4.5 + i + ci)) * 0.035;
-                    renderer.pushSolidQuad3D(cx, cy, 2.022, 18, 32, 0, ci < 0 ? 0.14 : 0.98, ci < 0 ? 0.92 : 0.24, 0.98, 0.55, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                    const ve = vehSprites && (vehSprites[(i * 2 + (ci < 0 ? 0 : 1)) % vehSprites.length]);
-                    const vRect = ve && (Array.isArray(ve) ? ve : (ve.base || (ve.remaps && ve.remaps[0])));
-                    if (vRect) {
-                        renderer.pushAtlasSprite3D(vRect, cx, cy, 2.048 + bounceZ, 0, 0.94, SPRITE_DRAW_ORDER.CAR, 1, 1, 1, 1);
-                    }
-                }
-                const mFr = 50 + (Math.floor(renderer.time * 5.2 + i) % 4);
-                renderer.batchPedSprite3D("bikini_pink", mFr, cm.x, cm.y - 16, 2.042, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_cuban", mFr, cm.x - 28, cm.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("vc_tommy", mFr, cm.x + 28, cm.y + 12, 2.042, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.coralDiveSites, minX, minY, maxX, maxY, 150)) {
@@ -14329,11 +14264,9 @@ class WorldObjectEngine {
                     const rSz = 34 + Math.sin(renderer.time * 5.0 + cd.seed) * 4.5;
                     renderer.pushSolidQuad3D(cd.x, cd.y, 2.024, rSz, rSz, renderer.time * 1.2, 0.14, 0.94, 0.88, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                // Scuba diver swimming over the coral reef + rising air-bubble rings + tropical lionfish!
                 const dAng = renderer.time * 0.9 + cd.seed;
                 const dx = cd.x + Math.cos(dAng) * 14.0;
                 const dy = cd.y + Math.sin(dAng) * 14.0;
-                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), dx, dy, 2.028, dAng + Math.PI * 0.5, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                 const bubSz = 6.0 + ((renderer.time * 6.0 + i) % 6.0);
                 renderer.pushSolidQuad3D(dx, dy, 2.032, bubSz, bubSz, renderer.time * 2.0, 0.88, 0.98, 1.0, 0.65, SPRITE_DRAW_ORDER.MAP_OBJECT);
                 // 3 Tropical Lionfish / Reef Fish darting around the coral heads
@@ -14361,7 +14294,6 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.2 + i) * 3.2;
                     renderer.pushSolidQuad3D(ss.x, ss.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.22, 0.86, 0.98, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), ss.x + 2, ss.y + 13, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.jetSkiSlalomGates, minX, minY, maxX, maxY, 150)) {
@@ -14380,11 +14312,9 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.0 + i) * 3.0;
                     renderer.pushSolidQuad3D(bq.x, bq.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.98, 0.56, 0.20, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                // Rising hickory BBQ smoke puffs from the smokestack + Pitmaster chef!
                 const smkPhase = (renderer.time * 1.8 + i * 0.7) % 1.0;
                 const smkSz = 6.0 + smkPhase * 10.0;
                 renderer.pushSolidQuad3D(bq.x - 12, bq.y - 3, 2.38 + smkPhase * 0.28, smkSz, smkSz, renderer.time * 1.5, 0.86, 0.88, 0.92, (1.0 - smkPhase) * 0.62, SPRITE_DRAW_ORDER.TREES);
-                renderer.batchPedSprite3D("vc_biker", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bq.x - 4, bq.y + 12, 2.042, -Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.tattooParlors, minX, minY, maxX, maxY, 130)) {
@@ -14395,7 +14325,6 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.6 + i) * 3.2;
                     renderer.pushSolidQuad3D(tp.x, tp.y, 2.028, rSz, rSz, -renderer.time * 1.5, 0.96, 0.28, 0.72, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 4.8 + i) % 4), tp.x, tp.y + 13, 2.042, Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.sandbarPartyBarges, minX, minY, maxX, maxY, 160)) {
@@ -14406,10 +14335,6 @@ class WorldObjectEngine {
                     const rSz = 36 + Math.sin(renderer.time * 5.5 + sb.seed) * 4.5;
                     renderer.pushSolidQuad3D(sb.x, sb.y, 2.025, rSz, rSz, renderer.time * 1.4, 0.98, 0.28, 0.74, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const dFr = 50 + (Math.floor(renderer.time * 6.0 + i) % 4);
-                renderer.batchPedSprite3D("bikini_pink", dFr, sb.x + 2, sb.y - 4, 2.11, renderer.time * 2.2, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("bikini_cyan", dFr, sb.x + 8, sb.y + 5, 2.11, -renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("surfer_guy", dFr, sb.x - 20, sb.y + 14, 2.03, 0.4, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.sandcastles, minX, minY, maxX, maxY, 130)) {
@@ -14420,7 +14345,6 @@ class WorldObjectEngine {
                     const rSz = 24 + Math.sin(renderer.time * 5.0 + i) * 3.0;
                     renderer.pushSolidQuad3D(sc.x, sc.y, 2.025, rSz, rSz, renderer.time * 1.2, 0.98, 0.84, 0.18, 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), sc.x - 13, sc.y + 4, 2.04, 0, 1.0, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.kayakOutposts, minX, minY, maxX, maxY, 140)) {
@@ -14431,7 +14355,6 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.2 + ko.seed) * 3.4;
                     renderer.pushSolidQuad3D(ko.x, ko.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.16, 0.86, 0.98, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.6 + i) % 4), ko.x + 2, ko.y + 13, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.baseJumpPads, minX, minY, maxX, maxY, 130)) {
@@ -14457,7 +14380,6 @@ class WorldObjectEngine {
                 const kx = ks.x + 28 + Math.cos(kAng) * 14.0;
                 const ky = ks.y + Math.sin(kAng * 2.0) * 18.0;
                 renderer.pushSolidQuad3D(kx, ky, 2.82, 16, 6.5, kAng, 0.98, 0.28, 0.72, 0.92, SPRITE_DRAW_ORDER.TREES);
-                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 5.0 + i) % 4), ks.x + 12, ks.y, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.luxuryValetStands, minX, minY, maxX, maxY, 130)) {
@@ -14468,7 +14390,6 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.2 + i) * 3.0;
                     renderer.pushSolidQuad3D(lv.x, lv.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.98, 0.84, 0.18, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("vc_suit", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), lv.x + 4, lv.y + 10, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.gatorTourDocks, minX, minY, maxX, maxY, 140)) {
@@ -14479,7 +14400,6 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.0 + gt.seed) * 3.2;
                     renderer.pushSolidQuad3D(gt.x, gt.y, 2.028, rSz, rSz, renderer.time * 1.3, 0.28, 0.92, 0.46, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("vc_biker", 50 + (Math.floor(renderer.time * 4.0 + i) % 4), gt.x - 4, gt.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.graffitiScaffolds, minX, minY, maxX, maxY, 130)) {
@@ -14490,7 +14410,6 @@ class WorldObjectEngine {
                     const rSz = 26 + Math.sin(renderer.time * 5.8 + i) * 3.2;
                     renderer.pushSolidQuad3D(gs.x, gs.y, 2.028, rSz, rSz, -renderer.time * 1.5, 0.96, 0.26, 0.72, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("vc_punk", 50 + (Math.floor(renderer.time * 5.2 + i) % 4), gs.x + 4, gs.y, 2.20, Math.PI, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.pierCarnivalGames, minX, minY, maxX, maxY, 130)) {
@@ -14501,7 +14420,6 @@ class WorldObjectEngine {
                     const rSz = 25 + Math.sin(renderer.time * 5.6 + i) * 3.0;
                     renderer.pushSolidQuad3D(pc.x, pc.y, 2.028, rSz, rSz, renderer.time * 1.5, 0.98, 0.24, 0.36, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("vc_cuban", 50 + (Math.floor(renderer.time * 4.5 + i) % 4), pc.x + 2, pc.y + 12, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.latinStreetBands, minX, minY, maxX, maxY, 140)) {
@@ -14512,9 +14430,6 @@ class WorldObjectEngine {
                     const rSz = 28 + Math.sin(renderer.time * 6.0 + i) * 3.4;
                     renderer.pushSolidQuad3D(lb.x, lb.y, 2.028, rSz, rSz, renderer.time * 1.6, 0.98, 0.62, 0.14, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const bFr = 50 + (Math.floor(renderer.time * 6.2 + i) % 4);
-                renderer.batchPedSprite3D("vc_cuban", bFr, lb.x + 2, lb.y - 3, 2.08, renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
-                renderer.batchPedSprite3D("bikini_pink", bFr, lb.x + 6, lb.y + 5, 2.08, -renderer.time * 2.0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.monsterCrushPads, minX, minY, maxX, maxY, 150)) {
@@ -14560,7 +14475,6 @@ class WorldObjectEngine {
                     const rSz = 24 + Math.sin(renderer.time * 5.0 + i) * 2.8;
                     renderer.pushSolidQuad3D(cr.x, cr.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.96, 0.62, 0.14, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("vc_cuban", 50 + (Math.floor(renderer.time * 4.0 + i) % 4), cr.x - 3, cr.y + 10, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.kalagaLookoutTowers, minX, minY, maxX, maxY, 140)) {
@@ -14581,7 +14495,6 @@ class WorldObjectEngine {
                     const rSz = 25 + Math.sin(renderer.time * 5.0 + i) * 3.0;
                     renderer.pushSolidQuad3D(bc.x, bc.y, 2.028, rSz, rSz, renderer.time * 1.2, 0.18, 0.88, 0.84, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("bikini_cyan", 50 + (Math.floor(renderer.time * 4.2 + i) % 4), bc.x + 2, bc.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.beachRescueStations, minX, minY, maxX, maxY, 130)) {
@@ -14592,7 +14505,6 @@ class WorldObjectEngine {
                     const rSz = 24 + Math.sin(renderer.time * 5.4 + i) * 3.0;
                     renderer.pushSolidQuad3D(br.x, br.y, 2.028, rSz, rSz, renderer.time * 1.4, 0.98, 0.22, 0.26, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                renderer.batchPedSprite3D("surfer_guy", 50 + (Math.floor(renderer.time * 4.4 + i) % 4), br.x + 2, br.y + 11, 2.042, 0, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.rollerDiscoRinks, minX, minY, maxX, maxY, 140)) {
@@ -14603,8 +14515,6 @@ class WorldObjectEngine {
                     const rSz = 30 + Math.sin(renderer.time * 6.0 + i) * 3.6;
                     renderer.pushSolidQuad3D(rd.x, rd.y, 2.062, rSz, rSz, renderer.time * 1.8, 0.98, 0.24, 0.76, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const skAng = renderer.time * 2.2 + i;
-                renderer.batchPedSprite3D("bikini_pink", 8 + (Math.floor(renderer.time * 9.0 + i) % 8), rd.x + Math.cos(skAng) * 9, rd.y + Math.sin(skAng) * 6, 2.065, skAng + Math.PI * 0.5, 1.05, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
             }
         }
         if (this._isStaticArrInView(this.conchShacks, minX, minY, maxX, maxY, 130)) {
@@ -14683,7 +14593,6 @@ class WorldObjectEngine {
             }
         }
         if (this._isStaticArrInView(this.beachBoxingRings, minX, minY, maxX, maxY, 150)) {
-            const boxFrame = Math.floor(renderer.time * 6.5) % 8;
             for (let i = 0; i < this.beachBoxingRings.length; i++) {
                 const br = this.beachBoxingRings[i];
                 if (br.x < minX - 140 || br.x > maxX + 140 || br.y < minY - 140 || br.y > maxY + 140) continue;
@@ -14691,9 +14600,6 @@ class WorldObjectEngine {
                     const rSz = 38 + Math.sin(renderer.time * 5.8 + i) * 3.5;
                     renderer.pushSolidQuad3D(br.x, br.y, 2.03, rSz, rSz, renderer.time * 1.2, 0.98, 0.24, 0.36, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const spar = Math.sin(renderer.time * 6.5 + i) * 3.5;
-                renderer.batchPedSprite3D("vc_bodybuilder", boxFrame, br.x - 5 + spar * 0.5, br.y, 2.13, 0, 1.24, false, SPRITE_DRAW_ORDER.PED);
-                renderer.batchPedSprite3D("civ2", (boxFrame + 4) % 8, br.x + 5 - spar * 0.5, br.y, 2.13, Math.PI, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }
         if (this._isStaticArrInView(this.derbyPitGarages, minX, minY, maxX, maxY, 150)) {
@@ -14717,7 +14623,6 @@ class WorldObjectEngine {
             }
         }
         if (this._isStaticArrInView(this.blockPartyStages, minX, minY, maxX, maxY, 150)) {
-            const djFrame = Math.floor(renderer.time * 5.0) % 8;
             for (let i = 0; i < this.blockPartyStages.length; i++) {
                 const bp = this.blockPartyStages[i];
                 if (bp.x < minX - 140 || bp.x > maxX + 140 || bp.y < minY - 140 || bp.y > maxY + 140) continue;
@@ -14725,8 +14630,6 @@ class WorldObjectEngine {
                     const rSz = 38 + Math.sin(renderer.time * 6.2 + i) * 3.8;
                     renderer.pushSolidQuad3D(bp.x, bp.y, 2.03, rSz, rSz, renderer.time * 1.5, 0.68, 0.28, 0.98, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const djAng = renderer.time * 4.5 + i;
-                renderer.batchPedSprite3D("bikini_cyan", djFrame, bp.x, bp.y - 2, 2.13, djAng, 1.24, false, SPRITE_DRAW_ORDER.PED);
             }
         }
         if (this._isStaticArrInView(this.coconutSmoothieBars, minX, minY, maxX, maxY, 130)) {
@@ -14767,9 +14670,6 @@ class WorldObjectEngine {
                     const rSz = 30 + Math.sin(renderer.time * 5.0 + i) * 3.0;
                     renderer.pushSolidQuad3D(yd.x, yd.y, 2.03, rSz, rSz, renderer.time * 1.1, 0.18, 0.88, 0.78, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }
-                const stretchAng = Math.sin(renderer.time * 2.2 + i) * 0.45;
-                renderer.batchPedSprite3D("bikini_pink", 0, yd.x - 9, yd.y, 2.09, stretchAng, 1.22, false, SPRITE_DRAW_ORDER.PED);
-                renderer.batchPedSprite3D("bikini_cyan", 0, yd.x + 9, yd.y, 2.09, -stretchAng, 1.22, false, SPRITE_DRAW_ORDER.PED);
             }
         }
         if (this._isStaticArrInView(this.dominoParkTables, minX, minY, maxX, maxY, 130)) {

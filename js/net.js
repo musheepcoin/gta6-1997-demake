@@ -2388,6 +2388,15 @@ class ViceNetworkManager {
                 if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id.startsWith("estate_") || id.startsWith("boat_") || id.startsWith("vport_") || id.startsWith("armored_") || id.startsWith("parked_") || missionTag === "LANDMARK") && drvCode === 0 && !(flags & 1)) {
                     continue;
                 }
+                // On initial server bootstrap (or autonomous server tick), skip stale transient emergency/pursuit/event vehicles
+                if (
+                    (isInitialServerBootstrap || isAutonomousServerTick) &&
+                    !isMod &&
+                    typeof id === "string" &&
+                    (id.startsWith("cop_") || id.startsWith("medic_") || id.startsWith("amb_") || id.startsWith("vcfd_") || id.startsWith("fire_") || id.startsWith("tow_") || id.startsWith("rb_") || id.startsWith("nemesis_") || id.startsWith("crim_"))
+                ) {
+                    continue;
+                }
                 let v = existingById.get(id);
                 if (v && specKey && v.specKey !== specKey) {
                     const idx = g.vehicles.indexOf(v);
@@ -2531,9 +2540,22 @@ class ViceNetworkManager {
                 if (!Array.isArray(row) || row.length < 10) continue;
                 const [id, kindCode, g24Type, x, y, z, a, spd, hp, flags, missionTag, copWeapon] = row;
                 const isDead = Boolean(flags & 1);
+                // On initial server bootstrap or autonomous server tick, only import persisted corpses —
+                // the client already seeds fresh local sidewalk pedestrians, monks, and compound guards!
+                if ((isInitialServerBootstrap || isAutonomousServerTick) && !isDead) {
+                    continue;
+                }
                 seenPedIds.add(id);
                 const kindStr = codeToKind(kindCode);
                 let ped = existingPedById.get(id);
+                // Never overwrite a local compound guard, inmate, or monk with a mismatched remote pedestrian!
+                if (
+                    ped &&
+                    (ped.missionTag === "PRISONER" || ped.missionTag === "PRISON_GUARD" || ped.missionTag === "AIRPORT_GUARD" || ped.missionTag === "SERA_GUARD" || ped.kind === "MONK") &&
+                    (ped.missionTag !== (missionTag || null) || ped.kind !== kindStr)
+                ) {
+                    ped = null;
+                }
                 // On initial server bootstrap, never hijack a distant living starter pedestrian whose sequential ID happened to match an old persisted corpse!
                 if (isInitialServerBootstrap && isDead && ped && !ped.dead && Math.hypot((ped.x || 0) - x, (ped.y || 0) - y) > 48) {
                     ped = null;
@@ -2568,6 +2590,7 @@ class ViceNetworkManager {
                         missionTag: missionTag || null,
                         copWeapon: copWeapon || null
                     });
+                    ped._fromRemoteSync = true;
                     g.peds.push(ped);
                     existingPedById.set(resolvedPedId, ped);
                     seenPedIds.add(resolvedPedId);
@@ -2598,6 +2621,9 @@ class ViceNetworkManager {
                     ped.netTargetY = y;
                     ped.netTargetZ = z !== undefined ? z : 2.0;
                     ped.netTargetAngle = a || 0;
+                    if (!isInitialServerBootstrap && !isAutonomousServerTick) {
+                        ped._lastNetSyncMs = syncNowMs;
+                    }
                     ped.z = z !== undefined ? z : 2.0;
                     ped.speed = spd || 0;
                     ped.hp = hp !== undefined ? hp : ped.hp;
@@ -2613,6 +2639,16 @@ class ViceNetworkManager {
                     ped.muzzleTimer = (flags & 128) ? Math.max(ped.muzzleTimer || 0, 0.2) : 0;
                     ped.inCombat = Boolean(flags & 256);
                     if (typeof ped.computeState === "function") ped.state = ped.computeState();
+                }
+            }
+
+            // Prune remote-spawned pedestrians that are no longer present in the Host's WORLD_SYNC packet
+            if (!isInitialServerBootstrap && !isAutonomousServerTick) {
+                for (let pi = g.peds.length - 1; pi >= 0; pi--) {
+                    const lp = g.peds[pi];
+                    if (lp && lp._fromRemoteSync && !lp.dead && !seenPedIds.has(lp.id) && (syncNowMs - (lp._lastNetSyncMs || 0)) > 2500) {
+                        g.peds.splice(pi, 1);
+                    }
                 }
             }
         }

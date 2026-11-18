@@ -1567,15 +1567,12 @@ class LeonidaGame {
         // Pre-seed interactive Orange-Jumpsuit Prison Inmates & Correctional Officers across all courtyards of Leonida State Penitentiary (c=57..67, r=78..144)
 
         const inmateSpots = [
-
-            [58.5, 78.5], [64.5, 78.5], [58.5, 85.5], [65.5, 85.5], [58.5, 92.5], [65.5, 92.5],
-
-            [58.5, 97.5], [61.5, 98.5], [64.5, 97.5], [59.5, 101.5], [63.5, 101.5],
-
+            [58.5, 78.5], [64.5, 78.5], [58.5, 81.5], [65.5, 81.5], [58.5, 85.5], [65.5, 85.5],
+            [58.5, 89.5], [65.5, 89.5], [58.5, 92.5], [65.5, 92.5],
+            [58.5, 97.5], [60.5, 97.5], [61.5, 98.5], [63.5, 97.5], [65.5, 97.5], [59.5, 101.5], [63.5, 101.5],
             [58.5, 106.5], [65.5, 106.5], [59.5, 110.5], [62.5, 111.5], [65.5, 110.5],
-
-            [58.5, 114.5], [64.5, 114.5], [60.5, 120.5], [63.5, 126.5], [59.5, 136.5], [63.5, 141.5]
-
+            [58.5, 114.5], [64.5, 114.5], [60.5, 120.5], [63.5, 120.5], [60.5, 126.5], [63.5, 126.5],
+            [59.5, 136.5], [61.5, 141.5], [63.5, 141.5]
         ];
 
         for (let i = 0; i < inmateSpots.length; i++) {
@@ -1589,6 +1586,7 @@ class LeonidaGame {
             const pz = this.map.getHeightAtPixel(px, py, 4.0);
 
             this.peds.push(new Pedestrian({
+                id: `pris_inmate_${i}`,
 
                 x: px,
 
@@ -1598,7 +1596,7 @@ class LeonidaGame {
 
                 angle: (i % 4) * Math.PI * 0.5,
 
-                speed: 34 + (i % 5) * 2,
+                speed: 32 + (i % 5) * 2,
 
                 kind: "CIVILIAN",
 
@@ -1623,9 +1621,8 @@ class LeonidaGame {
         }
 
         const guardSpots = [
-
-            [61.5, 77.4], [66.5, 96.5], [66.5, 104.5], [58.5, 123.5], [65.5, 139.5]
-
+            [60.5, 77.6], [63.2, 77.6], [61.5, 84.5], [66.5, 96.5],
+            [60.6, 104.2], [63.4, 104.2], [66.5, 112.5], [58.5, 123.5], [65.5, 139.5]
         ];
 
         for (let g = 0; g < guardSpots.length; g++) {
@@ -1639,6 +1636,7 @@ class LeonidaGame {
             const pz = this.map.getHeightAtPixel(px, py, 4.0);
 
             this.peds.push(new Pedestrian({
+                id: `pris_guard_${g}`,
 
                 x: px,
 
@@ -1648,15 +1646,15 @@ class LeonidaGame {
 
                 angle: (g % 2 === 0) ? Math.PI * 0.5 : -Math.PI * 0.5,
 
-                speed: 38,
+                speed: 30,
 
                 kind: "COP",
 
-                g24Type: "police",
+                g24Type: (g % 2 === 0) ? "g2_swat" : "police",
 
                 missionTag: "PRISON_GUARD",
 
-                copWeapon: "SHOTGUN",
+                copWeapon: (g % 2 === 0) ? "SHOTGUN" : "PISTOL",
 
                 shirtColor: "#1e3a8a",
 
@@ -1670,6 +1668,76 @@ class LeonidaGame {
 
             }));
 
+        }
+
+        // Seed real interactive VCIA Airport & SERA Spaceport Checkpoint Officers
+        if (this.map.airportCompound && Array.isArray(this.map.airportCompound.patrolGuards)) {
+            for (let i = 0; i < this.map.airportCompound.patrolGuards.length; i++) {
+                const pg = this.map.airportCompound.patrolGuards[i];
+                const pz = this.map.getHeightAtPixel(pg.x, pg.y, 4.0);
+                this.peds.push(new Pedestrian({
+                    id: `vcia_guard_${i}`,
+                    x: pg.x,
+                    y: pg.y,
+                    z: pz,
+                    angle: (i % 2 === 0) ? Math.PI * 0.5 : 0,
+                    speed: 28,
+                    kind: "COP",
+                    g24Type: (i % 2 === 0) ? "police" : "g2_swat",
+                    missionTag: "AIRPORT_GUARD",
+                    copWeapon: "PISTOL",
+                    shirtColor: "#1e3a8a",
+                    hp: 105,
+                    dead: false,
+                    panicTimer: 0,
+                    turnSeed: i + 301
+                }));
+            }
+        }
+        if (this.map.seraCompound && Array.isArray(this.map.seraCompound.patrolGuards)) {
+            for (let i = 0; i < this.map.seraCompound.patrolGuards.length; i++) {
+                const pg = this.map.seraCompound.patrolGuards[i];
+                const pz = this.map.getHeightAtPixel(pg.x, pg.y, 4.0);
+                this.peds.push(new Pedestrian({
+                    id: `sera_guard_${i}`,
+                    x: pg.x,
+                    y: pg.y,
+                    z: pz,
+                    angle: (i % 2 === 0) ? Math.PI * 0.5 : 0,
+                    speed: 28,
+                    kind: "COP",
+                    g24Type: (i % 2 === 0) ? "g2_swat" : "police",
+                    missionTag: "SERA_GUARD",
+                    copWeapon: "UZI",
+                    shirtColor: "#1e3a8a",
+                    hp: 120,
+                    dead: false,
+                    panicTimer: 0,
+                    turnSeed: i + 401
+                }));
+            }
+        }
+
+        // Seed real stealable Outlaw Biker Rally Choppers (HARLEY_BIKE)
+        if (this.map.industrialAndParkDetails && Array.isArray(this.map.industrialAndParkDetails.bikerRallies) && typeof Vehicle === "function") {
+            const rallies = this.map.industrialAndParkDetails.bikerRallies;
+            for (let ri = 0; ri < rallies.length; ri++) {
+                const br = rallies[ri];
+                const bz = br.z || 2.0;
+                for (let bi = 0; bi < br.count; bi++) {
+                    const bx = br.x + (bi - (br.count - 1) * 0.5) * 20;
+                    const by = br.y;
+                    const vid = `parked_rally_${ri}_${bi}`;
+                    if (!this.vehicles.some((v) => v.id === vid)) {
+                        const bike = new Vehicle(vid, "HARLEY_BIKE", bx, by, 0.65);
+                        bike.z = bz;
+                        bike.driver = null;
+                        bike.isStaticParked = true;
+                        bike.speed = 0;
+                        this.vehicles.push(bike);
+                    }
+                }
+            }
         }
 
     }
@@ -9723,7 +9791,10 @@ class LeonidaGame {
 
 
 
-        // Gunfire triggers GTA 1 panic in nearby AI traffic drivers & pedestrians!
+        // Gunfire triggers GTA 1 panic in nearby AI traffic drivers, pedestrians & open-air living events!
+        if (shooterKind === "PLAYER" || shooterKind === "CRIMINAL" || shooterKind === "COP") {
+            this.checkAndWipeoutLivingEvents(shooterX, shooterY, 85, shooterKind === "PLAYER", false, false, false, true);
+        }
 
         for (const v of this.vehicles) {
 
@@ -13373,7 +13444,12 @@ class LeonidaGame {
 
 
 
-            if (isClientWorldSync) {
+            if (
+                isClientWorldSync &&
+                ped.netTargetX !== undefined &&
+                ped.netTargetY !== undefined &&
+                (performance.now() - (ped._lastNetSyncMs || 0)) < 1500
+            ) {
 
                 if ((ped.burnTimer || 0) > 0) {
 
@@ -13895,7 +13971,12 @@ class LeonidaGame {
                             ? ped._boardingVeh
                             : null);
                     let bestCarDist = returnCar ? Math.hypot(returnCar.x - ped.x, returnCar.y - ped.y) : 780;
-                    if (!returnCar && ped.missionTag !== "PRISON_GUARD") {
+                    const isCompoundGuard = (
+                        ped.missionTag === "PRISON_GUARD" ||
+                        ped.missionTag === "AIRPORT_GUARD" ||
+                        ped.missionTag === "SERA_GUARD"
+                    );
+                    if (!returnCar && !isCompoundGuard) {
                         const vHead = this._vehGridHead;
                         const vNext = this._vehGridNext;
                         if (vHead && vNext) {
@@ -13944,14 +14025,38 @@ class LeonidaGame {
                             continue;
                         }
                         const runBackSpd = this.wantedLevel > 0 ? 102 : 88;
+                        ped.speed = runBackSpd;
                         ped.angle = this.steerPedWithObstacleFeelers(ped, returnCar.x, returnCar.y, returnCar);
                         ped.x += Math.cos(ped.angle) * runBackSpd * dt;
                         ped.y += Math.sin(ped.angle) * runBackSpd * dt;
                     } else {
-                        // Routine VCPD foot patrol when no wanted player or active criminal is nearby
-                        ped.x += Math.cos(ped.angle) * 26 * dt;
-                        ped.y += Math.sin(ped.angle) * 26 * dt;
+                        // Routine VCPD / Penitentiary / Airport / SERA foot patrol when no wanted player or active criminal is nearby
+                        ped.speed = 28;
+                        ped.x += Math.cos(ped.angle) * 28 * dt;
+                        ped.y += Math.sin(ped.angle) * 28 * dt;
                         if (Math.random() < 0.015) ped.angle += (Math.random() - 0.5) * 1.2;
+                        if (ped.missionTag === "PRISON_GUARD") {
+                            const minPx = 57.25 * TILE_SIZE, maxPx = 67.75 * TILE_SIZE, minPy = 77.25 * TILE_SIZE, maxPy = 145.55 * TILE_SIZE;
+                            if (ped.x < minPx || ped.x > maxPx || ped.y < minPy || ped.y > maxPy) {
+                                ped.x = Math.max(minPx, Math.min(maxPx, prevX));
+                                ped.y = Math.max(minPy, Math.min(maxPy, prevY));
+                                ped.angle += Math.PI * (0.7 + Math.random() * 0.6);
+                            }
+                        } else if (ped.missionTag === "AIRPORT_GUARD") {
+                            const minAx = 65.5 * TILE_SIZE, maxAx = 164.5 * TILE_SIZE, minAy = 299.8 * TILE_SIZE, maxAy = 368.0 * TILE_SIZE;
+                            if (ped.x < minAx || ped.x > maxAx || ped.y < minAy || ped.y > maxAy) {
+                                ped.x = Math.max(minAx, Math.min(maxAx, prevX));
+                                ped.y = Math.max(minAy, Math.min(maxAy, prevY));
+                                ped.angle += Math.PI * (0.7 + Math.random() * 0.6);
+                            }
+                        } else if (ped.missionTag === "SERA_GUARD") {
+                            const minSx = 459.2 * TILE_SIZE, maxSx = 479.8 * TILE_SIZE, minSy = 23.2 * TILE_SIZE, maxSy = 43.8 * TILE_SIZE;
+                            if (ped.x < minSx || ped.x > maxSx || ped.y < minSy || ped.y > maxSy) {
+                                ped.x = Math.max(minSx, Math.min(maxSx, prevX));
+                                ped.y = Math.max(minSy, Math.min(maxSy, prevY));
+                                ped.angle += Math.PI * (0.7 + Math.random() * 0.6);
+                            }
+                        }
                     }
 
                 }
@@ -14267,7 +14372,8 @@ class LeonidaGame {
                     if (amb) amb.deployedMedic = null;
                     if (ped.carryingCorpse) ped.carryingCorpse = null;
 
-                    ped.kind = "CIVILIAN";
+                    ped._boardedVehicle = true;
+                    ped.dead = true;
 
                     continue;
 
@@ -15945,6 +16051,8 @@ class LeonidaGame {
                     ped.targetBx = null;
                     ped.targetBy = null;
                     ped.turnSeed = (ped.turnSeed || 1) + 2;
+                } else if (ped.kind === "COP" && !ped.inCombat) {
+                    ped.angle += Math.PI * (0.65 + Math.random() * 0.7);
                 }
 
             }
@@ -15966,6 +16074,8 @@ class LeonidaGame {
                         ped.targetBx = null;
                         ped.targetBy = null;
                         ped.turnSeed = (ped.turnSeed || 1) + 3;
+                    } else if (ped.kind === "COP" && !ped.inCombat && !ped._boardingVeh) {
+                        ped.angle += Math.PI * (0.55 + Math.random() * 0.9);
                     }
                 }
             }
@@ -16980,9 +17090,9 @@ class LeonidaGame {
 
             // Hit open-air street/beach animation participants?
 
-            if (!hitSomething && pr.fromPlayer) {
+            if (!hitSomething) {
 
-                if (this.checkAndWipeoutLivingEvents(pr.x, pr.y, 20, true, false)) {
+                if (this.checkAndWipeoutLivingEvents(pr.x, pr.y, 26, Boolean(pr.fromPlayer), false, false, Boolean(pr.fromRemoteId))) {
 
                     this.spawnParticle(pr.x, pr.y, "BLOOD");
 
@@ -17614,11 +17724,20 @@ class LeonidaGame {
         }
         tickArray(this.map.beachVolleyballCourts);
         tickArray(this.map.beachParties);
+        tickArray(this.map.beachSwimmers);
+        tickArray(this.map.beachCatchGames);
         tickArray(this.map.muscleBeachGyms);
         tickArray(this.map.wildernessCamps);
         tickArray(this.map.golfGreens);
+        tickArray(this.map.tikiBars);
+        if (this.map.stadiumScrimmage) {
+            tickArray([this.map.stadiumScrimmage]);
+        }
         if (this.map.industrialAndParkDetails) {
             tickArray(this.map.industrialAndParkDetails.bikerRallies);
+            if (this.map.industrialAndParkDetails.miniGolf) {
+                tickArray([this.map.industrialAndParkDetails.miniGolf]);
+            }
         }
     }
 
@@ -17794,9 +17913,12 @@ class LeonidaGame {
             [m.streetTakeovers, 108],
             [m.beachVolleyballCourts, 92],
             [m.beachParties, 92],
+            [m.beachSwimmers, 86],
+            [m.beachCatchGames, 86],
             [m.muscleBeachGyms, 86],
             [m.wildernessCamps, 84],
             [m.golfGreens, 82],
+            [m.tikiBars, 92],
             [m.industrialAndParkDetails && m.industrialAndParkDetails.bikerRallies, 98]
         ];
         for (let li = 0; li < lists.length; li++) {
@@ -17808,17 +17930,23 @@ class LeonidaGame {
                 if (it && typeof it.x === "number") markPt(it.x, it.y, pad);
             }
         }
+        if (m.stadiumScrimmage) {
+            markPt(m.stadiumScrimmage.x, m.stadiumScrimmage.y, 180);
+        }
+        if (m.industrialAndParkDetails && m.industrialAndParkDetails.miniGolf) {
+            markPt(m.industrialAndParkDetails.miniGolf.x, m.industrialAndParkDetails.miniGolf.y, 92);
+        }
         if (Array.isArray(m.viceStreetDetails)) {
             for (let i = 0; i < m.viceStreetDetails.length; i++) {
                 const vd = m.viceStreetDetails[i];
-                if (vd && vd.kind === "CAFE_TABLE") markPt(vd.x, vd.y, 76);
+                if (vd && (vd.kind === "CAFE_TABLE" || vd.kind === "CUBA_DOMINO_TABLE")) markPt(vd.x, vd.y, 76);
             }
         }
         this._wipeoutCellMask = mask;
         return mask;
     }
 
-    checkAndWipeoutLivingEvents(hitX, hitY, hitRad = 28, byPlayer = true, isVehicleImpact = false, isNonLethal = false) {
+    checkAndWipeoutLivingEvents(hitX, hitY, hitRad = 28, byPlayer = true, isVehicleImpact = false, isNonLethal = false, fromNetwork = false, scatterOnly = false) {
         if (!this.map) return false;
         if (hitRad <= 52) {
             const mask = this._ensureWipeoutCellMask();
@@ -17881,9 +18009,12 @@ class LeonidaGame {
                     hp: 25,
                     dead: false,
                     panicTimer: 8.5,
+                    threatX: hitX,
+                    threatY: hitY,
                     turnSeed: i + 17
                 });
                 this.peds.push(ped);
+                if (scatterOnly) continue;
                 const checkX = m.seatX !== undefined ? m.seatX : m.x;
                 const checkY = m.seatY !== undefined ? m.seatY : m.y;
                 const d = Math.hypot(checkX - hitX, checkY - hitY);
@@ -17986,9 +18117,17 @@ class LeonidaGame {
             ];
             for (let i = 0; i < this.map.viceStreetDetails.length; i++) {
                 const vd = this.map.viceStreetDetails[i];
-                if (vd.kind !== "CAFE_TABLE" || (vd.wipeoutTimer || 0) > 0) continue;
+                if ((vd.kind !== "CAFE_TABLE" && vd.kind !== "CUBA_DOMINO_TABLE") || (vd.wipeoutTimer || 0) > 0) continue;
                 if (Math.abs(vd.x - hitX) > umbCull || Math.abs(vd.y - hitY) > umbCull) continue;
                 if (Math.hypot(vd.x - hitX, vd.y - hitY) < hitRad + 22) {
+                    if (vd.kind === "CUBA_DOMINO_TABLE") {
+                        spawnScenePeds(vd, [
+                            { ped: "vc_cuban", x: vd.x - 24.5, y: vd.y, seatX: vd.x - 17.5, seatY: vd.y },
+                            { ped: "vc_hawaiian_red", x: vd.x + 24.5, y: vd.y, seatX: vd.x + 17.5, seatY: vd.y },
+                            { ped: "g2_civ_granny", x: vd.x, y: vd.y - 24.5, seatX: vd.x, seatY: vd.y - 17.5 }
+                        ], "☕ CALLE OCHO DOMINO TABLE SCATTERED!");
+                        continue;
+                    }
                     const tblHash = Math.abs(Math.round(vd.y / 64));
                     const pair = cafePairs[tblHash % cafePairs.length];
                     const seatMode = tblHash % 3;
@@ -18221,7 +18360,7 @@ class LeonidaGame {
             }
         }
 
-        // 7. Outlaw Biker Gang Chopper Rallies
+        // 7. Outlaw Biker Gang Chopper Rallies, Tiki Bars, Mini-Golf, Beach Catch Games, Swimmers & Stadium Scrimmage
         if (this.map.industrialAndParkDetails && Array.isArray(this.map.industrialAndParkDetails.bikerRallies)) {
             const rallies = this.map.industrialAndParkDetails.bikerRallies;
             for (let i = 0; i < rallies.length; i++) {
@@ -18235,6 +18374,73 @@ class LeonidaGame {
                     }
                     spawnScenePeds(br, members, "🏍️ BIKER RALLY CRASHED!");
                 }
+            }
+        }
+        if (this.map.industrialAndParkDetails && this.map.industrialAndParkDetails.miniGolf) {
+            const mg = this.map.industrialAndParkDetails.miniGolf;
+            if ((mg.wipeoutTimer || 0) <= 0 && Math.hypot(mg.x - hitX, mg.y - hitY) < hitRad + 36) {
+                spawnScenePeds(mg, [
+                    { ped: "vc_tourist", x: mg.x - 24, y: mg.y + 24 },
+                    { ped: "bikini_cyan", x: mg.x + 24, y: mg.y + 24 }
+                ], "⛳ MINI-GOLF PARTY SCATTERED!");
+            }
+        }
+        if (Array.isArray(this.map.tikiBars)) {
+            for (let i = 0; i < this.map.tikiBars.length; i++) {
+                const tb = this.map.tikiBars[i];
+                if ((tb.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(tb.x - hitX, tb.y - hitY) < hitRad + 34) {
+                    const cs = Math.cos(tb.ang || 0), sn = Math.sin(tb.ang || 0);
+                    spawnScenePeds(tb, [
+                        { ped: "vc_cuban", x: tb.x, y: tb.y },
+                        { ped: "bikini_pink", x: tb.x + sn * 22, y: tb.y - cs * 22 },
+                        { ped: "vc_tommy", x: tb.x - cs * 18 + sn * 22, y: tb.y - sn * 18 - cs * 22 }
+                    ], "🍹 TIKI BAR SCATTERED!");
+                }
+            }
+        }
+        if (Array.isArray(this.map.beachCatchGames)) {
+            for (let i = 0; i < this.map.beachCatchGames.length; i++) {
+                const bg = this.map.beachCatchGames[i];
+                if ((bg.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(bg.x - hitX, bg.y - hitY) < hitRad + 28) {
+                    const members = bg.kind === "METAL_DETECTOR"
+                        ? [{ ped: "vc_tourist", x: bg.x, y: bg.y }]
+                        : [
+                            { ped: "surfer_guy", x: bg.x, y: bg.y - 18 },
+                            { ped: "bikini_cyan", x: bg.x, y: bg.y + 18 }
+                        ];
+                    spawnScenePeds(bg, members, "🏖️ BEACH GAME CRASHED!", true);
+                }
+            }
+        }
+        if (Array.isArray(this.map.beachSwimmers)) {
+            for (let i = 0; i < this.map.beachSwimmers.length; i++) {
+                const sw = this.map.beachSwimmers[i];
+                if ((sw.wipeoutTimer || 0) > 0) continue;
+                if (Math.hypot(sw.x - hitX, sw.y - hitY) < hitRad + 24) {
+                    const members = [{ ped: sw.pedType || (sw.isSurfer ? "surfer_guy" : "bikini_cyan"), x: sw.x, y: sw.y }];
+                    if (sw.friendWaderType) {
+                        members.push({ ped: sw.friendWaderType, x: sw.x + 8, y: sw.y + 13 });
+                    }
+                    spawnScenePeds(sw, members, "🌊 SWIMMER WIPED OUT!", true);
+                }
+            }
+        }
+        if (this.map.stadiumScrimmage && (this.map.stadiumScrimmage.wipeoutTimer || 0) <= 0) {
+            const sc = this.map.stadiumScrimmage;
+            if (Math.hypot(sc.x - hitX, sc.y - hitY) < hitRad + 95) {
+                const members = [];
+                for (let ti = 0; ti < 8; ti++) {
+                    const isHome = ti < 4;
+                    const idx = ti % 4;
+                    members.push({
+                        ped: isHome ? "vc_jogger" : "g2_civ_aqua",
+                        x: sc.x + (isHome ? -55 : 55) + (idx % 2) * 24,
+                        y: sc.y + (idx - 1.5) * 34
+                    });
+                }
+                spawnScenePeds(sc, members, "⚽ STADIUM SCRIMMAGE SCATTERED!", true);
             }
         }
 

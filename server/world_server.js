@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_201";
+const CURRENT_BUILD = "101_202";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -236,6 +236,11 @@ function loadPersistentState() {
                                     if (!Array.isArray(vrow) || vrow.length < 11) continue;
                                     if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
                                     if (cleanModVehs[vid]) continue;
+                                    // Only keep autonomous server traffic (srv_trf_*) across server restarts; purge stale client emergency/pursuit/traffic cars!
+                                    if (!String(vid).startsWith("srv_trf_")) {
+                                        migratedAny = true;
+                                        continue;
+                                    }
                                     if (vrow[8] === 4) vrow[8] = 0;
                                     loadedVehs[vid] = vrow;
                                 }
@@ -244,6 +249,11 @@ function loadPersistentState() {
                             if (rv.peds && typeof rv.peds === "object") {
                                 for (const [pid, prow] of Object.entries(rv.peds)) {
                                     if (Array.isArray(prow) && prow.length >= 10 && !(prow[9] & 1)) {
+                                        // Only keep autonomous server sidewalk peds (ped_init_*) across server restarts; purge stale client peds!
+                                        if (!String(pid).startsWith("ped_init_")) {
+                                            migratedAny = true;
+                                            continue;
+                                        }
                                         loadedPeds[pid] = prow;
                                     }
                                 }
@@ -803,15 +813,13 @@ function handleClientPacket(socket, pkt) {
             delete room.modifiedVehs[oldVid];
             delete room.modifiedVehTs[oldVid];
         }
-        // Cap total room.vehs at 240 by pruning only the oldest transient trf_ cars if exceeded
+        // Prune any transient client vehicle (traffic, emergency, pursuit) that is no longer synced by the WorldHost (> 6000ms)
         const allVehKeys = Object.keys(room.vehs);
-        if (allVehKeys.length > 240) {
-            for (const vk of allVehKeys) {
-                if (Object.keys(room.vehs).length <= 210) break;
-                if (vk.startsWith("trf_") && !room.modifiedVehs[vk] && (nowMs - (room.vehClientSyncMs[vk] || 0)) > 5000) {
-                    delete room.vehs[vk];
-                    delete room.vehClientSyncMs[vk];
-                }
+        for (const vk of allVehKeys) {
+            if (!room.modifiedVehs[vk] && !vk.startsWith("srv_trf_") && (nowMs - (room.vehClientSyncMs[vk] || 0)) > 6000) {
+                delete room.vehs[vk];
+                delete room.vehClientSyncMs[vk];
+                if (room.vehNav) delete room.vehNav[vk];
             }
         }
         if (Array.isArray(pkt.peds)) {
@@ -836,14 +844,13 @@ function handleClientPacket(socket, pkt) {
                 delete room.corpses[oldCid];
                 delete room.corpseTs[oldCid];
             }
+            // Prune any transient client pedestrian that is no longer synced by the WorldHost (> 6000ms)
             const pKeys = Object.keys(room.peds);
-            if (pKeys.length > 150) {
-                for (const pk of pKeys) {
-                    if (Object.keys(room.peds).length <= 125) break;
-                    if (pk.startsWith("dped_") && (nowMs - (room.pedClientSyncMs[pk] || 0)) > 5000) {
-                        delete room.peds[pk];
-                        delete room.pedClientSyncMs[pk];
-                    }
+            for (const pk of pKeys) {
+                if (!String(pk).startsWith("ped_init_") && (nowMs - (room.pedClientSyncMs[pk] || 0)) > 6000) {
+                    delete room.peds[pk];
+                    delete room.pedClientSyncMs[pk];
+                    if (room.pedNav) delete room.pedNav[pk];
                 }
             }
         }
