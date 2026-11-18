@@ -5801,7 +5801,11 @@ class LeonidaMap {
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
             if (!startInRestricted && this.isRestrictedNoTrafficZone(nx, ny)) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
-            if (!nb || nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) {
+            if (!nb || nb.groundType !== GROUND_TYPE.ROAD || nb.isRailway) {
+                continue;
+            }
+            const nextDirs = this.getAllowedRoadDirections(nx, ny, zBlocks);
+            if (nextDirs.length === 0) {
                 continue;
             }
             const absDiff = Math.abs(this.normalizeAngleDiff(d.angle, currentAngle));
@@ -5817,10 +5821,9 @@ class LeonidaMap {
             const lookY = (by + d.dy * 4 + 0.5) * TILE_SIZE;
             const distToTarget = Math.hypot(targetX - lookX, targetY - lookY);
             const penalty =
-                (nb.groundType === GROUND_TYPE.ROAD ? 0 : 220) +
-                (exitsIntersection ? 0 : 380) +
-                (isUturn ? 520 : 0) +
-                (isTurn && turnedInIntersection ? 420 : 0);
+                (exitsIntersection ? 0 : 650) +
+                (isUturn ? 2500 : 0) +
+                (isTurn && turnedInIntersection ? 850 : 0);
 
             candidates.push({
                 ...d,

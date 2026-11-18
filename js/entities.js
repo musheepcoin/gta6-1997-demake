@@ -1554,7 +1554,7 @@ class Vehicle {
                     const nbx = bx + rdx;
                     const nby = by + rdy;
                     const nb = map.getNavigationBlock(nbx, nby, curZ);
-                    if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway) {
+                    if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway && (!map.getAllowedRoadDirections || map.getAllowedRoadDirections(nbx, nby, curZ).length > 0)) {
                         const rcx = (nbx + 0.5) * TILE_SIZE;
                         const rcy = (nby + 0.5) * TILE_SIZE;
                         const d2 = (rcx - this.x) * (rcx - this.x) + (rcy - this.y) * (rcy - this.y);
@@ -2622,9 +2622,12 @@ class Vehicle {
         const cbx = Math.floor(this.x / TILE_SIZE);
         const cby = Math.floor(this.y / TILE_SIZE);
         const curNav = map.getNavigationBlock ? map.getNavigationBlock(cbx, cby, curZ) : null;
+        const hasRoadDirsHere = !map.getAllowedRoadDirections || map.getAllowedRoadDirections(cbx, cby, curZ).length > 0;
         const onRoadNow = Boolean(
-            (curNav && curNav.groundType === GROUND_TYPE.ROAD && !curNav.isRailway) ||
-            (map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y, curZ))
+            hasRoadDirsHere && (
+                (curNav && curNav.groundType === GROUND_TYPE.ROAD && !curNav.isRailway) ||
+                (map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y, curZ))
+            )
         );
 
         // Mode A: Real-Life Off-Road / Direct Tactical Interception (`forceDirect` ONLY):
@@ -2658,7 +2661,7 @@ class Vehicle {
                     const nbx = cbx + rdx;
                     const nby = cby + rdy;
                     const nb = map.getNavigationBlock(nbx, nby, curZ);
-                    if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway) {
+                    if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isRailway && (!map.getAllowedRoadDirections || map.getAllowedRoadDirections(nbx, nby, curZ).length > 0)) {
                         const rcx = (nbx + 0.5) * TILE_SIZE;
                         const rcy = (nby + 0.5) * TILE_SIZE;
                         const d2 = (rcx - this.x) * (rcx - this.x) + (rcy - this.y) * (rcy - this.y);
