@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_206";
+const CURRENT_BUILD = "101_207";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -567,7 +567,8 @@ function handleClientPacket(socket, pkt) {
         meta.pktWindowMs = nowPktMs;
         meta.pktCount = 0;
     }
-    if (++meta.pktCount > 95) {
+    const isHighFreqStatePkt = pkt.t === "STATE" || pkt.t === "WORLD_SYNC";
+    if (isHighFreqStatePkt && ++meta.pktCount > 360) {
         return;
     }
 

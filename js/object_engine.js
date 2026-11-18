@@ -6274,8 +6274,8 @@ class WorldObjectEngine {
        3. SPAWN REAL INTERACTIVE DRIVABLE VEHICLES IN ESTATE DRIVEWAYS
        ======================================================================== */
     spawnPrefabVehicles(game) {
-        if (!game || !Array.isArray(game.vehicles) || this.vehiclesSpawned) return;
-        this.vehiclesSpawned = true;
+        if (!game || !Array.isArray(game.vehicles) || game._prefabVehiclesSpawned) return;
+        game._prefabVehiclesSpawned = true;
 
         const sprToSpec = {
             0: "BANSHEE_GT",
@@ -13947,7 +13947,7 @@ class WorldObjectEngine {
        ======================================================================== */
     batchDynamicSockets3D(renderer, game, minX, minY, maxX, maxY, sunCos, sunSin) {
         if (!renderer || !this.instances || this.instances.length === 0) return;
-        if (game && !this.vehiclesSpawned) {
+        if (game && !game._prefabVehiclesSpawned) {
             this.spawnPrefabVehicles(game);
         }
         if (game) {

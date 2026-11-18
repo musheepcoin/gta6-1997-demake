@@ -252,6 +252,7 @@ class LeonidaGame {
         // World collections
 
         this.vehicles = [];
+        this._cmpLoadedApplied = false;
 
         this.peds = [];
 
@@ -1104,6 +1105,8 @@ class LeonidaGame {
     }
 
     onCmpLoaded(meta) {
+        if (this._cmpLoadedApplied) return;
+        this._cmpLoadedApplied = true;
 
         this.snapWaterCraftToWater();
 
@@ -1530,6 +1533,7 @@ class LeonidaGame {
             this.vehicles = this.vehicles.filter(v => !v.isCurbParked);
         } else {
             this.vehicles = [];
+        this._cmpLoadedApplied = false;
         }
 
         const bays = this.map.curbParkingBays;

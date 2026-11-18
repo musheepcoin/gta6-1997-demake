@@ -1589,7 +1589,7 @@ class Vehicle {
         if (lidZ1 === 25 && this.aiLaneShiftTimer > 0) {
             this.aiLaneShiftTimer = 0;
         }
-        const movedOutOfLane = this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
+        const movedOutOfLane = !this.aiChosenDir || (this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY));
         if (!movedOutOfLane && this.aiLaneShiftTimer > 0 && this.aiChosenDir && !this.aiChosenDir.isTurn) {
             if (this.aiChosenDir.dy !== 0 && by !== this.aiBlockY) {
                 this.aiBlockY = by;
@@ -1649,6 +1649,10 @@ class Vehicle {
                     }
                 }
             } else {
+                const snapAngle = Math.round(refAngle / (Math.PI * 0.5)) * (Math.PI * 0.5);
+                this.aiChosenDir = { dx: Math.round(Math.cos(snapAngle)), dy: Math.round(Math.sin(snapAngle)), angle: snapAngle, isTurn: false };
+            }
+            if (!this.aiChosenDir) {
                 const snapAngle = Math.round(refAngle / (Math.PI * 0.5)) * (Math.PI * 0.5);
                 this.aiChosenDir = { dx: Math.round(Math.cos(snapAngle)), dy: Math.round(Math.sin(snapAngle)), angle: snapAngle, isTurn: false };
             }
@@ -2784,7 +2788,7 @@ class Vehicle {
             this.aiLaneShiftTimer = 0;
         }
 
-        const movedOutOfLane = this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY || !this.aiChosenDir);
+        const movedOutOfLane = !this.aiChosenDir || (this.aiLaneShiftTimer <= 0 && (bx !== this.aiBlockX || by !== this.aiBlockY));
         if (!movedOutOfLane && this.aiLaneShiftTimer > 0 && this.aiChosenDir && !this.aiChosenDir.isTurn) {
             if (this.aiChosenDir.dy !== 0 && by !== this.aiBlockY) {
                 this.aiBlockY = by;
@@ -5768,7 +5772,8 @@ class TrafficManager {
             area: map.getOnScreenMapArea(camX, camY, camZ, canvasW, canvasH, camDist)
         }];
 
-        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+        // On the Dedicated Server (wsConnected), each client manages ambient peds/cars strictly around its own local camera
+        if (game.net && !game.net.wsConnected && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
             for (const rp of game.net.remotePlayers.values()) {
                 if (rp.isBot) continue;
                 const rz = rp.z !== undefined ? rp.z : 2.0;
@@ -6097,9 +6102,11 @@ class TrafficManager {
         const outerRect = this.expandRect(onScreenArea, this.pedsMaxDistanceBlocks);
 
         let nearbyPeds = 0;
+        let totalAlivePeds = 0;
         let vicePortPeds = 0;
         for (const ped of game.peds) {
             if (!ped.dead) {
+                totalAlivePeds++;
                 const bx = Math.floor(ped.x / TILE_SIZE);
                 const by = Math.floor(ped.y / TILE_SIZE);
                 if (this.isPointInRect(bx, by, outerRect)) {
@@ -6110,7 +6117,8 @@ class TrafficManager {
                 }
             }
         }
-        if (nearbyPeds >= this.maxTrafficPeds) return;
+        const maxTotalAlivePeds = this.isMobile ? 135 : 195;
+        if (nearbyPeds >= this.maxTrafficPeds || totalAlivePeds >= maxTotalAlivePeds) return;
 
         const allowEdgeOnScreen = nearbyPeds < (this.isMobile ? 56 : 92);
         const px = refX !== null ? refX : (game.player ? game.player.x : 0);

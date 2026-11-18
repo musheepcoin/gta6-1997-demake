@@ -701,7 +701,9 @@ class ViceNetworkManager {
                 } catch (_e) {}
             }
             this.initBroadcastChannel();
-            this.claimRoomSlot(0);
+            if (!this.wsUrl) {
+                this.claimRoomSlot(0);
+            }
         }
         this.broadcastDirectoryHeartbeat();
         this.updateServerListUI();
@@ -1031,7 +1033,9 @@ class ViceNetworkManager {
                 } catch (_e) {}
             }
             this.initBroadcastChannel();
-            this.claimRoomSlot(0);
+            if (!this.wsUrl) {
+                this.claimRoomSlot(0);
+            }
         } else {
             this.sendPacket({
                 t: "JOIN",
@@ -1414,6 +1418,7 @@ class ViceNetworkManager {
 
     handlePacket(pkt) {
         if (!pkt || pkt.id === this.playerId) return;
+        if (pkt.room && this.normalizeRoomCode(pkt.room) !== this.roomCode) return;
 
         if (pkt.t === "LEAVE") {
             if (this.remotePlayers.has(pkt.id)) {
@@ -1712,6 +1717,12 @@ class ViceNetworkManager {
     ensureRemotePlayer(pkt) {
         let rp = this.remotePlayers.get(pkt.id);
         if (!rp) {
+            const cleanName = pkt.name || "LUCIA ONLINE";
+            for (const [otherId, otherRp] of this.remotePlayers.entries()) {
+                if (otherId !== pkt.id && !otherRp.isBot && otherRp.name === cleanName) {
+                    this.remotePlayers.delete(otherId);
+                }
+            }
             const defX = (typeof mx256 === "function" ? mx256(213.5) : 443.5) * 64;
             const defY = (typeof my256 === "function" ? my256(146.0) : 287.0) * 64;
             rp = {
@@ -1848,6 +1859,14 @@ class ViceNetworkManager {
         if (pkt.kind === "VEH_ENTER" && pkt.vehId) {
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
             const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
+            const rp = pkt.id ? this.remotePlayers.get(pkt.id) : null;
+            if (rp) {
+                rp.veh = Object.assign(rp.veh || {}, {
+                    id: pkt.vehId,
+                    specKey: pkt.specKey || (v && v.specKey) || "STALLION",
+                    seat: rSeat
+                });
+            }
             if (v) {
                 v.doorOpenTimer = 0.48;
                 const localIsDriver = this.game.player.inVehicle === v && (this.game.player.seatIndex || 0) === 0;
@@ -1862,6 +1881,20 @@ class ViceNetworkManager {
                 }
             }
         } else if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
+            const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
+            if (pkt.id) {
+                const rp = this.remotePlayers.get(pkt.id);
+                if (rp && rp.veh && (!pkt.vehId || rp.veh.id === pkt.vehId)) {
+                    rp.veh = null;
+                    rp._linkedWorldVeh = false;
+                }
+            }
+            for (const rp of this.remotePlayers.values()) {
+                if (rp && rp.veh && rp.veh.id === pkt.vehId && (rp.veh.seat || 0) === rSeat && (!pkt.id || rp.id === pkt.id)) {
+                    rp.veh = null;
+                    rp._linkedWorldVeh = false;
+                }
+            }
             if (typeof pkt.x === "number" && typeof pkt.y === "number" && (pkt.x < 128 || pkt.y < 128)) {
                 const idx = this.game.vehicles.findIndex((veh) => veh.id === pkt.vehId);
                 if (idx !== -1 && this.game.vehicles[idx] !== this.game.player.inVehicle) {
@@ -1873,7 +1906,6 @@ class ViceNetworkManager {
                 return;
             }
             const v = this.game.vehicles.find((veh) => veh.id === pkt.vehId);
-            const rSeat = typeof pkt.seat === "number" ? pkt.seat : 0;
             if (v) {
                 v.doorOpenTimer = 0.48;
                 v._worldModified = true;
@@ -2344,21 +2376,26 @@ class ViceNetworkManager {
         };
 
         if (Array.isArray(pkt.vehs) && typeof Vehicle === "function") {
-            // On initial server bootstrap, replace default local startup traffic cars (`trf_*`) with the persistent server's traffic fleet
-            // so `g.vehicles` never doubles from ~180 to 380+ vehicles!
+            // On initial server bootstrap (or room switch), replace default local startup traffic cars (`trf_*`, `cmp_car_*`)
+            // and any previous room's autonomous server fleet (`srv_trf_*`) with the room's authoritative persistent fleet!
             if (isInitialServerBootstrap) {
                 for (let oi = g.vehicles.length - 1; oi >= 0; oi--) {
                     const ov = g.vehicles[oi];
-                    if (
-                        ov &&
-                        ov !== g.player.inVehicle &&
+                    if (!ov || ov === g.player.inVehicle) continue;
+                    const oid = typeof ov.id === "string" ? ov.id : "";
+                    const isLocalStartupTraffic =
                         !ov._worldModified &&
                         ov.driver === "AI_TRAFFIC" &&
                         !ov.isPolice &&
                         !ov.isEmergency &&
-                        typeof ov.id === "string" &&
-                        ov.id.startsWith("trf_")
-                    ) {
+                        (oid.startsWith("trf_") || oid.startsWith("cmp_car_"));
+                    const isPrevServerSim =
+                        ov._serverDriven ||
+                        oid.startsWith("srv_trf_") ||
+                        oid.startsWith("amb_srv_") ||
+                        oid.startsWith("vcfd_srv_") ||
+                        oid.startsWith("tow_srv_");
+                    if (isLocalStartupTraffic || isPrevServerSim) {
                         g.vehicles.splice(oi, 1);
                     }
                 }
@@ -2443,6 +2480,7 @@ class ViceNetworkManager {
                     v.aiBlockX = -1;
                     v.aiBlockY = -1;
                     v.aiChosenDir = null;
+                    v.aiLaneShiftTimer = 0;
                     v.aiTurnedInIntersection = false;
                 }
 
@@ -2702,7 +2740,7 @@ class ViceNetworkManager {
             } else {
                 rp._hiddenTimer = 0;
             }
-            if (now - rp.lastSeen > 8500 || (rp._hiddenTimer || 0) > 10.0) {
+            if (now - rp.lastSeen > 8500 || (rp._hiddenTimer || 0) > 6.0) {
                 this.remotePlayers.delete(id);
                 continue;
             }
@@ -2838,14 +2876,21 @@ class ViceNetworkManager {
             const isTabHidden = Boolean(typeof document !== "undefined" && document.hidden);
             if (isTabHidden) {
                 this._localHiddenTimer = (this._localHiddenTimer || 0) + dt;
+                if (!this._sentHiddenNotification) {
+                    this._sentHiddenNotification = true;
+                    this.broadcastStateNow();
+                }
             } else {
+                if (this._sentHiddenNotification) {
+                    this._sentHiddenNotification = false;
+                    this._localHiddenTimer = 0;
+                    this.broadcastStateNow();
+                }
                 this._localHiddenTimer = 0;
             }
-            const targetStateInterval = hasRemoteHumans
-                ? (isTabHidden ? 1.50 : this.syncInterval)
-                : (isTabHidden ? 6.0 : 1.5);
+            const targetStateInterval = hasRemoteHumans ? this.syncInterval : 1.5;
             this.syncAccumulator += dt;
-            if (this.syncAccumulator >= targetStateInterval && (this._localHiddenTimer || 0) < 8.0) {
+            if (!isTabHidden && this.syncAccumulator >= targetStateInterval) {
                 this.syncAccumulator = 0;
                 this.broadcastStateNow();
             }
