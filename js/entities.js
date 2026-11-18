@@ -1672,8 +1672,84 @@ class Vehicle {
             if (Math.abs(this.aiPullOverOffset) < 0.4) this.aiPullOverOffset = 0;
         }
 
-        // Release any active curbside parking stall if panicked or no longer normal AI traffic
-        if (this.aiCurbParkingBay && (isPanicked || this.driver !== "AI_TRAFFIC")) {
+        // 1B. Emergency Corridor / Siren Detection (Ambulances, Tow Trucks, Fire Engines & Police)
+        //     Runs BEFORE Curbside Parking & Bus/Taxi stops so priority emergency vehicles always take precedence!
+        const fx = Math.cos(this.angle);
+        const fy = Math.sin(this.angle);
+        const rx = -fy;
+        const ry = fx;
+        let sirenBehind = false;
+        let sirenYield = false;
+        const sirenVehicles = (game && game._prioritySirenVehicles) || (game && game.vehicles);
+        if (this.driver === "AI_TRAFFIC" && Array.isArray(sirenVehicles) && sirenVehicles.length > 0) {
+            for (let si = 0; si < sirenVehicles.length; si++) {
+                const other = sirenVehicles[si];
+                if (!other || other === this || other.destroyed) continue;
+                const isPriorityVeh = Boolean(
+                    other.sirenActive ||
+                    (other.driver === "AI_TOW" && (other.towTarget || other.towingVehicle))
+                );
+                if (!isPriorityVeh) continue;
+                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
+                const dx = other.x - this.x;
+                const dy = other.y - this.y;
+                if (Math.abs(dx) > 290 || Math.abs(dy) > 290) continue;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 290) continue;
+
+                const forwardDist = dx * fx + dy * fy; // < 0 means emergency/tow vehicle is BEHIND us
+                const signedLat = dx * rx + dy * ry;
+                const lateralDist = Math.abs(signedLat);
+                const cosDiff = Math.cos(other.angle - this.angle);
+
+                const isRightSafe = (offPx) => {
+                    const pxTest = this.x + rx * offPx;
+                    const pyTest = this.y + ry * offPx;
+                    return (
+                        (!map.isWaterAtPixel || !map.isWaterAtPixel(pxTest, pyTest)) &&
+                        (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(pxTest, pyTest, 14, curZ).hit)
+                    );
+                };
+
+                if (cosDiff > 0.35 && forwardDist < 42 && forwardDist > -275 && lateralDist < 58) {
+                    const prefSide = signedLat > 6 ? -1 : 1; // Default: pull right (+1)
+                    if (isRightSafe(prefSide * 24)) {
+                        this.aiPullOverOffset = prefSide * 25;
+                        this.aiPullOverTimer = 2.0;
+                    } else if (isRightSafe(-prefSide * 24)) {
+                        this.aiPullOverOffset = -prefSide * 25;
+                        this.aiPullOverTimer = 2.0;
+                    }
+                    this.aiTurnSignal = 2; // 4-way hazard blinkers
+                    if (lateralDist < 22 && forwardDist < 0) {
+                        sirenBehind = true;
+                        if (this.aiLaneChangeCooldown <= 0) {
+                            this.tryAdjacentLaneChange(bx, by, curZ, map, game);
+                        }
+                    } else {
+                        sirenYield = true;
+                    }
+                } else if (
+                    (cosDiff < -0.35 && forwardDist > -15 && forwardDist < 190 && lateralDist < 62) ||
+                    (Math.abs(cosDiff) <= 0.45 && forwardDist > -15 && forwardDist < 160 && lateralDist < 58)
+                ) {
+                    sirenYield = true;
+                    this.aiTurnSignal = 2;
+                    if (isRightSafe(22)) {
+                        this.aiPullOverOffset = 24;
+                        this.aiPullOverTimer = 1.8;
+                    }
+                }
+            }
+        }
+        if (sirenBehind) {
+            sirenYield = false;
+            this.aiState = "PULL_OVER_SIREN";
+            desiredThrottle = Math.max(desiredThrottle, 0.64);
+        }
+
+        // Release any active curbside parking stall if panicked, yielding to siren, or no longer normal AI traffic
+        if (this.aiCurbParkingBay && (isPanicked || sirenBehind || sirenYield || this.driver !== "AI_TRAFFIC")) {
             if (this.aiCurbParkingBay._occupiedBy === this) {
                 this.aiCurbParkingBay._occupiedBy = null;
             }
@@ -1688,6 +1764,8 @@ class Vehicle {
             movedOutOfLane &&
             !this.aiCurbParkingBay &&
             !isPanicked &&
+            !sirenBehind &&
+            !sirenYield &&
             this.driver === "AI_TRAFFIC" &&
             !this.isHeavyVehicle &&
             !this.isMotorcycle &&
@@ -1844,6 +1922,8 @@ class Vehicle {
         //         Taxis respond to hailing pedestrians or pull over to drop off a fare; buses make brief scheduled curb stops!
         if (
             !isPanicked &&
+            !sirenBehind &&
+            !sirenYield &&
             this.driver === "AI_TRAFFIC" &&
             !this.aiCurbParkingBay &&
             (this.specKey === "VICE_CAB" || this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH")
@@ -1933,87 +2013,6 @@ class Vehicle {
                     }
                 }
             }
-        }
-
-        // 1B. Emergency Corridor / Siren Detection (Ambulances, Tow Trucks, Fire Engines & Police)
-        //     When an emergency or tow vehicle approaches from behind, civilian cars pull over onto the
-        //     curb/shoulder (or change lanes) and advance past red lights to clear the lane!
-        const fx = Math.cos(this.angle);
-        const fy = Math.sin(this.angle);
-        const rx = -fy;
-        const ry = fx;
-        let sirenBehind = false;
-        let sirenYield = false;
-        const sirenVehicles = (game && game._prioritySirenVehicles) || (game && game.vehicles);
-        if (this.driver === "AI_TRAFFIC" && Array.isArray(sirenVehicles) && sirenVehicles.length > 0) {
-            for (let si = 0; si < sirenVehicles.length; si++) {
-                const other = sirenVehicles[si];
-                if (!other || other === this || other.destroyed) continue;
-                const isPriorityVeh = Boolean(
-                    other.sirenActive ||
-                    (other.driver === "AI_TOW" && (other.towTarget || other.towingVehicle))
-                );
-                if (!isPriorityVeh) continue;
-                if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
-                const dx = other.x - this.x;
-                const dy = other.y - this.y;
-                if (Math.abs(dx) > 290 || Math.abs(dy) > 290) continue;
-                const dist = Math.hypot(dx, dy);
-                if (dist > 290) continue;
-
-                const forwardDist = dx * fx + dy * fy; // < 0 means emergency/tow vehicle is BEHIND us
-                const signedLat = dx * rx + dy * ry;
-                const lateralDist = Math.abs(signedLat);
-                const cosDiff = Math.cos(other.angle - this.angle);
-
-                const isRightSafe = (offPx) => {
-                    const pxTest = this.x + rx * offPx;
-                    const pyTest = this.y + ry * offPx;
-                    return (
-                        (!map.isWaterAtPixel || !map.isWaterAtPixel(pxTest, pyTest)) &&
-                        (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(pxTest, pyTest, 14, curZ).hit)
-                    );
-                };
-
-                if (cosDiff > 0.35 && forwardDist < 42 && forwardDist > -275 && lateralDist < 58) {
-                    // Real-Life "Move Over Law":
-                    // 1) If we are still in the emergency vehicle's path (lateralDist < 22), advance & pull over to the right curb (even across a red light)!
-                    // 2) Once we have pulled over to the side (lateralDist >= 22), put on 4-way hazards and STOP until the siren passes!
-                    const prefSide = signedLat > 6 ? -1 : 1; // Default: pull right (+1)
-                    if (isRightSafe(prefSide * 24)) {
-                        this.aiPullOverOffset = prefSide * 25;
-                        this.aiPullOverTimer = 2.0;
-                    } else if (isRightSafe(-prefSide * 24)) {
-                        this.aiPullOverOffset = -prefSide * 25;
-                        this.aiPullOverTimer = 2.0;
-                    }
-                    this.aiTurnSignal = 2; // 4-way hazard blinkers
-                    if (lateralDist < 22 && forwardDist < 0) {
-                        sirenBehind = true;
-                        if (this.aiLaneChangeCooldown <= 0) {
-                            this.tryAdjacentLaneChange(bx, by, curZ, map, game);
-                        }
-                    } else {
-                        sirenYield = true;
-                    }
-                } else if (
-                    (cosDiff < -0.35 && forwardDist > -15 && forwardDist < 190 && lateralDist < 62) ||
-                    (Math.abs(cosDiff) <= 0.45 && forwardDist > -15 && forwardDist < 160 && lateralDist < 58)
-                ) {
-                    // Priority vehicle oncoming or crossing intersection ahead: pull right, flash hazards, and STOP before the junction!
-                    sirenYield = true;
-                    this.aiTurnSignal = 2;
-                    if (isRightSafe(22)) {
-                        this.aiPullOverOffset = 24;
-                        this.aiPullOverTimer = 1.8;
-                    }
-                }
-            }
-        }
-        if (sirenBehind) {
-            sirenYield = false;
-            this.aiState = "PULL_OVER_SIREN";
-            desiredThrottle = Math.max(desiredThrottle, 0.64);
         }
 
         // 2. Strict Cardinal Lane-Centered Steering & Clean 90-Degree Pivot Alignment
