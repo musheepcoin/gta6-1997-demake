@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_203";
+const CURRENT_BUILD = "101_204";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -759,17 +759,13 @@ function handleClientPacket(socket, pkt) {
         if (typeof pkt.ver === "number" && pkt.ver > (room.ver || 0)) {
             room.ver = pkt.ver;
         }
-        if (typeof pkt.wm === "number") {
-            room.worldMinutes = pkt.wm;
-        }
-        if (typeof pkt.tl === "number") {
-            room.trafficLightTimer = pkt.tl;
-        }
+        // Dedicated Server is the SOLE 24/7 World Host:
+        // Clients NEVER overwrite room.worldMinutes, room.trafficLightTimer, or pause tickAutonomousRoom!
+        // Clients only report player-modified vehicles (isMod === 1) and corpses to persist in the world DB.
         const nowMs = Date.now();
         room.updatedAt = nowMs;
-        room.lastClientWorldSyncMs = nowMs;
-        if (!room.vehClientSyncMs) room.vehClientSyncMs = {};
-        if (!room.pedClientSyncMs) room.pedClientSyncMs = {};
+        if (!room.modifiedVehs) room.modifiedVehs = {};
+        if (!room.modifiedVehTs) room.modifiedVehTs = {};
         const maxVehs = Math.min(pkt.vehs.length, 220);
         for (let i = 0; i < maxVehs; i++) {
             const row = pkt.vehs[i];
@@ -779,32 +775,16 @@ function handleClientPacket(socket, pkt) {
                 delete room.modifiedVehs[vid];
                 delete room.modifiedVehTs[vid];
                 delete room.vehs[vid];
-                delete room.vehClientSyncMs[vid];
                 continue;
             }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
-            // Skip unmodified driverless static map vehicles (every client spawns them locally)
-            if (!isMod && row[8] === 0 && !(row[10] & 256)) {
-                if (room.modifiedVehs[vid]) {
-                    room.vehs[vid] = room.modifiedVehs[vid];
-                }
-                continue;
+            if (!isMod) continue;
+            row[13] = 1;
+            if (!room.modifiedVehs[vid] || row[8] !== 0) {
+                room.modifiedVehTs[vid] = nowMs;
             }
-            room.vehClientSyncMs[vid] = nowMs;
-            if (isMod) {
-                row[13] = 1;
-                if (!room.modifiedVehs[vid] || row[8] !== 0) {
-                    room.modifiedVehTs[vid] = nowMs;
-                }
-                room.modifiedVehs[vid] = row;
-                room.vehs[vid] = row;
-            } else if (!room.modifiedVehs[vid]) {
-                // Update active traffic row in-place while preserving server-simulated vehicles in other districts!
-                room.vehs[vid] = row;
-            } else {
-                // Preserve the persisted modified vehicle!
-                room.vehs[vid] = room.modifiedVehs[vid];
-            }
+            room.modifiedVehs[vid] = row;
+            room.vehs[vid] = row;
         }
         // Keep all modifiedVehs (capped at 120 most recent) so parked/wrecked cars across the city never vanish!
         const modKeys = Object.keys(room.modifiedVehs);
@@ -813,26 +793,14 @@ function handleClientPacket(socket, pkt) {
             delete room.modifiedVehs[oldVid];
             delete room.modifiedVehTs[oldVid];
         }
-        // Prune any transient client vehicle (traffic, emergency, pursuit) that is no longer synced by the WorldHost (> 6000ms)
-        const allVehKeys = Object.keys(room.vehs);
-        for (const vk of allVehKeys) {
-            if (!room.modifiedVehs[vk] && !vk.startsWith("srv_trf_") && (nowMs - (room.vehClientSyncMs[vk] || 0)) > 6000) {
-                delete room.vehs[vk];
-                delete room.vehClientSyncMs[vk];
-                if (room.vehNav) delete room.vehNav[vk];
-            }
-        }
         if (Array.isArray(pkt.peds)) {
             if (!room.corpses) room.corpses = {};
             if (!room.corpseTs) room.corpseTs = {};
-            if (!room.peds) room.peds = {};
             const maxPeds = Math.min(pkt.peds.length, 160);
             for (let i = 0; i < maxPeds; i++) {
                 const pr = pkt.peds[i];
                 if (!Array.isArray(pr) || !pr[0]) continue;
                 const pid = pr[0];
-                room.peds[pid] = pr;
-                room.pedClientSyncMs[pid] = nowMs;
                 if (pr[9] & 1) {
                     if (!room.corpses[pid]) room.corpseTs[pid] = nowMs;
                     room.corpses[pid] = pr;
@@ -844,26 +812,8 @@ function handleClientPacket(socket, pkt) {
                 delete room.corpses[oldCid];
                 delete room.corpseTs[oldCid];
             }
-            // Prune any transient client pedestrian that is no longer synced by the WorldHost (> 6000ms)
-            const pKeys = Object.keys(room.peds);
-            for (const pk of pKeys) {
-                if (!String(pk).startsWith("ped_init_") && (nowMs - (room.pedClientSyncMs[pk] || 0)) > 6000) {
-                    delete room.peds[pk];
-                    delete room.pedClientSyncMs[pk];
-                    if (room.pedNav) delete room.pedNav[pk];
-                }
-            }
         }
         isDirty = true;
-
-        // Broadcast the authoritative merged vehicle & ped list only when other players are in the room
-        if (hasOtherRoomClients(roomCode, socket)) {
-            if (Array.isArray(pkt.peds)) {
-                pkt.peds = Object.values(Object.assign({}, room.peds, room.corpses));
-            }
-            pkt.vehs = getCombinedRoomVehicles(room);
-            broadcastToRoom(roomCode, pkt, socket);
-        }
         return;
     }
 
@@ -1607,21 +1557,17 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     const nowMs = Date.now();
     const TS = global.TILE_SIZE || 64;
 
-    // 1. Advance traffic lights (24s cycle) and 24-hour world clock continuously
+    // 1. Advance traffic lights (24s cycle) and 24-hour world clock continuously on the Dedicated Server 24/7
     room.trafficLightTimer = ((room.trafficLightTimer || 0) + dt) % 24.0;
-    if ((nowMs - (room.lastClientWorldSyncMs || 0)) > 250) {
-        const prevHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
-        room.worldMinutes = Math.round((((room.worldMinutes || 720) + dt * 0.35) % 1440) * 100) / 100;
-        const nextHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
-        if (prevHr < 17.0 && nextHr >= 17.0) {
-            room.worldMinutes = 600;
-        }
+    const prevHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+    room.worldMinutes = Math.round((((room.worldMinutes || 720) + dt * 0.35) % 1440) * 100) / 100;
+    const nextHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
+    if (prevHr < 17.0 && nextHr >= 17.0) {
+        room.worldMinutes = 600;
     }
 
     if (!room.vehNav) room.vehNav = {};
     if (!room.pedNav) room.pedNav = {};
-    if (!room.vehClientSyncMs) room.vehClientSyncMs = {};
-    if (!room.pedClientSyncMs) room.pedClientSyncMs = {};
 
     // 2. Build 128x128 spatial hash (256px cells) of all vehicles so autonomous traffic obeys safe bumper spacing
     const cellBuckets = new Map();
@@ -1640,9 +1586,9 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         b.push(vrow);
     }
 
-    // 3. Autonomous Municipal Dispatch Check (every 1.0s = 10 ticks)
+    // 3. Autonomous Municipal Dispatch Check (every 1.0s = 10 ticks, 100% Server-Authoritative)
     room._dispatchTick = ((room._dispatchTick || 0) + 1) % 10;
-    if (room._dispatchTick === 0 && (nowMs - (room.lastClientWorldSyncMs || 0)) > 4500) {
+    if (room._dispatchTick === 0) {
         // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
         const corpseEntries = Object.entries(room.corpses || {});
         if (corpseEntries.length > 0) {
@@ -1737,22 +1683,11 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         }
     }
 
-    // 4. Advance all autonomous vehicles along the .CMP road network
+    // 4. Advance all autonomous vehicles along the .CMP road network (100% Dedicated Server Authoritative)
     let seq = 1;
     for (const [vid, row] of allVehEntries) {
         seq++;
         if (!Array.isArray(row) || row.length < 11) continue;
-        // If an active client WorldHost updated this vehicle within the last 4500ms (covers the 3.0s solo WORLD_SYNC interval), let the 60 FPS client drive it!
-        if ((nowMs - (room.vehClientSyncMs[vid] || 0)) < 4500) {
-            let nav = room.vehNav[vid];
-            if (!nav) {
-                nav = { turnSeed: ((seq * 0.6180339) % 1.0) };
-                room.vehNav[vid] = nav;
-            }
-            nav.targetBx = Math.floor(row[2] / TS);
-            nav.targetBy = Math.floor(row[3] / TS);
-            continue;
-        }
 
         const drvCode = row[8] || 0;
         const flags = row[10] || 0;
@@ -1937,13 +1872,12 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         row[7] = Math.round(vy);
     }
 
-    // 5. Advance all autonomous pedestrians along .CMP sidewalks
+    // 5. Advance all autonomous pedestrians along .CMP sidewalks (100% Dedicated Server Authoritative)
     let pSeq = 1;
     for (const [pid, prow] of Object.entries(room.peds)) {
         pSeq++;
         if (!Array.isArray(prow) || prow.length < 10) continue;
         if (prow[9] & 1) continue; // Dead corpse
-        if ((nowMs - (room.pedClientSyncMs[pid] || 0)) < 4500) continue;
 
         let pnav = room.pedNav[pid];
         if (!pnav) {
@@ -1993,9 +1927,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         prow[6] = Math.round(pa * 100) / 100;
     }
 
-    // 6. Only broadcast autonomous server simulation ticks (throttled to 1 Hz = every 10th tick) when NO client WorldHost has synced in the last 4500ms!
-    // Never spam 10 Hz server_sim WORLD_SYNC packets back at an active 60 FPS client WorldHost!
-    if (room._dispatchTick === 0 && (nowMs - (room.lastClientWorldSyncMs || 0)) > 4500) {
+    // 6. Broadcast authoritative Dedicated Server simulation ticks (1 Hz = every 10th tick) to all players in the room!
+    if (room._dispatchTick === 0) {
         let hasRoomClients = false;
         for (const meta of clients.values()) {
             if (meta.room === roomCode && !meta.isOutdated) {

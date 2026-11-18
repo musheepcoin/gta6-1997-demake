@@ -1605,7 +1605,7 @@ class ViceNetworkManager {
                 } else {
                     this._pendingServerWorldSnapshot = pkt;
                 }
-            } else if ((pkt.ver || 0) >= 101181 && !this.isWorldHost()) {
+            } else if (pkt.id === "server_sim" || (!this.wsConnected && (pkt.ver || 0) >= 101181 && !this.isWorldHost())) {
                 this.applyWorldSync(pkt);
             }
             return;
@@ -1771,6 +1771,9 @@ class ViceNetworkManager {
     }
 
     isWorldHost() {
+        // When connected to the 24/7 Dedicated Persistent World Server (Hostinger vc26-world),
+        // the Dedicated Server is the SOLE World Host — NO player browser ever hosts the game!
+        if (this.wsConnected) return false;
         const MY_VER = 101181;
         const humans = this.getHumanRemotePlayers();
         if (humans.length === 0) return true;
@@ -1798,6 +1801,7 @@ class ViceNetworkManager {
     }
 
     isClientWorldSyncActive() {
+        if (this.wsConnected) return false;
         if (this.isWorldHost()) return false;
         return (performance.now() - (this.lastWorldSyncReceivedMs || 0)) < 1200;
     }
@@ -2151,6 +2155,11 @@ class ViceNetworkManager {
                 v.driver === "PLAYER" ||
                 v.driver === "REMOTE"
             );
+            // When connected to the 24/7 Dedicated Server, only report player-modified vehicles to persist in world_state.json;
+            // the Dedicated Server simulates its own autonomous traffic fleet 24/7 without any player hosting!
+            if (this.wsConnected && !isMod) {
+                continue;
+            }
             // Skip untouched driverless static map vehicles (every client spawns them deterministically)
             // while syncing ALL active moving traffic, police, emergency units, tow trucks AND player-modified cars across the persistent universe!
             const isUntouchedStatic = Boolean(
@@ -2237,6 +2246,9 @@ class ViceNetworkManager {
                     y: sy,
                     a: Math.round((pd.angle || 0) * 100) / 100
                 });
+            }
+            if (this.wsConnected && !pd.dead) {
+                continue;
             }
             const flags =
                 (pd.dead ? 1 : 0) |
@@ -2817,9 +2829,11 @@ class ViceNetworkManager {
                 this.broadcastStateNow();
             }
             // Never broadcast WORLD_SYNC from a hidden/background tab (whose requestAnimationFrame is throttled to 1 Hz by the browser!)
-            if (!isTabHidden && this.isWorldHost() && (hasRemoteHumans || (this.wsConnected && this._serverBootstrapApplied))) {
+            const shouldPersistToDedicated = Boolean(this.wsConnected && this._serverBootstrapApplied);
+            const shouldP2PHostSync = Boolean(!this.wsConnected && this.isWorldHost() && hasRemoteHumans);
+            if (!isTabHidden && (shouldPersistToDedicated || shouldP2PHostSync)) {
                 this.worldSyncAccumulator = (this.worldSyncAccumulator || 0) + dt;
-                const targetWorldInterval = hasRemoteHumans ? this.worldSyncInterval : 3.0;
+                const targetWorldInterval = this.wsConnected ? 3.0 : this.worldSyncInterval;
                 if (this.worldSyncAccumulator >= targetWorldInterval) {
                     this.worldSyncAccumulator = 0;
                     this.broadcastWorldSync();
