@@ -7936,6 +7936,9 @@ class RetroRenderer {
     }
 
     getEntityZ(ent, offset = 0.03) {
+        if (ent && typeof ent.z === "number" && ent.z >= 2.0) {
+            return ent.z + offset;
+        }
         const isWaterEnt = Boolean(
             ent && (
                 ent.waterOnly ||
@@ -8863,6 +8866,9 @@ class RetroRenderer {
             for (let ji = 0; ji < this.map.jetSkiers.length; ji++) {
                 const js = this.map.jetSkiers[ji];
                 if (js._boardedVehicle && !js._boardedVehicle.destroyed) continue;
+                const jPadX = (js.rx || 0) + 96;
+                const jPadY = (js.ry || 0) + 96;
+                if (js.x < minX - jPadX || js.x > maxX + jPadX || js.y < minY - jPadY || js.y > maxY + jPadY) continue;
                 const bz = js.z || 2.0;
                 const t = this.time * (js.speed || 1.35) + js.seed;
                 const jx = js.x + Math.cos(t) * js.rx;
@@ -8915,14 +8921,17 @@ class RetroRenderer {
         if (Array.isArray(this.map.parasailBoats)) {
             for (let pi = 0; pi < this.map.parasailBoats.length; pi++) {
                 const pb = this.map.parasailBoats[pi];
+                const pPadX = (pb.rx || 0) + 140;
+                const pPadY = (pb.ry || 0) + 140;
+                if (pb.x < minX - pPadX || pb.x > maxX + pPadX || pb.y < minY - pPadY || pb.y > maxY + pPadY) continue;
                 const bz = pb.z || 2.0;
                 const t = this.time * (pb.speed || 0.50) + pb.seed;
                 const bx = pb.x + Math.cos(t) * pb.rx;
                 const by = pb.y + Math.sin(t) * pb.ry;
+                if (bx < minX - 140 || bx > maxX + 140 || by < minY - 140 || by > maxY + 140) continue;
                 const vx = -Math.sin(t) * pb.rx;
                 const vy = Math.cos(t) * pb.ry;
                 const bAng = Math.atan2(vy, vx);
-                if (bx < minX - 140 || bx > maxX + 140 || by < minY - 140 || by > maxY + 140) continue;
                 const cosA = Math.cos(bAng);
                 const sinA = Math.sin(bAng);
 
@@ -9777,6 +9786,9 @@ class RetroRenderer {
             if (ind.kayakers) {
                 for (let ki = 0; ki < ind.kayakers.length; ki++) {
                     const kk = ind.kayakers[ki];
+                    const kPadX = (kk.rx || 0) + 96;
+                    const kPadY = (kk.ry || 0) + 96;
+                    if (kk.x < minX - kPadX || kk.x > maxX + kPadX || kk.y < minY - kPadY || kk.y > maxY + kPadY) continue;
                     const t = this.time * kk.speed + kk.seed;
                     const kx = kk.x + Math.cos(t) * kk.rx;
                     const ky = kk.y + Math.sin(t) * kk.ry;
@@ -11921,13 +11933,14 @@ class RetroRenderer {
 
         // 7C-ter. Off-Street Asphalt Surface Parking Lots & Recessed Boulevard Curbside Parking Bays (World-Space Procedural Asphalt + Worn Paint)
         if (this.map && Array.isArray(this.map.surfaceParkingLots)) {
-            for (let li = 0; li < this.map.surfaceParkingLots.length; li++) {
-                const lot = this.map.surfaceParkingLots[li];
-                const cx = ((lot.asphaltMinX + lot.asphaltMaxX + 1) * 0.5) * TILE_SIZE;
-                const cy = ((lot.asphaltMinY + lot.asphaltMaxY + 1) * 0.5) * TILE_SIZE;
+            const lotsVis = this._queryStaticChunkGrid(this.map.surfaceParkingLots, "cx", "cy", minX - 220, minY - 220, maxX + 220, maxY + 220, "_lotIdx");
+            for (let li = 0; li < lotsVis.length; li++) {
+                const lot = lotsVis[li];
+                const cx = lot.cx !== undefined ? lot.cx : (lot.cx = ((lot.asphaltMinX + lot.asphaltMaxX + 1) * 0.5) * TILE_SIZE);
+                const cy = lot.cy !== undefined ? lot.cy : (lot.cy = ((lot.asphaltMinY + lot.asphaltMaxY + 1) * 0.5) * TILE_SIZE);
                 if (cx < minX - 220 || cx > maxX + 220 || cy < minY - 220 || cy > maxY + 220) continue;
-                const lotW = (lot.asphaltMaxX - lot.asphaltMinX + 1) * TILE_SIZE - 4.0;
-                const lotH = (lot.asphaltMaxY - lot.asphaltMinY + 1) * TILE_SIZE - 4.0;
+                const lotW = lot._lotW !== undefined ? lot._lotW : (lot._lotW = (lot.asphaltMaxX - lot.asphaltMinX + 1) * TILE_SIZE - 4.0);
+                const lotH = lot._lotH !== undefined ? lot._lotH : (lot._lotH = (lot.asphaltMaxY - lot.asphaltMinY + 1) * TILE_SIZE - 4.0);
                 // Procedural world-space asphalt pad with 3D stone curb border & building cast shadows (uDayLightTex)
                 this.pushAsphaltBayQuad3D(cx, cy, 2.012, lotW + 6.0, lotH + 6.0, false, 1, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 // Subtle worn drive-aisle directional lane dashes
@@ -11945,12 +11958,11 @@ class RetroRenderer {
         if (this.map && Array.isArray(this.map.curbParkingStrips)) {
             for (let si = 0; si < this.map.curbParkingStrips.length; si++) {
                 const st = this.map.curbParkingStrips[si];
-                const stripCy = (st.yMin + st.yMax) * 0.5;
-                const stripH = st.yMax - st.yMin;
-                // Extend 8px across roadEdgeX so the recessed asphalt bay covers the road's yellow curb line and merges 100% seamlessly into the street
-                const padW = st.bayDepth + 8.0;
-                const padCx = st.roadEdgeX - st.dc * ((st.bayDepth - 8.0) * 0.5);
+                const padCx = st._padCx !== undefined ? st._padCx : (st._padCx = st.roadEdgeX - st.dc * ((st.bayDepth - 8.0) * 0.5));
                 if (padCx < minX - 120 || padCx > maxX + 120 || st.yMax < minY - 60 || st.yMin > maxY + 60) continue;
+                const stripCy = st._stripCy !== undefined ? st._stripCy : (st._stripCy = (st.yMin + st.yMax) * 0.5);
+                const stripH = st._stripH !== undefined ? st._stripH : (st._stripH = st.yMax - st.yMin);
+                const padW = st._padW !== undefined ? st._padW : (st._padW = st.bayDepth + 8.0);
                 const sz = st.z || 2.0;
                 this.pushAsphaltBayQuad3D(
                     padCx,
@@ -11966,12 +11978,13 @@ class RetroRenderer {
             }
         }
         if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.estateDriveways)) {
-            for (let di = 0; di < this.map.objectEngine.estateDriveways.length; di++) {
-                const dw = this.map.objectEngine.estateDriveways[di];
+            const dwVis = this._queryStaticChunkGrid(this.map.objectEngine.estateDriveways, "x", "y", minX - 64, minY - 64, maxX + 64, maxY + 64, "_edwIdx");
+            for (let di = 0; di < dwVis.length; di++) {
+                const dw = dwVis[di];
                 if (dw.x < minX - 64 || dw.x > maxX + 64 || dw.y < minY - 64 || dw.y > maxY + 64) continue;
                 const dz = dw.z || 2.0;
-                const ca = Math.cos(dw.angle || 0);
-                const sa = Math.sin(dw.angle || 0);
+                const ca = dw._ca !== undefined ? dw._ca : (dw._ca = Math.cos(dw.angle || 0));
+                const sa = dw._sa !== undefined ? dw._sa : (dw._sa = Math.sin(dw.angle || 0));
                 // Architectural private villa parking pad (paved dark slate border + worn corner L-brackets + concrete wheel stop)
                 this.pushSolidQuad3D(dw.x, dw.y, dz + 0.011, 66.0, 36.0, dw.angle || 0, 0.22, 0.24, 0.27, 0.72, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 this.pushSolidQuad3D(dw.x, dw.y, dz + 0.012, 62.0, 32.0, dw.angle || 0, 0.27, 0.30, 0.33, 0.82, SPRITE_DRAW_ORDER.TIRE_MARKS);
@@ -15260,11 +15273,12 @@ class RetroRenderer {
             }
         };
 
-        ctx.save();
+        const realCtx = ctx;
+        realCtx.save();
         if (pScale < 0.999) {
-            ctx.translate(px, py);
-            ctx.scale(pScale, pScale);
-            ctx.translate(-px, -py);
+            realCtx.translate(px, py);
+            realCtx.scale(pScale, pScale);
+            realCtx.translate(-px, -py);
         }
 
         const rrectOn = (c, rx, ry, rw, rh, rad) => {
@@ -15275,7 +15289,6 @@ class RetroRenderer {
                 c.rect(rx, ry, rw, rh);
             }
         };
-        const rrect = (rx, ry, rw, rh, rad) => rrectOn(ctx, rx, ry, rw, rh, rad);
 
         const timeInfo = (game && typeof game.getTimePhaseInfo === "function")
             ? game.getTimePhaseInfo()
@@ -15284,6 +15297,38 @@ class RetroRenderer {
         const liveClockStr = (game && typeof game.getClockString === "function")
             ? game.getClockString(showColon)
             : "16:30";
+
+        let fullPhoneStateKey = "";
+        if (!isMinimized) {
+            fullPhoneStateKey = `${W}x${H}:${isPlacesApp ? 1 : 0}:${this.tourScrollOffset || 0}:${this.minimapZoomIdx || 0}:${this.activePhoneMissionIdx || 0}:${game && game.activeMission ? game.activeMission.id : ""}:${game && game.ytMusicEnabled !== false ? 1 : 0}:${game ? (game.ytStationIdx || 0) : 0}:${Math.round(((game && game.ytMusicVolume) ?? 0.28) * 100)}:${timeInfo.phase}:${liveClockStr}`;
+            this._fullPhoneTick = ((this._fullPhoneTick || 0) + 1) | 0;
+            if (
+                this._fullPhoneCacheCanvas &&
+                this._fullPhoneStateKey === fullPhoneStateKey &&
+                (this._fullPhoneTick % 5) !== 0 &&
+                this._cachedPhoneButtons
+            ) {
+                realCtx.drawImage(this._fullPhoneCacheCanvas, px - 6, py - 6);
+                for (let bi = 0; bi < this._cachedPhoneButtons.length; bi++) {
+                    this.cheatButtons.push(this._cachedPhoneButtons[bi]);
+                }
+                realCtx.restore();
+                return;
+            }
+            const fcw = pw + 12;
+            const fch = ph + 12;
+            if (!this._fullPhoneCacheCanvas || this._fullPhoneCacheCanvas.width !== fcw || this._fullPhoneCacheCanvas.height !== fch) {
+                this._fullPhoneCacheCanvas = document.createElement("canvas");
+                this._fullPhoneCacheCanvas.width = fcw;
+                this._fullPhoneCacheCanvas.height = fch;
+                this._fullPhoneCacheCtx = this._fullPhoneCacheCanvas.getContext("2d");
+            }
+            ctx = this._fullPhoneCacheCtx;
+            ctx.clearRect(0, 0, fcw, fch);
+            ctx.save();
+            ctx.translate(6 - px, 6 - py);
+        }
+        const rrect = (rx, ry, rw, rh, rad) => rrectOn(ctx, rx, ry, rw, rh, rad);
 
         // Fast cached offscreen pill path for mobile minimized Smartphone (~2 redraws/sec instead of 60 Hz gradients + clips!)
         if (isMinimized && isMobile) {
@@ -15988,6 +16033,12 @@ class RetroRenderer {
         applyPhoneScaleToButtons();
         ctx.restore();
         ctx.restore();
+        if (ctx !== realCtx && this._fullPhoneCacheCanvas) {
+            this._fullPhoneStateKey = fullPhoneStateKey;
+            this._cachedPhoneButtons = this.cheatButtons.slice(btnStartIdx);
+            realCtx.drawImage(this._fullPhoneCacheCanvas, px - 6, py - 6);
+            realCtx.restore();
+        }
     }
 
     renderPhoneGpsWidget(ctx, game, gx, gy, gw, gh, rrect) {
@@ -16551,6 +16602,15 @@ class RetroRenderer {
     }
 
     getVehicleG24Mapping(v) {
+        if (
+            v._g24MapInfo &&
+            v._g24CacheSpec === v.specKey &&
+            v._g24CacheSpr === v.sprId &&
+            v._g24CacheRemap === v.remapIdx &&
+            v._g24CacheReady === Boolean(this.vehicleBySprIdx)
+        ) {
+            return v._g24MapInfo;
+        }
         const specObj = (typeof VEHICLE_SPECS !== "undefined" && VEHICLE_SPECS[v.specKey]) || {};
         const sprId = String(v.sprId || specObj.sprId || "66");
         const isTank = Boolean(v.isTank || specObj.isTank || sprId === "940");
@@ -16559,13 +16619,13 @@ class RetroRenderer {
         // Visually verified whitelist: only sprite 62 (open jeep) and 70 (cabrio with visible seats) are truly open.
         // Sprites 74 & 75 are flagged "convertible" in GTA1 metadata but are drawn as closed hardtops,
         // so drawing a driver on them puts a person on top of the roof.
-        const OPEN_TOP_SPRITES = { "62": true, "70": true };
         const spriteMeta = this.vehicleBySprIdx && this.vehicleBySprIdx[sprId];
         const isConvertible = spriteMeta
-            ? Boolean(spriteMeta.convertible && OPEN_TOP_SPRITES[sprId])
+            ? Boolean(spriteMeta.convertible && (sprId === "62" || sprId === "70"))
             : Boolean(v.isConvertible || specObj.isConvertible);
         const isMotorcycle = Boolean(v.isMotorcycle || specObj.isMotorcycle);
 
+        let info;
         if (v.specKey === "VCPD_CRUISER" || sprId === "73") {
             let rIdx = typeof v.remapIdx === "number" && v.remapIdx >= 0 ? (v.remapIdx % 5) : -1;
             if (rIdx < 0) {
@@ -16575,25 +16635,29 @@ class RetroRenderer {
                 const fleetRoll = Math.abs((h ^ Math.imul(Math.round(v.x || 0), 73856093) ^ Math.imul(Math.round(v.y || 0), 19349663))) % 100;
                 rIdx = fleetRoll < 36 ? 2 : (fleetRoll < 68 ? 1 : (fleetRoll < 86 ? 3 : (fleetRoll < 95 ? 0 : 4)));
             }
-            return { sprId: "73", useBaseObject: false, remapIdx: rIdx, isConvertible: false, isTank: false };
+            info = { sprId: "73", useBaseObject: false, remapIdx: rIdx, isConvertible: false, isTank: false };
+        } else if (v.specKey === "TOW_TRUCK" || sprId === "veh_tow_truck") {
+            info = { sprId: "veh_tow_truck", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
+        } else if (v.specKey === "SWAT_ENFORCER" || (v.isPolice && sprId === "76")) {
+            info = { sprId: "76", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
+        } else {
+            const hasRemap = typeof v.remapIdx === "number" && v.remapIdx >= 0 && !v.useBaseOnly && !specObj.useBaseOnly;
+            info = {
+                sprId,
+                useBaseObject: !hasRemap,
+                remapIdx: hasRemap ? v.remapIdx : 0,
+                isConvertible,
+                isMotorcycle,
+                isTank,
+                horizontalSprite: Boolean(specObj.horizontalSprite)
+            };
         }
-        if (v.specKey === "TOW_TRUCK" || sprId === "veh_tow_truck") {
-            return { sprId: "veh_tow_truck", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
-        }
-        if (v.specKey === "SWAT_ENFORCER" || (v.isPolice && sprId === "76")) {
-            return { sprId: "76", useBaseObject: true, remapIdx: 0, isConvertible: false, isTank: false };
-        }
-
-        const hasRemap = typeof v.remapIdx === "number" && v.remapIdx >= 0 && !v.useBaseOnly && !specObj.useBaseOnly;
-        return {
-            sprId,
-            useBaseObject: !hasRemap,
-            remapIdx: hasRemap ? v.remapIdx : 0,
-            isConvertible,
-            isMotorcycle,
-            isTank,
-            horizontalSprite: Boolean(specObj.horizontalSprite)
-        };
+        v._g24MapInfo = info;
+        v._g24CacheSpec = v.specKey;
+        v._g24CacheSpr = v.sprId;
+        v._g24CacheRemap = v.remapIdx;
+        v._g24CacheReady = Boolean(this.vehicleBySprIdx);
+        return info;
     }
 
     /* ========================================================================

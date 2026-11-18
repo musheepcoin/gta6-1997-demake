@@ -6131,14 +6131,6 @@ class TrafficManager {
 
             const nav = map.getNavigationBlock(bx, by, camZ);
             if (!nav) continue;
-            const col = map.getColumn ? map.getColumn(bx, by) : null;
-            if (col && col.length > 1) continue;
-            const lid = map.getBlockInfo ? (map.getBlockInfo(bx, by, 1)?.lid || 0) : 0;
-            if (lid === 69) continue;
-            if (bx >= 449 && bx <= 464 && lid === 10) continue;
-            // Never spawn inside a tiny enclosed sidewalk pocket (they could only pace back and forth)
-            if (typeof PedNav !== "undefined" && !PedNav.isGoodSpawnTile(game, bx, by, camZ)) continue;
-
             const inPrisonYard = (bx >= 57 && bx <= 67 && by >= 77 && by <= 145);
             const isSand = !!(map.coastalSandMask && map.coastalSandMask[by * MAP_COLS + bx] === 1 && nav.groundType === GROUND_TYPE.FIELD);
             if (
@@ -6148,13 +6140,27 @@ class TrafficManager {
             ) {
                 continue;
             }
+            const col = map.getColumn ? map.getColumn(bx, by) : null;
+            if (col && col.length > 1) continue;
+            const lid = map.getBlockInfo ? (map.getBlockInfo(bx, by, 1)?.lid || 0) : 0;
+            if (lid === 69) continue;
+            if (bx >= 449 && bx <= 464 && lid === 10) continue;
+            // Never spawn inside a tiny enclosed sidewalk pocket (they could only pace back and forth)
+            if (typeof PedNav !== "undefined" && !PedNav.isGoodSpawnTile(game, bx, by, camZ)) continue;
+
             const pick = { bx, by, isPave: nav.groundType === GROUND_TYPE.PAWEMENT, isSand, inPrisonYard };
             const pedX = (pick.bx + 0.25 + Math.random() * 0.5) * TILE_SIZE;
             const pedY = (pick.by + 0.25 + Math.random() * 0.5) * TILE_SIZE;
 
             let tooClose = false;
-            for (const other of game.peds) {
-                if (!other.dead && Math.hypot(other.x - pedX, other.y - pedY) < 34) {
+            for (let pi = 0; pi < game.peds.length; pi++) {
+                const other = game.peds[pi];
+                if (!other || other.dead) continue;
+                const odx = other.x - pedX;
+                if (odx > 34 || odx < -34) continue;
+                const ody = other.y - pedY;
+                if (ody > 34 || ody < -34) continue;
+                if (odx * odx + ody * ody < 1156) {
                     tooClose = true;
                     break;
                 }
@@ -6171,8 +6177,22 @@ class TrafficManager {
             if (typeof map.isInsideLivingEventZone === "function" && map.isInsideLivingEventZone(pedX, pedY, 14)) {
                 continue;
             }
-            if (map.objectEngine && Array.isArray(map.objectEngine.clearZones) && map.objectEngine.clearZones.some((cz) => Math.hypot(cz.x - pedX, cz.y - pedY) < Math.min(72, cz.r || 60))) {
-                continue;
+            if (map.objectEngine && Array.isArray(map.objectEngine.clearZones)) {
+                let inClearZone = false;
+                const czList = map.objectEngine.clearZones;
+                for (let ci = 0; ci < czList.length; ci++) {
+                    const cz = czList[ci];
+                    const czR = Math.min(72, cz.r || 60);
+                    const cdx = cz.x - pedX;
+                    if (cdx > czR || cdx < -czR) continue;
+                    const cdy = cz.y - pedY;
+                    if (cdy > czR || cdy < -czR) continue;
+                    if (cdx * cdx + cdy * cdy < czR * czR) {
+                        inClearZone = true;
+                        break;
+                    }
+                }
+                if (inClearZone) continue;
             }
 
             const rawAngle = dirs[Math.floor(Math.random() * dirs.length)];

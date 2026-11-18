@@ -14963,76 +14963,90 @@ class WorldObjectEngine {
        6B. RENDER 2D VILLA HEIST INTERACTION PROMPTS & ACTIVE GETAWAY BANNER
        ======================================================================== */
     _ensurePromptCellMask() {
-        if (this._promptCellMask) return this._promptCellMask;
+        if (this._promptCellGrid) return this._promptCellGrid;
         if (!this.map || !Array.isArray(this.heistTargets)) return null;
-        const mask = new Uint8Array(128 * 128);
-        const markPt = (px, py, pad = 215) => {
+        const grid = new Array(128 * 128);
+        const markPt = (px, py, pad = 145) => {
             if (typeof px !== "number" || typeof py !== "number") return;
             const x0 = Math.max(0, (px - pad) >> 8);
             const x1 = Math.min(127, (px + pad) >> 8);
             const y0 = Math.max(0, (py - pad) >> 8);
             const y1 = Math.min(127, (py + pad) >> 8);
+            const pt = { x: px, y: py, rSq: pad * pad };
             for (let cy = y0; cy <= y1; cy++) {
                 const rowOff = cy << 7;
                 for (let cx = x0; cx <= x1; cx++) {
-                    mask[rowOff | cx] = 1;
+                    const idx = rowOff | cx;
+                    if (!grid[idx]) grid[idx] = [pt];
+                    else grid[idx].push(pt);
                 }
             }
         };
-        const skipKeys = new Set(["instances", "interactiveProps", "streetProps", "cashDrops", "_cooldownArrayRefs"]);
+        const skipKeys = new Set([
+            "instances",
+            "interactiveProps",
+            "streetProps",
+            "cashDrops",
+            "_cooldownArrayRefs",
+            "clearZones",
+            "estateDriveways",
+            "rooftopProps",
+            "animatedBillboards",
+            "neonSigns"
+        ]);
         for (const k of Object.keys(this)) {
             if (skipKeys.has(k)) continue;
             const val = this[k];
             if (Array.isArray(val) && val.length > 0 && val[0] && typeof val[0].x === "number" && typeof val[0].y === "number") {
                 for (let i = 0; i < val.length; i++) {
-                    markPt(val[i].x, val[i].y, 215);
+                    markPt(val[i].x, val[i].y, 145);
                 }
             }
         }
         const m = this.map;
         for (const arr of [m.muscleBeachGyms, m.beachVolleyballCourts, m.yachtParties, m.tikiBars, m.streetTakeovers]) {
             if (!Array.isArray(arr)) continue;
-            for (let i = 0; i < arr.length; i++) markPt(arr[i].x, arr[i].y, 215);
+            for (let i = 0; i < arr.length; i++) markPt(arr[i].x, arr[i].y, 145);
         }
         if (m.industrialAndParkDetails && m.industrialAndParkDetails.miniGolf) {
-            markPt(m.industrialAndParkDetails.miniGolf.x, m.industrialAndParkDetails.miniGolf.y, 215);
+            markPt(m.industrialAndParkDetails.miniGolf.x, m.industrialAndParkDetails.miniGolf.y, 145);
         }
-        if (this.tishaWockaMarket) markPt(this.tishaWockaMarket.x, this.tishaWockaMarket.y, 215);
+        if (this.tishaWockaMarket) markPt(this.tishaWockaMarket.x, this.tishaWockaMarket.y, 145);
         if (this.mambasStadium) {
-            markPt(this.mambasStadium.x, this.mambasStadium.y, 220);
-            markPt(this.mambasStadium.x, this.mambasStadium.y - 308, 200);
-            markPt(this.mambasStadium.x, this.mambasStadium.y + 308, 200);
+            markPt(this.mambasStadium.x, this.mambasStadium.y, 180);
+            markPt(this.mambasStadium.x, this.mambasStadium.y - 308, 130);
+            markPt(this.mambasStadium.x, this.mambasStadium.y + 308, 130);
         }
         if (this.landmarks3D) {
             const lm = this.landmarks3D;
             if (lm.launchpad) {
-                markPt(lm.launchpad.x, lm.launchpad.y, 215);
-                markPt(lm.launchpad.consoleX, lm.launchpad.consoleY, 200);
+                markPt(lm.launchpad.x, lm.launchpad.y, 170);
+                markPt(lm.launchpad.consoleX, lm.launchpad.consoleY, 110);
             }
             if (lm.thrillbillyArena) {
-                markPt(lm.thrillbillyArena.x, lm.thrillbillyArena.y, 215);
-                markPt(lm.thrillbillyArena.x, lm.thrillbillyArena.y - 126, 200);
+                markPt(lm.thrillbillyArena.x, lm.thrillbillyArena.y, 165);
+                markPt(lm.thrillbillyArena.x, lm.thrillbillyArena.y - 126, 125);
             }
             if (lm.gellhornSpeedway) {
-                markPt(lm.gellhornSpeedway.x, lm.gellhornSpeedway.y, 215);
-                markPt(lm.gellhornSpeedway.pitX, lm.gellhornSpeedway.pitY, 200);
-                if (lm.gellhornSpeedway.westGateX) markPt(lm.gellhornSpeedway.westGateX, lm.gellhornSpeedway.westGateY, 200);
+                markPt(lm.gellhornSpeedway.x, lm.gellhornSpeedway.y, 150);
+                markPt(lm.gellhornSpeedway.pitX, lm.gellhornSpeedway.pitY, 130);
+                if (lm.gellhornSpeedway.westGateX) markPt(lm.gellhornSpeedway.westGateX, lm.gellhornSpeedway.westGateY, 145);
             }
             for (const obj of [lm.briansBoatyard, lm.jackOfHearts, lm.calHamptonOutpost, lm.rustyAnchorBar]) {
-                if (obj) markPt(obj.x, obj.y, 200);
+                if (obj) markPt(obj.x, obj.y, 135);
             }
         }
         for (let i = 0; i < this.heistTargets.length; i++) {
             const ht = this.heistTargets[i];
-            markPt(ht.keypadX, ht.keypadY, 160);
-            markPt(ht.vaultX, ht.vaultY, 160);
+            markPt(ht.keypadX, ht.keypadY, 85);
+            markPt(ht.vaultX, ht.vaultY, 85);
             if (ht.inst && ht.inst.dockBoat) {
-                markPt(ht.inst.dockBoat.worldX, ht.inst.dockBoat.worldY, 160);
-                markPt(ht.inst.dockBoat.pierMidX, ht.inst.dockBoat.pierMidY, 160);
+                markPt(ht.inst.dockBoat.worldX, ht.inst.dockBoat.worldY, 90);
+                markPt(ht.inst.dockBoat.pierMidX, ht.inst.dockBoat.pierMidY, 90);
             }
         }
-        this._promptCellMask = mask;
-        return mask;
+        this._promptCellGrid = grid;
+        return grid;
     }
 
     renderHeistPrompts(ctx, renderer, game) {
@@ -15043,7 +15057,7 @@ class WorldObjectEngine {
         const px = pVeh ? pVeh.x : p.x;
         const py = pVeh ? pVeh.y : p.y;
 
-        // Fast O(1) cell-mask early exit when no global HUD banner, moving cash truck, skunk ape, or static prompt is nearby!
+        // Fast O(1) cell-grid early exit when no global HUD banner, moving cash truck, skunk ape, or static prompt is within interaction range!
         const rlCheck = this.rocketLaunch;
         const hasGlobalBanner = Boolean(
             this.activeHeist ||
@@ -15066,13 +15080,24 @@ class WorldObjectEngine {
             nearCashTruck = true;
         }
         if (!hasGlobalBanner && !nearCashTruck) {
-            const mask = this._ensurePromptCellMask();
-            if (mask) {
+            const grid = this._ensurePromptCellMask();
+            if (grid) {
                 const gcx = px >> 8;
                 const gcy = py >> 8;
-                if (gcx < 0 || gcx > 127 || gcy < 0 || gcy > 127 || !mask[(gcy << 7) | gcx]) {
-                    return;
+                if (gcx < 0 || gcx > 127 || gcy < 0 || gcy > 127) return;
+                const cellPts = grid[(gcy << 7) | gcx];
+                if (!cellPts) return;
+                let nearAny = false;
+                for (let i = 0; i < cellPts.length; i++) {
+                    const pt = cellPts[i];
+                    const dx = px - pt.x;
+                    const dy = py - pt.y;
+                    if (dx * dx + dy * dy <= pt.rSq) {
+                        nearAny = true;
+                        break;
+                    }
                 }
+                if (!nearAny) return;
             }
         }
 

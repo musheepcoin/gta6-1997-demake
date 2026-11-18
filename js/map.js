@@ -5991,14 +5991,14 @@ class LeonidaMap {
             }
         }
         if (Array.isArray(vehicles)) {
-            const g = typeof window !== "undefined" ? window.game : null;
+            const g = this.game || (typeof window !== "undefined" ? window.game : null);
             if (g && vehicles === g.vehicles && g._vehGridHead && g._vehGridNext) {
                 const gHead = g._vehGridHead;
                 const gNext = g._vehGridNext;
-                const gx0 = Math.max(0, (cx >> 8) - 1);
-                const gx1 = Math.min(127, (cx >> 8) + 1);
-                const gy0 = Math.max(0, (cy >> 8) - 1);
-                const gy1 = Math.min(127, (cy >> 8) + 1);
+                const gx0 = Math.max(0, (cx - 56) >> 8);
+                const gx1 = Math.min(127, (cx + 56) >> 8);
+                const gy0 = Math.max(0, (cy - 56) >> 8);
+                const gy1 = Math.min(127, (cy + 56) >> 8);
                 for (let gy = gy0; gy <= gy1; gy++) {
                     const rowOff = gy << 7;
                     for (let gx = gx0; gx <= gx1; gx++) {
@@ -6219,14 +6219,14 @@ class LeonidaMap {
                     if (Array.isArray(vehicles)) {
                         const cx = (tx + 0.5) * TILE_SIZE;
                         const cy = (ty + 0.5) * TILE_SIZE;
-                        const g = typeof window !== "undefined" ? window.game : null;
+                        const g = this.game || (typeof window !== "undefined" ? window.game : null);
                         if (g && vehicles === g.vehicles && g._vehGridHead && g._vehGridNext) {
                             const gHead = g._vehGridHead;
                             const gNext = g._vehGridNext;
-                            const gx0 = Math.max(0, (cx >> 8) - 1);
-                            const gx1 = Math.min(127, (cx >> 8) + 1);
-                            const gy0 = Math.max(0, (cy >> 8) - 1);
-                            const gy1 = Math.min(127, (cy >> 8) + 1);
+                            const gx0 = Math.max(0, (cx - 148) >> 8);
+                            const gx1 = Math.min(127, (cx + 148) >> 8);
+                            const gy0 = Math.max(0, (cy - 148) >> 8);
+                            const gy1 = Math.min(127, (cy + 148) >> 8);
                             for (let gy = gy0; gy <= gy1 && roadTrafficClear; gy++) {
                                 const rowOff = gy << 7;
                                 for (let gx = gx0; gx <= gx1 && roadTrafficClear; gx++) {
@@ -7144,8 +7144,15 @@ class LeonidaMap {
                 ? Math.max(1, Math.min(MAP_LAYERS - 1, Math.floor(currentZBlocks + 0.25)))
                 : (this.surfaceLayer[curIdx] || 2);
 
-            for (let dy = -1; dy <= 1; dy++) {
-                for (let dx = -1; dx <= 1; dx++) {
+            const localX = nx - cx * TILE_SIZE;
+            const localY = ny - cy * TILE_SIZE;
+            const dx0 = localX <= radius + 0.5 ? -1 : 0;
+            const dx1 = localX >= TILE_SIZE - radius - 0.5 ? 1 : 0;
+            const dy0 = localY <= radius + 0.5 ? -1 : 0;
+            const dy1 = localY >= TILE_SIZE - radius - 0.5 ? 1 : 0;
+
+            for (let dy = dy0; dy <= dy1; dy++) {
+                for (let dx = dx0; dx <= dx1; dx++) {
                     const tx = cx + dx;
                     const ty = cy + dy;
                     if (tx < 0 || tx >= MAP_COLS || ty < 0 || ty >= MAP_ROWS) continue;
@@ -7366,8 +7373,16 @@ class LeonidaMap {
         let ny = y;
         let hit = false;
 
-        for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
+        const localX = x - cx * TILE_SIZE;
+        const localY = y - cy * TILE_SIZE;
+        const maxTrunkReach = radius + 16;
+        const dx0 = localX <= maxTrunkReach ? -1 : 0;
+        const dx1 = localX >= TILE_SIZE - maxTrunkReach ? 1 : 0;
+        const dy0 = localY <= maxTrunkReach ? -1 : 0;
+        const dy1 = localY >= TILE_SIZE - maxTrunkReach ? 1 : 0;
+
+        for (let dy = dy0; dy <= dy1; dy++) {
+            for (let dx = dx0; dx <= dx1; dx++) {
                 const key = ((cy + dy) << 16) | ((cx + dx) & 0xffff);
                 const cell = this.floraGrid.get(key);
                 if (!cell) continue;

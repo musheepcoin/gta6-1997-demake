@@ -40,6 +40,10 @@ class LeonidaGame {
         this.audio = new RetroAudioEngine();
 
         this.map = new LeonidaMap();
+        this.map.game = this;
+        if (typeof window !== "undefined") {
+            window.game = this;
+        }
 
         this.renderer = new RetroRenderer(this.canvas, this.radarCanvas, this.map);
 
@@ -6971,7 +6975,13 @@ class LeonidaGame {
 
 
 
-        for (const off of offsets) {
+        for (let oi = 0; oi < offsets.length; oi++) {
+            const off = offsets[oi];
+            // Branch-and-bound early exit: since offsets are ordered by increasing |off| and all obstacle terms are <= 0,
+            // no subsequent offset can ever exceed -|off| * 1.35!
+            if (-Math.abs(off) * 1.35 <= bestScore) {
+                break;
+            }
 
             const cand = directAngle + off;
 
@@ -6983,6 +6993,9 @@ class LeonidaGame {
 
             // Hysteresis term (-turnFromCur * 0.45) keeps the pedestrian committed to one side of an obstacle without fluttering
             const baseScore = -Math.abs(off) * 1.35 - turnFromCur * 0.45;
+            if (baseScore <= bestScore) {
+                continue;
+            }
             let score = baseScore;
 
             const p1x = ped.x + cCos * 16;
@@ -6996,6 +7009,7 @@ class LeonidaGame {
             if (this.map.isWaterAtPixel && (this.map.isWaterAtPixel(p1x, p1y) || this.map.isWaterAtPixel(p2x, p2y))) {
 
                 score -= 90;
+                if (score <= bestScore) continue;
 
             }
 
@@ -7008,6 +7022,7 @@ class LeonidaGame {
                 score -= 36;
 
             }
+            if (score <= bestScore) continue;
 
             if (ped.kind !== "FIREMAN" && ped.kind !== "MEDIC") {
                 if (this.resolveCircleVehicleCollision(p1x, p1y, 9, pz, ignoreVeh).hit) {
@@ -7019,6 +7034,7 @@ class LeonidaGame {
                     score -= 32;
 
                 }
+                if (score <= bestScore) continue;
             }
 
             if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0) {
@@ -7773,9 +7789,12 @@ class LeonidaGame {
 
 
         // Ambient Crime Targets (AI_CRIMINAL getaway vehicles & CRIMINAL bandits on foot within 950px)
-        if (Array.isArray(this.vehicles)) {
-            for (const v of this.vehicles) {
-                if (v.destroyed || v.driver !== "AI_CRIMINAL") continue;
+        const crimVehs = this._criminalVehicles || this.vehicles;
+        if (Array.isArray(crimVehs)) {
+            for (let vi = 0; vi < crimVehs.length; vi++) {
+                const v = crimVehs[vi];
+                if (!v || v.destroyed || v.driver !== "AI_CRIMINAL") continue;
+                if (Math.abs(v.x - fromX) > 950 || Math.abs(v.y - fromY) > 950) continue;
                 if (Math.hypot(v.x - fromX, v.y - fromY) > 950) continue;
                 candidates.push({
                     x: v.x,
@@ -7793,9 +7812,12 @@ class LeonidaGame {
                 });
             }
         }
-        if (Array.isArray(this.peds)) {
-            for (const ped of this.peds) {
-                if (ped.dead || ped.kind !== "CRIMINAL") continue;
+        const crimPeds = this._criminalPeds || this.peds;
+        if (Array.isArray(crimPeds)) {
+            for (let pi = 0; pi < crimPeds.length; pi++) {
+                const ped = crimPeds[pi];
+                if (!ped || ped.dead || ped.kind !== "CRIMINAL") continue;
+                if (Math.abs(ped.x - fromX) > 950 || Math.abs(ped.y - fromY) > 950) continue;
                 if (Math.hypot(ped.x - fromX, ped.y - fromY) > 950) continue;
                 candidates.push({
                     x: ped.x,
@@ -9792,8 +9814,8 @@ class LeonidaGame {
 
 
         // Gunfire triggers GTA 1 panic in nearby AI traffic drivers, pedestrians & open-air living events!
-        if (shooterKind === "PLAYER" || shooterKind === "CRIMINAL" || shooterKind === "COP") {
-            this.checkAndWipeoutLivingEvents(shooterX, shooterY, 85, shooterKind === "PLAYER", false, false, false, true);
+        if (isPlayer || npcFaction === "CRIMINAL" || npcFaction === "COP") {
+            this.checkAndWipeoutLivingEvents(shooterX, shooterY, 85, Boolean(isPlayer), false, false, false, true);
         }
 
         for (const v of this.vehicles) {
@@ -9981,25 +10003,19 @@ class LeonidaGame {
         // Check if an ambient crime event is already unfolding anywhere near the player
 
         let activeNearby = 0;
-
-        for (const v of this.vehicles) {
-
-            if (!v.destroyed && v.driver === "AI_CRIMINAL" && Math.hypot(v.x - p.x, v.y - p.y) < 1500) {
-
+        const crimVehs = this._criminalVehicles || this.vehicles;
+        for (let vi = 0; vi < crimVehs.length; vi++) {
+            const v = crimVehs[vi];
+            if (v && !v.destroyed && v.driver === "AI_CRIMINAL" && Math.hypot(v.x - p.x, v.y - p.y) < 1500) {
                 activeNearby++;
-
             }
-
         }
-
-        for (const ped of this.peds) {
-
-            if (!ped.dead && ped.kind === "CRIMINAL" && Math.hypot(ped.x - p.x, ped.y - p.y) < 1500) {
-
+        const crimPeds = this._criminalPeds || this.peds;
+        for (let pi = 0; pi < crimPeds.length; pi++) {
+            const ped = crimPeds[pi];
+            if (ped && !ped.dead && ped.kind === "CRIMINAL" && Math.hypot(ped.x - p.x, ped.y - p.y) < 1500) {
                 activeNearby++;
-
             }
-
         }
 
         if (activeNearby > 0) {
@@ -10542,6 +10558,10 @@ class LeonidaGame {
         const head = this._pedGridHead;
         const next = this._pedGridNext;
         head.fill(-1);
+        const criminalPeds = this._criminalPeds || (this._criminalPeds = []);
+        const copPeds = this._copPeds || (this._copPeds = []);
+        criminalPeds.length = 0;
+        copPeds.length = 0;
         const epoch = this._gridEpoch || 1;
         for (let i = 0; i < n; i++) {
             const ped = this.peds[i];
@@ -10552,6 +10572,10 @@ class LeonidaGame {
             const cell = (cy << 7) | cx;
             next[i] = head[cell];
             head[cell] = i;
+            if (!ped.dead) {
+                if (ped.kind === "CRIMINAL") criminalPeds.push(ped);
+                else if (ped.kind === "COP") copPeds.push(ped);
+            }
         }
         this._pedGridCount = n;
     }
@@ -10573,10 +10597,10 @@ class LeonidaGame {
         const sHead = this._stoppedVehGridHead;
         const sNext = this._stoppedVehGridNext;
         if (cache && sHead && sNext) {
-            const cx0 = Math.max(0, (curX >> 8) - 1);
-            const cx1 = Math.min(127, (curX >> 8) + 1);
-            const cy0 = Math.max(0, (curY >> 8) - 1);
-            const cy1 = Math.min(127, (curY >> 8) + 1);
+            const cx0 = Math.max(0, (curX - 56) >> 8);
+            const cx1 = Math.min(127, (curX + 56) >> 8);
+            const cy0 = Math.max(0, (curY - 56) >> 8);
+            const cy1 = Math.min(127, (curY + 56) >> 8);
             for (let cy = cy0; cy <= cy1; cy++) {
                 const rowOff = cy << 7;
                 for (let cx = cx0; cx <= cx1; cx++) {
@@ -12383,16 +12407,28 @@ class LeonidaGame {
         const activeTaxis = this._activeTaxis || (this._activeTaxis = []);
         const movingOrCrosswalkVehicles = this._movingOrCrosswalkVehicles || (this._movingOrCrosswalkVehicles = []);
         const armoredCashTrucks = this._armoredCashTrucks || (this._armoredCashTrucks = []);
+        const criminalVehicles = this._criminalVehicles || (this._criminalVehicles = []);
+        const copVehicles = this._copVehicles || (this._copVehicles = []);
+        const activeSimVehicles = this._activeSimVehicles || (this._activeSimVehicles = []);
         hazardVehicles.length = 0;
         prioritySirenVehicles.length = 0;
         activeTaxis.length = 0;
         movingOrCrosswalkVehicles.length = 0;
         armoredCashTrucks.length = 0;
+        criminalVehicles.length = 0;
+        copVehicles.length = 0;
+        activeSimVehicles.length = 0;
         for (let vi = 0; vi < this.vehicles.length; vi++) {
             const sv = this.vehicles[vi];
             if (!sv) continue;
             if (sv.isArmoredCashTruck) {
                 armoredCashTrucks.push(sv);
+            }
+            if (!sv.destroyed && sv.driver === "AI_CRIMINAL") {
+                criminalVehicles.push(sv);
+            }
+            if (!sv.destroyed && sv.isPolice && sv.driver === "AI_COP") {
+                copVehicles.push(sv);
             }
             const svSpd = Math.abs(sv.speed || 0);
             const isBurningHazard = Boolean(
@@ -12411,11 +12447,35 @@ class LeonidaGame {
             if (!sv.destroyed && (svSpd > 14 || sv.sirenActive)) {
                 movingOrCrosswalkVehicles.push(sv);
             }
+            // Fast-sleep completely stationary intact unoccupied parked vehicles so we don't call Vehicle.update() on 480+ parked cars!
+            if (
+                !sv.driver &&
+                !sv.destroyed &&
+                !sv.towedByTruck &&
+                !sv.bombArmed &&
+                !(sv.chainExplodeTimer > 0) &&
+                !(sv.burnTimer > 0) &&
+                sv.hp > 30 &&
+                !(sv.doorOpenTimer > 0) &&
+                !(sv.crashCooldown > 0) &&
+                !(sv.stuntAirTimer > 0) &&
+                svSpd < 0.05 &&
+                Math.abs(sv.vx || 0) < 0.05 &&
+                Math.abs(sv.vy || 0) < 0.05 &&
+                Math.abs(sv.angularVelocity || 0) < 0.01
+            ) {
+                if (!sv.isStaticParked && !sv.isCurbParked && !sv.isEstateCar) {
+                    sv.abandonedTimer = (sv.abandonedTimer || 0) + dt;
+                }
+                sv._activePairIdx = -1;
+                continue;
+            }
+            activeSimVehicles.push(sv);
         }
 
         this._vehTickFrame = ((this._vehTickFrame || 0) + 1) & 3;
-        for (let vi = 0; vi < this.vehicles.length; vi++) {
-            const v = this.vehicles[vi];
+        for (let vi = 0; vi < activeSimVehicles.length; vi++) {
+            const v = activeSimVehicles[vi];
             if (!v) continue;
 
             // Performance Optimization:
@@ -12667,8 +12727,8 @@ class LeonidaGame {
         if (!this._activePairVehicles) this._activePairVehicles = [];
         const activeVehs = this._activePairVehicles;
         activeVehs.length = 0;
-        for (let i = 0; i < this.vehicles.length; i++) {
-            const v = this.vehicles[i];
+        for (let i = 0; i < activeSimVehicles.length; i++) {
+            const v = activeSimVehicles[i];
             const isMovingOrDriven = Boolean(v.driver || Math.abs(v.speed || 0) > 0.05 || Math.abs(v.vx || 0) > 0.05 || Math.abs(v.vy || 0) > 0.05);
             const isNearOrPriority = (Math.abs(v.x - p.x) <= 1450 && Math.abs(v.y - p.y) <= 1450) || v.driver === "PLAYER" || v.driver === "REMOTE" || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY" || v.driver === "AI_TOW" || v.driver === "AI_CRIMINAL";
             if (isMovingOrDriven && isNearOrPriority) {
@@ -12688,10 +12748,10 @@ class LeonidaGame {
             const ax0 = a.x + aCos * aHalfL, ay0 = a.y + aSin * aHalfL;
             const ax1 = a.x, ay1 = a.y;
             const ax2 = a.x - aCos * aHalfL, ay2 = a.y - aSin * aHalfL;
-            const gx0 = Math.max(0, (a.x >> 8) - 1);
-            const gx1 = Math.min(127, (a.x >> 8) + 1);
-            const gy0 = Math.max(0, (a.y >> 8) - 1);
-            const gy1 = Math.min(127, (a.y >> 8) + 1);
+            const gx0 = Math.max(0, (a.x - 110) >> 8);
+            const gx1 = Math.min(127, (a.x + 110) >> 8);
+            const gy0 = Math.max(0, (a.y - 110) >> 8);
+            const gy1 = Math.min(127, (a.y + 110) >> 8);
 
             for (let gy = gy0; gy <= gy1; gy++) {
                 const rowOff = gy << 7;
@@ -13437,6 +13497,8 @@ class LeonidaGame {
                 continue;
 
             }
+            const pedStartX = ped.x;
+            const pedStartY = ped.y;
 
             if (ped.exitAnimTimer > 0) ped.exitAnimTimer = Math.max(0, ped.exitAnimTimer - dt);
 
@@ -13542,7 +13604,7 @@ class LeonidaGame {
             // running full obstacle feelers, OBB vehicle collisions & shop scans at 15 Hz or whenever crossing a tile edge!
             if (
                 ped.kind === "CIVILIAN" &&
-                !ped.missionTag &&
+                (!ped.missionTag || ped.missionTag === "BEACH" || ped.missionTag === "PRISON_INMATE" || ped.missionTag === "PORT_CREW") &&
                 !ped.isLivingProp &&
                 (ped.burnTimer || 0) <= 0 &&
                 (ped.electroTimer || 0) <= 0 &&
@@ -13557,12 +13619,16 @@ class LeonidaGame {
                 (Math.abs(ped.x - p.x) > 900 || Math.abs(ped.y - p.y) > 720)
             ) {
                 const movedTeleport = ped._lastLodX === undefined || Math.abs(ped.x - ped._lastLodX) > 24 || Math.abs(ped.y - ped._lastLodY) > 24;
-                ped._farLodTick = (ped._farLodTick === undefined || movedTeleport) ? 0 : ((ped._farLodTick + 1) & 3);
+                ped._farLodTick = (ped._farLodTick === undefined || movedTeleport) ? ((ped.turnSeed || 0) & 3) : ((ped._farLodTick + 1) & 3);
                 ped._lastLodX = ped.x;
                 ped._lastLodY = ped.y;
                 if (ped._farLodTick !== 0) {
                     if ((ped.socialTimer || 0) > 0) {
                         ped.socialTimer = Math.max(0, ped.socialTimer - dt);
+                        continue;
+                    }
+                    if ((ped.hangoutTimer || 0) > 0) {
+                        ped.hangoutTimer = Math.max(0, ped.hangoutTimer - dt);
                         continue;
                     }
                     if ((ped.hailingTaxiTimer || 0) <= 0 && ped.targetBx !== null && ped.targetBx !== undefined) {
@@ -13729,6 +13795,12 @@ class LeonidaGame {
 
 
                 const targetPos = this.getMonkTrackPosition((this.monkLeadS || 0) - ped.monkIndex * 22);
+                if (Math.abs(ped.x - p.x) > 1050 || Math.abs(ped.y - p.y) > 850) {
+                    ped.x = targetPos.x;
+                    ped.y = targetPos.y;
+                    ped.angle = targetPos.angle;
+                    continue;
+                }
 
                 const dTarget = Math.hypot(targetPos.x - ped.x, targetPos.y - ped.y);
 
@@ -13823,6 +13895,43 @@ class LeonidaGame {
                     ped.bustedGraceTimer = Math.max(0, ped.bustedGraceTimer - dt);
 
                 }
+                const isCompoundGuard = (
+                    ped.missionTag === "PRISON_GUARD" ||
+                    ped.missionTag === "AIRPORT_GUARD" ||
+                    ped.missionTag === "SERA_GUARD"
+                );
+                if (
+                    isCompoundGuard &&
+                    (Math.abs(ped.x - p.x) > 1150 || Math.abs(ped.y - p.y) > 950) &&
+                    ((ped.turnSeed + this._vehTickFrame) & 3) !== 0
+                ) {
+                    ped.speed = 28;
+                    ped.x += Math.cos(ped.angle) * 28 * dt;
+                    ped.y += Math.sin(ped.angle) * 28 * dt;
+                    if (ped.missionTag === "PRISON_GUARD") {
+                        const minPx = 57.25 * TILE_SIZE, maxPx = 67.75 * TILE_SIZE, minPy = 77.25 * TILE_SIZE, maxPy = 145.55 * TILE_SIZE;
+                        if (ped.x < minPx || ped.x > maxPx || ped.y < minPy || ped.y > maxPy) {
+                            ped.x = Math.max(minPx, Math.min(maxPx, prevX));
+                            ped.y = Math.max(minPy, Math.min(maxPy, prevY));
+                            ped.angle += Math.PI * 0.85;
+                        }
+                    } else if (ped.missionTag === "AIRPORT_GUARD") {
+                        const minAx = 65.5 * TILE_SIZE, maxAx = 164.5 * TILE_SIZE, minAy = 299.8 * TILE_SIZE, maxAy = 368.0 * TILE_SIZE;
+                        if (ped.x < minAx || ped.x > maxAx || ped.y < minAy || ped.y > maxAy) {
+                            ped.x = Math.max(minAx, Math.min(maxAx, prevX));
+                            ped.y = Math.max(minAy, Math.min(maxAy, prevY));
+                            ped.angle += Math.PI * 0.85;
+                        }
+                    } else if (ped.missionTag === "SERA_GUARD") {
+                        const minSx = 459.2 * TILE_SIZE, maxSx = 479.8 * TILE_SIZE, minSy = 23.2 * TILE_SIZE, maxSy = 43.8 * TILE_SIZE;
+                        if (ped.x < minSx || ped.x > maxSx || ped.y < minSy || ped.y > maxSy) {
+                            ped.x = Math.max(minSx, Math.min(maxSx, prevX));
+                            ped.y = Math.max(minSy, Math.min(maxSy, prevY));
+                            ped.angle += Math.PI * 0.85;
+                        }
+                    }
+                    continue;
+                }
 
                 const activeReliefTarget = Boolean(
                     ped.isReliefDriver &&
@@ -13831,7 +13940,7 @@ class LeonidaGame {
                     ped._boardingVeh.driver === null &&
                     !ped._boardingVeh.towedByTruck
                 );
-                const rawCopTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
+                let rawCopTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
 
                     x: p.inVehicle ? p.inVehicle.x : p.x,
 
@@ -13848,6 +13957,9 @@ class LeonidaGame {
                     wantedLevel: Math.max(1, this.wantedLevel || 1)
 
                 } : null));
+                if (isCompoundGuard && rawCopTarget && (Math.abs(rawCopTarget.x - ped.x) > 900 || Math.abs(rawCopTarget.y - ped.y) > 900)) {
+                    rawCopTarget = null;
+                }
 
                 // Real-Life Squad Pursuit Recovery:
                 // If the suspect has fled far away (> 420px, or > 260px in a speeding vehicle) and the officer's patrol cruiser (homeCruiser)
@@ -13971,11 +14083,6 @@ class LeonidaGame {
                             ? ped._boardingVeh
                             : null);
                     let bestCarDist = returnCar ? Math.hypot(returnCar.x - ped.x, returnCar.y - ped.y) : 780;
-                    const isCompoundGuard = (
-                        ped.missionTag === "PRISON_GUARD" ||
-                        ped.missionTag === "AIRPORT_GUARD" ||
-                        ped.missionTag === "SERA_GUARD"
-                    );
                     if (!returnCar && !isCompoundGuard) {
                         const vHead = this._vehGridHead;
                         const vNext = this._vehGridNext;
@@ -16033,38 +16140,17 @@ class LeonidaGame {
 
 
 
-            const pCol = this.map.resolveCircleBuildingCollision(ped.x, ped.y, 8, ped.z || 2.0);
+            const pedMovedThisFrame = (ped.x !== pedStartX || ped.y !== pedStartY || !ped._colVerified);
+            if (pedMovedThisFrame) {
+                const pCol = this.map.resolveCircleBuildingCollision(ped.x, ped.y, 8, ped.z || 2.0);
 
-            if (pCol.hit) {
+                if (pCol.hit) {
 
-                ped.x = pCol.x;
+                    ped.x = pCol.x;
 
-                ped.y = pCol.y;
+                    ped.y = pCol.y;
 
-                if (ped.kind === "CIVILIAN" && !ped.formationLeader) {
-                    ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
-                        ? ped.targetBx
-                        : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
-                    ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
-                        ? ped.targetBy
-                        : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
-                    ped.targetBx = null;
-                    ped.targetBy = null;
-                    ped.turnSeed = (ped.turnSeed || 1) + 2;
-                } else if (ped.kind === "COP" && !ped.inCombat) {
-                    ped.angle += Math.PI * (0.65 + Math.random() * 0.7);
-                }
-
-            }
-
-            // Physical collision against parked / stationary vehicles and wrecks (Emergency responders on foot can squeeze between jammed cars!)
-            if ((ped.slideCarTimer || 0) <= 0 && (ped.exitAnimTimer || 0) <= 0 && ped.kind !== "FIREMAN" && ped.kind !== "MEDIC") {
-                const pedVehRadius = 7.5;
-                const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, pedVehRadius, ped.z || 2.0, ped._boardingVeh || ped.fireTarget || null);
-                if (vCol.hit) {
-                    ped.x = vCol.x;
-                    ped.y = vCol.y;
-                    if (ped.kind === "CIVILIAN" && !ped._boardingVeh && !ped.formationLeader) {
+                    if (ped.kind === "CIVILIAN" && !ped.formationLeader) {
                         ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
                             ? ped.targetBx
                             : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
@@ -16073,11 +16159,36 @@ class LeonidaGame {
                             : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
                         ped.targetBx = null;
                         ped.targetBy = null;
-                        ped.turnSeed = (ped.turnSeed || 1) + 3;
-                    } else if (ped.kind === "COP" && !ped.inCombat && !ped._boardingVeh) {
-                        ped.angle += Math.PI * (0.55 + Math.random() * 0.9);
+                        ped.turnSeed = (ped.turnSeed || 1) + 2;
+                    } else if (ped.kind === "COP" && !ped.inCombat) {
+                        ped.angle += Math.PI * (0.65 + Math.random() * 0.7);
+                    }
+
+                }
+
+                // Physical collision against parked / stationary vehicles and wrecks (Emergency responders on foot can squeeze between jammed cars!)
+                if ((ped.slideCarTimer || 0) <= 0 && (ped.exitAnimTimer || 0) <= 0 && ped.kind !== "FIREMAN" && ped.kind !== "MEDIC") {
+                    const pedVehRadius = 7.5;
+                    const vCol = this.resolveCircleVehicleCollision(ped.x, ped.y, pedVehRadius, ped.z || 2.0, ped._boardingVeh || ped.fireTarget || null);
+                    if (vCol.hit) {
+                        ped.x = vCol.x;
+                        ped.y = vCol.y;
+                        if (ped.kind === "CIVILIAN" && !ped._boardingVeh && !ped.formationLeader) {
+                            ped._avoidBx = ped.targetBx !== null && ped.targetBx !== undefined
+                                ? ped.targetBx
+                                : Math.floor((ped.x + Math.cos(ped.angle) * 20) / TILE_SIZE);
+                            ped._avoidBy = ped.targetBy !== null && ped.targetBy !== undefined
+                                ? ped.targetBy
+                                : Math.floor((ped.y + Math.sin(ped.angle) * 20) / TILE_SIZE);
+                            ped.targetBx = null;
+                            ped.targetBy = null;
+                            ped.turnSeed = (ped.turnSeed || 1) + 3;
+                        } else if (ped.kind === "COP" && !ped.inCombat && !ped._boardingVeh) {
+                            ped.angle += Math.PI * (0.55 + Math.random() * 0.9);
+                        }
                     }
                 }
+                ped._colVerified = true;
             }
 
             // Real-displacement anti-stuck watchdog: if any walking pedestrian or on-foot responder (COP, MEDIC, FIREMAN) moved < 4.5px over 1.35s,
@@ -16140,7 +16251,9 @@ class LeonidaGame {
                 }
             }
 
-            ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
+            if (pedMovedThisFrame || ped.x !== pedStartX || ped.y !== pedStartY) {
+                ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
+            }
 
         }
 
@@ -16259,9 +16372,10 @@ class LeonidaGame {
         const pZ = pEnt.z || p.z || 2.0;
         const scenePos = this.lastKnownWantedPos || { x: pEnt.x, y: pEnt.y };
 
-        for (const v of this.vehicles) {
-
-            if (v.isPolice && !v.destroyed && v.driver === "AI_COP") {
+        const copVehList = this._copVehicles || this.vehicles;
+        for (let vi = 0; vi < copVehList.length; vi++) {
+            const v = copVehList[vi];
+            if (v && v.isPolice && !v.destroyed && v.driver === "AI_COP") {
 
                 activeCopCars++;
 
@@ -16284,9 +16398,10 @@ class LeonidaGame {
 
         }
 
-        for (const ped of this.peds) {
-
-            if (!ped.dead && ped.kind === "COP") {
+        const copPedList = this._copPeds || this.peds;
+        for (let pi = 0; pi < copPedList.length; pi++) {
+            const ped = copPedList[pi];
+            if (ped && !ped.dead && ped.kind === "COP") {
 
                 const d = Math.hypot(ped.x - pEnt.x, ped.y - pEnt.y);
 

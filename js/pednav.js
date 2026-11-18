@@ -72,11 +72,12 @@ const PedNav = (function () {
 
         walkable(x, y, z) {
             if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return false;
-            if (z !== 2.0) return this._calcWalk(x, y, z);
+            const useGroundCache = (z === undefined || z === null || z < 2.8 || z >= 3.8);
+            if (!useGroundCache) return this._calcWalk(x, y, z);
             const i = y * MAP_COLS + x;
             let v = this.walkCache[i];
             if (v === 0) {
-                v = this._calcWalk(x, y, z) ? 1 : 2;
+                v = this._calcWalk(x, y, 2.0) ? 1 : 2;
                 this.walkCache[i] = v;
             }
             return v === 1;
@@ -85,7 +86,8 @@ const PedNav = (function () {
         // Signalised zebra crossings that start from sidewalk tile (x, y)
         crossingsFrom(x, y, z) {
             const key = y * MAP_COLS + x;
-            if (z === 2.0) {
+            const useGroundCache = (z === undefined || z === null || z < 2.8 || z >= 3.8);
+            if (useGroundCache) {
                 const c = this.crossCache.get(key);
                 if (c) return c;
             }
@@ -115,7 +117,7 @@ const PedNav = (function () {
                     out.push({ dx: d.dx, dy: d.dy, bx: opposite.bx, by: opposite.by, steps: opposite.steps, ax: x, ay: y });
                 }
             }
-            if (z === 2.0) this.crossCache.set(key, out);
+            if (useGroundCache) this.crossCache.set(key, out);
             return out;
         }
 
@@ -517,8 +519,9 @@ const PedNav = (function () {
         const cached = spawnCache.get(key);
         if (cached !== undefined) return cached;
         let good = false;
+        let seen = null;
         if (nav.walkable(bx, by, z)) {
-            const seen = new Set([key]);
+            seen = new Set([key]);
             const queue = [key];
             let qi = 0;
             while (qi < queue.length && seen.size < 160) {
@@ -540,7 +543,13 @@ const PedNav = (function () {
             good = seen.size >= 160;
         }
         if (spawnCache.size > 60000) spawnCache.clear();
-        spawnCache.set(key, good);
+        if (seen) {
+            for (const sk of seen) {
+                spawnCache.set(sk, good);
+            }
+        } else {
+            spawnCache.set(key, false);
+        }
         return good;
     }
 
