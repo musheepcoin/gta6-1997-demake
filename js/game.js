@@ -6352,6 +6352,8 @@ class LeonidaGame {
 
                 copWeapon: copWep,
 
+                homeCruiser: reason === "COP_DEPLOY" ? vehicle : null,
+
                 carjackedCop: isCarjacked,
 
                 stunnedTimer: isCarjacked ? 1.15 : 0,
@@ -6412,6 +6414,8 @@ class LeonidaGame {
                     maxHp: copHp,
 
                     copWeapon: isSwat ? "UZI" : (this.wantedLevel >= 3 ? "UZI" : "PISTOL"),
+
+                    homeCruiser: vehicle,
 
                     dead: false,
 
@@ -7777,6 +7781,9 @@ class LeonidaGame {
             for (let i = this.vehicles.length - 1; i >= 0; i--) {
                 const v = this.vehicles[i];
                 v.lastHitByPlayer = false;
+                if (v.isPolice) {
+                    v.sirenActive = false;
+                }
                 if (v.driver === "AI_COP") {
                     v.sirenActive = false;
                     if (despawnNearPoint && this.player && Math.hypot(v.x - this.player.x, v.y - this.player.y) < 380) {
@@ -13678,7 +13685,7 @@ class LeonidaGame {
                     ped._boardingVeh.driver === null &&
                     !ped._boardingVeh.towedByTruck
                 );
-                const copTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
+                const rawCopTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
 
                     x: p.inVehicle ? p.inVehicle.x : p.x,
 
@@ -13688,11 +13695,28 @@ class LeonidaGame {
 
                     vy: p.inVehicle ? (p.inVehicle.vy || 0) : 0,
 
+                    inVehicle: Boolean(p.inVehicle),
+
                     isRemote: false,
 
                     wantedLevel: Math.max(1, this.wantedLevel || 1)
 
                 } : null));
+
+                // Real-Life Squad Pursuit Recovery:
+                // If the suspect has fled far away (> 420px, or > 260px in a speeding vehicle) and the officer's patrol cruiser (homeCruiser)
+                // is nearby (< 360px), the officer runs back to the cruiser and re-boards it to resume high-speed vehicle pursuit!
+                const rawDistToTarget = rawCopTarget ? Math.hypot(rawCopTarget.x - ped.x, rawCopTarget.y - ped.y) : 9999;
+                const hc = ped.homeCruiser;
+                const hcValid = Boolean(hc && !hc.destroyed && hc !== (p && p.inVehicle) && !hc.towedByTruck && this.vehicles.includes(hc));
+                const dHomeCruiser = hcValid ? Math.hypot(hc.x - ped.x, hc.y - ped.y) : 9999;
+                const shouldReboardCruiser = Boolean(
+                    rawCopTarget &&
+                    hcValid &&
+                    dHomeCruiser < 360 &&
+                    (rawDistToTarget > 420 || (rawCopTarget.inVehicle && rawDistToTarget > 260))
+                );
+                const copTarget = shouldReboardCruiser ? null : rawCopTarget;
 
                 ped.inCombat = Boolean(copTarget);
 
@@ -13793,11 +13817,13 @@ class LeonidaGame {
 
                 } else {
 
-                    // Post-shootout scene cleanup: if an unoccupied police cruiser or bandit getaway car is nearby,
-                    // VCPD officers walk back to it, climb in, and drive it away on patrol!
-                    let returnCar = (ped._boardingVeh && !ped._boardingVeh.destroyed && ped._boardingVeh.driver === null && !ped._boardingVeh.towedByTruck)
-                        ? ped._boardingVeh
-                        : null;
+                    // Post-shootout scene cleanup OR Squad Re-Boarding for Distant Pursuit:
+                    // VCPD officers walk/run back to their patrol cruiser (or nearest unoccupied police car), climb in, and drive off!
+                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && this.vehicles.includes(ped.homeCruiser))
+                        ? ped.homeCruiser
+                        : ((ped._boardingVeh && !ped._boardingVeh.destroyed && ped._boardingVeh.driver === null && !ped._boardingVeh.towedByTruck)
+                            ? ped._boardingVeh
+                            : null);
                     let bestCarDist = returnCar ? Math.hypot(returnCar.x - ped.x, returnCar.y - ped.y) : 780;
                     if (!returnCar && ped.missionTag !== "PRISON_GUARD") {
                         const vHead = this._vehGridHead;
@@ -13834,9 +13860,10 @@ class LeonidaGame {
                     if (returnCar) {
                         ped._boardingVeh = returnCar;
                         ped._reliefTimer = (ped._reliefTimer || 0) + dt;
-                        const boardDist = Math.max(44, (returnCar.w || 48) * 0.52 + 14);
+                        const boardDist = Math.max(46, (returnCar.w || 48) * 0.54 + 14);
                         if (bestCarDist < boardDist || (ped.isReliefDriver && ped._reliefTimer > 5.5)) {
                             returnCar.driver = "AI_COP";
+                            returnCar.noDeployCooldown = 4.8;
                             returnCar.wasCriminalCar = false;
                             returnCar.sirenActive = Boolean(this.wantedLevel > 0);
                             returnCar.lastPlayerDriven = false;
@@ -13846,9 +13873,10 @@ class LeonidaGame {
                             ped.dead = true;
                             continue;
                         }
+                        const runBackSpd = this.wantedLevel > 0 ? 102 : 88;
                         ped.angle = this.steerPedWithObstacleFeelers(ped, returnCar.x, returnCar.y, returnCar);
-                        ped.x += Math.cos(ped.angle) * 86 * dt;
-                        ped.y += Math.sin(ped.angle) * 86 * dt;
+                        ped.x += Math.cos(ped.angle) * runBackSpd * dt;
+                        ped.y += Math.sin(ped.angle) * runBackSpd * dt;
                     } else {
                         // Routine VCPD foot patrol when no wanted player or active criminal is nearby
                         ped.x += Math.cos(ped.angle) * 26 * dt;
@@ -16375,9 +16403,13 @@ class LeonidaGame {
         } else {
             // Persistent World Logic: when no player in the room is wanted (0★), VCPD cruisers turn off their sirens and resume calm street patrol!
             for (const v of this.vehicles) {
-                if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
-                    v.driver = "AI_TRAFFIC";
-                    v.sirenActive = false;
+                if (!v.destroyed && v.isPolice) {
+                    if (v.driver === "AI_COP") {
+                        v.driver = "AI_TRAFFIC";
+                    }
+                    if (v.driver !== "PLAYER" && v.driver !== "REMOTE") {
+                        v.sirenActive = false;
+                    }
                 }
             }
             if (this.policeHeli) {

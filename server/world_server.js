@@ -751,7 +751,7 @@ function handleClientPacket(socket, pkt) {
         room.lastClientWorldSyncMs = nowMs;
         if (!room.vehClientSyncMs) room.vehClientSyncMs = {};
         if (!room.pedClientSyncMs) room.pedClientSyncMs = {};
-        const maxVehs = Math.min(pkt.vehs.length, 200);
+        const maxVehs = Math.min(pkt.vehs.length, 220);
         for (let i = 0; i < maxVehs; i++) {
             const row = pkt.vehs[i];
             if (!Array.isArray(row) || !row[0]) continue;
@@ -1840,10 +1840,18 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 nav.targetBy = nextStep.by;
                 nav.targetAngle = nextStep.angle;
                 if (nextStep.isTurn) nav.turnedInIntersection = true;
+            } else if (bx >= 447) {
+                // Off-road on Vice Beach / Lummus Park: steer West back onto Ocean Drive (bx = 446)!
+                nav.targetBx = bx - 1;
+                nav.targetBy = by;
+                nav.targetAngle = Math.PI;
             } else {
-                nav.targetBx = bx + Math.round(Math.cos(a));
-                nav.targetBy = by + Math.round(Math.sin(a));
-                nav.targetAngle = a;
+                const nearestRd = snapStationToNearestRoad(x, y);
+                const rbx = Math.floor(nearestRd.x / TS);
+                const rby = Math.floor(nearestRd.y / TS);
+                nav.targetBx = bx + Math.sign(rbx - bx);
+                nav.targetBy = by + (rbx === bx ? Math.sign(rby - by) : 0);
+                nav.targetAngle = Math.atan2(nearestRd.y - y, nearestRd.x - x);
             }
         }
 

@@ -1566,9 +1566,13 @@ class Vehicle {
                     }
                 }
             }
+            if (bestRx < 0 && bx >= 447) {
+                bestRx = 446;
+                bestRy = by;
+            }
             if (bestRx >= 0) {
                 const toRoadAng = Math.atan2((bestRy + 0.5) * TILE_SIZE - this.y, (bestRx + 0.5) * TILE_SIZE - this.x);
-                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.52, game);
+                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.58, game);
             }
         }
 
@@ -2661,11 +2665,15 @@ class Vehicle {
                     }
                 }
             }
+            if (bestRx < 0 && cbx >= 447) {
+                bestRx = 446;
+                bestRy = cby;
+            }
             if (bestRx >= 0) {
                 const rcx = (bestRx + 0.5) * TILE_SIZE;
                 const rcy = (bestRy + 0.5) * TILE_SIZE;
                 const toRoadAng = Math.atan2(rcy - this.y, rcx - this.x);
-                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.65, game);
+                return this.steerTowardTargetWithFeelers(dt, map, curZ, toRoadAng, 0.68, game);
             }
         }
 
@@ -2911,15 +2919,20 @@ class Vehicle {
         );
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
 
+        if ((this.noDeployCooldown || 0) > 0) {
+            this.noDeployCooldown = Math.max(0, this.noDeployCooldown - dt);
+        }
+
         // Tactical Squad Deployment right at the scene:
-        // 1) Cruiser has driven up to tactical standoff range (< 175px) of a suspect on foot (on the beach, park, or street), OR
+        // 1) Cruiser has driven up to tactical standoff range (< 175px) of a visually spotted suspect on foot (on the beach, park, or street), OR
         // 2) Boxed-in slow getaway car (< 130px), OR
         // 3) Blocked by a solid building wall within 440px for > 1.35s
-        const playerOnFootAtScene = !wantedTarget.inVehicle && distToPlayer < 175;
-        const playerBoxedNear = Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
+        // Note: When patrolling a Search Zone (`wantedTarget.isSearchPoint === true`), cruisers stay mobile on patrol unless blocked by a building wall!
+        const playerOnFootAtScene = !wantedTarget.isSearchPoint && !wantedTarget.inVehicle && distToPlayer < 175;
+        const playerBoxedNear = !wantedTarget.isSearchPoint && Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
         const blockedByWallNear = !wantedTarget.inVehicle && distToPlayer < 440 && noProgress > 1.35;
 
-        if (playerOnFootAtScene || playerBoxedNear || blockedByWallNear) {
+        if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
             const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 64, wantedTarget);
             if (!spacingOk && this.aiBailTimer < 0.65) {
                 this.aiBailTimer += dt * 0.4;
@@ -2956,14 +2969,17 @@ class Vehicle {
             (!targetOnRoad && clearOfBuildings && distToPlayer < 560) ||
             (clearOfBuildings && distToPlayer < 380);
 
-        // When pursuing a wanted target (or ambient AI_CRIMINAL getaway vehicle) within range, the police passenger / tank turret fires!
+        // When pursuing a visually spotted target (or ambient AI_CRIMINAL getaway vehicle) with clear line-of-sight, the police passenger / tank turret fires!
         const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
         if (isTankUnit) {
             this.turretAngle = Math.atan2(wantedTarget.y - this.y, wantedTarget.x - this.x);
         }
         const canDriveByShoot =
-            (wantedTarget.isCriminalNPC && wantedTarget.inVehicle) ||
-            (!wantedTarget.isCriminalNPC && (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2);
+            !wantedTarget.isSearchPoint &&
+            clearOfBuildings && (
+                (wantedTarget.isCriminalNPC && wantedTarget.inVehicle) ||
+                (!wantedTarget.isCriminalNPC && (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2)
+            );
         const maxShootDist = isTankUnit ? 420 : 275;
         if (canDriveByShoot && distToPlayer < maxShootDist && (!isTankUnit || distToPlayer > 75) && game && typeof game.fireWeapon === "function") {
             this.copDriveByTimer = (this.copDriveByTimer || 0) - dt;
@@ -3447,6 +3463,20 @@ class Vehicle {
                     return { throttle: this.speed > 8 ? -0.85 : 0, steer: 0, handbrake: true };
                 }
                 this.aiBailTimer = 0;
+                const fireOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(burningCar.x, burningCar.y) : false;
+                const fireInBeachOrPark = Boolean(
+                    !fireOnRoad && (
+                        burningCar.x >= 447.5 * TILE_SIZE ||
+                        (map.getTileAtPixel && map.getTileAtPixel(burningCar.x, burningCar.y) === TILE.SAND)
+                    )
+                );
+                const fireClearOfBuildings = map.traceSegment2D
+                    ? !map.traceSegment2D(this.x, this.y, burningCar.x, burningCar.y, this.z || 2.0).hit
+                    : (bestDist < 320);
+                const fireForceDirect =
+                    (fireInBeachOrPark && this.x >= 445.0 * TILE_SIZE && bestDist < 1650) ||
+                    (!fireOnRoad && fireClearOfBuildings && bestDist < 540) ||
+                    (fireClearOfBuildings && bestDist < 360);
                 const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -3457,7 +3487,7 @@ class Vehicle {
                     burningCar.vy || 0,
                     0.68,
                     false,
-                    false
+                    fireForceDirect
                 );
                 // A heavy fire engine drives to the scene at a measured emergency pace (not race speed),
                 // and slows right down on the final approach so it can stop & deploy the crew
@@ -3723,7 +3753,14 @@ class Vehicle {
         }
         this.towHookTimer = 0;
 
-        const closeApproach = dist < 175;
+        const towTargetOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(target.x, target.y) : false;
+        const towTargetInBeachOrPark = Boolean(
+            !towTargetOnRoad && (
+                target.x >= 447.5 * TILE_SIZE ||
+                (map.getTileAtPixel && map.getTileAtPixel(target.x, target.y) === TILE.SAND)
+            )
+        );
+        const closeApproach = dist < 175 || (towTargetInBeachOrPark && this.x >= 445.0 * TILE_SIZE && dist < 1650);
         const roadCtrl = this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -3732,7 +3769,7 @@ class Vehicle {
             target.y,
             0,
             0,
-            closeApproach ? 0.24 : 0.38,
+            closeApproach ? 0.34 : 0.42,
             false,
             closeApproach
         );

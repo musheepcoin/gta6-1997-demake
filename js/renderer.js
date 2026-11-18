@@ -10581,6 +10581,16 @@ class RetroRenderer {
                 this.batchPedSprite3D(pedType, frameIdx, ped.x + mCos * cprLunge, ped.y + mSin * cprLunge, kneelZ, ped.angle, thisPedScale, false, pedDrawOrder, pr, pg, pb);
             } else {
                 this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
+                if (!ped.dead && (ped.calling911Timer || 0) > 0) {
+                    const phCos = Math.cos(ped.angle);
+                    const phSin = Math.sin(ped.angle);
+                    const phX = ped.x + phCos * 5.2 - phSin * 3.8;
+                    const phY = ped.y + phSin * 5.2 + phCos * 3.8;
+                    const sigPulse = ((this.time * 3.8) % 1.0 + 1.0) % 1.0;
+                    const sigRad = 4.0 + sigPulse * 11.0;
+                    this.pushSolidQuad3D(phX, phY, pz + 0.014, 3.0, 1.8, ped.angle, 0.22, 0.78, 0.98, 0.96, pedDrawOrder);
+                    this.pushSolidQuad3D(ped.x, ped.y, pz + 0.018, sigRad, sigRad, this.time * 2.4, 0.98, 0.82, 0.12, (1.0 - sigPulse) * 0.45, pedDrawOrder);
+                }
             }
 
             // Rare Sidewalk Dog Walkers (~4% of calm adult civilians): animated top-down companion dog on a leash!
@@ -17175,6 +17185,50 @@ class RetroRenderer {
                 ctx.strokeStyle = "#ffffff";
                 ctx.lineWidth = 1.2;
                 ctx.stroke();
+            }
+        }
+
+        // 8B. VCPD APB Search Zone & Police Unit Blips (when Wanted > 0)
+        if ((game.wantedLevel || 0) > 0) {
+            const strobeRed = (Math.floor((this.time || 0) * 6.5) % 2) === 0;
+            if (game.lastKnownWantedPos) {
+                const spt = worldToMini(game.lastKnownWantedPos.x, game.lastKnownWantedPos.y);
+                const sRad = Math.max(8, (320 / viewSpan) * mw);
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(spt.x, spt.y, sRad, 0, Math.PI * 2);
+                ctx.fillStyle = game.isPoliceSpotted
+                    ? (strobeRed ? "rgba(239, 68, 68, 0.18)" : "rgba(59, 130, 246, 0.18)")
+                    : "rgba(250, 204, 21, 0.14)";
+                ctx.fill();
+                ctx.strokeStyle = game.isPoliceSpotted
+                    ? (strobeRed ? "#ef4444" : "#3b82f6")
+                    : "#facc15";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+            }
+            if (Array.isArray(game.vehicles)) {
+                for (const v of game.vehicles) {
+                    if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
+                        const cpt = worldToMini(v.x, v.y);
+                        if (cpt.x >= mx - 3 && cpt.x <= mx + mw + 3 && cpt.y >= my - 3 && cpt.y <= my + mh + 3) {
+                            ctx.fillStyle = strobeRed ? "#ef4444" : "#3b82f6";
+                            ctx.fillRect(cpt.x - 2.4, cpt.y - 2.4, 4.8, 4.8);
+                        }
+                    }
+                }
+            }
+            if (Array.isArray(game.peds)) {
+                for (const ped of game.peds) {
+                    if (!ped.dead && ped.kind === "COP") {
+                        const cpt = worldToMini(ped.x, ped.y);
+                        if (cpt.x >= mx - 2 && cpt.x <= mx + mw + 2 && cpt.y >= my - 2 && cpt.y <= my + mh + 2) {
+                            ctx.fillStyle = strobeRed ? "#38bdf8" : "#ef4444";
+                            ctx.fillRect(cpt.x - 1.8, cpt.y - 1.8, 3.6, 3.6);
+                        }
+                    }
+                }
             }
         }
 
