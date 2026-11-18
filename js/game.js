@@ -12470,6 +12470,16 @@ class LeonidaGame {
                 sv._activePairIdx = -1;
                 continue;
             }
+            // Fast-skip distant Dedicated Server autonomous vehicles (> 1450px off-screen); their positions are updated in O(1) by server_sim!
+            if (
+                sv._serverDriven &&
+                !sv._worldModified &&
+                sv.driver !== "PLAYER" &&
+                (Math.abs(sv.x - p.x) > 1450 || Math.abs(sv.y - p.y) > 1450)
+            ) {
+                sv._activePairIdx = -1;
+                continue;
+            }
             activeSimVehicles.push(sv);
         }
 
@@ -12878,6 +12888,12 @@ class LeonidaGame {
                     // Only apply violent rigid-body PIT spin & impact damage when a human player is involved (or police vs criminal getaway car).
                     // AI-vs-AI pairs (including Police, Ambulance, Fire Truck, Tow Truck, and Civilian Traffic) resolve cleanly along their lanes
                     // so emergency vehicles NEVER spin buses sideways or create multi-car pileups!
+                    if (a.driver === "PLAYER" || b.driver === "PLAYER") {
+                        a._worldModified = true;
+                        a._serverDriven = false;
+                        b._worldModified = true;
+                        b._serverDriven = false;
+                    }
                     const involvesPlayerOrActiveCop =
                         a.driver === "PLAYER" ||
                         b.driver === "PLAYER" ||
@@ -17907,7 +17923,7 @@ class LeonidaGame {
                 this.flashEventCooldown = 180.0;
                 this.addFloatingText(p.x, p.y - 24, "⌛ HOT DROP CRATE EXPIRED!", "#f97316");
             }
-        } else if (!this.activeInterior && (!this.net || this.net.isWorldHost())) {
+        } else if (!this.activeInterior && (!this.net || (!this.net.wsConnected && this.net.isWorldHost()))) {
             this.flashEventCooldown = (this.flashEventCooldown || 140.0) - dt;
             if (this.flashEventCooldown <= 0) {
                 this.flashEventCooldown = 180.0;

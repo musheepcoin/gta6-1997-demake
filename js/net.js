@@ -1262,9 +1262,11 @@ class ViceNetworkManager {
        ======================================================================== */
     initWebRTCMesh() {
         if (typeof window === "undefined") return;
-        // Only initialize PeerJS WebRTC fallback if the dedicated Hostinger WebSocket server is not connected after 3.5s
+        // When a Dedicated WebSocket Server URL is configured, never spin up PeerJS P2P WebRTC!
+        if (this.wsUrl) return;
+        // Only initialize PeerJS WebRTC fallback if explicitly in P2P mode (!this.wsUrl)
         setTimeout(() => {
-            if (this.wsConnected) return;
+            if (this.wsConnected || this.wsUrl) return;
             if (typeof window.Peer === "function") {
                 this.claimRoomSlot(0);
                 return;
@@ -2446,7 +2448,16 @@ class ViceNetworkManager {
 
                 if (isMod) {
                     v._worldModified = true;
+                    v._serverDriven = false;
                     v.isStaticParked = false;
+                } else if (
+                    (isInitialServerBootstrap || isAutonomousServerTick) &&
+                    drvCode !== 0 &&
+                    drvCode !== 4 &&
+                    typeof id === "string" &&
+                    (id.startsWith("srv_trf_") || id.startsWith("amb_srv_") || id.startsWith("vcfd_srv_") || id.startsWith("tow_srv_"))
+                ) {
+                    v._serverDriven = true;
                 }
 
                 // Never overwrite the vehicle currently driven by the local player, linked to a 20Hz remote player, or actively towed locally
@@ -2473,7 +2484,7 @@ class ViceNetworkManager {
                 v.netTargetY = predY;
                 v.netTargetZ = z;
                 v.netTargetAngle = a;
-                if (!isInitialServerBootstrap) {
+                if (!isInitialServerBootstrap || v._serverDriven) {
                     v._lastNetSyncMs = syncNowMs;
                 }
                 let resolvedDriver = codeToDrv(drvCode);

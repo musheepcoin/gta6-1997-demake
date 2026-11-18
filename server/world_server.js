@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_204";
+const CURRENT_BUILD = "101_205";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -1569,7 +1569,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     if (!room.vehNav) room.vehNav = {};
     if (!room.pedNav) room.pedNav = {};
 
-    // 2. Build 128x128 spatial hash (256px cells) of all vehicles so autonomous traffic obeys safe bumper spacing
+    // 2. Build 128x128 spatial hash (256px cells) of all vehicles AND online players so autonomous server traffic obeys safe bumper spacing
     const cellBuckets = new Map();
     const allVehEntries = Object.entries(room.vehs);
     for (let i = 0; i < allVehEntries.length; i++) {
@@ -1585,10 +1585,56 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         }
         b.push(vrow);
     }
+    for (const meta of clients.values()) {
+        if (meta.room === roomCode && !meta.isOutdated && meta.lastState && meta.lastState.started && (nowMs - (meta.lastStateMs || 0)) < 8000) {
+            const st = meta.lastState;
+            if (typeof st.x === "number" && typeof st.y === "number") {
+                const cx = st.x >> 8;
+                const cy = st.y >> 8;
+                const key = (cy << 8) | cx;
+                let b = cellBuckets.get(key);
+                if (!b) {
+                    b = [];
+                    cellBuckets.set(key, b);
+                }
+                b.push([meta.playerId, "PLAYER", st.x, st.y, st.z || 2.0, st.a || 0, st.vx || 0, st.vy || 0]);
+            }
+        }
+    }
 
-    // 3. Autonomous Municipal Dispatch Check (every 1.0s = 10 ticks, 100% Server-Authoritative)
+    // 3. Autonomous Municipal Dispatch & Spec-Ops Hot Drop Check (every 1.0s = 10 ticks, 100% Server-Authoritative)
     room._dispatchTick = ((room._dispatchTick || 0) + 1) % 10;
     if (room._dispatchTick === 0) {
+        // 3-0. Autonomous Spec-Ops Hot Drop Crate Spawner (every 180s on the Dedicated Server when players are in the room)
+        room._flashDropCooldown = Math.max(0, (room._flashDropCooldown !== undefined ? room._flashDropCooldown : 90) - 1.0);
+        if (!room.activeFlashDrop && room._flashDropCooldown <= 0 && hotspotRoadTiles.length > 0) {
+            room._flashDropCooldown = 180;
+            const tile = hotspotRoadTiles[Math.floor(Math.random() * hotspotRoadTiles.length)];
+            const wx = Math.round((tile.bx + 0.5) * TS);
+            const wy = Math.round((tile.by + 0.5) * TS);
+            const wz = Math.round((tile.z || 2.0) * 100) / 100;
+            const wepPool = ["ROCKET", "FLAMETHROWER", "ELECTRO", "SHOTGUN"];
+            const wep = wepPool[Math.floor(Math.random() * wepPool.length)];
+            room.activeFlashDrop = {
+                x: wx,
+                y: wy,
+                z: wz,
+                reward: 800,
+                weapon: wep,
+                duration: 90,
+                startedAt: nowMs
+            };
+            broadcastToRoom(roomCode, {
+                t: "WORLD_EVENT",
+                kind: "FLASH_DROP_SPAWN",
+                x: wx,
+                y: wy,
+                z: wz,
+                reward: 800,
+                weapon: wep,
+                duration: 90
+            });
+        }
         // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
         const corpseEntries = Object.entries(room.corpses || {});
         if (corpseEntries.length > 0) {
@@ -1927,8 +1973,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         prow[6] = Math.round(pa * 100) / 100;
     }
 
-    // 6. Broadcast authoritative Dedicated Server simulation ticks (1 Hz = every 10th tick) to all players in the room!
-    if (room._dispatchTick === 0) {
+    // 6. Broadcast authoritative Dedicated Server simulation ticks (2 Hz = every 5th tick = 500ms) to all players in the room!
+    if ((room._dispatchTick % 5) === 0) {
         let hasRoomClients = false;
         for (const meta of clients.values()) {
             if (meta.room === roomCode && !meta.isOutdated) {

@@ -4119,16 +4119,24 @@ class Vehicle {
             return;
         }
 
-        // Client World Sync Mode: continuous 60 FPS velocity dead-reckoning + smooth error-offset decay (zero rubber-banding!)
+        // Dedicated Server & Client World Sync Mode: continuous 60 FPS velocity dead-reckoning + smooth error-offset decay (zero rubber-banding!)
+        const isServerDrivenActive = Boolean(
+            this._serverDriven &&
+            !this._worldModified &&
+            this.driver !== "PLAYER" &&
+            (performance.now() - (this._lastNetSyncMs || 0)) < 2200
+        );
         if (
             this.driver !== "PLAYER" &&
             this.netTargetX !== undefined &&
             this.netTargetY !== undefined &&
-            (performance.now() - (this._lastNetSyncMs || 0)) < 1200 &&
-            game &&
-            game.net &&
-            typeof game.net.isClientWorldSyncActive === "function" &&
-            game.net.isClientWorldSyncActive()
+            (isServerDrivenActive || (
+                (performance.now() - (this._lastNetSyncMs || 0)) < 1200 &&
+                game &&
+                game.net &&
+                typeof game.net.isClientWorldSyncActive === "function" &&
+                game.net.isClientWorldSyncActive()
+            ))
         ) {
             this.x += (this.vx || 0) * dt;
             this.y += (this.vy || 0) * dt;
@@ -5853,8 +5861,10 @@ class TrafficManager {
                 isAbandonedOrWreck;
             // Only protect a player-modified vehicle from off-screen recycling while it sits parked & unoccupied (< 180s).
             // Once an AI driver (AI_COP, AI_TRAFFIC, AI_CRIMINAL, AI_TOW) drives it off-screen, recycle and purge it!
+            // Also never locally delete the Dedicated Server's persistent autonomous fleet (srv_trf_* / _serverDriven)!
             const isRecentParkedMod = v._worldModified && !v.destroyed && v.driver === null && !isAbandonedOrWreck;
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || isRecentParkedMod) continue;
+            const isServerPersistentFleet = Boolean(v._serverDriven || (typeof v.id === "string" && v.id.startsWith("srv_trf_")));
+            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || isRecentParkedMod || isServerPersistentFleet) continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
