@@ -1870,14 +1870,40 @@ class Vehicle {
                     const roadLaneX = (bay.c + (bay.dc || 0) + 0.5) * TILE_SIZE;
                     let canPullOut = true;
                     if (game && Array.isArray(game.vehicles)) {
-                        for (let vi = 0; vi < game.vehicles.length; vi++) {
-                            const ov = game.vehicles[vi];
-                            if (!ov || ov === this) continue;
-                            if (Math.abs(ov.x - roadLaneX) < 30) {
-                                const relY = (ov.y - this.y) * travelSignY;
-                                if (relY > -105 && relY < 72) {
-                                    canPullOut = false;
-                                    break;
+                        const gHead = game._vehGridHead;
+                        const gNext = game._vehGridNext;
+                        if (gHead && gNext) {
+                            const gx0 = Math.max(0, (this.x >> 8) - 1);
+                            const gx1 = Math.min(127, (this.x >> 8) + 1);
+                            const gy0 = Math.max(0, (this.y >> 8) - 1);
+                            const gy1 = Math.min(127, (this.y >> 8) + 1);
+                            for (let gy = gy0; gy <= gy1 && canPullOut; gy++) {
+                                const rowOff = gy << 7;
+                                for (let gx = gx0; gx <= gx1; gx++) {
+                                    for (let vi = gHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
+                                        const ov = game.vehicles[vi];
+                                        if (!ov || ov === this) continue;
+                                        if (Math.abs(ov.x - roadLaneX) < 30) {
+                                            const relY = (ov.y - this.y) * travelSignY;
+                                            if (relY > -105 && relY < 72) {
+                                                canPullOut = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (!canPullOut) break;
+                                }
+                            }
+                        } else {
+                            for (let vi = 0; vi < game.vehicles.length; vi++) {
+                                const ov = game.vehicles[vi];
+                                if (!ov || ov === this) continue;
+                                if (Math.abs(ov.x - roadLaneX) < 30) {
+                                    const relY = (ov.y - this.y) * travelSignY;
+                                    if (relY > -105 && relY < 72) {
+                                        canPullOut = false;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -2107,22 +2133,29 @@ class Vehicle {
                     this.aiTurnSignal = turnDelta >= 0 ? 1 : -1;
                 }
             } else if (isStopBlock && typeof map.chooseNextRoadBlock === "function") {
-                // Pre-signal upcoming turn at the intersection box ahead!
-                const previewTurn = map.chooseNextRoadBlock(
-                    this.aiTargetBlockX,
-                    this.aiTargetBlockY,
-                    this.aiChosenDir ? this.aiChosenDir.angle : this.angle,
-                    curZ,
-                    (this.aiTurnSeed * 1.6180339887 + 0.31) % 1.0,
-                    false,
-                    this.aiChosenDir ? this.aiChosenDir.angle : this.angle
-                );
-                if (previewTurn && previewTurn.isTurn) {
-                    const turnDelta = this.normalizeAngle(previewTurn.angle - (this.aiChosenDir ? this.aiChosenDir.angle : this.angle));
-                    if (Math.abs(turnDelta) > 0.12) {
-                        this.aiTurnSignal = turnDelta >= 0 ? 1 : -1;
+                // Pre-signal upcoming turn at the intersection box ahead (cached per target block so we don't recompute 60x/s at red lights!)
+                const previewKey = ((this.aiTargetBlockY & 511) << 9) | (this.aiTargetBlockX & 511);
+                if (this._previewTurnBoxKey !== previewKey) {
+                    this._previewTurnBoxKey = previewKey;
+                    this._previewTurnSignalVal = 0;
+                    const baseA = this.aiChosenDir ? this.aiChosenDir.angle : this.angle;
+                    const previewTurn = map.chooseNextRoadBlock(
+                        this.aiTargetBlockX,
+                        this.aiTargetBlockY,
+                        baseA,
+                        curZ,
+                        (this.aiTurnSeed * 1.6180339887 + 0.31) % 1.0,
+                        false,
+                        baseA
+                    );
+                    if (previewTurn && previewTurn.isTurn) {
+                        const turnDelta = this.normalizeAngle(previewTurn.angle - baseA);
+                        if (Math.abs(turnDelta) > 0.12) {
+                            this._previewTurnSignalVal = turnDelta >= 0 ? 1 : -1;
+                        }
                     }
                 }
+                this.aiTurnSignal = this._previewTurnSignalVal || 0;
             }
         }
 
@@ -2143,26 +2176,45 @@ class Vehicle {
         let boxExitBlocked = false;
         if (!isPanicked && !sirenBehind && isStopBlock && runFullRadarNow && game && Array.isArray(game.vehicles)) {
             const extraExitClearance = Math.max(0, (this.w || 62) - 62);
-            for (let vi = 0; vi < game.vehicles.length; vi++) {
-                const ov = game.vehicles[vi];
-                if (!ov || ov === this || ov.destroyed) continue;
+            const gHead = game._vehGridHead;
+            const gNext = game._vehGridNext;
+            const checkBoxVeh = (ov) => {
+                if (!ov || ov === this || ov.destroyed) return false;
                 const dx = ov.x - this.x;
                 const dy = ov.y - this.y;
-                if (Math.abs(dx) > 220 || Math.abs(dy) > 220) continue;
-                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) continue;
+                if (Math.abs(dx) > 220 || Math.abs(dy) > 220) return false;
+                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) return false;
                 const fwd = dx * fx + dy * fy;
                 const lat = Math.abs(dx * rx + dy * ry);
                 const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
-                const ovLid = map.getBlockInfo ? map.getBlockInfo(Math.floor(ov.x / TILE_SIZE), Math.floor(ov.y / TILE_SIZE), 1).lid : 0;
-                // 1. Any vehicle (same-direction OR perpendicular cross-traffic/bus) stopped inside the intersection box ahead
-                if (ovLid === 25 && ovSpd < 12 && fwd > 12 && fwd < 155 && lat < 44) {
-                    boxExitBlocked = true;
-                    break;
+                const ovLid = map.getBlockInfo ? map.getBlockInfo(ov.x >> 6, ov.y >> 6, 1).lid : 0;
+                if (ovLid === 25 && ovSpd < 12 && fwd > 12 && fwd < 155 && lat < 44) return true;
+                if (fwd > 22 && fwd < (150 + extraExitClearance) && lat < 24 && ovSpd < 10 && Math.cos(ov.angle - this.angle) > 0.65) return true;
+                return false;
+            };
+            if (gHead && gNext) {
+                const gx0 = Math.max(0, (this.x >> 8) - 1);
+                const gx1 = Math.min(127, (this.x >> 8) + 1);
+                const gy0 = Math.max(0, (this.y >> 8) - 1);
+                const gy1 = Math.min(127, (this.y >> 8) + 1);
+                for (let gy = gy0; gy <= gy1 && !boxExitBlocked; gy++) {
+                    const rowOff = gy << 7;
+                    for (let gx = gx0; gx <= gx1; gx++) {
+                        for (let vi = gHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
+                            if (checkBoxVeh(game.vehicles[vi])) {
+                                boxExitBlocked = true;
+                                break;
+                            }
+                        }
+                        if (boxExitBlocked) break;
+                    }
                 }
-                // 2. Same-direction traffic stopped on the far side of the box (prevents buses/cars from entering and hanging their tail in the box!)
-                if (fwd > 22 && fwd < (150 + extraExitClearance) && lat < 24 && ovSpd < 10 && Math.cos(ov.angle - this.angle) > 0.65) {
-                    boxExitBlocked = true;
-                    break;
+            } else {
+                for (let vi = 0; vi < game.vehicles.length; vi++) {
+                    if (checkBoxVeh(game.vehicles[vi])) {
+                        boxExitBlocked = true;
+                        break;
+                    }
                 }
             }
             this._cachedBoxBlocked = boxExitBlocked;
@@ -2390,16 +2442,18 @@ class Vehicle {
                     }
                 }
                 if (Array.isArray(game.peds)) {
-                    for (const ped of game.peds) {
-                        if (ped.dead) continue;
+                    const pHead = game._pedGridHead;
+                    const pNext = game._pedGridNext;
+                    const checkPedAhead = (ped) => {
+                        if (!ped || ped.dead) return;
                         const dx = ped.x - this.x;
                         const dy = ped.y - this.y;
-                        if (Math.abs(dx) > 96 + extraFrontReach || Math.abs(dy) > 96 + extraFrontReach) continue;
+                        if (Math.abs(dx) > 96 + extraFrontReach || Math.abs(dy) > 96 + extraFrontReach) return;
                         const forwardDist = dx * fx + dy * fy;
                         const lateralDist = Math.abs(dx * rx + dy * ry);
                         const onZebraCrosswalk = Boolean(
                             ped.isCrossingRoad ||
-                            (map && map.isStopLineBlock && map.isStopLineBlock(Math.floor(ped.x / TILE_SIZE), Math.floor(ped.y / TILE_SIZE)))
+                            (map && map.isStopLineBlock && map.isStopLineBlock(ped.x >> 6, ped.y >> 6))
                         );
                         const maxFwd = ((onZebraCrosswalk && !this.aiAggressive) ? 84 : 56) + extraFrontReach;
                         const maxLat = (onZebraCrosswalk && !this.aiAggressive) ? 26 : 15;
@@ -2409,6 +2463,24 @@ class Vehicle {
                                 closestBumperGap = gap;
                                 closestEntity = ped;
                             }
+                        }
+                    };
+                    if (pHead && pNext) {
+                        const gx0 = Math.max(0, (this.x >> 8) - 1);
+                        const gx1 = Math.min(127, (this.x >> 8) + 1);
+                        const gy0 = Math.max(0, (this.y >> 8) - 1);
+                        const gy1 = Math.min(127, (this.y >> 8) + 1);
+                        for (let gy = gy0; gy <= gy1; gy++) {
+                            const rowOff = gy << 7;
+                            for (let gx = gx0; gx <= gx1; gx++) {
+                                for (let pi = pHead[rowOff | gx]; pi !== undefined && pi !== -1; pi = pNext[pi]) {
+                                    checkPedAhead(game.peds[pi]);
+                                }
+                            }
+                        }
+                    } else {
+                        for (let pi = 0; pi < game.peds.length; pi++) {
+                            checkPedAhead(game.peds[pi]);
                         }
                     }
                 }

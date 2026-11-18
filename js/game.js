@@ -17559,6 +17559,10 @@ class LeonidaGame {
 
     updateLivingEventsRespawn(dt) {
         if (!this.map || !this.player) return;
+        this._livingRespawnAcc = (this._livingRespawnAcc || 0) + dt;
+        if (this._livingRespawnAcc < 0.25) return;
+        const stepDt = this._livingRespawnAcc;
+        this._livingRespawnAcc = 0;
         const px = this.player.x;
         const py = this.player.y;
         const tickArray = (arr) => {
@@ -17571,10 +17575,10 @@ class LeonidaGame {
                 const distOut = Math.hypot(it.x - px, it.y - py) > 360;
                 if (!distOut) continue;
                 if (wt > 0) {
-                    it.wipeoutTimer = Math.max(0, wt - dt);
+                    it.wipeoutTimer = Math.max(0, wt - stepDt);
                 }
                 if (uwt > 0) {
-                    it.umbWipeoutTimer = Math.max(0, uwt - dt);
+                    it.umbWipeoutTimer = Math.max(0, uwt - stepDt);
                 }
             }
         };

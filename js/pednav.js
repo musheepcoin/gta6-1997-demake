@@ -17,8 +17,8 @@ const PedNav = (function () {
         { dx: -1, dy: 0 },
         { dx: 1, dy: 0 }
     ];
-    const MAX_COST = 78;       // path cost horizon (~ 60 tiles of sidewalk)
-    const MAX_NODES = 5200;
+    const MAX_COST = 46;       // path cost horizon (~ 40 tiles of sidewalk, plenty for multi-block travel)
+    const MAX_NODES = 1200;
     const MIN_DEST_COST = 14;  // never choose a destination closer than this
     const CROSS_BASE_COST = 7; // crossing a street costs ~ 8-10 tiles of sidewalk walking
 
@@ -27,8 +27,21 @@ const PedNav = (function () {
     class Navigator {
         constructor(map) {
             this.map = map;
-            this.walkCache = new Uint8Array(MAP_COLS * MAP_ROWS); // 0 unknown, 1 walkable, 2 blocked
+            const totalTiles = MAP_COLS * MAP_ROWS;
+            this.walkCache = new Uint8Array(totalTiles); // 0 unknown, 1 walkable, 2 blocked
             this.crossCache = new Map();
+            // Pre-allocated zero-GC Dijkstra buffers
+            this._planStamp = 1;
+            this._seenStamp = new Int32Array(totalTiles);
+            this._distArr = new Int16Array(totalTiles);
+            this._parentArr = new Int32Array(totalTiles);
+            this._hopIdxArr = new Int16Array(totalTiles);
+            this._hopList = [];
+            this._visitedKeys = new Int32Array(MAX_NODES + 512);
+            this._visitedCount = 0;
+            this._heapCost = new Int16Array(MAX_NODES * 4);
+            this._heapKey = new Int32Array(MAX_NODES * 4);
+            this._candKeys = new Int32Array(MAX_NODES + 512);
         }
 
         _restricted(x, y) {
@@ -106,94 +119,151 @@ const PedNav = (function () {
             return out;
         }
 
-        // Dijkstra over sidewalk tiles (+ crossing edges). Returns { dist, parent, hop, nodes }
+        // Zero-GC Dijkstra over sidewalk tiles (+ crossing edges) using pre-allocated typed arrays
         plan(sx, sy, z, allowCross, avoid, now) {
-            const dist = new Map();
-            const parent = new Map();
-            const hop = new Map();
-            const heap = []; // [cost, key]
+            let stamp = (this._planStamp + 1) | 0;
+            if (stamp <= 0 || stamp >= 0x7ffffff0) {
+                this._seenStamp.fill(0);
+                stamp = 1;
+            }
+            this._planStamp = stamp;
+
+            const seenStamp = this._seenStamp;
+            const distArr = this._distArr;
+            const parentArr = this._parentArr;
+            const hopIdxArr = this._hopIdxArr;
+            const hopList = this._hopList;
+            hopList.length = 1; // 0 = no crossing hop
+            const visitedKeys = this._visitedKeys;
+            let visitedCount = 0;
+
+            const heapCost = this._heapCost;
+            const heapKey = this._heapKey;
+            let heapLen = 0;
+
             const push = (cost, key) => {
-                heap.push([cost, key]);
-                let i = heap.length - 1;
+                let i = heapLen++;
+                heapCost[i] = cost;
+                heapKey[i] = key;
                 while (i > 0) {
                     const p = (i - 1) >> 1;
-                    if (heap[p][0] <= heap[i][0]) break;
-                    const t = heap[p]; heap[p] = heap[i]; heap[i] = t;
+                    if (heapCost[p] <= cost) break;
+                    heapCost[i] = heapCost[p];
+                    heapKey[i] = heapKey[p];
+                    heapCost[p] = cost;
+                    heapKey[p] = key;
                     i = p;
                 }
             };
-            const pop = () => {
-                const top = heap[0];
-                const last = heap.pop();
-                if (heap.length > 0) {
-                    heap[0] = last;
+
+            const startKey = sy * MAP_COLS + sx;
+            seenStamp[startKey] = stamp;
+            distArr[startKey] = 0;
+            parentArr[startKey] = -1;
+            hopIdxArr[startKey] = 0;
+            visitedKeys[visitedCount++] = startKey;
+            push(0, startKey);
+
+            const hasAvoid = Boolean(avoid && avoid.size > 0);
+            let expanded = 0;
+            let maxCostSeen = 0;
+
+            while (heapLen > 0 && expanded < MAX_NODES) {
+                const cost = heapCost[0];
+                const key = heapKey[0];
+                heapLen--;
+                if (heapLen > 0) {
+                    const lc = heapCost[heapLen];
+                    const lk = heapKey[heapLen];
+                    heapCost[0] = lc;
+                    heapKey[0] = lk;
                     let i = 0;
                     for (;;) {
-                        const l = i * 2 + 1, r = l + 1;
+                        const l = (i << 1) + 1, r = l + 1;
                         let m = i;
-                        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
-                        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+                        if (l < heapLen && heapCost[l] < heapCost[m]) m = l;
+                        if (r < heapLen && heapCost[r] < heapCost[m]) m = r;
                         if (m === i) break;
-                        const t = heap[m]; heap[m] = heap[i]; heap[i] = t;
+                        const tc = heapCost[m], tk = heapKey[m];
+                        heapCost[m] = heapCost[i]; heapKey[m] = heapKey[i];
+                        heapCost[i] = tc; heapKey[i] = tk;
                         i = m;
                     }
                 }
-                return top;
-            };
-            const startKey = sy * MAP_COLS + sx;
-            dist.set(startKey, 0);
-            push(0, startKey);
-            let expanded = 0;
-            while (heap.length > 0 && expanded < MAX_NODES) {
-                const [cost, key] = pop();
-                if (cost > dist.get(key)) continue;
+                if (cost > distArr[key]) continue;
                 expanded++;
-                const x = key % MAP_COLS;
-                const y = (key / MAP_COLS) | 0;
-                for (let ci = 0; ci < 4; ci++) {
-                    const nx = x + CARD[ci].dx, ny = y + CARD[ci].dy;
-                    const nk = ny * MAP_COLS + nx;
-                    const nc = cost + 1;
-                    if (nc > MAX_COST) continue;
-                    const od = dist.get(nk);
-                    if (od !== undefined && od <= nc) continue;
-                    if (avoid && avoid.has(nk) && avoid.get(nk) > now) continue;
-                    if (!this.walkable(nx, ny, z)) continue;
-                    dist.set(nk, nc);
-                    parent.set(nk, key);
-                    hop.delete(nk);
-                    push(nc, nk);
+                if (cost > maxCostSeen) maxCostSeen = cost;
+
+                const x = key & 511;
+                const y = key >> 9;
+                const nc1 = cost + 1;
+                if (nc1 <= MAX_COST) {
+                    for (let ci = 0; ci < 4; ci++) {
+                        const nx = x + CARD[ci].dx, ny = y + CARD[ci].dy;
+                        const nk = (ny << 9) | nx;
+                        if (seenStamp[nk] === stamp && distArr[nk] <= nc1) continue;
+                        if (hasAvoid && avoid.has(nk) && avoid.get(nk) > now) continue;
+                        if (!this.walkable(nx, ny, z)) continue;
+                        if (seenStamp[nk] !== stamp) {
+                            seenStamp[nk] = stamp;
+                            if (visitedCount < visitedKeys.length) visitedKeys[visitedCount++] = nk;
+                        }
+                        distArr[nk] = nc1;
+                        parentArr[nk] = key;
+                        hopIdxArr[nk] = 0;
+                        push(nc1, nk);
+                    }
                 }
                 if (allowCross) {
                     const cr = this.crossingsFrom(x, y, z);
                     for (let i = 0; i < cr.length; i++) {
                         const c = cr[i];
-                        const nk = c.by * MAP_COLS + c.bx;
+                        const nk = (c.by << 9) | c.bx;
                         const nc = cost + CROSS_BASE_COST + c.steps;
                         if (nc > MAX_COST) continue;
-                        const od = dist.get(nk);
-                        if (od !== undefined && od <= nc) continue;
-                        if (avoid && avoid.has(nk) && avoid.get(nk) > now) continue;
-                        if (avoid && avoid.has(-1 - key) && avoid.get(-1 - key) > now) continue; // crossing edge temporarily avoided
-                        dist.set(nk, nc);
-                        parent.set(nk, key);
-                        hop.set(nk, c);
+                        if (seenStamp[nk] === stamp && distArr[nk] <= nc) continue;
+                        if (hasAvoid) {
+                            if (avoid.has(nk) && avoid.get(nk) > now) continue;
+                            if (avoid.has(-1 - key) && avoid.get(-1 - key) > now) continue;
+                        }
+                        if (seenStamp[nk] !== stamp) {
+                            seenStamp[nk] = stamp;
+                            if (visitedCount < visitedKeys.length) visitedKeys[visitedCount++] = nk;
+                        }
+                        distArr[nk] = nc;
+                        parentArr[nk] = key;
+                        const hIdx = hopList.length;
+                        hopList.push(c);
+                        hopIdxArr[nk] = hIdx;
                         push(nc, nk);
                     }
                 }
             }
-            return { dist, parent, hop, startKey };
+            this._visitedCount = visitedCount;
+            return {
+                nav: this,
+                stamp,
+                startKey,
+                size: visitedCount,
+                maxCost: maxCostSeen
+            };
         }
 
         buildPath(res, destKey) {
             const rev = [];
+            const seenStamp = this._seenStamp;
+            const parentArr = this._parentArr;
+            const hopIdxArr = this._hopIdxArr;
+            const hopList = this._hopList;
+            const stamp = res.stamp;
             let k = destKey;
             let guard = 0;
             while (k !== res.startKey && guard++ < 500) {
-                const h = res.hop.get(k) || null;
-                rev.push({ bx: k % MAP_COLS, by: (k / MAP_COLS) | 0, cross: h });
-                k = res.parent.get(k);
-                if (k === undefined) return null;
+                if (k < 0 || seenStamp[k] !== stamp) return null;
+                const hIdx = hopIdxArr[k];
+                const h = hIdx > 0 ? hopList[hIdx] : null;
+                rev.push({ bx: k & 511, by: k >> 9, cross: h });
+                k = parentArr[k];
             }
             rev.reverse();
             return rev;
@@ -208,31 +278,35 @@ const PedNav = (function () {
     }
 
     function pickDestination(ped, res, sx, sy, fleeing, threatX, threatY) {
-        const nodes = [];
-        let maxC = 0;
-        res.dist.forEach((c) => { if (c > maxC) maxC = c; });
-        // Small plazas / islands: scale the minimum trip length to the reachable area so people still cross it
+        const nav = res.nav;
+        const visitedKeys = nav._visitedKeys;
+        const visitedCount = res.size;
+        const distArr = nav._distArr;
+        const hopIdxArr = nav._hopIdxArr;
+        const candKeys = nav._candKeys;
+        let candCount = 0;
+        const maxC = res.maxCost;
         const minC = Math.max(3, Math.min(MIN_DEST_COST, Math.floor(maxC * 0.6)));
-        res.dist.forEach((c, k) => {
-            if (fleeing) {
-                if (c >= Math.min(6, minC)) nodes.push(k);
-            } else if (c >= minC) {
-                nodes.push(k);
+        const thrC = fleeing ? Math.min(6, minC) : minC;
+
+        for (let i = 0; i < visitedCount; i++) {
+            const k = visitedKeys[i];
+            if (distArr[k] >= thrC) {
+                candKeys[candCount++] = k;
             }
-        });
-        if (nodes.length === 0) {
-            // Tiny enclosed pocket (walled courtyard / alley): there is nowhere meaningful to walk to
+        }
+        if (candCount === 0) {
             return -1;
         }
         const recent = ped._navRecent || [];
         const heading = ped.angle || 0;
         const hcos = Math.cos(heading), hsin = Math.sin(heading);
         let bestK = -1, bestScore = -1e9;
-        const samples = Math.min(nodes.length, 70);
+        const samples = Math.min(candCount, 56);
         for (let si = 0; si < samples; si++) {
-            const k = nodes[(Math.random() * nodes.length) | 0];
-            const x = k % MAP_COLS, y = (k / MAP_COLS) | 0;
-            const c = res.dist.get(k);
+            const k = candKeys[(Math.random() * candCount) | 0];
+            const x = k & 511, y = k >> 9;
+            const c = distArr[k];
             let score;
             if (fleeing) {
                 const px = (x + 0.5) * TILE_SIZE, py = (y + 0.5) * TILE_SIZE;
@@ -242,8 +316,7 @@ const PedNav = (function () {
                 const dl = Math.hypot(dx, dy) || 1;
                 const align = (hcos * dx + hsin * dy) / dl;
                 score = align * 0.9 + Math.min(c, 44) / 44 * 0.8 + Math.random() * 1.3;
-                // crossing streets keeps people moving between blocks
-                if (res.hop.has(k)) score += 0.25;
+                if (hopIdxArr[k] > 0) score += 0.25;
                 for (let ri = 0; ri < recent.length; ri++) {
                     const r = recent[ri];
                     if (Math.abs(r.bx - x) + Math.abs(r.by - y) < 8) score -= 1.6;
@@ -341,7 +414,7 @@ const PedNav = (function () {
             const res = nav.plan(baseX, baseY, z, allowCross, avoid, now);
             stats.plans++;
             if (wasReplan) stats.replans++;
-            if (!fleeing && res.dist.size < 24) {
+            if (!fleeing && res.size < 24) {
                 // Enclosed pocket (courtyard / walled alley / lone tile): nothing meaningful to walk to -> idle chat, vanish when unwatched
                 stats.failedPlans++;
                 ped._navTrapped = true;
@@ -351,21 +424,21 @@ const PedNav = (function () {
                 return null;
             }
             // People pause when they arrive (window shopping, phone, chat); always in small enclosed areas so nobody paces non-stop
-            if (justArrived && (res.dist.size < 160 || Math.random() < 0.22)) {
+            if (justArrived && (res.size < 160 || Math.random() < 0.22)) {
                 ped.hangoutTimer = Math.max(ped.hangoutTimer || 0, 3 + Math.random() * 8);
                 ped.hangoutBaseAngle = ped.angle;
             }
             let destKey = -1;
             if (!fleeing && ped._navDest) {
                 const dk = ped._navDest.by * MAP_COLS + ped._navDest.bx;
-                if (res.dist.has(dk) && res.dist.get(dk) >= 2) destKey = dk;
+                if (nav._seenStamp[dk] === res.stamp && nav._distArr[dk] >= 2) destKey = dk;
             }
             if (destKey < 0) {
                 destKey = pickDestination(ped, res, baseX, baseY, fleeing, navContext.threatX, navContext.threatY);
             }
             if (destKey < 0 || destKey === res.startKey) {
                 stats.failedPlans++;
-                if (res.dist.size < 24) {
+                if (res.size < 24) {
                     // Trapped in a tiny pocket: stand around chatting instead of pacing back and forth; vanishes when unwatched
                     ped._navTrapped = true;
                     if (!fleeing) {
@@ -374,7 +447,7 @@ const PedNav = (function () {
                     }
                 }
                 if (!stats.failInfo) stats.failInfo = [];
-                if (stats.failInfo.length < 40) stats.failInfo.push(baseX + ',' + baseY + ' n=' + res.dist.size + ' cross=' + allowCross + ' flee=' + fleeing);
+                if (stats.failInfo.length < 40) stats.failInfo.push(baseX + ',' + baseY + ' n=' + res.size + ' cross=' + allowCross + ' flee=' + fleeing);
                 ped._navDest = null;
                 return null; // isolated pocket: legacy walker handles it (U-turn)
             }

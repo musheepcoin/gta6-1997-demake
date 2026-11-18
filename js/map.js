@@ -5773,6 +5773,45 @@ class LeonidaMap {
 
     hasTrafficSignalNear(x, y, maxDist = 360) {
         if (!Array.isArray(this.trafficSignals) || this.trafficSignals.length === 0) return false;
+        if (maxDist <= 420) {
+            if (!this._signalNearDistMap || this._signalNearSrcLen !== this.trafficSignals.length) {
+                const dMap = new Uint8Array(MAP_COLS * MAP_ROWS);
+                dMap.fill(255);
+                const rTiles = 7; // 7 * 64 = 448px cover
+                for (let i = 0; i < this.trafficSignals.length; i++) {
+                    const ts = this.trafficSignals[i];
+                    const sbx = ts.headX >> 6;
+                    const sby = ts.headY >> 6;
+                    const x0 = Math.max(0, sbx - rTiles);
+                    const x1 = Math.min(MAP_COLS - 1, sbx + rTiles);
+                    const y0 = Math.max(0, sby - rTiles);
+                    const y1 = Math.min(MAP_ROWS - 1, sby + rTiles);
+                    for (let ty = y0; ty <= y1; ty++) {
+                        const cy = (ty << 6) + 32;
+                        const dy = ts.headY - cy;
+                        const rowOff = ty * MAP_COLS;
+                        for (let tx = x0; tx <= x1; tx++) {
+                            const cx = (tx << 6) + 32;
+                            const dx = ts.headX - cx;
+                            const distQ = (Math.hypot(dx, dy) * 0.5) | 0; // 2px quantization (0..224)
+                            const idx = rowOff + tx;
+                            if (distQ < dMap[idx]) dMap[idx] = distQ;
+                        }
+                    }
+                }
+                this._signalNearDistMap = dMap;
+                this._signalNearSrcLen = this.trafficSignals.length;
+            }
+            const bx = x >> 6;
+            const by = y >> 6;
+            if (bx >= 0 && bx < MAP_COLS && by >= 0 && by < MAP_ROWS) {
+                // Add 23 (46px half-diagonal of a 64px tile) for conservative tile-center bound
+                const q = this._signalNearDistMap[by * MAP_COLS + bx];
+                const thrQ = (maxDist * 0.5) | 0;
+                if (q + 23 <= thrQ) return true;
+                if (q - 23 > thrQ) return false;
+            }
+        }
         const maxD2 = maxDist * maxDist;
         for (let i = 0; i < this.trafficSignals.length; i++) {
             const ts = this.trafficSignals[i];

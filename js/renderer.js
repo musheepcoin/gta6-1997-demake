@@ -12580,27 +12580,30 @@ class RetroRenderer {
                 if (gSc.x < -180 || gSc.x > W + 180 || gSc.y < -180 || gSc.y > H + 180) continue;
                 const pxScale = (gSc.scale * H) / 128.0;
 
-                // Elevated 3D lamp head position for the soft, translucent golden-yellow radial halo
-                const hSc = this.worldToScreen(effHX, effHY, sz + 0.54 - zDrop);
-
                 if (sl.colorType === "SODIUM") {
                     addLightPool(gSc.x, gSc.y, 92 * pxScale, "rgba(255, 202, 88, 0.78)", "rgba(230, 142, 32, 0.28)");
-                    highResFlares.push({
-                        x: hSc.x,
-                        y: hSc.y,
-                        r: 32 * pxScale,
-                        isLampHalo: true,
-                        warmSodium: true
-                    });
+                    if (!useAlphaCutout) {
+                        const hSc = this.worldToScreen(effHX, effHY, sz + 0.54 - zDrop);
+                        highResFlares.push({
+                            x: hSc.x,
+                            y: hSc.y,
+                            r: 32 * pxScale,
+                            isLampHalo: true,
+                            warmSodium: true
+                        });
+                    }
                 } else {
                     addLightPool(gSc.x, gSc.y, 95 * pxScale, "rgba(255, 218, 104, 0.80)", "rgba(240, 165, 42, 0.30)");
-                    highResFlares.push({
-                        x: hSc.x,
-                        y: hSc.y,
-                        r: 34 * pxScale,
-                        isLampHalo: true,
-                        warmSodium: false
-                    });
+                    if (!useAlphaCutout) {
+                        const hSc = this.worldToScreen(effHX, effHY, sz + 0.54 - zDrop);
+                        highResFlares.push({
+                            x: hSc.x,
+                            y: hSc.y,
+                            r: 34 * pxScale,
+                            isLampHalo: true,
+                            warmSodium: false
+                        });
+                    }
                 }
             }
         }
@@ -12628,15 +12631,16 @@ class RetroRenderer {
                     addLightPool(gSc.x, gSc.y, 52 * pxScale, "rgba(255, 228, 142, 0.80)", "rgba(232, 170, 62, 0.28)");
                 }
 
-                // Subtle low-level lantern glow at the bollard diffuser height (sz + 0.165)
-                const hSc = this.worldToScreen(bl.x, bl.y, sz + 0.165);
-                highResFlares.push({
-                    x: hSc.x,
-                    y: hSc.y,
-                    r: 14 * pxScale,
-                    isLampHalo: true,
-                    warmSodium: bl.style !== "DECO_PARK"
-                });
+                if (!useAlphaCutout) {
+                    const hSc = this.worldToScreen(bl.x, bl.y, sz + 0.165);
+                    highResFlares.push({
+                        x: hSc.x,
+                        y: hSc.y,
+                        r: 14 * pxScale,
+                        isLampHalo: true,
+                        warmSodium: bl.style !== "DECO_PARK"
+                    });
+                }
             }
         }
 
@@ -12652,7 +12656,7 @@ class RetroRenderer {
                 const pxScale = (sc.scale * H) / 128.0;
                 if (vd.kind === "BISTRO_STRING") {
                     addLightPool(sc.x, sc.y, 54 * pxScale, "rgba(255, 200, 118, 0.55)", "rgba(235, 140, 55, 0.20)");
-                    highResFlares.push({ x: sc.x, y: sc.y, r: 18 * pxScale, isLampHalo: true, warmSodium: false });
+                    if (!useAlphaCutout) highResFlares.push({ x: sc.x, y: sc.y, r: 18 * pxScale, isLampHalo: true, warmSodium: false });
                 } else if (vd.kind === "SERPENTINE_WALL") {
                     const isPink = vd.theme === "PINK";
                     addLightPool(
@@ -12668,7 +12672,9 @@ class RetroRenderer {
 
         // 2B-2. Illuminated 3D eCola & Sprunk Sidewalk Vending Machine Neon Glow
         if (this.map && this.map.objectEngine && Array.isArray(this.map.objectEngine.sodaMachines)) {
-            for (const sm of this.map.objectEngine.sodaMachines) {
+            const smNightVis = this._queryStaticChunkGrid(this.map.objectEngine.sodaMachines, "x", "y", this.camX - 860, this.camY - 640, this.camX + 860, this.camY + 640);
+            for (let vi = 0; vi < smNightVis.length; vi++) {
+                const sm = smNightVis[vi];
                 if (Math.abs(sm.x - this.camX) > 840 || Math.abs(sm.y - this.camY) > 620) continue;
                 const sc = this.worldToScreen(sm.x, sm.y, (sm.z || 2.0) + 0.22);
                 if (sc.x < -100 || sc.x > W + 100 || sc.y < -100 || sc.y > H + 100) continue;
@@ -12729,7 +12735,9 @@ class RetroRenderer {
 
         // 3. Enterable Venue Neon Signs, Pay 'n' Sprays & Ringing Payphones (with GTA 2 LGHT blink/pulse jitter!)
         if (Array.isArray(this.map.interiors)) {
-            for (const intr of this.map.interiors) {
+            const intrVis = this._queryStaticChunkGrid(this.map.interiors, "doorX", "doorY", this.camX - 980, this.camY - 780, this.camX + 980, this.camY + 780);
+            for (let vi = 0; vi < intrVis.length; vi++) {
+                const intr = intrVis[vi];
                 if (Math.abs(intr.doorX - this.camX) > 960 || Math.abs(intr.doorY - this.camY) > 760) continue;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.12;
                 const sc = this.worldToScreen(intr.doorX, intr.doorY, dz);
@@ -12836,16 +12844,18 @@ class RetroRenderer {
                 isScoot ? "rgba(220, 255, 245, 0.96)" : "rgba(255, 250, 225, 0.98)",
                 isScoot ? "rgba(110, 240, 220, 0.48)" : "rgba(215, 232, 255, 0.52)"
             );
-            highResCones.push({
-                x: fSc.x,
-                y: fSc.y,
-                angle: beamAng,
-                len: beamLen * 0.92,
-                spread: coneSpread * 0.88,
-                baseHalfW: baseHalfWPx,
-                col0: isScoot ? "rgba(180, 255, 240, 0.20)" : "rgba(255, 250, 220, 0.22)",
-                col1: "rgba(180, 220, 255, 0.07)"
-            });
+            if (!useAlphaCutout) {
+                highResCones.push({
+                    x: fSc.x,
+                    y: fSc.y,
+                    angle: beamAng,
+                    len: beamLen * 0.92,
+                    spread: coneSpread * 0.88,
+                    baseHalfW: baseHalfWPx,
+                    col0: isScoot ? "rgba(180, 255, 240, 0.20)" : "rgba(255, 250, 220, 0.22)",
+                    col1: "rgba(180, 220, 255, 0.07)"
+                });
+            }
 
             // Front Headlight Bulbs (Dual for cars, Single central bow searchlight for motorcycles & boats)
             const headOffsets = (v.isMotorcycle || isWaterCraft) ? [0] : [-latSpread, latSpread];
@@ -13364,8 +13374,9 @@ class RetroRenderer {
 
         // 1. Glowing Enterable Venue Interior Door Badges (anchored at the physical door threshold)
         if (Array.isArray(this.map.interiors)) {
-            for (let ii = 0; ii < this.map.interiors.length; ii++) {
-                const intr = this.map.interiors[ii];
+            const intrNear = this._queryStaticChunkGrid(this.map.interiors, "doorX", "doorY", p.x - 380, p.y - 380, p.x + 380, p.y + 380);
+            for (let ii = 0; ii < intrNear.length; ii++) {
+                const intr = intrNear[ii];
                 if (Math.abs(p.x - intr.doorX) > 365 || Math.abs(p.y - intr.doorY) > 365) continue;
                 const fCode = intr.facing;
                 const fnvX = fCode === "E" ? 1 : (fCode === "W" ? -1 : 0);
@@ -13405,8 +13416,9 @@ class RetroRenderer {
 
         // 2. Stunt Jump Ramp Labels when nearby
         if (Array.isArray(this.map.stuntRamps)) {
-            for (let ri = 0; ri < this.map.stuntRamps.length; ri++) {
-                const ramp = this.map.stuntRamps[ri];
+            const rampNear = this._queryStaticChunkGrid(this.map.stuntRamps, "x", "y", p.x - 210, p.y - 210, p.x + 210, p.y + 210);
+            for (let ri = 0; ri < rampNear.length; ri++) {
+                const ramp = rampNear[ri];
                 if (Math.abs(p.x - ramp.x) > 195 || Math.abs(p.y - ramp.y) > 195) continue;
                 const dist = Math.hypot(p.x - ramp.x, p.y - ramp.y);
                 if (dist > 190) continue;
@@ -13632,8 +13644,9 @@ class RetroRenderer {
             }
             let bestProp = null;
             let bestPropDist = 92;
-            for (let i = 0; i < oe._usableInteractProps.length; i++) {
-                const pr = oe._usableInteractProps[i];
+            const propsNear = this._queryStaticChunkGrid(oe._usableInteractProps, "x", "y", p.x - 105, p.y - 105, p.x + 105, p.y + 105);
+            for (let i = 0; i < propsNear.length; i++) {
+                const pr = propsNear[i];
                 if (pr.broken || (pr.cooldown || 0) > 0) continue;
                 if (Math.abs(pr.x - p.x) > 92 || Math.abs(pr.y - p.y) > 92) continue;
                 const d = Math.hypot(pr.x - p.x, pr.y - p.y);
