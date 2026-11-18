@@ -13141,47 +13141,30 @@ class LeonidaGame {
                 }
 
                 if (ped.netTargetX !== undefined && ped.netTargetY !== undefined) {
-
                     const moveSpd = (ped.stunnedTimer || 0) > 0 ? 0 : (ped.speed || 0);
-
-                    ped.netTargetX += Math.cos(ped.netTargetAngle || ped.angle || 0) * moveSpd * dt * 0.48;
-
-                    ped.netTargetY += Math.sin(ped.netTargetAngle || ped.angle || 0) * moveSpd * dt * 0.48;
-
+                    const pAng = ped.netTargetAngle !== undefined ? ped.netTargetAngle : (ped.angle || 0);
+                    ped.x += Math.cos(pAng) * moveSpd * dt;
+                    ped.y += Math.sin(pAng) * moveSpd * dt;
                     const dx = ped.netTargetX - ped.x;
-
                     const dy = ped.netTargetY - ped.y;
-
                     const dist = Math.hypot(dx, dy);
-
-                    if (dist > 260) {
-
+                    if (dist > 220) {
                         ped.x = ped.netTargetX;
-
                         ped.y = ped.netTargetY;
-
                         if (ped.netTargetZ !== undefined) ped.z = ped.netTargetZ;
-
                     } else {
-
-                        const lerp = Math.min(1.0, dt * 13.5);
-
+                        const lerp = Math.min(1.0, dt * 6.5);
                         ped.x += dx * lerp;
-
                         ped.y += dy * lerp;
-
                         if (ped.netTargetZ !== undefined) ped.z += (ped.netTargetZ - ped.z) * lerp;
-
                     }
+                    ped.netTargetX += Math.cos(pAng) * moveSpd * dt;
+                    ped.netTargetY += Math.sin(pAng) * moveSpd * dt;
 
                     if (ped.netTargetAngle !== undefined) {
-
                         const angDiff = Math.atan2(Math.sin(ped.netTargetAngle - ped.angle), Math.cos(ped.netTargetAngle - ped.angle));
-
                         ped.angle += angDiff * Math.min(1.0, dt * 14.0);
-
                     }
-
                 }
 
                 // Check close-range COP arrest / damage AND ranged weapon fire on local player even in client sync mode

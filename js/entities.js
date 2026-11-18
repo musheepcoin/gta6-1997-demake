@@ -3877,38 +3877,32 @@ class Vehicle {
             return;
         }
 
-        // Client World Sync Mode: smoothly dead-reckon & interpolate AI vehicles actively streamed at 10 Hz by a live World Host
+        // Client World Sync Mode: continuous 60 FPS velocity dead-reckoning + smooth error-offset decay (zero rubber-banding!)
         if (
             this.driver !== "PLAYER" &&
             this.netTargetX !== undefined &&
             this.netTargetY !== undefined &&
-            (performance.now() - (this._lastNetSyncMs || 0)) < 450 &&
+            (performance.now() - (this._lastNetSyncMs || 0)) < 1200 &&
             game &&
             game.net &&
             typeof game.net.isClientWorldSyncActive === "function" &&
             game.net.isClientWorldSyncActive()
         ) {
-            // Advance target at 100% (1.0x) of velocity so vehicles never slow down between 10 Hz WORLD_SYNC packets!
-            this.netTargetX += (this.vx || 0) * dt;
-            this.netTargetY += (this.vy || 0) * dt;
-            const dx = this.netTargetX - this.x;
-            const dy = this.netTargetY - this.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist > 280) {
-                this.x = this.netTargetX;
-                this.y = this.netTargetY;
-                this.z = this.netTargetZ !== undefined ? this.netTargetZ : this.z;
-            } else {
-                const lerp = Math.min(1.0, dt * 14.0);
-                this.x += dx * lerp;
-                this.y += dy * lerp;
-                if (this.netTargetZ !== undefined) {
-                    this.z += (this.netTargetZ - this.z) * lerp;
-                }
+            this.x += (this.vx || 0) * dt;
+            this.y += (this.vy || 0) * dt;
+            if (this.netErrX || this.netErrY) {
+                const blend = Math.min(1.0, dt * 6.5);
+                this.x += (this.netErrX || 0) * blend;
+                this.y += (this.netErrY || 0) * blend;
+                this.netErrX = (this.netErrX || 0) * (1.0 - blend);
+                this.netErrY = (this.netErrY || 0) * (1.0 - blend);
+            }
+            if (this.netTargetZ !== undefined) {
+                this.z += (this.netTargetZ - this.z) * Math.min(1.0, dt * 10.0);
             }
             if (this.netTargetAngle !== undefined) {
                 const angDiff = Math.atan2(Math.sin(this.netTargetAngle - this.angle), Math.cos(this.netTargetAngle - this.angle));
-                this.angle += angDiff * Math.min(1.0, dt * 15.0);
+                this.angle += angDiff * Math.min(1.0, dt * 10.0);
             }
             if (this.hp < this.maxHp * 0.55 && Math.random() < 0.25 && !map.isWaterAtPixel(this.x, this.y)) {
                 game.spawnParticle(

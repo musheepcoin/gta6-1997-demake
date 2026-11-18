@@ -81,13 +81,18 @@ class ViceNetworkManager {
         this.initBroadcastChannel();
         this.initWebRTCMesh();
 
-        // Immediately broadcast hid: true/false on tab visibility change BEFORE browser suspends requestAnimationFrame!
+        // Immediately broadcast hid/foc state on tab visibility or window focus change BEFORE browser suspends requestAnimationFrame!
         if (typeof document !== "undefined") {
-            document.addEventListener("visibilitychange", () => {
+            const notifyFocusChange = () => {
                 if (this.game && this.game.started) {
                     this.broadcastStateNow();
                 }
-            });
+            };
+            document.addEventListener("visibilitychange", notifyFocusChange);
+            if (typeof window !== "undefined") {
+                window.addEventListener("focus", notifyFocusChange);
+                window.addEventListener("blur", notifyFocusChange);
+            }
         }
     }
 
@@ -1575,6 +1580,7 @@ class ViceNetworkManager {
             rp.muzzleTimer = pkt.mz || 0;
             rp.kills = pkt.k || 0;
             rp.isHidden = Boolean(pkt.hid);
+            rp.isFocused = pkt.foc !== undefined ? Boolean(pkt.foc) : !pkt.hid;
             rp.ver = pkt.ver || 0;
             rp.veh = pkt.veh || null;
             rp.lastSeen = performance.now();
@@ -1770,18 +1776,20 @@ class ViceNetworkManager {
         if (humans.length === 0) return true;
         const now = performance.now();
         const myHidden = Boolean(typeof document !== "undefined" && document.hidden);
+        const myFocused = Boolean(!myHidden && (typeof document === "undefined" || typeof document.hasFocus !== "function" || document.hasFocus()));
         const mySlot = (typeof this.slotIndex === "number" && this.slotIndex >= 0) ? this.slotIndex : 999;
         for (const rp of humans) {
-            // A throttled/idle remote tab that hasn't sent a fresh 20Hz STATE within 1.6s cannot take World Host priority!
             if ((now - (rp.lastSeen || 0)) > 1600) continue;
             const rpVer = rp.ver || 0;
-            // Newer game build version always takes World Host priority over an un-refreshed old tab!
             if (rpVer > MY_VER) return false;
             if (rpVer < MY_VER) continue;
             const rpHidden = Boolean(rp.isHidden);
-            // A visible tab always takes World Host priority over a minimized/hidden tab
             if (myHidden && !rpHidden) return false;
             if (!myHidden && rpHidden) continue;
+            const rpFocused = rp.isFocused !== undefined ? Boolean(rp.isFocused) : !rpHidden;
+            // An actively focused window always takes World Host priority over an unfocused background window!
+            if (!myFocused && rpFocused) return false;
+            if (myFocused && !rpFocused) continue;
             const rpSlot = (typeof rp.slot === "number" && rp.slot >= 0) ? rp.slot : 999;
             if (rpSlot < mySlot) return false;
             if (rpSlot === mySlot && String(rp.id) < String(this.playerId)) return false;
@@ -1790,9 +1798,8 @@ class ViceNetworkManager {
     }
 
     isClientWorldSyncActive() {
-        // Always run native 60 FPS local vehicle & pedestrian physics on every client!
-        // Remote player cars sync at 20 Hz via STATE, and persistent modified/parked/wrecked cars sync via WORLD_SYNC & WORLD_EVENT.
-        return false;
+        if (this.isWorldHost()) return false;
+        return (performance.now() - (this.lastWorldSyncReceivedMs || 0)) < 1200;
     }
 
     broadcastWorldEvent(ev) {
@@ -2123,9 +2130,16 @@ class ViceNetworkManager {
                 v.driver === "PLAYER" ||
                 v.driver === "REMOTE"
             );
-            // Only include player-modified, player-driven, damaged, or wrecked vehicles in WORLD_SYNC!
-            // Unmodified ambient AI traffic runs at native 60 FPS locally on each client so there is zero network jitter or ID collision.
-            if (!isMod) {
+            // Skip untouched driverless static map vehicles (every client spawns them deterministically)
+            // while syncing ALL active moving traffic, police, emergency units, tow trucks AND player-modified cars across the persistent universe!
+            const isUntouchedStatic = Boolean(
+                !isMod &&
+                !v.driver &&
+                !v.destroyed &&
+                !v.towedByTruck &&
+                (v.hp || v.maxHp || 100) >= (v.maxHp || 100)
+            );
+            if (isUntouchedStatic) {
                 continue;
             }
             const flags =
@@ -2170,7 +2184,7 @@ class ViceNetworkManager {
         const peds = [];
         for (let i = 0; i < g.peds.length; i++) {
             const pd = g.peds[i];
-            if (!pd || pd._boardedVehicle || !pd.dead) continue;
+            if (!pd || pd._boardedVehicle) continue;
             if (pd.dead && !pd._corpsePersisted && !pd.revived) {
                 pd._corpsePersisted = true;
                 const pType = `CORPSE:${pd.g24Type || "civ0"}:${pd.kind || "CIVILIAN"}`;
@@ -2324,15 +2338,11 @@ class ViceNetworkManager {
                         continue;
                     }
                 }
-                // Only apply player-modified / wrecked vehicles from WORLD_SYNC; never overwrite unmodified local 60 FPS AI traffic!
-                if (!isMod && !(flags & 1)) {
+                // Only skip static parked cars if they have NOT been modified/moved/damaged by any player!
+                if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id.startsWith("estate_") || id.startsWith("boat_") || id.startsWith("vport_") || id.startsWith("armored_") || id.startsWith("parked_") || missionTag === "LANDMARK") && drvCode === 0 && !(flags & 1)) {
                     continue;
                 }
                 let v = existingById.get(id);
-                // If this vehicle is currently being driven by a remote player (20Hz STATE), local player, or local AI, do not snap it from a periodic WORLD_SYNC!
-                if (v && (g.player.inVehicle === v || v._linkedRemoteId || v.towedByTruck || (v.driver && v.driver !== "REMOTE" && drvCode !== 0 && !(flags & 1)))) {
-                    continue;
-                }
                 if (v && specKey && v.specKey !== specKey) {
                     const idx = g.vehicles.indexOf(v);
                     if (idx !== -1) g.vehicles.splice(idx, 1);
@@ -2353,6 +2363,8 @@ class ViceNetworkManager {
                     v.netTargetY = y;
                     v.netTargetZ = z;
                     v.netTargetAngle = a;
+                    v.netErrX = 0;
+                    v.netErrY = 0;
                     if (remapIdx !== undefined) v.remapIdx = remapIdx;
                     if (missionTag) v.missionTag = missionTag;
                     g.vehicles.push(v);
@@ -2368,15 +2380,23 @@ class ViceNetworkManager {
                     continue;
                 }
 
-                // On initial server bootstrap or parked modified cars (not currently being towed), snap directly to persisted coordinates!
-                if (isInitialServerBootstrap || (isMod && drvCode === 0 && !(flags & 256)) || Math.hypot((v.x || 0) - x, (v.y || 0) - y) > 260) {
-                    v.x = x;
-                    v.y = y;
+                // Project moving vehicle coordinates forward by ~35ms one-way transit latency and compute smooth error offset (zero rubber-banding!)
+                const predX = drvCode !== 0 ? (x + (vx || 0) * 0.035) : x;
+                const predY = drvCode !== 0 ? (y + (vy || 0) * 0.035) : y;
+                const errDist = Math.hypot(predX - (v.x || 0), predY - (v.y || 0));
+                if (isInitialServerBootstrap || (isMod && drvCode === 0 && !(flags & 256)) || errDist > 220) {
+                    v.x = predX;
+                    v.y = predY;
                     v.z = z;
                     v.angle = a;
+                    v.netErrX = 0;
+                    v.netErrY = 0;
+                } else {
+                    v.netErrX = predX - v.x;
+                    v.netErrY = predY - v.y;
                 }
-                v.netTargetX = x;
-                v.netTargetY = y;
+                v.netTargetX = predX;
+                v.netTargetY = predY;
                 v.netTargetZ = z;
                 v.netTargetAngle = a;
                 if (!isInitialServerBootstrap) {
@@ -2784,6 +2804,7 @@ class ViceNetworkManager {
             econVer: 2,
             started: Boolean(this.game && this.game.started && (this._profileSynced || !this.wsConnected)),
             hid: Boolean(typeof document !== "undefined" && document.hidden),
+            foc: Boolean(typeof document !== "undefined" && !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus())),
             name: this.playerName,
             color: this.playerColor,
             pedType: this.pedSpriteType,
