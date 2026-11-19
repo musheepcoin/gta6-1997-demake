@@ -1490,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_228"), "ViceCreationEngine (v101_228) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_229"), "ViceCreationEngine (v101_229) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2218,13 +2218,8 @@ function runSimulations() {
 
         assert(
             neonCar._lastUnderglowColor === "#00f0ff" &&
-            Array.isArray(neonCar._tailTrail) &&
-            neonCar._tailTrail.length >= 3,
-            `2.5D Neon Chassis Underglow ('${neonCar._lastUnderglowColor}') & High-Speed Dual Taillight Ribbon Trails (${neonCar._tailTrail ? neonCar._tailTrail.length : 0} nodes) render cleanly at 60 FPS`
-        );
-        assert(
-            typeof r._lastCompassTargetsCount === "number" && r._lastCompassTargetsCount >= 2,
-            `Diegetic 2.5D Tactical Ground Compass Ring projects ${r._lastCompassTargetsCount} live directional chevrons (🔥 Hotspot, 📦 Hot Drop, 🦩/⚡ Crew) directly around player vehicle`
+            !neonCar._tailTrail,
+            `2.5D Neon Chassis Underglow ('${neonCar._lastUnderglowColor}') renders on custom showcase vehicles with zero cluttering taillight lines or ground rings`
         );
         assert(
             typeof r.drawArcadeCapsule === "function",

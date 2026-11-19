@@ -13793,144 +13793,32 @@ class RetroRenderer {
             }
         }
 
-        // 2. 2.5D Neon Chassis Underglow & High-Speed / Drift Taillight Ribbon Trails
+        // 2. 2.5D Neon Chassis Underglow (strictly for custom-tuned Creation Engine showcase vehicles)
         const isLocalKing = typeof game.isCurrentDistrictControlledByMe === "function" && game.isCurrentDistrictControlledByMe();
         const mySynCol = isLocalKing ? "#fde047" : ((game.net && game.net.syndicate === "CYAN") ? "#00f0ff" : "#ff2a85");
         if (Array.isArray(game.vehicles)) {
             for (let i = 0; i < game.vehicles.length; i++) {
                 const v = game.vehicles[i];
                 if (!v || v.destroyed) continue;
-                const isPlayerCar = (v === p.inVehicle);
-                const isRemoteCar = (v.driver === "REMOTE" || Boolean(v._linkedRemoteId));
-                const isShowcaseCar = Boolean(v.createdByEngine || (v.respectCount || 0) > 0 || v.color);
-                if (!isPlayerCar && !isRemoteCar && !isShowcaseCar) continue;
+                const isCustomTunedCar = Boolean(v.createdByEngine || (v.respectCount || 0) > 0);
+                if (!isCustomTunedCar) continue;
                 if (Math.abs(v.x - pObj.x) > 820 || Math.abs(v.y - pObj.y) > 620) continue;
 
-                let glowCol = v.color || "#00f0ff";
-                if (isPlayerCar) {
-                    glowCol = v.color || mySynCol;
-                } else if (isRemoteCar && game.net && game.net.remotePlayers) {
-                    const rp = v._linkedRemoteId ? game.net.remotePlayers.get(v._linkedRemoteId) : null;
-                    glowCol = (rp && rp.syndicate === "CYAN") ? "#00f0ff" : "#ff2a85";
-                }
-
+                const glowCol = v.color || mySynCol;
                 const vSc = this.worldToScreen(v.x, v.y, (v.z || 2.0) + 0.02);
-                const cosA = Math.cos(v.angle || 0);
-                const sinA = Math.sin(v.angle || 0);
-                // Record 2.5D Chassis Underglow & Taillight Trail telemetry for headless verification & live rendering
                 v._lastUnderglowColor = glowCol;
 
                 ctx.save();
                 ctx.translate(vSc.x, vSc.y);
                 ctx.rotate(v.angle || 0);
                 ctx.fillStyle = glowCol;
-                ctx.globalAlpha = isPlayerCar ? 0.28 : 0.22;
-                const uw = (v.w || 48) * 1.12;
-                const uh = (v.h || 24) * 1.24;
+                ctx.globalAlpha = 0.24;
+                const uw = (v.w || 48) * 1.10;
+                const uh = (v.h || 24) * 1.20;
                 ctx.fillRect(-uw * 0.5, -uh * 0.5, uw, uh);
                 ctx.restore();
-
-                // High-Speed / Drift Neon Taillight Ribbon Trails
-                const spd = v.speed !== undefined ? Math.abs(v.speed) : Math.hypot(v.vx || 0, v.vy || 0);
-                const isDrifting = isPlayerCar && Boolean(game.input && game.input.handbrake) && spd > 65;
-                if (spd > 135 || isDrifting) {
-                    if (!Array.isArray(v._tailTrail)) v._tailTrail = [];
-                    const rearX = v.x - cosA * ((v.w || 48) * 0.46);
-                    const rearY = v.y - sinA * ((v.w || 48) * 0.46);
-                    const lastPt = v._tailTrail[v._tailTrail.length - 1];
-                    if (!lastPt || Math.hypot(rearX - lastPt.x, rearY - lastPt.y) > 10) {
-                        v._tailTrail.push({ x: rearX, y: rearY, z: (v.z || 2.0) + 0.05, a: v.angle || 0 });
-                        if (v._tailTrail.length > 7) v._tailTrail.shift();
-                    }
-                } else if (Array.isArray(v._tailTrail) && v._tailTrail.length > 0) {
-                    v._tailTrail.shift();
-                }
-
-                if (Array.isArray(v._tailTrail) && v._tailTrail.length >= 2) {
-                    ctx.save();
-                    const halfTrack = (v.h || 24) * 0.34;
-                    for (let ti = 1; ti < v._tailTrail.length; ti++) {
-                        const pt0 = v._tailTrail[ti - 1];
-                        const pt1 = v._tailTrail[ti];
-                        const p0A = Math.sin(pt0.a), p0C = Math.cos(pt0.a);
-                        const p1A = Math.sin(pt1.a), p1C = Math.cos(pt1.a);
-                        const alpha = (ti / v._tailTrail.length) * 0.58;
-                        ctx.strokeStyle = isDrifting ? glowCol : "#ff1e38";
-                        ctx.lineWidth = isDrifting ? 2.6 : 2.0;
-                        ctx.globalAlpha = alpha;
-                        for (let side = -1; side <= 1; side += 2) {
-                            const s0 = this.worldToScreen(pt0.x - p0A * halfTrack * side, pt0.y + p0C * halfTrack * side, pt0.z);
-                            const s1 = this.worldToScreen(pt1.x - p1A * halfTrack * side, pt1.y + p1C * halfTrack * side, pt1.z);
-                            if (typeof ctx.beginPath === "function" && typeof ctx.moveTo === "function" && typeof ctx.lineTo === "function") {
-                                ctx.beginPath();
-                                ctx.moveTo(s0.x, s0.y);
-                                ctx.lineTo(s1.x, s1.y);
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                    ctx.restore();
-                }
             }
         }
-
-        // 3. Diegetic 2.5D Tactical Ground Compass Ring Around Local Player / Vehicle
-        const ringZ = (pObj.z || 2.0) + 0.04;
-        const pCenterSc = this.worldToScreen(pObj.x, pObj.y, ringZ);
-        const ringEdgeSc = this.worldToScreen(pObj.x + (p.inVehicle ? 50 : 36), pObj.y, ringZ);
-        const ringRadPx = Math.max(28, Math.min(78, Math.round(Math.abs(ringEdgeSc.x - pCenterSc.x))));
-
-        const compassTargets = [];
-        if (fd && !inHotspot) {
-            compassTargets.push({ x: fd.x, y: fd.y, color: fd.color || "#ff2a85", icon: "🔥", kind: "HOTSPOT" });
-        }
-        if (game.activeFlashEvent) {
-            compassTargets.push({ x: game.activeFlashEvent.x, y: game.activeFlashEvent.y, color: "#fde047", icon: "📦", kind: "HOT_DROP" });
-        }
-        if (game.missions && game.missions.activeMission && typeof game.missions.activeMission.targetX === "number") {
-            compassTargets.push({ x: game.missions.activeMission.targetX, y: game.missions.activeMission.targetY, color: "#39ff14", icon: "🎯", kind: "MISSION" });
-        }
-        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
-            let bestRp = null;
-            let bestRpDist = Infinity;
-            for (const rp of game.net.remotePlayers.values()) {
-                if (!rp || rp.dead || rp.isHidden) continue;
-                const d = Math.hypot((rp.x || 0) - pObj.x, (rp.y || 0) - pObj.y);
-                if (d > 140 && d < bestRpDist) {
-                    bestRpDist = d;
-                    bestRp = rp;
-                }
-            }
-            if (bestRp) {
-                const rpCol = bestRp.syndicate === "CYAN" ? "#00f0ff" : "#ff2a85";
-                compassTargets.push({ x: bestRp.x, y: bestRp.y, color: rpCol, icon: bestRp.syndicate === "CYAN" ? "⚡" : "🦩", kind: "PLAYER" });
-            }
-        }
-        this._lastCompassTargetsCount = compassTargets.length;
-
-        ctx.save();
-        if (typeof ctx.beginPath === "function" && typeof ctx.arc === "function") {
-            ctx.beginPath();
-            ctx.arc(pCenterSc.x, pCenterSc.y, ringRadPx, 0, Math.PI * 2);
-            ctx.strokeStyle = mySynCol;
-            ctx.lineWidth = 1.4;
-            ctx.globalAlpha = 0.34;
-            ctx.stroke();
-        }
-        for (let ci = 0; ci < compassTargets.length; ci++) {
-            const ct = compassTargets[ci];
-            const dx = ct.x - pObj.x;
-            const dy = ct.y - pObj.y;
-            if (Math.hypot(dx, dy) < 120) continue;
-            const ang = Math.atan2(dy, dx);
-            const tipX = pCenterSc.x + Math.cos(ang) * (ringRadPx + 7);
-            const tipY = pCenterSc.y + Math.sin(ang) * (ringRadPx + 7);
-            ctx.globalAlpha = 0.92;
-            ctx.fillStyle = ct.color;
-            ctx.fillRect(Math.round(tipX - 3), Math.round(tipY - 3), 6, 6);
-            ctx.fillText(ct.icon, Math.round(pCenterSc.x + Math.cos(ang) * (ringRadPx + 17)), Math.round(pCenterSc.y + Math.sin(ang) * (ringRadPx + 17)));
-        }
-        ctx.restore();
     }
 
     drawPedSprite2D(ctx, pedType, frameIdx, x, y, angle, scale = 2.4) {
