@@ -1107,6 +1107,12 @@ function runSimulations() {
         const allTagsMatch = Boolean(htmlBuild && assetTags.length >= 12 && assetTags.every(v => v === htmlBuild));
         assert(allTagsMatch, `index.html __VC26_BUILD (${htmlBuild}) matches all ${assetTags.length}/12 CSS/JS ?v= cache-busting tags 100%`);
 
+        // Verify <link rel="preload"> URLs in index.html match exact URLs in js/renderer.js (prevents double-downloading 2.77 MB sprite atlas)
+        const rendererSrc = fs.readFileSync(path.join(ROOT, "js", "renderer.js"), "utf8");
+        const preloadUrls = [...idxHtml.matchAll(/<link\s+rel="preload"[^>]+href="([^"]+)"/g)].map(m => m[1]);
+        const preloadMatchesRenderer = preloadUrls.length >= 3 && preloadUrls.every(u => rendererSrc.includes(`"${u}"`));
+        assert(preloadMatchesRenderer, `HTML <link rel="preload"> asset URLs (${preloadUrls.length}/3) match js/renderer.js query strings 100% (0 duplicate downloads)`);
+
         // 2. Multi-District 4-Agency Dispatch Reachability Matrix (6 Districts x 4 Agencies = 24 Probes)
         const districts = [
             { name: "Ocean Drive", x: 444.5 * 64, y: 276.5 * 64 },
@@ -1143,6 +1149,82 @@ function runSimulations() {
         stepSec(0.05);
         const sizeAfterGc = g.director.vehicleLedger.size;
         assert(sizeAfterGc < sizeBeforeGc - 100, `24/7 Vehicle Ledger Garbage Collector pruned stale despawned vehicle IDs (${sizeBeforeGc} -> ${sizeAfterGc})`);
+
+        // 5. Full Asset Pipeline Integrity Audit (Audio Manifest + Core Atlases + Sprite Metadata + Preload Sync)
+        const audioSrc = fs.readFileSync(path.join(ROOT, "js", "audio.js"), "utf8");
+        const manifestBlock = audioSrc.match(/const VEHICLE_AUDIO_MANIFEST\s*=\s*\{([\s\S]*?)\};/);
+        const audioEntries = manifestBlock ? [...manifestBlock[1].matchAll(/(\w+):\s*"([^"]+)"/g)] : [];
+        let validAudioFiles = 0;
+        const missingAudio = [];
+        for (const [, key, relPath] of audioEntries) {
+            const fullPath = path.join(ROOT, relPath);
+            if (fs.existsSync(fullPath)) {
+                const st = fs.statSync(fullPath);
+                const buf = fs.readFileSync(fullPath);
+                const hdr = buf.slice(0, 4).toString("ascii");
+                if (st.size > 100 && (hdr === "RIFF" || hdr === "OggS")) {
+                    validAudioFiles++;
+                } else {
+                    missingAudio.push(`${key}: invalid header/size (${hdr}, ${st.size}B)`);
+                }
+            } else {
+                missingAudio.push(`${key}: missing ${relPath}`);
+            }
+        }
+        assert(
+            audioEntries.length >= 115 && validAudioFiles === audioEntries.length,
+            `Audio Manifest Integrity: ${validAudioFiles}/${audioEntries.length} .ogg/.wav SFX files exist with valid RIFF/OggS headers`
+        );
+
+        const coreVisualAssets = [
+            "assets/gta1/gta1_char_portraits.png",
+            "assets/gta1/gta1_sprites.png",
+            "assets/gta1/gta1_tiles_vice.png",
+            "assets/gta1/gta1_tiles.png",
+            "assets/gta1/vice_cmp_overview.png",
+            "assets/gta1/nyc_cmp_overview.png",
+            "assets/gta1/gta1_meta.json",
+            "assets/gta1/gta1_map.bin"
+        ];
+        let validVisualCount = 0;
+        for (const rel of coreVisualAssets) {
+            const fp = path.join(ROOT, rel);
+            if (fs.existsSync(fp) && fs.statSync(fp).size > 1024) {
+                validVisualCount++;
+            }
+        }
+        assert(
+            validVisualCount === coreVisualAssets.length,
+            `Core Visual & Binary Atlases: ${validVisualCount}/${coreVisualAssets.length} files present and non-empty in assets/gta1/`
+        );
+
+        const metaJson = JSON.parse(fs.readFileSync(path.join(ROOT, "assets", "gta1", "gta1_meta.json"), "utf8"));
+        const spriteSheetBuf = fs.readFileSync(path.join(ROOT, "assets", "gta1", "gta1_sprites.png"));
+        // PNG IHDR width/height at byte offsets 16..23 (big-endian uint32)
+        const pngW = spriteSheetBuf.readUInt32BE(16);
+        const pngH = spriteSheetBuf.readUInt32BE(20);
+        const metaVehicles = (metaJson.sprites && Array.isArray(metaJson.sprites.vehicles)) ? metaJson.sprites.vehicles : [];
+        const metaSprById = new Set(metaVehicles.map(v => String(v.spr_idx)));
+        const customSprites = (metaJson.sprites && metaJson.sprites.custom) ? metaJson.sprites.custom : {};
+        const allVehSpecs = Object.entries(sandbox.VEHICLE_SPECS || {});
+        let resolvedVehSprites = 0;
+        let outOfBoundsBoxes = 0;
+        for (const [, spec] of allVehSpecs) {
+            const sid = String(spec.sprId || "");
+            if (metaSprById.has(sid) || customSprites[sid] || sid.startsWith("veh_") || sid.includes("_")) {
+                resolvedVehSprites++;
+            }
+        }
+        for (const mv of metaVehicles) {
+            if (Array.isArray(mv.base)) {
+                const [bx, by, bw, bh] = mv.base;
+                if (bx < 0 || by < 0 || bx + bw > pngW || by + bh > pngH) outOfBoundsBoxes++;
+            }
+        }
+        assert(
+            allVehSpecs.length >= 35 && resolvedVehSprites === allVehSpecs.length && outOfBoundsBoxes === 0,
+            `Vehicle Sprite Atlas Mapping: ${resolvedVehSprites}/${allVehSpecs.length} vehicle specs mapped, 0 out-of-bounds boxes in ${pngW}x${pngH} gta1_sprites.png`
+        );
         console.log("");
     }
 
