@@ -1488,7 +1488,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_221"), "ViceCreationEngine (v101_221) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_222"), "ViceCreationEngine (v101_222) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -1554,9 +1554,155 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 36: PRE-EXISTING WORLD & CREATION ENGINE DEEP INTEGRATION AUDIT
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 36: PRE-EXISTING WORLD & CREATION ENGINE DEEP INTEGRATION AUDIT ---");
+    {
+        const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        const ce = g.creationEngine;
+        const map = g.map;
+        const oe = map.objectEngine;
+
+        // 1. Pre-Existing World Census & Indexing Bridge
+        const summary = ce.getPreExistingWorldSummary();
+        assert(
+            summary.estates3D >= 23 &&
+            summary.interiors3D >= 30 &&
+            summary.streetProps3D >= 100 &&
+            summary.flora3D >= 1000 &&
+            summary.storyMissions === 5,
+            `Pre-Existing World Census indexed 100% of native assets (estates3D=${summary.estates3D}, interiors3D=${summary.interiors3D}, streetProps3D=${summary.streetProps3D}, flora3D=${summary.flora3D}, storyMissions=${summary.storyMissions})`
+        );
+
+        // 2. Native Schema Alignment for PREFAB_CATALOG & WorldObjectEngine.instances (Zero NaN in applyToElevationMap & paintOnOverviewCanvas)
+        ce.definePrefab3D("CUSTOM_ART_DECO_MANSION", {
+            label: "Custom Art Deco Mansion",
+            basePrefab: "villa_art_deco",
+            w1: 164,
+            d1: 118,
+            h1: 0.78
+        });
+        const villa = ce.placePrefab3D("CUSTOM_ART_DECO_MANSION", 448.5 * 64, 286.5 * 64, Math.PI * 0.25);
+        assert(
+            Boolean(
+                villa &&
+                typeof villa.ang === "number" && !Number.isNaN(villa.ang) &&
+                typeof villa.scale === "number" && villa.scale === 1.0 &&
+                typeof villa.hw === "number" && villa.hw > 50 &&
+                typeof villa.hh === "number" && villa.hh > 40 &&
+                typeof villa.extX === "number" && !Number.isNaN(villa.extX) &&
+                typeof villa.extY === "number" && !Number.isNaN(villa.extY) &&
+                typeof villa.totalHeightBlocks === "number" && villa.totalHeightBlocks > 0.7
+            ),
+            `placePrefab3D generates 100% native WorldObjectEngine instance schema (ang=${villa ? villa.ang.toFixed(2) : "NaN"}, scale=${villa ? villa.scale : "NaN"}, hw=${villa ? villa.hw : "NaN"}, totalHeightBlocks=${villa ? villa.totalHeightBlocks.toFixed(2) : "NaN"})`
+        );
+
+        const elevGrid = new Float32Array(512 * 512);
+        elevGrid.fill(2.0);
+        oe.applyToElevationMap(elevGrid);
+        let hasNaNElev = false;
+        let elevatedCount = 0;
+        for (let i = 0; i < elevGrid.length; i++) {
+            if (Number.isNaN(elevGrid[i])) {
+                hasNaNElev = true;
+                break;
+            }
+            if (elevGrid[i] > 2.0) elevatedCount++;
+        }
+        let overviewNaN = false;
+        const mockOverviewCtx = {
+            save() {},
+            restore() {},
+            beginPath() {},
+            ellipse() {},
+            fill() {},
+            stroke() {},
+            translate(x, y) { if (Number.isNaN(x) || Number.isNaN(y)) overviewNaN = true; },
+            rotate(a) { if (Number.isNaN(a)) overviewNaN = true; },
+            fillRect(x, y, w, h) { if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(w) || Number.isNaN(h)) overviewNaN = true; },
+            strokeRect(x, y, w, h) { if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(w) || Number.isNaN(h)) overviewNaN = true; }
+        };
+        oe.paintOnOverviewCanvas(mockOverviewCtx, 512, 512);
+        assert(!hasNaNElev && !overviewNaN && elevatedCount > 200, `oe.applyToElevationMap & oe.paintOnOverviewCanvas execute with ZERO NaN values across all pre-existing + custom 3D estates (elevatedTiles=${elevatedCount})`);
+
+        const villaCol = map.resolveCircleBuildingCollision(villa.x, villa.y, 16, 2.0);
+        assert(villaCol.hit === true, "Custom 3D Estate registers solid OBB hull in map.securityBarrierBoxes and blocks physical penetration");
+
+        // 3. Native Schema Alignment & Live Vehicle Collision Physics for Street Props (_propColGrid invalidation)
+        const payphone = ce.placePropOrFlora("PAYPHONE", 448.5 * 64, 282.5 * 64, 0);
+        const streetlamp = ce.placePropOrFlora("STREETLAMP", 448.5 * 64, 281.5 * 64, 0);
+        assert(
+            Boolean(
+                payphone && payphone.kind === "PAYPHONE_BOOTH" && typeof payphone.homeX === "number" && payphone.broken === false &&
+                streetlamp && streetlamp.kind === "STREETLIGHT_NEON" && typeof streetlamp.ang === "number"
+            ),
+            `placePropOrFlora normalizes 'PAYPHONE' -> 'PAYPHONE_BOOTH' and 'STREETLAMP' -> 'STREETLIGHT_NEON' with native homeX/homeY/ang/broken schema`
+        );
+
+        // Drive player's car into the newly created payphone and verify WorldObjectEngine.updateAndCollideProps smashes it!
+        const testCar = ce.spawnVehicle("BANSHEE_GT", payphone.x - 10, payphone.y, 0);
+        g.player.inVehicle = testCar;
+        testCar.x = payphone.x - 4;
+        testCar.y = payphone.y;
+        testCar.vx = 180;
+        testCar.vy = 0;
+        testCar.speed = 180;
+        oe.updateAndCollideProps(g, 1 / 60);
+        g.player.inVehicle = null;
+        assert(payphone.broken === true, "Newly placed street prop is immediately indexed in oe._ensurePropCollisionGrid() and smashes on vehicle impact in oe.updateAndCollideProps");
+
+        // 4. Native Schema Alignment for 3D Interactive Encounters & ShopInteriors.orientInterior
+        const crate = ce.placePrefab3D("SMUGGLER_CRATE_3D", 448.5 * 64, 279.5 * 64, 0);
+        const sprunk = ce.placePrefab3D("SODA_SPRUNK_3D", 443.5 * 64, 279.5 * 64, 0);
+        const promptGrid = oe._ensurePromptCellMask();
+        assert(
+            Boolean(crate && crate.active === true && sprunk && sprunk.brand === "SPRUNK" && sprunk.ad === "ad_sprunk" && promptGrid),
+            "SMUGGLER_CRATE_3D (active:true) & SODA_SPRUNK_3D (ad:'ad_sprunk', ang) match native schemas and rebuild oe._ensurePromptCellMask()"
+        );
+
+        const customDiner = ce.placeEstablishment({ tpl: "SHOP_RESTAURANT", name: "OCEAN DRIVE RETRO DINER", x: 443.5 * 64, y: 278.5 * 64 });
+        assert(
+            Boolean(customDiner && customDiner.isShop === true && customDiner._orientedFacing === customDiner.facing && customDiner.stations.length > 0),
+            `placeEstablishment invokes ShopInteriors.orientInterior(intr) (isShop=${customDiner ? customDiner.isShop : false}, _orientedFacing='${customDiner ? customDiner._orientedFacing : ""}')`
+        );
+
+        // 5. Pre-Existing World Inspector, Cloner, Relocator & Delete + Undo/Redo Restoration
+        const preVercetti = oe.instances.find((it) => it.id === "star_vercetti_palazzo") || oe.instances[0];
+        const origVx = preVercetti.x;
+        const origVy = preVercetti.y;
+        const origVang = preVercetti.ang;
+
+        const inspected = ce.findNearestWorldEntity(origVx, origVy, 64, true);
+        assert(Boolean(inspected && inspected.isPreExisting === true && inspected.entityRef === preVercetti), `findNearestWorldEntity inspects pre-existing 3D Estate '${preVercetti.name}' (isPreExisting=true)`);
+
+        const cloned = ce.cloneWorldEntityToPalette(origVx, origVy, 64);
+        assert(Boolean(cloned && ce.getActiveCategory() === "PREFABS_3D" && ce.getSelectedItem().key === preVercetti.kind), `cloneWorldEntityToPalette ([C]) picks pre-existing '${preVercetti.kind}' into Studio brush`);
+
+        const movedVx = origVx + 48;
+        const movedVy = origVy + 32;
+        ce.relocateWorldEntity(preVercetti.id, movedVx, movedVy, origVang + 0.5, { skipValidation: true });
+        const movedCol = map.resolveCircleBuildingCollision(movedVx, movedVy, 16, 2.0);
+        assert(preVercetti.x === movedVx && preVercetti.y === movedVy && movedCol.hit === true, "relocateWorldEntity moves pre-existing 3D Estate and updates its OBB collision hull in map.securityBarrierBoxes");
+
+        ce.undo();
+        assert(preVercetti.x === origVx && preVercetti.y === origVy && preVercetti.ang === origVang, "ce.undo() restores relocated pre-existing 3D Estate to its exact original position and orientation");
+
+        // Delete a pre-existing street prop and undo to restore it
+        const preProp = oe.streetProps.find((p) => !p.createdByEngine);
+        const prePropCountBefore = oe.streetProps.length;
+        const delDesc = ce.removeNearestWorldEntity(preProp.x, preProp.y, 32, true);
+        assert(Boolean(delDesc && delDesc.isPreExisting && oe.streetProps.length === prePropCountBefore - 1), "removeNearestWorldEntity(..., true) deletes pre-existing street prop and invalidates collision grid");
+        ce.undo();
+        assert(oe.streetProps.length === prePropCountBefore && oe.streetProps.includes(preProp), "ce.undo() restores deleted pre-existing street prop back into WorldObjectEngine.streetProps");
+
+        ce.clearAllCreations();
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 35 FULL-GAME AUDIT, PRODUCTION CONTROLLER & CREATION ENGINE SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 36 FULL-GAME AUDIT, PRODUCTION CONTROLLER & CREATION ENGINE SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

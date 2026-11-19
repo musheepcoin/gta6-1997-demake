@@ -1,15 +1,18 @@
 /* ============================================================================
-   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_221)
+   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_222)
    ----------------------------------------------------------------------------
    Provides both:
    1. A Declarative Programmatic Creation API (`game.creationEngine.*`) with
       automatic Spatial Safety Oracle (`validatePlacement`, `findSafePlacement`),
       3D Voxel Map Sculpting (`paintVoxelTile`), Custom Vehicle/3D Prefab/Prop/
-      Flora/Interior Factory, Declarative Mission Composer, and JSON Blueprint
-      Export/Import + Undo/Redo History Stack.
+      Flora/Interior Factory, Declarative Mission Composer, Pre-Existing World
+      Inspector/Relocator/Mutator Bridge (`getPreExistingWorldSummary`,
+      `inspectWorldAt`, `findNearestWorldEntity`, `relocateWorldEntity`,
+      `removeNearestWorldEntity`), and JSON Blueprint Export/Import + Undo/Redo.
    2. An Interactive In-Game 3D Visual World & Asset Studio (`[F10]`) with
-      Screen-to-3D-World Ray Projection, Live 3D Ghost Preview, Free Camera
-      Panning, Grid/Curb Snapping, Rotation (`[R]`), and 1-Click Placement.
+      Screen-to-3D-World Ray Projection, Live 3D Ghost Preview, Pre-Existing
+      Entity Eyedropper/Cloner (`[C]`), Grab/Move (`[M]`), Free Camera Panning,
+      Grid/Curb Snapping, Rotation (`[R]`), and 1-Click Placement.
    ============================================================================ */
 
 (function () {
@@ -20,7 +23,7 @@
     class ViceCreationEngine {
         constructor(game) {
             this.game = game;
-            this.version = "101_221";
+            this.version = "101_222";
             this.studioActive = false;
             this.freeCamActive = true;
             this.gridSnap = false;
@@ -30,6 +33,8 @@
             this.placementAngle = 0; // radians
             this.buildingStoreys = 2; // 1..4 storeys above ground z=2
             this.buildingStyle = 0;   // 0..11 GTA 6 facade style
+            this.grabbedEntity = null;
+            this._preExistingIndexed = false;
 
             // Active Studio UI state
             this.categories = ["TERRAIN", "VEHICLES", "PREFABS_3D", "PROPS_FLORA", "INTERIORS", "MISSIONS"];
@@ -136,17 +141,17 @@
                         label: p.label || k,
                         icon: "🏛️",
                         isEstatePrefab: true,
-                        footprintW: (p.footprintTiles ? p.footprintTiles[0] : 2) * 64,
-                        footprintH: (p.footprintTiles ? p.footprintTiles[1] : 2) * 64
+                        footprintW: p.w1 || ((p.footprintTiles ? p.footprintTiles[0] : 2) * 64),
+                        footprintH: p.d1 || ((p.footprintTiles ? p.footprintTiles[1] : 2) * 64)
                     });
                 }
                 items.push(
-                    { key: "TIKI_BAR_3D", label: "3D Thatch Beach Tiki Bar", icon: "🍹", isInteractiveEncounter: true },
-                    { key: "VOLLEYBALL_COURT_3D", label: "3D Beach Volleyball Court", icon: "🏐", isInteractiveEncounter: true },
-                    { key: "STREET_TAKEOVER_RING", label: "3D Drift Takeover Ring", icon: "🍩", isInteractiveEncounter: true },
-                    { key: "SMUGGLER_CRATE_3D", label: "3D Smuggler Contraband Drop", icon: "📦", isInteractiveEncounter: true },
-                    { key: "SODA_ECOLA_3D", label: "3D eCola Vending Machine", icon: "🥤", isInteractiveEncounter: true },
-                    { key: "SODA_SPRUNK_3D", label: "3D Sprunk Vending Machine", icon: "🟢", isInteractiveEncounter: true }
+                    { key: "TIKI_BAR_3D", label: "3D Thatch Beach Tiki Bar", icon: "🍹", isInteractiveEncounter: true, footprintW: 52, footprintH: 36 },
+                    { key: "VOLLEYBALL_COURT_3D", label: "3D Beach Volleyball Court", icon: "🏐", isInteractiveEncounter: true, footprintW: 72, footprintH: 48 },
+                    { key: "STREET_TAKEOVER_RING", label: "3D Drift Takeover Ring", icon: "🍩", isInteractiveEncounter: true, footprintW: 120, footprintH: 120 },
+                    { key: "SMUGGLER_CRATE_3D", label: "3D Smuggler Contraband Drop", icon: "📦", isInteractiveEncounter: true, footprintW: 36, footprintH: 36 },
+                    { key: "SODA_ECOLA_3D", label: "3D eCola Vending Machine", icon: "🥤", isInteractiveEncounter: true, footprintW: 28, footprintH: 24 },
+                    { key: "SODA_SPRUNK_3D", label: "3D Sprunk Vending Machine", icon: "🟢", isInteractiveEncounter: true, footprintW: 28, footprintH: 24 }
                 );
                 return items;
             }
@@ -754,31 +759,79 @@
 
         definePrefab3D(prefabId, config = {}) {
             if (!prefabId) return null;
-            const key = String(prefabId).toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+            const key = String(prefabId).replace(/[^A-Za-z0-9_]/g, "_");
             const cat = window.PREFAB_CATALOG || (window.PREFAB_CATALOG = {});
-            const base = cat[config.basePrefab || "OCEAN_DECO_BOUTIQUE"] || {
-                footprintTiles: [2, 2],
-                clearPaddingPx: 68,
-                lotBase: { w: 112, h: 112, dz: 0.015, mat: "CORAL_PAVER", rgb: [0.95, 0.89, 0.80] },
-                boxes: [
-                    { dx: 0, dy: 0, z0: 0.0, z1: 1.05, w: 78, h: 66, mat: "STUCCO_WALL", rgb: [0.97, 0.95, 0.90], winRows: 2, winCols: 4 }
-                ],
-                props: []
+            const baseKey = (config.basePrefab && cat[config.basePrefab])
+                ? config.basePrefab
+                : (cat.villa_art_deco ? "villa_art_deco" : Object.keys(cat)[0]);
+            const base = (baseKey && cat[baseKey]) || {
+                id: "villa_art_deco",
+                category: "ESTATE",
+                label: "South Beach Art Deco Boutique Villa",
+                w1: 156, d1: 112, h1: 0.72,
+                w2: 98,  d2: 72,  h2: 0.56,
+                roofStyle: "FLAT_DECO",
+                roofOverhang: 10,
+                roofPitch1: 0.08,
+                roofPitch2: 0.08,
+                frontWall1: "wall_art_deco_hotel",
+                sideWall1:  "wall_art_deco_hotel",
+                upperWall:  "wall_art_deco_hotel",
+                roofTex1:   "roof_terracotta_crown",
+                roofTex2:   "roof_terracotta_crown",
+                wallColor:  [0.98, 0.94, 0.96],
+                trimColor:  [0.25, 0.92, 0.88],
+                roofBaseColor:  [0.94, 0.92, 0.90],
+                roofRidgeColor: [0.96, 0.38, 0.68],
+                hasPortico: true,
+                porticoW: 48, porticoD: 22, porticoH: 0.68,
+                hasGlassBalcony: true,
+                mapColor: "#fdf2f8",
+                mapRoofColor: "#ec4899"
             };
-            const spec = {
+            const firstBox = Array.isArray(config.boxes) && config.boxes.length > 0 ? config.boxes[0] : null;
+            const secondBox = Array.isArray(config.boxes) && config.boxes.length > 1 ? config.boxes[1] : null;
+            const spec = Object.assign({}, base, {
                 id: key,
+                category: config.category || base.category || "ESTATE",
                 label: config.label || key.replace(/_/g, " "),
-                footprintTiles: config.footprintTiles || base.footprintTiles || [2, 2],
-                clearPaddingPx: config.clearPaddingPx || base.clearPaddingPx || 68,
-                lotBase: config.lotBase || Object.assign({}, base.lotBase),
-                boxes: Array.isArray(config.boxes) ? config.boxes : base.boxes.map((b) => Object.assign({}, b)),
-                props: Array.isArray(config.props) ? config.props : (base.props ? base.props.map((p) => Object.assign({}, p)) : []),
-                vehicle: config.vehicle || null
-            };
+                w1: Number(config.w1 || (firstBox && firstBox.w) || base.w1 || 156),
+                d1: Number(config.d1 || (firstBox && firstBox.h) || base.d1 || 112),
+                h1: Number(config.h1 || (firstBox && ((firstBox.z1 || 1.0) - (firstBox.z0 || 0.0))) || base.h1 || 0.72),
+                w2: config.w2 !== undefined ? Number(config.w2) : (secondBox ? Number(secondBox.w || 96) : (base.w2 || 0)),
+                d2: config.d2 !== undefined ? Number(config.d2) : (secondBox ? Number(secondBox.h || 68) : (base.d2 || 0)),
+                h2: config.h2 !== undefined ? Number(config.h2) : (secondBox ? Number((secondBox.z1 || 1.5) - (secondBox.z0 || 0.72)) : (base.h2 || 0)),
+                roofStyle: config.roofStyle || base.roofStyle || "FLAT_DECO",
+                roofOverhang: config.roofOverhang !== undefined ? Number(config.roofOverhang) : (base.roofOverhang || 10),
+                roofPitch1: config.roofPitch1 !== undefined ? Number(config.roofPitch1) : (base.roofPitch1 || 0.12),
+                roofPitch2: config.roofPitch2 !== undefined ? Number(config.roofPitch2) : (base.roofPitch2 || 0.08),
+                wallColor: Array.isArray(config.wallColor) ? config.wallColor : (firstBox && Array.isArray(firstBox.rgb) ? firstBox.rgb : base.wallColor),
+                trimColor: Array.isArray(config.trimColor) ? config.trimColor : (secondBox && Array.isArray(secondBox.rgb) ? secondBox.rgb : base.trimColor),
+                mapColor: config.mapColor || base.mapColor || "#f8fafc",
+                mapRoofColor: config.mapRoofColor || base.mapRoofColor || "#ec4899",
+                footprintTiles: config.footprintTiles || [3, 2],
+                clearPaddingPx: config.clearPaddingPx || 68,
+                boxes: Array.isArray(config.boxes) ? config.boxes.map((b) => Object.assign({}, b)) : [],
+                props: Array.isArray(config.props) ? config.props.map((p) => Object.assign({}, p)) : []
+            });
             cat[key] = spec;
             this.customPrefabs[key] = config;
-            this.setStatus(`DEFINED 3D ARCHITECTURAL PREFAB [${key}]`);
+            this.setStatus(`DEFINED 3D ARCHITECTURAL PREFAB [${key}] (${spec.w1}x${spec.d1}px)`);
             return spec;
+        }
+
+        _invalidateArrayAndPromptMasks(arr) {
+            if (Array.isArray(arr)) {
+                arr._chunkMask32 = null;
+                arr._boundsComputed = false;
+            }
+            const map = this.game && this.game.map;
+            if (map) {
+                map._livingEventGrid = null;
+                if (map.objectEngine) {
+                    map.objectEngine._promptCellGrid = null;
+                }
+            }
         }
 
         placePrefab3D(prefabId, x, y, angle = 0, opts = {}) {
@@ -789,12 +842,30 @@
             const sy = check.snappedY !== undefined ? check.snappedY : y;
             const sa = check.snappedAngle !== undefined ? check.snappedAngle : angle;
             const id = opts.id || `ce_prefab_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+            const oe = map.objectEngine;
 
             // Case A: Interactive 3D Encounter / World Activity Prefab
             if (prefabId === "TIKI_BAR_3D") {
-                const tb = { id, x: sx, y: sy, z: 2.0, angle: sa, seed: Math.random() * 10, createdByEngine: true };
+                const tb = { id, x: sx, y: sy, z: 2.0, ang: sa, angle: sa, seed: Math.random() * 10, createdByEngine: true };
                 if (!Array.isArray(map.tikiBars)) map.tikiBars = [];
                 map.tikiBars.push(tb);
+                this._invalidateArrayAndPromptMasks(map.tikiBars);
+                if (Array.isArray(map.securityBarrierBoxes)) {
+                    const cosA = Math.cos(sa), sinA = Math.sin(sa);
+                    const hw = 26, hh = 18;
+                    const ex = Math.abs(cosA) * hw + Math.abs(sinA) * hh;
+                    const ey = Math.abs(sinA) * hw + Math.abs(cosA) * hh;
+                    map.securityBarrierBoxes.push({
+                        cx: sx, cy: sy, hw, hh, cosA, sinA,
+                        minX: sx - ex, maxX: sx + ex, minY: sy - ey, maxY: sy + ey,
+                        estateId: id
+                    });
+                    map.barrierBoxGrid = null;
+                    if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                }
+                if (opts.rebuildMesh !== false && oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                }
                 const rec = { type: "PREFAB_3D", subtype: "TIKI_BAR_3D", id, prefabId, x: sx, y: sy, angle: sa, entityRef: tb };
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
@@ -803,9 +874,10 @@
                 return tb;
             }
             if (prefabId === "VOLLEYBALL_COURT_3D") {
-                const vc = { id, x: sx, y: sy, z: 2.0, seed: Math.random() * 10, createdByEngine: true };
+                const vc = { id, x: sx, y: sy, z: 2.0, ang: sa, angle: sa, seed: Math.random() * 10, createdByEngine: true };
                 if (!Array.isArray(map.beachVolleyballCourts)) map.beachVolleyballCourts = [];
                 map.beachVolleyballCourts.push(vc);
+                this._invalidateArrayAndPromptMasks(map.beachVolleyballCourts);
                 const rec = { type: "PREFAB_3D", subtype: "VOLLEYBALL_COURT_3D", id, prefabId, x: sx, y: sy, angle: sa, entityRef: vc };
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
@@ -814,9 +886,10 @@
                 return vc;
             }
             if (prefabId === "STREET_TAKEOVER_RING") {
-                const st = { id, x: sx, y: sy, z: 2.0, radius: 74, carSpec: "BANSHEE_GT", seed: Math.random() * 10, createdByEngine: true };
+                const st = { id, x: sx, y: sy, z: 2.0, radius: 74, carSpr: "0", carSpec: "BANSHEE_GT", seed: Math.random() * 10, createdByEngine: true };
                 if (!Array.isArray(map.streetTakeovers)) map.streetTakeovers = [];
                 map.streetTakeovers.push(st);
+                this._invalidateArrayAndPromptMasks(map.streetTakeovers);
                 const rec = { type: "PREFAB_3D", subtype: "STREET_TAKEOVER_RING", id, prefabId, x: sx, y: sy, angle: sa, entityRef: st };
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
@@ -825,9 +898,27 @@
                 return st;
             }
             if (prefabId === "SMUGGLER_CRATE_3D") {
-                const oe = map.objectEngine;
-                const drop = { id, x: sx, y: sy, z: 2.0, angle: sa, reward: 5000, weapon: "ROCKET", collected: false, respawnTimer: 0, createdByEngine: true };
-                if (oe && Array.isArray(oe.smugglerDrops)) oe.smugglerDrops.push(drop);
+                const drop = {
+                    id,
+                    name: opts.name || "CUSTOM SMUGGLER CONTRABAND DROP",
+                    x: sx,
+                    y: sy,
+                    z: 2.0,
+                    ang: sa,
+                    angle: sa,
+                    active: true,
+                    cooldown: 0,
+                    seed: 1.25,
+                    reward: 5000,
+                    weapon: "ROCKET",
+                    collected: false,
+                    respawnTimer: 0,
+                    createdByEngine: true
+                };
+                if (oe && Array.isArray(oe.smugglerDrops)) {
+                    oe.smugglerDrops.push(drop);
+                    this._invalidateArrayAndPromptMasks(oe.smugglerDrops);
+                }
                 const rec = { type: "PREFAB_3D", subtype: "SMUGGLER_CRATE_3D", id, prefabId, x: sx, y: sy, angle: sa, entityRef: drop };
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
@@ -836,13 +927,32 @@
                 return drop;
             }
             if (prefabId === "SODA_ECOLA_3D" || prefabId === "SODA_SPRUNK_3D") {
-                const oe = map.objectEngine;
                 const brand = prefabId === "SODA_SPRUNK_3D" ? "SPRUNK" : "eCOLA";
-                const sm = { id, x: sx, y: sy, z: 2.0, angle: sa, brand, cooldown: 0, broken: false, spr: "soda_machine", createdByEngine: true };
-                if (oe && Array.isArray(oe.sodaMachines)) oe.sodaMachines.push(sm);
+                const sm = {
+                    id,
+                    x: sx,
+                    y: sy,
+                    z: 2.0,
+                    ang: sa,
+                    angle: sa,
+                    brand,
+                    ad: brand === "SPRUNK" ? "ad_sprunk" : "ad_ecola",
+                    cooldown: 0,
+                    broken: false,
+                    spr: "soda_machine",
+                    createdByEngine: true
+                };
+                if (oe && Array.isArray(oe.sodaMachines)) {
+                    oe.sodaMachines.push(sm);
+                    this._invalidateArrayAndPromptMasks(oe.sodaMachines);
+                }
                 if (oe && Array.isArray(oe.interactiveProps)) {
                     oe.interactiveProps.push(sm);
                     oe._usableInteractProps = null;
+                    oe._propColGrid = null;
+                }
+                if (opts.rebuildMesh !== false && oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
                 }
                 const rec = { type: "PREFAB_3D", subtype: prefabId, id, prefabId, x: sx, y: sy, angle: sa, entityRef: sm };
                 this.createdEntities.push(rec);
@@ -854,26 +964,55 @@
 
             // Case B: Full 3D Volumetric Architectural Estate / Landmark Prefab (`PREFAB_CATALOG`)
             const cat = window.PREFAB_CATALOG || {};
-            const spec = cat[prefabId] || cat.OCEAN_DECO_BOUTIQUE;
-            const oe = map.objectEngine;
+            const resolvedKey = cat[prefabId]
+                ? prefabId
+                : (cat[String(prefabId).toLowerCase()] ? String(prefabId).toLowerCase() : (cat.villa_art_deco ? "villa_art_deco" : Object.keys(cat)[0]));
+            const spec = cat[resolvedKey];
             if (!spec || !oe) return null;
+
+            const sc = Number(opts.scale) || 1.0;
+            const cosA = Math.cos(sa);
+            const sinA = Math.sin(sa);
+            const overhang = Number(spec.roofOverhang) || 10;
+            const w1 = Number(spec.w1) || 156;
+            const d1 = Number(spec.d1) || 112;
+            const h1 = Number(spec.h1) || 0.72;
+            const hw = (w1 * 0.5 + overhang) * sc;
+            const hh = (d1 * 0.5 + overhang) * sc;
+            const extX = Math.abs(cosA) * hw + Math.abs(sinA) * hh;
+            const extY = Math.abs(sinA) * hw + Math.abs(cosA) * hh;
+            const totalHeightBlocks =
+                (Number(spec.stiltH) || 0) +
+                h1 * sc +
+                (Number(spec.h2) || 0) * sc +
+                (Number(spec.roofPitch1) || 0.2) * sc +
+                (Number(spec.roofPitch2) || 0) * sc;
 
             const inst = {
                 id,
-                prefabId,
+                name: opts.name || spec.label || resolvedKey,
+                kind: resolvedKey,
+                prefabId: resolvedKey,
                 spec,
                 x: sx,
                 y: sy,
                 z: 2.0,
+                ang: sa,
                 angle: sa,
+                scale: sc,
+                hw,
+                hh,
+                extX,
+                extY,
+                totalHeightBlocks,
                 district: map.getDistrictName ? map.getDistrictName(sx, sy) : "VICE CITY",
+                pool: null,
+                drivewayCars: [],
                 worldProps: [],
                 dockBoat: null,
                 createdByEngine: true
             };
 
-            const cosA = Math.cos(sa);
-            const sinA = Math.sin(sa);
             for (const p of (spec.props || [])) {
                 const wx = sx + p.dx * cosA - p.dy * sinA;
                 const wy = sy + p.dx * sinA + p.dy * cosA;
@@ -893,43 +1032,55 @@
                 if (wp.interact) {
                     oe.interactiveProps.push(wp);
                     oe._usableInteractProps = null;
+                    oe._propColGrid = null;
                 }
             }
 
             oe.instances.push(inst);
+            if (Array.isArray(map.residentialHouses)) {
+                map.residentialHouses.push({
+                    id,
+                    name: inst.name,
+                    district: inst.district,
+                    kind: resolvedKey,
+                    c: sx / TILE_SIZE,
+                    r: sy / TILE_SIZE,
+                    x: sx,
+                    y: sy,
+                    z: 2.0,
+                    ang: sa,
+                    scale: sc,
+                    hw,
+                    hh,
+                    createdByEngine: true
+                });
+            }
+            if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                this.game.renderer._staticChunkGridMap.delete(oe.instances);
+            }
 
-            // Register 3D OBB collision boxes for solid building volumes into map.securityBarrierBoxes
-            if (Array.isArray(spec.boxes)) {
-                if (!Array.isArray(map.securityBarrierBoxes)) map.securityBarrierBoxes = [];
-                for (const b of spec.boxes) {
-                    if ((b.z1 - b.z0) < 0.35 || b.mat === "POOL_WATER") continue;
-                    const bx = sx + b.dx * cosA - b.dy * sinA;
-                    const by = sy + b.dx * sinA + b.dy * cosA;
-                    const hw = b.w * 0.5;
-                    const hh = b.h * 0.5;
-                    const bAng = sa + (b.rot || 0);
-                    const bCos = Math.cos(bAng);
-                    const bSin = Math.sin(bAng);
-                    const ex = Math.abs(bCos) * hw + Math.abs(bSin) * hh;
-                    const ey = Math.abs(bSin) * hw + Math.abs(bCos) * hh;
-                    map.securityBarrierBoxes.push({
-                        cx: bx,
-                        cy: by,
-                        hw,
-                        hh,
-                        cosA: bCos,
-                        sinA: bSin,
-                        minX: bx - ex,
-                        maxX: bx + ex,
-                        minY: by - ey,
-                        maxY: by + ey,
-                        estateId: id
-                    });
-                }
-                map.barrierBoxGrid = null;
-                if (typeof map.ensureBarrierSpatialGrids === "function") {
-                    map.ensureBarrierSpatialGrids();
-                }
+            // Register 3D OBB collision hull for solid building footprint into map.securityBarrierBoxes
+            if (!Array.isArray(map.securityBarrierBoxes)) map.securityBarrierBoxes = [];
+            const wallHw = (w1 * 0.5) * sc;
+            const wallHh = (d1 * 0.5) * sc;
+            const wallEx = Math.abs(cosA) * wallHw + Math.abs(sinA) * wallHh;
+            const wallEy = Math.abs(sinA) * wallHw + Math.abs(cosA) * wallHh;
+            map.securityBarrierBoxes.push({
+                cx: sx,
+                cy: sy,
+                hw: wallHw,
+                hh: wallHh,
+                cosA,
+                sinA,
+                minX: sx - wallEx,
+                maxX: sx + wallEx,
+                minY: sy - wallEy,
+                maxY: sy + wallEy,
+                estateId: id
+            });
+            map.barrierBoxGrid = null;
+            if (typeof map.ensureBarrierSpatialGrids === "function") {
+                map.ensureBarrierSpatialGrids();
             }
 
             if (opts.rebuildMesh !== false && this.game.renderer && this.game.renderer.gl) {
@@ -943,7 +1094,7 @@
                 type: "PREFAB_3D",
                 subtype: "ESTATE",
                 id,
-                prefabId,
+                prefabId: resolvedKey,
                 x: sx,
                 y: sy,
                 angle: sa,
@@ -952,8 +1103,16 @@
             this.createdEntities.push(rec);
             if (!opts.skipHistory) this._pushHistory(rec);
             if (!opts.skipSave) this.saveToLocalStorage();
-            this.setStatus(`PLACED 3D PREFAB [${spec.label || prefabId}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
+            this.setStatus(`PLACED 3D PREFAB [${spec.label || resolvedKey}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
             return inst;
+        }
+
+        _normalizeStreetPropKind(kind) {
+            if (kind === "PAYPHONE" || kind === "PAYPHONE_BOOTH") return "PAYPHONE_BOOTH";
+            if (kind === "STREETLAMP" || kind === "STREETLIGHT_NEON") return "STREETLIGHT_NEON";
+            if (kind === "HYDRANT") return "HYDRANT";
+            if (kind === "NEWS_STAND") return "NEWS_STAND";
+            return null;
         }
 
         placePropOrFlora(kind, x, y, angle = 0, opts = {}) {
@@ -965,32 +1124,42 @@
             const sa = check.snappedAngle !== undefined ? check.snappedAngle : angle;
             const id = opts.id || `ce_prop_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
 
-            const isStreetProp = (kind === "HYDRANT" || kind === "STREETLAMP" || kind === "PAYPHONE" || kind === "NEWS_STAND");
-            if (isStreetProp) {
+            const nativeStreetKind = this._normalizeStreetPropKind(kind);
+            if (nativeStreetKind) {
                 const oe = map.objectEngine;
                 if (!oe || !Array.isArray(oe.streetProps)) return null;
                 const prop = {
                     id,
-                    kind,
+                    kind: nativeStreetKind,
+                    aliasKind: kind,
+                    homeX: sx,
+                    homeY: sy,
                     x: sx,
                     y: sy,
                     z: 2.0,
+                    vx: 0,
+                    vy: 0,
+                    vz: 0,
+                    ang: sa,
                     angle: sa,
-                    state: 0,
-                    fallAngle: 0,
-                    fallProgress: 0,
+                    vang: 0,
+                    broken: false,
+                    damaged: false,
+                    timer: 0,
                     geyserTimer: 0,
-                    sparkTimer: 0,
-                    respawnTimer: 0,
-                    accent: kind === "NEWS_STAND" ? [0.95, 0.22, 0.28] : [0.0, 0.94, 1.0],
+                    neonPink: true,
                     createdByEngine: true
                 };
                 oe.streetProps.push(prop);
-                const rec = { type: "PROP_FLORA", subtype: "STREET_PROP", id, kind, x: sx, y: sy, angle: sa, entityRef: prop };
+                oe._propColGrid = null;
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(oe.streetProps);
+                }
+                const rec = { type: "PROP_FLORA", subtype: "STREET_PROP", id, kind: nativeStreetKind, x: sx, y: sy, angle: sa, entityRef: prop };
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
-                this.setStatus(`PLACED 3D STREET PROP [${kind}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                this.setStatus(`PLACED 3D STREET PROP [${nativeStreetKind}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return prop;
             }
 
@@ -1023,7 +1192,6 @@
                     cell.push(flora);
                 }
             }
-            // Reset static chunk grid cache on renderer so new flora appears immediately
             if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
                 this.game.renderer._staticChunkGridMap.delete(map.vicePalms);
             }
@@ -1053,8 +1221,14 @@
             const base = T[tplKey] || T.SHOP_BAR;
             if (!base) return null;
 
-            const cloneStations = (arr) => (arr || []).map((s) => Object.assign({}, s, { cooldown: 0 }));
+            const cloneStations = (arr) => (arr || []).map((s) => Object.assign({}, s, { id: `${id}_${s.id || "st"}`, cooldown: 0 }));
             const cloneNpcs = (arr) => (arr || []).map((n) => Object.assign({}, n));
+            const builtStations = typeof base.buildStations === "function"
+                ? base.buildStations(id).map((s) => Object.assign({}, s, { cooldown: 0 }))
+                : cloneStations(base.stations);
+            const builtNpcs = typeof base.buildNpcs === "function"
+                ? base.buildNpcs().map((n) => Object.assign({}, n))
+                : cloneNpcs(base.npcs);
 
             const off = { S: [32, 16], N: [32, 48], E: [16, 32], W: [48, 32] }[facing] || [32, 16];
             const doorX = check.snappedX !== undefined ? check.snappedX : (c * TILE_SIZE + off[0]);
@@ -1063,22 +1237,27 @@
             const intr = {
                 id,
                 name: config.name || `CUSTOM ${tplKey.replace("SHOP_", "")}`,
-                subtitle: config.subtitle || `${map.getDistrictName ? map.getDistrictName(doorX, doorY) : "VICE CITY"} • ENTERABLE 3D VENUE`,
+                subtitle: config.subtitle || base.subtitle || `${map.getDistrictName ? map.getDistrictName(doorX, doorY) : "VICE CITY"} • ENTERABLE 3D VENUE`,
                 district: config.district || (map.getDistrictName ? map.getDistrictName(doorX, doorY) : "VICE CITY"),
                 doorX,
                 doorY,
                 facing,
+                isShop: true,
                 theme: base.theme,
                 accent: config.accent || base.accent,
                 matRGB: base.matRGB,
                 floorColor: base.floorColor,
                 floorGridColor: base.floorGridColor,
-                w: base.w,
-                h: base.h,
-                stations: cloneStations(base.stations),
-                npcs: cloneNpcs(base.npcs),
+                w: base.w || 820,
+                h: base.h || 560,
+                stations: builtStations,
+                npcs: builtNpcs,
                 createdByEngine: true
             };
+
+            if (typeof window.ShopInteriors.orientInterior === "function") {
+                window.ShopInteriors.orientInterior(intr);
+            }
 
             if (!Array.isArray(map.interiors)) map.interiors = [];
             map.interiors.push(intr);
@@ -1279,7 +1458,696 @@
         }
 
         /* ====================================================================
-           6. PILLAR 4: UNDO / REDO HISTORY STACK, DELETION & BLUEPRINT JSON I/O
+           6. PILLAR 4: PRE-EXISTING WORLD INSPECTOR, RELOCATOR & MUTATOR BRIDGE
+           ==================================================================== */
+        indexPreExistingWorld() {
+            const map = this.game && this.game.map;
+            if (!map) return false;
+            const oe = map.objectEngine;
+
+            // 1. Tag every pre-existing 3D Estate instance and link its OBB in map.securityBarrierBoxes
+            if (oe && Array.isArray(oe.instances)) {
+                for (let i = 0; i < oe.instances.length; i++) {
+                    const inst = oe.instances[i];
+                    if (!inst) continue;
+                    if (!inst.id) inst.id = `pre_estate_${i}`;
+                    if (inst.angle === undefined) inst.angle = inst.ang || 0;
+                    if (inst.ang === undefined) inst.ang = inst.angle || 0;
+                    if (inst.prefabId === undefined) inst.prefabId = inst.kind || (inst.spec && inst.spec.id) || "villa_art_deco";
+                    if (Array.isArray(map.securityBarrierBoxes)) {
+                        for (let bi = 0; bi < map.securityBarrierBoxes.length; bi++) {
+                            const bb = map.securityBarrierBoxes[bi];
+                            if (bb && !bb.estateId && bb.cx !== undefined && Math.hypot(bb.cx - inst.x, bb.cy - inst.y) < 12) {
+                                bb.estateId = inst.id;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Ensure stable IDs on pre-existing interiors, streetProps, sodaMachines, smugglerDrops, tikiBars, volleyball, takeovers, flora
+            if (Array.isArray(map.interiors)) {
+                for (let i = 0; i < map.interiors.length; i++) {
+                    const intr = map.interiors[i];
+                    if (intr && !intr.id) intr.id = `pre_interior_${i}`;
+                }
+            }
+            if (oe && Array.isArray(oe.streetProps)) {
+                for (let i = 0; i < oe.streetProps.length; i++) {
+                    const sp = oe.streetProps[i];
+                    if (sp && !sp.id) sp.id = `pre_sprop_${i}`;
+                }
+            }
+            if (oe && Array.isArray(oe.sodaMachines)) {
+                for (let i = 0; i < oe.sodaMachines.length; i++) {
+                    const sm = oe.sodaMachines[i];
+                    if (sm && !sm.id) sm.id = `pre_soda_${i}`;
+                }
+            }
+            if (oe && Array.isArray(oe.smugglerDrops)) {
+                for (let i = 0; i < oe.smugglerDrops.length; i++) {
+                    const sd = oe.smugglerDrops[i];
+                    if (sd && !sd.id) sd.id = `pre_smuggler_${i}`;
+                }
+            }
+            if (Array.isArray(map.tikiBars)) {
+                for (let i = 0; i < map.tikiBars.length; i++) {
+                    const tb = map.tikiBars[i];
+                    if (!tb) continue;
+                    if (!tb.id) tb.id = `pre_tiki_${i}`;
+                    if (Array.isArray(map.securityBarrierBoxes)) {
+                        for (let bi = 0; bi < map.securityBarrierBoxes.length; bi++) {
+                            const bb = map.securityBarrierBoxes[bi];
+                            if (bb && !bb.estateId && bb.cx !== undefined && Math.hypot(bb.cx - tb.x, bb.cy - tb.y) < 8) {
+                                bb.estateId = tb.id;
+                            }
+                        }
+                    }
+                }
+            }
+            if (Array.isArray(map.beachVolleyballCourts)) {
+                for (let i = 0; i < map.beachVolleyballCourts.length; i++) {
+                    const vc = map.beachVolleyballCourts[i];
+                    if (vc && !vc.id) vc.id = `pre_volleyball_${i}`;
+                }
+            }
+            if (Array.isArray(map.streetTakeovers)) {
+                for (let i = 0; i < map.streetTakeovers.length; i++) {
+                    const st = map.streetTakeovers[i];
+                    if (st && !st.id) st.id = `pre_takeover_${i}`;
+                }
+            }
+            if (Array.isArray(map.vicePalms)) {
+                for (let i = 0; i < map.vicePalms.length; i++) {
+                    const pm = map.vicePalms[i];
+                    if (pm && !pm.id) pm.id = `pre_flora_${i}`;
+                }
+            }
+            this._preExistingIndexed = true;
+            return true;
+        }
+
+        getPreExistingWorldSummary() {
+            this.indexPreExistingWorld();
+            const map = this.game && this.game.map;
+            const oe = map && map.objectEngine;
+            const mm = this.game && this.game.missions;
+            return {
+                estates3D: (oe && Array.isArray(oe.instances)) ? oe.instances.length : 0,
+                interiors3D: (map && Array.isArray(map.interiors)) ? map.interiors.length : 0,
+                streetProps3D: (oe && Array.isArray(oe.streetProps)) ? oe.streetProps.length : 0,
+                streetlights3D: (map && Array.isArray(map.streetlights)) ? map.streetlights.length : 0,
+                trafficSignals3D: (map && Array.isArray(map.trafficSignals)) ? map.trafficSignals.length : 0,
+                sodaMachines3D: (oe && Array.isArray(oe.sodaMachines)) ? oe.sodaMachines.length : 0,
+                smugglerDrops3D: (oe && Array.isArray(oe.smugglerDrops)) ? oe.smugglerDrops.length : 0,
+                tikiBars3D: (map && Array.isArray(map.tikiBars)) ? map.tikiBars.length : 0,
+                volleyballCourts3D: (map && Array.isArray(map.beachVolleyballCourts)) ? map.beachVolleyballCourts.length : 0,
+                streetTakeovers3D: (map && Array.isArray(map.streetTakeovers)) ? map.streetTakeovers.length : 0,
+                flora3D: (map && Array.isArray(map.vicePalms)) ? map.vicePalms.length : 0,
+                vehicles: (this.game && Array.isArray(this.game.vehicles)) ? this.game.vehicles.length : 0,
+                storyMissions: (mm && Array.isArray(mm.storyMissions)) ? mm.storyMissions.length : 5,
+                customCreatedCount: this.createdEntities.length
+            };
+        }
+
+        inspectWorldAt(x, y, radius = 160, includePreExisting = true) {
+            this.indexPreExistingWorld();
+            const map = this.game && this.game.map;
+            const oe = map && map.objectEngine;
+            const results = [];
+            const seenRefs = new Set();
+
+            const consider = (desc) => {
+                if (!desc || !desc.entityRef || seenRefs.has(desc.entityRef)) return;
+                if (!includePreExisting && desc.isPreExisting) return;
+                const d = Math.hypot((desc.x || 0) - x, (desc.y || 0) - y);
+                if (d <= radius) {
+                    seenRefs.add(desc.entityRef);
+                    desc.distance = d;
+                    results.push(desc);
+                }
+            };
+
+            // 1. Custom created entities first
+            for (let i = this.createdEntities.length - 1; i >= 0; i--) {
+                const ce = this.createdEntities[i];
+                if (!ce || !ce.entityRef || typeof ce.x !== "number" || typeof ce.y !== "number") continue;
+                consider({
+                    type: ce.type,
+                    subtype: ce.subtype || ce.type,
+                    category: ce.type === "VEHICLE" ? "VEHICLES" : (ce.type === "PREFAB_3D" ? "PREFABS_3D" : (ce.type === "PROP_FLORA" ? "PROPS_FLORA" : "INTERIORS")),
+                    id: ce.id,
+                    kind: ce.prefabId || ce.specKey || ce.kind || ce.tpl,
+                    label: ce.name || ce.prefabId || ce.specKey || ce.kind || ce.id,
+                    x: ce.entityRef.doorX !== undefined ? ce.entityRef.doorX : ce.entityRef.x,
+                    y: ce.entityRef.doorY !== undefined ? ce.entityRef.doorY : ce.entityRef.y,
+                    angle: ce.entityRef.ang !== undefined ? ce.entityRef.ang : (ce.entityRef.angle || 0),
+                    isPreExisting: false,
+                    createdRecord: ce,
+                    entityRef: ce.entityRef
+                });
+            }
+
+            if (includePreExisting && map) {
+                // 2. 3D Architectural Estates (oe.instances)
+                if (oe && Array.isArray(oe.instances)) {
+                    for (const inst of oe.instances) {
+                        if (!inst) continue;
+                        consider({
+                            type: "PREFAB_3D",
+                            subtype: "ESTATE",
+                            category: "PREFABS_3D",
+                            id: inst.id,
+                            kind: inst.kind || inst.prefabId || (inst.spec && inst.spec.id) || "villa_art_deco",
+                            label: inst.name || (inst.spec && inst.spec.label) || inst.id,
+                            x: inst.x,
+                            y: inst.y,
+                            angle: inst.ang !== undefined ? inst.ang : (inst.angle || 0),
+                            isPreExisting: !inst.createdByEngine,
+                            sourceArray: oe.instances,
+                            entityRef: inst
+                        });
+                    }
+                }
+                // 3. 3D Enterable Interiors (map.interiors)
+                if (Array.isArray(map.interiors)) {
+                    for (const intr of map.interiors) {
+                        if (!intr) continue;
+                        consider({
+                            type: "INTERIOR",
+                            subtype: "INTERIOR",
+                            category: "INTERIORS",
+                            id: intr.id,
+                            kind: intr.theme || "SHOP_BAR",
+                            label: intr.name || intr.id,
+                            x: intr.doorX,
+                            y: intr.doorY,
+                            angle: 0,
+                            facing: intr.facing || "S",
+                            isPreExisting: !intr.createdByEngine,
+                            sourceArray: map.interiors,
+                            entityRef: intr
+                        });
+                    }
+                }
+                // 4. 3D Street Props (oe.streetProps)
+                if (oe && Array.isArray(oe.streetProps)) {
+                    for (const sp of oe.streetProps) {
+                        if (!sp) continue;
+                        consider({
+                            type: "PROP_FLORA",
+                            subtype: "STREET_PROP",
+                            category: "PROPS_FLORA",
+                            id: sp.id,
+                            kind: sp.kind,
+                            label: `3D ${sp.kind}`,
+                            x: sp.x,
+                            y: sp.y,
+                            angle: sp.ang !== undefined ? sp.ang : (sp.angle || 0),
+                            isPreExisting: !sp.createdByEngine,
+                            sourceArray: oe.streetProps,
+                            entityRef: sp
+                        });
+                    }
+                }
+                // 5. 3D Interactive Encounters (tikiBars, volleyball, streetTakeovers, smugglerDrops, sodaMachines)
+                if (Array.isArray(map.tikiBars)) {
+                    for (const tb of map.tikiBars) {
+                        if (!tb) continue;
+                        consider({
+                            type: "PREFAB_3D",
+                            subtype: "TIKI_BAR_3D",
+                            category: "PREFABS_3D",
+                            id: tb.id,
+                            kind: "TIKI_BAR_3D",
+                            label: "3D Thatch Beach Tiki Bar",
+                            x: tb.x,
+                            y: tb.y,
+                            angle: tb.ang || tb.angle || 0,
+                            isPreExisting: !tb.createdByEngine,
+                            sourceArray: map.tikiBars,
+                            entityRef: tb
+                        });
+                    }
+                }
+                if (Array.isArray(map.beachVolleyballCourts)) {
+                    for (const vc of map.beachVolleyballCourts) {
+                        if (!vc) continue;
+                        consider({
+                            type: "PREFAB_3D",
+                            subtype: "VOLLEYBALL_COURT_3D",
+                            category: "PREFABS_3D",
+                            id: vc.id,
+                            kind: "VOLLEYBALL_COURT_3D",
+                            label: "3D Beach Volleyball Court",
+                            x: vc.x,
+                            y: vc.y,
+                            angle: vc.ang || vc.angle || 0,
+                            isPreExisting: !vc.createdByEngine,
+                            sourceArray: map.beachVolleyballCourts,
+                            entityRef: vc
+                        });
+                    }
+                }
+                if (Array.isArray(map.streetTakeovers)) {
+                    for (const st of map.streetTakeovers) {
+                        if (!st) continue;
+                        consider({
+                            type: "PREFAB_3D",
+                            subtype: "STREET_TAKEOVER_RING",
+                            category: "PREFABS_3D",
+                            id: st.id,
+                            kind: "STREET_TAKEOVER_RING",
+                            label: "3D Street Takeover Ring",
+                            x: st.x,
+                            y: st.y,
+                            angle: 0,
+                            isPreExisting: !st.createdByEngine,
+                            sourceArray: map.streetTakeovers,
+                            entityRef: st
+                        });
+                    }
+                }
+                if (oe && Array.isArray(oe.smugglerDrops)) {
+                    for (const sd of oe.smugglerDrops) {
+                        if (!sd) continue;
+                        consider({
+                            type: "PREFAB_3D",
+                            subtype: "SMUGGLER_CRATE_3D",
+                            category: "PREFABS_3D",
+                            id: sd.id,
+                            kind: "SMUGGLER_CRATE_3D",
+                            label: sd.name || "3D Smuggler Contraband Crate",
+                            x: sd.x,
+                            y: sd.y,
+                            angle: sd.ang || sd.angle || 0,
+                            isPreExisting: !sd.createdByEngine,
+                            sourceArray: oe.smugglerDrops,
+                            entityRef: sd
+                        });
+                    }
+                }
+                if (oe && Array.isArray(oe.sodaMachines)) {
+                    for (const sm of oe.sodaMachines) {
+                        if (!sm) continue;
+                        const k = sm.brand === "SPRUNK" ? "SODA_SPRUNK_3D" : "SODA_ECOLA_3D";
+                        consider({
+                            type: "PREFAB_3D",
+                            subtype: k,
+                            category: "PREFABS_3D",
+                            id: sm.id,
+                            kind: k,
+                            label: `3D ${sm.brand || "eCOLA"} Machine`,
+                            x: sm.x,
+                            y: sm.y,
+                            angle: sm.ang || sm.angle || 0,
+                            isPreExisting: !sm.createdByEngine,
+                            sourceArray: oe.sodaMachines,
+                            entityRef: sm
+                        });
+                    }
+                }
+                // 6. Vehicles (game.vehicles)
+                if (this.game && Array.isArray(this.game.vehicles)) {
+                    for (const v of this.game.vehicles) {
+                        if (!v || v.destroyed) continue;
+                        consider({
+                            type: "VEHICLE",
+                            subtype: "VEHICLE",
+                            category: "VEHICLES",
+                            id: v.id,
+                            kind: v.specKey || "MINT_STALLION",
+                            label: v.name || v.specKey || v.id,
+                            x: v.x,
+                            y: v.y,
+                            angle: v.angle || 0,
+                            isPreExisting: !v.createdByEngine,
+                            sourceArray: this.game.vehicles,
+                            entityRef: v
+                        });
+                    }
+                }
+                // 7. Tropical Flora (map.vicePalms)
+                if (Array.isArray(map.vicePalms)) {
+                    for (const pm of map.vicePalms) {
+                        if (!pm) continue;
+                        consider({
+                            type: "PROP_FLORA",
+                            subtype: "FLORA",
+                            category: "PROPS_FLORA",
+                            id: pm.id,
+                            kind: pm.kind || "palm_tree",
+                            label: `3D Flora (${pm.kind || "palm_tree"})`,
+                            x: pm.x,
+                            y: pm.y,
+                            angle: pm.angle || 0,
+                            isPreExisting: !pm.createdByEngine,
+                            sourceArray: map.vicePalms,
+                            entityRef: pm
+                        });
+                    }
+                }
+            }
+
+            results.sort((a, b) => a.distance - b.distance);
+            return results;
+        }
+
+        findNearestWorldEntity(x, y, maxRadius = 140, includePreExisting = true) {
+            const list = this.inspectWorldAt(x, y, maxRadius, includePreExisting);
+            return list.length > 0 ? list[0] : null;
+        }
+
+        _applyEntityPose(desc, newX, newY, newAngle, opts = {}) {
+            if (!desc || !desc.entityRef) return false;
+            const map = this.game && this.game.map;
+            const oe = map && map.objectEngine;
+            const ent = desc.entityRef;
+            const oldX = desc.type === "INTERIOR" ? ent.doorX : ent.x;
+            const oldY = desc.type === "INTERIOR" ? ent.doorY : ent.y;
+            const ang = newAngle !== undefined ? newAngle : (ent.ang !== undefined ? ent.ang : (ent.angle || 0));
+
+            if (desc.type === "INTERIOR") {
+                const check = opts.skipValidation
+                    ? { snappedX: newX, snappedY: newY, facing: opts.facing || ent.facing || "S", tileC: Math.floor(newX / TILE_SIZE), tileR: Math.floor(newY / TILE_SIZE) }
+                    : this.validatePlacement("INTERIORS", desc.kind || "SHOP_BAR", newX, newY, ang, opts);
+                ent.doorX = check.snappedX !== undefined ? check.snappedX : newX;
+                ent.doorY = check.snappedY !== undefined ? check.snappedY : newY;
+                if (check.facing) ent.facing = check.facing;
+                if (window.ShopInteriors && typeof window.ShopInteriors.orientInterior === "function") {
+                    window.ShopInteriors.orientInterior(ent);
+                }
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(map.interiors);
+                }
+            } else if (desc.subtype === "ESTATE") {
+                const cosA = Math.cos(ang);
+                const sinA = Math.sin(ang);
+                const dx = newX - oldX;
+                const dy = newY - oldY;
+                ent.x = newX;
+                ent.y = newY;
+                ent.ang = ang;
+                ent.angle = ang;
+                const sc = ent.scale || 1.0;
+                const spec = ent.spec || {};
+                const hw = ((spec.w1 || 156) * 0.5 + (spec.roofOverhang || 10)) * sc;
+                const hh = ((spec.d1 || 112) * 0.5 + (spec.roofOverhang || 10)) * sc;
+                ent.hw = hw;
+                ent.hh = hh;
+                ent.extX = Math.abs(cosA) * hw + Math.abs(sinA) * hh;
+                ent.extY = Math.abs(sinA) * hw + Math.abs(cosA) * hh;
+                if (ent.pool) {
+                    ent.pool.worldX = newX + cosA * (ent.pool.dx || 0) - sinA * (ent.pool.dy || 0);
+                    ent.pool.worldY = newY + sinA * (ent.pool.dx || 0) + cosA * (ent.pool.dy || 0);
+                }
+                if (Array.isArray(map.residentialHouses)) {
+                    const rh = map.residentialHouses.find((h) => h && (h.id === ent.id || Math.hypot(h.x - oldX, h.y - oldY) < 8));
+                    if (rh) {
+                        rh.x = newX;
+                        rh.y = newY;
+                        rh.c = newX / TILE_SIZE;
+                        rh.r = newY / TILE_SIZE;
+                        rh.ang = ang;
+                    }
+                }
+                if (Array.isArray(map.securityBarrierBoxes)) {
+                    const wallHw = ((spec.w1 || 156) * 0.5) * sc;
+                    const wallHh = ((spec.d1 || 112) * 0.5) * sc;
+                    const ex = Math.abs(cosA) * wallHw + Math.abs(sinA) * wallHh;
+                    const ey = Math.abs(sinA) * wallHw + Math.abs(cosA) * wallHh;
+                    for (const bb of map.securityBarrierBoxes) {
+                        if (bb && (bb.estateId === ent.id || (bb.cx !== undefined && Math.hypot(bb.cx - oldX, bb.cy - oldY) < 12))) {
+                            bb.estateId = ent.id;
+                            bb.cx = newX;
+                            bb.cy = newY;
+                            bb.hw = wallHw;
+                            bb.hh = wallHh;
+                            bb.cosA = cosA;
+                            bb.sinA = sinA;
+                            bb.minX = newX - ex;
+                            bb.maxX = newX + ex;
+                            bb.minY = newY - ey;
+                            bb.maxY = newY + ey;
+                        }
+                    }
+                    map.barrierBoxGrid = null;
+                    if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                }
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(oe.instances);
+                }
+                if (opts.rebuildMesh !== false && oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                }
+            } else if (desc.subtype === "STREET_PROP") {
+                ent.x = newX;
+                ent.y = newY;
+                ent.homeX = newX;
+                ent.homeY = newY;
+                ent.ang = ang;
+                ent.angle = ang;
+                ent.broken = false;
+                ent.damaged = false;
+                if (oe) oe._propColGrid = null;
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap && oe) {
+                    this.game.renderer._staticChunkGridMap.delete(oe.streetProps);
+                }
+            } else if (desc.subtype === "FLORA") {
+                if (map.floraGrid instanceof Map) {
+                    const oldC = Math.floor(oldX / TILE_SIZE);
+                    const oldR = Math.floor(oldY / TILE_SIZE);
+                    const oldKey = (oldR << 16) | (oldC & 0xffff);
+                    const oldCell = map.floraGrid.get(oldKey);
+                    if (Array.isArray(oldCell)) {
+                        map.floraGrid.set(oldKey, oldCell.filter((p) => p !== ent));
+                    }
+                }
+                ent.x = newX;
+                ent.y = newY;
+                ent.angle = ang;
+                if (ent.solid !== false && map.floraGrid instanceof Map) {
+                    const nc = Math.floor(newX / TILE_SIZE);
+                    const nr = Math.floor(newY / TILE_SIZE);
+                    const newKey = (nr << 16) | (nc & 0xffff);
+                    let cell = map.floraGrid.get(newKey);
+                    if (!cell) {
+                        cell = [];
+                        map.floraGrid.set(newKey, cell);
+                    }
+                    cell.push(ent);
+                }
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(map.vicePalms);
+                }
+            } else if (desc.type === "VEHICLE") {
+                ent.x = newX;
+                ent.y = newY;
+                ent.angle = ang;
+                ent.vx = 0;
+                ent.vy = 0;
+                ent.speed = 0;
+                if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
+                    this.game.rebuildVehicleSpatialGrid();
+                }
+            } else {
+                // 3D Interactive Encounter (tikiBars, volleyball, streetTakeovers, smugglerDrops, sodaMachines)
+                ent.x = newX;
+                ent.y = newY;
+                ent.ang = ang;
+                ent.angle = ang;
+                if (desc.subtype === "TIKI_BAR_3D" && Array.isArray(map.securityBarrierBoxes)) {
+                    const cosA = Math.cos(ang), sinA = Math.sin(ang);
+                    const ex = Math.abs(cosA) * 26 + Math.abs(sinA) * 18;
+                    const ey = Math.abs(sinA) * 26 + Math.abs(cosA) * 18;
+                    for (const bb of map.securityBarrierBoxes) {
+                        if (bb && (bb.estateId === ent.id || (bb.cx !== undefined && Math.hypot(bb.cx - oldX, bb.cy - oldY) < 8))) {
+                            bb.estateId = ent.id;
+                            bb.cx = newX;
+                            bb.cy = newY;
+                            bb.cosA = cosA;
+                            bb.sinA = sinA;
+                            bb.minX = newX - ex;
+                            bb.maxX = newX + ex;
+                            bb.minY = newY - ey;
+                            bb.maxY = newY + ey;
+                        }
+                    }
+                    map.barrierBoxGrid = null;
+                    if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                }
+                this._invalidateArrayAndPromptMasks(desc.sourceArray);
+                if (oe) oe._propColGrid = null;
+                if (opts.rebuildMesh !== false && oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                }
+            }
+
+            if (desc.createdRecord) {
+                desc.createdRecord.x = desc.type === "INTERIOR" ? ent.doorX : ent.x;
+                desc.createdRecord.y = desc.type === "INTERIOR" ? ent.doorY : ent.y;
+                desc.createdRecord.angle = ang;
+                if (desc.type === "INTERIOR") {
+                    desc.createdRecord.c = Math.floor(ent.doorX / TILE_SIZE);
+                    desc.createdRecord.r = Math.floor(ent.doorY / TILE_SIZE);
+                    desc.createdRecord.facing = ent.facing;
+                }
+            }
+            return true;
+        }
+
+        relocateWorldEntity(targetOrId, newX, newY, newAngle, opts = {}) {
+            this.indexPreExistingWorld();
+            let desc = null;
+            if (typeof targetOrId === "string") {
+                const all = this.inspectWorldAt(16384, 16384, 99999, true);
+                desc = all.find((d) => d.id === targetOrId || (d.entityRef && d.entityRef.id === targetOrId));
+            } else if (targetOrId && targetOrId.entityRef) {
+                desc = targetOrId;
+            } else if (targetOrId && typeof targetOrId === "object") {
+                const px = targetOrId.doorX !== undefined ? targetOrId.doorX : (targetOrId.x || 0);
+                const py = targetOrId.doorY !== undefined ? targetOrId.doorY : (targetOrId.y || 0);
+                const near = this.inspectWorldAt(px, py, 32, true);
+                desc = near.find((d) => d.entityRef === targetOrId) || near[0];
+            }
+            if (!desc || !desc.entityRef) return null;
+
+            const ent = desc.entityRef;
+            const beforeX = desc.type === "INTERIOR" ? ent.doorX : ent.x;
+            const beforeY = desc.type === "INTERIOR" ? ent.doorY : ent.y;
+            const beforeAngle = ent.ang !== undefined ? ent.ang : (ent.angle || 0);
+            const beforeFacing = ent.facing;
+
+            const check = opts.skipValidation
+                ? { ok: true, snappedX: newX, snappedY: newY, snappedAngle: newAngle !== undefined ? newAngle : beforeAngle }
+                : this.validatePlacement(desc.category || "PREFABS_3D", desc.kind, newX, newY, newAngle !== undefined ? newAngle : beforeAngle, opts);
+            const sx = check.snappedX !== undefined ? check.snappedX : newX;
+            const sy = check.snappedY !== undefined ? check.snappedY : newY;
+            const sa = check.snappedAngle !== undefined ? check.snappedAngle : (newAngle !== undefined ? newAngle : beforeAngle);
+
+            this._applyEntityPose(desc, sx, sy, sa, opts);
+
+            if (!opts.skipHistory) {
+                this._pushHistory({
+                    type: "RELOCATE_ENTITY",
+                    id: desc.id,
+                    desc,
+                    beforeX,
+                    beforeY,
+                    beforeAngle,
+                    beforeFacing,
+                    afterX: desc.type === "INTERIOR" ? ent.doorX : ent.x,
+                    afterY: desc.type === "INTERIOR" ? ent.doorY : ent.y,
+                    afterAngle: sa,
+                    afterFacing: ent.facing
+                });
+            }
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`MOVED [${desc.label}] TO (${Math.round(sx)}, ${Math.round(sy)})`);
+            return ent;
+        }
+
+        removeNearestWorldEntity(x, y, maxRadius = 140, includePreExisting = true) {
+            const desc = this.findNearestWorldEntity(x, y, maxRadius, includePreExisting);
+            if (!desc) {
+                this.setStatus("NO WORLD ENTITY WITHIN RANGE TO DELETE");
+                return null;
+            }
+            if (!desc.isPreExisting && desc.createdRecord) {
+                const idx = this.createdEntities.indexOf(desc.createdRecord);
+                if (idx >= 0) this.createdEntities.splice(idx, 1);
+                this.removeCreatedRecord(desc.createdRecord);
+                this._pushHistory({
+                    type: "DELETE_CREATED",
+                    record: desc.createdRecord
+                });
+                this.saveToLocalStorage();
+                this.setStatus(`DELETED CUSTOM [${desc.label}]`);
+                return desc;
+            }
+
+            // Deleting a Pre-Existing World Entity with full Undo/Redo support!
+            const map = this.game && this.game.map;
+            const oe = map && map.objectEngine;
+            const arr = desc.sourceArray;
+            const ent = desc.entityRef;
+            const arrIdx = Array.isArray(arr) ? arr.indexOf(ent) : -1;
+            if (arrIdx >= 0) {
+                arr.splice(arrIdx, 1);
+            }
+            const removedBarriers = [];
+            if (map && Array.isArray(map.securityBarrierBoxes) && (desc.subtype === "ESTATE" || desc.subtype === "TIKI_BAR_3D")) {
+                for (let i = map.securityBarrierBoxes.length - 1; i >= 0; i--) {
+                    const bb = map.securityBarrierBoxes[i];
+                    if (bb && (bb.estateId === ent.id || (bb.cx !== undefined && Math.hypot(bb.cx - desc.x, bb.cy - desc.y) < 12))) {
+                        removedBarriers.push(bb);
+                        map.securityBarrierBoxes.splice(i, 1);
+                    }
+                }
+                map.barrierBoxGrid = null;
+                if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+            }
+            if (desc.subtype === "FLORA" && map && map.floraGrid instanceof Map) {
+                const fc = Math.floor(desc.x / TILE_SIZE);
+                const fr = Math.floor(desc.y / TILE_SIZE);
+                const key = (fr << 16) | (fc & 0xffff);
+                const cell = map.floraGrid.get(key);
+                if (Array.isArray(cell)) {
+                    map.floraGrid.set(key, cell.filter((p) => p !== ent));
+                }
+            }
+            this._invalidateArrayAndPromptMasks(arr);
+            if (oe) oe._propColGrid = null;
+            if (this.game.renderer && this.game.renderer._staticChunkGridMap && arr) {
+                this.game.renderer._staticChunkGridMap.delete(arr);
+            }
+            if (typeof this.game.rebuildVehicleSpatialGrid === "function" && desc.type === "VEHICLE") {
+                this.game.rebuildVehicleSpatialGrid();
+            }
+            if (oe && this.game.renderer && this.game.renderer.gl && (desc.subtype === "ESTATE" || desc.subtype === "TIKI_BAR_3D" || desc.subtype === "SODA_ECOLA_3D" || desc.subtype === "SODA_SPRUNK_3D")) {
+                oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+            }
+
+            this._pushHistory({
+                type: "DELETE_PREEXISTING",
+                desc,
+                sourceArray: arr,
+                arrayIndex: arrIdx,
+                entityRef: ent,
+                removedBarriers
+            });
+            this.setStatus(`DELETED PRE-EXISTING [${desc.label}] ([CTRL+Z] TO RESTORE)`);
+            return desc;
+        }
+
+        cloneWorldEntityToPalette(x, y, maxRadius = 160) {
+            const desc = this.findNearestWorldEntity(x, y, maxRadius, true);
+            if (!desc) {
+                this.setStatus("NO ENTITY UNDER CURSOR TO CLONE");
+                return null;
+            }
+            const catIdx = this.categories.indexOf(desc.category);
+            if (catIdx >= 0) {
+                this.activeCategoryIdx = catIdx;
+                const cat = this.categories[catIdx];
+                const list = this.getCatalogForCategory(cat);
+                let matchIdx = list.findIndex((it) => it.key === desc.kind);
+                if (matchIdx < 0 && desc.subtype === "STREET_PROP") {
+                    const alias = desc.kind === "PAYPHONE_BOOTH" ? "PAYPHONE" : (desc.kind === "STREETLIGHT_NEON" ? "STREETLAMP" : desc.kind);
+                    matchIdx = list.findIndex((it) => it.key === alias);
+                }
+                if (matchIdx >= 0) {
+                    this.selectedItemIdxByCat[cat] = matchIdx;
+                    this.paletteScrollByCat[cat] = Math.max(0, Math.min(Math.max(0, list.length - 8), matchIdx - 2));
+                }
+            }
+            this.placementAngle = desc.angle || 0;
+            this.setStatus(`CLONED [${desc.label}] TO BRUSH (${desc.isPreExisting ? "PRE-EXISTING" : "CUSTOM"})`);
+            return desc;
+        }
+
+        /* ====================================================================
+           7. PILLAR 5: UNDO / REDO HISTORY STACK, DELETION & BLUEPRINT JSON I/O
            ==================================================================== */
         _pushHistory(action) {
             this.undoStack.push(action);
@@ -1296,6 +2164,49 @@
                 this.restoreVoxelColumnSnapshot(rec.beforeSnap, true);
                 return true;
             }
+            if (rec.type === "RELOCATE_ENTITY" && rec.desc) {
+                this._applyEntityPose(rec.desc, rec.beforeX, rec.beforeY, rec.beforeAngle, {
+                    skipValidation: true,
+                    facing: rec.beforeFacing
+                });
+                return true;
+            }
+            if (rec.type === "DELETE_CREATED" && rec.record) {
+                this.reapplyCreatedRecord(rec.record);
+                return true;
+            }
+            if (rec.type === "DELETE_PREEXISTING" && rec.entityRef && Array.isArray(rec.sourceArray)) {
+                const idx = Math.max(0, Math.min(rec.sourceArray.length, rec.arrayIndex >= 0 ? rec.arrayIndex : rec.sourceArray.length));
+                rec.sourceArray.splice(idx, 0, rec.entityRef);
+                if (map && Array.isArray(map.securityBarrierBoxes) && Array.isArray(rec.removedBarriers) && rec.removedBarriers.length > 0) {
+                    for (const bb of rec.removedBarriers) map.securityBarrierBoxes.push(bb);
+                    map.barrierBoxGrid = null;
+                    if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                }
+                if (rec.desc && rec.desc.subtype === "FLORA" && map && map.floraGrid instanceof Map) {
+                    const fc = Math.floor(rec.entityRef.x / TILE_SIZE);
+                    const fr = Math.floor(rec.entityRef.y / TILE_SIZE);
+                    const key = (fr << 16) | (fc & 0xffff);
+                    let cell = map.floraGrid.get(key);
+                    if (!cell) {
+                        cell = [];
+                        map.floraGrid.set(key, cell);
+                    }
+                    cell.push(rec.entityRef);
+                }
+                this._invalidateArrayAndPromptMasks(rec.sourceArray);
+                if (oe) oe._propColGrid = null;
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(rec.sourceArray);
+                }
+                if (typeof this.game.rebuildVehicleSpatialGrid === "function" && rec.desc && rec.desc.type === "VEHICLE") {
+                    this.game.rebuildVehicleSpatialGrid();
+                }
+                if (oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                }
+                return true;
+            }
             if (rec.type === "VEHICLE") {
                 this.game.vehicles = this.game.vehicles.filter((v) => v !== rec.entityRef && v.id !== rec.id);
                 if (typeof this.game.rebuildVehicleSpatialGrid === "function") this.game.rebuildVehicleSpatialGrid();
@@ -1304,17 +2215,33 @@
             if (rec.type === "PREFAB_3D") {
                 if (rec.subtype === "TIKI_BAR_3D" && Array.isArray(map.tikiBars)) {
                     map.tikiBars = map.tikiBars.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    this._invalidateArrayAndPromptMasks(map.tikiBars);
+                    if (Array.isArray(map.securityBarrierBoxes)) {
+                        map.securityBarrierBoxes = map.securityBarrierBoxes.filter((b) => b.estateId !== rec.id);
+                        map.barrierBoxGrid = null;
+                        if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                    }
                 } else if (rec.subtype === "VOLLEYBALL_COURT_3D" && Array.isArray(map.beachVolleyballCourts)) {
                     map.beachVolleyballCourts = map.beachVolleyballCourts.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    this._invalidateArrayAndPromptMasks(map.beachVolleyballCourts);
                 } else if (rec.subtype === "STREET_TAKEOVER_RING" && Array.isArray(map.streetTakeovers)) {
                     map.streetTakeovers = map.streetTakeovers.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    this._invalidateArrayAndPromptMasks(map.streetTakeovers);
                 } else if (rec.subtype === "SMUGGLER_CRATE_3D" && oe && Array.isArray(oe.smugglerDrops)) {
                     oe.smugglerDrops = oe.smugglerDrops.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    this._invalidateArrayAndPromptMasks(oe.smugglerDrops);
                 } else if ((rec.subtype === "SODA_ECOLA_3D" || rec.subtype === "SODA_SPRUNK_3D") && oe) {
-                    if (Array.isArray(oe.sodaMachines)) oe.sodaMachines = oe.sodaMachines.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    if (Array.isArray(oe.sodaMachines)) {
+                        oe.sodaMachines = oe.sodaMachines.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                        this._invalidateArrayAndPromptMasks(oe.sodaMachines);
+                    }
                     if (Array.isArray(oe.interactiveProps)) oe.interactiveProps = oe.interactiveProps.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    oe._propColGrid = null;
                 } else if (oe && Array.isArray(oe.instances)) {
                     oe.instances = oe.instances.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    if (Array.isArray(map.residentialHouses)) {
+                        map.residentialHouses = map.residentialHouses.filter((h) => h.id !== rec.id);
+                    }
                     if (Array.isArray(map.securityBarrierBoxes)) {
                         map.securityBarrierBoxes = map.securityBarrierBoxes.filter((b) => b.estateId !== rec.id);
                         map.barrierBoxGrid = null;
@@ -1322,17 +2249,30 @@
                             map.ensureBarrierSpatialGrids();
                         }
                     }
-                    if (this.game.renderer && this.game.renderer.gl) {
-                        oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
-                    }
+                }
+                if (oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
                 }
                 return true;
             }
             if (rec.type === "PROP_FLORA") {
                 if (rec.subtype === "STREET_PROP" && oe && Array.isArray(oe.streetProps)) {
                     oe.streetProps = oe.streetProps.filter((p) => p !== rec.entityRef && p.id !== rec.id);
+                    oe._propColGrid = null;
+                    if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                        this.game.renderer._staticChunkGridMap.delete(oe.streetProps);
+                    }
                 } else if (Array.isArray(map.vicePalms)) {
                     map.vicePalms = map.vicePalms.filter((p) => p !== rec.entityRef && p.id !== rec.id);
+                    if (map.floraGrid instanceof Map && rec.entityRef) {
+                        const fc = Math.floor(rec.entityRef.x / TILE_SIZE);
+                        const fr = Math.floor(rec.entityRef.y / TILE_SIZE);
+                        const key = (fr << 16) | (fc & 0xffff);
+                        const cell = map.floraGrid.get(key);
+                        if (Array.isArray(cell)) {
+                            map.floraGrid.set(key, cell.filter((p) => p !== rec.entityRef && p.id !== rec.id));
+                        }
+                    }
                     if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
                         this.game.renderer._staticChunkGridMap.delete(map.vicePalms);
                     }
@@ -1355,8 +2295,36 @@
 
         reapplyCreatedRecord(rec) {
             if (!rec) return false;
+            const map = this.game && this.game.map;
+            const oe = map && map.objectEngine;
+
             if (rec.type === "VOXEL_TILE" && rec.afterSnap) {
                 this.restoreVoxelColumnSnapshot(rec.afterSnap, true);
+                return true;
+            }
+            if (rec.type === "RELOCATE_ENTITY" && rec.desc) {
+                this._applyEntityPose(rec.desc, rec.afterX, rec.afterY, rec.afterAngle, {
+                    skipValidation: true,
+                    facing: rec.afterFacing
+                });
+                return true;
+            }
+            if (rec.type === "DELETE_CREATED" && rec.record) {
+                this.removeCreatedRecord(rec.record);
+                this.createdEntities = this.createdEntities.filter((e) => e !== rec.record && e.id !== rec.record.id);
+                return true;
+            }
+            if (rec.type === "DELETE_PREEXISTING" && rec.entityRef && Array.isArray(rec.sourceArray)) {
+                const idx = rec.sourceArray.indexOf(rec.entityRef);
+                if (idx >= 0) rec.sourceArray.splice(idx, 1);
+                if (map && Array.isArray(map.securityBarrierBoxes) && Array.isArray(rec.removedBarriers) && rec.removedBarriers.length > 0) {
+                    const rmSet = new Set(rec.removedBarriers);
+                    map.securityBarrierBoxes = map.securityBarrierBoxes.filter((b) => !rmSet.has(b));
+                    map.barrierBoxGrid = null;
+                    if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                }
+                this._invalidateArrayAndPromptMasks(rec.sourceArray);
+                if (oe) oe._propColGrid = null;
                 return true;
             }
             if (rec.type === "VEHICLE") {
@@ -1393,7 +2361,9 @@
             }
             const act = this.undoStack.pop();
             this.removeCreatedRecord(act);
-            this.createdEntities = this.createdEntities.filter((e) => e !== act && (e.id === undefined || e.id !== act.id));
+            if (act.type !== "RELOCATE_ENTITY" && act.type !== "DELETE_PREEXISTING" && act.type !== "DELETE_CREATED") {
+                this.createdEntities = this.createdEntities.filter((e) => e !== act && (e.id === undefined || e.id !== act.id));
+            }
             this.redoStack.push(act);
             this.saveToLocalStorage();
             this.setStatus(`UNDID [${act.type}]`);
@@ -1413,7 +2383,10 @@
             return true;
         }
 
-        removeNearestCreatedEntity(x, y, maxRadius = 110) {
+        removeNearestCreatedEntity(x, y, maxRadius = 110, allowPreExisting = false) {
+            if (allowPreExisting) {
+                return this.removeNearestWorldEntity(x, y, maxRadius, true);
+            }
             let bestIdx = -1;
             let bestDist = maxRadius;
             for (let i = this.createdEntities.length - 1; i >= 0; i--) {
@@ -1428,6 +2401,7 @@
             if (bestIdx >= 0) {
                 const rec = this.createdEntities.splice(bestIdx, 1)[0];
                 this.removeCreatedRecord(rec);
+                this._pushHistory({ type: "DELETE_CREATED", record: rec });
                 this.saveToLocalStorage();
                 this.setStatus(`DELETED [${rec.type}: ${rec.prefabId || rec.specKey || rec.kind || rec.name || rec.id}]`);
                 return rec;
@@ -1673,9 +2647,31 @@
                 this.setStatus(`STUDIO FREE CAMERA: ${this.freeCamActive ? "ON (WASD PANS CAMERA)" : "FOLLOW PLAYER"}`);
                 return true;
             }
+            if (code === "KeyC") {
+                const cur = this.screenToWorld(this.game.input.mouseX || 0, this.game.input.mouseY || 0, 2.0);
+                this.cloneWorldEntityToPalette(cur.x, cur.y, 160);
+                return true;
+            }
+            if (code === "KeyM") {
+                const cur = this.screenToWorld(this.game.input.mouseX || 0, this.game.input.mouseY || 0, 2.0);
+                if (this.grabbedEntity) {
+                    this.relocateWorldEntity(this.grabbedEntity, cur.x, cur.y, this.placementAngle);
+                    this.grabbedEntity = null;
+                } else {
+                    const hit = this.findNearestWorldEntity(cur.x, cur.y, 160, true);
+                    if (hit) {
+                        this.grabbedEntity = hit;
+                        this.placementAngle = hit.angle || 0;
+                        this.setStatus(`GRABBED [${hit.label}] — CLICK OR PRESS [M] AT DESTINATION ([R] TO ROTATE)`);
+                    } else {
+                        this.setStatus("NO WORLD ENTITY UNDER CURSOR TO MOVE");
+                    }
+                }
+                return true;
+            }
             if (code === "Delete" || code === "Backspace") {
                 const cur = this.screenToWorld(this.game.input.mouseX || 0, this.game.input.mouseY || 0, 2.0);
-                this.removeNearestCreatedEntity(cur.x, cur.y, 140);
+                this.removeNearestWorldEntity(cur.x, cur.y, 140, true);
                 return true;
             }
             if (code === "KeyX") {
@@ -1738,7 +2734,13 @@
 
             const cur = this.screenToWorld(screenX, screenY, 2.0);
             if (button === 2) {
-                this.removeNearestCreatedEntity(cur.x, cur.y, 140);
+                this.removeNearestWorldEntity(cur.x, cur.y, 140, true);
+                return true;
+            }
+
+            if (this.grabbedEntity) {
+                this.relocateWorldEntity(this.grabbedEntity, cur.x, cur.y, this.placementAngle);
+                this.grabbedEntity = null;
                 return true;
             }
 
@@ -1837,7 +2839,9 @@
             ctx.stroke();
 
             // Cursor floating coordinates + safety oracle pill
-            const badgeTxt = `${item ? item.icon + " " + item.label : ""} • (${cur.c}, ${cur.r}) • ${safety.reason}`;
+            const badgeTxt = this.grabbedEntity
+                ? `✋ MOVING: ${this.grabbedEntity.label} • (${cur.c}, ${cur.r}) • CLICK TO DROP`
+                : `${item ? item.icon + " " + item.label : ""} • (${cur.c}, ${cur.r}) • ${safety.reason}`;
             ctx.font = "bold 10px Consolas, 'Courier New', monospace";
             const bw = Math.max(180, ctx.measureText(badgeTxt).width + 18);
             const bx = Math.round(sc.x - bw * 0.5);
@@ -1851,6 +2855,27 @@
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(badgeTxt, sc.x, by + 10);
+
+            // 1B. Live Pre-Existing / Custom World Entity Inspector Highlight Under Cursor
+            const hovered = this.findNearestWorldEntity(cur.x, cur.y, 96, true);
+            if (hovered && !this.grabbedEntity) {
+                const hScr = renderer.worldToScreen(hovered.x, hovered.y, 2.08);
+                const hTag = hovered.isPreExisting ? "PRE-EXISTING" : "CUSTOM";
+                const hTxt = `🔎 [${hTag}] ${hovered.label} • [C] CLONE • [M] MOVE • [DEL] DELETE`;
+                const hW = Math.max(220, ctx.measureText(hTxt).width + 18);
+                const hX = Math.round(hScr.x - hW * 0.5);
+                const hY = Math.round(hScr.y + 18);
+                ctx.strokeStyle = "#fde047";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(hScr.x, hScr.y, 16, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+                ctx.fillRect(hX, hY, hW, 19);
+                ctx.strokeRect(hX + 0.5, hY + 0.5, hW - 1, 18);
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(hTxt, hScr.x, hY + 9.5);
+            }
 
             // 2. Left Dock Studio Panel
             const px = 12;
