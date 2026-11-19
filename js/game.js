@@ -7708,7 +7708,7 @@ class LeonidaGame {
 
             this.setWantedLevel(this.wantedLevel - 2);
 
-            this.addFloatingText(pk.x, pk.y - 16, "⭐ POLICE BRIBE (-2 HEADS)", "#00f0ff");
+            this.addFloatingText(pk.x, pk.y - 16, "⭐ POLICE BRIBE (-2★)", "#00f0ff");
 
         } else if (pk.type === "JAIL_FREE") {
 

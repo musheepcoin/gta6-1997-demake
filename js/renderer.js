@@ -16958,32 +16958,66 @@ class RetroRenderer {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
 
-        // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS) + GTA 6 RECOGNITION STATUS BADGE, DISTRICT BANNER (25/26) & CAR NAME (27)
+        // C. TOP-CENTER: WANTED STARS (UP TO 6 STARS) + GTA 6 RECOGNITION STATUS BADGE, DISTRICT BANNER (25/26) & CAR NAME (27)
         const recogStatus = (game.director && typeof game.director.getWantedRecognitionStatus === "function")
             ? game.director.getWantedRecognitionStatus()
             : null;
         if ((game.wantedLevel || 0) > 0) {
-            const headSp = this.gta1Meta.sprites.hud["41"];
             const headScale = isPhonePortrait ? s * 0.85 : s;
-            const headW = headSp ? headSp[2] * headScale : 24;
-            const headH = headSp ? headSp[3] * headScale : 24;
+            const headW = Math.round(14 * headScale);
+            const headH = headW;
             const maxHeads = 6;
-            const stripW = maxHeads * (headW + 3);
+            const gap = Math.max(3, Math.round(2.5 * headScale));
+            const stripW = maxHeads * headW + (maxHeads - 1) * gap;
             const stripX = Math.round((W - stripW) * 0.5);
             let hx = stripX;
             const hy = W < 640 ? (leftY + mugH + 10) : 10;
             const isEvading = !game.isPoliceSpotted;
             const flashActive = Math.floor(this.time * (isEvading ? 3.2 : 6.5)) % 2 === 0;
 
+            const drawWantedStar = (cx, cy, outerR, isLit) => {
+                const innerR = outerR * 0.44;
+                ctx.save();
+                ctx.beginPath();
+                for (let pt = 0; pt < 10; pt++) {
+                    const rad = (pt % 2 === 0) ? outerR : innerR;
+                    const ang = -Math.PI * 0.5 + (pt * Math.PI) / 5;
+                    const sxPt = cx + Math.cos(ang) * rad;
+                    const syPt = cy + Math.sin(ang) * rad;
+                    if (pt === 0) ctx.moveTo(sxPt, syPt);
+                    else ctx.lineTo(sxPt, syPt);
+                }
+                ctx.closePath();
+
+                if (!isLit) {
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
+                    ctx.fill();
+                    ctx.lineWidth = 1.4;
+                    ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+                    ctx.stroke();
+                } else {
+                    if (isEvading && !flashActive) {
+                        ctx.globalAlpha = 0.58;
+                    }
+                    const fillCol = isEvading
+                        ? (flashActive ? "#fde047" : "#38bdf8")
+                        : (flashActive ? "#facc15" : "#ff1e38");
+                    ctx.shadowColor = isEvading ? "#38bdf8" : (flashActive ? "#f59e0b" : "#ff1e38");
+                    ctx.shadowBlur = 6;
+                    ctx.fillStyle = fillCol;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = 1.6;
+                    ctx.strokeStyle = "#090d16";
+                    ctx.stroke();
+                }
+                ctx.restore();
+            };
+
             for (let i = 0; i < maxHeads; i++) {
                 const isLit = i < game.wantedLevel;
-                const sprId = isLit ? (flashActive ? "41" : "42") : "42";
-                ctx.save();
-                if (!isLit) ctx.globalAlpha = 0.32;
-                else if (isEvading && !flashActive) ctx.globalAlpha = 0.55;
-                this.drawHudSprite(ctx, sprId, hx, hy, headScale);
-                ctx.restore();
-                hx += headW + 3;
+                drawWantedStar(hx + headW * 0.5, hy + headH * 0.5, headW * 0.48, isLit);
+                hx += headW + gap;
             }
 
             // GTA 6 Recognition Status & Evasion Countdown Pill directly below the Wanted Heads
