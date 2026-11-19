@@ -13508,6 +13508,9 @@ class LeonidaGame {
                     v.color = paintColors[v.remapIdx % paintColors.length];
 
                     this.wantedSpottedVehicle = null;
+                    if (this.director && typeof this.director.onPayNSprayRespray === "function") {
+                        this.director.onPayNSprayRespray(v);
+                    }
                     this.setWantedLevel(0);
 
                     this.audio.playCashSound();
@@ -13617,6 +13620,9 @@ class LeonidaGame {
                         this.audio.playCashSound();
 
                         this.addCash(payout, "CRUSHED & EXPORTED!", true);
+                        if (this.director && typeof this.director.onCraneVehicleExport === "function") {
+                            this.director.onCraneVehicleExport(cv);
+                        }
                         if (typeof this.addTurfInfluence === "function") this.addTurfInfluence(140);
 
                         this.showBigBanner(
@@ -15863,7 +15869,7 @@ class LeonidaGame {
                 }
 
                 // 1B) Player Aimed Firearm Threat & Vehicle Horn Reaction
-                if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && !this.insideInterior) {
+                if (ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && (ped.surrenderTimer || 0) <= 0 && !this.activeInterior) {
                     const pl = this.player;
                     if (pl && !pl.inVehicle && pl.weapon && pl.weapon !== "FIST" && (this.input.shoot || (pl.weaponDrawnTimer || 0) > 0.25)) {
                         const dxP = ped.x - pl.x;
@@ -15875,7 +15881,10 @@ class LeonidaGame {
                             if (angDiff < 0.42) {
                                 ped.activityTimer = 0;
                                 ped.hangoutTimer = 0;
-                                if (ped.personality === "BRAVE" && !ped.isChild && !ped.missionTag) {
+                                if (distP < 92 && !ped._intimidatedOnce && this.director && typeof this.director.tryIntimidateStreetPed === "function") {
+                                    this.director.tryIntimidateStreetPed(92);
+                                    if ((ped.surrenderTimer || 0) > 0) continue;
+                                } else if (ped.personality === "BRAVE" && !ped.isChild && !ped.missionTag) {
                                     ped.kind = "HOSTILE";
                                     ped.baseWalkSpeed = 34;
                                     if ((ped._shoutCooldown || 0) <= 0) {
@@ -16976,7 +16985,11 @@ class LeonidaGame {
 
                     }
 
-                    this.addFloatingText(rbX, rbY - 26, "🚧 VCPD ROADBLOCK!", "#38bdf8");
+                    if (this.director && typeof this.director.deployRoadblockSpikeStrip === "function") {
+                        this.director.deployRoadblockSpikeStrip(rbX, rbY, spawnTarget.angle || 0);
+                    }
+
+                    this.addFloatingText(rbX, rbY - 26, "🚧 VCPD ROADBLOCK & SPIKE STRIP!", "#38bdf8");
 
                 }
 

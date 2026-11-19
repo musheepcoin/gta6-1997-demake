@@ -68,10 +68,14 @@ class ViceWorldDirector {
             totalTrackersJammed: 0,
             totalTrackerPings: 0,
             totalFocusBursts: 0,
-            totalGatorsWrangled: 0
+            totalGatorsWrangled: 0,
+            totalSpikeStripsDeployed: 0,
+            totalSpikeStripHits: 0,
+            totalTakeoverHypes: 0,
+            totalSmugglerExports: 0
         };
 
-        // 2B. GTA 6 Modern-Arcade State (Exotic GPS Trackers, Focus Mode, Street Hold-Ups, @LeonidaFeed Social Ticker)
+        // 2B. GTA 6 Modern-Arcade State (Exotic GPS Trackers, Focus Mode, Street Hold-Ups, @LeonidaFeed Social Ticker, Spike Strips, Takeovers)
         this.luxuryTrackedSpecs = new Set([
             "VICE_CHEETAH",
             "BANSHEE_GT",
@@ -84,6 +88,9 @@ class ViceWorldDirector {
         this.focusActiveTimer = 0;
         this.leonidaFeedPosts = [];
         this.activeSocialTicker = null;
+        this.spikeStrips = [];
+        this.takeoverDriftProgress = 0;
+        this.takeoverHypeCooldown = 0;
 
         // 3. Entity Authority & Anti-Teleportation Ledger
         this.vehicleLedger = new Map(); // vehId -> { lastX, lastY, owner, lastSyncMs, allowSnapUntilMs }
@@ -386,6 +393,13 @@ class ViceWorldDirector {
                     code: "GPS_TRACKER_ACTIVE",
                     label: `📡 EXOTIC GPS TRACKER (${Math.ceil(p.inVehicle.gpsTrackerTimer)}s) — PRESS [B] TO JAM!`,
                     color: "#f59e0b"
+                };
+            }
+            if (p.inVehicle && (p.inVehicle.tirePuncturedTimer || 0) > 0) {
+                return {
+                    code: "TIRE_PUNCTURED",
+                    label: `🛞 TIRES SHREDDED (${Math.ceil(p.inVehicle.tirePuncturedTimer)}s) — SWAP CAR OR RESPRAY!`,
+                    color: "#fb923c"
                 };
             }
             if ((this.openCarryWarnTimer || 0) > 0.1) {
@@ -892,6 +906,175 @@ class ViceWorldDirector {
     }
 
     /* ========================================================================
+       2D. GTA 6 WAVE 3 MODERN-ARCADE SYSTEMS:
+       - VCPD Tactical Roadblock Spike Strips & Tire Blowout Interdiction (3★+)
+       - Rideout Customs / Pay 'n' Spray Chop-Shop Tracker Strip & Brian Heder Fence
+       - Real Dimez (Bae-Luxe & Roxy) Street Takeover & Thrillbilly Drift Hype
+       ======================================================================== */
+    deployRoadblockSpikeStrip(rbX, rbY, roadAngle = 0) {
+        const g = this.game;
+        if (!g) return null;
+        const perpAng = roadAngle + Math.PI * 0.5;
+        const sx = rbX + Math.cos(perpAng) * 24;
+        const sy = rbY + Math.sin(perpAng) * 24;
+        const strip = {
+            id: `spike_${Date.now()}_${this.spikeStrips.length}`,
+            x: sx,
+            y: sy,
+            z: (g.map && typeof g.map.getHeightAtPixel === "function") ? g.map.getHeightAtPixel(sx, sy, 2.0) : 2.0,
+            angle: perpAng,
+            width: 52,
+            timer: 32.0,
+            hit: false,
+            dodged: false
+        };
+        this.spikeStrips.push(strip);
+        if (this.spikeStrips.length > 6) {
+            this.spikeStrips.shift();
+        }
+        this.blackboard.totalSpikeStripsDeployed = (this.blackboard.totalSpikeStripsDeployed || 0) + 1;
+        return strip;
+    }
+
+    updateSpikeStrips(dt) {
+        const g = this.game;
+        if (!g || !Array.isArray(this.spikeStrips) || this.spikeStrips.length === 0) return;
+        const p = g.player;
+        const pVeh = (p && !p.dead) ? p.inVehicle : null;
+
+        for (let i = this.spikeStrips.length - 1; i >= 0; i--) {
+            const st = this.spikeStrips[i];
+            st.timer -= dt;
+            if (st.timer <= 0 || st.hit || (g.wantedLevel || 0) <= 0) {
+                this.spikeStrips.splice(i, 1);
+                continue;
+            }
+            if (pVeh && !pVeh.destroyed && !pVeh.crushesCars && !pVeh.waterOnly) {
+                const d = Math.hypot(pVeh.x - st.x, pVeh.y - st.y);
+                if (d < 34) {
+                    st.hit = true;
+                    pVeh.tirePuncturedTimer = 7.0;
+                    this.blackboard.totalSpikeStripHits = (this.blackboard.totalSpikeStripHits || 0) + 1;
+                    if (g.audio && typeof g.audio.playTireScreech === "function") {
+                        g.audio.playTireScreech();
+                    }
+                    if (typeof g.spawnParticle === "function") {
+                        for (let k = 0; k < 8; k++) {
+                            g.spawnParticle(pVeh.x + (Math.random() - 0.5) * 20, pVeh.y + (Math.random() - 0.5) * 20, "SPARK");
+                        }
+                    }
+                    g.addFloatingText(pVeh.x, pVeh.y - 36, "🚨 VCPD SPIKE STRIP HIT — TIRES SHREDDED!", "#ff1e38");
+                    this.spikeStrips.splice(i, 1);
+                } else if (!st.dodged && d >= 34 && d < 78 && Math.abs(pVeh.speed || 0) > 95) {
+                    st.dodged = true;
+                    this.addFocusCharge(25);
+                    g.addFloatingText(pVeh.x, pVeh.y - 32, "🛞 DODGED VCPD SPIKE STRIP (+25 FOCUS)!", "#38bdf8");
+                }
+            }
+        }
+    }
+
+    onPayNSprayRespray(v) {
+        const g = this.game;
+        if (!g || !v) return { ok: false };
+        const hadTracker = (v.gpsTrackerTimer || 0) > 0;
+        const hadFlatTires = (v.tirePuncturedTimer || 0) > 0;
+        v.gpsTrackerTimer = 0;
+        v._gpsTrackerJammed = true;
+        v.tirePuncturedTimer = 0;
+
+        let smugglerBonus = 0;
+        if ((this.luxuryTrackedSpecs.has(v.specKey) || v.wasCriminalCar || hadTracker) && !v._chopShopFenced) {
+            v._chopShopFenced = true;
+            smugglerBonus = 250;
+            this.blackboard.totalSmugglerExports = (this.blackboard.totalSmugglerExports || 0) + 1;
+            if (typeof g.addCash === "function") {
+                g.addCash(smugglerBonus, "🔧 RIDEOUT CUSTOMS CHOP-SHOP FENCE!", true);
+            }
+            this.pushLeonidaFeedPost(
+                "@RideoutCustoms",
+                `🔧 Fresh plates, new chameleon wrap & zero factory LoJack on that ${v.name}!`,
+                "164K",
+                "#39ff14"
+            );
+        } else if (hadFlatTires) {
+            g.addFloatingText(v.x, v.y - 36, "🛞 SHREDDED TIRES REPLACED AT RIDEOUT CUSTOMS!", "#39ff14");
+        }
+        return { ok: true, hadTracker, hadFlatTires, smugglerBonus };
+    }
+
+    onCraneVehicleExport(v) {
+        const g = this.game;
+        if (!g || !v) return { ok: false, bonus: 0 };
+        let bonus = 0;
+        if (this.luxuryTrackedSpecs.has(v.specKey) || v.wasCriminalCar) {
+            bonus = 250;
+            this.blackboard.totalSmugglerExports = (this.blackboard.totalSmugglerExports || 0) + 1;
+            if (typeof g.addCash === "function") {
+                g.addCash(bonus, "⚓ BRIAN HEDER KEYS EXPORT BONUS!", true);
+            }
+            this.pushLeonidaFeedPost(
+                "@BrianHederKeys",
+                `⚓ High-end ${v.name} loaded onto the Keys cargo freighter. Clean smuggler payout!`,
+                "210K",
+                "#38bdf8"
+            );
+        }
+        return { ok: true, bonus };
+    }
+
+    updateStreetTakeoverHype(dt) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.activeInterior || !g.map || !Array.isArray(g.map.streetTakeovers)) return;
+        this.takeoverHypeCooldown = Math.max(0, (this.takeoverHypeCooldown || 0) - dt);
+        if (this.takeoverHypeCooldown > 0) return;
+
+        const v = g.player.inVehicle;
+        if (!v || v.destroyed) {
+            this.takeoverDriftProgress = 0;
+            return;
+        }
+        const vSpd = Math.max(Math.abs(v.speed || 0), Math.hypot(v.vx || 0, v.vy || 0));
+        const isStunting = Boolean(((v.drifting || (g.input && g.input.handbrake)) && vSpd > 50) || (v.wheelieTimer || 0) > 0.2);
+        if (!isStunting) {
+            this.takeoverDriftProgress = Math.max(0, (this.takeoverDriftProgress || 0) - dt * 0.5);
+            return;
+        }
+
+        let nearTakeover = null;
+        for (let i = 0; i < g.map.streetTakeovers.length; i++) {
+            const st = g.map.streetTakeovers[i];
+            if (!st || (st.wipeoutTimer || 0) > 0) continue;
+            if (Math.hypot(v.x - st.x, v.y - st.y) <= 210) {
+                nearTakeover = st;
+                break;
+            }
+        }
+        if (!nearTakeover) {
+            this.takeoverDriftProgress = Math.max(0, (this.takeoverDriftProgress || 0) - dt * 0.5);
+            return;
+        }
+
+        this.takeoverDriftProgress = (this.takeoverDriftProgress || 0) + dt;
+        if (this.takeoverDriftProgress >= 1.2) {
+            this.takeoverDriftProgress = 0;
+            this.takeoverHypeCooldown = 12.0;
+            this.blackboard.totalTakeoverHypes = (this.blackboard.totalTakeoverHypes || 0) + 1;
+            this.addFocusCharge(35);
+            if (typeof g.addCash === "function") {
+                g.addCash(250, "🔥 REAL DIMEZ TAKEOVER HYPE!", true);
+            }
+            g.addFloatingText(v.x, v.y - 38, "🎤 REAL DIMEZ (BAE-LUXE & ROXY): SICK TAKEOVER DRIFT!", "#f472b6");
+            this.pushLeonidaFeedPost(
+                "@RealDimez",
+                `🎤 Bae-Luxe & Roxy went LIVE at the street takeover! Cleanest ${v.name} drift in Leonida! #OnlyRawRecords`,
+                "420K",
+                "#f472b6"
+            );
+        }
+    }
+
+    /* ========================================================================
        3. ENTITY AUTHORITY LEDGER & ANTI-TELEPORTATION KINEMATIC VALIDATOR
        ======================================================================== */
     getVehicleAuthority(v) {
@@ -927,6 +1110,8 @@ class ViceWorldDirector {
         this.updateLuxuryGpsTrackers(dt);
         this.updateStreetIntimidation(dt);
         this.updateFocusMode(dt);
+        this.updateSpikeStrips(dt);
+        this.updateStreetTakeoverHype(dt);
         if (!Array.isArray(g.vehicles)) return;
         const now = this.nowMs();
         const p = g.player;

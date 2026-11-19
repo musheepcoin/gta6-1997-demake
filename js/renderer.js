@@ -17140,8 +17140,40 @@ class RetroRenderer {
             }
         }
 
-        // F. GTA 6 FOCUS MODE EAGLE-EYE TACTICAL LASER & WEAK-POINT RETICLES + STREET NPC STATUS BADGES
+        // F. GTA 6 FOCUS MODE EAGLE-EYE TACTICAL LASER & WEAK-POINT RETICLES + VCPD SPIKE STRIPS + STREET NPC STATUS BADGES
         if (!game.activeInterior && !p.dead && typeof this.worldToScreen === "function") {
+            if (game.director && Array.isArray(game.director.spikeStrips) && game.director.spikeStrips.length > 0) {
+                ctx.save();
+                ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                for (let si = 0; si < game.director.spikeStrips.length; si++) {
+                    const st = game.director.spikeStrips[si];
+                    if (!st || st.hit) continue;
+                    const halfW = (st.width || 52) * 0.5;
+                    const p1 = this.worldToScreen(st.x - Math.cos(st.angle) * halfW, st.y - Math.sin(st.angle) * halfW, st.z || 2.0);
+                    const p2 = this.worldToScreen(st.x + Math.cos(st.angle) * halfW, st.y + Math.sin(st.angle) * halfW, st.z || 2.0);
+                    const mid = this.worldToScreen(st.x, st.y, (st.z || 2.0) + 0.15);
+                    if (mid.x < -60 || mid.x > W + 60 || mid.y < -60 || mid.y > H + 60) continue;
+                    ctx.strokeStyle = "#facc15";
+                    ctx.lineWidth = 3.2;
+                    ctx.setLineDash([4, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = "rgba(38, 10, 18, 0.88)";
+                    ctx.fillRect(mid.x - 42, mid.y - 18, 84, 12);
+                    ctx.strokeStyle = "#ff1e38";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(mid.x - 42, mid.y - 18, 84, 12);
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText("⚠️ SPIKE STRIP", mid.x, mid.y - 12);
+                }
+                ctx.restore();
+            }
+
             const focusOn = Boolean(game.director && (game.director.focusActiveTimer || 0) > 0);
             if (focusOn) {
                 const pEnt = p.inVehicle || p;

@@ -4861,12 +4861,18 @@ class Vehicle {
             forwardVel *= Math.pow(0.12, dt);
         }
 
+        if ((this.tirePuncturedTimer || 0) > 0) {
+            this.tirePuncturedTimer = Math.max(0, this.tirePuncturedTimer - dt);
+        }
+        const tirePunctured = (this.tirePuncturedTimer || 0) > 0;
+        const tireMult = tirePunctured ? 0.58 : 1.0;
+
         let aiMaxCap = 1.0;
         if (this.driver === "AI_TRAFFIC" && this.aiPanicTimer <= 0) {
             aiMaxCap = this.aiCruiseFactor;
         }
-        const effectiveMax = this.maxSpeed * surfaceMult * aiMaxCap;
-        forwardVel = Math.max(-this.maxSpeed * (isWaterCraft ? 0.52 : 0.45), Math.min(effectiveMax, forwardVel));
+        const effectiveMax = this.maxSpeed * surfaceMult * aiMaxCap * tireMult;
+        forwardVel = Math.max(-this.maxSpeed * (isWaterCraft ? 0.52 : 0.45) * tireMult, Math.min(effectiveMax, forwardVel));
         this.speed = forwardVel;
 
         const maxSteerAngle = 0.5236;
@@ -4876,7 +4882,7 @@ class Vehicle {
             const speedFactor = isWaterCraft
                 ? Math.max(0.48, Math.min(1, Math.abs(forwardVel) / 95))
                 : Math.min(1, Math.abs(forwardVel) / 115);
-            const driftBoost = handbrake ? 1.34 : 1.0;
+            const driftBoost = (handbrake || tirePunctured) ? 1.34 : 1.0;
             this.angularVelocity = normSteer * this.turnSpeed * speedFactor * driftBoost * dir;
             this.angle += this.angularVelocity * dt;
         } else if (isWaterCraft && Math.abs(normSteer) > 0.05) {
@@ -4895,10 +4901,15 @@ class Vehicle {
        Kills lateral tire velocity, determines drift state & emits tire marks
        ======================================================================== */
     updateFriction(dt, forwardVel, lateralVel, handbrake, map, game) {
-        const lateralRetention = handbrake ? this.driftGrip : this.grip;
+        const tirePunctured = (this.tirePuncturedTimer || 0) > 0;
+        const baseRetention = handbrake ? this.driftGrip : this.grip;
+        const lateralRetention = tirePunctured ? Math.min(baseRetention, 0.35) : baseRetention;
         lateralVel *= Math.pow(1 - lateralRetention, dt * 10);
 
-        this.drifting = (handbrake && Math.abs(forwardVel) > 130) || Math.abs(lateralVel) > 75;
+        this.drifting = (tirePunctured && Math.abs(forwardVel) > 55) || (handbrake && Math.abs(forwardVel) > 130) || Math.abs(lateralVel) > 75;
+        if (tirePunctured && Math.abs(forwardVel) > 40 && game && typeof game.spawnParticle === "function" && Math.random() < 0.35) {
+            game.spawnParticle(this.x - Math.cos(this.angle) * 14, this.y - Math.sin(this.angle) * 14, "SPARK");
+        }
         if (this.drifting && !map.isWaterAtPixel(this.x, this.y)) {
             const tile = map.getTileAtPixel(this.x, this.y);
             const gt = typeof map.getGroundTypeAt === "function" ? map.getGroundTypeAt(this.x, this.y) : 0;
