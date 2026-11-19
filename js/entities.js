@@ -2760,7 +2760,7 @@ class Vehicle {
                 }
             }
             if (bestRx < 0 && cbx >= 447) {
-                bestRx = 446;
+                bestRx = 445;
                 bestRy = cby;
             }
             if (bestRx >= 0) {
@@ -3032,7 +3032,7 @@ class Vehicle {
         const targetInBeachOrParkExpanse = Boolean(
             !targetOnRoad && (
                 targetOnSand ||
-                wantedTarget.x >= 447.5 * TILE_SIZE
+                wantedTarget.x >= 447.2 * TILE_SIZE
             )
         );
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
@@ -3044,11 +3044,12 @@ class Vehicle {
         // Tactical Squad Deployment right at the scene:
         // 1) Cruiser has driven up to tactical standoff range (< 175px) of a visually spotted suspect on foot (on the beach, park, or street), OR
         // 2) Boxed-in slow getaway car (< 130px), OR
-        // 3) Blocked by a solid building wall within 440px for > 1.35s
-        // Note: When patrolling a Search Zone (`wantedTarget.isSearchPoint === true`), cruisers stay mobile on patrol unless blocked by a building wall!
+        // 3) Blocked by a solid building wall / palm row within 440px (or up to 1450px when intercepting a suspect across Lummus Park / Vice Beach) for > 1.35s
+        // Note: When patrolling a Search Zone (`wantedTarget.isSearchPoint === true`), cruisers stay mobile on patrol unless blocked by an obstacle!
         const playerOnFootAtScene = !wantedTarget.isSearchPoint && !wantedTarget.inVehicle && distToPlayer < 175;
         const playerBoxedNear = !wantedTarget.isSearchPoint && Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
-        const blockedByWallNear = !wantedTarget.inVehicle && distToPlayer < 440 && noProgress > 1.35;
+        const blockedMaxDist = (targetInBeachOrParkExpanse && this.x >= 444.0 * TILE_SIZE) ? 1450 : 440;
+        const blockedByWallNear = !wantedTarget.inVehicle && distToPlayer < blockedMaxDist && noProgress > 1.35;
 
         if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
             const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 64, wantedTarget);
@@ -3078,13 +3079,17 @@ class Vehicle {
 
         // Real-Life Off-Road Pursuit:
         // Leave the asphalt road (`forceDirect = true`) ONLY when:
-        // - The suspect is on Vice Beach / Lummus Park and the cruiser has reached Ocean Drive (this.x >= 445.0 * TILE_SIZE), OR
+        // - The suspect is on Vice Beach / Lummus Park and the cruiser has reached Ocean Drive (including Southbound lane bx=444 at 444.5 * TILE_SIZE)
+        //   and is aligned in Y within 440px (or already off-road in Lummus Park / Vice Beach this.x >= 447.2 * TILE_SIZE), OR
         // - The suspect is off-road on a sidewalk/plaza (`!targetOnRoad`) with clear line-of-sight within 240px!
         const clearOfBuildings = map.traceSegment2D
             ? !map.traceSegment2D(this.x, this.y, wantedTarget.x, wantedTarget.y, curZ).hit
             : (distToPlayer < 240);
+        const readyToCutOntoBeach =
+            this.x >= 444.0 * TILE_SIZE &&
+            (this.x >= 447.2 * TILE_SIZE || Math.abs(wantedTarget.y - this.y) <= 440 || distToPlayer < 520);
         const forceDirect =
-            (targetInBeachOrParkExpanse && this.x >= 445.0 * TILE_SIZE && distToPlayer < 1750) ||
+            (targetInBeachOrParkExpanse && readyToCutOntoBeach && distToPlayer < 2500) ||
             (!targetOnRoad && clearOfBuildings && distToPlayer < 240);
 
         // When pursuing a visually spotted target (or ambient AI_CRIMINAL getaway vehicle) with clear line-of-sight, the police passenger / tank turret fires!
@@ -3442,7 +3447,7 @@ class Vehicle {
                     ? !map.traceSegment2D(this.x, this.y, nearestCorpse.x, nearestCorpse.y, curZ).hit
                     : (rawDist < 240);
                 const forceDirect =
-                    (corpseInBeachOrPark && this.x >= 445.0 * TILE_SIZE && rawDist < 1650) ||
+                    (corpseInBeachOrPark && this.x >= 444.0 * TILE_SIZE && rawDist < 2400) ||
                     (!corpseOnRoad && clearOfBuildings && rawDist < 240);
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
@@ -3610,7 +3615,7 @@ class Vehicle {
                     ? !map.traceSegment2D(this.x, this.y, burningCar.x, burningCar.y, this.z || 2.0).hit
                     : (bestDist < 240);
                 const fireForceDirect =
-                    (fireInBeachOrPark && this.x >= 445.0 * TILE_SIZE && bestDist < 1650) ||
+                    (fireInBeachOrPark && this.x >= 444.0 * TILE_SIZE && bestDist < 2400) ||
                     (!fireOnRoad && fireClearOfBuildings && bestDist < 240);
                 const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
@@ -3913,8 +3918,8 @@ class Vehicle {
                 (map.getTileAtPixel && map.getTileAtPixel(target.x, target.y) === TILE.SAND)
             )
         );
-        const closeApproach = dist < 175 || (towTargetInBeachOrPark && this.x >= 445.0 * TILE_SIZE && dist < 1650);
-        const towForceDirect = (!towTargetOnRoad && dist < 175) || (towTargetInBeachOrPark && this.x >= 445.0 * TILE_SIZE && dist < 1650);
+        const closeApproach = dist < 175 || (towTargetInBeachOrPark && this.x >= 444.0 * TILE_SIZE && dist < 2400);
+        const towForceDirect = (!towTargetOnRoad && dist < 175) || (towTargetInBeachOrPark && this.x >= 444.0 * TILE_SIZE && dist < 2400);
         const roadCtrl = this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -4803,7 +4808,8 @@ class Vehicle {
                 this.specKey === "CAMPER_PICKUP" ||
                 this.specKey === "SWAT_ENFORCER"
             );
-            return isOffroad4x4 ? 0.92 : 0.72;
+            const isResponderOnSand = (this.driver === "AI_COP" || this.driver === "AI_EMERGENCY" || this.driver === "AI_TOW") && currentTile === TILE.SAND;
+            return isOffroad4x4 ? 0.92 : (isResponderOnSand ? 0.88 : 0.72);
         }
         if (map.isWaterAtPixel(this.x, this.y) && !this.amphibious && !this.waterOnly) {
             this.burnTimer = 0; // water extinguishes engine fire

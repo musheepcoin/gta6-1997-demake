@@ -7808,11 +7808,17 @@ class LeonidaGame {
         if (!p || p.dead || this.activeInterior || (this.wantedLevel || 0) <= 0) return false;
         const pEnt = p.inVehicle || p;
         const pZ = (pEnt.z !== undefined ? pEnt.z : p.z) || 2.0;
+        const playerOnOpenBeach = Boolean(
+            (pEnt.x >= 447.2 * TILE_SIZE && pEnt.y >= 44 * TILE_SIZE && pEnt.y <= 368 * TILE_SIZE) ||
+            (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(pEnt.x, pEnt.y) === TILE.SAND)
+        );
+        const copNearBeachfront = copX >= 443.0 * TILE_SIZE || (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(copX, copY) === TILE.SAND);
+        const effectiveMaxRange = (playerOnOpenBeach && copNearBeachfront) ? Math.max(maxRange, 2450) : maxRange;
         const dx = pEnt.x - copX;
         const dy = pEnt.y - copY;
-        if (Math.abs(dx) >= maxRange || Math.abs(dy) >= maxRange) return false;
+        if (Math.abs(dx) >= effectiveMaxRange || Math.abs(dy) >= effectiveMaxRange) return false;
         const d = Math.hypot(dx, dy);
-        if (d >= maxRange) return false;
+        if (d >= effectiveMaxRange) return false;
 
         // 1. Physical line-of-sight check against solid 3D buildings (always trace beyond 42px!)
         if (d >= 42 && this.map && typeof this.map.traceSegment2D === "function") {
@@ -7823,7 +7829,8 @@ class LeonidaGame {
         const activelyFiring = (p.muzzleTimer || 0) > 0;
         if (typeof copAngle === "number" && d >= 105 && !activelyFiring) {
             const cosFwd = (dx * Math.cos(copAngle) + dy * Math.sin(copAngle)) / Math.max(1, d);
-            if (cosFwd < -0.20) return false;
+            const minCos = (playerOnOpenBeach && copNearBeachfront) ? -0.65 : -0.20;
+            if (cosFwd < minCos) return false;
         }
 
         // 3. Suspect identification check:
@@ -7845,7 +7852,12 @@ class LeonidaGame {
         // Otherwise (911 witness call only — police are responding to the reported crime scene and have never laid eyes on the perpetrator yet!):
         const scene = this.lastKnownWantedPos;
         const distToScene = scene ? Math.hypot(pEnt.x - scene.x, pEnt.y - scene.y) : 0;
-        const atCrimeScene = distToScene < 240;
+        const playerOnBeachSand = Boolean(
+            pEnt.x >= 451.0 * TILE_SIZE ||
+            (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(pEnt.x, pEnt.y) === TILE.SAND)
+        );
+        const sceneNearBeach = Boolean(scene && (scene.x >= 441.5 * TILE_SIZE || (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(scene.x, scene.y) === TILE.SAND)));
+        const atCrimeScene = distToScene < ((playerOnBeachSand && sceneNearBeach && !inUnspottedCivCar) ? 1850 : 240);
         const openlyArmedOnFoot = !p.inVehicle && Boolean(p.weapon && p.weapon !== "FIST");
         const inRecentCombat = activelyFiring || (p.playerCombatTimer || 0) > 0 || (p.weaponDrawnTimer || 0) > 0;
         const inReportedOrPoliceCar = Boolean(p.inVehicle && (p.inVehicle === this.wantedSpottedVehicle || p.inVehicle.isPolice));
@@ -7890,10 +7902,18 @@ class LeonidaGame {
             if (useLastKnown) {
                 const dToLastKnown = Math.hypot(targX - fromX, targY - fromY);
                 if (dToLastKnown < 240) {
-                    // Unit has arrived at the Last Known Position / Crime Scene: fan out in a dynamic search pattern around the perimeter!
-                    const searchPhase = (performance.now() * 0.00085) + ((Math.round(fromX + fromY) % 13) * 0.48);
-                    targX += Math.cos(searchPhase) * 135;
-                    targY += Math.sin(searchPhase) * 135;
+                    // If the crime scene is along Ocean Drive / Lummus Park and the suspect fled east onto the open beach sand,
+                    // sweep eastward into Lummus Park / Vice Beach so responding units naturally inspect the beachfront!
+                    const onSandNow = realX >= 451.0 * TILE_SIZE || (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(realX, realY) === TILE.SAND);
+                    const playerFledToBeach = onSandNow && targX >= 441.5 * TILE_SIZE && Math.hypot(realX - targX, realY - targY) < 2200;
+                    if (playerFledToBeach) {
+                        targX = Math.min(realX, Math.max(targX + 260, 452.0 * TILE_SIZE));
+                        targY = targY + Math.max(-220, Math.min(220, realY - targY));
+                    } else {
+                        const searchPhase = (performance.now() * 0.00085) + ((Math.round(fromX + fromY) % 13) * 0.48);
+                        targX += Math.cos(searchPhase) * 135;
+                        targY += Math.sin(searchPhase) * 135;
+                    }
                 }
             }
 
@@ -14333,17 +14353,28 @@ class LeonidaGame {
                 }
 
                 // Real-Life Squad Pursuit Recovery:
-                // If the suspect has fled far away (> 420px, or > 260px in a speeding vehicle) and the officer's patrol cruiser (homeCruiser)
-                // is nearby (< 360px), the officer runs back to the cruiser and re-boards it to resume high-speed vehicle pursuit!
+                // If the suspect has fled far away down a city street (> 420px, or > 260px in a speeding vehicle) and the officer's patrol cruiser
+                // (homeCruiser) is nearby (< 360px), the officer runs back to the cruiser and re-boards it to resume high-speed vehicle pursuit!
+                // On the open Vice Beach / Lummus Park sand (where foot officers are deployed specifically to chase suspects across the sand),
+                // officers pursue on foot across the entire beach up to 1850px without turning back to re-board their cruiser!
                 const rawDistToTarget = rawCopTarget ? Math.hypot(rawCopTarget.x - ped.x, rawCopTarget.y - ped.y) : 9999;
                 const hc = ped.homeCruiser;
                 const hcValid = Boolean(hc && !hc.destroyed && hc !== (p && p.inVehicle) && !hc.towedByTruck && hc._gridEpoch === this._gridEpoch);
                 const dHomeCruiser = hcValid ? Math.hypot(hc.x - ped.x, hc.y - ped.y) : 9999;
+                const targetOnRoadForCop = Boolean(rawCopTarget && this.map && this.map.isRoadAtPixel && this.map.isRoadAtPixel(rawCopTarget.x, rawCopTarget.y));
+                const targetOnBeachOrParkForCop = Boolean(
+                    rawCopTarget && !targetOnRoadForCop && (
+                        rawCopTarget.x >= 447.2 * TILE_SIZE ||
+                        (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(rawCopTarget.x, rawCopTarget.y) === TILE.SAND)
+                    )
+                );
+                const reboardFootDist = targetOnBeachOrParkForCop ? 1850 : 420;
+                const reboardVehDist = targetOnBeachOrParkForCop ? 950 : 260;
                 const shouldReboardCruiser = Boolean(
                     rawCopTarget &&
                     hcValid &&
                     dHomeCruiser < 360 &&
-                    (rawDistToTarget > 420 || (rawCopTarget.inVehicle && rawDistToTarget > 260))
+                    (rawDistToTarget > reboardFootDist || (rawCopTarget.inVehicle && rawDistToTarget > reboardVehDist))
                 );
                 const copTarget = shouldReboardCruiser ? null : rawCopTarget;
 
@@ -14353,9 +14384,23 @@ class LeonidaGame {
 
                     const dTarget = Math.hypot(copTarget.x - ped.x, copTarget.y - ped.y);
 
-                    const effWanted = Math.max(this.wantedLevel || 0, copTarget.wantedLevel || 1);
+                    let effWanted = Math.max(this.wantedLevel || 0, copTarget.wantedLevel || 1);
 
-                    const copRunSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 104 : 96;
+                    // If a 1★ suspect wades into ocean water to evade a physical baton arrest while a foot officer is right at the shoreline,
+                    // VCPD escalates to 2★ so shoreline officers can engage!
+                    const targetInWater = Boolean(!copTarget.isCriminalNPC && !copTarget.isSearchPoint && this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(copTarget.x, copTarget.y));
+                    if (targetInWater && effWanted === 1 && dTarget < 240) {
+                        this._waterEvadeTimer = (this._waterEvadeTimer || 0) + dt;
+                        if (this._waterEvadeTimer >= 2.2) {
+                            this._waterEvadeTimer = 0;
+                            this.setWantedLevel(2, { x: copTarget.x, y: copTarget.y }, true);
+                            this.addFloatingText(copTarget.x, copTarget.y - 34, "🚨 10-80 FLEEING INTO SURF — 2★!", "#ef4444");
+                            effWanted = 2;
+                        }
+                    }
+
+                    const baseCopSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 104 : 96;
+                    const copRunSpd = targetOnBeachOrParkForCop ? (baseCopSpd + 10) : baseCopSpd;
 
                     const idealDist = copTarget.isCriminalNPC ? 95 : 28;
 
@@ -14410,7 +14455,8 @@ class LeonidaGame {
                     // Real-Life Proportional Force:
                     // At 1★ (minor offense / unarmed suspect), VCPD officers pursue on foot to make a physical arrest (baton/BUSTED) without opening fire!
                     // Lethal firearm engagement begins at 2★+ (or against armed NPC criminals).
-                    if (!copTarget.isSearchPoint && (copTarget.isCriminalNPC || effWanted >= 2) && dTarget < 325 && ped.shootCooldown <= 0 && (copTarget.isRemote || copTarget.isCriminalNPC || !this.activeInterior)) {
+                    const maxCopShootDist = (targetOnBeachOrParkForCop || targetInWater) ? 385 : 325;
+                    if (!copTarget.isSearchPoint && (copTarget.isCriminalNPC || effWanted >= 2) && dTarget < maxCopShootDist && ped.shootCooldown <= 0 && (copTarget.isRemote || copTarget.isCriminalNPC || !this.activeInterior)) {
 
                         const blocked = this.map.traceSegment2D
 
@@ -18589,6 +18635,7 @@ class LeonidaGame {
             triggeredAny = true;
             const bz = scene.z || this.map.getHeightAtPixel(scene.x, scene.y, 4.0);
             let killedCount = 0;
+            const spawnedBatch = [];
             for (let i = 0; i < members.length; i++) {
                 if (this.peds.length >= 235 && (scatterOnly || i > 0)) break;
                 const m = members[i];
@@ -18611,20 +18658,25 @@ class LeonidaGame {
                     turnSeed: i + 17
                 });
                 this.peds.push(ped);
-                if (scatterOnly) continue;
-                const checkX = m.seatX !== undefined ? m.seatX : m.x;
-                const checkY = m.seatY !== undefined ? m.seatY : m.y;
-                const d = Math.hypot(checkX - hitX, checkY - hitY);
-                if (d <= hitRad + 18 || (!requireDirectHit && i === 0 && killedCount === 0)) {
-                    if (isNonLethal) {
-                        ped.stunnedTimer = 1.65;
-                        ped.panicTimer = 6.5;
-                        ped.x += Math.cos(awayAng) * 14;
-                        ped.y += Math.sin(awayAng) * 14;
-                    } else {
-                        this.killPed(ped, byPlayer, fromNetwork);
+                spawnedBatch.push({ ped, m, i, awayAng });
+            }
+            if (!scatterOnly) {
+                for (let b = 0; b < spawnedBatch.length; b++) {
+                    const { ped, m, i, awayAng } = spawnedBatch[b];
+                    const checkX = m.seatX !== undefined ? m.seatX : m.x;
+                    const checkY = m.seatY !== undefined ? m.seatY : m.y;
+                    const d = Math.hypot(checkX - hitX, checkY - hitY);
+                    if (d <= hitRad + 18 || (!requireDirectHit && i === 0 && killedCount === 0)) {
+                        if (isNonLethal) {
+                            ped.stunnedTimer = 1.65;
+                            ped.panicTimer = 6.5;
+                            ped.x += Math.cos(awayAng) * 14;
+                            ped.y += Math.sin(awayAng) * 14;
+                        } else {
+                            this.killPed(ped, byPlayer, fromNetwork);
+                        }
+                        killedCount++;
                     }
-                    killedCount++;
                 }
             }
             if (byPlayer && labelText && killedCount > 0) {

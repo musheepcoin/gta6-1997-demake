@@ -151,6 +151,18 @@ class ViceWorldDirector {
     /* ========================================================================
        1. PERCEPTION ENGINE (3D Line-of-Sight, Forward Vision Cone & Acoustics)
        ======================================================================== */
+    isPointInOpenBeachOrPark(wx, wy) {
+        const g = this.game;
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        if (wx >= 447.2 * tileSize && wy >= 44 * tileSize && wy <= 368 * tileSize) {
+            return true;
+        }
+        if (g && g.map && typeof g.map.getTileAtPixel === "function" && typeof TILE !== "undefined") {
+            if (g.map.getTileAtPixel(wx, wy) === TILE.SAND) return true;
+        }
+        return false;
+    }
+
     hasLineOfSight(x1, y1, x2, y2, z = 2.0, minCheckDist = 42) {
         const g = this.game;
         const d = Math.hypot(x2 - x1, y2 - y1);
@@ -175,7 +187,12 @@ class ViceWorldDirector {
         const g = this.game;
         if (!g || g.activeInterior) return false;
         const pz = (g.player && (g.player.inVehicle ? g.player.inVehicle.z : g.player.z)) || 2.0;
-        const pedCap = Math.min(this.config.copFootSightRange, maxDist);
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        const eventOnOpenBeach = this.isPointInOpenBeachOrPark(x, y);
+        const effMaxDist = eventOnOpenBeach ? Math.max(maxDist, isLoudEvent ? 980 : 760) : maxDist;
+        const pedCap = eventOnOpenBeach
+            ? Math.max(this.config.copFootSightRange, isLoudEvent ? 860 : 680)
+            : Math.min(this.config.copFootSightRange, maxDist);
         const isLoud = Boolean(isLoudEvent || (g.player && (g.player.muzzleTimer || 0) > 0));
 
         if (Array.isArray(g.peds)) {
@@ -187,7 +204,7 @@ class ViceWorldDirector {
                 const d = Math.hypot(dx, dy);
                 if (d >= pedCap) continue;
                 if (!this.hasLineOfSight(ped.x, ped.y, x, y, pz, 42)) continue;
-                if (!isLoud && !this.isInVisionCone(ped.x, ped.y, ped.angle, x, y, -0.25, 110)) continue;
+                if (!isLoud && !this.isInVisionCone(ped.x, ped.y, ped.angle, x, y, eventOnOpenBeach ? -0.45 : -0.25, 110)) continue;
                 return true;
             }
         }
@@ -197,13 +214,14 @@ class ViceWorldDirector {
                 if (!v || v.destroyed || !v.isPolice) continue;
                 // An unoccupied parked police car has no officer inside and cannot witness crimes!
                 if (v.driver !== "AI_COP" && v.driver !== "AI_TRAFFIC") continue;
+                const vCap = (eventOnOpenBeach && (v.x >= 443.0 * tileSize || this.isPointInOpenBeachOrPark(v.x, v.y))) ? effMaxDist : maxDist;
                 const dx = x - v.x;
                 const dy = y - v.y;
-                if (Math.abs(dx) >= maxDist || Math.abs(dy) >= maxDist) continue;
+                if (Math.abs(dx) >= vCap || Math.abs(dy) >= vCap) continue;
                 const d = Math.hypot(dx, dy);
-                if (d >= maxDist) continue;
+                if (d >= vCap) continue;
                 if (!this.hasLineOfSight(v.x, v.y, x, y, pz, 42)) continue;
-                if (!isLoud && !this.isInVisionCone(v.x, v.y, v.angle, x, y, -0.25, 125)) continue;
+                if (!isLoud && !this.isInVisionCone(v.x, v.y, v.angle, x, y, eventOnOpenBeach ? -0.50 : -0.25, 125)) continue;
                 return true;
             }
         }
@@ -225,18 +243,28 @@ class ViceWorldDirector {
 
         const pEnt = p.inVehicle || p;
         const pZ = (pEnt.z !== undefined ? pEnt.z : p.z) || 2.0;
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        const playerOnOpenBeach = this.isPointInOpenBeachOrPark(pEnt.x, pEnt.y);
+        const copNearBeachfront = copX >= 443.0 * tileSize || this.isPointInOpenBeachOrPark(copX, copY);
+        // Vice Beach & Lummus Park form an unobstructed 2,300px open expanse east of Ocean Drive with zero buildings:
+        // officers on Ocean Drive, Lummus Park, or the beach have long-range visual sight across the open sand!
+        const effectiveMaxRange = (playerOnOpenBeach && copNearBeachfront)
+            ? Math.max(maxRange, 2450)
+            : maxRange;
+
         const dx = pEnt.x - copX;
         const dy = pEnt.y - copY;
-        if (Math.abs(dx) >= maxRange || Math.abs(dy) >= maxRange) return false;
+        if (Math.abs(dx) >= effectiveMaxRange || Math.abs(dy) >= effectiveMaxRange) return false;
         const d = Math.hypot(dx, dy);
-        if (d >= maxRange) return false;
+        if (d >= effectiveMaxRange) return false;
 
-        // 1. 3D Building Occlusion Check
+        // 1. 3D Building Occlusion Check (always enforced so buildings West of Ocean Drive still block sight 100%)
         if (!this.hasLineOfSight(copX, copY, pEnt.x, pEnt.y, pZ, 42)) return false;
 
-        // 2. Forward Vision Cone Check (unless point-blank < 105px or player is actively firing)
+        // 2. Forward Vision Cone Check (unless point-blank < 105px or player is actively firing; wider lateral scan across open beach)
         const activelyFiring = (p.muzzleTimer || 0) > 0;
-        if (!activelyFiring && !this.isInVisionCone(copX, copY, copAngle, pEnt.x, pEnt.y, this.config.copVisionConeMinCos, this.config.copBlindSpotNearDist)) {
+        const minConeCos = (playerOnOpenBeach && copNearBeachfront) ? -0.65 : this.config.copVisionConeMinCos;
+        if (!activelyFiring && !this.isInVisionCone(copX, copY, copAngle, pEnt.x, pEnt.y, minConeCos, this.config.copBlindSpotNearDist)) {
             return false;
         }
 
@@ -259,9 +287,19 @@ class ViceWorldDirector {
 
         // 4. 911 Witness-Only APB Identification Rules:
         // Responding units have only a crime-scene location and suspect/vehicle description from the 911 caller.
+        // On open Vice Beach sand (where there are no buildings to hide behind), a fugitive fleeing across the beach sand
+        // from an Ocean Drive or Beach crime scene is exposed to responding units scanning the beachfront!
         const scene = g.lastKnownWantedPos;
         const distToScene = scene ? Math.hypot(pEnt.x - scene.x, pEnt.y - scene.y) : 0;
-        const atCrimeScene = distToScene < this.config.crimeSceneRadiusPx;
+        const playerOnBeachSand = Boolean(
+            pEnt.x >= 451.0 * tileSize ||
+            (g.map && g.map.getTileAtPixel && typeof TILE !== "undefined" && g.map.getTileAtPixel(pEnt.x, pEnt.y) === TILE.SAND)
+        );
+        const sceneNearBeach = Boolean(scene && (scene.x >= 441.5 * tileSize || this.isPointInOpenBeachOrPark(scene.x, scene.y)));
+        const effectiveSceneRadius = (playerOnBeachSand && sceneNearBeach && !inUnspottedCivCar)
+            ? 1850
+            : this.config.crimeSceneRadiusPx;
+        const atCrimeScene = distToScene < effectiveSceneRadius;
         const openlyArmedOnFoot = !p.inVehicle && Boolean(p.weapon && p.weapon !== "FIST");
         const inRecentCombat = activelyFiring || (p.playerCombatTimer || 0) > 0 || (p.weaponDrawnTimer || 0) > 0;
         const inReportedOrPoliceCar = Boolean(p.inVehicle && (p.inVehicle === g.wantedSpottedVehicle || p.inVehicle.isPolice));
@@ -307,9 +345,11 @@ class ViceWorldDirector {
         }
 
         // Case 2: Civilian Witness 911 Call
-        const maxWitnessDist = isExplosion
+        const crimeOnOpenBeach = this.isPointInOpenBeachOrPark(x, y);
+        const baseWitnessDist = isExplosion
             ? this.config.witnessExplosionSightRange
             : (isGunfire ? this.config.witnessGunshotSightRange : this.config.witnessMeleeSightRange);
+        const maxWitnessDist = crimeOnOpenBeach ? Math.max(baseWitnessDist, 820) : baseWitnessDist;
         let bestWitness = null;
         let bestDist = maxWitnessDist;
         const pz = (g.player.inVehicle ? g.player.inVehicle.z : g.player.z) || 2.0;
@@ -1157,20 +1197,25 @@ class ViceWorldDirector {
         const stations = this.getEmergencyStations(serviceType).slice();
         stations.sort((a, b) => Math.hypot(a.x - targetX, a.y - targetY) - Math.hypot(b.x - targetX, b.y - targetY));
 
+        const targetOnEastBeach = targetX >= 447.2 * tileSize && targetY >= 44 * tileSize && targetY <= 368 * tileSize;
+        const roadTargetX = targetOnEastBeach
+            ? ((targetY < 75 * tileSize ? 456.5 : 445.0) * tileSize)
+            : targetX;
+
         for (let pass = 0; pass < 2; pass++) {
             const strictLaneAlign = (pass === 0);
             for (let si = 0; si < stations.length; si++) {
                 const st = stations[si];
-                const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
+                const distStToTarget = Math.hypot(st.x - roadTargetX, st.y - targetY);
                 const inViewSt = typeof g.isPointInAnyPlayerCameraView === "function"
                     ? g.isPointInAnyPlayerCameraView(st.x, st.y, 220)
                     : false;
                 const useStationGate = distStToTarget >= this.config.stationGateMinDist &&
                     distStToTarget <= this.config.stationGateMaxDist &&
                     !inViewSt;
-                const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
+                const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - roadTargetX);
                 const corridorDist = Math.max(1350, Math.min(distStToTarget, 1750));
-                const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * corridorDist);
+                const anchorX = useStationGate ? st.x : (roadTargetX + Math.cos(dirFromTargetToSt) * corridorDist);
                 const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
                 const baseBx = Math.floor(anchorX / tileSize);
                 const baseBy = Math.floor(anchorY / tileSize);
@@ -1194,7 +1239,8 @@ class ViceWorldDirector {
                             const sy = (by + 0.5) * tileSize;
                             if (Math.hypot(sx - targetX, sy - targetY) < 1180) continue;
                             if (typeof g.isPointInAnyPlayerCameraView === "function" && g.isPointInAnyPlayerCameraView(sx, sy, 220)) continue;
-                            const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
+                            const alignTargetX = (targetOnEastBeach && bx >= 443) ? roadTargetX : targetX;
+                            const toTargetAng = Math.atan2(targetY - sy, alignTargetX - sx);
                             const roadAng = typeof g.map.getAlignedRoadAngle === "function"
                                 ? g.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
                                 : toTargetAng;
