@@ -429,12 +429,12 @@ class ViceWorldDirector {
             const dCenter = Math.hypot(dx, dy);
             if (dCenter > maxDist) continue;
 
-            // Compute rear trunk world position of the vehicle
+            // Compute rear trunk world position of the vehicle (prefer unlooted trunks when two cars are adjacent)
             const halfLen = (v.w || 48) * 0.5;
             const trunkX = v.x - Math.cos(v.angle || 0) * halfLen;
             const trunkY = v.y - Math.sin(v.angle || 0) * halfLen;
             const dTrunk = Math.hypot(p.x - trunkX, p.y - trunkY);
-            const score = Math.min(dTrunk, dCenter * 0.85);
+            const score = Math.min(dTrunk, dCenter * 0.85) + (v._trunkLooted ? 18 : 0);
             if (score < bestScore) {
                 bestScore = score;
                 bestVeh = v;
