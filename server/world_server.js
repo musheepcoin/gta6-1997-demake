@@ -1777,67 +1777,6 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 }
             }
         }
-
-        // 3C. Autonomous Server-Authoritative Spec-Ops Hot Drop Crate & Bounty/Vault Expiration
-        if (room.activeFlashDrop && (nowMs - (room.activeFlashDrop.startedAt || 0)) >= (room.activeFlashDrop.duration || 90) * 1000) {
-            room.activeFlashDrop = null;
-        }
-        if (room.activeBounty && (nowMs - (room.activeBounty.startedAt || 0)) >= (room.activeBounty.duration || 60) * 1000) {
-            room.activeBounty = null;
-        }
-        if (room.robbedVaults && (autonomousSimTickCount % 50) === 0) {
-            for (const [vk, expMs] of Object.entries(room.robbedVaults)) {
-                if (expMs <= nowMs) delete room.robbedVaults[vk];
-            }
-        }
-        if (!room.activeFlashDrop && roomPlayers.length > 0 && roadSpawnTiles.length > 0) {
-            if (!room.nextFlashDropMs) {
-                room.nextFlashDropMs = nowMs + 95000;
-            } else if (nowMs >= room.nextFlashDropMs) {
-                room.nextFlashDropMs = nowMs + 165000;
-                const anchor = roomPlayers[autonomousSimTickCount % roomPlayers.length];
-                let dropTile = null;
-                for (let att = 0; att < 24; att++) {
-                    const cand = hotspotRoadTiles.length > 0
-                        ? hotspotRoadTiles[(autonomousSimTickCount * 17 + att * 31) % hotspotRoadTiles.length]
-                        : roadSpawnTiles[(autonomousSimTickCount * 17 + att * 31) % roadSpawnTiles.length];
-                    const d = Math.hypot(cand.x - anchor.x, cand.y - anchor.y);
-                    if (d >= 280 && d <= 1450) {
-                        dropTile = cand;
-                        break;
-                    }
-                }
-                if (!dropTile) {
-                    dropTile = hotspotRoadTiles[autonomousSimTickCount % hotspotRoadTiles.length] || roadSpawnTiles[0];
-                }
-                if (dropTile) {
-                    const wepPool = ["ROCKET", "FLAMETHROWER", "ELECTRO", "SHOTGUN"];
-                    const wep = wepPool[autonomousSimTickCount % wepPool.length];
-                    const reward = 800;
-                    room.activeFlashDrop = {
-                        x: Math.round(dropTile.x),
-                        y: Math.round(dropTile.y),
-                        z: dropTile.z || 2.0,
-                        reward,
-                        weapon: wep,
-                        duration: 90,
-                        startedAt: nowMs
-                    };
-                    broadcastToRoom(roomCode, {
-                        t: "WORLD_EVENT",
-                        id: "server_sim",
-                        room: roomCode,
-                        kind: "FLASH_DROP_SPAWN",
-                        x: room.activeFlashDrop.x,
-                        y: room.activeFlashDrop.y,
-                        z: room.activeFlashDrop.z,
-                        reward,
-                        weapon: wep,
-                        duration: 90
-                    });
-                }
-            }
-        }
     }
 
     // 4. Advance all autonomous vehicles along the .CMP road network (100% Dedicated Server Authoritative)
