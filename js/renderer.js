@@ -13556,30 +13556,38 @@ class RetroRenderer {
             }
         }
 
-        // 3. Online Multiplayer Floating 3D Player Nametags & Health Bars
+        // 3. Online Multiplayer Floating 3D Player Nametags, Syndicate Badges, 2.5D Emotes & Edge-of-Screen Social Radar
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        const activeTurf = (typeof game.getCurrentDistrictTurf === "function") ? game.getCurrentDistrictTurf() : null;
+        const kingpinName = (activeTurf && activeTurf.leaderName) ? String(activeTurf.leaderName).toUpperCase() : "";
+
         if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
-            const W = this.canvas.width;
-            const H = this.canvas.height;
             for (const rp of game.net.remotePlayers.values()) {
+                if (rp.isHidden) continue;
                 const rz = this.getEntityZ(rp, 0.22);
                 const sc = this.worldToScreen(rp.x, rp.y, rz);
-                const col = rp.color || "#00f0ff";
+                const synIcon = rp.syndicate === "CYAN" ? "⚡" : "🦩";
+                const isRpKing = Boolean(kingpinName && String(rp.name || "").toUpperCase() === kingpinName);
+                const crownTag = isRpKing ? "👑 " : "";
+                const col = isRpKing ? "#fde047" : (rp.syndicate === "CYAN" ? "#00f0ff" : (rp.color || "#ff2a85"));
+
                 if (sc.x >= -60 && sc.x <= W + 60 && sc.y >= -60 && sc.y <= H + 60) {
                     const rSeat = (rp.veh && typeof rp.veh.seat === "number") ? rp.veh.seat : 0;
-                    const seatIcon = rp.veh ? (rSeat === 0 ? "🚗" : "🔫") : "🌐";
-                    const tag = rp.dead ? `💀 ${rp.name} (WASTED)` : `${seatIcon} ${rp.name}`;
-                    const bw = Math.max(92, ctx.measureText(tag).width + 16);
+                    const seatIcon = rp.veh ? (rSeat === 0 ? "🚗" : "🔫") : synIcon;
+                    const tag = rp.dead ? `💀 ${rp.name} (WASTED)` : `${crownTag}${seatIcon} ${rp.name}`;
+                    const bw = Math.max(96, ctx.measureText(tag).width + 18);
                     const bh = 22;
                     const bx = Math.round(sc.x - bw * 0.5);
                     const by = Math.round(sc.y - (rp.veh ? (38 + rSeat * 24) : 30));
 
-                    ctx.fillStyle = "rgba(8, 12, 24, 0.88)";
+                    ctx.fillStyle = "rgba(8, 12, 24, 0.90)";
                     ctx.fillRect(bx, by, bw, bh);
                     ctx.strokeStyle = col;
-                    ctx.lineWidth = 1.5;
+                    ctx.lineWidth = isRpKing ? 2.0 : 1.5;
                     ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
-                    ctx.fillStyle = "#ffffff";
+                    ctx.fillStyle = isRpKing ? "#fde047" : "#ffffff";
                     ctx.fillText(tag, sc.x, by + 8);
 
                     // Mini Health Bar inside the nametag pill
@@ -13589,6 +13597,22 @@ class RetroRenderer {
                     ctx.fillRect(bx + 6, by + 15, barW, 4);
                     ctx.fillStyle = hpPct > 0.4 ? "#39ff14" : "#ff1e38";
                     ctx.fillRect(bx + 6, by + 15, Math.round(barW * hpPct), 4);
+
+                    // Floating 2.5D Arcade Social Emote Pill above remote player
+                    if (rp.socialEmote && (rp.socialEmote.timer || 0) > 0) {
+                        const emTxt = `${rp.socialEmote.icon} ${rp.socialEmote.label}`;
+                        const ebw = Math.max(96, ctx.measureText(emTxt).width + 20);
+                        const ebh = 22;
+                        const ebx = Math.round(sc.x - ebw * 0.5);
+                        const eby = by - ((rp.chatTimer || 0) > 0 ? 50 : 26);
+                        ctx.fillStyle = "rgba(10, 15, 30, 0.95)";
+                        ctx.fillRect(ebx, eby, ebw, ebh);
+                        ctx.strokeStyle = rp.socialEmote.color || "#39ff14";
+                        ctx.lineWidth = 2.0;
+                        ctx.strokeRect(ebx + 0.5, eby + 0.5, ebw - 1, ebh - 1);
+                        ctx.fillStyle = rp.socialEmote.color || "#39ff14";
+                        ctx.fillText(emTxt, sc.x, eby + ebh * 0.5);
+                    }
 
                     // Floating 3D Speech Bubble above remote player nametag when they chat!
                     if ((rp.chatTimer || 0) > 0 && rp.chatText) {
@@ -13605,15 +13629,64 @@ class RetroRenderer {
                         ctx.fillStyle = "#fde047";
                         ctx.fillText(bubbleTxt, sc.x, bby + bbh * 0.5);
                     }
+                } else {
+                    // Edge-of-Screen Directional Social Radar Badge for off-screen human/bot player!
+                    const pObj = p.inVehicle || p;
+                    const distMeters = Math.round(Math.hypot(rp.x - pObj.x, rp.y - pObj.y) / 16);
+                    const padX = 88;
+                    const padY = 82;
+                    const ex = Math.max(padX, Math.min(W - padX, sc.x));
+                    const ey = Math.max(padY, Math.min(H - padY, sc.y));
+                    const edgeTag = `${crownTag}${synIcon} ${rp.name.slice(0, 10)} (${distMeters}m)`;
+                    const ebw = Math.max(96, ctx.measureText(edgeTag).width + 16);
+                    const ebh = 20;
+                    const ebx = Math.round(ex - ebw * 0.5);
+                    const eby = Math.round(ey - ebh * 0.5);
+                    ctx.fillStyle = "rgba(8, 12, 24, 0.90)";
+                    ctx.fillRect(ebx, eby, ebw, ebh);
+                    ctx.strokeStyle = col;
+                    ctx.lineWidth = 1.6;
+                    ctx.strokeRect(ebx + 0.5, eby + 0.5, ebw - 1, ebh - 1);
+                    ctx.fillStyle = col;
+                    ctx.fillText(edgeTag, ex, eby + ebh * 0.5);
                 }
             }
         }
 
-        // 4. Local Player 3D Speech Bubble when Lucia sends a chat message [T]
+        // 4. Local Player 2.5D Kingpin Crown, Social Emote Bubble [U] & Speech Bubble [T]
+        const pObj = p.inVehicle || p;
+        const pz = this.getEntityZ(pObj, 0.24);
+        const pSc = this.worldToScreen(pObj.x, pObj.y, pz);
+        const isLocalKing = typeof game.isCurrentDistrictControlledByMe === "function" && game.isCurrentDistrictControlledByMe();
+        if (isLocalKing && !p.dead) {
+            const cTxt = `👑 KINGPIN (${game.net && game.net.syndicate === "CYAN" ? "⚡CYAN" : "🦩FLAMINGO"})`;
+            const cbw = Math.max(92, ctx.measureText(cTxt).width + 16);
+            const cbh = 18;
+            const cbx = Math.round(pSc.x - cbw * 0.5);
+            const cby = Math.round(pSc.y - (p.inVehicle ? 40 : 32));
+            ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+            ctx.fillRect(cbx, cby, cbw, cbh);
+            ctx.strokeStyle = "#fde047";
+            ctx.lineWidth = 1.6;
+            ctx.strokeRect(cbx + 0.5, cby + 0.5, cbw - 1, cbh - 1);
+            ctx.fillStyle = "#fde047";
+            ctx.fillText(cTxt, pSc.x, cby + cbh * 0.5);
+        }
+        if (p.socialEmote && (p.socialEmote.timer || 0) > 0) {
+            const emTxt = `${p.socialEmote.icon} ${p.socialEmote.label}`;
+            const ebw = Math.max(96, ctx.measureText(emTxt).width + 20);
+            const ebh = 22;
+            const ebx = Math.round(pSc.x - ebw * 0.5);
+            const eby = Math.round(pSc.y - (p.inVehicle ? 64 : 56));
+            ctx.fillStyle = "rgba(10, 15, 30, 0.95)";
+            ctx.fillRect(ebx, eby, ebw, ebh);
+            ctx.strokeStyle = p.socialEmote.color || "#39ff14";
+            ctx.lineWidth = 2.0;
+            ctx.strokeRect(ebx + 0.5, eby + 0.5, ebw - 1, ebh - 1);
+            ctx.fillStyle = p.socialEmote.color || "#39ff14";
+            ctx.fillText(emTxt, pSc.x, eby + ebh * 0.5);
+        }
         if ((p.chatTimer || 0) > 0 && p.chatText) {
-            const pObj = p.inVehicle || p;
-            const pz = this.getEntityZ(pObj, 0.24);
-            const pSc = this.worldToScreen(pObj.x, pObj.y, pz);
             const bubbleTxt = `💬 ${p.chatText.slice(0, 56)}`;
             const bbw = Math.max(80, ctx.measureText(bubbleTxt).width + 18);
             const bbh = 21;
@@ -13626,6 +13699,38 @@ class RetroRenderer {
             ctx.strokeRect(bbx + 0.5, bby + 0.5, bbw - 1, bbh - 1);
             ctx.fillStyle = "#ffffff";
             ctx.fillText(bubbleTxt, pSc.x, bby + bbh * 0.5);
+        }
+
+        // 5. Physical 2.5D Dropped Kingpin Crown Trophy & Nearby Car Meet Respect Tag [Y]
+        if (game.droppedKingpinCrown) {
+            const cr = game.droppedKingpinCrown;
+            const cSc = this.worldToScreen(cr.x, cr.y, cr.z || 2.0);
+            const cLbl = `👑 GRAB KINGPIN CROWN (+$${(cr.reward || 1000).toLocaleString()})`;
+            const cbw = Math.max(120, ctx.measureText(cLbl).width + 18);
+            ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+            ctx.fillRect(cSc.x - cbw * 0.5, cSc.y - 24, cbw, 20);
+            ctx.strokeStyle = "#fde047";
+            ctx.strokeRect(cSc.x - cbw * 0.5, cSc.y - 24, cbw, 20);
+            ctx.fillStyle = "#fde047";
+            ctx.fillText(cLbl, cSc.x, cSc.y - 14);
+        }
+        if (!p.inVehicle && Array.isArray(game.vehicles)) {
+            for (let vi = 0; vi < game.vehicles.length; vi++) {
+                const v = game.vehicles[vi];
+                if (!v || v.destroyed || (!v._worldModified && !v.createdByEngine && !v.respectCount)) continue;
+                if (Math.hypot(v.x - p.x, v.y - p.y) < 105) {
+                    const vSc = this.worldToScreen(v.x, v.y, v.z || 2.0);
+                    const rTag = `🚗 ${v.name} • ⭐${v.respectCount || 0} RESPECT • [Y] SALUTE (+$100)`;
+                    const rbw = Math.max(140, ctx.measureText(rTag).width + 18);
+                    ctx.fillStyle = "rgba(8, 12, 24, 0.92)";
+                    ctx.fillRect(vSc.x - rbw * 0.5, vSc.y - 34, rbw, 20);
+                    ctx.strokeStyle = "#39ff14";
+                    ctx.strokeRect(vSc.x - rbw * 0.5, vSc.y - 34, rbw, 20);
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillText(rTag, vSc.x, vSc.y - 24);
+                    break;
+                }
+            }
         }
 
         ctx.restore();
@@ -16828,10 +16933,50 @@ class RetroRenderer {
                 ctx.drawImage(this._lbHudCanvas, lbX - 2, lbY - 2);
             }
 
-            // A3. LIVE TURF KINGPIN, HOT DROP & BOUNTY HUD WIDGETS
+            // A3. LIVE FLASH DISTRICT MAGNET, SYNDICATE TUG-OF-WAR, TURF KINGPIN, HOT DROP & BOUNTY HUD WIDGETS
             let curY = lbY + lbH + 6;
             ctx.save();
             ctx.textBaseline = "middle";
+
+            // 0. 🔥 Active Flash District Magnet & 🦩 vs ⚡ Syndicate Crew Tug-of-War
+            if (typeof game.ensureActiveFlashDistrict === "function") {
+                const fd = game.ensureActiveFlashDistrict();
+                if (fd) {
+                    const boxH = 38;
+                    const inHot = typeof game.isInsideActiveFlashDistrict === "function" && game.isInsideActiveFlashDistrict();
+                    ctx.fillStyle = inHot ? "rgba(28, 10, 26, 0.92)" : "rgba(10, 16, 30, 0.90)";
+                    ctx.fillRect(lbX, curY, lbW, boxH);
+                    ctx.strokeStyle = fd.color || "#ff2a85";
+                    ctx.lineWidth = inHot ? 1.8 : 1.3;
+                    ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+                    ctx.textAlign = "left";
+                    ctx.fillStyle = fd.color || "#ff2a85";
+                    const shortHot = String(fd.key || "OCEAN_DRIVE").replace("_", " ").slice(0, 12);
+                    ctx.fillText(`🔥 HOT: ${shortHot} ${inHot ? "(2X!)" : ""}`, lbX + 6, curY + 10);
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = "#fde047";
+                    ctx.fillText(`${Math.ceil(fd.timer || 0)}s`, lbX + lbW - 6, curY + 10);
+
+                    // Syndicate Tug-of-War Bar (🦩 FLAMINGO vs ⚡ CYAN)
+                    const fScore = Number(fd.flamingoScore) || 0;
+                    const cScore = Number(fd.cyanScore) || 0;
+                    const tot = fScore + cScore;
+                    const fPct = tot > 0 ? Math.round((fScore / tot) * 100) : 50;
+                    const cPct = 100 - fPct;
+                    const mySyn = (game.net && game.net.syndicate) || "FLAMINGO";
+                    ctx.textAlign = "left";
+                    ctx.fillStyle = mySyn === "FLAMINGO" ? "#ff2a85" : "#94a3b8";
+                    ctx.fillText(`🦩${fPct}%`, lbX + 6, curY + 26);
+                    ctx.textAlign = "center";
+                    ctx.fillStyle = "#39ff14";
+                    ctx.fillText(`[I]:${mySyn.slice(0, 4)} [U]:EMO`, lbX + lbW * 0.5, curY + 26);
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = mySyn === "CYAN" ? "#00f0ff" : "#94a3b8";
+                    ctx.fillText(`${cPct}%⚡`, lbX + lbW - 6, curY + 26);
+                    curY += boxH + 5;
+                }
+            }
 
             // 1. 👑 District Turf Kingpin Badge
             if (typeof game.getCurrentDistrictTurf === "function") {

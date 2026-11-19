@@ -39,6 +39,27 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
+const FLASH_DISTRICTS = [
+    { index: 0, key: "OCEAN_DRIVE", label: "OCEAN DRIVE NEON STRIP", x: Math.round(445.5 * 64), y: Math.round(279.0 * 64), color: "#ff2a85" },
+    { index: 1, key: "STAR_ISLAND", label: "STAR ISLAND PALAZZO", x: Math.round(348.5 * 64), y: Math.round(173.5 * 64), color: "#c084fc" },
+    { index: 2, key: "DOWNTOWN", label: "DOWNTOWN & LITTLE CUBA", x: Math.round(288.5 * 64), y: Math.round(202.5 * 64), color: "#38bdf8" },
+    { index: 3, key: "WYNWOOD_HAITI", label: "WYNWOOD & MAMBAS STADIUM", x: Math.round(215.5 * 64), y: Math.round(148.5 * 64), color: "#39ff14" }
+];
+function createFlashDistrictState(idx = 0) {
+    const d = FLASH_DISTRICTS[((idx % FLASH_DISTRICTS.length) + FLASH_DISTRICTS.length) % FLASH_DISTRICTS.length];
+    return {
+        index: d.index,
+        key: d.key,
+        label: d.label,
+        x: d.x,
+        y: d.y,
+        color: d.color,
+        duration: 180,
+        startedAt: Date.now(),
+        flamingoScore: 0,
+        cyanScore: 0
+    };
+}
 const CURRENT_BUILD = (() => {
     try {
         const idxFile = path.join(__dirname, "..", "index.html");
@@ -469,6 +490,8 @@ function createEmptyRoom() {
         turfStandings: {}, // District Turf War Kingpins (leaderName, leaderColor, leaderScore)
         creationOps: {},   // Persisted Creation Engine operations (3D voxel edits, custom villas, shops, props, moves, modifications)
         graffitiTags: {},  // Persisted [P] Aerosol Graffiti Wall Tags across Vice City
+        carRespect: {},    // Persisted [Y] Car Meet Respect Commendations { [vehId]: count }
+        activeFlashDistrict: createFlashDistrictState(0),
         activeCustomMission: null,
         activeFlashDrop: null,
         activeBounty: null,
@@ -507,6 +530,8 @@ function ensureRoom(roomCode) {
     if (!r.turfStandings) r.turfStandings = {};
     if (!r.creationOps) r.creationOps = {};
     if (!r.graffitiTags) r.graffitiTags = {};
+    if (!r.carRespect) r.carRespect = {};
+    if (!r.activeFlashDistrict) r.activeFlashDistrict = createFlashDistrictState(0);
     if (!r.vehs) r.vehs = {};
     if (!r.peds) r.peds = {};
     if (!Array.isArray(r.chat)) r.chat = [];
@@ -613,6 +638,8 @@ function loadPersistentState() {
                                 turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
                                 creationOps: Object.assign({}, existing.creationOps || {}, (rv.creationOps && typeof rv.creationOps === "object") ? rv.creationOps : {}),
                                 graffitiTags: Object.assign({}, existing.graffitiTags || {}, (rv.graffitiTags && typeof rv.graffitiTags === "object") ? rv.graffitiTags : {}),
+                                carRespect: Object.assign({}, existing.carRespect || {}, (rv.carRespect && typeof rv.carRespect === "object") ? rv.carRespect : {}),
+                                activeFlashDistrict: createFlashDistrictState(0),
                                 activeCustomMission: null,
                                 activeFlashDrop: null,
                                 activeBounty: null,
@@ -882,6 +909,22 @@ function sendRoomBootstrap(socket, meta) {
         kind: "CREATION_SYNC",
         ops: Object.values(room.creationOps || {})
     });
+    if (room.activeFlashDistrict) {
+        const fd = room.activeFlashDistrict;
+        const remSec = Math.max(10, Math.round((fd.duration || 180) - (Date.now() - (fd.startedAt || Date.now())) / 1000));
+        sendJson(socket, {
+            t: "WORLD_EVENT",
+            kind: "FLASH_DISTRICT_SYNC",
+            district: Object.assign({}, fd, { duration: remSec })
+        });
+    }
+    if (room.carRespect && Object.keys(room.carRespect).length > 0) {
+        sendJson(socket, {
+            t: "WORLD_EVENT",
+            kind: "CAR_RESPECT_SYNC",
+            respect: room.carRespect
+        });
+    }
     if (room.graffitiTags && Object.keys(room.graffitiTags).length > 0) {
         sendJson(socket, {
             t: "WORLD_EVENT",
@@ -1418,6 +1461,22 @@ function handleClientPacket(socket, pkt) {
             if (gKeys.length > 120) {
                 delete room.graffitiTags[gKeys[0]];
             }
+            isDirty = true;
+        } else if (pkt.kind === "SYNDICATE_SCORE" && pkt.syndicate) {
+            if (!room.activeFlashDistrict) room.activeFlashDistrict = createFlashDistrictState(0);
+            const pts = Math.max(1, Math.min(5000, Math.round(Number(pkt.points) || 100)));
+            if (String(pkt.syndicate).toUpperCase() === "CYAN") {
+                room.activeFlashDistrict.cyanScore = (room.activeFlashDistrict.cyanScore || 0) + pts;
+            } else {
+                room.activeFlashDistrict.flamingoScore = (room.activeFlashDistrict.flamingoScore || 0) + pts;
+            }
+            pkt.flamingoScore = room.activeFlashDistrict.flamingoScore;
+            pkt.cyanScore = room.activeFlashDistrict.cyanScore;
+        } else if (pkt.kind === "CAR_RESPECT" && pkt.vehId) {
+            if (!room.carRespect) room.carRespect = {};
+            const vk = String(pkt.vehId).slice(0, 64);
+            room.carRespect[vk] = (Number(room.carRespect[vk]) || 0) + 1;
+            pkt.count = room.carRespect[vk];
             isDirty = true;
         } else if (pkt.kind === "CREATION_OP" && pkt.op && typeof pkt.op === "object") {
             if (!room.creationOps) room.creationOps = {};
@@ -2165,11 +2224,29 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     // 3. Autonomous Municipal Dispatch & Spec-Ops Hot Drop Check (every 1.0s = 10 ticks, 100% Server-Authoritative)
     room._dispatchTick = ((room._dispatchTick || 0) + 1) % 10;
     if (room._dispatchTick === 0) {
-        // 3-0. Autonomous Spec-Ops Hot Drop Crate Spawner (every 180s on the Dedicated Server when players are in the room)
+        // 3-0A. Autonomous 3-Minute Flash District Social Magnet Rotation (100% Server-Authoritative)
+        if (!room.activeFlashDistrict) {
+            room.activeFlashDistrict = createFlashDistrictState(0);
+        } else if ((nowMs - (room.activeFlashDistrict.startedAt || 0)) >= (room.activeFlashDistrict.duration || 180) * 1000) {
+            const nextIdx = ((room.activeFlashDistrict.index || 0) + 1) % FLASH_DISTRICTS.length;
+            room.activeFlashDistrict = createFlashDistrictState(nextIdx);
+            broadcastToRoom(roomCode, {
+                t: "WORLD_EVENT",
+                kind: "FLASH_DISTRICT_SYNC",
+                district: room.activeFlashDistrict
+            });
+            // Force a Hot Drop Crate in the new Flash District right away to pull players together!
+            room._flashDropCooldown = 0;
+        }
+
+        // 3-0. Autonomous Spec-Ops Hot Drop Crate Spawner (focused inside the active Flash District Magnet!)
         room._flashDropCooldown = Math.max(0, (room._flashDropCooldown !== undefined ? room._flashDropCooldown : 90) - 1.0);
         if (!room.activeFlashDrop && room._flashDropCooldown <= 0 && hotspotRoadTiles.length > 0) {
             room._flashDropCooldown = 180;
-            const tile = hotspotRoadTiles[Math.floor(Math.random() * hotspotRoadTiles.length)];
+            const fd = room.activeFlashDistrict || FLASH_DISTRICTS[0];
+            const nearTiles = hotspotRoadTiles.filter((t) => Math.hypot((t.bx + 0.5) * TS - fd.x, (t.by + 0.5) * TS - fd.y) < 1500);
+            const pool = nearTiles.length > 0 ? nearTiles : hotspotRoadTiles;
+            const tile = pool[Math.floor(Math.random() * pool.length)];
             const wx = Math.round((tile.bx + 0.5) * TS);
             const wy = Math.round((tile.by + 0.5) * TS);
             const wz = Math.round((tile.z || 2.0) * 100) / 100;

@@ -1489,7 +1489,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_225"), "ViceCreationEngine (v101_225) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_226"), "ViceCreationEngine (v101_226) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2062,9 +2062,113 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 41: WEB 2.5D SOCIAL MAGNET, FLASH DISTRICT, 2-SYNDICATE CO-OP, OVERHEAD EMOTES & CAR MEET RESPECT
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 41: WEB 2.5D SOCIAL MAGNET, FLASH DISTRICT, 2-SYNDICATE CO-OP, OVERHEAD EMOTES & CAR MEET RESPECT ---");
+    {
+        const peerA = createGameInstance(cmpBuf);
+        const peerB = peerBShared;
+        peerA.g.net.enabled = true;
+        peerB.g.net.enabled = true;
+        peerA.g.net.sendPacket = (pkt) => {
+            if (pkt) {
+                const copy = JSON.parse(JSON.stringify(pkt));
+                copy.id = peerA.g.net.playerId;
+                if (copy.t === "WORLD_EVENT") peerB.g.net.applyWorldEvent(copy);
+                else peerB.g.net.handlePacket(copy);
+            }
+        };
+        peerB.g.net.sendPacket = (pkt) => {
+            if (pkt) {
+                const copy = JSON.parse(JSON.stringify(pkt));
+                copy.id = peerB.g.net.playerId;
+                if (copy.t === "WORLD_EVENT") peerA.g.net.applyWorldEvent(copy);
+                else peerA.g.net.handlePacket(copy);
+            }
+        };
+
+        // 1. Server-Authoritative Flash District Social Magnet + 1-Click Hotspot Teleport
+        peerA.g.net.applyWorldEvent({
+            t: "WORLD_EVENT",
+            kind: "FLASH_DISTRICT_SYNC",
+            district: {
+                index: 1,
+                key: "STAR_ISLAND",
+                label: "STAR ISLAND PALAZZO",
+                x: Math.round(348.5 * 64),
+                y: Math.round(173.5 * 64),
+                color: "#c084fc",
+                duration: 165,
+                flamingoScore: 400,
+                cyanScore: 250
+            }
+        });
+        const tpOk = peerA.g.teleportToFlashDistrict();
+        assert(
+            Boolean(tpOk && peerA.g.isInsideActiveFlashDistrict() && Math.hypot(peerA.g.player.x - 348.5 * 64, peerA.g.player.y - 173.5 * 64) < 32),
+            "FLASH_DISTRICT_SYNC & teleportToFlashDistrict() pull player into the active 3-minute Flash District ('STAR ISLAND PALAZZO')"
+        );
+
+        // 2. 2-Syndicate Crew Co-Op Bonus (🦩 FLAMINGO CARTEL vs ⚡ CYAN SYNDICATE) & Friendly-Fire Shield
+        peerA.g.net.toggleSyndicate("FLAMINGO");
+        peerB.g.net.toggleSyndicate("FLAMINGO");
+        peerB.g.player.x = peerA.g.player.x + 24;
+        peerB.g.player.y = peerA.g.player.y;
+        peerB.g.net.broadcastStateNow();
+        assert(
+            peerA.g.net.hasSyndicateCoopPartnerNear(260) === true,
+            "toggleSyndicate('FLAMINGO') & 20Hz STATE sync register Peer B as a nearby 🦩 FLAMINGO CARTEL co-op partner on Peer A"
+        );
+
+        const cashBefore = peerA.g.cash;
+        peerA.g.multiplier = 1;
+        peerA.g.addCash(200, "SYNDICATE HEIST");
+        const cashGain = peerA.g.cash - cashBefore;
+        assert(
+            cashGain >= 450 && (peerA.g.activeFlashDistrict.flamingoScore > 400),
+            `Hotspot (+50%) + Syndicate Co-Op (+50%) stack to award $${cashGain} on a $200 base action and advance live 🦩 FLAMINGO tug-of-war score (${peerA.g.activeFlashDistrict.flamingoScore})`
+        );
+
+        // 3. 1-Key 2.5D Overhead Arcade Social Emotes ([U] -> SOCIAL_EMOTE)
+        const em = peerA.g.net.triggerSocialEmote("KING");
+        const rpAonB = peerB.g.net.remotePlayers.get(peerA.g.net.playerId);
+        assert(
+            Boolean(em && em.icon === "👑" && rpAonB && rpAonB.socialEmote && rpAonB.socialEmote.key === "KING"),
+            "triggerSocialEmote('KING') displays 2.5D overhead '👑 KING OF THE BLOCK!' bubble locally and replicates it onto Peer B"
+        );
+
+        // 4. Car Meet Street Respect Commendation ([Y] -> CAR_RESPECT) & Dropped Kingpin Crown Trophy
+        const showcaseCar = peerA.g.creationEngine.spawnVehicle("VICE_CHEETAH", peerA.g.player.x + 36, peerA.g.player.y, 0, { id: "car_meet_41" });
+        const saluted = peerA.g.commendNearestVehicle(115);
+        const carOnB = peerB.g.vehicles.find((v) => v.id === "car_meet_41");
+        assert(
+            Boolean(saluted && showcaseCar.respectCount === 1 && carOnB && carOnB.respectCount === 1),
+            "commendNearestVehicle ([Y]) increments 2.5D Car Meet ⭐ RESPECT counter on vehicle and synchronizes CAR_RESPECT to Peer B"
+        );
+
+        peerA.g.net.applyWorldEvent({
+            t: "WORLD_EVENT",
+            kind: "CROWN_DROP",
+            x: peerA.g.player.x + 10,
+            y: peerA.g.player.y,
+            z: 2.0,
+            reward: 1000,
+            victimName: "RIVAL_KING"
+        });
+        peerA.g.updateArcade2026Systems(0.05);
+        assert(
+            peerA.g.droppedKingpinCrown === null,
+            "Physical 2.5D Dropped Kingpin Crown Trophy is claimed on street contact, awarding +$1,000 & +600 Turf Influence and broadcasting CROWN_CLAIM"
+        );
+
+        peerA.g.creationEngine.clearAllCreations();
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 40 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE & 1000% MMO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 41 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO & 2.5D SOCIAL SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

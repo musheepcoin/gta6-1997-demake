@@ -20,6 +20,15 @@ const NET_COLORS = [
 
 const NET_PED_TYPES = ["lucia", "jason", "tommy", "trevor", "cj", "niko", "claude", "bigsmoke", "crockett"];
 
+const SOCIAL_EMOTES = [
+    { key: "KING",  icon: "👑", label: "KING OF THE BLOCK!",   color: "#fde047", pitch: 880 },
+    { key: "COOP",  icon: "🤝", label: "HOP IN! CO-OP CREW!",  color: "#39ff14", pitch: 740 },
+    { key: "DRIFT", icon: "🔥", label: "SICK DRIFT!",          color: "#fb923c", pitch: 820 },
+    { key: "COPS",  icon: "🚓", label: "VCPD INCOMING!",       color: "#38bdf8", pitch: 960 },
+    { key: "HEIST", icon: "💸", label: "ROBBERY NOW!",         color: "#ff2a85", pitch: 790 },
+    { key: "GG",    icon: "💀", label: "WASTED / GG!",         color: "#c084fc", pitch: 660 }
+];
+
 class ViceNetworkManager {
     constructor(game) {
         this.game = game;
@@ -32,6 +41,10 @@ class ViceNetworkManager {
         this.playerName = savedName || `LUCIA #${randNum}`;
         this.playerColor = NET_COLORS[randNum % NET_COLORS.length];
         this.pedSpriteType = NET_PED_TYPES[randNum % NET_PED_TYPES.length];
+        const savedSyn = this.safeGetStorage("vc97_mp_syndicate");
+        this.syndicate = (savedSyn === "FLAMINGO" || savedSyn === "CYAN") ? savedSyn : (randNum % 2 === 0 ? "FLAMINGO" : "CYAN");
+        this._emoteCycleIdx = 0;
+        this.carRespectMap = {};
 
         // Room code (from URL ?room=XXX or default public lobby "VICE26")
         const urlParams = new URLSearchParams(window.location.search || "");
@@ -1601,6 +1614,7 @@ class ViceNetworkManager {
             rp.name = pkt.name || rp.name;
             rp.color = pkt.color || rp.color;
             rp.pedType = pkt.pedType || rp.pedType;
+            if (pkt.syn === "FLAMINGO" || pkt.syn === "CYAN") rp.syndicate = pkt.syn;
             if (typeof pkt.slot === "number") rp.slot = pkt.slot;
             rp.wantedLevel = pkt.wl || 0;
             rp.targetX = pkt.x;
@@ -1687,6 +1701,7 @@ class ViceNetworkManager {
                         fromPlayer: false,
                         fromRemoteId: pkt.id,
                         fromRemoteName: pkt.name || "REMOTE PLAYER",
+                        fromRemoteSyndicate: (rp && rp.syndicate) || pkt.syn || null,
                         r: pl.flm ? 9 : 4
                     });
                 }
@@ -1768,6 +1783,8 @@ class ViceNetworkManager {
                 name: pkt.name || "LUCIA ONLINE",
                 color: pkt.color || "#00f0ff",
                 pedType: pkt.pedType || "gang",
+                syndicate: (pkt.syn === "FLAMINGO" || pkt.syn === "CYAN") ? pkt.syn : "FLAMINGO",
+                socialEmote: null,
                 x: pkt.x || defX,
                 y: pkt.y || defY,
                 z: pkt.z || 2.0,
@@ -2140,6 +2157,85 @@ class ViceNetworkManager {
             if (typeof this.game.saveGraffitiTags === "function") {
                 this.game.saveGraffitiTags();
             }
+        } else if (pkt.kind === "FLASH_DISTRICT_SYNC" && pkt.district && this.game) {
+            const d = pkt.district;
+            this.game.activeFlashDistrict = {
+                index: d.index || 0,
+                key: d.key || "OCEAN_DRIVE",
+                label: d.label || "OCEAN DRIVE NEON STRIP",
+                x: Number(d.x) || Math.round(445.5 * 64),
+                y: Number(d.y) || Math.round(279.0 * 64),
+                color: d.color || "#ff2a85",
+                timer: Number(d.duration) || 180,
+                maxTimer: 180,
+                flamingoScore: Number(d.flamingoScore) || 0,
+                cyanScore: Number(d.cyanScore) || 0
+            };
+        } else if (pkt.kind === "SYNDICATE_SCORE" && this.game) {
+            if (!this.game.activeFlashDistrict && typeof this.game.ensureActiveFlashDistrict === "function") {
+                this.game.ensureActiveFlashDistrict();
+            }
+            const fd = this.game.activeFlashDistrict;
+            if (fd) {
+                if (typeof pkt.flamingoScore === "number" && typeof pkt.cyanScore === "number") {
+                    fd.flamingoScore = pkt.flamingoScore;
+                    fd.cyanScore = pkt.cyanScore;
+                } else {
+                    const pts = Math.max(1, Number(pkt.points) || 100);
+                    if (String(pkt.syndicate).toUpperCase() === "CYAN") fd.cyanScore = (fd.cyanScore || 0) + pts;
+                    else fd.flamingoScore = (fd.flamingoScore || 0) + pts;
+                }
+            }
+        } else if (pkt.kind === "SOCIAL_EMOTE" && this.game) {
+            const rp = pkt.playerId ? this.remotePlayers.get(pkt.playerId) : null;
+            if (rp) {
+                rp.socialEmote = {
+                    key: pkt.key || "DRIFT",
+                    icon: pkt.icon || "🔥",
+                    label: pkt.label || "VICE CITY!",
+                    color: pkt.color || rp.color || "#00f0ff",
+                    timer: 4.0,
+                    maxTimer: 4.0
+                };
+            }
+            if (this.game.audio && typeof this.game.audio.playBeep === "function") {
+                this.game.audio.playBeep(820, 0.045, "triangle", 0.04);
+            }
+        } else if (pkt.kind === "CAR_RESPECT" && pkt.vehId && this.game) {
+            const cnt = Number(pkt.count) || ((this.carRespectMap[pkt.vehId] || 0) + 1);
+            this.carRespectMap[pkt.vehId] = cnt;
+            const v = Array.isArray(this.game.vehicles) ? this.game.vehicles.find((veh) => veh && veh.id === pkt.vehId) : null;
+            if (v) {
+                v.respectCount = cnt;
+            }
+            const myName = this.playerName || "LUCIA";
+            if (pkt.ownerName && String(pkt.ownerName).toUpperCase() === String(myName).toUpperCase() && pkt.voterName !== myName) {
+                const bonus = Number(pkt.bonus) || 250;
+                this.game.addCash(bonus, `⭐ CAR RESPECT FROM ${pkt.voterName || "PLAYER"}!`);
+                this.game.showBigBanner(
+                    "⭐ CAR MEET RESPECT!",
+                    `${pkt.voterName || "PLAYER"} SALUTED YOUR ${pkt.vehName || "RIDE"} (+$${bonus} • ⭐${cnt})`,
+                    "#fde047",
+                    2.6
+                );
+            }
+        } else if (pkt.kind === "CAR_RESPECT_SYNC" && pkt.respect && typeof pkt.respect === "object" && this.game) {
+            for (const [vid, cnt] of Object.entries(pkt.respect)) {
+                this.carRespectMap[vid] = Number(cnt) || 0;
+                const v = Array.isArray(this.game.vehicles) ? this.game.vehicles.find((veh) => veh && veh.id === vid) : null;
+                if (v) v.respectCount = this.carRespectMap[vid];
+            }
+        } else if (pkt.kind === "CROWN_DROP" && this.game && typeof pkt.x === "number" && typeof pkt.y === "number") {
+            this.game.droppedKingpinCrown = {
+                x: pkt.x,
+                y: pkt.y,
+                z: pkt.z || 2.0,
+                reward: pkt.reward || 1000,
+                timer: 20.0,
+                victimName: pkt.victimName || "KINGPIN"
+            };
+        } else if (pkt.kind === "CROWN_CLAIM" && this.game) {
+            this.game.droppedKingpinCrown = null;
         } else if (pkt.kind === "CREATION_OP" && pkt.op) {
             if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && typeof this.game.creationEngine.applyRemoteCreationOp === "function") {
                 this.game.creationEngine.applyRemoteCreationOp(pkt.op);
@@ -2860,6 +2956,10 @@ class ViceNetworkManager {
         if (this.game.player && (this.game.player.chatTimer || 0) > 0) {
             this.game.player.chatTimer = Math.max(0, this.game.player.chatTimer - dt);
         }
+        if (this.game.player && this.game.player.socialEmote && (this.game.player.socialEmote.timer || 0) > 0) {
+            this.game.player.socialEmote.timer = Math.max(0, this.game.player.socialEmote.timer - dt);
+            if (this.game.player.socialEmote.timer <= 0) this.game.player.socialEmote = null;
+        }
 
         // 1. Update simulated Online Rival Bots (if user spawned any via [O] for instant solo testing)
         this.updateSimulatedRivals(dt);
@@ -2868,6 +2968,10 @@ class ViceNetworkManager {
         for (const [id, rp] of this.remotePlayers.entries()) {
             if ((rp.chatTimer || 0) > 0) {
                 rp.chatTimer = Math.max(0, rp.chatTimer - dt);
+            }
+            if (rp.socialEmote && (rp.socialEmote.timer || 0) > 0) {
+                rp.socialEmote.timer = Math.max(0, rp.socialEmote.timer - dt);
+                if (rp.socialEmote.timer <= 0) rp.socialEmote = null;
             }
             if (rp.isBot) continue;
             if (rp.isHidden) {
@@ -3099,6 +3203,7 @@ class ViceNetworkManager {
             name: this.playerName,
             color: this.playerColor,
             pedType: this.pedSpriteType,
+            syn: this.syndicate,
             slot: this.slotIndex,
             wl: this.game.wantedLevel || 0,
             x: Math.round((v ? v.x : p.x) * 10) / 10,
@@ -3496,6 +3601,92 @@ class ViceNetworkManager {
         this.broadcastStateNow();
         this.game.addFloatingText(targetObj.x, targetObj.y - 30, `🌐 TELEPORTED TO ${target.name}!`, target.color || "#00f0ff");
         this.addChatLog("VICE NET", `🌐 Teleported to ${target.name}`, target.color || "#00f0ff", true);
+    }
+
+    /* ========================================================================
+       8. 2.5D WEB ARCADE-SOCIAL MECHANICS (Syndicate Crews, Overhead Emotes & Co-Op)
+       ======================================================================== */
+    toggleSyndicate(forceKey) {
+        const next = (forceKey === "FLAMINGO" || forceKey === "CYAN")
+            ? forceKey
+            : (this.syndicate === "FLAMINGO" ? "CYAN" : "FLAMINGO");
+        this.syndicate = next;
+        this.safeSetStorage("vc97_mp_syndicate", next);
+        const isFlamingo = next === "FLAMINGO";
+        const badge = isFlamingo ? "🦩 FLAMINGO CARTEL" : "⚡ CYAN SYNDICATE";
+        const col = isFlamingo ? "#ff2a85" : "#00f0ff";
+        if (this.game && this.game.player) {
+            const pObj = this.game.player.inVehicle || this.game.player;
+            this.game.addFloatingText(pObj.x, pObj.y - 34, `JOINED ${badge}!`, col);
+            if (this.game.audio && typeof this.game.audio.playBeep === "function") {
+                this.game.audio.playBeep(isFlamingo ? 780 : 920, 0.05, "triangle", 0.045);
+            }
+        }
+        this.addChatLog("SYNDICATE CREW", `Joined ${badge} (Co-op vehicle bonus +50% & friendly-fire shield active!)`, col, true);
+        this.broadcastStateNow();
+        return this.syndicate;
+    }
+
+    hasSyndicateCoopPartnerNear(radius = 260) {
+        if (!this.game || !this.game.player) return false;
+        const p = this.game.player;
+        const pObj = p.inVehicle || p;
+        const myVehId = p.inVehicle ? p.inVehicle.id : null;
+        for (const rp of this.remotePlayers.values()) {
+            if (!rp || rp.dead || rp.isHidden) continue;
+            const rpSyn = rp.syndicate || "FLAMINGO";
+            if (rpSyn !== this.syndicate) continue;
+            if (myVehId && rp.veh && rp.veh.id === myVehId) return true;
+            const dInterp = Math.hypot((rp.x || 0) - pObj.x, (rp.y || 0) - pObj.y);
+            const tx = rp.targetX !== undefined ? rp.targetX : (rp.x || 0);
+            const ty = rp.targetY !== undefined ? rp.targetY : (rp.y || 0);
+            const dTarget = Math.hypot(tx - pObj.x, ty - pObj.y);
+            if (Math.min(dInterp, dTarget) <= radius) return true;
+        }
+        return false;
+    }
+
+    triggerSocialEmote(keyOrIdx) {
+        if (!this.game || !this.game.player) return null;
+        let em = null;
+        if (typeof keyOrIdx === "string") {
+            const up = keyOrIdx.toUpperCase();
+            em = SOCIAL_EMOTES.find((e) => e.key === up) || null;
+        } else if (typeof keyOrIdx === "number") {
+            em = SOCIAL_EMOTES[((keyOrIdx % SOCIAL_EMOTES.length) + SOCIAL_EMOTES.length) % SOCIAL_EMOTES.length];
+        }
+        if (!em) {
+            em = SOCIAL_EMOTES[this._emoteCycleIdx % SOCIAL_EMOTES.length];
+            this._emoteCycleIdx = (this._emoteCycleIdx + 1) % SOCIAL_EMOTES.length;
+        }
+        const p = this.game.player;
+        const pObj = p.inVehicle || p;
+        p.socialEmote = {
+            key: em.key,
+            icon: em.icon,
+            label: em.label,
+            color: em.color,
+            timer: 4.0,
+            maxTimer: 4.0
+        };
+        if (this.game.audio && typeof this.game.audio.playBeep === "function") {
+            this.game.audio.playBeep(em.pitch || 840, 0.055, "triangle", 0.05);
+        }
+        if (em.key === "COOP" && p.inVehicle && this.game.audio && typeof this.game.audio.playHorn === "function") {
+            this.game.audio.playHorn(false, p.inVehicle.specKey);
+        }
+        this.broadcastWorldEvent({
+            kind: "SOCIAL_EMOTE",
+            playerId: this.playerId,
+            playerName: this.playerName,
+            key: em.key,
+            icon: em.icon,
+            label: em.label,
+            color: em.color,
+            x: Math.round(pObj.x),
+            y: Math.round(pObj.y)
+        });
+        return p.socialEmote;
     }
 }
 

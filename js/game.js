@@ -2707,30 +2707,43 @@ class LeonidaGame {
 
 
 
-            // Online P2P Multiplayer Action: Teleport to Remote Player / Spawn Online Rival [O]
-
-            if (code === "KeyO") {
-
-                if (this.net) this.net.triggerOnlineAction();
-
+            // Online Multiplayer Action: Teleport to Remote Player or Active Flash District Hotspot [O]
+            if (code === "KeyO" && !e.repeat) {
+                if (e.shiftKey && typeof this.teleportToFlashDistrict === "function") {
+                    this.teleportToFlashDistrict();
+                } else if (this.net) {
+                    this.net.triggerOnlineAction();
+                }
             }
 
-
-
-            // Open Online Multiplayer Live Chat Input [T or Y]
-
-            if (code === "KeyT" || code === "KeyY") {
-
-                if (this.net && typeof this.net.focusChatInput === "function") {
-
-                    e.preventDefault();
-
-                    this.net.focusChatInput();
-
-                    return;
-
+            // 2.5D Overhead Arcade Social Emote Bubble [U]
+            if (code === "KeyU" && !e.repeat) {
+                if (this.net && typeof this.net.triggerSocialEmote === "function") {
+                    this.net.triggerSocialEmote();
                 }
+            }
 
+            // Toggle Syndicate Crew (🦩 FLAMINGO CARTEL vs ⚡ CYAN SYNDICATE) [I]
+            if (code === "KeyI" && !e.repeat) {
+                if (this.net && typeof this.net.toggleSyndicate === "function") {
+                    this.net.toggleSyndicate();
+                }
+            }
+
+            // Car Meet Street Respect Commendation [Y] (or Social Emote if no car nearby)
+            if (code === "KeyY" && !e.repeat) {
+                if (!this.commendNearestVehicle(115) && this.net && typeof this.net.triggerSocialEmote === "function") {
+                    this.net.triggerSocialEmote();
+                }
+            }
+
+            // Open Online Multiplayer Live Chat Input [T]
+            if (code === "KeyT") {
+                if (this.net && typeof this.net.focusChatInput === "function") {
+                    e.preventDefault();
+                    this.net.focusChatInput();
+                    return;
+                }
             }
 
 
@@ -8398,17 +8411,21 @@ class LeonidaGame {
         const amt = Number(amount) || 0;
         if (amt <= 0) return;
         const turfBonusMult = (!skipCombo && this.isCurrentDistrictControlledByMe()) ? 1.10 : 1.0;
-        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * turfBonusMult);
+        const hotspotMult = (!skipCombo && typeof this.isInsideActiveFlashDistrict === "function" && this.isInsideActiveFlashDistrict()) ? 1.50 : 1.0;
+        const coopMult = (!skipCombo && this.net && typeof this.net.hasSyndicateCoopPartnerNear === "function" && this.net.hasSyndicateCoopPartnerNear()) ? 1.50 : 1.0;
+        const total = Math.floor(amt * Math.max(1, this.multiplier || 1) * turfBonusMult * hotspotMult * coopMult);
         this.cash += total;
         if (!skipCombo) {
             this.addTurfInfluence(Math.min(total, 1500));
         }
         if (this.player) {
             const turfTag = turfBonusMult > 1.0 ? " 👑+10%" : "";
+            const hotTag = hotspotMult > 1.0 ? " 🔥HOT" : "";
+            const coopTag = coopMult > 1.0 ? " 🤝CO-OP" : "";
             if (label) {
-                this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}${turfTag}`, "#39ff14");
+                this.addFloatingText(this.player.x, this.player.y - 22, `${label} +$${total.toLocaleString()}${turfTag}${hotTag}${coopTag}`, "#39ff14");
             } else {
-                this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}${turfTag}`, "#39ff14");
+                this.addFloatingText(this.player.x, this.player.y - 22, `+$${total.toLocaleString()}${turfTag}${hotTag}${coopTag}`, "#39ff14");
             }
         }
         this._checkScoreMilestonesAndSave();
@@ -8589,13 +8606,144 @@ class LeonidaGame {
         return count;
     }
 
+    getFlashDistrictCatalog() {
+        return [
+            { index: 0, key: "OCEAN_DRIVE", label: "OCEAN DRIVE NEON STRIP", x: Math.round(445.5 * TILE_SIZE), y: Math.round(279.0 * TILE_SIZE), color: "#ff2a85" },
+            { index: 1, key: "STAR_ISLAND", label: "STAR ISLAND PALAZZO", x: Math.round(348.5 * TILE_SIZE), y: Math.round(173.5 * TILE_SIZE), color: "#c084fc" },
+            { index: 2, key: "DOWNTOWN", label: "DOWNTOWN & LITTLE CUBA", x: Math.round(288.5 * TILE_SIZE), y: Math.round(202.5 * TILE_SIZE), color: "#38bdf8" },
+            { index: 3, key: "WYNWOOD_HAITI", label: "WYNWOOD & MAMBAS STADIUM", x: Math.round(215.5 * TILE_SIZE), y: Math.round(148.5 * TILE_SIZE), color: "#39ff14" }
+        ];
+    }
+
+    ensureActiveFlashDistrict() {
+        if (!this.activeFlashDistrict) {
+            const d = this.getFlashDistrictCatalog()[0];
+            this.activeFlashDistrict = {
+                index: d.index,
+                key: d.key,
+                label: d.label,
+                x: d.x,
+                y: d.y,
+                color: d.color,
+                timer: 180.0,
+                maxTimer: 180.0,
+                flamingoScore: 0,
+                cyanScore: 0
+            };
+        }
+        return this.activeFlashDistrict;
+    }
+
+    isInsideActiveFlashDistrict(wx, wy) {
+        const fd = this.ensureActiveFlashDistrict();
+        if (!fd || !this.player) return false;
+        const pObj = this.player.inVehicle || this.player;
+        const px = typeof wx === "number" ? wx : pObj.x;
+        const py = typeof wy === "number" ? wy : pObj.y;
+        if (Math.hypot(px - fd.x, py - fd.y) <= 1650) return true;
+        return this.getTurfKeyForDistrict(this.currentDistrict) === fd.key;
+    }
+
+    teleportToFlashDistrict() {
+        const fd = this.ensureActiveFlashDistrict();
+        if (!fd || !this.player) return false;
+        if (this.activeInterior) {
+            this.activeInterior = null;
+        }
+        const targetObj = this.player.inVehicle || this.player;
+        if (this.player.inVehicle) {
+            this.player.inVehicle._worldModified = true;
+            this.player.inVehicle.isStaticParked = false;
+        }
+        targetObj.x = fd.x;
+        targetObj.y = fd.y;
+        targetObj.z = this.map && typeof this.map.getHeightAtPixel === "function" ? this.map.getHeightAtPixel(fd.x, fd.y, 2.0) : 2.0;
+        targetObj.vx = 0;
+        targetObj.vy = 0;
+        if (targetObj.speed !== undefined) targetObj.speed = 0;
+        this.cameraX = targetObj.x;
+        this.cameraY = targetObj.y;
+        if (this.renderer) {
+            this.renderer.camX = targetObj.x;
+            this.renderer.camY = targetObj.y;
+        }
+        if (typeof this.rebuildVehicleSpatialGrid === "function") {
+            this.rebuildVehicleSpatialGrid();
+        }
+        if (this.net && typeof this.net.broadcastStateNow === "function") {
+            this.net.broadcastStateNow();
+        }
+        this.showBigBanner(
+            `🔥 HOTSPOT: ${fd.label}!`,
+            "2X TURF INFLUENCE • +50% HOTSPOT CASH • SYNDICATE CREW WAR ACTIVE!",
+            fd.color || "#ff2a85",
+            2.8
+        );
+        return true;
+    }
+
+    commendNearestVehicle(maxRadius = 115) {
+        if (!this.player || !Array.isArray(this.vehicles)) return null;
+        const pObj = this.player.inVehicle || this.player;
+        let bestVeh = null;
+        let bestDist = maxRadius;
+        for (const v of this.vehicles) {
+            if (!v || v.destroyed || v === this.player.inVehicle) continue;
+            const d = Math.hypot(v.x - pObj.x, v.y - pObj.y);
+            if (d < bestDist) {
+                bestDist = d;
+                bestVeh = v;
+            }
+        }
+        if (!bestVeh) return null;
+        bestVeh.respectCount = (bestVeh.respectCount || 0) + 1;
+        bestVeh._worldModified = true;
+        if (this.net && this.net.carRespectMap) {
+            this.net.carRespectMap[bestVeh.id] = bestVeh.respectCount;
+        }
+        const myName = (this.net && this.net.playerName) || this.player.nickname || "LUCIA";
+        this.addCash(100, `⭐ SALUTED ${bestVeh.name} (⭐${bestVeh.respectCount})!`, true);
+        if (this.audio && typeof this.audio.playBeep === "function") {
+            this.audio.playBeep(880, 0.055, "triangle", 0.05);
+        }
+        if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+            this.net.broadcastWorldEvent({
+                kind: "CAR_RESPECT",
+                vehId: bestVeh.id,
+                vehName: bestVeh.name,
+                ownerName: bestVeh.ownerName || null,
+                voterName: myName,
+                count: bestVeh.respectCount,
+                bonus: 250
+            });
+        }
+        return bestVeh;
+    }
+
     addTurfInfluence(points) {
-        const pts = Math.floor(Number(points) || 0);
-        if (pts <= 0 || !this.player || this.player.dead) return;
+        const rawPts = Math.floor(Number(points) || 0);
+        if (rawPts <= 0 || !this.player || this.player.dead) return;
+        const inHotspot = this.isInsideActiveFlashDistrict();
+        const pts = inHotspot ? rawPts * 2 : rawPts;
         const zones = this.ensureTurfZones();
         const tKey = this.getTurfKeyForDistrict(this.currentDistrict);
         const zone = zones[tKey];
         if (!zone) return;
+
+        if (inHotspot) {
+            const fd = this.ensureActiveFlashDistrict();
+            const syn = (this.net && this.net.syndicate) || "FLAMINGO";
+            if (syn === "CYAN") fd.cyanScore = (fd.cyanScore || 0) + pts;
+            else fd.flamingoScore = (fd.flamingoScore || 0) + pts;
+            if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                this.net.broadcastWorldEvent({
+                    kind: "SYNDICATE_SCORE",
+                    syndicate: syn,
+                    points: pts,
+                    districtKey: fd.key
+                });
+            }
+        }
 
         const myName = String((this.net && this.net.playerName) || (this.player && this.player.nickname) || "LUCIA").toUpperCase();
         const myColor = (this.net && this.net.playerColor) || "#ff2a85";
@@ -17832,16 +17980,20 @@ class LeonidaGame {
             // Hit player? (Stray police bullets during an NPC crime shootout do NOT hurt an innocent bystander player!)
 
             if (!hitSomething && !pr.fromPlayer && !p.inVehicle && !this.activeInterior && Math.abs(p.x - pr.x) < 15 && Math.abs(p.y - pr.y) < 15 && Math.hypot(p.x - pr.x, p.y - pr.y) < 15) {
-
+                const isSameSyndicateAlly = Boolean(
+                    pr.fromRemoteId &&
+                    pr.fromRemoteSyndicate &&
+                    this.net &&
+                    pr.fromRemoteSyndicate === this.net.syndicate &&
+                    (!this.activeServerBounty || this.activeServerBounty.targetId !== this.net.playerId)
+                );
                 const canHitPlayer =
-
-                    Boolean(pr.fromRemoteId) ||
-
-                    (pr.npcFaction === "COP" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && pd.carjackedCop))) ||
-
-                    (pr.npcFaction === "CRIMINAL" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && (pd.isAlertedGuard || (pd.kind === "CRIMINAL" && (pd.provokedByPlayer || pd.missionTag === "MISSION_ENEMY")))))) ||
-
-                    (!pr.npcFaction && this.wantedLevel > 0);
+                    !isSameSyndicateAlly && (
+                        Boolean(pr.fromRemoteId) ||
+                        (pr.npcFaction === "COP" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && pd.carjackedCop))) ||
+                        (pr.npcFaction === "CRIMINAL" && (this.wantedLevel > 0 || this.peds.some(pd => !pd.dead && (pd.isAlertedGuard || (pd.kind === "CRIMINAL" && (pd.provokedByPlayer || pd.missionTag === "MISSION_ENEMY")))))) ||
+                        (!pr.npcFaction && this.wantedLevel > 0)
+                    );
 
                 if (canHitPlayer) {
 
@@ -18451,6 +18603,50 @@ class LeonidaGame {
     updateArcade2026Systems(dt) {
         const p = this.player;
         if (!p || !this.map) return;
+
+        // 0. 3-Minute Active Flash District Hotspot & Dropped Kingpin Crown Trophy
+        const fd = this.ensureActiveFlashDistrict();
+        if (fd) {
+            fd.timer = Math.max(0, (fd.timer || 180) - dt);
+            if (fd.timer <= 0 && (!this.net || !this.net.wsConnected)) {
+                const cat = this.getFlashDistrictCatalog();
+                const next = cat[((fd.index || 0) + 1) % cat.length];
+                this.activeFlashDistrict = {
+                    index: next.index,
+                    key: next.key,
+                    label: next.label,
+                    x: next.x,
+                    y: next.y,
+                    color: next.color,
+                    timer: 180.0,
+                    maxTimer: 180.0,
+                    flamingoScore: 0,
+                    cyanScore: 0
+                };
+            }
+        }
+        if (this.droppedKingpinCrown) {
+            const cr = this.droppedKingpinCrown;
+            cr.timer -= dt;
+            const pObj = p.inVehicle || p;
+            if (!p.dead && Math.hypot(pObj.x - cr.x, pObj.y - cr.y) < 44) {
+                const reward = cr.reward || 1000;
+                this.droppedKingpinCrown = null;
+                this.addCash(reward, "👑 STOLEN KINGPIN CROWN!", true);
+                this.addTurfInfluence(600);
+                this.showBigBanner(
+                    "👑 KINGPIN CROWN CLAIMED!",
+                    `YOU SEIZED THE GOLDEN CROWN (+$${reward.toLocaleString()} & +600 TURF INFLUENCE)!`,
+                    "#fde047",
+                    3.0
+                );
+                if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                    this.net.broadcastWorldEvent({ kind: "CROWN_CLAIM" });
+                }
+            } else if (cr.timer <= 0) {
+                this.droppedKingpinCrown = null;
+            }
+        }
 
         // 1. 90s Hot Drop Flash Crate Event
         if (this.activeFlashEvent) {
