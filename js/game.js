@@ -2650,6 +2650,13 @@ class LeonidaGame {
                 this.triggerFocusMode();
             }
 
+            // Toggle ViceWorldDirector Internal Engine Live Telemetry Overlay [F9]
+            if (code === "F9" && !e.repeat && this.director && typeof this.director.toggleTelemetryOverlay === "function") {
+                e.preventDefault();
+                const isOpen = this.director.toggleTelemetryOverlay();
+                this.addFloatingText(this.player.x, this.player.y - 32, isOpen ? "🧠 ENGINE TELEMETRY: ON [F9]" : "🧠 ENGINE TELEMETRY: OFF", "#00f0ff");
+            }
+
 
 
             // Toggle Dossier Modal (H)
@@ -8761,6 +8768,9 @@ class LeonidaGame {
     }
 
     getEmergencyStations(serviceType) {
+        if (this.director && typeof this.director.getEmergencyStations === "function") {
+            return this.director.getEmergencyStations(serviceType);
+        }
         const list = [];
         if (this.map && Array.isArray(this.map.emergencyStations)) {
             for (const st of this.map.emergencyStations) {
@@ -8771,6 +8781,9 @@ class LeonidaGame {
     }
 
     getNearestEmergencyStation(serviceType, wx, wy) {
+        if (this.director && typeof this.director.getNearestEmergencyStation === "function") {
+            return this.director.getNearestEmergencyStation(serviceType, wx, wy);
+        }
         const stations = this.getEmergencyStations(serviceType);
         let best = null;
         let bestDist = Infinity;
@@ -8785,6 +8798,9 @@ class LeonidaGame {
     }
 
     findStationDispatchSpawn(serviceType, targetX, targetY, targetZ = 2.0) {
+        if (this.director && typeof this.director.findStationDispatchSpawn === "function") {
+            return this.director.findStationDispatchSpawn(serviceType, targetX, targetY, targetZ);
+        }
         if (!this.map || typeof this.map.getNavigationBlock !== "function") return null;
         const stations = this.getEmergencyStations(serviceType).slice();
         stations.sort((a, b) => Math.hypot(a.x - targetX, a.y - targetY) - Math.hypot(b.x - targetX, b.y - targetY));

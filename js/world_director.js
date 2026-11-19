@@ -72,7 +72,11 @@ class ViceWorldDirector {
             totalSpikeStripsDeployed: 0,
             totalSpikeStripHits: 0,
             totalTakeoverHypes: 0,
-            totalSmugglerExports: 0
+            totalSmugglerExports: 0,
+            totalMedicDispatches: 0,
+            totalFireDispatches: 0,
+            totalTowDispatches: 0,
+            totalAnomaliesHealed: 0
         };
 
         // 2B. GTA 6 Modern-Arcade State (Exotic GPS Trackers, Focus Mode, Street Hold-Ups, @LeonidaFeed Social Ticker, Spike Strips, Takeovers)
@@ -91,10 +95,51 @@ class ViceWorldDirector {
         this.spikeStrips = [];
         this.takeoverDriftProgress = 0;
         this.takeoverHypeCooldown = 0;
+        this.telemetryOverlayOpen = false;
 
-        // 3. Entity Authority & Anti-Teleportation Ledger
-        this.vehicleLedger = new Map(); // vehId -> { lastX, lastY, owner, lastSyncMs, allowSnapUntilMs }
+        // 3. Entity Authority & Anti-Teleportation Ledger + Municipal Fleet Ledger + Event Bus
+        this.vehicleLedger = new Map(); // vehId -> { lastX, lastY, lastDryX, lastDryY, owner, lastSyncMs, allowSnapUntilMs }
         this.teleportViolations = [];
+        this.fleetLedger = []; // ring buffer of municipal station dispatches
+        this.eventLog = []; // ring buffer of structured causal engine events
+        this._eventListeners = new Map();
+    }
+
+    on(eventType, handler) {
+        if (!eventType || typeof handler !== "function") return;
+        let list = this._eventListeners.get(eventType);
+        if (!list) {
+            list = [];
+            this._eventListeners.set(eventType, list);
+        }
+        list.push(handler);
+    }
+
+    emitEvent(eventType, payload = {}) {
+        const evt = {
+            id: (this.eventLog.length ? this.eventLog[this.eventLog.length - 1].id + 1 : 1),
+            type: eventType,
+            atMs: Math.round(this.nowMs()),
+            payload
+        };
+        this.eventLog.push(evt);
+        if (this.eventLog.length > 60) {
+            this.eventLog.shift();
+        }
+        const listeners = this._eventListeners.get(eventType);
+        if (Array.isArray(listeners)) {
+            for (let i = 0; i < listeners.length; i++) {
+                try {
+                    listeners[i](evt);
+                } catch (_e) {}
+            }
+        }
+        return evt;
+    }
+
+    toggleTelemetryOverlay(forceState = null) {
+        this.telemetryOverlayOpen = forceState !== null ? Boolean(forceState) : !this.telemetryOverlayOpen;
+        return this.telemetryOverlayOpen;
     }
 
     nowMs() {
@@ -1075,7 +1120,164 @@ class ViceWorldDirector {
     }
 
     /* ========================================================================
-       3. ENTITY AUTHORITY LEDGER & ANTI-TELEPORTATION KINEMATIC VALIDATOR
+       3. MUNICIPAL DISPATCH DIRECTOR (VCPD, EMS Hospital, VCFD Fire, Tow Impound)
+       ======================================================================== */
+    getEmergencyStations(serviceType) {
+        const g = this.game;
+        const list = [];
+        if (g && g.map && Array.isArray(g.map.emergencyStations)) {
+            for (const st of g.map.emergencyStations) {
+                if (st && st.type === serviceType) list.push(st);
+            }
+        }
+        return list;
+    }
+
+    getNearestEmergencyStation(serviceType, wx, wy) {
+        const stations = this.getEmergencyStations(serviceType);
+        let best = null;
+        let bestDist = Infinity;
+        for (const st of stations) {
+            const d = Math.hypot(st.x - wx, st.y - wy);
+            if (d < bestDist) {
+                bestDist = d;
+                best = st;
+            }
+        }
+        return best;
+    }
+
+    findStationDispatchSpawn(serviceType, targetX, targetY, targetZ = 2.0) {
+        const g = this.game;
+        if (!g || !g.map || typeof g.map.getNavigationBlock !== "function") return null;
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        const mapCols = (typeof MAP_COLS !== "undefined") ? MAP_COLS : (g.map.cols || 512);
+        const mapRows = (typeof MAP_ROWS !== "undefined") ? MAP_ROWS : (g.map.rows || 512);
+        const roadType = (typeof GROUND_TYPE !== "undefined" && GROUND_TYPE.ROAD !== undefined) ? GROUND_TYPE.ROAD : 2;
+        const stations = this.getEmergencyStations(serviceType).slice();
+        stations.sort((a, b) => Math.hypot(a.x - targetX, a.y - targetY) - Math.hypot(b.x - targetX, b.y - targetY));
+
+        for (let pass = 0; pass < 2; pass++) {
+            const strictLaneAlign = (pass === 0);
+            for (let si = 0; si < stations.length; si++) {
+                const st = stations[si];
+                const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
+                const inViewSt = typeof g.isPointInAnyPlayerCameraView === "function"
+                    ? g.isPointInAnyPlayerCameraView(st.x, st.y, 220)
+                    : false;
+                const useStationGate = distStToTarget >= this.config.stationGateMinDist &&
+                    distStToTarget <= this.config.stationGateMaxDist &&
+                    !inViewSt;
+                const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
+                const corridorDist = Math.max(1350, Math.min(distStToTarget, 1750));
+                const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * corridorDist);
+                const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
+                const baseBx = Math.floor(anchorX / tileSize);
+                const baseBy = Math.floor(anchorY / tileSize);
+
+                for (let r = 0; r <= 36; r++) {
+                    for (let dy = -r; dy <= r; dy++) {
+                        for (let dx = -r; dx <= r; dx++) {
+                            if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                            const bx = baseBx + dx;
+                            const by = baseBy + dy;
+                            if (bx < 2 || bx >= mapCols - 2 || by < 2 || by >= mapRows - 2) continue;
+                            if (g.map.isRestrictedNoTrafficZone && g.map.isRestrictedNoTrafficZone(bx, by)) continue;
+                            const navBlk = g.map.getNavigationBlock(bx, by, targetZ);
+                            if (!navBlk || navBlk.groundType !== roadType || navBlk.isRailway) continue;
+                            if (strictLaneAlign) {
+                                const lidZ1 = g.map.getBlockInfo ? g.map.getBlockInfo(bx, by, 1).lid : 0;
+                                const bits = (navBlk.up ? 1 : 0) + (navBlk.down ? 1 : 0) + (navBlk.left ? 1 : 0) + (navBlk.right ? 1 : 0);
+                                if (bits !== 1 || lidZ1 === 25) continue;
+                            }
+                            const sx = (bx + 0.5) * tileSize;
+                            const sy = (by + 0.5) * tileSize;
+                            if (Math.hypot(sx - targetX, sy - targetY) < 1180) continue;
+                            if (typeof g.isPointInAnyPlayerCameraView === "function" && g.isPointInAnyPlayerCameraView(sx, sy, 220)) continue;
+                            const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
+                            const roadAng = typeof g.map.getAlignedRoadAngle === "function"
+                                ? g.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
+                                : toTargetAng;
+                            if (strictLaneAlign && Math.cos(roadAng - toTargetAng) < 0.12) continue;
+                            const occupied = Array.isArray(g.vehicles) && g.vehicles.some((ov) => ov && Math.hypot(ov.x - sx, ov.y - sy) < 76);
+                            if (occupied) continue;
+                            const sz = g.map.getHeightAtPixel ? g.map.getHeightAtPixel(sx, sy, 4.0) : 2.0;
+
+                            if (serviceType === "POLICE") this.blackboard.totalPrecinctDispatches = (this.blackboard.totalPrecinctDispatches || 0) + 1;
+                            else if (serviceType === "MEDIC") this.blackboard.totalMedicDispatches = (this.blackboard.totalMedicDispatches || 0) + 1;
+                            else if (serviceType === "FIRE") this.blackboard.totalFireDispatches = (this.blackboard.totalFireDispatches || 0) + 1;
+                            else if (serviceType === "TOW") this.blackboard.totalTowDispatches = (this.blackboard.totalTowDispatches || 0) + 1;
+
+                            const spawnRecord = {
+                                serviceType,
+                                x: sx,
+                                y: sy,
+                                z: sz,
+                                angle: roadAng,
+                                station: st,
+                                usedStationGate: useStationGate,
+                                distToTarget: Math.round(Math.hypot(sx - targetX, sy - targetY)),
+                                atMs: Math.round(this.nowMs())
+                            };
+                            this.fleetLedger.push(spawnRecord);
+                            if (this.fleetLedger.length > 40) this.fleetLedger.shift();
+                            this.emitEvent("MUNICIPAL_DISPATCH", {
+                                serviceType,
+                                stationId: st ? st.id : null,
+                                distToTarget: spawnRecord.distToTarget,
+                                usedStationGate: useStationGate
+                            });
+                            return spawnRecord;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    getFleetTelemetry() {
+        const g = this.game;
+        const stats = {
+            activePoliceCruisers: 0,
+            activeSwatUnits: 0,
+            activeFootCops: 0,
+            activeAmbulances: 0,
+            activeFireTrucks: 0,
+            activeTowTrucks: 0,
+            pending911Callers: 0,
+            activeSpikeStrips: Array.isArray(this.spikeStrips) ? this.spikeStrips.length : 0
+        };
+        if (!g) return stats;
+        if (Array.isArray(g.vehicles)) {
+            for (let i = 0; i < g.vehicles.length; i++) {
+                const v = g.vehicles[i];
+                if (!v || v.destroyed) continue;
+                if (v.isPolice && v.driver === "AI_COP") {
+                    stats.activePoliceCruisers++;
+                    if (v.specKey === "SWAT_ENFORCER") stats.activeSwatUnits++;
+                } else if (v.specKey === "MEDIC_AMBULANCE" && v.driver === "AI_EMERGENCY") {
+                    stats.activeAmbulances++;
+                } else if (v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
+                    stats.activeFireTrucks++;
+                } else if (v.specKey === "TOW_TRUCK" && v.driver === "AI_TOW") {
+                    stats.activeTowTrucks++;
+                }
+            }
+        }
+        if (Array.isArray(g.peds)) {
+            for (let i = 0; i < g.peds.length; i++) {
+                const ped = g.peds[i];
+                if (!ped || ped.dead) continue;
+                if (ped.kind === "COP") stats.activeFootCops++;
+                if ((ped.calling911Timer || 0) > 0) stats.pending911Callers++;
+            }
+        }
+        return stats;
+    }
+
+    /* ========================================================================
+       4. ENTITY AUTHORITY LEDGER, SELF-HEALING SANITIZER & KINEMATIC VALIDATOR
        ======================================================================== */
     getVehicleAuthority(v) {
         const g = this.game;
@@ -1094,12 +1296,96 @@ class ViceWorldDirector {
         const now = this.nowMs();
         let entry = this.vehicleLedger.get(v.id);
         if (!entry) {
-            entry = { lastX: v.x, lastY: v.y, owner: this.getVehicleAuthority(v), lastSyncMs: now, allowSnapUntilMs: 0 };
+            entry = { lastX: v.x, lastY: v.y, lastDryX: v.x, lastDryY: v.y, owner: this.getVehicleAuthority(v), lastSyncMs: now, allowSnapUntilMs: 0 };
             this.vehicleLedger.set(v.id, entry);
         }
         entry.allowSnapUntilMs = now + durationMs;
         entry.lastX = v.x;
         entry.lastY = v.y;
+    }
+
+    autoHealWorldAnomalies() {
+        const g = this.game;
+        if (!g) return 0;
+        let healed = 0;
+        const boatSpecs = new Set(["AIRBOAT", "SPEEDBOAT", "JETSKI", "YACHT", "SWAMP_BOAT"]);
+
+        if (Array.isArray(g.vehicles)) {
+            for (let i = 0; i < g.vehicles.length; i++) {
+                const v = g.vehicles[i];
+                if (!v) continue;
+                const entry = v.id ? this.vehicleLedger.get(v.id) : null;
+
+                // 1. Heal NaN vehicle kinematics
+                if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.z || 0) || !Number.isFinite(v.angle || 0)) {
+                    v.x = (entry && Number.isFinite(entry.lastX)) ? entry.lastX : ((g.player && Number.isFinite(g.player.x)) ? g.player.x : 16384);
+                    v.y = (entry && Number.isFinite(entry.lastY)) ? entry.lastY : ((g.player && Number.isFinite(g.player.y)) ? g.player.y : 16384);
+                    v.z = 2.0;
+                    v.angle = 0;
+                    v.vx = 0;
+                    v.vy = 0;
+                    v.speed = 0;
+                    v.angularVelocity = 0;
+                    healed++;
+                    this.emitEvent("ANOMALY_HEALED", { kind: "NAN_VEHICLE", vehId: v.id });
+                }
+
+                // 2. Heal asymmetric / orphaned tow links
+                if (v.towingVehicle && v.towingVehicle.towedByTruck !== v) {
+                    v.towingVehicle = null;
+                    healed++;
+                    this.emitEvent("ANOMALY_HEALED", { kind: "ORPHAN_TOW_LINK", vehId: v.id });
+                }
+                if (v.towedByTruck && v.towedByTruck.towingVehicle !== v) {
+                    v.towedByTruck = null;
+                    healed++;
+                    this.emitEvent("ANOMALY_HEALED", { kind: "ORPHAN_TOWED_BY_LINK", vehId: v.id });
+                }
+
+                // 3. Heal AI land vehicles accidentally pushed into deep water
+                if (
+                    !v.destroyed &&
+                    (v.driver === "AI_TRAFFIC" || v.driver === "AI_COP" || v.driver === "AI_EMERGENCY" || v.driver === "AI_TOW") &&
+                    !boatSpecs.has(v.specKey) &&
+                    !v.amphibious &&
+                    g.map &&
+                    typeof g.map.isWaterAtPixel === "function" &&
+                    g.map.isWaterAtPixel(v.x, v.y) &&
+                    !(g.map.bridgeMask && g.map.bridgeMask[Math.floor(v.y / 64) * g.map.cols + Math.floor(v.x / 64)] > 0)
+                ) {
+                    if (entry && Number.isFinite(entry.lastDryX) && Number.isFinite(entry.lastDryY) && !g.map.isWaterAtPixel(entry.lastDryX, entry.lastDryY)) {
+                        v.x = entry.lastDryX;
+                        v.y = entry.lastDryY;
+                        v.vx = 0;
+                        v.vy = 0;
+                        v.speed = 0;
+                        healed++;
+                        this.emitEvent("ANOMALY_HEALED", { kind: "AI_VEHICLE_IN_WATER", vehId: v.id });
+                    }
+                }
+            }
+        }
+
+        if (Array.isArray(g.peds)) {
+            for (let i = 0; i < g.peds.length; i++) {
+                const ped = g.peds[i];
+                if (!ped) continue;
+                if (!Number.isFinite(ped.x) || !Number.isFinite(ped.y) || !Number.isFinite(ped.angle || 0)) {
+                    ped.x = (g.player && Number.isFinite(g.player.x)) ? g.player.x + 64 : 16384;
+                    ped.y = (g.player && Number.isFinite(g.player.y)) ? g.player.y + 64 : 16384;
+                    ped.z = 2.0;
+                    ped.angle = 0;
+                    ped.speed = 0;
+                    healed++;
+                    this.emitEvent("ANOMALY_HEALED", { kind: "NAN_PED", pedId: ped.id });
+                }
+            }
+        }
+
+        if (healed > 0) {
+            this.blackboard.totalAnomaliesHealed = (this.blackboard.totalAnomaliesHealed || 0) + healed;
+        }
+        return healed;
     }
 
     updateAndAuditFrame(dt) {
@@ -1112,6 +1398,7 @@ class ViceWorldDirector {
         this.updateFocusMode(dt);
         this.updateSpikeStrips(dt);
         this.updateStreetTakeoverHype(dt);
+        this.autoHealWorldAnomalies();
         if (!Array.isArray(g.vehicles)) return;
         const now = this.nowMs();
         const p = g.player;
@@ -1122,11 +1409,14 @@ class ViceWorldDirector {
             const v = g.vehicles[i];
             if (!v || !v.id) continue;
             const auth = this.getVehicleAuthority(v);
+            const isDry = !(g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(v.x, v.y));
             let entry = this.vehicleLedger.get(v.id);
             if (!entry) {
                 this.vehicleLedger.set(v.id, {
                     lastX: v.x,
                     lastY: v.y,
+                    lastDryX: isDry ? v.x : undefined,
+                    lastDryY: isDry ? v.y : undefined,
                     owner: auth,
                     lastSyncMs: now,
                     allowSnapUntilMs: now + 350
@@ -1161,9 +1451,33 @@ class ViceWorldDirector {
 
             entry.lastX = v.x;
             entry.lastY = v.y;
+            if (isDry) {
+                entry.lastDryX = v.x;
+                entry.lastDryY = v.y;
+            }
             entry.owner = auth;
             entry.lastSyncMs = now;
         }
+    }
+
+    getEngineSnapshot() {
+        const g = this.game;
+        const recog = this.getWantedRecognitionStatus();
+        const fleet = this.getFleetTelemetry();
+        const inv = this.auditWorldInvariants();
+        return {
+            wantedLevel: g ? (g.wantedLevel || 0) : 0,
+            recognitionCode: recog ? recog.code : "CLEAN",
+            recognitionLabel: recog ? recog.label : "0★ CLEAN PROFILE",
+            focusCharge: Math.round(this.focusCharge || 0),
+            focusActiveSec: Number((this.focusActiveTimer || 0).toFixed(1)),
+            blackboard: { ...this.blackboard },
+            fleet,
+            invariantsOk: inv.ok,
+            anomaliesHealed: this.blackboard.totalAnomaliesHealed || 0,
+            recentEventsCount: this.eventLog.length,
+            latestFeedPost: this.leonidaFeedPosts.length ? this.leonidaFeedPosts[this.leonidaFeedPosts.length - 1] : null
+        };
     }
 
     /* ========================================================================
