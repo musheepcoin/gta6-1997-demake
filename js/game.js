@@ -4113,7 +4113,23 @@ class LeonidaGame {
 
 
 
+    tryInteractVehicleTrunk() {
+        if (this.director && typeof this.director.interactWithNearestVehicleTrunk === "function") {
+            return this.director.interactWithNearestVehicleTrunk();
+        }
+        return { ok: false };
+    }
+
     toggleBandana(forceState = null) {
+        if (forceState === null && this.director && typeof this.director.findNearestTrunkVehicle === "function") {
+            const trunkVeh = this.director.findNearestTrunkVehicle(58);
+            if (trunkVeh) {
+                this.player.bandana = !this.player.bandana;
+                this.director.interactWithNearestVehicleTrunk();
+                this.renderPortraits();
+                return;
+            }
+        }
 
         this.player.bandana = forceState !== null ? Boolean(forceState) : !this.player.bandana;
 

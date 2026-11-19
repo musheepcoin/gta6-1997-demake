@@ -16958,7 +16958,10 @@ class RetroRenderer {
             this.drawHudSprite(ctx, "45", iconX, leftY, iconScale);
         }
 
-        // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS) + LINE-OF-SIGHT EVASION BAR, DISTRICT BANNER (25/26) & CAR NAME (27)
+        // C. TOP-CENTER: WANTED POLICE HEADS (41/42 — UP TO 6 HEADS) + GTA 6 RECOGNITION STATUS BADGE, DISTRICT BANNER (25/26) & CAR NAME (27)
+        const recogStatus = (game.director && typeof game.director.getWantedRecognitionStatus === "function")
+            ? game.director.getWantedRecognitionStatus()
+            : null;
         if ((game.wantedLevel || 0) > 0) {
             const headSp = this.gta1Meta.sprites.hud["41"];
             const headScale = isPhonePortrait ? s * 0.85 : s;
@@ -16969,7 +16972,7 @@ class RetroRenderer {
             const stripX = Math.round((W - stripW) * 0.5);
             let hx = stripX;
             const hy = W < 640 ? (leftY + mugH + 10) : 10;
-            const isEvading = !game.isPoliceSpotted && (game.wantedDecayTimer || 0) > 0.15;
+            const isEvading = !game.isPoliceSpotted;
             const flashActive = Math.floor(this.time * (isEvading ? 3.2 : 6.5)) % 2 === 0;
 
             for (let i = 0; i < maxHeads; i++) {
@@ -16983,16 +16986,17 @@ class RetroRenderer {
                 hx += headW + 3;
             }
 
-            // Line-of-Sight Police Getaway / Evasion Countdown Pill directly below the Wanted Heads
-            const barW = Math.max(168, Math.round(stripW));
-            const barH = 16;
+            // GTA 6 Recognition Status & Evasion Countdown Pill directly below the Wanted Heads
+            const barW = Math.max(216, Math.round(stripW));
+            const barH = 18;
             const barX = Math.round((W - barW) * 0.5);
             const barY = Math.round(hy + headH + 4);
             const dur = game.wantedDecayDuration || 16;
             const prog = Math.max(0, Math.min(1, (game.wantedDecayTimer || 0) / dur));
-            const switchedVehUnseen = Boolean(p.inVehicle && p.inVehicle !== game.wantedSpottedVehicle);
-            const effRate = switchedVehUnseen ? 1.75 : 1.0;
-            const secsLeft = Math.max(1, Math.ceil((dur - (game.wantedDecayTimer || 0)) / effRate));
+            const badgeColor = (recogStatus && recogStatus.color) ? recogStatus.color : (isEvading ? "#38bdf8" : "#ef4444");
+            const badgeText = (recogStatus && recogStatus.label)
+                ? recogStatus.label
+                : (isEvading ? "🔍 VCPD SEARCHING LAST SCENE" : "👁️ VCPD VISUAL CONTACT");
 
             ctx.save();
             ctx.fillStyle = isEvading ? "rgba(8, 22, 38, 0.90)" : "rgba(38, 10, 18, 0.88)";
@@ -17001,18 +17005,31 @@ class RetroRenderer {
                 ctx.fillStyle = "rgba(56, 189, 248, 0.35)";
                 ctx.fillRect(barX + 1, barY + 1, Math.round((barW - 2) * prog), barH - 2);
             }
-            ctx.strokeStyle = isEvading ? "#38bdf8" : "#ef4444";
+            ctx.strokeStyle = badgeColor;
             ctx.lineWidth = 1.2;
             ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
             ctx.font = "bold 9px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillStyle = isEvading ? "#7dd3fc" : "#fca5a5";
-            ctx.fillText(
-                isEvading ? `🕵️ HIDDEN — CLEARING APB IN ${secsLeft}s` : "🚨 SPOTTED — BREAK LINE OF SIGHT!",
-                barX + barW * 0.5,
-                barY + barH * 0.5 + 0.5
-            );
+            ctx.fillStyle = badgeColor;
+            ctx.fillText(badgeText, barX + barW * 0.5, barY + barH * 0.5 + 0.5);
+            ctx.restore();
+        } else if (recogStatus) {
+            const barW = 240;
+            const barH = 18;
+            const barX = Math.round((W - barW) * 0.5);
+            const barY = W < 640 ? (leftY + mugH + 10) : 12;
+            ctx.save();
+            ctx.fillStyle = "rgba(18, 16, 8, 0.90)";
+            ctx.fillRect(barX, barY, barW, barH);
+            ctx.strokeStyle = recogStatus.color || "#facc15";
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
+            ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = recogStatus.color || "#facc15";
+            ctx.fillText(recogStatus.label, barX + barW * 0.5, barY + barH * 0.5 + 0.5);
             ctx.restore();
         }
 
@@ -17068,13 +17085,21 @@ class RetroRenderer {
             }
         }
 
-        // E. BOTTOM-CENTER MISSION OBJECTIVE & TIMER IN SUB2.FON (when mission active)
+        // E. BOTTOM-CENTER MISSION OBJECTIVE & TIMER IN SUB2.FON (when mission active) OR GTA 6 VEHICLE TRUNK PROMPT [B]
         if (game.missions.activeMission) {
             const objText = objEl ? (objEl.textContent || "").trim().toUpperCase() : "";
             const timerText = timerEl ? (timerEl.textContent || "").trim().toUpperCase() : "";
             if (objText) {
                 const fullLine = timerText ? `${objText}  ${timerText}` : objText;
                 this.drawGta1FontString(ctx, "SUB2", fullLine, W * 0.5, H - 24 * s, s, "center");
+            }
+        } else if (game.director && typeof game.director.findNearestTrunkVehicle === "function") {
+            const nearTrunkVeh = game.director.findNearestTrunkVehicle(54);
+            if (nearTrunkVeh) {
+                const trunkLabel = nearTrunkVeh._trunkLooted
+                    ? "[B] OPEN TRUNK: SWAP OUTFIT DISGUISE"
+                    : "[B] OPEN TRUNK: ARSENAL STASH & DISGUISE";
+                this.drawGta1FontString(ctx, "SUB2", trunkLabel, W * 0.5, H - 24 * s, s * 0.85, "center");
             }
         }
     }

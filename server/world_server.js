@@ -38,7 +38,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_212";
+const CURRENT_BUILD = "101_213";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;

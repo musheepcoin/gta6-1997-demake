@@ -16,10 +16,10 @@ class MissionManager {
                 missionId: "M0_DYNAMIC_FIXER",
                 isVirtualPhone: true,
                 shortTitle: "⚡ FIXER: LIVE 90S",
-                caller: "ViceNet AI Fixer",
+                caller: "Cal Hampton & Fixers",
                 rewardCash: 1500,
-                name: "VICENET DYNAMIC 90S CONTRACT",
-                briefing: "⚡ LIVE AI FIXER: Scans real vehicles & syndicates in your current district to generate an instant 90-second contract ($1,200–$1,800)!",
+                name: "LEONIDA DYNAMIC 90S CONTRACT",
+                briefing: "⚡ LIVE LEONIDA FIXERS (Boobie Ike, Brian Heder, Cal Hampton & Raul Bautista): Instant 90-second district contracts ($1,200–$1,800)!",
                 x: 443.5 * TILE_SIZE,
                 y: 285.5 * TILE_SIZE,
                 completed: false
@@ -43,7 +43,7 @@ class MissionManager {
                 caller: "Dre'Quan Priest",
                 rewardCash: 2500,
                 name: "VICE BEACH PIER CONTRABAND",
-                briefing: "MISSION 2 (CONTRABAND): Collect 3 contraband crates on Vice Beach & Ocean Pier, then deliver to Hotel Dixon!",
+                briefing: "MISSION 2 (ONLY RAW RECORDS): Collect 3 contraband crates on Vice Beach & Ocean Pier for Dre'Quan Priest, then deliver to Hotel Dixon!",
                 x: 448.5 * TILE_SIZE,
                 y: 293.5 * TILE_SIZE,
                 completed: false
@@ -52,10 +52,10 @@ class MissionManager {
                 id: "phone_downtown",
                 missionId: "M3_OCEAN_DRIVE",
                 shortTitle: "M3: CHEETAH BOOST",
-                caller: "Jason Duval",
+                caller: "Boobie Ike",
                 rewardCash: 4000,
                 name: "STAR ISLAND CHEETAH BOOST",
-                briefing: "MISSION 3 (CHEETAH BOOST): Steal the VIP Grotti Cheetah on Star Island and deliver it to Vice Port Crane!",
+                briefing: "MISSION 3 (JACK OF HEARTS): Steal the VIP Grotti Cheetah on Star Island for Boobie Ike and deliver it to Vice Port Crane!",
                 x: 344.5 * TILE_SIZE,
                 y: 171.5 * TILE_SIZE,
                 completed: false
@@ -64,10 +64,10 @@ class MissionManager {
                 id: "phone_beach",
                 missionId: "M4_ANKLE_OVERRIDE",
                 shortTitle: "M4: ANKLE OVERRIDE",
-                caller: "Lucia & Jason",
+                caller: "Raul Bautista & Cal",
                 rewardCash: 7500,
                 name: "DOC ANKLE MONITOR OVERRIDE",
-                briefing: "MISSION 4 (THE BIG SCORE): Ambush the Armored Van in Port Gellhorn, then hack the DOC Relay at VCIA Airport!",
+                briefing: "MISSION 4 (THE BIG SCORE): Ambush the Armored Van with Raul Bautista's intel, then use Cal Hampton's frequency jammer at VCIA Airport!",
                 x: 68.5 * TILE_SIZE,
                 y: 187.5 * TILE_SIZE,
                 completed: false
@@ -590,11 +590,11 @@ class MissionManager {
                 objectiveLabel: `BOOST ${targetCar.name} IN ${distName}`
             };
             g.sendPager(
-                "📱 VICENET AI FIXER",
-                `Yo ${pName}! Our spotter in ${distName} just tagged a ${targetCar.name}! Hijack it and deliver it to ${bestDrop.name} for $1,200!`,
+                "📱 BOOBIE IKE (JACK OF HEARTS)",
+                `Yo ${pName}! Boobie Ike here — my spotter in ${distName} just tagged a ${targetCar.name}! Boost it and deliver it to ${bestDrop.name} for $1,200!`,
                 true
             );
-            g.showBigBanner("⚡ FIXER: LIVE BOOST", `STEAL THE ${targetCar.name} & DELIVER TO ${bestDrop.name}`, "#00f0ff", 2.6);
+            g.showBigBanner("⚡ BOOBIE IKE: LIVE BOOST", `STEAL THE ${targetCar.name} & DELIVER TO ${bestDrop.name}`, "#00f0ff", 2.6);
         } else if (arch === "RAM_AND_EXTORT") {
             const spot = this.findNearbyRoadSpot(220, 390);
             const pool = ["CHALLENGER_RT", "TULIP_MUSCLE", "PENETRATOR_GT"];
@@ -611,7 +611,7 @@ class MissionManager {
             this.activeMission = {
                 id: "M0_DYNAMIC_FIXER",
                 archetype: "RAM_AND_EXTORT",
-                title: "CARTEL COURIER EXTORTION",
+                title: "BRIAN HEDER SHAKEDOWN",
                 phone,
                 stage: 1,
                 timer: 90,
@@ -621,11 +621,11 @@ class MissionManager {
                 objectiveLabel: `RAM OR SHOOT THE ${courier.name} COURIER!`
             };
             g.sendPager(
-                "📱 VICENET AI FIXER",
-                `${pName}, a Cartel courier in a ${courier.name} is cutting through ${distName} with $1,500 in bearer bonds! Ram or shoot his car until he drops the briefcase!`,
+                "📱 BRIAN HEDER (LEONIDA KEYS)",
+                `${pName}, Brian Heder here. A deadbeat courier in a ${courier.name} is cutting through ${distName} with $1,500 of my Keys money! Ram his car until he drops the briefcase!`,
                 true
             );
-            g.showBigBanner("💥 FIXER: RAM & EXTORT", `SMASH THE ${courier.name} COURIER FOR $1,500!`, "#f97316", 2.6);
+            g.showBigBanner("💥 BRIAN HEDER: SHAKEDOWN", `SMASH THE ${courier.name} COURIER FOR $1,500!`, "#f97316", 2.6);
         } else if (arch === "SPEED_BOMB_RUN") {
             let bombCar = (p.inVehicle && !p.inVehicle.destroyed && !p.inVehicle.waterOnly) ? p.inVehicle : null;
             if (!bombCar) {
@@ -663,11 +663,11 @@ class MissionManager {
                 objectiveLabel: alreadyIn ? `SPEED RUN -> ${dropLm.shortName || "DROP ZONE"}` : `BOARD THE NITRO ${bombCar.name}`
             };
             g.sendPager(
-                "📱 VICENET AI FIXER",
-                `💣 High-voltage job, ${pName}! This ${bombCar.name} is wired with a speed-sensitive nitro payload. Floor it to ${this.activeMission.dropName} without stopping for $1,800!`,
+                "📱 CAL HAMPTON (RADIO SCANNER)",
+                `💣 ${pName}, Cal Hampton here! I intercepted Coast Guard & VCPD channels — this ${bombCar.name} is wired with a speed-sensitive nitro rig. Floor it to ${this.activeMission.dropName} without stopping for $1,800!`,
                 true
             );
-            g.showBigBanner("💣 60 MPH NITRO RUN", `FLOOR IT TO ${this.activeMission.dropName} — DO NOT STOP!`, "#ef4444", 2.6);
+            g.showBigBanner("💣 CAL HAMPTON: NITRO RUN", `FLOOR IT TO ${this.activeMission.dropName} — DO NOT STOP!`, "#ef4444", 2.6);
         } else {
             const spot = this.findNearbyRoadSpot(230, 390);
             const vip = new Pedestrian({
@@ -707,7 +707,7 @@ class MissionManager {
             this.activeMission = {
                 id: "M0_DYNAMIC_FIXER",
                 archetype: "VIP_HIT_SQUAD",
-                title: "SYNDICATE VIP HIT",
+                title: "RAUL BAUTISTA SYNDICATE HIT",
                 phone,
                 stage: 1,
                 timer: 90,
@@ -717,11 +717,11 @@ class MissionManager {
                 objectiveLabel: `ELIMINATE SYNDICATE LIEUTENANT IN ${distName}`
             };
             g.sendPager(
-                "📱 VICENET AI FIXER",
-                `🎯 Contract live for ${pName}: A Syndicate Lieutenant and his 2 bodyguards were just spotted in ${distName}. Take him out within 90s for $1,500!`,
+                "📱 RAUL BAUTISTA (HEIST CREW)",
+                `🎯 Raul Bautista here, ${pName}: A Syndicate banker who burned my crew and his 2 bodyguards were just spotted in ${distName}. Take him out within 90s for $1,500!`,
                 true
             );
-            g.showBigBanner("🎯 SYNDICATE VIP HIT", `ELIMINATE THE LIEUTENANT IN ${distName}`, "#ff2a85", 2.6);
+            g.showBigBanner("🎯 RAUL BAUTISTA: VIP HIT", `ELIMINATE THE LIEUTENANT IN ${distName}`, "#ff2a85", 2.6);
         }
         if (typeof g.rebuildVehicleSpatialGrid === "function") {
             g.rebuildVehicleSpatialGrid();

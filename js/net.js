@@ -2124,7 +2124,7 @@ class ViceNetworkManager {
         if (!this.game || !rawText) return;
         const lower = rawText.toLowerCase();
         const isAiTrigger =
-            /^@(fixer|diaz|sonny|toussaint|mitch|cortez|radio|ai)\b/i.test(rawText) ||
+            /^@(fixer|cal|raul|brian|boobie|drequan|diaz|sonny|toussaint|mitch|cortez|radio|ai)\b/i.test(rawText) ||
             /^\/ai\b/i.test(rawText);
         if (!isAiTrigger) return;
 
@@ -2148,6 +2148,25 @@ class ViceNetworkManager {
                 reply = isFr
                     ? `En direct sur Flash FM ! ${pName} roule dans ${dist} avec $${Math.floor(g.cash || 0).toLocaleString()} en poche ! Le boss actuel du quartier est ${king}. Faites chauffer le bitume !`
                     : `Live on Flash FM! ${pName} is cruising through ${dist} holding $${Math.floor(g.cash || 0).toLocaleString()}! Current district Kingpin: ${king}!`;
+            } else if (lower.startsWith("@cal")) {
+                agentName = "📡 CAL HAMPTON (RADIO SCANNER)";
+                agentColor = "#38bdf8";
+                const nowMs = performance.now();
+                if ((g.wantedLevel || 0) > 0 && !g.isPoliceSpotted && (nowMs - (this._lastCalJamMs || 0)) > 45000) {
+                    this._lastCalJamMs = nowMs;
+                    g.setWantedLevel(Math.max(0, (g.wantedLevel || 1) - 1));
+                    reply = isFr
+                        ? `Chut ${pName}, j'écoute la fréquence du VCPD et des Garde-Côtes ! Je viens de brouiller leur central radio dans ${dist} (-1★ Wanted) !`
+                        : `Keep your voice down ${pName}, I'm monitoring VCPD & Coast Guard bands! Just spoofed their dispatch channel in ${dist} (-1★ Wanted)!`;
+                } else {
+                    const recog = (g.director && typeof g.director.getWantedRecognitionStatus === "function")
+                        ? g.director.getWantedRecognitionStatus()
+                        : null;
+                    const statusHint = recog ? recog.label : "0★ CLEAR";
+                    reply = isFr
+                        ? `Ici Cal Hampton ! Sur mon scanner radio dans ${dist} : statut VCPD = [${statusHint}]. Astuce : ouvre un coffre de voiture avec [B] hors de leur vue pour te déguiser !`
+                        : `Cal Hampton on the scanner! VCPD frequency in ${dist}: [${statusHint}]. Pro tip: pop a car trunk with [B] out of sight for a quick disguise & stash!`;
+                }
             } else if (lower.startsWith("@diaz") || lower.startsWith("@sonny") || lower.startsWith("@toussaint") || lower.startsWith("@mitch") || lower.startsWith("@cortez")) {
                 const bossMap = {
                     "@diaz": { name: "🏛️ DON DIAZ (STAR CARTEL)", col: "#c084fc", fKey: "STAR" },
@@ -2166,8 +2185,21 @@ class ViceNetworkManager {
                     g.recordFactionGrudge("CHALLENGE", "Syndicate Turf", tag === "@cortez", bossMap[tag].fKey);
                 }
             } else {
-                // @fixer or /ai -> Launch a live dynamic contract or drop a crate if requested!
-                agentName = "📱 VICENET AI FIXER";
+                // @fixer, @boobie, @brian, @raul, @drequan or /ai -> Launch a live GTA 6 Fixer contract!
+                if (lower.startsWith("@boobie")) {
+                    agentName = "📱 BOOBIE IKE (JACK OF HEARTS)";
+                    if (g.missions) g.missions._fixerRollIdx = 0;
+                } else if (lower.startsWith("@brian")) {
+                    agentName = "📱 BRIAN HEDER (LEONIDA KEYS)";
+                    if (g.missions) g.missions._fixerRollIdx = 1;
+                } else if (lower.startsWith("@raul")) {
+                    agentName = "📱 RAUL BAUTISTA (HEIST CREW)";
+                    if (g.missions) g.missions._fixerRollIdx = 3;
+                } else if (lower.startsWith("@drequan")) {
+                    agentName = "📱 DRE'QUAN PRIEST (ONLY RAW)";
+                } else {
+                    agentName = "📱 LEONIDA FIXER NETWORK";
+                }
                 agentColor = "#39ff14";
                 if (g.missions && !g.missions.activeMission) {
                     const fixerPhone = g.missions.payphones ? g.missions.payphones[0] : null;

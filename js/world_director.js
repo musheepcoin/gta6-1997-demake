@@ -330,6 +330,296 @@ class ViceWorldDirector {
     }
 
     /* ========================================================================
+       2B. GTA 6 LEONIDA SANDBOX TRANSPOSITIONS
+       - Recognition Status Badges (SPOTTED / HOT VEHICLE / INCOGNITO / SEARCHING)
+       - Tactical Vehicle Trunk [B] (Arsenal Stash & Quick Outfit Disguise)
+       - Heavy Weapon Open-Carry Police Scrutiny vs. Holstered Stealth
+       - @LeonidaFeed Bystander Smartphone Viral Clips
+       ======================================================================== */
+    getWantedRecognitionStatus() {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead) return null;
+        const p = g.player;
+        const wl = g.wantedLevel || 0;
+
+        if (wl <= 0) {
+            let activeCaller = null;
+            if (Array.isArray(g.peds)) {
+                for (let i = 0; i < g.peds.length; i++) {
+                    const ped = g.peds[i];
+                    if (ped && !ped.dead && (ped.calling911Timer || 0) > 0) {
+                        activeCaller = ped;
+                        break;
+                    }
+                }
+            }
+            if (activeCaller || g.pending911Report) {
+                return {
+                    code: "CALLING_911",
+                    label: "📞 911 CALL IN PROGRESS — SILENCE WITNESS!",
+                    color: "#facc15"
+                };
+            }
+            if ((this.openCarryWarnTimer || 0) > 0.1) {
+                return {
+                    code: "OPEN_CARRY_WARN",
+                    label: "🚓 VCPD: HOLSTER HEAVY WEAPON [1]!",
+                    color: "#fb923c"
+                };
+            }
+            return null;
+        }
+
+        if (g.isPoliceSpotted) {
+            return {
+                code: "SPOTTED",
+                label: "👁️ VCPD VISUAL CONTACT",
+                color: "#ff1e38"
+            };
+        }
+        if (p.inVehicle && (p.inVehicle === g.wantedSpottedVehicle || p.inVehicle.isPolice)) {
+            return {
+                code: "HOT_VEHICLE",
+                label: "🚗 HOT VEHICLE — SWAP CAR OR RESPRAY!",
+                color: "#f97316"
+            };
+        }
+        if (
+            p.inVehicle &&
+            !p.inVehicle.isPolice &&
+            p.inVehicle !== g.wantedSpottedVehicle &&
+            Math.abs(p.inVehicle.speed || 0) < this.config.cleanCarMaxCalmSpeed
+        ) {
+            return {
+                code: "INCOGNITO_CAR",
+                label: "🕵️ INCOGNITO VEHICLE — DRIVE CALMLY",
+                color: "#39ff14"
+            };
+        }
+        if (!p.inVehicle && p.weapon && p.weapon !== "FIST") {
+            return {
+                code: "ARMED_EXPOSED",
+                label: "🔫 WEAPON EXPOSED — HOLSTER [1] OR TRUNK [B]",
+                color: "#fb923c"
+            };
+        }
+        return {
+            code: "SEARCHING_SCENE",
+            label: "🔍 VCPD SEARCHING LAST SCENE",
+            color: "#38bdf8"
+        };
+    }
+
+    findNearestTrunkVehicle(maxDist = 56) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.player.inVehicle || g.activeInterior) return null;
+        if (!Array.isArray(g.vehicles)) return null;
+        const p = g.player;
+        const noTrunkSpecs = new Set(["BMX_BIKE", "E_SCOOTER", "JETSKI", "AIRBOAT", "SPEEDBOAT", "YACHT", "SWAMP_BOAT", "MICRO_KART"]);
+        let bestVeh = null;
+        let bestScore = Infinity;
+
+        for (let i = 0; i < g.vehicles.length; i++) {
+            const v = g.vehicles[i];
+            if (!v || v.destroyed || v.isMotorcycle || v.waterOnly || noTrunkSpecs.has(v.specKey)) continue;
+            if (Math.abs(v.speed || 0) > 22) continue;
+            const dx = p.x - v.x;
+            const dy = p.y - v.y;
+            if (Math.abs(dx) > maxDist || Math.abs(dy) > maxDist) continue;
+            const dCenter = Math.hypot(dx, dy);
+            if (dCenter > maxDist) continue;
+
+            // Compute rear trunk world position of the vehicle
+            const halfLen = (v.w || 48) * 0.5;
+            const trunkX = v.x - Math.cos(v.angle || 0) * halfLen;
+            const trunkY = v.y - Math.sin(v.angle || 0) * halfLen;
+            const dTrunk = Math.hypot(p.x - trunkX, p.y - trunkY);
+            const score = Math.min(dTrunk, dCenter * 0.85);
+            if (score < bestScore) {
+                bestScore = score;
+                bestVeh = v;
+            }
+        }
+        return bestVeh;
+    }
+
+    interactWithNearestVehicleTrunk() {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead) return { ok: false, reason: "NO_PLAYER" };
+        const p = g.player;
+        if (p.inVehicle) {
+            g.addFloatingText(p.x, p.y - 26, "🧰 EXIT VEHICLE [F] TO OPEN TRUNK [B]!", "#fde047");
+            return { ok: false, reason: "IN_VEHICLE" };
+        }
+        const v = this.findNearestTrunkVehicle(58);
+        if (!v) {
+            g.addFloatingText(p.x, p.y - 26, "🧰 STAND BEHIND A CAR TRUNK & PRESS [B]!", "#94a3b8");
+            return { ok: false, reason: "NO_TRUNK_NEARBY" };
+        }
+
+        v.trunkOpenTimer = 1.8;
+        v.doorOpenTimer = Math.max(v.doorOpenTimer || 0, 0.55);
+        if (g.audio && typeof g.audio.playBeep === "function") {
+            g.audio.playBeep(520, 0.07, "triangle", 0.08);
+        }
+
+        // 1. GTA 6 Quick Outfit Disguise & Weapon Holster (when out of direct police sight!)
+        const outfits = ["#00f0ff", "#ff2a85", "#fde047", "#39ff14", "#c084fc", "#fb923c"];
+        this._disguiseIdx = ((this._disguiseIdx || 0) + 1) % outfits.length;
+        p.disguiseColor = outfits[this._disguiseIdx];
+        p.weapon = "FIST";
+        p.muzzleTimer = 0;
+        p.weaponDrawnTimer = 0;
+        let disguised = false;
+
+        if (!g.isPoliceSpotted) {
+            disguised = true;
+            g.hasBeenDirectlySpottedByCop = false;
+            if ((g.wantedLevel || 0) > 0) {
+                const scene = g.lastKnownWantedPos;
+                const dScene = scene ? Math.hypot(p.x - scene.x, p.y - scene.y) : 999;
+                if (g.wantedLevel === 1 && dScene > 220) {
+                    g.setWantedLevel(0);
+                    g.addFloatingText(p.x, p.y - 42, "🧥 TRUNK DISGUISE — 1★ APB EVADED!", "#39ff14");
+                } else {
+                    g.wantedDecayTimer = (g.wantedDecayTimer || 0) + 4.5;
+                    g.addFloatingText(p.x, p.y - 42, "🧥 TRUNK DISGUISE — OUTFIT SWAPPED!", "#38bdf8");
+                }
+            } else {
+                g.addFloatingText(p.x, p.y - 42, "🧥 TRUNK OUTFIT SWAPPED & WEAPON STORED!", "#38bdf8");
+            }
+        }
+
+        // 2. GTA 6 Vehicle Trunk Arsenal Stash (one-time per vehicle)
+        let lootType = "ALREADY_LOOTED";
+        if (!v._trunkLooted) {
+            v._trunkLooted = true;
+            this.blackboard.totalTrunksLooted = (this.blackboard.totalTrunksLooted || 0) + 1;
+            if (!Array.isArray(p.weaponsOwned)) p.weaponsOwned = ["FIST", "PISTOL"];
+            if (!p.ammo) p.ammo = { PISTOL: 45, UZI: 0, SHOTGUN: 0, FLAMETHROWER: 0, ROCKET: 0, ELECTRO: 0 };
+
+            if (v.isPolice) {
+                lootType = "POLICE_RACK";
+                p.armor = Math.min(p.maxArmor || 100, (p.armor || 0) + 50);
+                if (!p.weaponsOwned.includes("SHOTGUN")) p.weaponsOwned.push("SHOTGUN");
+                p.ammo.SHOTGUN = Math.min(999, (p.ammo.SHOTGUN || 0) + 24);
+                g.addFloatingText(v.x, v.y - 26, "🚔 VCPD TRUNK RACK: +50 ARMOR & +24 SHOTGUN!", "#00f0ff");
+            } else if (
+                v.driver === "AI_CRIMINAL" ||
+                v.wasCriminalCar ||
+                v.isEstateCar ||
+                v.specKey === "VICE_CHEETAH" ||
+                v.specKey === "BANSHEE_GT" ||
+                v.specKey === "STINGER_CABRIO" ||
+                v.specKey === "PENETRATOR_GT"
+            ) {
+                lootType = "SYNDICATE_STASH";
+                if (!p.weaponsOwned.includes("UZI")) p.weaponsOwned.push("UZI");
+                p.ammo.UZI = Math.min(999, (p.ammo.UZI || 0) + 60);
+                if (typeof g.addCash === "function") {
+                    g.addCash(350, "💼 TRUNK STASH (+60 UZI)", true);
+                }
+            } else {
+                lootType = "EMERGENCY_KIT";
+                p.hp = Math.min(p.maxHp || 100, (p.hp || 0) + 25);
+                p.ammo.PISTOL = Math.min(999, (p.ammo.PISTOL || 0) + 24);
+                g.addFloatingText(v.x, v.y - 26, "🧰 TRUNK KIT: +25 HP & +24 PISTOL AMMO!", "#39ff14");
+            }
+            if (typeof g.updateHud === "function") g.updateHud();
+        }
+
+        return { ok: true, vehicle: v, disguised, lootType };
+    }
+
+    updateOpenCarryScrutiny(dt) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.activeInterior) return;
+        const p = g.player;
+        if ((g.wantedLevel || 0) > 0 || p.inVehicle || (p.respawnGraceUntil || 0) > this.nowMs()) {
+            this.openCarryWarnTimer = 0;
+            this._openCarryWarned = false;
+            return;
+        }
+        const heavyWeapons = new Set(["SHOTGUN", "ROCKET", "FLAMETHROWER", "ELECTRO"]);
+        const isOpenCarryHeavy = Boolean(p.weapon && heavyWeapons.has(p.weapon));
+        if (isOpenCarryHeavy && this.hasCopWitnessNear(p.x, p.y, 195, false)) {
+            this.openCarryWarnTimer = (this.openCarryWarnTimer || 0) + dt;
+            if (!this._openCarryWarned) {
+                this._openCarryWarned = true;
+                g.addFloatingText(p.x, p.y - 32, "🚓 VCPD: HOLSTER THAT HEAVY WEAPON [1]!", "#fb923c");
+            }
+            if (this.openCarryWarnTimer >= 2.0) {
+                this.openCarryWarnTimer = 0;
+                this._openCarryWarned = false;
+                g.setWantedLevel(1, { x: p.x, y: p.y }, true);
+                g.addFloatingText(p.x, p.y - 44, "🚨 10-32 OPEN CARRY VIOLATION — 1★!", "#ff1e38");
+            }
+        } else {
+            this.openCarryWarnTimer = Math.max(0, (this.openCarryWarnTimer || 0) - dt * 2.0);
+            if (this.openCarryWarnTimer <= 0) {
+                this._openCarryWarned = false;
+            }
+        }
+    }
+
+    updateLeonidaViralClips(dt) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.activeInterior || !Array.isArray(g.peds)) return;
+        const p = g.player;
+        this.viralClipCooldown = Math.max(0, (this.viralClipCooldown || 0) - dt);
+
+        // Tick any bystander currently filming a viral clip
+        for (let i = 0; i < g.peds.length; i++) {
+            const ped = g.peds[i];
+            if (!ped || ped.dead || !((ped.filmingViralTimer || 0) > 0)) continue;
+            if ((ped.stunnedTimer || 0) > 0 || (ped.burnTimer || 0) > 0 || (ped.electroTimer || 0) > 0) {
+                ped.filmingViralTimer = 0;
+                continue;
+            }
+            ped.filmingViralTimer -= dt;
+            if (ped.filmingViralTimer <= 0) {
+                ped.filmingViralTimer = 0;
+                this.blackboard.totalViralClips = (this.blackboard.totalViralClips || 0) + 1;
+                if (typeof g.addCash === "function") {
+                    g.addCash(150, "📱 @LeonidaFeed VIRAL CLIP!", true);
+                }
+                if (typeof g.sendPager === "function" && (this.nowMs() - (this._lastViralPagerMs || 0)) > 18000) {
+                    this._lastViralPagerMs = this.nowMs();
+                    g.sendPager(
+                        "📱 @LEONIDAFEED // VIRAL TRENDING",
+                        "🔥 A bystander just posted your clip to Leonida Social Feed! +150K views & +$150 Viral Hype bonus!",
+                        false
+                    );
+                }
+            }
+        }
+
+        if (this.viralClipCooldown > 0) return;
+        const v = p.inVehicle;
+        const isFlashyDrift = Boolean(v && !v.destroyed && v.drifting && Math.abs(v.speed || 0) > 125);
+        const isAirStunt = Boolean(v && !v.destroyed && (v.stuntAirTimer || 0) > 0.12);
+        const isStreetAction = Boolean((p.playerCombatTimer || 0) > 0 || (g.wantedLevel || 0) >= 2);
+        if (!isFlashyDrift && !isAirStunt && !isStreetAction) return;
+
+        const px = v ? v.x : p.x;
+        const py = v ? v.y : p.y;
+        const pz = (v ? v.z : p.z) || 2.0;
+
+        for (let i = 0; i < g.peds.length; i++) {
+            const ped = g.peds[i];
+            if (!ped || ped.dead || ped.kind !== "CIVILIAN" || (ped.calling911Timer || 0) > 0 || (ped.filmingViralTimer || 0) > 0) continue;
+            const d = Math.hypot(ped.x - px, ped.y - py);
+            if (d > 38 && d < 240 && this.hasLineOfSight(ped.x, ped.y, px, py, pz, 38)) {
+                ped.filmingViralTimer = 2.2;
+                ped.angle = Math.atan2(py - ped.y, px - ped.x);
+                this.viralClipCooldown = 14.0;
+                g.addFloatingText(ped.x, ped.y - 22, "📱 FILMING LEONIDA CLIP!", "#f472b6");
+                break;
+            }
+        }
+    }
+
+    /* ========================================================================
        3. ENTITY AUTHORITY LEDGER & ANTI-TELEPORTATION KINEMATIC VALIDATOR
        ======================================================================== */
     getVehicleAuthority(v) {
@@ -359,7 +649,10 @@ class ViceWorldDirector {
 
     updateAndAuditFrame(dt) {
         const g = this.game;
-        if (!g || !Array.isArray(g.vehicles)) return;
+        if (!g) return;
+        this.updateOpenCarryScrutiny(dt);
+        this.updateLeonidaViralClips(dt);
+        if (!Array.isArray(g.vehicles)) return;
         const now = this.nowMs();
         const p = g.player;
         const camX = (g.renderer && Number.isFinite(g.renderer.camX)) ? g.renderer.camX : (p ? p.x : 0);
