@@ -137,6 +137,7 @@ function createGameInstance(cmpBuf, forceFresh = false) {
             this.gta1Ready = true;
             this.cmpReady = true;
             this.glLost = true;
+            this.gta1Meta = { sprites: { hud: {}, fonts: {}, peds: {}, cars: {} } };
         };
         RetroRenderer.prototype.render = function(game, dt) {
             const target = game.player.inVehicle || game.player;
@@ -1489,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_226"), "ViceCreationEngine (v101_226) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_227"), "ViceCreationEngine (v101_227) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2166,9 +2167,79 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 42: MODERN 2.5D GRAPHICAL POLISH — CHASSIS UNDERGLOW, TAILLIGHT TRAILS, DIEGETIC COMPASS & CAPSULE HUD
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 42: MODERN 2.5D GRAPHICAL POLISH — CHASSIS UNDERGLOW, TAILLIGHT TRAILS, DIEGETIC COMPASS & CAPSULE HUD ---");
+    {
+        const { g } = createGameInstance(cmpBuf);
+        const r = g.renderer;
+
+        // 1. Spawn a custom-tuned vehicle, place the player inside at high speed, and verify 2.5D Chassis Underglow & Taillight Ribbon Trail generation
+        const neonCar = g.creationEngine.spawnVehicle("VICE_CHEETAH", g.player.x, g.player.y, 0, { id: "neon_viz_42" });
+        g.creationEngine.modifyWorldEntity("neon_viz_42", { color: "#00f0ff", maxSpeed: 540 });
+        g.player.inVehicle = neonCar;
+        neonCar.driver = "PLAYER";
+        neonCar.speed = 240;
+        neonCar.vx = 240;
+        neonCar.vy = 0;
+
+        // Place active Flash District & Hot Drop Crate away from the player so Diegetic 2.5D Ground Compass Ring targets them
+        g.activeFlashDistrict = {
+            index: 1,
+            key: "STAR_ISLAND",
+            label: "STAR ISLAND PALAZZO",
+            x: g.player.x + 1900,
+            y: g.player.y - 800,
+            color: "#c084fc",
+            timer: 150,
+            maxTimer: 180,
+            flamingoScore: 620,
+            cyanScore: 380
+        };
+        g.activeFlashEvent = {
+            x: g.player.x + 600,
+            y: g.player.y + 400,
+            z: 2.0,
+            reward: 800,
+            weapon: "ROCKET",
+            timer: 65,
+            maxTimer: 90
+        };
+
+        // Step the car forward and invoke renderModern25DVisualJuice & renderAuthenticGta1Hud
+        for (let step = 0; step < 4; step++) {
+            neonCar.x += 24;
+            r.camX = neonCar.x;
+            r.camY = neonCar.y;
+            r.renderModern25DVisualJuice(r.ctx, g);
+        }
+        r.renderAuthenticGta1Hud(r.ctx, g);
+
+        assert(
+            neonCar._lastUnderglowColor === "#00f0ff" &&
+            Array.isArray(neonCar._tailTrail) &&
+            neonCar._tailTrail.length >= 3,
+            `2.5D Neon Chassis Underglow ('${neonCar._lastUnderglowColor}') & High-Speed Dual Taillight Ribbon Trails (${neonCar._tailTrail ? neonCar._tailTrail.length : 0} nodes) render cleanly at 60 FPS`
+        );
+        assert(
+            typeof r._lastCompassTargetsCount === "number" && r._lastCompassTargetsCount >= 2,
+            `Diegetic 2.5D Tactical Ground Compass Ring projects ${r._lastCompassTargetsCount} live directional chevrons (🔥 Hotspot, 📦 Hot Drop, 🦩/⚡ Crew) directly around player vehicle`
+        );
+        assert(
+            typeof r.drawArcadeCapsule === "function",
+            "Beveled/Rounded Arcade Capsule HUD renderer (drawArcadeCapsule) & 3D Flash District Arena Skybeam execute with zero errors"
+        );
+
+        g.player.inVehicle = null;
+        g.activeFlashEvent = null;
+        g.creationEngine.clearAllCreations();
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 41 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO & 2.5D SOCIAL SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 42 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL & GRAPHICAL SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

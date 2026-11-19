@@ -13556,7 +13556,10 @@ class RetroRenderer {
             }
         }
 
-        // 3. Online Multiplayer Floating 3D Player Nametags, Syndicate Badges, 2.5D Emotes & Edge-of-Screen Social Radar
+        // 3. Modern 2.5D Visual Juice: Flash District 3D Skybeam, Chassis Underglow, Taillight Trails & Diegetic Ground Compass Ring
+        this.renderModern25DVisualJuice(ctx, game);
+
+        // 3B. Online Multiplayer Floating 3D Player Nametags, Syndicate Badges, 2.5D Emotes & Edge-of-Screen Social Radar
         const W = this.canvas.width;
         const H = this.canvas.height;
         const activeTurf = (typeof game.getCurrentDistrictTurf === "function") ? game.getCurrentDistrictTurf() : null;
@@ -13576,40 +13579,32 @@ class RetroRenderer {
                     const rSeat = (rp.veh && typeof rp.veh.seat === "number") ? rp.veh.seat : 0;
                     const seatIcon = rp.veh ? (rSeat === 0 ? "🚗" : "🔫") : synIcon;
                     const tag = rp.dead ? `💀 ${rp.name} (WASTED)` : `${crownTag}${seatIcon} ${rp.name}`;
-                    const bw = Math.max(96, ctx.measureText(tag).width + 18);
-                    const bh = 22;
+                    const bw = Math.max(98, ctx.measureText(tag).width + 20);
+                    const bh = 23;
                     const bx = Math.round(sc.x - bw * 0.5);
                     const by = Math.round(sc.y - (rp.veh ? (38 + rSeat * 24) : 30));
 
-                    ctx.fillStyle = "rgba(8, 12, 24, 0.90)";
-                    ctx.fillRect(bx, by, bw, bh);
-                    ctx.strokeStyle = col;
-                    ctx.lineWidth = isRpKing ? 2.0 : 1.5;
-                    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+                    this.drawArcadeCapsule(ctx, bx, by, bw, bh, "rgba(8, 12, 26, 0.92)", col, 6, isRpKing ? 2.2 : 1.6);
 
                     ctx.fillStyle = isRpKing ? "#fde047" : "#ffffff";
                     ctx.fillText(tag, sc.x, by + 8);
 
-                    // Mini Health Bar inside the nametag pill
+                    // Mini Health Bar inside the nametag capsule
                     const hpPct = Math.max(0, Math.min(1, (rp.hp !== undefined ? rp.hp : 100) / 100));
-                    const barW = bw - 12;
+                    const barW = bw - 14;
                     ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
-                    ctx.fillRect(bx + 6, by + 15, barW, 4);
+                    ctx.fillRect(bx + 7, by + 15, barW, 4);
                     ctx.fillStyle = hpPct > 0.4 ? "#39ff14" : "#ff1e38";
-                    ctx.fillRect(bx + 6, by + 15, Math.round(barW * hpPct), 4);
+                    ctx.fillRect(bx + 7, by + 15, Math.round(barW * hpPct), 4);
 
-                    // Floating 2.5D Arcade Social Emote Pill above remote player
+                    // Floating 2.5D Arcade Social Emote Capsule above remote player
                     if (rp.socialEmote && (rp.socialEmote.timer || 0) > 0) {
                         const emTxt = `${rp.socialEmote.icon} ${rp.socialEmote.label}`;
-                        const ebw = Math.max(96, ctx.measureText(emTxt).width + 20);
+                        const ebw = Math.max(100, ctx.measureText(emTxt).width + 22);
                         const ebh = 22;
                         const ebx = Math.round(sc.x - ebw * 0.5);
                         const eby = by - ((rp.chatTimer || 0) > 0 ? 50 : 26);
-                        ctx.fillStyle = "rgba(10, 15, 30, 0.95)";
-                        ctx.fillRect(ebx, eby, ebw, ebh);
-                        ctx.strokeStyle = rp.socialEmote.color || "#39ff14";
-                        ctx.lineWidth = 2.0;
-                        ctx.strokeRect(ebx + 0.5, eby + 0.5, ebw - 1, ebh - 1);
+                        this.drawArcadeCapsule(ctx, ebx, eby, ebw, ebh, "rgba(10, 15, 32, 0.96)", rp.socialEmote.color || "#39ff14", 7, 2.0);
                         ctx.fillStyle = rp.socialEmote.color || "#39ff14";
                         ctx.fillText(emTxt, sc.x, eby + ebh * 0.5);
                     }
@@ -13617,20 +13612,16 @@ class RetroRenderer {
                     // Floating 3D Speech Bubble above remote player nametag when they chat!
                     if ((rp.chatTimer || 0) > 0 && rp.chatText) {
                         const bubbleTxt = `💬 ${rp.chatText.slice(0, 56)}`;
-                        const bbw = Math.max(80, ctx.measureText(bubbleTxt).width + 18);
+                        const bbw = Math.max(84, ctx.measureText(bubbleTxt).width + 20);
                         const bbh = 20;
                         const bbx = Math.round(sc.x - bbw * 0.5);
                         const bby = by - 25;
-                        ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
-                        ctx.fillRect(bbx, bby, bbw, bbh);
-                        ctx.strokeStyle = col;
-                        ctx.lineWidth = 1.5;
-                        ctx.strokeRect(bbx + 0.5, bby + 0.5, bbw - 1, bbh - 1);
+                        this.drawArcadeCapsule(ctx, bbx, bby, bbw, bbh, "rgba(15, 23, 42, 0.95)", col, 6, 1.5);
                         ctx.fillStyle = "#fde047";
                         ctx.fillText(bubbleTxt, sc.x, bby + bbh * 0.5);
                     }
                 } else {
-                    // Edge-of-Screen Directional Social Radar Badge for off-screen human/bot player!
+                    // Edge-of-Screen Directional Social Radar Capsule for off-screen human/bot player!
                     const pObj = p.inVehicle || p;
                     const distMeters = Math.round(Math.hypot(rp.x - pObj.x, rp.y - pObj.y) / 16);
                     const padX = 88;
@@ -13638,79 +13629,60 @@ class RetroRenderer {
                     const ex = Math.max(padX, Math.min(W - padX, sc.x));
                     const ey = Math.max(padY, Math.min(H - padY, sc.y));
                     const edgeTag = `${crownTag}${synIcon} ${rp.name.slice(0, 10)} (${distMeters}m)`;
-                    const ebw = Math.max(96, ctx.measureText(edgeTag).width + 16);
-                    const ebh = 20;
+                    const ebw = Math.max(98, ctx.measureText(edgeTag).width + 18);
+                    const ebh = 21;
                     const ebx = Math.round(ex - ebw * 0.5);
                     const eby = Math.round(ey - ebh * 0.5);
-                    ctx.fillStyle = "rgba(8, 12, 24, 0.90)";
-                    ctx.fillRect(ebx, eby, ebw, ebh);
-                    ctx.strokeStyle = col;
-                    ctx.lineWidth = 1.6;
-                    ctx.strokeRect(ebx + 0.5, eby + 0.5, ebw - 1, ebh - 1);
+                    this.drawArcadeCapsule(ctx, ebx, eby, ebw, ebh, "rgba(8, 12, 26, 0.92)", col, 6, 1.7);
                     ctx.fillStyle = col;
                     ctx.fillText(edgeTag, ex, eby + ebh * 0.5);
                 }
             }
         }
 
-        // 4. Local Player 2.5D Kingpin Crown, Social Emote Bubble [U] & Speech Bubble [T]
+        // 4. Local Player 2.5D Kingpin Crown, Social Emote Capsule [U] & Speech Bubble [T]
         const pObj = p.inVehicle || p;
         const pz = this.getEntityZ(pObj, 0.24);
         const pSc = this.worldToScreen(pObj.x, pObj.y, pz);
         const isLocalKing = typeof game.isCurrentDistrictControlledByMe === "function" && game.isCurrentDistrictControlledByMe();
         if (isLocalKing && !p.dead) {
             const cTxt = `👑 KINGPIN (${game.net && game.net.syndicate === "CYAN" ? "⚡CYAN" : "🦩FLAMINGO"})`;
-            const cbw = Math.max(92, ctx.measureText(cTxt).width + 16);
-            const cbh = 18;
+            const cbw = Math.max(96, ctx.measureText(cTxt).width + 18);
+            const cbh = 19;
             const cbx = Math.round(pSc.x - cbw * 0.5);
             const cby = Math.round(pSc.y - (p.inVehicle ? 40 : 32));
-            ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
-            ctx.fillRect(cbx, cby, cbw, cbh);
-            ctx.strokeStyle = "#fde047";
-            ctx.lineWidth = 1.6;
-            ctx.strokeRect(cbx + 0.5, cby + 0.5, cbw - 1, cbh - 1);
+            this.drawArcadeCapsule(ctx, cbx, cby, cbw, cbh, "rgba(15, 23, 42, 0.94)", "#fde047", 6, 1.8);
             ctx.fillStyle = "#fde047";
             ctx.fillText(cTxt, pSc.x, cby + cbh * 0.5);
         }
         if (p.socialEmote && (p.socialEmote.timer || 0) > 0) {
             const emTxt = `${p.socialEmote.icon} ${p.socialEmote.label}`;
-            const ebw = Math.max(96, ctx.measureText(emTxt).width + 20);
+            const ebw = Math.max(100, ctx.measureText(emTxt).width + 22);
             const ebh = 22;
             const ebx = Math.round(pSc.x - ebw * 0.5);
             const eby = Math.round(pSc.y - (p.inVehicle ? 64 : 56));
-            ctx.fillStyle = "rgba(10, 15, 30, 0.95)";
-            ctx.fillRect(ebx, eby, ebw, ebh);
-            ctx.strokeStyle = p.socialEmote.color || "#39ff14";
-            ctx.lineWidth = 2.0;
-            ctx.strokeRect(ebx + 0.5, eby + 0.5, ebw - 1, ebh - 1);
+            this.drawArcadeCapsule(ctx, ebx, eby, ebw, ebh, "rgba(10, 15, 32, 0.96)", p.socialEmote.color || "#39ff14", 7, 2.0);
             ctx.fillStyle = p.socialEmote.color || "#39ff14";
             ctx.fillText(emTxt, pSc.x, eby + ebh * 0.5);
         }
         if ((p.chatTimer || 0) > 0 && p.chatText) {
             const bubbleTxt = `💬 ${p.chatText.slice(0, 56)}`;
-            const bbw = Math.max(80, ctx.measureText(bubbleTxt).width + 18);
+            const bbw = Math.max(84, ctx.measureText(bubbleTxt).width + 20);
             const bbh = 21;
             const bbx = Math.round(pSc.x - bbw * 0.5);
             const bby = Math.round(pSc.y - (p.inVehicle ? 44 : 36));
-            ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
-            ctx.fillRect(bbx, bby, bbw, bbh);
-            ctx.strokeStyle = "#ff2a85";
-            ctx.lineWidth = 1.6;
-            ctx.strokeRect(bbx + 0.5, bby + 0.5, bbw - 1, bbh - 1);
+            this.drawArcadeCapsule(ctx, bbx, bby, bbw, bbh, "rgba(15, 23, 42, 0.95)", "#ff2a85", 6, 1.6);
             ctx.fillStyle = "#ffffff";
             ctx.fillText(bubbleTxt, pSc.x, bby + bbh * 0.5);
         }
 
-        // 5. Physical 2.5D Dropped Kingpin Crown Trophy & Nearby Car Meet Respect Tag [Y]
+        // 5. Physical 2.5D Dropped Kingpin Crown Trophy & Nearby Car Meet Respect Capsule [Y]
         if (game.droppedKingpinCrown) {
             const cr = game.droppedKingpinCrown;
             const cSc = this.worldToScreen(cr.x, cr.y, cr.z || 2.0);
             const cLbl = `👑 GRAB KINGPIN CROWN (+$${(cr.reward || 1000).toLocaleString()})`;
-            const cbw = Math.max(120, ctx.measureText(cLbl).width + 18);
-            ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
-            ctx.fillRect(cSc.x - cbw * 0.5, cSc.y - 24, cbw, 20);
-            ctx.strokeStyle = "#fde047";
-            ctx.strokeRect(cSc.x - cbw * 0.5, cSc.y - 24, cbw, 20);
+            const cbw = Math.max(124, ctx.measureText(cLbl).width + 20);
+            this.drawArcadeCapsule(ctx, Math.round(cSc.x - cbw * 0.5), Math.round(cSc.y - 24), cbw, 21, "rgba(15, 23, 42, 0.95)", "#fde047", 6, 1.8);
             ctx.fillStyle = "#fde047";
             ctx.fillText(cLbl, cSc.x, cSc.y - 14);
         }
@@ -13721,11 +13693,8 @@ class RetroRenderer {
                 if (Math.hypot(v.x - p.x, v.y - p.y) < 105) {
                     const vSc = this.worldToScreen(v.x, v.y, v.z || 2.0);
                     const rTag = `🚗 ${v.name} • ⭐${v.respectCount || 0} RESPECT • [Y] SALUTE (+$100)`;
-                    const rbw = Math.max(140, ctx.measureText(rTag).width + 18);
-                    ctx.fillStyle = "rgba(8, 12, 24, 0.92)";
-                    ctx.fillRect(vSc.x - rbw * 0.5, vSc.y - 34, rbw, 20);
-                    ctx.strokeStyle = "#39ff14";
-                    ctx.strokeRect(vSc.x - rbw * 0.5, vSc.y - 34, rbw, 20);
+                    const rbw = Math.max(144, ctx.measureText(rTag).width + 20);
+                    this.drawArcadeCapsule(ctx, Math.round(vSc.x - rbw * 0.5), Math.round(vSc.y - 34), rbw, 21, "rgba(8, 12, 26, 0.94)", "#39ff14", 6, 1.7);
                     ctx.fillStyle = "#39ff14";
                     ctx.fillText(rTag, vSc.x, vSc.y - 24);
                     break;
@@ -13733,6 +13702,234 @@ class RetroRenderer {
             }
         }
 
+        ctx.restore();
+    }
+
+    drawArcadeCapsule(ctx, x, y, w, h, bgCol = "rgba(8, 12, 26, 0.92)", borderCol = "#00f0ff", radius = 6, lineWidth = 1.6) {
+        if (!ctx) return;
+        const r = Math.max(2, Math.min(radius, h * 0.5, w * 0.5));
+        ctx.save();
+        if (typeof ctx.beginPath === "function" && typeof ctx.moveTo === "function" && typeof ctx.lineTo === "function") {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.lineTo(x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.lineTo(x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.lineTo(x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.closePath();
+            ctx.fillStyle = bgCol;
+            if (typeof ctx.fill === "function") ctx.fill();
+            else ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = borderCol;
+            ctx.lineWidth = lineWidth;
+            if (typeof ctx.stroke === "function") ctx.stroke();
+            else ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+            // Subtle top neon glass highlight strip
+            ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.fillRect(x + r, y + 1, Math.max(0, w - r * 2), 2);
+        } else {
+            ctx.fillStyle = bgCol;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = borderCol;
+            ctx.lineWidth = lineWidth;
+            ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        }
+        ctx.restore();
+    }
+
+    renderModern25DVisualJuice(ctx, game) {
+        if (!ctx || !game || !game.player || game.activeInterior) return;
+        const p = game.player;
+        const pObj = p.inVehicle || p;
+        const W = this.canvas ? this.canvas.width : 1280;
+        const H = this.canvas ? this.canvas.height : 720;
+        const t = this.time || 0;
+
+        // 1. 3D Flash District Arena Skybeam Pillar, Ground Beacon Rings & Screen-Edge Hotspot Aura
+        const fd = typeof game.ensureActiveFlashDistrict === "function" ? game.ensureActiveFlashDistrict() : game.activeFlashDistrict;
+        const inHotspot = typeof game.isInsideActiveFlashDistrict === "function" && game.isInsideActiveFlashDistrict();
+        if (fd) {
+            const fCol = fd.color || "#ff2a85";
+            if (inHotspot) {
+                // Subtle top & bottom neon arena edge bars when physically inside the 2x Hotspot!
+                ctx.save();
+                ctx.fillStyle = fCol;
+                ctx.globalAlpha = 0.22 + 0.08 * Math.sin(t * 4.5);
+                ctx.fillRect(0, 0, W, 3);
+                ctx.fillRect(0, H - 3, W, 3);
+                ctx.restore();
+            }
+            const distToCenter = Math.hypot(fd.x - pObj.x, fd.y - pObj.y);
+            if (distToCenter < 1450) {
+                const baseSc = this.worldToScreen(fd.x, fd.y, 2.02);
+                const topSc = this.worldToScreen(fd.x, fd.y, 5.6);
+                if (baseSc.x >= -180 && baseSc.x <= W + 180 && baseSc.y >= -180 && baseSc.y <= H + 180) {
+                    const pulse = 0.5 + 0.5 * Math.sin(t * 5.0);
+                    ctx.save();
+                    // Concentric 2.5D ground beacon rings
+                    if (typeof ctx.beginPath === "function" && typeof ctx.arc === "function") {
+                        ctx.beginPath();
+                        ctx.arc(baseSc.x, baseSc.y, 26 + pulse * 14, 0, Math.PI * 2);
+                        ctx.strokeStyle = fCol;
+                        ctx.lineWidth = 2.0;
+                        ctx.globalAlpha = 0.55;
+                        ctx.stroke();
+                    }
+                    // Vertical 3D Neon Skybeam Pillar from street (z=2.0) to sky (z=5.6)
+                    const beamW = Math.round(14 + pulse * 6);
+                    const beamX = Math.round(baseSc.x - beamW * 0.5);
+                    const beamY = Math.round(Math.min(baseSc.y, topSc.y));
+                    const beamH = Math.max(24, Math.round(Math.abs(baseSc.y - topSc.y)));
+                    ctx.fillStyle = fCol;
+                    ctx.globalAlpha = 0.18 + pulse * 0.10;
+                    ctx.fillRect(beamX, beamY, beamW, beamH);
+                    ctx.globalAlpha = 0.48;
+                    ctx.fillRect(Math.round(baseSc.x - 2), beamY, 4, beamH);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // 2. 2.5D Neon Chassis Underglow & High-Speed / Drift Taillight Ribbon Trails
+        const isLocalKing = typeof game.isCurrentDistrictControlledByMe === "function" && game.isCurrentDistrictControlledByMe();
+        const mySynCol = isLocalKing ? "#fde047" : ((game.net && game.net.syndicate === "CYAN") ? "#00f0ff" : "#ff2a85");
+        if (Array.isArray(game.vehicles)) {
+            for (let i = 0; i < game.vehicles.length; i++) {
+                const v = game.vehicles[i];
+                if (!v || v.destroyed) continue;
+                const isPlayerCar = (v === p.inVehicle);
+                const isRemoteCar = (v.driver === "REMOTE" || Boolean(v._linkedRemoteId));
+                const isShowcaseCar = Boolean(v.createdByEngine || (v.respectCount || 0) > 0 || v.color);
+                if (!isPlayerCar && !isRemoteCar && !isShowcaseCar) continue;
+                if (Math.abs(v.x - pObj.x) > 820 || Math.abs(v.y - pObj.y) > 620) continue;
+
+                let glowCol = v.color || "#00f0ff";
+                if (isPlayerCar) {
+                    glowCol = v.color || mySynCol;
+                } else if (isRemoteCar && game.net && game.net.remotePlayers) {
+                    const rp = v._linkedRemoteId ? game.net.remotePlayers.get(v._linkedRemoteId) : null;
+                    glowCol = (rp && rp.syndicate === "CYAN") ? "#00f0ff" : "#ff2a85";
+                }
+
+                const vSc = this.worldToScreen(v.x, v.y, (v.z || 2.0) + 0.02);
+                const cosA = Math.cos(v.angle || 0);
+                const sinA = Math.sin(v.angle || 0);
+                // Record 2.5D Chassis Underglow & Taillight Trail telemetry for headless verification & live rendering
+                v._lastUnderglowColor = glowCol;
+
+                ctx.save();
+                ctx.translate(vSc.x, vSc.y);
+                ctx.rotate(v.angle || 0);
+                ctx.fillStyle = glowCol;
+                ctx.globalAlpha = isPlayerCar ? 0.28 : 0.22;
+                const uw = (v.w || 48) * 1.12;
+                const uh = (v.h || 24) * 1.24;
+                ctx.fillRect(-uw * 0.5, -uh * 0.5, uw, uh);
+                ctx.restore();
+
+                // High-Speed / Drift Neon Taillight Ribbon Trails
+                const spd = v.speed !== undefined ? Math.abs(v.speed) : Math.hypot(v.vx || 0, v.vy || 0);
+                const isDrifting = isPlayerCar && Boolean(game.input && game.input.handbrake) && spd > 65;
+                if (spd > 135 || isDrifting) {
+                    if (!Array.isArray(v._tailTrail)) v._tailTrail = [];
+                    const rearX = v.x - cosA * ((v.w || 48) * 0.46);
+                    const rearY = v.y - sinA * ((v.w || 48) * 0.46);
+                    const lastPt = v._tailTrail[v._tailTrail.length - 1];
+                    if (!lastPt || Math.hypot(rearX - lastPt.x, rearY - lastPt.y) > 10) {
+                        v._tailTrail.push({ x: rearX, y: rearY, z: (v.z || 2.0) + 0.05, a: v.angle || 0 });
+                        if (v._tailTrail.length > 7) v._tailTrail.shift();
+                    }
+                } else if (Array.isArray(v._tailTrail) && v._tailTrail.length > 0) {
+                    v._tailTrail.shift();
+                }
+
+                if (Array.isArray(v._tailTrail) && v._tailTrail.length >= 2) {
+                    ctx.save();
+                    const halfTrack = (v.h || 24) * 0.34;
+                    for (let ti = 1; ti < v._tailTrail.length; ti++) {
+                        const pt0 = v._tailTrail[ti - 1];
+                        const pt1 = v._tailTrail[ti];
+                        const p0A = Math.sin(pt0.a), p0C = Math.cos(pt0.a);
+                        const p1A = Math.sin(pt1.a), p1C = Math.cos(pt1.a);
+                        const alpha = (ti / v._tailTrail.length) * 0.58;
+                        ctx.strokeStyle = isDrifting ? glowCol : "#ff1e38";
+                        ctx.lineWidth = isDrifting ? 2.6 : 2.0;
+                        ctx.globalAlpha = alpha;
+                        for (let side = -1; side <= 1; side += 2) {
+                            const s0 = this.worldToScreen(pt0.x - p0A * halfTrack * side, pt0.y + p0C * halfTrack * side, pt0.z);
+                            const s1 = this.worldToScreen(pt1.x - p1A * halfTrack * side, pt1.y + p1C * halfTrack * side, pt1.z);
+                            if (typeof ctx.beginPath === "function" && typeof ctx.moveTo === "function" && typeof ctx.lineTo === "function") {
+                                ctx.beginPath();
+                                ctx.moveTo(s0.x, s0.y);
+                                ctx.lineTo(s1.x, s1.y);
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                    ctx.restore();
+                }
+            }
+        }
+
+        // 3. Diegetic 2.5D Tactical Ground Compass Ring Around Local Player / Vehicle
+        const ringZ = (pObj.z || 2.0) + 0.04;
+        const pCenterSc = this.worldToScreen(pObj.x, pObj.y, ringZ);
+        const ringEdgeSc = this.worldToScreen(pObj.x + (p.inVehicle ? 50 : 36), pObj.y, ringZ);
+        const ringRadPx = Math.max(28, Math.min(78, Math.round(Math.abs(ringEdgeSc.x - pCenterSc.x))));
+
+        const compassTargets = [];
+        if (fd && !inHotspot) {
+            compassTargets.push({ x: fd.x, y: fd.y, color: fd.color || "#ff2a85", icon: "🔥", kind: "HOTSPOT" });
+        }
+        if (game.activeFlashEvent) {
+            compassTargets.push({ x: game.activeFlashEvent.x, y: game.activeFlashEvent.y, color: "#fde047", icon: "📦", kind: "HOT_DROP" });
+        }
+        if (game.missions && game.missions.activeMission && typeof game.missions.activeMission.targetX === "number") {
+            compassTargets.push({ x: game.missions.activeMission.targetX, y: game.missions.activeMission.targetY, color: "#39ff14", icon: "🎯", kind: "MISSION" });
+        }
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            let bestRp = null;
+            let bestRpDist = Infinity;
+            for (const rp of game.net.remotePlayers.values()) {
+                if (!rp || rp.dead || rp.isHidden) continue;
+                const d = Math.hypot((rp.x || 0) - pObj.x, (rp.y || 0) - pObj.y);
+                if (d > 140 && d < bestRpDist) {
+                    bestRpDist = d;
+                    bestRp = rp;
+                }
+            }
+            if (bestRp) {
+                const rpCol = bestRp.syndicate === "CYAN" ? "#00f0ff" : "#ff2a85";
+                compassTargets.push({ x: bestRp.x, y: bestRp.y, color: rpCol, icon: bestRp.syndicate === "CYAN" ? "⚡" : "🦩", kind: "PLAYER" });
+            }
+        }
+        this._lastCompassTargetsCount = compassTargets.length;
+
+        ctx.save();
+        if (typeof ctx.beginPath === "function" && typeof ctx.arc === "function") {
+            ctx.beginPath();
+            ctx.arc(pCenterSc.x, pCenterSc.y, ringRadPx, 0, Math.PI * 2);
+            ctx.strokeStyle = mySynCol;
+            ctx.lineWidth = 1.4;
+            ctx.globalAlpha = 0.34;
+            ctx.stroke();
+        }
+        for (let ci = 0; ci < compassTargets.length; ci++) {
+            const ct = compassTargets[ci];
+            const dx = ct.x - pObj.x;
+            const dy = ct.y - pObj.y;
+            if (Math.hypot(dx, dy) < 120) continue;
+            const ang = Math.atan2(dy, dx);
+            const tipX = pCenterSc.x + Math.cos(ang) * (ringRadPx + 7);
+            const tipY = pCenterSc.y + Math.sin(ang) * (ringRadPx + 7);
+            ctx.globalAlpha = 0.92;
+            ctx.fillStyle = ct.color;
+            ctx.fillRect(Math.round(tipX - 3), Math.round(tipY - 3), 6, 6);
+            ctx.fillText(ct.icon, Math.round(pCenterSc.x + Math.cos(ang) * (ringRadPx + 17)), Math.round(pCenterSc.y + Math.sin(ang) * (ringRadPx + 17)));
+        }
         ctx.restore();
     }
 
@@ -16783,7 +16980,7 @@ class RetroRenderer {
        8. AUTHENTIC 1997 1997 GTA 1 BITMAP FONT & HUD RENDERER (HUD.cpp)
        ======================================================================== */
     measureGta1FontString(fontName, text, scale = 1.0) {
-        if (!this.gta1Ready || !this.gta1Meta.sprites.fonts[fontName]) return text.length * 12 * scale;
+        if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.fonts || !this.gta1Meta.sprites.fonts[fontName]) return text.length * 12 * scale;
         const font = this.gta1Meta.sprites.fonts[fontName];
         const glyphs = font.glyphs || {};
         const spaceW = (glyphs["0"] ? glyphs["0"][2] : 10) * scale;
@@ -16797,7 +16994,7 @@ class RetroRenderer {
     }
 
     drawGta1FontString(ctx, fontName, text, x, y, scale = 1.0, align = "left") {
-        if (!this.gta1Ready || !this.gta1Meta.sprites.fonts[fontName]) return 0;
+        if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.fonts || !this.gta1Meta.sprites.fonts[fontName]) return 0;
         const font = this.gta1Meta.sprites.fonts[fontName];
         const glyphs = font.glyphs || {};
         const totalW = this.measureGta1FontString(fontName, text, scale);
@@ -16826,7 +17023,7 @@ class RetroRenderer {
     }
 
     drawHudSprite(ctx, hudIdStr, x, y, scale = 2.0) {
-        if (!this.gta1Ready || !this.gta1Meta.sprites.hud[hudIdStr]) return { w: 0, h: 0 };
+        if (!this.gta1Ready || !this.gta1Meta || !this.gta1Meta.sprites || !this.gta1Meta.sprites.hud || !this.gta1Meta.sprites.hud[hudIdStr]) return { w: 0, h: 0 };
         const [sx, sy, sw, sh] = this.gta1Meta.sprites.hud[hudIdStr];
         const dw = Math.round(sw * scale);
         const dh = Math.round(sh * scale);
@@ -16855,7 +17052,7 @@ class RetroRenderer {
         const mulW = this.measureGta1FontString("MISSMUL2_GREEN", mulStr, s);
         const livesW = this.measureGta1FontString("MISSMUL2", livesStr, s);
 
-        const badgeSp = this.gta1Meta.sprites.hud["24"];
+        const badgeSp = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.hud) ? this.gta1Meta.sprites.hud["24"] : null;
         const badgeW = badgeSp ? badgeSp[2] * s : 16;
 
         const mulTextX = scoreX - 6 - mulW;
@@ -16938,70 +17135,80 @@ class RetroRenderer {
             ctx.save();
             ctx.textBaseline = "middle";
 
-            // 0. 🔥 Active Flash District Magnet & 🦩 vs ⚡ Syndicate Crew Tug-of-War
+            // 0. 🔥 Active Flash District Magnet & 🦩 vs ⚡ Syndicate Crew Tug-of-War Capsule
             if (typeof game.ensureActiveFlashDistrict === "function") {
                 const fd = game.ensureActiveFlashDistrict();
                 if (fd) {
-                    const boxH = 38;
+                    const boxH = 42;
                     const inHot = typeof game.isInsideActiveFlashDistrict === "function" && game.isInsideActiveFlashDistrict();
-                    ctx.fillStyle = inHot ? "rgba(28, 10, 26, 0.92)" : "rgba(10, 16, 30, 0.90)";
-                    ctx.fillRect(lbX, curY, lbW, boxH);
-                    ctx.strokeStyle = fd.color || "#ff2a85";
-                    ctx.lineWidth = inHot ? 1.8 : 1.3;
-                    ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                    this.drawArcadeCapsule(
+                        ctx,
+                        lbX,
+                        curY,
+                        lbW,
+                        boxH,
+                        inHot ? "rgba(32, 10, 28, 0.94)" : "rgba(10, 16, 32, 0.92)",
+                        fd.color || "#ff2a85",
+                        7,
+                        inHot ? 2.0 : 1.5
+                    );
                     ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     ctx.textAlign = "left";
                     ctx.fillStyle = fd.color || "#ff2a85";
                     const shortHot = String(fd.key || "OCEAN_DRIVE").replace("_", " ").slice(0, 12);
-                    ctx.fillText(`🔥 HOT: ${shortHot} ${inHot ? "(2X!)" : ""}`, lbX + 6, curY + 10);
+                    ctx.fillText(`🔥 HOT: ${shortHot} ${inHot ? "(2X!)" : ""}`, lbX + 7, curY + 10);
                     ctx.textAlign = "right";
                     ctx.fillStyle = "#fde047";
-                    ctx.fillText(`${Math.ceil(fd.timer || 0)}s`, lbX + lbW - 6, curY + 10);
+                    ctx.fillText(`${Math.ceil(fd.timer || 0)}s`, lbX + lbW - 7, curY + 10);
 
-                    // Syndicate Tug-of-War Bar (🦩 FLAMINGO vs ⚡ CYAN)
+                    // Graphical Syndicate Tug-of-War Progress Bar (🦩 FLAMINGO vs ⚡ CYAN)
                     const fScore = Number(fd.flamingoScore) || 0;
                     const cScore = Number(fd.cyanScore) || 0;
                     const tot = fScore + cScore;
                     const fPct = tot > 0 ? Math.round((fScore / tot) * 100) : 50;
                     const cPct = 100 - fPct;
+                    const barX = lbX + 7;
+                    const barW = Math.max(40, lbW - 14);
+                    const fBarW = Math.round(barW * (fPct / 100));
+                    ctx.fillStyle = "#00f0ff";
+                    ctx.fillRect(barX, curY + 17, barW, 5);
+                    ctx.fillStyle = "#ff2a85";
+                    ctx.fillRect(barX, curY + 17, fBarW, 5);
+
                     const mySyn = (game.net && game.net.syndicate) || "FLAMINGO";
                     ctx.textAlign = "left";
                     ctx.fillStyle = mySyn === "FLAMINGO" ? "#ff2a85" : "#94a3b8";
-                    ctx.fillText(`🦩${fPct}%`, lbX + 6, curY + 26);
+                    ctx.fillText(`🦩${fPct}%`, lbX + 7, curY + 32);
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#39ff14";
-                    ctx.fillText(`[I]:${mySyn.slice(0, 4)} [U]:EMO`, lbX + lbW * 0.5, curY + 26);
+                    ctx.fillText(`[I]:${mySyn.slice(0, 4)} [U]:EMO`, lbX + lbW * 0.5, curY + 32);
                     ctx.textAlign = "right";
                     ctx.fillStyle = mySyn === "CYAN" ? "#00f0ff" : "#94a3b8";
-                    ctx.fillText(`${cPct}%⚡`, lbX + lbW - 6, curY + 26);
+                    ctx.fillText(`${cPct}%⚡`, lbX + lbW - 7, curY + 32);
                     curY += boxH + 5;
                 }
             }
 
-            // 1. 👑 District Turf Kingpin Badge
+            // 1. 👑 District Turf Kingpin Capsule
             if (typeof game.getCurrentDistrictTurf === "function") {
                 const turf = game.getCurrentDistrictTurf();
                 const myTurfCount = typeof game.getMyTurfControlledCount === "function" ? game.getMyTurfControlledCount() : 0;
                 if (turf && (turf.leaderName || myTurfCount > 0)) {
                     const boxH = 22;
-                    ctx.fillStyle = "rgba(18, 12, 34, 0.88)";
-                    ctx.fillRect(lbX, curY, lbW, boxH);
-                    ctx.strokeStyle = turf.leaderColor || "#c084fc";
-                    ctx.lineWidth = 1.3;
-                    ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                    this.drawArcadeCapsule(ctx, lbX, curY, lbW, boxH, "rgba(18, 12, 34, 0.90)", turf.leaderColor || "#c084fc", 6, 1.4);
                     ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     ctx.textAlign = "left";
                     ctx.fillStyle = turf.leaderColor || "#fde047";
                     const lName = turf.leaderName ? turf.leaderName.slice(0, 10) : "OPEN TURF";
-                    ctx.fillText(`👑 ${turf.shortLabel.slice(0, 10)}: ${lName}`, lbX + 6, curY + 11);
+                    ctx.fillText(`👑 ${turf.shortLabel.slice(0, 10)}: ${lName}`, lbX + 7, curY + 11);
                     ctx.textAlign = "right";
                     ctx.fillStyle = "#39ff14";
-                    ctx.fillText(`${myTurfCount}/8`, lbX + lbW - 6, curY + 11);
+                    ctx.fillText(`${myTurfCount}/8`, lbX + lbW - 7, curY + 11);
                     curY += boxH + 5;
                 }
             }
 
-            // 4. 📦 Active Flash Drop Crate or 🎯 Server Bounty Tracker
+            // 4. 📦 Active Flash Drop Crate or 🎯 Server Bounty Tracker Capsule
             if (game.activeFlashEvent && game.player) {
                 const ev = game.activeFlashEvent;
                 const dx = ev.x - game.player.x;
@@ -17010,35 +17217,27 @@ class RetroRenderer {
                 const dirs = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
                 const dirStr = dirs[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8];
                 const boxH = 22;
-                ctx.fillStyle = "rgba(68, 32, 6, 0.90)";
-                ctx.fillRect(lbX, curY, lbW, boxH);
-                ctx.strokeStyle = "#fde047";
-                ctx.lineWidth = 1.4;
-                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                this.drawArcadeCapsule(ctx, lbX, curY, lbW, boxH, "rgba(68, 32, 6, 0.92)", "#fde047", 6, 1.5);
                 ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
                 ctx.textAlign = "left";
                 ctx.fillStyle = "#fde047";
-                ctx.fillText(`📦 HOT DROP (${distM}m ${dirStr})`, lbX + 6, curY + 11);
+                ctx.fillText(`📦 HOT DROP (${distM}m ${dirStr})`, lbX + 7, curY + 11);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#ffffff";
-                ctx.fillText(`${Math.ceil(ev.timer)}s`, lbX + lbW - 6, curY + 11);
+                ctx.fillText(`${Math.ceil(ev.timer)}s`, lbX + lbW - 7, curY + 11);
                 curY += boxH + 5;
             }
             if (game.activeServerBounty) {
                 const b = game.activeServerBounty;
                 const boxH = 22;
-                ctx.fillStyle = "rgba(76, 12, 24, 0.90)";
-                ctx.fillRect(lbX, curY, lbW, boxH);
-                ctx.strokeStyle = "#ff2a85";
-                ctx.lineWidth = 1.4;
-                ctx.strokeRect(lbX + 0.5, curY + 0.5, lbW - 1, boxH - 1);
+                this.drawArcadeCapsule(ctx, lbX, curY, lbW, boxH, "rgba(76, 12, 24, 0.92)", "#ff2a85", 6, 1.5);
                 ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                 ctx.textAlign = "left";
                 ctx.fillStyle = "#ff2a85";
-                ctx.fillText(`🎯 BOUNTY: ${String(b.targetName || "PLAYER").slice(0, 9)}`, lbX + 6, curY + 11);
+                ctx.fillText(`🎯 BOUNTY: ${String(b.targetName || "PLAYER").slice(0, 9)}`, lbX + 7, curY + 11);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#fde047";
-                ctx.fillText(`$${Number(b.reward || 1200).toLocaleString()} (${Math.ceil(b.timer)}s)`, lbX + lbW - 6, curY + 11);
+                ctx.fillText(`$${Number(b.reward || 1200).toLocaleString()} (${Math.ceil(b.timer)}s)`, lbX + lbW - 7, curY + 11);
             }
             ctx.restore();
         }
