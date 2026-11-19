@@ -139,6 +139,7 @@ function createEmptyRoom() {
         corpseTs: {},      // Timestamp (ms) when each corpse was recorded
         robbedVaults: {},  // Interior station / safe / register lockout timestamps { [vaultKey]: expiresAtMs }
         turfStandings: {}, // District Turf War Kingpins (leaderName, leaderColor, leaderScore)
+        creationOps: {},   // Persisted Creation Engine operations (3D voxel edits, custom villas, shops, props, moves, modifications)
         activeFlashDrop: null,
         activeBounty: null,
         chat: [],
@@ -174,6 +175,7 @@ function ensureRoom(roomCode) {
     if (!r.corpseTs) r.corpseTs = {};
     if (!r.robbedVaults) r.robbedVaults = {};
     if (!r.turfStandings) r.turfStandings = {};
+    if (!r.creationOps) r.creationOps = {};
     if (!r.vehs) r.vehs = {};
     if (!r.peds) r.peds = {};
     if (!Array.isArray(r.chat)) r.chat = [];
@@ -278,6 +280,7 @@ function loadPersistentState() {
                                 corpseTs: {},
                                 robbedVaults: Object.assign({}, existing.robbedVaults || {}, (rv.robbedVaults && typeof rv.robbedVaults === "object") ? rv.robbedVaults : {}),
                                 turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
+                                creationOps: Object.assign({}, existing.creationOps || {}, (rv.creationOps && typeof rv.creationOps === "object") ? rv.creationOps : {}),
                                 activeFlashDrop: null,
                                 activeBounty: null,
                                 chat: (existing.chat || []).concat(Array.isArray(rv.chat) ? rv.chat : []).slice(-30),
@@ -533,6 +536,13 @@ function sendRoomBootstrap(socket, meta) {
             t: "WORLD_EVENT",
             kind: "TURF_SYNC",
             standings: room.turfStandings
+        });
+    }
+    if (room.creationOps && Object.keys(room.creationOps).length > 0) {
+        sendJson(socket, {
+            t: "WORLD_EVENT",
+            kind: "CREATION_SYNC",
+            ops: Object.values(room.creationOps)
         });
     }
     if (room.activeFlashDrop && (Date.now() - (room.activeFlashDrop.startedAt || 0)) < (room.activeFlashDrop.duration || 90) * 1000) {
@@ -1044,6 +1054,29 @@ function handleClientPacket(socket, pkt) {
             const cdSec = Math.max(5, Math.min(600, Number(pkt.cooldownSec) || 120));
             room.robbedVaults[String(pkt.vaultKey).slice(0, 80)] = Date.now() + cdSec * 1000;
             isDirty = true;
+        } else if (pkt.kind === "CREATION_OP" && pkt.op && typeof pkt.op === "object") {
+            if (!room.creationOps) room.creationOps = {};
+            const op = pkt.op;
+            if (op.action === "CLEAR_ALL") {
+                room.creationOps = {};
+                isDirty = true;
+            } else if (op.action === "REMOVE" && op.opKey) {
+                const k = String(op.opKey).slice(0, 96);
+                if (op.isPreExisting) {
+                    room.creationOps[k] = Object.assign({}, op, { ts: Date.now() });
+                } else {
+                    delete room.creationOps[k];
+                }
+                isDirty = true;
+            } else if (op.opKey) {
+                const k = String(op.opKey).slice(0, 96);
+                room.creationOps[k] = Object.assign({}, op, { ts: Date.now() });
+                const keys = Object.keys(room.creationOps);
+                if (keys.length > 300) {
+                    delete room.creationOps[keys[0]];
+                }
+                isDirty = true;
+            }
         }
         broadcastToRoom(roomCode, pkt, socket);
         return;
@@ -1152,6 +1185,7 @@ const server = http.createServer((req, res) => {
                 corpsesCount: Object.keys(rv.corpses || {}).length,
                 vaultLockoutsCount: Object.keys(rv.robbedVaults || {}).length,
                 turfZonesCount: Object.keys(rv.turfStandings || {}).length,
+                creationOpsCount: Object.keys(rv.creationOps || {}).length,
                 activeFlashDrop: Boolean(rv.activeFlashDrop),
                 activeBounty: Boolean(rv.activeBounty),
                 worldMinutes: rv.worldMinutes || 720,

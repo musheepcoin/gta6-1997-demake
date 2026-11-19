@@ -284,6 +284,13 @@ class ViceNetworkManager {
     }
 
     flushPendingPropSync() {
+        if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && Array.isArray(this._pendingCreationOps) && this._pendingCreationOps.length > 0) {
+            const ops = this._pendingCreationOps.splice(0, this._pendingCreationOps.length);
+            for (const op of ops) {
+                this.game.creationEngine.applyRemoteCreationOp(op, { batch: true });
+            }
+            this.game.creationEngine.rebuildWorldMeshes(false);
+        }
         if (!this._pendingPropSync || this._pendingPropSync.length === 0) return;
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded) return;
         const oe = this.game.map.objectEngine;
@@ -2116,6 +2123,23 @@ class ViceNetworkManager {
                 if (vk && Number(remSec) > 0) {
                     this.game.applyNetworkVaultCooldown(vk, Number(remSec));
                 }
+            }
+        } else if (pkt.kind === "CREATION_OP" && pkt.op) {
+            if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && typeof this.game.creationEngine.applyRemoteCreationOp === "function") {
+                this.game.creationEngine.applyRemoteCreationOp(pkt.op);
+            } else {
+                if (!this._pendingCreationOps) this._pendingCreationOps = [];
+                this._pendingCreationOps.push(pkt.op);
+            }
+        } else if (pkt.kind === "CREATION_SYNC" && Array.isArray(pkt.ops)) {
+            if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && typeof this.game.creationEngine.applyRemoteCreationOp === "function") {
+                for (const op of pkt.ops) {
+                    this.game.creationEngine.applyRemoteCreationOp(op, { batch: true });
+                }
+                this.game.creationEngine.rebuildWorldMeshes(false);
+            } else {
+                if (!this._pendingCreationOps) this._pendingCreationOps = [];
+                for (const op of pkt.ops) this._pendingCreationOps.push(op);
             }
         }
     }

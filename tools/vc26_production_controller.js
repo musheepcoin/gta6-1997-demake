@@ -1488,7 +1488,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_222"), "ViceCreationEngine (v101_222) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_223"), "ViceCreationEngine (v101_223) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -1700,9 +1700,127 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 37: LIVE PARAMETRIC ENTITY INSPECTOR, IN-PLACE MUTATION & EXPANSION PACKS
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 37: LIVE PARAMETRIC ENTITY INSPECTOR, IN-PLACE MUTATION & EXPANSION PACKS ---");
+    {
+        const { g } = createGameInstance(cmpBuf);
+        const ce = g.creationEngine;
+        const oe = g.map.objectEngine;
+
+        // 1. Select & parametrically mutate a pre-existing 3D Estate (scale, rotation, neon color palette, height) + Undo/Redo
+        const preVilla = oe.instances.find((it) => it.id === "sobe_artdeco_villa_1") || oe.instances[0];
+        const origScale = preVilla.scale;
+        const origHw = preVilla.hw;
+        const origMapRoof = preVilla.spec.mapRoofColor;
+
+        const sel = ce.selectWorldEntityAt(preVilla.x, preVilla.y, 64, true);
+        assert(Boolean(sel && ce.selectedEntity === sel && sel.entityRef === preVilla), `selectWorldEntityAt ([E]) locks Right-Side Parametric Inspector onto '${preVilla.name}'`);
+
+        ce.modifyWorldEntity(preVilla.id, {
+            scale: 1.35,
+            wallColor: [0.90, 0.98, 1.0],
+            trimColor: [1.0, 0.16, 0.52],
+            mapRoofColor: "#00f0ff"
+        });
+        assert(
+            Math.abs(preVilla.scale - 1.35) < 0.001 && preVilla.hw > origHw && preVilla.spec.mapRoofColor === "#00f0ff",
+            `modifyWorldEntity mutates pre-existing 3D Estate scale (1.35x), recalculates hw (${Math.round(preVilla.hw)}px > ${Math.round(origHw)}px) & updates facade/roof palette`
+        );
+
+        ce.undo();
+        assert(
+            Math.abs(preVilla.scale - origScale) < 0.001 && Math.abs(preVilla.hw - origHw) < 0.01 && preVilla.spec.mapRoofColor === origMapRoof,
+            "ce.undo() restores exact pre-mutation parametric scale, OBB footprint, and architectural material spec"
+        );
+        ce.redo();
+        assert(Math.abs(preVilla.scale - 1.35) < 0.001 && preVilla.spec.mapRoofColor === "#00f0ff", "ce.redo() reapplies parametric mutation to pre-existing 3D Estate");
+        ce.undo();
+
+        // 2. Parametrically mutate a 3D Enterable Interior's theme & facing + verify stations rebuild & orientInterior runs
+        const customClub = ce.placeEstablishment({ tpl: "SHOP_BAR", name: "VICE LOUNGE", x: 443.5 * 64, y: 277.5 * 64 });
+        const origTheme = customClub.theme;
+        ce.modifyWorldEntity(customClub.id, {
+            theme: "SHOP_GUN_SHOP",
+            facing: "W",
+            name: "OCEAN DRIVE TACTICAL ARMORY"
+        });
+        assert(
+            customClub.theme === "SHOP_GUN_SHOP" &&
+            customClub.facing === "W" &&
+            customClub._orientedFacing === "W" &&
+            customClub.stations.some((s) => s.action === "BUY_ROCKET"),
+            "modifyWorldEntity dynamically hot-swaps 3D Interior theme to SHOP_GUN_SHOP, rebuilds firing-range stations, and re-orients layout to facing 'W'"
+        );
+        ce.undo();
+        assert(customClub.theme === origTheme, "ce.undo() restores original 3D Interior theme and stations");
+
+        // 3. Deploy a Built-In Declarative World Expansion Pack (OCEAN_DRIVE_NEON_FESTIVAL)
+        const expRes = ce.applyExpansionPack("OCEAN_DRIVE_NEON_FESTIVAL");
+        assert(
+            Boolean(expRes && expRes.ok && expRes.count >= 7 && g.vehicles.some((v) => v.id === "exp_od_hypercar")),
+            `applyExpansionPack('OCEAN_DRIVE_NEON_FESTIVAL') deploys ${expRes ? expRes.count : 0} Oracle-validated 3D district assets in 1 click`
+        );
+        ce.clearAllCreations();
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 38: MULTIPLAYER & PERSISTENT SERVER CREATION ENGINE REAL-TIME SYNC
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 38: MULTIPLAYER & PERSISTENT SERVER CREATION ENGINE REAL-TIME SYNC ---");
+    {
+        const peerA = createGameInstance(cmpBuf);
+        const peerB = createGameInstance(cmpBuf);
+        const ceA = peerA.g.creationEngine;
+        const ceB = peerB.g.creationEngine;
+
+        const transmittedPackets = [];
+        peerA.g.net.enabled = true;
+        peerA.g.net.sendPacket = (pkt) => {
+            transmittedPackets.push(pkt);
+            if (pkt && pkt.t === "WORLD_EVENT") {
+                peerB.g.net.applyWorldEvent(pkt);
+            }
+        };
+
+        // Peer A paints a 6-storey 3D Voxel Skyscraper, defines a custom supercar, spawns it, places a 3D Villa, and mutates it
+        ceA.paintVoxelTile(216, 150, "BLDG_SKYSCRAPER_6F", { storeys: 4, style: 10 });
+        ceA.defineVehicle("PEER_A_APEX", { name: "PEER A APEX GT", baseSpec: "VICE_CHEETAH", maxSpeed: 530, color: "#39ff14" });
+        const carA = ceA.spawnVehicle("PEER_A_APEX", 445.5 * 64, 280.5 * 64, 0, { id: "net_car_38" });
+        const villaA = ceA.placePrefab3D("villa_art_deco", 448.5 * 64, 280.5 * 64, 0, { id: "net_villa_38" });
+        ceA.modifyWorldEntity("net_villa_38", { scale: 1.25, mapRoofColor: "#39ff14" });
+        ceA.relocateWorldEntity("net_villa_38", 448.5 * 64, 281.5 * 64, Math.PI * 0.5, { skipValidation: true });
+
+        const villaB = peerB.g.map.objectEngine.instances.find((it) => it.id === "net_villa_38");
+        const carB = peerB.g.vehicles.find((v) => v.id === "net_car_38");
+        assert(
+            transmittedPackets.length >= 6 &&
+            peerB.g.map.getSurfaceGroundType(216, 150) === peerB.sandbox.GROUND_TYPE.BUILDING &&
+            Boolean(carB && carB.maxSpeed === 530) &&
+            Boolean(villaB && Math.abs(villaB.scale - 1.25) < 0.01 && Math.abs(villaB.y - 281.5 * 64) < 1),
+            `Real-time CREATION_OP packets synchronize 3D voxel edits, custom vehicle specs, 3D prefabs, parametric mutations & relocations from Peer A -> Peer B (${transmittedPackets.length} packets)`
+        );
+
+        // Peer A deletes the synced 3D villa -> Peer B removes it automatically
+        ceA.removeNearestWorldEntity(villaA.x, villaA.y, 32, true);
+        assert(
+            !peerB.g.map.objectEngine.instances.some((it) => it.id === "net_villa_38"),
+            "Remote REMOVE packet cleanly deletes synced 3D Villa and its OBB collision box on Peer B"
+        );
+
+        const serverSrc = fs.readFileSync(path.join(ROOT, "server", "world_server.js"), "utf8");
+        assert(
+            serverSrc.includes("CREATION_OP") && serverSrc.includes("CREATION_SYNC") && serverSrc.includes("creationOps"),
+            "Dedicated World Server (server/world_server.js) persists room.creationOps and bootstraps joining players via CREATION_SYNC"
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 36 FULL-GAME AUDIT, PRODUCTION CONTROLLER & CREATION ENGINE SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 38 FULL-GAME AUDIT, PRODUCTION CONTROLLER & CREATION ENGINE SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

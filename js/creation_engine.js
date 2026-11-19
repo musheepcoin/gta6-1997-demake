@@ -23,7 +23,7 @@
     class ViceCreationEngine {
         constructor(game) {
             this.game = game;
-            this.version = "101_222";
+            this.version = "101_223";
             this.studioActive = false;
             this.freeCamActive = true;
             this.gridSnap = false;
@@ -34,6 +34,9 @@
             this.buildingStoreys = 2; // 1..4 storeys above ground z=2
             this.buildingStyle = 0;   // 0..11 GTA 6 facade style
             this.grabbedEntity = null;
+            this.selectedEntity = null;
+            this.activeExpansionIdx = 0;
+            this._paletteThemeIdx = 0;
             this._preExistingIndexed = false;
 
             // Active Studio UI state
@@ -669,8 +672,30 @@
                 this.rebuildWorldMeshes(true);
             }
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "VOXEL_TILE",
+                opKey: `voxel_${c}_${r}`,
+                c,
+                r,
+                presetKey,
+                storeys: opts.storeys,
+                style: opts.style
+            }, opts);
             this.setStatus(`PAINTED VOXEL [${presetKey}] AT TILE (${c}, ${r})`);
             return { ok: true, c, r, presetKey, groundType: newGround };
+        }
+
+        _broadcastCreationOp(op, opts = {}) {
+            if (!op || opts.isRemote || opts.skipBroadcast) return false;
+            const net = this.game && this.game.net;
+            if (net && typeof net.broadcastWorldEvent === "function") {
+                net.broadcastWorldEvent({
+                    kind: "CREATION_OP",
+                    op
+                });
+                return true;
+            }
+            return false;
         }
 
         rebuildWorldMeshes(fast = true) {
@@ -718,6 +743,12 @@
             });
             VEHICLE_SPECS[key] = merged;
             this.customVehicles[key] = Object.assign({ baseSpec: config.baseSpec || "BANSHEE_GT" }, config);
+            this._broadcastCreationOp({
+                action: "DEFINE_VEHICLE",
+                opKey: `defveh_${key}`,
+                specKey: key,
+                config: this.customVehicles[key]
+            }, config);
             this.setStatus(`DEFINED CUSTOM VEHICLE ARCHETYPE [${key}] (${merged.name})`);
             return merged;
         }
@@ -731,6 +762,13 @@
             const sa = check.snappedAngle !== undefined ? check.snappedAngle : angle;
 
             const id = opts.id || `ce_veh_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+            const existing = this.game.vehicles.find((veh) => veh && veh.id === id);
+            if (existing) {
+                existing.x = sx;
+                existing.y = sy;
+                existing.angle = sa;
+                return existing;
+            }
             const v = new Vehicle(id, key, sx, sy, sa);
             v.z = this.game.map ? this.game.map.getHeightAtPixel(sx, sy, 2.0, !v.waterOnly) : 2.0;
             if (v.waterOnly) v.z = Math.max(2.0, v.z);
@@ -753,6 +791,15 @@
             this.createdEntities.push(record);
             if (!opts.skipHistory) this._pushHistory(record);
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "SPAWN_VEHICLE",
+                opKey: id,
+                id,
+                specKey: key,
+                x: Math.round(sx * 10) / 10,
+                y: Math.round(sy * 10) / 10,
+                angle: Math.round(sa * 1000) / 1000
+            }, opts);
             this.setStatus(`SPAWNED VEHICLE [${v.name}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
             return v;
         }
@@ -816,6 +863,12 @@
             });
             cat[key] = spec;
             this.customPrefabs[key] = config;
+            this._broadcastCreationOp({
+                action: "DEFINE_PREFAB_3D",
+                opKey: `defprefab_${key}`,
+                prefabId: key,
+                config
+            }, config);
             this.setStatus(`DEFINED 3D ARCHITECTURAL PREFAB [${key}] (${spec.w1}x${spec.d1}px)`);
             return spec;
         }
@@ -1103,6 +1156,16 @@
             this.createdEntities.push(rec);
             if (!opts.skipHistory) this._pushHistory(rec);
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "PLACE_PREFAB_3D",
+                opKey: id,
+                id,
+                prefabId: resolvedKey,
+                x: Math.round(sx * 10) / 10,
+                y: Math.round(sy * 10) / 10,
+                angle: Math.round(sa * 1000) / 1000,
+                scale: sc
+            }, opts);
             this.setStatus(`PLACED 3D PREFAB [${spec.label || resolvedKey}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
             return inst;
         }
@@ -1159,6 +1222,15 @@
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({
+                    action: "PLACE_PROP_FLORA",
+                    opKey: id,
+                    id,
+                    kind: nativeStreetKind,
+                    x: Math.round(sx * 10) / 10,
+                    y: Math.round(sy * 10) / 10,
+                    angle: Math.round(sa * 1000) / 1000
+                }, opts);
                 this.setStatus(`PLACED 3D STREET PROP [${nativeStreetKind}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return prop;
             }
@@ -1200,6 +1272,16 @@
             this.createdEntities.push(rec);
             if (!opts.skipHistory) this._pushHistory(rec);
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "PLACE_PROP_FLORA",
+                opKey: id,
+                id,
+                kind,
+                x: Math.round(sx * 10) / 10,
+                y: Math.round(sy * 10) / 10,
+                angle: Math.round(sa * 1000) / 1000,
+                scale: flora.scale
+            }, opts);
             this.setStatus(`PLANTED 3D FLORA [${kind}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
             return flora;
         }
@@ -1280,6 +1362,18 @@
             this.createdEntities.push(rec);
             if (!opts.skipHistory) this._pushHistory(rec);
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "PLACE_INTERIOR",
+                opKey: id,
+                id,
+                tpl: tplKey,
+                name: intr.name,
+                c,
+                r,
+                facing,
+                x: Math.round(doorX * 10) / 10,
+                y: Math.round(doorY * 10) / 10
+            }, opts);
             this.setStatus(`CREATED 3D ENTERABLE VENUE [${intr.name}] FACING [${facing}] AT (${c}, ${r})`);
             return intr;
         }
@@ -2043,25 +2137,260 @@
                 });
             }
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "RELOCATE_ENTITY",
+                opKey: `reloc_${desc.id}`,
+                targetId: desc.id,
+                x: Math.round((desc.type === "INTERIOR" ? ent.doorX : ent.x) * 10) / 10,
+                y: Math.round((desc.type === "INTERIOR" ? ent.doorY : ent.y) * 10) / 10,
+                angle: Math.round(sa * 1000) / 1000,
+                facing: ent.facing
+            }, opts);
             this.setStatus(`MOVED [${desc.label}] TO (${Math.round(sx)}, ${Math.round(sy)})`);
             return ent;
         }
 
-        removeNearestWorldEntity(x, y, maxRadius = 140, includePreExisting = true) {
+        selectWorldEntityAt(x, y, maxRadius = 160, includePreExisting = true) {
+            const desc = this.findNearestWorldEntity(x, y, maxRadius, includePreExisting);
+            this.selectedEntity = desc || null;
+            if (desc) {
+                this.setStatus(`SELECTED [${desc.label}] (${desc.isPreExisting ? "PRE-EXISTING" : "CUSTOM"}) — EDIT IN RIGHT INSPECTOR`);
+            } else {
+                this.setStatus("NO ENTITY FOUND AT CURSOR TO INSPECT");
+            }
+            return this.selectedEntity;
+        }
+
+        _resolveEntityDescriptor(targetOrId) {
+            this.indexPreExistingWorld();
+            if (!targetOrId) return null;
+            if (typeof targetOrId === "string") {
+                const all = this.inspectWorldAt(16384, 16384, 99999, true);
+                return all.find((d) => d.id === targetOrId || (d.entityRef && d.entityRef.id === targetOrId)) || null;
+            }
+            if (targetOrId.entityRef) return targetOrId;
+            if (typeof targetOrId === "object") {
+                const px = targetOrId.doorX !== undefined ? targetOrId.doorX : (targetOrId.x || 0);
+                const py = targetOrId.doorY !== undefined ? targetOrId.doorY : (targetOrId.y || 0);
+                const near = this.inspectWorldAt(px, py, 48, true);
+                return near.find((d) => d.entityRef === targetOrId) || near[0] || null;
+            }
+            return null;
+        }
+
+        _captureEntityParametricState(desc) {
+            if (!desc || !desc.entityRef) return null;
+            const ent = desc.entityRef;
+            const state = {
+                name: ent.name,
+                ang: ent.ang,
+                angle: ent.angle,
+                scale: ent.scale,
+                height: ent.height,
+                facing: ent.facing,
+                theme: ent.theme,
+                accent: ent.accent,
+                color: ent.color,
+                stripe: ent.stripe,
+                maxSpeed: ent.maxSpeed,
+                accel: ent.accel,
+                hp: ent.hp,
+                broken: ent.broken,
+                damaged: ent.damaged
+            };
+            if (ent.spec && typeof ent.spec === "object") {
+                state.specCopy = Object.assign({}, ent.spec);
+            }
+            return state;
+        }
+
+        _applyEntityParametricPatch(desc, patch = {}, opts = {}) {
+            if (!desc || !desc.entityRef || !patch) return false;
+            const map = this.game && this.game.map;
+            const oe = map && map.objectEngine;
+            const ent = desc.entityRef;
+
+            if (patch.name !== undefined) {
+                ent.name = String(patch.name);
+                desc.label = ent.name;
+            }
+            if (patch.angle !== undefined || patch.ang !== undefined) {
+                const na = Number(patch.angle !== undefined ? patch.angle : patch.ang) || 0;
+                ent.ang = na;
+                ent.angle = na;
+                desc.angle = na;
+            }
+
+            if (desc.subtype === "ESTATE") {
+                if (patch.specCopy) {
+                    ent.spec = Object.assign({}, patch.specCopy);
+                } else if (patch.wallColor || patch.trimColor || patch.roofBaseColor || patch.roofRidgeColor || patch.mapColor || patch.mapRoofColor || patch.w1 || patch.d1 || patch.h1 || patch.roofStyle) {
+                    ent.spec = Object.assign({}, ent.spec || {});
+                    if (Array.isArray(patch.wallColor)) ent.spec.wallColor = patch.wallColor.slice();
+                    if (Array.isArray(patch.trimColor)) ent.spec.trimColor = patch.trimColor.slice();
+                    if (Array.isArray(patch.roofBaseColor)) ent.spec.roofBaseColor = patch.roofBaseColor.slice();
+                    if (Array.isArray(patch.roofRidgeColor)) ent.spec.roofRidgeColor = patch.roofRidgeColor.slice();
+                    if (patch.mapColor) ent.spec.mapColor = patch.mapColor;
+                    if (patch.mapRoofColor) ent.spec.mapRoofColor = patch.mapRoofColor;
+                    if (patch.w1) ent.spec.w1 = Number(patch.w1);
+                    if (patch.d1) ent.spec.d1 = Number(patch.d1);
+                    if (patch.h1) ent.spec.h1 = Number(patch.h1);
+                    if (patch.roofStyle) ent.spec.roofStyle = patch.roofStyle;
+                }
+                if (patch.scale !== undefined) {
+                    ent.scale = Math.max(0.5, Math.min(2.2, Number(patch.scale) || 1.0));
+                }
+                const sc = ent.scale || 1.0;
+                const spec = ent.spec || {};
+                const ang = ent.ang || 0;
+                const cosA = Math.cos(ang), sinA = Math.sin(ang);
+                const w1 = Number(spec.w1) || 156;
+                const d1 = Number(spec.d1) || 112;
+                const h1 = Number(spec.h1) || 0.72;
+                const overhang = Number(spec.roofOverhang) || 10;
+                ent.hw = (w1 * 0.5 + overhang) * sc;
+                ent.hh = (d1 * 0.5 + overhang) * sc;
+                ent.extX = Math.abs(cosA) * ent.hw + Math.abs(sinA) * ent.hh;
+                ent.extY = Math.abs(sinA) * ent.hw + Math.abs(cosA) * ent.hh;
+                ent.totalHeightBlocks = (Number(spec.stiltH) || 0) + h1 * sc + (Number(spec.h2) || 0) * sc + (Number(spec.roofPitch1) || 0.2) * sc + (Number(spec.roofPitch2) || 0) * sc;
+
+                if (map && Array.isArray(map.securityBarrierBoxes)) {
+                    const wallHw = (w1 * 0.5) * sc;
+                    const wallHh = (d1 * 0.5) * sc;
+                    const ex = Math.abs(cosA) * wallHw + Math.abs(sinA) * wallHh;
+                    const ey = Math.abs(sinA) * wallHw + Math.abs(cosA) * wallHh;
+                    for (const bb of map.securityBarrierBoxes) {
+                        if (bb && (bb.estateId === ent.id || (bb.cx !== undefined && Math.hypot(bb.cx - ent.x, bb.cy - ent.y) < 12))) {
+                            bb.estateId = ent.id;
+                            bb.hw = wallHw;
+                            bb.hh = wallHh;
+                            bb.cosA = cosA;
+                            bb.sinA = sinA;
+                            bb.minX = ent.x - ex;
+                            bb.maxX = ent.x + ex;
+                            bb.minY = ent.y - ey;
+                            bb.maxY = ent.y + ey;
+                        }
+                    }
+                    map.barrierBoxGrid = null;
+                    if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
+                }
+                if (opts.rebuildMesh !== false && oe && this.game.renderer && this.game.renderer.gl) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                    if (typeof this.game.renderer.bakeRadarBackground === "function") {
+                        this.game.renderer.bakeRadarBackground();
+                    }
+                }
+            } else if (desc.type === "INTERIOR") {
+                if (patch.theme && window.ShopInteriors && window.ShopInteriors.SHOP_TEMPLATES && window.ShopInteriors.SHOP_TEMPLATES[patch.theme]) {
+                    const tpl = window.ShopInteriors.SHOP_TEMPLATES[patch.theme];
+                    ent.theme = tpl.theme;
+                    ent.accent = patch.accent || tpl.accent;
+                    ent.matRGB = tpl.matRGB;
+                    ent.w = tpl.w || 820;
+                    ent.h = tpl.h || 560;
+                    if (typeof tpl.buildStations === "function") {
+                        ent.stations = tpl.buildStations(ent.id).map((s) => Object.assign({}, s, { cooldown: 0 }));
+                        delete ent._rawStations;
+                    }
+                    if (typeof tpl.buildNpcs === "function") {
+                        ent.npcs = tpl.buildNpcs().map((n) => Object.assign({}, n));
+                        delete ent._rawNpcs;
+                    }
+                }
+                if (patch.accent) ent.accent = patch.accent;
+                if (patch.facing && ["S", "N", "E", "W"].includes(patch.facing)) {
+                    ent.facing = patch.facing;
+                }
+                if (window.ShopInteriors && typeof window.ShopInteriors.orientInterior === "function") {
+                    ent._orientedFacing = null;
+                    window.ShopInteriors.orientInterior(ent);
+                }
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap && map) {
+                    this.game.renderer._staticChunkGridMap.delete(map.interiors);
+                }
+            } else if (desc.type === "VEHICLE") {
+                if (patch.color) ent.color = patch.color;
+                if (patch.stripe !== undefined) ent.stripe = patch.stripe;
+                if (patch.maxSpeed !== undefined) ent.maxSpeed = Number(patch.maxSpeed);
+                if (patch.accel !== undefined) ent.accel = Number(patch.accel);
+                if (patch.hp !== undefined) {
+                    ent.hp = Number(patch.hp);
+                    ent.maxHp = Math.max(ent.maxHp || 120, ent.hp);
+                    ent.destroyed = false;
+                    ent.smokeTimer = 0;
+                }
+            } else if (desc.type === "PROP_FLORA") {
+                if (patch.scale !== undefined) ent.scale = Math.max(0.4, Math.min(2.5, Number(patch.scale) || 1.0));
+                if (patch.height !== undefined) ent.height = Math.max(0.4, Math.min(2.8, Number(patch.height) || 1.15));
+                if (patch.broken !== undefined) ent.broken = Boolean(patch.broken);
+                if (patch.damaged !== undefined) ent.damaged = Boolean(patch.damaged);
+                if (oe) oe._propColGrid = null;
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap && map) {
+                    this.game.renderer._staticChunkGridMap.delete(map.vicePalms);
+                    if (oe) this.game.renderer._staticChunkGridMap.delete(oe.streetProps);
+                }
+            }
+            return true;
+        }
+
+        modifyWorldEntity(targetOrId, patch = {}, opts = {}) {
+            const desc = this._resolveEntityDescriptor(targetOrId);
+            if (!desc || !desc.entityRef) return null;
+
+            const beforeState = this._captureEntityParametricState(desc);
+            this._applyEntityParametricPatch(desc, patch, opts);
+            const afterState = this._captureEntityParametricState(desc);
+
+            if (!opts.skipHistory) {
+                this._pushHistory({
+                    type: "MODIFY_ENTITY",
+                    id: desc.id,
+                    desc,
+                    beforeState,
+                    afterState,
+                    patch: Object.assign({}, patch)
+                });
+            }
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "MODIFY_ENTITY",
+                opKey: `mod_${desc.id}`,
+                targetId: desc.id,
+                patch
+            }, opts);
+            this.setStatus(`MODIFIED [${desc.label}] (${Object.keys(patch).join(", ")})`);
+            return desc.entityRef;
+        }
+
+        removeNearestWorldEntity(x, y, maxRadius = 140, includePreExisting = true, opts = {}) {
             const desc = this.findNearestWorldEntity(x, y, maxRadius, includePreExisting);
             if (!desc) {
                 this.setStatus("NO WORLD ENTITY WITHIN RANGE TO DELETE");
                 return null;
             }
+            if (this.selectedEntity && this.selectedEntity.id === desc.id) {
+                this.selectedEntity = null;
+            }
             if (!desc.isPreExisting && desc.createdRecord) {
                 const idx = this.createdEntities.indexOf(desc.createdRecord);
                 if (idx >= 0) this.createdEntities.splice(idx, 1);
                 this.removeCreatedRecord(desc.createdRecord);
-                this._pushHistory({
-                    type: "DELETE_CREATED",
-                    record: desc.createdRecord
-                });
-                this.saveToLocalStorage();
+                if (!opts.skipHistory) {
+                    this._pushHistory({
+                        type: "DELETE_CREATED",
+                        record: desc.createdRecord
+                    });
+                }
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({
+                    action: "REMOVE",
+                    opKey: desc.id,
+                    targetId: desc.id,
+                    x: Math.round(desc.x),
+                    y: Math.round(desc.y),
+                    isPreExisting: false
+                }, opts);
                 this.setStatus(`DELETED CUSTOM [${desc.label}]`);
                 return desc;
             }
@@ -2108,14 +2437,24 @@
                 oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
             }
 
-            this._pushHistory({
-                type: "DELETE_PREEXISTING",
-                desc,
-                sourceArray: arr,
-                arrayIndex: arrIdx,
-                entityRef: ent,
-                removedBarriers
-            });
+            if (!opts.skipHistory) {
+                this._pushHistory({
+                    type: "DELETE_PREEXISTING",
+                    desc,
+                    sourceArray: arr,
+                    arrayIndex: arrIdx,
+                    entityRef: ent,
+                    removedBarriers
+                });
+            }
+            this._broadcastCreationOp({
+                action: "REMOVE",
+                opKey: `rm_${desc.id}`,
+                targetId: desc.id,
+                x: Math.round(desc.x),
+                y: Math.round(desc.y),
+                isPreExisting: true
+            }, opts);
             this.setStatus(`DELETED PRE-EXISTING [${desc.label}] ([CTRL+Z] TO RESTORE)`);
             return desc;
         }
@@ -2169,6 +2508,10 @@
                     skipValidation: true,
                     facing: rec.beforeFacing
                 });
+                return true;
+            }
+            if (rec.type === "MODIFY_ENTITY" && rec.desc && rec.beforeState) {
+                this._applyEntityParametricPatch(rec.desc, rec.beforeState);
                 return true;
             }
             if (rec.type === "DELETE_CREATED" && rec.record) {
@@ -2309,6 +2652,10 @@
                 });
                 return true;
             }
+            if (rec.type === "MODIFY_ENTITY" && rec.desc && rec.afterState) {
+                this._applyEntityParametricPatch(rec.desc, rec.afterState);
+                return true;
+            }
             if (rec.type === "DELETE_CREATED" && rec.record) {
                 this.removeCreatedRecord(rec.record);
                 this.createdEntities = this.createdEntities.filter((e) => e !== rec.record && e.id !== rec.record.id);
@@ -2361,7 +2708,7 @@
             }
             const act = this.undoStack.pop();
             this.removeCreatedRecord(act);
-            if (act.type !== "RELOCATE_ENTITY" && act.type !== "DELETE_PREEXISTING" && act.type !== "DELETE_CREATED") {
+            if (act.type !== "RELOCATE_ENTITY" && act.type !== "MODIFY_ENTITY" && act.type !== "DELETE_PREEXISTING" && act.type !== "DELETE_CREATED") {
                 this.createdEntities = this.createdEntities.filter((e) => e !== act && (e.id === undefined || e.id !== act.id));
             }
             this.redoStack.push(act);
@@ -2410,7 +2757,7 @@
             return null;
         }
 
-        clearAllCreations() {
+        clearAllCreations(opts = {}) {
             while (this.undoStack.length > 0) {
                 const act = this.undoStack.pop();
                 this.removeCreatedRecord(act);
@@ -2420,10 +2767,168 @@
             }
             this.createdEntities.length = 0;
             this.redoStack.length = 0;
+            this.selectedEntity = null;
+            this.grabbedEntity = null;
             this.rebuildWorldMeshes(true);
-            this.saveToLocalStorage();
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "CLEAR_ALL",
+                opKey: "clear_all"
+            }, opts);
             this.setStatus("CLEARED ALL CUSTOM CREATIONS");
             return true;
+        }
+
+        /* ====================================================================
+           7B. MULTIPLAYER & DEDICATED SERVER REAL-TIME CREATION SYNC
+           ==================================================================== */
+        applyRemoteCreationOp(op, opts = {}) {
+            if (!op || typeof op !== "object" || !this.game || !this.game.map) return false;
+            const remoteOpts = {
+                id: op.id,
+                isRemote: true,
+                skipBroadcast: true,
+                skipHistory: true,
+                skipSave: true,
+                rebuildMesh: !opts.batch
+            };
+
+            if (op.action === "VOXEL_TILE" && typeof op.c === "number" && typeof op.r === "number") {
+                this.paintVoxelTile(op.c, op.r, op.presetKey || "SIDEWALK", Object.assign({}, remoteOpts, {
+                    storeys: op.storeys,
+                    style: op.style
+                }));
+                return true;
+            }
+            if (op.action === "DEFINE_VEHICLE" && op.specKey) {
+                this.defineVehicle(op.specKey, Object.assign({}, op.config, { isRemote: true, skipBroadcast: true }));
+                return true;
+            }
+            if (op.action === "SPAWN_VEHICLE" && op.specKey) {
+                this.spawnVehicle(op.specKey, op.x, op.y, op.angle || 0, remoteOpts);
+                return true;
+            }
+            if (op.action === "DEFINE_PREFAB_3D" && op.prefabId) {
+                this.definePrefab3D(op.prefabId, Object.assign({}, op.config, { isRemote: true, skipBroadcast: true }));
+                return true;
+            }
+            if (op.action === "PLACE_PREFAB_3D" && op.prefabId) {
+                if (op.id && this.createdEntities.some((e) => e && e.id === op.id)) return true;
+                this.placePrefab3D(op.prefabId, op.x, op.y, op.angle || 0, Object.assign({}, remoteOpts, { scale: op.scale }));
+                return true;
+            }
+            if (op.action === "PLACE_PROP_FLORA" && op.kind) {
+                if (op.id && this.createdEntities.some((e) => e && e.id === op.id)) return true;
+                this.placePropOrFlora(op.kind, op.x, op.y, op.angle || 0, Object.assign({}, remoteOpts, { scale: op.scale }));
+                return true;
+            }
+            if (op.action === "PLACE_INTERIOR" && op.tpl) {
+                if (op.id && this.createdEntities.some((e) => e && e.id === op.id)) return true;
+                this.placeEstablishment({
+                    id: op.id,
+                    tpl: op.tpl,
+                    name: op.name,
+                    c: op.c,
+                    r: op.r,
+                    facing: op.facing,
+                    x: op.x,
+                    y: op.y
+                }, remoteOpts);
+                return true;
+            }
+            if (op.action === "RELOCATE_ENTITY" && op.targetId) {
+                this.relocateWorldEntity(op.targetId, op.x, op.y, op.angle, Object.assign({}, remoteOpts, {
+                    skipValidation: true,
+                    facing: op.facing
+                }));
+                return true;
+            }
+            if (op.action === "MODIFY_ENTITY" && op.targetId && op.patch) {
+                this.modifyWorldEntity(op.targetId, op.patch, remoteOpts);
+                return true;
+            }
+            if (op.action === "REMOVE") {
+                const desc = op.targetId ? this._resolveEntityDescriptor(op.targetId) : null;
+                if (desc) {
+                    this.removeNearestWorldEntity(desc.x, desc.y, 32, true, remoteOpts);
+                    return true;
+                }
+                if (typeof op.x === "number" && typeof op.y === "number") {
+                    this.removeNearestWorldEntity(op.x, op.y, 48, Boolean(op.isPreExisting), remoteOpts);
+                    return true;
+                }
+                return false;
+            }
+            if (op.action === "CLEAR_ALL") {
+                this.clearAllCreations(remoteOpts);
+                return true;
+            }
+            return false;
+        }
+
+        /* ====================================================================
+           7C. DECLARATIVE WORLD EXPANSION PACK LIBRARY (ZERO MONOLITH BLOAT)
+           ==================================================================== */
+        getBuiltInExpansionPacks() {
+            return {
+                OCEAN_DRIVE_NEON_FESTIVAL: {
+                    id: "OCEAN_DRIVE_NEON_FESTIVAL",
+                    title: "Ocean Drive Neon Block Party & VIP Showcase",
+                    district: "OCEAN DRIVE",
+                    customVehicles: {
+                        OCEAN_FEST_TURBO: {
+                            name: "OCEAN FEST TURBO GT",
+                            baseSpec: "VICE_CHEETAH",
+                            maxSpeed: 515,
+                            accel: 335,
+                            color: "#00f0ff",
+                            stripe: "#ff2a85"
+                        }
+                    },
+                    entities: [
+                        { type: "PREFAB_3D", id: "exp_od_tiki", prefabId: "TIKI_BAR_3D", x: 465.5 * TILE_SIZE, y: 274.5 * TILE_SIZE, angle: 0 },
+                        { type: "PREFAB_3D", id: "exp_od_volley", prefabId: "VOLLEYBALL_COURT_3D", x: 466.5 * TILE_SIZE, y: 277.5 * TILE_SIZE, angle: 0 },
+                        { type: "PREFAB_3D", id: "exp_od_ecola", prefabId: "SODA_ECOLA_3D", x: 448.5 * TILE_SIZE, y: 275.5 * TILE_SIZE, angle: 0 },
+                        { type: "PROP_FLORA", id: "exp_od_palm1", kind: "coconut_palm_cluster", x: 449.5 * TILE_SIZE, y: 274.5 * TILE_SIZE, angle: 0.4 },
+                        { type: "PROP_FLORA", id: "exp_od_lamp1", kind: "STREETLAMP", x: 448.5 * TILE_SIZE, y: 276.5 * TILE_SIZE, angle: 0 },
+                        { type: "VEHICLE", id: "exp_od_hypercar", specKey: "OCEAN_FEST_TURBO", x: 445.5 * TILE_SIZE, y: 275.5 * TILE_SIZE, angle: Math.PI * 0.5 },
+                        { type: "INTERIOR", id: "exp_od_lounge", tpl: "SHOP_BAR", name: "NEON MIRAGE ROOFTOP BAR", x: 443.5 * TILE_SIZE, y: 275.5 * TILE_SIZE }
+                    ]
+                },
+                STAR_ISLAND_CARTEL_COMPOUND: {
+                    id: "STAR_ISLAND_CARTEL_COMPOUND",
+                    title: "Star Island Cartel Waterfront Compound",
+                    district: "STAR ISLAND",
+                    entities: [
+                        { type: "PREFAB_3D", id: "exp_si_crate1", prefabId: "SMUGGLER_CRATE_3D", x: 351.5 * TILE_SIZE, y: 171.5 * TILE_SIZE, angle: 0 },
+                        { type: "PREFAB_3D", id: "exp_si_sprunk", prefabId: "SODA_SPRUNK_3D", x: 350.5 * TILE_SIZE, y: 171.5 * TILE_SIZE, angle: 0 },
+                        { type: "PROP_FLORA", id: "exp_si_phone", kind: "PAYPHONE", x: 349.5 * TILE_SIZE, y: 171.5 * TILE_SIZE, angle: 0 },
+                        { type: "VEHICLE", id: "exp_si_stinger", specKey: "STINGER_CABRIO", x: 348.5 * TILE_SIZE, y: 173.5 * TILE_SIZE, angle: 0 }
+                    ]
+                },
+                VICE_BEACH_SPORTS_PLAZA: {
+                    id: "VICE_BEACH_SPORTS_PLAZA",
+                    title: "Vice Beach Drift & Boardwalk Sports Plaza",
+                    district: "SOUTH BEACH",
+                    entities: [
+                        { type: "PREFAB_3D", id: "exp_vb_ring", prefabId: "STREET_TAKEOVER_RING", x: 448.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, angle: 0 },
+                        { type: "PREFAB_3D", id: "exp_vb_tiki2", prefabId: "TIKI_BAR_3D", x: 465.5 * TILE_SIZE, y: 234.5 * TILE_SIZE, angle: 0 },
+                        { type: "PROP_FLORA", id: "exp_vb_hydrant", kind: "HYDRANT", x: 448.5 * TILE_SIZE, y: 232.5 * TILE_SIZE, angle: 0 }
+                    ]
+                }
+            };
+        }
+
+        applyExpansionPack(packId, opts = {}) {
+            const packs = this.getBuiltInExpansionPacks();
+            const keys = Object.keys(packs);
+            const resolvedKey = (packId && packs[packId]) ? packId : keys[this.activeExpansionIdx % keys.length];
+            const pack = packs[resolvedKey];
+            if (!pack) return { ok: false, reason: "PACK_NOT_FOUND" };
+            this.activeExpansionIdx = (keys.indexOf(resolvedKey) + 1) % keys.length;
+            const res = this.importBlueprintJSON(pack, opts);
+            this.setStatus(`DEPLOYED EXPANSION PACK [${pack.title}] (${res.count} ASSETS)`);
+            return Object.assign({ packId: resolvedKey, title: pack.title }, res);
         }
 
         exportBlueprintJSON() {
@@ -2647,6 +3152,11 @@
                 this.setStatus(`STUDIO FREE CAMERA: ${this.freeCamActive ? "ON (WASD PANS CAMERA)" : "FOLLOW PLAYER"}`);
                 return true;
             }
+            if (code === "KeyE") {
+                const cur = this.screenToWorld(this.game.input.mouseX || 0, this.game.input.mouseY || 0, 2.0);
+                this.selectWorldEntityAt(cur.x, cur.y, 160, true);
+                return true;
+            }
             if (code === "KeyC") {
                 const cur = this.screenToWorld(this.game.input.mouseX || 0, this.game.input.mouseY || 0, 2.0);
                 this.cloneWorldEntityToPalette(cur.x, cur.y, 160);
@@ -2661,6 +3171,7 @@
                     const hit = this.findNearestWorldEntity(cur.x, cur.y, 160, true);
                     if (hit) {
                         this.grabbedEntity = hit;
+                        this.selectedEntity = hit;
                         this.placementAngle = hit.angle || 0;
                         this.setStatus(`GRABBED [${hit.label}] — CLICK OR PRESS [M] AT DESTINATION ([R] TO ROTATE)`);
                     } else {
@@ -2685,10 +3196,41 @@
             return false;
         }
 
+        _cycleEntityPaletteTheme(desc) {
+            if (!desc || !desc.entityRef) return;
+            const themes = [
+                { name: "FLAMINGO NEON", wall: [0.98, 0.90, 0.95], trim: [1.0, 0.16, 0.52], hex: "#ff2a85", stripe: "#00f0ff", shopTpl: "SHOP_BAR" },
+                { name: "OCEAN CYAN",    wall: [0.90, 0.98, 1.00], trim: [0.0, 0.94, 1.00], hex: "#00f0ff", stripe: "#fde047", shopTpl: "SHOP_HOTEL" },
+                { name: "STAR GOLD",     wall: [0.99, 0.97, 0.88], trim: [0.98, 0.78, 0.15], hex: "#fde047", stripe: "#0f172a", shopTpl: "SHOP_RESTAURANT" },
+                { name: "EMERALD PALM",  wall: [0.92, 0.99, 0.94], trim: [0.22, 0.98, 0.45], hex: "#39ff14", stripe: "#ffffff", shopTpl: "SHOP_CONVENIENCE" },
+                { name: "ULTRAVIOLET",   wall: [0.95, 0.91, 1.00], trim: [0.68, 0.32, 0.98], hex: "#a855f7", stripe: "#38bdf8", shopTpl: "SHOP_CLOTHES" }
+            ];
+            this._paletteThemeIdx = ((this._paletteThemeIdx || 0) + 1) % themes.length;
+            const t = themes[this._paletteThemeIdx];
+            if (desc.subtype === "ESTATE") {
+                this.modifyWorldEntity(desc, {
+                    wallColor: t.wall,
+                    trimColor: t.trim,
+                    roofRidgeColor: t.trim,
+                    mapRoofColor: t.hex
+                });
+            } else if (desc.type === "VEHICLE") {
+                this.modifyWorldEntity(desc, {
+                    color: t.hex,
+                    stripe: t.stripe
+                });
+            } else if (desc.type === "INTERIOR") {
+                this.modifyWorldEntity(desc, {
+                    theme: t.shopTpl,
+                    accent: t.hex
+                });
+            }
+        }
+
         handleMouseDown(screenX, screenY, button = 0) {
             if (!this.studioActive) return false;
 
-            // Check Studio HUD Panel buttons first
+            // Check Studio HUD Panel buttons first (Left Dock & Right Inspector Dock)
             for (const b of this.studioButtons) {
                 if (screenX >= b.x && screenX <= b.x + b.w && screenY >= b.y && screenY <= b.y + b.h) {
                     if (b.id === "STUDIO_CLOSE") {
@@ -2720,19 +3262,72 @@
                             navigator.clipboard.writeText(json).catch(() => {});
                         }
                         this.setStatus("BLUEPRINT JSON COPIED TO CLIPBOARD!");
+                    } else if (b.id === "STUDIO_EXPANSION") {
+                        this.applyExpansionPack();
                     } else if (b.id === "STUDIO_CLEAR") {
                         this.clearAllCreations();
+                    } else if (b.id === "INSP_CLOSE") {
+                        this.selectedEntity = null;
+                    } else if (b.id === "INSP_ROT_CCW" && this.selectedEntity) {
+                        const curA = this.selectedEntity.entityRef.ang !== undefined ? this.selectedEntity.entityRef.ang : (this.selectedEntity.entityRef.angle || 0);
+                        this.modifyWorldEntity(this.selectedEntity, { angle: curA - Math.PI * 0.25 });
+                    } else if (b.id === "INSP_ROT_CW" && this.selectedEntity) {
+                        const curA = this.selectedEntity.entityRef.ang !== undefined ? this.selectedEntity.entityRef.ang : (this.selectedEntity.entityRef.angle || 0);
+                        this.modifyWorldEntity(this.selectedEntity, { angle: curA + Math.PI * 0.25 });
+                    } else if (b.id === "INSP_SCALE_DOWN" && this.selectedEntity) {
+                        const ent = this.selectedEntity.entityRef;
+                        if (this.selectedEntity.type === "INTERIOR") {
+                            const dirs = ["S", "W", "N", "E"];
+                            const nextF = dirs[(dirs.indexOf(ent.facing || "S") + 1) % 4];
+                            this.modifyWorldEntity(this.selectedEntity, { facing: nextF });
+                        } else if (this.selectedEntity.type === "VEHICLE") {
+                            this.modifyWorldEntity(this.selectedEntity, { hp: 250 });
+                        } else {
+                            this.modifyWorldEntity(this.selectedEntity, { scale: Math.max(0.6, (ent.scale || 1.0) - 0.15) });
+                        }
+                    } else if (b.id === "INSP_SCALE_UP" && this.selectedEntity) {
+                        const ent = this.selectedEntity.entityRef;
+                        if (this.selectedEntity.type === "INTERIOR") {
+                            if (typeof this.game.enterInterior === "function") {
+                                this.toggleStudio(false);
+                                this.game.enterInterior(ent);
+                            }
+                        } else if (this.selectedEntity.type === "VEHICLE") {
+                            this.modifyWorldEntity(this.selectedEntity, {
+                                maxSpeed: Math.round((ent.maxSpeed || 400) * 1.25),
+                                accel: Math.round((ent.accel || 260) * 1.25)
+                            });
+                        } else {
+                            this.modifyWorldEntity(this.selectedEntity, { scale: Math.min(1.85, (ent.scale || 1.0) + 0.15) });
+                        }
+                    } else if (b.id === "INSP_THEME" && this.selectedEntity) {
+                        this._cycleEntityPaletteTheme(this.selectedEntity);
+                    } else if (b.id === "INSP_CLONE" && this.selectedEntity) {
+                        this.cloneWorldEntityToPalette(this.selectedEntity.x, this.selectedEntity.y, 64);
+                    } else if (b.id === "INSP_MOVE" && this.selectedEntity) {
+                        this.grabbedEntity = this.selectedEntity;
+                        this.setStatus(`GRABBED [${this.selectedEntity.label}] — CLICK DESTINATION IN WORLD`);
+                    } else if (b.id === "INSP_DELETE" && this.selectedEntity) {
+                        this.removeNearestWorldEntity(this.selectedEntity.x, this.selectedEntity.y, 48, true);
                     }
                     return true;
                 }
             }
 
-            // Avoid placing in world if clicking inside left dock rectangle
+            // Avoid placing in world if clicking inside left dock or right inspector dock
             if (screenX <= 292 && screenY >= 56 && screenY <= 585) {
+                return true;
+            }
+            const W = (this.game && this.game.renderer && this.game.renderer.canvas) ? this.game.renderer.canvas.width : 1280;
+            if (this.selectedEntity && screenX >= W - 266 && screenY >= 68 && screenY <= 360) {
                 return true;
             }
 
             const cur = this.screenToWorld(screenX, screenY, 2.0);
+            if (button === 1) {
+                this.selectWorldEntityAt(cur.x, cur.y, 160, true);
+                return true;
+            }
             if (button === 2) {
                 this.removeNearestWorldEntity(cur.x, cur.y, 140, true);
                 return true;
@@ -2996,7 +3591,67 @@
             drawActBtn("STUDIO_EXPORT", "📋 JSON [X]", px + 12 + b3W * 2, actY2, b3W, 24, "#3b0764", "#fde047");
 
             const actY3 = actY2 + 28;
-            drawActBtn("STUDIO_CLEAR", `🗑️ CLEAR ALL (${this.createdEntities.length} ENTITIES)`, px + 6, actY3, pw - 12, 22, "#450a0a", "#ef4444");
+            const b2W = Math.floor((pw - 16) / 2);
+            drawActBtn("STUDIO_EXPANSION", "📦 EXPANSION PACK", px + 6, actY3, b2W, 22, "#065f46", "#39ff14");
+            drawActBtn("STUDIO_CLEAR", `🗑️ CLEAR (${this.createdEntities.length})`, px + 10 + b2W, actY3, b2W, 22, "#450a0a", "#ef4444");
+
+            // 3. Right-Side Live Parametric Entity Inspector Dock (when an entity is selected via [E] or Middle-Click)
+            if (this.selectedEntity && this.selectedEntity.entityRef) {
+                const sel = this.selectedEntity;
+                const ent = sel.entityRef;
+                const rx = W - 264;
+                const ry = 68;
+                const rw = 252;
+                const rh = 276;
+
+                ctx.fillStyle = "rgba(9, 14, 28, 0.95)";
+                ctx.fillRect(rx, ry, rw, rh);
+                ctx.strokeStyle = "#ff2a85";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+
+                ctx.fillStyle = "#31102f";
+                ctx.fillRect(rx + 2, ry + 2, rw - 4, 24);
+                ctx.fillStyle = "#fde047";
+                ctx.textAlign = "left";
+                ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
+                ctx.fillText("🔎 PARAMETRIC INSPECTOR [E]", rx + 8, ry + 14);
+                drawActBtn("INSP_CLOSE", "✖", rx + rw - 24, ry + 4, 19, 18, "#7f1d1d", "#ef4444");
+
+                ctx.fillStyle = "#38bdf8";
+                ctx.textAlign = "left";
+                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                ctx.fillText(`${sel.isPreExisting ? "[PRE-EXISTING]" : "[CUSTOM]"} ${sel.type}`, rx + 10, ry + 38);
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(String(sel.label || sel.id).slice(0, 30), rx + 10, ry + 54);
+                const ex = Math.round(sel.type === "INTERIOR" ? (ent.doorX || 0) : (ent.x || 0));
+                const ey = Math.round(sel.type === "INTERIOR" ? (ent.doorY || 0) : (ent.y || 0));
+                const ea = Math.round((((ent.ang !== undefined ? ent.ang : (ent.angle || 0)) * 180) / Math.PI) % 360);
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fillText(`POS: (${ex}, ${ey}) • ROT: ${ea}°`, rx + 10, ry + 70);
+                const metaLine = sel.type === "INTERIOR"
+                    ? `FACING: ${ent.facing || "S"} • THEME: ${ent.theme || "SHOP"}`
+                    : (sel.type === "VEHICLE"
+                        ? `SPD: ${ent.maxSpeed || 400} • HP: ${Math.round(ent.hp || 100)}`
+                        : `SCALE: ${(ent.scale || 1.0).toFixed(2)}x • ID: ${String(sel.id).slice(0, 12)}`);
+                ctx.fillText(metaLine.slice(0, 32), rx + 10, ry + 86);
+
+                const ibW = Math.floor((rw - 20) / 2);
+                drawActBtn("INSP_ROT_CCW", "⟲ ROT -45°", rx + 8, ry + 102, ibW, 24, "#1e293b", "#38bdf8");
+                drawActBtn("INSP_ROT_CW", "⟳ ROT +45°", rx + 12 + ibW, ry + 102, ibW, 24, "#1e293b", "#38bdf8");
+
+                const leftLbl = sel.type === "INTERIOR" ? "🔄 FACING" : (sel.type === "VEHICLE" ? "🔧 REPAIR 100%" : "➖ SCALE -15%");
+                const rightLbl = sel.type === "INTERIOR" ? "🚪 ENTER 3D" : (sel.type === "VEHICLE" ? "⚡ +25% TURBO" : "➕ SCALE +15%");
+                drawActBtn("INSP_SCALE_DOWN", leftLbl, rx + 8, ry + 132, ibW, 24, "#1e293b", "#39ff14");
+                drawActBtn("INSP_SCALE_UP", rightLbl, rx + 12 + ibW, ry + 132, ibW, 24, "#065f46", "#39ff14");
+
+                drawActBtn("INSP_THEME", "🎨 CYCLE MIAMI VICE PALETTE", rx + 8, ry + 162, rw - 16, 24, "#3b0764", "#ff2a85");
+
+                drawActBtn("INSP_CLONE", "📋 CLONE [C]", rx + 8, ry + 192, ibW, 24, "#1e293b", "#fde047");
+                drawActBtn("INSP_MOVE", "✋ MOVE [M]", rx + 12 + ibW, ry + 192, ibW, 24, "#0369a1", "#00f0ff");
+
+                drawActBtn("INSP_DELETE", "🗑️ DELETE ENTITY [DEL]", rx + 8, ry + 222, rw - 16, 24, "#450a0a", "#ef4444");
+            }
 
             // Bottom status bar banner
             const stW = Math.min(760, W - 320);
