@@ -1490,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_227"), "ViceCreationEngine (v101_227) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_228"), "ViceCreationEngine (v101_228) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2237,9 +2237,97 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 43: POLICE vs. PLAYER-IN-VEHICLE PURSUIT, CAR-DOOR PULL ARREST & VEHICULAR GUNFIRE
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 43: POLICE vs. PLAYER-IN-VEHICLE PURSUIT, CAR-DOOR PULL ARREST & VEHICULAR GUNFIRE ---");
+    {
+        const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        g.trafficManager.generateTrafficCars = () => {};
+        g.trafficManager.generateTrafficPeds = () => {};
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+
+        // 1. Place the player inside a stopped pickup truck on Vice Beach sand at 1★ with a deployed VCPD foot officer 75px away
+        const beachX = 466.5 * 64;
+        const beachY = 276.5 * 64;
+        const pickup = sandbox.makeVeh("beach_truck_43", "PICKUP_4X4", beachX, beachY, -Math.PI * 0.5);
+        pickup.driver = "PLAYER";
+        pickup.speed = 0;
+        pickup.vx = 0;
+        pickup.vy = 0;
+        g.vehicles.push(pickup);
+        g.player.inVehicle = pickup;
+        g.player.x = beachX;
+        g.player.y = beachY;
+        g.player.hp = 100;
+        g.player._copDoorPullTimer = 0;
+        g.setWantedLevel(1, { x: beachX, y: beachY }, true, pickup);
+
+        const footCop = sandbox.makePed({
+            id: "beach_cop_43",
+            x: beachX - 72,
+            y: beachY + 18,
+            z: 2.0,
+            angle: 0,
+            kind: "COP",
+            copWeapon: "PISTOL",
+            hp: 105,
+            speed: 98,
+            dead: false
+        });
+        g.peds.push(footCop);
+
+        let doorWrenched = false;
+        let bustedTitle = null;
+        const origTrigger = g.triggerWastedOrBusted.bind(g);
+        g.triggerWastedOrBusted = (title, subtitle, color, kind) => {
+            bustedTitle = title;
+        };
+
+        stepSec(2.0);
+        if ((pickup.doorOpenTimer || 0) > 0 || (g.player._copDoorPullTimer || 0) > 0 || bustedTitle === "BUSTED!") {
+            doorWrenched = true;
+        }
+        g.triggerWastedOrBusted = origTrigger;
+
+        assert(
+            doorWrenched === true && bustedTitle === "BUSTED!",
+            `At 1★ on Vice Beach sand, VCPD foot officer runs straight to the stopped truck's door (no OBB orbit loop), wrenches it open, and busts the driver (bustedTitle=${bustedTitle})`
+        );
+
+        // 2. Now verify that when the suspect's vehicle is moving/at range, foot officers & cruisers open fire and damage p.inVehicle
+        g.player.hp = 100;
+        g.player._copDoorPullTimer = 0;
+        pickup.hp = 180;
+        const hpBefore = pickup.hp;
+        footCop.x = beachX - 135;
+        footCop.y = beachY;
+        footCop.shootCooldown = 0;
+        g.projectiles.length = 0;
+        stepSec(1.2, () => {
+            pickup.x = beachX;
+            pickup.y = beachY;
+            pickup.speed = 55;
+            pickup.vx = 0;
+            pickup.vy = -55;
+            g.player.x = beachX;
+            g.player.y = beachY;
+        });
+
+        assert(
+            pickup.hp < hpBefore,
+            `VCPD officer opens fire on fleeing getaway vehicle and damages vehicle hull (HP ${hpBefore} -> ${Math.round(pickup.hp)})`
+        );
+
+        g.player.inVehicle = null;
+        g.setWantedLevel(0);
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 42 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL & GRAPHICAL SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 43 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL & POLICE SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

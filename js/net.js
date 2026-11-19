@@ -2722,8 +2722,14 @@ class ViceNetworkManager {
                     v._serverDriven = true;
                 }
 
-                // Never overwrite the vehicle currently driven by the local player, linked to a 20Hz remote player, or actively towed locally
-                if (g.player.inVehicle === v || v._linkedRemoteId || v.towedByTruck) {
+                // Never overwrite the vehicle currently driven by the local player, linked to a 20Hz remote player, actively towed locally,
+                // or an active local police pursuit cruiser / deployed squad car while a wanted pursuit is underway
+                if (
+                    g.player.inVehicle === v ||
+                    v._linkedRemoteId ||
+                    v.towedByTruck ||
+                    (isAutonomousServerTick && !isMod && v.isPolice && ((g.wantedLevel || 0) > 0 || v.driver === "AI_COP" || (v.noDeployCooldown || 0) > 0))
+                ) {
                     continue;
                 }
 

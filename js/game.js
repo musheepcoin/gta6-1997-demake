@@ -14130,21 +14130,37 @@ class LeonidaGame {
                     }
                 }
 
-                // Check close-range COP arrest / damage AND ranged weapon fire on local player even in client sync mode
+                // Check close-range COP arrest / car-door pull / damage AND ranged weapon fire on local player even in client sync mode
                 if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop) && !p.dead && !this.activeInterior) {
                     ped.inCombat = true;
                     const targetEnt = p.inVehicle || p;
                     const dPlayer = Math.hypot(targetEnt.x - ped.x, targetEnt.y - ped.y);
-                    if (dPlayer <= 28 && !p.inVehicle) {
+                    const vehDoorReach = p.inVehicle ? Math.max(44, ((p.inVehicle.w || 56) * 0.50) + 16) : 28;
+                    if (dPlayer <= vehDoorReach) {
                         const maxHp = p.maxHp || 100;
-                        if (p.hp < maxHp * 0.25) {
-                            this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
-                        } else {
-                            this.damagePlayer(18 * dt);
+                        if (!p.inVehicle) {
+                            if (p.hp < maxHp * 0.25) {
+                                this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
+                            } else {
+                                this.damagePlayer(18 * dt);
+                            }
+                        } else if (Math.abs(p.inVehicle.speed || 0) < 65) {
+                            p.inVehicle.doorOpenTimer = Math.max(p.inVehicle.doorOpenTimer || 0, 0.45);
+                            p.inVehicle.vx *= Math.pow(0.08, dt);
+                            p.inVehicle.vy *= Math.pow(0.08, dt);
+                            p.inVehicle.speed *= Math.pow(0.08, dt);
+                            p._copDoorPullTimer = (p._copDoorPullTimer || 0) + dt;
+                            this.damagePlayer(24 * dt);
+                            if (p._copDoorPullTimer >= 0.55 || p.hp < maxHp * 0.35) {
+                                p._copDoorPullTimer = 0;
+                                this.triggerWastedOrBusted("BUSTED!", "PULLED FROM VEHICLE & ARRESTED BY LEONIDA VCPD", "#38bdf8", "POLICE");
+                            }
                         }
+                    } else if (p._copDoorPullTimer) {
+                        p._copDoorPullTimer = Math.max(0, p._copDoorPullTimer - dt * 1.5);
                     }
                     ped.shootCooldown = (ped.shootCooldown || 0) - dt;
-                    if (dPlayer < 325 && ped.shootCooldown <= 0 && (ped.stunnedTimer || 0) <= 0) {
+                    if (dPlayer < 350 && ped.shootCooldown <= 0 && (ped.stunnedTimer || 0) <= 0) {
                         const blocked = this.map.traceSegment2D
                             ? this.map.traceSegment2D(ped.x, ped.y, targetEnt.x, targetEnt.y, ped.z || 2.0).hit
                             : false;
@@ -14611,11 +14627,27 @@ class LeonidaGame {
                     const baseCopSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 104 : 96;
                     const copRunSpd = targetOnBeachOrParkForCop ? (baseCopSpd + 10) : baseCopSpd;
 
-                    const idealDist = copTarget.isCriminalNPC ? 95 : 28;
+                    const playerVeh = (!copTarget.isSearchPoint && !copTarget.isRemote && !copTarget.isCriminalNPC && p && p.inVehicle) ? p.inVehicle : null;
+                    const vehDoorReach = playerVeh ? Math.max(44, ((playerVeh.w || 56) * 0.50) + 16) : 28;
+                    let walkTargetX = copTarget.x;
+                    let walkTargetY = copTarget.y;
+                    let dWalkTarget = dTarget;
+                    if (playerVeh && Math.abs(playerVeh.speed || 0) < 75) {
+                        const vRx = -Math.sin(playerVeh.angle || 0);
+                        const vRy = Math.cos(playerVeh.angle || 0);
+                        const doorOff = ((playerVeh.h || 26) * 0.50) + 7;
+                        const sideSign = ((ped.x - playerVeh.x) * vRx + (ped.y - playerVeh.y) * vRy) >= 0 ? 1 : -1;
+                        walkTargetX = playerVeh.x + vRx * sideSign * doorOff;
+                        walkTargetY = playerVeh.y + vRy * sideSign * doorOff;
+                        dWalkTarget = Math.hypot(walkTargetX - ped.x, walkTargetY - ped.y);
+                    }
 
-                    if (dTarget > idealDist) {
+                    const idealDist = copTarget.isCriminalNPC ? 95 : (playerVeh ? 16 : 28);
+                    const checkDist = playerVeh ? dWalkTarget : dTarget;
 
-                        ped.angle = this.steerPedWithObstacleFeelers(ped, copTarget.x, copTarget.y);
+                    if (checkDist > idealDist && (!playerVeh || dTarget > vehDoorReach)) {
+
+                        ped.angle = this.steerPedWithObstacleFeelers(ped, walkTargetX, walkTargetY, playerVeh || copTarget.vehRef || null);
 
                         ped.x += Math.cos(ped.angle) * copRunSpd * dt;
 
@@ -14637,11 +14669,9 @@ class LeonidaGame {
 
                         } else if (!copTarget.isSearchPoint && !copTarget.isRemote && !copTarget.isCriminalNPC && !p.dead && !this.activeInterior && !((ped.bustedGraceTimer || 0) > 0)) {
 
-                            // Cops never bust a player inside a vehicle; on foot, arrest triggers below 25% HP (or faster at 1★ non-lethal baton arrest)!
+                            const maxHp = p.maxHp || 100;
 
                             if (!p.inVehicle) {
-
-                                const maxHp = p.maxHp || 100;
 
                                 if (p.hp < maxHp * (effWanted <= 1 ? 0.35 : 0.25)) {
 
@@ -14653,19 +14683,49 @@ class LeonidaGame {
 
                                 }
 
+                            } else if (dTarget <= vehDoorReach && Math.abs(p.inVehicle.speed || 0) < 65) {
+
+                                // Foot officer at driver/passenger door of a stopped or slow vehicle: wrench door open, brake vehicle, and yank suspect out!
+                                p.inVehicle.doorOpenTimer = Math.max(p.inVehicle.doorOpenTimer || 0, 0.45);
+                                p.inVehicle.vx *= Math.pow(0.08, dt);
+                                p.inVehicle.vy *= Math.pow(0.08, dt);
+                                p.inVehicle.speed *= Math.pow(0.08, dt);
+                                p._copDoorPullTimer = (p._copDoorPullTimer || 0) + dt;
+                                this.damagePlayer(24 * dt);
+                                if (p._copDoorPullTimer >= 0.55 || p.hp < maxHp * (effWanted <= 1 ? 0.45 : 0.30)) {
+                                    p._copDoorPullTimer = 0;
+                                    this.triggerWastedOrBusted("BUSTED!", "PULLED FROM VEHICLE & ARRESTED BY LEONIDA VCPD", "#38bdf8", "POLICE");
+                                }
+
                             }
 
                         }
 
                     }
 
+                    // If a 1★ suspect in a vehicle refuses to stop or evades an officer on foot within 280px, escalate to 2★ Vehicular Evasion
+                    if (playerVeh && effWanted === 1 && dTarget < 280 && Math.abs(playerVeh.speed || 0) >= 38) {
+                        this._vehEvadeTimer = (this._vehEvadeTimer || 0) + dt;
+                        if (this._vehEvadeTimer >= 1.8) {
+                            this._vehEvadeTimer = 0;
+                            this.setWantedLevel(2, { x: copTarget.x, y: copTarget.y }, true, playerVeh);
+                            this.addFloatingText(copTarget.x, copTarget.y - 34, "🚨 10-80 VEHICULAR EVASION — 2★!", "#ef4444");
+                            effWanted = 2;
+                        }
+                    }
+
                     ped.shootCooldown = (ped.shootCooldown || 0) - dt;
 
                     // Real-Life Proportional Force:
-                    // At 1★ (minor offense / unarmed suspect), VCPD officers pursue on foot to make a physical arrest (baton/BUSTED) without opening fire!
-                    // Lethal firearm engagement begins at 2★+ (or against armed NPC criminals).
+                    // At 1★ on foot (unarmed suspect), VCPD officers pursue to make a physical baton arrest without opening fire.
+                    // Against a suspect inside a 2-ton getaway vehicle (or at 2★+ / armed NPC criminals), officers open fire on the vehicle!
                     const maxCopShootDist = (targetOnBeachOrParkForCop || targetInWater) ? 385 : 325;
-                    if (!copTarget.isSearchPoint && (copTarget.isCriminalNPC || effWanted >= 2) && dTarget < maxCopShootDist && ped.shootCooldown <= 0 && (copTarget.isRemote || copTarget.isCriminalNPC || !this.activeInterior)) {
+                    const canShootTarget = Boolean(
+                        copTarget.isCriminalNPC ||
+                        effWanted >= 2 ||
+                        (copTarget.inVehicle && (!playerVeh || dTarget > vehDoorReach || Math.abs(playerVeh.speed || 0) >= 42))
+                    );
+                    if (!copTarget.isSearchPoint && canShootTarget && dTarget < maxCopShootDist && ped.shootCooldown <= 0 && (copTarget.isRemote || copTarget.isCriminalNPC || !this.activeInterior)) {
 
                         const blocked = this.map.traceSegment2D
 
@@ -17762,16 +17822,17 @@ class LeonidaGame {
                     if (!pr.fromPlayer && pr.npcFaction === "COP" && v.isPolice && p.inVehicle !== v) return false;
                     if (!pr.fromPlayer && pr.npcFaction === "CRIMINAL" && v.driver === "AI_CRIMINAL") return false;
                     if (!pr.fromPlayer && !pr.npcFaction && v.isPolice && p.inVehicle !== v) return false;
+                    const hitRad = (!pr.fromPlayer && p.inVehicle === v) ? Math.max(28, (v.w || 52) * 0.45) : 24;
                     const vdx = v.x - pr.x;
-                    if (vdx >= 24 || vdx <= -24) return false;
+                    if (vdx >= hitRad || vdx <= -hitRad) return false;
                     const vdy = v.y - pr.y;
-                    if (vdy >= 24 || vdy <= -24) return false;
+                    if (vdy >= hitRad || vdy <= -hitRad) return false;
 
                     // Do not let a vehicle immediately next to an NPC shooter swallow their bullet on spawn,
                     // nor swallow a bullet that is hitting the on-foot player right next to the car
                     if (!pr.fromPlayer && p.inVehicle !== v && (distTraveled < 44 || (!p.inVehicle && Math.hypot(p.x - pr.x, p.y - pr.y) < 16))) return false;
 
-                    if (vdx * vdx + vdy * vdy < 576) {
+                    if (vdx * vdx + vdy * vdy < hitRad * hitRad) {
                         const vehDmg = pr.isRocket
                             ? pr.damage * 1.35
                             : (pr.isFlame ? pr.damage * 0.85 : (pr.fromPlayer ? pr.damage * 0.34 : pr.damage * 0.42));

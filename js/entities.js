@@ -3049,9 +3049,12 @@ class Vehicle {
         // 3) Blocked by a solid building wall / palm row / fence within 440px (or up to 1450px when intercepting an off-road suspect across a beach/park/golf course) for > 1.35s
         // Note: When patrolling a Search Zone (`wantedTarget.isSearchPoint === true`), cruisers stay mobile on patrol unless blocked by an obstacle!
         const playerOnFootAtScene = !wantedTarget.isSearchPoint && !wantedTarget.inVehicle && distToPlayer < 175;
-        const playerBoxedNear = !wantedTarget.isSearchPoint && Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
+        const playerBoxedNear = !wantedTarget.isSearchPoint && Boolean(wantedTarget.inVehicle) && (
+            (Math.abs(wantedTarget.speed || 0) < 65 && distToPlayer < 155) ||
+            (Math.abs(wantedTarget.speed || 0) < 85 && distToPlayer < 220 && noProgress > 1.05)
+        );
         const blockedMaxDist = (targetInBeachOrParkExpanse && this.x >= coastalRoadMinX) ? 1450 : 440;
-        const blockedByWallNear = !wantedTarget.inVehicle && distToPlayer < blockedMaxDist && noProgress > 1.35;
+        const blockedByWallNear = (!wantedTarget.inVehicle || Math.abs(wantedTarget.speed || 0) < 85) && distToPlayer < blockedMaxDist && noProgress > 1.35;
 
         if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
             const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 64, wantedTarget);
@@ -3065,7 +3068,7 @@ class Vehicle {
             this.vx *= brakeMult;
             this.vy *= brakeMult;
             this.speed *= brakeMult;
-            const bailDelay = playerBoxedNear ? 0.55 : 0.18;
+            const bailDelay = playerBoxedNear ? 0.35 : 0.18;
             if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
                 this.aiBailTimer = 0;
                 this.approachNoProgress = 0;
@@ -3103,9 +3106,12 @@ class Vehicle {
             !wantedTarget.isSearchPoint &&
             clearOfBuildings && (
                 (wantedTarget.isCriminalNPC && wantedTarget.inVehicle) ||
-                (!wantedTarget.isCriminalNPC && (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2)
+                (!wantedTarget.isCriminalNPC && (
+                    (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2 ||
+                    (wantedTarget.inVehicle && distToPlayer < 260)
+                ))
             );
-        const maxShootDist = isTankUnit ? 420 : 275;
+        const maxShootDist = isTankUnit ? 420 : 285;
         if (canDriveByShoot && distToPlayer < maxShootDist && (!isTankUnit || distToPlayer > 75) && game && typeof game.fireWeapon === "function") {
             this.copDriveByTimer = (this.copDriveByTimer || 0) - dt;
             if (this.copDriveByTimer <= 0) {
@@ -3129,8 +3135,8 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            forceDirect ? 0.82 : 0.90,
-            Boolean(wantedTarget.inVehicle && targetOnRoad),
+            forceDirect ? 0.86 : 0.90,
+            Boolean(wantedTarget.inVehicle && (targetOnRoad || forceDirect)),
             forceDirect
         );
     }
