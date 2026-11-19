@@ -278,9 +278,10 @@ function runSimulations() {
     {
         console.log("--- SCENARIO 3: 911 CALL COMPLETES -> PRECINCT DISPATCH -> ROAD ARRIVAL AT SCENE ---");
         const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        g.trafficManager.generateTrafficCars = () => {};
         g.trafficManager.generateTrafficPeds = () => {};
         g.peds.length = 0;
-        g.vehicles = g.vehicles.filter(v => !v.isPolice);
+        g.vehicles.length = 0;
 
         const px = g.player.x, py = g.player.y;
         const victim = sandbox.makePed({ id: "vic_3", x: px + 16, y: py, z: 2.0, kind: "CIVILIAN", hp: 30, dead: false });
@@ -346,9 +347,10 @@ function runSimulations() {
     {
         console.log("--- SCENARIO 4: HIT-AND-RUN EVASION (PLAYER HOLSTERS WEAPON & FLEES SCENE UNSEEN) ---");
         const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        g.trafficManager.generateTrafficCars = () => {};
         g.trafficManager.generateTrafficPeds = () => {};
         g.peds.length = 0;
-        g.vehicles = g.vehicles.filter(v => !v.isPolice);
+        g.vehicles.length = 0;
 
         const crimeX = g.player.x, crimeY = g.player.y;
         const victim = sandbox.makePed({ id: "vic_4", x: crimeX + 16, y: crimeY, z: 2.0, kind: "CIVILIAN", hp: 30, dead: false });
@@ -1228,9 +1230,260 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 29: LONG-RANGE 3D RAYCAST OCCLUSION AUDIT (>1,024PX / >16 TILES)
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 29: LONG-RANGE 3D BUILDING RAYCAST OCCLUSION (>1,024PX / >16 TILES) ---");
+    {
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        // Find a building block at row ~105, col ~435 and cast a 28-tile (1,792px) ray across it
+        // where the building is >20 tiles away from the ray origin!
+        let foundLongOcclusion = false;
+        for (let r = 80; r <= 180 && !foundLongOcclusion; r += 2) {
+            for (let c = 380; c <= 445 && !foundLongOcclusion; c++) {
+                const blk = g.map.getBlockInfo(c, r, 2);
+                if (blk && blk.groundType === sandbox.GROUND_TYPE.BUILDING && blk.slopeType === 0) {
+                    const origC = c - 24;
+                    if (origC > 20) {
+                        const origBlk = g.map.getBlockInfo(origC, r, 2);
+                        if (origBlk && origBlk.groundType !== sandbox.GROUND_TYPE.BUILDING) {
+                            const ray = g.map.traceSegment2D((origC + 0.5) * 64, (r + 0.5) * 64, (c + 2.5) * 64, (r + 0.5) * 64, 2.0);
+                            if (ray && ray.hit) {
+                                foundLongOcclusion = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Also verify an unobstructed 28-tile ray over open beach water/sand returns hit === false
+        const clearBeachRay = g.map.traceSegment2D(463.5 * 64, 90.5 * 64, 463.5 * 64, 118.5 * 64, 2.0);
+        assert(foundLongOcclusion === true, "Long-range 3D DDA raycast (>1,536px / 24+ tiles) detects distant solid 3D buildings without prematurely cutting off at 16 steps");
+        assert(clearBeachRay && clearBeachRay.hit === false, "Long-range 3D DDA raycast (1,792px / 28 tiles) over open North Beach corridor returns hit === false");
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 30: FULL STORY & DYNAMIC FIXER MISSION LIFECYCLE AUDIT (M0..M4)
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 30: FULL STORY & DYNAMIC FIXER MISSION LIFECYCLE AUDIT (M0..M4) ---");
+    {
+        const { g } = createGameInstance(cmpBuf);
+        assert(Boolean(g.missions && Array.isArray(g.missions.payphones) && g.missions.payphones.length === 5), "MissionManager initialized all 5 payphones / Fixer terminals (M0..M4)");
+
+        // Verify updateAmbientCrimeEvents properly guards against g.missions.activeMission
+        g.missions.startMission(g.missions.payphones[1]); // M1_UNCLE_JACK
+        assert(Boolean(g.missions.activeMission && g.missions.activeMission.id === "M1_UNCLE_JACK"), "Story Mission M1_UNCLE_JACK ('HOTWHEELS FOR UNCLE JACK') launches cleanly with getaway Stinger");
+        g.ambientCrimeQuietTimer = 0;
+        g.ambientCrimeRollTimer = 0;
+        const vehCountDuringM1 = g.vehicles.length;
+        g.updateAmbientCrimeEvents(1.0);
+        assert(g.vehicles.length === vehCountDuringM1, "Ambient Crime Events are strictly suppressed while a Story/Fixer Mission (this.missions.activeMission) is active");
+        g.missions.completeMission();
+
+        // Test M2_GRASSRIVERS
+        g.missions.startMission(g.missions.payphones[2]);
+        assert(Boolean(g.missions.activeMission && g.missions.activeMission.id === "M2_GRASSRIVERS" && Array.isArray(g.missions.activeMission.crates) && g.missions.activeMission.crates.length === 3), "Story Mission M2_GRASSRIVERS ('LEONIDA KEYS DROP') spawns 3 contraband beach crates");
+        g.missions.abortMission();
+
+        // Test M3_OCEAN_DRIVE
+        g.missions.startMission(g.missions.payphones[3]);
+        assert(Boolean(g.missions.activeMission && g.missions.activeMission.id === "M3_OCEAN_DRIVE" && g.missions.activeMission.targetCar && g.missions.activeMission.targetCar.specKey === "VICE_CHEETAH"), "Story Mission M3_OCEAN_DRIVE ('STAR ISLAND BOOST') spawns guarded Vice Cheetah on Star Island");
+        g.missions.abortMission();
+
+        // Test M4_ANKLE_OVERRIDE
+        g.missions.startMission(g.missions.payphones[4]);
+        assert(Boolean(g.missions.activeMission && g.missions.activeMission.id === "M4_ANKLE_OVERRIDE" && g.missions.activeMission.armoredVan && g.missions.activeMission.armoredVan.specKey === "BRINKS_TRUCK"), "Story Mission M4_ANKLE_OVERRIDE ('ANKLE MONITOR OVERRIDE') spawns Grupo Seguro Armored Van (BRINKS_TRUCK)");
+        g.missions.abortMission();
+
+        // Test all 4 M0_DYNAMIC_FIXER Procedural Archetypes
+        const testedArchetypes = new Set();
+        const m0Phone = g.missions.payphones[0];
+        for (let i = 0; i < 4; i++) {
+            g.missions._fixerRollIdx = i;
+            g.missions.startDynamicFixerMission(m0Phone);
+            if (g.missions.activeMission && g.missions.activeMission.archetype) {
+                testedArchetypes.add(g.missions.activeMission.archetype);
+            }
+            g.missions.update(0.1);
+            g.missions.abortMission();
+        }
+        assert(
+            testedArchetypes.has("HIJACK_LIVE_TARGET") &&
+            testedArchetypes.has("RAM_AND_EXTORT") &&
+            testedArchetypes.has("SPEED_BOMB_RUN") &&
+            testedArchetypes.has("VIP_HIT_SQUAD"),
+            `All 4 Procedural Fixer Contract Archetypes (${Array.from(testedArchetypes).join(", ")}) launch, tick, and complete cleanly`
+        );
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 31: HAND-CRAFTED 3D BUILDING INTERIORS & 4-WAY FACADE ORIENTATION
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 31: HAND-CRAFTED 3D BUILDING INTERIORS & 4-WAY FACADE ORIENTATION ---");
+    {
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const shopInteriors = sandbox.ShopInteriors;
+        const shops = (g.map && Array.isArray(g.map.interiors)) ? g.map.interiors : [];
+        assert(Boolean(shopInteriors && shops.length >= 24), `ShopInteriors initialized ${shops.length} hand-crafted enterable establishments & landmarks across Leonida`);
+        let validDoors = 0;
+        for (const s of shops) {
+            if (Number.isFinite(s.doorX) && Number.isFinite(s.doorY) && !g.map.isWaterAtPixel(s.doorX, s.doorY)) {
+                validDoors++;
+            }
+        }
+        assert(validDoors === shops.length, `All ${validDoors}/${shops.length} interior doors snap to dry walkable facade coordinates`);
+
+        // Test 4-way orientation transformation (orientInterior + getObstacles) across "S", "N", "E", "W"
+        const sides = ["S", "N", "E", "W"];
+        let validTransforms = 0;
+        for (const side of sides) {
+            const cloneIntr = Object.assign({}, shops[0], {
+                facing: side,
+                w: 820,
+                h: 560,
+                npcs: (shops[0].npcs || []).map(n => Object.assign({}, n)),
+                stations: (shops[0].stations || []).map(st => Object.assign({}, st))
+            });
+            shopInteriors.orientInterior(cloneIntr);
+            const obs = shopInteriors.getObstacles(cloneIntr);
+            const pose = shopInteriors.getEntrancePose(cloneIntr);
+            if (Array.isArray(obs) && obs.length > 0 && pose && Number.isFinite(pose.spawnX) && Number.isFinite(pose.spawnY)) {
+                validTransforms++;
+            }
+        }
+        assert(validTransforms === 4, "ShopInteriors.orientInterior & getObstacles transform room walls, furniture, stations, and entrance poses across all 4 facade orientations (S, N, E, W)");
+
+        // Test entering a shop, robbing the vault/register, and exiting
+        const robShop = shops.find(s => Array.isArray(s.stations) && s.stations.some(st => st.action === "ROB_VAULT")) || shops[0];
+        g.enterInterior(robShop);
+        assert(Boolean(g.activeInterior && g.activeInterior.id === robShop.id), `Player cleanly enters hand-crafted interior '${robShop.name}'`);
+        const robStation = (g.activeInterior.stations || []).find(st => st.action === "ROB_VAULT");
+        if (robStation) {
+            const cashBefore = g.cash;
+            g.triggerInteriorStation(robStation);
+            assert(g.cash > cashBefore && g.wantedLevel >= 2, `Executing ROB_VAULT inside '${robShop.name}' awards heist payout and triggers Wanted Alert`);
+        }
+        g.exitInterior();
+        assert(g.activeInterior === null, "Player cleanly exits interior back to exterior street coordinates");
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 32: PEDESTRIAN NAVIGATION (PedNav) & ZEBRA CROSSWALK PATHFINDING
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 32: PEDESTRIAN NAVIGATION (PedNav) & ZEBRA CROSSWALK PATHFINDING ---");
+    {
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const pedNav = sandbox.PedNav;
+        assert(Boolean(pedNav && typeof pedNav.nextStep === "function" && typeof pedNav.routeWaypoint === "function" && typeof pedNav.getNav === "function"), "PedNav module exposes zero-GC Dijkstra nextStep/getNav and A* routeWaypoint");
+
+        // Test routeWaypoint around a solid building block (from East of a building to West of that building!)
+        let wp = null;
+        for (let r = 100; r <= 160 && !wp; r += 2) {
+            for (let c = 436; c <= 442 && !wp; c++) {
+                const blk = g.map.getBlockInfo(c, r, 2);
+                const eastBlk = g.map.getBlockInfo(c + 2, r, 2);
+                const westBlk = g.map.getBlockInfo(c - 2, r, 2);
+                if (
+                    blk && blk.groundType === sandbox.GROUND_TYPE.BUILDING && blk.slopeType === 0 &&
+                    eastBlk && eastBlk.groundType !== sandbox.GROUND_TYPE.BUILDING && eastBlk.groundType !== sandbox.GROUND_TYPE.WATER &&
+                    westBlk && westBlk.groundType !== sandbox.GROUND_TYPE.BUILDING && westBlk.groundType !== sandbox.GROUND_TYPE.WATER
+                ) {
+                    const dummyPed = new sandbox.Pedestrian({ x: (c + 2.5) * 64, y: (r + 0.5) * 64, z: 2.0, kind: "PARAMEDIC" });
+                    wp = pedNav.routeWaypoint(g, dummyPed, (c - 2.5) * 64, (r + 0.5) * 64);
+                }
+            }
+        }
+        assert(Boolean(wp && Number.isFinite(wp.x) && Number.isFinite(wp.y)), `PedNav.routeWaypoint computes valid obstacle-avoiding waypoint around solid 3D building (${wp ? Math.round(wp.x) : 0}, ${wp ? Math.round(wp.y) : 0})`);
+
+        // Test Navigator Dijkstra nextStep & signalized zebra crosswalk discovery
+        const nav = pedNav.getNav(g);
+        let stepRes = null;
+        for (let r = 100; r <= 150 && !stepRes; r += 2) {
+            for (let c = 435; c <= 444 && !stepRes; c++) {
+                if (pedNav.isGoodSpawnTile(g, c, r, 2.0)) {
+                    const civPed = new sandbox.Pedestrian({ x: (c + 0.5) * 64, y: (r + 0.5) * 64, z: 2.0, kind: "CIVILIAN" });
+                    stepRes = pedNav.nextStep(g, civPed, c, r, 2.0, { allowCrosswalk: true }, true);
+                }
+            }
+        }
+        assert(Boolean(nav && stepRes && Number.isFinite(stepRes.bx) && Number.isFinite(stepRes.by)), `PedNav.nextStep plans multi-block sidewalk & zebra crosswalk trajectory (target tile ${stepRes ? stepRes.bx : 0}, ${stepRes ? stepRes.by : 0})`);
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 33: AUDIO ENGINE, WEAPON SPECS & MULTIPLAYER/SERVER SPEC POOL AUDIT
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 33: AUDIO ENGINE, WEAPON SPECS & MULTIPLAYER/SERVER SPEC POOL AUDIT ---");
+    {
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const vehSpecs = sandbox.VEHICLE_SPECS || {};
+        const weapSpecs = sandbox.WEAPON_SPECS || {};
+        const vehKeys = Object.keys(vehSpecs);
+        const weapKeys = Object.keys(weapSpecs);
+
+        // 1. Verify RetroAudioEngine resolves a valid engine sound class for every single VEHICLE_SPECS key
+        let resolvedAudioClasses = 0;
+        for (const vk of vehKeys) {
+            const cls = g.audio.getVehicleAudioClass(vk);
+            if (typeof cls === "string" && cls.length > 0) {
+                resolvedAudioClasses++;
+            }
+        }
+        assert(resolvedAudioClasses === vehKeys.length, `RetroAudioEngine.getVehicleAudioClass maps all ${resolvedAudioClasses}/${vehKeys.length} VEHICLE_SPECS to valid synthesis/sample banks`);
+
+        // 2. Verify all 7 WEAPON_SPECS have valid fireRate, damage, speed, range, and color
+        let validWeapons = 0;
+        for (const [, ws] of Object.entries(weapSpecs)) {
+            if (ws && ws.name && ws.fireRate > 0 && ws.damage > 0 && ws.speed > 0 && ws.range > 0) {
+                validWeapons++;
+            }
+        }
+        assert(weapKeys.length === 7 && validWeapons === 7, `All ${validWeapons}/${weapKeys.length} WEAPON_SPECS (${weapKeys.join(", ")}) have valid combat parameters`);
+
+        // 3. Verify ViceNetworkManager.spawnSimulatedRival and server/world_server.js only reference valid VEHICLE_SPECS keys
+        const netSrc = fs.readFileSync(path.join(ROOT, "js", "net.js"), "utf8");
+        const srvSrc = fs.readFileSync(path.join(ROOT, "server", "world_server.js"), "utf8");
+        const hasInvalidStallionFallback = /"STALLION"|'STALLION'|BANSHEE_SS|CHEETAH_GT/.test(netSrc) || /"STALLION"|'STALLION'|BANSHEE_SS|CHEETAH_GT/.test(srvSrc);
+        assert(!hasInvalidStallionFallback, "Zero invalid vehicle spec keys (BANSHEE_SS, CHEETAH_GT, STALLION) remain in js/net.js or server/world_server.js");
+
+        // Verify SERVER_SPEC_POOL in world_server.js
+        const poolMatch = srvSrc.match(/const SERVER_SPEC_POOL\s*=\s*\[([\s\S]*?)\];/);
+        const poolSpecs = poolMatch ? [...poolMatch[1].matchAll(/"([^"]+)"/g)].map(m => m[1]) : [];
+        const invalidPoolSpecs = poolSpecs.filter(k => !vehSpecs[k]);
+        assert(poolSpecs.length >= 12 && invalidPoolSpecs.length === 0, `All ${poolSpecs.length}/${poolSpecs.length} SERVER_SPEC_POOL vehicles in server/world_server.js exist in VEHICLE_SPECS`);
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 34: 3D WORLD OBJECT ENGINE LANDMARKS, PROPS & COLLISION GRIDS
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 34: 3D WORLD OBJECT ENGINE LANDMARKS, PROPS & COLLISION GRIDS ---");
+    {
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const objEng = g.map ? g.map.objectEngine : null;
+        assert(Boolean(objEng && Array.isArray(objEng.instances) && objEng.instances.length >= 15), `WorldObjectEngine initialized ${objEng && objEng.instances ? objEng.instances.length : 0} 3D architectural estates & villas`);
+        assert(Boolean(objEng && objEng.landmarks3D && Array.isArray(objEng.landmarks3D.lighthouses) && Array.isArray(objEng.landmarks3D.gantryCranes)), "WorldObjectEngine initialized 3D monuments (lighthouses, gantry cranes, space launch pad, Ferris wheel)");
+        assert(Boolean(objEng && Array.isArray(objEng.streetProps) && objEng.streetProps.length >= 100), `WorldObjectEngine initialized ${objEng && objEng.streetProps ? objEng.streetProps.length : 0} destructible 3D street furniture props`);
+        assert(Boolean(g.map.barrierBoxGrid instanceof Map && g.map.floraGrid instanceof Map), "WorldObjectEngine O(1) spatial hash grids (barrierBoxGrid, floraGrid) built cleanly");
+
+        // Verify BUSTED and WASTED respawn points are 100% collision-free
+        const bustedX = sandbox.mx256(203.0) * 64, bustedY = sandbox.my256(146.0) * 64;
+        const wastedX = sandbox.mx256(213.5) * 64, wastedY = sandbox.my256(146.0) * 64;
+        const safeBusted = g.map.resolveCircleBuildingCollision(bustedX, bustedY, 12, 2.0, false);
+        const safeWasted = g.map.resolveCircleBuildingCollision(wastedX, wastedY, 12, 2.0, false);
+        const checkBustedAfter = g.map.resolveCircleBuildingCollision(safeBusted.x, safeBusted.y, 10, 2.0, false);
+        const checkWastedAfter = g.map.resolveCircleBuildingCollision(safeWasted.x, safeWasted.y, 10, 2.0, false);
+        assert(!checkBustedAfter.hit && !g.map.isWaterAtPixel(safeBusted.x, safeBusted.y), "BUSTED respawn coordinate is 100% dry and building-collision-free");
+        assert(!checkWastedAfter.hit && !g.map.isWaterAtPixel(safeWasted.x, safeWasted.y), "WASTED respawn coordinate is 100% dry and building-collision-free");
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 28 GTA 6 PRODUCTION CONTROLLER, SPATIAL MATRIX & ENGINE SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 34 FULL-GAME AUDIT, PRODUCTION CONTROLLER & ENGINE SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

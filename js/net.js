@@ -524,7 +524,7 @@ class ViceNetworkManager {
                             kind: "VEH_EXIT",
                             vehId: v.id,
                             seat: 0,
-                            specKey: v.specKey || "STALLION",
+                            specKey: v.specKey || "MINT_STALLION",
                             x: Math.round(v.x),
                             y: Math.round(v.y),
                             z: Math.round((v.z || 2.0) * 100) / 100,
@@ -671,7 +671,7 @@ class ViceNetworkManager {
                     kind: "VEH_EXIT",
                     vehId: v.id,
                     seat: 0,
-                    specKey: v.specKey || "STALLION",
+                    specKey: v.specKey || "MINT_STALLION",
                     x: Math.round(v.x),
                     y: Math.round(v.y),
                     z: Math.round((v.z || 2.0) * 100) / 100,
@@ -1887,7 +1887,7 @@ class ViceNetworkManager {
             if (rp) {
                 rp.veh = Object.assign(rp.veh || {}, {
                     id: pkt.vehId,
-                    specKey: pkt.specKey || (v && v.specKey) || "STALLION",
+                    specKey: pkt.specKey || (v && v.specKey) || "MINT_STALLION",
                     seat: rSeat
                 });
                 // Immediately align the remote player's interpolated coordinates with the entered vehicle
@@ -2309,7 +2309,7 @@ class ViceNetworkManager {
                 (v.towedByTruck ? 256 : 0);
             const row = [
                 v.id,
-                v.specKey || "STALLION",
+                v.specKey || "MINT_STALLION",
                 Math.round(v.x),
                 Math.round(v.y),
                 Math.round((v.z || 2.0) * 100) / 100,
@@ -2867,7 +2867,7 @@ class ViceNetworkManager {
             if (rp.veh && rp.veh.id && this.game && Array.isArray(this.game.vehicles)) {
                 let wv = this.game.vehicles.find((v) => v.id === rp.veh.id);
                 if (!wv && typeof Vehicle === "function") {
-                    wv = new Vehicle(rp.veh.id, rp.veh.specKey || "STALLION", rp.x, rp.y, rp.angle);
+                    wv = new Vehicle(rp.veh.id, rp.veh.specKey || "MINT_STALLION", rp.x, rp.y, rp.angle);
                     this.game.vehicles.push(wv);
                     if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
                         this.game.rebuildVehicleSpatialGrid();
@@ -3023,7 +3023,7 @@ class ViceNetworkManager {
             vehData = {
                 id: v.id || "player_car",
                 seat: p.seatIndex || 0,
-                specKey: v.specKey || "STALLION",
+                specKey: v.specKey || "MINT_STALLION",
                 sprId: v.sprId || "66",
                 remapIdx: v.remapIdx || 0,
                 w: v.w || 48,
@@ -3226,7 +3226,7 @@ class ViceNetworkManager {
         const p = this.game.player;
         const botCount = Array.from(this.remotePlayers.values()).filter((r) => r.isBot).length;
         const callSigns = ["TOMMY_V #86", "RICO_GT #305", "VALERIA #97", "DANTE_VC #404"];
-        const specs = ["BANSHEE_SS", "STINGER_CABRIO", "CHEETAH_GT", "SUPERBIKE"];
+        const specs = ["BANSHEE_GT", "STINGER_CABRIO", "VICE_CHEETAH", "SUPERBIKE"];
         const idx = botCount % callSigns.length;
         const botId = `bot_rival_${Date.now()}_${idx}`;
 

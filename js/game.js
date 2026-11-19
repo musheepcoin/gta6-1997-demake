@@ -2159,7 +2159,7 @@ class LeonidaGame {
                         kind: "VEH_EXIT",
                         vehId: prevVeh.id,
                         seat: 0,
-                        specKey: prevVeh.specKey || "STALLION",
+                        specKey: prevVeh.specKey || "MINT_STALLION",
                         x: Math.round(prevVeh.x),
                         y: Math.round(prevVeh.y),
                         z: Math.round((prevVeh.z || 2.0) * 100) / 100,
@@ -6018,7 +6018,7 @@ class LeonidaGame {
 
                         vehId: v.id,
 
-                        specKey: v.specKey || "STALLION",
+                        specKey: v.specKey || "MINT_STALLION",
 
                         seat: mySeat,
 
@@ -6314,7 +6314,7 @@ class LeonidaGame {
 
                     vehId: closest.id,
 
-                    specKey: closest.specKey || "STALLION",
+                    specKey: closest.specKey || "MINT_STALLION",
 
                     seat: freeSeat,
 
@@ -9303,7 +9303,7 @@ class LeonidaGame {
 
                 vehId: v.id,
 
-                specKey: v.specKey || "STALLION",
+                specKey: v.specKey || "MINT_STALLION",
 
                 x: Math.round(v.x),
 
@@ -9730,7 +9730,7 @@ class LeonidaGame {
                         kind: "VEH_EXIT",
                         vehId: prevVeh.id,
                         seat: 0,
-                        specKey: prevVeh.specKey || "STALLION",
+                        specKey: prevVeh.specKey || "MINT_STALLION",
                         x: Math.round(prevVeh.x),
                         y: Math.round(prevVeh.y),
                         z: Math.round((prevVeh.z || 2.0) * 100) / 100,
@@ -9916,6 +9916,12 @@ class LeonidaGame {
 
                 p.y = my256(146.0) * TILE_SIZE;
 
+            }
+
+            if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                const safeSpawn = this.map.resolveCircleBuildingCollision(p.x, p.y, 12, 2.0, false);
+                p.x = safeSpawn.x;
+                p.y = safeSpawn.y;
             }
 
             p.z = this.map.getHeightAtPixel(p.x, p.y, 4.0);
@@ -10255,7 +10261,7 @@ class LeonidaGame {
 
         if ((this.wantedLevel || 0) >= 2) return;
 
-        if (this.missionMgr && this.missionMgr.activeMission) return;
+        if (this.missions && this.missions.activeMission) return;
 
 
 
@@ -14860,7 +14866,7 @@ class LeonidaGame {
                                 this.net.broadcastWorldEvent({
                                     kind: "VEH_EXIT",
                                     vehId: stolenBack.id,
-                                    specKey: stolenBack.specKey || "STALLION",
+                                    specKey: stolenBack.specKey || "MINT_STALLION",
                                     seat: prevSeat,
                                     x: Math.round(stolenBack.x),
                                     y: Math.round(stolenBack.y),
@@ -15458,7 +15464,7 @@ class LeonidaGame {
                                     this.net.broadcastWorldEvent({
                                         kind: "VEH_EXIT",
                                         vehId: targetFire.id,
-                                        specKey: targetFire.specKey || "STALLION",
+                                        specKey: targetFire.specKey || "MINT_STALLION",
                                         x: Math.round(targetFire.x),
                                         y: Math.round(targetFire.y),
                                         z: Math.round((targetFire.z || 2.0) * 100) / 100,

@@ -46,7 +46,7 @@ const CURRENT_BUILD = (() => {
             if (m && m[1]) return m[1];
         }
     } catch (_e) {}
-    return "101_219";
+    return "101_220";
 })();
 
 const serverMap = new global.LeonidaMap();
@@ -772,7 +772,7 @@ function handleClientPacket(socket, pkt) {
                 (v.hDent ? 16 : 0);
             const row = [
                 v.id,
-                v.specKey || "STALLION",
+                v.specKey || "MINT_STALLION",
                 Math.round(pkt.x),
                 Math.round(pkt.y),
                 Math.round((pkt.z || 2.0) * 100) / 100,
@@ -886,7 +886,7 @@ function handleClientPacket(socket, pkt) {
             const existing = room.modifiedVehs[pkt.vehId] || room.vehs[pkt.vehId];
             const row = existing ? existing.slice() : [
                 pkt.vehId,
-                pkt.specKey || "STALLION",
+                pkt.specKey || "MINT_STALLION",
                 Math.round(pkt.x || 0),
                 Math.round(pkt.y || 0),
                 Math.round((pkt.z || 2.0) * 100) / 100,
@@ -918,7 +918,7 @@ function handleClientPacket(socket, pkt) {
             const existing = room.modifiedVehs[pkt.vehId] || room.vehs[pkt.vehId];
             const row = existing ? existing.slice() : [
                 pkt.vehId,
-                pkt.specKey || "STALLION",
+                pkt.specKey || "MINT_STALLION",
                 Math.round(pkt.x || 0),
                 Math.round(pkt.y || 0),
                 Math.round((pkt.z || 2.0) * 100) / 100,
@@ -1834,7 +1834,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         let y = row[3];
         let z = row[4] || 2.0;
         let a = row[5] || 0;
-        const specKey = row[1] || "STALLION";
+        const specKey = row[1] || "MINT_STALLION";
         const sirenActive = Boolean(flags & 2);
 
         // Handle Municipal Fleet scene work & station return (EMS, FIRE, TOW)

@@ -659,3 +659,6 @@ const PedNav = (function () {
 
     return { nextStep, stats, getNav, isGoodSpawnTile, routeWaypoint };
 })();
+if (typeof window !== "undefined") {
+    window.PedNav = PedNav;
+}

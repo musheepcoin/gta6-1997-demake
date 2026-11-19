@@ -3591,7 +3591,7 @@ class Vehicle {
                                 game.net.broadcastWorldEvent({
                                     kind: "VEH_EXIT",
                                     vehId: burningCar.id,
-                                    specKey: burningCar.specKey || "STALLION",
+                                    specKey: burningCar.specKey || "MINT_STALLION",
                                     x: Math.round(burningCar.x),
                                     y: Math.round(burningCar.y),
                                     z: Math.round((burningCar.z || 2.0) * 100) / 100,

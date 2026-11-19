@@ -6913,7 +6913,9 @@ class LeonidaMap {
             return { hit: false, x: destPxX, y: destPxY };
         }
 
-        const MAX_STEPS = 16;
+        // Dynamic DDA step budget scaled to segment length so long-range rays (>1,024px / >16 tiles)
+        // never prematurely terminate at 16 steps and return false line-of-sight through distant buildings.
+        const MAX_STEPS = Math.max(24, Math.min(96, Math.ceil(segLen * 2.2) + 4));
         let side = 0;
         for (let istep = 0; istep < MAX_STEPS; ++istep) {
             if (sideDistX < sideDistY) {
