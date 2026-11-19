@@ -4960,6 +4960,8 @@ class Pedestrian {
         this.calling911Timer = props.calling911Timer || 0;
         this.calling911Stars = props.calling911Stars || 0;
         this.calling911Pos = props.calling911Pos || null;
+        this.surrenderTimer = props.surrenderTimer || 0;
+        this.personality = props.personality || "CAUTIOUS";
         this.panicTimer = props.panicTimer || 0;
         this.threatX = props.threatX;
         this.threatY = props.threatY;
@@ -4982,6 +4984,7 @@ class Pedestrian {
     computeState() {
         if (this.dead) return PED_STATE.DEAD;
         if ((this.stunnedTimer || 0) > 0) return PED_STATE.STUNNED;
+        if ((this.surrenderTimer || 0) > 0) return PED_STATE.STANDING_STILL;
         if ((this.exitAnimTimer || 0) > 0) return PED_STATE.EXITING_CAR;
         if ((this.slideCarTimer || 0) > 0) return PED_STATE.SLIDE_ON_CAR;
         if ((this.panicTimer || 0) > 0 || (this.burnTimer || 0) > 0 || this.kind === "COP" || this.kind === "HOSTILE") {

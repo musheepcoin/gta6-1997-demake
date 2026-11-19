@@ -2636,12 +2636,18 @@ class LeonidaGame {
 
 
 
-            // Toggle Lucia's Iconic Red Heist Bandana Mask (B)
+            // Toggle Lucia's Iconic Red Heist Bandana Mask / Vehicle Trunk / Exotic GPS Jammer (B)
 
             if (code === "KeyB") {
 
                 this.toggleBandana();
 
+            }
+
+            // GTA 6 Unified Focus Mode / Eagle-Eye Tactical Burst [L or CapsLock]
+            if ((code === "KeyL" || code === "CapsLock") && !e.repeat) {
+                e.preventDefault();
+                this.triggerFocusMode();
             }
 
 
@@ -4120,7 +4126,32 @@ class LeonidaGame {
         return { ok: false };
     }
 
+    triggerFocusMode() {
+        if (this.director && typeof this.director.activateFocusMode === "function") {
+            return this.director.activateFocusMode();
+        }
+        return { ok: false };
+    }
+
+    tryIntimidateStreetPed(maxDist = 110) {
+        if (this.director && typeof this.director.tryIntimidateStreetPed === "function") {
+            return this.director.tryIntimidateStreetPed(maxDist);
+        }
+        return { ok: false };
+    }
+
     toggleBandana(forceState = null) {
+        if (
+            forceState === null &&
+            this.player &&
+            this.player.inVehicle &&
+            (this.player.inVehicle.gpsTrackerTimer || 0) > 0 &&
+            this.director &&
+            typeof this.director.tryJamVehicleGpsTracker === "function"
+        ) {
+            this.director.tryJamVehicleGpsTracker(this.player.inVehicle);
+            return;
+        }
         if (forceState === null && this.director && typeof this.director.findNearestTrunkVehicle === "function") {
             const trunkVeh = this.director.findNearestTrunkVehicle(58);
             if (trunkVeh) {
@@ -6257,6 +6288,9 @@ class LeonidaGame {
         closest._worldModified = true;
         closest.isStaticParked = false;
         closest.lastPlayerDriven = true;
+        if (freeSeat === 0 && this.director && typeof this.director.onPlayerEnteredVehicle === "function") {
+            this.director.onPlayerEnteredVehicle(closest, Boolean(wasOccupied));
+        }
         if (wasOccupied || closest.isEstateCar || closest.isPolice) {
             if (typeof this.recordFactionGrudge === "function") {
                 this.recordFactionGrudge("STEAL_CAR", closest.name || "vehicle", Boolean(closest.isPolice));
@@ -7403,6 +7437,17 @@ class LeonidaGame {
             }
 
         } else {
+
+            // GTA 6 Street Hold-Up Intimidation when armed with a firearm on foot [G / V]
+            if (p.weapon && p.weapon !== "FIST" && this.director && typeof this.director.tryIntimidateStreetPed === "function") {
+                const holdup = this.director.tryIntimidateStreetPed(115);
+                if (holdup && holdup.ok) {
+                    if (this.audio && typeof this.audio.playBeep === "function") {
+                        this.audio.playBeep(480, 0.08, "sawtooth", 0.08);
+                    }
+                    return;
+                }
+            }
 
             // Iconic 1997 DMA Design GTA 1 on-foot Burp / Fart!
 
@@ -9513,6 +9558,13 @@ class LeonidaGame {
         if (reward > 0) {
             this.addCash(reward, label);
         }
+        if (this.director) {
+            if (ped.kind === "GATOR" && typeof this.director.onGatorWrangled === "function") {
+                this.director.onGatorWrangled(ped);
+            } else if ((ped.kind === "COP" || ped.kind === "CRIMINAL") && typeof this.director.addFocusCharge === "function") {
+                this.director.addFocusCharge(18);
+            }
+        }
 
         this.lastKillTime = performance.now() * 0.001;
 
@@ -10063,10 +10115,14 @@ class LeonidaGame {
         }
 
         const spawnedPellets = [];
+        const focusActive = Boolean(isPlayer && !fromJason && this.director && (this.director.focusActiveTimer || 0) > 0);
+        const effSpread = focusActive ? (spec.spread || 0) * 0.15 : (spec.spread || 0);
+        const effSpeed = focusActive ? (spec.speed || 600) * 1.28 : (spec.speed || 600);
+        const effDamage = focusActive ? Math.round((spec.damage || 25) * 1.35) : (spec.damage || 25);
 
         for (let i = 0; i < count; i++) {
 
-            const a = angle + (Math.random() - 0.5) * spec.spread;
+            const a = angle + (Math.random() - 0.5) * effSpread;
 
             const proj = {
 
@@ -10076,13 +10132,13 @@ class LeonidaGame {
 
                 z: shooterZ,
 
-                vx: Math.cos(a) * spec.speed,
+                vx: Math.cos(a) * effSpeed,
 
-                vy: Math.sin(a) * spec.speed,
+                vy: Math.sin(a) * effSpeed,
 
                 angle: a,
 
-                damage: spec.damage,
+                damage: effDamage,
 
                 rangeLeft: spec.range,
 
@@ -14025,6 +14081,24 @@ class LeonidaGame {
             }
             if (ped._isCarjackVictimCaller) {
                 ped._isCarjackVictimCaller = false;
+            }
+
+            // GTA 6 Street Hold-Up Intimidation / Surrender State ("HANDS UP!")
+            if ((ped.surrenderTimer || 0) > 0) {
+                ped.surrenderTimer = Math.max(0, ped.surrenderTimer - dt);
+                ped.speed = 0;
+                if (p && !p.dead) {
+                    ped.angle = Math.atan2(p.y - ped.y, p.x - ped.x);
+                }
+                if (ped.surrenderTimer <= 0) {
+                    ped.panicTimer = 6.0;
+                    if (p) {
+                        ped.threatX = p.x;
+                        ped.threatY = p.y;
+                        ped.angle = Math.atan2(ped.y - p.y, ped.x - p.x);
+                    }
+                }
+                continue;
             }
 
 

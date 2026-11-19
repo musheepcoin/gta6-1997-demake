@@ -17119,7 +17119,7 @@ class RetroRenderer {
             }
         }
 
-        // E. BOTTOM-CENTER MISSION OBJECTIVE & TIMER IN SUB2.FON (when mission active) OR GTA 6 VEHICLE TRUNK PROMPT [B]
+        // E. BOTTOM-CENTER MISSION OBJECTIVE & TIMER IN SUB2.FON (when mission active) OR GTA 6 VEHICLE TRUNK / GPS JAMMER PROMPT [B]
         if (game.missions.activeMission) {
             const objText = objEl ? (objEl.textContent || "").trim().toUpperCase() : "";
             const timerText = timerEl ? (timerEl.textContent || "").trim().toUpperCase() : "";
@@ -17127,6 +17127,9 @@ class RetroRenderer {
                 const fullLine = timerText ? `${objText}  ${timerText}` : objText;
                 this.drawGta1FontString(ctx, "SUB2", fullLine, W * 0.5, H - 24 * s, s, "center");
             }
+        } else if (p.inVehicle && (p.inVehicle.gpsTrackerTimer || 0) > 0) {
+            const jamLabel = `[B] JAM EXOTIC GPS TRACKER (${Math.ceil(p.inVehicle.gpsTrackerTimer)}S LEFT)`;
+            this.drawGta1FontString(ctx, "SUB2", jamLabel, W * 0.5, H - 24 * s, s * 0.85, "center");
         } else if (game.director && typeof game.director.findNearestTrunkVehicle === "function") {
             const nearTrunkVeh = game.director.findNearestTrunkVehicle(54);
             if (nearTrunkVeh) {
@@ -17135,6 +17138,110 @@ class RetroRenderer {
                     : "[B] OPEN TRUNK: ARSENAL STASH & DISGUISE";
                 this.drawGta1FontString(ctx, "SUB2", trunkLabel, W * 0.5, H - 24 * s, s * 0.85, "center");
             }
+        }
+
+        // F. GTA 6 FOCUS MODE EAGLE-EYE TACTICAL LASER & WEAK-POINT RETICLES + STREET NPC STATUS BADGES
+        if (!game.activeInterior && !p.dead && typeof this.worldToScreen === "function") {
+            const focusOn = Boolean(game.director && (game.director.focusActiveTimer || 0) > 0);
+            if (focusOn) {
+                const pEnt = p.inVehicle || p;
+                const pScr = this.worldToScreen(pEnt.x, pEnt.y, (pEnt.z || 2.0) + 0.15);
+                const aimAng = p.angle || 0;
+                const endWorldX = pEnt.x + Math.cos(aimAng) * 260;
+                const endWorldY = pEnt.y + Math.sin(aimAng) * 260;
+                const endScr = this.worldToScreen(endWorldX, endWorldY, (pEnt.z || 2.0) + 0.15);
+                ctx.save();
+                ctx.strokeStyle = "rgba(0, 240, 255, 0.72)";
+                ctx.lineWidth = 1.6;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(pScr.x, pScr.y);
+                ctx.lineTo(endScr.x, endScr.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+
+            if (Array.isArray(game.peds)) {
+                ctx.save();
+                ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                for (let i = 0; i < game.peds.length; i++) {
+                    const ped = game.peds[i];
+                    if (!ped || ped.dead) continue;
+                    const d = Math.hypot(ped.x - p.x, ped.y - p.y);
+                    if (d > 380) continue;
+                    const isThreat = (ped.kind === "COP" || ped.kind === "CRIMINAL" || ped.kind === "HOSTILE" || ped.kind === "GATOR");
+                    const isCalling911 = (ped.calling911Timer || 0) > 0;
+                    const isSurrendered = (ped.surrenderTimer || 0) > 0;
+                    const isFilming = (ped.filmingViralTimer || 0) > 0;
+                    if (!focusOn && !isCalling911 && !isSurrendered && !isFilming) continue;
+
+                    const scr = this.worldToScreen(ped.x, ped.y, (ped.z || 2.0) + 0.25);
+                    if (scr.x < -30 || scr.x > W + 30 || scr.y < -30 || scr.y > H + 30) continue;
+
+                    if (focusOn && (isThreat || isCalling911)) {
+                        const retCol = isThreat ? "#ff1e38" : "#fde047";
+                        const rad = 12 + Math.sin(this.time * 12) * 2;
+                        ctx.strokeStyle = retCol;
+                        ctx.lineWidth = 1.6;
+                        ctx.beginPath();
+                        ctx.moveTo(scr.x, scr.y - rad);
+                        ctx.lineTo(scr.x + rad, scr.y);
+                        ctx.lineTo(scr.x, scr.y + rad);
+                        ctx.lineTo(scr.x - rad, scr.y);
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+
+                    let tagTxt = null;
+                    let tagCol = "#fde047";
+                    if (isSurrendered) {
+                        tagTxt = "🙌 HANDS UP";
+                        tagCol = "#fde047";
+                    } else if (isCalling911) {
+                        tagTxt = `📞 911 (${ped.calling911Timer.toFixed(1)}s)`;
+                        tagCol = "#facc15";
+                    } else if (isFilming) {
+                        tagTxt = "📱 LIVE";
+                        tagCol = "#f472b6";
+                    }
+                    if (tagTxt) {
+                        const tw = Math.max(46, tagTxt.length * 5.6 + 8);
+                        ctx.fillStyle = "rgba(8, 13, 23, 0.85)";
+                        ctx.fillRect(scr.x - tw * 0.5, scr.y - 26, tw, 13);
+                        ctx.strokeStyle = tagCol;
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(scr.x - tw * 0.5, scr.y - 26, tw, 13);
+                        ctx.fillStyle = tagCol;
+                        ctx.fillText(tagTxt, scr.x, scr.y - 19.5);
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        // G. GTA 6 LIVE @LEONIDAFEED SOCIAL MEDIA TICKER PILL
+        if (game.director && game.director.activeSocialTicker && (game.director.activeSocialTicker.timer || 0) > 0 && W >= 520) {
+            const tk = game.director.activeSocialTicker;
+            const pillW = Math.min(440, W - 40);
+            const pillH = 20;
+            const pillX = Math.round((W - pillW) * 0.5);
+            const pillY = Math.round(H - 52 * s);
+            ctx.save();
+            ctx.fillStyle = "rgba(12, 10, 24, 0.90)";
+            ctx.fillRect(pillX, pillY, pillW, pillH);
+            ctx.strokeStyle = tk.color || "#f472b6";
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(pillX + 0.5, pillY + 0.5, pillW - 1, pillH - 1);
+            ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = tk.color || "#f472b6";
+            const msg = `📱 ${tk.handle}: ${tk.text} (👁️ ${tk.views})`.slice(0, 68);
+            ctx.fillText(msg, pillX + pillW * 0.5, pillY + pillH * 0.5 + 0.5);
+            ctx.restore();
         }
     }
 

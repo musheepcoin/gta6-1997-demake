@@ -61,8 +61,29 @@ class ViceWorldDirector {
             total911CallsAborted: 0,
             total911CallsCompleted: 0,
             totalPrecinctDispatches: 0,
-            totalSceneInvestigations: 0
+            totalSceneInvestigations: 0,
+            totalTrunksLooted: 0,
+            totalViralClips: 0,
+            totalStickUps: 0,
+            totalTrackersJammed: 0,
+            totalTrackerPings: 0,
+            totalFocusBursts: 0,
+            totalGatorsWrangled: 0
         };
+
+        // 2B. GTA 6 Modern-Arcade State (Exotic GPS Trackers, Focus Mode, Street Hold-Ups, @LeonidaFeed Social Ticker)
+        this.luxuryTrackedSpecs = new Set([
+            "VICE_CHEETAH",
+            "BANSHEE_GT",
+            "STINGER_CABRIO",
+            "PENETRATOR_GT",
+            "PORKA_TURBO",
+            "TURISMO_CABRIO"
+        ]);
+        this.focusCharge = 100;
+        this.focusActiveTimer = 0;
+        this.leonidaFeedPosts = [];
+        this.activeSocialTicker = null;
 
         // 3. Entity Authority & Anti-Teleportation Ledger
         this.vehicleLedger = new Map(); // vehId -> { lastX, lastY, owner, lastSyncMs, allowSnapUntilMs }
@@ -360,11 +381,25 @@ class ViceWorldDirector {
                     color: "#facc15"
                 };
             }
+            if (p.inVehicle && (p.inVehicle.gpsTrackerTimer || 0) > 0) {
+                return {
+                    code: "GPS_TRACKER_ACTIVE",
+                    label: `📡 EXOTIC GPS TRACKER (${Math.ceil(p.inVehicle.gpsTrackerTimer)}s) — PRESS [B] TO JAM!`,
+                    color: "#f59e0b"
+                };
+            }
             if ((this.openCarryWarnTimer || 0) > 0.1) {
                 return {
                     code: "OPEN_CARRY_WARN",
                     label: "🚓 VCPD: HOLSTER HEAVY WEAPON [1]!",
                     color: "#fb923c"
+                };
+            }
+            if ((this.focusActiveTimer || 0) > 0) {
+                return {
+                    code: "FOCUS_ACTIVE",
+                    label: `🎯 GTA 6 FOCUS MODE (${this.focusActiveTimer.toFixed(1)}s) — LASER AIM!`,
+                    color: "#00f0ff"
                 };
             }
             return null;
@@ -448,6 +483,9 @@ class ViceWorldDirector {
         if (!g || !g.player || g.player.dead) return { ok: false, reason: "NO_PLAYER" };
         const p = g.player;
         if (p.inVehicle) {
+            if ((p.inVehicle.gpsTrackerTimer || 0) > 0) {
+                return this.tryJamVehicleGpsTracker(p.inVehicle);
+            }
             g.addFloatingText(p.x, p.y - 26, "🧰 EXIT VEHICLE [F] TO OPEN TRUNK [B]!", "#fde047");
             return { ok: false, reason: "IN_VEHICLE" };
         }
@@ -583,6 +621,13 @@ class ViceWorldDirector {
                 if (typeof g.addCash === "function") {
                     g.addCash(150, "📱 @LeonidaFeed VIRAL CLIP!", true);
                 }
+                const distTag = String(g.currentDistrict || "VICE CITY").toUpperCase();
+                this.pushLeonidaFeedPost(
+                    "@LeonidaClips",
+                    `🔥 Wild street action caught on camera in ${distTag}! #OnlyInLeonida`,
+                    "185K",
+                    "#f472b6"
+                );
                 if (typeof g.sendPager === "function" && (this.nowMs() - (this._lastViralPagerMs || 0)) > 18000) {
                     this._lastViralPagerMs = this.nowMs();
                     g.sendPager(
@@ -607,7 +652,7 @@ class ViceWorldDirector {
 
         for (let i = 0; i < g.peds.length; i++) {
             const ped = g.peds[i];
-            if (!ped || ped.dead || ped.kind !== "CIVILIAN" || (ped.calling911Timer || 0) > 0 || (ped.filmingViralTimer || 0) > 0) continue;
+            if (!ped || ped.dead || ped.kind !== "CIVILIAN" || (ped.calling911Timer || 0) > 0 || (ped.filmingViralTimer || 0) > 0 || (ped.surrenderTimer || 0) > 0) continue;
             const d = Math.hypot(ped.x - px, ped.y - py);
             if (d > 38 && d < 240 && this.hasLineOfSight(ped.x, ped.y, px, py, pz, 38)) {
                 ped.filmingViralTimer = 2.2;
@@ -617,6 +662,233 @@ class ViceWorldDirector {
                 break;
             }
         }
+    }
+
+    /* ========================================================================
+       2C. GTA 6 WAVE 2 MODERN-ARCADE SYSTEMS:
+       - High-End Exotic Vehicle Factory GPS Tracker & Cal Hampton Signal Jammer [B]
+       - Dynamic Street Hold-Ups & NPC Intimidation / Surrender (Hands Up & Cash Drop)
+       - Unified Focus Mode / Eagle-Eye Tactical Combat Burst ([L] / Right-Click)
+       - Leonida Gator Wrangler & Live @LeonidaFeed Social Media Ticker
+       ======================================================================== */
+    pushLeonidaFeedPost(handle, text, viewsStr = "142K", color = "#f472b6") {
+        const post = {
+            handle: handle || "@LeonidaFeed",
+            text: text || "Wild day in Leonida!",
+            views: viewsStr,
+            color,
+            atMs: this.nowMs()
+        };
+        this.leonidaFeedPosts.push(post);
+        if (this.leonidaFeedPosts.length > 25) {
+            this.leonidaFeedPosts.shift();
+        }
+        this.activeSocialTicker = {
+            handle: post.handle,
+            text: post.text,
+            views: post.views,
+            color: post.color,
+            timer: 4.5
+        };
+        return post;
+    }
+
+    onPlayerEnteredVehicle(v, _wasOccupied = false) {
+        const g = this.game;
+        if (!g || !v || v.destroyed || v.isPolice || v.isEmergency) return;
+        if (this.luxuryTrackedSpecs.has(v.specKey) && !v._gpsTrackerJammed && !v._gpsTrackerPinged) {
+            v.gpsTrackerTimer = 12.0;
+            g.addFloatingText(v.x, v.y - 54, "📡 EXOTIC GPS TRACKER ACTIVE — PRESS [B] TO JAM (12s)!", "#f59e0b");
+        }
+    }
+
+    tryJamVehicleGpsTracker(veh = null) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead) return { ok: false, reason: "NO_PLAYER" };
+        const v = veh || g.player.inVehicle;
+        if (!v) return { ok: false, reason: "NOT_IN_VEHICLE" };
+        if (!((v.gpsTrackerTimer || 0) > 0)) {
+            return { ok: false, reason: "NO_ACTIVE_TRACKER" };
+        }
+        v.gpsTrackerTimer = 0;
+        v._gpsTrackerJammed = true;
+        this.blackboard.totalTrackersJammed = (this.blackboard.totalTrackersJammed || 0) + 1;
+        if (g.wantedSpottedVehicle === v && !g.isPoliceSpotted) {
+            g.wantedSpottedVehicle = null;
+        }
+        if (g.audio && typeof g.audio.playBeep === "function") {
+            g.audio.playBeep(880, 0.08, "sine", 0.09);
+        }
+        if (typeof g.addCash === "function") {
+            g.addCash(200, "🔓 EXOTIC GPS TRACKER JAMMED!", true);
+        }
+        this.addFocusCharge(25);
+        this.pushLeonidaFeedPost(
+            "@CalHamptonTech",
+            `🔓 Factory LoJack scrambled on a ${v.name}! Zero satellite trace on the scanner.`,
+            "94K",
+            "#38bdf8"
+        );
+        return { ok: true, vehicle: v, jammed: true };
+    }
+
+    updateLuxuryGpsTrackers(dt) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.activeInterior) return;
+        const v = g.player.inVehicle;
+        if (!v || v.destroyed || !((v.gpsTrackerTimer || 0) > 0)) return;
+        v.gpsTrackerTimer -= dt;
+        if (v.gpsTrackerTimer <= 0) {
+            v.gpsTrackerTimer = 0;
+            v._gpsTrackerPinged = true;
+            this.blackboard.totalTrackerPings = (this.blackboard.totalTrackerPings || 0) + 1;
+            g.setWantedLevel(Math.max(g.wantedLevel || 0, 1), { x: v.x, y: v.y }, false, v);
+            g.addFloatingText(v.x, v.y - 36, "🚨 LOJACK SATELLITE PINGED VCPD — 1★ HOT VEHICLE!", "#ff1e38");
+        }
+    }
+
+    tryIntimidateStreetPed(maxDist = 110) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.player.inVehicle || g.activeInterior) {
+            return { ok: false, reason: "NOT_ON_FOOT" };
+        }
+        const p = g.player;
+        if (!p.weapon || p.weapon === "FIST") {
+            return { ok: false, reason: "UNARMED" };
+        }
+        if (!Array.isArray(g.peds)) return { ok: false, reason: "NO_PEDS" };
+
+        const pz = p.z || 2.0;
+        const aimCos = Math.cos(p.angle || 0);
+        const aimSin = Math.sin(p.angle || 0);
+        let bestPed = null;
+        let bestDist = maxDist;
+
+        for (let i = 0; i < g.peds.length; i++) {
+            const ped = g.peds[i];
+            if (!ped || ped.dead || ped.kind !== "CIVILIAN" || ped._intimidatedOnce || ped.isChild) continue;
+            if ((ped.filmingViralTimer || 0) > 0) continue;
+            const dx = ped.x - p.x;
+            const dy = ped.y - p.y;
+            const d = Math.hypot(dx, dy);
+            if (d < 10 || d >= bestDist) continue;
+            const cosFwd = (dx * aimCos + dy * aimSin) / Math.max(1, d);
+            if (cosFwd < 0.72) continue;
+            if (!this.hasLineOfSight(p.x, p.y, ped.x, ped.y, pz, 28)) continue;
+            bestDist = d;
+            bestPed = ped;
+        }
+
+        if (!bestPed) return { ok: false, reason: "NO_TARGET_IN_SIGHTS" };
+
+        bestPed._intimidatedOnce = true;
+        p.weaponDrawnTimer = Math.max(p.weaponDrawnTimer || 0, 0.9);
+        if ((bestPed.calling911Timer || 0) > 0) {
+            this.abortWitness911Call(bestPed, true);
+        }
+
+        if (bestPed.personality === "BRAVE") {
+            bestPed.kind = "HOSTILE";
+            bestPed.panicTimer = 0;
+            bestPed.surrenderTimer = 0;
+            bestPed.speed = 92;
+            g.addFloatingText(bestPed.x, bestPed.y - 24, "🤬 WRONG ONE! FIGHTING BACK!", "#ef4444");
+            return { ok: true, ped: bestPed, outcome: "FOUGHT_BACK", cashDropped: 0 };
+        }
+
+        bestPed.surrenderTimer = 4.5;
+        bestPed.panicTimer = 0;
+        bestPed.speed = 0;
+        bestPed.angle = Math.atan2(p.y - bestPed.y, p.x - bestPed.x);
+        this.blackboard.totalStickUps = (this.blackboard.totalStickUps || 0) + 1;
+        const cashDropped = 75;
+        if (typeof g.addCash === "function") {
+            g.addCash(cashDropped, "🙌 STREET HOLD-UP!", true);
+        }
+        g.addFloatingText(bestPed.x, bestPed.y - 26, "🙌 HANDS UP! DON'T SHOOT!", "#fde047");
+        this.addFocusCharge(20);
+        this.pushLeonidaFeedPost(
+            "@OceanBeachWatch",
+            `🙌 Brazen daylight stick-up on ${g.currentDistrict || "Ocean Drive"}! Suspect took wallet & vanished!`,
+            "118K",
+            "#fde047"
+        );
+        return { ok: true, ped: bestPed, outcome: "SURRENDERED", cashDropped };
+    }
+
+    updateStreetIntimidation(dt) {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead || g.player.inVehicle || g.activeInterior) return;
+        const p = g.player;
+        if (!p.weapon || p.weapon === "FIST") {
+            this._aimIntimidateAccum = 0;
+            return;
+        }
+        // Automatic close-quarters intimidation when gun is actively drawn/aimed (< 78px in front)
+        if ((p.weaponDrawnTimer || 0) > 0 && (p.muzzleTimer || 0) <= 0) {
+            this._aimIntimidateAccum = (this._aimIntimidateAccum || 0) + dt;
+            if (this._aimIntimidateAccum >= 0.25) {
+                this._aimIntimidateAccum = 0;
+                this.tryIntimidateStreetPed(78);
+            }
+        } else {
+            this._aimIntimidateAccum = 0;
+        }
+    }
+
+    addFocusCharge(amount = 15) {
+        this.focusCharge = Math.max(0, Math.min(100, (this.focusCharge || 0) + amount));
+        return this.focusCharge;
+    }
+
+    activateFocusMode() {
+        const g = this.game;
+        if (!g || !g.player || g.player.dead) return { ok: false, reason: "NO_PLAYER" };
+        if ((this.focusActiveTimer || 0) > 0) {
+            return { ok: true, alreadyActive: true, remaining: this.focusActiveTimer };
+        }
+        if ((this.focusCharge || 0) < 35) {
+            g.addFloatingText(g.player.x, g.player.y - 28, `🎯 FOCUS RECHARGING (${Math.round(this.focusCharge || 0)}/35)!`, "#94a3b8");
+            return { ok: false, reason: "LOW_CHARGE" };
+        }
+        this.focusCharge = Math.max(0, (this.focusCharge || 0) - 45);
+        this.focusActiveTimer = 4.5;
+        this.blackboard.totalFocusBursts = (this.blackboard.totalFocusBursts || 0) + 1;
+        if (g.audio && typeof g.audio.playBeep === "function") {
+            g.audio.playBeep(740, 0.09, "triangle", 0.08);
+        }
+        g.addFloatingText(g.player.x, g.player.y - 38, "🎯 GTA 6 FOCUS MODE: LASER AIM & +35% DMG!", "#00f0ff");
+        return { ok: true, remaining: this.focusActiveTimer };
+    }
+
+    updateFocusMode(dt) {
+        if ((this.focusActiveTimer || 0) > 0) {
+            this.focusActiveTimer = Math.max(0, this.focusActiveTimer - dt);
+        } else {
+            this.focusCharge = Math.min(100, (this.focusCharge || 0) + dt * 9.0);
+        }
+        if (this.activeSocialTicker && (this.activeSocialTicker.timer || 0) > 0) {
+            this.activeSocialTicker.timer = Math.max(0, this.activeSocialTicker.timer - dt);
+            if (this.activeSocialTicker.timer <= 0) {
+                this.activeSocialTicker = null;
+            }
+        }
+    }
+
+    onGatorWrangled(gatorPed) {
+        const g = this.game;
+        if (!g || !gatorPed) return;
+        this.blackboard.totalGatorsWrangled = (this.blackboard.totalGatorsWrangled || 0) + 1;
+        this.addFocusCharge(30);
+        if (typeof g.addCash === "function") {
+            g.addCash(150, "🐊 LEONIDA GATOR WRANGLER!", true);
+        }
+        this.pushLeonidaFeedPost(
+            "@GrassriversDaily",
+            "🐊 #LeonidaMan just wrangled a 12-foot Grassrivers gator in broad daylight! 🔥",
+            "310K",
+            "#39ff14"
+        );
     }
 
     /* ========================================================================
@@ -652,6 +924,9 @@ class ViceWorldDirector {
         if (!g) return;
         this.updateOpenCarryScrutiny(dt);
         this.updateLeonidaViralClips(dt);
+        this.updateLuxuryGpsTrackers(dt);
+        this.updateStreetIntimidation(dt);
+        this.updateFocusMode(dt);
         if (!Array.isArray(g.vehicles)) return;
         const now = this.nowMs();
         const p = g.player;
