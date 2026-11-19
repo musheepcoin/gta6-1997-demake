@@ -18281,6 +18281,7 @@ class LeonidaGame {
             const bz = scene.z || this.map.getHeightAtPixel(scene.x, scene.y, 4.0);
             let killedCount = 0;
             for (let i = 0; i < members.length; i++) {
+                if (this.peds.length >= 235 && (scatterOnly || i > 0)) break;
                 const m = members[i];
                 const awayAng = Math.atan2(m.y - hitY, m.x - hitX);
                 const ped = new Pedestrian({
