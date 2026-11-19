@@ -38,7 +38,16 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_214";
+const CURRENT_BUILD = (() => {
+    try {
+        const idxFile = path.join(__dirname, "..", "index.html");
+        if (fs.existsSync(idxFile)) {
+            const m = fs.readFileSync(idxFile, "utf8").match(/__VC26_BUILD\s*=\s*"([^"]+)"/);
+            if (m && m[1]) return m[1];
+        }
+    } catch (_e) {}
+    return "101_219";
+})();
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -1586,10 +1595,10 @@ function getStationCoords(serviceType) {
         const st = serverMap.emergencyStations.find((s) => s.type === serviceType);
         if (st) return st;
     }
-    if (serviceType === "MEDIC") return { id: "ems_hq", x: global.mx256(208.5) * TS, y: global.my256(140.5) * TS };
-    if (serviceType === "FIRE") return { id: "vcfd_hq", x: 428.5 * TS, y: 295.5 * TS };
+    if (serviceType === "MEDIC") return { id: "ems_hq", x: 421.5 * TS, y: 252.5 * TS };
+    if (serviceType === "FIRE") return { id: "vcfd_hq", x: 421.5 * TS, y: 304.5 * TS };
     if (serviceType === "TOW") return { id: "tow_hq", x: 333.2 * TS, y: 306.5 * TS };
-    return { id: "vcpd_hq", x: global.mx256(203.0) * TS, y: global.my256(146.0) * TS };
+    return { id: "vcpd_hq", x: 425.5 * TS, y: 266.5 * TS };
 }
 
 function snapStationToNearestRoad(wx, wy) {

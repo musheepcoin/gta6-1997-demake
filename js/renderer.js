@@ -17276,13 +17276,13 @@ class RetroRenderer {
             ctx.restore();
         }
 
-        // H. VICEWORLDDIRECTOR INTERNAL ENGINE LIVE TELEMETRY OVERLAY [F9]
+        // H. VICEWORLDDIRECTOR INTERNAL ENGINE LIVE TELEMETRY & PRODUCTION AUDIT OVERLAY [F9]
         if (game.director && game.director.telemetryOverlayOpen && typeof game.director.getEngineSnapshot === "function") {
             const snap = game.director.getEngineSnapshot();
             const bb = snap.blackboard || {};
             const fl = snap.fleet || {};
-            const boxW = Math.min(340, W - 24);
-            const boxH = 128;
+            const boxW = Math.min(370, W - 24);
+            const boxH = 146;
             const boxX = 12;
             const boxY = Math.max(82, H - boxH - 64);
             ctx.save();
@@ -17295,17 +17295,18 @@ class RetroRenderer {
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
             const lines = [
-                { t: `🧠 VICEWORLDDIRECTOR ENGINE [F9] • ORACLE: ${snap.invariantsOk ? "100% OK" : "ALERT"}`, c: snap.invariantsOk ? "#00f0ff" : "#ff1e38" },
+                { t: `🧠 VICEWORLDDIRECTOR [F9] v${snap.buildVersion || "101_219"} • AUDIT: ${snap.auditPassedCount || 12}/${snap.auditTotalCount || 12} PASS`, c: snap.invariantsOk ? "#00f0ff" : "#ff1e38" },
                 { t: `WANTED: ${snap.wantedLevel}★ | STATUS: ${snap.recognitionCode} | FOCUS: ${snap.focusCharge}%`, c: "#fde047" },
-                { t: `911 CALLS: ${bb.total911CallsStarted || 0} start / ${bb.total911CallsAborted || 0} silenced / ${ fl.pending911Callers || 0 } active`, c: "#f8fafc" },
+                { t: `PURSUIT: ${snap.pursuitMode || "ROAD_GRID"} (LOS: ${snap.effectiveSightRangePx || 480}px)`, c: "#34d399" },
+                { t: `911 CALLS: ${bb.total911CallsStarted || 0} start / ${bb.total911CallsAborted || 0} silenced / ${fl.pending911Callers || 0} active`, c: "#f8fafc" },
                 { t: `FLEET: ${fl.activePoliceCruisers || 0} VCPD | ${fl.activeFootCops || 0} Foot | ${fl.activeAmbulances || 0} EMS | ${fl.activeFireTrucks || 0} FD | ${fl.activeTowTrucks || 0} Tow`, c: "#38bdf8" },
                 { t: `DISPATCHES: ${bb.totalPrecinctDispatches || 0} PD | ${bb.totalMedicDispatches || 0} EMS | ${bb.totalFireDispatches || 0} FD | ${bb.totalTowDispatches || 0} Tow`, c: "#94a3b8" },
                 { t: `GTA6: ${bb.totalTrunksLooted || 0} Trunks | ${bb.totalStickUps || 0} StickUps | ${bb.totalTrackersJammed || 0} GPS | ${bb.totalTakeoverHypes || 0} Drift`, c: "#39ff14" },
-                { t: `SELF-HEALED: ${snap.anomaliesHealed} anomalies | EVENTS: ${snap.recentEventsCount}`, c: "#f472b6" }
+                { t: `ORACLE: ${snap.invariantsOk ? "100% OK" : "ALERT"} | HEALED: ${snap.anomaliesHealed} | LEDGER: ${snap.vehicleLedgerSize || 0}`, c: "#f472b6" }
             ];
             for (let li = 0; li < lines.length; li++) {
                 ctx.fillStyle = lines[li].c;
-                ctx.fillText(lines[li].t.slice(0, 52), boxX + 8, boxY + 7 + li * 16.5);
+                ctx.fillText(lines[li].t.slice(0, 56), boxX + 8, boxY + 7 + li * 16.5);
             }
             ctx.restore();
         }

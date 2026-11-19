@@ -3029,10 +3029,12 @@ class Vehicle {
         const distToPlayer = Math.hypot(wantedTarget.x - this.x, wantedTarget.y - this.y);
         const targetOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(wantedTarget.x, wantedTarget.y) : false;
         const targetOnSand = Boolean(!targetOnRoad && map.getTileAtPixel && map.getTileAtPixel(wantedTarget.x, wantedTarget.y) === TILE.SAND);
+        const coastalRoadMinX = (wantedTarget.y < 75 * TILE_SIZE ? 455.5 : 444.0) * TILE_SIZE;
+        const coastalOffRoadMinX = (wantedTarget.y < 75 * TILE_SIZE ? 458.0 : 447.2) * TILE_SIZE;
         const targetInBeachOrParkExpanse = Boolean(
             !targetOnRoad && (
                 targetOnSand ||
-                wantedTarget.x >= 447.2 * TILE_SIZE
+                wantedTarget.x >= coastalOffRoadMinX
             )
         );
         const noProgress = this.updateApproachProgress(dt, distToPlayer);
@@ -3044,11 +3046,11 @@ class Vehicle {
         // Tactical Squad Deployment right at the scene:
         // 1) Cruiser has driven up to tactical standoff range (< 175px) of a visually spotted suspect on foot (on the beach, park, or street), OR
         // 2) Boxed-in slow getaway car (< 130px), OR
-        // 3) Blocked by a solid building wall / palm row within 440px (or up to 1450px when intercepting a suspect across Lummus Park / Vice Beach) for > 1.35s
+        // 3) Blocked by a solid building wall / palm row / fence within 440px (or up to 1450px when intercepting an off-road suspect across a beach/park/golf course) for > 1.35s
         // Note: When patrolling a Search Zone (`wantedTarget.isSearchPoint === true`), cruisers stay mobile on patrol unless blocked by an obstacle!
         const playerOnFootAtScene = !wantedTarget.isSearchPoint && !wantedTarget.inVehicle && distToPlayer < 175;
         const playerBoxedNear = !wantedTarget.isSearchPoint && Boolean(wantedTarget.inVehicle) && Math.abs(wantedTarget.speed || 0) < 42 && distToPlayer < 130;
-        const blockedMaxDist = (targetInBeachOrParkExpanse && this.x >= 444.0 * TILE_SIZE) ? 1450 : 440;
+        const blockedMaxDist = (targetInBeachOrParkExpanse && this.x >= coastalRoadMinX) ? 1450 : 440;
         const blockedByWallNear = !wantedTarget.inVehicle && distToPlayer < blockedMaxDist && noProgress > 1.35;
 
         if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
@@ -3079,15 +3081,15 @@ class Vehicle {
 
         // Real-Life Off-Road Pursuit:
         // Leave the asphalt road (`forceDirect = true`) ONLY when:
-        // - The suspect is on Vice Beach / Lummus Park and the cruiser has reached Ocean Drive (including Southbound lane bx=444 at 444.5 * TILE_SIZE)
-        //   and is aligned in Y within 440px (or already off-road in Lummus Park / Vice Beach this.x >= 447.2 * TILE_SIZE), OR
-        // - The suspect is off-road on a sidewalk/plaza (`!targetOnRoad`) with clear line-of-sight within 240px!
+        // - The suspect is on Vice Beach / North Beach / Lummus Park and the cruiser has reached the coastal road (coastalRoadMinX)
+        //   and is aligned in Y within 440px (or already off-road in the park/beach this.x >= coastalOffRoadMinX), OR
+        // - The suspect is off-road on a city sidewalk/plaza (`!targetOnRoad`) with clear line-of-sight within 240px!
         const clearOfBuildings = map.traceSegment2D
             ? !map.traceSegment2D(this.x, this.y, wantedTarget.x, wantedTarget.y, curZ).hit
             : (distToPlayer < 240);
         const readyToCutOntoBeach =
-            this.x >= 444.0 * TILE_SIZE &&
-            (this.x >= 447.2 * TILE_SIZE || Math.abs(wantedTarget.y - this.y) <= 440 || distToPlayer < 520);
+            this.x >= coastalRoadMinX &&
+            (this.x >= coastalOffRoadMinX || Math.abs(wantedTarget.y - this.y) <= 440 || distToPlayer < 520);
         const forceDirect =
             (targetInBeachOrParkExpanse && readyToCutOntoBeach && distToPlayer < 2500) ||
             (!targetOnRoad && clearOfBuildings && distToPlayer < 240);

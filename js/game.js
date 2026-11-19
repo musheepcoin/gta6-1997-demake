@@ -8827,15 +8827,17 @@ class LeonidaGame {
 
         // 1. Try spawning directly at the road exit of the nearest Central Municipal HQ (1150..2400px),
         //    or along the road corridor coming from that HQ at realistic travel distance (1350..1750px)!
+        const targetOnEastBeach = targetX >= 447.2 * TILE_SIZE && targetY >= 44 * TILE_SIZE && targetY <= 368 * TILE_SIZE;
+        const roadTargetX = targetOnEastBeach ? ((targetY < 75 * TILE_SIZE ? 456.5 : 445.0) * TILE_SIZE) : targetX;
         for (let pass = 0; pass < 2; pass++) {
             const strictLaneAlign = (pass === 0);
             for (let si = 0; si < stations.length; si++) {
                 const st = stations[si];
-                const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
+                const distStToTarget = Math.hypot(st.x - roadTargetX, st.y - targetY);
                 const useStationGate = distStToTarget >= 1150 && distStToTarget <= 2400 && !this.isPointInAnyPlayerCameraView(st.x, st.y, 220);
-                const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
+                const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - roadTargetX);
                 const corridorDist = Math.max(1350, Math.min(distStToTarget, 1750));
-                const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * corridorDist);
+                const anchorX = useStationGate ? st.x : (roadTargetX + Math.cos(dirFromTargetToSt) * corridorDist);
                 const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
                 const baseBx = Math.floor(anchorX / TILE_SIZE);
                 const baseBy = Math.floor(anchorY / TILE_SIZE);
@@ -8859,7 +8861,8 @@ class LeonidaGame {
                             const sy = (by + 0.5) * TILE_SIZE;
                             if (Math.hypot(sx - targetX, sy - targetY) < 1180) continue;
                             if (this.isPointInAnyPlayerCameraView(sx, sy, 220)) continue;
-                            const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
+                            const alignTargetX = (targetOnEastBeach && bx >= 443) ? roadTargetX : targetX;
+                            const toTargetAng = Math.atan2(targetY - sy, alignTargetX - sx);
                             const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                                 ? this.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
                                 : toTargetAng;
@@ -14361,15 +14364,17 @@ class LeonidaGame {
                 const hc = ped.homeCruiser;
                 const hcValid = Boolean(hc && !hc.destroyed && hc !== (p && p.inVehicle) && !hc.towedByTruck && hc._gridEpoch === this._gridEpoch);
                 const dHomeCruiser = hcValid ? Math.hypot(hc.x - ped.x, hc.y - ped.y) : 9999;
-                const targetOnRoadForCop = Boolean(rawCopTarget && this.map && this.map.isRoadAtPixel && this.map.isRoadAtPixel(rawCopTarget.x, rawCopTarget.y));
+        const targetOnRoadForCop = Boolean(rawCopTarget && this.map && this.map.isRoadAtPixel && this.map.isRoadAtPixel(rawCopTarget.x, rawCopTarget.y));
                 const targetOnBeachOrParkForCop = Boolean(
                     rawCopTarget && !targetOnRoadForCop && (
-                        rawCopTarget.x >= 447.2 * TILE_SIZE ||
+                        rawCopTarget.x >= (rawCopTarget.y < 75 * TILE_SIZE ? 458.0 : 447.2) * TILE_SIZE ||
                         (this.map && this.map.getTileAtPixel && typeof TILE !== "undefined" && this.map.getTileAtPixel(rawCopTarget.x, rawCopTarget.y) === TILE.SAND)
                     )
                 );
-                const reboardFootDist = targetOnBeachOrParkForCop ? 1850 : 420;
-                const reboardVehDist = targetOnBeachOrParkForCop ? 950 : 260;
+                // Whenever a wanted suspect is off-road (beach, park, golf course, stadium, airport tarmac, swamp),
+                // deployed on-foot officers pursue across the off-road terrain up to 1850px without turning back to re-board their road cruiser!
+                const reboardFootDist = !targetOnRoadForCop ? 1850 : 420;
+                const reboardVehDist = !targetOnRoadForCop ? 950 : 260;
                 const shouldReboardCruiser = Boolean(
                     rawCopTarget &&
                     hcValid &&

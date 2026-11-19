@@ -154,13 +154,22 @@ class ViceWorldDirector {
     isPointInOpenBeachOrPark(wx, wy) {
         const g = this.game;
         const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
-        if (wx >= 447.2 * tileSize && wy >= 44 * tileSize && wy <= 368 * tileSize) {
+        const minBeachX = (wy < 75 * tileSize ? 458.0 : 447.2) * tileSize;
+        if (wx >= minBeachX && wy >= 44 * tileSize && wy <= 368 * tileSize) {
             return true;
         }
         if (g && g.map && typeof g.map.getTileAtPixel === "function" && typeof TILE !== "undefined") {
             if (g.map.getTileAtPixel(wx, wy) === TILE.SAND) return true;
         }
         return false;
+    }
+
+    isPointOffRoad(wx, wy) {
+        const g = this.game;
+        if (g && g.map && typeof g.map.isRoadAtPixel === "function") {
+            return !g.map.isRoadAtPixel(wx, wy);
+        }
+        return this.isPointInOpenBeachOrPark(wx, wy);
     }
 
     hasLineOfSight(x1, y1, x2, y2, z = 2.0, minCheckDist = 42) {
@@ -245,12 +254,17 @@ class ViceWorldDirector {
         const pZ = (pEnt.z !== undefined ? pEnt.z : p.z) || 2.0;
         const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
         const playerOnOpenBeach = this.isPointInOpenBeachOrPark(pEnt.x, pEnt.y);
-        const copNearBeachfront = copX >= 443.0 * tileSize || this.isPointInOpenBeachOrPark(copX, copY);
-        // Vice Beach & Lummus Park form an unobstructed 2,300px open expanse east of Ocean Drive with zero buildings:
-        // officers on Ocean Drive, Lummus Park, or the beach have long-range visual sight across the open sand!
+        const playerOffRoad = playerOnOpenBeach || this.isPointOffRoad(pEnt.x, pEnt.y);
+        const coastalRoadMinX = (pEnt.y < 75 * tileSize ? 455.0 : 443.0) * tileSize;
+        const copNearBeachfront = copX >= coastalRoadMinX || this.isPointInOpenBeachOrPark(copX, copY);
+        // Vice Beach & Lummus Park form an unobstructed 2,300px open expanse east of Ocean Drive with zero buildings (2450px sight),
+        // and any active pursuit across open off-road terrain (parks, golf courses, stadium, airport tarmac, swamps) maintains sight up to 1450px
+        // whenever the 3D building raycast is 100% clear!
         const effectiveMaxRange = (playerOnOpenBeach && copNearBeachfront)
             ? Math.max(maxRange, 2450)
-            : maxRange;
+            : ((playerOffRoad && (g.isPoliceSpotted || g.hasBeenDirectlySpottedByCop))
+                ? Math.max(maxRange, 1450)
+                : maxRange);
 
         const dx = pEnt.x - copX;
         const dy = pEnt.y - copY;
@@ -1504,6 +1518,162 @@ class ViceWorldDirector {
             entry.owner = auth;
             entry.lastSyncMs = now;
         }
+
+        // Periodic Vehicle Ledger Garbage Collection (prevents memory growth from despawned traffic/emergency IDs over 24/7 sessions)
+        if (this.vehicleLedger.size > g.vehicles.length + 48) {
+            for (const [vid, entry] of this.vehicleLedger.entries()) {
+                if (!entry || (now - (entry.lastSyncMs || 0)) > 15000) {
+                    this.vehicleLedger.delete(vid);
+                }
+            }
+        }
+    }
+
+    /* ========================================================================
+       5. PRODUCTION CONTROL, SPATIAL PURSUIT PROBE & AUTOMATED SELF-AUDIT
+       ======================================================================== */
+    probePursuitReachabilityAt(targetX, targetY) {
+        const g = this.game;
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        const onRoad = Boolean(g && g.map && typeof g.map.isRoadAtPixel === "function" && g.map.isRoadAtPixel(targetX, targetY));
+        const onOpenBeach = this.isPointInOpenBeachOrPark(targetX, targetY);
+        const offRoad = !onRoad;
+        const coastalRoadX = (targetY < 75 * tileSize ? 456.5 : 445.0) * tileSize;
+
+        let nearestRoadDistPx = onRoad ? 0 : 9999;
+        let nearestRoadX = targetX;
+        let nearestRoadY = targetY;
+        if (!onRoad && g && g.map && typeof g.map.getNavigationBlock === "function") {
+            const cbx = Math.floor(targetX / tileSize);
+            const cby = Math.floor(targetY / tileSize);
+            const roadType = (typeof GROUND_TYPE !== "undefined" && GROUND_TYPE.ROAD !== undefined) ? GROUND_TYPE.ROAD : 2;
+            for (let r = 1; r <= 38 && nearestRoadDistPx === 9999; r++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                        const bx = cbx + dx;
+                        const by = cby + dy;
+                        if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
+                        const nb = g.map.getNavigationBlock(bx, by, 2.0);
+                        if (nb && nb.groundType === roadType && !nb.isRailway) {
+                            const rx = (bx + 0.5) * tileSize;
+                            const ry = (by + 0.5) * tileSize;
+                            const d = Math.hypot(rx - targetX, ry - targetY);
+                            if (d < nearestRoadDistPx) {
+                                nearestRoadDistPx = Math.round(d);
+                                nearestRoadX = rx;
+                                nearestRoadY = ry;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const clearFromNearestRoad = this.hasLineOfSight(nearestRoadX, nearestRoadY, targetX, targetY, 2.0, 42);
+        const cruiserCanCutOffRoad = Boolean(
+            onRoad ||
+            (onOpenBeach && Math.hypot(coastalRoadX - targetX, 0) < 2500) ||
+            (offRoad && clearFromNearestRoad && nearestRoadDistPx < 950)
+        );
+        const footCopReboardThresholdPx = offRoad ? 1850 : 420;
+        const effectiveSightRangePx = onOpenBeach ? 2450 : (offRoad ? 1450 : 480);
+
+        return {
+            x: Math.round(targetX),
+            y: Math.round(targetY),
+            bx: Math.floor(targetX / tileSize),
+            by: Math.floor(targetY / tileSize),
+            onRoad,
+            onOpenBeach,
+            offRoad,
+            nearestRoadDistPx,
+            nearestRoadX: Math.round(nearestRoadX),
+            nearestRoadY: Math.round(nearestRoadY),
+            clearFromNearestRoad,
+            cruiserCanCutOffRoad,
+            footCopReboardThresholdPx,
+            effectiveSightRangePx,
+            pursuitMode: onRoad ? "ROAD_GRID" : (onOpenBeach ? "BEACH_OFFROAD_INTERCEPT" : "OPEN_TERRAIN_INTERCEPT")
+        };
+    }
+
+    runProductionSelfAudit() {
+        const g = this.game;
+        const checks = [];
+        const addCheck = (id, ok, detail) => {
+            checks.push({ id, ok: Boolean(ok), detail: String(detail || "") });
+        };
+
+        // 1. Map Topology & Coastal Mask
+        const mapOk = Boolean(g && g.map && g.map.cmpLoaded && g.map.coastalSandMask && typeof g.map.traceSegment2D === "function");
+        addCheck("MAP_TOPOLOGY", mapOk, mapOk ? "512x512x6 .CMP voxel map & 3D raycaster online" : "Map not loaded");
+
+        // 2. 4-Agency Municipal HQ Stations
+        const pSt = this.getEmergencyStations("POLICE");
+        const mSt = this.getEmergencyStations("MEDIC");
+        const fSt = this.getEmergencyStations("FIRE");
+        const tSt = this.getEmergencyStations("TOW");
+        const hqOk = pSt.length >= 1 && mSt.length >= 1 && fSt.length >= 1 && tSt.length >= 1;
+        addCheck("MUNICIPAL_HQ_GATES", hqOk, `POLICE=${pSt.length}, MEDIC=${mSt.length}, FIRE=${fSt.length}, TOW=${tSt.length}`);
+
+        // 3. 3D Perception & Open-Beach vs Building Occlusion
+        const wallBlocked = g && g.map ? g.map.traceSegment2D(439.5 * 64, 284.5 * 64, 443.5 * 64, 284.5 * 64, 2.0).hit : false;
+        const beachClear = g && g.map ? !g.map.traceSegment2D(444.5 * 64, 276.5 * 64, 468.0 * 64, 276.5 * 64, 2.0).hit : false;
+        addCheck("PERCEPTION_3D_LOS", wallBlocked && beachClear, `Building occlusion=${wallBlocked}, Open beach LOS=${beachClear}`);
+
+        // 4. Beach & Off-Road Pursuit Reachability (South Beach + North Beach)
+        const sbProbe = this.probePursuitReachabilityAt(467.0 * 64, 276.5 * 64);
+        const nbProbe = this.probePursuitReachabilityAt(467.0 * 64, 58.5 * 64);
+        const beachPursuitOk = sbProbe.onOpenBeach && sbProbe.cruiserCanCutOffRoad && sbProbe.footCopReboardThresholdPx === 1850 &&
+                               nbProbe.onOpenBeach && nbProbe.cruiserCanCutOffRoad && nbProbe.footCopReboardThresholdPx === 1850;
+        addCheck("BEACH_OFFROAD_PURSUIT", beachPursuitOk, `SouthBeach=${sbProbe.pursuitMode}:cut=${sbProbe.cruiserCanCutOffRoad}:los=${sbProbe.clearFromNearestRoad}, NorthBeach=${nbProbe.pursuitMode}:cut=${nbProbe.cruiserCanCutOffRoad}:los=${nbProbe.clearFromNearestRoad}:road=(${Math.floor(nbProbe.nearestRoadX / 64)},${Math.floor(nbProbe.nearestRoadY / 64)})`);
+
+        // 5. 911 Witness Pipeline Config
+        const w911Ok = this.config.call911DurationSec >= 3.5 && this.config.crimeSceneRadiusPx === 240;
+        addCheck("WITNESS_911_PIPELINE", w911Ok, `callDuration=${this.config.call911DurationSec}s, sceneRadius=${this.config.crimeSceneRadiusPx}px`);
+
+        // 6. GTA 6 Trunk & Outfit Disguise API
+        const trunkOk = typeof this.findNearestTrunkVehicle === "function" && typeof this.interactWithNearestVehicleTrunk === "function";
+        addCheck("GTA6_TRUNK_DISGUISE", trunkOk, "Vehicle trunk arsenal & outfit disguise ready");
+
+        // 7. GTA 6 Luxury Exotic GPS Tracker & Cal Hampton Jammer
+        const gpsOk = this.luxuryTrackedSpecs instanceof Set && this.luxuryTrackedSpecs.has("VICE_CHEETAH") && typeof this.tryJamVehicleGpsTracker === "function";
+        addCheck("GTA6_GPS_JAMMER", gpsOk, `Tracked exotic specs=${this.luxuryTrackedSpecs ? this.luxuryTrackedSpecs.size : 0}`);
+
+        // 8. GTA 6 Street Hold-Ups & Intimidation
+        const holdupOk = typeof this.tryIntimidateStreetPed === "function" && typeof this.updateStreetIntimidation === "function";
+        addCheck("GTA6_HOLDUP_INTIMIDATION", holdupOk, "Street hold-up & brave NPC combat active");
+
+        // 9. GTA 6 Unified Focus Mode / Eagle-Eye
+        const focusOk = typeof this.activateFocusMode === "function" && typeof this.updateFocusMode === "function" && Number.isFinite(this.focusCharge);
+        addCheck("GTA6_FOCUS_EAGLE_EYE", focusOk, `focusCharge=${Math.round(this.focusCharge || 0)}%`);
+
+        // 10. GTA 6 Spike Strips & Rideout Customs Chop-Shop
+        const spikeOk = typeof this.deployRoadblockSpikeStrip === "function" && typeof this.onPayNSprayRespray === "function" && typeof this.onCraneVehicleExport === "function";
+        addCheck("GTA6_SPIKE_AND_CUSTOMS", spikeOk, "3★+ spike strips, tire blowout & chop-shop fence ready");
+
+        // 11. GTA 6 @LeonidaFeed Social Ticker & Real Dimez Street Takeovers
+        const socialOk = typeof this.pushLeonidaFeedPost === "function" && typeof this.updateStreetTakeoverHype === "function" && typeof this.onGatorWrangled === "function";
+        addCheck("GTA6_SOCIAL_AND_TAKEOVERS", socialOk, `feedPosts=${this.leonidaFeedPosts.length}`);
+
+        // 12. Runtime Invariant Oracle & Self-Healing Sanitizer
+        this.autoHealWorldAnomalies();
+        const inv = this.auditWorldInvariants();
+        addCheck("WORLD_SANITIZER_ORACLE", inv.ok, `ok=${inv.ok}, healed=${this.blackboard.totalAnomaliesHealed || 0}, ledger=${this.vehicleLedger.size}`);
+
+        const passedCount = checks.filter((c) => c.ok).length;
+        const buildVersion = (typeof window !== "undefined" && window.__VC26_BUILD) ? window.__VC26_BUILD : "101_219";
+        const result = {
+            ok: passedCount === checks.length,
+            passedCount,
+            totalCount: checks.length,
+            buildVersion,
+            checks,
+            atMs: Math.round(this.nowMs())
+        };
+        this._lastSelfAudit = result;
+        return result;
     }
 
     getEngineSnapshot() {
@@ -1511,16 +1681,25 @@ class ViceWorldDirector {
         const recog = this.getWantedRecognitionStatus();
         const fleet = this.getFleetTelemetry();
         const inv = this.auditWorldInvariants();
+        const pEnt = (g && g.player) ? (g.player.inVehicle || g.player) : null;
+        const pursuitProbe = pEnt ? this.probePursuitReachabilityAt(pEnt.x, pEnt.y) : null;
+        const audit = this._lastSelfAudit || this.runProductionSelfAudit();
         return {
+            buildVersion: audit.buildVersion,
             wantedLevel: g ? (g.wantedLevel || 0) : 0,
             recognitionCode: recog ? recog.code : "CLEAN",
             recognitionLabel: recog ? recog.label : "0★ CLEAN PROFILE",
             focusCharge: Math.round(this.focusCharge || 0),
             focusActiveSec: Number((this.focusActiveTimer || 0).toFixed(1)),
+            pursuitMode: pursuitProbe ? pursuitProbe.pursuitMode : "ROAD_GRID",
+            effectiveSightRangePx: pursuitProbe ? pursuitProbe.effectiveSightRangePx : 480,
             blackboard: { ...this.blackboard },
             fleet,
             invariantsOk: inv.ok,
             anomaliesHealed: this.blackboard.totalAnomaliesHealed || 0,
+            vehicleLedgerSize: this.vehicleLedger.size,
+            auditPassedCount: audit.passedCount,
+            auditTotalCount: audit.totalCount,
             recentEventsCount: this.eventLog.length,
             latestFeedPost: this.leonidaFeedPosts.length ? this.leonidaFeedPosts[this.leonidaFeedPosts.length - 1] : null
         };
