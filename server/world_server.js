@@ -105,6 +105,188 @@ function initServerMapAndRoadTopology() {
 }
 initServerMapAndRoadTopology();
 
+const serverBaseVoxelSnapshots = new Map();
+let serverVoxelTplBlocks = null;
+
+function ensureServerVoxelTemplates() {
+    if (serverVoxelTplBlocks || !serverMap || !serverMap.cmpLoaded || !Array.isArray(serverMap.blocksData)) return serverVoxelTplBlocks;
+    const GT = global.GROUND_TYPE || { AIR: 0, WATER: 1, ROAD: 2, PAWEMENT: 3, FIELD: 4, BUILDING: 5 };
+    const findOrAdd = (spec) => {
+        for (let i = 1; i < serverMap.blocksData.length; i++) {
+            const b = serverMap.blocksData[i];
+            if (b && b.groundType === spec.groundType && (b.slopeType || 0) === 0 && Boolean(b.isFlat) === Boolean(spec.isFlat) &&
+                b.faces[0] === spec.faces[0] && b.faces[1] === spec.faces[1] && b.faces[2] === spec.faces[2] && b.faces[3] === spec.faces[3] && b.faces[4] === spec.faces[4]) {
+                return i;
+            }
+        }
+        const idx = serverMap.blocksData.length;
+        serverMap.blocksData.push({
+            w: spec.faces[0], e: spec.faces[1], n: spec.faces[2], s: spec.faces[3], lid: spec.faces[4],
+            faces: spec.faces.slice(), arrows: spec.arrows || 0, groundType: spec.groundType,
+            slopeType: 0, lidRotation: 0, isFlat: Boolean(spec.isFlat), remap: 0, flipLR: false, flipTB: false
+        });
+        return idx;
+    };
+    serverVoxelTplBlocks = {
+        roadNS_z1: findOrAdd({ faces: [0, 0, 0, 0, 74], groundType: GT.ROAD, arrows: 3 }),
+        roadEW_z1: findOrAdd({ faces: [0, 0, 0, 0, 81], groundType: GT.ROAD, arrows: 12 }),
+        roadCross_z1: findOrAdd({ faces: [0, 0, 0, 0, 25], groundType: GT.ROAD, arrows: 15 }),
+        roadNav_z2: findOrAdd({ faces: [0, 0, 0, 0, 0], groundType: GT.ROAD, arrows: 15 }),
+        pave_z1: findOrAdd({ faces: [8, 8, 8, 8, 8], groundType: GT.PAWEMENT }),
+        boardwalk_z1: findOrAdd({ faces: [8, 8, 8, 8, 77], groundType: GT.PAWEMENT }),
+        sand_z1: findOrAdd({ faces: [8, 8, 8, 8, 98], groundType: GT.PAWEMENT }),
+        paveNav_z2: findOrAdd({ faces: [0, 0, 0, 0, 0], groundType: GT.PAWEMENT }),
+        lawn_z1: findOrAdd({ faces: [8, 8, 8, 8, 10], groundType: GT.FIELD }),
+        lawnNav_z2: findOrAdd({ faces: [0, 0, 0, 0, 0], groundType: GT.FIELD }),
+        water_z1: findOrAdd({ faces: [0, 0, 0, 0, 41], groundType: GT.WATER, isFlat: true }),
+        waterNav_z2: findOrAdd({ faces: [0, 0, 0, 0, 0], groundType: GT.WATER }),
+        bldgWall_z: findOrAdd({ faces: [32, 32, 32, 32, 0], groundType: GT.BUILDING }),
+        bldgTop_z: findOrAdd({ faces: [32, 32, 32, 32, 46], groundType: GT.BUILDING })
+    };
+    return serverVoxelTplBlocks;
+}
+
+function captureServerVoxelSnapshot(c, r) {
+    if (!serverMap || !serverMap.voxelGrid) return null;
+    const MC = global.MAP_COLS || 512;
+    const MR = global.MAP_ROWS || 512;
+    const ML = global.MAP_LAYERS || 6;
+    const voxels = [];
+    for (let z = 0; z < ML; z++) {
+        voxels.push(serverMap.voxelGrid[(z * MR + r) * MC + c]);
+    }
+    const idx = r * MC + c;
+    return {
+        c,
+        r,
+        voxels,
+        surfaceGround: serverMap.surfaceGround ? serverMap.surfaceGround[idx] : 0,
+        surfaceLayer: serverMap.surfaceLayer ? serverMap.surfaceLayer[idx] : 1,
+        bldgId: serverMap.bldgIdGrid ? serverMap.bldgIdGrid[idx] : 0,
+        bldgStyle: serverMap.bldgStyleGrid ? serverMap.bldgStyleGrid[idx] : 0,
+        bldgTopZ: serverMap.bldgTopZGrid ? serverMap.bldgTopZGrid[idx] : 2,
+        coastalSand: serverMap.coastalSandMask ? serverMap.coastalSandMask[idx] : 0
+    };
+}
+
+function restoreServerVoxelSnapshot(snap) {
+    if (!serverMap || !serverMap.voxelGrid || !snap) return false;
+    const MC = global.MAP_COLS || 512;
+    const MR = global.MAP_ROWS || 512;
+    const ML = global.MAP_LAYERS || 6;
+    const { c, r } = snap;
+    if (typeof c !== "number" || typeof r !== "number") return false;
+    for (let z = 0; z < ML; z++) {
+        serverMap.voxelGrid[(z * MR + r) * MC + c] = (snap.voxels && snap.voxels[z]) || 0;
+    }
+    const idx = r * MC + c;
+    if (serverMap.surfaceGround) serverMap.surfaceGround[idx] = snap.surfaceGround;
+    if (serverMap.surfaceLayer) serverMap.surfaceLayer[idx] = snap.surfaceLayer;
+    if (serverMap.bldgIdGrid) serverMap.bldgIdGrid[idx] = snap.bldgId || 0;
+    if (serverMap.bldgStyleGrid) serverMap.bldgStyleGrid[idx] = snap.bldgStyle || 0;
+    if (serverMap.bldgTopZGrid) serverMap.bldgTopZGrid[idx] = snap.bldgTopZ || 2;
+    if (serverMap.coastalSandMask) serverMap.coastalSandMask[idx] = snap.coastalSand || 0;
+    return true;
+}
+
+function applyCreationOpToServerMap(op) {
+    if (!op || !serverMap || !serverMap.cmpLoaded || !serverMap.voxelGrid) return false;
+    const MC = global.MAP_COLS || 512;
+    const MR = global.MAP_ROWS || 512;
+    const ML = global.MAP_LAYERS || 6;
+    const GT = global.GROUND_TYPE || { AIR: 0, WATER: 1, ROAD: 2, PAWEMENT: 3, FIELD: 4, BUILDING: 5 };
+
+    if (op.action === "CLEAR_ALL") {
+        for (const snap of serverBaseVoxelSnapshots.values()) {
+            restoreServerVoxelSnapshot(snap);
+        }
+        serverBaseVoxelSnapshots.clear();
+        return true;
+    }
+    if (op.action === "RESTORE_VOXEL_TILE" && typeof op.c === "number" && typeof op.r === "number") {
+        const c = Math.max(2, Math.min(MC - 3, Math.floor(op.c)));
+        const r = Math.max(2, Math.min(MR - 3, Math.floor(op.r)));
+        const snap = op.snap || serverBaseVoxelSnapshots.get(`${c}_${r}`);
+        if (snap) {
+            return restoreServerVoxelSnapshot(snap);
+        }
+        return false;
+    }
+    if (op.action === "VOXEL_TILE" && typeof op.c === "number" && typeof op.r === "number") {
+        const c = Math.max(2, Math.min(MC - 3, Math.floor(op.c)));
+        const r = Math.max(2, Math.min(MR - 3, Math.floor(op.r)));
+        const T = ensureServerVoxelTemplates();
+        if (!T) return false;
+        const tKey = `${c}_${r}`;
+        if (!serverBaseVoxelSnapshots.has(tKey)) {
+            const baseSnap = captureServerVoxelSnapshot(c, r);
+            if (baseSnap) serverBaseVoxelSnapshots.set(tKey, baseSnap);
+        }
+        const idx = r * MC + c;
+        for (let z = 1; z < ML; z++) {
+            serverMap.voxelGrid[(z * MR + r) * MC + c] = 0;
+        }
+        if (serverMap.bldgIdGrid) serverMap.bldgIdGrid[idx] = 0;
+        if (serverMap.bldgStyleGrid) serverMap.bldgStyleGrid[idx] = 0;
+        if (serverMap.bldgTopZGrid) serverMap.bldgTopZGrid[idx] = 2;
+        if (serverMap.coastalSandMask) serverMap.coastalSandMask[idx] = 0;
+
+        const presetKey = String(op.presetKey || "SIDEWALK");
+        let newGround = GT.PAWEMENT;
+        let newLayer = 2;
+        if (presetKey === "ROAD_NS" || presetKey === "ROAD_EW" || presetKey === "ROAD_CROSS") {
+            const z1Blk = presetKey === "ROAD_EW" ? T.roadEW_z1 : (presetKey === "ROAD_CROSS" ? T.roadCross_z1 : T.roadNS_z1);
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = z1Blk;
+            serverMap.voxelGrid[(2 * MR + r) * MC + c] = T.roadNav_z2;
+            newGround = GT.ROAD;
+        } else if (presetKey === "SIDEWALK" || presetKey === "DEMOLISH_TO_PAVE") {
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = T.pave_z1;
+            serverMap.voxelGrid[(2 * MR + r) * MC + c] = T.paveNav_z2;
+            newGround = GT.PAWEMENT;
+        } else if (presetKey === "WOOD_BOARDWALK") {
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = T.boardwalk_z1;
+            serverMap.voxelGrid[(2 * MR + r) * MC + c] = T.paveNav_z2;
+            newGround = GT.PAWEMENT;
+        } else if (presetKey === "BEACH_SAND") {
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = T.sand_z1;
+            serverMap.voxelGrid[(2 * MR + r) * MC + c] = T.paveNav_z2;
+            if (serverMap.coastalSandMask) serverMap.coastalSandMask[idx] = 1;
+            newGround = GT.PAWEMENT;
+        } else if (presetKey === "TROPICAL_LAWN") {
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = T.lawn_z1;
+            serverMap.voxelGrid[(2 * MR + r) * MC + c] = T.lawnNav_z2;
+            newGround = GT.FIELD;
+        } else if (presetKey === "OCEAN_WATER") {
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = T.water_z1;
+            serverMap.voxelGrid[(2 * MR + r) * MC + c] = T.waterNav_z2;
+            newGround = GT.WATER;
+        } else if (presetKey.startsWith("BLDG_")) {
+            let storeys = Number(op.storeys) || 2;
+            let style = op.style !== undefined ? Number(op.style) : 0;
+            if (presetKey === "BLDG_ART_DECO_3F") { storeys = Number(op.storeys) || 1; style = op.style !== undefined ? Number(op.style) : 0; }
+            else if (presetKey === "BLDG_HOTEL_4F") { storeys = Number(op.storeys) || 2; style = op.style !== undefined ? Number(op.style) : 1; }
+            else if (presetKey === "BLDG_TOWER_5F") { storeys = Number(op.storeys) || 3; style = op.style !== undefined ? Number(op.style) : 3; }
+            else if (presetKey === "BLDG_SKYSCRAPER_6F") { storeys = Number(op.storeys) || 4; style = op.style !== undefined ? Number(op.style) : 10; }
+            storeys = Math.max(1, Math.min(4, storeys));
+            const topZ = Math.min(5, 1 + storeys);
+            serverMap.voxelGrid[(1 * MR + r) * MC + c] = T.pave_z1;
+            for (let z = 2; z < topZ; z++) {
+                serverMap.voxelGrid[(z * MR + r) * MC + c] = T.bldgWall_z;
+            }
+            serverMap.voxelGrid[(topZ * MR + r) * MC + c] = T.bldgTop_z;
+            newGround = GT.BUILDING;
+            newLayer = topZ;
+            if (serverMap.bldgIdGrid) serverMap.bldgIdGrid[idx] = 9000 + ((c * 31 + r * 17) & 0xfff);
+            if (serverMap.bldgStyleGrid) serverMap.bldgStyleGrid[idx] = style % 12;
+            if (serverMap.bldgTopZGrid) serverMap.bldgTopZGrid[idx] = topZ + 1;
+        }
+        if (serverMap.surfaceGround) serverMap.surfaceGround[idx] = newGround;
+        if (serverMap.surfaceLayer) serverMap.surfaceLayer[idx] = newLayer;
+        return true;
+    }
+    return false;
+}
+
 function normalizeRoomCode(roomCode) {
     const raw = String(roomCode || "VICE26").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "VICE26";
     return raw === "VICE97" ? "VICE26" : raw;
@@ -293,6 +475,12 @@ function loadPersistentState() {
                     }
                 }
                 persistentStore.econVer = ECON_VERSION;
+                if (persistentStore.rooms.VICE26 && persistentStore.rooms.VICE26.creationOps) {
+                    const savedOps = Object.values(persistentStore.rooms.VICE26.creationOps).sort((a, b) => ((a && a.ts) || 0) - ((b && b.ts) || 0));
+                    for (const op of savedOps) {
+                        applyCreationOpToServerMap(op);
+                    }
+                }
                 if (migratedAny) {
                     isDirty = true;
                 }
@@ -538,13 +726,11 @@ function sendRoomBootstrap(socket, meta) {
             standings: room.turfStandings
         });
     }
-    if (room.creationOps && Object.keys(room.creationOps).length > 0) {
-        sendJson(socket, {
-            t: "WORLD_EVENT",
-            kind: "CREATION_SYNC",
-            ops: Object.values(room.creationOps)
-        });
-    }
+    sendJson(socket, {
+        t: "WORLD_EVENT",
+        kind: "CREATION_SYNC",
+        ops: Object.values(room.creationOps || {})
+    });
     if (room.activeFlashDrop && (Date.now() - (room.activeFlashDrop.startedAt || 0)) < (room.activeFlashDrop.duration || 90) * 1000) {
         const remSec = Math.max(5, Math.round((room.activeFlashDrop.duration || 90) - (Date.now() - room.activeFlashDrop.startedAt) / 1000));
         sendJson(socket, Object.assign({}, room.activeFlashDrop, {
@@ -1059,6 +1245,16 @@ function handleClientPacket(socket, pkt) {
             const op = pkt.op;
             if (op.action === "CLEAR_ALL") {
                 room.creationOps = {};
+                if (roomCode === "VICE26") applyCreationOpToServerMap(op);
+                isDirty = true;
+            } else if (op.action === "RESTORE_VOXEL_TILE" && op.opKey) {
+                const k = String(op.opKey).slice(0, 96);
+                delete room.creationOps[k];
+                if (roomCode === "VICE26") applyCreationOpToServerMap(op);
+                isDirty = true;
+            } else if (op.action === "RESTORE_PREEXISTING") {
+                if (op.opKey) delete room.creationOps[String(op.opKey).slice(0, 96)];
+                if (op.targetId) delete room.creationOps[`rm_${String(op.targetId).slice(0, 92)}`];
                 isDirty = true;
             } else if (op.action === "REMOVE" && op.opKey) {
                 const k = String(op.opKey).slice(0, 96);
@@ -1067,13 +1263,61 @@ function handleClientPacket(socket, pkt) {
                 } else {
                     delete room.creationOps[k];
                 }
+                const targetId = op.targetId || op.opKey;
+                if (targetId) {
+                    if (room.modifiedVehs && room.modifiedVehs[targetId]) delete room.modifiedVehs[targetId];
+                    if (room.modifiedVehTs && room.modifiedVehTs[targetId]) delete room.modifiedVehTs[targetId];
+                    if (room.vehs && room.vehs[targetId]) delete room.vehs[targetId];
+                }
                 isDirty = true;
             } else if (op.opKey) {
                 const k = String(op.opKey).slice(0, 96);
                 room.creationOps[k] = Object.assign({}, op, { ts: Date.now() });
                 const keys = Object.keys(room.creationOps);
-                if (keys.length > 300) {
+                if (keys.length > 2500) {
                     delete room.creationOps[keys[0]];
+                }
+                if (roomCode === "VICE26" && op.action === "VOXEL_TILE") {
+                    applyCreationOpToServerMap(op);
+                }
+                if (op.action === "SPAWN_VEHICLE" && op.id && op.specKey) {
+                    const vrow = [
+                        op.id,
+                        op.specKey,
+                        Math.round(op.x || 0),
+                        Math.round(op.y || 0),
+                        2.0,
+                        Math.round((Number(op.angle) || 0) * 1000) / 1000,
+                        0,
+                        0,
+                        0,
+                        140,
+                        0,
+                        0,
+                        0,
+                        1
+                    ];
+                    if (!room.modifiedVehs) room.modifiedVehs = {};
+                    if (!room.modifiedVehTs) room.modifiedVehTs = {};
+                    room.modifiedVehs[op.id] = vrow;
+                    room.modifiedVehTs[op.id] = Date.now();
+                    room.vehs[op.id] = vrow;
+                } else if (op.action === "RELOCATE_ENTITY" && op.targetId) {
+                    const existingVeh = (room.modifiedVehs && room.modifiedVehs[op.targetId]) || (room.vehs && room.vehs[op.targetId]);
+                    if (Array.isArray(existingVeh) && existingVeh.length >= 11) {
+                        const uRow = existingVeh.slice();
+                        if (typeof op.x === "number") uRow[2] = Math.round(op.x);
+                        if (typeof op.y === "number") uRow[3] = Math.round(op.y);
+                        if (typeof op.angle === "number") uRow[5] = Math.round(op.angle * 1000) / 1000;
+                        uRow[6] = 0;
+                        uRow[7] = 0;
+                        uRow[13] = 1;
+                        if (!room.modifiedVehs) room.modifiedVehs = {};
+                        if (!room.modifiedVehTs) room.modifiedVehTs = {};
+                        room.modifiedVehs[op.targetId] = uRow;
+                        room.modifiedVehTs[op.targetId] = Date.now();
+                        room.vehs[op.targetId] = uRow;
+                    }
                 }
                 isDirty = true;
             }

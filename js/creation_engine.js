@@ -1,5 +1,5 @@
 /* ============================================================================
-   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_222)
+   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_224)
    ----------------------------------------------------------------------------
    Provides both:
    1. A Declarative Programmatic Creation API (`game.creationEngine.*`) with
@@ -23,7 +23,7 @@
     class ViceCreationEngine {
         constructor(game) {
             this.game = game;
-            this.version = "101_223";
+            this.version = "101_224";
             this.studioActive = false;
             this.freeCamActive = true;
             this.gridSnap = false;
@@ -38,6 +38,14 @@
             this.activeExpansionIdx = 0;
             this._paletteThemeIdx = 0;
             this._preExistingIndexed = false;
+            this._baseVoxelSnapshots = new Map();
+            this._activeVoxelEdits = new Map();
+            this._deletedPreExistingMap = new Map();
+            this._basePreExistingPoses = new Map();
+            this._basePreExistingStates = new Map();
+            this._persistedEntityPatches = new Map();
+            this._serverCreationSynced = false;
+            this._pendingAuthoritativeOps = null;
 
             // Active Studio UI state
             this.categories = ["TERRAIN", "VEHICLES", "PREFABS_3D", "PROPS_FLORA", "INTERIORS", "MISSIONS"];
@@ -576,6 +584,11 @@
             if (map.bldgStyleGrid) map.bldgStyleGrid[idx] = snap.bldgStyle;
             if (map.bldgTopZGrid) map.bldgTopZGrid[idx] = snap.bldgTopZ;
             if (map.coastalSandMask) map.coastalSandMask[idx] = snap.coastalSand;
+            const tKey = `${c}_${r}`;
+            const baseSnap = this._baseVoxelSnapshots ? this._baseVoxelSnapshots.get(tKey) : null;
+            if (baseSnap && snap.surfaceGround === baseSnap.surfaceGround && snap.bldgId === baseSnap.bldgId) {
+                this._activeVoxelEdits.delete(tKey);
+            }
             if (rebuildMesh) this.rebuildWorldMeshes(true);
         }
 
@@ -588,7 +601,17 @@
             const T = this._tplBlocks;
             if (!T) return { ok: false, reason: "TEMPLATES_UNAVAILABLE" };
 
+            const tKey = `${c}_${r}`;
             const beforeSnap = this.captureVoxelColumnSnapshot(c, r);
+            if (!this._baseVoxelSnapshots.has(tKey) && beforeSnap) {
+                this._baseVoxelSnapshots.set(tKey, beforeSnap);
+            }
+            this._activeVoxelEdits.set(tKey, {
+                c,
+                r,
+                presetKey,
+                opts: { storeys: opts.storeys, style: opts.style }
+            });
             const idx = r * MAP_COLS + c;
 
             // Clear column layers 1..5 first
@@ -767,6 +790,7 @@
                 existing.x = sx;
                 existing.y = sy;
                 existing.angle = sa;
+                this.reapplyPersistedEntityPatch(existing);
                 return existing;
             }
             const v = new Vehicle(id, key, sx, sy, sa);
@@ -774,6 +798,7 @@
             if (v.waterOnly) v.z = Math.max(2.0, v.z);
             v.driver = opts.driver || null;
             v.createdByEngine = true;
+            this.reapplyPersistedEntityPatch(v);
             this.game.vehicles.push(v);
             if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
                 this.game.rebuildVehicleSpatialGrid();
@@ -2038,9 +2063,16 @@
                 ent.x = newX;
                 ent.y = newY;
                 ent.angle = ang;
+                ent.netTargetX = newX;
+                ent.netTargetY = newY;
+                ent.netTargetAngle = ang;
+                ent.netErrX = 0;
+                ent.netErrY = 0;
                 ent.vx = 0;
                 ent.vy = 0;
                 ent.speed = 0;
+                ent._worldModified = true;
+                ent.isStaticParked = false;
                 if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
                     this.game.rebuildVehicleSpatialGrid();
                 }
@@ -2111,6 +2143,15 @@
             const beforeY = desc.type === "INTERIOR" ? ent.doorY : ent.y;
             const beforeAngle = ent.ang !== undefined ? ent.ang : (ent.angle || 0);
             const beforeFacing = ent.facing;
+            if (desc.isPreExisting && !this._basePreExistingPoses.has(desc.id)) {
+                this._basePreExistingPoses.set(desc.id, {
+                    desc,
+                    x: beforeX,
+                    y: beforeY,
+                    angle: beforeAngle,
+                    facing: beforeFacing
+                });
+            }
 
             const check = opts.skipValidation
                 ? { ok: true, snappedX: newX, snappedY: newY, snappedAngle: newAngle !== undefined ? newAngle : beforeAngle }
@@ -2200,6 +2241,10 @@
             };
             if (ent.spec && typeof ent.spec === "object") {
                 state.specCopy = Object.assign({}, ent.spec);
+                if (Array.isArray(ent.spec.wallColor)) state.specCopy.wallColor = ent.spec.wallColor.slice();
+                if (Array.isArray(ent.spec.trimColor)) state.specCopy.trimColor = ent.spec.trimColor.slice();
+                if (Array.isArray(ent.spec.roofBaseColor)) state.specCopy.roofBaseColor = ent.spec.roofBaseColor.slice();
+                if (Array.isArray(ent.spec.roofRidgeColor)) state.specCopy.roofRidgeColor = ent.spec.roofRidgeColor.slice();
             }
             return state;
         }
@@ -2209,6 +2254,13 @@
             const map = this.game && this.game.map;
             const oe = map && map.objectEngine;
             const ent = desc.entityRef;
+
+            if (desc.isPreExisting && !this._basePreExistingStates.has(desc.id)) {
+                this._basePreExistingStates.set(desc.id, {
+                    desc,
+                    state: this._captureEntityParametricState(desc)
+                });
+            }
 
             if (patch.name !== undefined) {
                 ent.name = String(patch.name);
@@ -2320,6 +2372,8 @@
                     ent.destroyed = false;
                     ent.smokeTimer = 0;
                 }
+                ent._worldModified = true;
+                ent.isStaticParked = false;
             } else if (desc.type === "PROP_FLORA") {
                 if (patch.scale !== undefined) ent.scale = Math.max(0.4, Math.min(2.5, Number(patch.scale) || 1.0));
                 if (patch.height !== undefined) ent.height = Math.max(0.4, Math.min(2.8, Number(patch.height) || 1.15));
@@ -2331,7 +2385,36 @@
                     if (oe) this.game.renderer._staticChunkGridMap.delete(oe.streetProps);
                 }
             }
+
+            if (desc.id) {
+                const prevPatch = this._persistedEntityPatches.get(desc.id) || {};
+                this._persistedEntityPatches.set(desc.id, Object.assign({}, prevPatch, patch));
+            }
             return true;
+        }
+
+        reapplyPersistedEntityPatch(entityOrId) {
+            if (!entityOrId || !this._persistedEntityPatches || this._persistedEntityPatches.size === 0) return false;
+            const id = typeof entityOrId === "string" ? entityOrId : entityOrId.id;
+            if (!id || !this._persistedEntityPatches.has(id)) return false;
+            const patch = this._persistedEntityPatches.get(id);
+            const ent = typeof entityOrId === "object" ? entityOrId : null;
+            if (ent) {
+                if (patch.color) ent.color = patch.color;
+                if (patch.stripe !== undefined) ent.stripe = patch.stripe;
+                if (patch.maxSpeed !== undefined) ent.maxSpeed = Number(patch.maxSpeed);
+                if (patch.accel !== undefined) ent.accel = Number(patch.accel);
+                if (patch.hp !== undefined) {
+                    ent.hp = Math.max(ent.hp || 100, Number(patch.hp));
+                    ent.maxHp = Math.max(ent.maxHp || 120, Number(patch.hp));
+                }
+                return true;
+            }
+            const desc = this._resolveEntityDescriptor(id);
+            if (desc) {
+                return this._applyEntityParametricPatch(desc, patch, { rebuildMesh: false });
+            }
+            return false;
         }
 
         modifyWorldEntity(targetOrId, patch = {}, opts = {}) {
@@ -2363,12 +2446,8 @@
             return desc.entityRef;
         }
 
-        removeNearestWorldEntity(x, y, maxRadius = 140, includePreExisting = true, opts = {}) {
-            const desc = this.findNearestWorldEntity(x, y, maxRadius, includePreExisting);
-            if (!desc) {
-                this.setStatus("NO WORLD ENTITY WITHIN RANGE TO DELETE");
-                return null;
-            }
+        _removeWorldEntityDescriptor(desc, opts = {}) {
+            if (!desc) return null;
             if (this.selectedEntity && this.selectedEntity.id === desc.id) {
                 this.selectedEntity = null;
             }
@@ -2395,7 +2474,7 @@
                 return desc;
             }
 
-            // Deleting a Pre-Existing World Entity with full Undo/Redo support!
+            // Deleting a Pre-Existing World Entity with full Undo/Redo & MMO Restore support!
             const map = this.game && this.game.map;
             const oe = map && map.objectEngine;
             const arr = desc.sourceArray;
@@ -2433,19 +2512,22 @@
             if (typeof this.game.rebuildVehicleSpatialGrid === "function" && desc.type === "VEHICLE") {
                 this.game.rebuildVehicleSpatialGrid();
             }
-            if (oe && this.game.renderer && this.game.renderer.gl && (desc.subtype === "ESTATE" || desc.subtype === "TIKI_BAR_3D" || desc.subtype === "SODA_ECOLA_3D" || desc.subtype === "SODA_SPRUNK_3D")) {
+            if (opts.rebuildMesh !== false && oe && this.game.renderer && this.game.renderer.gl && (desc.subtype === "ESTATE" || desc.subtype === "TIKI_BAR_3D" || desc.subtype === "SODA_ECOLA_3D" || desc.subtype === "SODA_SPRUNK_3D")) {
                 oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
             }
 
+            const delRecord = {
+                type: "DELETE_PREEXISTING",
+                desc,
+                sourceArray: arr,
+                arrayIndex: arrIdx,
+                entityRef: ent,
+                removedBarriers
+            };
+            this._deletedPreExistingMap.set(desc.id, delRecord);
+
             if (!opts.skipHistory) {
-                this._pushHistory({
-                    type: "DELETE_PREEXISTING",
-                    desc,
-                    sourceArray: arr,
-                    arrayIndex: arrIdx,
-                    entityRef: ent,
-                    removedBarriers
-                });
+                this._pushHistory(delRecord);
             }
             this._broadcastCreationOp({
                 action: "REMOVE",
@@ -2457,6 +2539,15 @@
             }, opts);
             this.setStatus(`DELETED PRE-EXISTING [${desc.label}] ([CTRL+Z] TO RESTORE)`);
             return desc;
+        }
+
+        removeNearestWorldEntity(x, y, maxRadius = 140, includePreExisting = true, opts = {}) {
+            const desc = this.findNearestWorldEntity(x, y, maxRadius, includePreExisting);
+            if (!desc) {
+                this.setStatus("NO WORLD ENTITY WITHIN RANGE TO DELETE");
+                return null;
+            }
+            return this._removeWorldEntityDescriptor(desc, opts);
         }
 
         cloneWorldEntityToPalette(x, y, maxRadius = 160) {
@@ -2519,10 +2610,17 @@
                 return true;
             }
             if (rec.type === "DELETE_PREEXISTING" && rec.entityRef && Array.isArray(rec.sourceArray)) {
-                const idx = Math.max(0, Math.min(rec.sourceArray.length, rec.arrayIndex >= 0 ? rec.arrayIndex : rec.sourceArray.length));
-                rec.sourceArray.splice(idx, 0, rec.entityRef);
+                if (!rec.sourceArray.includes(rec.entityRef)) {
+                    const idx = Math.max(0, Math.min(rec.sourceArray.length, rec.arrayIndex >= 0 ? rec.arrayIndex : rec.sourceArray.length));
+                    rec.sourceArray.splice(idx, 0, rec.entityRef);
+                }
+                if (rec.desc && rec.desc.id) {
+                    this._deletedPreExistingMap.delete(rec.desc.id);
+                }
                 if (map && Array.isArray(map.securityBarrierBoxes) && Array.isArray(rec.removedBarriers) && rec.removedBarriers.length > 0) {
-                    for (const bb of rec.removedBarriers) map.securityBarrierBoxes.push(bb);
+                    for (const bb of rec.removedBarriers) {
+                        if (!map.securityBarrierBoxes.includes(bb)) map.securityBarrierBoxes.push(bb);
+                    }
                     map.barrierBoxGrid = null;
                     if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
                 }
@@ -2535,7 +2633,7 @@
                         cell = [];
                         map.floraGrid.set(key, cell);
                     }
-                    cell.push(rec.entityRef);
+                    if (!cell.includes(rec.entityRef)) cell.push(rec.entityRef);
                 }
                 this._invalidateArrayAndPromptMasks(rec.sourceArray);
                 if (oe) oe._propColGrid = null;
@@ -2643,6 +2741,12 @@
 
             if (rec.type === "VOXEL_TILE" && rec.afterSnap) {
                 this.restoreVoxelColumnSnapshot(rec.afterSnap, true);
+                this._activeVoxelEdits.set(`${rec.c}_${rec.r}`, {
+                    c: rec.c,
+                    r: rec.r,
+                    presetKey: rec.presetKey,
+                    opts: rec.opts || {}
+                });
                 return true;
             }
             if (rec.type === "RELOCATE_ENTITY" && rec.desc) {
@@ -2664,6 +2768,9 @@
             if (rec.type === "DELETE_PREEXISTING" && rec.entityRef && Array.isArray(rec.sourceArray)) {
                 const idx = rec.sourceArray.indexOf(rec.entityRef);
                 if (idx >= 0) rec.sourceArray.splice(idx, 1);
+                if (rec.desc && rec.desc.id) {
+                    this._deletedPreExistingMap.set(rec.desc.id, rec);
+                }
                 if (map && Array.isArray(map.securityBarrierBoxes) && Array.isArray(rec.removedBarriers) && rec.removedBarriers.length > 0) {
                     const rmSet = new Set(rec.removedBarriers);
                     map.securityBarrierBoxes = map.securityBarrierBoxes.filter((b) => !rmSet.has(b));
@@ -2701,6 +2808,101 @@
             return false;
         }
 
+        _broadcastUndoAction(act) {
+            if (!act) return;
+            if (act.type === "VOXEL_TILE") {
+                this._broadcastCreationOp({
+                    action: "RESTORE_VOXEL_TILE",
+                    opKey: `voxel_${act.c}_${act.r}`,
+                    c: act.c,
+                    r: act.r,
+                    snap: act.beforeSnap
+                });
+            } else if (act.type === "RELOCATE_ENTITY" && act.id) {
+                this._broadcastCreationOp({
+                    action: "RELOCATE_ENTITY",
+                    opKey: `reloc_${act.id}`,
+                    targetId: act.id,
+                    x: Math.round((act.beforeX || 0) * 10) / 10,
+                    y: Math.round((act.beforeY || 0) * 10) / 10,
+                    angle: Math.round((act.beforeAngle || 0) * 1000) / 1000,
+                    facing: act.beforeFacing
+                });
+            } else if (act.type === "MODIFY_ENTITY" && act.id && act.beforeState) {
+                this._broadcastCreationOp({
+                    action: "MODIFY_ENTITY",
+                    opKey: `mod_${act.id}`,
+                    targetId: act.id,
+                    patch: act.beforeState
+                });
+            } else if (act.type === "DELETE_PREEXISTING" && act.desc && act.desc.id) {
+                this._broadcastCreationOp({
+                    action: "RESTORE_PREEXISTING",
+                    opKey: `rm_${act.desc.id}`,
+                    targetId: act.desc.id
+                });
+            } else if ((act.type === "VEHICLE" || act.type === "PREFAB_3D" || act.type === "PROP_FLORA" || act.type === "INTERIOR") && act.id) {
+                this._broadcastCreationOp({
+                    action: "REMOVE",
+                    opKey: act.id,
+                    targetId: act.id,
+                    x: Math.round(act.x || 0),
+                    y: Math.round(act.y || 0),
+                    isPreExisting: false
+                });
+            }
+        }
+
+        _broadcastRedoAction(act) {
+            if (!act) return;
+            if (act.type === "VOXEL_TILE") {
+                this._broadcastCreationOp({
+                    action: "VOXEL_TILE",
+                    opKey: `voxel_${act.c}_${act.r}`,
+                    c: act.c,
+                    r: act.r,
+                    presetKey: act.presetKey,
+                    storeys: act.opts && act.opts.storeys,
+                    style: act.opts && act.opts.style
+                });
+            } else if (act.type === "RELOCATE_ENTITY" && act.id) {
+                this._broadcastCreationOp({
+                    action: "RELOCATE_ENTITY",
+                    opKey: `reloc_${act.id}`,
+                    targetId: act.id,
+                    x: Math.round((act.afterX || 0) * 10) / 10,
+                    y: Math.round((act.afterY || 0) * 10) / 10,
+                    angle: Math.round((act.afterAngle || 0) * 1000) / 1000,
+                    facing: act.afterFacing
+                });
+            } else if (act.type === "MODIFY_ENTITY" && act.id && act.afterState) {
+                this._broadcastCreationOp({
+                    action: "MODIFY_ENTITY",
+                    opKey: `mod_${act.id}`,
+                    targetId: act.id,
+                    patch: act.afterState
+                });
+            } else if (act.type === "DELETE_CREATED" && act.record && act.record.id) {
+                this._broadcastCreationOp({
+                    action: "REMOVE",
+                    opKey: act.record.id,
+                    targetId: act.record.id,
+                    x: Math.round(act.record.x || 0),
+                    y: Math.round(act.record.y || 0),
+                    isPreExisting: false
+                });
+            } else if (act.type === "DELETE_PREEXISTING" && act.desc && act.desc.id) {
+                this._broadcastCreationOp({
+                    action: "REMOVE",
+                    opKey: `rm_${act.desc.id}`,
+                    targetId: act.desc.id,
+                    x: Math.round(act.desc.x || 0),
+                    y: Math.round(act.desc.y || 0),
+                    isPreExisting: true
+                });
+            }
+        }
+
         undo() {
             if (this.undoStack.length === 0) {
                 this.setStatus("UNDO STACK EMPTY");
@@ -2711,6 +2913,7 @@
             if (act.type !== "RELOCATE_ENTITY" && act.type !== "MODIFY_ENTITY" && act.type !== "DELETE_PREEXISTING" && act.type !== "DELETE_CREATED") {
                 this.createdEntities = this.createdEntities.filter((e) => e !== act && (e.id === undefined || e.id !== act.id));
             }
+            this._broadcastUndoAction(act);
             this.redoStack.push(act);
             this.saveToLocalStorage();
             this.setStatus(`UNDID [${act.type}]`);
@@ -2724,6 +2927,7 @@
             }
             const act = this.redoStack.pop();
             this.reapplyCreatedRecord(act);
+            this._broadcastRedoAction(act);
             this.undoStack.push(act);
             this.saveToLocalStorage();
             this.setStatus(`REDID [${act.type}]`);
@@ -2731,33 +2935,10 @@
         }
 
         removeNearestCreatedEntity(x, y, maxRadius = 110, allowPreExisting = false) {
-            if (allowPreExisting) {
-                return this.removeNearestWorldEntity(x, y, maxRadius, true);
-            }
-            let bestIdx = -1;
-            let bestDist = maxRadius;
-            for (let i = this.createdEntities.length - 1; i >= 0; i--) {
-                const e = this.createdEntities[i];
-                if (!e || typeof e.x !== "number" || typeof e.y !== "number") continue;
-                const d = Math.hypot(e.x - x, e.y - y);
-                if (d < bestDist) {
-                    bestDist = d;
-                    bestIdx = i;
-                }
-            }
-            if (bestIdx >= 0) {
-                const rec = this.createdEntities.splice(bestIdx, 1)[0];
-                this.removeCreatedRecord(rec);
-                this._pushHistory({ type: "DELETE_CREATED", record: rec });
-                this.saveToLocalStorage();
-                this.setStatus(`DELETED [${rec.type}: ${rec.prefabId || rec.specKey || rec.kind || rec.name || rec.id}]`);
-                return rec;
-            }
-            this.setStatus("NO CREATED ENTITY WITHIN RANGE TO DELETE");
-            return null;
+            return this.removeNearestWorldEntity(x, y, maxRadius, Boolean(allowPreExisting));
         }
 
-        clearAllCreations(opts = {}) {
+        resetToCleanBaseWorld() {
             while (this.undoStack.length > 0) {
                 const act = this.undoStack.pop();
                 this.removeCreatedRecord(act);
@@ -2769,7 +2950,41 @@
             this.redoStack.length = 0;
             this.selectedEntity = null;
             this.grabbedEntity = null;
-            this.rebuildWorldMeshes(true);
+
+            if (this._deletedPreExistingMap && this._deletedPreExistingMap.size > 0) {
+                for (const delRec of Array.from(this._deletedPreExistingMap.values())) {
+                    this.removeCreatedRecord(Object.assign({ type: "DELETE_PREEXISTING" }, delRec));
+                }
+                this._deletedPreExistingMap.clear();
+            }
+            if (this._basePreExistingStates && this._basePreExistingStates.size > 0) {
+                for (const { desc, state } of this._basePreExistingStates.values()) {
+                    this._applyEntityParametricPatch(desc, state, { rebuildMesh: false });
+                }
+                this._basePreExistingStates.clear();
+            }
+            if (this._basePreExistingPoses && this._basePreExistingPoses.size > 0) {
+                for (const { desc, x, y, angle, facing } of this._basePreExistingPoses.values()) {
+                    this._applyEntityPose(desc, x, y, angle, { skipValidation: true, facing, rebuildMesh: false });
+                }
+                this._basePreExistingPoses.clear();
+            }
+            if (this._baseVoxelSnapshots && this._baseVoxelSnapshots.size > 0) {
+                for (const snap of this._baseVoxelSnapshots.values()) {
+                    this.restoreVoxelColumnSnapshot(snap, false);
+                }
+                this._baseVoxelSnapshots.clear();
+            }
+            if (this._activeVoxelEdits) this._activeVoxelEdits.clear();
+            if (this._persistedEntityPatches) this._persistedEntityPatches.clear();
+            return true;
+        }
+
+        clearAllCreations(opts = {}) {
+            this.resetToCleanBaseWorld();
+            if (opts.rebuildMesh !== false) {
+                this.rebuildWorldMeshes(true);
+            }
             if (!opts.skipSave) this.saveToLocalStorage();
             this._broadcastCreationOp({
                 action: "CLEAR_ALL",
@@ -2799,6 +3014,14 @@
                     style: op.style
                 }));
                 return true;
+            }
+            if (op.action === "RESTORE_VOXEL_TILE" && typeof op.c === "number" && typeof op.r === "number") {
+                const snap = op.snap || (this._baseVoxelSnapshots ? this._baseVoxelSnapshots.get(`${op.c}_${op.r}`) : null);
+                if (snap) {
+                    this.restoreVoxelColumnSnapshot(snap, !opts.batch);
+                    return true;
+                }
+                return false;
             }
             if (op.action === "DEFINE_VEHICLE" && op.specKey) {
                 this.defineVehicle(op.specKey, Object.assign({}, op.config, { isRemote: true, skipBroadcast: true }));
@@ -2847,10 +3070,18 @@
                 this.modifyWorldEntity(op.targetId, op.patch, remoteOpts);
                 return true;
             }
+            if (op.action === "RESTORE_PREEXISTING" && op.targetId) {
+                const delRec = this._deletedPreExistingMap ? this._deletedPreExistingMap.get(op.targetId) : null;
+                if (delRec) {
+                    this.removeCreatedRecord(Object.assign({ type: "DELETE_PREEXISTING" }, delRec));
+                    return true;
+                }
+                return false;
+            }
             if (op.action === "REMOVE") {
                 const desc = op.targetId ? this._resolveEntityDescriptor(op.targetId) : null;
                 if (desc) {
-                    this.removeNearestWorldEntity(desc.x, desc.y, 32, true, remoteOpts);
+                    this._removeWorldEntityDescriptor(desc, remoteOpts);
                     return true;
                 }
                 if (typeof op.x === "number" && typeof op.y === "number") {
@@ -2864,6 +3095,27 @@
                 return true;
             }
             return false;
+        }
+
+        applyAuthoritativeServerCreationSync(ops = []) {
+            if (!this.game || !this.game.map || !this.game.map.cmpLoaded) {
+                this._pendingAuthoritativeOps = Array.isArray(ops) ? ops.slice() : [];
+                return false;
+            }
+            this._pendingAuthoritativeOps = null;
+            this.resetToCleanBaseWorld();
+            const sortedOps = (Array.isArray(ops) ? ops.slice() : []).sort((a, b) => ((a && a.ts) || 0) - ((b && b.ts) || 0));
+            let applied = 0;
+            for (const op of sortedOps) {
+                if (this.applyRemoteCreationOp(op, { batch: true })) {
+                    applied++;
+                }
+            }
+            this._serverCreationSynced = true;
+            this.rebuildWorldMeshes(false);
+            this.saveToLocalStorage();
+            this.setStatus(`MMO WORLD SYNCED (${applied} AUTHORITATIVE SERVER CREATIONS)`);
+            return true;
         }
 
         /* ====================================================================
@@ -2932,17 +3184,9 @@
         }
 
         exportBlueprintJSON() {
-            const voxelEdits = [];
-            for (const act of this.undoStack) {
-                if (act.type === "VOXEL_TILE") {
-                    voxelEdits.push({
-                        c: act.c,
-                        r: act.r,
-                        presetKey: act.presetKey,
-                        opts: act.opts || {}
-                    });
-                }
-            }
+            const voxelEdits = this._activeVoxelEdits && this._activeVoxelEdits.size > 0
+                ? Array.from(this._activeVoxelEdits.values())
+                : [];
             const entities = this.createdEntities.map((e) => ({
                 type: e.type,
                 subtype: e.subtype,

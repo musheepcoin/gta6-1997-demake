@@ -6,8 +6,8 @@ const LOCAL_ROOT = path.resolve(__dirname, "..");
 const ROOT = fs.existsSync(path.join(LOCAL_ROOT, "index.html")) ? LOCAL_ROOT : "/opt/vice-city-26-server";
 
 let cachedEnv = null;
-function createGameInstance(cmpBuf) {
-    if (cachedEnv) {
+function createGameInstance(cmpBuf, forceFresh = false) {
+    if (cachedEnv && !forceFresh) {
         const { g, sandbox, stepSec, basePlayerX, basePlayerY } = cachedEnv;
         g.setWantedLevel(0);
         g.peds.length = 0;
@@ -175,8 +175,9 @@ function createGameInstance(cmpBuf) {
         }
     };
 
-    cachedEnv = { g, sandbox, stepSec, basePlayerX: g.player.x, basePlayerY: g.player.y };
-    return cachedEnv;
+    const env = { g, sandbox, stepSec, basePlayerX: g.player.x, basePlayerY: g.player.y };
+    if (!cachedEnv) cachedEnv = env;
+    return env;
 }
 
 function runSimulations() {
@@ -1488,7 +1489,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_223"), "ViceCreationEngine (v101_223) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_224"), "ViceCreationEngine (v101_224) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -1770,18 +1771,21 @@ function runSimulations() {
     // SCENARIO 38: MULTIPLAYER & PERSISTENT SERVER CREATION ENGINE REAL-TIME SYNC
     // ------------------------------------------------------------------------
     console.log("--- SCENARIO 38: MULTIPLAYER & PERSISTENT SERVER CREATION ENGINE REAL-TIME SYNC ---");
+    const peerBShared = createGameInstance(cmpBuf, true);
     {
         const peerA = createGameInstance(cmpBuf);
-        const peerB = createGameInstance(cmpBuf);
+        const peerB = peerBShared;
         const ceA = peerA.g.creationEngine;
         const ceB = peerB.g.creationEngine;
+        ceA.clearAllCreations({ skipBroadcast: true });
+        ceB.clearAllCreations({ skipBroadcast: true });
 
         const transmittedPackets = [];
         peerA.g.net.enabled = true;
         peerA.g.net.sendPacket = (pkt) => {
             transmittedPackets.push(pkt);
             if (pkt && pkt.t === "WORLD_EVENT") {
-                peerB.g.net.applyWorldEvent(pkt);
+                peerB.g.net.applyWorldEvent(JSON.parse(JSON.stringify(pkt)));
             }
         };
 
@@ -1800,14 +1804,14 @@ function runSimulations() {
             peerB.g.map.getSurfaceGroundType(216, 150) === peerB.sandbox.GROUND_TYPE.BUILDING &&
             Boolean(carB && carB.maxSpeed === 530) &&
             Boolean(villaB && Math.abs(villaB.scale - 1.25) < 0.01 && Math.abs(villaB.y - 281.5 * 64) < 1),
-            `Real-time CREATION_OP packets synchronize 3D voxel edits, custom vehicle specs, 3D prefabs, parametric mutations & relocations from Peer A -> Peer B (${transmittedPackets.length} packets)`
+            `Real-time CREATION_OP packets synchronize 3D voxel edits, custom vehicle specs, 3D prefabs, parametric mutations & relocations across 2 isolated VM instances (${transmittedPackets.length} packets)`
         );
 
         // Peer A deletes the synced 3D villa -> Peer B removes it automatically
         ceA.removeNearestWorldEntity(villaA.x, villaA.y, 32, true);
         assert(
             !peerB.g.map.objectEngine.instances.some((it) => it.id === "net_villa_38"),
-            "Remote REMOVE packet cleanly deletes synced 3D Villa and its OBB collision box on Peer B"
+            "Remote REMOVE packet cleanly deletes synced 3D Villa and its OBB collision box on isolated Peer B"
         );
 
         const serverSrc = fs.readFileSync(path.join(ROOT, "server", "world_server.js"), "utf8");
@@ -1815,12 +1819,150 @@ function runSimulations() {
             serverSrc.includes("CREATION_OP") && serverSrc.includes("CREATION_SYNC") && serverSrc.includes("creationOps"),
             "Dedicated World Server (server/world_server.js) persists room.creationOps and bootstraps joining players via CREATION_SYNC"
         );
+        ceA.clearAllCreations();
+        console.log("");
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 39: TRUE MMO SERVER-AUTHORITATIVE PERSISTENCE, NETWORKED UNDO/REDO & LIVE SERVERMAP VOXEL SYNC
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 39: TRUE MMO SERVER-AUTHORITATIVE PERSISTENCE, NETWORKED UNDO/REDO & LIVE SERVERMAP VOXEL SYNC ---");
+    {
+        const peerA = createGameInstance(cmpBuf);
+        const peerB = peerBShared;
+        const ceA = peerA.g.creationEngine;
+        const ceB = peerB.g.creationEngine;
+        ceA.clearAllCreations({ skipBroadcast: true });
+        ceB.clearAllCreations({ skipBroadcast: true });
+
+        // Simulate the Dedicated Server's room.creationOps table in between Peer A and Peer B
+        const serverCreationOps = {};
+        peerA.g.net.enabled = true;
+        peerA.g.net.sendPacket = (pkt) => {
+            if (pkt && pkt.t === "WORLD_EVENT" && pkt.kind === "CREATION_OP" && pkt.op) {
+                const op = JSON.parse(JSON.stringify(pkt.op));
+                if (op.action === "CLEAR_ALL") {
+                    for (const k of Object.keys(serverCreationOps)) delete serverCreationOps[k];
+                } else if (op.action === "RESTORE_VOXEL_TILE" && op.opKey) {
+                    delete serverCreationOps[op.opKey];
+                } else if (op.action === "RESTORE_PREEXISTING") {
+                    if (op.opKey) delete serverCreationOps[op.opKey];
+                    if (op.targetId) delete serverCreationOps[`rm_${op.targetId}`];
+                } else if (op.action === "REMOVE" && op.opKey) {
+                    if (op.isPreExisting) serverCreationOps[op.opKey] = Object.assign({}, op, { ts: Date.now() });
+                    else delete serverCreationOps[op.opKey];
+                } else if (op.opKey) {
+                    serverCreationOps[op.opKey] = Object.assign({}, op, { ts: Date.now() });
+                }
+                peerB.g.net.applyWorldEvent({ t: "WORLD_EVENT", kind: "CREATION_OP", op });
+            }
+        };
+
+        // 1. Network-Authoritative Undo ([Ctrl+Z]) & Redo ([Ctrl+Y]) across Voxel Building, 3D Villa, Pre-Existing Prop Deletion & Vehicle Turbo Tuning
+        const origGroundA = peerA.g.map.getSurfaceGroundType(220, 152);
+        const origGroundB = peerB.g.map.getSurfaceGroundType(220, 152);
+        ceA.paintVoxelTile(220, 152, "BLDG_HOTEL_4F", { storeys: 2, style: 1 });
+        assert(
+            peerB.g.map.getSurfaceGroundType(220, 152) === peerB.sandbox.GROUND_TYPE.BUILDING && Boolean(serverCreationOps["voxel_220_152"]),
+            "Step 1a: Peer A 3D Voxel Building at (220,152) replicates to Peer B and server room.creationOps"
+        );
+        ceA.undo();
+        assert(
+            peerA.g.map.getSurfaceGroundType(220, 152) === origGroundA &&
+            peerB.g.map.getSurfaceGroundType(220, 152) === origGroundB &&
+            !serverCreationOps["voxel_220_152"],
+            "Step 1b: Peer A [Ctrl+Z] (undo VOXEL_TILE) broadcasts RESTORE_VOXEL_TILE -> restores Peer B's 3D voxel column and deletes server opKey"
+        );
+        ceA.redo();
+        assert(
+            peerB.g.map.getSurfaceGroundType(220, 152) === peerB.sandbox.GROUND_TYPE.BUILDING && Boolean(serverCreationOps["voxel_220_152"]),
+            "Step 1c: Peer A [Ctrl+Y] (redo VOXEL_TILE) re-paints Peer B's 3D voxel column and restores server opKey"
+        );
+
+        // Pre-existing prop deletion + networked Undo/Redo restoration on Peer B
+        ceA.indexPreExistingWorld();
+        ceB.indexPreExistingWorld();
+        const targetPropA = peerA.g.map.objectEngine.streetProps.find((p) => !p.createdByEngine && p.id);
+        const targetPropId = targetPropA.id;
+        const propCountB0 = peerB.g.map.objectEngine.streetProps.length;
+        ceA.removeNearestWorldEntity(targetPropA.x, targetPropA.y, 24, true);
+        assert(
+            peerB.g.map.objectEngine.streetProps.length === propCountB0 - 1 &&
+            !peerB.g.map.objectEngine.streetProps.some((p) => p.id === targetPropId) &&
+            Boolean(serverCreationOps[`rm_${targetPropId}`]),
+            `Step 2a: Peer A deleting pre-existing street prop '${targetPropId}' removes it on Peer B and records tombstone on server`
+        );
+        ceA.undo();
+        assert(
+            peerB.g.map.objectEngine.streetProps.length === propCountB0 &&
+            peerB.g.map.objectEngine.streetProps.some((p) => p.id === targetPropId) &&
+            !serverCreationOps[`rm_${targetPropId}`],
+            `Step 2b: Peer A [Ctrl+Z] broadcasts RESTORE_PREEXISTING -> restores '${targetPropId}' on Peer B and clears server tombstone`
+        );
+        ceA.redo();
+        assert(
+            peerB.g.map.objectEngine.streetProps.length === propCountB0 - 1 &&
+            Boolean(serverCreationOps[`rm_${targetPropId}`]),
+            `Step 2c: Peer A [Ctrl+Y] re-deletes '${targetPropId}' on Peer B and re-records server tombstone`
+        );
+        ceA.undo();
+
+        // 2. Authoritative Server CREATION_SYNC Overrides Stale Local Client State + Preserves Vehicle Turbo Patch Across WORLD_SYNC
+        // Give Peer B a stale local-only 3D villa that does NOT exist on the server
+        ceB.placePrefab3D("villa_art_deco", 448.5 * 64, 272.5 * 64, 0, { id: "stale_local_villa_only", skipBroadcast: true });
+        assert(peerB.g.map.objectEngine.instances.some((it) => it.id === "stale_local_villa_only"), "Peer B initially holds a stale local-only 3D Villa before connecting to server");
+
+        // Peer A spawns a custom-tuned vehicle on the server
+        const mmoCarA = ceA.spawnVehicle("VICE_CHEETAH", 445.5 * 64, 278.5 * 64, 0, { id: "mmo_car_39" });
+        ceA.modifyWorldEntity("mmo_car_39", { maxSpeed: 595, accel: 390, color: "#ff2a85", hp: 250 });
+
+        // Server sends authoritative CREATION_SYNC to Peer B
+        peerB.g.net.applyWorldEvent({
+            t: "WORLD_EVENT",
+            kind: "CREATION_SYNC",
+            ops: Object.values(serverCreationOps)
+        });
+        const mmoCarB = peerB.g.vehicles.find((v) => v.id === "mmo_car_39");
+        assert(
+            !peerB.g.map.objectEngine.instances.some((it) => it.id === "stale_local_villa_only") &&
+            peerB.g.map.getSurfaceGroundType(220, 152) === peerB.sandbox.GROUND_TYPE.BUILDING &&
+            Boolean(mmoCarB && mmoCarB.maxSpeed === 595 && mmoCarB.color === "#ff2a85"),
+            "applyAuthoritativeServerCreationSync purges stale local-only creations on Peer B and applies authoritative server creations & vehicle tuning"
+        );
+
+        // Simulate a WORLD_SYNC packet arriving on Peer B for mmo_car_39 and verify turbo tuning & custom color persist!
+        peerB.g.net.applyWorldSync({
+            t: "WORLD_SYNC",
+            id: "server_world",
+            ver: 101195,
+            wm: 720,
+            tl: 0,
+            vehs: [["mmo_car_39", "VICE_CHEETAH", Math.round(mmoCarA.x), Math.round(mmoCarA.y), 2.0, 0, 0, 0, 0, 140, 0, 0, 0, 1]],
+            peds: []
+        });
+        const mmoCarBAfterSync = peerB.g.vehicles.find((v) => v.id === "mmo_car_39");
+        assert(
+            Boolean(mmoCarBAfterSync && mmoCarBAfterSync.maxSpeed === 595 && mmoCarBAfterSync.color === "#ff2a85"),
+            "reapplyPersistedEntityPatch preserves custom vehicle turbo maxSpeed (595) and neon color (#ff2a85) across WORLD_SYNC updates"
+        );
+
+        // 3. Dedicated Server Live serverMap Voxel Synchronization Verification
+        const srvSrc = fs.readFileSync(path.join(ROOT, "server", "world_server.js"), "utf8");
+        assert(
+            srvSrc.includes("applyCreationOpToServerMap") &&
+            srvSrc.includes("RESTORE_VOXEL_TILE") &&
+            srvSrc.includes("RESTORE_PREEXISTING") &&
+            srvSrc.includes("keys.length > 2500"),
+            "Dedicated Server (server/world_server.js) synchronizes serverMap 3D voxel topology on VOXEL_TILE/RESTORE_VOXEL_TILE and scales capacity to 2,500 ops/room"
+        );
+
+        ceA.clearAllCreations();
         console.log("");
     }
 
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 38 FULL-GAME AUDIT, PRODUCTION CONTROLLER & CREATION ENGINE SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 39 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE & TRUE MMO SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

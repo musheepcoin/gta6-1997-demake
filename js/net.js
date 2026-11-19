@@ -284,12 +284,19 @@ class ViceNetworkManager {
     }
 
     flushPendingPropSync() {
-        if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && Array.isArray(this._pendingCreationOps) && this._pendingCreationOps.length > 0) {
-            const ops = this._pendingCreationOps.splice(0, this._pendingCreationOps.length);
-            for (const op of ops) {
-                this.game.creationEngine.applyRemoteCreationOp(op, { batch: true });
+        if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine) {
+            if (Array.isArray(this.game.creationEngine._pendingAuthoritativeOps)) {
+                const authOps = this.game.creationEngine._pendingAuthoritativeOps;
+                this.game.creationEngine._pendingAuthoritativeOps = null;
+                this.game.creationEngine.applyAuthoritativeServerCreationSync(authOps);
             }
-            this.game.creationEngine.rebuildWorldMeshes(false);
+            if (Array.isArray(this._pendingCreationOps) && this._pendingCreationOps.length > 0) {
+                const ops = this._pendingCreationOps.splice(0, this._pendingCreationOps.length);
+                for (const op of ops) {
+                    this.game.creationEngine.applyRemoteCreationOp(op, { batch: true });
+                }
+                this.game.creationEngine.rebuildWorldMeshes(false);
+            }
         }
         if (!this._pendingPropSync || this._pendingPropSync.length === 0) return;
         if (!this.game || !this.game.map || !this.game.map.cmpLoaded) return;
@@ -2132,7 +2139,9 @@ class ViceNetworkManager {
                 this._pendingCreationOps.push(pkt.op);
             }
         } else if (pkt.kind === "CREATION_SYNC" && Array.isArray(pkt.ops)) {
-            if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && typeof this.game.creationEngine.applyRemoteCreationOp === "function") {
+            if (this.game && this.game.creationEngine && typeof this.game.creationEngine.applyAuthoritativeServerCreationSync === "function") {
+                this.game.creationEngine.applyAuthoritativeServerCreationSync(pkt.ops);
+            } else if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && typeof this.game.creationEngine.applyRemoteCreationOp === "function") {
                 for (const op of pkt.ops) {
                     this.game.creationEngine.applyRemoteCreationOp(op, { batch: true });
                 }
@@ -2686,6 +2695,9 @@ class ViceNetworkManager {
                 v.heavyDented = Boolean(flags & 16);
                 if ((flags & 32) && (v.doorOpenTimer || 0) <= 0) v.doorOpenTimer = 0.35;
                 if (flags & 64) v.aiPanicTimer = Math.max(v.aiPanicTimer || 0, 1.0);
+                if (g.creationEngine && typeof g.creationEngine.reapplyPersistedEntityPatch === "function") {
+                    g.creationEngine.reapplyPersistedEntityPatch(v);
+                }
             }
 
             if (typeof g.rebuildVehicleSpatialGrid === "function") {

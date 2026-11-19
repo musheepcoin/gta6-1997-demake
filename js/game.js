@@ -1514,7 +1514,12 @@ class LeonidaGame {
 
         this.worldReady = true;
         this._resetLoopClock = true;
-        if (this.creationEngine && typeof this.creationEngine.loadFromLocalStorage === "function") {
+        if (
+            this.creationEngine &&
+            typeof this.creationEngine.loadFromLocalStorage === "function" &&
+            !this.creationEngine._serverCreationSynced &&
+            !Array.isArray(this.creationEngine._pendingAuthoritativeOps)
+        ) {
             this.creationEngine.loadFromLocalStorage();
         }
         if (this.net && typeof this.net.onWorldReady === "function") {
