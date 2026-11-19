@@ -318,6 +318,18 @@ class MissionManager {
                 }
             }
         } else if (m.id === "M3_OCEAN_DRIVE") {
+            const cheetahSunk = Boolean(
+                m.targetCar &&
+                !m.targetCar.amphibious &&
+                !m.targetCar.waterOnly &&
+                g.map &&
+                g.map.isWaterAtPixel &&
+                g.map.isWaterAtPixel(m.targetCar.x, m.targetCar.y)
+            );
+            if (cheetahSunk) {
+                this.failMission("THE TARGET CHEETAH SANK IN BISCAYNE BAY!");
+                return;
+            }
             if (m.stage === 1) {
                 if (m.targetCar && !m.targetCar.destroyed) {
                     m.targetPos = { x: m.targetCar.x, y: m.targetCar.y };
@@ -376,6 +388,19 @@ class MissionManager {
                 }
             }
         } else if (m.id === "M0_DYNAMIC_FIXER") {
+            const fixerCarSunk = Boolean(
+                m.targetCar &&
+                !m.targetCar.amphibious &&
+                !m.targetCar.waterOnly &&
+                g.map &&
+                g.map.isWaterAtPixel &&
+                g.map.isWaterAtPixel(m.targetCar.x, m.targetCar.y)
+            );
+            if (fixerCarSunk) {
+                this.failMission("THE CONTRACT VEHICLE SANK IN THE WATER!");
+                return;
+            }
+            const speedBonus = (m.timer || 0) >= 35 ? 300 : 0;
             if (m.archetype === "HIJACK_LIVE_TARGET") {
                 if (m.stage === 1) {
                     if (!m.targetCar || m.targetCar.destroyed) {
@@ -401,7 +426,7 @@ class MissionManager {
                         return;
                     }
                     if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 92) {
-                        this.completeMission(null, `FIXER BOOST: ${m.targetCar.name}`, m.reward || 1200);
+                        this.completeMission(null, `FIXER BOOST: ${m.targetCar.name}`, (m.reward || 1200) + speedBonus);
                     }
                 }
             } else if (m.archetype === "RAM_AND_EXTORT") {
@@ -413,7 +438,7 @@ class MissionManager {
                         const dropX = tc ? tc.x : m.targetPos.x;
                         const dropY = tc ? tc.y : m.targetPos.y;
                         if (p.inVehicle === tc) {
-                            this.completeMission(null, "COURIER HIJACKED & LOOTED", m.reward || 1500);
+                            this.completeMission(null, "COURIER HIJACKED & LOOTED", (m.reward || 1500) + speedBonus);
                             return;
                         }
                         m.stage = 2;
@@ -428,7 +453,7 @@ class MissionManager {
                     }
                 } else if (m.stage === 2) {
                     if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 46) {
-                        this.completeMission(null, "CARTEL COURIER EXTORTION", m.reward || 1500);
+                        this.completeMission(null, "CARTEL COURIER EXTORTION", (m.reward || 1500) + speedBonus);
                     }
                 }
             } else if (m.archetype === "SPEED_BOMB_RUN") {
@@ -477,14 +502,14 @@ class MissionManager {
                         m.slowTimer = Math.max(0, (m.slowTimer || 0) - dt * 1.6);
                     }
                     if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 90) {
-                        this.completeMission(null, `NITRO SPEED DELIVERY (${m.dropName})`, m.reward || 1800);
+                        this.completeMission(null, `NITRO SPEED DELIVERY (${m.dropName})`, (m.reward || 1800) + speedBonus);
                     }
                 }
             } else if (m.archetype === "VIP_HIT_SQUAD") {
                 if (m.targetPed && !m.targetPed.dead) {
                     m.targetPos = { x: m.targetPed.x, y: m.targetPed.y };
                 } else {
-                    this.completeMission(null, `SYNDICATE VIP ELIMINATED`, m.reward || 1500);
+                    this.completeMission(null, `SYNDICATE VIP ELIMINATED`, (m.reward || 1500) + speedBonus);
                 }
             }
         }
@@ -823,6 +848,9 @@ class MissionManager {
         this.cleanupMissionVehicles();
         this.activeMission = null;
         g.addCash(finalReward, "MISSION PASSED!", true);
+        if (typeof g.addTurfInfluence === "function") {
+            g.addTurfInfluence(250);
+        }
         if (g.net && typeof g.net.broadcastStateNow === "function") {
             g.net.broadcastStateNow();
         }

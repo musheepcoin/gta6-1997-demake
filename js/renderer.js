@@ -7630,8 +7630,10 @@ class RetroRenderer {
             if (game.activeInterior) {
                 this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), this.canvas.width * 0.5, 118, 1.35, "center");
             } else {
+                if (Math.abs(ft.x - this.camX) > 960 || Math.abs(ft.y - this.camY) > 720) continue;
                 const ftZ = ft.z !== undefined ? ft.z : (this.camZBlocks + 0.35);
                 const sp = this.worldToScreen(ft.x, ft.y, ftZ);
+                if (sp.x < -160 || sp.x > this.canvas.width + 160 || sp.y < -60 || sp.y > this.canvas.height + 60) continue;
                 this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), sp.x, sp.y, 1.35, "center");
             }
         }
@@ -12297,8 +12299,8 @@ class RetroRenderer {
 
         const nf = Math.max(0, Math.min(1, this.nightFactor !== undefined ? this.nightFactor : (this.nightMode ? 1.0 : 0.0)));
         const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0.0));
-        // Artificial lights (streetlamps, neon signs, headlights) fade on smoothly as dusk deepens (nf > 0.12)
-        const lightInt = Math.max(0, Math.min(1, (nf - 0.10) / 0.55));
+        // Artificial lights (streetlamps, neon signs, headlights) fade on smoothly at sunset/twilight (sf > 0.32 or nf > 0.08)
+        const lightInt = Math.max(0, Math.min(1, Math.max((nf - 0.08) / 0.52, (sf - 0.32) * 0.65)));
 
         // 1. Fill offscreen lightmap with smooth Day (255,255,255) -> Golden-Pink Sunset -> Deep Midnight Darkness (34,44,76)
         const ambR = Math.round(Math.max(24, Math.min(255, 255 * (1.0 - nf) + 34 * nf - sf * 10 * (1.0 - nf))));
@@ -17646,6 +17648,41 @@ class RetroRenderer {
             fctx.strokeStyle = "#ff2a85";
             fctx.lineWidth = 2;
             fctx.strokeRect(tx - pulse, ty - pulse, pulse * 2, pulse * 2);
+        }
+
+        if (game.activeFlashEvent) {
+            const fx = Math.round(game.activeFlashEvent.x * sx);
+            const fy = Math.round(game.activeFlashEvent.y * sy);
+            const fpulse = 7 + Math.sin(this.time * 9) * 2.5;
+            fctx.strokeStyle = "#fde047";
+            fctx.lineWidth = 2.2;
+            fctx.strokeRect(fx - fpulse, fy - fpulse, fpulse * 2, fpulse * 2);
+            fctx.fillStyle = "#fde047";
+            fctx.fillRect(fx - 3, fy - 3, 6, 6);
+        }
+
+        if (game.activeServerBounty && game.net) {
+            let bx = null;
+            let by = null;
+            const myId = game.net.playerId || "local";
+            if (game.activeServerBounty.targetId === myId && game.player) {
+                bx = Math.round(game.player.x * sx);
+                by = Math.round(game.player.y * sy);
+            } else if (game.net.remotePlayers) {
+                const brp = game.net.remotePlayers.get(game.activeServerBounty.targetId);
+                if (brp) {
+                    bx = Math.round(brp.x * sx);
+                    by = Math.round(brp.y * sy);
+                }
+            }
+            if (bx !== null && by !== null) {
+                const bpulse = 8 + Math.sin(this.time * 10) * 3.0;
+                fctx.beginPath();
+                fctx.arc(bx, by, bpulse, 0, Math.PI * 2);
+                fctx.strokeStyle = "#ef4444";
+                fctx.lineWidth = 2.4;
+                fctx.stroke();
+            }
         }
 
         if (game.jason) {

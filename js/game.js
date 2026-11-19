@@ -2716,6 +2716,11 @@ class LeonidaGame {
 
                     this.toggleFullMap(false);
 
+                } else if (this.started) {
+                    const modal = document.getElementById("start-modal");
+                    if (modal && !modal.classList.contains("hidden")) {
+                        modal.classList.add("hidden");
+                    }
                 }
 
             }
@@ -4907,6 +4912,9 @@ class LeonidaGame {
             this.player.isMoving = false;
         }
         this.input.shoot = false;
+        if (this.audio && typeof this.audio.resetLoops === "function") {
+            this.audio.resetLoops();
+        }
 
 
 
@@ -5110,16 +5118,24 @@ class LeonidaGame {
             const loot = Math.min(400, fx.heist[0] + Math.floor(Math.random() * (fx.heist[1] - fx.heist[0] + 1)));
 
             this.addCash(loot, "HOLD-UP!", true);
+            if (typeof this.addTurfInfluence === "function") this.addTurfInfluence(180);
 
             this.setWantedLevel(Math.max(this.wantedLevel, fx.wanted || 3));
 
             this.audio.playShot("PISTOL");
-            this.recordStationCooldown(this.activeInterior, st, st.cooldown || 90.0, true);
+            this.recordStationCooldown(this.activeInterior, st, Math.max(90.0, st.cooldownSec || 90.0), true);
+            if (this.activeInterior && Array.isArray(this.activeInterior.npcs)) {
+                for (const npc of this.activeInterior.npcs) {
+                    npc._robbedTimer = 14.0;
+                }
+            }
 
         } else {
 
             this.audio.playCashSound();
-            this.recordStationCooldown(this.activeInterior, st, st.cooldown || 5.0, Boolean(fx.multiplier || fx.extraLife || fx.jailCards));
+            const isMajorReward = Boolean(fx.multiplier || fx.extraLife || fx.jailCards);
+            const cdSec = isMajorReward ? Math.max(120.0, st.cooldownSec || 120.0) : (st.cooldownSec || 5.0);
+            this.recordStationCooldown(this.activeInterior, st, cdSec, isMajorReward);
 
         }
 
@@ -5349,6 +5365,7 @@ class LeonidaGame {
                     this.recordStationCooldown(this.activeInterior, st, 120.0, true);
                     const take = Math.min(350, Number(st.reward) || 300);
                     this.addCash(take, "💵 ARMED REGISTER HOLD-UP!", true);
+                    if (typeof this.addTurfInfluence === "function") this.addTurfInfluence(160);
                     this.setWantedLevel(Math.max(this.wantedLevel + 1, 2));
                     if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
                         this.missions.onInteriorRobbery();
@@ -5467,10 +5484,16 @@ class LeonidaGame {
                 grantWep("UZI", 90);
 
                 this.addCash(600, "VAULT CRACKED!", true);
+                if (typeof this.addTurfInfluence === "function") this.addTurfInfluence(240);
                 this.setWantedLevel(Math.max(this.wantedLevel + 1, 3));
 
                 rwdCooldown = 150.0;
                 syncVault = true;
+                if (this.activeInterior && Array.isArray(this.activeInterior.npcs)) {
+                    for (const npc of this.activeInterior.npcs) {
+                        npc._robbedTimer = 14.0;
+                    }
+                }
 
                 if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
                     this.missions.onInteriorRobbery();
@@ -5822,14 +5845,15 @@ class LeonidaGame {
 
             if (this.map.getGroundTypeAt(exitX, exitY) === GROUND_TYPE.WATER) {
 
-                // If moored right beside a dock, beach, or pier (<= 76px), step onto dry land; otherwise dive into the water and swim!
+                // If moored right beside a dock, beach, or pier (<= 104px), step onto dry land; otherwise dive into the water and swim!
                 let foundDry = null;
+                const maxSearchR = (v.waterOnly || v.specKey === "AIRBOAT" || v.amphibious) ? 104 : 78;
 
-                for (let r = 24; r <= 76 && !foundDry; r += 14) {
+                for (let r = 24; r <= maxSearchR && !foundDry; r += 12) {
 
-                    for (let a = 0; a < 16; a++) {
+                    for (let a = 0; a < 24; a++) {
 
-                        const ang = (a / 16) * Math.PI * 2;
+                        const ang = (a / 24) * Math.PI * 2;
 
                         const tx = v.x + Math.cos(ang) * r;
 
@@ -5837,7 +5861,8 @@ class LeonidaGame {
 
                         if (this.map.getGroundTypeAt(tx, ty) !== GROUND_TYPE.WATER &&
 
-                            this.map.getGroundTypeAt(tx, ty) !== GROUND_TYPE.BUILDING) {
+                            this.map.getGroundTypeAt(tx, ty) !== GROUND_TYPE.BUILDING &&
+                            (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(tx, ty, 8, p.z || 2.0).hit)) {
 
                             foundDry = { x: tx, y: ty };
 
@@ -8492,7 +8517,7 @@ class LeonidaGame {
                 }
             }
         }
-        if (this.trafficManager && typeof this.trafficManager.getAllHumanPlayerViewports === "function") {
+        if ((!this.net || !this.net.wsConnected) && this.trafficManager && typeof this.trafficManager.getAllHumanPlayerViewports === "function") {
             const bx = Math.floor(wx / TILE_SIZE);
             const by = Math.floor(wy / TILE_SIZE);
             const vps = this.trafficManager.getAllHumanPlayerViewports();
@@ -8509,7 +8534,7 @@ class LeonidaGame {
 
     getDistanceToNearestHumanPlayer(wx, wy) {
         let best = this.player && !this.player.dead ? Math.hypot(wx - this.player.x, wy - this.player.y) : 99999;
-        if (this.net && typeof this.net.getHumanRemotePlayers === "function") {
+        if (this.net && !this.net.wsConnected && typeof this.net.getHumanRemotePlayers === "function") {
             const humans = this.net.getHumanRemotePlayers();
             for (let i = 0; i < humans.length; i++) {
                 const rp = humans[i];
@@ -9298,6 +9323,7 @@ class LeonidaGame {
         const p = this.player;
 
         if (!this.started || p.dead || this.activeInterior) return;
+        if (p.respawnGraceUntil && performance.now() < p.respawnGraceUntil) return;
 
         let rem = amount;
 
@@ -9569,6 +9595,7 @@ class LeonidaGame {
 
             p.dead = false;
             p.deathType = null;
+            p.respawnGraceUntil = performance.now() + 3500;
 
             p.hp = 100;
 
@@ -9780,7 +9807,7 @@ class LeonidaGame {
 
         for (const v of this.vehicles) {
 
-            if (!v.destroyed && v.driver === "AI_TRAFFIC" && Math.hypot(v.x - shooterX, v.y - shooterY) < 350) {
+            if (!v.destroyed && v.driver === "AI_TRAFFIC" && Math.abs(v.x - shooterX) < 350 && Math.abs(v.y - shooterY) < 350 && Math.hypot(v.x - shooterX, v.y - shooterY) < 350) {
 
                 if (typeof v.triggerPanic === "function") v.triggerPanic(7.5, shooterX, shooterY);
 
@@ -9790,7 +9817,7 @@ class LeonidaGame {
 
         for (const ped of this.peds) {
 
-            if (!ped.dead && ped.kind === "CIVILIAN" && Math.hypot(ped.x - shooterX, ped.y - shooterY) < 360) {
+            if (!ped.dead && ped.kind === "CIVILIAN" && Math.abs(ped.x - shooterX) < 360 && Math.abs(ped.y - shooterY) < 360 && Math.hypot(ped.x - shooterX, ped.y - shooterY) < 360) {
 
                 if (ped.isVillaGuard) {
                     if (isPlayer) {
@@ -9817,6 +9844,13 @@ class LeonidaGame {
         const count = spec.pellets || 1;
         const isTankCannon = (audioWeaponOverride === "TANK_CANNON");
         const muzzleDist = isTankCannon ? 34 : 16;
+        const shooterZ = (isPlayer && this.player) ? (this.player.z || 2.0) : 2.0;
+
+        if (isPlayer && this.renderer && (isTankCannon || spec.isRocket || weaponKey === "SHOTGUN")) {
+            const kick = isTankCannon ? 5.5 : (spec.isRocket ? 4.2 : 2.2);
+            this.renderer.camX -= Math.cos(angle) * kick;
+            this.renderer.camY -= Math.sin(angle) * kick;
+        }
 
         if (isTankCannon) {
             const muzX = shooterX + Math.cos(angle) * muzzleDist;
@@ -9837,6 +9871,8 @@ class LeonidaGame {
                 x: shooterX + Math.cos(a) * muzzleDist,
 
                 y: shooterY + Math.sin(a) * muzzleDist,
+
+                z: shooterZ,
 
                 vx: Math.cos(a) * spec.speed,
 
@@ -11122,6 +11158,11 @@ class LeonidaGame {
                 } else {
                     p.weaponDrawnTimer = 0.65;
                     p.muzzleTimer = 0.09;
+                    if (intr.theme !== "SHOP_GUN_SHOP" && Array.isArray(intr.npcs)) {
+                        for (const npc of intr.npcs) {
+                            npc._robbedTimer = Math.max(npc._robbedTimer || 0, 10.0);
+                        }
+                    }
                 }
                 if (wKey !== "FIST" && !this.infiniteAmmo) {
                     p.ammo[wKey] = Math.max(0, (p.ammo[wKey] || 0) - 1);
@@ -11640,6 +11681,10 @@ class LeonidaGame {
 
                 }
 
+                if ((v._stuntLandingGrace || 0) > 0) {
+                    v._stuntLandingGrace = Math.max(0, v._stuntLandingGrace - dt);
+                }
+
                 if ((v.stuntAirTimer || 0) > 0) {
 
                     v.stuntAirTimer = Math.max(0, v.stuntAirTimer - dt);
@@ -11659,14 +11704,16 @@ class LeonidaGame {
                     if (v.stuntAirTimer <= 0) {
 
                         v.stuntZOffset = 0;
+                        v._stuntLandingGrace = 0.70;
 
                         if (mySeat === 0) {
+                            const stuntReward = Math.min(500, Math.round(200 + (v.stuntMaxTime || 1.0) * 180));
 
                             this.audio.playCashSound();
 
-                            this.addCash(250, "🔥 STUNT JUMP!");
+                            this.addCash(stuntReward, "🔥 STUNT JUMP!");
 
-                            this.showBigBanner("UNIQUE STUNT BONUS!", `${v.lastRampName || "BIG AIR"} — +$250!`, "#fde047", 2.0);
+                            this.showBigBanner("UNIQUE STUNT BONUS!", `${v.lastRampName || "BIG AIR"} — +$${stuntReward}!`, "#fde047", 2.0);
 
                         }
 
@@ -12478,11 +12525,15 @@ class LeonidaGame {
 
             const pHead = this._pedGridHead;
             const pNext = this._pedGridNext;
-            if (!v.destroyed && !isLethalDriver && v.driver && vSpeed > 14 && Math.abs(v.x - p.x) < 680 && Math.abs(v.y - p.y) < 520 && pHead && pNext) {
-                const cx0 = Math.max(0, (v.x - 28) >> 8);
-                const cx1 = Math.min(127, (v.x + 28) >> 8);
-                const cy0 = Math.max(0, (v.y - 28) >> 8);
-                const cy1 = Math.min(127, (v.y + 28) >> 8);
+            if (!v.destroyed && v.driver && vSpeed > 14 && Math.abs(v.x - p.x) < 680 && Math.abs(v.y - p.y) < 520 && pHead && pNext) {
+                const vCos = Math.cos(v.angle || 0);
+                const vSin = Math.sin(v.angle || 0);
+                const rCos = -vSin;
+                const rSin = vCos;
+                const cx0 = Math.max(0, (v.x - 76) >> 8);
+                const cx1 = Math.min(127, (v.x + 76) >> 8);
+                const cy0 = Math.max(0, (v.y - 76) >> 8);
+                const cy1 = Math.min(127, (v.y + 76) >> 8);
                 for (let cy = cy0; cy <= cy1; cy++) {
                     const rowOff = cy << 7;
                     for (let cx = cx0; cx <= cx1; cx++) {
@@ -12490,16 +12541,27 @@ class LeonidaGame {
                             const ped = this.peds[pi];
                             if (!ped || ped.dead) continue;
                             const pdx = ped.x - v.x;
-                            if (pdx >= 26 || pdx <= -26) continue;
+                            if (pdx >= 76 || pdx <= -76) continue;
                             const pdy = ped.y - v.y;
-                            if (pdy >= 26 || pdy <= -26) continue;
+                            if (pdy >= 76 || pdy <= -76) continue;
                             if (v.z !== undefined && ped.z !== undefined && Math.abs(v.z - ped.z) > 0.24) continue;
-                            if (pdx * pdx + pdy * pdy < 576) {
-                                const rCos = -Math.sin(v.angle || 0);
-                                const rSin = Math.cos(v.angle || 0);
+                            const dSq = pdx * pdx + pdy * pdy;
+                            if (!isLethalDriver && dSq < 576) {
                                 const sideSign = (pdx * rCos + pdy * rSin) >= 0 ? 1 : -1;
                                 ped.x += rCos * sideSign * 14;
                                 ped.y += rSin * sideSign * 14;
+                            } else if (vSpeed > 85 && ped.kind === "CIVILIAN" && (ped.dodgeTimer || 0) <= 0 && dSq > 625 && dSq < 5400) {
+                                const fwd = pdx * vCos + pdy * vSin;
+                                const lat = pdx * rCos + pdy * rSin;
+                                if (fwd > 22 && fwd < 72 && Math.abs(lat) < 22) {
+                                    const sideSign = lat >= 0 ? 1 : -1;
+                                    ped.dodgeTimer = 0.55;
+                                    ped.panicTimer = Math.max(ped.panicTimer || 0, 2.5);
+                                    ped.isCrossingRoad = false;
+                                    ped.angle = Math.atan2(rSin * sideSign, rCos * sideSign);
+                                    ped.x += rCos * sideSign * 9;
+                                    ped.y += rSin * sideSign * 9;
+                                }
                             }
                         }
                     }
@@ -13165,18 +13227,30 @@ class LeonidaGame {
                     pns.cooldown = 6.0;
 
                     if (typeof v.resetDamage === "function") v.resetDamage();
-
                     else v.hp = v.maxHp;
+
+                    v.burnTimer = 0;
+                    v.chainExplodeTimer = 0;
+                    v.extinguishProgress = 0;
+                    v.fireExtinguished = false;
+                    v.frontDented = false;
+                    v.rearDented = false;
+                    v.heavyDented = false;
+                    v.remapIdx = ((v.remapIdx || 0) + 1) % 6;
 
                     const paintColors = ["#ff2a85", "#00f0ff", "#39ff14", "#ffd13b", "#a855f7", "#f97316"];
 
-                    v.color = paintColors[Math.floor(Math.random() * paintColors.length)];
+                    v.color = paintColors[v.remapIdx % paintColors.length];
 
+                    this.wantedSpottedVehicle = null;
                     this.setWantedLevel(0);
 
                     this.audio.playCashSound();
 
-                    this.showBigBanner("PAY 'N' SPRAY", "NEW PAINT JOB + BODY DENTS REPAIRED + WANTED CLEARED!", "#39ff14", 2.2);
+                    this.showBigBanner("PAY 'N' SPRAY", "NEW PAINT JOB + ENGINE & BODY REPAIRED + WANTED CLEARED!", "#39ff14", 2.2);
+                    if (this.net && typeof this.net.broadcastStateNow === "function") {
+                        this.net.broadcastStateNow();
+                    }
 
                 }
 
@@ -16937,8 +17011,9 @@ class LeonidaGame {
 
 
             // Hit building? Exact 2D DDA grid raycast (GameMapManager::TraceSegment2D)
+            const prZ = pr.z !== undefined ? pr.z : (p.z || 2.0);
 
-            const traceRes = this.map.traceSegment2D(prevX, prevY, pr.x, pr.y, p.z || 2.0);
+            const traceRes = this.map.traceSegment2D(prevX, prevY, pr.x, pr.y, prZ);
 
             if (traceRes.hit) {
 
@@ -16956,7 +17031,7 @@ class LeonidaGame {
 
             } else {
 
-                const bCol = this.map.resolveCircleBuildingCollision(pr.x, pr.y, 3, p.z || 2.0);
+                const bCol = this.map.resolveCircleBuildingCollision(pr.x, pr.y, 3, prZ);
 
                 if (bCol.hit) {
 
@@ -17213,7 +17288,7 @@ class LeonidaGame {
 
             // Hit player? (Stray police bullets during an NPC crime shootout do NOT hurt an innocent bystander player!)
 
-            if (!hitSomething && !pr.fromPlayer && !p.inVehicle && !this.activeInterior) {
+            if (!hitSomething && !pr.fromPlayer && !p.inVehicle && !this.activeInterior && Math.abs(p.x - pr.x) < 15 && Math.abs(p.y - pr.y) < 15 && Math.hypot(p.x - pr.x, p.y - pr.y) < 15) {
 
                 const canHitPlayer =
 
@@ -17225,7 +17300,7 @@ class LeonidaGame {
 
                     (!pr.npcFaction && this.wantedLevel > 0);
 
-                if (canHitPlayer && Math.hypot(p.x - pr.x, p.y - pr.y) < 15) {
+                if (canHitPlayer) {
 
                     if (pr.fromRemoteId) {
 

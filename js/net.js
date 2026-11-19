@@ -2521,7 +2521,11 @@ class ViceNetworkManager {
                 v.netTargetX = predX;
                 v.netTargetY = predY;
                 v.netTargetZ = z;
-                v.netTargetAngle = a;
+                const angDelta = Math.atan2(Math.sin(a - (v.angle || 0)), Math.cos(a - (v.angle || 0)));
+                v.netTargetAngle = (v.angle || 0) + angDelta;
+                if (remapIdx !== undefined && isMod) {
+                    v.remapIdx = remapIdx;
+                }
                 if (!isInitialServerBootstrap || v._serverDriven) {
                     v._lastNetSyncMs = syncNowMs;
                 }

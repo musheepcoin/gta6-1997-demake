@@ -3647,8 +3647,17 @@ class Vehicle {
                 const idx = game.vehicles.indexOf(this);
                 if (idx !== -1 && this !== (game.player && game.player.inVehicle)) {
                     game.vehicles.splice(idx, 1);
+                    if (typeof game.rebuildVehicleSpatialGrid === "function") {
+                        game.rebuildVehicleSpatialGrid();
+                    }
                 }
                 return { throttle: 0, steer: 0, handbrake: true };
+            }
+            if (this._returnToBaseTimer > 20.0) {
+                this._returnToBaseTimer = 0;
+                this.sirenActive = false;
+                this.driver = "AI_TRAFFIC";
+                return this.computeTrafficControls(dt, map, game);
             }
             if (dHome > 180) {
                 const retCtrl = this.computeTargetRoadOrFeelerControls(
@@ -3797,8 +3806,17 @@ class Vehicle {
                     const idx = game.vehicles.indexOf(this);
                     if (idx !== -1 && this !== (game.player && game.player.inVehicle)) {
                         game.vehicles.splice(idx, 1);
+                        if (typeof game.rebuildVehicleSpatialGrid === "function") {
+                            game.rebuildVehicleSpatialGrid();
+                        }
                     }
                     return { throttle: 0, steer: 0, handbrake: true };
+                }
+                if (this._returnToBaseTimer > 20.0) {
+                    this._returnToBaseTimer = 0;
+                    this.sirenActive = false;
+                    this.driver = "AI_TRAFFIC";
+                    return this.computeTrafficControls(dt, map, game);
                 }
                 if (dHome > 180) {
                     const retCtrl = this.computeTargetRoadOrFeelerControls(dt, map, game, this.homeStation.x, this.homeStation.y, 0, 0, 0.45, false, false);
@@ -4504,21 +4522,50 @@ class Vehicle {
                 }
                 this.speed = Math.hypot(this.vx, this.vy);
             } else {
-                this.vx *= -0.35;
-                this.vy *= -0.35;
+                const pushLen = Math.hypot(pushDx, pushDy);
+                let headOnRatio = 1.0;
+                if (pushLen > 0.01 && impact > 1.0) {
+                    const nx = pushDx / pushLen;
+                    const ny = pushDy / pushLen;
+                    const vn = this.vx * nx + this.vy * ny;
+                    headOnRatio = Math.max(0, -vn / impact);
+                    if (vn < 0 && headOnRatio < 0.72) {
+                        // Oblique wall graze: slide smoothly along the wall tangent instead of bouncing backward!
+                        this.vx = (this.vx - nx * vn) * 0.84;
+                        this.vy = (this.vy - ny * vn) * 0.84;
+                        this.speed = Math.hypot(this.vx, this.vy) * (this.speed >= 0 ? 1 : -1);
+                        const tangentAng = Math.atan2(this.vy, this.vx);
+                        if (Math.abs(this.speed) > 25 && this.speed > 0) {
+                            const aDiff = this.normalizeAngle(tangentAng - this.angle);
+                            if (Math.abs(aDiff) < 0.85) {
+                                this.angle += aDiff * 0.28;
+                            }
+                        }
+                    } else {
+                        this.vx *= -0.32;
+                        this.vy *= -0.32;
+                        this.speed *= -0.32;
+                    }
+                } else {
+                    this.vx *= -0.32;
+                    this.vy *= -0.32;
+                    this.speed *= -0.32;
+                }
                 if (this.driver && this.driver !== "PLAYER" && this.aiReverseTimer <= 0) {
                     this.aiReverseTimer = 0.85;
                     this.aiReverseSteer = Math.random() < 0.5 ? 0.9 : -0.9;
                 }
                 if (impact > 155 && (this.crashCooldown || 0) <= 0) {
                     this.crashCooldown = 0.52;
-                    this.receiveImpactDamage((impact - 140) * (this.driver === "PLAYER" ? 0.085 : 0.065), hitX, hitY);
+                    const stuntShield = ((this.stuntAirTimer || 0) > 0 || (this._stuntLandingGrace || 0) > 0) ? 0.25 : 1.0;
+                    const dmgScale = (0.35 + 0.65 * headOnRatio) * stuntShield;
+                    this.receiveImpactDamage((impact - 140) * (this.driver === "PLAYER" ? 0.085 : 0.065) * dmgScale, hitX, hitY);
                     if (this.driver === "PLAYER") {
                         if (this.specKey !== "BMX_BIKE") {
                             game.spawnParticle(hitX, hitY, "SPARK");
                         }
                         if (game && game.audio) {
-                            game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145), this.specKey);
+                            game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145) * (0.45 + 0.55 * headOnRatio), this.specKey);
                         }
                     }
                 }
