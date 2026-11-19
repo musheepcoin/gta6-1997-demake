@@ -2207,11 +2207,12 @@ class ViceNetworkManager {
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
             const isMod = Boolean(
-                v._worldModified ||
+                (v._worldModified ||
                 v.lastPlayerDriven ||
                 v.destroyed ||
                 v.driver === "PLAYER" ||
-                v.driver === "REMOTE"
+                v.driver === "REMOTE") &&
+                (!this.wsConnected || !v.driver || v.driver === "PLAYER" || v.driver === "REMOTE" || v.destroyed)
             );
             // When connected to the 24/7 Dedicated Server, only report player-modified vehicles to persist in world_state.json;
             // the Dedicated Server simulates its own autonomous traffic fleet 24/7 without any player hosting!
@@ -2367,6 +2368,7 @@ class ViceNetworkManager {
             }
             return;
         }
+        const wasBootstrapped = Boolean(this._serverBootstrapApplied);
         const syncNowMs = performance.now();
         if (!isInitialServerBootstrap && !isAutonomousServerTick) {
             this.lastWorldSyncReceivedMs = syncNowMs;
@@ -2384,9 +2386,15 @@ class ViceNetworkManager {
             const netTl = ((pkt.tl || 0) % 24.0 + 24.0) % 24.0;
             const rawDiff = Math.abs(curTl - netTl);
             const circDiff = Math.min(rawDiff, 24.0 - rawDiff);
-            if (isInitialServerBootstrap || circDiff > 0.8) {
+            if ((isInitialServerBootstrap && !wasBootstrapped) || circDiff > 0.8) {
                 g.trafficLightTimer = netTl;
             }
+        }
+
+        // Dedicated Server 2 Hz ticks (server_sim) and duplicate server_world bootstraps (e.g. clicking PLAY NOW after ws.onopen)
+        // ONLY synchronize the 24h world clock & traffic light phase — they NEVER overwrite or teleport active vehicles!
+        if (isAutonomousServerTick || (isInitialServerBootstrap && wasBootstrapped)) {
+            return;
         }
 
         const codeToDrv = (c) => {
@@ -2400,30 +2408,6 @@ class ViceNetworkManager {
         };
 
         if (Array.isArray(pkt.vehs) && typeof Vehicle === "function") {
-            // On initial server bootstrap (or room switch), replace default local startup traffic cars (`trf_*`, `cmp_car_*`)
-            // and any previous room's autonomous server fleet (`srv_trf_*`) with the room's authoritative persistent fleet!
-            if (isInitialServerBootstrap) {
-                for (let oi = g.vehicles.length - 1; oi >= 0; oi--) {
-                    const ov = g.vehicles[oi];
-                    if (!ov || ov === g.player.inVehicle) continue;
-                    const oid = typeof ov.id === "string" ? ov.id : "";
-                    const isLocalStartupTraffic =
-                        !ov._worldModified &&
-                        ov.driver === "AI_TRAFFIC" &&
-                        !ov.isPolice &&
-                        !ov.isEmergency &&
-                        (oid.startsWith("trf_") || oid.startsWith("cmp_car_"));
-                    const isPrevServerSim =
-                        ov._serverDriven ||
-                        oid.startsWith("srv_trf_") ||
-                        oid.startsWith("amb_srv_") ||
-                        oid.startsWith("vcfd_srv_") ||
-                        oid.startsWith("tow_srv_");
-                    if (isLocalStartupTraffic || isPrevServerSim) {
-                        g.vehicles.splice(oi, 1);
-                    }
-                }
-            }
             const existingById = new Map();
             for (const v of g.vehicles) {
                 existingById.set(v.id, v);
@@ -2442,6 +2426,14 @@ class ViceNetworkManager {
                         existingById.delete(id);
                     }
                     continue;
+                }
+                // On Dedicated Server bootstrap, ONLY import player-modified persistent vehicles (parked, player-driven, or destroyed wrecks);
+                // never import untouched server-rail AI_TRAFFIC cars so local 60 FPS street traffic never teleports or stacks!
+                if (isInitialServerBootstrap) {
+                    const isPersistedPlayerVeh = (Boolean(isMod) || Boolean(flags & 1) || drvCode === 4) && (drvCode === 0 || drvCode === 4 || Boolean(flags & 1));
+                    if (!isPersistedPlayerVeh) {
+                        continue;
+                    }
                 }
                 if (g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(x, y) && specKey !== "AIRBOAT" && specKey !== "SPEEDBOAT" && specKey !== "JETSKI" && specKey !== "YACHT" && specKey !== "SWAMP_BOAT") {
                     continue;
@@ -2479,16 +2471,19 @@ class ViceNetworkManager {
                     existingById.delete(id);
                     v = null;
                 }
-                if (!v) {
-                    // Prevent stacking a newly spawned server vehicle on top of an untouched static curb-parked or local startup car
+                if (isInitialServerBootstrap) {
+                    // Prevent stacking a persisted modified vehicle on top of an untouched static curb-parked or local startup car
                     for (let oi = g.vehicles.length - 1; oi >= 0; oi--) {
                         const ov = g.vehicles[oi];
-                        if (!ov || ov === g.player.inVehicle || seenIds.has(ov.id)) continue;
-                        const isDisposableLocal = !ov._worldModified && (ov.isStaticParked || ov.isCurbParked || (isInitialServerBootstrap && ov.driver === "AI_TRAFFIC"));
+                        if (!ov || ov === v || ov === g.player.inVehicle || seenIds.has(ov.id)) continue;
+                        const isDisposableLocal = !ov._worldModified && (ov.isStaticParked || ov.isCurbParked || ov.driver === "AI_TRAFFIC");
                         if (isDisposableLocal && Math.hypot(ov.x - x, ov.y - y) < 58) {
                             g.vehicles.splice(oi, 1);
+                            existingById.delete(ov.id);
                         }
                     }
+                }
+                if (!v) {
                     v = new Vehicle(id, specKey, x, y, a);
                     v.z = z;
                     v.netTargetX = x;
@@ -2500,6 +2495,7 @@ class ViceNetworkManager {
                     if (remapIdx !== undefined) v.remapIdx = remapIdx;
                     if (missionTag) v.missionTag = missionTag;
                     g.vehicles.push(v);
+                    existingById.set(id, v);
                 } else if (isInitialServerBootstrap) {
                     v.aiBlockX = -1;
                     v.aiBlockY = -1;

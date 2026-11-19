@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_209";
+const CURRENT_BUILD = "101_210";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -467,9 +467,11 @@ function sendRoomBootstrap(socket, meta) {
         });
     }
 
-    // 4. Persisted World Vehicles (Modified/Parked/Wrecked + Active Traffic) & Corpses/Peds
-    const vehRows = getCombinedRoomVehicles(room);
-    const pedRows = Object.values(Object.assign({}, room.peds || {}, room.corpses || {}));
+    // 4. Persisted Player-Modified World Vehicles (Parked/Damaged/Wrecked/Player-Driven) & Corpses
+    const vehRows = Object.values(room.modifiedVehs || {}).filter(
+        (r) => Array.isArray(r) && (r[8] === 0 || r[8] === 4 || Boolean(r[10] & 1))
+    );
+    const pedRows = Object.values(room.corpses || {});
     sendJson(socket, {
         t: "WORLD_SYNC",
         id: "server_world",
@@ -817,6 +819,11 @@ function handleClientPacket(socket, pkt) {
             }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
             if (!isMod) continue;
+            if (row[8] !== 0 && row[8] !== 4 && !(row[10] & 1)) {
+                delete room.modifiedVehs[vid];
+                delete room.modifiedVehTs[vid];
+                continue;
+            }
             row[13] = 1;
             if (!room.modifiedVehs[vid] || row[8] !== 0) {
                 room.modifiedVehTs[vid] = nowMs;
@@ -1405,6 +1412,14 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
     if (!room.peds) room.peds = {};
     if (!room.vehNav) room.vehNav = {};
     if (!room.pedNav) room.pedNav = {};
+    if (room.modifiedVehs) {
+        for (const [mvid, mrow] of Object.entries(room.modifiedVehs)) {
+            if (!Array.isArray(mrow) || (mrow[8] !== 0 && mrow[8] !== 4 && !(mrow[10] & 1))) {
+                delete room.modifiedVehs[mvid];
+                if (room.modifiedVehTs) delete room.modifiedVehTs[mvid];
+            }
+        }
+    }
     const TS = global.TILE_SIZE || 64;
 
     // 1. Seed starter Ocean Drive / Collins Ave / Española Way moving vehicles if missing
@@ -2033,16 +2048,12 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             }
         }
         if (hasRoomClients) {
-            const vehRows = getCombinedRoomVehicles(room).slice(0, 140);
-            const pedRows = Object.values(Object.assign({}, room.peds || {}, room.corpses || {})).slice(0, 90);
             broadcastToRoom(roomCode, {
                 t: "WORLD_SYNC",
                 id: "server_sim",
                 ver: room.ver || MIN_CLIENT_VER,
                 wm: room.worldMinutes || 720,
-                tl: Math.round((room.trafficLightTimer || 0) * 100) / 100,
-                vehs: vehRows,
-                peds: pedRows
+                tl: Math.round((room.trafficLightTimer || 0) * 100) / 100
             });
         }
     }
