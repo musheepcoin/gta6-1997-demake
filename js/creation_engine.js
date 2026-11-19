@@ -1,5 +1,5 @@
 /* ============================================================================
-   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_224)
+   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_225)
    ----------------------------------------------------------------------------
    Provides both:
    1. A Declarative Programmatic Creation API (`game.creationEngine.*`) with
@@ -23,7 +23,7 @@
     class ViceCreationEngine {
         constructor(game) {
             this.game = game;
-            this.version = "101_224";
+            this.version = "101_225";
             this.studioActive = false;
             this.freeCamActive = true;
             this.gridSnap = false;
@@ -1426,19 +1426,27 @@
                 vehicleSpec: blueprint.vehicleSpec || "VICE_CHEETAH"
             };
             this.customMissions[id] = spec;
-            const rec = { type: "MISSION_BLUEPRINT", id, blueprint: spec };
-            this.createdEntities.push(rec);
-            if (!opts.skipHistory) this._pushHistory(rec);
+            if (!this.createdEntities.some((e) => e && e.id === id)) {
+                const rec = { type: "MISSION_BLUEPRINT", id, blueprint: spec };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+            }
             if (!opts.skipSave) this.saveToLocalStorage();
+            this._broadcastCreationOp({
+                action: "CREATE_MISSION",
+                opKey: `msn_${id}`,
+                id,
+                blueprint: spec
+            }, opts);
             this.setStatus(`COMPOSED CUSTOM MISSION [${spec.title}] ($${spec.reward.toLocaleString()})`);
             return spec;
         }
 
-        launchCustomMission(idOrBlueprint) {
+        launchCustomMission(idOrBlueprint, opts = {}) {
             if (!this.game || !this.game.missions) return null;
             const spec = (typeof idOrBlueprint === "string")
-                ? (this.customMissions[idOrBlueprint] || this.createCustomMission({ type: idOrBlueprint }))
-                : this.createCustomMission(idOrBlueprint);
+                ? (this.customMissions[idOrBlueprint] || this.createCustomMission({ type: idOrBlueprint }, opts))
+                : this.createCustomMission(idOrBlueprint, opts);
             if (!spec) return null;
 
             const mm = this.game.missions;
@@ -1460,6 +1468,18 @@
                 targetX: tx,
                 targetY: ty,
                 isCustomEngineMission: true
+            };
+
+            const finishMmoMission = (g) => {
+                this._broadcastCreationOp({
+                    action: "COMPLETE_MISSION",
+                    opKey: `active_msn_${spec.id}`,
+                    id: spec.id,
+                    title: spec.title,
+                    winner: (g.net && g.net.playerName) || "LUCIA",
+                    reward: spec.reward
+                }, {});
+                mm.completeMission(g, m);
             };
 
             if (spec.type === "CONTRABAND_DROP") {
@@ -1484,11 +1504,11 @@
                         m.targetY = m.crates[0].y;
                         m.objectiveLabel = `${spec.title} (${m.crates.length} LEFT)`;
                     } else {
-                        mm.completeMission(g, m);
+                        finishMmoMission(g);
                     }
                 };
             } else if (spec.type === "ARMORED_AMBUSH") {
-                const van = this.spawnVehicle("ARMORED_VAN", tx, ty, 0, { skipHistory: true, skipSave: true });
+                const van = this.spawnVehicle("ARMORED_VAN", tx, ty, 0, { id: `${spec.id}_van`, skipHistory: true, skipSave: true, skipBroadcast: true });
                 van.driver = "AI_TRAFFIC";
                 van.hp = 180;
                 m.armoredVan = van;
@@ -1507,7 +1527,7 @@
                     } else {
                         const p = g.player.inVehicle || g.player;
                         if (Math.hypot(p.x - m.briefcase.x, p.y - m.briefcase.y) < 48) {
-                            mm.completeMission(g, m);
+                            finishMmoMission(g);
                         }
                     }
                 };
@@ -1515,7 +1535,7 @@
                 const targets = [];
                 for (let i = 0; i < 3; i++) {
                     const ped = new Pedestrian({
-                        id: `ce_vip_${Date.now()}_${i}`,
+                        id: `${spec.id}_vip_${i}`,
                         x: tx + (i - 1) * 28,
                         y: ty,
                         z: 2.0,
@@ -1534,12 +1554,12 @@
                         m.targetY = alive[0].y;
                         m.objectiveLabel = `ELIMINATE VIP SQUAD (${alive.length} LEFT)`;
                     } else {
-                        mm.completeMission(g, m);
+                        finishMmoMission(g);
                     }
                 };
             } else {
                 // Default: HIJACK_VEHICLE & deliver to dropoff
-                const car = this.spawnVehicle(spec.vehicleSpec || "VICE_CHEETAH", tx, ty, 0, { skipHistory: true, skipSave: true });
+                const car = this.spawnVehicle(spec.vehicleSpec || "VICE_CHEETAH", tx, ty, 0, { id: `${spec.id}_veh`, skipHistory: true, skipSave: true, skipBroadcast: true });
                 m.targetCar = car;
                 m.dropoff = { x: spec.dropoffX, y: spec.dropoffY };
                 m.update = (g) => {
@@ -1556,7 +1576,7 @@
                         m.targetY = m.dropoff.y;
                         m.objectiveLabel = "DELIVER TO DROP-OFF ZONE";
                         if (Math.hypot(car.x - m.dropoff.x, car.y - m.dropoff.y) < 76) {
-                            mm.completeMission(g, m);
+                            finishMmoMission(g);
                         }
                     }
                 };
@@ -1572,7 +1592,13 @@
                 mm.setPager(spec.pagerText);
             }
             if (typeof this.game.updateHud === "function") this.game.updateHud();
-            this.setStatus(`LAUNCHED CUSTOM MISSION [${spec.title}]!`);
+            this._broadcastCreationOp({
+                action: "LAUNCH_MISSION",
+                opKey: `active_msn_${spec.id}`,
+                id: spec.id,
+                blueprint: spec
+            }, opts);
+            this.setStatus(`LAUNCHED MMO ROOM MISSION [${spec.title}]!`);
             return m;
         }
 
@@ -2850,6 +2876,13 @@
                     y: Math.round(act.y || 0),
                     isPreExisting: false
                 });
+            } else if (act.type === "MISSION_BLUEPRINT" && act.id) {
+                this._broadcastCreationOp({
+                    action: "REMOVE",
+                    opKey: `msn_${act.id}`,
+                    targetId: act.id,
+                    isPreExisting: false
+                });
             }
         }
 
@@ -3068,6 +3101,30 @@
             }
             if (op.action === "MODIFY_ENTITY" && op.targetId && op.patch) {
                 this.modifyWorldEntity(op.targetId, op.patch, remoteOpts);
+                return true;
+            }
+            if (op.action === "CREATE_MISSION" && op.blueprint) {
+                this.createCustomMission(op.blueprint, remoteOpts);
+                return true;
+            }
+            if (op.action === "LAUNCH_MISSION" && op.blueprint) {
+                this.launchCustomMission(op.blueprint, remoteOpts);
+                return true;
+            }
+            if (op.action === "COMPLETE_MISSION" && op.id) {
+                const mm = this.game && this.game.missions;
+                if (mm && mm.activeMission && mm.activeMission.id === op.id) {
+                    mm.activeMission = null;
+                    if (typeof this.game.showBigBanner === "function") {
+                        this.game.showBigBanner(
+                            "🏆 MMO ROOM CONTRACT COMPLETED!",
+                            `${op.winner || "PLAYER"} COMPLETED ${op.title || op.id} (+$${Number(op.reward || 25000).toLocaleString()})`,
+                            "#39ff14",
+                            3.0
+                        );
+                    }
+                    if (typeof this.game.updateHud === "function") this.game.updateHud();
+                }
                 return true;
             }
             if (op.action === "RESTORE_PREEXISTING" && op.targetId) {

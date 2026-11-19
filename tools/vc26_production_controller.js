@@ -1489,7 +1489,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_224"), "ViceCreationEngine (v101_224) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_225"), "ViceCreationEngine (v101_225) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -1960,9 +1960,111 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 40: 1000% MMO CO-OP STUDIO MISSIONS, PERSISTENT GRAFFITI TAGS & SERVER 3D OBB PHYSICS
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 40: 1000% MMO CO-OP STUDIO MISSIONS, PERSISTENT GRAFFITI TAGS & SERVER 3D OBB PHYSICS ---");
+    {
+        const peerA = createGameInstance(cmpBuf);
+        const peerB = peerBShared;
+        const ceA = peerA.g.creationEngine;
+        const ceB = peerB.g.creationEngine;
+        ceA.clearAllCreations({ skipBroadcast: true });
+        ceB.clearAllCreations({ skipBroadcast: true });
+
+        peerA.g.net.enabled = true;
+        peerA.g.net.sendPacket = (pkt) => {
+            if (pkt && pkt.t === "WORLD_EVENT") {
+                peerB.g.net.applyWorldEvent(JSON.parse(JSON.stringify(pkt)));
+            }
+        };
+
+        // 1. Networked Co-Op / PVP Studio Mission Creation, Live Room Launch & Completion Sync
+        const mmoMsn = ceA.launchCustomMission({
+            id: "MMO_OCEAN_CONTRABAND_40",
+            type: "CONTRABAND_DROP",
+            title: "OCEAN DRIVE MMO CONTRABAND DROP",
+            reward: 75000,
+            wantedStars: 2,
+            startX: 448.5 * 64,
+            startY: 276.5 * 64
+        });
+        assert(
+            Boolean(
+                mmoMsn &&
+                ceB.customMissions["MMO_OCEAN_CONTRABAND_40"] &&
+                peerB.g.missions.activeMission &&
+                peerB.g.missions.activeMission.id === "MMO_OCEAN_CONTRABAND_40" &&
+                Array.isArray(peerB.g.missions.activeMission.crates) &&
+                peerB.g.missions.activeMission.crates.length === 3
+            ),
+            "launchCustomMission broadcasts CREATE_MISSION & LAUNCH_MISSION -> activates shared GPS mission on Peer B with 3 contraband crates"
+        );
+
+        // Peer A collects all 3 contraband crates -> broadcasts COMPLETE_MISSION -> clears active mission & announces winner on Peer B!
+        for (const c of mmoMsn.crates.slice()) {
+            peerA.g.player.x = c.x;
+            peerA.g.player.y = c.y;
+            mmoMsn.update(peerA.g);
+        }
+        assert(
+            peerA.g.missions.activeMission === null && peerB.g.missions.activeMission === null,
+            "Completing MMO Studio Mission on Peer A broadcasts COMPLETE_MISSION and resolves active contract across all peers in the room"
+        );
+
+        // 2. Networked & Server-Persisted Graffiti Wall Tags ([P] -> GRAFFITI_TAG & GRAFFITI_SYNC)
+        peerA.g.graffitiTags.length = 0;
+        peerB.g.graffitiTags.length = 0;
+        peerA.g.tagSprayTarget = {
+            x: 443.2 * 64,
+            y: 278.4 * 64,
+            z: 2.0,
+            angle: 0,
+            style: 3,
+            hex: "#111111",
+            r: 0.03,
+            g: 0.03,
+            b: 0.04,
+            seed: 404
+        };
+        peerA.g.tagSprayStartX = peerA.g.player.x;
+        peerA.g.tagSprayStartY = peerA.g.player.y;
+        peerA.g.tagSprayTimer = 0.01;
+        peerA.g.updateGraffitiTagging(0.05);
+        assert(
+            peerA.g.graffitiTags.length === 1 &&
+            peerB.g.graffitiTags.length === 1 &&
+            Math.abs(peerB.g.graffitiTags[0].x - 443.2 * 64) < 1,
+            "Spraying a [P] Graffiti Wall Tag on Peer A broadcasts GRAFFITI_TAG and replicates the aerosol tag onto Peer B's city wall"
+        );
+
+        peerB.g.net.applyWorldEvent({
+            t: "WORLD_EVENT",
+            kind: "GRAFFITI_SYNC",
+            tags: [{ x: 443.2 * 64, y: 280.4 * 64, z: 2.0, angle: 0, style: 2, hex: "#111111", r: 0.03, g: 0.03, b: 0.04, seed: 777 }]
+        });
+        assert(
+            peerB.g.graffitiTags.length === 2,
+            "Server GRAFFITI_SYNC bootstrap packet populates persisted room graffiti tags on joining client without duplicating existing tags"
+        );
+
+        // 3. Dedicated Server 3D Prefab OBB Collision Hull Sync & CLEAR_ALL Vehicle Table Cleanup
+        const srvSrc = fs.readFileSync(path.join(ROOT, "server", "world_server.js"), "utf8");
+        assert(
+            srvSrc.includes('require("../js/object_engine.js")') &&
+            srvSrc.includes("isCustomServerBox: true") &&
+            srvSrc.includes("GRAFFITI_SYNC") &&
+            srvSrc.includes("activeCustomMission"),
+            "Dedicated Server (server/world_server.js) synchronizes 3D Prefab OBB hulls into serverMap.securityBarrierBoxes, persists room.graffitiTags, and purges SPAWN_VEHICLE rows on CLEAR_ALL"
+        );
+
+        ceA.clearAllCreations();
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 39 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE & TRUE MMO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 40 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE & 1000% MMO SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

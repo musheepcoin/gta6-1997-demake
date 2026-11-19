@@ -7267,6 +7267,20 @@ class LeonidaGame {
         } catch (err) { /* ignore */ }
     }
 
+    applyNetworkGraffitiTag(tag, save = true) {
+        if (!tag || typeof tag.x !== "number" || typeof tag.y !== "number") return false;
+        if (!Array.isArray(this.graffitiTags)) this.graffitiTags = [];
+        for (const t of this.graffitiTags) {
+            if (t && Math.hypot(t.x - tag.x, t.y - tag.y) < 18) {
+                return false;
+            }
+        }
+        this.graffitiTags.push(Object.assign({}, tag));
+        if (this.graffitiTags.length > 120) this.graffitiTags.shift();
+        if (save) this.saveGraffitiTags();
+        return true;
+    }
+
     startGraffitiTag() {
         const p = this.player;
         if (!p || p.dead || !this.started) return;
@@ -7370,9 +7384,16 @@ class LeonidaGame {
             this.tagSprayTimer = 0;
             this.tagCooldown = 1.2;
             tg.t = Date.now();
+            tg.author = (this.net && this.net.playerName) || "LUCIA";
             this.graffitiTags.push(tg);
             if (this.graffitiTags.length > 120) this.graffitiTags.shift();
             this.saveGraffitiTags();
+            if (this.net && typeof this.net.broadcastWorldEvent === "function") {
+                this.net.broadcastWorldEvent({
+                    kind: "GRAFFITI_TAG",
+                    tag: tg
+                });
+            }
             this.tagSprayTarget = null;
             this.addFloatingText(p.x, p.y - 26, `🎨 TAG #${this.graffitiTags.length} SPRAYED!`, "#39ff14");
             // Cops that see vandalism with line-of-sight and forward vision cone get angry

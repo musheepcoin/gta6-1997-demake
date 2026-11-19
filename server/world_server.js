@@ -21,6 +21,7 @@ const path = require("path");
 // Load the authentic 512x512x6 3D LeonidaMap engine directly on the Dedicated Server
 // so the server simulates real road lanes, traffic lights, bridges, municipal stations, and sidewalks 24/7!
 global.window = global;
+require("../js/object_engine.js");
 require("../js/map.js");
 require("../js/world_director.js");
 
@@ -195,13 +196,158 @@ function applyCreationOpToServerMap(op) {
     const MR = global.MAP_ROWS || 512;
     const ML = global.MAP_LAYERS || 6;
     const GT = global.GROUND_TYPE || { AIR: 0, WATER: 1, ROAD: 2, PAWEMENT: 3, FIELD: 4, BUILDING: 5 };
+    if (!Array.isArray(serverMap.securityBarrierBoxes)) serverMap.securityBarrierBoxes = [];
+    if (!serverMap._removedPreExistingBoxes) serverMap._removedPreExistingBoxes = new Map();
+
+    const rebuildServerBarrierGrid = () => {
+        serverMap.barrierBoxGrid = null;
+        if (typeof serverMap.ensureBarrierSpatialGrids === "function") {
+            serverMap.ensureBarrierSpatialGrids();
+        }
+    };
 
     if (op.action === "CLEAR_ALL") {
         for (const snap of serverBaseVoxelSnapshots.values()) {
             restoreServerVoxelSnapshot(snap);
         }
         serverBaseVoxelSnapshots.clear();
+        serverMap.securityBarrierBoxes = serverMap.securityBarrierBoxes.filter((b) => !b || !b.isCustomServerBox);
+        for (const boxes of serverMap._removedPreExistingBoxes.values()) {
+            for (const bb of boxes) {
+                if (!serverMap.securityBarrierBoxes.includes(bb)) {
+                    serverMap.securityBarrierBoxes.push(bb);
+                }
+            }
+        }
+        serverMap._removedPreExistingBoxes.clear();
+        rebuildServerBarrierGrid();
         return true;
+    }
+    if (op.action === "DEFINE_PREFAB_3D" && op.prefabId && op.config) {
+        const cat = global.PREFAB_CATALOG || (global.PREFAB_CATALOG = {});
+        const baseKey = (op.config.basePrefab && cat[op.config.basePrefab]) ? op.config.basePrefab : "villa_art_deco";
+        const base = cat[baseKey] || { w1: 156, d1: 112, h1: 0.72, roofOverhang: 10 };
+        cat[op.prefabId] = Object.assign({}, base, op.config, { id: op.prefabId });
+        return true;
+    }
+    if (op.action === "PLACE_PREFAB_3D" && op.id && op.prefabId && typeof op.x === "number" && typeof op.y === "number") {
+        if (op.prefabId === "VOLLEYBALL_COURT_3D" || op.prefabId === "STREET_TAKEOVER_RING" || op.prefabId === "SMUGGLER_CRATE_3D" || op.prefabId === "SODA_ECOLA_3D" || op.prefabId === "SODA_SPRUNK_3D") {
+            return true;
+        }
+        const cat = global.PREFAB_CATALOG || {};
+        const spec = cat[op.prefabId] || cat.villa_art_deco || { w1: 156, d1: 112 };
+        const sc = Math.max(0.5, Math.min(2.2, Number(op.scale) || 1.0));
+        const ang = Number(op.angle) || 0;
+        const cosA = Math.cos(ang), sinA = Math.sin(ang);
+        const wallHw = op.prefabId === "TIKI_BAR_3D" ? 26 : ((Number(spec.w1) || 156) * 0.5) * sc;
+        const wallHh = op.prefabId === "TIKI_BAR_3D" ? 18 : ((Number(spec.d1) || 112) * 0.5) * sc;
+        const wallEx = Math.abs(cosA) * wallHw + Math.abs(sinA) * wallHh;
+        const wallEy = Math.abs(sinA) * wallHw + Math.abs(cosA) * wallHh;
+        serverMap.securityBarrierBoxes = serverMap.securityBarrierBoxes.filter((b) => !b || b.estateId !== op.id);
+        serverMap.securityBarrierBoxes.push({
+            cx: op.x,
+            cy: op.y,
+            hw: wallHw,
+            hh: wallHh,
+             baseW1: Number(spec.w1) || 156,
+            baseD1: Number(spec.d1) || 112,
+            scale: sc,
+            ang,
+            cosA,
+            sinA,
+            minX: op.x - wallEx,
+            maxX: op.x + wallEx,
+            minY: op.y - wallEy,
+            maxY: op.y + wallEy,
+            estateId: op.id,
+            isCustomServerBox: true
+        });
+        rebuildServerBarrierGrid();
+        return true;
+    }
+    if (op.action === "RELOCATE_ENTITY" && op.targetId && typeof op.x === "number" && typeof op.y === "number") {
+        let updated = false;
+        for (const bb of serverMap.securityBarrierBoxes) {
+            if (bb && bb.estateId === op.targetId) {
+                const ang = op.angle !== undefined ? Number(op.angle) : (bb.ang || 0);
+                const cosA = Math.cos(ang), sinA = Math.sin(ang);
+                const ex = Math.abs(cosA) * bb.hw + Math.abs(sinA) * bb.hh;
+                const ey = Math.abs(sinA) * bb.hw + Math.abs(cosA) * bb.hh;
+                bb.cx = op.x;
+                bb.cy = op.y;
+                bb.ang = ang;
+                bb.cosA = cosA;
+                bb.sinA = sinA;
+                bb.minX = op.x - ex;
+                bb.maxX = op.x + ex;
+                bb.minY = op.y - ey;
+                bb.maxY = op.y + ey;
+                updated = true;
+            }
+        }
+        if (updated) rebuildServerBarrierGrid();
+        return updated;
+    }
+    if (op.action === "MODIFY_ENTITY" && op.targetId && op.patch) {
+        let updated = false;
+        for (const bb of serverMap.securityBarrierBoxes) {
+            if (bb && bb.estateId === op.targetId) {
+                if (op.patch.scale !== undefined) bb.scale = Math.max(0.5, Math.min(2.2, Number(op.patch.scale) || 1.0));
+                if (op.patch.w1) bb.baseW1 = Number(op.patch.w1);
+                if (op.patch.d1) bb.baseD1 = Number(op.patch.d1);
+                if (op.patch.angle !== undefined || op.patch.ang !== undefined) {
+                    bb.ang = Number(op.patch.angle !== undefined ? op.patch.angle : op.patch.ang) || 0;
+                }
+                const sc = bb.scale || 1.0;
+                bb.hw = ((bb.baseW1 || 156) * 0.5) * sc;
+                bb.hh = ((bb.baseD1 || 112) * 0.5) * sc;
+                const cosA = Math.cos(bb.ang || 0), sinA = Math.sin(bb.ang || 0);
+                const ex = Math.abs(cosA) * bb.hw + Math.abs(sinA) * bb.hh;
+                const ey = Math.abs(sinA) * bb.hw + Math.abs(cosA) * bb.hh;
+                bb.cosA = cosA;
+                bb.sinA = sinA;
+                bb.minX = bb.cx - ex;
+                bb.maxX = bb.cx + ex;
+                bb.minY = bb.cy - ey;
+                bb.maxY = bb.cy + ey;
+                updated = true;
+            }
+        }
+        if (updated) rebuildServerBarrierGrid();
+        return updated;
+    }
+    if (op.action === "REMOVE" && (op.targetId || op.opKey)) {
+        const tid = op.targetId || op.opKey;
+        const removed = [];
+        for (let i = serverMap.securityBarrierBoxes.length - 1; i >= 0; i--) {
+            const bb = serverMap.securityBarrierBoxes[i];
+            if (bb && (bb.estateId === tid || (op.isPreExisting && typeof op.x === "number" && typeof op.y === "number" && bb.cx !== undefined && Math.hypot(bb.cx - op.x, bb.cy - op.y) < 14))) {
+                removed.push(bb);
+                serverMap.securityBarrierBoxes.splice(i, 1);
+            }
+        }
+        if (removed.length > 0) {
+            if (op.isPreExisting) {
+                serverMap._removedPreExistingBoxes.set(tid, removed);
+            }
+            rebuildServerBarrierGrid();
+            return true;
+        }
+        return false;
+    }
+    if (op.action === "RESTORE_PREEXISTING" && op.targetId) {
+        const boxes = serverMap._removedPreExistingBoxes.get(op.targetId);
+        if (Array.isArray(boxes) && boxes.length > 0) {
+            for (const bb of boxes) {
+                if (!serverMap.securityBarrierBoxes.includes(bb)) {
+                    serverMap.securityBarrierBoxes.push(bb);
+                }
+            }
+            serverMap._removedPreExistingBoxes.delete(op.targetId);
+            rebuildServerBarrierGrid();
+            return true;
+        }
+        return false;
     }
     if (op.action === "RESTORE_VOXEL_TILE" && typeof op.c === "number" && typeof op.r === "number") {
         const c = Math.max(2, Math.min(MC - 3, Math.floor(op.c)));
@@ -322,6 +468,8 @@ function createEmptyRoom() {
         robbedVaults: {},  // Interior station / safe / register lockout timestamps { [vaultKey]: expiresAtMs }
         turfStandings: {}, // District Turf War Kingpins (leaderName, leaderColor, leaderScore)
         creationOps: {},   // Persisted Creation Engine operations (3D voxel edits, custom villas, shops, props, moves, modifications)
+        graffitiTags: {},  // Persisted [P] Aerosol Graffiti Wall Tags across Vice City
+        activeCustomMission: null,
         activeFlashDrop: null,
         activeBounty: null,
         chat: [],
@@ -358,6 +506,7 @@ function ensureRoom(roomCode) {
     if (!r.robbedVaults) r.robbedVaults = {};
     if (!r.turfStandings) r.turfStandings = {};
     if (!r.creationOps) r.creationOps = {};
+    if (!r.graffitiTags) r.graffitiTags = {};
     if (!r.vehs) r.vehs = {};
     if (!r.peds) r.peds = {};
     if (!Array.isArray(r.chat)) r.chat = [];
@@ -463,6 +612,8 @@ function loadPersistentState() {
                                 robbedVaults: Object.assign({}, existing.robbedVaults || {}, (rv.robbedVaults && typeof rv.robbedVaults === "object") ? rv.robbedVaults : {}),
                                 turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
                                 creationOps: Object.assign({}, existing.creationOps || {}, (rv.creationOps && typeof rv.creationOps === "object") ? rv.creationOps : {}),
+                                graffitiTags: Object.assign({}, existing.graffitiTags || {}, (rv.graffitiTags && typeof rv.graffitiTags === "object") ? rv.graffitiTags : {}),
+                                activeCustomMission: null,
                                 activeFlashDrop: null,
                                 activeBounty: null,
                                 chat: (existing.chat || []).concat(Array.isArray(rv.chat) ? rv.chat : []).slice(-30),
@@ -731,6 +882,25 @@ function sendRoomBootstrap(socket, meta) {
         kind: "CREATION_SYNC",
         ops: Object.values(room.creationOps || {})
     });
+    if (room.graffitiTags && Object.keys(room.graffitiTags).length > 0) {
+        sendJson(socket, {
+            t: "WORLD_EVENT",
+            kind: "GRAFFITI_SYNC",
+            tags: Object.values(room.graffitiTags)
+        });
+    }
+    if (room.activeCustomMission && room.activeCustomMission.blueprint && (Date.now() - (room.activeCustomMission.startedAt || 0)) < ((room.activeCustomMission.blueprint.timer || 180) * 1000)) {
+        sendJson(socket, {
+            t: "WORLD_EVENT",
+            kind: "CREATION_OP",
+            op: {
+                action: "LAUNCH_MISSION",
+                opKey: `active_msn_${room.activeCustomMission.id}`,
+                id: room.activeCustomMission.id,
+                blueprint: room.activeCustomMission.blueprint
+            }
+        });
+    }
     if (room.activeFlashDrop && (Date.now() - (room.activeFlashDrop.startedAt || 0)) < (room.activeFlashDrop.duration || 90) * 1000) {
         const remSec = Math.max(5, Math.round((room.activeFlashDrop.duration || 90) - (Date.now() - room.activeFlashDrop.startedAt) / 1000));
         sendJson(socket, Object.assign({}, room.activeFlashDrop, {
@@ -1240,13 +1410,47 @@ function handleClientPacket(socket, pkt) {
             const cdSec = Math.max(5, Math.min(600, Number(pkt.cooldownSec) || 120));
             room.robbedVaults[String(pkt.vaultKey).slice(0, 80)] = Date.now() + cdSec * 1000;
             isDirty = true;
+        } else if (pkt.kind === "GRAFFITI_TAG" && pkt.tag && typeof pkt.tag.x === "number" && typeof pkt.tag.y === "number") {
+            if (!room.graffitiTags) room.graffitiTags = {};
+            const tKey = `tag_${Math.round(pkt.tag.x)}_${Math.round(pkt.tag.y)}`;
+            room.graffitiTags[tKey] = Object.assign({}, pkt.tag, { ts: Date.now() });
+            const gKeys = Object.keys(room.graffitiTags);
+            if (gKeys.length > 120) {
+                delete room.graffitiTags[gKeys[0]];
+            }
+            isDirty = true;
         } else if (pkt.kind === "CREATION_OP" && pkt.op && typeof pkt.op === "object") {
             if (!room.creationOps) room.creationOps = {};
             const op = pkt.op;
             if (op.action === "CLEAR_ALL") {
+                for (const oldOp of Object.values(room.creationOps)) {
+                    if (oldOp && oldOp.action === "SPAWN_VEHICLE" && oldOp.id) {
+                        if (room.modifiedVehs) delete room.modifiedVehs[oldOp.id];
+                        if (room.modifiedVehTs) delete room.modifiedVehTs[oldOp.id];
+                        if (room.vehs) delete room.vehs[oldOp.id];
+                    }
+                }
+                if (room.modifiedVehs) {
+                    for (const vid of Object.keys(room.modifiedVehs)) {
+                        if (String(vid).startsWith("ce_veh_") || String(vid).startsWith("exp_")) {
+                            delete room.modifiedVehs[vid];
+                            if (room.modifiedVehTs) delete room.modifiedVehTs[vid];
+                            if (room.vehs) delete room.vehs[vid];
+                        }
+                    }
+                }
                 room.creationOps = {};
+                room.activeCustomMission = null;
                 if (roomCode === "VICE26") applyCreationOpToServerMap(op);
                 isDirty = true;
+            } else if (op.action === "LAUNCH_MISSION" && op.blueprint) {
+                room.activeCustomMission = {
+                    id: op.id || op.blueprint.id,
+                    blueprint: op.blueprint,
+                    startedAt: Date.now()
+                };
+            } else if (op.action === "COMPLETE_MISSION") {
+                room.activeCustomMission = null;
             } else if (op.action === "RESTORE_VOXEL_TILE" && op.opKey) {
                 const k = String(op.opKey).slice(0, 96);
                 delete room.creationOps[k];
@@ -1255,6 +1459,7 @@ function handleClientPacket(socket, pkt) {
             } else if (op.action === "RESTORE_PREEXISTING") {
                 if (op.opKey) delete room.creationOps[String(op.opKey).slice(0, 96)];
                 if (op.targetId) delete room.creationOps[`rm_${String(op.targetId).slice(0, 92)}`];
+                if (roomCode === "VICE26") applyCreationOpToServerMap(op);
                 isDirty = true;
             } else if (op.action === "REMOVE" && op.opKey) {
                 const k = String(op.opKey).slice(0, 96);
@@ -1268,7 +1473,9 @@ function handleClientPacket(socket, pkt) {
                     if (room.modifiedVehs && room.modifiedVehs[targetId]) delete room.modifiedVehs[targetId];
                     if (room.modifiedVehTs && room.modifiedVehTs[targetId]) delete room.modifiedVehTs[targetId];
                     if (room.vehs && room.vehs[targetId]) delete room.vehs[targetId];
+                    if (room.creationOps[`msn_${targetId}`]) delete room.creationOps[`msn_${targetId}`];
                 }
+                if (roomCode === "VICE26") applyCreationOpToServerMap(op);
                 isDirty = true;
             } else if (op.opKey) {
                 const k = String(op.opKey).slice(0, 96);
@@ -1277,7 +1484,7 @@ function handleClientPacket(socket, pkt) {
                 if (keys.length > 2500) {
                     delete room.creationOps[keys[0]];
                 }
-                if (roomCode === "VICE26" && op.action === "VOXEL_TILE") {
+                if (roomCode === "VICE26") {
                     applyCreationOpToServerMap(op);
                 }
                 if (op.action === "SPAWN_VEHICLE" && op.id && op.specKey) {

@@ -2131,6 +2131,15 @@ class ViceNetworkManager {
                     this.game.applyNetworkVaultCooldown(vk, Number(remSec));
                 }
             }
+        } else if (pkt.kind === "GRAFFITI_TAG" && pkt.tag && this.game && typeof this.game.applyNetworkGraffitiTag === "function") {
+            this.game.applyNetworkGraffitiTag(pkt.tag, true);
+        } else if (pkt.kind === "GRAFFITI_SYNC" && Array.isArray(pkt.tags) && this.game && typeof this.game.applyNetworkGraffitiTag === "function") {
+            for (const tg of pkt.tags) {
+                this.game.applyNetworkGraffitiTag(tg, false);
+            }
+            if (typeof this.game.saveGraffitiTags === "function") {
+                this.game.saveGraffitiTags();
+            }
         } else if (pkt.kind === "CREATION_OP" && pkt.op) {
             if (this.game && this.game.map && this.game.map.cmpLoaded && this.game.creationEngine && typeof this.game.creationEngine.applyRemoteCreationOp === "function") {
                 this.game.creationEngine.applyRemoteCreationOp(pkt.op);
