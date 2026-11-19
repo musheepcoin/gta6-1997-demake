@@ -304,6 +304,8 @@ class LeonidaGame {
 
 
 
+        this.director = typeof ViceWorldDirector !== "undefined" ? new ViceWorldDirector(this) : null;
+
         this.initWorldEntities();
 
         this.net = typeof ViceNetworkManager !== "undefined" ? new ViceNetworkManager(this) : null;
@@ -6181,15 +6183,18 @@ class LeonidaGame {
 
         if (wasOccupied) {
 
-            this.ejectVehicleDriver(closest, "CARJACK");
+            const ejectedPed = this.ejectVehicleDriver(closest, "CARJACK");
 
             if (closest.isPolice) {
 
-                this.setWantedLevel(Math.max(this.wantedLevel, 1), { x: closest.x, y: closest.y }, true);
+                this.setWantedLevel(Math.max(this.wantedLevel, 1), { x: closest.x, y: closest.y }, true, closest);
 
             } else {
 
-                this.reportCrimeAt(closest.x, closest.y, Math.max(this.wantedLevel, 1), false);
+                this.reportCrimeAt(closest.x, closest.y, Math.max(this.wantedLevel, 1), false, {
+                    veh: closest,
+                    ejectedVictim: ejectedPed
+                });
 
             }
 
@@ -6256,7 +6261,15 @@ class LeonidaGame {
 
                     seat: freeSeat,
 
-                    carjack: Boolean(wasOccupied)
+                    carjack: Boolean(wasOccupied),
+
+                    x: Math.round(closest.x),
+
+                    y: Math.round(closest.y),
+
+                    z: Math.round((closest.z || 2.0) * 100) / 100,
+
+                    a: Math.round((closest.angle || 0) * 1000) / 1000
 
                 });
 
@@ -6673,7 +6686,7 @@ class LeonidaGame {
             ? "g2_fireman"
             : (isMedicDriver ? "g2_medic" : (fightsBack ? "gang" : "civ1"));
 
-        this.peds.push(new Pedestrian({
+        const ejectedDriver = new Pedestrian({
 
             x: doorX,
 
@@ -6705,13 +6718,15 @@ class LeonidaGame {
 
             turnSeed: Math.floor(Math.random() * 16) + 1
 
-        }));
+        });
+        this.peds.push(ejectedDriver);
 
         if (isFiremanDriver) {
             this.addFloatingText(doorX, doorY - 22, "🚒 VCFD FIREFIGHTER YANKED OUT!", "#f97316");
         } else if (isMedicDriver) {
             this.addFloatingText(doorX, doorY - 22, "🚑 PARAMEDIC YANKED OUT!", "#38bdf8");
         }
+        return ejectedDriver;
 
     }
 
@@ -7278,12 +7293,10 @@ class LeonidaGame {
             this.saveGraffitiTags();
             this.tagSprayTarget = null;
             this.addFloatingText(p.x, p.y - 26, `🎨 TAG #${this.graffitiTags.length} SPRAYED!`, "#39ff14");
-            // Cops that see vandalism get angry
-            const copWitness =
-                this.peds.some((ped) => !ped.dead && ped.kind === "COP" && Math.hypot(ped.x - p.x, ped.y - p.y) < 260) ||
-                this.vehicles.some((v) => v.isPolice && !v.destroyed && Math.hypot(v.x - p.x, v.y - p.y) < 300);
+            // Cops that see vandalism with line-of-sight and forward vision cone get angry
+            const copWitness = this.hasCopWitnessNear(p.x, p.y, 280);
             if (copWitness && Math.random() < 0.7) {
-                this.setWantedLevel(Math.max(this.wantedLevel, 1));
+                this.setWantedLevel(Math.max(this.wantedLevel, 1), { x: p.x, y: p.y }, true);
                 this.addFloatingText(p.x, p.y - 44, "🚓 VANDALISM SPOTTED!", "#38bdf8");
             }
         }
@@ -7720,6 +7733,9 @@ class LeonidaGame {
 
 
     canCopIdentifyPlayer(copX, copY, copAngle = null, maxRange = 460) {
+        if (this.director && typeof this.director.canCopIdentifyPlayer === "function") {
+            return this.director.canCopIdentifyPlayer(copX, copY, copAngle, maxRange);
+        }
         const p = this.player;
         if (!p || p.dead || this.activeInterior || (this.wantedLevel || 0) <= 0) return false;
         const pEnt = p.inVehicle || p;
@@ -8008,6 +8024,9 @@ class LeonidaGame {
     }
 
     hasCopWitnessNear(x, y, maxDist = 460) {
+        if (this.director && typeof this.director.hasCopWitnessNear === "function") {
+            return this.director.hasCopWitnessNear(x, y, maxDist);
+        }
         if (this.activeInterior) return false;
         const pz = (this.player && (this.player.inVehicle ? this.player.inVehicle.z : this.player.z)) || 2.0;
         const pedCap = Math.min(400, maxDist);
@@ -8057,6 +8076,9 @@ class LeonidaGame {
     }
 
     reportCrimeAt(x, y, targetStars, isExplosion = false, crimeOpts = null) {
+        if (this.director && typeof this.director.reportCrime === "function") {
+            return this.director.reportCrime(x, y, targetStars, isExplosion, crimeOpts);
+        }
         if (!this.player || this.player.dead || (this.player.respawnGraceUntil || 0) > performance.now()) return false;
         const clampedStars = Math.max(1, Math.min(6, Math.floor(targetStars || 1)));
         const involvedVeh = (crimeOpts && crimeOpts.veh !== undefined) ? crimeOpts.veh : (this.player.inVehicle || null);
@@ -9312,11 +9334,15 @@ class LeonidaGame {
         if (ped.dead) return;
 
         const wasCalling911 = (ped.calling911Timer || 0) > 0;
-        ped.calling911Timer = 0;
-        ped.calling911Stars = 0;
-        ped.calling911Pos = null;
-        if (wasCalling911 && byPlayer && this.player && !this.player.dead) {
-            this.addFloatingText(ped.x, ped.y - 24, "🔇 911 WITNESS SILENCED!", "#38bdf8");
+        if (wasCalling911 && this.director && typeof this.director.abortWitness911Call === "function") {
+            this.director.abortWitness911Call(ped, Boolean(byPlayer));
+        } else {
+            ped.calling911Timer = 0;
+            ped.calling911Stars = 0;
+            ped.calling911Pos = null;
+            if (wasCalling911 && byPlayer && this.player && !this.player.dead) {
+                this.addFloatingText(ped.x, ped.y - 24, "🔇 911 WITNESS SILENCED!", "#38bdf8");
+            }
         }
 
         ped.dead = true;
@@ -13966,11 +13992,23 @@ class LeonidaGame {
             // 1997 GTA 1 ePedestrianState_Stunned (knocked down onto asphalt, frames 38..41)
 
             if ((ped.stunnedTimer || 0) > 0) {
+                if ((ped.calling911Timer || 0) > 0 && !ped._isCarjackVictimCaller) {
+                    if (this.director && typeof this.director.abortWitness911Call === "function") {
+                        this.director.abortWitness911Call(ped, true);
+                    } else {
+                        ped.calling911Timer = 0;
+                        ped.calling911Stars = 0;
+                        ped.calling911Pos = null;
+                    }
+                }
 
                 ped.stunnedTimer -= dt;
 
                 continue;
 
+            }
+            if (ped._isCarjackVictimCaller) {
+                ped._isCarjackVictimCaller = false;
             }
 
 
@@ -15520,10 +15558,14 @@ class LeonidaGame {
                 // If a civilian witness is dialing 911 and survives without being stunned/killed, they transmit the crime scene coordinates to VCPD Dispatch!
                 if ((ped.calling911Timer || 0) > 0) {
                     if ((ped.stunnedTimer || 0) > 0 || (ped.electroTimer || 0) > 0 || (ped.burnTimer || 0) > 0 || (ped.drownTimer || 0) > 0) {
-                        ped.calling911Timer = 0;
-                        ped.calling911Stars = 0;
-                        ped.calling911Pos = null;
-                        ped.calling911Veh = null;
+                        if (this.director && typeof this.director.abortWitness911Call === "function") {
+                            this.director.abortWitness911Call(ped, false);
+                        } else {
+                            ped.calling911Timer = 0;
+                            ped.calling911Stars = 0;
+                            ped.calling911Pos = null;
+                            ped.calling911Veh = null;
+                        }
                     } else {
                         ped.calling911Timer -= dt;
                         if (ped.calling911Timer <= 0) {
@@ -15534,6 +15576,10 @@ class LeonidaGame {
                             ped.calling911Stars = 0;
                             ped.calling911Pos = null;
                             ped.calling911Veh = null;
+                            ped._isCarjackVictimCaller = false;
+                            if (this.director && this.director.blackboard) {
+                                this.director.blackboard.total911CallsCompleted++;
+                            }
                             if (this.player && !this.player.dead) {
                                 this.setWantedLevel(Math.max(this.wantedLevel || 0, repStars), repPos, false, repVeh);
                                 const nowMs = performance.now();
@@ -17358,7 +17404,11 @@ class LeonidaGame {
                         if (pr.fromPlayer) {
                             v.damagedByPlayer = true;
                             if (v.isPolice && !pr.fromJason && Math.random() < 0.75) {
-                                this.setWantedLevel(Math.max(this.wantedLevel, 1));
+                                if (v.driver === "AI_COP" || v.driver === "AI_TRAFFIC") {
+                                    this.setWantedLevel(Math.max(this.wantedLevel, 1), { x: v.x, y: v.y }, true);
+                                } else {
+                                    this.reportCrimeAt(v.x, v.y, Math.max(this.wantedLevel, 1), false, { isGunfire: true });
+                                }
                             }
                         }
                         if (typeof v.receiveImpactDamage === "function") {
@@ -17451,8 +17501,20 @@ class LeonidaGame {
 
                         this.spawnParticle(pr.x, pr.y, "BLOOD");
 
+                        if (pr.fromPlayer && (ped.calling911Timer || 0) > 0) {
+                            if (this.director && typeof this.director.abortWitness911Call === "function") {
+                                this.director.abortWitness911Call(ped, true);
+                            } else {
+                                ped.calling911Timer = 0;
+                                ped.calling911Stars = 0;
+                                ped.calling911Pos = null;
+                            }
+                        }
+
                         if (pr.fromPlayer && ped.kind === "COP" && Math.random() < 0.80) {
-                            this.setWantedLevel(Math.max(this.wantedLevel, 2));
+                            this.setWantedLevel(Math.max(this.wantedLevel, 2), { x: ped.x, y: ped.y }, true);
+                        } else if (pr.fromPlayer && ped.hp > 0 && ped.kind === "CIVILIAN" && !ped.isVillaGuard) {
+                            this.reportCrimeAt(ped.x, ped.y, Math.max(this.wantedLevel || 0, 1), false, { isGunfire: true });
                         }
 
                         if (Math.hypot(ped.x - p.x, ped.y - p.y) < 480) {
@@ -18094,6 +18156,10 @@ class LeonidaGame {
             nightFactor: this.renderer ? (this.renderer.nightFactor || 0) : 0
 
         });
+        }
+
+        if (this.director && typeof this.director.updateAndAuditFrame === "function") {
+            this.director.updateAndAuditFrame(dt);
         }
 
     }

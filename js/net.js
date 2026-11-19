@@ -1890,6 +1890,22 @@ class ViceNetworkManager {
                     specKey: pkt.specKey || (v && v.specKey) || "STALLION",
                     seat: rSeat
                 });
+                // Immediately align the remote player's interpolated coordinates with the entered vehicle
+                // so the vehicle NEVER snaps onto the sidewalk to the pedestrian's old walking position/angle!
+                if (rSeat === 0) {
+                    const enterX = v ? v.x : (typeof pkt.x === "number" ? pkt.x : rp.x);
+                    const enterY = v ? v.y : (typeof pkt.y === "number" ? pkt.y : rp.y);
+                    const enterZ = v ? (v.z || 2.0) : (typeof pkt.z === "number" ? pkt.z : rp.z);
+                    const enterA = v ? (v.angle || 0) : (typeof pkt.a === "number" ? pkt.a : rp.angle);
+                    rp.x = enterX;
+                    rp.y = enterY;
+                    rp.z = enterZ;
+                    rp.angle = enterA;
+                    rp.targetX = enterX;
+                    rp.targetY = enterY;
+                    rp.targetZ = enterZ;
+                    rp.targetAngle = enterA;
+                }
             }
             if (v) {
                 v.doorOpenTimer = 0.48;
@@ -1902,6 +1918,9 @@ class ViceNetworkManager {
                     }
                     v.driver = "REMOTE";
                     v._linkedRemoteId = pkt.id;
+                    if (this.game.director && typeof this.game.director.allowVehicleSnap === "function") {
+                        this.game.director.allowVehicleSnap(v, 400);
+                    }
                 }
             }
         } else if (pkt.kind === "VEH_EXIT" && pkt.vehId) {
@@ -1938,8 +1957,23 @@ class ViceNetworkManager {
                 if (rSeat === 0 && !localIsDriver) {
                     v.driver = null;
                     v._linkedRemoteId = null;
-                    if (typeof pkt.x === "number") { v.x = pkt.x; v.netTargetX = pkt.x; }
-                    if (typeof pkt.y === "number") { v.y = pkt.y; v.netTargetY = pkt.y; }
+                    if (typeof pkt.x === "number" && typeof pkt.y === "number") {
+                        const exitErr = Math.hypot(pkt.x - (v.x || 0), pkt.y - (v.y || 0));
+                        if (exitErr > 0 && exitErr < 140) {
+                            v.netErrX = pkt.x - v.x;
+                            v.netErrY = pkt.y - v.y;
+                        } else {
+                            if (this.game.director && typeof this.game.director.allowVehicleSnap === "function") {
+                                this.game.director.allowVehicleSnap(v, 400);
+                            }
+                            v.x = pkt.x;
+                            v.y = pkt.y;
+                            v.netErrX = 0;
+                            v.netErrY = 0;
+                        }
+                        v.netTargetX = pkt.x;
+                        v.netTargetY = pkt.y;
+                    }
                     if (typeof pkt.z === "number") { v.z = pkt.z; v.netTargetZ = pkt.z; }
                     if (typeof pkt.a === "number") { v.angle = pkt.a; v.netTargetAngle = pkt.a; }
                     v.vx = 0;
