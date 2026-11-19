@@ -599,7 +599,7 @@ class LeonidaGame {
 
             { spec: "CHALLENGER_RT", c: 216.5, r: 155.5, a: -Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
-            { spec: "VCPD_CRUISER", c: 214.5, r: 154.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
+            { spec: "MINT_STALLION", c: 214.5, r: 154.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
             { spec: "CITY_BUS", c: 204.5, r: 147.5, a: Math.PI * 0.5, z: 2.0, driver: "AI_TRAFFIC" },
 
@@ -7719,7 +7719,66 @@ class LeonidaGame {
 
 
 
-    getNearestWantedTarget(fromX, fromY) {
+    canCopIdentifyPlayer(copX, copY, copAngle = null, maxRange = 460) {
+        const p = this.player;
+        if (!p || p.dead || this.activeInterior || (this.wantedLevel || 0) <= 0) return false;
+        const pEnt = p.inVehicle || p;
+        const pZ = (pEnt.z !== undefined ? pEnt.z : p.z) || 2.0;
+        const dx = pEnt.x - copX;
+        const dy = pEnt.y - copY;
+        if (Math.abs(dx) >= maxRange || Math.abs(dy) >= maxRange) return false;
+        const d = Math.hypot(dx, dy);
+        if (d >= maxRange) return false;
+
+        // 1. Physical line-of-sight check against solid 3D buildings (always trace beyond 42px!)
+        if (d >= 42 && this.map && typeof this.map.traceSegment2D === "function") {
+            if (this.map.traceSegment2D(copX, copY, pEnt.x, pEnt.y, pZ).hit) return false;
+        }
+
+        // 2. Forward vision cone check (unless very close < 105px or player is actively firing a gun!)
+        const activelyFiring = (p.muzzleTimer || 0) > 0;
+        if (typeof copAngle === "number" && d >= 105 && !activelyFiring) {
+            const cosFwd = (dx * Math.cos(copAngle) + dy * Math.sin(copAngle)) / Math.max(1, d);
+            if (cosFwd < -0.20) return false;
+        }
+
+        // 3. Suspect identification check:
+        // If a police officer has already visually identified the player during this wanted pursuit, they recognize the suspect on sight
+        // unless the player switched into an unspotted civilian vehicle while unseen and is driving calmly > 175px away!
+        const inUnspottedCivCar = Boolean(
+            p.inVehicle &&
+            !p.inVehicle.isPolice &&
+            p.inVehicle !== this.wantedSpottedVehicle &&
+            Math.abs(p.inVehicle.speed || 0) < 155 &&
+            !activelyFiring &&
+            (p.playerCombatTimer || 0) <= 0
+        );
+        if (this.isPoliceSpotted || this.hasBeenDirectlySpottedByCop) {
+            if (inUnspottedCivCar && d > 175) return false;
+            return true;
+        }
+
+        // Otherwise (911 witness call only — police are responding to the reported crime scene and have never laid eyes on the perpetrator yet!):
+        const scene = this.lastKnownWantedPos;
+        const distToScene = scene ? Math.hypot(pEnt.x - scene.x, pEnt.y - scene.y) : 0;
+        const atCrimeScene = distToScene < 240;
+        const openlyArmedOnFoot = !p.inVehicle && Boolean(p.weapon && p.weapon !== "FIST");
+        const inRecentCombat = activelyFiring || (p.playerCombatTimer || 0) > 0 || (p.weaponDrawnTimer || 0) > 0;
+        const inReportedOrPoliceCar = Boolean(p.inVehicle && (p.inVehicle === this.wantedSpottedVehicle || p.inVehicle.isPolice));
+        const recklessSpeedingNearCop = Boolean(p.inVehicle && Math.abs(p.inVehicle.speed || 0) >= 160 && d < 240);
+        const pointBlank = d < 78;
+
+        return (
+            atCrimeScene ||
+            openlyArmedOnFoot ||
+            inRecentCombat ||
+            inReportedOrPoliceCar ||
+            recklessSpeedingNearCop ||
+            pointBlank
+        );
+    }
+
+    getNearestWantedTarget(fromX, fromY, fromAngle = null) {
 
         const candidates = [];
 
@@ -7735,11 +7794,7 @@ class LeonidaGame {
             const realX = v ? v.x : p.x;
             const realY = v ? v.y : p.y;
             const realZ = (v ? v.z : p.z) || 2.0;
-            const dFromCop = Math.hypot(realX - fromX, realY - fromY);
-            const hasDirectSight =
-                !this.activeInterior &&
-                dFromCop < 520 &&
-                (dFromCop < 135 || !this.map || !this.map.traceSegment2D || !this.map.traceSegment2D(fromX, fromY, realX, realY, realZ).hit);
+            const hasDirectSight = this.canCopIdentifyPlayer(fromX, fromY, fromAngle, 480);
 
             // Real-Life APB Search Logic:
             // Cops only know the player's live position if this unit has direct sight OR another police unit currently has visual contact (isPoliceSpotted).
@@ -7952,18 +8007,26 @@ class LeonidaGame {
         }
     }
 
-    hasCopWitnessNear(x, y, maxDist = 480) {
+    hasCopWitnessNear(x, y, maxDist = 460) {
         if (this.activeInterior) return false;
         const pz = (this.player && (this.player.inVehicle ? this.player.inVehicle.z : this.player.z)) || 2.0;
-        const pedCap = Math.min(420, maxDist);
+        const pedCap = Math.min(400, maxDist);
+        const isLoudShot = Boolean(this.player && (this.player.muzzleTimer || 0) > 0);
         if (Array.isArray(this.peds)) {
             for (const ped of this.peds) {
                 if (!ped.dead && ped.kind === "COP") {
-                    if (Math.abs(ped.x - x) >= pedCap || Math.abs(ped.y - y) >= pedCap) continue;
-                    const d = Math.hypot(ped.x - x, ped.y - y);
+                    const dx = x - ped.x;
+                    const dy = y - ped.y;
+                    if (Math.abs(dx) >= pedCap || Math.abs(dy) >= pedCap) continue;
+                    const d = Math.hypot(dx, dy);
                     if (d < pedCap) {
-                        const blocked = d >= 115 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(ped.x, ped.y, x, y, pz).hit;
-                        if (!blocked) return true;
+                        const blocked = d >= 42 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(ped.x, ped.y, x, y, pz).hit;
+                        if (blocked) continue;
+                        if (d >= 110 && !isLoudShot && typeof ped.angle === "number") {
+                            const cosFwd = (dx * Math.cos(ped.angle) + dy * Math.sin(ped.angle)) / Math.max(1, d);
+                            if (cosFwd < -0.25) continue;
+                        }
+                        return true;
                     }
                 }
             }
@@ -7971,11 +8034,18 @@ class LeonidaGame {
         if (Array.isArray(this.vehicles)) {
             for (const v of this.vehicles) {
                 if (!v.destroyed && v.isPolice && (v.driver === "AI_COP" || v.driver === "AI_TRAFFIC")) {
-                    if (Math.abs(v.x - x) >= maxDist || Math.abs(v.y - y) >= maxDist) continue;
-                    const d = Math.hypot(v.x - x, v.y - y);
+                    const dx = x - v.x;
+                    const dy = y - v.y;
+                    if (Math.abs(dx) >= maxDist || Math.abs(dy) >= maxDist) continue;
+                    const d = Math.hypot(dx, dy);
                     if (d < maxDist) {
-                        const blocked = d >= 135 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(v.x, v.y, x, y, pz).hit;
-                        if (!blocked) return true;
+                        const blocked = d >= 42 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(v.x, v.y, x, y, pz).hit;
+                        if (blocked) continue;
+                        if (d >= 125 && !isLoudShot && typeof v.angle === "number") {
+                            const cosFwd = (dx * Math.cos(v.angle) + dy * Math.sin(v.angle)) / Math.max(1, d);
+                            if (cosFwd < -0.25) continue;
+                        }
+                        return true;
                     }
                 }
             }
@@ -7986,19 +8056,30 @@ class LeonidaGame {
         return false;
     }
 
-    reportCrimeAt(x, y, targetStars, isExplosion = false) {
-        if (!this.player || this.player.dead || (this.player.respawnGraceUntil || 0) > performance.now()) return;
+    reportCrimeAt(x, y, targetStars, isExplosion = false, crimeOpts = null) {
+        if (!this.player || this.player.dead || (this.player.respawnGraceUntil || 0) > performance.now()) return false;
         const clampedStars = Math.max(1, Math.min(6, Math.floor(targetStars || 1)));
+        const involvedVeh = (crimeOpts && crimeOpts.veh !== undefined) ? crimeOpts.veh : (this.player.inVehicle || null);
+        const isGunfire = Boolean(
+            isExplosion ||
+            (crimeOpts && crimeOpts.isGunfire) ||
+            (this.player.muzzleTimer || 0) > 0 ||
+            (!this.player.inVehicle && this.player.weapon && this.player.weapon !== "FIST" && (this.player.weaponDrawnTimer || 0) > 0)
+        );
 
         // Case 1: Direct Police Sight (or player is already actively spotted by VCPD) -> Immediate radio alert!
-        if ((this.wantedLevel > 0 && this.isPoliceSpotted) || this.hasCopWitnessNear(x, y, isExplosion ? 620 : 480)) {
-            this.setWantedLevel(Math.max(this.wantedLevel || 0, clampedStars), { x, y }, true);
-            return;
+        if ((this.wantedLevel > 0 && this.isPoliceSpotted) || this.hasCopWitnessNear(x, y, isExplosion ? 600 : 460)) {
+            this.setWantedLevel(Math.max(this.wantedLevel || 0, clampedStars), { x, y }, true, involvedVeh);
+            return true;
         }
 
-        // Case 2: Civilian Witness 911 Call -> Find nearest living civilian witness within sight/hearing who dials 911!
-        // If the witness survives ~1.8s (1.1s for explosions), VCPD dispatches units to the CRIME SCENE coordinates {x, y}!
-        const maxWitnessDist = isExplosion ? 680 : 420;
+        // Case 2: Civilian Witness 911 Call -> Find nearest living civilian witness within sight (or gunshot/explosion hearing) who dials 911!
+        // Real-Life Causal Principle:
+        // - Silent melee (FIST) or roadkill requires unobstructed visual line-of-sight (!traceSegment2D.hit) within 380px.
+        // - Loud gunfire can be heard up to 175px even around a corner, or seen up to 420px with line-of-sight.
+        // - The witness takes ~3.8s (2.5s for explosions) to dial 911 and describe the crime scene {x, y}.
+        //   If the player silences/stuns/kills the witness before the timer finishes, the 911 call is aborted!
+        const maxWitnessDist = isExplosion ? 660 : (isGunfire ? 420 : 380);
         let bestWitness = null;
         let bestDist = maxWitnessDist;
         const pz = (this.player.inVehicle ? this.player.inVehicle.z : this.player.z) || 2.0;
@@ -8016,9 +8097,11 @@ class LeonidaGame {
                     continue;
                 }
                 const d = Math.hypot(ped.x - x, ped.y - y);
-                if (d < bestDist && d > 14) {
-                    const hasSightOrAcoustic = d < (isExplosion ? 380 : 185) || !this.map || !this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, x, y, pz).hit;
-                    if (hasSightOrAcoustic) {
+                if (d < bestDist && d > 12) {
+                    const blockedByBuilding = d >= 36 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(ped.x, ped.y, x, y, pz).hit;
+                    const hasVisualSight = !blockedByBuilding;
+                    const hasAcousticHearing = (isExplosion && d < 420) || (isGunfire && d < 175);
+                    if (hasVisualSight || hasAcousticHearing) {
                         bestDist = d;
                         bestWitness = ped;
                     }
@@ -8027,30 +8110,40 @@ class LeonidaGame {
         }
 
         if (bestWitness) {
+            const callDuration = isExplosion ? 2.5 : 3.8;
             bestWitness.calling911Timer = bestWitness.calling911Timer > 0
-                ? Math.min(bestWitness.calling911Timer, isExplosion ? 1.0 : 1.5)
-                : (isExplosion ? 1.15 : 1.85);
+                ? Math.min(bestWitness.calling911Timer, callDuration)
+                : callDuration;
             bestWitness.calling911Stars = Math.max(bestWitness.calling911Stars || 0, clampedStars);
             bestWitness.calling911Pos = { x, y };
+            bestWitness.calling911Veh = involvedVeh;
+            bestWitness.panicTimer = Math.max(bestWitness.panicTimer || 0, callDuration + 2.5);
+            bestWitness.threatX = x;
+            bestWitness.threatY = y;
             const nowMs = performance.now();
-            if (nowMs - (this._last911FloatAt || 0) > 2200) {
+            if (nowMs - (this._last911FloatAt || 0) > 1800) {
                 this._last911FloatAt = nowMs;
                 this.addFloatingText(bestWitness.x, bestWitness.y - 24, "📞 WITNESS CALLING 911!", "#facc15");
             }
-            return;
+            return true;
         }
 
-        // Case 3: Massive Explosion Acoustic 911 Report (neighbors/residents hear the blast even if all close beach/street peds were killed)
+        // Case 3: Massive Explosion Acoustic 911 Report (neighbors/residents hear the blast wave even if street peds were wiped out)
         if (isExplosion) {
             this.pending911Report = {
-                timer: this.pending911Report ? Math.min(this.pending911Report.timer, 1.2) : 1.35,
+                timer: this.pending911Report ? Math.min(this.pending911Report.timer, 2.4) : 2.8,
                 stars: Math.max(this.pending911Report ? this.pending911Report.stars : 0, clampedStars),
-                pos: { x, y }
+                pos: { x, y },
+                veh: involvedVeh
             };
+            return true;
         }
+
+        // Unwitnessed crime in an isolated spot -> 0★, no 911 call!
+        return false;
     }
 
-    setWantedLevel(level, crimePos = null, directlySpotted = null) {
+    setWantedLevel(level, crimePos = null, directlySpotted = null, reportedVeh = undefined) {
 
         const clamped = Math.max(0, Math.min(6, Math.floor(level)));
 
@@ -8060,16 +8153,28 @@ class LeonidaGame {
         }
 
         const prevWanted = this.wantedLevel || 0;
+        const ent = this.player ? (this.player.inVehicle || this.player) : { x: 0, y: 0 };
+        const reportedX = (crimePos && Number.isFinite(crimePos.x)) ? crimePos.x : ent.x;
+        const reportedY = (crimePos && Number.isFinite(crimePos.y)) ? crimePos.y : ent.y;
+        const isDirect = directlySpotted !== null
+            ? Boolean(directlySpotted)
+            : Boolean(this.isPoliceSpotted || this.hasCopWitnessNear(reportedX, reportedY));
 
         if (prevWanted === 0 && clamped > 0) {
 
-            this.copSpawnTimer = 9.0; // Dispatch first unit within ~1.5..2.0s (strictly off-screen)
+            // Real-Life Dispatch Timing:
+            // - Direct police sight: unit responds within ~1.1s (9.5 - 8.4).
+            // - Civilian 911 call completed: VCPD Central Dispatch takes ~3.2s (9.5 - 6.3) to radio & dispatch a unit from VCPD Central Precinct HQ!
+            this.copSpawnTimer = isDirect ? 8.4 : 6.3;
             this.wantedPeakLevel = clamped;
+            this.hasBeenDirectlySpottedByCop = isDirect;
+            this._crimeSceneAnnounced = false;
 
         } else if (clamped > prevWanted) {
 
             this.wantedPeakLevel = Math.max(this.wantedPeakLevel || 1, clamped);
-            this.copSpawnTimer = Math.max(this.copSpawnTimer || 0, 6.5);
+            this.copSpawnTimer = Math.max(this.copSpawnTimer || 0, isDirect ? 7.2 : 5.8);
+            if (isDirect) this.hasBeenDirectlySpottedByCop = true;
 
         } else if (clamped === 0) {
 
@@ -8080,6 +8185,8 @@ class LeonidaGame {
             this.wantedGetawayPot = 0;
             this.wantedPeakLevel = 0;
             this.isPoliceSpotted = false;
+            this.hasBeenDirectlySpottedByCop = false;
+            this._crimeSceneAnnounced = false;
             this.lastKnownWantedPos = null;
             this.wantedSpottedVehicle = null;
             this.crimeSceneLockTimer = 0;
@@ -8095,20 +8202,16 @@ class LeonidaGame {
         }
 
         if (clamped >= prevWanted && clamped > 0 && this.player) {
-            const ent = this.player.inVehicle || this.player;
-            const reportedX = (crimePos && Number.isFinite(crimePos.x)) ? crimePos.x : ent.x;
-            const reportedY = (crimePos && Number.isFinite(crimePos.y)) ? crimePos.y : ent.y;
-            const isDirect = directlySpotted !== null
-                ? Boolean(directlySpotted)
-                : Boolean(this.isPoliceSpotted || this.hasCopWitnessNear(reportedX, reportedY));
-
             this.lastKnownWantedPos = { x: reportedX, y: reportedY };
-            this.crimeSceneLockTimer = Math.max(this.crimeSceneLockTimer || 0, 14.0);
+            this.crimeSceneLockTimer = Math.max(this.crimeSceneLockTimer || 0, 22.0);
             this.crimeSceneSearchedTimer = 0;
 
             if (isDirect) {
                 this.isPoliceSpotted = true;
+                this.hasBeenDirectlySpottedByCop = true;
                 this.wantedSpottedVehicle = this.player.inVehicle || null;
+            } else if (reportedVeh !== undefined) {
+                this.wantedSpottedVehicle = reportedVeh;
             }
             if (clamped > prevWanted && !this.player.ankleScrambled) {
                 this.audio.playAnkleMonitorAlert();
@@ -8603,15 +8706,16 @@ class LeonidaGame {
         const stations = this.getEmergencyStations(serviceType).slice();
         stations.sort((a, b) => Math.hypot(a.x - targetX, a.y - targetY) - Math.hypot(b.x - targetX, b.y - targetY));
 
-        // 1. Try spawning directly at the road exit of the nearest station (or along the road avenue coming from that station)
+        // 1. Try spawning directly at the road exit of the nearest Central Municipal HQ (1150..2400px),
+        //    or along the road corridor coming from that HQ at realistic travel distance (1350..1750px)!
         for (let pass = 0; pass < 2; pass++) {
             const strictLaneAlign = (pass === 0);
             for (let si = 0; si < stations.length; si++) {
                 const st = stations[si];
                 const distStToTarget = Math.hypot(st.x - targetX, st.y - targetY);
-                const useStationGate = distStToTarget >= 920 && distStToTarget <= 1650 && !this.isPointInAnyPlayerCameraView(st.x, st.y, 200);
+                const useStationGate = distStToTarget >= 1150 && distStToTarget <= 2400 && !this.isPointInAnyPlayerCameraView(st.x, st.y, 220);
                 const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - targetX);
-                const corridorDist = Math.max(1020, Math.min(distStToTarget, 1280));
+                const corridorDist = Math.max(1350, Math.min(distStToTarget, 1750));
                 const anchorX = useStationGate ? st.x : (targetX + Math.cos(dirFromTargetToSt) * corridorDist);
                 const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
                 const baseBx = Math.floor(anchorX / TILE_SIZE);
@@ -8634,8 +8738,8 @@ class LeonidaGame {
                             }
                             const sx = (bx + 0.5) * TILE_SIZE;
                             const sy = (by + 0.5) * TILE_SIZE;
-                            if (Math.hypot(sx - targetX, sy - targetY) < 880) continue;
-                            if (this.isPointInAnyPlayerCameraView(sx, sy, 200)) continue;
+                            if (Math.hypot(sx - targetX, sy - targetY) < 1180) continue;
+                            if (this.isPointInAnyPlayerCameraView(sx, sy, 220)) continue;
                             const toTargetAng = Math.atan2(targetY - sy, targetX - sx);
                             const roadAng = typeof this.map.getAlignedRoadAngle === "function"
                                 ? this.map.getAlignedRoadAngle(bx, by, toTargetAng, targetZ)
@@ -8645,7 +8749,7 @@ class LeonidaGame {
                             const occupied = this.vehicles.some((ov) => ov && Math.hypot(ov.x - sx, ov.y - sy) < 76);
                             if (occupied) continue;
                             const sz = this.map.getHeightAtPixel(sx, sy, 4.0);
-                            return { x: sx, y: sy, z: sz, angle: roadAng, station: st };
+                            return { x: sx, y: sy, z: sz, angle: roadAng, station: st, usedStationGate: useStationGate };
                         }
                     }
                 }
@@ -9312,10 +9416,12 @@ class LeonidaGame {
 
         } else if (ped.kind !== "GATOR" && ped.kind !== "CRIMINAL") {
 
-            this.crimeHeat = (this.crimeHeat || 0) + 1;
-            const ch = this.crimeHeat;
-            const targetWanted = ch >= 21 ? 6 : (ch >= 15 ? 5 : (ch >= 10 ? 4 : (ch >= 6 ? 3 : (ch >= 3 ? 2 : 1))));
-            this.reportCrimeAt(ped.x, ped.y, Math.max(this.wantedLevel || 0, targetWanted), false);
+            const nextHeat = (this.crimeHeat || 0) + 1;
+            const targetWanted = nextHeat >= 21 ? 6 : (nextHeat >= 15 ? 5 : (nextHeat >= 10 ? 4 : (nextHeat >= 6 ? 3 : (nextHeat >= 3 ? 2 : 1))));
+            const wasReported = this.reportCrimeAt(ped.x, ped.y, Math.max(this.wantedLevel || 0, targetWanted), false);
+            if (wasReported) {
+                this.crimeHeat = nextHeat;
+            }
 
         }
 
@@ -14055,7 +14161,7 @@ class LeonidaGame {
                     ped._boardingVeh.driver === null &&
                     !ped._boardingVeh.towedByTruck
                 );
-                let rawCopTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y) || (ped.carjackedCop && p && !p.dead ? {
+                let rawCopTarget = activeReliefTarget ? null : (this.getNearestWantedTarget(ped.x, ped.y, ped.angle) || (ped.carjackedCop && p && !p.dead ? {
 
                     x: p.inVehicle ? p.inVehicle.x : p.x,
 
@@ -15417,20 +15523,23 @@ class LeonidaGame {
                         ped.calling911Timer = 0;
                         ped.calling911Stars = 0;
                         ped.calling911Pos = null;
+                        ped.calling911Veh = null;
                     } else {
                         ped.calling911Timer -= dt;
                         if (ped.calling911Timer <= 0) {
                             const repStars = ped.calling911Stars || 1;
                             const repPos = ped.calling911Pos || { x: ped.x, y: ped.y };
+                            const repVeh = ped.calling911Veh !== undefined ? ped.calling911Veh : null;
                             ped.calling911Timer = 0;
                             ped.calling911Stars = 0;
                             ped.calling911Pos = null;
+                            ped.calling911Veh = null;
                             if (this.player && !this.player.dead) {
-                                this.setWantedLevel(Math.max(this.wantedLevel || 0, repStars), repPos, false);
+                                this.setWantedLevel(Math.max(this.wantedLevel || 0, repStars), repPos, false, repVeh);
                                 const nowMs = performance.now();
                                 if (nowMs - (this._last911DispatchedAt || 0) > 2500) {
                                     this._last911DispatchedAt = nowMs;
-                                    this.addFloatingText(ped.x, ped.y - 24, "📡 911 APB DISPATCHED TO SCENE!", "#38bdf8");
+                                    this.addFloatingText(ped.x, ped.y - 24, "📡 911 CALL RECEIVED — DISPATCHING VCPD!", "#38bdf8");
                                 }
                             }
                         }
@@ -16524,7 +16633,7 @@ class LeonidaGame {
                 const rep = this.pending911Report;
                 this.pending911Report = null;
                 if (p && !p.dead) {
-                    this.setWantedLevel(Math.max(this.wantedLevel || 0, rep.stars || 1), rep.pos, false);
+                    this.setWantedLevel(Math.max(this.wantedLevel || 0, rep.stars || 1), rep.pos, false, rep.veh !== undefined ? rep.veh : null);
                     this.addFloatingText(rep.pos.x, rep.pos.y - 28, "📡 911 BLAST REPORTED TO VCPD!", "#38bdf8");
                 }
             }
@@ -16561,9 +16670,8 @@ class LeonidaGame {
                     copsAtCrimeScene = true;
                 }
 
-                if (!anyCopHasVisual && !this.activeInterior && d < 520) {
-                    const blocked = d >= 135 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(v.x, v.y, pEnt.x, pEnt.y, pZ).hit;
-                    if (!blocked) anyCopHasVisual = true;
+                if (!anyCopHasVisual && this.canCopIdentifyPlayer(v.x, v.y, v.angle, 480)) {
+                    anyCopHasVisual = true;
                 }
 
             }
@@ -16585,9 +16693,8 @@ class LeonidaGame {
                     copsAtCrimeScene = true;
                 }
 
-                if (!anyCopHasVisual && !this.activeInterior && d < 420) {
-                    const blocked = d >= 115 && this.map && this.map.traceSegment2D && this.map.traceSegment2D(ped.x, ped.y, pEnt.x, pEnt.y, pZ).hit;
-                    if (!blocked) anyCopHasVisual = true;
+                if (!anyCopHasVisual && this.canCopIdentifyPlayer(ped.x, ped.y, ped.angle, 400)) {
+                    anyCopHasVisual = true;
                 }
 
             }
@@ -16627,13 +16734,15 @@ class LeonidaGame {
 
                 const pz = spawnTarget.z || 2.0;
 
-                // Persistent World Priority #1: Alert an existing patrolling VCPD Cruiser already on the streets (< 1850px) to switch its siren on and respond!
+                // Persistent World Priority #1: Alert an existing patrolling VCPD Cruiser already on the streets at a realistic off-screen patrol distance (1180..2200px)!
+                // Never convert a nearby traffic cruiser (< 1180px) into an instant ambush on a 911 call if that cruiser did not witness the crime!
+                const minPatrolAlertDist = this.isPoliceSpotted ? 480 : 1180;
                 let alertedPatrolCop = null;
-                let bestPatrolDist = 1850;
+                let bestPatrolDist = 2200;
                 for (const v of this.vehicles) {
                     if (!v.destroyed && v.isPolice && v.driver === "AI_TRAFFIC") {
                         const d = Math.hypot(v.x - spawnTarget.x, v.y - spawnTarget.y);
-                        if (d < bestPatrolDist) {
+                        if (d >= minPatrolAlertDist && d < bestPatrolDist && (this.isPoliceSpotted || !this.isPointInAnyPlayerCameraView(v.x, v.y, 180))) {
                             bestPatrolDist = d;
                             alertedPatrolCop = v;
                         }
@@ -16644,7 +16753,7 @@ class LeonidaGame {
                     alertedPatrolCop.sirenActive = true;
                     alertedPatrolCop.isPersistentFleet = true;
                 } else {
-                    // Persistent World Priority #2: Dispatch a unit from the nearest VCPD Police Precinct (strictly off-screen)!
+                    // Persistent World Priority #2: Dispatch a unit from the Central VCPD Police Precinct HQ (strictly off-screen)!
                     const spawnInfo = this.findStationDispatchSpawn("POLICE", spawnTarget.x, spawnTarget.y, pz);
                     if (spawnInfo) {
                         const useSwat = tWanted >= 4 && activeSwatCars < 1 && Math.random() < (tWanted >= 5 ? 0.35 : 0.25);
@@ -16897,6 +17006,10 @@ class LeonidaGame {
             //      (1.75x faster if the player switched vehicles unseen!) and clears the entire wanted APB once the search timer completes!
             this.crimeSceneLockTimer = Math.max(0, (this.crimeSceneLockTimer || 0) - dt);
             if (copsAtCrimeScene && !anyCopHasVisual) {
+                if (!this._crimeSceneAnnounced && this.lastKnownWantedPos) {
+                    this._crimeSceneAnnounced = true;
+                    this.addFloatingText(this.lastKnownWantedPos.x, this.lastKnownWantedPos.y - 28, "🔍 VCPD INVESTIGATING CRIME SCENE!", "#facc15");
+                }
                 this.crimeSceneSearchedTimer = (this.crimeSceneSearchedTimer || 0) + dt;
             }
             const decayThreshold = this.wantedLevel === 1 ? 16 : (this.wantedLevel === 2 ? 22 : (this.wantedLevel === 3 ? 28 : 35));
@@ -16905,6 +17018,7 @@ class LeonidaGame {
 
             if (this.isPoliceSpotted) {
 
+                this.hasBeenDirectlySpottedByCop = true;
                 this.lastKnownWantedPos = { x: pEnt.x, y: pEnt.y };
                 this.wantedSpottedVehicle = p.inVehicle || null;
                 this.crimeSceneSearchedTimer = 0;
@@ -16922,14 +17036,22 @@ class LeonidaGame {
 
                 const lastKnown = this.lastKnownWantedPos || { x: pEnt.x, y: pEnt.y };
                 const distToLastKnown = Math.hypot(pEnt.x - lastKnown.x, pEnt.y - lastKnown.y);
+                // Real-Life Crime Scene Investigation Principle:
+                // 1) If the player lingers at the crime scene (< 260px), or
+                // 2) If a 911 unit is still en route from the Precinct and hasn't finished inspecting the crime scene (< 4.5s on scene),
+                // the APB stays active until the unit arrives and inspects the scene!
+                const unitEnRouteOrInspectingScene =
+                    !this.hasBeenDirectlySpottedByCop &&
+                    ((this.crimeSceneLockTimer || 0) > 0 && (this.crimeSceneSearchedTimer || 0) < 4.5);
                 const lingeredAtCrimeScene =
-                    distToLastKnown < 320 &&
-                    ((this.crimeSceneLockTimer || 0) > 0 || ((activeCopCars + activeFootCopsNear) > 0 && (this.crimeSceneSearchedTimer || 0) < 6.0));
+                    (distToLastKnown < 260 && ((this.crimeSceneLockTimer || 0) > 0 || ((activeCopCars + activeFootCopsNear) > 0 && (this.crimeSceneSearchedTimer || 0) < 6.0))) ||
+                    unitEnRouteOrInspectingScene;
                 const switchedVehicleUnseen = Boolean(p.inVehicle && p.inVehicle !== this.wantedSpottedVehicle);
-                const evasionRate = lingeredAtCrimeScene ? 0.25 : (switchedVehicleUnseen ? 1.75 : 1.0);
+                const sceneClearedByCops = (this.crimeSceneSearchedTimer || 0) >= 4.5 && distToLastKnown >= 240;
+                const evasionRate = lingeredAtCrimeScene ? 0.35 : (sceneClearedByCops ? 2.4 : (switchedVehicleUnseen ? 1.65 : 1.0));
 
                 const nextDecay = (this.wantedDecayTimer || 0) + dt * evasionRate;
-                this.wantedDecayTimer = lingeredAtCrimeScene ? Math.min(decayThreshold - 4.0, nextDecay) : nextDecay;
+                this.wantedDecayTimer = lingeredAtCrimeScene ? Math.min(decayThreshold - 3.5, nextDecay) : nextDecay;
 
                 if (this.wantedDecayTimer >= decayThreshold) {
 
@@ -16947,6 +17069,8 @@ class LeonidaGame {
 
         } else {
             this.isPoliceSpotted = false;
+            this.hasBeenDirectlySpottedByCop = false;
+            this._crimeSceneAnnounced = false;
             this.wantedDecayTimer = 0;
             this.crimeSceneLockTimer = 0;
             this.crimeSceneSearchedTimer = 0;

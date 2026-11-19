@@ -3004,7 +3004,7 @@ class Vehicle {
        ======================================================================== */
     computePoliceControls(dt, map, game) {
         const wantedTarget = (game && typeof game.getNearestWantedTarget === "function")
-            ? game.getNearestWantedTarget(this.x, this.y)
+            ? game.getNearestWantedTarget(this.x, this.y, this.angle)
             : ((game && game.wantedLevel > 0 && !game.player.dead)
                 ? {
                     x: (game.player.inVehicle || game.player).x,
@@ -5918,7 +5918,7 @@ class TrafficManager {
         const vps = Array.isArray(viewports) ? viewports : [{ area: viewports }];
         const minKeep = 24 + (vps.length - 1) * 10;
         const outerRects = vps.map((vp) => this.expandRect(vp.area, this.carsMaxDistanceBlocks + 2));
-        const farWreckRects = vps.map((vp) => this.expandRect(vp.area, 38));
+        const farWreckRects = vps.map((vp) => this.expandRect(vp.area, 48));
         let activeMovingCount = 0;
         for (let k = 0; k < game.vehicles.length; k++) {
             const mv = game.vehicles[k];

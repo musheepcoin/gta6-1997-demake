@@ -6558,16 +6558,16 @@ class LeonidaMap {
         // PERSISTENT WORLD MUNICIPAL HQ BUILDINGS (1 CENTRAL BUILDING PER SERVICE FOR THE MAP)
         // --------------------------------------------------------------------
         this.emergencyStations = [
-            // 1 CENTRAL VCPD POLICE PRECINCT
-            { id: "vcpd_hq", type: "POLICE", name: "VCPD CENTRAL PRECINCT HQ", shortName: "VCPD CENTRAL HQ", x: mx256(203.0) * TILE_SIZE, y: my256(146.0) * TILE_SIZE },
+            // 1 CENTRAL VCPD POLICE PRECINCT (West South Beach / Alton Avenue Precinct Gate — ~1745px NW of Ocean Drive)
+            { id: "vcpd_hq", type: "POLICE", name: "VCPD CENTRAL PRECINCT HQ", shortName: "VCPD CENTRAL HQ", x: 425.5 * TILE_SIZE, y: 266.5 * TILE_SIZE },
 
-            // 1 CENTRAL HOSPITAL
-            { id: "ems_hq", type: "MEDIC", name: "LEONIDA GENERAL HOSPITAL", shortName: "LEONIDA HOSPITAL", x: mx256(208.5) * TILE_SIZE, y: my256(140.5) * TILE_SIZE },
+            // 1 CENTRAL HOSPITAL (Leonida General Hospital — ~1840px SW of Ocean Drive)
+            { id: "ems_hq", type: "MEDIC", name: "LEONIDA GENERAL HOSPITAL", shortName: "LEONIDA HOSPITAL", x: 425.5 * TILE_SIZE, y: 309.5 * TILE_SIZE },
 
-            // 1 CENTRAL VCFD FIRE STATION
-            { id: "vcfd_hq", type: "FIRE", name: "VCFD CENTRAL FIRE STATION", shortName: "VCFD CENTRAL STATION", x: 428.5 * TILE_SIZE, y: 295.5 * TILE_SIZE },
+            // 1 CENTRAL VCFD FIRE STATION (VCFD Central Station — ~1300px W-SW of Ocean Drive)
+            { id: "vcfd_hq", type: "FIRE", name: "VCFD CENTRAL FIRE STATION", shortName: "VCFD CENTRAL STATION", x: 425.5 * TILE_SIZE, y: 296.5 * TILE_SIZE },
 
-            // 1 CENTRAL MUNICIPAL IMPOUND YARD
+            // 1 CENTRAL MUNICIPAL IMPOUND YARD (Vice Port Municipal Impound)
             { id: "tow_hq", type: "TOW", name: "VICE CITY MUNICIPAL IMPOUND", shortName: "MUNICIPAL IMPOUND", x: 333.2 * TILE_SIZE, y: 306.5 * TILE_SIZE }
         ];
 

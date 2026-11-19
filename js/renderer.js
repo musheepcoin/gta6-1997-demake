@@ -17591,6 +17591,20 @@ class RetroRenderer {
             fctx.strokeRect(px - 5, py - 5, 10, 10);
         }
 
+        // Central Municipal HQ Buildings (VCPD Precinct HQ, Leonida Hospital, VCFD Fire Station, Municipal Impound)
+        if (Array.isArray(this.map.emergencyStations)) {
+            for (const st of this.map.emergencyStations) {
+                const ex = Math.round(st.x * sx);
+                const ey = Math.round(st.y * sy);
+                const col = st.type === "POLICE" ? "#3b82f6" : (st.type === "MEDIC" ? "#38bdf8" : (st.type === "FIRE" ? "#ef4444" : "#facc15"));
+                fctx.fillStyle = "#090d16";
+                fctx.fillRect(ex - 5, ey - 5, 10, 10);
+                fctx.strokeStyle = col;
+                fctx.lineWidth = 1.8;
+                fctx.strokeRect(ex - 5, ey - 5, 10, 10);
+            }
+        }
+
         // Enterable Shops, Bars, Hotels, Ammu-Nation & 3D Luxury Villa Interiors on the [M] Full Map
         if (Array.isArray(this.map.interiors)) {
             for (const intr of this.map.interiors) {
