@@ -13311,32 +13311,34 @@ class RetroRenderer {
             const dist = Math.hypot(p.x - ev.x, p.y - ev.y);
             if (dist < 560) {
                 const sc = this.worldToScreen(ev.x, ev.y, (ev.z || 2.0) + 0.08);
-                const pulse = 0.5 + 0.5 * Math.sin((this.time || 0) * 10.0);
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(sc.x, sc.y, 16 + pulse * 8, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(250, 204, 21, 0.25)";
-                ctx.fill();
-                ctx.strokeStyle = "#fde047";
-                ctx.lineWidth = 2.2;
-                ctx.stroke();
-                ctx.fillStyle = "#b45309";
-                ctx.fillRect(sc.x - 9, sc.y - 9, 18, 18);
-                ctx.strokeStyle = "#fde047";
-                ctx.strokeRect(sc.x - 9, sc.y - 9, 18, 18);
-                ctx.restore();
+                if (sc.x >= -140 && sc.x <= this.canvas.width + 140 && sc.y >= -60 && sc.y <= this.canvas.height + 60) {
+                    const pulse = 0.5 + 0.5 * Math.sin((this.time || 0) * 10.0);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(sc.x, sc.y, 16 + pulse * 8, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(250, 204, 21, 0.25)";
+                    ctx.fill();
+                    ctx.strokeStyle = "#fde047";
+                    ctx.lineWidth = 2.2;
+                    ctx.stroke();
+                    ctx.fillStyle = "#b45309";
+                    ctx.fillRect(sc.x - 9, sc.y - 9, 18, 18);
+                    ctx.strokeStyle = "#fde047";
+                    ctx.strokeRect(sc.x - 9, sc.y - 9, 18, 18);
+                    ctx.restore();
 
-                const label = `📦 HOT DROP CRATE (+$${(ev.reward || 20000).toLocaleString()} + ${ev.weapon}) • ${Math.ceil(ev.timer)}s`;
-                const bw = measurePromptW(label) + 18;
-                const bx = Math.round(sc.x - bw * 0.5);
-                const by = Math.round(sc.y - 28);
-                ctx.fillStyle = "rgba(120, 53, 15, 0.92)";
-                ctx.fillRect(bx, by, bw, 20);
-                ctx.strokeStyle = "#fde047";
-                ctx.lineWidth = 1.6;
-                ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 19);
-                ctx.fillStyle = "#fef08a";
-                ctx.fillText(label, sc.x, by + 10);
+                    const label = `📦 HOT DROP CRATE (+$${(ev.reward || 800).toLocaleString()} + ${ev.weapon}) • ${Math.ceil(ev.timer)}s`;
+                    const bw = measurePromptW(label) + 18;
+                    const bx = Math.round(sc.x - bw * 0.5);
+                    const by = Math.round(sc.y - 28);
+                    ctx.fillStyle = "rgba(120, 53, 15, 0.92)";
+                    ctx.fillRect(bx, by, bw, 20);
+                    ctx.strokeStyle = "#fde047";
+                    ctx.lineWidth = 1.6;
+                    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 19);
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillText(label, sc.x, by + 10);
+                }
             }
         }
 
@@ -16757,10 +16759,11 @@ class RetroRenderer {
             const lbX = W - lbW - 14;
             const lbY = Math.round(scoreY + 26 * s + 4);
             const myName = String((game.net && game.net.playerName) || (game.player && game.player.nickname) || "").trim().toUpperCase();
-            const lbCacheKey = `${lbW}x${lbH}|${scoreStr}|${myName}`;
+            const topScores = game.getAllTimeHighScores().slice(0, 3);
+            const t0 = topScores[0], t1 = topScores[1], t2 = topScores[2];
+            const lbCacheKey = `${lbW}x${lbH}|${myName}|${t0 ? t0.name + ":" + t0.score : ""}|${t1 ? t1.name + ":" + t1.score : ""}|${t2 ? t2.name + ":" + t2.score : ""}`;
 
             if (!this._lbHudCanvas || this._lbHudCacheKey !== lbCacheKey) {
-                const topScores = game.getAllTimeHighScores().slice(0, 3);
                 if (topScores.length > 0) {
                     if (!this._lbHudCanvas) {
                         this._lbHudCanvas = document.createElement("canvas");
@@ -16880,7 +16883,7 @@ class RetroRenderer {
                 ctx.fillText(`🎯 BOUNTY: ${String(b.targetName || "PLAYER").slice(0, 9)}`, lbX + 6, curY + 11);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#fde047";
-                ctx.fillText(`$${Number(b.reward || 20000).toLocaleString()} (${Math.ceil(b.timer)}s)`, lbX + lbW - 6, curY + 11);
+                ctx.fillText(`$${Number(b.reward || 1200).toLocaleString()} (${Math.ceil(b.timer)}s)`, lbX + lbW - 6, curY + 11);
             }
             ctx.restore();
         }
@@ -16896,10 +16899,19 @@ class RetroRenderer {
         // Draw Player 1997 Pixel-Art Portrait Badge + Health Bar (Click to change Character/Nickname [H]!)
         const mugW = isPhonePortrait ? 34 : (isCompact ? 40 : 48);
         const mugH = mugW;
+        const hasSpawnShield = Boolean(p.respawnGraceUntil && performance.now() < p.respawnGraceUntil);
         this.drawPixelPortraitRect(ctx, iconX, leftY, mugW, mugH, p.charId || "LUCIA", {
             bandana: Boolean(p.bandana),
-            alert: (game.wantedLevel || 0) > 0
+            alert: (game.wantedLevel || 0) > 0,
+            shield: hasSpawnShield
         });
+        if (hasSpawnShield) {
+            ctx.save();
+            ctx.strokeStyle = "#00f0ff";
+            ctx.lineWidth = 2.2;
+            ctx.strokeRect(iconX - 1, leftY - 1, mugW + 2, mugH + 2);
+            ctx.restore();
+        }
         this.cheatButtons.push({ id: "OPEN_CHAR_SELECT", x: iconX, y: leftY, w: mugW, h: mugH + 10 });
         // Health Bar right below Player's Mugshot
         ctx.fillStyle = "rgba(10, 12, 20, 0.88)";
@@ -16976,9 +16988,11 @@ class RetroRenderer {
             const barH = 16;
             const barX = Math.round((W - barW) * 0.5);
             const barY = Math.round(hy + headH + 4);
-            const dur = game.wantedDecayDuration || 12;
+            const dur = game.wantedDecayDuration || 16;
             const prog = Math.max(0, Math.min(1, (game.wantedDecayTimer || 0) / dur));
-            const secsLeft = Math.max(1, Math.ceil(dur - (game.wantedDecayTimer || 0)));
+            const switchedVehUnseen = Boolean(p.inVehicle && p.inVehicle !== game.wantedSpottedVehicle);
+            const effRate = switchedVehUnseen ? 1.75 : 1.0;
+            const secsLeft = Math.max(1, Math.ceil((dur - (game.wantedDecayTimer || 0)) / effRate));
 
             ctx.save();
             ctx.fillStyle = isEvading ? "rgba(8, 22, 38, 0.90)" : "rgba(38, 10, 18, 0.88)";
@@ -16995,7 +17009,7 @@ class RetroRenderer {
             ctx.textBaseline = "middle";
             ctx.fillStyle = isEvading ? "#7dd3fc" : "#fca5a5";
             ctx.fillText(
-                isEvading ? `🕵️ HIDDEN — LOSING 1★ IN ${secsLeft}s` : "🚨 SPOTTED — BREAK LINE OF SIGHT!",
+                isEvading ? `🕵️ HIDDEN — CLEARING APB IN ${secsLeft}s` : "🚨 SPOTTED — BREAK LINE OF SIGHT!",
                 barX + barW * 0.5,
                 barY + barH * 0.5 + 0.5
             );
@@ -17187,8 +17201,8 @@ class RetroRenderer {
             const copFlash = Math.floor(this.time * 8) % 2 === 0;
             for (const v of game.vehicles) {
                 if (v.destroyed || v === p.inVehicle) continue;
+                if (v.x < viewWorldX || v.x > viewWorldX + viewWorldW || v.y < viewWorldY || v.y > viewWorldY + viewWorldH) continue;
                 const pt = worldToMini(v.x, v.y);
-                if (pt.x < mx || pt.x > mx + mw || pt.y < my || pt.y > my + mh) continue;
                 if (v.driver === "AI_COP" || v.isPolice) {
                     ctx.fillStyle = copFlash ? "#ef4444" : "#3b82f6";
                     ctx.fillRect(pt.x - 2.5, pt.y - 2.5, 5, 5);
@@ -17283,6 +17297,7 @@ class RetroRenderer {
         }
         if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
             for (const rp of game.net.remotePlayers.values()) {
+                if (rp.isHidden) continue;
                 const rpt = worldToMini(rp.x, rp.y);
                 const rx = Math.max(mx + 5, Math.min(mx + mw - 5, rpt.x));
                 const ry = Math.max(my + 5, Math.min(my + mh - 5, rpt.y));
@@ -17319,22 +17334,20 @@ class RetroRenderer {
             if (Array.isArray(game.vehicles)) {
                 for (const v of game.vehicles) {
                     if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
+                        if (v.x < viewWorldX || v.x > viewWorldX + viewWorldW || v.y < viewWorldY || v.y > viewWorldY + viewWorldH) continue;
                         const cpt = worldToMini(v.x, v.y);
-                        if (cpt.x >= mx - 3 && cpt.x <= mx + mw + 3 && cpt.y >= my - 3 && cpt.y <= my + mh + 3) {
-                            ctx.fillStyle = strobeRed ? "#ef4444" : "#3b82f6";
-                            ctx.fillRect(cpt.x - 2.4, cpt.y - 2.4, 4.8, 4.8);
-                        }
+                        ctx.fillStyle = strobeRed ? "#ef4444" : "#3b82f6";
+                        ctx.fillRect(cpt.x - 2.4, cpt.y - 2.4, 4.8, 4.8);
                     }
                 }
             }
             if (Array.isArray(game.peds)) {
                 for (const ped of game.peds) {
                     if (!ped.dead && ped.kind === "COP") {
+                        if (ped.x < viewWorldX || ped.x > viewWorldX + viewWorldW || ped.y < viewWorldY || ped.y > viewWorldY + viewWorldH) continue;
                         const cpt = worldToMini(ped.x, ped.y);
-                        if (cpt.x >= mx - 2 && cpt.x <= mx + mw + 2 && cpt.y >= my - 2 && cpt.y <= my + mh + 2) {
-                            ctx.fillStyle = strobeRed ? "#38bdf8" : "#ef4444";
-                            ctx.fillRect(cpt.x - 1.8, cpt.y - 1.8, 3.6, 3.6);
-                        }
+                        ctx.fillStyle = strobeRed ? "#38bdf8" : "#ef4444";
+                        ctx.fillRect(cpt.x - 1.8, cpt.y - 1.8, 3.6, 3.6);
                     }
                 }
             }
@@ -17694,6 +17707,7 @@ class RetroRenderer {
 
         if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
             for (const rp of game.net.remotePlayers.values()) {
+                if (rp.isHidden) continue;
                 const rx = Math.round(rp.x * sx);
                 const ry = Math.round(rp.y * sy);
                 fctx.fillStyle = rp.color || "#00f0ff";

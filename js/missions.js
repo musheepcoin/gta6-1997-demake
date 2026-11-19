@@ -226,6 +226,7 @@ class MissionManager {
         if (!m || !g) return;
         if (m.id === "M1_UNCLE_JACK" && m.stage === 1) {
             m.stage = 2;
+            g.addCash(m.phone && m.phone.completed ? 100 : 300, "REGISTER ROBBED!", true);
             g.setWantedLevel(Math.max(g.wantedLevel, 2));
             g.sendPager(
                 "JASON (SMARTPHONE)",
@@ -367,7 +368,8 @@ class MissionManager {
                 if (v && !v.destroyed) {
                     m.targetPos = { x: v.x, y: v.y };
                 }
-                if (!v || v.destroyed || p.inVehicle === v) {
+                const vanSubmerged = Boolean(v && g.map && g.map.isWaterAtPixel && g.map.isWaterAtPixel(v.x, v.y));
+                if (!v || v.destroyed || vanSubmerged || p.inVehicle === v) {
                     m.stage = 2;
                     g.addCash(m.phone && m.phone.completed ? 250 : 750, "ARMORED VAULT LOOT!", true);
                     g.setWantedLevel(Math.max(g.wantedLevel, 4));
@@ -826,6 +828,9 @@ class MissionManager {
                 true
             );
             g.showBigBanner("THE BIG LEONIDA SCORE", "AMBUSH THE ARMORED VAN & HACK DOC RELAY", "#ffd13b", 2.6);
+        }
+        if (typeof g.rebuildVehicleSpatialGrid === "function") {
+            g.rebuildVehicleSpatialGrid();
         }
     }
 

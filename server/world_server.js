@@ -37,7 +37,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const ROOM_CODES = ["VICE26", "VICE97", "MIAMI86", "KEYS305"];
 const ECON_VERSION = 2;
 const MIN_CLIENT_VER = 101181;
-const CURRENT_BUILD = "101_208";
+const CURRENT_BUILD = "101_209";
 
 const serverMap = new global.LeonidaMap();
 let serverMapMeta = null;
@@ -599,6 +599,23 @@ function handleClientPacket(socket, pkt) {
         const prevRoom = meta.room;
         const { code } = ensureRoom(pkt.room);
         if (prevRoom && prevRoom !== code) {
+            if (meta.lastDrivenVehId) {
+                const { room: pr } = ensureRoom(prevRoom);
+                const oldVid = meta.lastDrivenVehId;
+                if (pr.modifiedVehs && pr.modifiedVehs[oldVid] && pr.modifiedVehs[oldVid][8] === 4) {
+                    pr.modifiedVehs[oldVid][8] = 0;
+                    pr.modifiedVehs[oldVid][6] = 0;
+                    pr.modifiedVehs[oldVid][7] = 0;
+                    pr.modifiedVehs[oldVid][10] = (pr.modifiedVehs[oldVid][10] || 0) & ~2;
+                }
+                if (pr.vehs && pr.vehs[oldVid] && pr.vehs[oldVid][8] === 4) {
+                    pr.vehs[oldVid][8] = 0;
+                    pr.vehs[oldVid][6] = 0;
+                    pr.vehs[oldVid][7] = 0;
+                    pr.vehs[oldVid][10] = (pr.vehs[oldVid][10] || 0) & ~2;
+                }
+                meta.lastDrivenVehId = null;
+            }
             broadcastToRoom(prevRoom, { t: "LEAVE", id: meta.playerId, name: meta.name }, socket);
         }
         meta.room = code;
@@ -713,8 +730,28 @@ function handleClientPacket(socket, pkt) {
             isDirty = true;
         }
 
-        // If player is driving a vehicle, persist its pose in room.modifiedVehs!
-        if (pkt.started && pkt.veh && pkt.veh.id && typeof pkt.x === "number" && typeof pkt.y === "number") {
+        // If player was previously driving a vehicle and has now exited or switched vehicles, release the old vehicle on the server!
+        const curDrivenId = (pkt.started && pkt.veh && pkt.veh.id && (pkt.veh.seat || 0) === 0) ? pkt.veh.id : null;
+        if (meta.lastDrivenVehId && meta.lastDrivenVehId !== curDrivenId) {
+            const oldVid = meta.lastDrivenVehId;
+            if (room.modifiedVehs && room.modifiedVehs[oldVid] && room.modifiedVehs[oldVid][8] === 4) {
+                room.modifiedVehs[oldVid][8] = 0;
+                room.modifiedVehs[oldVid][6] = 0;
+                room.modifiedVehs[oldVid][7] = 0;
+                room.modifiedVehs[oldVid][10] = (room.modifiedVehs[oldVid][10] || 0) & ~2;
+                isDirty = true;
+            }
+            if (room.vehs && room.vehs[oldVid] && room.vehs[oldVid][8] === 4) {
+                room.vehs[oldVid][8] = 0;
+                room.vehs[oldVid][6] = 0;
+                room.vehs[oldVid][7] = 0;
+                room.vehs[oldVid][10] = (room.vehs[oldVid][10] || 0) & ~2;
+            }
+        }
+        meta.lastDrivenVehId = curDrivenId;
+
+        // If player is driving a vehicle (seat === 0), persist its pose in room.modifiedVehs!
+        if (curDrivenId && typeof pkt.x === "number" && typeof pkt.y === "number") {
             const v = pkt.veh;
             const flags =
                 (v.siren ? 2 : 0) |
@@ -1050,6 +1087,14 @@ function handleClientPacket(socket, pkt) {
         return;
     }
 
+    if (pkt.t === "KILLED") {
+        if (room.activeBounty && (room.activeBounty.targetId === (pkt.victimId || pkt.id) || room.activeBounty.targetName === pkt.victimName)) {
+            room.activeBounty = null;
+        }
+        broadcastToRoom(roomCode, pkt, socket);
+        return;
+    }
+
     broadcastToRoom(roomCode, pkt, socket);
 }
 
@@ -1259,19 +1304,21 @@ server.on("upgrade", (req, socket) => {
         const m = clients.get(socket);
         if (m) {
             // Release any vehicle this player was driving so it becomes a parked unoccupied car (drvCode = 0)
-            if (m.lastState && m.lastState.veh && m.lastState.veh.id) {
+            const relVid = m.lastDrivenVehId || (m.lastState && m.lastState.veh && (m.lastState.veh.seat || 0) === 0 && m.lastState.veh.id);
+            if (relVid) {
                 const { room: r } = ensureRoom(m.room);
-                const vid = m.lastState.veh.id;
-                if (r.modifiedVehs[vid] && r.modifiedVehs[vid][8] === 4) {
-                    r.modifiedVehs[vid][8] = 0;
-                    r.modifiedVehs[vid][6] = 0;
-                    r.modifiedVehs[vid][7] = 0;
+                if (r.modifiedVehs[relVid] && r.modifiedVehs[relVid][8] === 4) {
+                    r.modifiedVehs[relVid][8] = 0;
+                    r.modifiedVehs[relVid][6] = 0;
+                    r.modifiedVehs[relVid][7] = 0;
+                    r.modifiedVehs[relVid][10] = (r.modifiedVehs[relVid][10] || 0) & ~2;
                     isDirty = true;
                 }
-                if (r.vehs[vid] && r.vehs[vid][8] === 4) {
-                    r.vehs[vid][8] = 0;
-                    r.vehs[vid][6] = 0;
-                    r.vehs[vid][7] = 0;
+                if (r.vehs[relVid] && r.vehs[relVid][8] === 4) {
+                    r.vehs[relVid][8] = 0;
+                    r.vehs[relVid][6] = 0;
+                    r.vehs[relVid][7] = 0;
+                    r.vehs[relVid][10] = (r.vehs[relVid][10] || 0) & ~2;
                 }
             }
             clients.delete(socket);

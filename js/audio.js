@@ -1243,7 +1243,7 @@ class RetroAudioEngine {
             } else {
 
             // 5-Speed Automatic Transmission Gear Selection with Hysteresis (continuous marine drive for boats!)
-            const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
+            const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT" || specKey === "SWAMP_BOAT" || specKey === "YACHT");
             let targetGear = 1;
             if (speedNorm > 0.78) targetGear = 5;
             else if (speedNorm > 0.56) targetGear = 4;
@@ -1814,12 +1814,12 @@ class RetroAudioEngine {
             return;
         }
 
-        const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
+        const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT" || specKey === "SWAMP_BOAT" || specKey === "YACHT");
         if (isWaterCraft) {
             this.playWaterSplash(0.85);
             setTimeout(() => {
-                if (!this.ctx || this.muted) return;
-                const boatStartKey = specKey === "AIRBOAT"
+                if (!this.ctx || this.muted || !this.inVehicle) return;
+                const boatStartKey = (specKey === "AIRBOAT" || specKey === "SWAMP_BOAT")
                     ? "airboat_idle"
                     : (specKey === "JETSKI" ? "jetski_idle" : "gta_boat_engine");
                 this.playSample(boatStartKey, 0.125, 0.94 + Math.random() * 0.08, 0.85);
@@ -1829,7 +1829,7 @@ class RetroAudioEngine {
             const doorKey = (vehClass === "TRUCK" || vehClass === "TANK") ? "truck_door" : "gta_car_door_open";
             this.playSample(doorKey, 0.115, 0.96 + Math.random() * 0.08, 0.55);
             setTimeout(() => {
-                if (this.ctx && !this.muted) {
+                if (this.ctx && !this.muted && this.inVehicle) {
                     this.playSample("gta_car_door_close", 0.11, 0.96 + Math.random() * 0.08, 0.35);
                 }
             }, 135);
@@ -1837,7 +1837,7 @@ class RetroAudioEngine {
 
         // Play class-authentic ignition starter crank & initial engine roar!
         setTimeout(() => {
-            if (!this.ctx || this.muted) return;
+            if (!this.ctx || this.muted || !this.inVehicle) return;
             let startKey = "start_sedan";
             let startRate = 1.0;
             let maxDur = 1.15;
@@ -1865,7 +1865,7 @@ class RetroAudioEngine {
 
     playCarExit(isMotorcycle = false, specKey = null) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT");
+        const isWaterCraft = (specKey === "SPEEDBOAT" || specKey === "JETSKI" || specKey === "AIRBOAT" || specKey === "SWAMP_BOAT" || specKey === "YACHT");
         if (isWaterCraft) {
             this.playWaterSplash(0.72);
             this.playSample("step_soft", 0.075, 0.98, 0.18);

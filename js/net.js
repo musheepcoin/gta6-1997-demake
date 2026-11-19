@@ -687,6 +687,24 @@ class ViceNetworkManager {
             this._pendingPropSync = [];
             this._pendingServerWorldSnapshot = null;
             this._serverBootstrapApplied = false;
+            if (this.game) {
+                this.game.activeFlashEvent = null;
+                this.game.activeServerBounty = null;
+                if (Array.isArray(this.game.vehicles)) {
+                    for (const v of this.game.vehicles) {
+                        if (v && (v._linkedRemoteId || v.driver === "REMOTE")) {
+                            v._linkedRemoteId = null;
+                            if (v.driver === "REMOTE") {
+                                v.driver = null;
+                                v.vx = 0;
+                                v.vy = 0;
+                                v.speed = 0;
+                                v.sirenActive = false;
+                            }
+                        }
+                    }
+                }
+            }
             if (this.chatRoomBadge) {
                 this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
             }
@@ -1634,16 +1652,20 @@ class ViceNetworkManager {
             }
             if (Array.isArray(pkt.pellets)) {
                 const maxPellets = pkt.pellets.slice(0, 12);
+                const rProjZ = (rp && rp.z !== undefined) ? rp.z : 2.0;
                 for (const pl of maxPellets) {
                     if (!pl || typeof pl.x !== "number" || typeof pl.y !== "number") continue;
+                    const pRng = Math.max(10, Math.min(900, Number(pl.rng) || 320));
                     this.game.projectiles.push({
                         x: pl.x,
                         y: pl.y,
+                        z: rProjZ,
                         vx: Number(pl.vx) || 0,
                         vy: Number(pl.vy) || 0,
                         angle: Math.atan2(pl.vy || 0, pl.vx || 1),
                         damage: Math.max(1, Math.min(180, Number(pl.dmg) || 20)),
-                        rangeLeft: Math.max(10, Math.min(900, Number(pl.rng) || 320)),
+                        rangeLeft: pRng,
+                        maxRange: pRng,
                         isFlame: Boolean(pl.flm),
                         isRocket: Boolean(pl.rck),
                         isTankShell: Boolean(pl.tsh),
@@ -1670,7 +1692,9 @@ class ViceNetworkManager {
         if (pkt.t === "HORN" && this.game) {
             const dist = Math.hypot((pkt.x || 0) - this.game.player.x, (pkt.y || 0) - this.game.player.y);
             if (dist < 600 && this.game.audio) {
-                this.game.audio.playHorn(Boolean(pkt.siren));
+                const hrp = pkt.id ? this.remotePlayers.get(pkt.id) : null;
+                const hSpec = (hrp && hrp.veh && hrp.veh.specKey) || null;
+                this.game.audio.playHorn(Boolean(pkt.siren), hSpec);
             }
             this.game.addFloatingText(pkt.x, pkt.y - 28, pkt.text || "📯 HONK!", pkt.color || "#ffd13b");
             return;
@@ -3083,10 +3107,10 @@ class ViceNetworkManager {
        ======================================================================== */
     checkRemoteVehicleInteractions(dt) {
         const p = this.game.player;
-        if (!p || p.dead) return;
+        if (!p || p.dead || this.game.activeInterior || (p.respawnGraceUntil && performance.now() < p.respawnGraceUntil)) return;
 
         for (const rp of this.remotePlayers.values()) {
-            if (rp.dead || !rp.veh || (rp.veh.seat || 0) > 0) continue;
+            if (rp.dead || rp.isHidden || !rp.veh || (rp.veh.seat || 0) > 0) continue;
             if (p.inVehicle && p.inVehicle.id === rp.veh.id) continue;
             const rSpeed = Math.hypot(rp.vx || 0, rp.vy || 0);
             if (rSpeed < 45) continue;
@@ -3094,8 +3118,15 @@ class ViceNetworkManager {
             if (!p.inVehicle && (p.hitByCarCooldown || 0) <= 0 && (p.jumpTimer || 0) <= 0) {
                 if (Math.hypot(p.x - rp.x, p.y - rp.y) < 24) {
                     p.hitByCarCooldown = 0.85;
-                    p.x += ((rp.vx || 0) / Math.max(1, rSpeed)) * 20;
-                    p.y += ((rp.vy || 0) / Math.max(1, rSpeed)) * 20;
+                    let nx = p.x + ((rp.vx || 0) / Math.max(1, rSpeed)) * 20;
+                    let ny = p.y + ((rp.vy || 0) / Math.max(1, rSpeed)) * 20;
+                    if (this.game.map && typeof this.game.map.resolveCircleBuildingCollision === "function") {
+                        const col = this.game.map.resolveCircleBuildingCollision(nx, ny, 10, p.z || 2.0, false);
+                        nx = col.x;
+                        ny = col.y;
+                    }
+                    p.x = nx;
+                    p.y = ny;
                     const isRemoteScooterOrBike = rp.veh && (rp.veh.specKey === "E_SCOOTER" || rp.veh.specKey === "BMX_BIKE");
                     if (isRemoteScooterOrBike) {
                         p.slideCarTimer = 0.42;

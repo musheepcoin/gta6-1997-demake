@@ -1253,9 +1253,10 @@ class Vehicle {
        ======================================================================== */
     receiveImpactDamage(amount, hitX, hitY, isExplosive = false) {
         if (this.destroyed || amount <= 0) return;
-        if (this.specKey === "BMX_BIKE") {
-            // A pedal bicycle has no engine or fuel tank: normal wall/curb bumps never set it on fire or blow it up!
+        if (this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") {
+            // A pedal bicycle or micro e-scooter has no gasoline fuel tank: normal wall/curb bumps never set it on fire!
             this.burnTimer = 0;
+            this.chainExplodeTimer = 0;
             if (!isExplosive && amount < 38) {
                 this.hp = Math.max(15, this.hp - amount * 0.35);
                 return;
@@ -1317,6 +1318,10 @@ class Vehicle {
     resetDamage() {
         this.hp = this.maxHp;
         this.burnTimer = 0;
+        this.chainExplodeTimer = 0;
+        this.extinguishProgress = 0;
+        this.fireExtinguished = false;
+        this.damagedByPlayer = false;
         this.damageDeltaBits = 0;
         this.frontDented = false;
         this.rearDented = false;
@@ -3142,6 +3147,7 @@ class Vehicle {
             let bestCopDist = 380;
             for (const v of game.vehicles) {
                 if (!v.destroyed && v.isPolice && v.driver === "AI_COP") {
+                    if (Math.abs(v.x - this.x) >= bestCopDist || Math.abs(v.y - this.y) >= bestCopDist) continue;
                     const d = Math.hypot(v.x - this.x, v.y - this.y);
                     if (d < bestCopDist) {
                         bestCopDist = d;
@@ -3151,6 +3157,7 @@ class Vehicle {
             }
             for (const ped of game.peds) {
                 if (!ped.dead && ped.kind === "COP") {
+                    if (Math.abs(ped.x - this.x) >= bestCopDist || Math.abs(ped.y - this.y) >= bestCopDist) continue;
                     const d = Math.hypot(ped.x - this.x, ped.y - this.y);
                     if (d < bestCopDist) {
                         bestCopDist = d;
@@ -3572,6 +3579,20 @@ class Vehicle {
                             burningCar.burnTimer = 0;
                             if (typeof game.addFloatingText === "function") {
                                 game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
+                            }
+                            if (game.net && typeof game.net.broadcastWorldEvent === "function" && burningCar.id) {
+                                game.net.broadcastWorldEvent({
+                                    kind: "VEH_EXIT",
+                                    vehId: burningCar.id,
+                                    specKey: burningCar.specKey || "STALLION",
+                                    x: Math.round(burningCar.x),
+                                    y: Math.round(burningCar.y),
+                                    z: Math.round((burningCar.z || 2.0) * 100) / 100,
+                                    a: Math.round((burningCar.angle || 0) * 1000) / 1000,
+                                    hp: 0,
+                                    flags: 1 | 128,
+                                    remapIdx: burningCar.remapIdx || 0
+                                });
                             }
                         }
                     }
@@ -4188,7 +4209,7 @@ class Vehicle {
 
         // 1997 GTA 1 Delayed Chain-Reaction Explosion (mCarExplosionChainDelayTime)
         if (this.chainExplodeTimer > 0) {
-            if (this.specKey === "BMX_BIKE") {
+            if (this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") {
                 this.chainExplodeTimer = 0;
                 this.burnTimer = 0;
                 game.explodeVehicle(this);
@@ -4223,8 +4244,8 @@ class Vehicle {
             }
         }
 
-        // Pedal bicycles never catch fire, emit engine smoke, or explode!
-        if (this.specKey === "BMX_BIKE") {
+        // Pedal bicycles and e-scooters never catch gasoline engine fire or emit engine smoke!
+        if (this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") {
             this.burnTimer = 0;
             if (this.hp <= 0 && !this.destroyed) {
                 game.explodeVehicle(this);
@@ -4774,7 +4795,15 @@ class Vehicle {
     computeSurfaceMultiplier(map) {
         const currentTile = map.getTileAtPixel(this.x, this.y);
         if ((currentTile === TILE.SAND || currentTile === TILE.SWAMP_MUD) && !this.amphibious && !this.waterOnly) {
-            return 0.72;
+            const isOffroad4x4 = Boolean(
+                this.isTank ||
+                this.specKey === "GATOR_4X4" ||
+                this.specKey === "MONSTER_BUGGY" ||
+                this.specKey === "PICKUP_TRUCK" ||
+                this.specKey === "CAMPER_PICKUP" ||
+                this.specKey === "SWAT_ENFORCER"
+            );
+            return isOffroad4x4 ? 0.92 : 0.72;
         }
         if (map.isWaterAtPixel(this.x, this.y) && !this.amphibious && !this.waterOnly) {
             this.burnTimer = 0; // water extinguishes engine fire
@@ -4788,11 +4817,12 @@ class Vehicle {
 
     /* ========================================================================
        1997 GTA 1 Vehicle::UpdateSteer (Vehicle.cpp:1058-1095)
-       Front wheels steer up to ±30 deg (0.5236 rad) at 270 deg/s (4.712 rad/s)
+       Front wheels steer up to ±30 deg (0.5236 rad) at 270 deg/s (4.712 rad/s),
+       with 1.45x self-centering caster return when steering input is released.
        ======================================================================== */
     updateSteer(dt, steerInput) {
         const maxSteerAngle = 0.5236; // 30 degrees
-        const steerRate = 4.712;      // 270 degrees/sec
+        const steerRate = steerInput === 0 ? 6.83 : 4.712;
         const targetSteerAngle = steerInput * maxSteerAngle;
         if (this.steerAngleRad < targetSteerAngle) {
             this.steerAngleRad = Math.min(targetSteerAngle, this.steerAngleRad + steerRate * dt);
@@ -4816,7 +4846,9 @@ class Vehicle {
         let lateralVel = this.vx * rx + this.vy * ry;
 
         if (throttle !== 0) {
-            forwardVel += throttle * this.accel * dt;
+            const isBrakingAgainstMotion = (forwardVel > 12 && throttle < 0) || (forwardVel < -12 && throttle > 0);
+            const brakeGain = (isBrakingAgainstMotion && !isWaterCraft) ? 1.75 : 1.0;
+            forwardVel += throttle * this.accel * brakeGain * dt;
         } else {
             forwardVel *= Math.pow(isWaterCraft ? 0.42 : 0.22, dt);
         }
